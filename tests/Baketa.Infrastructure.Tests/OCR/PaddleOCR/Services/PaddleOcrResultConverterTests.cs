@@ -88,27 +88,8 @@ public class PaddleOcrResultConverterTests : IDisposable
 
     #region ConvertDetectionOnlyResult テスト
 
-    [Fact]
-    public void ConvertDetectionOnlyResult_EmptyResults_ReturnsEmptyList()
-    {
-        // Arrange
-        var emptyResults = Array.Empty<PaddleOcrResult>();
-
-        // Act
-        var textRegions = _resultConverter.ConvertDetectionOnlyResult(emptyResults);
-
-        // Assert
-        Assert.NotNull(textRegions);
-        Assert.Empty(textRegions);
-    }
-
-    [Fact]
-    public void ConvertDetectionOnlyResult_NullResults_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
-            _resultConverter.ConvertDetectionOnlyResult(null!));
-    }
+    // 🔥 [HYBRID_MODE_DELETION] Step 6.1: ConvertDetectionOnlyResult()削除に伴うテスト削除
+    // 検出専用モード機能が廃止されたため、対応するテストも削除
 
     #endregion
 

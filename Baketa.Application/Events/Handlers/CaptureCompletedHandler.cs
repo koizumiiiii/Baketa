@@ -452,40 +452,43 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             _logger?.LogInformation("🎯 [UltraThink] 翻訳完了条件チェック - LastStage: {LastStage}, TranslationSuccess: {Success}",
                 result.LastCompletedStage, result.TranslationResult?.Success ?? false);
 
-            if (result.LastCompletedStage >= ProcessingStageType.TranslationExecution && result.TranslationResult?.Success == true)
-            {
-                // 統一言語設定サービスから言語ペア取得
-                var languagePair = _languageConfig.GetCurrentLanguagePair();
-
-                var translationEvent = new TranslationCompletedEvent(
-                    sourceText: result.OcrResult?.DetectedText ?? "",
-                    translatedText: result.TranslationResult.TranslatedText,
-                    sourceLanguage: languagePair.Source.DisplayName,
-                    targetLanguage: languagePair.Target.DisplayName,
-                    processingTime: result.TranslationResult.ProcessingTime,
-                    engineName: result.TranslationResult.EngineUsed);
-                await _eventAggregator.PublishAsync(translationEvent).ConfigureAwait(false);
-                
-                _logger?.LogDebug("TranslationCompletedEvent発行 - 翻訳テキスト長: {TextLength}", result.TranslationResult.TranslatedText.Length);
-
-                // 🎯 UltraThink修正: UI表示用のTranslationWithBoundsCompletedEventも発行
-                var boundsEvent = new Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent(
-                    sourceText: result.OcrResult?.DetectedText ?? "",
-                    translatedText: result.TranslationResult.TranslatedText,
-                    sourceLanguage: languagePair.Source.DisplayName,
-                    targetLanguage: languagePair.Target.DisplayName,
-                    bounds: eventData.CaptureRegion, // キャプチャ領域を座標情報として使用
-                    confidence: 0.95f, // デフォルト信頼度（実装時にOCR信頼度から設定）
-                    engineName: result.TranslationResult.EngineUsed);
-
-                await _eventAggregator.PublishAsync(boundsEvent).ConfigureAwait(false);
-                
-                _logger?.LogInformation("🎯 [UltraThink] TranslationWithBoundsCompletedEvent発行完了 - ID: {EventId}, Bounds: ({X},{Y},{Width},{Height})", 
-                    boundsEvent.Id, eventData.CaptureRegion.X, eventData.CaptureRegion.Y, 
-                    eventData.CaptureRegion.Width, eventData.CaptureRegion.Height);
-                Console.WriteLine($"🎯 [UltraThink] TranslationWithBoundsCompletedEvent発行 - ID: {boundsEvent.Id}");
-                Console.WriteLine($"🎯 [UltraThink] 座標情報: ({eventData.CaptureRegion.X},{eventData.CaptureRegion.Y}) サイズ: {eventData.CaptureRegion.Width}x{eventData.CaptureRegion.Height}");
-            }
+            // 翻訳完了時イベント - 🎯 [DUPLICATE_TRANSLATION_FIX]
+            // 新アーキテクチャ(AggregatedChunksReadyEventHandler)が直接オーバーレイ表示を行うため、
+            // この古いイベント発行パスは二重翻訳の原因となるため無効化する。
+            // if (result.LastCompletedStage >= ProcessingStageType.TranslationExecution && result.TranslationResult?.Success == true)
+            // {
+            //     // 統一言語設定サービスから言語ペア取得
+            //     var languagePair = _languageConfig.GetCurrentLanguagePair();
+            //
+            //     var translationEvent = new TranslationCompletedEvent(
+            //         sourceText: result.OcrResult?.DetectedText ?? "",
+            //         translatedText: result.TranslationResult.TranslatedText,
+            //         sourceLanguage: languagePair.Source.DisplayName,
+            //         targetLanguage: languagePair.Target.DisplayName,
+            //         processingTime: result.TranslationResult.ProcessingTime,
+            //         engineName: result.TranslationResult.EngineUsed);
+            //     await _eventAggregator.PublishAsync(translationEvent).ConfigureAwait(false);
+            //     
+            //     _logger?.LogDebug("TranslationCompletedEvent発行 - 翻訳テキスト長: {TextLength}", result.TranslationResult.TranslatedText.Length);
+            //
+            //     // 🎯 UltraThink修正: UI表示用のTranslationWithBoundsCompletedEventも発行
+            //     var boundsEvent = new Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent(
+            //         sourceText: result.OcrResult?.DetectedText ?? "",
+            //         translatedText: result.TranslationResult.TranslatedText,
+            //         sourceLanguage: languagePair.Source.DisplayName,
+            //         targetLanguage: languagePair.Target.DisplayName,
+            //         bounds: eventData.CaptureRegion, // キャプチャ領域を座標情報として使用
+            //         confidence: 0.95f, // デフォルト信頼度（実装時にOCR信頼度から設定）
+            //         engineName: result.TranslationResult.EngineUsed);
+            //
+            //     await _eventAggregator.PublishAsync(boundsEvent).ConfigureAwait(false);
+            //     
+            //     _logger?.LogInformation("🎯 [UltraThink] TranslationWithBoundsCompletedEvent発行完了 - ID: {EventId}, Bounds: ({X},{Y},{Width},{Height})", 
+            //         boundsEvent.Id, eventData.CaptureRegion.X, eventData.CaptureRegion.Y, 
+            //         eventData.CaptureRegion.Width, eventData.CaptureRegion.Height);
+            //     Console.WriteLine($"🎯 [UltraThink] TranslationWithBoundsCompletedEvent発行 - ID: {boundsEvent.Id}");
+            //     Console.WriteLine($"🎯 [UltraThink] 座標情報: ({eventData.CaptureRegion.X},{eventData.CaptureRegion.Y}) サイズ: {eventData.CaptureRegion.Width}x{eventData.CaptureRegion.Height}");
+            // }
 
             // パフォーマンスメトリクス通知（デバッグ情報）
             if (result.Metrics.EarlyTerminated)

@@ -235,17 +235,10 @@ public sealed class PaddleOcrModule : IServiceModule
                 HighQualityTimeoutMs = highQualityTimeoutMs
             };
         });
-        
-        // ハイブリッドPaddleOCRサービス
-        services.AddSingleton<HybridPaddleOcrService>(serviceProvider =>
-        {
-            var logger = serviceProvider.GetService<ILogger<HybridPaddleOcrService>>() ?? 
-                        Microsoft.Extensions.Logging.Abstractions.NullLogger<HybridPaddleOcrService>.Instance;
-            var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-            var hybridSettings = serviceProvider.GetRequiredService<HybridOcrSettings>();
-            return new HybridPaddleOcrService(logger, eventAggregator, hybridSettings);
-        });
-        
+
+        // 🔥 [HYBRID_MODE_DELETION] Step 7: HybridPaddleOcrService DI登録削除
+        // HybridPaddleOcrService.cs削除に伴い、DI登録も削除
+
         // Phase 1ベンチマークランナー
         services.AddSingleton<Phase1BenchmarkRunner>(serviceProvider =>
         {

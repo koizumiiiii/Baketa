@@ -158,7 +158,7 @@ public sealed class CachedOcrEngine : IOcrEngine
                 // 🔄 [FALLBACK_COMPATIBILITY] 従来のIWindowsImage対応維持
                 using var memoryStream = new MemoryStream();
                 using var bitmap = windowsImage.GetBitmap();
-                
+
                 if (regionOfInterest.HasValue)
                 {
                     var roi = regionOfInterest.Value;
@@ -171,13 +171,36 @@ public sealed class CachedOcrEngine : IOcrEngine
                 {
                     bitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
                 }
-                
+
                 imageData = memoryStream.ToArray();
+            }
+            else if (image.GetType().Name == "WindowsImageToIImageAdapter")
+            {
+                // 🔥 [ADAPTER_FIX] WindowsImageToIImageAdapter対応
+                // FullScreenOcrCaptureStrategy内のアダプタークラスをサポート
+                // IImageインターフェース経由でToByteArrayAsync()を使用
+                imageData = await image.ToByteArrayAsync().ConfigureAwait(false);
+
+                // ROI指定時は切り取り処理を適用
+                if (regionOfInterest.HasValue)
+                {
+                    using var memoryStream = new MemoryStream(imageData);
+                    using var bitmap = new Bitmap(memoryStream);
+
+                    var roi = regionOfInterest.Value;
+                    using var croppedBitmap = new Bitmap(roi.Width, roi.Height);
+                    using var graphics = Graphics.FromImage(croppedBitmap);
+                    graphics.DrawImage(bitmap, 0, 0, roi, GraphicsUnit.Pixel);
+
+                    using var outputStream = new MemoryStream();
+                    croppedBitmap.Save(outputStream, System.Drawing.Imaging.ImageFormat.Png);
+                    imageData = outputStream.ToArray();
+                }
             }
             else
             {
-                // エラーメッセージ改善 - ReferencedSafeImage対応を明記
-                throw new NotSupportedException($"IImage type {image.GetType().Name} is not supported for caching. Supported types: ReferencedSafeImage, IAdvancedImage, IWindowsImage");
+                // エラーメッセージ改善 - WindowsImageToIImageAdapter対応を明記
+                throw new NotSupportedException($"IImage type {image.GetType().Name} is not supported for caching. Supported types: ReferencedSafeImage, IAdvancedImage, IWindowsImage, WindowsImageToIImageAdapter");
             }
             
             var imageHash = _cacheService.GenerateImageHash(imageData);
@@ -185,24 +208,6 @@ public sealed class CachedOcrEngine : IOcrEngine
 
             _logger.LogDebug("🔍 [Req:{RequestId}] 画像ハッシュ生成: {Hash} - 時間: {ElapsedMs}ms, サイズ: {Size}bytes",
                 requestId, imageHash[..12], hashStopwatch.ElapsedMilliseconds, imageData.Length);
-
-            // 🔥 [ROI_COORDINATE_FIX] ROI指定時はキャッシュをスキップ
-            // 問題: ベースエンジンが返す絶対座標をキャッシュすると、後続処理で相対座標として誤認される
-            // 解決策: ROI指定時はキャッシュを使わず、常にベースエンジンを直接呼び出す
-            // Gemini推奨の恒久的修正（座標変換）は今後の改善として保留
-            if (regionOfInterest.HasValue)
-            {
-                _logger.LogDebug("🔧 [ROI_FIX] ROI指定検出 - キャッシュスキップして直接OCR実行 (座標ズレ防止)");
-                var ocrStopwatchDirect = Stopwatch.StartNew();
-                var ocrResultDirect = await _baseEngine.RecognizeAsync(image, regionOfInterest, progressCallback, cancellationToken).ConfigureAwait(false);
-                ocrStopwatchDirect.Stop();
-
-                totalStopwatch.Stop();
-                _logger.LogInformation("✅ [ROI_FIX] ROI直接OCR完了 - 総時間: {TotalMs}ms (OCR: {OcrMs}ms), 認識数: {TextCount}",
-                    totalStopwatch.ElapsedMilliseconds, ocrStopwatchDirect.ElapsedMilliseconds, ocrResultDirect.TextRegions.Count);
-
-                return ocrResultDirect;
-            }
 
             // 🎯 Step 2: キャッシュチェック
             var cacheStopwatch = Stopwatch.StartNew();
@@ -233,16 +238,27 @@ public sealed class CachedOcrEngine : IOcrEngine
             var ocrStopwatch = Stopwatch.StartNew();
             var ocrResult = await _baseEngine.RecognizeAsync(image, regionOfInterest, progressCallback, cancellationToken).ConfigureAwait(false);
             ocrStopwatch.Stop();
-            
-            // 🎯 Step 4: 結果をキャッシュに保存
-            var saveCacheStopwatch = Stopwatch.StartNew();
-            _cacheService.CacheResult(imageHash, ocrResult);
-            saveCacheStopwatch.Stop();
+
+            // 🎯 Step 4: 結果をキャッシュに保存 (品質チェック付き)
+            const double confidenceThreshold = 0.85;
+            var isHighConfidence = ocrResult.TextRegions.All(r => r.Confidence >= confidenceThreshold);
+
+            if (isHighConfidence && ocrResult.TextRegions.Any())
+            {
+                var saveCacheStopwatch = Stopwatch.StartNew();
+                _cacheService.CacheResult(imageHash, ocrResult);
+                saveCacheStopwatch.Stop();
+                _logger.LogInformation("💾 [Req:{RequestId}] 高信頼度結果をキャッシュに保存 - 保存時間: {SaveMs}ms", requestId, saveCacheStopwatch.ElapsedMilliseconds);
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ [Req:{RequestId}] 低信頼度のためキャッシュをスキップ - 信頼度 < {Threshold} の領域あり", requestId, confidenceThreshold);
+            }
             
             totalStopwatch.Stop();
             
-            _logger.LogInformation("💾 [Req:{RequestId}] OCR処理+キャッシュ保存完了 - 総時間: {TotalMs}ms (ハッシュ: {HashMs}ms, OCR: {OcrMs}ms, 保存: {SaveMs}ms), 認識数: {TextCount}", 
-                requestId, totalStopwatch.ElapsedMilliseconds, hashStopwatch.ElapsedMilliseconds, ocrStopwatch.ElapsedMilliseconds, saveCacheStopwatch.ElapsedMilliseconds, ocrResult.TextRegions.Count);
+            _logger.LogInformation("✅ [Req:{RequestId}] OCR処理完了 - 総時間: {TotalMs}ms (ハッシュ: {HashMs}ms, OCR: {OcrMs}ms), 認識数: {TextCount}", 
+                requestId, totalStopwatch.ElapsedMilliseconds, hashStopwatch.ElapsedMilliseconds, ocrStopwatch.ElapsedMilliseconds, ocrResult.TextRegions.Count);
             
             return ocrResult;
         }

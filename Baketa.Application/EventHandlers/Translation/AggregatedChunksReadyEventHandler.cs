@@ -358,37 +358,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     /// <returns>正規化後のTextChunk（画像絶対座標）</returns>
     private TextChunk NormalizeChunkCoordinates(TextChunk chunk)
     {
-        // CaptureRegionがnull = フルスクリーンキャプチャ → 変換不要
-        if (!chunk.CaptureRegion.HasValue)
-        {
-            _logger.LogInformation("🔍 [FIX6_NORMALIZE] フルスクリーンキャプチャ - 座標変換不要 - ChunkId: {ChunkId}",
-                chunk.ChunkId);
-            return chunk;
-        }
-
-        // ROI相対座標 → 画像絶対座標変換
-        // CombinedBounds.Offset()メソッドでCaptureRegion.Locationを加算
-        var absoluteBounds = chunk.CombinedBounds;
-        absoluteBounds.Offset(chunk.CaptureRegion.Value.Location);
-
-        _logger.LogInformation("🔧 [FIX6_NORMALIZE] ROI相対座標変換 - ChunkId: {ChunkId}, ROI相対: ({RX},{RY}) + Offset({OX},{OY}) = 画像絶対: ({AX},{AY})",
-            chunk.ChunkId,
-            chunk.CombinedBounds.X, chunk.CombinedBounds.Y,
-            chunk.CaptureRegion.Value.X, chunk.CaptureRegion.Value.Y,
-            absoluteBounds.X, absoluteBounds.Y);
-
-        // 正規化後の新しいTextChunkインスタンスを生成（classのためwith式不可）
-        return new TextChunk
-        {
-            ChunkId = chunk.ChunkId,
-            TextResults = chunk.TextResults,
-            CombinedBounds = absoluteBounds,  // 🔥 画像絶対座標（正規化済み）
-            CombinedText = chunk.CombinedText,
-            TranslatedText = chunk.TranslatedText,
-            SourceWindowHandle = chunk.SourceWindowHandle,
-            DetectedLanguage = chunk.DetectedLanguage,
-            CaptureRegion = chunk.CaptureRegion  // コンテキスト情報を保持
-        };
+        // 座標は前段のPaddleOcrResultConverterで既に絶対座標に変換済みのため、ここでは何もしない。
+        _logger.LogInformation("ℹ️ [COORD_FIX] 座標正規化は不要です。座標は既に絶対値のはずです: ({X},{Y})",
+            chunk.CombinedBounds.X, chunk.CombinedBounds.Y);
+        return chunk;
     }
 
     /// <summary>

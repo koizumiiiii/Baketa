@@ -190,35 +190,37 @@ public sealed class EventHandlerInitializationService(
                 Console.WriteLine($"🔥 [ERROR] BatchTranslationRequestHandlerの登録失敗: {ex.Message}");
             }
 
-            // 🔄 [FIX] TranslationCompletedHandler登録 - TranslationCompletedEvent中継処理
-            try
-            {
-                var translationCompletedHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>();
-                eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>(translationCompletedHandler);
-                _logger.LogInformation("TranslationCompletedHandlerを登録しました - 翻訳完了イベント中継修復");
-                Console.WriteLine("🔄 [FIX] TranslationCompletedHandlerを登録しました - 翻訳完了イベント中継修復");
-                
-                // 確実なファイル記録
-                try
-                {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [FIX] TranslationCompletedHandler登録 - 翻訳完了イベント中継修復{Environment.NewLine}");
-                }
-                catch { /* ファイル出力失敗は無視 */ }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "TranslationCompletedHandlerの登録に失敗しました");
-                Console.WriteLine($"🔥 [ERROR] TranslationCompletedHandlerの登録失敗: {ex.Message}");
-                
-                // 確実なファイル記録
-                try
-                {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
-                        $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] TranslationCompletedHandler登録失敗: {ex.Message}{Environment.NewLine}");
-                }
-                catch { /* ファイル出力失敗は無視 */ }
-            }
+            // 🔄 [DUPLICATE_TRANSLATION_FIX] TranslationCompletedHandler登録を無効化
+            // このハンドラは、新しいアーキテクチャの完了イベントを古いUI表示イベントに変換する
+            // ブリッジとして機能しており、二重翻訳の根本原因となっていたため登録を停止する。
+            // try
+            // {
+            //     var translationCompletedHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>();
+            //     eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>(translationCompletedHandler);
+            //     _logger.LogInformation("TranslationCompletedHandlerを登録しました - 翻訳完了イベント中継修復");
+            //     Console.WriteLine("🔄 [FIX] TranslationCompletedHandlerを登録しました - 翻訳完了イベント中継修復");
+            //     
+            //     // 確実なファイル記録
+            //     try
+            //     {
+            //         System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+            //             $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [FIX] TranslationCompletedHandler登録 - 翻訳完了イベント中継修復{Environment.NewLine}");
+            //     }
+            //     catch { /* ファイル出力失敗は無視 */ }
+            // }
+            // catch (Exception ex)
+            // {
+            //     _logger.LogError(ex, "TranslationCompletedHandlerの登録に失敗しました");
+            //     Console.WriteLine($"🔥 [ERROR] TranslationCompletedHandlerの登録失敗: {ex.Message}");
+            //     
+            //     // 確実なファイル記録
+            //     try
+            //     {
+            //         System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+            //             $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] TranslationCompletedHandler登録失敗: {ex.Message}{Environment.NewLine}");
+            //     }
+            //     catch { /* ファイル出力失敗は無視 */ }
+            // }
 
             // 🔄 [FIX] TranslationWithBoundsCompletedHandler復活 - 翻訳結果をTextChunkに反映するため必須
             try

@@ -1,7 +1,6 @@
 ﻿using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.Results; // 🔧 [TRANSLATION_FIX] PositionedTextResult用
-using Baketa.Core.Abstractions.Capture; // 🎯 UltraThink: ITextRegionDetector用
 using Baketa.Core.Abstractions.Platform.Windows; // 🎯 UltraThink: IWindowsImage用
 using Baketa.Core.Abstractions.Memory; // 🎯 UltraThink Phase 75: SafeImage統合
 using Baketa.Core.Abstractions.Factories; // 🎯 UltraThink Phase 76: IImageFactory for SafeImage→IImage変換
@@ -33,7 +32,6 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 {
     private readonly ILogger<OcrExecutionStageStrategy> _logger;
     private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
-    private readonly ITextRegionDetector _textRegionDetector; // 🔥 [PHASE13.2.31I_FIX] nullable削除 - 必須依存として明示（フィールド宣言とコンストラクタの一致）
     private readonly IImageLifecycleManager _imageLifecycleManager; // 🎯 UltraThink Phase 75: 安全な画像管理
     private readonly IImageFactoryInterface _imageFactory; // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
     private readonly ITextChunkAggregatorService? _textChunkAggregator; // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
@@ -51,25 +49,15 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
         IImageLifecycleManager imageLifecycleManager, // 🎯 UltraThink Phase 75: 必須依存関係として追加
         IImageFactoryInterface imageFactory, // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
-        ITextRegionDetector textRegionDetector, // 🔥 [PHASE13.2.31H_FIX] 必須依存に変更（デフォルト値削除） - Gemini推奨⭐5/5
         ICoordinateTransformationService coordinateTransformationService, // 🔥 [COORDINATE_FIX] ROI→スクリーン座標変換サービス注入
         ITextChunkAggregatorService? textChunkAggregator = null) // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        // 🔥 [PHASE13.2.31I_DIAG] コンストラクタ診断ログ（Logger使用 - Console.WriteLineはGUIアプリで記録されない）
-        _logger.LogInformation("🔥🔥🔥 [PHASE13.2.31I] OcrExecutionStageStrategy コンストラクタ呼び出し - textRegionDetector: {TextRegionDetectorStatus}",
-            textRegionDetector != null ? "NOT NULL" : "NULL");
-
         _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
         _imageLifecycleManager = imageLifecycleManager ?? throw new ArgumentNullException(nameof(imageLifecycleManager));
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
-        _textRegionDetector = textRegionDetector ?? throw new ArgumentNullException(nameof(textRegionDetector)); // 🔥 [PHASE13.2.31H_FIX] 必須依存として明示
         _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService)); // 🔥 [COORDINATE_FIX]
         _textChunkAggregator = textChunkAggregator; // null許容（翻訳無効時対応）
-
-        _logger.LogInformation("✅ [PHASE13.2.31I] OcrExecutionStageStrategy 初期化完了 - _textRegionDetector: {FieldStatus}",
-            _textRegionDetector != null ? "NOT NULL" : "NULL");
     }
 
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken = default)
@@ -187,73 +175,8 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
             }
 
-            // 🔥 [PHASE5] ROI特別処理削除 - FullScreenOcr方式に統一、常にテキスト領域検出を実行
-            IList<Rectangle>? detectedRegions = null;
+            // ✅ [PHASE5_COMPLETE] ROI検出と2回目OCRループを完全削除 - シンプルな1回OCR実行のみ
 
-            if (_textRegionDetector != null)
-            {
-                // 通常の全画面キャプチャ: 標準の領域検出を実行
-                try
-                {
-                    _logger.LogDebug("🎯 UltraThink: ROI検出開始 - テキスト領域を事前検出");
-
-                    // 🎯 UltraThink Phase 77.6: IImage → IWindowsImage アダプター変換でROI検出器動作
-                    IWindowsImage windowsImage;
-                    bool needsDisposal = false;
-
-                    if (ocrImage is IWindowsImage directWindowsImage)
-                    {
-                        // 既に IWindowsImage の場合は直接使用
-                        windowsImage = directWindowsImage;
-                        _logger.LogDebug("🎯 [PHASE77.6] 既存 IWindowsImage を直接使用");
-                    }
-                    else
-                    {
-                        // IImage → IWindowsImage インライン アダプター変換
-                        _logger.LogDebug("🎯 [PHASE77.6] IImage → IWindowsImage インラインアダプター変換開始 - Type: {ImageType}", ocrImage.GetType().Name);
-
-                        windowsImage = new InlineImageToWindowsImageAdapter(ocrImage, _logger);
-                        needsDisposal = true; // アダプターは後でDispose必要
-
-                        _logger.LogInformation("✅ [PHASE77.6] IWindowsImageインラインアダプター作成完了 - Size: {Width}x{Height}", windowsImage.Width, windowsImage.Height);
-                    }
-
-                    try
-                    {
-                        // 🔥 [OPTION_D_POC] パフォーマンス測定開始
-                        var pocStopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-                        // TextRegionDetectorAdapter による高精度 ROI 検出実行
-                        detectedRegions = await _textRegionDetector.DetectTextRegionsAsync(windowsImage).ConfigureAwait(false);
-
-                        // 🔥 [OPTION_D_POC] パフォーマンス測定終了
-                        pocStopwatch.Stop();
-                        _logger.LogWarning("🔥 [OPTION_D_POC] DetectTextRegionsAsync実行時間: {ElapsedMs}ms (画像サイズ: {Width}x{Height})",
-                            pocStopwatch.ElapsedMilliseconds, windowsImage.Width, windowsImage.Height);
-
-                        _logger.LogInformation("🎯 UltraThink: ROI検出完了 - 検出領域数: {RegionCount}", detectedRegions.Count);
-                    }
-                    finally
-                    {
-                        // アダプターが作成された場合のリソース解放
-                        if (needsDisposal && windowsImage is IDisposable disposableAdapter)
-                        {
-                            disposableAdapter.Dispose();
-                            _logger.LogDebug("🎯 [PHASE77.6] InlineImageToWindowsImageAdapter リソース解放完了");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "🎯 UltraThink: ROI検出でエラー - 全画面OCRにフォールバック");
-                    detectedRegions = null; // フォールバック処理へ
-                }
-            }
-            else
-            {
-                _logger.LogDebug("🎯 UltraThink: ITextRegionDetectorが未注入 - 全画面OCR実行");
-            }
-            
             // 実際のOCRサービス統合
             string detectedText;
             List<object> textChunks = [];
@@ -295,129 +218,26 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                     _logger.LogError(ex, error);
                     return ProcessingStageResult.CreateError(StageType, $"{error}: {ex.Message}", stopwatch.Elapsed);
                 }
-                
-                // 🎯 UltraThink Phase 50.2: ROI検出結果に基づくOCR実行戦略
-                if (detectedRegions?.Count > 0)
-                {
-                    _logger.LogInformation("🎯 UltraThink: {RegionCount}個の検出領域でROI指定OCR実行", detectedRegions.Count);
 
-                    // 🔥 [FIX7_DEBUG] ROI特化OCRパス実行時のcontext.Input.CaptureRegion値を診断
-                    _logger.LogInformation("🔥 [FIX7_DEBUG] ROI特化OCRパス - context.Input.CaptureRegion: HasValue={HasValue}, Value={CaptureRegion}",
-                        context.Input.CaptureRegion != Rectangle.Empty,
-                        context.Input.CaptureRegion != Rectangle.Empty ?
-                            $"({context.Input.CaptureRegion.X},{context.Input.CaptureRegion.Y},{context.Input.CaptureRegion.Width}x{context.Input.CaptureRegion.Height})" :
-                            "Empty");
+                // ✅ [PHASE5_COMPLETE] シンプルな全画面OCR実行のみ
+                _logger.LogInformation("🎯 [PHASE5_COMPLETE] 全画面OCR実行開始 - サイズ: {Width}x{Height}",
+                    ocrImage.Width, ocrImage.Height);
 
-                    var allTextResults = new List<string>();
-                    var allTextChunks = new List<object>();
-                    
-                    // 各検出領域に対してOCR実行
-                    foreach (var region in detectedRegions)
-                    {
-                        try
-                        {
-                            _logger.LogDebug("🎯 UltraThink: 領域指定OCR実行 - ({X},{Y},{Width},{Height})",
-                                region.X, region.Y, region.Width, region.Height);
+                // 🎯 [OPTION_B_PHASE2] OcrContext使用（CaptureRegion=null）
+                var ocrContext = new OcrContext(
+                    ocrImage,
+                    context.Input.SourceWindowHandle,
+                    null, // 全体画像処理
+                    cancellationToken);
 
-                            // 🎯 [OCR_DEBUG_LOG] ROI領域情報をデバッグログに出力
-                            _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR開始 - 座標=({region.X},{region.Y}), サイズ=({region.Width}x{region.Height})");
+                ocrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
 
-                            // 🎯 [OPTION_B_PHASE2] OcrContext使用でROI座標変換を一元化
-                            var ocrContext = new OcrContext(
-                                ocrImage,
-                                context.Input.SourceWindowHandle,
-                                region, // ROI領域
-                                cancellationToken);
+                // OCR結果から文字列とチャンクを取得
+                detectedText = string.Join(" ", ocrResults.TextRegions.Select(r => r.Text));
+                textChunks = ocrResults.TextRegions.Cast<object>().ToList();
 
-                            var regionOcrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
-
-                            if (regionOcrResults?.TextRegions?.Count > 0)
-                            {
-                                // ✅ [GEMINI_FIX] FIX7_OPTION_C_ROI座標変換削除
-                                // 理由: PHASE2.5_ROI_COORD_FIXで統一的に座標変換を実行するため、ここでの早期変換は不要
-                                //       二重加算問題（ROI相対 → FIX7で加算 → PHASE2.5で再加算）を完全に解消
-                                // 設計: Single Responsibility Principle準拠、座標変換責務をTextChunk生成直前に集約
-
-                                var regionText = string.Join(" ", regionOcrResults.TextRegions.Select(r => r.Text));
-                                if (!string.IsNullOrWhiteSpace(regionText))
-                                {
-                                    allTextResults.Add(regionText);
-                                    allTextChunks.AddRange(regionOcrResults.TextRegions.Cast<object>());
-
-                                    // 🎯 [OCR_DEBUG_LOG] 領域OCR結果をデバッグログに出力
-                                    _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR成功 - テキスト='{regionText}', チャンク数={regionOcrResults.TextRegions.Count}");
-                                }
-                                else
-                                {
-                                    _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR結果 - 空文字列");
-                                }
-                            }
-                            else
-                            {
-                                _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCR結果 - テキスト領域なし");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "🎯 UltraThink: 領域({X},{Y},{Width},{Height})のOCR処理でエラー - スキップ",
-                                region.X, region.Y, region.Width, region.Height);
-                            _logger?.LogDebug($"🔍 [ROI_OCR] 領域OCRエラー - 座標=({region.X},{region.Y}), エラー={ex.Message}");
-                        }
-                    }
-                    
-                    // 結果統合
-                    detectedText = string.Join(" ", allTextResults);
-                    textChunks = allTextChunks;
-                    
-                    _logger.LogInformation("🎯 UltraThink: ROI指定OCR完了 - 総テキスト長: {TextLength}", detectedText.Length);
-                }
-                else
-                {
-                    // 🎯 UltraThink Phase 50.3: フォールバック - 従来の全画面OCR実行
-                    _logger.LogDebug("🎯 UltraThink: ROI検出結果なし - 全画面OCR実行");
-                    
-                    if (context.Input.CaptureRegion != Rectangle.Empty)
-                    {
-                        // 特定領域でのOCR処理
-                        _logger.LogDebug("🔧 [PHASE3.2_FIX] 領域指定OCR実行 - ({X},{Y},{Width},{Height})",
-                            context.Input.CaptureRegion.X, context.Input.CaptureRegion.Y,
-                            context.Input.CaptureRegion.Width, context.Input.CaptureRegion.Height);
-
-                        // 🎯 [OCR_DEBUG_LOG] 領域指定OCR実行をデバッグログに出力
-                        _logger?.LogDebug($"🔍 [REGION_OCR] 領域指定OCR開始 - 座標=({context.Input.CaptureRegion.X},{context.Input.CaptureRegion.Y}), サイズ=({context.Input.CaptureRegion.Width}x{context.Input.CaptureRegion.Height})");
-
-                        // 🎯 [OPTION_B_PHASE2] OcrContext使用でCaptureRegion座標変換を一元化
-                        var ocrContext = new OcrContext(
-                            ocrImage,
-                            context.Input.SourceWindowHandle,
-                            context.Input.CaptureRegion,
-                            cancellationToken);
-
-                        ocrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        // 全体画像でのOCR処理
-                        _logger.LogDebug("🔧 [PHASE3.2_FIX] 全体画像OCR実行 - {Width}x{Height}",
-                            ocrImage.Width, ocrImage.Height);
-
-                        // 🎯 [OCR_DEBUG_LOG] 全体画像OCR実行をデバッグログに出力
-                        _logger?.LogDebug($"🔍 [FULL_OCR] 全体画像OCR開始 - サイズ=({ocrImage.Width}x{ocrImage.Height})");
-
-                        // 🎯 [OPTION_B_PHASE2] OcrContext使用（CaptureRegion=null）
-                        var ocrContext = new OcrContext(
-                            ocrImage,
-                            context.Input.SourceWindowHandle,
-                            null, // 全体画像処理
-                            cancellationToken);
-
-                        ocrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
-                    }
-                    
-                    // OCR結果から文字列とチャンクを取得
-                    detectedText = string.Join(" ", ocrResults.TextRegions.Select(r => r.Text));
-                    textChunks = ocrResults.TextRegions.Cast<object>().ToList();
-                }
+                _logger.LogInformation("✅ [PHASE5_COMPLETE] 全画面OCR完了 - テキスト長: {TextLength}文字, 領域数: {RegionCount}個",
+                    detectedText.Length, textChunks.Count);
             }
             catch (ObjectDisposedException ex)
             {
@@ -511,128 +331,6 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             catch (Exception imageEx)
             {
                 _logger.LogWarning(imageEx, "🎯 [ROI_IMAGE_SAVE] ROI画像保存でエラー");
-            }
-
-            // 🔧 [TRANSLATION_FIX] OCR結果をTextChunkに変換して翻訳パイプラインに送信
-            if (_textChunkAggregator != null && textChunks.Count > 0 && !string.IsNullOrEmpty(detectedText))
-            {
-                try
-                {
-                    // 🔥 [FIX7_CRITICAL_FIX] OcrTextRegionをPositionedTextResultに変換
-                    // 問題: OfType<TextRegion>() が空を返す → positionedResults.Count == 0 → 座標変換スキップ
-                    // 修正: OfType<OcrTextRegion>() に変更 → 座標変換コード（Line 534-650）が正常実行
-                    var positionedResults = textChunks
-                        .OfType<Baketa.Core.Abstractions.OCR.OcrTextRegion>()
-                        .Select(region => new PositionedTextResult
-                        {
-                            Text = region.Text,
-                            BoundingBox = region.Bounds,
-                            Confidence = (float)region.Confidence,
-                            ChunkId = _nextChunkId,
-                            ProcessingTime = stopwatch.Elapsed,
-                            DetectedLanguage = null // OCR結果には言語情報がない場合がある
-                        })
-                        .ToList();
-
-                    if (positionedResults.Count > 0)
-                    {
-                        // 🔥 [OPTION_A_FIX] 個別TextChunk生成 - メニュー項目を個別オーバーレイ表示
-                        // 問題: 全OcrTextRegionを1つのTextChunkに統合 → 巨大オーバーレイ（H:2519px）
-                        // 修正: 各OcrTextRegionごとに個別TextChunkを作成 → 個別オーバーレイ表示
-                        // ProximityGroupingは後段で実行（セリフ行のグルーピング用）
-
-                        // 🔥 [FIX7_OPTION_C] CaptureRegion情報取得（全TextChunk共通）
-                        Rectangle? captureRegionForTransform = null;
-
-                        if (context.Input.CapturedImage is IAdvancedImage advancedImage &&
-                            advancedImage.CaptureRegion.HasValue)
-                        {
-                            captureRegionForTransform = advancedImage.CaptureRegion.Value;
-                            _logger.LogDebug("🔥 [FIX7_OPTION_C] IAdvancedImage.CaptureRegion使用: ({X},{Y})",
-                                captureRegionForTransform.Value.X, captureRegionForTransform.Value.Y);
-                        }
-                        else if (context.Input.CaptureRegion != Rectangle.Empty)
-                        {
-                            // フォールバック: ProcessingPipelineInput.CaptureRegionを使用
-                            captureRegionForTransform = context.Input.CaptureRegion;
-                            _logger.LogInformation("🔥 [FIX7_OPTION_C] Input.CaptureRegionフォールバック使用: ({X},{Y})",
-                                captureRegionForTransform.Value.X, captureRegionForTransform.Value.Y);
-                        }
-
-                        // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出（セッション初回のみ実行）
-                        if (!context.Metadata.TryGetValue(METADATA_KEY_BORDERLESS, out var borderlessObj))
-                        {
-                            var windowHandle = context.Input.SourceWindowHandle;
-                            var isBorderless = _coordinateTransformationService.DetectBorderlessOrFullscreen(windowHandle);
-
-                            context.Metadata.TryAdd(METADATA_KEY_BORDERLESS, isBorderless);
-
-                            _logger.LogInformation(
-                                "🔥 [PHASE2.1] ウィンドウモード検出完了 - Handle={Handle}, Borderless/Fullscreen={IsBorderless}",
-                                windowHandle, isBorderless);
-                        }
-
-                        // CaptureRegion情報（コンテキスト保持用）
-                        Rectangle? captureRegionInfo = null;
-                        if (context.Input.CapturedImage is IAdvancedImage advImg && advImg.CaptureRegion.HasValue)
-                        {
-                            captureRegionInfo = advImg.CaptureRegion.Value;
-                        }
-                        else if (context.Input.CaptureRegion != Rectangle.Empty)
-                        {
-                            captureRegionInfo = context.Input.CaptureRegion;
-                        }
-
-                        _logger.LogInformation("🔥 [OPTION_A_FIX] 個別TextChunk生成開始 - OCR検出数: {Count}, CaptureRegion: {CaptureRegion}",
-                            positionedResults.Count,
-                            captureRegionInfo.HasValue ? $"({captureRegionInfo.Value.X},{captureRegionInfo.Value.Y})" : "null");
-
-                        // 🔥 [OPTION_A_FIX] 各OcrTextRegionごとにTextChunkを個別生成
-                        foreach (var positionedResult in positionedResults)
-                        {
-                            // ✅ [GEMINI_FIX2] PHASE2.5_ROI_COORD_FIX削除
-                            // 理由: FIX6_NORMALIZE (AggregatedChunksReadyEventHandler) で統一的に座標変換を実行
-                            // 設計: OCR段階ではROI画像相対座標のまま保持、翻訳段階で画面絶対座標に変換
-                            // Separation of Concerns原則準拠
-                            var roiBounds = positionedResult.BoundingBox;
-
-                            // ROI画像相対座標のままPositionedTextResult作成
-                            var transformedResult = new PositionedTextResult
-                            {
-                                Text = positionedResult.Text,
-                                BoundingBox = roiBounds, // ROI画像相対座標（変換なし）
-                                Confidence = positionedResult.Confidence,
-                                ChunkId = _nextChunkId,
-                                ProcessingTime = positionedResult.ProcessingTime,
-                                DetectedLanguage = positionedResult.DetectedLanguage
-                            };
-
-                            // 個別TextChunk作成
-                            var textChunk = new TextChunk
-                            {
-                                ChunkId = _nextChunkId++,
-                                TextResults = new[] { transformedResult },
-                                CombinedBounds = roiBounds, // 画像絶対座標
-                                CombinedText = positionedResult.Text,
-                                SourceWindowHandle = context.Input.SourceWindowHandle,
-                                DetectedLanguage = null,
-                                CaptureRegion = captureRegionInfo
-                            };
-
-                            // TimedChunkAggregatorに送信
-                            var added = await _textChunkAggregator.TryAddTextChunkAsync(textChunk, cancellationToken).ConfigureAwait(false);
-
-                            _logger.LogInformation("🔥 [OPTION_A_FIX] 個別TextChunk送信 - ChunkId: {ChunkId}, Text: '{Text}', Bounds: ({X},{Y},{W}x{H}), 成功: {Added}",
-                                textChunk.ChunkId, positionedResult.Text, roiBounds.X, roiBounds.Y, roiBounds.Width, roiBounds.Height, added);
-                        }
-
-                        _logger.LogInformation("🔥 [OPTION_A_FIX] 個別TextChunk生成完了 - 送信数: {Count}", positionedResults.Count);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "🔧 [TRANSLATION_FIX] 翻訳パイプライン送信でエラー - 処理は継続");
-                }
             }
 
             // ProcessingStageResult作成

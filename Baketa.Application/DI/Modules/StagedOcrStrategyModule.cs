@@ -30,46 +30,9 @@ public sealed class StagedOcrStrategyModule : ServiceModuleBase
     /// <param name="services">サービスコレクション</param>
     public override void RegisterServices(IServiceCollection services)
     {
-        // 🎯 高機能版OCRスタック構成
-        Console.WriteLine("🚀 HighPerformanceOcrModule.RegisterServices 実行中！");
-        
-        // [ROI_DELETION] ROI並列処理統合削除 - シンプルなPaddleOcrEngine登録に変更
-        services.AddTransient<IOcrEngine>(provider =>
-        {
-            var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PaddleOcrEngine>>();
-            var factory = provider.GetRequiredService<IPaddleOcrEngineFactory>();
-
-            // 標準PaddleOcrEngineを作成
-            var baseOcrEngine = factory.CreateAsync().GetAwaiter().GetResult();
-
-            logger.LogInformation("✅ PaddleOcrEngine作成完了 - ROI機能除去済み");
-
-            return baseOcrEngine;
-        });
-        
-        // 🏊 PooledOcrService（並列処理対応）をシングルトン登録
-        services.AddSingleton<PooledOcrService>(provider =>
-        {
-            var enginePool = provider.GetRequiredService<ObjectPool<IOcrEngine>>();
-            var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PooledOcrService>>();
-            
-            var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
-            return new PooledOcrService(enginePool, logger, ocrSettings);
-        });
-        
-        // 💾 CachedOcrEngine（最上位キャッシュ層）をシングルトン登録
-        services.AddSingleton<CachedOcrEngine>(provider =>
-        {
-            var pooledService = provider.GetRequiredService<PooledOcrService>();
-            var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
-            var cacheService = provider.GetRequiredService<Baketa.Core.Abstractions.Services.IAdvancedOcrCacheService>();
-            
-            return new CachedOcrEngine(pooledService, cacheService, logger);
-        });
-        
-        // 🎯 メインのIOcrEngineとしてCachedOcrEngineを登録
-        services.AddSingleton<IOcrEngine>(provider => 
-            provider.GetRequiredService<CachedOcrEngine>());
+        // 🎯 このモジュールでの登録はAdvancedCachingModuleに移行されました。
+        // 競合を避けるため、ここでは何も登録しません。
+        Console.WriteLine("ℹ️ StagedOcrStrategyModule: 登録処理はAdvancedCachingModuleに移行済み。");
     }
     
     /// <summary>

@@ -45,8 +45,26 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
             // IImageからバイト配列を取得
             var imageData = await image.ToByteArrayAsync().ConfigureAwait(false);
 
-            // OpenCV Matに変換
-            var mat = Mat.FromImageData(imageData, ImreadModes.Color);
+            // OpenCV Matに変換し、3チャンネル(BGR)に正規化
+            using var initialMat = Mat.FromImageData(imageData, ImreadModes.Unchanged);
+            Mat mat;
+
+            if (initialMat.Channels() == 4)
+            {
+                _logger?.LogDebug("🎨 Converting 4-channel (BGRA) image to 3-channel (BGR) for PaddleOCR compatibility.");
+                mat = new Mat();
+                Cv2.CvtColor(initialMat, mat, ColorConversionCodes.BGRA2BGR);
+            }
+            else if (initialMat.Channels() == 1)
+            {
+                _logger?.LogDebug("🎨 Converting 1-channel (Grayscale) image to 3-channel (BGR) for PaddleOCR compatibility.");
+                mat = new Mat();
+                Cv2.CvtColor(initialMat, mat, ColorConversionCodes.GRAY2BGR);
+            }
+            else
+            {
+                mat = initialMat.Clone();
+            }
 
             // ROI指定がある場合は切り出し
             if (regionOfInterest.HasValue)

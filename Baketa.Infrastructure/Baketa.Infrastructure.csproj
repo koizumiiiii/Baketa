@@ -59,8 +59,8 @@
 		</PackageReference>
 
 		<!-- Phase 2.1: gRPC クライアント通信 -->
-		<PackageReference Include="Grpc.Net.Client" Version="2.69.0" />
-		<PackageReference Include="Grpc.Tools" Version="2.69.0">
+		<PackageReference Include="Grpc.Net.Client" Version="2.70.0" />
+		<PackageReference Include="Grpc.Tools" Version="2.70.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>

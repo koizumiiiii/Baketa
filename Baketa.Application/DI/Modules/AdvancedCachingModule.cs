@@ -32,25 +32,41 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
         services.AddSingleton<IAdvancedOcrCacheService, AdvancedOcrCacheService>();
         Console.WriteLine("✅ IAdvancedOcrCacheService登録完了");
         
-        // ❌ 旧プール化システム依存の機能を一時的に無効化
-        // CachedOcrEngineはPooledOcrServiceに依存しているため、
-        // 新しいファクトリシステムとの整合性確保まで無効化
-        
         /*
-        // 🏭 将来実装: ファクトリパターン対応CachedOcrEngine
-        // 現在のCachedOcrEngineは固定IOcrEngineベースなので、
-        // ファクトリパターンに対応するにはアーキテクチャ変更が必要
+        // 🏭 ファクトリパターン対応のため、古い登録は無効化
         services.AddSingleton<CachedOcrEngine>(provider =>
         {
-            // 新しいファクトリシステムから基本IOcrEngineを取得
-            var baseEngine = provider.GetRequiredService<IOcrEngine>();
+            var baseEngine = provider.GetRequiredService<IOcrEngine>(); // これは循環参照を引き起こす
             var cacheService = provider.GetRequiredService<IAdvancedOcrCacheService>();
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
             
-            Console.WriteLine($"🏭 CachedOcrEngine作成中... 新ファクトリシステム対応");
+            Console.WriteLine($"🏭 CachedOcrEngine作成中... （旧実装）");
             return new CachedOcrEngine(baseEngine, cacheService, logger);
         });
         */
+
+        // 🚀 Gemini推奨: デコレーターパターンによる正しいキャッシング実装
+        // 1. ベースとなるプール化サービスを具体的な型で登録
+        services.AddSingleton<PooledOcrService>();
+        Console.WriteLine("✅ PooledOcrServiceを具体的な型で登録完了");
+
+        // 2. キャッシュエンジン（デコレーター）を具体的な型で登録
+        //    ベースとなるPooledOcrServiceをコンストラクタで受け取る
+        services.AddSingleton<CachedOcrEngine>(provider =>
+        {
+            var pooledService = provider.GetRequiredService<PooledOcrService>();
+            var cacheService = provider.GetRequiredService<IAdvancedOcrCacheService>();
+            var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
+            
+            Console.WriteLine($"✅ CachedOcrEngine（デコレーター）作成 - ベースサービス: {pooledService.GetType().Name}");
+            return new CachedOcrEngine(pooledService, cacheService, logger);
+        });
+        Console.WriteLine("✅ CachedOcrEngineを具体的な型で登録完了");
+
+        // 3. IOcrEngineインターフェースへの要求を、最終的なキャッシュエンジン実装に解決
+        //    これにより、IOcrEngineを要求する全てのサービスがキャッシュ機能の恩恵を受ける
+        services.AddSingleton<IOcrEngine>(provider => provider.GetRequiredService<CachedOcrEngine>());
+        Console.WriteLine("✅ IOcrEngineをCachedOcrEngineに解決するよう最終登録完了");
         
         Console.WriteLine("✅ Step3: 高度キャッシング戦略登録完了");
         Console.WriteLine("🎯 期待効果: キャッシュヒット時 数ミリ秒応答");

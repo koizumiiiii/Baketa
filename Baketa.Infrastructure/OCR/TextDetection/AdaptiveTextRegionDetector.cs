@@ -203,28 +203,40 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
 
             try
             {
-                // 元画像サイズを記録（座標復元用）
-                var originalWidth = image.Width;
-                var originalHeight = image.Height;
+                // 🔥 [ROI_FIX_FINAL] Resizing logic is the cause of detection failure.
+                // Disable resizing to pass the full-resolution image to the detector.
+                // The original crash issue with >960px images is likely resolved by other fixes (e.g., 4-channel conversion).
+                const int det_limit_side_len = 960;
+                var originalWidth = convertedImage.Width;
+                var originalHeight = convertedImage.Height;
+                double scale = 1.0;
+                IImage imageForDetection = convertedImage;
+                bool resizedImageNeedsDisposal = false;
 
-                // スケールファクター計算（座標復元用）
-                var convertedWidth = convertedImage.Width;
-                var convertedHeight = convertedImage.Height;
-                var scaleFactorX = (double)convertedWidth / originalWidth;
-                var scaleFactorY = (double)convertedHeight / originalHeight;
-                var scaleFactor = Math.Min(scaleFactorX, scaleFactorY); // 縮小率を使用
+                // if (originalWidth > det_limit_side_len || originalHeight > det_limit_side_len)
+                // {
+                //     scale = (originalWidth > originalHeight)
+                //         ? (double)det_limit_side_len / originalWidth
+                //         : (double)det_limit_side_len / originalHeight;
+                //
+                //     int newWidth = (int)(originalWidth * scale);
+                //     int newHeight = (int)(originalHeight * scale);
+                //
+                //     _logger.LogInformation("🖼️ [ROI_DETECTION_FIX] 画像が大きすぎるため検出用にリサイズします: {OriginalW}x{OriginalH} -> {NewW}x{NewH} (スケール: {Scale:F3})",
+                //         originalWidth, originalHeight, newWidth, newHeight, scale);
+                //
+                //     imageForDetection = await convertedImage.ResizeAsync(newWidth, newHeight);
+                //     resizedImageNeedsDisposal = true;
+                // }
 
-                _logger.LogDebug("🎯 [COORDINATE_FIX] 座標復元情報: 元画像={OriginalWidth}x{OriginalHeight}, 変換後={ConvertedWidth}x{ConvertedHeight}, スケール={ScaleFactor:F3}",
-                    originalWidth, originalHeight, convertedWidth, convertedHeight, scaleFactor);
+                // PaddleOCRの検出専用機能を使用
+                var ocrResults = await _ocrEngine.DetectTextRegionsAsync(imageForDetection, cancellationToken).ConfigureAwait(false);
 
-                // 🔥 [K-28_STEP3] PaddleOCR検出前のログ
-                _logger.LogDebug("🔍 [K-28_STEP3] PaddleOCR DetectTextRegionsAsync開始");
-
-                // PaddleOCRの検出専用機能を使用（認識処理をスキップして高速化）
-                var ocrResults = await _ocrEngine.DetectTextRegionsAsync(convertedImage, cancellationToken).ConfigureAwait(false);
-
-                _logger.LogDebug("✅ [K-28_STEP3] PaddleOCR DetectTextRegionsAsync完了: {ResultCount}個",
-                    ocrResults?.TextRegions?.Count ?? 0);
+                // リサイズした画像は不要になったら破棄
+                if (resizedImageNeedsDisposal)
+                {
+                    (imageForDetection as IDisposable)?.Dispose();
+                }
 
                 if (ocrResults?.TextRegions == null || ocrResults.TextRegions.Count == 0)
                 {
@@ -232,14 +244,11 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                     return await CreateFullScreenFallbackAsync(image).ConfigureAwait(false);
                 }
 
-                // 🔥 [K-28_STEP4] 座標復元前のログ
-                _logger.LogDebug("🔍 [K-28_STEP4] 座標復元処理開始: {RegionCount}個の領域", ocrResults.TextRegions.Count);
-
-                // 🎯 [COORDINATE_FIX] 座標復元処理を追加 - CoordinateRestorerでスケーリング後座標を元座標に復元
-                // 🔥 [P0-2_FIX] 元画像サイズを渡して境界クリッピングを有効化
-                var originalImageSize = new Size(image.Width, image.Height);
+                // 座標を元の画像サイズに復元
+                var restorationScale = 1.0 / scale;
+                var originalImageSize = new Size(originalWidth, originalHeight);
                 var restoredRegions = ocrResults.TextRegions
-                    .Select(region => CoordinateRestorer.RestoreTextRegion(region, scaleFactor, originalImageSize))
+                    .Select(region => CoordinateRestorer.RestoreTextRegion(region, restorationScale, originalImageSize))
                     .Where(region => IsRegionValid(region.Bounds))
                     .ToList();
 
@@ -358,52 +367,60 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     private List<OCRTextRegion> MergeOverlappingRegions(List<OCRTextRegion> regions)
     {
         if (regions.Count <= 1) return regions;
-        
-        var merged = new List<OCRTextRegion>();
-        var processed = new bool[regions.Count];
+
         var overlapThreshold = GetParameter<double>("OverlapThreshold");
-        
-        for (int i = 0; i < regions.Count; i++)
+        bool mergedInThisPass;
+
+        do
         {
-            if (processed[i]) continue;
-            
-            var currentRegion = regions[i];
-            processed[i] = true;
-            var mergedConfidence = currentRegion.Confidence;
-            var mergeCount = 1;
-            
-            for (int j = i + 1; j < regions.Count; j++)
+            mergedInThisPass = false;
+            var merged = new List<OCRTextRegion>();
+            var processed = new bool[regions.Count];
+
+            for (int i = 0; i < regions.Count; i++)
             {
-                if (processed[j]) continue;
-                
-                var otherRegion = regions[j];
-                var overlap = CalculateOverlap(currentRegion.Bounds, otherRegion.Bounds);
-                
-                if (overlap >= overlapThreshold)
+                if (processed[i]) continue;
+
+                var currentRegion = regions[i];
+                var mergedConfidence = currentRegion.Confidence;
+                var mergeCount = 1;
+
+                for (int j = i + 1; j < regions.Count; j++)
                 {
-                    currentRegion = new OCRTextRegion(Rectangle.Union(currentRegion.Bounds, otherRegion.Bounds), currentRegion.ConfidenceScore)
+                    if (processed[j]) continue;
+
+                    var otherRegion = regions[j];
+                    var overlap = CalculateOverlap(currentRegion.Bounds, otherRegion.Bounds);
+
+                    if (overlap >= overlapThreshold)
                     {
-                        RegionType = currentRegion.RegionType,
-                        DetectionMethod = $"{currentRegion.DetectionMethod}+{otherRegion.DetectionMethod}",
-                        ProcessedImage = currentRegion.ProcessedImage
-                    };
-                    mergedConfidence += otherRegion.Confidence;
-                    mergeCount++;
-                    processed[j] = true;
+                        currentRegion = new OCRTextRegion(Rectangle.Union(currentRegion.Bounds, otherRegion.Bounds), currentRegion.ConfidenceScore)
+                        {
+                            RegionType = currentRegion.RegionType,
+                            DetectionMethod = $"{currentRegion.DetectionMethod}+{otherRegion.DetectionMethod}",
+                            ProcessedImage = currentRegion.ProcessedImage
+                        };
+                        mergedConfidence += otherRegion.Confidence;
+                        mergeCount++;
+                        processed[j] = true;
+                        mergedInThisPass = true; // A merge occurred
+                    }
                 }
+
+                currentRegion = new OCRTextRegion(currentRegion.Bounds, (float)(mergedConfidence / mergeCount))
+                {
+                    RegionType = currentRegion.RegionType,
+                    DetectionMethod = currentRegion.DetectionMethod,
+                    ProcessedImage = currentRegion.ProcessedImage
+                };
+                merged.Add(currentRegion);
             }
-            
-            // 平均信頼度を計算
-            currentRegion = new OCRTextRegion(currentRegion.Bounds, (float)(mergedConfidence / mergeCount))
-            {
-                RegionType = currentRegion.RegionType,
-                DetectionMethod = currentRegion.DetectionMethod,
-                ProcessedImage = currentRegion.ProcessedImage
-            };
-            merged.Add(currentRegion);
-        }
-        
-        return merged;
+
+            regions = merged; // Replace the list with the newly merged list
+
+        } while (mergedInThisPass);
+
+        return regions;
     }
 
     #region Parameter Management

@@ -30,7 +30,7 @@ public static class ProcessingServiceExtensions
         services.AddTransient<IProcessingStageStrategy, OcrExecutionStageStrategy>();
         // 🔥 [OLD_FLOW_REMOVAL] TranslationExecutionStageStrategy削除 - Phase 12.2新アーキテクチャ移行完了
         // 理由: CoordinateBasedTranslationService + AggregatedChunksReadyEventHandlerに統一
-        services.AddTransient<IProcessingStageStrategy, ImageChangeDetectionStageStrategy>();
+        services.AddSingleton<IProcessingStageStrategy, ImageChangeDetectionStageStrategy>();
         services.AddTransient<IProcessingStageStrategy, TextChangeDetectionStageStrategy>();
 
         // 4. デバッグ用ログ出力
