@@ -25,10 +25,12 @@ OCR技術によりゲーム画面からテキストを検出し、翻訳結果�
 
 ### 🌐 翻訳機能
 - **NLLB-200**: Meta製多言語翻訳モデル（600M distilled版、ローカル処理）
+- **gRPC通信**: HTTP/2ベースの高速C#↔Python間通信（Keep-Alive対応）
+- **CTranslate2**: メモリ使用量80%削減の最適化版エンジン（2.4GB → 500MB）
 - **Google Gemini**: クラウド翻訳エンジン（高精度翻訳・フォールバック）
-- **ハイブリッド戦略**: テキスト長・複雑度に応じた自動エンジン選択
 - **多言語対応**: 200言語対応（日英中韓など主要言語ペア最適化）
-- **翻訳履歴**: 過去の翻訳結果管理・キャッシュシステム
+- **バッチ翻訳**: 最大32件同時翻訳対応で処理効率向上
+- **自動サーバー起動**: 初回翻訳時にPython gRPCサーバーを自動起動
 
 ### 🖥️ UI・UX
 - **透過オーバーレイ**: ゲームプレイを妨げない表示
@@ -54,6 +56,8 @@ Baketaは5層クリーンアーキテクチャとモジュラー設計を採用�
 
 2. **Baketa.Infrastructure**: インフラストラクチャ層（OCR、翻訳、設定管理）
    - PaddleOCR統合、翻訳エンジン (NLLB-200, Gemini, モックエンジン)
+   - **gRPC翻訳クライアント**: Python翻訳サーバーとのHTTP/2通信 (`GrpcTranslationClient`)
+   - **Pythonサーバー管理**: 自動起動・ヘルスチェック (`PythonServerManager`)
    - 画像処理パイプライン、設定永続化 (JSONベース)
 
 3. **Baketa.Infrastructure.Platform**: Windows専用プラットフォーム実装
@@ -84,6 +88,76 @@ Baketaは5層クリーンアーキテクチャとモジュラー設計を採用�
 - **設定管理**: 階層的設定と検証・マイグレーション
 - **サーキットブレーカー**: 翻訳システム信頼性向上パターン
 - **動的リソース監視**: CPU/メモリ/GPU使用率リアルタイム監視システム
+
+### 🔄 gRPC翻訳アーキテクチャ
+
+BaketaはgRPC (HTTP/2) による高速C#↔Python間通信で翻訳処理を実現しています：
+
+```mermaid
+graph TB
+    subgraph "Baketa.UI<br/>(Avalonia UI Layer)"
+        UI[UI Components<br/>MainWindow]
+    end
+
+    subgraph "Baketa.Application<br/>(Business Logic Layer)"
+        App[DefaultTranslationService<br/>翻訳サービス統括]
+        EventHandler[AggregatedChunksReadyEventHandler<br/>イベント処理]
+    end
+
+    subgraph "Baketa.Infrastructure<br/>(Infrastructure Layer)"
+        Adapter[GrpcTranslationEngineAdapter<br/>ITranslationEngine実装]
+        Client[GrpcTranslationClient<br/>HTTP/2通信]
+        ServerMgr[PythonServerManager<br/>サーバー自動起動]
+    end
+
+    subgraph "Python gRPC Server<br/>(Translation Engine)"
+        Server[TranslationServicer<br/>gRPC Service]
+        Engine[NLLB Engine<br/>facebook/nllb-200-distilled-600M]
+        CT2[CTranslate2 Engine<br/>メモリ80%削減版]
+    end
+
+    UI -->|翻訳リクエスト| App
+    App -->|ITranslationEngine.TranslateAsync| Adapter
+    EventHandler -->|バッチ翻訳| Adapter
+
+    Adapter -->|1. サーバー起動確認| ServerMgr
+    ServerMgr -.->|python start_server.py| Server
+
+    Adapter -->|2. gRPC Call| Client
+    Client -->|HTTP/2 Keep-Alive<br/>port:50051| Server
+
+    Server -->|translate()| Engine
+    Server -.->|オプション| CT2
+
+    Server -->|TranslateResponse| Client
+    Client -->|TranslationResponse| Adapter
+    Adapter -->|結果| App
+    App -->|表示| UI
+
+    style Server fill:#e1f5fe
+    style Engine fill:#fff3e0
+    style CT2 fill:#fff3e0
+    style Adapter fill:#f3e5f5
+    style Client fill:#f3e5f5
+```
+
+#### gRPC APIメソッド
+
+| メソッド | 説明 | 実装状況 |
+|---------|------|---------|
+| `Translate()` | 単一テキスト翻訳 | ✅ **稼働中** |
+| `TranslateBatch()` | バッチ翻訳（最大32件） | ✅ **稼働中** |
+| `HealthCheck()` | サーバーヘルスチェック | ✅ 実装済み |
+| `IsReady()` | モデル準備状態確認 | ✅ 実装済み |
+
+#### 技術仕様
+- **プロトコル**: HTTP/2 (gRPC)
+- **ポート**: 50051 (デフォルト)
+- **Keep-Alive**: 10秒間隔（C#クライアント）、30秒間隔（Pythonサーバー）
+- **自動起動**: 初回翻訳時にPython gRPCサーバーを自動起動
+- **エラーハンドリング**: 自動再接続、サーキットブレーカーパターン
+- **バッチサイズ**: 最大32件/リクエスト
+- **タイムアウト**: 30秒（翻訳リクエスト）
 
 ## ダウンロード・インストール
 
