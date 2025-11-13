@@ -76,7 +76,14 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
-        
+
+    - name: Install Windows 10 SDK 19041
+      run: |
+        Write-Host "Installing Windows 10 SDK 19041..."
+        choco install windows-sdk-10-version-2004-all --yes --no-progress --force
+        Write-Host "Windows 10 SDK installation completed"
+      shell: powershell
+
     - name: Download Native DLL
       uses: actions/download-artifact@v5
       with:
