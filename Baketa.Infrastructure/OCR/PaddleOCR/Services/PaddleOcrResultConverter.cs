@@ -1,5 +1,6 @@
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Microsoft.Extensions.Logging;
@@ -27,15 +28,24 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
 {
     private readonly ILogger<PaddleOcrResultConverter>? _logger;
-    private readonly string _currentLanguage;
+    private readonly ILanguageConfigurationService? _languageConfig;
+    private readonly double _minConfidenceThreshold;
+
+    /// <summary>
+    /// 現在のソース言語コードを取得（動的）
+    /// </summary>
+    private string CurrentLanguage => _languageConfig?.GetSourceLanguageCode() ?? "jpn";
 
     public PaddleOcrResultConverter(
         ILogger<PaddleOcrResultConverter>? logger = null,
-        string language = "jpn")
+        ILanguageConfigurationService? languageConfig = null,
+        double minConfidenceThreshold = 0.7)
     {
         _logger = logger;
-        _currentLanguage = language;
-        _logger?.LogInformation("🚀 PaddleOcrResultConverter初期化完了 - Language: {Language}", _currentLanguage);
+        _languageConfig = languageConfig;
+        _minConfidenceThreshold = minConfidenceThreshold;
+        _logger?.LogInformation("🚀 PaddleOcrResultConverter初期化完了 - LanguageConfig: {HasConfig}, MinConfidence: {MinConfidence:F2}",
+            _languageConfig != null, _minConfidenceThreshold);
     }
 
     #region IPaddleOcrResultConverter実装
@@ -125,54 +135,6 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
     }
 
     /// <summary>
-    /// 検出専用結果の変換
-    /// Phase 2.9.1: 完全実装（リフレクション対応）
-    /// </summary>
-    public IReadOnlyList<OcrTextRegion> ConvertDetectionOnlyResult(PaddleOcrResult[] paddleResults)
-    {
-        _logger?.LogDebug("⚡ ConvertDetectionOnlyResult開始: 結果数={Count}", paddleResults?.Length ?? 0);
-
-        var textRegions = new List<OcrTextRegion>();
-
-        try
-        {
-            if (paddleResults == null)
-            {
-                _logger?.LogDebug("⚡ 検出専用結果がnullです");
-                return textRegions;
-            }
-
-            _logger?.LogDebug("⚡ 検出専用結果の変換開始: {ResultType}", paddleResults.GetType().FullName);
-
-            // ✅ [PHASE2.9.1] 完全実装 - PaddleOcrEngineのConvertDetectionOnlyResultロジック移行
-            if (paddleResults.Length > 0)
-            {
-                _logger?.LogDebug("⚡ PaddleOcrResult配列として処理: {Count}個", paddleResults.Length);
-
-                for (int i = 0; i < paddleResults.Length; i++)
-                {
-                    // 🔧 [GEMINI_FIX] 実際のPaddleOCR検出結果から座標情報を取得（テキストは空に設定）
-                    // ProcessSinglePaddleResultForDetectionOnlyはList<OcrTextRegion>?を返すため、AddRange()で追加
-                    var detectionRegions = ProcessSinglePaddleResultForDetectionOnly(paddleResults[i], i + 1);
-                    if (detectionRegions != null && detectionRegions.Count > 0)
-                    {
-                        textRegions.AddRange(detectionRegions);
-                        _logger?.LogDebug("⚡ PaddleResult #{Index}: {Count}個の領域を追加", i + 1, detectionRegions.Count);
-                    }
-                }
-            }
-
-            _logger?.LogDebug("⚡ 検出専用結果変換完了: {Count}個のテキスト領域", textRegions.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "検出専用結果の変換でエラー発生");
-        }
-
-        return textRegions;
-    }
-
-    /// <summary>
     /// 空結果の作成
     /// Phase 2.9.1: 完全実装（言語コード対応）
     /// </summary>
@@ -185,7 +147,7 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
             [],
             image,
             processingTime,
-            _currentLanguage ?? "jpn",
+            CurrentLanguage,
             roi,
             string.Empty // 空の場合は空文字列
         );
@@ -324,6 +286,14 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
                     else if (confValue is double d) confidence = d;
                 }
 
+                // 🔥 [CONFIDENCE_FILTER] 信頼度フィルタリング - 低信頼度テキストを除外
+                if (confidence < _minConfidenceThreshold)
+                {
+                    _logger?.LogDebug("⚠️ [FILTER] 低信頼度テキストを除外: '{Text}' (信頼度: {Confidence:F3} < 閾値: {Threshold:F2})",
+                        text.Trim(), confidence, _minConfidenceThreshold);
+                    return; // 信頼度が閾値未満の場合は追加しない
+                }
+
                 // 境界ボックスの取得を試行 - RotatedRect対応版
                 var boundingBox = Rectangle.Empty; // 初期値を空に設定
                 var regionProperty = regionType.GetProperty("Region") ??
@@ -363,6 +333,10 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
                                 // Angleを取得
                                 var angle = Convert.ToSingle(angleField?.GetValue(regionValue) ?? 0, System.Globalization.CultureInfo.InvariantCulture);
 
+                                // 🔥 [OCR_DETECTION_DEBUG] RotatedRect座標詳細ログ - 対話領域検出確認
+                                Console.WriteLine($"   🔍 [RotatedRect検出] テキスト: '{text.Trim()}'");
+                                Console.WriteLine($"      Center: ({centerX:F1}, {centerY:F1}), Size: {width:F1}x{height:F1}, Angle: {angle:F1}°");
+
                                 // 回転を考慮したバウンディングボックス計算
                                 var angleRad = angle * Math.PI / 180.0;
                                 var cosA = Math.Abs(Math.Cos(angleRad));
@@ -375,6 +349,9 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
                                 var top = (int)Math.Floor(centerY - boundingHeight / 2.0);
 
                                 boundingBox = new Rectangle(left, top, boundingWidth, boundingHeight);
+
+                                // 🔥 [OCR_DETECTION_DEBUG] 計算結果ログ
+                                Console.WriteLine($"      計算結果: X={left}, Y={top}, W={boundingWidth}, H={boundingHeight}");
                             }
                         }
                         catch (Exception)
@@ -745,71 +722,49 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
         {
             var bounds = region.Bounds;
 
-            // 🔧 [PHASE10.4_SIZE_FIX] スケーリング処理を復活（サイズが小さい問題の修正）
-            // 根本原因: PaddleOCRライブラリのバージョン変更により、縮小画像スケールの座標を返すように変更
-            // 証拠: textRegions[0]: {X=5,Y=3,Width=136,Height=40} はROI内の縮小画像スケール
-            // ROIオフセット加算後: {X=272,Y=750,Width=136,Height=40} ← Width/Heightが小さいまま
-            // 期待値: Width=136/0.491=277, Height=40/0.491=81
-            // 修正: スケーリング処理を復活し、サイズも元画像スケールに復元
-            //
-            // 🔧 [SIZE_TUNING] Width/HeightをMath.Ceiling()に変更
-            // 理由: Math.Round()だと小数点以下が切り捨てられ、オーバーレイが元テキストより小さくなる
-            // 例: Height=40/0.491=81.46 → Math.Round()=81, Math.Ceiling()=82
-            // 効果: オーバーレイが元テキストを確実に覆うサイズになる
-
             // スケーリング適用
             if (Math.Abs(scaleFactor - 1.0) > 0.001)
             {
-                bounds = new Rectangle(
-                    (int)Math.Round(bounds.X / scaleFactor),     // 位置は四捨五入（ずれ防止）
-                    (int)Math.Round(bounds.Y / scaleFactor),     // 位置は四捨五入（ずれ防止）
-                    (int)Math.Ceiling(bounds.Width / scaleFactor),   // サイズは切り上げ（確実に覆う）
-                    (int)Math.Ceiling(bounds.Height / scaleFactor)   // サイズは切り上げ（確実に覆う）
+                bounds = new System.Drawing.Rectangle(
+                    (int)Math.Round(bounds.X / scaleFactor),
+                    (int)Math.Round(bounds.Y / scaleFactor),
+                    (int)Math.Ceiling(bounds.Width / scaleFactor),
+                    (int)Math.Ceiling(bounds.Height / scaleFactor)
                 );
             }
 
             // ROI座標調整
             if (roi.HasValue)
             {
-                // 画面サイズを取得
-                var screenBounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? new Rectangle(0, 0, 1920, 1080);
-                var screenWidth = screenBounds.Width;
-                var screenHeight = screenBounds.Height;
+                bounds = new System.Drawing.Rectangle(
+                    bounds.X + roi.Value.X,
+                    bounds.Y + roi.Value.Y,
+                    bounds.Width,
+                    bounds.Height
+                );
+            }
 
-                // ROI補正後の座標を計算
-                var adjustedX = bounds.X + roi.Value.X;
-                var adjustedY = bounds.Y + roi.Value.Y;
-
-                // 画面境界内に制限
-                var clampedX = Math.Max(0, Math.Min(adjustedX, screenWidth - bounds.Width));
-                var clampedY = Math.Max(0, Math.Min(adjustedY, screenHeight - bounds.Height));
-
-                bounds = new Rectangle(clampedX, clampedY, bounds.Width, bounds.Height);
-
-                // Contour調整
-                var adjustedContour = region.Contour?.Select(p => new System.Drawing.Point(
-                    Math.Max(0, Math.Min(p.X + roi.Value.X, screenWidth)),
-                    Math.Max(0, Math.Min(p.Y + roi.Value.Y, screenHeight))
-                )).ToArray();
-
-                adjustedRegions.Add(new OcrTextRegion(
-                    region.Text,
-                    bounds,
-                    region.Confidence,
-                    adjustedContour,
-                    region.Direction
-                ));
+            // 画面境界内に最終座標をクランプ（安全策）
+            var screen = System.Windows.Forms.Screen.PrimaryScreen;
+            if (screen != null)
+            {
+                var screenBounds = screen.Bounds;
+                var clampedX = Math.Max(screenBounds.Left, Math.Min(bounds.X, screenBounds.Right - bounds.Width));
+                var clampedY = Math.Max(screenBounds.Top, Math.Min(bounds.Y, screenBounds.Bottom - bounds.Height));
+                bounds = new System.Drawing.Rectangle(clampedX, clampedY, bounds.Width, bounds.Height);
             }
             else
             {
-                adjustedRegions.Add(new OcrTextRegion(
-                    region.Text,
-                    bounds,
-                    region.Confidence,
-                    region.Contour,
-                    region.Direction
-                ));
+                _logger?.LogWarning("プライマリスクリーンの取得に失敗したため、座標のクランプ処理をスキップします。");
             }
+
+            adjustedRegions.Add(new OcrTextRegion(
+                region.Text,
+                bounds,
+                region.Confidence,
+                region.Contour,
+                region.Direction
+            ));
         }
 
         return adjustedRegions;
@@ -817,11 +772,13 @@ public sealed class PaddleOcrResultConverter : IPaddleOcrResultConverter
 
     /// <summary>
     /// 日本語言語かどうかを判定
+    /// 🔥 [MULTILANG] 動的言語設定対応 - ILanguageConfigurationServiceから取得
     /// </summary>
     private bool IsJapaneseLanguage()
     {
-        return _currentLanguage?.Contains("jpn", StringComparison.OrdinalIgnoreCase) == true ||
-               _currentLanguage?.Contains("ja", StringComparison.OrdinalIgnoreCase) == true;
+        var language = CurrentLanguage;
+        return language?.Contains("jpn", StringComparison.OrdinalIgnoreCase) == true ||
+               language?.Contains("ja", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     #endregion

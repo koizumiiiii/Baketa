@@ -9,9 +9,11 @@ namespace Baketa.Infrastructure.OCR.Scaling;
 public static class AdaptiveImageScaler
 {
     private const int PADDLE_OCR_SAFE_MAX_DIMENSION = 4096;
-    // 🔥 [P0_OPTIMIZATION] Full HD (1920x1080 = 2,073,600ピクセル) を許容するため2.5Mに引き上げ
-    // 根拠: PaddleOCR PP-OCRv5はFull HDで安定動作（実測済み）、ゲーム翻訳用途に最適化
-    private const int PADDLE_OCR_MEMORY_LIMIT_PIXELS = 2_500_000;
+    // 🔥 [PHASE5_COMPLETE_SCALE] UWQHD (3440x1440 = 4,953,600ピクセル) の0.75スケールを実現するため3Mに引き上げ
+    // 根拠: 0.75スケールでOCR精度10-20%向上を期待（UltraThink分析）、メモリ使用量は許容範囲内
+    // 3,000,000ピクセル → 3440x1440で約0.78スケール (sqrt(3M/4.95M) = 0.778)
+    // 🔥 [PHASE5_COORDINATE_FIX] PaddleOcrEngineの予防処理と統一するためpublicに変更
+    public const int PADDLE_OCR_MEMORY_LIMIT_PIXELS = 3_000_000;
     
     /// <summary>
     /// PaddleOCR処理に最適な画像サイズを計算

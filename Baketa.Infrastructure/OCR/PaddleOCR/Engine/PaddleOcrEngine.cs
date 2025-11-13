@@ -173,12 +173,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     private int _totalProcessedImages;
     private int _errorCount;
     private readonly DateTime _startTime = DateTime.UtcNow;
-    
-    // 🔄 [HYBRID_STRATEGY] ハイブリッドOCR戦略サポート
-    private HybridPaddleOcrService? _hybridService;
-    private HybridOcrSettings? _hybridSettings;
-    private bool _isHybridMode;
-    
+
     // ❌ DI競合解決: 静的コンストラクタと独自インスタンス追跡を無効化
     // ✅ ObjectPoolとDIコンテナによる適切なライフサイクル管理に一任
     /*
@@ -284,7 +279,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 _settings = settings.Clone();
                 CurrentLanguage = settings.Language;
 
-                await InitializeHybridModeAsync(settings, cancellationToken).ConfigureAwait(false);
+                // 🔥 [HYBRID_MODE_DELETION] Step 7: ハイブリッドモード初期化呼び出し削除
+                // InitializeHybridModeAsync() メソッド削除に伴い呼び出しも削除
 
                 IsInitialized = true;
                 __logger?.LogInformation("PaddleOCRエンジンの初期化完了");
@@ -525,11 +521,12 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             {
                 // 🎯 [ULTRATHINK_PREVENTION] OCR実行前の早期予防システム
                 progressCallback?.Report(new CoreOcrProgress(0.25, "画像品質検証中"));
-            
+
                 Mat processedMat;
-            try 
+                double additionalScale;
+            try
             {
-                processedMat = ApplyPreventiveNormalization(mat);
+                (processedMat, additionalScale) = ApplyPreventiveNormalization(mat);
                 __logger?.LogDebug("✅ [PREVENTIVE_NORM] 早期正規化完了");
             }
             catch (Exception ex)
@@ -537,32 +534,27 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 __logger?.LogError(ex, "🚨 [PREVENTIVE_NORM] 早期正規化失敗");
                 return CreateEmptyResult(image, regionOfInterest, stopwatch.Elapsed);
             }
-            
+
+            // 🔥 [PHASE5_COORDINATE_FIX] 総合スケール係数を計算（AdaptiveImageScaler + 予防処理）
+            var finalScaleFactor = scaleFactor * additionalScale;
+            __logger?.LogDebug("📏 [SCALE_COMBINED] スケール係数統合: {AdaptiveScale:F3} × {PreventiveScale:F3} = {FinalScale:F3}",
+                scaleFactor, additionalScale, finalScaleFactor);
+
             progressCallback?.Report(new CoreOcrProgress(0.3, "OCR処理実行中"));
-            
+
             using (processedMat) // processedMatの適切なDispose管理
             {
-                if (_isHybridMode && _hybridService != null)
-                {
-                    __logger?.LogDebug("🔄 ハイブリッドモードでOCR実行（予防処理済み）");
-                    var processingMode = DetermineProcessingMode();
-                    textRegions = await _hybridService.ExecuteHybridOcrAsync(processedMat, processingMode, cancellationToken).ConfigureAwait(false);
-                    __logger?.LogDebug($"🔄 ハイブリッドOCR完了: {textRegions.Count}領域検出 ({processingMode}モード)");
-                }
-                else
-                {
-                    __logger?.LogDebug("📊 シングルモードでOCR実行（予防処理済み）");
+                __logger?.LogDebug("📊 OCR実行開始（予防処理済み）");
 
-                    // ✅ [PHASE2.9.3.4b] _executor + _resultConverter使用に置換
-                    var paddleResult = await _executor.ExecuteOcrAsync(processedMat, progressCallback, cancellationToken).ConfigureAwait(false);
-                    textRegions = _resultConverter.ConvertToTextRegions(
-                        new[] { paddleResult },  // PaddleOcrResultを配列にラップ
-                        scaleFactor,
-                        regionOfInterest
-                    );
+                // ✅ [PHASE2.9.3.4b] _executor + _resultConverter使用に置換
+                var paddleResult = await _executor.ExecuteOcrAsync(processedMat, progressCallback, cancellationToken).ConfigureAwait(false);
+                textRegions = _resultConverter.ConvertToTextRegions(
+                    new[] { paddleResult },  // PaddleOcrResultを配列にラップ
+                    finalScaleFactor,  // 🔥 [PHASE5_COORDINATE_FIX] 総合スケール係数を使用
+                    regionOfInterest
+                );
 
-                    __logger?.LogDebug($"📊 シングルOCR完了: {textRegions?.Count ?? 0}領域検出");
-                }
+                __logger?.LogDebug($"📊 OCR完了: {textRegions?.Count ?? 0}領域検出");
                 
                 // テキスト結合アルゴリズムを適用
                 if (textRegions != null && textRegions.Count > 0)
@@ -1494,6 +1486,16 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             // → 同期ヘルパーメソッドCreateMatFromImage()に完全分離
             var mat = CreateMatFromImage(image);
 
+            // 🔥 [CHANNEL_FIX] 4チャンネル画像を3チャンネルに変換
+            if (mat.Channels() == 4)
+            {
+                __logger?.LogDebug("🎨 [CHANNEL_FIX] Converting 4-channel (BGRA) image to 3-channel (BGR) for PaddleOCR compatibility.");
+                var bgrMat = new Mat();
+                Cv2.CvtColor(mat, bgrMat, ColorConversionCodes.BGRA2BGR);
+                mat.Dispose(); // 元の4ch Matを解放
+                mat = bgrMat;  // 3ch Matに置き換え
+            }
+
                 // ROI指定がある場合は切り出し
                 if (regionOfInterest.HasValue)
                 {
@@ -1786,74 +1788,6 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     }
 
     // ✅ [PHASE2.9.3.4b] ExecuteOcrAsyncメソッド削除 - _executor + _resultConverter に置換済み
-
-    /// <summary>
-    /// テキスト検出のみを実行（認識処理をスキップして高速化）
-    /// PaddleOCRの検出モードのみを使用してテキスト領域を検出
-    /// </summary>
-    private async Task<IReadOnlyList<OcrTextRegion>> ExecuteTextDetectionOnlyAsync(
-        Mat mat,
-        CancellationToken cancellationToken)
-    {
-        __logger?.LogDebug("⚡ ExecuteTextDetectionOnlyAsync開始 - 高速検出モード");
-
-        // 🚀 [PERFORMANCE_OPTIMIZATION] Phase 3: GameOptimizedPreprocessingService を使用した前処理（検出専用）
-        Mat processedMat;
-        try
-        {
-            // 🎯 [SPEED_OPTIMIZATION] 検出専用の軽量前処理
-            // OpenCvSharp.Mat を IAdvancedImage に変換
-            var imageData = await ConvertMatToByteArrayAsync(mat).ConfigureAwait(false);
-            
-            // 🛡️ [MEMORY_PROTECTION] Mat.Width/Height の安全なアクセス（検出専用）
-            int matWidth, matHeight;
-            try 
-            {
-                matWidth = mat.Width;
-                matHeight = mat.Height;
-            }
-            catch (AccessViolationException ex)
-            {
-                __logger?.LogError(ex, "🚨 AccessViolationException in Mat.Width/Height during detection-only AdvancedImage creation");
-                throw new OcrException("検出専用処理でMat画像サイズの取得中にメモリアクセス違反が発生しました", ex);
-            }
-            
-            // 🎯 [PERFORMANCE_BOOST] 検出専用のため複雑な前処理をスキップ
-            processedMat = mat.Clone();
-            
-            // 🛡️ [MEMORY_PROTECTION] Mat.Width/Height の安全なアクセス（ログ用）
-            try 
-            {
-                __logger?.LogDebug("⚡ 検出専用前処理完了: {Width}x{Height} → {ProcessedWidth}x{ProcessedHeight}",
-                    mat.Width, mat.Height, processedMat.Width, processedMat.Height);
-            }
-            catch (AccessViolationException ex)
-            {
-                __logger?.LogError(ex, "🚨 AccessViolationException during log output for Mat dimensions");
-                __logger?.LogDebug("⚡ 検出専用前処理完了 - サイズ情報取得不可");
-            }
-        }
-        catch (Exception ex)
-        {
-            __logger?.LogWarning(ex, "前処理でエラー発生、元画像を使用");
-            processedMat = mat.Clone(); // 安全にクローン
-        }
-
-        try
-        {
-            // ✅ [PHASE2.9.4c] _executor + _resultConverter使用に置換
-            var paddleResult = await _executor.ExecuteDetectionOnlyAsync(processedMat, cancellationToken).ConfigureAwait(false);
-            return _resultConverter.ConvertDetectionOnlyResult(new[] { paddleResult });
-        }
-        finally
-        {
-            // processedMat が元の mat と異なる場合のみ Dispose
-            if (!ReferenceEquals(processedMat, mat))
-            {
-                processedMat?.Dispose();
-            }
-        }
-    }
 
     /// <summary>
     /// PaddleOCRの検出専用実行（内部実装）
@@ -3374,40 +3308,24 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 return CreateEmptyResult(image, null, stopwatch.Elapsed);
             }
 
-            // 検出結果を格納する変数を宣言（スコープ問題解決）
+            // 🔥 [HYBRID_MODE_DELETION] Step 6: 完全OCR処理に変更（検出専用モード廃止）
+            // ExecuteTextDetectionOnlyAsync()を削除し、完全なテキスト認識 + 座標変換を実行
+            // これにより、OCR座標ずれ・空文字列問題を根本解消
             IReadOnlyList<OcrTextRegion> textRegions;
             using (mat) // Matのリソース管理
             {
-                // テキスト検出のみを実行（認識をスキップ）
-                textRegions = await ExecuteTextDetectionOnlyAsync(mat, cancellationToken).ConfigureAwait(false);
+                // ✅ 完全OCR実行（テキスト検出 + 認識）
+                var paddleResult = await _executor.ExecuteOcrAsync(mat, null, cancellationToken).ConfigureAwait(false);
+
+                // ✅ 座標変換を含む完全なOcrTextRegion変換
+                textRegions = _resultConverter.ConvertToTextRegions(
+                    new[] { paddleResult },
+                    scaleFactor,
+                    null // ROI指定なし（全画面）
+                );
             }
 
             stopwatch.Stop();
-
-            // 🔥 [PHASE10.4_REVERT] 座標復元処理を復活（Gemini専門分析による決定）
-            // 根本原因: PaddleOCRライブラリのバージョンアップにより動作変更
-            //   - PHASE2.1_FIX当時: 縮小画像でも元スケールの座標を返していた（X=2505など）
-            //   - 現在: 縮小画像のスケールで座標を返す（X=131など）
-            // 証拠: PaddleOcrResultConverter.cs:748のPHASE2.1_FIXコメント
-            // 修正: scaleFactorによる座標復元を復活（元画像スケールへの変換が必須）
-            // 参照: /tmp/gemini_phase10_4_coordinate_scale_issue.md
-            if (Math.Abs(scaleFactor - 1.0) > 0.001) // スケーリングが行われた場合のみ
-            {
-                __logger?.LogDebug("🔧 [PHASE10.4_REVERT] 座標復元実行: ScaleFactor={ScaleFactor}", scaleFactor);
-
-                var originalImageSize = new System.Drawing.Size(image.Width, image.Height);
-                var restoredRegions = new List<OcrTextRegion>(textRegions.Count);
-                foreach (var region in textRegions)
-                {
-                    restoredRegions.Add(CoordinateRestorer.RestoreTextRegion(region, scaleFactor, originalImageSize));
-                }
-                textRegions = restoredRegions;
-
-                if (textRegions.Count > 0)
-                {
-                    __logger?.LogDebug("  -> 復元後の最初の座標: {Bounds}", textRegions[0].Bounds);
-                }
-            }
 
             var result = new OcrResults(
                 textRegions ?? [],
@@ -4134,15 +4052,10 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             __logger?.LogDebug("PaddleOcrEngineのリソースを解放中");
             _currentOcrCancellation?.Dispose();
             _currentOcrCancellation = null;
-            
-            // ハイブリッドサービスの廃棄
-            if (_hybridService != null)
-            {
-                __logger?.LogDebug("🔄 ハイブリッドサービスを廃棄中");
-                _hybridService.Dispose();
-                _hybridService = null;
-            }
-            
+
+            // 🔥 [HYBRID_MODE_DELETION] Step 7: ハイブリッドサービス廃棄処理削除
+            // ハイブリッドモード完全廃止に伴い削除
+
             // 🎯 [GEMINI_EMERGENCY_FIX_V2] 静的SemaphoreSlimはDispose対象外
             // _globalOcrSemaphore は全インスタンス共有のため個別Disposeしない
             // アプリケーション終了時まで維持される
@@ -4341,93 +4254,9 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         
         return Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
     }
-
-    /// <summary>
-    /// ハイブリッドモード初期化
-    /// </summary>
-    private async Task InitializeHybridModeAsync(OcrEngineSettings settings, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            // ハイブリッドモード設定を確認
-            if (settings.EnableHybridMode)
-            {
-                __logger?.LogInformation("🔄 ハイブリッドモード初期化開始 - V3(高速) + V5(高精度)");
-                
-                // DIからハイブリッド設定とサービスを取得（Serviceサービス方式に対応）
-                try
-                {
-                    // Microsoft.Extensions.DependencyInjectionでServiceProviderを直接利用する方法を回避し、
-                    // 代わりにデフォルト設定を使用
-                    _hybridSettings = new HybridOcrSettings
-                    {
-                        FastDetectionModel = PaddleOcrModelVersion.V3,
-                        HighQualityModel = PaddleOcrModelVersion.V5,
-                        ImageQualityThreshold = 0.6,
-                        RegionCountThreshold = 5,
-                        FastDetectionTimeoutMs = 500,
-                        HighQualityTimeoutMs = 3000
-                    };
-
-                    // HybridPaddleOcrServiceを直接初期化
-                    _hybridService = new HybridPaddleOcrService(
-                        __logger as ILogger<HybridPaddleOcrService> ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<HybridPaddleOcrService>.Instance,
-                        __eventAggregator,
-                        _hybridSettings
-                    );
-
-                    await _hybridService.InitializeAsync(cancellationToken).ConfigureAwait(false);
-                    
-                    _isHybridMode = true;
-                    __logger?.LogInformation("✅ ハイブリッドモード初期化完了");
-                    
-                    // 診断イベントを発行
-                    await __eventAggregator.PublishAsync(new PipelineDiagnosticEvent
-                    {
-                        Stage = "OCR_Initialization",
-                        IsSuccess = true,
-                        ProcessingTimeMs = 0,
-                        Message = "ハイブリッドモード初期化完了",
-                        Severity = DiagnosticSeverity.Information,
-                        Metrics = new Dictionary<string, object>
-                        {
-                            { "HybridModeEnabled", true },
-                            { "FastDetectionModel", _hybridSettings.FastDetectionModel.ToString() },
-                            { "HighQualityModel", _hybridSettings.HighQualityModel.ToString() }
-                        }
-                    }).ConfigureAwait(false);
-                }
-                catch (Exception hybridInitEx)
-                {
-                    __logger?.LogError(hybridInitEx, "❌ ハイブリッドサービス初期化失敗");
-                    _isHybridMode = false;
-                    throw; // 親のcatchで処理
-                }
-            }
-            else
-            {
-                __logger?.LogDebug("📊 シングルモードで初期化 - ハイブリッドモード無効");
-                _isHybridMode = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            __logger?.LogError(ex, "❌ ハイブリッドモード初期化失敗");
-            _isHybridMode = false;
-            
-            // ハイブリッドモードが失敗してもシングルモードで続行
-            __logger?.LogWarning("⚠️ シングルモードで続行します");
-        }
-    }
-
-    /// <summary>
-    /// ハイブリッド処理モードを決定
-    /// </summary>
-    private OcrProcessingMode DetermineProcessingMode()
-    {
-        // デフォルトは適応的モード（画像品質に基づく自動選択）
-        return OcrProcessingMode.Adaptive;
-    }
+    // 🔥 [HYBRID_MODE_DELETION] Step 7: ハイブリッドモード初期化メソッド削除
+    // InitializeHybridModeAsync() および DetermineProcessingMode() メソッドを削除
+    // ハイブリッドモード完全廃止に伴い削除
 
     /// <summary>
     /// PaddleOCR連続失敗カウンターを強制リセット
@@ -4445,7 +4274,8 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     /// 🎯 [ULTRATHINK_PREVENTION] PaddlePredictor失敗を完全予防する包括的正規化
     /// すべての既知問題を事前解決し、エラー発生自体を防ぐ
     /// </summary>
-    private Mat ApplyPreventiveNormalization(Mat inputMat)
+    /// <returns>正規化済みMatと追加スケール係数（リサイズが発生しなかった場合は1.0）</returns>
+    private (Mat processedMat, double additionalScale) ApplyPreventiveNormalization(Mat inputMat)
     {
         if (inputMat == null || inputMat.Empty())
         {
@@ -4454,6 +4284,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
         var preventiveSw = System.Diagnostics.Stopwatch.StartNew();
         Mat processedMat = inputMat;
+        double additionalScale = 1.0; // 追加スケール係数（デフォルトは1.0 = 変更なし）
 
         try
         {
@@ -4462,21 +4293,25 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             __logger?.LogDebug("🎯 [PREVENTIVE_START] 予防処理開始: {OriginalInfo}", originalInfo);
 
             // ステップ1: 極端なサイズ問題の予防
+            // 🔥 [PHASE5_COORDINATE_FIX] AdaptiveImageScalerと同じ3M制限に統一（座標ずれ修正）
             var totalPixels = processedMat.Width * processedMat.Height;
-            if (totalPixels > 2000000) // 200万ピクセル制限
+            if (totalPixels > AdaptiveImageScaler.PADDLE_OCR_MEMORY_LIMIT_PIXELS)
             {
-                var scale = Math.Sqrt(2000000.0 / totalPixels);
+                var scale = Math.Sqrt((double)AdaptiveImageScaler.PADDLE_OCR_MEMORY_LIMIT_PIXELS / totalPixels);
                 var newWidth = Math.Max(16, (int)(processedMat.Width * scale));
                 var newHeight = Math.Max(16, (int)(processedMat.Height * scale));
-                
+
                 var resizedMat = new Mat();
                 Cv2.Resize(processedMat, resizedMat, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Area);
-                
+
                 if (processedMat != inputMat) processedMat.Dispose();
                 processedMat = resizedMat;
-                
-                __logger?.LogInformation("🎯 [PREVENTION_RESIZE] 大画像リサイズ: {OriginalPixels:N0} → {NewPixels:N0} pixels", 
-                    totalPixels, newWidth * newHeight);
+
+                // 追加スケール係数を記録（座標変換で使用）
+                additionalScale *= scale;
+
+                __logger?.LogInformation("🎯 [PREVENTION_RESIZE] 大画像リサイズ: {OriginalPixels:N0} → {NewPixels:N0} pixels (追加スケール: {Scale:F3})",
+                    totalPixels, newWidth * newHeight, scale);
             }
 
             // ステップ2: 奇数幅・高さの完全解決
@@ -4561,15 +4396,15 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
             preventiveSw.Stop();
             var finalInfo = $"{processedMat.Width}x{processedMat.Height}, Ch:{processedMat.Channels()}, Type:{processedMat.Type()}";
-            __logger?.LogInformation("✅ [PREVENTION_COMPLETE] 予防処理完了: {FinalInfo} (処理時間: {ElapsedMs}ms)", 
-                finalInfo, preventiveSw.ElapsedMilliseconds);
+            __logger?.LogInformation("✅ [PREVENTION_COMPLETE] 予防処理完了: {FinalInfo} (追加スケール: {AdditionalScale:F3}, 処理時間: {ElapsedMs}ms)",
+                finalInfo, additionalScale, preventiveSw.ElapsedMilliseconds);
 
-            return processedMat;
+            return (processedMat, additionalScale);
         }
         catch (Exception ex)
         {
             __logger?.LogError(ex, "🚨 [PREVENTION_ERROR] 予防処理でエラー発生");
-            
+
             // エラー時は元のMatをクローンして返す
             if (processedMat != inputMat && processedMat != null)
             {
