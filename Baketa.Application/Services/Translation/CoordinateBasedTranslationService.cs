@@ -729,6 +729,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             var inPlaceOverlayManager = _processingFacade.OverlayManager;
             if (inPlaceOverlayManager != null)
             {
+                // 🔧 [OVERLAY_CLEANUP] 画面変化時に古いオーバーレイをクリア
+                try
+                {
+                    await inPlaceOverlayManager.HideAllAsync().ConfigureAwait(false);
+                    _logger?.LogDebug("🧹 [OVERLAY_CLEANUP] 古いオーバーレイをクリアしました");
+                }
+                catch (Exception cleanupEx)
+                {
+                    _logger?.LogWarning(cleanupEx, "⚠️ [OVERLAY_CLEANUP] オーバーレイクリーンアップ中にエラー - 処理継続");
+                }
+
                 _logger?.LogInformation("🎯 インプレースオーバーレイ表示開始 - チャンク数: {Count}", textChunks.Count);
                 _logger?.LogDebug($"🎯 インプレースオーバーレイ表示開始 - チャンク数: {textChunks.Count}");
                 
