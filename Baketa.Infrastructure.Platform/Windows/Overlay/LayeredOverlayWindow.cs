@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -46,6 +47,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     private int _currentY;
     private int _currentWidth = 200;
     private int _currentHeight = 50;
+    private int _originalHeight = 50; // 🔧 [MIN_HEIGHT] 元のテキスト領域の高さを保持
     private Color _backgroundColor = Color.FromArgb(240, 255, 255, 255); // 半透明白
 
     // 🔥 [MESSAGE_COALESCING] メッセージ集約用フラグ
@@ -379,6 +381,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
         _currentWidth = width;
         _currentHeight = height;
+        _originalHeight = height; // 🔧 [MIN_HEIGHT] 元の高さを保存
 
         _messageQueue.Add(() =>
         {
@@ -437,6 +440,54 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     {
         try
         {
+            // 🔧 [HEIGHT_AUTO] テキストサイズを事前測定して高さを調整
+            if (!string.IsNullOrWhiteSpace(_currentText))
+            {
+                var originalHeight = _currentHeight;
+
+                // 一時的なBitmapとGraphicsを作成してテキストサイズを測定
+                using var tempBitmap = new Bitmap(1, 1);
+                using var tempGraphics = Graphics.FromImage(tempBitmap);
+                using var font = new Font("Segoe UI", 14, FontStyle.Regular);
+
+                var padding = 8f;
+                var textWidth = _currentWidth - padding * 2;
+
+                // 🔧 [LINE_SPACING] テキストを行ごとに分割して110%の行間で高さを計算
+                var lines = GetWrappedTextLines(tempGraphics, _currentText, font, textWidth);
+                var lineHeight = font.GetHeight(tempGraphics) * 1.1f;
+                var textHeight = lines.Count * lineHeight;
+                var requiredHeight = (int)(textHeight + padding * 2);
+
+                // 🔧 [MIN_HEIGHT] 元の高さを最小値として保証
+                requiredHeight = Math.Max(_originalHeight, requiredHeight);
+
+                // 高さが変わった場合のみ更新
+                if (requiredHeight != _currentHeight)
+                {
+                    _currentHeight = requiredHeight;
+
+                    // 🔧 [BOUNDARY_CHECK] 画面境界チェック
+                    var screenHeight = System.Windows.Forms.Screen.FromPoint(
+                        new System.Drawing.Point(_currentX, _currentY)).Bounds.Height;
+
+                    var overlayBottom = _currentY + _currentHeight;
+
+                    // 画面下端を超える場合、Y座標を上方向にシフト
+                    if (overlayBottom > screenHeight)
+                    {
+                        var originalY = _currentY;
+                        var adjustedY = Math.Max(0, screenHeight - _currentHeight);
+
+                        _currentY = adjustedY;
+                        _logger.LogDebug("🔧 [BOUNDARY_CHECK] Y座標調整: {OriginalY} → {AdjustedY} (画面高さ: {ScreenHeight})",
+                            originalY, adjustedY, screenHeight);
+                    }
+
+                    _logger.LogDebug("📏 [HEIGHT_AUTO] 高さ調整: {OriginalHeight} → {NewHeight}", originalHeight, _currentHeight);
+                }
+            }
+
             // 既存のGDIリソースをクリーンアップ
             CleanupGdiResources();
 
@@ -492,11 +543,32 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                     using var brush = new SolidBrush(Color.FromArgb(255, 45, 45, 45)); // 濃いグレー
                     using var font = new Font("Segoe UI", 14, FontStyle.Regular);
 
-                    var textSize = g.MeasureString(_currentText, font);
-                    var x = 8f; // Padding
-                    var y = (_currentHeight - textSize.Height) / 2;
+                    var padding = 8f;
+                    var textWidth = _currentWidth - padding * 2;
 
-                    g.DrawString(_currentText, font, brush, x, y);
+                    // 🔧 [LINE_SPACING] テキストを行ごとに分割して、110%の行間で描画
+                    var lines = GetWrappedTextLines(g, _currentText, font, textWidth);
+                    var lineHeight = font.GetHeight(g) * 1.1f;
+
+                    // 1行ずつ描画（自動折り返しは無効）
+                    using var format = new StringFormat(StringFormat.GenericTypographic)
+                    {
+                        FormatFlags = StringFormatFlags.NoWrap,
+                        Trimming = StringTrimming.None
+                    };
+
+                    var y = padding;
+                    foreach (var line in lines)
+                    {
+                        // 描画領域の高さを超える場合は描画を停止
+                        if ((y + lineHeight) > _currentHeight)
+                        {
+                            break;
+                        }
+
+                        g.DrawString(line, font, brush, new PointF(padding, y), format);
+                        y += lineHeight;
+                    }
                 }
             }
 
@@ -592,6 +664,65 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
             _updatePending = true;
             LayeredWindowMethods.PostMessage(_hwnd, WM_PROCESS_QUEUE, IntPtr.Zero, IntPtr.Zero);
         }
+    }
+
+    // ========================================
+    // テキスト折り返しヘルパー
+    // ========================================
+
+    /// <summary>
+    /// 指定された最大幅に基づいて、文字列を複数行に分割します
+    /// </summary>
+    /// <param name="g">Graphics オブジェクト</param>
+    /// <param name="text">分割するテキスト</param>
+    /// <param name="font">使用するフォント</param>
+    /// <param name="maxWidth">最大幅（ピクセル）</param>
+    /// <returns>分割された行のリスト</returns>
+    private List<string> GetWrappedTextLines(Graphics g, string text, Font font, float maxWidth)
+    {
+        var lines = new List<string>();
+        var paragraphs = text.Split(new[] { '\n' }, StringSplitOptions.None);
+
+        foreach (var paragraph in paragraphs)
+        {
+            if (string.IsNullOrEmpty(paragraph))
+            {
+                lines.Add(string.Empty);
+                continue;
+            }
+
+            var words = paragraph.Split(' ');
+            var wrappedLine = new System.Text.StringBuilder();
+
+            foreach (var word in words)
+            {
+                if (wrappedLine.Length > 0)
+                {
+                    var testLine = wrappedLine.ToString() + " " + word;
+                    if (g.MeasureString(testLine, font).Width > maxWidth)
+                    {
+                        lines.Add(wrappedLine.ToString());
+                        wrappedLine.Clear();
+                        wrappedLine.Append(word);
+                    }
+                    else
+                    {
+                        wrappedLine.Append(" " + word);
+                    }
+                }
+                else
+                {
+                    wrappedLine.Append(word);
+                }
+            }
+
+            if (wrappedLine.Length > 0)
+            {
+                lines.Add(wrappedLine.ToString());
+            }
+        }
+
+        return lines;
     }
 
     // ========================================

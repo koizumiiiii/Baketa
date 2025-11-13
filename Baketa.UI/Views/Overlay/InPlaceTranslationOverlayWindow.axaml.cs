@@ -138,14 +138,14 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 // ウィンドウ位置設定
                 Position = new PixelPoint(overlayPosition.X, overlayPosition.Y);
 
-                // 🔧 [PHASE4.5_WIDTH_FIX] ウィンドウサイズ設定: 横幅固定、縦幅も明示的に設定
+                // 🔧 [PHASE4.5_WIDTH_FIX] ウィンドウサイズ設定: 横幅固定、縦幅は後で調整
                 // 横幅: OCR検知領域の幅に固定 (テキストが収まらない場合は折り返し)
-                // 縦幅: overlaySize.Heightを使用（TextBlock折り返し後の高さを想定）
                 Width = overlaySize.Width;
-                Height = overlaySize.Height;
                 MaxWidth = overlaySize.Width;  // 🔧 TextBlockの自動拡張を防止
                 MinWidth = overlaySize.Width;  // 🔧 ウィンドウ幅を厳密に固定
-                MaxHeight = overlaySize.Height * 3; // 🔧 折り返し時の高さ拡張を許可（最大3倍）
+
+                // 🔧 [OVERLAY_HEIGHT_AUTO] 縦幅は初期値を設定（後でTextBlock測定後に調整）
+                Height = overlaySize.Height;
                 MinHeight = overlaySize.Height; // 🔧 最小高さを元テキストと同じに
 
                 // 🔧 [PHASE4.5_DIAGNOSTIC] 想定サイズと実際の表示座標・サイズを比較
@@ -203,7 +203,40 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 {
                     Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ [InPlaceTranslationOverlay] ウィンドウスタイル設定失敗: {ex.Message}");
                 }
-                
+
+                // 🔧 [OVERLAY_HEIGHT_AUTO] Show()後にウィンドウの高さと位置を調整
+                try
+                {
+                    var textBlockForMeasure = this.FindControl<TextBlock>("InPlaceTranslatedTextBlock");
+                    if (textBlockForMeasure != null)
+                    {
+                        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                            $"🔍 [OVERLAY_HEIGHT_AUTO] TextBlock発見 - Width: {Width}, Text Length: {textBlockForMeasure.Text?.Length ?? 0}");
+
+                        // レイアウト更新を強制
+                        textBlockForMeasure.UpdateLayout();
+
+                        // TextBlockの実際の高さを測定
+                        textBlockForMeasure.Measure(new Size(Width - 8, double.PositiveInfinity));
+                        var requiredHeight = textBlockForMeasure.DesiredSize.Height + 8; // Padding考慮
+
+                        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                            $"📏 [OVERLAY_HEIGHT_AUTO] 測定完了 - DesiredSize: {textBlockForMeasure.DesiredSize}, RequiredHeight: {requiredHeight:F1}");
+
+                        AdjustWindowHeightAndPosition(requiredHeight);
+                    }
+                    else
+                    {
+                        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                            "⚠️ [OVERLAY_HEIGHT_AUTO] TextBlockが見つかりません");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                        $"❌ [OVERLAY_HEIGHT_AUTO] 高さ調整エラー: {ex.Message}\n{ex.StackTrace}");
+                }
+
                 // 🔧 [PHASE4.5_DIAGNOSTIC] 表示完了後の実際のウィンドウサイズを記録
                 var actualWidth = Width;
                 var actualHeight = Height;
@@ -291,6 +324,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             else
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ [InPlaceTranslationOverlay] InPlaceTranslatedTextBlockが見つかりません");
+                return; // TextBlockが見つからない場合は処理を中断
             }
 
             // Border の洗練されたデザイン適用
@@ -310,7 +344,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 
                 // ブラー効果風の薄い白背景
                 border.Background = new SolidColorBrush(Color.FromArgb(230, 255, 255, 255)); // ごく薄い白（90%透明度）
-                
+
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] 視認性向上インプレーススタイル適用完了（改善モード）");
             }
         }
@@ -318,6 +352,70 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
         {
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ [InPlaceTranslationOverlay] インプレーススタイル適用エラー: {ex.Message}");
             _logger?.LogError(ex, "❌ インプレーススタイル適用エラー - ChunkId: {ChunkId}", ChunkId);
+        }
+    }
+
+    /// <summary>
+    /// ウィンドウの高さを調整し、画面外にはみ出す場合はY座標を調整
+    /// </summary>
+    private void AdjustWindowHeightAndPosition(double requiredHeight)
+    {
+        try
+        {
+            var currentPosition = Position;
+            var currentX = currentPosition.X;
+            var currentY = currentPosition.Y;
+
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                $"🔧 [OVERLAY_HEIGHT_AUTO] 調整前 - Position: ({currentX}, {currentY}), Height: {Height:F1}");
+
+            // 🔧 [OVERLAY_HEIGHT_AUTO] ウィンドウの高さを必要な高さに調整
+            Height = requiredHeight;
+
+            // 🔧 [OVERLAY_BOUNDARY_CHECK] 画面境界チェック
+            var screen = Screens.ScreenFromPoint(currentPosition);
+            if (screen != null)
+            {
+                var screenBounds = screen.WorkingArea;
+                var overlayBottom = currentY + requiredHeight;
+
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                    $"📐 [OVERLAY_BOUNDARY_CHECK] Screen: {screenBounds}, OverlayBottom: {overlayBottom}");
+
+                // 画面下端を超える場合、Y座標を上方向にシフト
+                if (overlayBottom > screenBounds.Height)
+                {
+                    var adjustedY = (int)(screenBounds.Height - requiredHeight);
+
+                    // TargetBounds（元テキストの位置）より上には行かないように制限
+                    if (adjustedY < TargetBounds.Y)
+                    {
+                        adjustedY = TargetBounds.Y;
+                        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                            $"⚠️ [OVERLAY_BOUNDARY_CHECK] Y座標を元テキスト位置に制限: {adjustedY}");
+                    }
+
+                    Position = new PixelPoint(currentX, adjustedY);
+
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                        $"🔧 [OVERLAY_BOUNDARY_CHECK] Y座標を調整: {currentY} → {adjustedY} " +
+                        $"(画面外はみ出し防止)");
+                }
+                else
+                {
+                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                        $"✅ [OVERLAY_BOUNDARY_CHECK] 画面内に収まっています");
+                }
+            }
+
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                $"✅ [OVERLAY_HEIGHT_AUTO] 調整後 - Position: {Position}, Height: {Height:F1}");
+        }
+        catch (Exception ex)
+        {
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                $"❌ [OVERLAY_HEIGHT_AUTO] 高さ・位置調整エラー: {ex.Message}");
+            _logger?.LogError(ex, "❌ ウィンドウ高さ・位置調整エラー - ChunkId: {ChunkId}", ChunkId);
         }
     }
 
