@@ -15,11 +15,12 @@ public sealed class ProximityGroupingSettings
 
     /// <summary>
     /// 垂直距離倍率（文字高さに対する倍率）
-    /// 0.2 = 文字高さの0.2倍まで同一グループ（極めて厳格）
+    /// 0.2 = 文字高さの0.2倍まで同一グループ（極めて厳格、行間統合不可）
     /// 1.0 = 文字高さと同じ距離まで同一グループ
+    /// 1.5 = 文字高さの1.5倍まで同一グループ（広い行間対応、推奨）
     /// </summary>
     [Range(0.5, 3.0)]
-    public double VerticalDistanceFactor { get; set; } = 0.2;
+    public double VerticalDistanceFactor { get; set; } = 1.5;
 
     /// <summary>
     /// 水平距離倍率（平均文字幅に対する倍率）
@@ -77,7 +78,7 @@ public sealed class ProximityGroupingSettings
     public static ProximityGroupingSettings Default => new()
     {
         Enabled = true,
-        VerticalDistanceFactor = 0.2,
+        VerticalDistanceFactor = 1.5,
         HorizontalDistanceFactor = 3.0,
         CrossRowHorizontalDistanceFactor = 2.0,
         MaxCrossRowHorizontalGapPixels = 100,
@@ -93,7 +94,7 @@ public sealed class ProximityGroupingSettings
     public static ProximityGroupingSettings Development => new()
     {
         Enabled = true,
-        VerticalDistanceFactor = 0.2,
+        VerticalDistanceFactor = 1.5,
         HorizontalDistanceFactor = 3.0,
         CrossRowHorizontalDistanceFactor = 2.5,
         MaxCrossRowHorizontalGapPixels = 120,
