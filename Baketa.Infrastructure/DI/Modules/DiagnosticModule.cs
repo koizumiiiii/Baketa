@@ -26,6 +26,10 @@ public sealed class DiagnosticModule : ServiceModuleBase
         services.AddHostedService<QueuedHostedService>();
         Console.WriteLine("🔍 [DIAGNOSTIC] BackgroundTaskQueue登録完了");
 
+        // ROI画像自動クリーンアップサービス
+        services.AddHostedService<RoiImageCleanupHostedService>();
+        Console.WriteLine("🔍 [DIAGNOSTIC] RoiImageCleanupHostedService登録完了");
+
         // 診断サービス群
         services.AddSingleton<IDiagnosticReportGenerator, DiagnosticReportGenerator>();
         services.AddSingleton<IDiagnosticCollectionService, DiagnosticCollectionService>();
