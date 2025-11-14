@@ -77,13 +77,6 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Install Windows 10 SDK 19041
-      run: |
-        Write-Host "Installing Windows 10 SDK 19041..."
-        choco install windows-sdk-10-version-2004-all --yes --no-progress --force
-        Write-Host "Windows 10 SDK installation completed"
-      shell: powershell
-
     - name: Download Native DLL
       uses: actions/download-artifact@v5
       with:
@@ -100,7 +93,7 @@ jobs:
           
     - name: Copy Native DLL to Output
       run: |
-        $outputPath = "Baketa.UI\bin\x64\Debug\net8.0-windows10.0.19041.0"
+        $outputPath = "Baketa.UI\bin\x64\Debug\net8.0-windows10.0.22621.0"
         New-Item -ItemType Directory -Path $outputPath -Force
         Copy-Item "BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll" $outputPath -Force
         Copy-Item "BaketaCaptureNative\bin\Debug\BaketaCaptureNative.pdb" $outputPath -Force
