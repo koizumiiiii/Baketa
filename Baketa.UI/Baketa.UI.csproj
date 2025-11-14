@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
@@ -109,8 +109,8 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>BaketaCaptureNative.dll</Link>
 		</None>
-		<!-- net8.0-windows10.0.22621.0フォルダにあるDLLを直接リンク（暫定対応） -->
-		<None Include="..\Baketa.Infrastructure.Platform\bin\x64\Debug\net8.0-windows10.0.22621.0\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Debug' and '$(Platform)' == 'x64' and Exists('..\Baketa.Infrastructure.Platform\bin\x64\Debug\net8.0-windows10.0.22621.0\BaketaCaptureNative.dll')">
+		<!-- net8.0-windows10.0.19041.0フォルダにあるDLLを直接リンク（暫定対応） -->
+		<None Include="..\Baketa.Infrastructure.Platform\bin\x64\Debug\net8.0-windows10.0.19041.0\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Debug' and '$(Platform)' == 'x64' and Exists('..\Baketa.Infrastructure.Platform\bin\x64\Debug\net8.0-windows10.0.19041.0\BaketaCaptureNative.dll')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>BaketaCaptureNative.dll</Link>
 		</None>
