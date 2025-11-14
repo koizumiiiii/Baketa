@@ -7,6 +7,9 @@
 		<UseWPF>true</UseWPF>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Platforms>AnyCPU;x64</Platforms>
+		<!-- Windows Platform設定の明示的指定（GitHub Actions CodeQL対応） -->
+		<TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+		<TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>
 		<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
 		<UseWinRT>true</UseWinRT>
 		<!-- プラットフォーム固有実装の警告抑制 - Win32パッケージ削除後の最適化版 -->
