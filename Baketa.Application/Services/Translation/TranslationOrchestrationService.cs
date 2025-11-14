@@ -485,20 +485,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     await _automaticTranslationTask.WaitAsync(combinedCts.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (_automaticTranslationCts?.Token.IsCancellationRequested == true)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    // 内部タスクのキャンセルは正常な停止操作
-                    _logger?.LogDebug("自動翻訳タスクが正常にキャンセルされました");
+                    // 外部からのキャンセルは再スロー（最優先で処理）
+                    _logger?.LogDebug("自動翻訳の停止が外部からキャンセルされました");
+                    throw;
                 }
-                catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested)
                 {
                     _logger?.LogWarning("自動翻訳の停止がタイムアウトしました");
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException)
                 {
-                    // 外部からのキャンセルは再スロー
-                    _logger?.LogDebug("自動翻訳の停止が外部からキャンセルされました");
-                    throw;
+                    // その他のキャンセル（内部タスクのキャンセルなど）は正常な停止操作
+                    _logger?.LogDebug("自動翻訳タスクが正常にキャンセルされました");
                 }
             }
         }
