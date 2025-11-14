@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Translation.Common;
 using Baketa.Core.Translation.Models;

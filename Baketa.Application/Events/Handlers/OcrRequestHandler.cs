@@ -62,7 +62,7 @@ public sealed class OcrRequestHandler(
 
             _logger.LogInformation("🔥 [FIX7_STEP4] OcrContext生成完了 - CaptureRegion: {HasCaptureRegion}, Value: {CaptureRegion}",
                 ocrContext.HasCaptureRegion,
-                ocrContext.HasCaptureRegion ? $"({ocrContext.CaptureRegion.Value.X},{ocrContext.CaptureRegion.Value.Y},{ocrContext.CaptureRegion.Value.Width}x{ocrContext.CaptureRegion.Value.Height})" : "null");
+                ocrContext.HasCaptureRegion ? $"({ocrContext.CaptureRegion!.Value.X},{ocrContext.CaptureRegion.Value.Y},{ocrContext.CaptureRegion.Value.Width}x{ocrContext.CaptureRegion.Value.Height})" : "null");
 
             var enhancedChunks = await _enhancedBatchOcrService.ProcessWithEnhancedOcrAsync(ocrContext).ConfigureAwait(false);
 

@@ -38,7 +38,10 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
     // パフォーマンス監視用
     private readonly ConcurrentDictionary<string, ProcessingStatistics> _processingStats;
     private long _totalProcessedImages;
+    // NOTE: readonlyを付けられない - Interlocked.Read(ref _totalAggregatedChunks)で使用するため
+#pragma warning disable IDE0044 // Interlocked操作でref引数として使用するため読み取り専用にできない
     private long _totalAggregatedChunks;
+#pragma warning restore IDE0044
     private bool _disposed;
 
     public EnhancedBatchOcrIntegrationService(

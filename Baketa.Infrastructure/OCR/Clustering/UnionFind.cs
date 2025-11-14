@@ -97,11 +97,12 @@ public sealed class UnionFind
         for (int i = 0; i < _parent.Length; i++)
         {
             int root = Find(i);
-            if (!components.ContainsKey(root))
+            if (!components.TryGetValue(root, out var list))
             {
-                components[root] = [];
+                list = [];
+                components[root] = list;
             }
-            components[root].Add(i);
+            list.Add(i);
         }
 
         return components;

@@ -31,7 +31,7 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
     /// <summary>
     /// IImageからMat形式に変換
     /// </summary>
-    public async Task<Mat> ConvertToMatAsync(IImage image, Rectangle? regionOfInterest, CancellationToken cancellationToken)
+    public async Task<Mat> ConvertToMatAsync(IImage image, Rectangle? roi, CancellationToken cancellationToken)
     {
         try
         {
@@ -67,10 +67,10 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
             }
 
             // ROI指定がある場合は切り出し
-            if (regionOfInterest.HasValue)
+            if (roi.HasValue)
             {
-                var roi = regionOfInterest.Value;
-                var rect = new Rect(roi.X, roi.Y, roi.Width, roi.Height);
+                var roiRect = roi.Value;
+                var rect = new Rect(roiRect.X, roiRect.Y, roiRect.Width, roiRect.Height);
 
                 // 🛡️ [MEMORY_PROTECTION] 画像境界チェック - Mat.Width/Heightの安全なアクセス
                 try
@@ -146,7 +146,7 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
     /// スケーリング付きでIImageからMat形式に変換
     /// </summary>
     public async Task<(Mat mat, double scaleFactor)> ConvertToMatWithScalingAsync(
-        IImage image, Rectangle? regionOfInterest, CancellationToken cancellationToken)
+        IImage image, Rectangle? roi, CancellationToken cancellationToken)
     {
         // 🔥 [ROI_NO_SCALING] ROI画像（小さい画像）は追加縮小しない
         // 問題: 全画面OCR用のscaleFactor（0.491等）がROI抽出後の小さい画像にも適用され、
@@ -160,7 +160,7 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
             _logger?.LogInformation("🎯 [ROI_NO_SCALING] ROI画像は縮小スキップ: {Width}x{Height} (高さ≤{Threshold}px)",
                 image.Width, image.Height, ROI_MIN_HEIGHT_FOR_SCALING);
 
-            var roiMat = await ConvertToMatAsync(image, regionOfInterest, cancellationToken).ConfigureAwait(false);
+            var roiMat = await ConvertToMatAsync(image, roi, cancellationToken).ConfigureAwait(false);
             return (roiMat, scaleFactor: 1.0); // スケーリングなし
         }
 
@@ -201,15 +201,15 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
 
         // Step 4: ROI座標もスケーリングに合わせて調整（精度向上版）
         Rectangle? adjustedRoi = null;
-        if (regionOfInterest.HasValue && Math.Abs(scaleFactor - 1.0) >= 0.001)
+        if (roi.HasValue && Math.Abs(scaleFactor - 1.0) >= 0.001)
         {
-            var roi = regionOfInterest.Value;
+            var roiValue = roi.Value;
 
             // 🎯 精度向上: Math.Floor/Ceilingで認識対象領域の欠落を防止
-            var x1 = roi.X * scaleFactor;
-            var y1 = roi.Y * scaleFactor;
-            var x2 = (roi.X + roi.Width) * scaleFactor;
-            var y2 = (roi.Y + roi.Height) * scaleFactor;
+            var x1 = roiValue.X * scaleFactor;
+            var y1 = roiValue.Y * scaleFactor;
+            var x2 = (roiValue.X + roiValue.Width) * scaleFactor;
+            var y2 = (roiValue.Y + roiValue.Height) * scaleFactor;
 
             var newX = (int)Math.Floor(x1);
             var newY = (int)Math.Floor(y1);
@@ -222,11 +222,11 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
             );
 
             _logger?.LogDebug("🎯 ROI座標精密スケーリング調整: {OriginalRoi} → {AdjustedRoi} (Floor/Ceiling適用)",
-                regionOfInterest.Value, adjustedRoi.Value);
+                roi.Value, adjustedRoi.Value);
         }
         else
         {
-            adjustedRoi = regionOfInterest;
+            adjustedRoi = roi;
         }
 
         // Step 5: 既存のConvertToMatAsyncを使用してMatに変換
@@ -249,7 +249,9 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
         if (inputMat == null || inputMat.Empty())
         {
             _logger?.LogWarning("⚠️ [NORMALIZE] Cannot normalize null or empty Mat");
+#pragma warning disable CS8603 // null入力時はnullを返すことを許容（呼び出し元でnullチェック実施）
             return inputMat;
+#pragma warning restore CS8603
         }
 
         try
@@ -348,15 +350,15 @@ public sealed class PaddleOcrImageProcessor : IPaddleOcrImageProcessor
 
             if (width < MIN_SIZE || height < MIN_SIZE)
             {
-                _logger?.LogError("🚨 [MAT_VALIDATION] Image too small: {Width}x{Height} (minimum: {Min}x{Min})",
-                    width, height, MIN_SIZE);
+                _logger?.LogError("🚨 [MAT_VALIDATION] Image too small: {Width}x{Height} (minimum: {MinWidth}x{MinHeight})",
+                    width, height, MIN_SIZE, MIN_SIZE);
                 return false;
             }
 
             if (width > MAX_SIZE || height > MAX_SIZE)
             {
-                _logger?.LogError("🚨 [MAT_VALIDATION] Image too large: {Width}x{Height} (maximum: {Max}x{Max})",
-                    width, height, MAX_SIZE);
+                _logger?.LogError("🚨 [MAT_VALIDATION] Image too large: {Width}x{Height} (maximum: {MaxWidth}x{MaxHeight})",
+                    width, height, MAX_SIZE, MAX_SIZE);
                 return false;
             }
 

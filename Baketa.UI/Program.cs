@@ -49,8 +49,8 @@ internal sealed class Program
         const string lockFileName = "baketa_instance.lock";
         var lockFilePath = Path.Combine(Path.GetTempPath(), lockFileName);
 
-        System.Threading.Mutex mutex = null;
-        FileStream lockFile = null;
+        System.Threading.Mutex mutex = null!;
+        FileStream lockFile = null!;
         bool isOwnerOfMutex = false;
         bool isOwnerOfFileLock = false;
 
@@ -362,7 +362,7 @@ internal sealed class Program
                 else if (initTask.IsFaulted)
                 {
                     Console.WriteLine($"🚨 [IMMEDIATE] EventHandlerInitializationService失敗: {initTask.Exception?.Flatten().Message}");
-                    throw (Exception)(initTask.Exception?.Flatten()) ?? new InvalidOperationException("InitializeAsync failed");
+                    throw (Exception)(initTask.Exception?.Flatten()!) ?? new InvalidOperationException("InitializeAsync failed");
                 }
                 else
                 {

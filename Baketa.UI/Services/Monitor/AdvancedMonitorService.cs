@@ -24,7 +24,9 @@ public sealed class AdvancedMonitorService : IAdvancedMonitorService
     private readonly object _cacheLock = new();
 
     /// <inheritdoc />
+#pragma warning disable CS0067 // イベントは将来の拡張用に予約
     public event EventHandler<MonitorConfigurationChangedEventArgs>? MonitorConfigurationChanged;
+#pragma warning restore CS0067
 
     public AdvancedMonitorService(ILogger<AdvancedMonitorService> logger)
     {
@@ -54,17 +56,17 @@ public sealed class AdvancedMonitorService : IAdvancedMonitorService
         return (width, height, dpiScaling) switch
         {
             // フルHD系
-            (1920, 1080, <= 1.1) => MonitorType.FullHD_100DPI,
-            (1920, 1080, <= 1.35) => MonitorType.FullHD_125DPI,
+            (1920, 1080, <= 1.1) => MonitorType.FullHd100Dpi,
+            (1920, 1080, <= 1.35) => MonitorType.FullHd125Dpi,
 
             // ウルトラワイド系（現在環境）
-            (2560, 1080, <= 1.1) => MonitorType.UltraWide_100DPI,
-            (2560, 1080, <= 1.35) => MonitorType.UltraWide_125DPI,
+            (2560, 1080, <= 1.1) => MonitorType.UltraWide100Dpi,
+            (2560, 1080, <= 1.35) => MonitorType.UltraWide125Dpi,
 
             // 4K系
-            (3840, 2160, <= 1.6) => MonitorType.FourK_150DPI,
-            (3840, 2160, <= 1.85) => MonitorType.FourK_175DPI,
-            (3840, 2160, <= 2.1) => MonitorType.FourK_200DPI,
+            (3840, 2160, <= 1.6) => MonitorType.FourK150Dpi,
+            (3840, 2160, <= 1.85) => MonitorType.FourK175Dpi,
+            (3840, 2160, <= 2.1) => MonitorType.FourK200Dpi,
 
             // その他
             _ => MonitorType.Custom
@@ -207,10 +209,10 @@ public sealed class AdvancedMonitorService : IAdvancedMonitorService
         // 他環境は将来のテスト結果に基づいて調整
         return monitorType switch
         {
-            MonitorType.UltraWide_100DPI => true,  // 現在の問題環境
-            MonitorType.FourK_150DPI => true,      // 高DPI環境では補正が必要になる可能性が高い
-            MonitorType.FourK_175DPI => true,
-            MonitorType.FourK_200DPI => true,
+            MonitorType.UltraWide100Dpi => true,  // 現在の問題環境
+            MonitorType.FourK150Dpi => true,      // 高DPI環境では補正が必要になる可能性が高い
+            MonitorType.FourK175Dpi => true,
+            MonitorType.FourK200Dpi => true,
             _ => avaloniaScaling > 1.1 // その他は高DPIの場合のみ補正
         };
     }

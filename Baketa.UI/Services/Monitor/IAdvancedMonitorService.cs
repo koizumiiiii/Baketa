@@ -43,25 +43,25 @@ public interface IAdvancedMonitorService
 public enum MonitorType
 {
     /// <summary>フルHD 100% DPI (1920×1080, DPI=1.0)</summary>
-    FullHD_100DPI,
+    FullHd100Dpi,
 
     /// <summary>フルHD 125% DPI (1920×1080, DPI=1.25)</summary>
-    FullHD_125DPI,
+    FullHd125Dpi,
 
     /// <summary>ウルトラワイド 100% DPI (2560×1080, DPI=1.0) - 現在環境</summary>
-    UltraWide_100DPI,
+    UltraWide100Dpi,
 
     /// <summary>ウルトラワイド 125% DPI (2560×1080, DPI=1.25)</summary>
-    UltraWide_125DPI,
+    UltraWide125Dpi,
 
     /// <summary>4K 150% DPI (3840×2160, DPI=1.5)</summary>
-    FourK_150DPI,
+    FourK150Dpi,
 
     /// <summary>4K 175% DPI (3840×2160, DPI=1.75)</summary>
-    FourK_175DPI,
+    FourK175Dpi,
 
     /// <summary>4K 200% DPI (3840×2160, DPI=2.0)</summary>
-    FourK_200DPI,
+    FourK200Dpi,
 
     /// <summary>その他の解像度・DPI組み合わせ</summary>
     Custom

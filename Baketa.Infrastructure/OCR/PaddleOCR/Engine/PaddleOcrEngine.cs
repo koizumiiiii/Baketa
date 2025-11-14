@@ -2668,7 +2668,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                 }
 
                 // 🎯 [GEMINI_MEMORY_SEPARATION] byte[]から新しいMatを再構築 - 完全なスレッド分離
-                Mat reconstructedMat = null;
+                Mat reconstructedMat = null!;
                 try
                 {
                     __logger?.LogDebug("🔄 [MAT_RECONSTRUCTION] byte[]からMat再構築: {Size}, Type={Type}, データサイズ={DataSize:N0}bytes",
@@ -2939,7 +2939,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
     private async Task<object> ExecuteOcrInSeparateTaskOptimized(Mat processedMat, CancellationToken cancellationToken, int timeoutSeconds = 15)
     {
         // 🧠 [ULTRATHINK_GEMINI_FIX] Gemini推奨Mat防御的コピー戦略（最適化版） - メモリ競合回避
-        Mat safeMat = null;
+        Mat safeMat = null!;
         try
         {
             safeMat = processedMat.Clone(); // 防御的コピー作成
@@ -3007,7 +3007,9 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
                         // 🧠 [GEMINI_MAT_FIX] safeMatを安全に置き換え（最適化版）
                         safeMat.Dispose(); // 古いsafeMatを解放
+#pragma warning disable CS0728 // using内でのローカル変数代入は意図的（元のsafeMatはすでにDispose済み）
                         safeMat = resizedMat.Clone(); // 新しいサイズのsafeMatに更新
+#pragma warning restore CS0728
 
                         var finalPixels = safeMat.Cols * safeMat.Rows;
                         __logger?.LogDebug("✅ [IMAGE_RESIZE_OPT] 高速リサイズ完了: {NewWidth}x{NewHeight}={FinalPixels:N0}ピクセル (縮小率: {Scale:F3})",
@@ -3028,7 +3030,7 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                             }
 
                             // 🔍 [CRITICAL_DEBUG_OPT] PaddleOCR実行前のMat詳細検証と自動修正（軽量版）
-                            Mat workingMat = null;
+                            Mat workingMat = null!;
                             try
                             {
                                 // 🧠 [GEMINI_MAT_FIX] 既に防御的コピー済safeMatを使用（最適化版）
@@ -3543,15 +3545,15 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
 
             if (width < MIN_SIZE || height < MIN_SIZE)
             {
-                __logger?.LogError("🚨 [MAT_VALIDATION] Image too small: {Width}x{Height} (minimum: {Min}x{Min})",
-                    width, height, MIN_SIZE);
+                __logger?.LogError("🚨 [MAT_VALIDATION] Image too small: {Width}x{Height} (minimum: {MinWidth}x{MinHeight})",
+                    width, height, MIN_SIZE, MIN_SIZE);
                 return false;
             }
 
             if (width > MAX_SIZE || height > MAX_SIZE)
             {
-                __logger?.LogError("🚨 [MAT_VALIDATION] Image too large: {Width}x{Height} (maximum: {Max}x{Max})",
-                    width, height, MAX_SIZE);
+                __logger?.LogError("🚨 [MAT_VALIDATION] Image too large: {Width}x{Height} (maximum: {MaxWidth}x{MaxHeight})",
+                    width, height, MAX_SIZE, MAX_SIZE);
                 return false;
             }
 
@@ -3641,7 +3643,9 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
         if (inputMat == null || inputMat.Empty())
         {
             __logger?.LogWarning("⚠️ [NORMALIZE] Cannot normalize null or empty Mat");
+#pragma warning disable CS8603 // null入力時はnullを返すことを許容（呼び出し元でnullチェック実施）
             return inputMat;
+#pragma warning restore CS8603
         }
 
         try
@@ -4294,9 +4298,9 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
             // ステップ1: 極端なサイズ問題の予防
             // 🔥 [PHASE5_COORDINATE_FIX] AdaptiveImageScalerと同じ3M制限に統一（座標ずれ修正）
             var totalPixels = processedMat.Width * processedMat.Height;
-            if (totalPixels > AdaptiveImageScaler.PADDLE_OCR_MEMORY_LIMIT_PIXELS)
+            if (totalPixels > AdaptiveImageScaler.PaddleOcrMemoryLimitPixels)
             {
-                var scale = Math.Sqrt((double)AdaptiveImageScaler.PADDLE_OCR_MEMORY_LIMIT_PIXELS / totalPixels);
+                var scale = Math.Sqrt((double)AdaptiveImageScaler.PaddleOcrMemoryLimitPixels / totalPixels);
                 var newWidth = Math.Max(16, (int)(processedMat.Width * scale));
                 var newHeight = Math.Max(16, (int)(processedMat.Height * scale));
 

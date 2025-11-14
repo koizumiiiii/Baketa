@@ -115,10 +115,10 @@ public sealed class QueuedHostedService : Microsoft.Extensions.Hosting.Backgroun
         }
     }
 
-    public override async Task StopAsync(CancellationToken stoppingToken)
+    public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("バックグラウンドタスクキュー停止");
 
-        await base.StopAsync(stoppingToken);
+        await base.StopAsync(cancellationToken);
     }
 }

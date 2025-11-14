@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 一時的にFodyを無効化：OutOfMemoryException回避のため -->
-<Weavers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="FodyWeavers.xsd">
-  <!-- <ReactiveUI /> -->
+<Weavers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="FodyWeavers.xsd" VerifyAssembly="false">
+  <!-- ReactiveUIを明示的に無効化: OutOfMemoryException回避のため -->
 </Weavers>

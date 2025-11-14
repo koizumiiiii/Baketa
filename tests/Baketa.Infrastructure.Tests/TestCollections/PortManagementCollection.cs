@@ -7,7 +7,9 @@ namespace Baketa.Infrastructure.Tests.TestCollections;
 /// ポート競合を避けるため、関連テストを順次実行
 /// </summary>
 [CollectionDefinition("PortManagement")]
+#pragma warning disable CA1711 // xUnit CollectionDefinitionのためCollectionサフィックスは必須
 public class PortManagementCollection : ICollectionFixture<PortManagementFixture>
+#pragma warning restore CA1711
 {
 }
 

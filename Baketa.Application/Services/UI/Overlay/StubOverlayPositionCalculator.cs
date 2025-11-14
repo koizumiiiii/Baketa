@@ -71,8 +71,7 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
     /// <inheritdoc />
     public async Task<Rectangle> CalculateOptimalPositionAsync(PositionCalculationRequest request, CancellationToken cancellationToken = default)
     {
-        if (request == null)
-            throw new ArgumentNullException(nameof(request));
+        ArgumentNullException.ThrowIfNull(request);
 
         try
         {

@@ -515,9 +515,13 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
             System.Diagnostics.Debug.WriteLine($"🚀 ネイティブ Windows Graphics Capture API 試行開始: Handle={handle}");
 
             // ネイティブキャプチャラッパーを使用
+            // NOTE: WindowsImageFactoryは実際には使用されないため、意図的にnullを渡している
+            // 実行時例外はtry-catchブロックで処理される
+#pragma warning disable CS8625 // null リテラルを null 非許容参照型に変換できません
             using var nativeCapture = new Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper(
-                new Baketa.Infrastructure.Platform.Windows.WindowsImageFactory(null, null),
-                null);
+                new Baketa.Infrastructure.Platform.Windows.WindowsImageFactory(null!, null!),
+                null!);
+#pragma warning restore CS8625
 
             // ライブラリを初期化
             if (!nativeCapture.Initialize())

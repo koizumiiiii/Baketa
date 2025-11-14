@@ -397,6 +397,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                     Console.WriteLine("📥 [PHASE22] TimedChunkAggregator統合フロー - 集約完了後に翻訳処理が実行されます");
                     */
                 }
+#pragma warning disable CS0162 // 到達不可能コード: 意図的に無効化されたフォールバックロジック
                 else if (false) // 🔥 到達不可能コード無効化（Line 267と同じ条件のため絶対到達しない）
                 {
                     // フォールバック: EnhancedBatchOcrIntegrationServiceが利用できない場合は従来のOCRCompletedEvent発行
@@ -424,6 +425,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                         _logger?.LogInformation("🎯 [PHASE22] フォールバックOCRCompletedEvent発行完了");
                     }
                 }
+#pragma warning restore CS0162
                 else if (!string.IsNullOrWhiteSpace(result.OcrResult.DetectedText))
                 {
                     // 最終フォールバック: DetectedTextのみ利用可能な場合

@@ -55,7 +55,7 @@ public sealed class BatchOcrIntegrationService : IDisposable
 
         _logger?.LogInformation("🔥 [FIX7_STEP2] ProcessWithIntegratedOcrAsync開始 - CaptureRegion: {HasCaptureRegion}, Value: {CaptureRegion}",
             context.HasCaptureRegion,
-            context.HasCaptureRegion ? $"({context.CaptureRegion.Value.X},{context.CaptureRegion.Value.Y},{context.CaptureRegion.Value.Width}x{context.CaptureRegion.Value.Height})" : "null");
+            context.HasCaptureRegion ? $"({context.CaptureRegion!.Value.X},{context.CaptureRegion.Value.Y},{context.CaptureRegion.Value.Width}x{context.CaptureRegion.Value.Height})" : "null");
 
         // HybridResourceManager経由でリソース制御付きOCR処理を実行
         var request = new ProcessingRequest(

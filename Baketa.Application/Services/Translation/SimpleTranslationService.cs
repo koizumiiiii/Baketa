@@ -74,8 +74,7 @@ public sealed class SimpleTranslationService : ISimpleTranslationService, IDispo
         WindowInfo windowInfo,
         CancellationToken cancellationToken = default)
     {
-        if (windowInfo == null)
-            throw new ArgumentNullException(nameof(windowInfo));
+        ArgumentNullException.ThrowIfNull(windowInfo);
 
         ObjectDisposedException.ThrowIf(_disposed, this);
 

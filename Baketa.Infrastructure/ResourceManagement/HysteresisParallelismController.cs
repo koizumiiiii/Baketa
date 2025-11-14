@@ -51,10 +51,7 @@ public sealed class HysteresisParallelismController : IDisposable
     /// </summary>
     public async Task<int> AdjustParallelismAsync(GpuVramMetrics gpuMetrics, SystemLoad systemLoad, CancellationToken cancellationToken = default)
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(HysteresisParallelismController));
-        }
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         lock (_stateLock)
         {

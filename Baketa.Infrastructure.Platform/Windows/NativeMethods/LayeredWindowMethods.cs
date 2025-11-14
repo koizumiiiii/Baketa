@@ -375,7 +375,9 @@ internal enum ShowWindowCommands
     SW_SHOWNORMAL = 1,
     SW_SHOWMINIMIZED = 2,
     SW_SHOWMAXIMIZED = 3,
+#pragma warning disable CA1069 // Windows API定義でSW_MAXIMIZEとSW_SHOWMAXIMIZEDは意図的に同じ値
     SW_MAXIMIZE = 3,
+#pragma warning restore CA1069
     SW_SHOWNOACTIVATE = 4,
     SW_SHOW = 5,
     SW_MINIMIZE = 6,

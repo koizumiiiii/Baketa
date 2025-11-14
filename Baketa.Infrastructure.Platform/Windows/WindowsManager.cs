@@ -307,7 +307,9 @@ public class WindowsManager : IWindowManager
                             uint windowProcessId = 0;
                             var processIdTask = Task.Run(() =>
                             {
+#pragma warning disable CA1806 // out引数でpidが取得できるため戻り値チェックは不要
                                 NativeMethods.User32Methods.GetWindowThreadProcessId(hWnd, out uint pid);
+#pragma warning restore CA1806
                                 return pid;
                             });
                             if (!processIdTask.Wait(500)) // 0.5秒タイムアウト

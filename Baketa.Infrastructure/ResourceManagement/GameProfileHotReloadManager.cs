@@ -292,7 +292,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
     public AbTestSummary GetAbTestSummary(string gameProcessName)
     {
         var variants = _abTestMetrics
-            .Where(kvp => kvp.Key.StartsWith($"{gameProcessName}_"))
+            .Where(kvp => kvp.Key.StartsWith($"{gameProcessName}_", StringComparison.Ordinal))
             .ToDictionary(kvp => kvp.Key.Substring($"{gameProcessName}_".Length), kvp => kvp.Value);
 
         if (!variants.Any())
@@ -458,9 +458,8 @@ public sealed class GameProfileHotReloadManager : IDisposable
 
             lock (_profileLock)
             {
-                if (_gameProfiles.ContainsKey(gameName))
+                if (_gameProfiles.Remove(gameName))
                 {
-                    _gameProfiles.Remove(gameName);
                     _logger.LogInformation("🗑️ [PHASE3] プロファイル削除検出: {GameName}", gameName);
                 }
             }

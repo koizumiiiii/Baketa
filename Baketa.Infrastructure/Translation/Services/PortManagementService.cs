@@ -247,7 +247,7 @@ public class PortManagementService : IPortManagementService
                 var fileName = Path.GetFileName(filePath);
 
                 // ファイル名からプロセスID抽出: translation_ports_{PID}.json
-                if (fileName.StartsWith("translation_ports_") && fileName.EndsWith(".json"))
+                if (fileName.StartsWith("translation_ports_", StringComparison.Ordinal) && fileName.EndsWith(".json", StringComparison.Ordinal))
                 {
                     var pidString = fileName.Substring("translation_ports_".Length, fileName.Length - "translation_ports_".Length - ".json".Length);
 

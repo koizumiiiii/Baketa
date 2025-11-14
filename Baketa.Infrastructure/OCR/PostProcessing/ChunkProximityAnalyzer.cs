@@ -12,8 +12,8 @@ namespace Baketa.Infrastructure.OCR.PostProcessing;
 /// </summary>
 public sealed class ChunkProximityAnalyzer
 {
-    private readonly ILogger<ChunkProximityAnalyzer> _logger;
-    private readonly ProximityGroupingSettings _settings;
+    private readonly ILogger<ChunkProximityAnalyzer> _logger = null!;
+    private readonly ProximityGroupingSettings _settings = null!;
 
     /// <summary>
     /// 垂直距離倍率（文字高さに対する倍率）

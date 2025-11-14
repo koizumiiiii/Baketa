@@ -2212,11 +2212,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             {
                 _logger?.LogTrace("✅ NLLB-200翻訳成功: '{Text}' -> '{Translation}' ({SourceLang} -> {TargetLang})",
                     text, translatedText, sourceLanguage, targetLanguage);
-                return translatedText;
+                return translatedText!;
             }
 
             _logger?.LogTrace("🔄 NLLB-200翻訳結果が元のテキストと同じ: '{Text}'", text);
-            return translatedText;
+            return translatedText!;
         }
         catch (Exception ex)
         {

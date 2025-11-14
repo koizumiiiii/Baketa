@@ -26,8 +26,7 @@ public sealed class SimpleErrorHandler : ISimpleErrorHandler
     /// </summary>
     public async Task<bool> HandleErrorAsync(SimpleError errorInfo)
     {
-        if (errorInfo == null)
-            throw new ArgumentNullException(nameof(errorInfo));
+        ArgumentNullException.ThrowIfNull(errorInfo);
 
         await Task.CompletedTask.ConfigureAwait(false);
 

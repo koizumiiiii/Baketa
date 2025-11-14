@@ -274,7 +274,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
     public void Show()
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(LayeredOverlayWindow));
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _messageQueue.Add(() =>
         {
@@ -292,7 +292,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
     public void Hide()
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(LayeredOverlayWindow));
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _messageQueue.Add(() =>
         {
@@ -331,7 +331,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
     public void SetText(string text)
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(LayeredOverlayWindow));
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (string.IsNullOrWhiteSpace(text)) return;
 
         _currentText = text;
@@ -350,7 +350,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
     public void SetPosition(int x, int y)
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(LayeredOverlayWindow));
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _currentX = x;
         _currentY = y;
@@ -376,7 +376,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
     public void SetSize(int width, int height)
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(LayeredOverlayWindow));
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (width <= 0 || height <= 0) return;
 
         _currentWidth = width;
@@ -404,7 +404,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
     public void SetBackgroundColor(byte a, byte r, byte g, byte b)
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(LayeredOverlayWindow));
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _backgroundColor = Color.FromArgb(a, r, g, b);
 
@@ -639,7 +639,9 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
         if (_hdcScreen != IntPtr.Zero)
         {
+#pragma warning disable CA1806 // クリーンアップ処理のため戻り値チェックは不要
             User32Methods.ReleaseDC(IntPtr.Zero, _hdcScreen);
+#pragma warning restore CA1806
             _hdcScreen = IntPtr.Zero;
         }
     }

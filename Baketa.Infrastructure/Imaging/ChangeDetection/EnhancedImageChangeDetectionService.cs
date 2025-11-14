@@ -399,8 +399,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             // 🔍 P0システム動作確認用 - ハッシュ値デバッグログ
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                var prevHashShort = string.IsNullOrEmpty(previousHash) ? "NULL" : previousHash.Substring(0, Math.Min(8, previousHash.Length)) + "...";
-                var currHashShort = string.IsNullOrEmpty(currentHash) ? "NULL" : currentHash.Substring(0, Math.Min(8, currentHash.Length)) + "...";
+                var prevHashShort = string.IsNullOrEmpty(previousHash) ? "NULL" : string.Concat(previousHash.AsSpan(0, Math.Min(8, previousHash.Length)), "...");
+                var currHashShort = string.IsNullOrEmpty(currentHash) ? "NULL" : string.Concat(currentHash.AsSpan(0, Math.Min(8, currentHash.Length)), "...");
 
                 _logger.LogDebug("🔍 [P0_HASH_DEBUG] Algorithm: {Algorithm}, PrevHash: {PrevHash}, CurrHash: {CurrHash}, Similarity: {Similarity:F4}, HasChange: {HasChange}, ContextId: {ContextId}",
                     quickAlgorithm, prevHashShort, currHashShort, similarity, hasPotentialChange, contextId);

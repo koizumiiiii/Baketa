@@ -45,8 +45,7 @@ public sealed class VramCapacityDetector : IDisposable
     /// </summary>
     public async Task<long> DetectVramCapacityAsync(CancellationToken cancellationToken = default)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(VramCapacityDetector));
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         lock (_detectionLock)
         {

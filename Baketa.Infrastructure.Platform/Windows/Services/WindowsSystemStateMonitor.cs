@@ -234,7 +234,7 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
 
         public MEMORYSTATUSEX()
         {
-            dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+            dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>();
         }
     }
 

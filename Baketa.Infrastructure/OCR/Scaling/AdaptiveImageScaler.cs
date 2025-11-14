@@ -14,7 +14,7 @@ public static class AdaptiveImageScaler
     // 4,000,000ピクセル → 3440x1440 (UWQHD) で約0.90スケール (sqrt(4M/4.95M) = 0.898)
     // 3,000,000 (旧) → 0.78スケールでは小文字認識が不十分
     // 🔥 [PHASE5_COORDINATE_FIX] PaddleOcrEngineの予防処理と統一するためpublicに変更
-    public const int PADDLE_OCR_MEMORY_LIMIT_PIXELS = 4_000_000;
+    public const int PaddleOcrMemoryLimitPixels = 4_000_000;
 
     /// <summary>
     /// PaddleOCR処理に最適な画像サイズを計算
@@ -39,8 +39,8 @@ public static class AdaptiveImageScaler
 
         // Step 2: ピクセル総数2M制限チェック  
         long totalPixels = (long)originalWidth * originalHeight;
-        double memoryScale = totalPixels > PADDLE_OCR_MEMORY_LIMIT_PIXELS
-            ? Math.Sqrt((double)PADDLE_OCR_MEMORY_LIMIT_PIXELS / totalPixels)
+        double memoryScale = totalPixels > PaddleOcrMemoryLimitPixels
+            ? Math.Sqrt((double)PaddleOcrMemoryLimitPixels / totalPixels)
             : 1.0;
 
         // Step 3: より厳しい制限を採用、拡大は禁止
@@ -100,8 +100,8 @@ public static class AdaptiveImageScaler
         );
 
         long totalPixels = (long)originalWidth * originalHeight;
-        double memoryScale = totalPixels > PADDLE_OCR_MEMORY_LIMIT_PIXELS
-            ? Math.Sqrt((double)PADDLE_OCR_MEMORY_LIMIT_PIXELS / totalPixels)
+        double memoryScale = totalPixels > PaddleOcrMemoryLimitPixels
+            ? Math.Sqrt((double)PaddleOcrMemoryLimitPixels / totalPixels)
             : 1.0;
 
         if (dimensionScale >= 1.0 && memoryScale >= 1.0)

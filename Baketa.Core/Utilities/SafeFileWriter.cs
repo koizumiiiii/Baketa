@@ -22,10 +22,12 @@ public static class SafeFileWriter
         encoding ??= Encoding.UTF8;
 
         // ファイルパス別の専用ロック取得
-        object fileLock;
+        object fileLock = null!;
         lock (_fileLock)
         {
+#pragma warning disable CS8600 // TryGetValue失敗時にnullが設定されるが、次の行で必ず非null値を設定
             if (!_fileLocks.TryGetValue(filePath, out fileLock))
+#pragma warning restore CS8600
             {
                 fileLock = new object();
                 _fileLocks[filePath] = fileLock;

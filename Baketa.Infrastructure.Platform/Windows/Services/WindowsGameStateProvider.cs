@@ -117,7 +117,9 @@ public sealed class WindowsGameStateProvider : IGameStateProvider
             }
 
             // フォアグラウンドプロセスの取得
+#pragma warning disable CA1806 // out引数でprocessIdが取得できるため戻り値チェックは不要
             GetWindowThreadProcessId(foregroundWindow, out uint processId);
+#pragma warning restore CA1806
             var process = Process.GetProcessById((int)processId);
 
             if (process == null)

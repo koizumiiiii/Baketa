@@ -58,7 +58,9 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
 
     public event EventHandler<ResourceStateChangedEventArgs>? ResourceStateChanged;
     public event EventHandler<HysteresisStateChangedEventArgs>? HysteresisStateChanged;
+#pragma warning disable CS0067 // イベントは将来の拡張用に予約
     public event EventHandler<PredictiveControlTriggeredEventArgs>? PredictiveControlTriggered;
+#pragma warning restore CS0067
 
     public bool Initialize()
     {

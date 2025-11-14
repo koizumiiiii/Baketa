@@ -401,6 +401,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // TimedChunkAggregatorがAggregatedChunksReadyEventを発行 → AggregatedChunksReadyEventHandlerで翻訳 + オーバーレイ表示
             return;
 
+#pragma warning disable CS0162 // 到達不可能コード: Phase 12.2完全移行後に削除予定（後方互換性のため一時保持）
             // 🚨 [PHASE12.2_TRACE] トレースログ5: returnの後（実行されないはず）
             Console.WriteLine("🚨🚨🚨 [PHASE12.2_TRACE] TRACE-5: ❌ returnの後が実行されている！！ ❌");
 
@@ -912,6 +913,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogError(ex, "❌ 座標ベース翻訳処理でエラーが発生しました");
             throw;
         }
+#pragma warning restore CS0162
     }
 
     /// <summary>
@@ -1515,7 +1517,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 [combinedText],
                 Language.FromCode(eventData.SourceLanguage),
                 Language.FromCode(eventData.TargetLanguage),
-                null,
+                null!,
                 CancellationToken.None).ConfigureAwait(false);
 
             if (translationResult != null && translationResult.Count > 0)

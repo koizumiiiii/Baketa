@@ -136,24 +136,24 @@ public sealed class DetailedPerformanceMetrics : IDisposable
                     );
 
                     // パフォーマンスカウンタから値を取得
-                    if (_performanceCounters.ContainsKey("Memory"))
+                    if (_performanceCounters.TryGetValue("Memory", out var memoryCounter))
                     {
-                        snapshot.MemoryUsageMB = (long)(_performanceCounters["Memory"].NextValue() / (1024 * 1024));
+                        snapshot.MemoryUsageMB = (long)(memoryCounter.NextValue() / (1024 * 1024));
                     }
 
-                    if (_performanceCounters.ContainsKey("Threads"))
+                    if (_performanceCounters.TryGetValue("Threads", out var threadsCounter))
                     {
-                        snapshot.ThreadCount = (int)_performanceCounters["Threads"].NextValue();
+                        snapshot.ThreadCount = (int)threadsCounter.NextValue();
                     }
 
-                    if (_performanceCounters.ContainsKey("HandleCount"))
+                    if (_performanceCounters.TryGetValue("HandleCount", out var handleCounter))
                     {
-                        snapshot.HandleCount = (int)_performanceCounters["HandleCount"].NextValue();
+                        snapshot.HandleCount = (int)handleCounter.NextValue();
                     }
 
-                    if (_performanceCounters.ContainsKey("AvailableMemory"))
+                    if (_performanceCounters.TryGetValue("AvailableMemory", out var availableMemoryCounter))
                     {
-                        snapshot.AvailableSystemMemoryMB = (long)_performanceCounters["AvailableMemory"].NextValue();
+                        snapshot.AvailableSystemMemoryMB = (long)availableMemoryCounter.NextValue();
                     }
 
                     // GPU使用率（推定値）

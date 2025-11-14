@@ -1,4 +1,10 @@
 #pragma warning disable CS0618 // Type or member is obsolete
+using System;
+using System.Globalization;
+using System.Linq;
+using System.Reactive.Linq;
+using System.Threading.Tasks;
+using System.Windows.Input;
 using Baketa.Application.Services.Diagnostics;
 using Baketa.Application.Services.Translation;
 using Baketa.Application.Services.UI;
@@ -18,12 +24,6 @@ using Baketa.UI.Views;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
-using System;
-using System.Globalization;
-using System.Linq;
-using System.Reactive.Linq;
-using System.Threading.Tasks;
-using System.Windows.Input;
 using WindowInfo = Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo;
 
 namespace Baketa.UI.ViewModels;

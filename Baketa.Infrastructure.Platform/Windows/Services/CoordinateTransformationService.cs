@@ -197,7 +197,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
 
             // 🔥 [PHASE2_MAXIMIZED_WINDOW] 最大化ウィンドウの検出と補正
             var placement = new WINDOWPLACEMENT();
-            placement.length = Marshal.SizeOf(typeof(WINDOWPLACEMENT));
+            placement.length = Marshal.SizeOf<WINDOWPLACEMENT>();
 
             if (GetWindowPlacement(windowHandle, ref placement))
             {
@@ -213,7 +213,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                     if (hMonitor != IntPtr.Zero)
                     {
                         var monitorInfo = new MONITORINFO();
-                        monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+                        monitorInfo.cbSize = Marshal.SizeOf<MONITORINFO>();
 
                         if (GetMonitorInfo(hMonitor, ref monitorInfo))
                         {
@@ -316,7 +316,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
 
             // 🔥 [PHASE2_BATCH_OPTIMIZATION] 最大化ウィンドウ情報とモニタ情報を1回だけ取得
             var placement = new WINDOWPLACEMENT();
-            placement.length = Marshal.SizeOf(typeof(WINDOWPLACEMENT));
+            placement.length = Marshal.SizeOf<WINDOWPLACEMENT>();
             var isMaximized = false;
             MONITORINFO monitorInfo = default;
             var hasMonitorInfo = false;
@@ -331,7 +331,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                     if (hMonitor != IntPtr.Zero)
                     {
                         monitorInfo = new MONITORINFO();
-                        monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+                        monitorInfo.cbSize = Marshal.SizeOf<MONITORINFO>();
                         hasMonitorInfo = GetMonitorInfo(hMonitor, ref monitorInfo);
 
                         if (hasMonitorInfo)
@@ -467,7 +467,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                 windowHandle,
                 DWMWA_EXTENDED_FRAME_BOUNDS,
                 out RECT dwmRect,
-                Marshal.SizeOf(typeof(RECT)));
+                Marshal.SizeOf<RECT>());
 
             if (hr != 0) // HRESULT失敗
             {
@@ -484,7 +484,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
             }
 
             var monitorInfo = new MONITORINFO();
-            monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+            monitorInfo.cbSize = Marshal.SizeOf<MONITORINFO>();
             if (!GetMonitorInfo(hMonitor, ref monitorInfo))
             {
                 _logger.LogDebug("⚠️ [PHASE2.1_DWM] GetMonitorInfo失敗");
@@ -561,7 +561,7 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
             }
 
             var monitorInfo = new MONITORINFO();
-            monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+            monitorInfo.cbSize = Marshal.SizeOf<MONITORINFO>();
             if (!GetMonitorInfo(hMonitor, ref monitorInfo))
             {
                 return false;

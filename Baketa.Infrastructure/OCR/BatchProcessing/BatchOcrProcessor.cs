@@ -2144,7 +2144,7 @@ public sealed class BatchOcrProcessor(
             }
 
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
-            var extension = _roiDiagnosticsSettings.RoiImageFormat.ToLower() switch
+            var extension = _roiDiagnosticsSettings.RoiImageFormat.ToLower(System.Globalization.CultureInfo.InvariantCulture) switch
             {
                 "jpeg" => "jpg",
                 "jpg" => "jpg",

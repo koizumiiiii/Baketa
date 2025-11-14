@@ -88,10 +88,12 @@ public class InPlaceOverlayFactory(
 
                 // モニター情報取得
                 var monitorResult = _monitorManager.DetermineOptimalMonitor(textChunk.SourceWindowHandle);
+#pragma warning disable CS8073 // MonitorInfoは値型だがnullチェックは後方互換性のため保持
                 if (monitorResult == null)
                 {
                     throw new InvalidOperationException($"モニター情報取得失敗 - ChunkId: {textChunk.ChunkId}");
                 }
+#pragma warning restore CS8073
                 actualMonitor = monitorResult;
 
                 _logger.LogDebug("対象モニター: {MonitorName}, 境界: ({X},{Y}) サイズ: {W}x{H}",

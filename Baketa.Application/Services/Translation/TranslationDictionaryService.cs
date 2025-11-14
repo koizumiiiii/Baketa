@@ -126,9 +126,9 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
         var normalizer = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.GetSupportedLanguageCodes();
         var additionalPairs = new List<(string, string)>();
 
-        foreach (var sourceCode in normalizer.Where(code => code.StartsWith("ja") || code.StartsWith("en")))
+        foreach (var sourceCode in normalizer.Where(code => code.StartsWith("ja", StringComparison.Ordinal) || code.StartsWith("en", StringComparison.Ordinal)))
         {
-            foreach (var targetCode in normalizer.Where(code => code.StartsWith("ja") || code.StartsWith("en")))
+            foreach (var targetCode in normalizer.Where(code => code.StartsWith("ja", StringComparison.Ordinal) || code.StartsWith("en", StringComparison.Ordinal)))
             {
                 if (sourceCode != targetCode)
                 {

@@ -87,8 +87,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
     /// <inheritdoc />
     public async Task<OverlayInfo> CreateOverlayAsync(OverlayCreationRequest request, CancellationToken cancellationToken = default)
     {
-        if (request == null)
-            throw new ArgumentNullException(nameof(request));
+        ArgumentNullException.ThrowIfNull(request);
 
         EnsureInitialized();
 
@@ -154,8 +153,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
         if (string.IsNullOrEmpty(overlayId))
             throw new ArgumentException("overlayId が null または空文字です", nameof(overlayId));
 
-        if (request == null)
-            throw new ArgumentNullException(nameof(request));
+        ArgumentNullException.ThrowIfNull(request);
 
         EnsureInitialized();
 

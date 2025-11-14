@@ -103,7 +103,7 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
     public async Task SelectWindowAsync(WindowInfo windowInfo)
     {
         if (_disposed) return;
-        if (windowInfo == null) throw new ArgumentNullException(nameof(windowInfo));
+        ArgumentNullException.ThrowIfNull(windowInfo);
 
         try
         {

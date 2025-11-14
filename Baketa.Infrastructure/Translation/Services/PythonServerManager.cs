@@ -100,7 +100,7 @@ public class PythonServerManager(
                 logger.LogInformation("🔍 外部翻訳サーバー検出・登録: Port {Port}", externalServerPort.Value);
 
                 // 外部サーバーをPythonServerManagerに登録
-                var externalInstance = new PythonServerInstance(externalServerPort.Value, languagePair, null);
+                var externalInstance = new PythonServerInstance(externalServerPort.Value, languagePair, null!);
                 externalInstance.UpdateStatus(ServerStatus.Running);
                 _activeServers[languagePair] = externalInstance;
 

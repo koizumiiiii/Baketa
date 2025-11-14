@@ -87,7 +87,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
 
             // 診断レポート生成
             var operation = _isTranslationActive ? "Stop" : "Start";
-            var trigger = $"execute_{operation.ToLower()}_button_pressed";
+            var trigger = $"execute_{operation.ToLower(System.Globalization.CultureInfo.InvariantCulture)}_button_pressed";
             var context = $"ExecuteStartStopAsync {operation} operation";
 
             _logger.LogDebug("診断レポート生成開始（統一サービス使用 - {Operation}操作時）", operation);
@@ -136,7 +136,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
         CancellationToken cancellationToken = default)
     {
         if (_disposed) return new TranslationControlResult(false, "Service is disposed");
-        if (windowInfo == null) throw new ArgumentNullException(nameof(windowInfo));
+        ArgumentNullException.ThrowIfNull(windowInfo);
 
         var executionTimer = System.Diagnostics.Stopwatch.StartNew();
 

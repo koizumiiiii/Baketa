@@ -49,10 +49,7 @@ public sealed class SimpleInPlaceOverlayManager : IInPlaceTranslationOverlayMana
     /// <param name="cancellationToken">キャンセルトークン</param>
     public Task ShowInPlaceOverlayAsync(TextChunk textChunk, CancellationToken cancellationToken = default)
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(SimpleInPlaceOverlayManager));
-        }
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (textChunk == null)
         {
