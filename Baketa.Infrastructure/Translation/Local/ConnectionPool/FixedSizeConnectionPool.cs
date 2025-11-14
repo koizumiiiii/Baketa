@@ -4,11 +4,11 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.Translation.Local.ConnectionPool;
 
@@ -28,11 +28,11 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
     private readonly System.Threading.Timer? _healthCheckTimer;
     private readonly CancellationTokenSource _disposalCts = new();
     private readonly SmartConnectionEstablisher _smartConnectionEstablisher; // Phase 2: 接続信頼性向上
-    
+
     private int _activeConnections;
     private int _totalConnectionsCreated;
     private bool _disposed;
-    
+
     /// <summary>
     /// アクティブな接続数を取得する
     /// </summary>
@@ -52,22 +52,22 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _settings = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        
+
         // Phase 2: SmartConnectionEstablisher初期化
-        _smartConnectionEstablisher = new SmartConnectionEstablisher(_logger as ILogger<SmartConnectionEstablisher> ?? 
+        _smartConnectionEstablisher = new SmartConnectionEstablisher(_logger as ILogger<SmartConnectionEstablisher> ??
             new Microsoft.Extensions.Logging.Abstractions.NullLogger<SmartConnectionEstablisher>());
-        
+
         // 接続数の計算
         _maxConnections = _settings.MaxConnections ?? Math.Max(8, Environment.ProcessorCount / 2);  // 🔧 CONCURRENT_OPTIMIZATION: 最小8接続を保証
         _minConnections = _settings.MinConnections;
-        
+
         if (_maxConnections < 1) _maxConnections = 1;
         if (_minConnections < 1) _minConnections = 1;
         if (_minConnections > _maxConnections) _minConnections = _maxConnections;
-        
-        _logger.LogInformation("接続プール初期化: 最大接続数={MaxConnections}, 最小接続数={MinConnections}", 
+
+        _logger.LogInformation("接続プール初期化: 最大接続数={MaxConnections}, 最小接続数={MinConnections}",
             _maxConnections, _minConnections);
-        
+
         // Channel設定
         var channelOptions = new BoundedChannelOptions(_maxConnections)
         {
@@ -76,20 +76,20 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
             SingleWriter = false,
             AllowSynchronousContinuations = false
         };
-        
+
         _connectionChannel = Channel.CreateBounded<PersistentConnection>(channelOptions);
         _poolSemaphore = new SemaphoreSlim(_maxConnections, _maxConnections);
-        
+
         // ヘルスチェックタイマー設定
         if (_settings.HealthCheckIntervalMs > 0)
         {
             _healthCheckTimer = new System.Threading.Timer(
-                PerformHealthCheck, 
-                null, 
+                PerformHealthCheck,
+                null,
                 TimeSpan.FromMilliseconds(_settings.HealthCheckIntervalMs),
                 TimeSpan.FromMilliseconds(_settings.HealthCheckIntervalMs));
         }
-        
+
         _ = Task.Run(InitializeMinConnectionsAsync, _disposalCts.Token);
     }
 
@@ -119,10 +119,10 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
     public async Task<PersistentConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, _disposalCts.Token);
-        
+
         try
         {
             var connectionTimeoutMs = _settings.ConnectionTimeoutMs;
@@ -132,7 +132,7 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
 
             // セマフォで同時接続数制御
             await _poolSemaphore.WaitAsync(finalCts.Token);
-            
+
             try
             {
                 var logPath = System.IO.Path.Combine(
@@ -234,9 +234,9 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
     /// </summary>
     public ConnectionPoolMetrics GetMetrics()
     {
-        var queuedConnections = _connectionChannel.Reader.CanCount ? 
+        var queuedConnections = _connectionChannel.Reader.CanCount ?
             _connectionChannel.Reader.Count : 0;
-        
+
         return new ConnectionPoolMetrics
         {
             ActiveConnections = _activeConnections,
@@ -368,23 +368,23 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
                     throw; // 最終試行失敗は例外を再スロー
                 }
             }
-            
+
             stream = tcpClient.GetStream();
-            
+
             // タイムアウトとバッファサイズの最適化
             stream.ReadTimeout = _settings.ConnectionTimeoutMs;
             stream.WriteTimeout = _settings.ConnectionTimeoutMs;
-            
+
             // 🔧 [CRITICAL_ENCODING_FIX] システムレベルUTF-8エンコーディング指定（Windows問題対応）
             var utf8EncodingNoBom = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
             reader = new StreamReader(stream, utf8EncodingNoBom, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
-            writer = new StreamWriter(stream, utf8EncodingNoBom, bufferSize: 8192, leaveOpen: true) 
-            { 
+            writer = new StreamWriter(stream, utf8EncodingNoBom, bufferSize: 8192, leaveOpen: true)
+            {
                 AutoFlush = false // パフォーマンス向上のため手動フラッシュ
             };
-            
+
             var connection = new PersistentConnection(connectionId, tcpClient, stream, reader, writer);
-            
+
             _logger.LogDebug("新規TCP接続を確立: {ConnectionId}", connectionId);
             return connection;
         }
@@ -395,12 +395,12 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
             reader?.Dispose();
             stream?.Dispose();
             tcpClient?.Dispose();
-            
+
             _logger.LogError(ex, "TCP接続の確立に失敗: {ConnectionId}", connectionId);
             throw;
         }
     }
-    
+
     /// <summary>
     /// 接続を安全に破棄
     /// </summary>
@@ -515,7 +515,7 @@ public sealed class FixedSizeConnectionPool : IConnectionPool
         try
         {
             _disposalCts.Cancel();
-            
+
             _healthCheckTimer?.Dispose();
             _connectionChannel.Writer.Complete();
 

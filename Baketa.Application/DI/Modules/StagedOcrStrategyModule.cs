@@ -1,19 +1,19 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.ObjectPool;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.DI;
-using Baketa.Core.DI.Attributes;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Services;
-using Baketa.Application.Services;
-using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
-using Baketa.Infrastructure.OCR.PaddleOCR.Services;
-using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
 using System;
 using System.Collections.Generic;
+using Baketa.Application.Services;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.DI;
+using Baketa.Core.DI.Attributes;
+using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Baketa.Infrastructure.OCR.PaddleOCR.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -34,7 +34,7 @@ public sealed class StagedOcrStrategyModule : ServiceModuleBase
         // 競合を避けるため、ここでは何も登録しません。
         Console.WriteLine("ℹ️ StagedOcrStrategyModule: 登録処理はAdvancedCachingModuleに移行済み。");
     }
-    
+
     /// <summary>
     /// このモジュールが依存する他のモジュールの型を取得します
     /// </summary>

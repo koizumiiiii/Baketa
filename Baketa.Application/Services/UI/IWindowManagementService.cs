@@ -1,5 +1,5 @@
-using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using System.Reactive;
+using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 
 namespace Baketa.Application.Services.UI;
 

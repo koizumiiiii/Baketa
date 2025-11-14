@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -41,15 +41,15 @@ public sealed class ConfidenceBasedReprocessor(
             return textChunks ?? [];
 
         _logger.LogInformation("信頼度ベース再処理開始: {ChunkCount}個のチャンクを分析", textChunks.Count);
-        
+
         // 直接ファイル書き込みで信頼度ベース再処理開始を記録
         try
         {
             // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            
+
             // 設定情報をログ出力
             // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化{Environment.NewLine}");
-            
+
             // 各チャンクの信頼度を詳細ログ出力
             for (int i = 0; i < textChunks.Count; i++)
             {
@@ -81,8 +81,8 @@ public sealed class ConfidenceBasedReprocessor(
             try
             {
                 var averageConfidence = chunk.AverageConfidence;
-                
-                _logger.LogDebug("チャンク#{ChunkId} 信頼度分析: {Confidence:F3} (閾値: {Threshold:F3})", 
+
+                _logger.LogDebug("チャンク#{ChunkId} 信頼度分析: {Confidence:F3} (閾値: {Threshold:F3})",
                     chunk.ChunkId, averageConfidence, _settings?.ReprocessingThreshold ?? 0.7);
 
                 // ShouldReprocessの詳細ログ
@@ -96,7 +96,7 @@ public sealed class ConfidenceBasedReprocessor(
                 }
 
                 var shouldReprocess = ShouldReprocess(chunk, averageConfidence);
-                
+
                 try
                 {
                     // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
@@ -108,9 +108,9 @@ public sealed class ConfidenceBasedReprocessor(
 
                 if (shouldReprocess)
                 {
-                    _logger.LogInformation("低信頼度チャンク#{ChunkId}を再処理: 信頼度={Confidence:F3}, テキスト='{Text}'", 
+                    _logger.LogInformation("低信頼度チャンク#{ChunkId}を再処理: 信頼度={Confidence:F3}, テキスト='{Text}'",
                         chunk.ChunkId, averageConfidence, chunk.CombinedText);
-                    
+
                     // 直接ファイル書き込みで低信頼度チャンク再処理を記録
                     try
                     {
@@ -130,10 +130,10 @@ public sealed class ConfidenceBasedReprocessor(
                     {
                         System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor タスク作成ログ書き込みエラー: {fileEx.Message}");
                     }
-                    
+
                     var reprocessingTask = ReprocessSingleChunkAsync(chunk, originalImage, cancellationToken);
                     reprocessingTasks.Add(reprocessingTask);
-                    
+
                     try
                     {
                         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
@@ -146,7 +146,7 @@ public sealed class ConfidenceBasedReprocessor(
                 else
                 {
                     reprocessedChunks.Add(chunk);
-                    _logger.LogDebug("チャンク#{ChunkId}は再処理不要: 信頼度={Confidence:F3}", 
+                    _logger.LogDebug("チャンク#{ChunkId}は再処理不要: 信頼度={Confidence:F3}",
                         chunk.ChunkId, averageConfidence);
                 }
             }
@@ -160,12 +160,12 @@ public sealed class ConfidenceBasedReprocessor(
                 {
                     System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 例外ログ書き込みエラー: {fileEx.Message}");
                 }
-                
+
                 _logger.LogError(ex, "チャンク#{ChunkId}の処理中にエラーが発生、元のチャンクを保持", chunk.ChunkId);
                 reprocessedChunks.Add(chunk);
             }
         }
-        
+
         try
         {
             // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
@@ -188,7 +188,7 @@ public sealed class ConfidenceBasedReprocessor(
         if (reprocessingTasks.Count > 0)
         {
             _logger.LogInformation("再処理実行中: {TaskCount}個のチャンクを並列処理", reprocessingTasks.Count);
-            
+
             try
             {
                 // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
@@ -197,11 +197,11 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor Task.WhenAllログ書き込みエラー: {fileEx.Message}");
             }
-            
+
             try
             {
                 var reprocessedResults = await Task.WhenAll(reprocessingTasks).ConfigureAwait(false);
-                
+
                 try
                 {
                     // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
@@ -210,7 +210,7 @@ public sealed class ConfidenceBasedReprocessor(
                 {
                     System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor Task.WhenAll完了ログ書き込みエラー: {fileEx.Message}");
                 }
-                
+
                 reprocessedChunks.AddRange(reprocessedResults);
             }
             catch (TaskCanceledException)
@@ -224,7 +224,7 @@ public sealed class ConfidenceBasedReprocessor(
                 {
                     System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor キャンセル検出ログ書き込みエラー: {fileEx.Message}");
                 }
-                
+
                 // 完了したタスクの結果を収集
                 foreach (var task in reprocessingTasks)
                 {
@@ -233,13 +233,13 @@ public sealed class ConfidenceBasedReprocessor(
                         reprocessedChunks.Add(task.Result);
                     }
                 }
-                
-                _logger.LogWarning("再処理タスクがキャンセルされました。完了した{CompletedCount}個のタスクの結果を使用します。", 
+
+                _logger.LogWarning("再処理タスクがキャンセルされました。完了した{CompletedCount}個のタスクの結果を使用します。",
                     reprocessedChunks.Count);
             }
 
             var improvementCount = reprocessedChunks.Where(r => r != null).Count(r => r!.AverageConfidence > (_settings?.ReprocessingThreshold ?? 0.7));
-            _logger.LogInformation("再処理完了: {TotalCount}個中{ImprovedCount}個が改善", 
+            _logger.LogInformation("再処理完了: {TotalCount}個中{ImprovedCount}個が改善",
                 reprocessedChunks.Count, improvementCount);
         }
         else
@@ -256,7 +256,7 @@ public sealed class ConfidenceBasedReprocessor(
 
         // ChunkIdでソートして順序を保持
         var finalResult = reprocessedChunks.OrderBy(c => c.ChunkId).ToList();
-        
+
         _logger.LogInformation("信頼度ベース再処理完了: 最終チャンク数={FinalCount}", finalResult.Count);
         return finalResult.AsReadOnly();
     }
@@ -289,10 +289,10 @@ public sealed class ConfidenceBasedReprocessor(
                 _logger?.LogDebug($"画像有効性チェック失敗: チャンク#{originalChunk.ChunkId}の再処理をスキップ");
                 return originalChunk;
             }
-            
+
             // 2. 領域を少し拡張してOCRを再実行
             var expandedBounds = ExpandBoundsForReprocessing(originalChunk.CombinedBounds, originalImage);
-            
+
             // 直接ファイル書き込みで拡張領域をログ出力
             try
             {
@@ -302,14 +302,14 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 拡張領域ログ書き込みエラー: {fileEx.Message}");
             }
-            
+
             // 2. OCRエンジンの初期化状態を確認・保証
             await EnsureOcrEngineInitializedAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // 3. 改善された設定でOCRを再実行
             var enhancedSettings = CreateEnhancedOcrSettings();
             var originalSettings = _ocrEngine.GetSettings();
-            
+
             // 設定変更をログ出力
             try
             {
@@ -319,7 +319,7 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 設定変更ログ書き込みエラー: {fileEx.Message}");
             }
-            
+
             await _ocrEngine.ApplySettingsAsync(enhancedSettings, cancellationToken).ConfigureAwait(false);
 
             try
@@ -342,7 +342,7 @@ public sealed class ConfidenceBasedReprocessor(
                 try
                 {
                     // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-                    
+
                     if (reprocessedResults.HasText && reprocessedResults.TextRegions.Count > 0)
                     {
                         foreach (var region in reprocessedResults.TextRegions.Take(3)) // 最初の3個のみログ出力
@@ -358,7 +358,7 @@ public sealed class ConfidenceBasedReprocessor(
 
                 // 4. 再処理結果を評価（座標補正のため拡張領域情報を渡す）
                 var improvedChunk = EvaluateReprocessingResults(originalChunk, reprocessedResults, expandedBounds);
-                
+
                 // 結果をログ出力
                 try
                 {
@@ -368,8 +368,8 @@ public sealed class ConfidenceBasedReprocessor(
                 {
                     System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 完了ログ書き込みエラー: {fileEx.Message}");
                 }
-                
-                _logger.LogDebug("チャンク#{ChunkId}再処理完了: 元信頼度={OriginalConf:F3} → 新信頼度={NewConf:F3}", 
+
+                _logger.LogDebug("チャンク#{ChunkId}再処理完了: 元信頼度={OriginalConf:F3} → 新信頼度={NewConf:F3}",
                     originalChunk.ChunkId, originalChunk.AverageConfidence, improvedChunk.AverageConfidence);
 
                 return improvedChunk;
@@ -385,7 +385,7 @@ public sealed class ConfidenceBasedReprocessor(
                 {
                     System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor OCR例外ログ書き込みエラー: {fileEx.Message}");
                 }
-                
+
                 _logger.LogWarning(ocrEx, "チャンク#{ChunkId}のOCR再実行でエラー発生", originalChunk.ChunkId);
                 return originalChunk;
             }
@@ -395,7 +395,7 @@ public sealed class ConfidenceBasedReprocessor(
                 try
                 {
                     await _ocrEngine.ApplySettingsAsync(originalSettings, cancellationToken).ConfigureAwait(false);
-                    
+
                     // 設定復元をログ出力
                     try
                     {
@@ -423,7 +423,7 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor キャンセルログ書き込みエラー: {fileEx.Message}");
             }
-            
+
             _logger.LogDebug("チャンク#{ChunkId}の再処理がキャンセルされました", originalChunk.ChunkId);
             return originalChunk;
         }
@@ -438,7 +438,7 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 全体例外ログ書き込みエラー: {fileEx.Message}");
             }
-            
+
             _logger.LogWarning(ex, "チャンク#{ChunkId}の再処理でエラー発生、元のチャンクを保持", originalChunk.ChunkId);
             return originalChunk;
         }
@@ -483,13 +483,13 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor テキスト長チェック不合格ログ書き込みエラー: {fileEx.Message}");
             }
-            _logger.LogDebug("チャンク#{ChunkId}は短すぎるため再処理をスキップ: 長さ={Length}", 
+            _logger.LogDebug("チャンク#{ChunkId}は短すぎるため再処理をスキップ: 長さ={Length}",
                 chunk.ChunkId, chunk.CombinedText.Length);
             return false;
         }
 
         // 極小領域は再処理しない
-        if (chunk.CombinedBounds.Width < _settings.MinimumRegionSize.Width || 
+        if (chunk.CombinedBounds.Width < _settings.MinimumRegionSize.Width ||
             chunk.CombinedBounds.Height < _settings.MinimumRegionSize.Height)
         {
             try
@@ -500,7 +500,7 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 領域サイズチェック不合格ログ書き込みエラー: {fileEx.Message}");
             }
-            _logger.LogDebug("チャンク#{ChunkId}は小さすぎるため再処理をスキップ: サイズ=({Width}x{Height})", 
+            _logger.LogDebug("チャンク#{ChunkId}は小さすぎるため再処理をスキップ: サイズ=({Width}x{Height})",
                 chunk.ChunkId, chunk.CombinedBounds.Width, chunk.CombinedBounds.Height);
             return false;
         }
@@ -517,7 +517,7 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor ノイズチェック不合格ログ書き込みエラー: {fileEx.Message}");
             }
-            _logger.LogDebug("チャンク#{ChunkId}はノイズと判定、再処理をスキップ: テキスト='{Text}'", 
+            _logger.LogDebug("チャンク#{ChunkId}はノイズと判定、再処理をスキップ: テキスト='{Text}'",
                 chunk.ChunkId, chunk.CombinedText);
             return false;
         }
@@ -544,19 +544,19 @@ public sealed class ConfidenceBasedReprocessor(
             _logger?.LogDebug("IsImageValid: 画像がnull");
             return false;
         }
-        
+
         try
         {
             // Widthプロパティにアクセスして有効性を確認
             var width = image.Width;
             var height = image.Height;
-            
+
             if (width <= 0 || height <= 0)
             {
                 _logger?.LogDebug($"IsImageValid: 無効な画像サイズ {width}x{height}");
                 return false;
             }
-            
+
             _logger?.LogDebug($"IsImageValid: 画像有効 {width}x{height}");
             return true;
         }
@@ -581,7 +581,7 @@ public sealed class ConfidenceBasedReprocessor(
     /// 再処理用に領域を拡張
     /// </summary>
     private System.Drawing.Rectangle ExpandBoundsForReprocessing(
-        System.Drawing.Rectangle originalBounds, 
+        System.Drawing.Rectangle originalBounds,
         IImage image)
     {
         // 事前に画像の有効性をチェック
@@ -590,20 +590,20 @@ public sealed class ConfidenceBasedReprocessor(
             _logger.LogWarning("ExpandBoundsForReprocessing: 画像が無効です");
             return originalBounds;
         }
-        
+
         try
         {
             var expansion = _settings.BoundsExpansionPixels;
-            
+
             var expandedX = Math.Max(0, originalBounds.X - expansion);
             var expandedY = Math.Max(0, originalBounds.Y - expansion);
             var expandedWidth = Math.Min(image.Width - expandedX, originalBounds.Width + expansion * 2);
             var expandedHeight = Math.Min(image.Height - expandedY, originalBounds.Height + expansion * 2);
 
             var expandedBounds = new System.Drawing.Rectangle(expandedX, expandedY, expandedWidth, expandedHeight);
-            
+
             _logger?.LogDebug($"領域拡張: {originalBounds} → {expandedBounds} (画像: {image.Width}x{image.Height})");
-            
+
             return expandedBounds;
         }
         catch (Exception ex)
@@ -634,32 +634,32 @@ public sealed class ConfidenceBasedReprocessor(
         var enhancedSettings = currentSettings.Clone();
 
         // 【Phase 2改善】日本語文字検出に特化した設定調整
-        
+
         // 1. 検出閾値の最適化 - より低い閾値で微細な文字も捕捉
         enhancedSettings.DetectionThreshold = Math.Max(0.03, currentSettings.DetectionThreshold * 0.5);
-        
+
         // 2. 認識閾値の調整 - 中国語文字も含めて幅広く認識
         enhancedSettings.RecognitionThreshold = Math.Max(0.1, currentSettings.RecognitionThreshold * 0.6);
-        
+
         // 3. 前処理とLanguageModel強制有効化
         enhancedSettings.EnablePreprocessing = true;
         enhancedSettings.UseLanguageModel = true;
-        
+
         // 4. 言語設定の最適化 - 日本語に特化
         enhancedSettings.Language = "jpn";
-        
+
         // 5. 最大検出数の増加 - 細かい文字も見逃さない
         enhancedSettings.MaxDetections = Math.Max(currentSettings.MaxDetections, 300);
-        
+
         // 6. 方向分類の有効化 - 回転したテキストにも対応
         enhancedSettings.UseDirectionClassification = true;
-        
+
         // 7. マルチスレッド処理で高速化
         enhancedSettings.EnableMultiThread = true;
         enhancedSettings.WorkerCount = Math.Max(2, currentSettings.WorkerCount);
 
         // 【Phase 2ログ強化】設定変更の詳細ログ
-        _logger.LogDebug("【Phase 2】再処理用設定作成: DetectionThreshold={DetectionThreshold:F3}, RecognitionThreshold={RecognitionThreshold:F3}, 前処理={Preprocessing}, LM={LanguageModel}, 最大検出数={MaxDetections}, 方向分類={DirectionClassification}", 
+        _logger.LogDebug("【Phase 2】再処理用設定作成: DetectionThreshold={DetectionThreshold:F3}, RecognitionThreshold={RecognitionThreshold:F3}, 前処理={Preprocessing}, LM={LanguageModel}, 最大検出数={MaxDetections}, 方向分類={DirectionClassification}",
             enhancedSettings.DetectionThreshold, enhancedSettings.RecognitionThreshold, enhancedSettings.EnablePreprocessing, enhancedSettings.UseLanguageModel, enhancedSettings.MaxDetections, enhancedSettings.UseDirectionClassification);
 
         try
@@ -691,7 +691,7 @@ public sealed class ConfidenceBasedReprocessor(
 
         // 再処理結果から最適な領域を選択
         var bestRegion = SelectBestRegionFromReprocessing(reprocessedResults.TextRegions);
-        
+
         if (bestRegion == null)
         {
             _logger.LogDebug("再処理結果に適切な領域なし、元のチャンクを保持");
@@ -701,7 +701,7 @@ public sealed class ConfidenceBasedReprocessor(
         // 改善されたかどうかを判定
         if (bestRegion.Confidence <= originalChunk.AverageConfidence + _settings.MinimumImprovementThreshold)
         {
-            _logger.LogDebug("再処理結果が十分改善されていない: {Original:F3} → {New:F3}", 
+            _logger.LogDebug("再処理結果が十分改善されていない: {Original:F3} → {New:F3}",
                 originalChunk.AverageConfidence, bestRegion.Confidence);
             return originalChunk;
         }
@@ -736,8 +736,8 @@ public sealed class ConfidenceBasedReprocessor(
             TranslatedText = originalChunk.TranslatedText // 翻訳は保持
         };
 
-        _logger.LogInformation("チャンク#{ChunkId}が改善: '{OriginalText}' (信頼度:{OriginalConf:F3}) → '{NewText}' (信頼度:{NewConf:F3})", 
-            originalChunk.ChunkId, originalChunk.CombinedText, originalChunk.AverageConfidence, 
+        _logger.LogInformation("チャンク#{ChunkId}が改善: '{OriginalText}' (信頼度:{OriginalConf:F3}) → '{NewText}' (信頼度:{NewConf:F3})",
+            originalChunk.ChunkId, originalChunk.CombinedText, originalChunk.AverageConfidence,
             improvedChunk.CombinedText, improvedChunk.AverageConfidence);
 
         return improvedChunk;
@@ -753,7 +753,7 @@ public sealed class ConfidenceBasedReprocessor(
             return null;
 
         // 信頼度が基準を満たす領域をフィルタリング
-        var candidateRegions = regions.Where(r => 
+        var candidateRegions = regions.Where(r =>
             r.Confidence >= _settings.MinimumAcceptableConfidence &&
             !string.IsNullOrWhiteSpace(r.Text))
             .ToList();
@@ -796,7 +796,7 @@ public sealed class ConfidenceBasedReprocessor(
             return true;
 
         var trimmedText = text.Trim();
-        
+
         // 単一文字で記号のみ
         if (trimmedText.Length == 1 && !char.IsLetterOrDigit(trimmedText[0]))
             return true;
@@ -829,7 +829,7 @@ public sealed class ConfidenceBasedReprocessor(
         {
             // OCRエンジンの初期化状態を確認（プロパティで確認）
             var isInitialized = _ocrEngine.IsInitialized;
-            
+
             // 初期化ログを記録
             try
             {
@@ -839,7 +839,7 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 初期化状態ログ書き込みエラー: {fileEx.Message}");
             }
-            
+
             if (!isInitialized)
             {
                 // 初期化が必要な場合は実行
@@ -851,9 +851,9 @@ public sealed class ConfidenceBasedReprocessor(
                 {
                     System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 初期化開始ログ書き込みエラー: {fileEx.Message}");
                 }
-                
+
                 var initSuccess = await _ocrEngine.InitializeAsync(settings: null, cancellationToken: cancellationToken).ConfigureAwait(false);
-                
+
                 try
                 {
                     // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
@@ -862,7 +862,7 @@ public sealed class ConfidenceBasedReprocessor(
                 {
                     System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 初期化完了ログ書き込みエラー: {fileEx.Message}");
                 }
-                
+
                 if (initSuccess)
                 {
                     _logger.LogInformation("ConfidenceBasedReprocessor: OCRエンジンを初期化しました");
@@ -885,7 +885,7 @@ public sealed class ConfidenceBasedReprocessor(
             {
                 System.Diagnostics.Debug.WriteLine($"ConfidenceBasedReprocessor 初期化エラーログ書き込みエラー: {fileEx.Message}");
             }
-            
+
             _logger.LogError(ex, "ConfidenceBasedReprocessor: OCRエンジンの初期化に失敗しました");
             throw;
         }

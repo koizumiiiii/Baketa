@@ -17,7 +17,7 @@ public interface IPerceptualHashService
     /// <param name="algorithm">ハッシュアルゴリズム</param>
     /// <returns>64bitハッシュ文字列</returns>
     string ComputeHash(IImage image, HashAlgorithmType algorithm);
-    
+
     /// <summary>
     /// 2つのハッシュを比較して類似度を取得
     /// </summary>
@@ -26,14 +26,14 @@ public interface IPerceptualHashService
     /// <param name="algorithm">使用されたアルゴリズム</param>
     /// <returns>類似度（0.0-1.0、1.0が完全一致）</returns>
     float CompareHashes(string hash1, string hash2, HashAlgorithmType algorithm);
-    
+
     /// <summary>
     /// 画像タイプに応じた最適アルゴリズムを取得
     /// </summary>
     /// <param name="imageType">画像タイプ</param>
     /// <returns>推奨アルゴリズム</returns>
     HashAlgorithmType GetOptimalAlgorithm(ImageType imageType);
-    
+
     /// <summary>
     /// ハミング距離を計算（ハッシュ比較用）
     /// </summary>
@@ -41,7 +41,7 @@ public interface IPerceptualHashService
     /// <param name="hash2">ハッシュ2（64bit文字列）</param>
     /// <returns>ハミング距離（0-64）</returns>
     int CalculateHammingDistance(string hash1, string hash2);
-    
+
     /// <summary>
     /// 構造的類似性指数（SSIM）を計算
     /// 高精度分析用（Stage 3）

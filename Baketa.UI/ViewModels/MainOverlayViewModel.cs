@@ -457,14 +457,14 @@ public class MainOverlayViewModel : ViewModelBase
 
                     var enabled = canStart || canStop;
 
-                    Console.WriteLine($"🔍🔍🔍 [OBSERVABLE_CHANGE] canExecute計算: canStart={canStart}, canStop={canStop}, IsTranslationActive={isTranslationActive}, enabled={enabled}, Thread:{System.Threading.Thread.CurrentThread.ManagedThreadId}");
+                    Console.WriteLine($"🔍🔍🔍 [OBSERVABLE_CHANGE] canExecute計算: canStart={canStart}, canStop={canStop}, IsTranslationActive={isTranslationActive}, enabled={enabled}, Thread:{Environment.CurrentManagedThreadId}");
                     Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [OBSERVABLE_CHANGE] canStart={canStart}, canStop={canStop}, IsTranslationActive={isTranslationActive}, enabled={enabled}");
 
                     return enabled;
                 })
                 .Do(canExecute =>
                 {
-                    Console.WriteLine($"🔍🔍🔍 [DO_OPERATOR] canExecute値: {canExecute}, Thread:{System.Threading.Thread.CurrentThread.ManagedThreadId}");
+                    Console.WriteLine($"🔍🔍🔍 [DO_OPERATOR] canExecute値: {canExecute}, Thread:{Environment.CurrentManagedThreadId}");
                     Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [DO_OPERATOR] canExecute値: {canExecute}");
                 })
                 .StartWith(false) // 🔥 [PHASE6.1_FINAL_FIX_V3] Cold Observable問題の完全解決 - 初期値を強制発行
@@ -500,7 +500,7 @@ public class MainOverlayViewModel : ViewModelBase
             // 🔥 [PHASE6.1_DIAGNOSTIC_DEEP] コマンド結果の監視
             startStopCmd.Subscribe(result =>
             {
-                Console.WriteLine($"🎬🎬🎬 [COMMAND_SUBSCRIBE] StartStopCommand.Subscribe()実行！IsTranslationActive={IsTranslationActive}, Thread:{System.Threading.Thread.CurrentThread.ManagedThreadId}");
+                Console.WriteLine($"🎬🎬🎬 [COMMAND_SUBSCRIBE] StartStopCommand.Subscribe()実行！IsTranslationActive={IsTranslationActive}, Thread:{Environment.CurrentManagedThreadId}");
                 Logger?.LogDebug($"🎬 StartStopCommandの結果を受信: {result.GetType().Name}");
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🎬 [COMMAND_SUBSCRIBE] StartStopCommand.Subscribe()実行！IsTranslationActive={IsTranslationActive}");
             });

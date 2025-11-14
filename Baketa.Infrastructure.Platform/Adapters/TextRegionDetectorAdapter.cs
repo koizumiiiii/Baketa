@@ -1,11 +1,11 @@
 using System.Drawing;
 using System.IO;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Memory;
+using Baketa.Core.Abstractions.Platform.Windows;
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: TextDetectionConfig取得用
 using Baketa.Core.Models.Capture;
+using Microsoft.Extensions.Logging;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Rectangle = System.Drawing.Rectangle;
 

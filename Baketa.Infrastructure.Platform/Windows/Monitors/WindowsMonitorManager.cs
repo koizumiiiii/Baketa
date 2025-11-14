@@ -19,23 +19,23 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
     private readonly ILogger<WindowsMonitorManager> _logger;
     private readonly object _lockObject = new();
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-    
+
     // Windowsメッセージベース検出用
     private readonly IDisposable _displayChangeListener;
     private GameWindowTracker? _gameWindowTracker;
-    
+
     // インテリジェントフォールバック用キャッシュ
     private readonly ConcurrentDictionary<IntPtr, MonitorInfo> _windowMonitorCache = new();
-    
+
     // 自動クリーンアップ用タイマー
     private readonly Timer _cleanupTimer;
-    
+
     private volatile bool _isMonitoring;
     private volatile bool _disposed;
     private List<MonitorInfo> _monitors = [];
     private MonitorInfo? _primaryMonitor;
     private IntPtr _gameWindowHandle;
-    
+
     /// <summary>
     /// WindowsMonitorManagerを初期化
     /// </summary>
@@ -43,10 +43,10 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
     public WindowsMonitorManager(ILogger<WindowsMonitorManager> logger)
     {
         _logger = logger;
-        
+
         // テスト環境を検出
         bool isTestEnvironment = IsRunningInTestEnvironment();
-        
+
         // Windowsメッセージベース検出の初期化（テスト環境ではスキップ）
         if (isTestEnvironment)
         {
@@ -57,11 +57,11 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         {
             _displayChangeListener = new WindowsDisplayChangeListener(OnDisplaySettingsChanged, OnDpiChanged, _logger);
         }
-        
+
         // 自動クリーンアップタイマーの初期化（30秒間隔）
-        _cleanupTimer = new Timer(CleanupStaleCache, null, 
+        _cleanupTimer = new Timer(CleanupStaleCache, null,
             TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-        
+
         // 初期化時にモニター情報を取得
         _ = Task.Run(async () =>
         {
@@ -84,7 +84,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             }
         });
     }
-    
+
     /// <inheritdoc/>
     public IReadOnlyList<MonitorInfo> Monitors
     {
@@ -96,7 +96,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             }
         }
     }
-    
+
     /// <inheritdoc/>
     public MonitorInfo? PrimaryMonitor
     {
@@ -108,13 +108,13 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             }
         }
     }
-    
+
     /// <inheritdoc/>
     public bool IsMonitoring => _isMonitoring && !_disposed;
-    
+
     /// <inheritdoc/>
     public event EventHandler<MonitorChangedEventArgs>? MonitorChanged;
-    
+
     /// <inheritdoc/>
     public MonitorInfo? GetMonitorFromWindow(IntPtr windowHandle)
     {
@@ -123,12 +123,12 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _logger.LogWarning("Invalid window handle provided");
             return PrimaryMonitor;
         }
-        
+
         try
         {
             var monitorHandle = User32Methods.MonitorFromWindow(windowHandle, MonitorFlags.MONITOR_DEFAULTTONEAREST);
             var monitor = GetMonitorByHandle(monitorHandle);
-            
+
             if (monitor.HasValue)
             {
                 // 成功時は結果をキャッシュ
@@ -144,13 +144,13 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         }
         catch (Win32Exception ex)
         {
-            _logger.LogError(ex, "Win32 error getting monitor from window {Handle:X}: {Error}", 
+            _logger.LogError(ex, "Win32 error getting monitor from window {Handle:X}: {Error}",
                 windowHandle, ex.NativeErrorCode);
-            
+
             // 前回の正常値があれば使用
             if (_windowMonitorCache.TryGetValue(windowHandle, out var cachedMonitor))
             {
-                _logger.LogDebug("Using cached monitor for window {Handle:X}: {Monitor}", 
+                _logger.LogDebug("Using cached monitor for window {Handle:X}: {Monitor}",
                     windowHandle, cachedMonitor.Name);
                 return cachedMonitor;
             }
@@ -163,7 +163,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         catch (InvalidOperationException ex)
         {
             _logger.LogError(ex, "Invalid operation getting monitor from window {Handle:X}", windowHandle);
-            
+
             // 前回の正常値があれば使用、なければプライマリ
             if (_windowMonitorCache.TryGetValue(windowHandle, out var cachedMonitor))
             {
@@ -173,7 +173,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         catch (NotSupportedException ex)
         {
             _logger.LogError(ex, "Operation not supported getting monitor from window handle {Handle:X}", windowHandle);
-            
+
             if (_windowMonitorCache.TryGetValue(windowHandle, out var cachedMonitor))
             {
                 return cachedMonitor;
@@ -182,16 +182,16 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         catch (ExternalException ex)
         {
             _logger.LogError(ex, "External error getting monitor from window handle {Handle:X}", windowHandle);
-            
+
             if (_windowMonitorCache.TryGetValue(windowHandle, out var cachedMonitor))
             {
                 return cachedMonitor;
             }
         }
-        
+
         return PrimaryMonitor;
     }
-    
+
     /// <inheritdoc/>
     public MonitorInfo? GetMonitorFromPoint(Point point)
     {
@@ -200,7 +200,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             var nativePoint = new POINT(
                 (int)Math.Round(point.X),
                 (int)Math.Round(point.Y));
-            
+
             var monitorHandle = User32Methods.MonitorFromPoint(nativePoint, MonitorFlags.MONITOR_DEFAULTTONEAREST);
             return GetMonitorByHandle(monitorHandle);
         }
@@ -235,21 +235,21 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             return PrimaryMonitor;
         }
     }
-    
+
     /// <inheritdoc/>
     public IReadOnlyList<MonitorInfo> GetMonitorsFromRect(Rect rect)
     {
         var monitors = Monitors;
         if (monitors.Count == 0)
             return [];
-        
+
         return [.. monitors
             .Select(monitor => new { Monitor = monitor, Overlap = monitor.CalculateOverlapRatio(rect) })
             .Where(x => x.Overlap > 0)
             .OrderByDescending(x => x.Overlap)
             .Select(x => x.Monitor)];
     }
-    
+
     /// <inheritdoc/>
     public MonitorInfo? GetMonitorByHandle(IntPtr handle)
     {
@@ -259,61 +259,61 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             return monitor.Handle != IntPtr.Zero ? monitor : null;
         }
     }
-    
+
     /// <inheritdoc/>
     public Point TransformPointBetweenMonitors(Point point, MonitorInfo sourceMonitor, MonitorInfo targetMonitor)
     {
         // ソースモニターでの相対位置を計算
         var relativeX = (point.X - sourceMonitor.Bounds.X) / sourceMonitor.Bounds.Width;
         var relativeY = (point.Y - sourceMonitor.Bounds.Y) / sourceMonitor.Bounds.Height;
-        
+
         // ターゲットモニターでの絶対位置に変換
         var targetX = targetMonitor.Bounds.X + (relativeX * targetMonitor.Bounds.Width);
         var targetY = targetMonitor.Bounds.Y + (relativeY * targetMonitor.Bounds.Height);
-        
+
         // DPIスケールファクターを適用
         var dpiScaleX = targetMonitor.ScaleFactorX / sourceMonitor.ScaleFactorX;
         var dpiScaleY = targetMonitor.ScaleFactorY / sourceMonitor.ScaleFactorY;
-        
+
         return new Point(targetX * dpiScaleX, targetY * dpiScaleY);
     }
-    
+
     /// <inheritdoc/>
     public Rect TransformRectBetweenMonitors(Rect rect, MonitorInfo sourceMonitor, MonitorInfo targetMonitor)
     {
         var topLeft = TransformPointBetweenMonitors(
             new Point(rect.X, rect.Y), sourceMonitor, targetMonitor);
-        
+
         var bottomRight = TransformPointBetweenMonitors(
             new Point(rect.X + rect.Width, rect.Y + rect.Height), sourceMonitor, targetMonitor);
-        
+
         return new Rect(
-            topLeft.X, 
+            topLeft.X,
             topLeft.Y,
             bottomRight.X - topLeft.X,
             bottomRight.Y - topLeft.Y);
     }
-    
+
     /// <inheritdoc/>
     public async Task RefreshMonitorsAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             _logger.LogDebug("Refreshing monitor information");
-            
+
             var newMonitors = await Task.Run(() => EnumerateMonitors(), cancellationToken).ConfigureAwait(false);
             var oldMonitors = Monitors.ToList();
-            
+
             lock (_lockObject)
             {
                 _monitors = [.. newMonitors];
                 var primary = _monitors.FirstOrDefault(m => m.IsPrimary);
                 _primaryMonitor = primary.Handle != IntPtr.Zero ? primary : null;
             }
-            
+
             // 変更を検出してイベントを発火
             await DetectAndNotifyChangesAsync(oldMonitors, newMonitors, cancellationToken).ConfigureAwait(false);
-            
+
             _logger.LogDebug("Monitor refresh completed. Found {Count} monitors", newMonitors.Count);
         }
         catch (OperationCanceledException)
@@ -342,7 +342,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             throw;
         }
     }
-    
+
     /// <inheritdoc/>
     public async Task StartMonitoringAsync(CancellationToken cancellationToken = default)
     {
@@ -351,12 +351,12 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _logger.LogWarning("Monitor monitoring is already started");
             return;
         }
-        
+
         try
         {
             _logger.LogInformation("Starting monitor monitoring (message-based)");
             _isMonitoring = true;
-            
+
             // Windowsメッセージベース検出を開始
             if (_displayChangeListener is WindowsDisplayChangeListener windowsListener)
             {
@@ -366,9 +366,9 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             {
                 testListener.StartListening();
             }
-            
+
             await Task.Delay(100, cancellationToken).ConfigureAwait(false); // 短い遅延で開始を確認
-            
+
             _logger.LogInformation("Monitor monitoring started successfully (0.1% CPU usage)");
         }
         catch (OperationCanceledException)
@@ -402,7 +402,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             throw;
         }
     }
-    
+
     /// <inheritdoc/>
     public async Task StopMonitoringAsync(CancellationToken cancellationToken = default)
     {
@@ -411,12 +411,12 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _logger.LogDebug("Monitor monitoring is not running");
             return;
         }
-        
+
         try
         {
             _logger.LogInformation("Stopping monitor monitoring");
             _isMonitoring = false;
-            
+
             // Windowsメッセージベース検出を停止
             if (_displayChangeListener is WindowsDisplayChangeListener windowsListener)
             {
@@ -427,9 +427,9 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
                 testListener.StopListening();
             }
             _gameWindowTracker?.StopTracking();
-            
+
             await Task.Delay(50, cancellationToken).ConfigureAwait(false); // 短い遅延で停止を確認
-            
+
             _logger.LogInformation("Monitor monitoring stopped successfully");
         }
         catch (OperationCanceledException)
@@ -458,7 +458,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             throw;
         }
     }
-    
+
     /// <summary>
     /// Windowsメッセージベースのディスプレイ設定変更イベント処理
     /// </summary>
@@ -490,7 +490,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _logger.LogError(ex, "External error handling display settings change");
         }
     }
-    
+
     /// <summary>
     /// DPI変更イベント処理
     /// </summary>
@@ -522,7 +522,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _logger.LogError(ex, "External error handling DPI change");
         }
     }
-    
+
     /// <summary>
     /// 定期的なキャッシュクリーンアップ
     /// </summary>
@@ -534,7 +534,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
                 .Where(kvp => !IsValidWindow(kvp.Key))
                 .Select(kvp => kvp.Key)
                 .ToList();
-                
+
             foreach (var staleHandle in staleEntries)
             {
                 if (_windowMonitorCache.TryRemove(staleHandle, out var removedMonitor))
@@ -560,7 +560,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _logger.LogError(ex, "External error during cache cleanup");
         }
     }
-    
+
     /// <summary>
     /// ウィンドウハンドル有効性チェック
     /// </summary>
@@ -568,7 +568,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
     {
         return handle != IntPtr.Zero && User32Methods.IsWindow(handle);
     }
-    
+
     /// <summary>
     /// ゲームウィンドウの追跡を開始
     /// </summary>
@@ -580,16 +580,16 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _logger.LogWarning("Invalid game window handle provided for tracking");
             return;
         }
-        
+
         _gameWindowHandle = gameWindowHandle;
-        
+
         // ゲームウィンドウ位置変更の追跡を開始
         _gameWindowTracker?.Dispose();
         _gameWindowTracker = new GameWindowTracker(gameWindowHandle, OnGameWindowMoved, _logger);
-        
+
         _logger.LogInformation("Started tracking game window: 0x{Handle:X}", gameWindowHandle);
     }
-    
+
     /// <summary>
     /// ゲームウィンドウ移動イベント処理
     /// </summary>
@@ -617,14 +617,14 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _logger.LogError(ex, "External error handling game window move");
         }
     }
-    
+
     /// <summary>
     /// システムからモニター情報を列挙
     /// </summary>
     private static List<MonitorInfo> EnumerateMonitors()
     {
         var monitors = new List<MonitorInfo>();
-        
+
         // デリゲートを明示的に定義してrefパラメータ問題を回避
         bool MonitorEnumProc(IntPtr monitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData)
         {
@@ -654,22 +654,22 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             }
             return true;
         }
-        
+
         User32Methods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, MonitorEnumProc, IntPtr.Zero);
-        
+
         return monitors;
     }
-    
+
     /// <summary>
     /// 指定されたモニターハンドルから詳細情報を取得
     /// </summary>
     private static MonitorInfo? GetMonitorInfoEx(IntPtr monitor)
     {
         var monitorInfoEx = MONITORINFOEX.Create();
-        
+
         if (!User32Methods.GetMonitorInfo(monitor, ref monitorInfoEx))
             return null;
-        
+
         // DPI情報を取得
         var dpiResult = User32Methods.GetDpiForMonitor(monitor, DpiType.Effective, out var dpiX, out var dpiY);
         if (dpiResult != 0)
@@ -678,22 +678,22 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             dpiX = 96;
             dpiY = 96;
         }
-        
+
         var bounds = new Rect(
             monitorInfoEx.rcMonitor.left,
             monitorInfoEx.rcMonitor.top,
             monitorInfoEx.rcMonitor.right - monitorInfoEx.rcMonitor.left,
             monitorInfoEx.rcMonitor.bottom - monitorInfoEx.rcMonitor.top);
-        
+
         var workArea = new Rect(
             monitorInfoEx.rcWork.left,
             monitorInfoEx.rcWork.top,
             monitorInfoEx.rcWork.right - monitorInfoEx.rcWork.left,
             monitorInfoEx.rcWork.bottom - monitorInfoEx.rcWork.top);
-        
+
         var isPrimary = (monitorInfoEx.dwFlags & User32Methods.MONITORINFOF_PRIMARY) != 0;
         var deviceName = monitorInfoEx.szDevice;
-        
+
         return new MonitorInfo(
             Handle: monitor,
             Name: deviceName,
@@ -704,7 +704,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             DpiX: dpiX,
             DpiY: dpiY);
     }
-    
+
     /// <summary>
     /// モニター変更を検出してイベントを通知
     /// </summary>
@@ -719,22 +719,22 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         {
             await NotifyMonitorChangedAsync(MonitorChangeType.Added, added, newMonitors, cancellationToken).ConfigureAwait(false);
         }
-        
+
         // 削除されたモニターをチェック
         var removedMonitors = oldMonitors.ExceptBy(newMonitors.Select(m => m.Handle), m => m.Handle);
         foreach (var removed in removedMonitors)
         {
             await NotifyMonitorChangedAsync(MonitorChangeType.Removed, removed, newMonitors, cancellationToken).ConfigureAwait(false);
         }
-        
+
         // プライマリモニター変更をチェック
         var oldPrimary = oldMonitors.FirstOrDefault(m => m.IsPrimary);
         var newPrimary = newMonitors.FirstOrDefault(m => m.IsPrimary);
-        
+
         // 値型なので、ハンドルが0の場合は有効なモニターではない
         var oldHasValidPrimary = oldPrimary.Handle != IntPtr.Zero;
         var newHasValidPrimary = newPrimary.Handle != IntPtr.Zero;
-        
+
         if (oldHasValidPrimary && newHasValidPrimary && oldPrimary.Handle != newPrimary.Handle)
         {
             await NotifyMonitorChangedAsync(MonitorChangeType.PrimaryChanged, newPrimary, newMonitors, cancellationToken).ConfigureAwait(false);
@@ -744,19 +744,19 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             // 新しいプライマリモニターが追加された
             await NotifyMonitorChangedAsync(MonitorChangeType.PrimaryChanged, newPrimary, newMonitors, cancellationToken).ConfigureAwait(false);
         }
-        
+
         // 変更されたモニターをチェック
         var changedMonitors = newMonitors
             .Join(oldMonitors, n => n.Handle, o => o.Handle, (n, o) => new { New = n, Old = o })
             .Where(x => !MonitorInfoEquals(x.Old, x.New))
             .Select(x => x.New);
-        
+
         foreach (var changed in changedMonitors)
         {
             await NotifyMonitorChangedAsync(MonitorChangeType.Changed, changed, newMonitors, cancellationToken).ConfigureAwait(false);
         }
     }
-    
+
     /// <summary>
     /// モニター変更イベントを通知
     /// </summary>
@@ -769,9 +769,9 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         try
         {
             var eventArgs = new MonitorChangedEventArgs(changeType, affectedMonitor, allMonitors);
-            
+
             MonitorChanged?.Invoke(this, eventArgs);
-            
+
             _logger.LogInformation("Monitor change notified: {Change}", eventArgs.ToString());
             return Task.CompletedTask;
         }
@@ -796,7 +796,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             return Task.FromException(ex);
         }
     }
-    
+
     /// <summary>
     /// テスト環境で実行されているかどうかを検出
     /// </summary>
@@ -809,7 +809,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         {
             return true;
         }
-        
+
         // 方法2: スタックトレースでテストランナーを検出
         var stackTrace = new System.Diagnostics.StackTrace();
         for (int i = 0; i < stackTrace.FrameCount; i++)
@@ -821,7 +821,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
                 return true;
             }
         }
-        
+
         // 方法3: 现在のアセンブリコンテキストでテスト関連アセンブリを検出
         var loadedAssemblies = System.AppDomain.CurrentDomain.GetAssemblies();
         foreach (var assembly in loadedAssemblies)
@@ -836,10 +836,10 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
                 return true;
             }
         }
-        
+
         return false;
     }
-    
+
     /// <summary>
     /// モニター情報の等価性をチェック
     /// </summary>
@@ -850,7 +850,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
         a.IsPrimary == b.IsPrimary &&
         Math.Abs(a.DpiX - b.DpiX) < 0.1 &&
         Math.Abs(a.DpiY - b.DpiY) < 0.1;
-    
+
     /// <summary>
     /// ファイナライザー
     /// アンマネージリソース（Windowsメッセージウィンドウ、フック等）の確実な解放を保証
@@ -859,13 +859,13 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
     {
         Dispose(false);
     }
-    
+
     public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
-    
+
     /// <summary>
     /// リソースを破棄します
     /// </summary>
@@ -873,7 +873,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
     private void Dispose(bool disposing)
     {
         if (_disposed) return;
-        
+
         try
         {
             if (disposing)
@@ -885,9 +885,9 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
                 _gameWindowTracker?.Dispose();
                 _cleanupTimer?.Dispose();
             }
-            
+
             // アンマネージリソースの破棄（必要に応じて）
-            
+
             _disposed = true;
         }
         catch (ObjectDisposedException)
@@ -895,26 +895,26 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             // 既に破棄済み - 無視
         }
     }
-    
+
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
-        
+
         try
         {
 #pragma warning disable CA1849 // Call async methods when in an async method
             _cancellationTokenSource?.Cancel(); // Cancel()に非同期版は存在しない
 #pragma warning restore CA1849 // Call async methods when in an async method
-            
+
             // メッセージリスナーの停止
             _displayChangeListener?.Dispose();
             _gameWindowTracker?.Dispose();
-            
+
             // タイマーの停止
             await _cleanupTimer.DisposeAsync().ConfigureAwait(false);
-            
+
             // 監視の停止
             if (_isMonitoring)
             {
@@ -938,7 +938,7 @@ public sealed class WindowsMonitorManager : IMonitorManager, IAsyncDisposable
             _cancellationTokenSource?.Dispose();
             _disposed = true;
         }
-        
+
         GC.SuppressFinalize(this);
         _logger.LogInformation("WindowsMonitorManager disposed asynchronously");
     }
@@ -952,7 +952,7 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
 {
     private const uint WM_DISPLAYCHANGE = 0x007E;
     private const uint WM_SETTINGCHANGE = 0x001A;
-    
+
     private readonly Action _onDisplayChanged;
     private readonly Action _onDpiChanged;
     private readonly ILogger _logger;
@@ -960,10 +960,10 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
     private readonly WndProcDelegate _wndProc;
     private volatile bool _isListening;
     private volatile bool _disposed;
-    
+
     public WindowsDisplayChangeListener(
-        Action onDisplayChanged, 
-        Action onDpiChanged, 
+        Action onDisplayChanged,
+        Action onDpiChanged,
         ILogger logger)
     {
         _onDisplayChanged = onDisplayChanged;
@@ -972,19 +972,19 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
         _wndProc = WndProc;
         _messageWindow = CreateMessageOnlyWindow(_wndProc);
     }
-    
+
     public void StartListening()
     {
         _isListening = true;
         _logger.LogDebug("Started listening for display change messages");
     }
-    
+
     public void StopListening()
     {
         _isListening = false;
         _logger.LogDebug("Stopped listening for display change messages");
     }
-    
+
     /// <summary>
     /// ファイナライザー
     /// アンマネージリソース（Windowsメッセージウィンドウ）の確実な解放を保証
@@ -993,12 +993,12 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
     {
         Dispose();
     }
-    
+
     private IntPtr WndProc(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
         if (!_isListening || _disposed)
             return User32Methods.DefWindowProc(hwnd, msg, wParam, lParam);
-        
+
         try
         {
             switch (msg)
@@ -1007,7 +1007,7 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
                     _logger.LogDebug("WM_DISPLAYCHANGE received");
                     _onDisplayChanged();
                     break;
-                    
+
                 case WM_SETTINGCHANGE:
                     if (lParam != IntPtr.Zero)
                     {
@@ -1043,10 +1043,10 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
             // キャンセル例外のみは再スローし、その他はログ記録後継続
             _logger.LogError(ex, "Error in WndProc handling message {Message:X}", msg);
         }
-        
+
         return User32Methods.DefWindowProc(hwnd, msg, wParam, lParam);
     }
-    
+
     private static IntPtr CreateMessageOnlyWindow(WndProcDelegate wndProc)
     {
         // プロセスIDとタイムスタンプでユニークなクラス名を生成
@@ -1054,7 +1054,7 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
         var timestamp = Environment.TickCount64;
         var threadId = Environment.CurrentManagedThreadId;
         var uniqueClassName = $"BaketaDisplayChangeListener_{processId}_{timestamp}_{threadId}";
-        
+
         var wndClass = new WNDCLASS
         {
             style = 0,
@@ -1068,34 +1068,34 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
             lpszMenuName = null,
             lpszClassName = uniqueClassName
         };
-        
+
         var classAtom = User32Methods.RegisterClass(ref wndClass);
         if (classAtom == 0)
         {
             var lastError = Marshal.GetLastWin32Error();
             throw new Win32Exception(lastError, $"Window class registration failed: {lastError}");
         }
-        
+
         var hwnd = User32Methods.CreateWindowEx(
             0, classAtom, uniqueClassName,
             0, 0, 0, 0, 0,
             User32Methods.HWND_MESSAGE, IntPtr.Zero,
             wndClass.hInstance, IntPtr.Zero);
-        
+
         if (hwnd == IntPtr.Zero)
         {
             var lastError = Marshal.GetLastWin32Error();
             throw new Win32Exception(lastError, $"Message window creation failed: {lastError}");
         }
-        
+
         return hwnd;
     }
-    
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        
+
         try
         {
             if (_messageWindow != IntPtr.Zero)
@@ -1121,7 +1121,7 @@ internal sealed class WindowsDisplayChangeListener : IDisposable
             // キャンセル例外のみは再スローし、その他はログ記録後継続
             _logger.LogError(ex, "Error disposing WindowsDisplayChangeListener");
         }
-        
+
         // ファイナライザーを抑制（CA1816対応）
         GC.SuppressFinalize(this);
     }
@@ -1135,27 +1135,27 @@ internal sealed class TestDisplayChangeListener : IDisposable
 {
     private readonly ILogger _logger;
     private volatile bool _disposed;
-    
+
     public TestDisplayChangeListener(ILogger logger)
     {
         _logger = logger;
     }
-    
+
     public void StartListening()
     {
         _logger.LogDebug("Test display change listener started (no-op)");
     }
-    
+
     public void StopListening()
     {
         _logger.LogDebug("Test display change listener stopped (no-op)");
     }
-    
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        
+
         _logger.LogDebug("Test display change listener disposed");
         GC.SuppressFinalize(this);
     }
@@ -1169,21 +1169,21 @@ internal sealed class GameWindowTracker : IDisposable
 {
     private const uint EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
     private const uint WINEVENT_OUTOFCONTEXT = 0x0000;
-    
+
     private readonly IntPtr _gameWindow;
     private readonly Action _onWindowMoved;
     private readonly ILogger _logger;
     private readonly WinEventDelegate _winEventProc;
     private readonly IntPtr _hook;
     private volatile bool _disposed;
-    
+
     public GameWindowTracker(IntPtr gameWindow, Action onWindowMoved, ILogger logger)
     {
         _gameWindow = gameWindow;
         _onWindowMoved = onWindowMoved;
         _logger = logger;
         _winEventProc = WinEventProc;
-        
+
         _hook = User32Methods.SetWinEventHook(
             EVENT_OBJECT_LOCATIONCHANGE,
             EVENT_OBJECT_LOCATIONCHANGE,
@@ -1191,16 +1191,16 @@ internal sealed class GameWindowTracker : IDisposable
             _winEventProc,
             0, 0,
             WINEVENT_OUTOFCONTEXT);
-        
+
         if (_hook == IntPtr.Zero)
             throw new Win32Exception(Marshal.GetLastWin32Error());
     }
-    
+
     public void StopTracking()
     {
         // フックの解除はDisposeで実行
     }
-    
+
     /// <summary>
     /// ファイナライザー
     /// アンマネージリソース（Windowsイベントフック）の確実な解放を保証
@@ -1209,12 +1209,12 @@ internal sealed class GameWindowTracker : IDisposable
     {
         Dispose();
     }
-    
-    private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, 
+
+    private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd,
         int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
     {
         if (_disposed) return;
-        
+
         try
         {
             if (hwnd == _gameWindow && eventType == EVENT_OBJECT_LOCATIONCHANGE)
@@ -1242,12 +1242,12 @@ internal sealed class GameWindowTracker : IDisposable
             _logger.LogError(ex, "Error in WinEventProc");
         }
     }
-    
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        
+
         try
         {
             if (_hook != IntPtr.Zero)
@@ -1273,7 +1273,7 @@ internal sealed class GameWindowTracker : IDisposable
             // キャンセル例外のみは再スローし、その他はログ記録後継続
             _logger.LogError(ex, "Error disposing GameWindowTracker");
         }
-        
+
         // ファイナライザーを抑制（CA1816対応）
         GC.SuppressFinalize(this);
     }

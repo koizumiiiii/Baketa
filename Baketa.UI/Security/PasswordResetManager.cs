@@ -4,8 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Auth;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Security;
 
@@ -56,7 +56,7 @@ public sealed class PasswordResetManager : IDisposable
         _logger = logger;
 
         // 期限切れトークンのクリーンアップタイマー
-        _cleanupTimer = new Timer(CleanupExpiredTokens, null, 
+        _cleanupTimer = new Timer(CleanupExpiredTokens, null,
             TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
     }
 
@@ -210,7 +210,7 @@ public sealed class PasswordResetManager : IDisposable
         {
             _auditLogger.LogPasswordChange(normalizedEmail, false, "PasswordReset", ipAddress);
             _logger?.LogError(ex, "パスワードリセット実行エラー: {Email}", normalizedEmail);
-            
+
             return new ResetExecutionResult(false, "パスワード更新中にエラーが発生しました");
         }
     }
@@ -241,7 +241,7 @@ public sealed class PasswordResetManager : IDisposable
     {
         var now = DateTime.UtcNow;
         var windowStart = now - RateLimitWindow;
-        
+
         int recentRequests = 0;
         foreach (var kvp in _activeResets)
         {
@@ -262,7 +262,7 @@ public sealed class PasswordResetManager : IDisposable
         var bytes = new byte[TokenLength];
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(bytes);
-        
+
         // Base64エンコード（URLセーフ）
         return Convert.ToBase64String(bytes)
             .Replace('+', '-')
@@ -283,7 +283,7 @@ public sealed class PasswordResetManager : IDisposable
 
         foreach (var kvp in _activeResets)
         {
-            if (now > kvp.Value.ExpiresAt || 
+            if (now > kvp.Value.ExpiresAt ||
                 (kvp.Value.IsUsed && now > kvp.Value.RequestedAt.AddHours(1)))
             {
                 expiredKeys.Add(kvp.Key);

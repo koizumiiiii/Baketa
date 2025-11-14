@@ -1,9 +1,9 @@
+using Baketa.Core.UI.Fullscreen;
 using Baketa.Core.UI.Overlay.Positioning;
-using Baketa.UI.Overlay.Positioning;
-using Baketa.UI.Overlay.MultiMonitor;
 using Baketa.UI.Monitors;
 using Baketa.UI.Overlay;
-using Baketa.Core.UI.Fullscreen;
+using Baketa.UI.Overlay.MultiMonitor;
+using Baketa.UI.Overlay.Positioning;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -21,15 +21,15 @@ public sealed class OverlayPositioningModule
     public static void RegisterServices(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        
+
         // マルチモニター関連サービス（依存関係の順序で登録）
         services.AddSingleton<AvaloniaMultiMonitorAdapter>();
         services.AddSingleton<AvaloniaOverlayWindowAdapter>();
         services.AddSingleton<MultiMonitorOverlayManager>();
-        
+
         // テキスト測定サービス
         services.AddSingleton<ITextMeasurementService, AvaloniaTextMeasurementService>();
-        
+
         // オーバーレイ位置管理システム（ファクトリーパターンで作成）
         services.AddSingleton<IOverlayPositionManagerFactory, OverlayPositionManagerFactory>();
     }
@@ -58,11 +58,11 @@ public sealed class OverlayPositionManagerFactory(
 
     /// <inheritdoc/>
     public async Task<IOverlayPositionManager> CreateWithSettingsAsync(
-        OverlayPositionSettings settings, 
+        OverlayPositionSettings settings,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         await Task.Yield(); // 非同期メソッドのため
 
         var positionManager = new OverlayPositionManager(

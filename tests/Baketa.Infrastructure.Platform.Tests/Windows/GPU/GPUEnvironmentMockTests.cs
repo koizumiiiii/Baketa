@@ -1,15 +1,15 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Models.Capture;
-using Baketa.Core.Abstractions.GPU;
-using Baketa.Infrastructure.Platform.Windows.GPU;
-using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
-using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Models.Capture;
+using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+using Baketa.Infrastructure.Platform.Windows.GPU;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Platform.Tests.Windows.GPU;
 
@@ -155,7 +155,7 @@ public class GPUEnvironmentMockTests
         var mockCapturer = new Mock<IWindowsCapturer>();
         var mockEventAggregator = new Mock<IEventAggregator>();
         var strategy = new DirectFullScreenCaptureStrategy(mockLogger.Object, mockCapturer.Object, mockEventAggregator.Object);
-        
+
         var gpuEnv = new GpuEnvironmentInfo
         {
             IsIntegratedGpu = true,
@@ -198,7 +198,7 @@ public class GPUEnvironmentMockTests
         // Assert - 実際のウィンドウAPIを使用するため、結果は環境依存
         // モックテストでは前提条件の検証ロジック自体をテスト
         Assert.True(validWindowHandle != IntPtr.Zero);
-        
+
         // Note: isValid は環境依存のため、具体的な値をアサートしない
         _ = isValid; // 使用されていない警告を抑制
     }

@@ -1,16 +1,16 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Application.EventHandlers;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.Diagnostics;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Events.Handlers;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Events.EventTypes;
-using Baketa.Core.Events.Handlers;
-using Baketa.Application.EventHandlers;
-using Baketa.Core.Events.Diagnostics;
-using Baketa.Core.Settings;
 
 namespace Baketa.Application.Services.Events;
 
@@ -29,7 +29,7 @@ public sealed class EventHandlerInitializationService(
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     private readonly ILogger<EventHandlerInitializationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly LoggingSettings _loggingSettings = InitializeLoggingSettings(serviceProvider);
-    
+
     private static LoggingSettings InitializeLoggingSettings(IServiceProvider serviceProvider)
     {
         try
@@ -64,22 +64,22 @@ public sealed class EventHandlerInitializationService(
         var startTimestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
         Console.WriteLine("🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！");
         System.Diagnostics.Debug.WriteLine("🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！");
-        
+
         // 確実なファイル記録
         try
         {
-            System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+            System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                 $"{startTimestamp}→🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！{Environment.NewLine}");
         }
         catch { /* ファイル出力失敗は無視 */ }
-        
+
         _logger.LogInformation("イベントハンドラー初期化を開始します");
         Console.WriteLine("🔥 [INIT_LOG] _logger.LogInformation実行完了");
-        
+
         // ファイル記録
         try
         {
-            System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+            System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                 $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→🔥 [INIT_LOG] _logger.LogInformation実行完了{Environment.NewLine}");
         }
         catch { /* ファイル出力失敗は無視 */ }
@@ -89,7 +89,7 @@ public sealed class EventHandlerInitializationService(
             // EventAggregatorの取得
             var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
             _logger.LogInformation("EventAggregator取得成功");
-            
+
             // EventAggregator DI取得詳細デバッグ
             Console.WriteLine($"🔥 [DI_DEBUG] EventHandlerInitializationService - EventAggregator取得");
             Console.WriteLine($"🔥 [DI_DEBUG] EventAggregator型: {eventAggregator.GetType().FullName}");
@@ -135,11 +135,11 @@ public sealed class EventHandlerInitializationService(
                 eventAggregator.Subscribe<OcrRequestEvent>(ocrRequestHandler);
                 _logger.LogInformation("OcrRequestHandlerを登録しました");
                 Console.WriteLine("🔥 [DEBUG] OcrRequestHandlerを登録しました");
-                
+
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→✅ [SUCCESS] OcrRequestHandler (翻訳パイプライン連鎖) を登録しました{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -148,11 +148,11 @@ public sealed class EventHandlerInitializationService(
             {
                 _logger.LogError(ex, "OcrRequestHandlerの登録に失敗しました");
                 Console.WriteLine($"🔥 [ERROR] OcrRequestHandlerの登録失敗: {ex.Message}");
-                
+
                 // 確実なファイル記録
                 try
                 {
-                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+                    System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                         $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")}→❌ [ERROR] OcrRequestHandler登録失敗: {ex.Message}{Environment.NewLine}");
                 }
                 catch { /* ファイル出力失敗は無視 */ }
@@ -362,20 +362,20 @@ public sealed class EventHandlerInitializationService(
             System.Diagnostics.Debug.WriteLine($"🚨🚨🚨 [INIT_EXCEPTION] EventHandlerInitializationService例外発生！");
             System.Diagnostics.Debug.WriteLine($"🚨 [INIT_EXCEPTION] Type: {ex.GetType().FullName}");
             System.Diagnostics.Debug.WriteLine($"🚨 [INIT_EXCEPTION] Message: {ex.Message}");
-            
+
             _logger.LogError(ex, "イベントハンドラー初期化中にエラーが発生しました");
             Console.WriteLine($"🔥 [ERROR] イベントハンドラー初期化エラー: {ex.Message}");
-            
+
             // ファイルにも記録
             try
             {
-                System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+                System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [INIT_EXCEPTION] {ex.GetType().FullName}: {ex.Message}{Environment.NewLine}");
-                System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(), 
+                System.IO.File.AppendAllText(_loggingSettings.GetFullDebugLogPath(),
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [INIT_EXCEPTION_STACK] {ex.StackTrace}{Environment.NewLine}");
             }
             catch { /* ファイル出力失敗は無視 */ }
-            
+
             throw;
         }
     }

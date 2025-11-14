@@ -187,9 +187,9 @@ public sealed class SafeImage : IDisposable
 
         // セキュリティ要件：画像データに機密情報が含まれる場合のみクリアを実行
         // パフォーマンス最適化：通常のゲーム画像の場合はクリアを省略可能
-        #if SECURE_IMAGE_DISPOSAL
+#if SECURE_IMAGE_DISPOSAL
         Array.Clear(_rentedBuffer, 0, _actualDataLength);
-        #endif
+#endif
 
         _arrayPool.Return(_rentedBuffer);
         _disposed = true;

@@ -18,17 +18,17 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
     private readonly IDiagnosticReportGenerator _reportGenerator;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<DiagnosticCollectionService> _logger;
-    
+
     private readonly ConcurrentQueue<PipelineDiagnosticEvent> _diagnosticEvents = new();
     private readonly System.Threading.Timer _flushTimer;
     private readonly SemaphoreSlim _flushSemaphore = new(1, 1);
-    
+
     private volatile bool _isCollecting;
     private volatile bool _disposed;
-    
+
     private const int MaxEventsInMemory = 1000;
     private const int FlushIntervalMs = 30000; // 30秒
-    
+
     public DiagnosticCollectionService(
         IBackgroundTaskQueue backgroundQueue,
         IDiagnosticReportGenerator reportGenerator,
@@ -39,7 +39,7 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
         _reportGenerator = reportGenerator;
         _eventAggregator = eventAggregator;
         _logger = logger;
-        
+
         // 定期フラッシュタイマー設定
         _flushTimer = new System.Threading.Timer(FlushToFile, null, Timeout.Infinite, Timeout.Infinite);
     }
@@ -50,10 +50,10 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
     {
         _isCollecting = true;
         _flushTimer.Change(FlushIntervalMs, FlushIntervalMs);
-        
+
         Console.WriteLine("🩺 [DIAGNOSTIC_COLLECTION] 診断データ収集開始 - IsCollecting=true");
         _logger.LogInformation("診断データ収集開始");
-        
+
         return Task.CompletedTask;
     }
 
@@ -61,17 +61,17 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
     {
         _isCollecting = false;
         _flushTimer.Change(Timeout.Infinite, Timeout.Infinite);
-        
+
         // 残りのデータをフラッシュ
         await FlushEventsAsync(cancellationToken).ConfigureAwait(false);
-        
+
         _logger.LogInformation("診断データ収集停止");
     }
 
     public async Task CollectDiagnosticAsync(PipelineDiagnosticEvent diagnosticEvent, CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] CollectDiagnosticAsync呼び出し - Stage: {diagnosticEvent.Stage}, IsCollecting: {_isCollecting}, Disposed: {_disposed}");
-        
+
         if (!_isCollecting || _disposed)
         {
             Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] 収集スキップ - IsCollecting: {_isCollecting}, Disposed: {_disposed}");
@@ -80,10 +80,10 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
 
         // 🔧 CRITICAL FIX: イベントを即座に蓄積（バックグラウンド処理ではなく同期処理）
         Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] 即座にイベント蓄積開始 - Stage: {diagnosticEvent.Stage}");
-        
+
         // 即座に蓄積処理を実行
         await ProcessDiagnosticEventAsync(diagnosticEvent, cancellationToken).ConfigureAwait(false);
-        
+
         Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] 即座にイベント蓄積完了 - Stage: {diagnosticEvent.Stage}");
     }
 
@@ -91,11 +91,11 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
     {
         Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] GenerateReportAsync開始 - reportType: {reportType}, IsCollecting: {_isCollecting}");
         Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] ExtractAllEvents呼び出し前 - キューサイズ: {_diagnosticEvents.Count}");
-        
+
         var events = ExtractAllEvents();
-        
+
         Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] ExtractAllEvents完了 - 取得イベント数: {events.Count}");
-        
+
         if (!events.Any())
         {
             Console.WriteLine("🩺 [DIAGNOSTIC_COLLECTION] 警告: 生成する診断イベントがありません");
@@ -124,16 +124,16 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
         try
         {
             Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] ProcessDiagnosticEventAsync開始 - Stage: {diagnosticEvent.Stage}, 現在キューサイズ: {_diagnosticEvents.Count}");
-            
+
             _diagnosticEvents.Enqueue(diagnosticEvent);
-            
+
             Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] イベント追加完了 - 新キューサイズ: {_diagnosticEvents.Count}");
 
             // メモリ制限チェック - バックグラウンドでフラッシュ実行
             if (_diagnosticEvents.Count > MaxEventsInMemory)
             {
                 Console.WriteLine($"🩺 [DIAGNOSTIC_COLLECTION] メモリ制限到達 - バックグラウンドフラッシュ実行: {_diagnosticEvents.Count} > {MaxEventsInMemory}");
-                
+
                 // フラッシュ処理はバックグラウンドで実行（パフォーマンスを保持）
                 _backgroundQueue.QueueBackgroundWorkItem(async token =>
                 {
@@ -145,13 +145,13 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
             if (diagnosticEvent.Severity >= DiagnosticSeverity.Error)
             {
                 Console.WriteLine($"🚨 [DIAGNOSTIC] [{diagnosticEvent.Severity}] {diagnosticEvent.Stage}: {diagnosticEvent.ErrorMessage}");
-                _logger.LogError("診断イベント: [{Severity}] {Stage}: {ErrorMessage}", 
+                _logger.LogError("診断イベント: [{Severity}] {Stage}: {ErrorMessage}",
                     diagnosticEvent.Severity, diagnosticEvent.Stage, diagnosticEvent.ErrorMessage);
             }
             else if (diagnosticEvent.Severity >= DiagnosticSeverity.Warning)
             {
                 Console.WriteLine($"⚠️ [DIAGNOSTIC] [{diagnosticEvent.Severity}] {diagnosticEvent.Stage}: {diagnosticEvent.ErrorMessage}");
-                _logger.LogWarning("診断イベント: [{Severity}] {Stage}: {ErrorMessage}", 
+                _logger.LogWarning("診断イベント: [{Severity}] {Stage}: {ErrorMessage}",
                     diagnosticEvent.Severity, diagnosticEvent.Stage, diagnosticEvent.ErrorMessage);
             }
         }
@@ -191,7 +191,7 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
             var reportPath = await _reportGenerator.GenerateReportAsync(
                 events, "flush", cancellationToken: cancellationToken).ConfigureAwait(false);
 
-            _logger.LogDebug("診断データフラッシュ完了: {EventCount}イベント, {FilePath}", 
+            _logger.LogDebug("診断データフラッシュ完了: {EventCount}イベント, {FilePath}",
                 events.Count, reportPath);
         }
         finally
@@ -203,12 +203,12 @@ public sealed class DiagnosticCollectionService : IDiagnosticCollectionService, 
     private List<PipelineDiagnosticEvent> ExtractAllEvents()
     {
         var events = new List<PipelineDiagnosticEvent>();
-        
+
         while (_diagnosticEvents.TryDequeue(out var evt))
         {
             events.Add(evt);
         }
-        
+
         return events;
     }
 

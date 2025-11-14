@@ -21,14 +21,14 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
     private System.Threading.Timer? _reportTimer;
     private readonly int _targetLatencyMs;
     private readonly int _maxTimingRecords;
-    
+
     // 統計情報
     private long _totalTranslations;
     private long _successfulTranslations;
     private long _failedTranslations;
     private long _cacheHits;
     private long _targetExceeded;
-    
+
     public TranslationPerformanceMonitor(
         ILogger<TranslationPerformanceMonitor> logger,
         int targetLatencyMs = 500,
@@ -80,7 +80,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
         EnsureTimerInitialized();
         var stopwatch = Stopwatch.StartNew();
         var engineName = engine.Name;
-        
+
         try
         {
             // エンジンメトリクスを取得または作成
@@ -89,19 +89,19 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
                 EngineName = engineName,
                 FirstUsed = DateTime.UtcNow
             });
-            
+
             // 翻訳実行
             var response = await engine.TranslateAsync(request, cancellationToken).ConfigureAwait(false);
-            
+
             stopwatch.Stop();
             var elapsedMs = stopwatch.ElapsedMilliseconds;
-            
+
             // メトリクス更新
             UpdateMetrics(metrics, elapsedMs, response.IsSuccess);
-            
+
             // タイミングデータ記録
             RecordTiming(engineName, request.SourceText, elapsedMs, response.IsSuccess);
-            
+
             // 目標超過チェック
             if (elapsedMs > _targetLatencyMs)
             {
@@ -109,7 +109,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
                 _logger.LogWarning(
                     "翻訳処理が目標を超過 - エンジン: {Engine}, 処理時間: {ElapsedMs}ms > {TargetMs}ms, テキスト: '{Text}'",
                     engineName, elapsedMs, _targetLatencyMs, request.SourceText[..Math.Min(50, request.SourceText.Length)]);
-                
+
                 // アラート発行（将来的には外部監視システムと連携）
                 await RaisePerformanceAlertAsync(engineName, elapsedMs).ConfigureAwait(false);
             }
@@ -118,7 +118,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
                 // 高速処理の場合はキャッシュヒットの可能性
                 Interlocked.Increment(ref _cacheHits);
             }
-            
+
             // 結果を返す
             return new MonitoredTranslationResult
             {
@@ -133,7 +133,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
         {
             stopwatch.Stop();
             var elapsedMs = stopwatch.ElapsedMilliseconds;
-            
+
             // エラーメトリクス更新
             var metrics = _engineMetrics.GetOrAdd(engineName, _ => new PerformanceMetrics
             {
@@ -141,10 +141,10 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
                 FirstUsed = DateTime.UtcNow
             });
             UpdateMetrics(metrics, elapsedMs, false);
-            
-            _logger.LogError(ex, "翻訳処理エラー - エンジン: {Engine}, 処理時間: {ElapsedMs}ms", 
+
+            _logger.LogError(ex, "翻訳処理エラー - エンジン: {Engine}, 処理時間: {ElapsedMs}ms",
                 engineName, elapsedMs);
-            
+
             throw;
         }
     }
@@ -162,32 +162,32 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
 
         var stopwatch = Stopwatch.StartNew();
         var engineName = engine.Name;
-        
+
         try
         {
             var responses = await engine.TranslateBatchAsync(requests, cancellationToken).ConfigureAwait(false);
-            
+
             stopwatch.Stop();
             var totalMs = stopwatch.ElapsedMilliseconds;
             var avgMs = requests.Count > 0 ? totalMs / requests.Count : 0;
-            
+
             // メトリクス更新
             var metrics = _engineMetrics.GetOrAdd(engineName, _ => new PerformanceMetrics
             {
                 EngineName = engineName,
                 FirstUsed = DateTime.UtcNow
             });
-            
+
             var successCount = responses.Count(r => r.IsSuccess);
             metrics.TotalRequests += requests.Count;
             metrics.SuccessfulRequests += successCount;
             metrics.FailedRequests += requests.Count - successCount;
             metrics.TotalProcessingTimeMs += totalMs;
-            
+
             _logger.LogInformation(
                 "バッチ翻訳完了 - エンジン: {Engine}, 件数: {Count}, 総時間: {TotalMs}ms, 平均: {AvgMs}ms/件",
                 engineName, requests.Count, totalMs, avgMs);
-            
+
             return new BatchMonitoredTranslationResult
             {
                 Responses = responses,
@@ -202,7 +202,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
         catch (Exception ex)
         {
             stopwatch.Stop();
-            _logger.LogError(ex, "バッチ翻訳エラー - エンジン: {Engine}, 件数: {Count}", 
+            _logger.LogError(ex, "バッチ翻訳エラー - エンジン: {Engine}, 件数: {Count}",
                 engineName, requests.Count);
             throw;
         }
@@ -214,7 +214,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
         {
             metrics.TotalRequests++;
             metrics.TotalProcessingTimeMs += elapsedMs;
-            
+
             if (success)
             {
                 metrics.SuccessfulRequests++;
@@ -225,13 +225,13 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
                 metrics.FailedRequests++;
                 Interlocked.Increment(ref _failedTranslations);
             }
-            
+
             // 最小/最大/平均を更新
             metrics.MinLatencyMs = Math.Min(metrics.MinLatencyMs, elapsedMs);
             metrics.MaxLatencyMs = Math.Max(metrics.MaxLatencyMs, elapsedMs);
             metrics.LastUsed = DateTime.UtcNow;
         }
-        
+
         Interlocked.Increment(ref _totalTranslations);
     }
 
@@ -245,9 +245,9 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
             Success = success,
             Timestamp = DateTime.UtcNow
         };
-        
+
         _recentTimings.Enqueue(timing);
-        
+
         // 最大レコード数を超えたら古いものを削除
         while (_recentTimings.Count > _maxTimingRecords)
         {
@@ -259,7 +259,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
     {
         // 将来的には外部監視システム（Prometheus、Application Insights等）と連携
         await Task.CompletedTask;
-        
+
         _logger.LogWarning(
             "⚠️ パフォーマンスアラート - エンジン: {Engine}, レイテンシ: {ElapsedMs}ms (目標: {TargetMs}ms)",
             engineName, elapsedMs, _targetLatencyMs);
@@ -270,7 +270,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
         try
         {
             if (_totalTranslations == 0) return;
-            
+
             var report = new System.Text.StringBuilder();
             report.AppendLine("\n📊 === 翻訳パフォーマンスレポート ===");
             report.AppendLine($"期間: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
@@ -279,30 +279,30 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
             report.AppendLine($"失敗: {_failedTranslations:N0} ({100.0 * _failedTranslations / _totalTranslations:F1}%)");
             report.AppendLine($"キャッシュヒット推定: {_cacheHits:N0} ({100.0 * _cacheHits / _totalTranslations:F1}%)");
             report.AppendLine($"目標超過: {_targetExceeded:N0} ({100.0 * _targetExceeded / _totalTranslations:F1}%)");
-            
+
             // エンジン別統計
             report.AppendLine("\n🔧 エンジン別統計:");
             foreach (var kvp in _engineMetrics.OrderBy(x => x.Key))
             {
                 var metrics = kvp.Value;
                 if (metrics.TotalRequests == 0) continue;
-                
+
                 var avgMs = metrics.TotalProcessingTimeMs / metrics.TotalRequests;
                 var successRate = 100.0 * metrics.SuccessfulRequests / metrics.TotalRequests;
-                
+
                 report.AppendLine($"  [{metrics.EngineName}]");
                 report.AppendLine($"    リクエスト: {metrics.TotalRequests:N0}");
                 report.AppendLine($"    平均: {avgMs:F1}ms (最小: {metrics.MinLatencyMs}ms, 最大: {metrics.MaxLatencyMs}ms)");
                 report.AppendLine($"    成功率: {successRate:F1}%");
                 report.AppendLine($"    最終使用: {metrics.LastUsed:HH:mm:ss}");
             }
-            
+
             // 最近の遅延トップ5
             var slowest = _recentTimings
                 .OrderByDescending(t => t.ProcessingTimeMs)
                 .Take(5)
                 .ToList();
-                
+
             if (slowest.Any())
             {
                 report.AppendLine("\n⚠️ 最近の遅延トップ5:");
@@ -311,16 +311,16 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
                     report.AppendLine($"  {timing.ProcessingTimeMs}ms - {timing.EngineName} - \"{timing.TextPreview}\"");
                 }
             }
-            
+
             // SLA達成率
             var slaAchievement = 100.0 * (_totalTranslations - _targetExceeded) / _totalTranslations;
             report.AppendLine($"\n✅ SLA達成率 ({_targetLatencyMs}ms以下): {slaAchievement:F1}%");
-            
+
             if (slaAchievement < 90)
             {
                 report.AppendLine("⚠️ 警告: SLA達成率が90%を下回っています！");
             }
-            
+
             _logger.LogInformation(report.ToString());
         }
         catch (Exception ex)
@@ -344,7 +344,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
             TargetLatencyMs = _targetLatencyMs,
             Timestamp = DateTime.UtcNow
         };
-        
+
         // エンジン別統計を追加
         foreach (var kvp in _engineMetrics)
         {
@@ -362,7 +362,7 @@ public class TranslationPerformanceMonitor : ITranslationPerformanceMonitor
                 };
             }
         }
-        
+
         return stats;
     }
 
@@ -403,12 +403,12 @@ public interface ITranslationPerformanceMonitor : IDisposable
         ITranslationEngine engine,
         TranslationRequest request,
         CancellationToken cancellationToken = default);
-        
+
     Task<BatchMonitoredTranslationResult> MonitorBatchTranslationAsync(
         ITranslationEngine engine,
         IReadOnlyList<TranslationRequest> requests,
         CancellationToken cancellationToken = default);
-        
+
     PerformanceStatistics GetStatistics();
 }
 

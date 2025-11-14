@@ -1,11 +1,11 @@
-using Xunit;
-using Baketa.Core.Settings;
-using Baketa.UI.ViewModels.Settings;
 using System;
 using System.Linq;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
+using Baketa.UI.ViewModels.Settings;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Xunit;
 
 namespace Baketa.UI.Tests.ViewModels.Settings;
 
@@ -23,10 +23,10 @@ public sealed class MainUiSettingsViewModelTests
     {
         var mockEventAggregator = new Mock<IEventAggregator>();
         var mockLogger = new Mock<ILogger<MainUiSettingsViewModel>>();
-        
+
         return new MainUiSettingsViewModel(settings, mockEventAggregator.Object, mockLogger.Object);
     }
-    
+
     /// <summary>
     /// テスト用のモックオブジェクトを作成し、MainUiSettingsViewModelを生成します（Loggerはnull）
     /// </summary>
@@ -35,7 +35,7 @@ public sealed class MainUiSettingsViewModelTests
     private static MainUiSettingsViewModel CreateViewModelWithNullLogger(MainUiSettings settings)
     {
         var mockEventAggregator = new Mock<IEventAggregator>();
-        
+
         return new MainUiSettingsViewModel(settings, mockEventAggregator.Object, null);
     }
 
@@ -76,7 +76,7 @@ public sealed class MainUiSettingsViewModelTests
     {
         // Arrange
         var mockEventAggregator = new Mock<IEventAggregator>();
-        
+
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => new MainUiSettingsViewModel(null!, mockEventAggregator.Object, null));
     }
@@ -90,7 +90,7 @@ public sealed class MainUiSettingsViewModelTests
         // Arrange
         var settings = new MainUiSettings();
         var viewModel = CreateViewModel(settings);
-        
+
         // HasChangesの初期状態確認
         Assert.False(viewModel.HasChanges);
 
@@ -135,7 +135,7 @@ public sealed class MainUiSettingsViewModelTests
         // Arrange
         var settings = new MainUiSettings();
         var viewModel = CreateViewModel(settings);
-        
+
         Assert.False(viewModel.ShowAdvancedSettings);
 
         // Act
@@ -143,7 +143,7 @@ public sealed class MainUiSettingsViewModelTests
 
         // Assert
         Assert.True(viewModel.ShowAdvancedSettings);
-        
+
         // もう一度トグル
         viewModel.ToggleAdvancedSettingsCommand.Execute().Subscribe();
         Assert.False(viewModel.ShowAdvancedSettings);
@@ -276,7 +276,7 @@ public sealed class MainUiSettingsViewModelTests
         // Arrange
         var initialSettings = new MainUiSettings();
         var viewModel = CreateViewModel(initialSettings);
-        
+
         var newSettings = new MainUiSettings
         {
             PanelOpacity = 0.4,

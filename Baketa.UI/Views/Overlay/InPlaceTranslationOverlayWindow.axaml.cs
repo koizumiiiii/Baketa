@@ -8,14 +8,14 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.UI.Monitors;
 using Baketa.UI.Services.Monitor;
 using Baketa.UI.Utils;
+using Microsoft.Extensions.Logging;
 using DrawingPoint = System.Drawing.Point;
-using DrawingSize = System.Drawing.Size;
 using DrawingRectangle = System.Drawing.Rectangle;
+using DrawingSize = System.Drawing.Size;
 
 namespace Baketa.UI.Views.Overlay;
 
@@ -29,7 +29,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
 #pragma warning disable SYSLIB1054 // Use LibraryImportAttribute instead of DllImportAttribute to generate P/Invoke marshalling code at compile time
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-    
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 #pragma warning restore SYSLIB1054
@@ -41,11 +41,11 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
     public DrawingRectangle TargetBounds { get; init; }
     public IntPtr SourceWindowHandle { get; init; }
 
-    #pragma warning disable CS0649 // Field is never assigned
+#pragma warning disable CS0649 // Field is never assigned
     private readonly ILogger<InPlaceTranslationOverlayWindow>? _logger;
-    #pragma warning restore CS0649
+#pragma warning restore CS0649
     private bool _disposed;
-    
+
     // フォントサイズ設定（デフォルト値）
     private static int _globalFontSize = 14;
 
@@ -54,12 +54,12 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
         try
         {
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🏗️ [InPlaceTranslationOverlay] InPlaceTranslationOverlayWindow コンストラクタ開始");
-            
+
             // AvaloniaXamlLoaderを使用してXAMLをロード
             Avalonia.Markup.Xaml.AvaloniaXamlLoader.Load(this);
-            
+
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] InPlace XAML ロード完了");
-            
+
             // ウィンドウプロパティ設定
             DataContext = this;
             Topmost = true;
@@ -68,17 +68,17 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             SystemDecorations = SystemDecorations.None;
             TransparencyLevelHint = [WindowTransparencyLevel.Transparent];
             Background = Brushes.Transparent;
-            
+
             // インプレース表示用の追加設定
             ShowActivated = false; // アクティブ化しない
             WindowStartupLocation = WindowStartupLocation.Manual; // 手動位置設定
-            
+
             // クリックスルー（マウスイベント透過）を有効化してゲームプレイ阻害を防止
             // Avaloniaでは直接的なクリックスルー設定はShow後に行う
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎮 [InPlaceTranslationOverlay] クリックスルー設定はShow後に延期（ゲームプレイ阻害防止）");
-            
+
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] InPlaceウィンドウプロパティ設定完了");
-            
+
             _logger?.LogDebug("🖼️ InPlaceTranslationOverlayWindow created - ChunkId: {ChunkId}", ChunkId);
         }
         catch (Exception ex)
@@ -134,7 +134,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 var overlayPosition = textChunk.GetBasicOverlayPosition();
                 var overlaySize = textChunk.GetOverlaySize();
                 var optimalFontSize = textChunk.CalculateOptimalFontSize();
-                
+
                 // ウィンドウ位置設定
                 Position = new PixelPoint(overlayPosition.X, overlayPosition.Y);
 
@@ -163,15 +163,15 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                     Hide();
                     return;
                 }
-                
+
                 // インプレース表示スタイルを適用（ユーザー設定フォントサイズを使用）
                 var userFontSize = GetConfiguredFontSize();
                 var finalFontSize = userFontSize > 0 ? userFontSize : optimalFontSize;
                 ApplyInPlaceStyle(finalFontSize, textChunk.TranslatedText);
-                
+
                 // ウィンドウを表示
                 Show();
-                
+
                 // 🎯 改善されたクリックスルー設定（透明度問題対策）
                 try
                 {
@@ -182,13 +182,13 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                         const int WS_EX_TRANSPARENT = 0x00000020;
                         const int WS_EX_LAYERED = 0x00080000;
                         const int WS_EX_TOPMOST = 0x00000008;
-                        
+
                         var currentStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-                        
+
                         // 🎯 クリックスルー有効化でゲームプレイ阻害を防止
                         var newStyle = currentStyle | WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT;
                         var result = SetWindowLong(hwnd, GWL_EXSTYLE, newStyle);
-                        
+
                         if (result != 0)
                         {
                             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] クリックスルー有効化完了（ゲームプレイ阻害防止）");
@@ -272,7 +272,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
     {
         return _globalFontSize;
     }
-    
+
     /// <summary>
     /// 全オーバーレイウィンドウのフォントサイズを更新（静的メソッド）
     /// </summary>
@@ -290,17 +290,17 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
         {
             // ユーザー設定フォントサイズをそのまま使用（強制的な最小値設定を削除）
             var effectiveFontSize = fontSize;
-            
+
             // TextBlockを取得してスタイルを適用
             var textBlock = this.FindControl<TextBlock>("InPlaceTranslatedTextBlock");
             if (textBlock != null)
             {
                 // 翻訳テキストを設定
                 textBlock.Text = translatedText ?? string.Empty;
-                
+
                 // ユーザー設定フォントサイズを適用
                 textBlock.FontSize = effectiveFontSize;
-                
+
                 // 🔧 [TEXT_WRAPPING] インプレース表示用のスタイル設定
                 // 横幅固定・縦方向折り返し対応: TextWrapping.Wrap で長文を折り返し
                 textBlock.TextWrapping = TextWrapping.Wrap;  // 折り返し有効化
@@ -341,7 +341,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 // 枠無し設定
                 border.CornerRadius = new CornerRadius(0);
                 border.BorderThickness = new Thickness(0);
-                
+
                 // ブラー効果風の薄い白背景
                 border.Background = new SolidColorBrush(Color.FromArgb(230, 255, 255, 255)); // ごく薄い白（90%透明度）
 
@@ -424,17 +424,17 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
     /// インプレース表示内容を更新
     /// </summary>
     public async Task UpdateInPlaceContentAsync(
-        TextChunk updatedTextChunk, 
+        TextChunk updatedTextChunk,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 [InPlaceTranslationOverlay] インプレース内容更新開始 - ChunkId: {ChunkId}");
-                
+
                 // 🛡️ [CORRUPTED_TRANSLATION_FILTER] 更新時も汚染翻訳とエラーメッセージを完全フィルタリング
                 if (IsCorruptedOrErrorTranslation(updatedTextChunk.TranslatedText))
                 {
@@ -442,19 +442,19 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                     Hide();
                     return;
                 }
-                
+
                 // 新しい翻訳テキストで更新
                 TranslatedText = updatedTextChunk.TranslatedText;
-                
+
                 // スタイルを再適用（ユーザー設定フォントサイズを優先）
                 var userFontSize = GetConfiguredFontSize();
                 var newFontSize = userFontSize > 0 ? userFontSize : updatedTextChunk.CalculateOptimalFontSize();
                 ApplyInPlaceStyle(newFontSize, TranslatedText);
-                
+
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] インプレース内容更新完了 - ChunkId: {ChunkId}");
-                
+
             }, DispatcherPriority.Normal, cancellationToken);
-            
+
             _logger?.LogDebug("🔄 インプレース内容更新完了 - ChunkId: {ChunkId}", ChunkId);
         }
         catch (Exception ex)
@@ -477,13 +477,13 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚫 [InPlaceTranslationOverlay] インプレース非表示開始 - ChunkId: {ChunkId}");
-                
+
                 Hide();
-                
+
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] インプレース非表示完了 - ChunkId: {ChunkId}");
-                
+
             }, DispatcherPriority.Normal, cancellationToken);
-            
+
             _logger?.LogDebug("🚫 インプレース非表示完了 - ChunkId: {ChunkId}", ChunkId);
         }
         catch (Exception ex)
@@ -501,7 +501,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
     {
         if (string.IsNullOrEmpty(translatedText))
             return true;
-            
+
         // 既存のエラーメッセージパターン
         if (translatedText.StartsWith("Translation Error:", StringComparison.OrdinalIgnoreCase) ||
             translatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal) ||
@@ -509,7 +509,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
         {
             return true;
         }
-        
+
         // 🚨 Helsinki-NLP/opus-mt-en-japモデル汚染パターン検出（厳格化）
         var corruptedPatterns = new[]
         {
@@ -519,7 +519,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             "ピハヒロテは",     // "ピハヒロテは" の正確なパターン
             "マグブキ バス",   // "マグブキ バス" の正確なパターン
         };
-        
+
         // 汚染パターンが含まれているかチェック
         foreach (var pattern in corruptedPatterns)
         {
@@ -528,28 +528,28 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 return true;
             }
         }
-        
+
         // 異常な空白文字の連続パターンを検出
         if (RepeatingSmallKanaRegex().IsMatch(translatedText))
         {
             return true; // "ぁ ぁ ぁ ぁ ぁ ぁ ぁ" のようなパターン
         }
-        
+
         // 非日本語文字の検出（デバナーガリー文字など）
         if (DevanagariRegex().IsMatch(translatedText)) // デバナーガリー文字
         {
             return true;
         }
-        
+
         // ランダムな数字や記号のみの文字列（短い文字列は除外）
         if (translatedText.Length > 5 && RandomNumbersAndSymbolsRegex().IsMatch(translatedText))
         {
             return true; // "2473~928" のようなパターン（5文字以上のみ）
         }
-        
+
         return false;
     }
-    
+
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -562,9 +562,9 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
         try
         {
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🧹 [InPlaceTranslationOverlay] InPlaceTranslationOverlayWindow Dispose開始 - ChunkId: {ChunkId}");
-            
+
             _disposed = true;
-            
+
             // UIスレッドでウィンドウを閉じる
             try
             {
@@ -585,9 +585,9 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             {
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ [InPlaceTranslationOverlay] Dispatcher.UIThread.Postエラー: {ex.Message}");
             }
-            
+
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [InPlaceTranslationOverlay] InPlaceTranslationOverlayWindow Dispose完了 - ChunkId: {ChunkId}");
-            
+
             _logger?.LogDebug("🧹 InPlaceTranslationOverlayWindow disposed - ChunkId: {ChunkId}", ChunkId);
         }
         catch (Exception ex)
@@ -595,7 +595,7 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ [InPlaceTranslationOverlay] Dispose例外: {ex.Message}");
             _logger?.LogError(ex, "❌ InPlaceTranslationOverlayWindow Dispose例外 - ChunkId: {ChunkId}", ChunkId);
         }
-        
+
         GC.SuppressFinalize(this);
     }
 

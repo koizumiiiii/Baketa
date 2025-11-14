@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Services;
 using Baketa.Application.Services.Diagnostics;
+using Baketa.Core.Abstractions.Services;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Services.RealTime.Adapters;
 
@@ -15,7 +15,7 @@ public sealed class DiagnosticMetricsTaskAdapter : IUpdatableTask
 {
     private readonly IDiagnosticReportService _diagnosticReportService;
     private readonly ILogger<DiagnosticMetricsTaskAdapter> _logger;
-    
+
     // 📊 実行頻度制御（元30秒間隔を維持）
     private DateTime _lastExecutionTime = DateTime.MinValue;
     private readonly TimeSpan _executionInterval = TimeSpan.FromSeconds(30);
@@ -49,26 +49,26 @@ public sealed class DiagnosticMetricsTaskAdapter : IUpdatableTask
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        
+
         // 📊 30秒間隔制御（元Timerの動作を再現）
         if (now - _lastExecutionTime < _executionInterval)
         {
             _logger.LogTrace("⏭️ DiagnosticMetrics: インターバル未経過、スキップ");
             return;
         }
-        
+
         _lastExecutionTime = now;
 
         try
         {
             // システムヘルス状態取得（非同期版）
             var healthStatus = await _diagnosticReportService.GetSystemHealthAsync().ConfigureAwait(false);
-            
-            _logger.LogDebug("✅ DiagnosticMetrics収集完了: Health={IsHealthy}, CPU={CpuUsage:F1}%, Memory={MemoryMB:F1}MB", 
-                healthStatus.IsHealthy, 
-                healthStatus.CpuUsage, 
+
+            _logger.LogDebug("✅ DiagnosticMetrics収集完了: Health={IsHealthy}, CPU={CpuUsage:F1}%, Memory={MemoryMB:F1}MB",
+                healthStatus.IsHealthy,
+                healthStatus.CpuUsage,
                 healthStatus.MemoryUsageBytes / (1024.0 * 1024.0));
-                
+
             // メトリクスストリーム通知（既存のReactiveXストリーム連携）
             // DiagnosticReportServiceの内部MetricsSubjectが自動的に通知済み
         }

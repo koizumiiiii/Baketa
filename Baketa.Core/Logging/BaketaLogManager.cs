@@ -19,22 +19,22 @@ public static class BaketaLogManager
     private static readonly string LogsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
     private static readonly object InitializationLock = new();
     private static volatile bool _initialized;
-    
+
     // ログファイルのパス定数
     private static readonly string OcrResultsLogPath = Path.Combine(LogsDirectory, "ocr_results.log");
     private static readonly string TranslationResultsLogPath = Path.Combine(LogsDirectory, "translation_results.log");
     private static readonly string PerformanceAnalysisLogPath = Path.Combine(LogsDirectory, "performance_analysis.log");
     private static readonly string SystemDebugLogPath = Path.Combine(LogsDirectory, "system_debug.log");
-    
+
     // 非同期書き込み用チャンネル
     private static readonly Channel<LogWriteOperation> _logChannel = Channel.CreateUnbounded<LogWriteOperation>();
     private static readonly ChannelWriter<LogWriteOperation> _logWriter = _logChannel.Writer;
     private static readonly ChannelReader<LogWriteOperation> _logReader = _logChannel.Reader;
-    
+
     // バックグラウンドタスク
     private static Task? _backgroundTask;
     private static readonly CancellationTokenSource _cancellationTokenSource = new();
-    
+
     // JSON シリアライズ設定
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -43,34 +43,34 @@ public static class BaketaLogManager
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         Converters = { new JsonStringEnumConverter() }
     };
-    
+
     // ファイルサイズ制限（10MB）
     private const long MaxLogFileSize = 10 * 1024 * 1024;
-    
+
     // ファイルロック
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> FileLocks = new();
-    
+
     /// <summary>
     /// ログシステムを初期化
     /// </summary>
     public static void Initialize()
     {
         if (_initialized) return;
-        
+
         lock (InitializationLock)
         {
             if (_initialized) return;
-            
+
             try
             {
                 // ログディレクトリの作成
                 Directory.CreateDirectory(LogsDirectory);
-                
+
                 // バックグラウンドタスクの開始
                 _backgroundTask = Task.Run(ProcessLogEntriesAsync, _cancellationTokenSource.Token);
-                
+
                 _initialized = true;
-                
+
                 // 初期化完了ログ
                 LogSystemDebug("📊 BaketaLogManager initialized successfully");
             }
@@ -82,7 +82,7 @@ public static class BaketaLogManager
             }
         }
     }
-    
+
     /// <summary>
     /// OCR結果をログに記録
     /// </summary>
@@ -90,21 +90,21 @@ public static class BaketaLogManager
     public static void LogOcrResult(OcrResultLogEntry entry)
     {
         if (!_initialized) Initialize();
-        
+
         var operation = new LogWriteOperation
         {
             FilePath = OcrResultsLogPath,
             Content = JsonSerializer.Serialize(entry, JsonOptions),
             Timestamp = entry.Timestamp
         };
-        
+
         if (!_logWriter.TryWrite(operation))
         {
             // チャンネル書き込み失敗時は同期でファイルに書き込み
             WriteToFileSynchronously(operation);
         }
     }
-    
+
     /// <summary>
     /// 翻訳結果をログに記録
     /// </summary>
@@ -112,20 +112,20 @@ public static class BaketaLogManager
     public static void LogTranslationResult(TranslationResultLogEntry entry)
     {
         if (!_initialized) Initialize();
-        
+
         var operation = new LogWriteOperation
         {
             FilePath = TranslationResultsLogPath,
             Content = JsonSerializer.Serialize(entry, JsonOptions),
             Timestamp = entry.Timestamp
         };
-        
+
         if (!_logWriter.TryWrite(operation))
         {
             WriteToFileSynchronously(operation);
         }
     }
-    
+
     /// <summary>
     /// パフォーマンス分析結果をログに記録
     /// </summary>
@@ -133,20 +133,20 @@ public static class BaketaLogManager
     public static void LogPerformance(PerformanceLogEntry entry)
     {
         if (!_initialized) Initialize();
-        
+
         var operation = new LogWriteOperation
         {
             FilePath = PerformanceAnalysisLogPath,
             Content = JsonSerializer.Serialize(entry, JsonOptions),
             Timestamp = entry.Timestamp
         };
-        
+
         if (!_logWriter.TryWrite(operation))
         {
             WriteToFileSynchronously(operation);
         }
     }
-    
+
     /// <summary>
     /// システムデバッグメッセージをログに記録
     /// </summary>
@@ -154,7 +154,7 @@ public static class BaketaLogManager
     public static void LogSystemDebug(string message)
     {
         if (!_initialized) Initialize();
-        
+
         var logEntry = new
         {
             Timestamp = DateTime.Now,
@@ -163,23 +163,23 @@ public static class BaketaLogManager
             ThreadId = Environment.CurrentManagedThreadId,
             Environment.ProcessId
         };
-        
+
         var operation = new LogWriteOperation
         {
             FilePath = SystemDebugLogPath,
             Content = JsonSerializer.Serialize(logEntry, JsonOptions),
             Timestamp = logEntry.Timestamp
         };
-        
+
         if (!_logWriter.TryWrite(operation))
         {
             WriteToFileSynchronously(operation);
         }
-        
+
         // 既存のDebugLogUtilityとの統合（段階的移行のため）
         Console.WriteLine(message);
     }
-    
+
     /// <summary>
     /// エラー情報をログに記録
     /// </summary>
@@ -188,7 +188,7 @@ public static class BaketaLogManager
     public static void LogError(Exception ex, string context)
     {
         if (!_initialized) Initialize();
-        
+
         var errorLogEntry = new
         {
             Timestamp = DateTime.Now,
@@ -201,40 +201,40 @@ public static class BaketaLogManager
             ThreadId = Environment.CurrentManagedThreadId,
             Environment.ProcessId
         };
-        
+
         var operation = new LogWriteOperation
         {
             FilePath = SystemDebugLogPath,
             Content = JsonSerializer.Serialize(errorLogEntry, JsonOptions),
             Timestamp = errorLogEntry.Timestamp
         };
-        
+
         if (!_logWriter.TryWrite(operation))
         {
             WriteToFileSynchronously(operation);
         }
-        
+
         // 既存のDebugLogUtilityとの統合
         Console.WriteLine($"❌ ERROR in {context}: {ex.Message}");
     }
-    
+
     /// <summary>
     /// ログシステムのシャットダウン
     /// </summary>
     public static async Task ShutdownAsync()
     {
         if (!_initialized) return;
-        
+
         try
         {
             _logWriter.Complete();
             _cancellationTokenSource.Cancel();
-            
+
             if (_backgroundTask != null)
             {
                 await _backgroundTask.ConfigureAwait(false);
             }
-            
+
             LogSystemDebug("📊 BaketaLogManager shutdown completed");
         }
         catch (Exception ex)
@@ -246,7 +246,7 @@ public static class BaketaLogManager
             _cancellationTokenSource.Dispose();
         }
     }
-    
+
     /// <summary>
     /// バックグラウンドでログエントリを処理
     /// </summary>
@@ -268,21 +268,21 @@ public static class BaketaLogManager
             Console.WriteLine($"❌ BaketaLogManager background task error: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// ファイルに非同期でログを書き込み
     /// </summary>
     private static async Task WriteToFileAsync(LogWriteOperation operation)
     {
         var semaphore = FileLocks.GetOrAdd(operation.FilePath, _ => new SemaphoreSlim(1, 1));
-        
+
         try
         {
             await semaphore.WaitAsync(_cancellationTokenSource.Token).ConfigureAwait(false);
-            
+
             // ファイルローテーションチェック
             await RotateLogFileIfNeededAsync(operation.FilePath).ConfigureAwait(false);
-            
+
             // ログエントリを書き込み
             var logLine = operation.Content + Environment.NewLine;
             await File.AppendAllTextAsync(operation.FilePath, logLine, _cancellationTokenSource.Token).ConfigureAwait(false);
@@ -296,7 +296,7 @@ public static class BaketaLogManager
             semaphore.Release();
         }
     }
-    
+
     /// <summary>
     /// 同期的にファイルにログを書き込み（フォールバック用）
     /// </summary>
@@ -306,12 +306,12 @@ public static class BaketaLogManager
         {
             var semaphore = FileLocks.GetOrAdd(operation.FilePath, _ => new SemaphoreSlim(1, 1));
             semaphore.Wait();
-            
+
             try
             {
                 // ファイルローテーションチェック
                 RotateLogFileIfNeeded(operation.FilePath);
-                
+
                 var logLine = operation.Content + Environment.NewLine;
                 File.AppendAllText(operation.FilePath, logLine);
             }
@@ -325,7 +325,7 @@ public static class BaketaLogManager
             Console.WriteLine($"❌ Failed to write log synchronously to {operation.FilePath}: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// 必要に応じてログファイルをローテーション（非同期版）
     /// </summary>
@@ -334,14 +334,14 @@ public static class BaketaLogManager
         try
         {
             if (!File.Exists(filePath)) return;
-            
+
             var fileInfo = new FileInfo(filePath);
             if (fileInfo.Length < MaxLogFileSize) return;
-            
+
             var rotatedPath = $"{filePath}.{DateTime.Now:yyyyMMdd_HHmmss}.old";
             File.Move(filePath, rotatedPath);
-            
-            await File.WriteAllTextAsync(filePath, 
+
+            await File.WriteAllTextAsync(filePath,
                 $"=== Log rotated at {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}",
                 _cancellationTokenSource.Token).ConfigureAwait(false);
         }
@@ -350,7 +350,7 @@ public static class BaketaLogManager
             Console.WriteLine($"❌ Log rotation failed for {filePath}: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// 必要に応じてログファイルをローテーション（同期版）
     /// </summary>
@@ -359,13 +359,13 @@ public static class BaketaLogManager
         try
         {
             if (!File.Exists(filePath)) return;
-            
+
             var fileInfo = new FileInfo(filePath);
             if (fileInfo.Length < MaxLogFileSize) return;
-            
+
             var rotatedPath = $"{filePath}.{DateTime.Now:yyyyMMdd_HHmmss}.old";
             File.Move(filePath, rotatedPath);
-            
+
             File.WriteAllText(filePath, $"=== Log rotated at {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
         }
         catch (Exception ex)

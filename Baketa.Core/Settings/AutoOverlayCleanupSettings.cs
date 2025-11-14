@@ -14,28 +14,28 @@ public sealed class AutoOverlayCleanupSettings
     /// </summary>
     [Range(0.0, 1.0)]
     public float MinConfidenceScore { get; set; } = 0.7f;
-    
+
     /// <summary>
     /// Circuit Breaker - 毎秒最大削除数 (1-100)
     /// レート制限により誤検知によるオーバーレイ大量削除を防止
     /// </summary>
     [Range(1, 100)]
     public int MaxCleanupPerSecond { get; set; } = 10;
-    
+
     /// <summary>
     /// 画像変化検知でのテキスト消失判定閾値 (0.0-1.0)
     /// この値以下の変化率の場合にテキスト消失とみなしてイベントを発行
     /// </summary>
     [Range(0.0, 1.0)]
     public float TextDisappearanceChangeThreshold { get; set; } = 0.05f;
-    
+
     /// <summary>
     /// 統計情報をログ出力する間隔（処理回数）
     /// この回数毎に統計情報がログに出力される（0で無効化）
     /// </summary>
     [Range(0, 10000)]
     public int StatisticsLogInterval { get; set; } = 100;
-    
+
     /// <summary>
     /// 初期化タイムアウト時間（ミリ秒）
     /// InitializeAsync処理のタイムアウト時間

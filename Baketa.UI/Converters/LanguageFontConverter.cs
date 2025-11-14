@@ -15,12 +15,12 @@ public class LanguageFontConverter : IValueConverter
     /// 通常フォント用のコンバーター
     /// </summary>
     public static readonly LanguageFontConverter Regular = new();
-    
+
     /// <summary>
     /// 太字フォント用のコンバーター
     /// </summary>
     public static readonly LanguageFontConverter Bold = new() { IsBold = true };
-    
+
     /// <summary>
     /// 太字フォントかどうか
     /// </summary>
@@ -37,9 +37,9 @@ public class LanguageFontConverter : IValueConverter
 
             // 言語に基づいてフォントを選択
             var fontKey = GetFontKey(language);
-            
+
             // Avaloniaのリソース系からフォントファミリーを取得
-            if (Avalonia.Application.Current?.Resources?.TryGetResource(fontKey, null, out var resource) == true 
+            if (Avalonia.Application.Current?.Resources?.TryGetResource(fontKey, null, out var resource) == true
                 && resource is FontFamily fontFamily)
             {
                 return fontFamily;
@@ -64,7 +64,7 @@ public class LanguageFontConverter : IValueConverter
     private string GetFontKey(string language)
     {
         var suffix = IsBold ? "-Bold" : "";
-        
+
         return language?.ToLowerInvariant() switch
         {
             "japanese" or "ja" or "jp" => $"JapaneseFont{suffix}",

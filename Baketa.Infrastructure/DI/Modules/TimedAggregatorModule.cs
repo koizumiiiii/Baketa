@@ -1,10 +1,10 @@
-using Microsoft.Extensions.DependencyInjection;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.DI;
 using Baketa.Core.Settings;
-using Baketa.Infrastructure.OCR.PostProcessing;
 using Baketa.Infrastructure.OCR.BatchProcessing;
-using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Abstractions.Services;
+using Baketa.Infrastructure.OCR.PostProcessing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -67,7 +67,7 @@ public class TimedAggregatorModule : ConfigurableServiceModuleBase
             throw;
         }
     }
-    
+
     /// <summary>
     /// このモジュールが依存する他のモジュールの型を取得します。
     /// </summary>

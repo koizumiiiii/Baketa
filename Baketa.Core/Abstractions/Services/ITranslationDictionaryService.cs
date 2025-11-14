@@ -19,7 +19,7 @@ public interface ITranslationDictionaryService
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>翻訳されたテキスト。辞書に存在しない場合は元のテキストを返す</returns>
     Task<string> TranslateAsync(string text, string sourceLanguage, string targetLanguage, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 指定されたテキストが翻訳辞書に存在するかを確認します
     /// </summary>
@@ -28,13 +28,13 @@ public interface ITranslationDictionaryService
     /// <param name="targetLanguage">目標言語コード</param>
     /// <returns>辞書に存在する場合はtrue</returns>
     bool HasTranslation(string text, string sourceLanguage, string targetLanguage);
-    
+
     /// <summary>
     /// 翻訳辞書設定を再読み込みします
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     Task ReloadConfigurationAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 指定された言語ペアの利用可能な翻訳数を取得します
     /// </summary>
@@ -42,7 +42,7 @@ public interface ITranslationDictionaryService
     /// <param name="targetLanguage">目標言語コード</param>
     /// <returns>利用可能な翻訳の数</returns>
     int GetTranslationCount(string sourceLanguage, string targetLanguage);
-    
+
     /// <summary>
     /// サポートされている言語ペアを取得します
     /// </summary>

@@ -25,7 +25,7 @@ internal sealed class StatisticalAnalyzer
         try
         {
             // サンプルサイズ検証
-            if (variant1.TotalMeasurements < ResourceManagementConstants.Statistics.MinimumSampleSize || 
+            if (variant1.TotalMeasurements < ResourceManagementConstants.Statistics.MinimumSampleSize ||
                 variant2.TotalMeasurements < ResourceManagementConstants.Statistics.MinimumSampleSize)
             {
                 return new StatisticalTestResult(
@@ -41,7 +41,7 @@ internal sealed class StatisticalAnalyzer
 
             // 成功率のChi-square検定
             var chisquareResult = PerformChiSquareTest(variant1, variant2);
-            
+
             // パフォーマンス指標のt-test（成功率が有意差ありの場合）
             TestResult? performanceResult = null;
             if (chisquareResult.IsSignificant)
@@ -55,7 +55,7 @@ internal sealed class StatisticalAnalyzer
 
             // 推奨事項生成
             var recommendation = GenerateRecommendation(chisquareResult, performanceResult, effectCategory);
-            var confidence = CalculateConfidence(chisquareResult, performanceResult, 
+            var confidence = CalculateConfidence(chisquareResult, performanceResult,
                 variant1.TotalMeasurements, variant2.TotalMeasurements);
 
             return new StatisticalTestResult(
@@ -70,9 +70,9 @@ internal sealed class StatisticalAnalyzer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ [STATS] 統計検定エラー: {V1} vs {V2}", 
+            _logger.LogError(ex, "❌ [STATS] 統計検定エラー: {V1} vs {V2}",
                 variant1.VariantName, variant2.VariantName);
-            
+
             return new StatisticalTestResult(
                 TestType: "Error",
                 PValue: ResourceManagementConstants.Fallback.DefaultPValue,
@@ -101,7 +101,7 @@ internal sealed class StatisticalAnalyzer
         var total = n1 + n2;
         var totalSuccess = success1 + success2;
         var totalFailure = failure1 + failure2;
-        
+
         var expected11 = (double)(n1 * totalSuccess) / total;  // variant1 success
         var expected12 = (double)(n1 * totalFailure) / total;  // variant1 failure
         var expected21 = (double)(n2 * totalSuccess) / total;  // variant2 success
@@ -109,7 +109,7 @@ internal sealed class StatisticalAnalyzer
 
         // Yatesの連続性補正を適用したChi-square統計量計算
         var yatesCorrection = ResourceManagementConstants.Statistics.YatesCorrectionValue;
-        var chiSquare = 
+        var chiSquare =
             Math.Pow(Math.Abs(success1 - expected11) - yatesCorrection, 2) / expected11 +
             Math.Pow(Math.Abs(failure1 - expected12) - yatesCorrection, 2) / expected12 +
             Math.Pow(Math.Abs(success2 - expected21) - yatesCorrection, 2) / expected21 +
@@ -144,7 +144,7 @@ internal sealed class StatisticalAnalyzer
 
         // Welch's t統計量計算
         var tStatistic = (mean1 - mean2) / Math.Sqrt((var1 / n1) + (var2 / n2));
-        
+
         // Welch-Satterthwaiteの自由度近似
         var numerator = Math.Pow((var1 / n1) + (var2 / n2), 2);
         var denominator = (Math.Pow(var1 / n1, 2) / (n1 - 1)) + (Math.Pow(var2 / n2, 2) / (n2 - 1));
@@ -180,7 +180,7 @@ internal sealed class StatisticalAnalyzer
 
         // 重み付き平均による総合効果量
         var totalEffectSize = (successRateEffectSize * 0.4) + (cooldownEffectSize * 0.4) + (vramEffectSize * 0.2);
-        
+
         return Math.Min(totalEffectSize, 2.0); // 効果量を2.0でキャップ
     }
 
@@ -198,7 +198,7 @@ internal sealed class StatisticalAnalyzer
             if (chiSquare > 2.71) return 0.10;   // p < 0.10
             return 0.5; // p ≥ 0.10
         }
-        
+
         return 0.5; // フォールバック
     }
 
@@ -216,7 +216,7 @@ internal sealed class StatisticalAnalyzer
             if (tValue > 1.645) return 0.05; // p < 0.10
             return 0.5;
         }
-        
+
         // 小サンプルの場合（簡易的な臨界値テーブル）
         if (tValue > 2.75) return 0.01;
         if (tValue > 2.06) return 0.05;
@@ -246,8 +246,8 @@ internal sealed class StatisticalAnalyzer
     {
         if (chisquareResult.IsSignificant && effectCategory >= EffectSizeCategory.Medium)
         {
-            return performanceResult?.IsSignificant == true 
-                ? "統計的有意差あり：より良いバリアントに切り替え推奨" 
+            return performanceResult?.IsSignificant == true
+                ? "統計的有意差あり：より良いバリアントに切り替え推奨"
                 : "成功率に有意差あり：パフォーマンス監視継続推奨";
         }
 
@@ -265,13 +265,13 @@ internal sealed class StatisticalAnalyzer
     private static double CalculateConfidence(TestResult chisquareResult, TestResult? performanceResult, int n1, int n2)
     {
         var baseConfidence = Math.Max(0, 1 - chisquareResult.PValue);
-        
+
         // サンプルサイズ補正
         var sampleSizeBonus = Math.Min(0.2, (n1 + n2 - 60) / 500.0);
-        
+
         // パフォーマンステスト一致度ボーナス
         var consistencyBonus = performanceResult?.IsSignificant == true ? 0.1 : 0.0;
-        
+
         return Math.Min(0.99, baseConfidence + sampleSizeBonus + consistencyBonus);
     }
 

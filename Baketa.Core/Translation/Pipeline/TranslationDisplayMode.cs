@@ -10,7 +10,7 @@ public enum TranslationDisplayMode
     /// TranslationCompletedEvent発行による従来フロー
     /// </summary>
     Default,
-    
+
     /// <summary>
     /// インプレース表示（座標ベース直接表示）
     /// ShowInPlaceOverlayAsync経由による座標ベース表示

@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Settings;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
 
@@ -16,23 +16,23 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
     private readonly IFullscreenDetectionService _fullscreenDetection;
     private readonly IAdvancedCaptureService _captureService;
     private readonly ILogger<WindowsFullscreenOptimizationService>? _logger;
-    
+
     private bool _isEnabled = true;
     private bool _isOptimizationActive;
     private CaptureSettings? _originalSettings;
     private bool _disposed;
     private CancellationTokenSource? _optimizationCancellation;
-    
+
     /// <summary>
     /// 現在の最適化状態
     /// </summary>
     public FullscreenOptimizationStatus Status { get; private set; } = FullscreenOptimizationStatus.Disabled;
-    
+
     /// <summary>
     /// 最適化統計情報
     /// </summary>
     public FullscreenOptimizationStats Statistics { get; } = new();
-    
+
     /// <summary>
     /// 最適化サービスが有効かどうか
     /// </summary>
@@ -45,7 +45,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             {
                 _isEnabled = value;
                 _logger?.LogInformation("Fullscreen optimization {Status}", value ? "enabled" : "disabled");
-                
+
                 if (!value && _isOptimizationActive)
                 {
                     // 非同期処理は後でSetIsEnabledAsyncメソッドから実行
@@ -54,32 +54,32 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             }
         }
     }
-    
+
     /// <summary>
     /// 現在フルスクリーン最適化が適用されているかどうか
     /// </summary>
     public bool IsOptimizationActive => _isOptimizationActive && !_disposed;
-    
+
     /// <summary>
     /// 現在のフルスクリーン情報
     /// </summary>
     public FullscreenInfo? CurrentFullscreenInfo { get; private set; }
-    
+
     /// <summary>
     /// フルスクリーン最適化が適用されたときのイベント
     /// </summary>
     public event EventHandler<FullscreenOptimizationAppliedEventArgs>? OptimizationApplied;
-    
+
     /// <summary>
     /// フルスクリーン最適化が解除されたときのイベント
     /// </summary>
     public event EventHandler<FullscreenOptimizationRemovedEventArgs>? OptimizationRemoved;
-    
+
     /// <summary>
     /// 最適化処理でエラーが発生したときのイベント
     /// </summary>
     public event EventHandler<FullscreenOptimizationErrorEventArgs>? OptimizationError;
-    
+
     public WindowsFullscreenOptimizationService(
         IFullscreenDetectionService fullscreenDetection,
         IAdvancedCaptureService captureService,
@@ -88,13 +88,13 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
         _fullscreenDetection = fullscreenDetection ?? throw new ArgumentNullException(nameof(fullscreenDetection));
         _captureService = captureService ?? throw new ArgumentNullException(nameof(captureService));
         _logger = logger;
-        
+
         // フルスクリーン状態変更イベントを監視
         _fullscreenDetection.FullscreenStateChanged += OnFullscreenStateChanged;
-        
+
         _logger?.LogDebug("WindowsFullscreenOptimizationService initialized");
     }
-    
+
     /// <summary>
     /// フルスクリーン最適化を開始します
     /// </summary>
@@ -104,29 +104,29 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(WindowsFullscreenOptimizationService));
-        
+
         if (Status != FullscreenOptimizationStatus.Disabled)
         {
             _logger?.LogWarning("Fullscreen optimization is already running or in process");
             return;
         }
-        
+
         _logger?.LogInformation("Starting fullscreen optimization service");
-        
+
         try
         {
             Status = FullscreenOptimizationStatus.Standby;
             _optimizationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            
+
             // 元の設定をバックアップ
             _originalSettings = _captureService.GetCurrentSettings();
-            
+
             // フルスクリーン検出サービスが実行されていない場合は開始
             if (!_fullscreenDetection.IsRunning)
             {
                 await _fullscreenDetection.StartMonitoringAsync(_optimizationCancellation.Token).ConfigureAwait(false);
             }
-            
+
             _logger?.LogInformation("Fullscreen optimization service started successfully");
         }
         catch (OperationCanceledException)
@@ -145,13 +145,13 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             Status = FullscreenOptimizationStatus.Error;
             Statistics.ErrorCount++;
             Statistics.LastErrorTime = DateTime.Now;
-            
+
             _logger?.LogError(ex, "Invalid operation while starting fullscreen optimization service");
             OnOptimizationError(ex, "StartOptimizationAsync");
             throw;
         }
     }
-    
+
     /// <summary>
     /// フルスクリーン最適化を停止します
     /// </summary>
@@ -161,26 +161,26 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
         {
             return;
         }
-        
+
         _logger?.LogInformation("Stopping fullscreen optimization service");
-        
+
         try
         {
             Status = FullscreenOptimizationStatus.Disabled;
-            
+
             // 現在の最適化を解除
             if (_isOptimizationActive)
             {
                 await RemoveOptimizationAsync().ConfigureAwait(false);
             }
-            
+
             // 監視を停止
 #pragma warning disable CA1849 // Call async methods when in an async method - Cancel() has no async version
             _optimizationCancellation?.Cancel();
 #pragma warning restore CA1849
             _optimizationCancellation?.Dispose();
             _optimizationCancellation = null;
-            
+
             _logger?.LogInformation("Fullscreen optimization service stopped");
         }
         catch (ObjectDisposedException ex)
@@ -199,7 +199,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             OnOptimizationError(ex, "StopOptimizationAsync");
         }
     }
-    
+
     /// <summary>
     /// 指定されたフルスクリーン情報に基づいて最適化を手動適用します
     /// </summary>
@@ -210,48 +210,48 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
         if (_disposed)
             throw new ObjectDisposedException(nameof(WindowsFullscreenOptimizationService));
         ArgumentNullException.ThrowIfNull(fullscreenInfo);
-        
+
         if (!_isEnabled)
         {
             _logger?.LogDebug("Fullscreen optimization is disabled, skipping application");
             return;
         }
-        
+
         if (_isOptimizationActive)
         {
             _logger?.LogDebug("Fullscreen optimization is already active");
             return;
         }
-        
+
         try
         {
             Status = FullscreenOptimizationStatus.Optimizing;
-            _logger?.LogInformation("Applying fullscreen optimization for {ProcessName} (Confidence: {Confidence:F2})", 
+            _logger?.LogInformation("Applying fullscreen optimization for {ProcessName} (Confidence: {Confidence:F2})",
                 fullscreenInfo.ProcessName, fullscreenInfo.Confidence);
-            
+
             // 元の設定を保存（まだ保存されていない場合）
             _originalSettings ??= _captureService.GetCurrentSettings();
-            
+
             // 最適化設定を作成・適用
             var optimizedSettings = CreateOptimizedSettings(fullscreenInfo, _originalSettings);
             _captureService.UpdateSettings(optimizedSettings);
-            
+
             // 状態更新
             CurrentFullscreenInfo = fullscreenInfo;
             _isOptimizationActive = true;
             Status = FullscreenOptimizationStatus.Active;
-            
+
             // 統計更新
             Statistics.OptimizationAppliedCount++;
             Statistics.LastOptimizationTime = DateTime.Now;
             Statistics.CurrentOptimizedWindow = $"{fullscreenInfo.ProcessName} - {fullscreenInfo.WindowTitle}";
-            
+
             // イベント発行
             var eventArgs = new FullscreenOptimizationAppliedEventArgs(fullscreenInfo, optimizedSettings, _originalSettings);
             OptimizationApplied?.Invoke(this, eventArgs);
-            
+
             _logger?.LogInformation("Fullscreen optimization applied successfully");
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (ObjectDisposedException ex)
@@ -259,7 +259,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             Status = FullscreenOptimizationStatus.Error;
             Statistics.ErrorCount++;
             Statistics.LastErrorTime = DateTime.Now;
-            
+
             _logger?.LogError(ex, "Object disposed while applying fullscreen optimization");
             OnOptimizationError(ex, "ApplyOptimizationAsync");
             throw;
@@ -269,7 +269,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             Status = FullscreenOptimizationStatus.Error;
             Statistics.ErrorCount++;
             Statistics.LastErrorTime = DateTime.Now;
-            
+
             _logger?.LogError(ex, "Invalid operation while applying fullscreen optimization");
             OnOptimizationError(ex, "ApplyOptimizationAsync");
             throw;
@@ -279,13 +279,13 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             Status = FullscreenOptimizationStatus.Error;
             Statistics.ErrorCount++;
             Statistics.LastErrorTime = DateTime.Now;
-            
+
             _logger?.LogError(ex, "Invalid argument while applying fullscreen optimization");
             OnOptimizationError(ex, "ApplyOptimizationAsync");
             throw;
         }
     }
-    
+
     /// <summary>
     /// 現在の最適化を手動で解除し、元の設定に復元します
     /// </summary>
@@ -295,33 +295,33 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
         {
             return;
         }
-        
+
         try
         {
             Status = FullscreenOptimizationStatus.Restoring;
             _logger?.LogInformation("Removing fullscreen optimization");
-            
+
             // 元の設定に復元
             _captureService.UpdateSettings(_originalSettings);
-            
+
             // 状態更新
             var restoredSettings = _originalSettings;
             var windowInfo = Statistics.CurrentOptimizedWindow;
-            
+
             _isOptimizationActive = false;
             CurrentFullscreenInfo = null;
             Status = FullscreenOptimizationStatus.Standby;
-            
+
             // 統計更新
             Statistics.OptimizationRemovedCount++;
             Statistics.CurrentOptimizedWindow = null;
-            
+
             // イベント発行
             var eventArgs = new FullscreenOptimizationRemovedEventArgs(restoredSettings, "Manual removal");
             OptimizationRemoved?.Invoke(this, eventArgs);
-            
+
             _logger?.LogInformation("Fullscreen optimization removed successfully");
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (ObjectDisposedException ex)
@@ -329,7 +329,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             Status = FullscreenOptimizationStatus.Error;
             Statistics.ErrorCount++;
             Statistics.LastErrorTime = DateTime.Now;
-            
+
             _logger?.LogError(ex, "Object disposed while removing fullscreen optimization");
             OnOptimizationError(ex, "RemoveOptimizationAsync");
             throw;
@@ -339,7 +339,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             Status = FullscreenOptimizationStatus.Error;
             Statistics.ErrorCount++;
             Statistics.LastErrorTime = DateTime.Now;
-            
+
             _logger?.LogError(ex, "Invalid operation while removing fullscreen optimization");
             OnOptimizationError(ex, "RemoveOptimizationAsync");
             throw;
@@ -349,31 +349,31 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             Status = FullscreenOptimizationStatus.Error;
             Statistics.ErrorCount++;
             Statistics.LastErrorTime = DateTime.Now;
-            
+
             _logger?.LogError(ex, "Invalid argument while removing fullscreen optimization");
             OnOptimizationError(ex, "RemoveOptimizationAsync");
             throw;
         }
     }
-    
+
     /// <summary>
     /// 最適化設定を強制的にリセットします
     /// </summary>
     public async Task ForceResetAsync()
     {
         _logger?.LogWarning("Force resetting fullscreen optimization");
-        
+
         try
         {
             _isOptimizationActive = false;
             CurrentFullscreenInfo = null;
             Status = FullscreenOptimizationStatus.Standby;
-            
+
             if (_originalSettings != null)
             {
                 _captureService.UpdateSettings(_originalSettings);
             }
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (ObjectDisposedException ex)
@@ -392,7 +392,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             OnOptimizationError(ex, "ForceResetAsync");
         }
     }
-    
+
     /// <summary>
     /// 統計情報をリセットします
     /// </summary>
@@ -401,7 +401,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
         Statistics.Reset();
         _logger?.LogDebug("Fullscreen optimization statistics reset");
     }
-    
+
     /// <summary>
     /// フルスクリーン状態変更イベントハンドラー
     /// </summary>
@@ -413,7 +413,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
         {
             return;
         }
-        
+
         try
         {
             if (fullscreenInfo.IsFullscreen && fullscreenInfo.Confidence >= 0.8)
@@ -449,7 +449,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             OnOptimizationError(ex, "OnFullscreenStateChanged");
         }
     }
-    
+
     /// <summary>
     /// 最適化設定を作成
     /// </summary>
@@ -459,14 +459,14 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
     private static CaptureSettings CreateOptimizedSettings(FullscreenInfo fullscreenInfo, CaptureSettings originalSettings)
     {
         var optimizedSettings = originalSettings.Clone();
-        
+
         // フルスクリーン専用最適化を有効化
         optimizedSettings.FullscreenOptimization = true;
         optimizedSettings.AutoDetectCaptureArea = false; // 固定領域使用
-        
+
         // 解像度に基づく最適化
         var screenArea = fullscreenInfo.MonitorBounds.Width * fullscreenInfo.MonitorBounds.Height;
-        
+
         if (screenArea > 1920 * 1080) // 高解像度画面（1080p超）
         {
             // 高解像度では負荷軽減を重視
@@ -489,23 +489,23 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
             optimizedSettings.CaptureQuality = Math.Min(optimizedSettings.CaptureQuality, 90);
             optimizedSettings.DifferenceDetectionGridSize = Math.Max(optimizedSettings.DifferenceDetectionGridSize, 12);
         }
-        
+
         // フルスクリーン領域を固定設定
         optimizedSettings.FixedCaptureAreaX = fullscreenInfo.MonitorBounds.X;
         optimizedSettings.FixedCaptureAreaY = fullscreenInfo.MonitorBounds.Y;
         optimizedSettings.FixedCaptureAreaWidth = fullscreenInfo.MonitorBounds.Width;
         optimizedSettings.FixedCaptureAreaHeight = fullscreenInfo.MonitorBounds.Height;
-        
+
         // ゲームの場合はさらに最適化
         if (fullscreenInfo.IsLikelyGame)
         {
             optimizedSettings.UseHardwareAcceleration = true;
             optimizedSettings.AutoOptimizeForGames = true;
         }
-        
+
         return optimizedSettings;
     }
-    
+
     /// <summary>
     /// 最適化エラーイベントを発行
     /// </summary>
@@ -516,7 +516,7 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
         var eventArgs = new FullscreenOptimizationErrorEventArgs(exception, context);
         OptimizationError?.Invoke(this, eventArgs);
     }
-    
+
     /// <summary>
     /// リソースを解放します
     /// </summary>
@@ -526,12 +526,12 @@ public sealed class WindowsFullscreenOptimizationService : IFullscreenOptimizati
         {
             return;
         }
-        
+
         _fullscreenDetection.FullscreenStateChanged -= OnFullscreenStateChanged;
-        
+
         _optimizationCancellation?.Cancel();
         _optimizationCancellation?.Dispose();
-        
+
         _disposed = true;
         _logger?.LogDebug("WindowsFullscreenOptimizationService disposed");
     }

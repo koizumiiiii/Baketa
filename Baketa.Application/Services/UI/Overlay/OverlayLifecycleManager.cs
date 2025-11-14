@@ -18,18 +18,18 @@ namespace Baketa.Application.Services.UI.Overlay;
 public class OverlayLifecycleManager : IOverlayLifecycleManager
 {
     private readonly ILogger<OverlayLifecycleManager> _logger;
-    
+
     /// <summary>
     /// アクティブオーバーレイの管理
     /// Key: オーバーレイID, Value: オーバーレイ情報
     /// </summary>
     private readonly ConcurrentDictionary<string, OverlayInfo> _activeOverlays = new();
-    
+
     /// <summary>
     /// 統計情報の管理
     /// </summary>
     private readonly LifecycleStatistics _statistics;
-    
+
     private bool _isInitialized = false;
     private readonly object _initLock = new();
 
@@ -40,7 +40,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _statistics = new LifecycleStatistics { StartTime = DateTimeOffset.UtcNow };
-        
+
         _logger.LogDebug("🔄 OverlayLifecycleManager インスタンス作成");
     }
 
@@ -60,7 +60,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
         {
             if (_isInitialized)
                 return;
-                
+
             _logger.LogInformation("🚀 OverlayLifecycleManager 初期化開始");
         }
 
@@ -68,7 +68,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
         {
             // 初期化処理（必要に応じて拡張）
             _activeOverlays.Clear();
-            
+
             lock (_initLock)
             {
                 _isInitialized = true;
@@ -101,7 +101,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
             if (_activeOverlays.ContainsKey(request.Id))
             {
                 _logger.LogDebug("⚠️ 同じIDのオーバーレイが既に存在 - 更新処理に切り替え - ID: {Id}", request.Id);
-                
+
                 var updateRequest = new OverlayUpdateRequest
                 {
                     Text = request.Text,
@@ -109,7 +109,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
                     Visibility = request.InitialVisibility,
                     ZIndex = request.ZIndex
                 };
-                
+
                 var updatedInfo = await UpdateOverlayAsync(request.Id, updateRequest, cancellationToken).ConfigureAwait(false);
                 return updatedInfo ?? throw new InvalidOperationException($"既存オーバーレイの更新に失敗 - ID: {request.Id}");
             }
@@ -279,7 +279,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
             {
                 var updateRequest = new OverlayUpdateRequest { Visibility = visible };
                 var updatedInfo = await UpdateOverlayAsync(overlayId, updateRequest, cancellationToken).ConfigureAwait(false);
-                
+
                 if (updatedInfo != null)
                 {
                     changedCount++;
@@ -307,7 +307,7 @@ public class OverlayLifecycleManager : IOverlayLifecycleManager
         EnsureInitialized();
 
         _activeOverlays.TryGetValue(overlayId, out var overlayInfo);
-        
+
         // 最終アクセス時刻を更新
         if (overlayInfo != null)
         {

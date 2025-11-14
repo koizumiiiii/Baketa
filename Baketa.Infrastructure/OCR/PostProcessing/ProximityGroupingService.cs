@@ -1,4 +1,4 @@
-﻿using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 
@@ -39,7 +39,7 @@ public sealed class ProximityGroupingService
         if (chunks.Count == 1)
         {
             _logger.LogDebug("チャンクが1個 - 単一グループを返します");
-            return [chunks.ToList()];
+            return [[.. chunks]];
         }
 
         var startTime = DateTime.UtcNow;

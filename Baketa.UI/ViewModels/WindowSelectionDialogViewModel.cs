@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Utilities;
-using Baketa.UI.Framework.Events;
 using Baketa.UI.Framework;
+using Baketa.UI.Framework.Events;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using WindowInfo = Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo;
@@ -32,9 +32,9 @@ public class WindowSelectionDialogViewModel : ViewModelBase
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
-        
+
         AvailableWindows = [];
-        
+
         // コマンドの初期化（UI スレッドで安全に初期化）
         try
         {
@@ -50,10 +50,10 @@ public class WindowSelectionDialogViewModel : ViewModelBase
             Logger?.LogError(ex, "WindowSelectionDialogViewModelのReactiveCommand初期化エラー");
             throw;
         }
-        
+
         // 🚀 GEMINI FIX: レースコンディション回避 - コンストラクタ内非同期初期化を削除
         // Task.Runによる初期ロードは削除し、明示的なRefreshCommand呼び出しに変更
-        
+
         Logger?.LogInformation("WindowSelectionDialogViewModel初期化完了 - 非同期ロードはRefreshCommand経由で実行");
     }
 
@@ -237,7 +237,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
             "Device Manager", "Computer Management", "Disk Cleanup", "System Configuration",
 
             // Windows サービス・プロセス（具体的なサービス名）
-            "Windows Audio Device Graph Isolation", "Windows Audio", 
+            "Windows Audio Device Graph Isolation", "Windows Audio",
             "Antimalware Service Executable", "Windows Security Health Service",
 
             // システムトレイ・通知系（完全一致）
@@ -259,11 +259,11 @@ public class WindowSelectionDialogViewModel : ViewModelBase
         var backgroundPatterns = new[]
         {
             // 🔥 UltraThink修正: ゲームランチャーはバックグラウンド時のみ除外
-            "Steam Client Bootstrapper", "Epic Games Launcher (minimized)", 
+            "Steam Client Bootstrapper", "Epic Games Launcher (minimized)",
             "Battle.net (background)", "Origin (minimized)", "Uplay (background)",
 
             // バックグラウンド同期・クラウド（明確にバックグラウンド状態）
-            "OneDrive - ", "Google Drive (syncing)", "Dropbox (syncing)", 
+            "OneDrive - ", "Google Drive (syncing)", "Dropbox (syncing)",
             "iCloud (background)", "Backup in progress",
 
             // 音楽・メディアプレイヤー（明確に一時停止・非アクティブ）
@@ -280,11 +280,11 @@ public class WindowSelectionDialogViewModel : ViewModelBase
         };
 
         // 🔥 UltraThink修正: 完全一致またはより具体的なパターンマッチに変更
-        return systemPatterns.Any(pattern => 
+        return systemPatterns.Any(pattern =>
                    string.Equals(title, pattern, StringComparison.OrdinalIgnoreCase) ||
                    (pattern.Contains("Service") && title.Equals(pattern, StringComparison.OrdinalIgnoreCase))
                ) ||
-               backgroundPatterns.Any(pattern => 
+               backgroundPatterns.Any(pattern =>
                    title.Contains(pattern, StringComparison.OrdinalIgnoreCase) ||
                    (pattern.Contains('(') && title.EndsWith(pattern.Substring(pattern.IndexOf('(')), StringComparison.OrdinalIgnoreCase))
                );
@@ -523,7 +523,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     /// </summary>
     private async Task ExecuteSelectWindowAsync(WindowInfo selectedWindow)
     {
-        
+
         try
         {
             if (selectedWindow == null)
@@ -532,9 +532,9 @@ public class WindowSelectionDialogViewModel : ViewModelBase
                 return;
             }
 
-            Logger?.LogInformation("Window selection executed: '{Title}' (Handle: {Handle})", 
+            Logger?.LogInformation("Window selection executed: '{Title}' (Handle: {Handle})",
                 selectedWindow.Title, selectedWindow.Handle);
-            
+
             Logger?.LogDebug($"📢 ウィンドウ選択実行: '{selectedWindow.Title}' (Handle={selectedWindow.Handle})");
 
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -559,7 +559,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     private void ExecuteCancel()
     {
         Logger?.LogDebug("Window selection cancelled");
-        
+
         // UIスレッドで確実に実行
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {

@@ -33,14 +33,14 @@ public static class HttpClientFactoryHelper
         // メッセージを直接定義
         var msgInfo = "HttpClientFactoryは Microsoft.Extensions.Http 名前空間にあります";
         var msgPackage = "Microsoft.Extensions.Http パッケージが必要です";
-        
+
         Console.WriteLine(msgInfo);
         Console.WriteLine(msgPackage);
-        
+
         // DIサービスとしても登録
         var services = new ServiceCollection();
         services.AddHttpClient(); // これにより IHttpClientFactory が登録される
-        
+
         // 使用例
         var serviceProvider = services.BuildServiceProvider();
         using (serviceProvider)

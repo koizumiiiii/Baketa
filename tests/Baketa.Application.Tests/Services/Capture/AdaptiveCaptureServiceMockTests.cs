@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Linq;
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
-using Baketa.Core.Models.Capture;
+using System.Threading.Tasks;
+using Baketa.Application.Services.Capture;
 using Baketa.Core.Abstractions.Capture;
-using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.GPU;
-using Baketa.Application.Services.Capture;
+using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Models.Capture;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Moq;
+using Xunit;
 // GPU Environment Mock Helper moved here to avoid cross-project test dependencies
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
 using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
@@ -109,7 +109,7 @@ public class AdaptiveCaptureServiceMockTests
         _mockStrategyFactory = new Mock<ICaptureStrategyFactory>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLoggingOptions = new Mock<IOptions<Baketa.Core.Settings.LoggingSettings>>();
-        
+
         // LoggingSettings用の設定値をモック
         var mockLoggingSettings = new Baketa.Core.Settings.LoggingSettings
         {
@@ -119,16 +119,16 @@ public class AdaptiveCaptureServiceMockTests
             DebugLogRetentionDays = 7
         };
         _mockLoggingOptions.Setup(x => x.Value).Returns(mockLoggingSettings);
-        
+
         // 各戦略のモック設定
         _mockDirectFullScreenStrategy = new Mock<ICaptureStrategy>();
         _mockDirectFullScreenStrategy.Setup(x => x.StrategyName).Returns("DirectFullScreen");
         _mockDirectFullScreenStrategy.Setup(x => x.Priority).Returns(100);
-        
+
         _mockROIStrategy = new Mock<ICaptureStrategy>();
         _mockROIStrategy.Setup(x => x.StrategyName).Returns("ROIBased");
         _mockROIStrategy.Setup(x => x.Priority).Returns(80);
-        
+
         _mockFallbackStrategy = new Mock<ICaptureStrategy>();
         _mockFallbackStrategy.Setup(x => x.StrategyName).Returns("GDIFallback");
         _mockFallbackStrategy.Setup(x => x.Priority).Returns(10);
@@ -145,8 +145,8 @@ public class AdaptiveCaptureServiceMockTests
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
             .ReturnsAsync(integratedGpu);
 
-        var availableStrategies = new List<ICaptureStrategy> 
-        { 
+        var availableStrategies = new List<ICaptureStrategy>
+        {
             _mockDirectFullScreenStrategy.Object,
             _mockROIStrategy.Object,
             _mockFallbackStrategy.Object
@@ -154,7 +154,7 @@ public class AdaptiveCaptureServiceMockTests
 
         _mockStrategyFactory.Setup(x => x.GetStrategiesInOrder(It.IsAny<ICaptureStrategy>()))
             .Returns(availableStrategies);
-            
+
         // GetOptimalStrategy のモック設定を追加（実装ではIntPtr.Zeroが使用される）
         _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(integratedGpu, IntPtr.Zero))
             .Returns(_mockDirectFullScreenStrategy.Object);
@@ -206,8 +206,8 @@ public class AdaptiveCaptureServiceMockTests
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
             .ReturnsAsync(dedicatedGpu);
 
-        var availableStrategies = new List<ICaptureStrategy> 
-        { 
+        var availableStrategies = new List<ICaptureStrategy>
+        {
             _mockDirectFullScreenStrategy.Object,
             _mockROIStrategy.Object,
             _mockFallbackStrategy.Object
@@ -215,7 +215,7 @@ public class AdaptiveCaptureServiceMockTests
 
         _mockStrategyFactory.Setup(x => x.GetStrategiesInOrder(It.IsAny<ICaptureStrategy>()))
             .Returns(availableStrategies);
-            
+
         // GetOptimalStrategy のモック設定を追加（実装ではIntPtr.Zeroが使用される）
         _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(dedicatedGpu, IntPtr.Zero))
             .Returns(_mockROIStrategy.Object);
@@ -271,8 +271,8 @@ public class AdaptiveCaptureServiceMockTests
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
             .ReturnsAsync(lowEndGpu);
 
-        var availableStrategies = new List<ICaptureStrategy> 
-        { 
+        var availableStrategies = new List<ICaptureStrategy>
+        {
             _mockDirectFullScreenStrategy.Object,
             _mockROIStrategy.Object,
             _mockFallbackStrategy.Object
@@ -280,7 +280,7 @@ public class AdaptiveCaptureServiceMockTests
 
         _mockStrategyFactory.Setup(x => x.GetStrategiesInOrder(It.IsAny<ICaptureStrategy>()))
             .Returns(availableStrategies);
-            
+
         // GetOptimalStrategy のモック設定を追加（実装ではIntPtr.Zeroが使用される）
         _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(lowEndGpu, IntPtr.Zero))
             .Returns(_mockFallbackStrategy.Object);
@@ -338,15 +338,15 @@ public class AdaptiveCaptureServiceMockTests
         _mockGpuDetector.Setup(x => x.DetectEnvironmentAsync())
             .ReturnsAsync(integratedGpu);
 
-        var availableStrategies = new List<ICaptureStrategy> 
-        { 
+        var availableStrategies = new List<ICaptureStrategy>
+        {
             _mockDirectFullScreenStrategy.Object,
             _mockFallbackStrategy.Object
         };
 
         _mockStrategyFactory.Setup(x => x.GetStrategiesInOrder(It.IsAny<ICaptureStrategy>()))
             .Returns(availableStrategies);
-            
+
         // GetOptimalStrategy のモック設定を追加（最初の戦略が失敗するため、実装ではIntPtr.Zeroが使用される）
         _mockStrategyFactory.Setup(x => x.GetOptimalStrategy(integratedGpu, IntPtr.Zero))
             .Returns(_mockDirectFullScreenStrategy.Object);
@@ -410,8 +410,8 @@ public class AdaptiveCaptureServiceMockTests
     public async Task GetStrategiesInOrder_ReturnsCorrectPriorityOrder()
     {
         // Arrange
-        var availableStrategies = new List<ICaptureStrategy> 
-        { 
+        var availableStrategies = new List<ICaptureStrategy>
+        {
             _mockFallbackStrategy.Object,   // Priority: 10
             _mockDirectFullScreenStrategy.Object, // Priority: 100
             _mockROIStrategy.Object         // Priority: 80
@@ -452,7 +452,7 @@ public class AdaptiveCaptureServiceMockTests
 
         // Assert
         Assert.Equal(CaptureStrategyUsed.DirectFullScreen, captureResult.StrategyUsed);
-        
+
         // 実際に使われた戦略のアサーション
         _mockDirectFullScreenStrategy.Verify(x => x.ExecuteCaptureAsync(It.IsAny<IntPtr>(), It.IsAny<CaptureOptions>()), Times.AtLeastOnce);
         // 実装では複数の戦略が試行される可能性があるため、Neverアサーションは削除

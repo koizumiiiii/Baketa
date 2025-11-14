@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Models.Translation;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Services.Translation;
 

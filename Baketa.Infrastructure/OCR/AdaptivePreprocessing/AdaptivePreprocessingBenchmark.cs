@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.Benchmarking;
-using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 
@@ -76,7 +76,7 @@ public class AdaptivePreprocessingBenchmark(
     /// 特定の画像品質レベルでのベンチマーク
     /// </summary>
     public async Task<AdaptiveQualityBenchmarkResult> RunQualitySpecificBenchmarkAsync(
-        IOcrEngine ocrEngine, 
+        IOcrEngine ocrEngine,
         ImageQualityLevel qualityLevel)
     {
         logger.LogInformation("品質特化ベンチマーク開始: {QualityLevel}", qualityLevel);
@@ -185,7 +185,7 @@ public class AdaptivePreprocessingBenchmark(
         {
             var image = await testCaseGenerator.GenerateLowQualityImageAsync(
                 "テスト文字列", param.Contrast, param.Brightness, param.Noise).ConfigureAwait(false);
-            
+
             testCases.Add(new TestCase($"LowQuality_{param.Name}", image, "テスト文字列"));
         }
 
@@ -204,7 +204,7 @@ public class AdaptivePreprocessingBenchmark(
             {
                 var image = await testCaseGenerator.GenerateNoisyImageAsync(
                     "ノイズテスト", noiseType, noiseLevel).ConfigureAwait(false);
-                
+
                 testCases.Add(new TestCase($"Noisy_{noiseType}_{noiseLevel:F1}", image, "ノイズテスト"));
             }
         }
@@ -240,7 +240,7 @@ public class AdaptivePreprocessingBenchmark(
     private async Task<List<TestCase>> GeneratePerformanceTestCasesAsync()
     {
         var testCases = new List<TestCase>();
-        var imageSizes = new[] { 
+        var imageSizes = new[] {
             new { Width = 640, Height = 480 },
             new { Width = 1280, Height = 720 },
             new { Width = 1920, Height = 1080 }
@@ -250,8 +250,8 @@ public class AdaptivePreprocessingBenchmark(
         {
             var image = await testCaseGenerator.GeneratePerformanceTestImageAsync(
                 $"パフォーマンステスト {size.Width}x{size.Height}", size.Width, size.Height).ConfigureAwait(false);
-            
-            testCases.Add(new TestCase($"Performance_{size.Width}x{size.Height}", image, 
+
+            testCases.Add(new TestCase($"Performance_{size.Width}x{size.Height}", image,
                 $"パフォーマンステスト {size.Width}x{size.Height}"));
         }
 
@@ -265,11 +265,11 @@ public class AdaptivePreprocessingBenchmark(
     private async Task<BaselineTestResult> RunBaselineTestAsync(IOcrEngine ocrEngine, TestCase testCase)
     {
         var sw = Stopwatch.StartNew();
-        
+
         try
         {
             var result = await ocrEngine.RecognizeAsync(testCase.Image).ConfigureAwait(false);
-            
+
             return new BaselineTestResult
             {
                 TestCaseName = testCase.Name,
@@ -299,25 +299,25 @@ public class AdaptivePreprocessingBenchmark(
     private async Task<AdaptiveTestResult> RunAdaptiveTestAsync(IOcrEngine ocrEngine, TestCase testCase)
     {
         var sw = Stopwatch.StartNew();
-        
+
         try
         {
             // IImageをIAdvancedImageに変換
             var imageBytes = await testCase.Image.ToByteArrayAsync().ConfigureAwait(false);
-            var advancedImage = new Core.Services.Imaging.AdvancedImage(imageBytes, testCase.Image.Width, testCase.Image.Height, 
-                testCase.Image.Format == Core.Abstractions.Imaging.ImageFormat.Png 
-                    ? Core.Abstractions.Imaging.ImageFormat.Png 
+            var advancedImage = new Core.Services.Imaging.AdvancedImage(imageBytes, testCase.Image.Width, testCase.Image.Height,
+                testCase.Image.Format == Core.Abstractions.Imaging.ImageFormat.Png
+                    ? Core.Abstractions.Imaging.ImageFormat.Png
                     : Core.Abstractions.Imaging.ImageFormat.Rgb24);
-            
+
             // 適応的前処理パラメータを最適化
             var optimizationResult = await parameterOptimizer.OptimizeWithDetailsAsync(advancedImage).ConfigureAwait(false);
             var optimizationTime = sw.ElapsedMilliseconds;
 
             // 適応的OCRエンジンでOCR実行
             var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole());
-            var adaptiveEngine = new AdaptiveOcrEngine(ocrEngine, parameterOptimizer, 
+            var adaptiveEngine = new AdaptiveOcrEngine(ocrEngine, parameterOptimizer,
                 loggerFactory.CreateLogger<AdaptiveOcrEngine>());
-            
+
             var result = await adaptiveEngine.RecognizeAsync(testCase.Image, progressCallback: null, cancellationToken: default).ConfigureAwait(false);
             var totalTime = sw.ElapsedMilliseconds;
 
@@ -359,18 +359,18 @@ public class AdaptivePreprocessingBenchmark(
 
         // IImageをIAdvancedImageに変換
         var imageBytes = await testCase.Image.ToByteArrayAsync().ConfigureAwait(false);
-        var advancedImage = new Core.Services.Imaging.AdvancedImage(imageBytes, testCase.Image.Width, testCase.Image.Height, 
-            testCase.Image.Format == Core.Abstractions.Imaging.ImageFormat.Png 
-                ? Core.Abstractions.Imaging.ImageFormat.Png 
+        var advancedImage = new Core.Services.Imaging.AdvancedImage(imageBytes, testCase.Image.Width, testCase.Image.Height,
+            testCase.Image.Format == Core.Abstractions.Imaging.ImageFormat.Png
+                ? Core.Abstractions.Imaging.ImageFormat.Png
                 : Core.Abstractions.Imaging.ImageFormat.Rgb24);
 
         for (int i = 0; i < iterations; i++)
         {
             var sw = Stopwatch.StartNew();
-            
+
             await parameterOptimizer.OptimizeWithDetailsAsync(advancedImage).ConfigureAwait(false);
             var optimizationTime = sw.ElapsedMilliseconds;
-            
+
             await ocrEngine.RecognizeAsync(testCase.Image).ConfigureAwait(false);
             var totalTime = sw.ElapsedMilliseconds;
 
@@ -394,7 +394,7 @@ public class AdaptivePreprocessingBenchmark(
     #region Result Analysis
 
     private AdaptiveBenchmarkAnalysis AnalyzeResults(
-        List<AdaptiveTestResult> adaptiveResults, 
+        List<AdaptiveTestResult> adaptiveResults,
         List<BaselineTestResult> baselineResults)
     {
         var pairedResults = adaptiveResults
@@ -426,7 +426,7 @@ public class AdaptivePreprocessingBenchmark(
     }
 
     private QualitySpecificAnalysis AnalyzeQualitySpecificResults(
-        List<AdaptiveTestResult> results, 
+        List<AdaptiveTestResult> results,
         ImageQualityLevel qualityLevel)
     {
         return new QualitySpecificAnalysis

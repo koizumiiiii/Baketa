@@ -14,33 +14,33 @@ public sealed class OverlayPositioningOptions
     /// テキスト領域からの標準余白（物理ピクセル）
     /// </summary>
     public int StandardMargin { get; init; } = 5;
-    
+
     /// <summary>
     /// 動的オフセット調整のステップサイズ（物理ピクセル）
     /// </summary>
     public int DynamicOffsetStep { get; init; } = 10;
-    
+
     /// <summary>
     /// 最大動的オフセット調整回数
     /// </summary>
     public int MaxDynamicOffsetSteps { get; init; } = 20;
-    
+
     /// <summary>
     /// 優先配置戦略（1-8の優先順位）
     /// デフォルト: [上, 下, 右, 左, 右上, 左上, 右下, 左下]
     /// </summary>
     public int[] PreferredPositionPriority { get; init; } = [1, 2, 3, 4, 5, 6, 7, 8];
-    
+
     /// <summary>
     /// モニター境界からの最小距離（論理ピクセル）
     /// </summary>
     public int MonitorBoundaryMargin { get; init; } = 10;
-    
+
     /// <summary>
     /// 衝突検知の最小重複面積閾値（平方ピクセル）
     /// </summary>
     public int CollisionThreshold { get; init; } = 1;
-    
+
     /// <summary>
     /// 高パフォーマンスモード（計算の簡素化）
     /// </summary>
@@ -56,27 +56,27 @@ public sealed class PositioningResult
     /// 最終決定位置
     /// </summary>
     public Point Position { get; init; }
-    
+
     /// <summary>
     /// 使用された配置戦略
     /// </summary>
     public PositioningStrategy UsedStrategy { get; init; }
-    
+
     /// <summary>
     /// 対象モニター情報
     /// </summary>
     public MonitorInfo TargetMonitor { get; init; }
-    
+
     /// <summary>
     /// 衝突回避が適用されたか
     /// </summary>
     public bool CollisionAvoidanceApplied { get; init; }
-    
+
     /// <summary>
     /// DPI補正が適用されたか
     /// </summary>
     public bool DpiCorrectionApplied { get; init; }
-    
+
     /// <summary>
     /// 計算に要した時間（ミリ秒）
     /// </summary>

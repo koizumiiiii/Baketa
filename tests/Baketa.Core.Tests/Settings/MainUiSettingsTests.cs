@@ -1,8 +1,8 @@
 using System;
 using System.Drawing;
 using System.Linq;
-using Xunit;
 using Baketa.Core.Settings;
+using Xunit;
 
 namespace Baketa.Core.Tests.Settings;
 

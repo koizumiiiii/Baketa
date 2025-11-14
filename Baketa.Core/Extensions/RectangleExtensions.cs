@@ -38,7 +38,7 @@ public static class RectangleExtensions
     /// </summary>
     public static List<MemoryRectangle> ToMemoryRectangleList(this IEnumerable<Rectangle> rects)
     {
-        return rects.Select(r => r.ToMemoryRectangle()).ToList();
+        return [.. rects.Select(r => r.ToMemoryRectangle())];
     }
 
     /// <summary>
@@ -46,6 +46,6 @@ public static class RectangleExtensions
     /// </summary>
     public static List<Rectangle> ToDrawingRectangleList(this IEnumerable<MemoryRectangle> rects)
     {
-        return rects.Select(r => r.ToDrawingRectangle()).ToList();
+        return [.. rects.Select(r => r.ToDrawingRectangle())];
     }
 }

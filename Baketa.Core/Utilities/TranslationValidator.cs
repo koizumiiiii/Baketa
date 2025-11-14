@@ -37,7 +37,7 @@ public static class TranslationValidator
         {
             return false;
         }
-            
+
         // 明らかなエラーメッセージの場合のみ除外
         // システムエラーメッセージは表示しない
         if (translatedText.StartsWith("Error:", StringComparison.OrdinalIgnoreCase) ||
@@ -46,7 +46,7 @@ public static class TranslationValidator
         {
             return false;
         }
-        
+
         // それ以外は全て有効な翻訳結果として扱う
         // OCR結果が不完全でも、ユーザーが判断できるよう表示する
         return true;

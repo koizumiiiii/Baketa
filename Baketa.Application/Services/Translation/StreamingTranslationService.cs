@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -6,11 +6,11 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Translation.Models;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.Diagnostics;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 
@@ -30,17 +30,17 @@ public class StreamingTranslationService : IStreamingTranslationService
     private readonly IEventAggregator? _eventAggregator;
     private readonly Core.Translation.Models.TranslationProgress _progress;
     private readonly object _progressLock = new();
-    
+
     // チャンクサイズ設定（パフォーマンス最適化）
     private const int OptimalChunkSize = 3; // 3つずつ処理して段階的表示
     private const int MaxParallelChunks = 2; // 並列処理数
-    
+
     // 🚀 [DYNAMIC_TIMEOUT] 動的タイムアウト設定定数
     private const int BaseTimeoutSeconds = 60; // 🔧 [PHASE5.2E_FIX] gRPC再接続時間確保 - 10秒→60秒（KeepAlive切断後の再接続対応）
     private const int TimeoutExtensionThreshold = 500; // タイムアウト延長を開始する文字数
     private const double TimeoutExtensionPercentage = 0.5; // 500文字ごとに50%延長
     private const int MaxTimeoutMultiplier = 10; // 最大10倍まで延長
-    
+
     public StreamingTranslationService(
         ITranslationService translationService,
         ILogger<StreamingTranslationService> logger,
@@ -58,7 +58,7 @@ public class StreamingTranslationService : IStreamingTranslationService
         _logger?.LogDebug($"🔥 [STREAMING] StreamingTranslationService初期化完了 - TranslationService型: {_translationService.GetType().Name}");
         _logger.LogInformation("StreamingTranslationService初期化完了");
     }
-    
+
     /// <inheritdoc/>
     public async Task<List<string>> TranslateBatchWithStreamingAsync(
         IList<string> texts,
@@ -96,62 +96,62 @@ public class StreamingTranslationService : IStreamingTranslationService
 
         var stopwatch = Stopwatch.StartNew();
 
-        
+
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] Logger情報出力前");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            
+
         _logger.LogInformation("🔥 [STREAMING] バッチ翻訳開始 - テキスト数: {Count}", texts.Count);
         Console.WriteLine($"🔥 [STREAMING] バッチ翻訳開始 - テキスト数: {texts.Count}");
-        
+
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] 進行状況初期化前");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        
+
         // 進行状況初期化
         lock (_progressLock)
         {
             Console.WriteLine($"🚨 [CRITICAL_DEBUG] lockブロック内部に到達");
             // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-                
+
             _progress.TotalChunks = texts.Count;
             _progress.CompletedChunks = 0;
             _progress.CurrentChunkIndex = 0;
-            
+
             Console.WriteLine($"🚨 [CRITICAL_DEBUG] 進行状況初期化完了");
             // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
-        
+
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] lockブロック脱出、CreateChunks呼び出し直前");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        
+
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] results配列作成開始");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        
+
         var results = new string[texts.Count];
-        
+
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks呼び出し開始 - OptimalChunkSize={OptimalChunkSize}");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        
+
         var chunks = CreateChunks(texts, OptimalChunkSize);
-        
+
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks呼び出し完了");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        
+
         Console.WriteLine($"🚨 [CRITICAL_DEBUG] CreateChunks完了 - チャンク数: {chunks?.Count ?? 0}");
         // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        
+
         Console.WriteLine($"📦 [STREAMING] {chunks.Count}個のチャンクに分割（各{OptimalChunkSize}アイテム）");
-        
+
         // 🚀 [STREAMING_FIX] 正常なチャンク処理によるストリーミング翻訳を実行
         Console.WriteLine($"🚀 [STREAMING_FIX] 通常のチャンク処理を実行 - 段階的結果表示");
-        
+
         // 並列チャンク処理
         var semaphore = new SemaphoreSlim(MaxParallelChunks, MaxParallelChunks);
-        
+
         Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync作成開始 - チャンク数: {chunks.Count}");
-        var processingTasks = chunks.Select(chunk => 
+        var processingTasks = chunks.Select(chunk =>
             ProcessChunkAsync(chunk, sourceLanguage, targetLanguage, results, onChunkCompleted, semaphore, stopwatch, cancellationToken)
         ).ToArray(); // 🔧 [HANGUP_FIX] ToArray()で即座に評価、遅延実行を回避
-        
+
         Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync配列作成完了 - タスク数: {processingTasks.Length}");
 
 
@@ -168,14 +168,14 @@ public class StreamingTranslationService : IStreamingTranslationService
         {
             semaphore?.Dispose();
         }
-        
+
         stopwatch.Stop();
         _logger.LogInformation("✅ [STREAMING] バッチ翻訳完了 - 総時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
         Console.WriteLine($"✅ [STREAMING] バッチ翻訳完了 - 総時間: {stopwatch.ElapsedMilliseconds}ms");
-        
+
         return [.. results];
     }
-    
+
     /// <inheritdoc/>
     public Core.Translation.Models.TranslationProgress GetProgress()
     {
@@ -190,7 +190,7 @@ public class StreamingTranslationService : IStreamingTranslationService
             };
         }
     }
-    
+
     private async Task ProcessChunkAsync(
         ChunkInfo chunk,
         Language sourceLanguage,
@@ -205,11 +205,11 @@ public class StreamingTranslationService : IStreamingTranslationService
 
         Console.WriteLine($"🚨 [CHUNK_DEBUG] ProcessChunkAsync開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
         Console.WriteLine($"🚨 [CHUNK_DEBUG] semaphore.WaitAsync呼び出し前");
-        
+
         // 🔧 [SEMAPHORE_FIX] usingパターンによるセマフォデッドロック完全解決
         using var semaphoreTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         using var semaphoreCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, semaphoreTimeout.Token);
-        
+
         try
         {
             Console.WriteLine($"🚨 [DEADLOCK_DEBUG] セマフォ取得試行開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 利用可能数: {semaphore.CurrentCount}");
@@ -234,26 +234,26 @@ public class StreamingTranslationService : IStreamingTranslationService
 
 
             Console.WriteLine($"✅ [DEADLOCK_DEBUG] セマフォ取得成功 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}, 残り利用可能数: {semaphore.CurrentCount}");
-            
+
             // 🔧 [FIXED] usingパターンで自動的にセマフォが解放されるため、安全に処理を実行
             using (semaphoreScope)
             {
                 Console.WriteLine($"🔧 [POST_SEMAPHORE] セマフォ取得後処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-                
+
                 var chunkStopwatch = Stopwatch.StartNew();
                 Console.WriteLine($"🔧 [STOPWATCH] Stopwatch.StartNew完了 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
                 Console.WriteLine($"🚀 [STREAMING] チャンク処理開始 - インデックス: {chunk.StartIndex}-{chunk.EndIndex}");
-                
+
                 // 🔥 [STREAMING + PARALLEL] チャンク全体を一度にバッチ翻訳で処理
                 if (cancellationToken.IsCancellationRequested)
                     return;
-                    
+
                 try
                 {
                     // 🚀 [DYNAMIC_TIMEOUT] テキスト量に応じた動的タイムアウト実装（Geminiレビュー対応）
                     var chunkTexts = chunk.Texts;
                     var totalTextLength = chunkTexts.Sum(t => t.Length);
-                    
+
                     // 期待する計算: 基本30秒 + 500文字を超える部分について500文字ごとに15秒（50%）を加算
                     var timeoutSeconds = BaseTimeoutSeconds;
                     if (totalTextLength > TimeoutExtensionThreshold)
@@ -261,19 +261,19 @@ public class StreamingTranslationService : IStreamingTranslationService
                         var excessCharacters = totalTextLength - TimeoutExtensionThreshold;
                         var extensionChunks = Math.Ceiling((double)excessCharacters / TimeoutExtensionThreshold); // 浮動小数点計算
                         var maxExtensionChunks = Math.Min(extensionChunks, MaxTimeoutMultiplier - 1); // 最大9回延長（10倍まで）
-                        
+
                         timeoutSeconds += (int)(BaseTimeoutSeconds * TimeoutExtensionPercentage * maxExtensionChunks);
                     }
-                    
+
                     Console.WriteLine($"⏰ [STREAMING+TIMEOUT] 動的タイムアウト設定 - チャンク文字数: {totalTextLength}, タイムアウト: {timeoutSeconds}秒");
-                    
+
                     using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
                     using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-                    
+
                     // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント: 言語検出
                     var translationId = Guid.NewGuid().ToString("N")[..8];
                     var translationStart = DateTime.UtcNow;
-                    
+
                     if (_eventAggregator != null)
                     {
                         await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
@@ -292,7 +292,7 @@ public class StreamingTranslationService : IStreamingTranslationService
                                 { "TotalTextLength", totalTextLength }
                             }
                         }).ConfigureAwait(false);
-                        
+
                         // 🔥 [DIAGNOSTIC] 翻訳エンジン選択診断イベント
                         await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                         {
@@ -311,7 +311,7 @@ public class StreamingTranslationService : IStreamingTranslationService
                             }
                         }).ConfigureAwait(false);
                     }
-                    
+
                     // 🚀 [TRUE_BATCH_PROCESSING] 真のバッチ翻訳実装 - GPU最適化されたバッチ推論を活用
                     Console.WriteLine($"🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳開始 - テキスト数: {chunkTexts.Count}");
 
@@ -326,20 +326,20 @@ public class StreamingTranslationService : IStreamingTranslationService
 
 
                     Console.WriteLine($"✅ [TRUE_BATCH_PROCESSING] バッチ翻訳完了 - 結果数: {batchTranslationResults.Count}");
-                    
+
                     // 🔥 [DIAGNOSTIC] 翻訳品質診断イベント: 翻訳実行結果
                     var translationEnd = DateTime.UtcNow;
                     var translationDuration = (translationEnd - translationStart).TotalMilliseconds;
                     var successCount = batchTranslationResults.Count(r => r != null && r.IsSuccess); // 🔧 [ULTRAPHASE4_L1] null安全化
                     var sameLanguageCount = 0;
-                    
+
                     // 🔍 翻訳品質チェック: 高精度言語比較による翻訳失敗検出
                     var sameLanguageFailures = new List<string>();
                     for (int qualityCheck = 0; qualityCheck < Math.Min(chunkTexts.Count, batchTranslationResults.Count); qualityCheck++)
                     {
                         var originalText = chunkTexts[qualityCheck];
                         var translatedText = batchTranslationResults[qualityCheck]?.TranslatedText;
-                        
+
                         if (!string.IsNullOrEmpty(translatedText))
                         {
                             try
@@ -348,10 +348,10 @@ public class StreamingTranslationService : IStreamingTranslationService
                                 // TODO: 言語検出APIが利用可能になった場合に実装予定
                                 // var originalLangTask = languageDetectionService.DetectLanguageAsync(originalText, combinedCts.Token);
                                 // var translatedLangTask = languageDetectionService.DetectLanguageAsync(translatedText, combinedCts.Token);
-                                
+
                                 // フォールバック: 文字列比較による翻訳失敗検出
                                 var isSameText = originalText.Trim().Equals(translatedText.Trim(), StringComparison.OrdinalIgnoreCase);
-                                
+
                                 // 改良された翻訳失敗検出ロジック
                                 if (isSameText)
                                 {
@@ -372,7 +372,7 @@ public class StreamingTranslationService : IStreamingTranslationService
                             }
                         }
                     }
-                    
+
                     if (_eventAggregator != null)
                     {
                         await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
@@ -392,7 +392,7 @@ public class StreamingTranslationService : IStreamingTranslationService
                                 { "EngineName", _translationService.GetType().Name }
                             }
                         }).ConfigureAwait(false);
-                        
+
                         // 🔥 [DIAGNOSTIC] 翻訳品質チェック診断イベント
                         await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                         {
@@ -401,8 +401,8 @@ public class StreamingTranslationService : IStreamingTranslationService
                             ProcessingTimeMs = 0,
                             SessionId = translationId,
                             Severity = sameLanguageCount > 0 ? DiagnosticSeverity.Warning : DiagnosticSeverity.Information,
-                            Message = sameLanguageCount > 0 
-                                ? $"翻訳品質警告: {sameLanguageCount}件の翻訳失敗検出（改良された診断ロジック）" 
+                            Message = sameLanguageCount > 0
+                                ? $"翻訳品質警告: {sameLanguageCount}件の翻訳失敗検出（改良された診断ロジック）"
                                 : "翻訳品質チェック成功: 正常な翻訳結果（改良された診断検証済み）",
                             Metrics = new Dictionary<string, object>
                             {
@@ -417,28 +417,28 @@ public class StreamingTranslationService : IStreamingTranslationService
                             }
                         }).ConfigureAwait(false);
                     }
-                    
+
                     // 🔥 [DIAGNOSTIC] 翻訳結果の詳細ログ出力
                     Console.WriteLine($"🔍 [TRANSLATION_QUALITY] 翻訳品質診断: 成功{successCount}/{batchTranslationResults.Count}, 同一結果{sameLanguageCount}件");
-                    
+
                     // バッチ翻訳結果を個別インデックスに配置し、コールバック通知
                     for (int j = 0; j < chunkTexts.Count; j++)
                     {
                         var textIndex = chunk.StartIndex + j;
                         var translationResult = j < batchTranslationResults.Count ? batchTranslationResults[j] : null;
                         var translatedText = translationResult?.IsSuccess == true ? translationResult.TranslatedText : chunkTexts[j];
-                        
+
                         results[textIndex] = translatedText;
                         Console.WriteLine($"📢 [TRUE_BATCH_PROCESSING] バッチ翻訳完了通知 - インデックス: {textIndex}, 成功: {translationResult?.IsSuccess}");
                         onChunkCompleted?.Invoke(textIndex, translatedText);
                     }
-                    
+
                     // チャンク全体の進行状況更新
                     lock (_progressLock)
                     {
                         _progress.CompletedChunks += chunkTexts.Count;
                         _progress.CurrentChunkIndex = chunk.EndIndex;
-                        
+
                         // 推定残り時間計算
                         if (_progress.CompletedChunks > 0)
                         {
@@ -447,7 +447,7 @@ public class StreamingTranslationService : IStreamingTranslationService
                             _progress.EstimatedRemainingMs = avgTimePerChunk * remainingChunks;
                         }
                     }
-                    
+
                     var currentProgress = GetProgress();
                     Console.WriteLine($"✨ [STREAMING+PARALLEL] チャンク完了 [{chunk.StartIndex}-{chunk.EndIndex}] - " +
                                     $"進行率: {currentProgress.ProgressPercentage:F1}% - " +
@@ -455,9 +455,9 @@ public class StreamingTranslationService : IStreamingTranslationService
                 }
                 catch (OperationCanceledException ex)
                 {
-                    _logger.LogWarning("🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳タイムアウト/キャンセル - チャンク: {Start}-{End}, エラー: {Error}", 
+                    _logger.LogWarning("🚀 [TRUE_BATCH_PROCESSING] チャンクバッチ翻訳タイムアウト/キャンセル - チャンク: {Start}-{End}, エラー: {Error}",
                         chunk.StartIndex, chunk.EndIndex, ex.Message);
-                        
+
                     // エラー時はプレースホルダーを設定
                     for (int j = 0; j < chunk.Texts.Count; j++)
                     {
@@ -480,7 +480,7 @@ public class StreamingTranslationService : IStreamingTranslationService
                         onChunkCompleted?.Invoke(chunk.StartIndex + j, results[chunk.StartIndex + j]);
                     }
                 }
-                
+
                 chunkStopwatch.Stop();
                 Console.WriteLine($"⏱️ [STREAMING] チャンク処理完了 - 処理時間: {chunkStopwatch.ElapsedMilliseconds}ms");
             } // 🔧 [FIXED] usingブロックここで自動的にsemaphore.Release()が実行される
@@ -492,11 +492,11 @@ public class StreamingTranslationService : IStreamingTranslationService
         }
         // 🔧 [FIXED] finally句は不要 - usingパターンで自動リソース管理
     }
-    
+
     private List<ChunkInfo> CreateChunks(IList<string> texts, int chunkSize)
     {
         var chunks = new List<ChunkInfo>();
-        
+
         for (int i = 0; i < texts.Count; i += chunkSize)
         {
             var chunkTexts = texts.Skip(i).Take(chunkSize).ToList();
@@ -507,11 +507,11 @@ public class StreamingTranslationService : IStreamingTranslationService
                 Texts = chunkTexts
             });
         }
-        
+
         return chunks;
     }
-    
-    
+
+
     private class ChunkInfo
     {
         public int StartIndex { get; set; }

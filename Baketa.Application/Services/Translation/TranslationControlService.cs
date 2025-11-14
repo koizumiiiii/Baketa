@@ -1,3 +1,5 @@
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Baketa.Application.Services.Diagnostics;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
@@ -5,8 +7,6 @@ using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.UI.Overlays;
 using Microsoft.Extensions.Logging;
-using System.Reactive.Linq;
-using System.Reactive.Subjects;
 
 namespace Baketa.Application.Services.Translation;
 
@@ -20,14 +20,14 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
     private readonly IDiagnosticReportService _diagnosticReportService;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<TranslationControlService> _logger;
-    
+
     private readonly Subject<TranslationStateChanged> _translationStateSubject = new();
     private readonly Subject<bool> _loadingStateSubject = new();
     private readonly Subject<TranslationUIState> _uiStateSubject = new();
-    
+
     // 競合状態対策: 非同期排他制御用セマフォ
     private readonly SemaphoreSlim _stateLock = new(1, 1);
-    
+
     private TranslationStatus _currentStatus = TranslationStatus.Idle;
     private bool _isTranslationActive;
     private bool _isTranslationResultVisible;
@@ -72,13 +72,13 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
 
     /// <inheritdoc />
     public async Task<TranslationControlResult> ExecuteStartStopAsync(
-        WindowInfo? windowInfo, 
+        WindowInfo? windowInfo,
         CancellationToken cancellationToken = default)
     {
         if (_disposed) return new TranslationControlResult(false, "Service is disposed");
 
         var executionTimer = System.Diagnostics.Stopwatch.StartNew();
-        
+
         // 競合状態対策: 状態チェックと更新をアトミックに実行
         await _stateLock.WaitAsync(cancellationToken);
         try
@@ -89,12 +89,12 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
             var operation = _isTranslationActive ? "Stop" : "Start";
             var trigger = $"execute_{operation.ToLower()}_button_pressed";
             var context = $"ExecuteStartStopAsync {operation} operation";
-            
+
             _logger.LogDebug("診断レポート生成開始（統一サービス使用 - {Operation}操作時）", operation);
             await _diagnosticReportService.GenerateReportAsync(trigger, context, cancellationToken);
 
             TranslationControlResult result;
-            
+
             if (_isTranslationActive)
             {
                 _logger.LogDebug("翻詳停止処理呼び出し");
@@ -106,7 +106,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
                 {
                     return new TranslationControlResult(false, "ウィンドウが選択されていません");
                 }
-                
+
                 _logger.LogDebug("翻訳開始処理呼び出し");
                 result = await StartTranslationAsync(windowInfo, cancellationToken);
             }
@@ -117,10 +117,10 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
         catch (Exception ex)
         {
             _logger.LogError(ex, "翻訳開始/停止処理中にエラーが発生");
-            
+
             // エラー時は安全な状態に戻す
             await UpdateTranslationStateAsync(TranslationStatus.Idle, false, false, false, "ExecuteStartStopAsync_Error");
-            
+
             executionTimer.Stop();
             return new TranslationControlResult(false, ex.Message, null, executionTimer.Elapsed);
         }
@@ -139,7 +139,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
         if (windowInfo == null) throw new ArgumentNullException(nameof(windowInfo));
 
         var executionTimer = System.Diagnostics.Stopwatch.StartNew();
-        
+
         try
         {
             _logger.LogInformation("翻訳ワークフローを開始");
@@ -168,22 +168,22 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
 
             // 翻訳開始処理（実際の翻訳サービスとの統合が必要）
             // TODO: 翻訳サービスとの統合実装
-            
+
             // 翻訳開始状態に更新
             await UpdateTranslationStateAsync(TranslationStatus.Ready, true, false, false, "StartTranslationAsync_Complete");
 
             _logger.LogInformation("翻訳ワークフロー開始完了");
-            
+
             executionTimer.Stop();
             return new TranslationControlResult(true, null, TranslationStatus.Ready, executionTimer.Elapsed);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "翻訳開始処理中にエラーが発生");
-            
+
             // エラー時は安全な状態に戻す
             await UpdateTranslationStateAsync(TranslationStatus.Idle, false, false, false, "StartTranslationAsync_Error");
-            
+
             executionTimer.Stop();
             return new TranslationControlResult(false, ex.Message, null, executionTimer.Elapsed);
         }
@@ -195,7 +195,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
         if (_disposed) return new TranslationControlResult(false, "Service is disposed");
 
         var executionTimer = System.Diagnostics.Stopwatch.StartNew();
-        
+
         try
         {
             _logger.LogInformation("翻訳停止処理開始");
@@ -222,7 +222,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
         catch (Exception ex)
         {
             _logger.LogError(ex, "翻訳停止処理中にエラーが発生");
-            
+
             executionTimer.Stop();
             return new TranslationControlResult(false, ex.Message, null, executionTimer.Elapsed);
         }
@@ -262,10 +262,10 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
     /// 翻訳状態を更新し、関連する通知を発行します
     /// </summary>
     private async Task UpdateTranslationStateAsync(
-        TranslationStatus status, 
-        bool isActive, 
-        bool isResultVisible, 
-        bool isLoading, 
+        TranslationStatus status,
+        bool isActive,
+        bool isResultVisible,
+        bool isLoading,
         string source)
     {
         var previousStatus = _currentStatus;
@@ -291,7 +291,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
                 DateTime.UtcNow,
                 source
             );
-            
+
             _translationStateSubject.OnNext(stateChangeEvent);
         }
 

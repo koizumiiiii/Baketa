@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Tests.TestUtilities;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -9,7 +10,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
-using Baketa.Infrastructure.Tests.TestUtilities;
 
 namespace Baketa.Infrastructure.Tests.Translation.Local.ConnectionPool;
 
@@ -31,10 +31,10 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
         _output = output;
         _mockLogger = new Mock<ILogger<FixedSizeConnectionPool>>();
         _mockConfiguration = new Mock<IConfiguration>();
-        
+
         // IConfigurationのモック設定（デフォルトでNLLB-200）
         _mockConfiguration.Setup(x => x["Translation:DefaultEngine"]).Returns("NLLB200");
-        
+
         // テスト用設定
         _testSettings = new TranslationSettings
         {
@@ -80,7 +80,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
         var metrics = _connectionPool.GetMetrics();
         var expectedMax = Environment.ProcessorCount / 2;
         if (expectedMax < 1) expectedMax = 1;
-        
+
         Assert.Equal(expectedMax, metrics.MaxConnections);
         Assert.Equal(1, metrics.MinConnections);
     }
@@ -96,7 +96,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
         try
         {
             var connection = await _connectionPool.GetConnectionAsync(cts.Token);
-            
+
             // もし接続が成功した場合（稀なケース）、適切にクリーンアップ
             if (connection != null)
             {
@@ -180,7 +180,7 @@ public class FixedSizeConnectionPoolTests : IAsyncDisposable
 
         // Act & Assert - 例外をスローしない
         await _connectionPool.DisposeAsync();
-        
+
         // 二重破棄も例外をスローしない
         await _connectionPool.DisposeAsync();
     }

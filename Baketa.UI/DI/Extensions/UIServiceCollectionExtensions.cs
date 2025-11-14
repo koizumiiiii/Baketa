@@ -1,24 +1,24 @@
 #pragma warning disable CS0618 // Type or member is obsolete
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Baketa.UI.ViewModels;
-using Baketa.UI.Services;
-using Baketa.UI.DI.Modules;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Settings;
-using Baketa.Core.Events.EventTypes;
-using Baketa.Core.Services;
-using Baketa.Application.Services.Translation;
-using Baketa.Core.Abstractions.Services;
-using Baketa.Core.Abstractions.Platform.Windows.Adapters;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.UI;
-using Baketa.Infrastructure.OCR.BatchProcessing;
-using Baketa.UI.Framework.Events; // 🔥 [DI_FIX] StartTranslationRequestEvent用
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Application.Services.Translation;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Services;
+using Baketa.Infrastructure.OCR.BatchProcessing;
+using Baketa.UI.DI.Modules;
+using Baketa.UI.Framework.Events; // 🔥 [DI_FIX] StartTranslationRequestEvent用
+using Baketa.UI.Services;
+using Baketa.UI.ViewModels;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.DI.Extensions;
 
@@ -39,16 +39,16 @@ internal static class UIServiceCollectionExtensions
     {
         // UIサービスの登録
         RegisterUISpecificServices(services, configuration);
-        
+
         // ビューモデルの登録
         RegisterViewModels(services);
-        
+
         // UI関連のイベントハンドラーの登録
         RegisterUIEventHandlers(services);
-        
+
         return services;
     }
-    
+
     /// <summary>
     /// UI固有のサービスを登録
     /// </summary>
@@ -56,15 +56,15 @@ internal static class UIServiceCollectionExtensions
     {
         // 設定関連サービスの登録
         services.AddSettingsServices();
-        
+
         // 翻訳エンジン状態監視サービス（モック実装）
         services.AddSingleton<ITranslationEngineStatusService, MockTranslationEngineStatusService>();
-        
+
         // 翻訳結果オーバーレイマネージャーは削除済み（ARシステムに置き換え）
-        
+
         // ローディングオーバーレイマネージャー
         services.AddSingleton<LoadingOverlayManager>();
-        
+
         // IOcrFailureManagerインターフェース登録（IBatchOcrProcessorと同じインスタンス）
         services.AddSingleton<IOcrFailureManager>(provider =>
             provider.GetRequiredService<IBatchOcrProcessor>() as IOcrFailureManager
@@ -103,19 +103,19 @@ internal static class UIServiceCollectionExtensions
             provider.GetRequiredService<TranslationFlowEventProcessor>());
         services.AddSingleton<IEventProcessor<StopTranslationRequestEvent>>(provider =>
             provider.GetRequiredService<TranslationFlowEventProcessor>());
-        
+
         // メインオーバーレイViewModel
         services.AddSingleton<Baketa.UI.ViewModels.MainOverlayViewModel>();
-        
+
         // フォント管理サービス
         services.AddSingleton<IFontManagerService, FontManagerService>();
-        
+
         // その他のUIサービス
         // 例: services.AddSingleton<INotificationService, NotificationService>();
         // 例: services.AddSingleton<IDialogService, DialogService>();
         // 例: services.AddSingleton<IClipboardService, ClipboardService>();
     }
-    
+
     /// <summary>
     /// ビューモデルの登録
     /// </summary>
@@ -124,12 +124,12 @@ internal static class UIServiceCollectionExtensions
     {
         // ViewModelの登録はUIModuleで一元化するため、ここでは何も登録しない
         // UIModuleとの重複を避ける
-        
+
         // その他のビューモデル
         // 例: services.AddTransient<MainWindowViewModel>();
         // 例: services.AddTransient<OverlayViewModel>();
     }
-    
+
     /// <summary>
     /// UI関連のイベントハンドラーを登録
     /// </summary>
@@ -138,7 +138,7 @@ internal static class UIServiceCollectionExtensions
         // UIイベントプロセッサー
         // 例: services.AddSingleton<ThemeChangedEventProcessor>();
         // 例: services.AddSingleton<LanguageChangedEventProcessor>();
-        
+
         // 現時点では具体的なイベントハンドラーはコメントアウト
         // 必要に応じて実装時に追加
     }
@@ -179,7 +179,7 @@ internal sealed class MockTranslationEngineStatusService(ILogger<MockTranslation
         _logger.LogDebug("モック状態監視サービスを更新しました");
         return Task.CompletedTask;
     }
-    
+
     private static TranslationEngineStatus CreateMockLocalEngineStatus()
     {
         var status = new TranslationEngineStatus
@@ -190,7 +190,7 @@ internal sealed class MockTranslationEngineStatusService(ILogger<MockTranslation
         };
         return status;
     }
-    
+
     private static TranslationEngineStatus CreateMockCloudEngineStatus()
     {
         var status = new TranslationEngineStatus
@@ -201,7 +201,7 @@ internal sealed class MockTranslationEngineStatusService(ILogger<MockTranslation
         };
         return status;
     }
-    
+
     private static NetworkConnectionStatus CreateMockNetworkStatus()
     {
         var status = new NetworkConnectionStatus

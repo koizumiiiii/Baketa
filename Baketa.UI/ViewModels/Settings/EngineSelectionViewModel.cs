@@ -5,14 +5,14 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using ReactiveUI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using ReactiveUI;
 using EngineStatus = Baketa.UI.Services.TranslationEngineStatus;
 using StatusUpdate = Baketa.UI.Services.TranslationEngineStatusUpdate;
 
@@ -144,7 +144,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
         ArgumentNullException.ThrowIfNull(notificationService);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
-        
+
         _statusService = statusService;
         _planService = planService;
         _notificationService = notificationService;
@@ -231,7 +231,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
                 await _notificationService.ShowWarningAsync(
                 "CloudOnlyエンジンの状態",
                 "CloudOnlyエンジンは現在利用できません。ネットワーク接続を確認してください。").ConfigureAwait(false);
-                
+
                 // それでも選択する場合は警告を表示して継続
                 HasStatusWarning = true;
                 StatusWarningMessage = "CloudOnlyエンジンはオフラインです";
@@ -243,7 +243,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             }
 
             SelectedEngine = engine;
-            
+
             // 成功通知
             if (_options.EnableNotifications)
             {
@@ -305,7 +305,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             IsLoading = true;
             await _statusService.RefreshStatusAsync().ConfigureAwait(false);
             UpdateCloudOnlyAvailability();
-            
+
             _logger.LogDebug("Engine status refreshed successfully");
         }
         catch (TaskCanceledException ex)
@@ -365,7 +365,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             (update.EngineName == "LocalOnly" && SelectedEngine == TranslationEngine.LocalOnly))
         {
             UpdateEngineDescription();
-            
+
             // エラー状態の警告表示
             if (update.UpdateType == StatusUpdateType.ErrorOccurred)
             {
@@ -398,7 +398,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     private void UpdateCloudOnlyAvailability()
     {
         IsCloudOnlyEnabled = _planService.CanUseCloudOnlyEngine;
-        
+
         if (!IsCloudOnlyEnabled && SelectedEngine == TranslationEngine.CloudOnly)
         {
             // プランダウングレード時のフォールバック
@@ -427,12 +427,12 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     {
         var status = LocalEngineStatus;
         var baseDesc = "NLLB-200モデルを使用したローカル翻訳。高品質・無料・オフライン対応。";
-        
+
         if (!status.IsHealthy)
         {
             return $"{baseDesc}\n⚠️ 状態: エラー ({status.LastError})";
         }
-        
+
         return $"{baseDesc}\n✅ 状態: 正常";
     }
 

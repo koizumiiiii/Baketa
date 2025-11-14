@@ -31,7 +31,7 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _maxCapacity = maxCapacity;
         Statistics.MaxCapacity = maxCapacity;
-        
+
         _logger.LogInformation("🏊‍♂️ AdvancedImagePool initialized with capacity: {MaxCapacity}", maxCapacity);
     }
 
@@ -40,9 +40,9 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
     public IAdvancedImage Acquire()
     {
         ThrowIfDisposed();
-        
+
         _getTimeWatch.Restart();
-        
+
         lock (_statsLock)
         {
             Statistics.TotalGets++;
@@ -52,41 +52,41 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
         {
             _getTimeWatch.Stop();
             Interlocked.Add(ref _totalGetTime, _getTimeWatch.ElapsedTicks);
-            
+
             lock (_statsLock)
             {
                 Statistics.PooledCount--;
             }
-            
-            _logger.LogDebug("📤 Image retrieved from pool: Size={Width}x{Height}, Format={Format}, PoolHit=true", 
+
+            _logger.LogDebug("📤 Image retrieved from pool: Size={Width}x{Height}, Format={Format}, PoolHit=true",
                 pooledItem.Image.Width, pooledItem.Image.Height, pooledItem.PixelFormat);
-            
+
             return pooledItem.Image;
         }
 
         // プールにない場合は新規作成
         var newImage = CreateNewImage(800, 600, PixelFormat.Bgra32); // デフォルトサイズ
-        
+
         _getTimeWatch.Stop();
         Interlocked.Add(ref _totalGetTime, _getTimeWatch.ElapsedTicks);
-        
+
         lock (_statsLock)
         {
             Statistics.TotalCreations++;
         }
-        
-        _logger.LogDebug("🆕 New image created: Size={Width}x{Height}, Format={Format}, PoolHit=false", 
+
+        _logger.LogDebug("🆕 New image created: Size={Width}x{Height}, Format={Format}, PoolHit=false",
             newImage.Width, newImage.Height, PixelFormat.Bgra32);
-        
+
         return newImage;
     }
 
     public IAdvancedImage AcquireImage(int width, int height, PixelFormat pixelFormat)
     {
         ThrowIfDisposed();
-        
+
         _getTimeWatch.Restart();
-        
+
         lock (_statsLock)
         {
             Statistics.TotalGets++;
@@ -100,21 +100,21 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
             {
                 _getTimeWatch.Stop();
                 Interlocked.Add(ref _totalGetTime, _getTimeWatch.ElapsedTicks);
-                
+
                 lock (_statsLock)
                 {
                     Statistics.PooledCount--;
                 }
-                
+
                 // 互換性のない画像はプールに戻す
                 foreach (var incompatibleItem in compatibleImages)
                 {
                     _pool.Enqueue(incompatibleItem);
                 }
-                
-                _logger.LogDebug("📤 Compatible image retrieved from pool: Requested={Width}x{Height}:{Format}, Found={ActualWidth}x{ActualHeight}:{ActualFormat}", 
+
+                _logger.LogDebug("📤 Compatible image retrieved from pool: Requested={Width}x{Height}:{Format}, Found={ActualWidth}x{ActualHeight}:{ActualFormat}",
                     width, height, pixelFormat, item.Image.Width, item.Image.Height, item.PixelFormat);
-                
+
                 return item.Image;
             }
             compatibleImages.Add(item);
@@ -128,25 +128,25 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
 
         // 互換性のある画像がない場合は新規作成
         var newImage = CreateNewImage(width, height, pixelFormat);
-        
+
         _getTimeWatch.Stop();
         Interlocked.Add(ref _totalGetTime, _getTimeWatch.ElapsedTicks);
-        
+
         lock (_statsLock)
         {
             Statistics.TotalCreations++;
         }
-        
-        _logger.LogDebug("🆕 New compatible image created: Size={Width}x{Height}, Format={Format}", 
+
+        _logger.LogDebug("🆕 New compatible image created: Size={Width}x{Height}, Format={Format}",
             width, height, pixelFormat);
-        
+
         return newImage;
     }
 
     public IAdvancedImage GetCompatible(IAdvancedImage templateImage)
     {
         ArgumentNullException.ThrowIfNull(templateImage);
-        
+
         // PixelFormatの推定（実際の実装では適切なマッピングが必要）
         var estimatedFormat = EstimatePixelFormat(templateImage);
         return AcquireImage(templateImage.Width, templateImage.Height, estimatedFormat);
@@ -158,23 +158,23 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
             return;
 
         _returnTimeWatch.Restart();
-        
+
         lock (_statsLock)
         {
             Statistics.TotalReturns++;
-            
+
             // 容量チェック
             if (Statistics.PooledCount >= _maxCapacity)
             {
-                _logger.LogDebug("🗑️ Pool at capacity, disposing returned image: Size={Width}x{Height}", 
+                _logger.LogDebug("🗑️ Pool at capacity, disposing returned image: Size={Width}x{Height}",
                     item.Width, item.Height);
-                
+
                 item.Dispose();
                 _returnTimeWatch.Stop();
                 Interlocked.Add(ref _totalReturnTime, _returnTimeWatch.ElapsedTicks);
                 return;
             }
-            
+
             Statistics.PooledCount++;
         }
 
@@ -184,36 +184,36 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
             PixelFormat = EstimatePixelFormat(item),
             ReturnedAt = DateTime.UtcNow
         };
-        
+
         _pool.Enqueue(pooledItem);
-        
+
         _returnTimeWatch.Stop();
         Interlocked.Add(ref _totalReturnTime, _returnTimeWatch.ElapsedTicks);
-        
-        _logger.LogDebug("📥 Image returned to pool: Size={Width}x{Height}, Format={Format}, PoolSize={PoolSize}", 
+
+        _logger.LogDebug("📥 Image returned to pool: Size={Width}x{Height}, Format={Format}, PoolSize={PoolSize}",
             item.Width, item.Height, pooledItem.PixelFormat, Statistics.PooledCount);
     }
 
     public void Clear()
     {
         _logger.LogInformation("🧹 Clearing AdvancedImagePool");
-        
+
         var clearedCount = 0;
         while (_pool.TryDequeue(out var item))
         {
             item.Image.Dispose();
             clearedCount++;
         }
-        
+
         lock (_statsLock)
         {
             Statistics.PooledCount = 0;
             Statistics.Clear();
         }
-        
+
         _totalGetTime = 0;
         _totalReturnTime = 0;
-        
+
         _logger.LogInformation("✅ AdvancedImagePool cleared: {ClearedCount} images disposed", clearedCount);
     }
 
@@ -223,19 +223,19 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
             return;
 
         _disposed = true;
-        
+
         LogFinalStatistics();
         Clear();
-        
+
         _logger.LogInformation("🏁 AdvancedImagePool disposed");
     }
 
     private void LogFinalStatistics()
     {
-        var avgGetTime = Statistics.TotalGets > 0 ? 
+        var avgGetTime = Statistics.TotalGets > 0 ?
             new TimeSpan(_totalGetTime / Statistics.TotalGets).TotalMicroseconds : 0;
-        
-        var avgReturnTime = Statistics.TotalReturns > 0 ? 
+
+        var avgReturnTime = Statistics.TotalReturns > 0 ?
             new TimeSpan(_totalReturnTime / Statistics.TotalReturns).TotalMicroseconds : 0;
 
         _logger.LogInformation("📊 AdvancedImagePool Final Statistics:\n" +
@@ -251,8 +251,8 @@ public sealed class AdvancedImagePool : IAdvancedImagePool
 
     private static bool IsCompatible(PooledImageItem item, int width, int height, PixelFormat pixelFormat)
     {
-        return item.Image.Width == width && 
-               item.Image.Height == height && 
+        return item.Image.Width == width &&
+               item.Image.Height == height &&
                item.PixelFormat == pixelFormat;
     }
 

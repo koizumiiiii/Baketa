@@ -1,10 +1,10 @@
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Models.ImageProcessing;
 using Microsoft.Extensions.Logging;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
 
 namespace Baketa.Infrastructure.Imaging.ChangeDetection;
 
@@ -17,7 +17,7 @@ namespace Baketa.Infrastructure.Imaging.ChangeDetection;
 public sealed class OptimizedPerceptualHashService : IPerceptualHashService
 {
     private readonly ILogger<OptimizedPerceptualHashService> _logger;
-    
+
     // ゲーム特化アルゴリズム最適化マッピング
     private static readonly Dictionary<ImageType, HashAlgorithmType> OptimalAlgorithms = new()
     {
@@ -40,12 +40,12 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     public string ComputeHash(IImage image, HashAlgorithmType algorithm)
     {
         ArgumentNullException.ThrowIfNull(image);
-        
+
         try
         {
             // 🔥 Critical Fix: IImage -> Bitmap変換とリソース管理
             using var bitmap = ConvertToBitmap(image);
-            
+
             return algorithm switch
             {
                 HashAlgorithmType.AverageHash => ComputeAverageHashOptimized(bitmap),
@@ -79,10 +79,10 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         {
             var hammingDistance = CalculateHammingDistance(hash1, hash2);
             var maxBits = hash1.Length * 4; // 16進数1文字=4bit
-            
+
             // アルゴリズム別類似度調整
             var similarity = 1.0f - ((float)hammingDistance / maxBits);
-            
+
             return algorithm switch
             {
                 HashAlgorithmType.AverageHash => Math.Max(0f, similarity - 0.05f),      // 少し厳しく
@@ -94,7 +94,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "ハッシュ比較エラー - Hash1: {Hash1}, Hash2: {Hash2}", 
+            _logger.LogError(ex, "ハッシュ比較エラー - Hash1: {Hash1}, Hash2: {Hash2}",
                 hash1?[..Math.Min(8, hash1.Length)], hash2?[..Math.Min(8, hash2.Length)]);
             return 0.0f;
         }
@@ -103,8 +103,8 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     /// <inheritdoc />
     public HashAlgorithmType GetOptimalAlgorithm(ImageType imageType)
     {
-        return OptimalAlgorithms.TryGetValue(imageType, out var algorithm) 
-            ? algorithm 
+        return OptimalAlgorithms.TryGetValue(imageType, out var algorithm)
+            ? algorithm
             : HashAlgorithmType.DifferenceHash;
     }
 
@@ -124,7 +124,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         try
         {
             var distance = 0;
-            
+
             // 16進数文字単位での比較（高速化）
             for (int i = 0; i < hash1.Length; i++)
             {
@@ -159,7 +159,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                 // 🔥 Critical Fix: Bitmapリソース管理
                 using var bitmap1 = ConvertToBitmap(image1);
                 using var bitmap2 = ConvertToBitmap(image2);
-                
+
                 return CalculateSSIMOptimized(bitmap1, bitmap2);
             }
             catch (Exception ex)
@@ -179,30 +179,30 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     private string ComputeAverageHashOptimized(Bitmap bitmap)
     {
         const int size = 8;
-        
+
         using var resized = new Bitmap(size, size, PixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
-        
+
         // 高速リサイズ設定
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
         graphics.DrawImage(bitmap, 0, 0, size, size);
 
         // 平均輝度の高速計算
-        var lockData = resized.LockBits(new Rectangle(0, 0, size, size), 
+        var lockData = resized.LockBits(new Rectangle(0, 0, size, size),
             ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
-        
+
         try
         {
             var stride = lockData.Stride;
             var scan0 = lockData.Scan0;
-            
+
             var totalBrightness = 0;
             var pixels = size * size;
-            
+
             unsafe
             {
                 byte* ptr = (byte*)scan0;
-                
+
                 for (int y = 0; y < size; y++)
                 {
                     for (int x = 0; x < size; x++)
@@ -213,24 +213,24 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                     }
                 }
             }
-            
+
             var averageBrightness = totalBrightness / pixels;
-            
+
             // ハッシュ生成
             var hash = 0UL;
             var bitIndex = 0;
-            
+
             unsafe
             {
                 byte* ptr = (byte*)scan0;
-                
+
                 for (int y = 0; y < size; y++)
                 {
                     for (int x = 0; x < size; x++)
                     {
                         var offset = y * stride + x * 3;
                         var brightness = (ptr[offset] + ptr[offset + 1] + ptr[offset + 2]) / 3;
-                        
+
                         if (brightness >= averageBrightness)
                         {
                             hash |= 1UL << bitIndex;
@@ -239,7 +239,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                     }
                 }
             }
-            
+
             return hash.ToString("X16");
         }
         finally
@@ -255,14 +255,14 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     private string ComputeDifferenceHashOptimized(Bitmap bitmap)
     {
         const int size = 8;
-        
+
         using var resized = new Bitmap(size + 1, size, PixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
-        
+
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
         graphics.DrawImage(bitmap, 0, 0, size + 1, size);
 
-        var lockData = resized.LockBits(new Rectangle(0, 0, size + 1, size), 
+        var lockData = resized.LockBits(new Rectangle(0, 0, size + 1, size),
             ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
 
         try
@@ -270,22 +270,22 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
             var hash = 0UL;
             var bitIndex = 0;
             var stride = lockData.Stride;
-            
+
             unsafe
             {
                 byte* ptr = (byte*)lockData.Scan0;
-                
+
                 for (int y = 0; y < size; y++)
                 {
                     for (int x = 0; x < size; x++)
                     {
                         var leftOffset = y * stride + x * 3;
                         var rightOffset = y * stride + (x + 1) * 3;
-                        
+
                         // RGB -> 輝度変換（高速化）
                         var leftGray = (ptr[leftOffset] + ptr[leftOffset + 1] + ptr[leftOffset + 2]) / 3;
                         var rightGray = (ptr[rightOffset] + ptr[rightOffset + 1] + ptr[rightOffset + 2]) / 3;
-                        
+
                         if (leftGray > rightGray)
                         {
                             hash |= 1UL << bitIndex;
@@ -294,7 +294,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                     }
                 }
             }
-            
+
             return hash.ToString("X16");
         }
         finally
@@ -310,24 +310,24 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     private string ComputePerceptualHashOptimized(Bitmap bitmap)
     {
         const int size = 32; // pHashは通常32x32
-        
+
         using var resized = new Bitmap(size, size, PixelFormat.Format8bppIndexed);
         using var temp = new Bitmap(size, size, PixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(temp);
-        
+
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
         graphics.DrawImage(bitmap, 0, 0, size, size);
-        
+
         // グレースケール変換（高速化）
         var grayData = ConvertToGrayscale(temp);
-        
+
         // DCT近似（高速実装）
         var dctData = ApproximateDCT(grayData, size);
-        
+
         // ハッシュ生成（上位64要素から）
         var median = CalculateMedian(dctData, 64);
         var hash = 0UL;
-        
+
         for (int i = 0; i < 64; i++)
         {
             if (dctData[i] > median)
@@ -335,7 +335,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                 hash |= 1UL << i;
             }
         }
-        
+
         return hash.ToString("X16");
     }
 
@@ -346,24 +346,24 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     private string ComputeWaveletHashOptimized(Bitmap bitmap)
     {
         const int size = 16; // Waveletは16x16が適切
-        
+
         using var resized = new Bitmap(size, size, PixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
-        
+
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
         graphics.DrawImage(bitmap, 0, 0, size, size);
-        
+
         // グレースケール変換
         var grayData = ConvertToGrayscale(resized);
-        
+
         // 簡易Haar Wavelet変換（2Dハール変換）
         var waveletCoeff = ApplyHaarWavelet2D(grayData, size);
-        
+
         // 低周波成分からハッシュ生成（左上8x8領域）
         var hash = 0UL;
         var bitIndex = 0;
         var avgCoeff = waveletCoeff.Take(64).Average();
-        
+
         for (int i = 0; i < 64 && bitIndex < 64; i++)
         {
             if (waveletCoeff[i] > avgCoeff)
@@ -372,7 +372,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
             }
             bitIndex++;
         }
-        
+
         return hash.ToString("X16");
     }
 
@@ -387,24 +387,24 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     private float CalculateSSIMOptimized(Bitmap bitmap1, Bitmap bitmap2)
     {
         const int windowSize = 8; // 計算ウィンドウサイズ
-        
+
         if (bitmap1.Width != bitmap2.Width || bitmap1.Height != bitmap2.Height)
         {
             // サイズ不一致時は小さい方にリサイズ
             var minWidth = Math.Min(bitmap1.Width, bitmap2.Width);
             var minHeight = Math.Min(bitmap1.Height, bitmap2.Height);
-            
+
             using var resized1 = new Bitmap(minWidth, minHeight);
             using var resized2 = new Bitmap(minWidth, minHeight);
             using var g1 = Graphics.FromImage(resized1);
             using var g2 = Graphics.FromImage(resized2);
-            
+
             g1.DrawImage(bitmap1, 0, 0, minWidth, minHeight);
             g2.DrawImage(bitmap2, 0, 0, minWidth, minHeight);
-            
+
             return CalculateSSIMWindow(resized1, resized2, windowSize);
         }
-        
+
         return CalculateSSIMWindow(bitmap1, bitmap2, windowSize);
     }
 
@@ -417,7 +417,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         var height = bitmap1.Height;
         var ssimSum = 0.0;
         var windowCount = 0;
-        
+
         // ウィンドウ単位でSSIM計算
         for (int y = 0; y <= height - windowSize; y += windowSize / 2)
         {
@@ -425,12 +425,12 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
             {
                 var window1 = ExtractWindow(bitmap1, x, y, windowSize);
                 var window2 = ExtractWindow(bitmap2, x, y, windowSize);
-                
+
                 ssimSum += CalculateWindowSSIM(window1, window2);
                 windowCount++;
             }
         }
-        
+
         return windowCount > 0 ? (float)(ssimSum / windowCount) : 0.0f;
     }
 
@@ -455,11 +455,11 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
 
             // フォールバック: 基本実装（ピクセルデータのコピーが必要）
             var bitmap = new Bitmap(image.Width, image.Height, PixelFormat.Format24bppRgb);
-            
+
             // IImageからピクセルデータを取得してBitmapにコピー
             // 注意: この実装は不完全 - 実際のIImage実装に依存
             _logger.LogWarning("⚠️ ConvertToBitmapフォールバック実装使用 - ピクセルデータコピー未実装");
-            
+
             return bitmap;
         }
         catch (Exception ex)
@@ -486,7 +486,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         var width = bitmap.Width;
         var height = bitmap.Height;
         var grayData = new float[width * height];
-        
+
         for (int y = 0; y < height; y++)
         {
             for (int x = 0; x < width; x++)
@@ -495,7 +495,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                 grayData[y * width + x] = (pixel.R * 0.299f + pixel.G * 0.587f + pixel.B * 0.114f);
             }
         }
-        
+
         return grayData;
     }
 
@@ -506,27 +506,27 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     {
         // 簡易DCT実装（実用的には OpenCV や専用ライブラリを使用推奨）
         var result = new float[size * size];
-        
+
         for (int v = 0; v < size; v++)
         {
             for (int u = 0; u < size; u++)
             {
                 var sum = 0.0;
-                
+
                 for (int y = 0; y < size; y++)
                 {
                     for (int x = 0; x < size; x++)
                     {
-                        sum += data[y * size + x] * 
+                        sum += data[y * size + x] *
                                Math.Cos((2 * x + 1) * u * Math.PI / (2 * size)) *
                                Math.Cos((2 * y + 1) * v * Math.PI / (2 * size));
                     }
                 }
-                
+
                 result[v * size + u] = (float)sum;
             }
         }
-        
+
         return result;
     }
 
@@ -537,13 +537,13 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     {
         var result = new float[size * size];
         Array.Copy(data, result, data.Length);
-        
+
         // 行方向変換
         for (int y = 0; y < size; y++)
         {
             ApplyHaarWavelet1D(result, y * size, size);
         }
-        
+
         // 列方向変換
         var temp = new float[size];
         for (int x = 0; x < size; x++)
@@ -552,15 +552,15 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
             {
                 temp[y] = result[y * size + x];
             }
-            
+
             ApplyHaarWavelet1D(temp, 0, size);
-            
+
             for (int y = 0; y < size; y++)
             {
                 result[y * size + x] = temp[y];
             }
         }
-        
+
         return result;
     }
 
@@ -570,22 +570,22 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     private void ApplyHaarWavelet1D(float[] data, int start, int length)
     {
         if (length < 2) return;
-        
+
         var temp = new float[length];
         var half = length / 2;
-        
+
         // 低周波成分（平均）
         for (int i = 0; i < half; i++)
         {
             temp[i] = (data[start + i * 2] + data[start + i * 2 + 1]) / 2;
         }
-        
+
         // 高周波成分（差分）
         for (int i = 0; i < half; i++)
         {
             temp[half + i] = (data[start + i * 2] - data[start + i * 2 + 1]) / 2;
         }
-        
+
         Array.Copy(temp, 0, data, start, length);
     }
 
@@ -596,9 +596,9 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     {
         var sorted = data.Take(count).OrderBy(x => x).ToArray();
         var mid = count / 2;
-        
-        return count % 2 == 0 
-            ? (sorted[mid - 1] + sorted[mid]) / 2 
+
+        return count % 2 == 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2
             : sorted[mid];
     }
 
@@ -609,7 +609,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     {
         var window = new float[size * size];
         var index = 0;
-        
+
         for (int wy = 0; wy < size; wy++)
         {
             for (int wx = 0; wx < size; wx++)
@@ -617,11 +617,11 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                 var px = Math.Min(x + wx, bitmap.Width - 1);
                 var py = Math.Min(y + wy, bitmap.Height - 1);
                 var pixel = bitmap.GetPixel(px, py);
-                
+
                 window[index++] = (pixel.R * 0.299f + pixel.G * 0.587f + pixel.B * 0.114f);
             }
         }
-        
+
         return window;
     }
 
@@ -631,20 +631,20 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     private double CalculateWindowSSIM(float[] window1, float[] window2)
     {
         var n = window1.Length;
-        
+
         // 平均計算
         var mean1 = window1.Average();
         var mean2 = window2.Average();
-        
+
         // 分散・共分散計算
         var variance1 = window1.Select(x => (x - mean1) * (x - mean1)).Average();
         var variance2 = window2.Select(x => (x - mean2) * (x - mean2)).Average();
         var covariance = window1.Zip(window2, (x1, x2) => (x1 - mean1) * (x2 - mean2)).Average();
-        
+
         // SSIM計算
         var numerator = (2 * mean1 * mean2 + C1) * (2 * covariance + C2);
         var denominator = (mean1 * mean1 + mean2 * mean2 + C1) * (variance1 + variance2 + C2);
-        
+
         return denominator > 0 ? numerator / denominator : 0.0;
     }
 

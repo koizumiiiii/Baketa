@@ -33,7 +33,7 @@ public sealed class PaddleOcrPerformanceTracker : IPaddleOcrPerformanceTracker
 
     // 🔒 [GEMINI_REVIEW] 適応的タイムアウト用の統計（スレッドセーフ強化）
     private long _lastOcrTimeTicks = DateTime.MinValue.Ticks; // DateTime → long Ticks (Interlocked対応)
-    private int _consecutiveTimeouts;
+    private readonly int _consecutiveTimeouts;
 
     // 🔒 [GEMINI_REVIEW] PaddlePredictor失敗統計（スレッドセーフ強化）
     private int _consecutivePaddleFailures;

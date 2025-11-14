@@ -1,5 +1,5 @@
-using Baketa.Application.Services.Translation;
 using System.Reactive;
+using Baketa.Application.Services.Translation;
 
 namespace Baketa.Application.Services.Translation;
 
@@ -36,7 +36,7 @@ public interface ITranslationControlService
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>実行結果</returns>
     Task<TranslationControlResult> ExecuteStartStopAsync(
-        Core.Abstractions.Platform.Windows.Adapters.WindowInfo? windowInfo, 
+        Core.Abstractions.Platform.Windows.Adapters.WindowInfo? windowInfo,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -1,7 +1,7 @@
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Imaging;
 using System;
 using System.Drawing;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Imaging;
 
 namespace Baketa.Core.Events.EventTypes;
 
@@ -17,16 +17,16 @@ public class OcrRequestEvent(IImage capturedImage, Rectangle captureRegion, IntP
 {
     /// <summary>キャプチャされた画像</summary>
     public IImage CapturedImage { get; } = capturedImage ?? throw new ArgumentNullException(nameof(capturedImage));
-    
+
     /// <summary>キャプチャ領域</summary>
     public Rectangle CaptureRegion { get; } = captureRegion;
-    
+
     /// <summary>対象ウィンドウハンドル（null可）</summary>
     public IntPtr? TargetWindowHandle { get; } = targetWindowHandle;
-    
+
     /// <inheritdoc />
     public override string Name => "OcrRequest";
-    
+
     /// <inheritdoc />
     public override string Category => "OCR";
 }

@@ -5,15 +5,15 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Abstractions.Platform.Windows;
-using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
+using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Infrastructure.Platform.Windows;
-using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
+using CoreRectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 using GdiImageFormat = System.Drawing.Imaging.ImageFormat;
+using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
 using GdiRectangle = System.Drawing.Rectangle;
 using SafePixelFormat = Baketa.Core.Abstractions.Memory.ImagePixelFormat;
-using CoreRectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Infrastructure.Platform.Adapters;
 
@@ -304,21 +304,21 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
 
         return await Task.Run(() =>
         {
-            try 
+            try
             {
                 // 🔧 [PHASE3.2_DEBUG] SafeImageAdapter状態詳細ログ
                 Console.WriteLine($"🔧 [PHASE3.2_DEBUG] ToByteArrayAsync開始 - Width: {_safeImage.Width}, Height: {_safeImage.Height}, IsDisposed: {_safeImage.IsDisposed}");
-                
+
                 using var bitmap = CreateBitmapFromSafeImage();
-                
+
                 Console.WriteLine($"🔧 [PHASE3.2_DEBUG] Bitmap作成完了 - Size: {bitmap.Width}x{bitmap.Height}, PixelFormat: {bitmap.PixelFormat}");
-                
+
                 using var memoryStream = new MemoryStream();
                 bitmap.Save(memoryStream, format ?? GdiImageFormat.Png);
-                
+
                 var result = memoryStream.ToArray();
                 Console.WriteLine($"🔧 [PHASE3.2_DEBUG] Bitmap.Save完了 - 出力データサイズ: {result.Length}bytes");
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -371,10 +371,10 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
         {
             // 🔍 Phase 3.10: SafeImage状態確認
             Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] CreateBitmapFromSafeImage開始 - Width: {_safeImage.Width}, Height: {_safeImage.Height}");
-            
+
             var imageData = _safeImage.GetImageData();
             Console.WriteLine($"🔍 [PHASE_3_10_DEBUG] SafeImage.GetImageData完了 - データサイズ: {imageData.Length}bytes");
-            
+
             // 🔥 [PHASE10.31] Gemini推奨実装の正しい適用: SafeImageのPixelFormatを尊重
             // Phase 10.30の誤り: Format24bppRgb固定により、Bgra32のSafeImageで縦線発生
             // 正しい修正: SafeImageのPixelFormatに応じてBitmapを作成

@@ -1,10 +1,10 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Models.OCR;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Models.OCR;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.Ensemble;
 
@@ -77,8 +77,8 @@ public class EnsembleOcrEngine(
     }
 
     public async Task<EnsembleOcrResults> RecognizeWithDetailsAsync(
-        IImage image, 
-        IProgress<OcrProgress>? progress = null, 
+        IImage image,
+        IProgress<OcrProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
@@ -117,7 +117,7 @@ public class EnsembleOcrEngine(
         catch (Exception ex)
         {
             logger.LogError(ex, "アンサンブルOCR認識中にエラーが発生しました");
-            
+
             // フォールバック: 最も重みの大きいエンジンで処理
             return await ExecuteFallbackRecognitionAsync(image, progress, sw.Elapsed, cancellationToken).ConfigureAwait(false);
         }
@@ -126,8 +126,8 @@ public class EnsembleOcrEngine(
     public EnsemblePerformanceStats GetEnsembleStats()
     {
         var totalExecutions = _engineStats.Values.Sum(s => s.TotalExecutions);
-        var averageTime = _engineStats.Values.Count > 0 
-            ? _engineStats.Values.Average(s => s.AverageProcessingTime) 
+        var averageTime = _engineStats.Values.Count > 0
+            ? _engineStats.Values.Average(s => s.AverageProcessingTime)
             : 0;
 
         var engineStatsDict = _engineStats.ToDictionary(
@@ -164,7 +164,7 @@ public class EnsembleOcrEngine(
                 try
                 {
                     var result = await engineInfo.Engine.InitializeAsync(settings, cancellationToken).ConfigureAwait(false);
-                    logger.LogDebug("エンジン初期化結果: {EngineName}={Result}", 
+                    logger.LogDebug("エンジン初期化結果: {EngineName}={Result}",
                         engineInfo.EngineName, result);
                     return (engineInfo.EngineName, result);
                 }
@@ -202,7 +202,7 @@ public class EnsembleOcrEngine(
     public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("アンサンブルエンジンウォームアップ開始");
-        
+
         var warmupTasks = _engines.Where(e => e.IsEnabled).Select(async engineInfo =>
         {
             try
@@ -220,17 +220,17 @@ public class EnsembleOcrEngine(
                 return false;
             }
         });
-        
+
         var results = await Task.WhenAll(warmupTasks).ConfigureAwait(false);
         var successCount = results.Count(r => r);
-        
+
         if (successCount > 0)
         {
             logger.LogInformation("アンサンブルエンジンウォームアップ完了: {Success}/{Total}エンジン成功",
                 successCount, _engines.Count(e => e.IsEnabled));
             return true;
         }
-        
+
         logger.LogWarning("すべてのエンジンのウォームアップに失敗");
         return false;
     }
@@ -238,7 +238,7 @@ public class EnsembleOcrEngine(
     public async Task<OcrResults> RecognizeAsync(IImage image, IProgress<OcrProgress>? progressCallback = null, CancellationToken cancellationToken = default)
     {
         var ensembleResults = await RecognizeWithDetailsAsync(image, progressCallback, cancellationToken).ConfigureAwait(false);
-        
+
         // EnsembleOcrResultsからOcrResultsに変換
         return new OcrResults(
             ensembleResults.TextRegions,
@@ -299,7 +299,7 @@ public class EnsembleOcrEngine(
     public IReadOnlyList<string> GetAvailableLanguages()
     {
         HashSet<string> allLanguages = [];
-        
+
         foreach (var engineInfo in _engines)
         {
             try
@@ -322,7 +322,7 @@ public class EnsembleOcrEngine(
     public IReadOnlyList<string> GetAvailableModels()
     {
         HashSet<string> allModels = [];
-        
+
         foreach (var engineInfo in _engines)
         {
             try
@@ -368,8 +368,8 @@ public class EnsembleOcrEngine(
         }
 
         var totalExecutions = _engineStats.Values.Sum(s => s.TotalExecutions);
-        var averageTime = _engineStats.Values.Count > 0 
-            ? _engineStats.Values.Average(s => s.AverageProcessingTime) 
+        var averageTime = _engineStats.Values.Count > 0
+            ? _engineStats.Values.Average(s => s.AverageProcessingTime)
             : 0;
 
         return new OcrPerformanceStats
@@ -437,20 +437,20 @@ public class EnsembleOcrEngine(
     {
         ArgumentNullException.ThrowIfNull(image);
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         var availableEngine = _engines.FirstOrDefault()?.Engine;
         if (availableEngine == null)
         {
             throw new InvalidOperationException("利用可能なOCRエンジンがありません");
         }
-        
+
         return await availableEngine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
     }
 
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         foreach (var engineInfo in _engines)
         {
             try
@@ -462,7 +462,7 @@ public class EnsembleOcrEngine(
                 logger.LogWarning(ex, "エンジン破棄エラー: {EngineName}", engineInfo.EngineName);
             }
         }
-        
+
         _engines.Clear();
         _engineStats.Clear();
         _disposed = true;
@@ -472,7 +472,7 @@ public class EnsembleOcrEngine(
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
-        
+
         foreach (var engineInfo in _engines)
         {
             try
@@ -514,7 +514,7 @@ public class EnsembleOcrEngine(
         var tasks = activeEngines.Select(async engineInfo =>
         {
             var engineSw = Stopwatch.StartNew();
-            
+
             try
             {
                 var result = await engineInfo.Engine.RecognizeAsync(image, progress, cancellationToken).ConfigureAwait(false);
@@ -569,9 +569,9 @@ public class EnsembleOcrEngine(
             if (fallbackEngine != null)
             {
                 logger.LogInformation("フォールバック実行: {EngineName}", fallbackEngine.EngineName);
-                
+
                 var result = await fallbackEngine.Engine.RecognizeAsync(image, progress, cancellationToken).ConfigureAwait(false);
-                
+
                 return new EnsembleOcrResults(
                     result.TextRegions,
                     result.SourceImage,
@@ -620,10 +620,10 @@ public class EnsembleOcrEngine(
                 var newStats = new EnsembleEngineStats(
                     currentStats.TotalExecutions + 1,
                     (currentStats.AverageProcessingTime * currentStats.TotalExecutions + result.ProcessingTime.TotalMilliseconds) / (currentStats.TotalExecutions + 1),
-                    result.IsSuccessful && result.Results.TextRegions.Count > 0 
+                    result.IsSuccessful && result.Results.TextRegions.Count > 0
                         ? (currentStats.AverageConfidence * currentStats.TotalExecutions + result.Results.TextRegions.Average(r => r.Confidence)) / (currentStats.TotalExecutions + 1)
                         : currentStats.AverageConfidence,
-                    result.IsSuccessful 
+                    result.IsSuccessful
                         ? (currentStats.SuccessRate * currentStats.TotalExecutions + 1.0) / (currentStats.TotalExecutions + 1)
                         : (currentStats.SuccessRate * currentStats.TotalExecutions) / (currentStats.TotalExecutions + 1),
                     DateTime.UtcNow);

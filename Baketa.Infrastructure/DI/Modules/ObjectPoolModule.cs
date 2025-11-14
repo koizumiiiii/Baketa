@@ -53,12 +53,12 @@ public interface IObjectPoolStatisticsReporter
     /// すべてのプールの統計情報を取得
     /// </summary>
     ObjectPoolReport GetReport();
-    
+
     /// <summary>
     /// 統計情報をログに出力
     /// </summary>
     void LogStatistics();
-    
+
     /// <summary>
     /// 統計情報をクリア
     /// </summary>
@@ -74,17 +74,17 @@ public class ObjectPoolReport
     public ObjectPoolStatistics ImagePoolStats { get; init; } = new();
     public ObjectPoolStatistics TextRegionPoolStats { get; init; } = new();
     public ObjectPoolStatistics MatPoolStats { get; init; } = new();
-    
+
     /// <summary>
     /// 全体的なメモリ効率
     /// </summary>
-    public double OverallHitRate => 
+    public double OverallHitRate =>
         (ImagePoolStats.TotalGets + TextRegionPoolStats.TotalGets + MatPoolStats.TotalGets) > 0 ?
         (double)(ImagePoolStats.TotalGets - ImagePoolStats.TotalCreations +
                 TextRegionPoolStats.TotalGets - TextRegionPoolStats.TotalCreations +
                 MatPoolStats.TotalGets - MatPoolStats.TotalCreations) /
         (ImagePoolStats.TotalGets + TextRegionPoolStats.TotalGets + MatPoolStats.TotalGets) : 0.0;
-    
+
     /// <summary>
     /// 回避されたオブジェクト作成数
     /// </summary>
@@ -121,7 +121,7 @@ public sealed class ObjectPoolStatisticsReporter(
     public void LogStatistics()
     {
         var report = GetReport();
-        
+
         _logger.LogInformation("📊 Object Pool Performance Report ({ReportTime:yyyy-MM-dd HH:mm:ss}):\n" +
             "  🌟 Overall Efficiency: HitRate={OverallHitRate:P1}, ObjectsAvoided={ObjectsAvoided}\n" +
             "  📸 ImagePool: {ImageStats}\n" +
@@ -139,11 +139,11 @@ public sealed class ObjectPoolStatisticsReporter(
     public void ClearStatistics()
     {
         _logger.LogInformation("🧹 Clearing all object pool statistics");
-        
+
         _imagePool.Statistics.Clear();
         _textRegionPool.Statistics.Clear();
         _matPool.Statistics.Clear();
-        
+
         _logger.LogInformation("✅ All object pool statistics cleared");
     }
 }

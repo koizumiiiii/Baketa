@@ -10,13 +10,13 @@ public interface ITranslationUISettingsService
     /// </summary>
     /// <returns>ソース言語コード（例: "ja"）</returns>
     string GetCurrentSourceLanguage();
-    
+
     /// <summary>
     /// 現在のターゲット言語コードを取得
     /// </summary>
     /// <returns>ターゲット言語コード（例: "en"）</returns>
     string GetCurrentTargetLanguage();
-    
+
     /// <summary>
     /// 自動検出が有効かどうかを取得
     /// </summary>

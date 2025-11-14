@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Models.OCR; // 🔥 [FIX7_STEP2] OcrContext統合
 using Baketa.Infrastructure.ResourceManagement;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.BatchProcessing;
 
@@ -139,8 +139,8 @@ public sealed class BatchOcrIntegrationService : IDisposable
     /// バッチ処理性能の最適化設定
     /// </summary>
     public async Task OptimizeBatchPerformanceAsync(
-        int imageWidth, 
-        int imageHeight, 
+        int imageWidth,
+        int imageHeight,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -158,11 +158,11 @@ public sealed class BatchOcrIntegrationService : IDisposable
         };
 
         await _batchOcrProcessor.ConfigureBatchProcessingAsync(options).ConfigureAwait(false);
-        
+
         // cancellationTokenが要求された場合の処理
         cancellationToken.ThrowIfCancellationRequested();
-        
-        _logger?.LogInformation("⚙️ バッチ性能最適化完了 - 並列度: {Parallelism}, 前処理: {Preprocessing}", 
+
+        _logger?.LogInformation("⚙️ バッチ性能最適化完了 - 並列度: {Parallelism}, 前処理: {Preprocessing}",
             options.MaxParallelism, options.EnablePreprocessing);
     }
 
@@ -261,8 +261,8 @@ public sealed class BatchOcrIntegrationService : IDisposable
             return false;
 
         // 有効なテキストを含むチャンクが存在するかチェック
-        var validChunks = chunks.Count(c => 
-            !string.IsNullOrWhiteSpace(c.CombinedText) && 
+        var validChunks = chunks.Count(c =>
+            !string.IsNullOrWhiteSpace(c.CombinedText) &&
             c.AverageConfidence >= 0.1);
 
         return validChunks > 0;

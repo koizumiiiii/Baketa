@@ -21,7 +21,7 @@ public interface IOverlayRenderer
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>描画が成功した場合はtrue</returns>
     Task<bool> RenderOverlayAsync(OverlayInfo info, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// オーバーレイの表示内容を更新
     /// テキスト・位置・スタイル変更に対応
@@ -31,7 +31,7 @@ public interface IOverlayRenderer
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>更新が成功した場合はtrue</returns>
     Task<bool> UpdateOverlayAsync(string overlayId, OverlayRenderUpdate updateInfo, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// オーバーレイの可視性を制御
     /// パフォーマンス最適化: 削除・再作成ではなく可視性のみ変更
@@ -41,7 +41,7 @@ public interface IOverlayRenderer
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>可視性変更が成功した場合はtrue</returns>
     Task<bool> SetVisibilityAsync(string overlayId, bool visible, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 全オーバーレイの可視性を一括制御
     /// ホットキー切り替え・一時非表示機能用
@@ -50,7 +50,7 @@ public interface IOverlayRenderer
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>変更されたオーバーレイ数</returns>
     Task<int> SetAllVisibilityAsync(bool visible, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// オーバーレイを削除
     /// UI要素の完全削除とリソース解放
@@ -59,7 +59,7 @@ public interface IOverlayRenderer
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>削除が成功した場合はtrue</returns>
     Task<bool> RemoveOverlayAsync(string overlayId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 指定領域内のオーバーレイを一括削除
     /// 画面変化時の自動クリーンアップ用
@@ -69,14 +69,14 @@ public interface IOverlayRenderer
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>削除されたオーバーレイ数</returns>
     Task<int> RemoveOverlaysInAreaAsync(Rectangle area, IEnumerable<string>? excludeIds = null, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// すべてのオーバーレイを削除
     /// 完全リセット・アプリケーション終了時用
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     Task RemoveAllOverlaysAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// オーバーレイの現在位置を取得
     /// 衝突検出・位置調整用
@@ -85,20 +85,20 @@ public interface IOverlayRenderer
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>現在の表示領域、存在しない場合はnull</returns>
     Task<Rectangle?> GetOverlayBoundsAsync(string overlayId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// レンダラーの初期化
     /// UI フレームワークの準備・設定読み込み
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     Task InitializeAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 現在レンダリングされているオーバーレイ数
     /// パフォーマンス監視用
     /// </summary>
     int RenderedCount { get; }
-    
+
     /// <summary>
     /// レンダラーがサポートする機能フラグ
     /// プラットフォーム・フレームワーク依存機能の判定用
@@ -115,22 +115,22 @@ public record OverlayRenderUpdate
     /// 更新するテキスト（nullの場合は変更なし）
     /// </summary>
     public string? Text { get; init; }
-    
+
     /// <summary>
     /// 更新する表示領域（nullの場合は変更なし）
     /// </summary>
     public Rectangle? DisplayArea { get; init; }
-    
+
     /// <summary>
     /// 更新するスタイル情報（nullの場合は変更なし）
     /// </summary>
     public OverlayRenderStyle? Style { get; init; }
-    
+
     /// <summary>
     /// Z-index変更（nullの場合は変更なし）
     /// </summary>
     public int? ZIndex { get; init; }
-    
+
     /// <summary>
     /// 更新時のアニメーション設定
     /// </summary>
@@ -147,42 +147,42 @@ public record OverlayRenderStyle
     /// 背景色（ARGB形式）
     /// </summary>
     public uint? BackgroundColor { get; init; }
-    
+
     /// <summary>
     /// 前景色・テキスト色（ARGB形式）
     /// </summary>
     public uint? ForegroundColor { get; init; }
-    
+
     /// <summary>
     /// フォントサイズ
     /// </summary>
     public double? FontSize { get; init; }
-    
+
     /// <summary>
     /// フォントファミリー
     /// </summary>
     public string? FontFamily { get; init; }
-    
+
     /// <summary>
     /// フォント太さ
     /// </summary>
     public FontWeight? FontWeight { get; init; }
-    
+
     /// <summary>
     /// 不透明度（0.0-1.0）
     /// </summary>
     public double? Opacity { get; init; }
-    
+
     /// <summary>
     /// 枠線色（ARGB形式）
     /// </summary>
     public uint? BorderColor { get; init; }
-    
+
     /// <summary>
     /// 枠線の太さ
     /// </summary>
     public double? BorderThickness { get; init; }
-    
+
     /// <summary>
     /// 角丸半径
     /// </summary>
@@ -212,12 +212,12 @@ public record OverlayAnimation
     /// アニメーション種類
     /// </summary>
     public AnimationType Type { get; init; } = AnimationType.None;
-    
+
     /// <summary>
     /// アニメーション継続時間
     /// </summary>
     public TimeSpan Duration { get; init; } = TimeSpan.FromMilliseconds(300);
-    
+
     /// <summary>
     /// イージング関数
     /// </summary>
@@ -275,22 +275,22 @@ public record RenderingStatistics
     /// 描画されたオーバーレイ総数
     /// </summary>
     public long TotalRendered { get; init; }
-    
+
     /// <summary>
     /// 削除されたオーバーレイ総数
     /// </summary>
     public long TotalRemoved { get; init; }
-    
+
     /// <summary>
     /// 平均描画時間（ミリ秒）
     /// </summary>
     public double AverageRenderTime { get; init; }
-    
+
     /// <summary>
     /// 現在のフレームレート（FPS）
     /// </summary>
     public double CurrentFps { get; init; }
-    
+
     /// <summary>
     /// GPU使用率（0.0-1.0）
     /// </summary>

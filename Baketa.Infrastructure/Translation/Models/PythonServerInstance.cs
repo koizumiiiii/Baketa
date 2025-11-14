@@ -16,39 +16,39 @@ public record PythonServerInstance(
     /// サーバー開始時刻
     /// </summary>
     public DateTime StartedAt { get; init; } = DateTime.UtcNow;
-    
+
     /// <summary>
     /// サーバーステータス
     /// </summary>
     public ServerStatus Status { get; private set; } = ServerStatus.Starting;
-    
+
     /// <summary>
     /// 最後のヘルスチェック時刻
     /// </summary>
     public DateTime? LastHealthCheck { get; set; }
-    
+
     /// <summary>
     /// ヘルスチェック成功回数
     /// </summary>
     public int HealthCheckSuccessCount { get; set; }
-    
+
     /// <summary>
     /// ヘルスチェック失敗回数
     /// </summary>
     public int HealthCheckFailureCount { get; set; }
-    
+
     /// <summary>
     /// サーバーが健全かどうか
     /// </summary>
-    public bool IsHealthy => Status == ServerStatus.Running && 
-                           !Process.HasExited && 
+    public bool IsHealthy => Status == ServerStatus.Running &&
+                           !Process.HasExited &&
                            HealthCheckFailureCount <= 3;
-    
+
     /// <summary>
     /// 稼働時間
     /// </summary>
     public TimeSpan Uptime => DateTime.UtcNow - StartedAt;
-    
+
     /// <summary>
     /// サーバーステータスを更新
     /// </summary>
@@ -57,7 +57,7 @@ public record PythonServerInstance(
     {
         Status = newStatus;
     }
-    
+
     /// <summary>
     /// ヘルスチェック結果を記録
     /// </summary>
@@ -65,7 +65,7 @@ public record PythonServerInstance(
     public void RecordHealthCheck(bool success)
     {
         LastHealthCheck = DateTime.UtcNow;
-        
+
         if (success)
         {
             HealthCheckSuccessCount++;
@@ -76,7 +76,7 @@ public record PythonServerInstance(
             HealthCheckFailureCount++;
         }
     }
-    
+
     /// <summary>
     /// サーバーインスタンスの非同期破棄
     /// 🔧 [GEMINI_FIX] 段階的プロセス終了実装 - データ損失・リソースリーク防止
@@ -174,7 +174,7 @@ public record PythonServerInstance(
             }
         }
     }
-    
+
     /// <summary>
     /// サーバー情報の文字列表現
     /// </summary>

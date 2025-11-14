@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Imaging;
 using System.Diagnostics;
+using Baketa.Core.Abstractions.Imaging;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 
@@ -76,7 +76,7 @@ public class ImageQualityAnalyzer(ILogger<ImageQualityAnalyzer> logger) : IImage
                 var mean = pixels.Average(p => (double)p);
                 var variance = pixels.Select(p => Math.Pow(p - mean, 2)).Average();
                 var stdDev = Math.Sqrt(variance);
-                
+
                 // 標準偏差を0-1の範囲に正規化（最大値を128と仮定）
                 return Math.Min(stdDev / 128.0, 1.0);
             }
@@ -203,7 +203,7 @@ public class ImageQualityAnalyzer(ILogger<ImageQualityAnalyzer> logger) : IImage
 
                 // テキストサイズ推定（簡易版）
                 var estimatedTextSize = EstimateTextSize(edgeDensity, width, height);
-                
+
                 // テキスト領域割合の推定
                 var textAreaRatio = Math.Min(edgeDensity * 3.0, 1.0); // 経験的補正
 
@@ -247,11 +247,11 @@ public class ImageQualityAnalyzer(ILogger<ImageQualityAnalyzer> logger) : IImage
                     for (int x = 1; x < width - 1; x++)
                     {
                         var center = pixels[y * width + x];
-                        var laplacian = 
+                        var laplacian =
                             -center * 8 +
-                            pixels[(y-1) * width + (x-1)] + pixels[(y-1) * width + x] + pixels[(y-1) * width + (x+1)] +
-                            pixels[y * width + (x-1)] + pixels[y * width + (x+1)] +
-                            pixels[(y+1) * width + (x-1)] + pixels[(y+1) * width + x] + pixels[(y+1) * width + (x+1)];
+                            pixels[(y - 1) * width + (x - 1)] + pixels[(y - 1) * width + x] + pixels[(y - 1) * width + (x + 1)] +
+                            pixels[y * width + (x - 1)] + pixels[y * width + (x + 1)] +
+                            pixels[(y + 1) * width + (x - 1)] + pixels[(y + 1) * width + x] + pixels[(y + 1) * width + (x + 1)];
 
                         laplacianVariance += laplacian * laplacian;
                         count++;
@@ -282,7 +282,7 @@ public class ImageQualityAnalyzer(ILogger<ImageQualityAnalyzer> logger) : IImage
         var weightNoise = 0.3; // ノイズは逆相関（少ない方が良い）
         var weightSharpness = 0.2;
 
-        var qualityScore = 
+        var qualityScore =
             contrast * weightContrast +
             (brightness > 0.5 ? 1.0 - Math.Abs(brightness - 0.5) * 2 : brightness * 2) * weightBrightness +
             (1.0 - noise) * weightNoise +
@@ -341,9 +341,9 @@ public class ImageQualityAnalyzer(ILogger<ImageQualityAnalyzer> logger) : IImage
     private double CalculateSobelX(byte[] pixels, int x, int y, int width)
     {
         return
-            -1 * pixels[(y-1) * width + (x-1)] + 1 * pixels[(y-1) * width + (x+1)] +
-            -2 * pixels[y * width + (x-1)] + 2 * pixels[y * width + (x+1)] +
-            -1 * pixels[(y+1) * width + (x-1)] + 1 * pixels[(y+1) * width + (x+1)];
+            -1 * pixels[(y - 1) * width + (x - 1)] + 1 * pixels[(y - 1) * width + (x + 1)] +
+            -2 * pixels[y * width + (x - 1)] + 2 * pixels[y * width + (x + 1)] +
+            -1 * pixels[(y + 1) * width + (x - 1)] + 1 * pixels[(y + 1) * width + (x + 1)];
     }
 
     /// <summary>
@@ -352,8 +352,8 @@ public class ImageQualityAnalyzer(ILogger<ImageQualityAnalyzer> logger) : IImage
     private double CalculateSobelY(byte[] pixels, int x, int y, int width)
     {
         return
-            -1 * pixels[(y-1) * width + (x-1)] + -2 * pixels[(y-1) * width + x] + -1 * pixels[(y-1) * width + (x+1)] +
-             1 * pixels[(y+1) * width + (x-1)] +  2 * pixels[(y+1) * width + x] +  1 * pixels[(y+1) * width + (x+1)];
+            -1 * pixels[(y - 1) * width + (x - 1)] + -2 * pixels[(y - 1) * width + x] + -1 * pixels[(y - 1) * width + (x + 1)] +
+             1 * pixels[(y + 1) * width + (x - 1)] + 2 * pixels[(y + 1) * width + x] + 1 * pixels[(y + 1) * width + (x + 1)];
     }
 
     /// <summary>

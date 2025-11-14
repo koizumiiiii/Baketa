@@ -5,11 +5,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR.TextDetection;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Baketa.Core.Abstractions.OCR.TextDetection;
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Settings;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Timer = System.Threading.Timer;
 
@@ -27,11 +27,11 @@ public sealed class AdaptiveTextRegionManager : IDisposable
     private readonly Dictionary<string, ITextRegionDetector> _detectors = [];
     private readonly Dictionary<string, DetectorPerformanceMetrics> _performanceMetrics = [];
     private readonly Timer _performanceEvaluationTimer;
-    
+
     private string _currentBestDetector = "adaptive";
     private DateTime _lastEvaluation = DateTime.MinValue;
     private bool _disposed;
-    
+
     private const int EvaluationIntervalMs = 30000; // 30秒間隔で評価
     private const int MaxPerformanceHistorySize = 100;
 
@@ -42,15 +42,15 @@ public sealed class AdaptiveTextRegionManager : IDisposable
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrSettings = ocrSettings ?? throw new ArgumentNullException(nameof(ocrSettings));
-        
+
         // 利用可能な検出器を登録
         RegisterDetectors(detectors);
-        
+
         // パフォーマンス評価タイマーを開始
-        _performanceEvaluationTimer = new Timer(EvaluatePerformance, null, 
+        _performanceEvaluationTimer = new Timer(EvaluatePerformance, null,
             TimeSpan.FromMilliseconds(EvaluationIntervalMs),
             TimeSpan.FromMilliseconds(EvaluationIntervalMs));
-            
+
         _logger.LogInformation("適応的テキスト領域管理システムを初期化: 検出器数={DetectorCount}", _detectors.Count);
     }
 
@@ -58,44 +58,44 @@ public sealed class AdaptiveTextRegionManager : IDisposable
     /// 最適な検出器を使用してテキスト領域を検出
     /// </summary>
     public async Task<IReadOnlyList<OCRTextRegion>> DetectOptimalRegionsAsync(
-        IAdvancedImage image, 
+        IAdvancedImage image,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var detectorName = SelectBestDetector();
-        
+
         try
         {
-            _logger.LogDebug("最適検出器選択: {DetectorName} (画像サイズ: {Width}x{Height})", 
+            _logger.LogDebug("最適検出器選択: {DetectorName} (画像サイズ: {Width}x{Height})",
                 detectorName, image.Width, image.Height);
-            
+
             if (!_detectors.TryGetValue(detectorName, out var detector))
             {
                 _logger.LogWarning("検出器が見つからないため、デフォルトに切り替え: {DetectorName} → adaptive", detectorName);
                 detector = _detectors["adaptive"];
                 detectorName = "adaptive";
             }
-            
+
             var regions = await detector.DetectRegionsAsync(image, cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
-            
+
             // パフォーマンス記録
             RecordPerformance(detectorName, stopwatch.Elapsed.TotalMilliseconds, regions.Count, true);
-            
-            _logger.LogInformation("テキスト領域検出完了: 検出器={DetectorName}, 領域数={RegionCount}, 処理時間={ElapsedMs}ms", 
+
+            _logger.LogInformation("テキスト領域検出完了: 検出器={DetectorName}, 領域数={RegionCount}, 処理時間={ElapsedMs}ms",
                 detectorName, regions.Count, stopwatch.ElapsedMilliseconds);
-                
+
             return regions;
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             RecordPerformance(detectorName, stopwatch.Elapsed.TotalMilliseconds, 0, false);
-            
+
             _logger.LogError(ex, "テキスト領域検出エラー: 検出器={DetectorName}", detectorName);
-            
+
             // フォールバック実行
             return await ExecuteFallbackDetectionAsync(image, detectorName, cancellationToken).ConfigureAwait(false);
         }
@@ -109,15 +109,15 @@ public sealed class AdaptiveTextRegionManager : IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        
+
         var ensembleSettings = _ocrSettings.CurrentValue.TextDetectionEnsemble;
         if (!ensembleSettings.EnableEnsemble)
         {
             return await DetectOptimalRegionsAsync(image, cancellationToken).ConfigureAwait(false);
         }
-        
+
         _logger.LogDebug("アンサンブル検出開始: 使用検出器数={DetectorCount}", ensembleSettings.DetectorNames.Count);
-        
+
         var detectionTasks = ensembleSettings.DetectorNames
             .Where(name => _detectors.ContainsKey(name))
             .Select(async name =>
@@ -134,22 +134,22 @@ public sealed class AdaptiveTextRegionManager : IDisposable
                     return new DetectionResult(name, [], false);
                 }
             });
-        
+
         var results = await Task.WhenAll(detectionTasks).ConfigureAwait(false);
         var successfulResults = results.Where(r => r.Success).ToList();
-        
+
         if (successfulResults.Count == 0)
         {
             _logger.LogWarning("全ての検出器が失敗、空の結果を返します");
             return [];
         }
-        
+
         // アンサンブル統合
         var ensembleRegions = CombineEnsembleResults(successfulResults, ensembleSettings);
-        
+
         _logger.LogInformation("アンサンブル検出完了: 成功検出器数={SuccessCount}/{TotalCount}, 最終領域数={RegionCount}",
             successfulResults.Count, results.Length, ensembleRegions.Count);
-            
+
         return ensembleRegions;
     }
 
@@ -188,13 +188,13 @@ public sealed class AdaptiveTextRegionManager : IDisposable
             _logger.LogWarning("検出器が見つかりません: {DetectorName}", detectorName);
             return;
         }
-        
+
         foreach (var (key, value) in parameters)
         {
             try
             {
                 detector.SetParameter(key, value);
-                _logger.LogDebug("検出器パラメータ調整: {DetectorName}.{ParameterName} = {Value}", 
+                _logger.LogDebug("検出器パラメータ調整: {DetectorName}.{ParameterName} = {Value}",
                     detectorName, key, value);
             }
             catch (Exception ex)
@@ -213,10 +213,10 @@ public sealed class AdaptiveTextRegionManager : IDisposable
             var name = detector.Name.ToLowerInvariant();
             _detectors[name] = detector;
             _performanceMetrics[name] = new DetectorPerformanceMetrics(name);
-            
+
             _logger.LogDebug("検出器登録: {DetectorName} ({Method})", detector.Name, detector.Method);
         }
-        
+
         // フォールバック用の基本検出器を確保
         if (!_detectors.ContainsKey("adaptive"))
         {
@@ -227,14 +227,14 @@ public sealed class AdaptiveTextRegionManager : IDisposable
     private string SelectBestDetector()
     {
         var settings = _ocrSettings.CurrentValue.TextDetectionSettings;
-        
+
         // 設定による強制指定があれば使用
-        if (!string.IsNullOrEmpty(settings.ForcedDetectorName) && 
+        if (!string.IsNullOrEmpty(settings.ForcedDetectorName) &&
             _detectors.ContainsKey(settings.ForcedDetectorName))
         {
             return settings.ForcedDetectorName;
         }
-        
+
         // パフォーマンス履歴による最適選択
         if (_performanceMetrics.Any(p => p.Value.TotalExecutions > 5))
         {
@@ -242,35 +242,35 @@ public sealed class AdaptiveTextRegionManager : IDisposable
                 .Where(p => p.Value.TotalExecutions > 5)
                 .OrderByDescending(p => CalculateOverallScore(p.Value))
                 .FirstOrDefault();
-                
+
             if (bestDetector.Key != null)
             {
                 _currentBestDetector = bestDetector.Key;
             }
         }
-        
+
         return _currentBestDetector;
     }
 
     private async Task<IReadOnlyList<OCRTextRegion>> ExecuteFallbackDetectionAsync(
-        IAdvancedImage image, 
-        string failedDetector, 
+        IAdvancedImage image,
+        string failedDetector,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("フォールバック検出実行: 失敗検出器={FailedDetector}", failedDetector);
-        
+
         // 失敗した検出器以外で最も信頼性の高い検出器を選択
         var fallbackDetector = _performanceMetrics
             .Where(p => p.Key != failedDetector && p.Value.SuccessRate > 0.8)
             .OrderByDescending(p => p.Value.SuccessRate)
             .FirstOrDefault();
-        
+
         if (fallbackDetector.Key != null && _detectors.TryGetValue(fallbackDetector.Key, out var detector))
         {
             try
             {
                 var regions = await detector.DetectRegionsAsync(image, cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("フォールバック検出成功: 使用検出器={FallbackDetector}, 領域数={RegionCount}", 
+                _logger.LogInformation("フォールバック検出成功: 使用検出器={FallbackDetector}, 領域数={RegionCount}",
                     fallbackDetector.Key, regions.Count);
                 return regions;
             }
@@ -279,28 +279,28 @@ public sealed class AdaptiveTextRegionManager : IDisposable
                 _logger.LogError(ex, "フォールバック検出も失敗: {FallbackDetector}", fallbackDetector.Key);
             }
         }
-        
+
         // すべて失敗した場合は空の結果を返す
         _logger.LogWarning("全ての検出器が失敗、空の結果を返します");
         return [];
     }
 
     private List<OCRTextRegion> CombineEnsembleResults(
-        List<DetectionResult> results, 
+        List<DetectionResult> results,
         EnsembleSettings settings)
     {
         if (results.Count == 1)
         {
             return [.. results[0].Regions];
         }
-        
+
         // 投票ベースの統合アルゴリズム
         var allRegions = results.SelectMany(r => r.Regions).ToList();
         var combinedRegions = new List<OCRTextRegion>();
-        
+
         // 類似領域をグループ化
         var regionGroups = GroupSimilarRegions(allRegions, settings.OverlapThreshold);
-        
+
         foreach (var group in regionGroups)
         {
             if (group.Count >= settings.MinVotes)
@@ -310,26 +310,26 @@ public sealed class AdaptiveTextRegionManager : IDisposable
                 combinedRegions.Add(representativeRegion);
             }
         }
-        
+
         return combinedRegions;
     }
-    
+
     private List<List<OCRTextRegion>> GroupSimilarRegions(List<OCRTextRegion> regions, double overlapThreshold)
     {
         var groups = new List<List<OCRTextRegion>>();
         var processed = new bool[regions.Count];
-        
+
         for (int i = 0; i < regions.Count; i++)
         {
             if (processed[i]) continue;
-            
+
             var group = new List<OCRTextRegion> { regions[i] };
             processed[i] = true;
-            
+
             for (int j = i + 1; j < regions.Count; j++)
             {
                 if (processed[j]) continue;
-                
+
                 var overlap = regions[i].CalculateOverlapRatio(regions[j]);
                 if (overlap >= overlapThreshold)
                 {
@@ -337,25 +337,25 @@ public sealed class AdaptiveTextRegionManager : IDisposable
                     processed[j] = true;
                 }
             }
-            
+
             groups.Add(group);
         }
-        
+
         return groups;
     }
-    
+
     private OCRTextRegion CreateRepresentativeRegion(List<OCRTextRegion> group)
     {
         // 最も信頼度の高い領域をベースとして使用
         var bestRegion = group.OrderByDescending(r => r.Confidence).First();
-        
+
         // 平均位置とサイズを計算
         var avgX = (int)group.Average(r => r.Bounds.X);
         var avgY = (int)group.Average(r => r.Bounds.Y);
         var avgWidth = (int)group.Average(r => r.Bounds.Width);
         var avgHeight = (int)group.Average(r => r.Bounds.Height);
         var avgConfidence = group.Average(r => r.Confidence);
-        
+
         return new OCRTextRegion(new Rectangle(avgX, avgY, avgWidth, avgHeight), (float)avgConfidence)
         {
             RegionType = bestRegion.RegionType,
@@ -377,7 +377,7 @@ public sealed class AdaptiveTextRegionManager : IDisposable
         var successScore = metrics.SuccessRate * 0.6;
         var speedScore = Math.Max(0, (2000 - metrics.AverageProcessingTimeMs) / 2000) * 0.25; // 2秒を基準
         var qualityScore = Math.Min(1.0, metrics.AverageRegionCount / 10.0) * 0.15; // 10個を理想とする
-        
+
         return successScore + speedScore + qualityScore;
     }
 
@@ -387,9 +387,9 @@ public sealed class AdaptiveTextRegionManager : IDisposable
         {
             if (DateTime.Now - _lastEvaluation < TimeSpan.FromMilliseconds(EvaluationIntervalMs))
                 return;
-                
+
             _lastEvaluation = DateTime.Now;
-            
+
             var rankings = GetDetectorRankings();
             if (rankings.Count > 0)
             {
@@ -401,7 +401,7 @@ public sealed class AdaptiveTextRegionManager : IDisposable
                     _currentBestDetector = newBest;
                 }
             }
-            
+
             // パフォーマンス履歴のクリーンアップ
             CleanupPerformanceHistory();
         }
@@ -424,9 +424,9 @@ public sealed class AdaptiveTextRegionManager : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _performanceEvaluationTimer?.Dispose();
-        
+
         foreach (var detector in _detectors.Values)
         {
             if (detector is IDisposable disposable)
@@ -434,10 +434,10 @@ public sealed class AdaptiveTextRegionManager : IDisposable
                 disposable.Dispose();
             }
         }
-        
+
         _disposed = true;
         _logger.LogInformation("適応的テキスト領域管理システムをクリーンアップ");
-        
+
         GC.SuppressFinalize(this);
     }
 }
@@ -460,7 +460,7 @@ public class DetectorPerformanceMetrics(string detectorName)
     public double TotalProcessingTimeMs { get; private set; }
     public int TotalRegionsDetected { get; private set; }
     public DateTime LastExecutionTime { get; private set; }
-    
+
     private readonly Queue<PerformanceDataPoint> _recentPerformance = new();
 
     public double SuccessRate => TotalExecutions > 0 ? (double)SuccessfulExecutions / TotalExecutions : 0.0;
@@ -471,7 +471,7 @@ public class DetectorPerformanceMetrics(string detectorName)
     {
         TotalExecutions++;
         LastExecutionTime = DateTime.Now;
-        
+
         var dataPoint = new PerformanceDataPoint
         {
             Timestamp = DateTime.Now,
@@ -479,9 +479,9 @@ public class DetectorPerformanceMetrics(string detectorName)
             RegionCount = regionCount,
             Success = success
         };
-        
+
         _recentPerformance.Enqueue(dataPoint);
-        
+
         if (success)
         {
             SuccessfulExecutions++;

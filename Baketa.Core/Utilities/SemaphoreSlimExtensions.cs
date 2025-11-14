@@ -15,11 +15,11 @@ public static class SemaphoreSlimExtensions
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>Dispose時に自動でセマフォを解放するIDisposable</returns>
     public static async Task<IDisposable> WaitAsyncDisposable(
-        this SemaphoreSlim semaphore, 
+        this SemaphoreSlim semaphore,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(semaphore);
-        
+
         await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         return new SemaphoreReleaser(semaphore);
     }
@@ -32,12 +32,12 @@ public static class SemaphoreSlimExtensions
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>Dispose時に自動でセマフォを解放するIDisposable（取得失敗時はnull）</returns>
     public static async Task<IDisposable?> WaitAsyncDisposableWithTimeout(
-        this SemaphoreSlim semaphore, 
+        this SemaphoreSlim semaphore,
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(semaphore);
-        
+
         var acquired = await semaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
         return acquired ? new SemaphoreReleaser(semaphore) : null;
     }
@@ -59,7 +59,7 @@ public static class SemaphoreSlimExtensions
         public void Dispose()
         {
             if (_isDisposed) return;
-            
+
             try
             {
                 _semaphore.Release();
@@ -74,7 +74,7 @@ public static class SemaphoreSlimExtensions
                 // セマフォが既にフル状態の場合は無視
                 // 二重解放やバグが原因の可能性があるが、クラッシュを避ける
             }
-            
+
             _isDisposed = true;
         }
     }

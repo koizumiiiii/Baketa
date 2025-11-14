@@ -1,8 +1,8 @@
+using Baketa.Application.Services.Capture;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Services;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Application.Services.Capture;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -26,10 +26,10 @@ public static class FullscreenApplicationModule
             var optimizationService = provider.GetRequiredService<IFullscreenOptimizationService>();
             var eventAggregator = provider.GetRequiredService<IEventAggregator>();
             var logger = provider.GetService<ILogger<FullscreenManagerService>>();
-            
+
             return new FullscreenManagerService(detectionService, optimizationService, eventAggregator, logger);
         });
-        
+
         return services;
     }
 }

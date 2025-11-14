@@ -1,11 +1,11 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
 using System.Management;
-using System.Collections.Concurrent;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Monitoring;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Baketa.Core.Abstractions.Monitoring;
-using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Infrastructure.Platform.Windows.Monitoring;
 
@@ -18,34 +18,34 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
     private readonly ILogger<WindowsSystemResourceMonitor> _logger;
     private readonly IEventAggregator _eventAggregator;
     private readonly ResourceMonitoringSettings _settings;
-    
+
     // パフォーマンスカウンター
     private PerformanceCounter? _cpuCounter;
     private PerformanceCounter? _memoryAvailableCounter;
     private readonly PerformanceCounter? _memoryCommittedCounter;
     private PerformanceCounter? _processCountCounter;
     private PerformanceCounter? _threadCountCounter;
-    
+
     // GPU関連
     private ManagementObjectSearcher? _gpuSearcher;
     private string? _gpuInstanceName;
-    private Advanced.NvmlGpuMonitor? _nvmlGpuMonitor;
-    
+    private readonly Advanced.NvmlGpuMonitor? _nvmlGpuMonitor;
+
     // 監視状態管理
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private Task? _monitoringTask;
     private readonly object _lockObject = new();
     private volatile bool _isDisposed;
-    
+
     // メトリクス履歴（スレッドセーフなコレクション）
     private readonly ConcurrentQueue<ResourceMetrics> _metricsHistory = new();
     private ResourceMetrics? _currentMetrics;
     private ResourceMetrics? _previousMetrics;
-    
+
     // システム情報キャッシュ
     private readonly Lazy<long> _totalMemoryMB;
     private volatile bool _isInitialized;
-    
+
     public WindowsSystemResourceMonitor(
         ILogger<WindowsSystemResourceMonitor> logger,
         IEventAggregator eventAggregator,
@@ -54,49 +54,49 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settings = settings.Value ?? throw new ArgumentNullException(nameof(settings));
-        
+
         if (!_settings.IsValid)
         {
             throw new ArgumentException("リソース監視設定が無効です", nameof(settings));
         }
-        
+
         _totalMemoryMB = new Lazy<long>(GetTotalSystemMemoryMB);
-        
+
         // NVML GPU監視の初期化（Phase 3強化）
         // ロガー型不一致を解決するため、ILoggerFactory経由で適切な型のロガーを作成
-        var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => 
+        var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
         {
             builder.AddConsole().SetMinimumLevel(LogLevel.Debug);
         });
         var nvmlLogger = loggerFactory.CreateLogger<Advanced.NvmlGpuMonitor>();
         _nvmlGpuMonitor = new Advanced.NvmlGpuMonitor(nvmlLogger);
-        
-        _logger.LogInformation("WindowsSystemResourceMonitor初期化開始 - 監視間隔:{MonitoringInterval}ms", 
+
+        _logger.LogInformation("WindowsSystemResourceMonitor初期化開始 - 監視間隔:{MonitoringInterval}ms",
             _settings.MonitoringIntervalMs);
     }
-    
+
     /// <inheritdoc />
     public bool IsMonitoring { get; private set; }
-    
+
     /// <inheritdoc />
-    public int MonitoringIntervalMs 
-    { 
+    public int MonitoringIntervalMs
+    {
         get => _settings.MonitoringIntervalMs;
         set => throw new NotSupportedException("監視間隔の動的変更はサポートされていません。設定ファイルを変更して再起動してください。");
     }
-    
+
     /// <inheritdoc />
     public ResourceMetrics? CurrentMetrics => _currentMetrics;
-    
+
     /// <inheritdoc />
     public bool IsInitialized => _isInitialized;
-    
+
     /// <inheritdoc />
     public event EventHandler<ResourceMetricsChangedEventArgs>? ResourceMetricsChanged;
-    
+
     /// <inheritdoc />
     public event EventHandler<ResourceWarningEventArgs>? ResourceWarning;
-    
+
     /// <inheritdoc />
     public bool Initialize()
     {
@@ -104,7 +104,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             return true;
         }
-        
+
         try
         {
             InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
@@ -116,7 +116,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             return false;
         }
     }
-    
+
     /// <inheritdoc />
     public void Shutdown()
     {
@@ -124,7 +124,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             return;
         }
-        
+
         try
         {
             StopMonitoringAsync().GetAwaiter().GetResult();
@@ -135,24 +135,24 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             _logger.LogError(ex, "同期シャットダウンエラー");
         }
     }
-    
+
     /// <inheritdoc />
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
-        
+
         if (_isInitialized)
         {
             return;
         }
-        
+
         try
         {
             _logger.LogInformation("🔧 [PHASE3] Windowsリソース監視システム初期化開始");
-            
+
             await InitializePerformanceCountersAsync(cancellationToken).ConfigureAwait(false);
             await InitializeGpuMonitoringAsync(cancellationToken).ConfigureAwait(false);
-            
+
             _isInitialized = true;
             _logger.LogInformation("🔧 [PHASE3] Windowsリソース監視システム初期化完了");
         }
@@ -162,12 +162,12 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             throw;
         }
     }
-    
+
     /// <inheritdoc />
     public async Task StartMonitoringAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
-        
+
         lock (_lockObject)
         {
             if (IsMonitoring)
@@ -175,23 +175,23 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 _logger.LogWarning("リソース監視は既に開始されています");
                 return;
             }
-            
+
             IsMonitoring = true;
         }
-        
+
         try
         {
             // 初期メトリクス取得
             var initialMetrics = await GetCurrentMetricsAsync(cancellationToken).ConfigureAwait(false);
             _currentMetrics = initialMetrics;
-            
+
             // 監視開始イベント発火
             var startEvent = ResourceMonitoringEvent.CreateMonitoringStarted(initialMetrics);
             await _eventAggregator.PublishAsync(startEvent).ConfigureAwait(false);
-            
+
             // バックグラウンド監視タスク開始
             _monitoringTask = MonitoringLoopAsync(_cancellationTokenSource.Token);
-            
+
             _logger.LogInformation("🚀 [PHASE3] リソース監視開始 - 初期状況: {InitialMetrics}", initialMetrics);
         }
         catch (Exception ex)
@@ -201,7 +201,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             throw;
         }
     }
-    
+
     /// <inheritdoc />
     public async Task StopMonitoringAsync()
     {
@@ -209,29 +209,29 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             return;
         }
-        
+
         lock (_lockObject)
         {
             IsMonitoring = false;
         }
-        
+
         try
         {
             // 監視ループ停止
             _cancellationTokenSource.Cancel();
-            
+
             if (_monitoringTask != null)
             {
                 await _monitoringTask.ConfigureAwait(false);
             }
-            
+
             // 最終メトリクス取得・イベント発火
             if (_currentMetrics != null)
             {
                 var stopEvent = ResourceMonitoringEvent.CreateMonitoringStopped(_currentMetrics);
                 await _eventAggregator.PublishAsync(stopEvent).ConfigureAwait(false);
             }
-            
+
             _logger.LogInformation("⏹️ [PHASE3] リソース監視停止完了");
         }
         catch (Exception ex)
@@ -239,32 +239,32 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             _logger.LogError(ex, "リソース監視停止エラー");
         }
     }
-    
+
     /// <inheritdoc />
     public async Task<ResourceMetrics> GetCurrentMetricsAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
-        
+
         try
         {
             var timestamp = DateTime.UtcNow;
-            
+
             // CPU使用率取得（2回測定して精度向上）
             var cpuUsage = await GetCpuUsageAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // メモリ使用量取得
             var (availableMemoryMB, totalMemoryMB) = GetMemoryUsage();
-            var memoryUsagePercent = totalMemoryMB > 0 
-                ? ((double)(totalMemoryMB - availableMemoryMB) / totalMemoryMB) * 100.0 
+            var memoryUsagePercent = totalMemoryMB > 0
+                ? ((double)(totalMemoryMB - availableMemoryMB) / totalMemoryMB) * 100.0
                 : 0.0;
-            
+
             // GPU使用率取得（利用可能な場合）
             var gpuUsage = _settings.EnableGpuMonitoring ? await GetGpuUsageAsync(cancellationToken).ConfigureAwait(false) : null;
-            
+
             // プロセス・スレッド数取得
             var processCount = GetProcessCount();
             var threadCount = GetThreadCount();
-            
+
             var metrics = new ResourceMetrics(
                 timestamp,
                 Math.Max(0, Math.Min(100, cpuUsage)),
@@ -274,19 +274,19 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 gpuUsage.HasValue ? Math.Max(0, Math.Min(100, gpuUsage.Value)) : null,
                 ProcessCount: processCount,
                 ThreadCount: threadCount);
-            
+
             return metrics;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "現在のリソースメトリクス取得エラー");
-            
+
             // フォールバックメトリクス
             return new ResourceMetrics(
                 DateTime.UtcNow, 0, 0, 0, _totalMemoryMB.Value);
         }
     }
-    
+
     /// <inheritdoc />
     public IEnumerable<ResourceMetrics> GetMetricsHistory(DateTime fromTime, DateTime toTime)
     {
@@ -294,14 +294,14 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             .Where(m => m.Timestamp >= fromTime && m.Timestamp <= toTime)
             .OrderBy(m => m.Timestamp);
     }
-    
+
     /// <summary>
     /// リソース監視ループ（バックグラウンド実行）
     /// </summary>
     private async Task MonitoringLoopAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("リソース監視ループ開始");
-        
+
         try
         {
             while (!cancellationToken.IsCancellationRequested && IsMonitoring)
@@ -310,19 +310,19 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 {
                     // メトリクス取得
                     var newMetrics = await GetCurrentMetricsAsync(cancellationToken).ConfigureAwait(false);
-                    
+
                     // 履歴に追加（古い履歴は定期的に削除）
                     _metricsHistory.Enqueue(newMetrics);
                     CleanupOldMetrics();
-                    
+
                     // 前回メトリクスをバックアップ
                     _previousMetrics = _currentMetrics;
                     _currentMetrics = newMetrics;
-                    
+
                     // イベント発火
                     await NotifyMetricsChangedAsync(newMetrics, _previousMetrics).ConfigureAwait(false);
                     await CheckAndNotifyWarningsAsync(newMetrics).ConfigureAwait(false);
-                    
+
                     // 監視間隔待機
                     await Task.Delay(_settings.MonitoringIntervalMs, cancellationToken).ConfigureAwait(false);
                 }
@@ -333,11 +333,11 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "リソース監視ループでエラーが発生しました");
-                    
+
                     // エラーイベント発火
                     var errorEvent = ResourceMonitoringEvent.CreateMonitoringError(_currentMetrics, ex);
                     await _eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
-                    
+
                     // 一時的な停止（エラー連発防止）
                     await Task.Delay(Math.Min(_settings.MonitoringIntervalMs * 2, 10000), cancellationToken).ConfigureAwait(false);
                 }
@@ -352,7 +352,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             _logger.LogDebug("リソース監視ループ終了");
         }
     }
-    
+
     /// <summary>
     /// パフォーマンスカウンター初期化
     /// </summary>
@@ -365,14 +365,14 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 // CPU使用率
                 _cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total", readOnly: true);
                 _cpuCounter.NextValue(); // 初回読み込み（精度向上のため）
-                
+
                 // メモリ使用量
                 _memoryAvailableCounter = new PerformanceCounter("Memory", "Available MBytes", readOnly: true);
-                
+
                 // プロセス・スレッド数
                 _processCountCounter = new PerformanceCounter("System", "Processes", readOnly: true);
                 _threadCountCounter = new PerformanceCounter("System", "Threads", readOnly: true);
-                
+
                 _logger.LogDebug("パフォーマンスカウンター初期化完了");
             }
             catch (Exception ex)
@@ -382,7 +382,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             }
         }, cancellationToken).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// GPU監視機能初期化
     /// </summary>
@@ -393,7 +393,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             _logger.LogDebug("GPU監視は無効化されています");
             return;
         }
-        
+
         // Phase 3: 高度なNVML GPU監視初期化
         var nvmlInitialized = false;
         if (_nvmlGpuMonitor != null)
@@ -402,10 +402,10 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             {
                 _logger.LogInformation("🎯 [PHASE3] NVML GPU監視初期化開始");
                 nvmlInitialized = await _nvmlGpuMonitor.InitializeAsync(cancellationToken).ConfigureAwait(false);
-                
+
                 if (nvmlInitialized)
                 {
-                    _logger.LogInformation("✅ [PHASE3] NVML GPU監視初期化成功 - デバイス数: {DeviceCount}", 
+                    _logger.LogInformation("✅ [PHASE3] NVML GPU監視初期化成功 - デバイス数: {DeviceCount}",
                         _nvmlGpuMonitor.DetectedDeviceCount);
                     return; // NVML成功時はWMIフォールバック不要
                 }
@@ -419,18 +419,18 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 _logger.LogWarning(ex, "⚠️ [PHASE3] NVML初期化例外 - WMIフォールバックに切り替え");
             }
         }
-        
+
         // フォールバック: 従来のWMI GPU監視
         await Task.Run(() =>
         {
             try
             {
                 _logger.LogInformation("🔄 [FALLBACK] WMI GPU監視初期化開始");
-                
+
                 // WMI経由でGPU情報を取得
-                _gpuSearcher = new ManagementObjectSearcher("root\\CIMV2", 
+                _gpuSearcher = new ManagementObjectSearcher("root\\CIMV2",
                     "SELECT Name, AdapterRAM FROM Win32_VideoController WHERE AdapterRAM > 0");
-                
+
                 using var gpuCollection = _gpuSearcher.Get();
                 foreach (ManagementObject gpu in gpuCollection.Cast<ManagementObject>())
                 {
@@ -442,7 +442,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                         break;
                     }
                 }
-                
+
                 if (string.IsNullOrEmpty(_gpuInstanceName))
                 {
                     _logger.LogWarning("⚠️ [FALLBACK] GPU監視: 対応GPUが見つかりませんでした");
@@ -460,7 +460,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             }
         }, cancellationToken).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// CPU使用率取得（精度向上のため2回測定）
     /// </summary>
@@ -470,15 +470,15 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             return 0.0;
         }
-        
+
         try
         {
             // 1回目の測定（ベースライン）
             _cpuCounter.NextValue();
-            
+
             // 短時間待機（測定精度向上）
             await Task.Delay(100, cancellationToken).ConfigureAwait(false);
-            
+
             // 2回目の測定（実際の値）
             return _cpuCounter.NextValue();
         }
@@ -488,7 +488,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             return 0.0;
         }
     }
-    
+
     /// <summary>
     /// メモリ使用量取得
     /// </summary>
@@ -498,7 +498,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             var availableMemoryMB = (long)(_memoryAvailableCounter?.NextValue() ?? 0);
             var totalMemoryMB = _totalMemoryMB.Value;
-            
+
             return (availableMemoryMB, totalMemoryMB);
         }
         catch (Exception ex)
@@ -507,7 +507,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             return (0, _totalMemoryMB.Value);
         }
     }
-    
+
     /// <summary>
     /// GPU使用率取得（WMI経由）
     /// </summary>
@@ -521,7 +521,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 var detailedMetrics = await _nvmlGpuMonitor.GetDetailedGpuMetricsAsync(cancellationToken).ConfigureAwait(false);
                 if (detailedMetrics != null)
                 {
-                    _logger.LogTrace("[NVML] GPU使用率取得成功: {Usage:F1}%, VRAM: {VramUsage:F1}%, 温度: {Temp}℃", 
+                    _logger.LogTrace("[NVML] GPU使用率取得成功: {Usage:F1}%, VRAM: {VramUsage:F1}%, 温度: {Temp}℃",
                         detailedMetrics.GpuUtilizationPercent, detailedMetrics.VramUsagePercent, detailedMetrics.TemperatureCelsius);
                     return detailedMetrics.GpuUtilizationPercent;
                 }
@@ -531,13 +531,13 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 _logger.LogWarning(ex, "⚠️ [NVML] GPU使用率取得エラー - フォールバックに切り替え");
             }
         }
-        
+
         // フォールバック: 従来のWMI GPU監視（基本的な可用性確認）
         if (_gpuSearcher == null || string.IsNullOrEmpty(_gpuInstanceName))
         {
             return null;
         }
-        
+
         return await Task.Run<double?>(() =>
         {
             try
@@ -554,7 +554,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             }
         }, cancellationToken).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// プロセス数取得
     /// </summary>
@@ -570,7 +570,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             return Process.GetProcesses().Length; // フォールバック
         }
     }
-    
+
     /// <summary>
     /// スレッド数取得
     /// </summary>
@@ -586,7 +586,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             return 0;
         }
     }
-    
+
     /// <summary>
     /// システム総メモリ容量取得
     /// </summary>
@@ -596,7 +596,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             using var searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
             using var collection = searcher.Get();
-            
+
             foreach (ManagementObject obj in collection.Cast<ManagementObject>())
             {
                 if (obj["TotalPhysicalMemory"] is ulong totalBytes)
@@ -609,11 +609,11 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             _logger.LogError(ex, "システム総メモリ容量取得エラー");
         }
-        
+
         // フォールバック: 環境変数やGCから推定
         return Environment.WorkingSet / (1024 * 1024) * 4; // 概算値
     }
-    
+
     /// <summary>
     /// メトリクス変更イベント通知
     /// </summary>
@@ -624,7 +624,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             // イベントハンドラー呼び出し
             var eventArgs = new ResourceMetricsChangedEventArgs(newMetrics, previousMetrics);
             ResourceMetricsChanged?.Invoke(this, eventArgs);
-            
+
             // イベントアグリゲーター通知
             var resourceEvent = ResourceMonitoringEvent.CreateMetricsChanged(newMetrics, previousMetrics);
             await _eventAggregator.PublishAsync(resourceEvent).ConfigureAwait(false);
@@ -634,7 +634,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             _logger.LogError(ex, "メトリクス変更イベント通知エラー");
         }
     }
-    
+
     /// <summary>
     /// 警告チェック・通知
     /// </summary>
@@ -643,7 +643,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         try
         {
             var warnings = new List<ResourceWarning>();
-            
+
             // CPU警告チェック
             if (metrics.CpuUsagePercent > _settings.CpuWarningThreshold)
             {
@@ -654,7 +654,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                     _settings.CpuWarningThreshold,
                     metrics.CpuUsagePercent));
             }
-            
+
             // メモリ警告チェック
             if (metrics.MemoryUsagePercent > _settings.MemoryWarningThreshold)
             {
@@ -665,7 +665,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                     _settings.MemoryWarningThreshold,
                     metrics.MemoryUsagePercent));
             }
-            
+
             // GPU警告チェック
             if (metrics.GpuUsagePercent.HasValue && metrics.GpuUsagePercent.Value > _settings.GpuWarningThreshold)
             {
@@ -676,13 +676,13 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                     _settings.GpuWarningThreshold,
                     metrics.GpuUsagePercent.Value));
             }
-            
+
             // 警告通知
             foreach (var warning in warnings)
             {
                 var warningArgs = new ResourceWarningEventArgs(warning.Type, warning.Message, metrics);
                 ResourceWarning?.Invoke(this, warningArgs);
-                
+
                 var warningEvent = ResourceMonitoringEvent.CreateWarning(metrics, warning);
                 await _eventAggregator.PublishAsync(warningEvent).ConfigureAwait(false);
             }
@@ -692,21 +692,21 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             _logger.LogError(ex, "リソース警告チェックエラー");
         }
     }
-    
+
     /// <summary>
     /// 古いメトリクス履歴のクリーンアップ
     /// </summary>
     private void CleanupOldMetrics()
     {
         var cutoffTime = DateTime.UtcNow.AddMinutes(-_settings.HistoryRetentionMinutes);
-        
-        while (_metricsHistory.TryPeek(out var oldestMetric) && 
+
+        while (_metricsHistory.TryPeek(out var oldestMetric) &&
                oldestMetric.Timestamp < cutoffTime)
         {
             _metricsHistory.TryDequeue(out _);
         }
     }
-    
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -714,7 +714,7 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             return;
         }
-        
+
         try
         {
             // 監視停止
@@ -722,22 +722,22 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             {
                 StopMonitoringAsync().GetAwaiter().GetResult();
             }
-            
+
             // リソース解放
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
-            
+
             _cpuCounter?.Dispose();
             _memoryAvailableCounter?.Dispose();
             _memoryCommittedCounter?.Dispose();
             _processCountCounter?.Dispose();
             _threadCountCounter?.Dispose();
-            
+
             _gpuSearcher?.Dispose();
-            
+
             // Phase 3: NVML GPU監視のリソース解放
             _nvmlGpuMonitor?.Dispose();
-            
+
             _logger.LogInformation("WindowsSystemResourceMonitor正常終了");
         }
         catch (Exception ex)

@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
+using Baketa.Core.Services.Imaging;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using Baketa.Core.Services.Imaging;
 
 namespace Baketa.Infrastructure.Imaging.Filters;
 
@@ -61,7 +61,7 @@ public sealed class OpenCvContrastEnhancementFilter : BaseImageFilter
     /// </summary>
     protected override IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
     {
-        return 
+        return
         [
             new PipelineStepParameter("Alpha", "コントラスト調整係数", typeof(double), 1.5, minValue: 1.0, maxValue: 3.0),
             new PipelineStepParameter("Beta", "明度調整値", typeof(int), 0, minValue: -100, maxValue: 100),
@@ -88,7 +88,7 @@ public sealed class OpenCvContrastEnhancementFilter : BaseImageFilter
         var tileSize = GetParameter<int>("TileSize");
         var gamma = GetParameter<double>("Gamma");
 
-        _logger?.LogInformation("OpenCVコントラスト強化開始: Method={Method}, Alpha={Alpha}, Beta={Beta}", 
+        _logger?.LogInformation("OpenCVコントラスト強化開始: Method={Method}, Alpha={Alpha}, Beta={Beta}",
             method, alpha, beta);
 
         try
@@ -101,7 +101,7 @@ public sealed class OpenCvContrastEnhancementFilter : BaseImageFilter
             }
             else if (method == "CLAHE")
             {
-                _logger?.LogInformation("CLAHE適応的ヒストグラム均等化完了: ClipLimit={ClipLimit}, TileSize={TileSize}x{TileSize}", 
+                _logger?.LogInformation("CLAHE適応的ヒストグラム均等化完了: ClipLimit={ClipLimit}, TileSize={TileSize}x{TileSize}",
                     clipLimit, tileSize, tileSize);
             }
             else if (method == "Gamma")

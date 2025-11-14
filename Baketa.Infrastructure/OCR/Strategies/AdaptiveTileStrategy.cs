@@ -1,13 +1,13 @@
 using System.Drawing;
 using System.IO;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.OCR.Strategies;
 
@@ -34,13 +34,13 @@ public sealed class AdaptiveTileStrategy(
     /// 適応的テキスト境界保護分割
     /// </summary>
     public async Task<List<TileRegion>> GenerateRegionsAsync(
-        IAdvancedImage image, 
-        TileGenerationOptions options, 
+        IAdvancedImage image,
+        TileGenerationOptions options,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            _logger?.LogDebug("🎯 AdaptiveTileStrategy開始 - 画像: {Width}x{Height}", 
+            _logger?.LogDebug("🎯 AdaptiveTileStrategy開始 - 画像: {Width}x{Height}",
                 image.Width, image.Height);
 
             // Phase 1: 高速テキスト検出
@@ -50,7 +50,7 @@ public sealed class AdaptiveTileStrategy(
             if (detectionResult?.TextRegions == null || detectionResult.TextRegions.Count == 0)
             {
                 _logger?.LogWarning("⚠️ テキスト検出結果が空 - 文字分割回避のため、時間はかかるが全画面OCR処理を継続");
-                
+
                 // 🎯 [PROPER_APPROACH] テキスト分割回避のため、全画面を一つの領域として処理
                 // グリッド分割は文字を分断するため使用しない
                 return GenerateFullScreenRegion(image);
@@ -60,7 +60,7 @@ public sealed class AdaptiveTileStrategy(
 
             // Phase 2: バウンディングボックス統合
             var mergedRegions = MergeBoundingBoxes(
-[..detectionResult.TextRegions], Parameters);
+[.. detectionResult.TextRegions], Parameters);
 
             _logger?.LogDebug("🔄 バウンディングボックス統合完了 - 統合領域数: {Count}", mergedRegions.Count);
 
@@ -90,7 +90,7 @@ public sealed class AdaptiveTileStrategy(
     /// テキスト検出実行（PaddleOCR検出モード）
     /// </summary>
     private async Task<OcrResults?> DetectTextRegionsAsync(
-        IAdvancedImage image, 
+        IAdvancedImage image,
         CancellationToken cancellationToken)
     {
         try
@@ -113,21 +113,21 @@ public sealed class AdaptiveTileStrategy(
     /// テキスト検出結果を意味のある領域に統合
     /// </summary>
     private List<TileRegion> MergeBoundingBoxes(
-        List<OcrTextRegion> textRegions, 
+        List<OcrTextRegion> textRegions,
         TileStrategyParameters parameters)
     {
 
         // Step 1: ノイズ除去
         var filteredRegions = FilterNoiseBoundingBoxes(textRegions, parameters);
 
-        _logger?.LogDebug("🧹 ノイズ除去完了 - {Original} → {Filtered}個", 
+        _logger?.LogDebug("🧹 ノイズ除去完了 - {Original} → {Filtered}個",
             textRegions.Count, filteredRegions.Count);
-        
+
         // 🔍 [DEBUG] 除去されたテキスト内容の確認
         var removedRegions = textRegions.Where(r => !filteredRegions.Contains(r)).ToList();
         foreach (var removed in removedRegions.Take(5)) // 最初の5個だけログ出力
         {
-            _logger?.LogDebug("❌ [NOISE_FILTER] 除去されたテキスト: '{Text}' (信頼度: {Confidence}, 領域: {Width}×{Height})", 
+            _logger?.LogDebug("❌ [NOISE_FILTER] 除去されたテキスト: '{Text}' (信頼度: {Confidence}, 領域: {Width}×{Height})",
                 removed.Text, removed.Confidence, removed.Bounds.Width, removed.Bounds.Height);
         }
 
@@ -135,7 +135,7 @@ public sealed class AdaptiveTileStrategy(
         var lineGroups = GroupBoundingBoxesByLines(filteredRegions, parameters);
 
         _logger?.LogDebug("📝 行グループ化完了 - {Groups}グループ", lineGroups.Count);
-        
+
         // 🔍 [DEBUG] 行グループの詳細ログ
         for (int i = 0; i < lineGroups.Count && i < 3; i++) // 最初の3グループのみ
         {
@@ -151,7 +151,7 @@ public sealed class AdaptiveTileStrategy(
         foreach (var lineGroup in lineGroups)
         {
             var horizontalMerged = MergeHorizontalBoundingBoxes(lineGroup, parameters);
-            
+
             foreach (var mergedBounds in horizontalMerged)
             {
                 var region = new TileRegion
@@ -160,19 +160,19 @@ public sealed class AdaptiveTileStrategy(
                     RegionType = TileRegionType.TextAdaptive,
                     RegionId = $"adaptive-{regionIdCounter++}",
                     ConfidenceScore = CalculateRegionConfidence(mergedBounds, lineGroup),
-                    Metadata = 
+                    Metadata =
                     {
                         ["SourceBoundingBoxCount"] = lineGroup.Count,
                         ["LineGroupId"] = lineGroups.IndexOf(lineGroup),
                         ["MergedFromTexts"] = string.Join(", ", lineGroup.Select(r => r.Text.Length > 10 ? r.Text[..10] + "..." : r.Text))
                     }
                 };
-                
+
                 // 🔍 [DEBUG] 作成されたTileRegionの詳細ログ
                 var sourceTexts = string.Join(" | ", lineGroup.Select(r => r.Text.Length > 20 ? r.Text[..20] + "..." : r.Text));
-                _logger?.LogDebug("✅ [TILE_REGION] 作成: ID={RegionId}, 範囲={X},{Y} ({Width}×{Height}), 信頼度={Confidence:F3}, 含有テキスト=[{SourceTexts}]", 
+                _logger?.LogDebug("✅ [TILE_REGION] 作成: ID={RegionId}, 範囲={X},{Y} ({Width}×{Height}), 信頼度={Confidence:F3}, 含有テキスト=[{SourceTexts}]",
                     region.RegionId, mergedBounds.X, mergedBounds.Y, mergedBounds.Width, mergedBounds.Height, region.ConfidenceScore, sourceTexts);
-                
+
                 mergedRegions.Add(region);
             }
         }
@@ -186,7 +186,7 @@ public sealed class AdaptiveTileStrategy(
     /// ノイズ除去: 小さすぎる・信頼度低いボックスを除去
     /// </summary>
     private List<OcrTextRegion> FilterNoiseBoundingBoxes(
-        List<OcrTextRegion> regions, 
+        List<OcrTextRegion> regions,
         TileStrategyParameters parameters)
     {
         return [..regions.Where(region =>
@@ -194,7 +194,7 @@ public sealed class AdaptiveTileStrategy(
             var area = region.Bounds.Width * region.Bounds.Height;
             var hasMinArea = area >= parameters.MinBoundingBoxArea;
             var hasMinConfidence = region.Confidence >= parameters.MinConfidenceThreshold;
-            
+
             return hasMinArea && hasMinConfidence;
         })];
     }
@@ -224,7 +224,7 @@ public sealed class AdaptiveTileStrategy(
                 if (processed.Contains(other)) continue;
 
                 var otherY = other.Bounds.Y + other.Bounds.Height / 2f;
-                
+
                 // Y座標の差が閾値以内なら同じ行
                 if (Math.Abs(baseY - otherY) <= parameters.LineGroupingYTolerance)
                 {
@@ -283,10 +283,10 @@ public sealed class AdaptiveTileStrategy(
 
         var avgConfidence = sourceRegions.Average(r => r.Confidence);
         var area = bounds.Width * bounds.Height;
-        
+
         // 面積が大きく、平均信頼度が高い程、信頼度を上げる
         var areaBonus = Math.Min(0.2, area / 100000.0); // 最大20%のボーナス
-        
+
         return Math.Min(1.0, avgConfidence + areaBonus);
     }
 
@@ -304,21 +304,21 @@ public sealed class AdaptiveTileStrategy(
         foreach (var region in regions)
         {
             // 🔍 [DEBUG] 検証前の領域情報
-            _logger?.LogDebug("🔍 [VALIDATE_INPUT] 領域={RegionId}, バウンディング={X},{Y}({Width}x{Height}), 信頼度={Confidence:F3}", 
+            _logger?.LogDebug("🔍 [VALIDATE_INPUT] 領域={RegionId}, バウンディング={X},{Y}({Width}x{Height}), 信頼度={Confidence:F3}",
                 region.RegionId, region.Bounds.X, region.Bounds.Y, region.Bounds.Width, region.Bounds.Height, region.ConfidenceScore);
-            
+
             var adjustedRegions = ValidateRegionSize(region, image, Parameters);
             if (adjustedRegions != null)
             {
                 // 🔍 [DEBUG] 検証後の領域情報
                 foreach (var adjusted in adjustedRegions)
                 {
-                    _logger?.LogDebug("🔍 [VALIDATE_OUTPUT] 調整領域={RegionId}, バウンディング={X},{Y}({Width}x{Height})", 
+                    _logger?.LogDebug("🔍 [VALIDATE_OUTPUT] 調整領域={RegionId}, バウンディング={X},{Y}({Width}x{Height})",
                         adjusted.RegionId, adjusted.Bounds.X, adjusted.Bounds.Y, adjusted.Bounds.Width, adjusted.Bounds.Height);
                 }
-                
+
                 validatedRegions.AddRange(adjustedRegions);
-                
+
                 // ROI画像保存（設定が有効な場合）
                 if (_advancedSettings.EnableRoiImageOutput && _diagnosticsSaver != null)
                 {
@@ -358,24 +358,24 @@ public sealed class AdaptiveTileStrategy(
     /// 領域サイズ検証・調整（巨大領域は複数領域に分割）
     /// </summary>
     private List<TileRegion>? ValidateRegionSize(
-        TileRegion region, 
-        IAdvancedImage image, 
+        TileRegion region,
+        IAdvancedImage image,
         TileStrategyParameters parameters)
     {
         var bounds = region.Bounds;
-        
+
         // 画像境界内にクリップ
         bounds = Rectangle.Intersect(bounds, new Rectangle(0, 0, image.Width, image.Height));
-        
+
         // 🎯 [ROI_EXPANSION_STRATEGY] 小さすぎる領域をPaddleOCR対応サイズまで自動拡張
         const int PADDLE_MIN_WIDTH = 64;   // PaddleOCR最小幅
         const int PADDLE_MIN_HEIGHT = 32;  // PaddleOCR最小高さ        
-        
+
         if (bounds.Width < PADDLE_MIN_WIDTH || bounds.Height < PADDLE_MIN_HEIGHT)
         {
-            _logger?.LogDebug("🔧 [ROI_EXPANSION] 小領域検出、PaddleOCR対応サイズに拡張: {Width}x{Height} → 最小{MinW}x{MinH}", 
+            _logger?.LogDebug("🔧 [ROI_EXPANSION] 小領域検出、PaddleOCR対応サイズに拡張: {Width}x{Height} → 最小{MinW}x{MinH}",
                 bounds.Width, bounds.Height, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT);
-            
+
             // 文脈保持型ROI拡張を実行
             var expandedRegion = ExpandSmallRegionWithContext(region, image, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT);
             if (expandedRegion != null)
@@ -398,9 +398,9 @@ public sealed class AdaptiveTileStrategy(
         var maxArea = (int)Math.Min(int.MaxValue, scaledMaxArea);
         if (bounds.Width * bounds.Height > maxArea)
         {
-            _logger?.LogDebug("巨大領域検出、分割実行: {Width}x{Height} → 最大面積制限: {MaxArea}", 
+            _logger?.LogDebug("巨大領域検出、分割実行: {Width}x{Height} → 最大面積制限: {MaxArea}",
                 bounds.Width, bounds.Height, maxArea);
-            
+
             // 巨大領域を適切なサイズに分割
             return SplitLargeRegion(region, image, parameters);
         }
@@ -418,42 +418,42 @@ public sealed class AdaptiveTileStrategy(
     {
         var bounds = largeRegion.Bounds;
         var splitRegions = new List<TileRegion>();
-        
+
         // 最適な分割サイズを計算（オーバーフロー防止でlong計算→int変換、浮動小数点精度保持）
         var baseArea = (long)image.Width * image.Height;
         var scaledArea = (long)(baseArea * parameters.MaxRegionSizeRatio * 0.7); // 浮動小数点計算を分離
         var targetArea = (int)Math.Min(int.MaxValue, scaledArea); // 余裕をもたせる
         var targetSize = (int)Math.Sqrt(targetArea);
-        
+
         // 水平・垂直分割数を計算
         var horizontalSplits = Math.Max(1, (int)Math.Ceiling((double)bounds.Width / targetSize));
         var verticalSplits = Math.Max(1, (int)Math.Ceiling((double)bounds.Height / targetSize));
-        
-        _logger?.LogDebug("巨大領域分割設計: {Width}x{Height} → {HSplits}x{VSplits} = {TotalSplits}個の領域", 
+
+        _logger?.LogDebug("巨大領域分割設計: {Width}x{Height} → {HSplits}x{VSplits} = {TotalSplits}個の領域",
             bounds.Width, bounds.Height, horizontalSplits, verticalSplits, horizontalSplits * verticalSplits);
-        
+
         var regionIdCounter = 0;
-        
+
         for (int y = 0; y < verticalSplits; y++)
         {
             for (int x = 0; x < horizontalSplits; x++)
             {
                 var splitX = bounds.X + (x * bounds.Width / horizontalSplits);
                 var splitY = bounds.Y + (y * bounds.Height / verticalSplits);
-                var splitWidth = (x == horizontalSplits - 1) 
-                    ? bounds.X + bounds.Width - splitX 
+                var splitWidth = (x == horizontalSplits - 1)
+                    ? bounds.X + bounds.Width - splitX
                     : bounds.Width / horizontalSplits;
-                var splitHeight = (y == verticalSplits - 1) 
-                    ? bounds.Y + bounds.Height - splitY 
+                var splitHeight = (y == verticalSplits - 1)
+                    ? bounds.Y + bounds.Height - splitY
                     : bounds.Height / verticalSplits;
-                
+
                 var splitBounds = new Rectangle(splitX, splitY, splitWidth, splitHeight);
-                
+
                 // 画像境界内にクリップ
                 splitBounds = Rectangle.Intersect(splitBounds, new Rectangle(0, 0, image.Width, image.Height));
-                
+
                 // 最小サイズチェック
-                if (splitBounds.Width >= parameters.MinRegionSize.Width && 
+                if (splitBounds.Width >= parameters.MinRegionSize.Width &&
                     splitBounds.Height >= parameters.MinRegionSize.Height)
                 {
                     var splitRegion = new TileRegion
@@ -462,7 +462,7 @@ public sealed class AdaptiveTileStrategy(
                         RegionType = TileRegionType.TextAdaptive, // 分割された巨大領域
                         RegionId = $"{largeRegion.RegionId}-split-{regionIdCounter++}",
                         ConfidenceScore = largeRegion.ConfidenceScore * 0.8, // 分割による信頼度低下
-                        Metadata = 
+                        Metadata =
                         {
                             ["ParentRegionId"] = largeRegion.RegionId,
                             ["SplitIndex"] = $"{x}-{y}",
@@ -470,15 +470,15 @@ public sealed class AdaptiveTileStrategy(
                             ["SplitReason"] = "LargeRegionSubdivision"
                         }
                     };
-                    
+
                     splitRegions.Add(splitRegion);
                 }
             }
         }
-        
-        _logger?.LogDebug("巨大領域分割完了: {OriginalSize} → {SplitCount}個の分割領域", 
+
+        _logger?.LogDebug("巨大領域分割完了: {OriginalSize} → {SplitCount}個の分割領域",
             $"{bounds.Width}x{bounds.Height}", splitRegions.Count);
-        
+
         return splitRegions;
     }
 
@@ -487,19 +487,19 @@ public sealed class AdaptiveTileStrategy(
     /// デバッグキャプチャ保存（AdaptiveTileStrategy用）
     /// </summary>
     private async Task SaveDebugCaptureAsync(
-        IAdvancedImage image, 
-        List<TileRegion> regions, 
-        string suffix, 
+        IAdvancedImage image,
+        List<TileRegion> regions,
+        string suffix,
         string? debugPath)
     {
         try
         {
             // 環境依存しないデバッグキャプチャパスの設定
             var capturePath = debugPath ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), 
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                 "BaketaDebugCaptures"
             );
-            
+
             if (!Directory.Exists(capturePath))
             {
                 Directory.CreateDirectory(capturePath);
@@ -518,14 +518,14 @@ public sealed class AdaptiveTileStrategy(
             {
                 var annotatedFilename = $"adaptive-debug-annotated_{timestamp}_{suffix}_{image.Width}x{image.Height}.png";
                 var annotatedPath = Path.Combine(capturePath, annotatedFilename);
-                
+
                 await CreateAnnotatedImageAsync(imageBytes, regions, image.Width, image.Height, annotatedPath)
                     .ConfigureAwait(false);
-                
+
                 _logger?.LogDebug("🎯 AdaptiveTile デバッグ画像保存完了: {AnnotatedFile}", annotatedFilename);
             }
 
-            _logger?.LogDebug("🎯 AdaptiveTile デバッグキャプチャ完了: {OriginalFile}, 領域数: {Count}", 
+            _logger?.LogDebug("🎯 AdaptiveTile デバッグキャプチャ完了: {OriginalFile}, 領域数: {Count}",
                 originalFilename, regions.Count);
         }
         catch (Exception ex)
@@ -538,10 +538,10 @@ public sealed class AdaptiveTileStrategy(
     /// 注釈付き画像作成（AdaptiveTileStrategy用）
     /// </summary>
     private async Task CreateAnnotatedImageAsync(
-        byte[] imageBytes, 
-        List<TileRegion> regions, 
-        int width, 
-        int height, 
+        byte[] imageBytes,
+        List<TileRegion> regions,
+        int width,
+        int height,
         string outputPath)
     {
         try
@@ -550,51 +550,51 @@ public sealed class AdaptiveTileStrategy(
             using var originalBitmap = new System.Drawing.Bitmap(memoryStream);
             using var annotatedBitmap = new System.Drawing.Bitmap(originalBitmap);
             using var graphics = System.Drawing.Graphics.FromImage(annotatedBitmap);
-            
+
             // 高品質描画設定
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            
+
             // 適応的領域境界線描画（緑色、太い線）
             using var adaptivePen = new System.Drawing.Pen(System.Drawing.Color.LimeGreen, 4.0f);
             // フォールバック処理削除により不要
-            using var borderPen = new System.Drawing.Pen(System.Drawing.Color.Red, 2.0f) 
-            { 
-                DashStyle = System.Drawing.Drawing2D.DashStyle.Dash 
+            using var borderPen = new System.Drawing.Pen(System.Drawing.Color.Red, 2.0f)
+            {
+                DashStyle = System.Drawing.Drawing2D.DashStyle.Dash
             };
-            
+
             for (int i = 0; i < regions.Count; i++)
             {
                 var region = regions[i];
                 var rect = region.Bounds;
                 var pen = adaptivePen;
-                
+
                 // 適応的境界を緑色で描画
                 graphics.DrawRectangle(pen, rect);
-                
+
                 // 領域情報を描画
                 var regionInfo = $"A-{i} ({region.ConfidenceScore:F2})";
 
                 using var font = new System.Drawing.Font("Arial", 11, System.Drawing.FontStyle.Bold);
                 using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.LimeGreen);
                 using var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(220, 0, 0, 0));
-                
+
                 var textSize = graphics.MeasureString(regionInfo, font);
                 var textRect = new System.Drawing.RectangleF(rect.X + 3, rect.Y + 3, textSize.Width + 4, textSize.Height + 2);
-                
+
                 // 背景描画
                 graphics.FillRectangle(backgroundBrush, textRect);
-                
+
                 // テキスト描画
                 graphics.DrawString(regionInfo, font, brush, rect.X + 5, rect.Y + 5);
             }
-            
+
             // 全体境界を赤色破線で描画
             graphics.DrawRectangle(borderPen, 0, 0, width - 1, height - 1);
-            
+
             // 注釈付き画像保存
             annotatedBitmap.Save(outputPath, System.Drawing.Imaging.ImageFormat.Png);
-            
+
             _logger?.LogTrace("🎯 AdaptiveTile 注釈描画完了 - {Count}個の適応領域", regions.Count);
         }
         catch (Exception ex)
@@ -602,7 +602,7 @@ public sealed class AdaptiveTileStrategy(
             _logger?.LogWarning(ex, "AdaptiveTile 注釈描画エラー");
         }
     }
-    
+
     /// <summary>
     /// ROI画像保存（AdaptiveTileStrategy用）
     /// </summary>
@@ -616,24 +616,24 @@ public sealed class AdaptiveTileStrategy(
                 System.Diagnostics.Debug.WriteLine($"AdaptiveTile: _diagnosticsSaver is null, ROI保存スキップ: {regionId}");
                 return;
             }
-            
+
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture);
             var fileName = $"{timestamp}_adaptive_roi_{regionId}.png";
-            
+
             // 🎯 実際の画像保存をImageDiagnosticsSaverに委任
             var imageBytes = await ExtractRoiImageAsync(sourceImage, region).ConfigureAwait(false);
             if (imageBytes != null && imageBytes.Length > 0)
             {
                 var outputPath = Path.Combine(GetDiagnosticOutputPath(), fileName);
-                
+
                 // 🎯 ROI画像を直接保存（byte[]からファイルへ）
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
                 await File.WriteAllBytesAsync(outputPath, imageBytes).ConfigureAwait(false);
-                
+
                 // 🎯 ROI画像情報をBatchOcrProcessorに通知（イベント使用）
                 await NotifyRoiImageSavedAsync(regionId, outputPath, region, imageBytes.Length)
                     .ConfigureAwait(false);
-                
+
                 System.Diagnostics.Debug.WriteLine($"AdaptiveTile ROI画像保存完了: {fileName} ({imageBytes.Length} bytes)");
             }
             else
@@ -651,56 +651,56 @@ public sealed class AdaptiveTileStrategy(
     /// 小さなROI領域を文脈保持しながらPaddleOCR対応サイズまで拡張
     /// </summary>
     private TileRegion? ExpandSmallRegionWithContext(
-        TileRegion smallRegion, 
-        IAdvancedImage image, 
-        int minWidth, 
+        TileRegion smallRegion,
+        IAdvancedImage image,
+        int minWidth,
         int minHeight)
     {
         try
         {
             var originalBounds = smallRegion.Bounds;
             var expandedBounds = originalBounds;
-            
+
             // 🎯 [CONTEXT_PRESERVING_EXPANSION] テキスト文脈を保持する拡張戦略
-            
+
             // Step 1: 最小サイズまで均等拡張
             if (expandedBounds.Width < minWidth)
             {
                 var widthExpansion = minWidth - expandedBounds.Width;
                 var leftExpansion = widthExpansion / 2;
                 var rightExpansion = widthExpansion - leftExpansion;
-                
+
                 expandedBounds.X = Math.Max(0, expandedBounds.X - leftExpansion);
-                expandedBounds.Width = Math.Min(image.Width - expandedBounds.X, 
+                expandedBounds.Width = Math.Min(image.Width - expandedBounds.X,
                     expandedBounds.Width + leftExpansion + rightExpansion);
             }
-            
+
             if (expandedBounds.Height < minHeight)
             {
                 var heightExpansion = minHeight - expandedBounds.Height;
                 var topExpansion = heightExpansion / 2;
                 var bottomExpansion = heightExpansion - topExpansion;
-                
+
                 expandedBounds.Y = Math.Max(0, expandedBounds.Y - topExpansion);
                 expandedBounds.Height = Math.Min(image.Height - expandedBounds.Y,
                     expandedBounds.Height + topExpansion + bottomExpansion);
             }
-            
+
             // Step 2: アスペクト比調整（極端な縦横比を修正）
             var aspectRatio = (double)expandedBounds.Width / expandedBounds.Height;
             const double MAX_ASPECT_RATIO = 8.0; // 最大アスペクト比
             const double MIN_ASPECT_RATIO = 1.0 / 8.0; // 最小アスペクト比
-            
+
             if (aspectRatio > MAX_ASPECT_RATIO)
             {
                 // 横長すぎる場合：高さを増加
                 var targetHeight = (int)(expandedBounds.Width / MAX_ASPECT_RATIO);
                 var heightIncrease = targetHeight - expandedBounds.Height;
-                
+
                 expandedBounds.Y = Math.Max(0, expandedBounds.Y - heightIncrease / 2);
                 expandedBounds.Height = Math.Min(image.Height - expandedBounds.Y, targetHeight);
-                
-                _logger?.LogDebug("🔧 [ASPECT_FIX] 横長修正: aspect={Aspect:F2} → height={Height}", 
+
+                _logger?.LogDebug("🔧 [ASPECT_FIX] 横長修正: aspect={Aspect:F2} → height={Height}",
                     aspectRatio, expandedBounds.Height);
             }
             else if (aspectRatio < MIN_ASPECT_RATIO)
@@ -708,23 +708,23 @@ public sealed class AdaptiveTileStrategy(
                 // 縦長すぎる場合：幅を増加
                 var targetWidth = (int)(expandedBounds.Height * MIN_ASPECT_RATIO);
                 var widthIncrease = targetWidth - expandedBounds.Width;
-                
+
                 expandedBounds.X = Math.Max(0, expandedBounds.X - widthIncrease / 2);
                 expandedBounds.Width = Math.Min(image.Width - expandedBounds.X, targetWidth);
-                
-                _logger?.LogDebug("🔧 [ASPECT_FIX] 縦長修正: aspect={Aspect:F2} → width={Width}", 
+
+                _logger?.LogDebug("🔧 [ASPECT_FIX] 縦長修正: aspect={Aspect:F2} → width={Width}",
                     aspectRatio, expandedBounds.Width);
             }
-            
+
             // Step 3: 画像境界内に最終調整
-            expandedBounds = Rectangle.Intersect(expandedBounds, 
+            expandedBounds = Rectangle.Intersect(expandedBounds,
                 new Rectangle(0, 0, image.Width, image.Height));
-                
+
             // Step 4: 最終サイズ確認
             if (expandedBounds.Width >= minWidth && expandedBounds.Height >= minHeight)
             {
-                var expandedRegion = smallRegion with 
-                { 
+                var expandedRegion = smallRegion with
+                {
                     Bounds = expandedBounds,
                     RegionId = $"{smallRegion.RegionId}-expanded",
                     Metadata = new Dictionary<string, object>(smallRegion.Metadata)
@@ -734,14 +734,14 @@ public sealed class AdaptiveTileStrategy(
                         ["ExpansionFactor"] = $"{(double)expandedBounds.Width * expandedBounds.Height / (originalBounds.Width * originalBounds.Height):F2}x"
                     }
                 };
-                
+
                 _logger?.LogDebug("✅ [CONTEXT_EXPANSION] 成功: {Original} → {Expanded} (拡張率: {Factor}x)",
-                    originalBounds, expandedBounds, 
+                    originalBounds, expandedBounds,
                     (double)expandedBounds.Width * expandedBounds.Height / (originalBounds.Width * originalBounds.Height));
-                
+
                 return expandedRegion;
             }
-            
+
             return null;
         }
         catch (Exception ex)
@@ -761,22 +761,22 @@ public sealed class AdaptiveTileStrategy(
             // 元画像をバイト配列に変換
             var sourceBytes = await sourceImage.ToByteArrayAsync().ConfigureAwait(false);
             if (sourceBytes == null || sourceBytes.Length == 0) return null;
-            
+
             // 元画像からROI領域を切り出し
             using var memoryStream = new MemoryStream(sourceBytes);
             using var sourceBitmap = new System.Drawing.Bitmap(memoryStream);
             using var roiBitmap = new System.Drawing.Bitmap(region.Bounds.Width, region.Bounds.Height);
             using var graphics = System.Drawing.Graphics.FromImage(roiBitmap);
-            
+
             // 高品質描画設定
             graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-            
+
             // ROI領域を切り出し
             var destRect = new Rectangle(0, 0, region.Bounds.Width, region.Bounds.Height);
             graphics.DrawImage(sourceBitmap, destRect, region.Bounds, GraphicsUnit.Pixel);
-            
+
             // ROI画像をバイト配列に変換
             using var outputStream = new MemoryStream();
             roiBitmap.Save(outputStream, System.Drawing.Imaging.ImageFormat.Png);
@@ -788,7 +788,7 @@ public sealed class AdaptiveTileStrategy(
             return null;
         }
     }
-    
+
     /// <summary>
     /// ROI画像保存完了通知
     /// </summary>
@@ -809,10 +809,10 @@ public sealed class AdaptiveTileStrategy(
                 ConfidenceScore = region.ConfidenceScore,
                 Metadata = new Dictionary<string, object>(region.Metadata)
             };
-            
+
             // 🎯 グローバルROI情報コレクションに追加
             GlobalRoiImageCollection.AddRoiImage(roiInfo);
-            
+
             logger?.LogDebug("🎯 AdaptiveTile ROI保存通知完了: {RegionId}", regionId);
         }
         catch (Exception ex)
@@ -820,7 +820,7 @@ public sealed class AdaptiveTileStrategy(
             logger?.LogWarning(ex, "AdaptiveTile ROI保存通知エラー");
         }
     }
-    
+
     /// <summary>
     /// 診断出力パスを取得
     /// </summary>
@@ -835,19 +835,19 @@ public sealed class AdaptiveTileStrategy(
     /// </summary>
     private List<TileRegion> GenerateFullScreenRegion(IAdvancedImage image)
     {
-        _logger?.LogInformation("🎯 [PROPER_APPROACH] 全画面OCR戦略を開始 - 画像: {Width}x{Height} (文字分割回避)", 
+        _logger?.LogInformation("🎯 [PROPER_APPROACH] 全画面OCR戦略を開始 - 画像: {Width}x{Height} (文字分割回避)",
             image.Width, image.Height);
 
         // 全画面を一つの領域として処理
         var fullScreenBounds = new Rectangle(0, 0, image.Width, image.Height);
-        
+
         var region = new TileRegion
         {
             Bounds = fullScreenBounds,
             RegionType = TileRegionType.Composite, // 全画面複合領域
             RegionId = $"fullscreen-{DateTime.UtcNow.Ticks}",
             ConfidenceScore = 0.8, // 高い信頼度（文字分割リスクなし）
-            Metadata = 
+            Metadata =
             {
                 ["Strategy"] = "FullScreenOCR",
                 ["Reason"] = "TextDetectionFailed_AvoidCharacterSplitting",
@@ -855,9 +855,9 @@ public sealed class AdaptiveTileStrategy(
                 ["ExpectedBehavior"] = "SlowerButAccurate"
             }
         };
-        
+
         _logger?.LogInformation("✅ [PROPER_APPROACH] 全画面OCR領域生成完了 - 1つの完全な領域 (時間はかかるが正確)");
-        
+
         return [region];
     }
 }

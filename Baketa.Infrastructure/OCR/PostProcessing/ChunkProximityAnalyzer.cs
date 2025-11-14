@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
 using Baketa.Core.Utilities;

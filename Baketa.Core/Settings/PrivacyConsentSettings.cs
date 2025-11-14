@@ -56,16 +56,16 @@ public sealed record PrivacyConsentSettings
     /// <summary>
     /// 同意が有効期限内かどうか（GDPR要件：定期的な再同意）
     /// </summary>
-    public bool IsConsentValid => ConsentDate.HasValue && 
+    public bool IsConsentValid => ConsentDate.HasValue &&
                                   ConsentDate.Value.AddYears(2) > DateTime.UtcNow;
 
     /// <summary>
     /// 何らかのデータ収集に同意しているかどうか
     /// </summary>
-    public bool HasAnyConsent => FeedbackConsent || 
-                                UsageStatisticsConsent || 
-                                CrashReportConsent || 
-                                PerformanceMonitoringConsent || 
+    public bool HasAnyConsent => FeedbackConsent ||
+                                UsageStatisticsConsent ||
+                                CrashReportConsent ||
+                                PerformanceMonitoringConsent ||
                                 SystemInformationConsent;
 
     /// <summary>
@@ -89,15 +89,15 @@ public sealed record PrivacyConsentSettings
         bool? crashReportConsent = null,
         bool? performanceMonitoringConsent = null,
         bool? systemInformationConsent = null) => this with
-    {
-        FeedbackConsent = feedbackConsent ?? FeedbackConsent,
-        UsageStatisticsConsent = usageStatisticsConsent ?? UsageStatisticsConsent,
-        CrashReportConsent = crashReportConsent ?? CrashReportConsent,
-        PerformanceMonitoringConsent = performanceMonitoringConsent ?? PerformanceMonitoringConsent,
-        SystemInformationConsent = systemInformationConsent ?? SystemInformationConsent,
-        LastUpdated = DateTime.UtcNow,
-        ConsentDate = DateTime.UtcNow
-    };
+        {
+            FeedbackConsent = feedbackConsent ?? FeedbackConsent,
+            UsageStatisticsConsent = usageStatisticsConsent ?? UsageStatisticsConsent,
+            CrashReportConsent = crashReportConsent ?? CrashReportConsent,
+            PerformanceMonitoringConsent = performanceMonitoringConsent ?? PerformanceMonitoringConsent,
+            SystemInformationConsent = systemInformationConsent ?? SystemInformationConsent,
+            LastUpdated = DateTime.UtcNow,
+            ConsentDate = DateTime.UtcNow
+        };
 
     /// <summary>
     /// 全ての同意を撤回した新しい設定を作成

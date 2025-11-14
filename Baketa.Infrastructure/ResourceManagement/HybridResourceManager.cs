@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+using System.Threading.Channels;
 using Baketa.Core.Abstractions.Common;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Monitoring;
@@ -107,11 +107,11 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
     // === リソース監視 ===
     private readonly IResourceMonitor _resourceMonitor;
-    
+
     // === GPU環境検出（動的VRAM容量対応） ===
     private readonly IGpuEnvironmentDetector? _gpuEnvironmentDetector;
     private long _actualTotalVramMB = 8192; // デフォルトフォールバック値
-    
+
     // === Phase 4.1: パフォーマンスメトリクス収集統合 ===
     private readonly IPerformanceMetricsCollector? _metricsCollector;
 
@@ -125,14 +125,14 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     private readonly IOptionsMonitor<HybridResourceSettings> _optionsMonitor;
     private HybridResourceSettings _settings;
     private readonly ILogger<HybridResourceManager> _logger;
-    private IDisposable? _settingsChangeSubscription;
+    private readonly IDisposable? _settingsChangeSubscription;
 
     // === 状態管理 ===
     private bool _isInitialized = false;
     private readonly CancellationTokenSource _disposalCts = new();
 
     // === Phase 12.1: Channel Readerバックグラウンドタスク ===
-    private Task? _translationChannelReaderTask;
+    private readonly Task? _translationChannelReaderTask;
 
     /// <summary>
     /// リソース管理システムの初期化状態
@@ -345,9 +345,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         var snapshot = new ResourceStatusSnapshot(
             status.CpuUsage, status.MemoryUsage, status.GpuUtilization, status.VramUsage, now);
         _recentStatusHistory.Enqueue(snapshot);
-        
+
         // 履歴サイズ制限（直近10分間のデータ）
-        while (_recentStatusHistory.Count > 0 && 
+        while (_recentStatusHistory.Count > 0 &&
                (now - _recentStatusHistory.Peek().Timestamp).TotalMinutes > 10)
         {
             _recentStatusHistory.Dequeue();
@@ -355,12 +355,12 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
         // Important: VRAM動的監視統合（Gemini指摘事項対応）
         var vramMonitoring = await MonitorVramDynamicallyAsync(cancellationToken).ConfigureAwait(false);
-        
+
         // Phase 3: 負荷トレンドの分析
         var currentTrend = AnalyzeLoadTrend();
         if (currentTrend != _currentLoadTrend)
         {
-            _logger.LogInformation("🔄 [PHASE3] 負荷トレンド変更検出: {OldTrend} → {NewTrend}", 
+            _logger.LogInformation("🔄 [PHASE3] 負荷トレンド変更検出: {OldTrend} → {NewTrend}",
                 _currentLoadTrend, currentTrend);
             _currentLoadTrend = currentTrend;
             _lastTrendChangeTime = now;
@@ -386,25 +386,25 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             case VramAction.EmergencyFallback:
                 forceAdjustmentDueToVram = true;
                 isHighLoad = true;
-                _logger.LogWarning("⚠️ [VRAM統合] VRAM圧迫による処理削減推奨 - 圧迫度: {Pressure}, アクション: {Action}", 
+                _logger.LogWarning("⚠️ [VRAM統合] VRAM圧迫による処理削減推奨 - 圧迫度: {Pressure}, アクション: {Action}",
                     vramMonitoring.PressureLevel, vramMonitoring.RecommendedAction);
                 break;
-            
+
             case VramAction.ScaleUp:
                 if (!isHighLoad && vramMonitoring.OptimalForGpuProcessing)
                 {
                     forceAdjustmentDueToVram = true;
                     isLowLoad = true;
-                    _logger.LogInformation("📈 [VRAM統合] VRAM最適状態による処理増強推奨 - 圧迫度: {Pressure}", 
+                    _logger.LogInformation("📈 [VRAM統合] VRAM最適状態による処理増強推奨 - 圧迫度: {Pressure}",
                         vramMonitoring.PressureLevel);
                 }
                 break;
-                
+
             case VramAction.Maintain:
                 // VRAM状況は安定、従来ロジックを維持
                 if (_settings.EnableVerboseLogging)
                 {
-                    _logger.LogTrace("✅ [VRAM統合] VRAM状況安定 - 従来制御継続 圧迫度: {Pressure}", 
+                    _logger.LogTrace("✅ [VRAM統合] VRAM状況安定 - 従来制御継続 圧迫度: {Pressure}",
                         vramMonitoring.PressureLevel);
                 }
                 break;
@@ -424,9 +424,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             await DecreaseParallelismAsync().ConfigureAwait(false);
             _lastThresholdCrossTime = now;
             _logger.LogWarning("🔻 [VRAM統合] 並列度減少実行: CPU={Cpu:F1}%, Memory={Memory:F1}%, GPU={Gpu:F1}%, " +
-                "VRAM={Vram:F1}%({Pressure}), トレンド={Trend}, アクション={Action}", 
-                status.CpuUsage, status.MemoryUsage, status.GpuUtilization, 
-                vramMonitoring.CurrentUsagePercent, vramMonitoring.PressureLevel, 
+                "VRAM={Vram:F1}%({Pressure}), トレンド={Trend}, アクション={Action}",
+                status.CpuUsage, status.MemoryUsage, status.GpuUtilization,
+                vramMonitoring.CurrentUsagePercent, vramMonitoring.PressureLevel,
                 currentTrend, vramMonitoring.RecommendedAction);
         }
         else if (shouldAdjust.Increase)
@@ -434,15 +434,15 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             await IncreaseParallelismAsync().ConfigureAwait(false);
             _lastThresholdCrossTime = now;
             _logger.LogInformation("🔺 [VRAM統合] 並列度増加実行: CPU={Cpu:F1}%, Memory={Memory:F1}%, GPU={Gpu:F1}%, " +
-                "VRAM={Vram:F1}%({Pressure}), トレンド={Trend}, アクション={Action}", 
-                status.CpuUsage, status.MemoryUsage, status.GpuUtilization, 
-                vramMonitoring.CurrentUsagePercent, vramMonitoring.PressureLevel, 
+                "VRAM={Vram:F1}%({Pressure}), トレンド={Trend}, アクション={Action}",
+                status.CpuUsage, status.MemoryUsage, status.GpuUtilization,
+                vramMonitoring.CurrentUsagePercent, vramMonitoring.PressureLevel,
                 currentTrend, vramMonitoring.RecommendedAction);
         }
         else if (_settings.EnableVerboseLogging)
         {
             _logger.LogTrace("⚖️ [VRAM統合] 並列度調整不要 - 安定状態維持: トレンド={Trend}, VRAM圧迫度={Pressure}, " +
-                "待機時間={Wait:F1}秒", currentTrend, vramMonitoring.PressureLevel, 
+                "待機時間={Wait:F1}秒", currentTrend, vramMonitoring.PressureLevel,
                 (now - _lastThresholdCrossTime).TotalSeconds);
         }
     }
@@ -452,8 +452,8 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     /// 実際の処理を関数として受け取り、リソース管理下で実行する
     /// </summary>
     public async Task<TResult> ProcessOcrAsync<TResult>(
-        Func<ProcessingRequest, CancellationToken, Task<TResult>> ocrTaskFactory, 
-        ProcessingRequest request, 
+        Func<ProcessingRequest, CancellationToken, Task<TResult>> ocrTaskFactory,
+        ProcessingRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ocrTaskFactory);
@@ -613,21 +613,21 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
         // Phase 3: 重み付け総合負荷スコア
         var weightedScore = (cpuFactor * 1.2 + memoryFactor * 1.0 + gpuFactor * 1.1 + vramFactor * 1.3) / 4.6;
-        
+
         // Phase 3: トレンド係数による調整
         var trendMultiplier = CalculateTrendMultiplier(_currentLoadTrend);
-        
+
         // Phase 3: 履歴ベース予測調整
         var predictiveAdjustment = CalculatePredictiveAdjustment();
-        
+
         // Phase 3: 最終クールダウン計算
         var baseCooldown = weightedScore * _settings.MaxCooldownMs;
         var trendAdjustedCooldown = baseCooldown * trendMultiplier;
         var finalCooldown = trendAdjustedCooldown + predictiveAdjustment;
-        
+
         // 範囲制限と整数化
         var result = Math.Max(0, Math.Min((int)finalCooldown, _settings.MaxCooldownMs * 2)); // 最大2倍まで延長可能
-        
+
         // Phase 3: 詳細ログ（設定有効時）
         if (_settings.EnableVerboseLogging)
         {
@@ -637,7 +637,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 baseCooldown, trendMultiplier, predictiveAdjustment, result, weightedScore,
                 cpuFactor, 1.2, memoryFactor, 1.0, gpuFactor, 1.1, vramFactor, 1.3);
         }
-        
+
         return result;
     }
 
@@ -648,12 +648,12 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     {
         if (usage <= lowThreshold)
             return 0.0;
-        
+
         var normalizedUsage = Math.Min(1.0, (usage - lowThreshold) / (highThreshold - lowThreshold));
-        
+
         // 非線形カーブ適用（二次関数：高負荷時により敏感に反応）
-        var curveAdjusted = Math.Pow(normalizedUsage, 1.5); 
-        
+        var curveAdjusted = Math.Pow(normalizedUsage, 1.5);
+
         return curveAdjusted * weight;
     }
 
@@ -681,25 +681,25 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             return 0.0;
 
         var recent = _recentStatusHistory.TakeLast(3).ToArray();
-        
+
         // 短期トレンド検出（直近3サンプル）
         var scores = recent.Select(r => r.CompositeScore).ToArray();
         var trend = scores.Length >= 2 ? scores[^1] - scores[^2] : 0.0;
-        
+
         // 急激な負荷上昇の予測
         if (trend > 5.0) // 5%以上の急上昇
         {
             var severity = Math.Min(trend / 10.0, 1.0); // 最大+100msまで
             return severity * 100; // 予防的クールダウン延長
         }
-        
+
         // 安定継続の検出
         var variance = CalculateVariance(scores);
         if (variance < 2.0) // 非常に安定
         {
             return -30; // 安定時はクールダウン短縮
         }
-        
+
         return 0.0; // 標準状態
     }
 
@@ -709,7 +709,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     private static double CalculateVariance(double[] values)
     {
         if (values.Length < 2) return 0.0;
-        
+
         var mean = values.Average();
         return values.Select(v => Math.Pow(v - mean, 2)).Average();
     }
@@ -724,11 +724,11 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             if (_gpuEnvironmentDetector != null)
             {
                 var gpuInfo = await _gpuEnvironmentDetector.DetectEnvironmentAsync(cancellationToken).ConfigureAwait(false);
-                
+
                 if (gpuInfo != null && gpuInfo.AvailableMemoryMB > 0)
                 {
                     _actualTotalVramMB = gpuInfo.AvailableMemoryMB;
-                    _logger.LogInformation("🎯 [VRAM-FIX] 動的VRAM容量検出成功: {ActualVramMB}MB (GPU: {GpuName})", 
+                    _logger.LogInformation("🎯 [VRAM-FIX] 動的VRAM容量検出成功: {ActualVramMB}MB (GPU: {GpuName})",
                         _actualTotalVramMB, gpuInfo.GpuName);
                 }
                 else
@@ -758,7 +758,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
         // 🎯 動的VRAM容量を使用（8192MB固定問題解決済み）
         var usagePercent = (double)metrics.GpuMemoryUsageMB.Value / _actualTotalVramMB * 100;
-        
+
         return Math.Min(100, Math.Max(0, usagePercent));
     }
 
@@ -773,11 +773,11 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             var vramUsagePercent = status.VramUsage;
             var vramUsageMB = (long)(vramUsagePercent / 100.0 * _actualTotalVramMB);
             var availableVramMB = _actualTotalVramMB - vramUsageMB;
-            
+
             // Sprint 3: VRAM圧迫度分析
             var vramPressure = CalculateVramPressureLevel(vramUsagePercent);
             var recommendedAction = DetermineVramAction(vramPressure, vramUsagePercent);
-            
+
             var result = new VramMonitoringResult
             {
                 CurrentUsagePercent = vramUsagePercent,
@@ -795,14 +795,14 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             {
                 _logger.LogDebug("📊 Sprint 3 VRAM動的監視: 使用率={Usage:F1}% ({UsageMB}MB/{TotalMB}MB), " +
                     "圧迫度={Pressure}, 推奨アクション={Action}, CPU切替={Fallback}",
-                    vramUsagePercent, vramUsageMB, _actualTotalVramMB, 
+                    vramUsagePercent, vramUsageMB, _actualTotalVramMB,
                     vramPressure, recommendedAction, result.ShouldFallbackToCpu);
             }
 
             // Phase 4.1: VRAM監視メトリクス記録（将来実装予定）
             if (_metricsCollector != null && _settings.EnableVerboseLogging)
             {
-                _logger.LogDebug("📊 Phase 4.1: VRAM監視メトリクス記録 - 使用率={Usage:F1}%, 圧迫度={Pressure}", 
+                _logger.LogDebug("📊 Phase 4.1: VRAM監視メトリクス記録 - 使用率={Usage:F1}%, 圧迫度={Pressure}",
                     vramUsagePercent, vramPressure);
             }
 
@@ -830,7 +830,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         return vramUsagePercent switch
         {
             < 40 => VramPressureLevel.Low,
-            < 60 => VramPressureLevel.Moderate, 
+            < 60 => VramPressureLevel.Moderate,
             < 75 => VramPressureLevel.High,
             < 90 => VramPressureLevel.Critical,
             _ => VramPressureLevel.Emergency
@@ -917,7 +917,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     private async Task DecreaseParallelismAsync()
     {
         var status = await GetCurrentResourceStatusAsync(_disposalCts.Token).ConfigureAwait(false);
-        
+
         lock (_semaphoreLock)
         {
             // 翻訳の並列度を優先的に削減
@@ -927,7 +927,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 var newCount = Math.Max(1, currentTranslation - 1);
                 RecreateSemaphore(ref _translationSemaphore, newCount, _settings.MaxTranslationParallelism);
                 _logger.LogInformation("翻訳並列度減少: {Old} → {New}", currentTranslation, newCount);
-                
+
                 // Phase 4.1: リソース調整メトリクス記録
                 RecordResourceAdjustmentMetrics("Translation", "DecreaseParallelism", currentTranslation, newCount, "High load detected", status);
                 return;
@@ -940,7 +940,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 var newCount = Math.Max(1, currentOcr - 1);
                 RecreateSemaphore(ref _ocrSemaphore, newCount, _settings.MaxOcrParallelism);
                 _logger.LogInformation("OCR並列度減少: {Old} → {New}", currentOcr, newCount);
-                
+
                 // Phase 4.1: リソース調整メトリクス記録
                 RecordResourceAdjustmentMetrics("OCR", "DecreaseParallelism", currentOcr, newCount, "High load + Translation at minimum", status);
             }
@@ -957,7 +957,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     private async Task IncreaseParallelismAsync()
     {
         var status = await GetCurrentResourceStatusAsync(_disposalCts.Token).ConfigureAwait(false);
-        
+
         lock (_semaphoreLock)
         {
             // OCRの並列度を優先的に回復
@@ -967,7 +967,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 var newCount = Math.Min(_settings.MaxOcrParallelism, currentOcr + 1);
                 RecreateSemaphore(ref _ocrSemaphore, newCount, _settings.MaxOcrParallelism);
                 _logger.LogInformation("OCR並列度増加: {Old} → {New}", currentOcr, newCount);
-                
+
                 // Phase 4.1: リソース調整メトリクス記録
                 RecordResourceAdjustmentMetrics("OCR", "IncreaseParallelism", currentOcr, newCount, "Low load detected - OCR priority recovery", status);
                 return;
@@ -981,7 +981,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 var newCount = Math.Min(_settings.MaxTranslationParallelism, currentTranslation + 1);
                 RecreateSemaphore(ref _translationSemaphore, newCount, _settings.MaxTranslationParallelism);
                 _logger.LogInformation("翻訳並列度増加: {Old} → {New}", currentTranslation, newCount);
-                
+
                 // Phase 4.1: リソース調整メトリクス記録
                 RecordResourceAdjustmentMetrics("Translation", "IncreaseParallelism", currentTranslation, newCount, "Low load + OCR stable", status);
             }
@@ -1025,7 +1025,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
         var snapshots = _recentStatusHistory.ToArray();
         var recentScores = snapshots.TakeLast(5).Select(s => s.CompositeScore).ToArray();
-        
+
         if (recentScores.Length < 3)
             return LoadTrend.Stable;
 
@@ -1033,10 +1033,10 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         var n = recentScores.Length;
         var xMean = (n - 1) / 2.0;
         var yMean = recentScores.Average();
-        
+
         var numerator = 0.0;
         var denominator = 0.0;
-        
+
         for (int i = 0; i < n; i++)
         {
             var x = i;
@@ -1044,26 +1044,26 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             numerator += (x - xMean) * (y - yMean);
             denominator += (x - xMean) * (x - xMean);
         }
-        
+
         var slope = denominator != 0 ? numerator / denominator : 0.0;
-        
+
         // ボラティリティ計算（標準偏差）
         var variance = recentScores.Select(s => Math.Pow(s - yMean, 2)).Average();
         var volatility = Math.Sqrt(variance);
-        
+
         // トレンド判定
         const double trendThreshold = 2.0; // 傾きの閾値
         const double volatilityThreshold = 15.0; // ボラティリティ閾値
-        
+
         if (volatility > volatilityThreshold)
             return LoadTrend.Volatile;
-        
+
         if (slope > trendThreshold)
             return LoadTrend.Increasing;
-        
+
         if (slope < -trendThreshold)
             return LoadTrend.Decreasing;
-        
+
         return LoadTrend.Stable;
     }
 
@@ -1075,29 +1075,29 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     {
         var timeSinceLastAdjustment = (now - _lastThresholdCrossTime).TotalSeconds;
         var timeSinceLastTrendChange = (now - _lastTrendChangeTime).TotalSeconds;
-        
+
         // 高負荷時の即座対応（従来通り）
         if (isHighLoad)
         {
             // ただし、Volatileトレンド中は頻繁な調整を避ける
             if (trend == LoadTrend.Volatile && timeSinceLastAdjustment < _settings.HysteresisTimeoutSeconds * 2)
                 return (false, false);
-                
+
             return (false, true); // 減少
         }
-        
+
         // 低負荷時の智能的判定
         if (isLowLoad)
         {
             var baseWaitTime = _settings.HysteresisTimeoutSeconds;
             var adjustedWaitTime = CalculateAdaptiveWaitTime(trend, baseWaitTime, timeSinceLastTrendChange);
-            
+
             if (timeSinceLastAdjustment > adjustedWaitTime)
             {
                 return (true, false); // 増加
             }
         }
-        
+
         return (false, false); // 調整なし
     }
 
@@ -1125,7 +1125,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         {
             var oldSettings = _settings;
             var differences = oldSettings.GetDifferences(newSettings);
-            
+
             if (!differences.Any())
             {
                 if (newSettings.EnableVerboseLogging)
@@ -1138,12 +1138,12 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             // 設定妥当性検証
             if (!newSettings.IsValid())
             {
-                _logger.LogWarning("⚠️ [PHASE3] 無効な設定値が検出されました。変更を無視します: {InvalidSettings}", 
+                _logger.LogWarning("⚠️ [PHASE3] 無効な設定値が検出されました。変更を無視します: {InvalidSettings}",
                     string.Join(", ", differences));
                 return;
             }
 
-            _logger.LogInformation("🔄 [PHASE3] 設定変更を適用中: {Changes}", 
+            _logger.LogInformation("🔄 [PHASE3] 設定変更を適用中: {Changes}",
                 string.Join(", ", differences));
 
             // 設定を原子的に更新
@@ -1208,7 +1208,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
                     _ocrSemaphore.Dispose();
                     _ocrSemaphore = newOcrSemaphore;
-                    
+
                     _logger.LogInformation("🔄 [PHASE3] OCR並列度制限変更: {Old} → {New} (現在: {Current})",
                         oldSettings.MaxOcrParallelism, newSettings.MaxOcrParallelism, currentOcrCount);
                 }
@@ -1223,7 +1223,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
 
                     _translationSemaphore.Dispose();
                     _translationSemaphore = newTranslationSemaphore;
-                    
+
                     _logger.LogInformation("🔄 [PHASE3] Translation並列度制限変更: {Old} → {New} (現在: {Current})",
                         oldSettings.MaxTranslationParallelism, newSettings.MaxTranslationParallelism, currentTranslationCount);
                 }
@@ -1244,9 +1244,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         try
         {
             // Phase 3: 閾値設定の動的変更完了（_settingsから直接参照）
-            
+
             _logger.LogInformation("🔄 [PHASE3] リソース閾値変更が適用されました: CPU:{CpuHigh}%, Memory:{MemoryHigh}%, GPU:{GpuHigh}%, VRAM:{VramHigh}%",
-                newSettings.CpuHighThreshold, newSettings.MemoryHighThreshold, 
+                newSettings.CpuHighThreshold, newSettings.MemoryHighThreshold,
                 newSettings.GpuHighThreshold, newSettings.VramHighThreshold);
         }
         catch (Exception ex)
@@ -1255,20 +1255,20 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             throw;
         }
     }
-    
+
     /// <summary>
     /// Phase 4.1: リソース調整メトリクス記録ヘルパー
     /// </summary>
     private void RecordResourceAdjustmentMetrics(
-        string componentName, 
-        string adjustmentType, 
-        int oldValue, 
-        int newValue, 
-        string reason, 
+        string componentName,
+        string adjustmentType,
+        int oldValue,
+        int newValue,
+        string reason,
         ResourceStatus status)
     {
         if (_metricsCollector == null) return;
-        
+
         try
         {
             var metrics = new ResourceAdjustmentMetrics
@@ -1284,9 +1284,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                 VramUsage = status.VramUsage,
                 Timestamp = DateTime.UtcNow
             };
-            
+
             _metricsCollector.RecordResourceAdjustment(metrics);
-            
+
             if (_settings.EnableVerboseLogging)
             {
                 _logger.LogTrace("📊 [PHASE4.1] リソース調整メトリクス記録: {Component} {Type} {OldValue}→{NewValue}",
@@ -1333,7 +1333,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             _resourceMonitor?.Dispose();
 
             _logger.LogInformation("🔄 [PHASE3] HybridResourceManager正常終了（ホットリロード機能含む）");
-            
+
             // Phase 4.1: メトリクスコレクターの終了処理
             _metricsCollector?.Dispose();
         }

@@ -18,8 +18,8 @@ namespace Baketa.Core.Services.Imaging;
 /// <param name="height">高さ</param>
 /// <param name="format">画像フォーマット</param>
 public class CoreImage(byte[] pixelData, int width, int height, ImageFormat format) : DisposableBase, IImage
-    {
-        private byte[] _pixelData = pixelData ?? throw new ArgumentNullException(nameof(pixelData));
+{
+    private byte[] _pixelData = pixelData ?? throw new ArgumentNullException(nameof(pixelData));
 
     /// <inheritdoc/>
     public int Width { get; } = width;
@@ -52,10 +52,10 @@ public class CoreImage(byte[] pixelData, int width, int height, ImageFormat form
 
     /// <inheritdoc/>
     public Task<byte[]> ToByteArrayAsync()
-        {
-            ThrowIfDisposed();
-            return Task.FromResult<byte[]>([.. _pixelData]);
-        }
+    {
+        ThrowIfDisposed();
+        return Task.FromResult<byte[]>([.. _pixelData]);
+    }
 
     /// <summary>
     /// 画像データの読み取り専用メモリを取得（IImage拡張対応）
@@ -73,59 +73,59 @@ public class CoreImage(byte[] pixelData, int width, int height, ImageFormat form
     /// </summary>
     public PixelDataLock LockPixelData() => throw new NotSupportedException("CoreImageは生ピクセルデータアクセスをサポートしません（WindowsImageを使用してください）");
 
-        /// <summary>
-        /// 画像データのバイト配列を取得します
-        /// </summary>
-        /// <returns>画像データのバイト配列</returns>
-        public IReadOnlyList<byte> Bytes => [.. _pixelData];
-        
-        /// <inheritdoc/>
-        public IImage Clone()
-        {
-            ThrowIfDisposed();
-            var resultBytes = new byte[_pixelData.Length];
-            Buffer.BlockCopy(_pixelData, 0, resultBytes, 0, _pixelData.Length);
-            return new CoreImage(resultBytes, Width, Height, Format);
-        }
-        
-        /// <inheritdoc/>
-        public Task<IImage> ResizeAsync(int width, int height)
-        {
-            ThrowIfDisposed();
-            
-            // 実際の実装では適切なリサイズアルゴリズムを使用する
-            // 空の配列を使用
-            byte[] newData = [];
-            
-            // リサイズロジックを実装...
-            
-            return Task.FromResult<IImage>(new CoreImage(newData, width, height, Format));
-        }
-        
-        /// <summary>
-        /// オブジェクトが破棄されている場合に例外をスローします
-        /// </summary>
-        protected new void ThrowIfDisposed()
-        {
-            ObjectDisposedException.ThrowIf(IsDisposed(), nameof(CoreImage));
-        }
-        
-        /// <summary>
-        /// ピクセルあたりのバイト数
-        /// </summary>
-        protected int BytesPerPixel => Format switch
-        {
-            ImageFormat.Rgb24 => 3,
-            ImageFormat.Rgba32 => 4,
-            ImageFormat.Grayscale8 => 1,
-            _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
-        };
-        
-        /// <summary>
-        /// マネージドリソースを解放します
-        /// </summary>
-        protected override void DisposeManagedResources()
-        {
-            _pixelData = [];
-        }
+    /// <summary>
+    /// 画像データのバイト配列を取得します
+    /// </summary>
+    /// <returns>画像データのバイト配列</returns>
+    public IReadOnlyList<byte> Bytes => [.. _pixelData];
+
+    /// <inheritdoc/>
+    public IImage Clone()
+    {
+        ThrowIfDisposed();
+        var resultBytes = new byte[_pixelData.Length];
+        Buffer.BlockCopy(_pixelData, 0, resultBytes, 0, _pixelData.Length);
+        return new CoreImage(resultBytes, Width, Height, Format);
     }
+
+    /// <inheritdoc/>
+    public Task<IImage> ResizeAsync(int width, int height)
+    {
+        ThrowIfDisposed();
+
+        // 実際の実装では適切なリサイズアルゴリズムを使用する
+        // 空の配列を使用
+        byte[] newData = [];
+
+        // リサイズロジックを実装...
+
+        return Task.FromResult<IImage>(new CoreImage(newData, width, height, Format));
+    }
+
+    /// <summary>
+    /// オブジェクトが破棄されている場合に例外をスローします
+    /// </summary>
+    protected new void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(IsDisposed(), nameof(CoreImage));
+    }
+
+    /// <summary>
+    /// ピクセルあたりのバイト数
+    /// </summary>
+    protected int BytesPerPixel => Format switch
+    {
+        ImageFormat.Rgb24 => 3,
+        ImageFormat.Rgba32 => 4,
+        ImageFormat.Grayscale8 => 1,
+        _ => throw new NotSupportedException($"未サポートのフォーマット: {Format}")
+    };
+
+    /// <summary>
+    /// マネージドリソースを解放します
+    /// </summary>
+    protected override void DisposeManagedResources()
+    {
+        _pixelData = [];
+    }
+}

@@ -10,10 +10,10 @@ public class PortRegistry
 {
     [JsonPropertyName("active_ports")]
     public List<int> ActivePorts { get; set; } = [];
-    
+
     [JsonPropertyName("servers")]
     public Dictionary<string, ServerInfo> Servers { get; set; } = [];
-    
+
     [JsonPropertyName("last_updated")]
     public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
 }
@@ -25,16 +25,16 @@ public class ServerInfo
 {
     [JsonPropertyName("language_pair")]
     public required string LanguagePair { get; set; }
-    
+
     [JsonPropertyName("pid")]
     public required int Pid { get; set; }
-    
+
     [JsonPropertyName("started_at")]
     public double StartedAt { get; set; }
-    
+
     [JsonPropertyName("status")]
     public required string Status { get; set; }
-    
+
     [JsonPropertyName("last_health_check")]
     public DateTime? LastHealthCheck { get; set; }
 }
@@ -58,7 +58,7 @@ public class GlobalPortRegistry
 {
     [JsonPropertyName("ports")]
     public Dictionary<string, PortEntry> Ports { get; set; } = [];
-    
+
     [JsonPropertyName("last_updated")]
     public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
 }
@@ -70,10 +70,10 @@ public class PortEntry
 {
     [JsonPropertyName("pid")]
     public int Pid { get; set; }
-    
+
     [JsonPropertyName("last_heartbeat")]
     public DateTime LastHeartbeat { get; set; } = DateTime.UtcNow;
-    
+
     [JsonPropertyName("metadata")]
     public Dictionary<string, object>? Metadata { get; set; }
 }

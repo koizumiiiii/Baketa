@@ -17,12 +17,12 @@ namespace Baketa.Application.Services.UI;
 public sealed class OverlayPositioningService : IOverlayPositioningService
 {
     private readonly ILogger<OverlayPositioningService> _logger;
-    
+
     public OverlayPositioningService(ILogger<OverlayPositioningService> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-    
+
     /// <summary>
     /// 精密オーバーレイ位置調整（DPI/マルチモニター対応）
     /// Phase 2対応の8段階精密位置調整システム
@@ -35,30 +35,30 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         OverlayPositioningOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(textChunk);
-        
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         options ??= new OverlayPositioningOptions();
         existingOverlayBounds ??= [];
-        
+
         try
         {
-            _logger.LogDebug("精密位置調整開始 - ChunkId: {ChunkId}, Monitor: {MonitorName}", 
+            _logger.LogDebug("精密位置調整開始 - ChunkId: {ChunkId}, Monitor: {MonitorName}",
                 textChunk.ChunkId, targetMonitor.Name);
-                
+
             // 1. DPI/スケール補正適用
             var scaledTextBounds = ApplyDpiScaling(textChunk.CombinedBounds, targetMonitor);
             var scaledOverlaySize = ApplyDpiScaling(overlaySize, targetMonitor);
             var scaledMonitorBounds = ConvertWorkAreaToRectangle(targetMonitor);
-            
+
             // 2. 8段階戦略による候補位置生成
             var candidatePositions = GenerateAdvancedCandidatePositions(
                 scaledTextBounds, scaledOverlaySize, scaledMonitorBounds, options);
-            
+
             // 3. 優先順位に基づく最適位置選択
             var selectedPosition = SelectOptimalPosition(
-                candidatePositions, scaledOverlaySize, scaledMonitorBounds, 
+                candidatePositions, scaledOverlaySize, scaledMonitorBounds,
                 existingOverlayBounds, options);
-            
+
             // 4. 結果情報構築
             var result = new PositioningResult
             {
@@ -69,10 +69,10 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
                 DpiCorrectionApplied = true,
                 ComputationTimeMs = stopwatch.Elapsed.TotalMilliseconds
             };
-            
-            _logger.LogDebug("精密位置調整完了 - Strategy: {Strategy}, Position: {Position}, Time: {TimeMs}ms", 
+
+            _logger.LogDebug("精密位置調整完了 - Strategy: {Strategy}, Position: {Position}, Time: {TimeMs}ms",
                 result.UsedStrategy, result.Position, result.ComputationTimeMs);
-                
+
             return result;
         }
         catch (ArgumentException ex)
@@ -90,19 +90,19 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
             stopwatch.Stop();
         }
     }
-    
+
     /// <summary>
     /// 基本位置調整（従来互換）
     /// </summary>
     public Point CalculateBasicPosition(TextChunk textChunk, Size overlaySize, Rectangle screenBounds)
     {
         ArgumentNullException.ThrowIfNull(textChunk);
-        
+
         _logger.LogDebug("基本位置調整 - ChunkId: {ChunkId}", textChunk.ChunkId);
-        
+
         return CalculateBasicPositionInternal(textChunk.CombinedBounds, overlaySize, screenBounds);
     }
-    
+
     /// <summary>
     /// 衝突回避付き位置調整（従来互換）
     /// </summary>
@@ -111,26 +111,26 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
     {
         ArgumentNullException.ThrowIfNull(textChunk);
         ArgumentNullException.ThrowIfNull(existingOverlayBounds);
-        
-        _logger.LogDebug("衝突回避位置調整 - ChunkId: {ChunkId}, ExistingOverlays: {Count}", 
+
+        _logger.LogDebug("衝突回避位置調整 - ChunkId: {ChunkId}, ExistingOverlays: {Count}",
             textChunk.ChunkId, existingOverlayBounds.Count);
-        
+
         return CalculatePositionWithCollisionAvoidanceInternal(
             textChunk.CombinedBounds, overlaySize, screenBounds, existingOverlayBounds);
     }
-    
+
     #region Private Helper Methods
-    
+
     /// <summary>
     /// フォールバック結果作成
     /// </summary>
     private PositioningResult CreateFallbackResult(
-        TextChunk textChunk, Size overlaySize, MonitorInfo targetMonitor, 
+        TextChunk textChunk, Size overlaySize, MonitorInfo targetMonitor,
         IReadOnlyList<Rectangle> existingOverlayBounds, System.Diagnostics.Stopwatch stopwatch)
     {
         var fallbackPosition = CalculatePositionWithCollisionAvoidanceInternal(
             textChunk.CombinedBounds, overlaySize, ConvertWorkAreaToRectangle(targetMonitor), existingOverlayBounds);
-            
+
         return new PositioningResult
         {
             Position = fallbackPosition,
@@ -141,7 +141,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
             ComputationTimeMs = stopwatch.Elapsed.TotalMilliseconds
         };
     }
-    
+
     /// <summary>
     /// MonitorInfo.WorkArea から System.Drawing.Rectangle への変換
     /// </summary>
@@ -155,7 +155,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
             (int)Math.Round(workArea.Height)
         );
     }
-    
+
     /// <summary>
     /// DPI/スケール補正を適用
     /// </summary>
@@ -168,7 +168,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
             (int)Math.Round(rect.Height * monitor.ScaleFactorY)
         );
     }
-    
+
     /// <summary>
     /// サイズにDPI/スケール補正を適用
     /// </summary>
@@ -179,7 +179,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
             (int)Math.Round(size.Height * monitor.ScaleFactorY)
         );
     }
-    
+
     /// <summary>
     /// 8段階戦略による候補位置生成
     /// </summary>
@@ -187,7 +187,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         Rectangle textBounds, Size overlaySize, Rectangle monitorBounds, OverlayPositioningOptions options)
     {
         var margin = options.StandardMargin;
-        
+
         return new List<CandidatePosition>
         {
             // 1. テキスト直上（最優先：原文を隠さない）
@@ -247,7 +247,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
             }
         };
     }
-    
+
     /// <summary>
     /// 安全な優先順位取得（設定ミス対策）
     /// </summary>
@@ -256,7 +256,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         var index = Array.IndexOf(priorities, defaultStrategy);
         return index >= 0 ? index + 1 : defaultStrategy; // 見つからない場合はデフォルト値使用
     }
-    
+
     /// <summary>
     /// 優先順位に基づく最適位置選択
     /// </summary>
@@ -265,12 +265,12 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         IReadOnlyList<Rectangle> existingOverlayBounds, OverlayPositioningOptions options)
     {
         var sortedCandidates = candidates.OrderBy(c => c.Priority).ToList();
-        
+
         foreach (var candidate in sortedCandidates)
         {
-            var candidateRect = new Rectangle(candidate.Position.X, candidate.Position.Y, 
+            var candidateRect = new Rectangle(candidate.Position.X, candidate.Position.Y,
                                             overlaySize.Width, overlaySize.Height);
-            
+
             // 1. モニター境界チェック（マージン考慮）
             var adjustedMonitorBounds = new Rectangle(
                 monitorBounds.X + options.MonitorBoundaryMargin,
@@ -278,14 +278,14 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
                 monitorBounds.Width - (options.MonitorBoundaryMargin * 2),
                 monitorBounds.Height - (options.MonitorBoundaryMargin * 2)
             );
-            
+
             if (!adjustedMonitorBounds.Contains(candidateRect))
                 continue;
-            
+
             // 2. 衝突検知チェック
             if (HasSignificantCollision(candidateRect, existingOverlayBounds, options.CollisionThreshold))
                 continue;
-            
+
             // 3. 有効な位置を発見
             return new SelectionResult
             {
@@ -294,12 +294,12 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
                 CollisionAvoidanceApplied = false
             };
         }
-        
+
         // 4. 基本戦略で配置できない場合は動的オフセット調整
-        return ApplyDynamicOffsetAdjustment(candidates.First(), overlaySize, 
+        return ApplyDynamicOffsetAdjustment(candidates.First(), overlaySize,
                                           monitorBounds, existingOverlayBounds, options);
     }
-    
+
     /// <summary>
     /// 動的オフセット調整による位置最適化
     /// </summary>
@@ -310,12 +310,12 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         var basePosition = baseCandidate.Position;
         var stepSize = options.DynamicOffsetStep;
         var maxSteps = options.MaxDynamicOffsetSteps;
-        
+
         // X軸方向の調整を優先
         for (int step = 1; step <= maxSteps; step++)
         {
             var offsetX = step * stepSize;
-            
+
             // 右方向への調整
             var rightPosition = new Point(basePosition.X + offsetX, basePosition.Y);
             if (IsPositionValid(rightPosition, overlaySize, monitorBounds, existingOverlayBounds, options))
@@ -327,7 +327,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
                     CollisionAvoidanceApplied = true
                 };
             }
-            
+
             // 左方向への調整
             var leftPosition = new Point(basePosition.X - offsetX, basePosition.Y);
             if (IsPositionValid(leftPosition, overlaySize, monitorBounds, existingOverlayBounds, options))
@@ -340,12 +340,12 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
                 };
             }
         }
-        
+
         // Y軸方向の調整
         for (int step = 1; step <= maxSteps; step++)
         {
             var offsetY = step * stepSize;
-            
+
             // 下方向への調整
             var downPosition = new Point(basePosition.X, basePosition.Y + offsetY);
             if (IsPositionValid(downPosition, overlaySize, monitorBounds, existingOverlayBounds, options))
@@ -357,7 +357,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
                     CollisionAvoidanceApplied = true
                 };
             }
-            
+
             // 上方向への調整
             var upPosition = new Point(basePosition.X, basePosition.Y - offsetY);
             if (IsPositionValid(upPosition, overlaySize, monitorBounds, existingOverlayBounds, options))
@@ -370,13 +370,13 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
                 };
             }
         }
-        
+
         // 最終フォールバック: 座標クランプ
         var clampedX = Math.Max(monitorBounds.Left + options.MonitorBoundaryMargin,
                        Math.Min(monitorBounds.Right - overlaySize.Width - options.MonitorBoundaryMargin, basePosition.X));
         var clampedY = Math.Max(monitorBounds.Top + options.MonitorBoundaryMargin,
                        Math.Min(monitorBounds.Bottom - overlaySize.Height - options.MonitorBoundaryMargin, basePosition.Y));
-        
+
         return new SelectionResult
         {
             Position = new Point(clampedX, clampedY),
@@ -384,7 +384,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
             CollisionAvoidanceApplied = true
         };
     }
-    
+
     /// <summary>
     /// 位置の有効性を検証
     /// </summary>
@@ -392,7 +392,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         IReadOnlyList<Rectangle> existingOverlayBounds, OverlayPositioningOptions options)
     {
         var candidateRect = new Rectangle(position.X, position.Y, overlaySize.Width, overlaySize.Height);
-        
+
         // モニター境界チェック
         var adjustedMonitorBounds = new Rectangle(
             monitorBounds.X + options.MonitorBoundaryMargin,
@@ -400,35 +400,35 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
             monitorBounds.Width - (options.MonitorBoundaryMargin * 2),
             monitorBounds.Height - (options.MonitorBoundaryMargin * 2)
         );
-        
+
         if (!adjustedMonitorBounds.Contains(candidateRect))
             return false;
-        
+
         // 衝突検知チェック
         return !HasSignificantCollision(candidateRect, existingOverlayBounds, options.CollisionThreshold);
     }
-    
+
     /// <summary>
     /// 有意な衝突があるかチェック
     /// </summary>
-    private static bool HasSignificantCollision(Rectangle candidateRect, 
+    private static bool HasSignificantCollision(Rectangle candidateRect,
         IReadOnlyList<Rectangle> existingOverlayBounds, int threshold)
     {
         foreach (var existingBounds in existingOverlayBounds)
         {
             if (!candidateRect.IntersectsWith(existingBounds))
                 continue;
-            
+
             var intersection = Rectangle.Intersect(candidateRect, existingBounds);
             var overlapArea = intersection.Width * intersection.Height;
-            
+
             if (overlapArea > threshold)
                 return true;
         }
-        
+
         return false;
     }
-    
+
     /// <summary>
     /// 基本位置調整内部実装
     /// </summary>
@@ -448,7 +448,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         foreach (var pos in positions.OrderBy(p => p.Priority))
         {
             var candidateRect = new Rectangle(pos.X, pos.Y, overlaySize.Width, overlaySize.Height);
-            
+
             if (screenBounds.Contains(candidateRect))
             {
                 return new Point(pos.X, pos.Y);
@@ -456,14 +456,14 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         }
 
         // 座標クランプ
-        var clampedX = Math.Max(screenBounds.Left, 
+        var clampedX = Math.Max(screenBounds.Left,
                        Math.Min(screenBounds.Right - overlaySize.Width, textBounds.X));
-        var clampedY = Math.Max(screenBounds.Top, 
+        var clampedY = Math.Max(screenBounds.Top,
                        Math.Min(screenBounds.Bottom - overlaySize.Height, textBounds.Bottom + 5));
-                       
+
         return new Point(clampedX, clampedY);
     }
-    
+
     /// <summary>
     /// 衝突回避付き位置調整内部実装
     /// </summary>
@@ -486,7 +486,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         foreach (var pos in positions.OrderBy(p => p.Priority))
         {
             var candidateRect = new Rectangle(pos.X, pos.Y, overlaySize.Width, overlaySize.Height);
-            
+
             if (!screenBounds.Contains(candidateRect))
                 continue;
 
@@ -510,7 +510,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         var basePosition = CalculateBasicPositionInternal(textBounds, overlaySize, screenBounds);
         return FindNonCollidingPositionInternal(basePosition, overlaySize, screenBounds, existingOverlayBounds);
     }
-    
+
     /// <summary>
     /// 衝突回避位置検索内部実装
     /// </summary>
@@ -518,19 +518,19 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
     {
         const int stepSize = 10;
         const int maxSteps = 20;
-        
+
         // X軸方向の調整
         for (int step = 1; step <= maxSteps; step++)
         {
             var offsetX = step * stepSize;
-            
+
             var rightPosition = new Point(basePosition.X + offsetX, basePosition.Y);
             var rightRect = new Rectangle(rightPosition.X, rightPosition.Y, overlaySize.Width, overlaySize.Height);
             if (screenBounds.Contains(rightRect) && !HasCollisionWithExistingOverlays(rightRect, existingOverlayBounds))
             {
                 return rightPosition;
             }
-            
+
             var leftPosition = new Point(basePosition.X - offsetX, basePosition.Y);
             var leftRect = new Rectangle(leftPosition.X, leftPosition.Y, overlaySize.Width, overlaySize.Height);
             if (screenBounds.Contains(leftRect) && !HasCollisionWithExistingOverlays(leftRect, existingOverlayBounds))
@@ -543,14 +543,14 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         for (int step = 1; step <= maxSteps; step++)
         {
             var offsetY = step * stepSize;
-            
+
             var downPosition = new Point(basePosition.X, basePosition.Y + offsetY);
             var downRect = new Rectangle(downPosition.X, downPosition.Y, overlaySize.Width, overlaySize.Height);
             if (screenBounds.Contains(downRect) && !HasCollisionWithExistingOverlays(downRect, existingOverlayBounds))
             {
                 return downPosition;
             }
-            
+
             var upPosition = new Point(basePosition.X, basePosition.Y - offsetY);
             var upRect = new Rectangle(upPosition.X, upPosition.Y, overlaySize.Width, overlaySize.Height);
             if (screenBounds.Contains(upRect) && !HasCollisionWithExistingOverlays(upRect, existingOverlayBounds))
@@ -561,7 +561,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
 
         return basePosition;
     }
-    
+
     /// <summary>
     /// 既存オーバーレイとの衝突チェック
     /// </summary>
@@ -569,11 +569,11 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
     {
         return existingOverlayBounds.Any(existingBounds => candidateRect.IntersectsWith(existingBounds));
     }
-    
+
     #endregion
-    
+
     #region Helper Classes
-    
+
     /// <summary>
     /// 候補位置情報
     /// </summary>
@@ -583,7 +583,7 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         public PositioningStrategy Strategy { get; init; }
         public int Priority { get; init; }
     }
-    
+
     /// <summary>
     /// 選択結果情報
     /// </summary>
@@ -593,6 +593,6 @@ public sealed class OverlayPositioningService : IOverlayPositioningService
         public PositioningStrategy Strategy { get; init; }
         public bool CollisionAvoidanceApplied { get; init; }
     }
-    
+
     #endregion
 }

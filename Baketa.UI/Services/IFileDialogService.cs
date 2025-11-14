@@ -16,8 +16,8 @@ public interface IFileDialogService
     /// <param name="fileTypeFilters">ファイルタイプのフィルタ</param>
     /// <returns>選択されたファイルパス。キャンセルされた場合はnull</returns>
     Task<string?> ShowSaveFileDialogAsync(
-        string title, 
-        string? defaultFileName = null, 
+        string title,
+        string? defaultFileName = null,
         IReadOnlyList<FileTypeFilter>? fileTypeFilters = null);
 
     /// <summary>
@@ -28,8 +28,8 @@ public interface IFileDialogService
     /// <param name="allowMultiple">複数ファイルの選択を許可するか</param>
     /// <returns>選択されたファイルパス。キャンセルされた場合はnull</returns>
     Task<IReadOnlyList<string>?> ShowOpenFileDialogAsync(
-        string title, 
-        IReadOnlyList<FileTypeFilter>? fileTypeFilters = null, 
+        string title,
+        IReadOnlyList<FileTypeFilter>? fileTypeFilters = null,
         bool allowMultiple = false);
 
     /// <summary>

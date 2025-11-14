@@ -45,13 +45,13 @@ public sealed class ResourceMonitoringHostedService : IHostedService, IDisposabl
         }
 
         _logger.LogInformation("🚀 Phase 3.2: VRAM監視5-tier圧迫度レベル判定システム開始");
-        _logger.LogInformation("⚙️ 監視間隔: {IntervalMs}ms, GPU監視: {EnableGpu}", 
+        _logger.LogInformation("⚙️ 監視間隔: {IntervalMs}ms, GPU監視: {EnableGpu}",
             _settings.MonitoringIntervalMs, _settings.EnableGpuMonitoring);
 
         // 定期実行タイマー開始
         _monitoringTimer = new System.Threading.Timer(
-            ExecuteVramMonitoring, 
-            null, 
+            ExecuteVramMonitoring,
+            null,
             TimeSpan.FromSeconds(1), // 1秒後に最初の実行
             TimeSpan.FromMilliseconds(_settings.MonitoringIntervalMs));
 

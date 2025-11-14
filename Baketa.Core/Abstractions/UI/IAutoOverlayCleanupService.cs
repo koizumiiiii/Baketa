@@ -21,7 +21,7 @@ public interface IAutoOverlayCleanupService : IDisposable
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     Task InitializeAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 指定領域のオーバーレイを手動で削除
     /// </summary>
@@ -30,15 +30,15 @@ public interface IAutoOverlayCleanupService : IDisposable
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>削除されたオーバーレイ数</returns>
     Task<int> CleanupOverlaysInRegionAsync(
-        IntPtr windowHandle, 
-        IReadOnlyList<Rectangle> regions, 
+        IntPtr windowHandle,
+        IReadOnlyList<Rectangle> regions,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// サービスの統計情報を取得
     /// </summary>
     AutoOverlayCleanupStatistics GetStatistics();
-    
+
     /// <summary>
     /// Circuit Breaker設定を更新
     /// </summary>
@@ -56,32 +56,32 @@ public sealed class AutoOverlayCleanupStatistics
     /// 処理したイベント総数
     /// </summary>
     public int TotalEventsProcessed { get; init; }
-    
+
     /// <summary>
     /// 実際に削除したオーバーレイ数
     /// </summary>
     public int OverlaysCleanedUp { get; init; }
-    
+
     /// <summary>
     /// 信頼度不足で却下した削除要求数
     /// </summary>
     public int RejectedByConfidence { get; init; }
-    
+
     /// <summary>
     /// レート制限により却下した削除要求数
     /// </summary>
     public int RejectedByRateLimit { get; init; }
-    
+
     /// <summary>
     /// 平均処理時間（ミリ秒）
     /// </summary>
     public double AverageProcessingTimeMs { get; init; }
-    
+
     /// <summary>
     /// 最後のイベント処理時刻
     /// </summary>
     public DateTime? LastEventProcessedAt { get; init; }
-    
+
     /// <summary>
     /// エラー発生数
     /// </summary>

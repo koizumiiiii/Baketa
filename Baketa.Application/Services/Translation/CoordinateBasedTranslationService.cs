@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -6,25 +6,25 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Baketa.Core.Abstractions.Configuration;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
+using Baketa.Core.Events.Diagnostics;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Logging;
+using Baketa.Core.Models.OCR;
+using Baketa.Core.Performance;
+using Baketa.Core.Settings;
+using Baketa.Core.Translation.Models;
+using Baketa.Core.Utilities;
+using Baketa.Infrastructure.OCR.BatchProcessing;
+using Baketa.Infrastructure.Translation.Local;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.Processing;
-using Baketa.Core.Abstractions.Configuration;
-using Baketa.Core.Utilities;
-using Baketa.Core.Translation.Models;
-using Baketa.Core.Settings;
-using Baketa.Core.Performance;
-using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Logging;
-using Baketa.Core.Events.EventTypes;
-using Baketa.Core.Events.Diagnostics;
-using Baketa.Core.Models.OCR;
-using Baketa.Infrastructure.OCR.BatchProcessing;
-using Baketa.Infrastructure.Translation.Local;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 
 namespace Baketa.Application.Services.Translation;
 
@@ -61,15 +61,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _textChunkAggregatorService = textChunkAggregatorService ?? throw new ArgumentNullException(nameof(textChunkAggregatorService));
         _pipelineService = pipelineService ?? throw new ArgumentNullException(nameof(pipelineService)); // 🎯 [OPTION_A] パイプラインサービス注入
         _logger = logger;
-        
+
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
         _eventAggregator = _configurationFacade.EventAggregator;
-        
+
         if (_streamingTranslationService != null)
         {
             Console.WriteLine("🔥 [STREAMING] ストリーミング翻訳サービスが利用可能");
         }
-        
+
         // 🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合完了
         Console.WriteLine("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合完了 - 時間軸集約システム有効化");
         _logger?.LogInformation("🎯 TimedChunkAggregator統合完了 - 翻訳品質40-60%向上機能有効化");
@@ -88,7 +88,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             EventAggregatorHash = _configurationFacade.EventAggregator.GetHashCode(),
             EventAggregatorReference = _configurationFacade.EventAggregator.ToString()
         });
-        
+
         // 統一設定サービス注入時の設定値確認
         try
         {
@@ -104,7 +104,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         {
             _configurationFacade.Logger?.LogError("CoordinateBasedTranslationService", "設定値の取得に失敗", ex);
         }
-        
+
         _logger?.LogInformation("🚀 CoordinateBasedTranslationService initialized - Hash: {Hash}", this.GetHashCode());
     }
 
@@ -117,13 +117,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         {
             // 🚨 [SETTINGS_BASED_ONLY] 設定ファイルの値のみを使用（動的言語検出削除）
             var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
-            
+
             // 🚨 [SIMPLIFIED] AutoDetectSourceLanguage削除 - 常に設定ファイルの値を使用
             var sourceLanguageCode = translationSettings.DefaultSourceLanguage;
             var targetLanguageCode = translationSettings.DefaultTargetLanguage;
-            
+
             Console.WriteLine($"🔍 [SETTINGS_BASED] 設定ファイルベースの言語ペア: {sourceLanguageCode} → {targetLanguageCode}");
-            
+
             _logger?.LogDebug("🔍 [SETTINGS_BASED] 設定ファイルベースの言語ペア: {Source} → {Target}", sourceLanguageCode, targetLanguageCode);
 
             // Language enumに変換（統一ユーティリティ使用）
@@ -142,22 +142,22 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             return (Language.Japanese, Language.English);
         }
     }
-    
+
 
     /// <summary>
     /// 座標ベース翻訳処理を実行
     /// バッチOCR処理 → 複数ウィンドウオーバーレイ表示の統合フロー
     /// </summary>
     public async Task ProcessWithCoordinateBasedTranslationAsync(
-        IAdvancedImage image, 
+        IAdvancedImage image,
         IntPtr windowHandle,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
-            _logger?.LogInformation("🎯 座標ベース翻訳処理開始 - 画像: {Width}x{Height}, ウィンドウ: 0x{Handle:X}", 
+            _logger?.LogInformation("🎯 座標ベース翻訳処理開始 - 画像: {Width}x{Height}, ウィンドウ: 0x{Handle:X}",
                 image.Width, image.Height, windowHandle.ToInt64());
             _logger?.LogDebug($"🎯 座標ベース翻訳処理開始 - 画像: {image.Width}x{image.Height}, ウィンドウ: 0x{windowHandle.ToInt64():X}");
             Console.WriteLine($"🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {image.Width}x{image.Height}");
@@ -170,10 +170,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             // バッチOCR処理でテキストチャンクを取得（詳細時間測定）
             var ocrMeasurement = new PerformanceMeasurement(
-                MeasurementType.BatchOcrProcessing, 
+                MeasurementType.BatchOcrProcessing,
                 $"バッチOCR処理 - 画像:{image.Width}x{image.Height}")
                 .WithAdditionalInfo($"WindowHandle:0x{windowHandle.ToInt64():X}");
-            
+
             // 🔄 [PADDLE_OCR_RESET] OCR処理前にPaddleOCR失敗カウンターをリセット（緊急修正）
             try
             {
@@ -277,7 +277,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogDebug($"🎯 [OPTION_A] OCR結果取得 - ChunkCount: {textChunks.Count}");
             _logger?.LogDebug("🎯 [OPTION_A] OCR結果取得 - ChunkCount: {ChunkCount}, CancellationToken.IsCancellationRequested: {IsCancellationRequested}",
                 textChunks.Count, cancellationToken.IsCancellationRequested);
-            
+
             // 🚀 [FIX] OCR完了後はキャンセル無視でバッチ翻訳を実行（並列チャンク処理実現のため）
             if (textChunks.Count > 0 && cancellationToken.IsCancellationRequested)
             {
@@ -285,10 +285,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 // 🔥 [FILE_CONFLICT_FIX_6] ファイルアクセス競合回避のためILogger使用
                 _logger?.LogDebug("🚀 [PARALLEL_CHUNKS_FIX] OCR完了後のキャンセル要求を無視してバッチ翻訳を実行");
             }
-            
+
             var ocrResult = ocrMeasurement.Complete();
             var ocrProcessingTime = ocrResult.Duration;
-            
+
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms",
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
 
@@ -327,7 +327,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // 🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合 - 時間軸集約による翻訳品質向上
             _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - 時間軸集約システム");
             _logger?.LogInformation("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - OCRチャンク数: {Count}", textChunks.Count);
-            
+
             try
             {
                 // 🚨 [ULTRA_DEBUG] tryブロック到達確認
@@ -368,7 +368,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] チャンク追加 - ChunkId: {ChunkId}, Text: '{Text}'",
                         chunk.ChunkId, chunk.CombinedText);
                 }
-                
+
                 // 注意: TimedChunkAggregatorはイベント駆動型設計
                 // 集約完了時にOnChunksAggregatedコールバックが自動的に呼ばれる
                 // 現在の同期的翻訳フローでは、チャンク追加のみ実行し、従来通り処理継続
@@ -381,7 +381,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 _logger?.LogError(ex, "🚨 [TIMED_AGGREGATOR] TimedChunkAggregator処理でエラー - 元のチャンクを使用");
                 Console.WriteLine($"🚨 [TIMED_AGGREGATOR] エラーのため元のチャンクを使用: {ex.Message}");
             }
-            
+
             // 🚨 [ULTRA_DEBUG] tryブロック完了確認
             _logger?.LogDebug("🚨🚨🚨 [ULTRA_DEBUG] tryブロック完了 - Line 268到達");
 
@@ -468,82 +468,82 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             }
 
             // OCR完了イベントは既に90行目で発行済み（二重発行バグ修正）
-            
+
             // 実際の翻訳処理を実行（バッチ処理で高速化）
             Console.WriteLine($"🚨 [CRITICAL_FIX] バッチ翻訳処理開始直前 - チャンク数: {textChunks.Count}, CancellationToken.IsCancellationRequested: {cancellationToken.IsCancellationRequested}");
             // 🔥 [FILE_CONFLICT_FIX_9] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("🚨 [CRITICAL_FIX] バッチ翻訳処理開始直前 - チャンク数: {ChunkCount}, IsCancellationRequested: {IsCancellationRequested}", 
+            _logger?.LogDebug("🚨 [CRITICAL_FIX] バッチ翻訳処理開始直前 - チャンク数: {ChunkCount}, IsCancellationRequested: {IsCancellationRequested}",
                 textChunks.Count, cancellationToken.IsCancellationRequested);
-            
+
             _logger?.LogInformation("🌐 バッチ翻訳処理開始 - チャンク数: {Count}", textChunks.Count);
             _logger?.LogDebug($"🌐 バッチ翻訳処理開始 - チャンク数: {textChunks.Count}");
-            
+
             // 翻訳サービスの詳細情報をログ出力
             var serviceType = _processingFacade.TranslationService.GetType().Name;
             _logger?.LogDebug($"🔧 使用中の翻訳サービス: {serviceType}");
-            
+
             // 🚀 Phase 2: バッチ翻訳の実装
             Console.WriteLine($"🔍 [CHUNK_DEBUG] Total textChunks received: {textChunks.Count}");
             // 🔥 [FILE_CONFLICT_FIX_10] ファイルアクセス競合回避のためILogger使用
             _logger?.LogDebug("🔍 [CHUNK_DEBUG] Total textChunks received: {Count}", textChunks.Count);
-            
+
             // 空でないテキストチャンクを抽出
             var nonEmptyChunks = textChunks.Where(c => !string.IsNullOrWhiteSpace(c.CombinedText)).ToList();
             var emptyChunks = textChunks.Where(c => string.IsNullOrWhiteSpace(c.CombinedText)).ToList();
-            
+
             Console.WriteLine($"🔍 [CHUNK_DEBUG] NonEmpty chunks: {nonEmptyChunks.Count}, Empty chunks: {emptyChunks.Count}");
             // 🔥 [FILE_CONFLICT_FIX_11] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("🔍 [CHUNK_DEBUG] NonEmpty chunks: {NonEmpty}, Empty chunks: {Empty}", 
+            _logger?.LogDebug("🔍 [CHUNK_DEBUG] NonEmpty chunks: {NonEmpty}, Empty chunks: {Empty}",
                 nonEmptyChunks.Count, emptyChunks.Count);
-                
+
             // チャンク詳細をダンプ
             for (int i = 0; i < Math.Min(textChunks.Count, 3); i++)
             {
                 var chunk = textChunks[i];
                 Console.WriteLine($"🔍 [CHUNK_DEBUG] Chunk[{i}]: Text='{chunk.CombinedText}', IsEmpty={string.IsNullOrWhiteSpace(chunk.CombinedText)}");
                 // 🔥 [FILE_CONFLICT_FIX_12] ファイルアクセス競合回避のためILogger使用
-                _logger?.LogDebug("🔍 [CHUNK_DEBUG] Chunk[{Index}]: Text='{Text}', IsEmpty={IsEmpty}", 
+                _logger?.LogDebug("🔍 [CHUNK_DEBUG] Chunk[{Index}]: Text='{Text}', IsEmpty={IsEmpty}",
                     i, chunk.CombinedText, string.IsNullOrWhiteSpace(chunk.CombinedText));
             }
-            
+
             // 空のチャンクは翻訳をスキップ
             foreach (var emptyChunk in emptyChunks)
             {
                 emptyChunk.TranslatedText = "";
             }
-            
+
             if (nonEmptyChunks.Count > 0)
             {
                 using var batchTranslationMeasurement = new PerformanceMeasurement(
-                    MeasurementType.TranslationProcessing, 
+                    MeasurementType.TranslationProcessing,
                     $"バッチ翻訳処理 - {nonEmptyChunks.Count}チャンク")
                     .WithAdditionalInfo($"Service:{serviceType}");
-                
+
                 // バッチ翻訳リクエストを作成
                 var batchTexts = nonEmptyChunks.Select(c => c.CombinedText).ToList();
-                
+
                 try
                 {
                     _logger?.LogInformation("🚀 [BATCH_PROCESSING] バッチ翻訳試行開始 - テキスト数: {Count}", batchTexts.Count);
-                    
+
                     // 🔥 [STREAMING] ストリーミング翻訳を試行（段階的結果表示）
                     // 🚀 [DYNAMIC_LANGUAGE_FIX] 最初のテキストチャンクから言語を動的検出
                     var firstText = nonEmptyChunks.FirstOrDefault()?.CombinedText ?? "";
                     var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings(firstText);
-                    
+
                     List<string> batchResults;
                     if (_streamingTranslationService != null)
                     {
                         Console.WriteLine("🔥 [STREAMING] ストリーミング翻訳サービス使用 - 段階的表示開始");
-                        
+
                         // 🚨 [BATCH_CRITICAL] ストリーミング翻訳サービス呼び出し前の詳細ログ
                         Console.WriteLine($"🚨 [BATCH_STREAMING] ストリーミング翻訳呼び出し前 - StreamingService: {_streamingTranslationService?.GetType().Name}");
                         Console.WriteLine($"🔍 [BATCH_STREAMING] バッチテキスト数: {batchTexts?.Count}, SourceLang: {sourceLanguage?.Code}, TargetLang: {targetLanguage?.Code}");
                         Console.WriteLine($"🔍 [TRANSLATION_FLOW] バッチ翻訳開始 - テキスト数: {batchTexts.Count}, 言語: {sourceLanguage.Code} → {targetLanguage.Code}");
-                        
+
                         // 🔥 [FILE_CONFLICT_FIX_13] ファイルアクセス競合回避のためILogger使用
                         _logger?.LogDebug("🔥 [STREAMING] ストリーミング翻訳サービス使用 - 段階的表示開始");
-                        
+
                         // 段階的結果表示のコールバック関数を定義
                         void OnChunkCompleted(int index, string translatedText)
                         {
@@ -551,10 +551,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             {
                                 var chunk = nonEmptyChunks[index];
                                 chunk.TranslatedText = translatedText;
-                                
+
                                 Console.WriteLine($"✨ [STREAMING] チャンク完了 [{index + 1}/{nonEmptyChunks.Count}] - " +
                                                 $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText[..30] + "..." : chunk.CombinedText)}'");
-                                
+
                                 // 🚀 [STREAMING_OVERLAY_FIX] 翻訳完了時に即座にオーバーレイ表示
                                 if (!cancellationToken.IsCancellationRequested)
                                 {
@@ -564,7 +564,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                                         {
                                             // Task内での再度のキャンセル確認（確実な停止のため）
                                             cancellationToken.ThrowIfCancellationRequested();
-                                            
+
                                             if (_processingFacade.OverlayManager != null && chunk.CanShowInPlace())
                                             {
                                                 // 🚫 Phase 11.2: 重複表示修正 - 直接オーバーレイ表示を無効化
@@ -590,7 +590,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                                 }
                             }
                         }
-                        
+
                         // 🛑 [STOP_FIX] キャンセル要求を適切に処理（無視しない）
                         if (cancellationToken.IsCancellationRequested)
                         {
@@ -598,25 +598,25 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             Console.WriteLine("🛑 [STOP_FIX] Stop要求により翻訳処理を中断 - オーバーレイ表示をスキップ");
                             return; // 確実に処理を中断
                         }
-                        
+
                         // キャンセル要求を無視せず、適切に伝播
                         var translationToken = cancellationToken;
-                        
+
                         Console.WriteLine($"🚀 [BATCH_TRANSLATION] TranslateBatchWithStreamingAsync呼び出し直前");
-                        
+
                         // 🚨 [BATCH_CRITICAL] StreamingService呼び出し直前の最終確認ログ
                         Console.WriteLine($"🚨 [FINAL_CHECK] StreamingService.TranslateBatchWithStreamingAsync呼び出し直前");
                         Console.WriteLine($"🔍 [FINAL_CHECK] テキスト配列: [{string.Join(", ", batchTexts.Take(3).Select(t => $"'{t[..Math.Min(20, t.Length)]}...'"))}]");
-                        
+
                         batchResults = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
                             batchTexts,
                             sourceLanguage,
                             targetLanguage,
                             OnChunkCompleted,
                             translationToken).ConfigureAwait(false);
-                        
+
                         Console.WriteLine($"✅ [BATCH_TRANSLATION] TranslateBatchWithStreamingAsync完了 - 結果数: {batchResults?.Count ?? 0}");
-                        
+
                         // 🚨 [BATCH_RESULT] 結果詳細のログ出力
                         Console.WriteLine($"🚨 [BATCH_RESULT] TranslateBatchWithStreamingAsync完了後の詳細ログ");
                         if (batchResults != null && batchResults.Count > 0)
@@ -641,51 +641,51 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             targetLanguage,
                             cancellationToken).ConfigureAwait(false);
                     }
-                    
+
                     // 結果をチャンクに反映
                     for (int i = 0; i < nonEmptyChunks.Count && i < batchResults.Count; i++)
                     {
                         nonEmptyChunks[i].TranslatedText = batchResults[i];
                         _logger?.LogDebug($"   [{nonEmptyChunks[i].ChunkId}] '{nonEmptyChunks[i].CombinedText}' → '{batchResults[i]}'");
                     }
-                    
+
                     var batchResult = batchTranslationMeasurement.Complete();
-                    _logger?.LogInformation("✅ バッチ翻訳完了: {Count}チャンク, {Duration}ms", 
+                    _logger?.LogInformation("✅ バッチ翻訳完了: {Count}チャンク, {Duration}ms",
                         nonEmptyChunks.Count, batchResult.Duration.TotalMilliseconds);
                 }
                 catch (NotImplementedException)
                 {
                     // バッチ翻訳が未実装の場合は個別処理にフォールバック
                     _logger?.LogWarning("⚠️ バッチ翻訳未実装のため個別処理にフォールバック");
-                    
+
                     foreach (var chunk in nonEmptyChunks)
                     {
                         try
                         {
                             using var chunkTranslationMeasurement = new PerformanceMeasurement(
-                                MeasurementType.TranslationProcessing, 
+                                MeasurementType.TranslationProcessing,
                                 $"チャンク翻訳処理 - ChunkId:{chunk.ChunkId}, テキスト:'{chunk.CombinedText}' ({chunk.CombinedText.Length}文字)")
                                 .WithAdditionalInfo($"Service:{serviceType}");
-                                
+
                             // 🚀 [DYNAMIC_LANGUAGE_FIX] チャンクごとに動的言語検出を実行
                             var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings(chunk.CombinedText);
                             var translationResult = await _processingFacade.TranslationService.TranslateAsync(
-                                chunk.CombinedText, 
-                                sourceLanguage, 
-                                targetLanguage, 
+                                chunk.CombinedText,
+                                sourceLanguage,
+                                targetLanguage,
                                 null,
                                 cancellationToken).ConfigureAwait(false);
-                            
+
                             var chunkResult = chunkTranslationMeasurement.Complete();
-                            
+
                             // 翻訳結果の詳細をログ出力
                             var engineName = translationResult.EngineName ?? "Unknown";
                             _logger?.LogDebug($"🔧 翻訳エンジン: {engineName}, 成功: {translationResult.IsSuccess}, 時間: {chunkResult.Duration.TotalMilliseconds:F1}ms");
-                                
+
                             // 🛡️ [ERROR_SKIP] エラー結果（IsSuccess=false）のオーバーレイ表示をスキップ
                             Console.WriteLine($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
                             _logger?.LogDebug($"🔍 [DEBUG_FILTER] 翻訳結果チェック - IsSuccess: {translationResult.IsSuccess}, Text: '{translationResult.TranslatedText}'");
-                            
+
                             if (translationResult.IsSuccess)
                             {
                                 chunk.TranslatedText = translationResult.TranslatedText ?? string.Empty;
@@ -696,13 +696,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             {
                                 Console.WriteLine($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}");
                                 _logger?.LogDebug($"🚫 [ERROR_SKIP] 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {chunk.ChunkId}, エラー: '{translationResult.TranslatedText}'");
-                                _logger?.LogWarning("🚫 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {ChunkId}, エラー: {Error}", 
+                                _logger?.LogWarning("🚫 翻訳エラーのためオーバーレイ表示をスキップ - ChunkId: {ChunkId}, エラー: {Error}",
                                     chunk.ChunkId, translationResult.TranslatedText);
                                 chunk.TranslatedText = ""; // エラー時は空文字に設定してオーバーレイ表示を阻止
                                 continue; // 次のチャンクに進む
                             }
-                            
-                            _logger?.LogDebug("🌐 翻訳完了 - ChunkId: {ChunkId}, 原文: '{Original}', 翻訳: '{Translated}'", 
+
+                            _logger?.LogDebug("🌐 翻訳完了 - ChunkId: {ChunkId}, 原文: '{Original}', 翻訳: '{Translated}'",
                                 chunk.ChunkId, chunk.CombinedText, chunk.TranslatedText);
                             _logger?.LogDebug($"🌐 翻訳完了 - ChunkId: {chunk.ChunkId}, 原文: '{chunk.CombinedText}', 翻訳: '{chunk.TranslatedText}'");
                         }
@@ -721,8 +721,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 // 🔥 [FILE_CONFLICT_FIX_14] ファイルアクセス競合回避のためILogger使用
                 _logger?.LogDebug("❌ [CHUNK_DEBUG] No non-empty chunks found! Skipping translation.");
             }
-            
-            _logger?.LogInformation("✅ 翻訳処理完了 - 処理チャンク数: {Count}, 成功チャンク数: {SuccessCount}", 
+
+            _logger?.LogInformation("✅ 翻訳処理完了 - 処理チャンク数: {Count}, 成功チャンク数: {SuccessCount}",
                 textChunks.Count, textChunks.Count(c => !string.IsNullOrEmpty(c.TranslatedText) && !c.TranslatedText.StartsWith("[翻訳エラー]", StringComparison.Ordinal)));
 
             // インプレースオーバーレイ表示を優先的に使用
@@ -742,7 +742,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
                 _logger?.LogInformation("🎯 インプレースオーバーレイ表示開始 - チャンク数: {Count}", textChunks.Count);
                 _logger?.LogDebug($"🎯 インプレースオーバーレイ表示開始 - チャンク数: {textChunks.Count}");
-                
+
                 try
                 {
                     // 🔧 [OVERLAY_UNIFICATION] IOverlayManagerには InitializeAsync メソッドがないため削除
@@ -756,32 +756,32 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         _logger?.LogDebug($"   インプレース表示可能: {chunk.CanShowInPlace()}");
                         _logger?.LogDebug($"   元座標: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})");
                         _logger?.LogDebug($"   元サイズ: ({chunk.CombinedBounds.Width},{chunk.CombinedBounds.Height})");
-                        
+
                         // 🛡️ [ERROR_PROTECTION] 失敗・エラー結果の表示を包括的に防止
                         var hasValidTranslation = TranslationValidator.IsValid(chunk.TranslatedText, chunk.CombinedText);
-                        
+
                         _logger?.LogDebug($"   翻訳結果: '{chunk.TranslatedText}'");
                         _logger?.LogDebug($"   原文: '{chunk.CombinedText}'");
                         _logger?.LogDebug($"   有効な翻訳: {hasValidTranslation}");
-                        
+
                         // 🔍 [DEBUG] TranslatedTextの初期値と翻訳後の値を確認
                         if (!string.IsNullOrEmpty(chunk.TranslatedText) && chunk.TranslatedText == chunk.CombinedText)
                         {
                             _logger?.LogDebug($"   ⚠️ [WARNING] TranslatedTextが原文と同じ: '{chunk.TranslatedText}'");
                             Console.WriteLine($"⚠️ [WARNING] TranslatedTextが原文と同じ - ChunkId: {chunk.ChunkId}, Text: '{chunk.TranslatedText}'");
                         }
-                        
+
                         if (chunk.CanShowInPlace() && hasValidTranslation)
                         {
-                            _logger?.LogDebug("🎭 インプレース表示 - ChunkId: {ChunkId}, 位置: ({X},{Y}), サイズ: ({W}x{H})", 
-                                chunk.ChunkId, chunk.CombinedBounds.X, chunk.CombinedBounds.Y, 
+                            _logger?.LogDebug("🎭 インプレース表示 - ChunkId: {ChunkId}, 位置: ({X},{Y}), サイズ: ({W}x{H})",
+                                chunk.ChunkId, chunk.CombinedBounds.X, chunk.CombinedBounds.Y,
                                 chunk.CombinedBounds.Width, chunk.CombinedBounds.Height);
-                            
+
                             using var overlayMeasurement = new PerformanceMeasurement(
-                                MeasurementType.OverlayRendering, 
+                                MeasurementType.OverlayRendering,
                                 $"インプレース表示 - ChunkId:{chunk.ChunkId}, 位置:({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y})")
                                 .WithAdditionalInfo($"Text:'{chunk.TranslatedText}'");
-                            
+
                             // 🔥 [ULTRAFUIX] UltraThink Phase 9 根本修正: 実際のUI表示処理を復活
                             // 問題: Phase 11.2でコメントアウトされた表示処理により、翻訳成功しても画面に表示されない
                             // 🔧 [OVERLAY_UNIFICATION] ShowInPlaceOverlayAsync → ShowAsync に変更
@@ -824,15 +824,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             }
                         }
                     }
-                    
-                    _logger?.LogInformation("✅ インプレースオーバーレイ表示完了 - アクティブオーバーレイ数: {Count}", 
+
+                    _logger?.LogInformation("✅ インプレースオーバーレイ表示完了 - アクティブオーバーレイ数: {Count}",
                         inPlaceOverlayManager!.ActiveOverlayCount);
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "❌ インプレースオーバーレイ表示でエラーが発生");
                     _logger?.LogDebug($"❌❌❌ インプレースオーバーレイエラー: {ex.GetType().Name} - {ex.Message}");
-                    
+
                     // インプレースUIでエラーが発生した場合は従来のオーバーレイにフォールバック
                     _logger?.LogWarning("🔄 従来のオーバーレイ表示にフォールバック");
                     await DisplayInPlaceTranslationOverlay(textChunks, cancellationToken).ConfigureAwait(false);
@@ -844,10 +844,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 _logger?.LogWarning("⚠️ インプレースオーバーレイが利用できません。従来のオーバーレイを使用");
                 await DisplayInPlaceTranslationOverlay(textChunks, cancellationToken).ConfigureAwait(false);
             }
-            
+
             _logger?.LogInformation("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
             _logger?.LogDebug("🎉 座標ベース翻訳処理完了 - 座標ベース翻訳表示成功");
-            
+
             // BaketaLogManagerで座標ベース翻訳フローのパフォーマンスログを記録
             try
             {
@@ -855,7 +855,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 var processingEndTime = DateTime.Now;
                 var processingStartTime = processingEndTime.Subtract(ocrProcessingTime);
                 var totalProcessingTime = (processingEndTime - processingStartTime).TotalMilliseconds;
-                
+
                 var performanceLogEntry = new PerformanceLogEntry
                 {
                     OperationId = operationId,
@@ -875,11 +875,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         ["hasOverlay"] = true,
                         ["chunksTranslated"] = textChunks.Count(c => !string.IsNullOrEmpty(c.TranslatedText))
                     },
-                    Level = totalProcessingTime > 5000 ? PerformanceLevel.Critical 
-                          : totalProcessingTime > 2000 ? PerformanceLevel.Warning 
+                    Level = totalProcessingTime > 5000 ? PerformanceLevel.Critical
+                          : totalProcessingTime > 2000 ? PerformanceLevel.Warning
                           : PerformanceLevel.Normal
                 };
-                
+
                 BaketaLogManager.LogPerformance(performanceLogEntry);
             }
             catch (Exception logEx)
@@ -891,20 +891,20 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         {
             // 🚨 [CRITICAL_FIX] TaskCanceledException詳細をERRORレベルでログ出力
             _logger?.LogError(ex, "🚨 座標ベース翻訳処理がキャンセル/タイムアウトしました - これがバッチ翻訳実行されない根本原因");
-            
+
             Console.WriteLine($"🚨 [CRITICAL_FIX] TaskCanceledException発生: {ex.Message}");
             Console.WriteLine($"🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {ex.CancellationToken.IsCancellationRequested}");
             Console.WriteLine($"🚨 [CRITICAL_FIX] スタックトレース: {ex.StackTrace}");
-            
+
             // 🔥 [FILE_CONFLICT_FIX_15] ファイルアクセス競合回避のためILogger使用
             _logger?.LogError("🚨 [CRITICAL_FIX] TaskCanceledException発生: {Message}", ex.Message);
             // 🔥 [FILE_CONFLICT_FIX_16] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogError("🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {IsCancellationRequested}", 
+            _logger?.LogError("🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {IsCancellationRequested}",
                 ex.CancellationToken.IsCancellationRequested);
             // 🔥 [FILE_CONFLICT_FIX_17] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogError("🚨 [CRITICAL_FIX] スタックトレース: {StackTrace}", 
+            _logger?.LogError("🚨 [CRITICAL_FIX] スタックトレース: {StackTrace}",
                 ex.StackTrace?.Replace(Environment.NewLine, " | "));
-            
+
             return;
         }
         catch (Exception ex)
@@ -927,14 +927,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         // 🚨 [CRITICAL_DEBUG] メソッド開始の即座ログ出力
         Console.WriteLine($"🚨 [BATCH_CRITICAL] TranslateBatchAsync開始 - テキスト数: {texts?.Count ?? 0}");
         Console.WriteLine($"🔍 [BATCH_LANGUAGE] 受信した言語設定: Source={sourceLanguage?.Code}({sourceLanguage?.DisplayName}) → Target={targetLanguage?.Code}({targetLanguage?.DisplayName})");
-        
+
         _logger?.LogInformation("🔍 [BATCH_DEBUG] TranslateBatchAsync呼び出し開始 - テキスト数: {Count}", texts.Count);
         _logger?.LogInformation("[TIMING] CoordinateBasedTranslationService.TranslateBatchAsync開始 - テキスト数: {Count}", texts.Count);
         Console.WriteLine($"🚀 [FACADE_DEBUG] TranslationService via Facade: {_processingFacade.TranslationService?.GetType().Name}");
         // 🔥 [FILE_CONFLICT_FIX_18] ファイルアクセス競合回避のためILogger使用
-        _logger?.LogDebug("🚀 [FACADE_DEBUG] TranslationService via Facade: {ServiceType}", 
+        _logger?.LogDebug("🚀 [FACADE_DEBUG] TranslationService via Facade: {ServiceType}",
             _processingFacade.TranslationService?.GetType().Name);
-        
+
         // 🔍 [VERIFICATION] バッチ翻訳の実際の動作を検証
         // 🚀 汎用的なITranslationServiceベースのアプローチに変更
         var translationService = _processingFacade.TranslationService;
@@ -942,31 +942,31 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         {
             Console.WriteLine($"🚀 [VERIFICATION] 翻訳サービス取得成功 - バッチ翻訳検証開始: {translationService.GetType().Name}");
             _logger?.LogDebug("🚀 [VERIFICATION] 翻訳サービス取得成功 - バッチ翻訳検証開始: {ServiceType}", translationService.GetType().Name);
-                
+
             // 汎用的なバッチ翻訳処理（ITranslationServiceの標準的なアプローチ）
             Console.WriteLine($"📏 [VERIFICATION] バッチ翻訳開始 - テキスト数: {texts.Count}");
             _logger?.LogDebug("📏 [VERIFICATION] バッチ翻訳開始 - テキスト数: {Count}", texts.Count);
-            
+
             // ITranslationServiceのTranslateBatchAsyncメソッドを使用
             try
             {
                 Console.WriteLine($"🎯 [VERIFICATION] ITranslationService.TranslateBatchAsync実行開始");
                 _logger?.LogDebug("🎯 [VERIFICATION] ITranslationService.TranslateBatchAsync実行開始");
-                
+
                 var timeoutSetupStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 // 🔧 [EMERGENCY_FIX] 60秒タイムアウトを設定（Python翻訳サーバー重要処理対応）
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
                 using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
                 timeoutSetupStopwatch.Stop();
                 _logger?.LogInformation("[TIMING] タイムアウト設定: {ElapsedMs}ms", timeoutSetupStopwatch.ElapsedMilliseconds);
-                
+
                 var startTime = DateTime.Now;
                 var batchCallStopwatch = System.Diagnostics.Stopwatch.StartNew();
-                
+
                 // 翻訳品質診断: セッションID生成
                 var translationId = Guid.NewGuid().ToString("N")[..8];
                 var totalTextLength = texts.Sum(t => t?.Length ?? 0);
-                
+
                 // 翻訳品質診断: 言語検出イベント
                 await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                 {
@@ -1006,16 +1006,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
                 // ITranslationServiceのTranslateBatchAsyncメソッドを使用（文字列リスト）
                 var batchResults = await translationService.TranslateBatchAsync(
-                    texts, 
-                    sourceLanguage, 
-                    targetLanguage, 
-                    null, 
+                    texts,
+                    sourceLanguage,
+                    targetLanguage,
+                    null,
                     combinedCts.Token).ConfigureAwait(false);
-                
+
                 batchCallStopwatch.Stop();
                 var endTime = DateTime.Now;
                 var duration = endTime - startTime;
-                
+
                 // 翻訳品質診断: 翻訳実行結果イベント
                 var isTranslationSuccess = batchResults != null && batchResults.Any(r => r.IsSuccess);
                 await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
@@ -1025,7 +1025,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     ProcessingTimeMs = (long)duration.TotalMilliseconds,
                     SessionId = translationId,
                     Severity = isTranslationSuccess ? DiagnosticSeverity.Information : DiagnosticSeverity.Warning,
-                    Message = isTranslationSuccess 
+                    Message = isTranslationSuccess
                         ? $"フォールバック翻訳実行成功: {batchResults?.Count(r => r.IsSuccess) ?? 0}/{batchResults?.Count ?? 0}件"
                         : "フォールバック翻訳実行失敗",
                     Metrics = new Dictionary<string, object>
@@ -1037,21 +1037,21 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         { "UsedEngine", engineName }
                     }
                 }).ConfigureAwait(false);
-                
+
                 Console.WriteLine($"✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {duration.TotalMilliseconds:F0}ms");
                 _logger?.LogDebug("✅ [VERIFICATION] バッチ翻訳完了 - 実行時間: {Duration:F0}ms", duration.TotalMilliseconds);
                 _logger?.LogInformation("[TIMING] ITranslationService.TranslateBatchAsync実行: {ElapsedMs}ms", batchCallStopwatch.ElapsedMilliseconds);
-                
+
                 // 結果を詳細分析
                 if (batchResults != null && batchResults.Count > 0)
                 {
                     var successCount = batchResults.Count(r => r.IsSuccess);
                     var translations = batchResults.Select(r => r.TranslatedText ?? "").ToList();
-                    
+
                     Console.WriteLine($"🔍 [VERIFICATION] 結果分析: SuccessCount={successCount}/{batchResults.Count}, Translations={translations.Count}");
-                    _logger?.LogDebug("🔍 [VERIFICATION] 結果分析: SuccessCount={SuccessCount}/{TotalCount}, Translations={TranslationCount}", 
+                    _logger?.LogDebug("🔍 [VERIFICATION] 結果分析: SuccessCount={SuccessCount}/{TotalCount}, Translations={TranslationCount}",
                         successCount, batchResults.Count, translations.Count);
-                    
+
                     if (successCount == batchResults.Count)
                     {
                         // 🔍 翻訳品質診断: 高精度言語比較による翻訳失敗検出（フォールバックルート）
@@ -1066,7 +1066,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                                     // 改良された翻訳失敗検出ロジック（フォールバックバッチ処理）
                                     // TODO: 将来的に言語検出APIが統合された場合に高精度検出を実装予定
                                     var isSameText = string.Equals(texts[i].Trim(), translations[i].Trim(), StringComparison.OrdinalIgnoreCase);
-                                    
+
                                     if (isSameText)
                                     {
                                         sameLanguageCount++;
@@ -1095,7 +1095,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             ProcessingTimeMs = 0,
                             SessionId = translationId,
                             Severity = qualityIsGood ? DiagnosticSeverity.Information : DiagnosticSeverity.Warning,
-                            Message = qualityIsGood 
+                            Message = qualityIsGood
                                 ? $"フォールバック翻訳品質良好: 全{translations.Count}件成功（改良された診断検証済み）"
                                 : $"フォールバック翻訳品質問題検出: {sameLanguageCount}件翻訳失敗（改良された診断使用）",
                             Metrics = new Dictionary<string, object>
@@ -1223,35 +1223,35 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         Console.WriteLine($"🌟 [BATCH_DEBUG] バッチ翻訳が利用できないため個別翻訳にフォールバック");
         // 🔥 [FILE_CONFLICT_FIX_30] ファイルアクセス競合回避のためILogger使用
         _logger?.LogDebug("🌟 [BATCH_DEBUG] バッチ翻訳が利用できないため個別翻訳にフォールバック");
-        
-        
+
+
         // 🔧 一時的に並列処理を無効化（TransformersOpusMtEngineのIOException問題調査のため）
         var results = new List<string>();
-        
+
         _logger?.LogInformation("🔄 順次翻訳開始 - チャンク数: {Count}", texts.Count);
-        
+
         foreach (var text in texts)
         {
             try
             {
                 Console.WriteLine($"🌍 [FACADE_DEBUG] Individual translate call for: '{text[..Math.Min(20, text.Length)]}...'");
                 // 🔥 [FILE_CONFLICT_FIX_31] ファイルアクセス競合回避のためILogger使用
-                _logger?.LogDebug("🌍 [FACADE_DEBUG] Individual translate call for: '{TextPreview}...'", 
+                _logger?.LogDebug("🌍 [FACADE_DEBUG] Individual translate call for: '{TextPreview}...'",
                     text[..Math.Min(20, text.Length)]);
-                    
+
                 var result = await _processingFacade.TranslationService.TranslateAsync(
                     text, sourceLanguage, targetLanguage, null, cancellationToken)
                     .ConfigureAwait(false);
-                    
+
                 Console.WriteLine($"🔍 [FACADE_DEBUG] Translation result: IsSuccess={result?.IsSuccess}, Text='{result?.TranslatedText?[..Math.Min(20, result?.TranslatedText?.Length ?? 0)] ?? "null"}...'");
                 // 🔥 [FILE_CONFLICT_FIX_32] ファイルアクセス競合回避のためILogger使用
-                _logger?.LogDebug("🔍 [FACADE_DEBUG] Translation result: IsSuccess={IsSuccess}, Text='{TextPreview}...'", 
+                _logger?.LogDebug("🔍 [FACADE_DEBUG] Translation result: IsSuccess={IsSuccess}, Text='{TextPreview}...'",
                     result?.IsSuccess, result?.TranslatedText?[..Math.Min(20, result?.TranslatedText?.Length ?? 0)] ?? "null");
                 results.Add(result.TranslatedText ?? "[Translation Failed]");
-                
-                _logger?.LogDebug("✅ 順次翻訳完了: {Text} → {Result}", 
+
+                _logger?.LogDebug("✅ 順次翻訳完了: {Text} → {Result}",
                     text.Length > 20 ? string.Concat(text.AsSpan(0, 20), "...") : text,
-                    (result.TranslatedText ?? "[Translation Failed]").Length > 20 ? 
+                    (result.TranslatedText ?? "[Translation Failed]").Length > 20 ?
                         string.Concat(result.TranslatedText.AsSpan(0, 20), "...") : result.TranslatedText ?? "[Translation Failed]");
             }
             catch (TaskCanceledException)
@@ -1265,28 +1265,28 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 _logger?.LogError(ex, "❌ 翻訳エラー: {Text}", text.Length > 20 ? string.Concat(text.AsSpan(0, 20), "...") : text);
             }
         }
-        
-        _logger?.LogInformation("🏁 順次翻訳完了 - 成功: {Success}/{Total}", 
+
+        _logger?.LogInformation("🏁 順次翻訳完了 - 成功: {Success}/{Total}",
             results.Count(r => !r.StartsWith('[')), results.Count);
-        
+
         return results;
     }
 
     // OPUS-MT削除済み: TransformersOpusMtEngine関連機能はNLLB-200統一により不要
-    
-    
+
+
     /// <summary>
     /// インプレース翻訳オーバーレイ表示
     /// </summary>
     private async Task DisplayInPlaceTranslationOverlay(
-        IReadOnlyList<TextChunk> textChunks, 
+        IReadOnlyList<TextChunk> textChunks,
         CancellationToken cancellationToken)
     {
         try
         {
             _logger?.LogDebug("🖼️ インプレース翻訳オーバーレイ表示開始");
             _logger?.LogDebug("🖼️ インプレース翻訳オーバーレイ表示開始");
-            
+
             _logger?.LogDebug($"🔥🔥🔥 インプレース翻訳オーバーレイ表示直前 - overlayManager null?: {_processingFacade.OverlayManager == null}");
             if (_processingFacade.OverlayManager != null)
             {
@@ -1295,7 +1295,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 {
                     // 🚫 [TRANSLATION_ONLY] 失敗・エラー結果の表示を包括的に防止
                     var hasValidTranslation = TranslationValidator.IsValid(textChunk.TranslatedText, textChunk.CombinedText);
-                    
+
                     if (hasValidTranslation)
                     {
                         // 🚫 Phase 11.2: 重複表示修正 - DisplayInPlaceTranslationOverlay内も無効化
@@ -1336,7 +1336,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         Console.WriteLine($"🔥 [DEBUG] PublishOcrCompletedEventAsync呼び出し開始: チャンク数={textChunks.Count}");
         // 🔥 [FILE_CONFLICT_FIX_33] ファイルアクセス競合回避のためILogger使用
         _logger?.LogDebug("🔥 [DEBUG] PublishOcrCompletedEventAsync呼び出し開始: チャンク数={ChunkCount}", textChunks.Count);
-        
+
         try
         {
             Console.WriteLine($"🔥 [DEBUG] SelectMany実行開始 - textChunks.Count={textChunks.Count}");
@@ -1344,9 +1344,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             Console.WriteLine($"🔥 [DEBUG] SelectMany実行完了 - positionedResults作成成功");
             Console.WriteLine($"🔥 [DEBUG] TextResults検証: チャンク数={textChunks.Count}, positionedResults数={positionedResults.Count}");
             // 🔥 [FILE_CONFLICT_FIX_34] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogDebug("🔥 [DEBUG] TextResults検証: チャンク数={ChunkCount}, positionedResults数={ResultsCount}", 
+            _logger?.LogDebug("🔥 [DEBUG] TextResults検証: チャンク数={ChunkCount}, positionedResults数={ResultsCount}",
                 textChunks.Count, positionedResults.Count);
-            
+
             Console.WriteLine($"🔥 [DEBUG] 条件判定: positionedResults.Count={positionedResults.Count}, 条件結果={positionedResults.Count > 0}");
             if (positionedResults.Count > 0)
             {
@@ -1396,26 +1396,26 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 }).ToList();
 
                 Console.WriteLine($"🔥 [DEBUG] OcrResult作成完了 - ocrResults数: {ocrResults.Count}");
-                
+
                 var ocrCompletedEvent = new OcrCompletedEvent(
                     sourceImage: image,
                     results: ocrResults,
                     processingTime: processingTime);
-                    
+
                 Console.WriteLine($"🔥 [DEBUG] OcrCompletedEvent作成完了 - ID: {ocrCompletedEvent.Id}");
-                    
+
                 _logger?.LogDebug("🔥 OCR完了イベント発行開始 - Results: {ResultCount}", ocrResults.Count);
                 Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ocrResults.Count}");
                 // 🔥 [FILE_CONFLICT_FIX_35] ファイルアクセス競合回避のためILogger使用
                 _logger?.LogDebug("🔥 [DEBUG] OCR完了イベント発行開始 - Results: {ResultCount}", ocrResults.Count);
-                
+
                 try
                 {
                     Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し直前");
                     Console.WriteLine($"🔥 [DEBUG] EventAggregator型: {_configurationFacade.EventAggregator.GetType().FullName}");
                     Console.WriteLine($"🔥 [DEBUG] EventAggregatorハッシュ: {_configurationFacade.EventAggregator.GetHashCode()}");
                     // 🔥 [FILE_CONFLICT_FIX_36] ファイルアクセス競合回避のためILogger使用
-                    _logger?.LogDebug("🔥 [DEBUG] PublishAsync直前 - EventAggregator型: {EventAggregatorType}, ハッシュ: {HashCode}", 
+                    _logger?.LogDebug("🔥 [DEBUG] PublishAsync直前 - EventAggregator型: {EventAggregatorType}, ハッシュ: {HashCode}",
                         _configurationFacade.EventAggregator.GetType().FullName, _configurationFacade.EventAggregator.GetHashCode());
                     await _configurationFacade.EventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
                     Console.WriteLine($"🔥 [DEBUG] EventAggregator.PublishAsync呼び出し完了");
@@ -1427,7 +1427,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     _logger?.LogError(publishEx, "🔥 [ERROR] EventAggregator.PublishAsync例外: {ExceptionType}", publishEx.GetType().Name);
                     throw;
                 }
-                
+
                 _logger?.LogDebug("🔥 OCR完了イベント発行完了 - Results: {ResultCount}", ocrResults.Count);
                 Console.WriteLine($"🔥 [DEBUG] OCR完了イベント発行完了 - Results: {ocrResults.Count}");
                 // 🔥 [FILE_CONFLICT_FIX_38] ファイルアクセス競合回避のためILogger使用
@@ -1455,18 +1455,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     public bool IsCoordinateBasedTranslationAvailable()
     {
         ThrowIfDisposed();
-        
+
         try
         {
             var batchOcrAvailable = _processingFacade.OcrProcessor != null;
             var overlayAvailable = _processingFacade.OverlayManager != null;
             var available = batchOcrAvailable && overlayAvailable;
-            
+
             _logger?.LogDebug($"🔍 [CoordinateBasedTranslationService] 座標ベース翻訳システム可用性チェック:");
             _logger?.LogDebug($"   📦 BatchOcrProcessor: {batchOcrAvailable}");
             _logger?.LogDebug($"   🖼️ OverlayManager: {overlayAvailable}");
             _logger?.LogDebug($"   ✅ 総合判定: {available}");
-            
+
             _logger?.LogDebug("🔍 座標ベース翻訳システム可用性チェック: {Available}", available);
             return available;
         }

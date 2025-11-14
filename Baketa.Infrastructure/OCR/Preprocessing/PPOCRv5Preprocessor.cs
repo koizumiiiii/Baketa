@@ -1,5 +1,5 @@
-using OpenCvSharp;
 using Baketa.Core.Utilities;
+using OpenCvSharp;
 
 namespace Baketa.Infrastructure.OCR.Preprocessing;
 
@@ -56,7 +56,7 @@ public static class PPOCRv5Preprocessor
         {
             // 画像特性を自動分析
             var characteristics = ImageCharacteristicsAnalyzer.AnalyzeImage(input);
-            
+
             // 分析結果に基づいて適応的処理
             if (characteristics.IsBrightBackground)
             {
@@ -94,9 +94,9 @@ public static class PPOCRv5Preprocessor
         }
 
         Console.WriteLine($"🚀 PP-OCRv5専用前処理開始: {input.Width}x{input.Height}, モード: {mode}");
-        
+
         var processed = new Mat();
-        
+
         try
         {
             // モードに応じた最適化処理を選択
@@ -104,51 +104,51 @@ public static class PPOCRv5Preprocessor
             {
                 case OptimizationMode.KanjiEnhanced:
                     return ProcessWithKanjiOptimization(input);
-                    
+
                 case OptimizationMode.ContrastEnhanced:
                     return ProcessWithContrastOptimization(input);
-                    
+
                 case OptimizationMode.SmallTextEnhanced:
                     return ProcessWithSmallTextOptimization(input);
-                    
+
                 case OptimizationMode.Combined:
                     return ProcessWithCombinedOptimization(input);
-                    
+
                 case OptimizationMode.UltraHighAccuracy:
                     return UltraHighAccuracyPreprocessor.ProcessForUltraAccuracy(input);
-                    
+
                 case OptimizationMode.PerfectAccuracy:
                     return UltraHighAccuracyPreprocessor.ProcessForPerfectAccuracy(input);
-                    
+
                 default: // Standard
                     break;
             }
-            
+
             // 標準処理
             // 1. V5専用適応的コントラスト強化（高精度）
             var contrastOptimized = EnhanceContrastForV5(input);
-            
+
             // 2. V5専用高周波ノイズ除去
             var denoised = RemoveHighFrequencyNoiseForV5(contrastOptimized);
-            
+
             // 3. V5多言語対応テキスト強調
             var textEnhanced = EnhanceMultilingualTextForV5(denoised);
-            
+
             // 4. V5専用シャープネス最適化
             var sharpened = OptimizeSharpnessForV5(textEnhanced);
-            
+
             // 5. V5高速処理向け最終調整
             var finalResult = ApplyV5FinalOptimization(sharpened);
-            
+
             finalResult.CopyTo(processed);
-            
+
             // リソース解放
             contrastOptimized.Dispose();
             denoised.Dispose();
             textEnhanced.Dispose();
             sharpened.Dispose();
             finalResult.Dispose();
-            
+
             Console.WriteLine($"✅ PP-OCRv5専用前処理完了");
             return processed;
         }
@@ -156,14 +156,14 @@ public static class PPOCRv5Preprocessor
         {
             Console.WriteLine($"❌ PP-OCRv5前処理エラー: {ex.Message}");
             processed?.Dispose();
-            
+
             // エラー時は元画像を返す
             var fallback = new Mat();
             input.CopyTo(fallback);
             return fallback;
         }
     }
-    
+
     /// <summary>
     /// PP-OCRv5専用適応的コントラスト強化
     /// V5の高精度認識に最適化された控えめなコントラスト調整
@@ -171,32 +171,32 @@ public static class PPOCRv5Preprocessor
     private static Mat EnhanceContrastForV5(Mat input)
     {
         Console.WriteLine($"   🔆 PP-OCRv5コントラスト強化開始");
-        
+
         var output = new Mat();
-        
+
         try
         {
             // V5専用CLAHE設定：より控えめで精密
             using var clahe = Cv2.CreateCLAHE(clipLimit: 2.0, tileGridSize: new OpenCvSharp.Size(8, 8));
-            
+
             if (input.Channels() == 3)
             {
                 // カラー画像：Lab色空間でL成分のみを精密処理
                 using var lab = new Mat();
                 using var enhancedL = new Mat();
-                
+
                 Cv2.CvtColor(input, lab, ColorConversionCodes.BGR2Lab);
                 var channels = Cv2.Split(lab);
-                
+
                 // V5では細やかなコントラスト調整が効果的
                 clahe.Apply(channels[0], enhancedL);
-                
+
                 // L成分を置き換えて統合
                 var enhancedChannels = new Mat[] { enhancedL, channels[1], channels[2] };
                 using var enhancedLab = new Mat();
                 Cv2.Merge(enhancedChannels, enhancedLab);
                 Cv2.CvtColor(enhancedLab, output, ColorConversionCodes.Lab2BGR);
-                
+
                 // リソース解放
                 foreach (var ch in channels) ch.Dispose();
                 foreach (var ch in enhancedChannels.Skip(1)) ch.Dispose();
@@ -206,7 +206,7 @@ public static class PPOCRv5Preprocessor
                 // グレースケール：直接適用
                 clahe.Apply(input, output);
             }
-            
+
             Console.WriteLine($"   ✅ PP-OCRv5コントラスト強化完了");
         }
         catch (Exception ex)
@@ -214,10 +214,10 @@ public static class PPOCRv5Preprocessor
             Console.WriteLine($"   ❌ V5コントラスト強化エラー: {ex.Message}");
             input.CopyTo(output);
         }
-        
+
         return output;
     }
-    
+
     /// <summary>
     /// PP-OCRv5専用高周波ノイズ除去
     /// V5の高感度認識に対応した精密ノイズ除去
@@ -225,20 +225,20 @@ public static class PPOCRv5Preprocessor
     private static Mat RemoveHighFrequencyNoiseForV5(Mat input)
     {
         Console.WriteLine($"   🎯 PP-OCRv5ノイズ除去開始");
-        
+
         var output = new Mat();
-        
+
         try
         {
             // V5専用：エッジ保持を重視したバイラテラルフィルタ
             // より大きなカーネルサイズでV5の高精度認識をサポート
             Cv2.BilateralFilter(input, output, d: 9, sigmaColor: 50, sigmaSpace: 50);
-            
+
             // V5向け微細ノイズ除去：ガウシアンブラーを強めに
             using var temp = new Mat();
             output.CopyTo(temp);
             Cv2.GaussianBlur(temp, output, new OpenCvSharp.Size(5, 5), 0.8);
-            
+
             Console.WriteLine($"   ✅ PP-OCRv5ノイズ除去完了");
         }
         catch (Exception ex)
@@ -246,10 +246,10 @@ public static class PPOCRv5Preprocessor
             Console.WriteLine($"   ❌ V5ノイズ除去エラー: {ex.Message}");
             input.CopyTo(output);
         }
-        
+
         return output;
     }
-    
+
     /// <summary>
     /// PP-OCRv5多言語対応テキスト強調
     /// V5の多言語同時認識機能に最適化
@@ -257,9 +257,9 @@ public static class PPOCRv5Preprocessor
     private static Mat EnhanceMultilingualTextForV5(Mat input)
     {
         Console.WriteLine($"   🌍 PP-OCRv5多言語テキスト強調開始");
-        
+
         var output = new Mat();
-        
+
         try
         {
             // グレースケール変換
@@ -272,28 +272,28 @@ public static class PPOCRv5Preprocessor
             {
                 input.CopyTo(gray);
             }
-            
+
             // V5専用：多言語対応適応的二値化
             // ブロックサイズを大きくして多様な文字サイズに対応
             using var binary = new Mat();
-            Cv2.AdaptiveThreshold(gray, binary, 
+            Cv2.AdaptiveThreshold(gray, binary,
                 maxValue: 255,
                 adaptiveMethod: AdaptiveThresholdTypes.GaussianC,
                 thresholdType: ThresholdTypes.Binary,
                 blockSize: 15,  // V5用：大きなブロックサイズ
                 c: 3);           // V5用：高めのC値
-            
+
             // V5専用：多言語文字形状に対応したモルフォロジー
             using var kernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(3, 3));
             using var cleaned = new Mat();
-            
+
             // 開放演算：ノイズ除去
             Cv2.MorphologyEx(binary, cleaned, MorphTypes.Open, kernel);
-            
+
             // 閉鎖演算：文字の隙間埋め（V5では強めに）
             using var strongKernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(2, 2));
             Cv2.MorphologyEx(cleaned, output, MorphTypes.Close, strongKernel);
-            
+
             Console.WriteLine($"   ✅ PP-OCRv5多言語テキスト強調完了");
         }
         catch (Exception ex)
@@ -301,10 +301,10 @@ public static class PPOCRv5Preprocessor
             Console.WriteLine($"   ❌ V5多言語テキスト強調エラー: {ex.Message}");
             input.CopyTo(output);
         }
-        
+
         return output;
     }
-    
+
     /// <summary>
     /// PP-OCRv5専用シャープネス最適化
     /// V5の高速処理に合わせた効率的シャープネス強化
@@ -312,22 +312,22 @@ public static class PPOCRv5Preprocessor
     private static Mat OptimizeSharpnessForV5(Mat input)
     {
         Console.WriteLine($"   ✨ PP-OCRv5シャープネス最適化開始");
-        
+
         var output = new Mat();
-        
+
         try
         {
             // V5専用：高精度Laplacianエッジ検出
             using var laplacian = new Mat();
             Cv2.Laplacian(input, laplacian, MatType.CV_64F, ksize: 3);
-            
+
             // エッジ情報を正規化
             using var laplacianNormalized = new Mat();
             laplacian.ConvertTo(laplacianNormalized, MatType.CV_8U);
-            
+
             // V5専用：控えめなエッジ統合（高速処理重視）
             Cv2.AddWeighted(input, 0.85, laplacianNormalized, 0.15, 0, output);
-            
+
             Console.WriteLine($"   ✅ PP-OCRv5シャープネス最適化完了");
         }
         catch (Exception ex)
@@ -335,10 +335,10 @@ public static class PPOCRv5Preprocessor
             Console.WriteLine($"   ❌ V5シャープネス最適化エラー: {ex.Message}");
             input.CopyTo(output);
         }
-        
+
         return output;
     }
-    
+
     /// <summary>
     /// PP-OCRv5高速処理向け最終調整
     /// V5の高速性能とバランスを取った最終最適化
@@ -346,22 +346,22 @@ public static class PPOCRv5Preprocessor
     private static Mat ApplyV5FinalOptimization(Mat input)
     {
         Console.WriteLine($"   🌟 PP-OCRv5最終最適化開始");
-        
+
         var output = new Mat();
-        
+
         try
         {
             // V5専用：高速アンシャープマスク
             using var blurred = new Mat();
             using var unsharpMask = new Mat();
-            
+
             // V5では軽微なブラーで高速化
             Cv2.GaussianBlur(input, blurred, new OpenCvSharp.Size(3, 3), 0.8);
             Cv2.AddWeighted(input, 1.3, blurred, -0.3, 0, unsharpMask);
-            
+
             // V5専用：控えめなコントラスト調整（高速処理維持）
             unsharpMask.ConvertTo(output, MatType.CV_8U, alpha: 1.05, beta: 3);
-            
+
             Console.WriteLine($"   ✅ PP-OCRv5最終最適化完了");
         }
         catch (Exception ex)
@@ -369,10 +369,10 @@ public static class PPOCRv5Preprocessor
             Console.WriteLine($"   ❌ V5最終最適化エラー: {ex.Message}");
             input.CopyTo(output);
         }
-        
+
         return output;
     }
-    
+
     /// <summary>
     /// ゲーム画面向けPP-OCRv5最適化処理
     /// ゲーム特化前処理とV5専用処理を組み合わせた最高品質処理
@@ -380,22 +380,22 @@ public static class PPOCRv5Preprocessor
     public static Mat ProcessGameImageForV5(Mat input)
     {
         Console.WriteLine($"🎮🚀 ゲーム画面PP-OCRv5専用処理開始");
-        
+
         try
         {
             // 1. ゲーム特化前処理を軽量化して適用
             using var gameProcessed = GameTextPreprocessor.ProcessGameImage(input);
-            
+
             // 2. PP-OCRv5専用最適化を追加適用
             var v5Optimized = ProcessForPPOCRv5(gameProcessed);
-            
+
             Console.WriteLine($"✅ ゲーム画面PP-OCRv5専用処理完了");
             return v5Optimized;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"❌ ゲーム画面V5処理エラー: {ex.Message}");
-            
+
             // エラー時は元画像を返す
             var fallback = new Mat();
             input.CopyTo(fallback);
@@ -409,28 +409,28 @@ public static class PPOCRv5Preprocessor
     private static Mat ProcessWithKanjiOptimization(Mat input)
     {
         Console.WriteLine($"🔍 漢字認識最適化処理開始");
-        
+
         var output = new Mat();
         try
         {
             // 細かいCLAHE（漢字の細部強調）
             using var clahe = Cv2.CreateCLAHE(clipLimit: 1.8, tileGridSize: new OpenCvSharp.Size(4, 4));
             using var contrastEnhanced = new Mat();
-            
+
             if (input.Channels() == 3)
             {
                 using var lab = new Mat();
                 Cv2.CvtColor(input, lab, ColorConversionCodes.BGR2Lab);
                 var channels = Cv2.Split(lab);
-                
+
                 using var enhancedL = new Mat();
                 clahe.Apply(channels[0], enhancedL);
-                
+
                 var enhancedChannels = new Mat[] { enhancedL, channels[1], channels[2] };
                 using var enhancedLab = new Mat();
                 Cv2.Merge(enhancedChannels, enhancedLab);
                 Cv2.CvtColor(enhancedLab, contrastEnhanced, ColorConversionCodes.Lab2BGR);
-                
+
                 foreach (var ch in channels) ch.Dispose();
                 foreach (var ch in enhancedChannels.Skip(1)) ch.Dispose();
             }
@@ -438,7 +438,7 @@ public static class PPOCRv5Preprocessor
             {
                 clahe.Apply(input, contrastEnhanced);
             }
-            
+
             // 方向性フィルタ（漢字の縦横線強調）
             using var gray = new Mat();
             if (contrastEnhanced.Channels() == 3)
@@ -449,27 +449,27 @@ public static class PPOCRv5Preprocessor
             {
                 contrastEnhanced.CopyTo(gray);
             }
-            
+
             // 横線・縦線強調カーネル
             var kernelHorizontal = new Mat(3, 3, MatType.CV_32F);
             kernelHorizontal.Set<float>(0, 0, -1); kernelHorizontal.Set<float>(0, 1, -1); kernelHorizontal.Set<float>(0, 2, -1);
-            kernelHorizontal.Set<float>(1, 0, 2);  kernelHorizontal.Set<float>(1, 1, 2);  kernelHorizontal.Set<float>(1, 2, 2);
+            kernelHorizontal.Set<float>(1, 0, 2); kernelHorizontal.Set<float>(1, 1, 2); kernelHorizontal.Set<float>(1, 2, 2);
             kernelHorizontal.Set<float>(2, 0, -1); kernelHorizontal.Set<float>(2, 1, -1); kernelHorizontal.Set<float>(2, 2, -1);
-            
+
             var kernelVertical = new Mat(3, 3, MatType.CV_32F);
             kernelVertical.Set<float>(0, 0, -1); kernelVertical.Set<float>(0, 1, 2); kernelVertical.Set<float>(0, 2, -1);
             kernelVertical.Set<float>(1, 0, -1); kernelVertical.Set<float>(1, 1, 2); kernelVertical.Set<float>(1, 2, -1);
             kernelVertical.Set<float>(2, 0, -1); kernelVertical.Set<float>(2, 1, 2); kernelVertical.Set<float>(2, 2, -1);
-            
+
             using var horizontalEnhanced = new Mat();
             using var verticalEnhanced = new Mat();
-            
+
             Cv2.Filter2D(gray, horizontalEnhanced, MatType.CV_8U, kernelHorizontal);
             Cv2.Filter2D(gray, verticalEnhanced, MatType.CV_8U, kernelVertical);
-            
+
             // 統合
             Cv2.AddWeighted(horizontalEnhanced, 0.5, verticalEnhanced, 0.5, 0, output);
-            
+
             Console.WriteLine($"✅ 漢字認識最適化完了");
             return output;
         }
@@ -488,33 +488,33 @@ public static class PPOCRv5Preprocessor
     private static Mat ProcessWithContrastOptimization(Mat input)
     {
         Console.WriteLine($"🔍 コントラスト改善最適化処理開始");
-        
+
         var output = new Mat();
         try
         {
             // 複数スケールCLAHE
             var clipLimits = new[] { 1.5, 2.5, 3.5 };
             var results = new List<Mat>();
-            
+
             foreach (var limit in clipLimits)
             {
                 using var clahe = Cv2.CreateCLAHE(clipLimit: limit, tileGridSize: new OpenCvSharp.Size(8, 8));
                 var result = new Mat();
-                
+
                 if (input.Channels() == 3)
                 {
                     using var lab = new Mat();
                     Cv2.CvtColor(input, lab, ColorConversionCodes.BGR2Lab);
                     var channels = Cv2.Split(lab);
-                    
+
                     using var enhancedL = new Mat();
                     clahe.Apply(channels[0], enhancedL);
-                    
+
                     var enhancedChannels = new Mat[] { enhancedL, channels[1], channels[2] };
                     using var enhancedLab = new Mat();
                     Cv2.Merge(enhancedChannels, enhancedLab);
                     Cv2.CvtColor(enhancedLab, result, ColorConversionCodes.Lab2BGR);
-                    
+
                     foreach (var ch in channels) ch.Dispose();
                     foreach (var ch in enhancedChannels.Skip(1)) ch.Dispose();
                 }
@@ -522,19 +522,19 @@ public static class PPOCRv5Preprocessor
                 {
                     clahe.Apply(input, result);
                 }
-                
+
                 results.Add(result);
             }
-            
+
             // 中間値を使用
             results[1].CopyTo(output);
-            
+
             // リソース解放
             foreach (var result in results)
             {
                 result.Dispose();
             }
-            
+
             Console.WriteLine($"✅ コントラスト改善最適化完了");
             return output;
         }
@@ -553,7 +553,7 @@ public static class PPOCRv5Preprocessor
     private static Mat ProcessWithSmallTextOptimization(Mat input)
     {
         Console.WriteLine($"🔍 小さなテキスト強化最適化処理開始");
-        
+
         var output = new Mat();
         try
         {
@@ -567,26 +567,26 @@ public static class PPOCRv5Preprocessor
             {
                 input.CopyTo(grayInput);
             }
-            
+
             // 2倍アップスケール
             using var upscaled = new Mat();
-            Cv2.Resize(grayInput, upscaled, new OpenCvSharp.Size(grayInput.Width * 2, grayInput.Height * 2), 
+            Cv2.Resize(grayInput, upscaled, new OpenCvSharp.Size(grayInput.Width * 2, grayInput.Height * 2),
                        interpolation: InterpolationFlags.Cubic);
-            
+
             // 適応的しきい値処理
             using var adaptive = new Mat();
-            Cv2.AdaptiveThreshold(upscaled, adaptive, 255, AdaptiveThresholdTypes.GaussianC, 
+            Cv2.AdaptiveThreshold(upscaled, adaptive, 255, AdaptiveThresholdTypes.GaussianC,
                                 ThresholdTypes.Binary, 11, 2);
-            
+
             // 軽微なノイズ除去
             using var kernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(2, 2));
             using var cleaned = new Mat();
             Cv2.MorphologyEx(adaptive, cleaned, MorphTypes.Close, kernel);
-            
+
             // 元サイズに戻す
-            Cv2.Resize(cleaned, output, new OpenCvSharp.Size(input.Width, input.Height), 
+            Cv2.Resize(cleaned, output, new OpenCvSharp.Size(input.Width, input.Height),
                        interpolation: InterpolationFlags.Area);
-            
+
             Console.WriteLine($"✅ 小さなテキスト強化最適化完了");
             return output;
         }
@@ -605,18 +605,18 @@ public static class PPOCRv5Preprocessor
     private static Mat ProcessWithCombinedOptimization(Mat input)
     {
         Console.WriteLine($"🔍 全手法統合最適化処理開始");
-        
+
         try
         {
             // 1. コントラスト改善
             using var contrastImproved = ProcessWithContrastOptimization(input);
-            
+
             // 2. 漢字認識最適化
             using var kanjiOptimized = ProcessWithKanjiOptimization(contrastImproved);
-            
+
             // 3. 小さなテキスト強化
             var smallTextEnhanced = ProcessWithSmallTextOptimization(kanjiOptimized);
-            
+
             Console.WriteLine($"✅ 全手法統合最適化完了");
             return smallTextEnhanced;
         }
@@ -751,20 +751,20 @@ public static class PPOCRv5Preprocessor
 
             // 2. 2倍アップスケール（小さなテキスト拡大）
             using var upscaled = new Mat();
-            Cv2.Resize(gray, upscaled, new OpenCvSharp.Size(gray.Width * 2, gray.Height * 2), 
+            Cv2.Resize(gray, upscaled, new OpenCvSharp.Size(gray.Width * 2, gray.Height * 2),
                        interpolation: InterpolationFlags.Cubic);
 
             // 3. 明るい画像用シャープニング
             var kernel = new Mat(3, 3, MatType.CV_32F);
-            kernel.Set<float>(0, 0, 0);  kernel.Set<float>(0, 1, -1); kernel.Set<float>(0, 2, 0);
-            kernel.Set<float>(1, 0, -1); kernel.Set<float>(1, 1, 5);  kernel.Set<float>(1, 2, -1);
-            kernel.Set<float>(2, 0, 0);  kernel.Set<float>(2, 1, -1); kernel.Set<float>(2, 2, 0);
+            kernel.Set<float>(0, 0, 0); kernel.Set<float>(0, 1, -1); kernel.Set<float>(0, 2, 0);
+            kernel.Set<float>(1, 0, -1); kernel.Set<float>(1, 1, 5); kernel.Set<float>(1, 2, -1);
+            kernel.Set<float>(2, 0, 0); kernel.Set<float>(2, 1, -1); kernel.Set<float>(2, 2, 0);
 
             using var sharpened = new Mat();
             Cv2.Filter2D(upscaled, sharpened, MatType.CV_8U, kernel);
 
             // 4. 元サイズに戻す
-            Cv2.Resize(sharpened, output, new OpenCvSharp.Size(gray.Width, gray.Height), 
+            Cv2.Resize(sharpened, output, new OpenCvSharp.Size(gray.Width, gray.Height),
                        interpolation: InterpolationFlags.Area);
 
             return output;
@@ -900,7 +900,7 @@ public static class PPOCRv5Preprocessor
             // 3. 方向性エッジ強化（漢字の横線・縦線強調）
             var kernelH = new Mat(3, 3, MatType.CV_32F);
             kernelH.Set<float>(0, 0, -1); kernelH.Set<float>(0, 1, -1); kernelH.Set<float>(0, 2, -1);
-            kernelH.Set<float>(1, 0, 2);  kernelH.Set<float>(1, 1, 2);  kernelH.Set<float>(1, 2, 2);
+            kernelH.Set<float>(1, 0, 2); kernelH.Set<float>(1, 1, 2); kernelH.Set<float>(1, 2, 2);
             kernelH.Set<float>(2, 0, -1); kernelH.Set<float>(2, 1, -1); kernelH.Set<float>(2, 2, -1);
 
             var kernelV = new Mat(3, 3, MatType.CV_32F);
@@ -994,10 +994,10 @@ public static class PPOCRv5Preprocessor
         {
             // 1. 画像特性分析
             var imageCharacteristics = ImageCharacteristicsAnalyzer.AnalyzeImage(input);
-            
+
             // 2. フォント特性分析
             var fontCharacteristics = FontSpecificPreprocessor.AnalyzeFontCharacteristics(input);
-            
+
             Console.WriteLine($"🔍 統合適応的前処理 - 分析結果:");
             Console.WriteLine($"   📸 画像タイプ: {imageCharacteristics.ImageType}");
             Console.WriteLine($"   🔤 フォントタイプ: {fontCharacteristics.DetectedType}");
@@ -1061,25 +1061,25 @@ public static class PPOCRv5Preprocessor
     {
         // フォント特性を優先し、画像特性で調整
         var baseMode = fontChar.RecommendedMode;
-        
+
         // 小さなフォント + 暗い画像 = 超高精度必要
         if (fontChar.DetectedType == FontSpecificPreprocessor.FontType.SmallThin && imageChar.IsDarkBackground)
         {
             return OptimizationMode.PerfectAccuracy;
         }
-        
+
         // 装飾フォント + 低コントラスト = 完璧な前処理必要
         if (fontChar.DetectedType == FontSpecificPreprocessor.FontType.Decorative && imageChar.IsLowContrast)
         {
             return OptimizationMode.PerfectAccuracy;
         }
-        
+
         // 標準フォント + 明るい画像 = 軽量処理で十分
         if (fontChar.DetectedType == FontSpecificPreprocessor.FontType.Standard && imageChar.IsBrightBackground)
         {
             return OptimizationMode.ContrastEnhanced;
         }
-        
+
         // ピクセルフォント = 複合処理が効果的
         if (fontChar.DetectedType == FontSpecificPreprocessor.FontType.Pixel)
         {

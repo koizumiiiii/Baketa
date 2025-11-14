@@ -1,5 +1,5 @@
-using System.Text;
 using System.IO;
+using System.Text;
 
 namespace Baketa.Core.Utilities;
 
@@ -10,7 +10,7 @@ public static class SafeFileWriter
 {
     private static readonly object _fileLock = new();
     private static readonly Dictionary<string, object> _fileLocks = new();
-    
+
     /// <summary>
     /// ファイルアクセス競合を回避して安全にログ書き込み
     /// </summary>
@@ -18,9 +18,9 @@ public static class SafeFileWriter
     {
         if (string.IsNullOrEmpty(filePath) || string.IsNullOrEmpty(content))
             return;
-            
+
         encoding ??= Encoding.UTF8;
-        
+
         // ファイルパス別の専用ロック取得
         object fileLock;
         lock (_fileLock)
@@ -31,13 +31,13 @@ public static class SafeFileWriter
                 _fileLocks[filePath] = fileLock;
             }
         }
-        
+
         // ファイル専用ロックで安全に書き込み
         lock (fileLock)
         {
             var maxRetries = 3;
             var retryDelay = 50; // 50ms
-            
+
             for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
                 try
@@ -48,7 +48,7 @@ public static class SafeFileWriter
                     {
                         Directory.CreateDirectory(directory);
                     }
-                    
+
                     // 安全な書き込み実行
                     File.AppendAllText(filePath, content, encoding);
                     return; // 成功時は即座にreturn
@@ -77,12 +77,12 @@ public static class SafeFileWriter
                     return;
                 }
             }
-            
+
             // 最大リトライ回数に達した場合
             Console.WriteLine($"⚠️ [FILE_ACCESS] ファイル書き込み失敗: {filePath} (最大リトライ回数到達)");
         }
     }
-    
+
     /// <summary>
     /// デバッグログ専用の安全書き込みメソッド
     /// </summary>
@@ -92,7 +92,7 @@ public static class SafeFileWriter
         // 構造化された診断データはPipelineDiagnosticEventとDiagnosticCollectionServiceで管理
         return;
     }
-    
+
     /// <summary>
     /// デバッグログ専用の安全書き込みメソッド（パラメータ付き）
     /// </summary>

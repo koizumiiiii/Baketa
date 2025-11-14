@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
+using Baketa.Core.Services.Imaging;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using Baketa.Core.Services.Imaging;
 
 namespace Baketa.Infrastructure.Imaging.Filters;
 
@@ -63,7 +63,7 @@ public sealed class OpenCvNoiseReductionFilter : BaseImageFilter
     /// </summary>
     protected override IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
     {
-        return 
+        return
         [
             new PipelineStepParameter("Method", "ノイズ除去方法", typeof(string), "Bilateral", allowedValues: ["Gaussian", "Bilateral", "Median", "FastNlMeansDenoising"]),
             new PipelineStepParameter("KernelSize", "Gaussian/Medianカーネルサイズ", typeof(int), 5, minValue: 3, maxValue: 15),
@@ -94,7 +94,7 @@ public sealed class OpenCvNoiseReductionFilter : BaseImageFilter
         var searchWindowSize = GetParameter<int>("SearchWindowSize");
         var iterations = GetParameter<int>("Iterations");
 
-        _logger?.LogInformation("OpenCVノイズ除去開始: Method={Method}, KernelSize={KernelSize}, Iterations={Iterations}", 
+        _logger?.LogInformation("OpenCVノイズ除去開始: Method={Method}, KernelSize={KernelSize}, Iterations={Iterations}",
             method, kernelSize, iterations);
 
         try
@@ -107,14 +107,14 @@ public sealed class OpenCvNoiseReductionFilter : BaseImageFilter
                     _logger?.LogInformation("ガウシアンノイズ除去完了: KernelSize={KernelSize}", kernelSize);
                     break;
                 case "Bilateral":
-                    _logger?.LogInformation("バイラテラルノイズ除去完了: SigmaColor={SigmaColor}, SigmaSpace={SigmaSpace}", 
+                    _logger?.LogInformation("バイラテラルノイズ除去完了: SigmaColor={SigmaColor}, SigmaSpace={SigmaSpace}",
                         sigmaColor, sigmaSpace);
                     break;
                 case "Median":
                     _logger?.LogInformation("メディアンノイズ除去完了: KernelSize={KernelSize}", kernelSize);
                     break;
                 case "FastNlMeansDenoising":
-                    _logger?.LogInformation("FastNlMeansDenoising完了: H={H}, Template={TemplateSize}, Search={SearchSize}", 
+                    _logger?.LogInformation("FastNlMeansDenoising完了: H={H}, Template={TemplateSize}, Search={SearchSize}",
                         h, templateWindowSize, searchWindowSize);
                     break;
             }

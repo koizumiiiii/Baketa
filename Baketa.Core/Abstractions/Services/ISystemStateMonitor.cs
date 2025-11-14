@@ -12,17 +12,17 @@ public interface ISystemStateMonitor
     /// システムがアイドル状態かどうか
     /// </summary>
     bool IsSystemIdle();
-    
+
     /// <summary>
     /// 現在のシステムリソース状況
     /// </summary>
     SystemResourceState GetCurrentResourceState();
-    
+
     /// <summary>
     /// バッテリー駆動中かどうか（ラップトップ等）
     /// </summary>
     bool IsOnBatteryPower();
-    
+
     /// <summary>
     /// システム状態変化イベント
     /// </summary>
@@ -48,9 +48,9 @@ public class SystemStateChangedEventArgs : EventArgs
     public SystemResourceState CurrentState { get; }
     public bool BatteryStatusChanged { get; }
     public bool PerformanceModeChanged { get; }
-    
+
     public SystemStateChangedEventArgs(
-        SystemResourceState currentState, 
+        SystemResourceState currentState,
         bool batteryStatusChanged = false,
         bool performanceModeChanged = false)
     {

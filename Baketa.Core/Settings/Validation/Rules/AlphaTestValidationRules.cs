@@ -102,7 +102,7 @@ public sealed class AlphaTestLanguagePairRule : AlphaTestValidationRuleBase
 
         // αテストでは日本語↔英語のみ許可
         var allowedLanguages = new[] { "Japanese", "English", "ja", "en", "jp", "日本語", "英語" };
-        
+
         if (!allowedLanguages.Contains(sourceLanguage, StringComparer.OrdinalIgnoreCase))
         {
             return CreateFailure(value, $"αテストでは日本語↔英語の翻訳のみ利用可能です。現在の設定: '{sourceLanguage}'");
@@ -220,7 +220,7 @@ public sealed class AlphaTestOpacityRule : AlphaTestValidationRuleBase
         {
             return CreateSuccess(value, $"透明度{opacity:F1}%は非常に薄く、テキストが見えにくい可能性があります");
         }
-        
+
         if (opacity > 80.0)
         {
             return CreateSuccess(value, $"透明度{opacity:F1}%は非常に濃く、背景が見えにくい可能性があります");

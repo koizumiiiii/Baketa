@@ -20,43 +20,43 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     private readonly ILogger<RegressionTestRunner> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
-    
+
     private readonly string _baselineDirectory = "benchmarks/baselines";
     private readonly string _resultsDirectory = "benchmarks/results";
-    
+
     /// <summary>
     /// 回帰テストの実行
     /// </summary>
     public async Task<RegressionTestReport> RunAsync()
     {
         _logger.LogInformation("=== 回帰テスト自動化システム開始 ===");
-        
+
         var report = new RegressionTestReport
         {
             ExecutionTime = DateTime.Now,
             TestEnvironment = await CollectTestEnvironmentAsync().ConfigureAwait(false)
         };
-        
+
         try
         {
             // ディレクトリ準備
             await PrepareDirectoriesAsync().ConfigureAwait(false);
-            
+
             // ベースライン読み込み
             var baseline = await LoadBaselineAsync().ConfigureAwait(false);
-            
+
             // 現在のパフォーマンス測定
             report.CurrentResults = await MeasureCurrentPerformanceAsync().ConfigureAwait(false);
-            
+
             // 回帰分析
             report.RegressionAnalysis = AnalyzeRegression(baseline, report.CurrentResults);
-            
+
             // ベースライン更新判定
             var shouldUpdateBaseline = ShouldUpdateBaseline(report.RegressionAnalysis);
             if (shouldUpdateBaseline)
@@ -64,15 +64,15 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
                 await UpdateBaselineAsync(report.CurrentResults).ConfigureAwait(false);
                 report.BaselineUpdated = true;
             }
-            
+
             // レポート出力
             await OutputReportAsync(report).ConfigureAwait(false);
-            
+
             // 結果保存
             await SaveResultsAsync(report).ConfigureAwait(false);
-            
+
             _logger.LogInformation("=== 回帰テスト自動化システム完了 ===");
-            
+
             return report;
         }
         catch (Exception ex)
@@ -81,7 +81,7 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             throw;
         }
     }
-    
+
     /// <summary>
     /// テスト環境情報収集
     /// </summary>
@@ -95,7 +95,7 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             ProcessorCount = Environment.ProcessorCount,
             WorkingSet = Environment.WorkingSet
         };
-        
+
         try
         {
             // Git情報収集
@@ -106,10 +106,10 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
         {
             _logger.LogWarning(ex, "Git情報収集失敗");
         }
-        
+
         return environment;
     }
-    
+
     /// <summary>
     /// Git コミットハッシュ取得
     /// </summary>
@@ -128,11 +128,11 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
                     CreateNoWindow = true
                 }
             };
-            
+
             process.Start();
             var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
             await process.WaitForExitAsync().ConfigureAwait(false);
-            
+
             return output.Trim();
         }
         catch
@@ -140,7 +140,7 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             return "unknown";
         }
     }
-    
+
     /// <summary>
     /// Git ブランチ名取得
     /// </summary>
@@ -159,11 +159,11 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
                     CreateNoWindow = true
                 }
             };
-            
+
             process.Start();
             var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
             await process.WaitForExitAsync().ConfigureAwait(false);
-            
+
             return output.Trim();
         }
         catch
@@ -171,7 +171,7 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             return "unknown";
         }
     }
-    
+
     /// <summary>
     /// ディレクトリ準備
     /// </summary>
@@ -183,25 +183,25 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             Directory.CreateDirectory(_resultsDirectory);
         }).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// ベースライン読み込み
     /// </summary>
     private async Task<RegressionPerformanceBaseline?> LoadBaselineAsync()
     {
         var baselineFile = Path.Combine(_baselineDirectory, "performance_baseline.json");
-        
+
         if (!File.Exists(baselineFile))
         {
             _logger.LogInformation("ベースラインファイルが存在しません: {BaselineFile}", baselineFile);
             return null;
         }
-        
+
         try
         {
             var json = await File.ReadAllTextAsync(baselineFile).ConfigureAwait(false);
             var baseline = JsonSerializer.Deserialize<RegressionPerformanceBaseline>(json, JsonOptions);
-            
+
             _logger.LogInformation("ベースライン読み込み完了: {BaselineDate}", baseline?.CreatedAt);
             return baseline;
         }
@@ -211,30 +211,30 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             return null;
         }
     }
-    
+
     /// <summary>
     /// 現在のパフォーマンス測定
     /// </summary>
     private async Task<PerformanceMeasurement> MeasureCurrentPerformanceAsync()
     {
         _logger.LogInformation("現在のパフォーマンス測定開始");
-        
+
         var measurement = new PerformanceMeasurement
         {
             MeasuredAt = DateTime.Now
         };
-        
+
         try
         {
             // キャプチャパフォーマンス測定
             measurement.CapturePerformance = await MeasureCapturePerformanceAsync().ConfigureAwait(false);
-            
+
             // OCRパフォーマンス測定
             measurement.OcrPerformance = await MeasureOcrPerformanceAsync().ConfigureAwait(false);
-            
+
             // メモリ使用量測定
             measurement.MemoryUsage = await MeasureMemoryUsageAsync().ConfigureAwait(false);
-            
+
             _logger.LogInformation("現在のパフォーマンス測定完了");
         }
         catch (Exception ex)
@@ -242,10 +242,10 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             _logger.LogError(ex, "パフォーマンス測定エラー");
             throw;
         }
-        
+
         return measurement;
     }
-    
+
     /// <summary>
     /// キャプチャパフォーマンス測定（スタブ版）
     /// </summary>
@@ -253,19 +253,19 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
     {
         // スタブ実装: キャプチャサービスの代わりにシミュレーション
         var measurements = new List<double>();
-        
+
         // スタブ実装: キャプチャ時間をシミュレート
         await Task.Delay(100).ConfigureAwait(false);
-        
+
         for (int i = 0; i < 10; i++)
         {
             var stopwatch = Stopwatch.StartNew();
             await Task.Delay(Random.Shared.Next(80, 120)).ConfigureAwait(false); // 80-120msのランダムディレイ
             stopwatch.Stop();
-            
+
             measurements.Add(stopwatch.Elapsed.TotalMilliseconds);
         }
-        
+
         return new CapturePerformance
         {
             AverageTimeMs = measurements.Average(),
@@ -275,7 +275,7 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             MeasurementCount = measurements.Count
         };
     }
-    
+
     /// <summary>
     /// OCRパフォーマンス測定（スタブ版）
     /// </summary>
@@ -283,19 +283,19 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
     {
         // スタブ実装: OCRエンジンの代わりにシミュレーション
         var measurements = new List<double>();
-        
+
         // スタブ実装: OCR処理時間をシミュレート
         await Task.Delay(100).ConfigureAwait(false);
-        
+
         for (int i = 0; i < 5; i++)
         {
             var stopwatch = Stopwatch.StartNew();
             await Task.Delay(Random.Shared.Next(2000, 4000)).ConfigureAwait(false); // 2-4秒のランダムディレイ
             stopwatch.Stop();
-            
+
             measurements.Add(stopwatch.Elapsed.TotalMilliseconds);
         }
-        
+
         return new OcrPerformance
         {
             AverageTimeMs = measurements.Average(),
@@ -305,20 +305,20 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             MeasurementCount = measurements.Count
         };
     }
-    
+
     /// <summary>
     /// メモリ使用量測定
     /// </summary>
     private async Task<MemoryUsage> MeasureMemoryUsageAsync()
     {
         await Task.Delay(100).ConfigureAwait(false); // GC安定化待機
-        
+
         var beforeGC = GC.GetTotalMemory(false);
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
         var afterGC = GC.GetTotalMemory(false);
-        
+
         return new MemoryUsage
         {
             BeforeGCBytes = beforeGC,
@@ -329,64 +329,64 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             Gen2Collections = GC.CollectionCount(2)
         };
     }
-    
+
     // テスト用画像生成メソッドはスタブ実装のため削除
-    
+
     /// <summary>
     /// 標準偏差計算
     /// </summary>
     private static double CalculateStandardDeviation(List<double> values)
     {
         if (values.Count <= 1) return 0;
-        
+
         var mean = values.Average();
         var sumOfSquares = values.Sum(x => Math.Pow(x - mean, 2));
         return Math.Sqrt(sumOfSquares / (values.Count - 1));
     }
-    
+
     /// <summary>
     /// 回帰分析
     /// </summary>
     private RegressionAnalysis AnalyzeRegression(RegressionPerformanceBaseline? baseline, PerformanceMeasurement current)
     {
         var analysis = new RegressionAnalysis();
-        
+
         if (baseline?.PerformanceData == null)
         {
             analysis.Status = "ベースラインなし - 初回実行";
             analysis.IsRegression = false;
             return analysis;
         }
-        
+
         // キャプチャパフォーマンス比較
         var captureChange = CalculatePerformanceChange(
             baseline.PerformanceData.CapturePerformance.AverageTimeMs,
             current.CapturePerformance.AverageTimeMs);
-        
+
         // OCRパフォーマンス比較
         var ocrChange = CalculatePerformanceChange(
             baseline.PerformanceData.OcrPerformance.AverageTimeMs,
             current.OcrPerformance.AverageTimeMs);
-        
+
         // メモリ使用量比較
         var memoryChange = CalculatePerformanceChange(
             baseline.PerformanceData.MemoryUsage.AfterGCBytes,
             current.MemoryUsage.AfterGCBytes);
-        
+
         analysis.CapturePerformanceChange = captureChange;
         analysis.OcrPerformanceChange = ocrChange;
         analysis.MemoryUsageChange = memoryChange;
-        
+
         // 回帰判定（10%以上の悪化で回帰とみなす）
-        analysis.IsRegression = captureChange.PercentChange > 10 || 
-                               ocrChange.PercentChange > 10 || 
+        analysis.IsRegression = captureChange.PercentChange > 10 ||
+                               ocrChange.PercentChange > 10 ||
                                memoryChange.PercentChange > 10;
-        
+
         analysis.Status = analysis.IsRegression ? "パフォーマンス回帰検出" : "パフォーマンス正常";
-        
+
         return analysis;
     }
-    
+
     /// <summary>
     /// パフォーマンス変化計算
     /// </summary>
@@ -394,7 +394,7 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
     {
         var absoluteChange = current - baseline;
         var percentChange = baseline != 0 ? (absoluteChange / baseline) * 100 : 0;
-        
+
         return new PerformanceChange
         {
             BaselineValue = baseline,
@@ -403,18 +403,18 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             PercentChange = percentChange
         };
     }
-    
+
     /// <summary>
     /// ベースライン更新判定
     /// </summary>
     private bool ShouldUpdateBaseline(RegressionAnalysis analysis)
     {
         // 回帰がなく、かつ性能改善があった場合にベースライン更新
-        return !analysis.IsRegression && 
-               (analysis.CapturePerformanceChange.PercentChange < -5 || 
+        return !analysis.IsRegression &&
+               (analysis.CapturePerformanceChange.PercentChange < -5 ||
                 analysis.OcrPerformanceChange.PercentChange < -5);
     }
-    
+
     /// <summary>
     /// ベースライン更新
     /// </summary>
@@ -425,22 +425,22 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             CreatedAt = DateTime.Now,
             PerformanceData = current
         };
-        
+
         var baselineFile = Path.Combine(_baselineDirectory, "performance_baseline.json");
         var json = JsonSerializer.Serialize(baseline, JsonOptions);
-        
+
         await File.WriteAllTextAsync(baselineFile, json).ConfigureAwait(false);
-        
+
         _logger.LogInformation("ベースライン更新完了: {BaselineFile}", baselineFile);
     }
-    
+
     /// <summary>
     /// レポート出力
     /// </summary>
     private async Task OutputReportAsync(RegressionTestReport report)
     {
         _logger.LogInformation("回帰テストレポート出力開始");
-        
+
         // コンソール出力
         Console.WriteLine("=== 回帰テスト結果レポート ===");
         Console.WriteLine($"実行時間: {report.ExecutionTime:yyyy-MM-dd HH:mm:ss}");
@@ -449,7 +449,7 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
         Console.WriteLine($"コミット: {report.TestEnvironment.GitCommit}");
         Console.WriteLine($"ステータス: {report.RegressionAnalysis.Status}");
         Console.WriteLine();
-        
+
         if (report.RegressionAnalysis.IsRegression)
         {
             Console.WriteLine("⚠️  パフォーマンス回帰が検出されました!");
@@ -459,21 +459,21 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
             Console.WriteLine("✅ パフォーマンスは正常範囲内です");
         }
         Console.WriteLine();
-        
+
         Console.WriteLine("=== パフォーマンス変化 ===");
         Console.WriteLine($"キャプチャ: {report.RegressionAnalysis.CapturePerformanceChange.PercentChange:+0.0;-0.0;0}%");
         Console.WriteLine($"OCR: {report.RegressionAnalysis.OcrPerformanceChange.PercentChange:+0.0;-0.0;0}%");
         Console.WriteLine($"メモリ: {report.RegressionAnalysis.MemoryUsageChange.PercentChange:+0.0;-0.0;0}%");
-        
+
         if (report.BaselineUpdated)
         {
             Console.WriteLine();
             Console.WriteLine("📊 ベースラインが更新されました");
         }
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// 結果保存
     /// </summary>
@@ -481,9 +481,9 @@ public class RegressionTestRunner(IServiceProvider serviceProvider, ILogger<Regr
     {
         var resultFile = Path.Combine(_resultsDirectory, $"regression_test_{DateTime.Now:yyyyMMdd_HHmmss}.json");
         var json = JsonSerializer.Serialize(report, JsonOptions);
-        
+
         await File.WriteAllTextAsync(resultFile, json).ConfigureAwait(false);
-        
+
         _logger.LogInformation("回帰テスト結果保存完了: {ResultFile}", resultFile);
     }
 }

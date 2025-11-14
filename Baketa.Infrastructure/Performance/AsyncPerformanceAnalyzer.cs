@@ -46,12 +46,12 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
         try
         {
             _logger.LogDebug("⏱️ Starting measurement for operation: {OperationName}", operationName);
-            
+
             await operation(cancellationToken).ConfigureAwait(false);
-            
+
             stopwatch.Stop();
             var endTime = DateTime.UtcNow;
-            
+
             measurement = measurement with
             {
                 ExecutionTime = stopwatch.Elapsed,
@@ -62,7 +62,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             // カウンターを更新
             UpdateOperationCounter(operationName, stopwatch.Elapsed, true);
 
-            _logger.LogDebug("✅ Operation completed successfully: {OperationName} in {ExecutionTime:F2}ms", 
+            _logger.LogDebug("✅ Operation completed successfully: {OperationName} in {ExecutionTime:F2}ms",
                 operationName, stopwatch.Elapsed.TotalMilliseconds);
         }
         catch (OperationCanceledException oce)
@@ -157,8 +157,8 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
 
         var totalStopwatch = Stopwatch.StartNew();
         var measurements = new List<PerformanceMeasurement>();
-        var semaphore = maxDegreeOfParallelism > 0 
-            ? new SemaphoreSlim(maxDegreeOfParallelism, maxDegreeOfParallelism) 
+        var semaphore = maxDegreeOfParallelism > 0
+            ? new SemaphoreSlim(maxDegreeOfParallelism, maxDegreeOfParallelism)
             : null;
 
         _logger.LogInformation("🚀 Starting parallel operations: {OperationGroup} with {Count} operations, MaxParallelism={MaxParallelism}",
@@ -175,7 +175,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
 
                 try
                 {
-                    return await MeasureAsync(async ct => 
+                    return await MeasureAsync(async ct =>
                     {
                         var result = await operation(ct).ConfigureAwait(false);
                         return result;
@@ -203,8 +203,8 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
         {
             OperationGroupName = operationGroupName,
             TotalExecutionTime = totalStopwatch.Elapsed,
-            AverageExecutionTime = executionTimes.Count > 0 
-                ? TimeSpan.FromTicks((long)executionTimes.Average(t => t.Ticks)) 
+            AverageExecutionTime = executionTimes.Count > 0
+                ? TimeSpan.FromTicks((long)executionTimes.Average(t => t.Ticks))
                 : TimeSpan.Zero,
             MaxExecutionTime = executionTimes.Count > 0 ? executionTimes.Max() : TimeSpan.Zero,
             MinExecutionTime = executionTimes.Count > 0 ? executionTimes.Min() : TimeSpan.Zero,
@@ -212,8 +212,8 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             SuccessfulOperations = successfulMeasurements.Count,
             FailedOperations = measurements.Count - successfulMeasurements.Count,
             ActualDegreeOfParallelism = CalculateActualParallelism(measurements),
-            Throughput = totalStopwatch.Elapsed.TotalSeconds > 0 
-                ? successfulMeasurements.Count / totalStopwatch.Elapsed.TotalSeconds 
+            Throughput = totalStopwatch.Elapsed.TotalSeconds > 0
+                ? successfulMeasurements.Count / totalStopwatch.Elapsed.TotalSeconds
                 : 0,
             IndividualMeasurements = measurements
         };
@@ -221,7 +221,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
         _logger.LogInformation("📊 Parallel operations completed: {OperationGroup} - " +
             "Total={Total}, Successful={Successful}, Failed={Failed}, " +
             "TotalTime={TotalTime:F2}ms, AvgTime={AvgTime:F2}ms, Throughput={Throughput:F1}ops/s",
-            operationGroupName, parallelMeasurement.TotalOperations, 
+            operationGroupName, parallelMeasurement.TotalOperations,
             parallelMeasurement.SuccessfulOperations, parallelMeasurement.FailedOperations,
             parallelMeasurement.TotalExecutionTime.TotalMilliseconds,
             parallelMeasurement.AverageExecutionTime.TotalMilliseconds,
@@ -250,7 +250,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
                     OperationName = group.Key,
                     Count = measurements.Count,
                     TotalTime = TimeSpan.FromTicks(executionTimes.Sum(t => t.Ticks)),
-                    AverageTime = executionTimes.Count > 0 
+                    AverageTime = executionTimes.Count > 0
                         ? TimeSpan.FromTicks((long)executionTimes.Average(t => t.Ticks))
                         : TimeSpan.Zero,
                     MinTime = executionTimes.Count > 0 ? executionTimes.Min() : TimeSpan.Zero,
@@ -266,7 +266,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             SuccessfulOperations = measurementsList.Count(m => m.IsSuccessful),
             FailedOperations = measurementsList.Count(m => !m.IsSuccessful),
             TotalExecutionTime = TimeSpan.FromTicks(measurementsList.Sum(m => m.ExecutionTime.Ticks)),
-            AverageExecutionTime = measurementsList.Count > 0 
+            AverageExecutionTime = measurementsList.Count > 0
                 ? TimeSpan.FromTicks((long)measurementsList.Average(m => m.ExecutionTime.Ticks))
                 : TimeSpan.Zero,
             OperationStats = operationStats
@@ -283,10 +283,10 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
     public void ClearStatistics()
     {
         ThrowIfDisposed();
-        
+
         _measurements.Clear();
         _operationCounters.Clear();
-        
+
         _logger.LogInformation("🧹 Performance statistics cleared");
     }
 
@@ -351,7 +351,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
         _logger.LogInformation("🏁 AsyncPerformanceAnalyzer disposed");
     }

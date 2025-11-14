@@ -1,7 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.DI;
 using Baketa.Infrastructure.Platform.Windows.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.Platform.DI.Modules;
 
@@ -27,15 +27,15 @@ public sealed class RealTimePlatformModule : ServiceModuleBase
     private static void RegisterWindowsServices(IServiceCollection services)
     {
         Console.WriteLine("  🖼️ Windows固有サービス登録中...");
-        
+
         // ゲーム状態監視
         services.AddSingleton<IGameStateProvider, WindowsGameStateProvider>();
         Console.WriteLine("    ✅ WindowsGameStateProvider登録 - ゲーム検出・フルスクリーン判定");
-        
+
         // システム状態監視
         services.AddSingleton<ISystemStateMonitor, WindowsSystemStateMonitor>();
         Console.WriteLine("    ✅ WindowsSystemStateMonitor登録 - リソース監視・バッテリー状態");
-        
+
         Console.WriteLine("  ✅ Windows固有サービス登録完了");
     }
 

@@ -5,12 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
-using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Infrastructure.OCR.PaddleOCR.TextDetection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.TextDetection;
 
@@ -24,12 +24,12 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly TextDetectionEffectivenessAnalyzer _effectivenessAnalyzer;
     private readonly TestCaseGenerator _testCaseGenerator;
-    
+
     private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-    private static readonly System.Text.Json.JsonSerializerOptions ReportJsonOptions = new() 
-    { 
-        WriteIndented = true, 
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping 
+    private static readonly System.Text.Json.JsonSerializerOptions ReportJsonOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
     private bool _disposed;
 
@@ -39,16 +39,16 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        
+
         // テキスト領域検出器を取得
         var detectors = GetAvailableDetectors();
         _effectivenessAnalyzer = new TextDetectionEffectivenessAnalyzer(
             serviceProvider.GetRequiredService<ILogger<TextDetectionEffectivenessAnalyzer>>(),
             detectors);
-        
+
         _testCaseGenerator = new TestCaseGenerator(
             serviceProvider.GetRequiredService<ILogger<TestCaseGenerator>>());
-            
+
         _logger.LogInformation("テキスト領域検出ベンチマークシステム初期化完了");
     }
 
@@ -60,7 +60,7 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("包括的ベンチマーク実行開始: 設定={ConfigName}", config.Name);
-        
+
         var executionReport = new BenchmarkExecutionReport
         {
             ExecutionTime = DateTime.Now,
@@ -73,13 +73,13 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
             _logger.LogInformation("テストケース生成開始");
             var testCases = await _testCaseGenerator.GenerateTestCasesAsync(config, cancellationToken).ConfigureAwait(false);
             executionReport.GeneratedTestCases = testCases.Count;
-            
+
             if (testCases.Count == 0)
             {
                 _logger.LogWarning("テストケースが生成されませんでした");
                 return executionReport;
             }
-            
+
             // 2. OCRエンジン取得（品質測定用）
             IOcrEngine? ocrEngine = null;
             if (config.MeasureOcrQuality)
@@ -94,26 +94,26 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
                     _logger.LogWarning(ex, "OCRエンジン取得失敗、品質測定をスキップ");
                 }
             }
-            
+
             // 3. 効果測定実行
             _logger.LogInformation("効果測定開始: テストケース数={TestCaseCount}", testCases.Count);
             var effectivenessReport = await _effectivenessAnalyzer.MeasureComprehensiveEffectivenessAsync(
                 testCases, ocrEngine, cancellationToken).ConfigureAwait(false);
-            
+
             executionReport.EffectivenessReport = effectivenessReport;
-            
+
             // 4. 結果分析と推奨事項生成
             executionReport.ExecutionSummary = GenerateExecutionSummary(effectivenessReport);
             executionReport.PerformanceComparison = GeneratePerformanceComparison(effectivenessReport);
             executionReport.RecommendedConfiguration = GenerateRecommendedConfiguration(effectivenessReport);
-            
+
             // 5. レポート保存
             await SaveBenchmarkReportAsync(executionReport).ConfigureAwait(false);
-            
+
             _logger.LogInformation("包括的ベンチマーク完了: 総合スコア={OverallScore:F3}, 最適検出器={BestDetector}",
                 effectivenessReport.ComprehensiveAnalysis.OverallEffectivenessScore,
                 effectivenessReport.ComprehensiveAnalysis.MostAccurateDetector);
-                
+
             return executionReport;
         }
         catch (Exception ex)
@@ -138,7 +138,7 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
             MeasureAdaptationEffect = true,
             OutputDetailedResults = false
         };
-        
+
         return await RunComprehensiveBenchmarkAsync(config, cancellationToken).ConfigureAwait(false);
     }
 
@@ -152,7 +152,7 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("A/Bテスト実行: {DetectorA} vs {DetectorB}", detectorA, detectorB);
-        
+
         var result = new AbTestResult
         {
             DetectorA = detectorA,
@@ -163,18 +163,18 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
         try
         {
             var detectors = GetAvailableDetectors().ToDictionary(d => d.Name.ToLowerInvariant(), d => d);
-            
+
             if (!detectors.TryGetValue(detectorA.ToLowerInvariant(), out var detA) ||
                 !detectors.TryGetValue(detectorB.ToLowerInvariant(), out var detB))
             {
                 throw new ArgumentException("指定された検出器が見つかりません");
             }
-            
+
             // 検出器A実行
             var stopwatchA = System.Diagnostics.Stopwatch.StartNew();
             var regionsA = await detA.DetectRegionsAsync(testImage, cancellationToken).ConfigureAwait(false);
             stopwatchA.Stop();
-            
+
             result.DetectorAResults = new AbTestDetectorResult
             {
                 ProcessingTimeMs = stopwatchA.Elapsed.TotalMilliseconds,
@@ -182,12 +182,12 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
                 AverageConfidence = regionsA.Count > 0 ? regionsA.Average(r => r.Confidence) : 0,
                 RegionSizes = [.. regionsA.Select(r => r.Bounds.Width * r.Bounds.Height)]
             };
-            
+
             // 検出器B実行
             var stopwatchB = System.Diagnostics.Stopwatch.StartNew();
             var regionsB = await detB.DetectRegionsAsync(testImage, cancellationToken).ConfigureAwait(false);
             stopwatchB.Stop();
-            
+
             result.DetectorBResults = new AbTestDetectorResult
             {
                 ProcessingTimeMs = stopwatchB.Elapsed.TotalMilliseconds,
@@ -195,21 +195,21 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
                 AverageConfidence = regionsB.Count > 0 ? regionsB.Average(r => r.Confidence) : 0,
                 RegionSizes = [.. regionsB.Select(r => r.Bounds.Width * r.Bounds.Height)]
             };
-            
+
             // 比較分析
             result.SpeedAdvantage = result.DetectorAResults.ProcessingTimeMs < result.DetectorBResults.ProcessingTimeMs ? detectorA : detectorB;
             result.RegionCountDifference = Math.Abs(result.DetectorAResults.RegionCount - result.DetectorBResults.RegionCount);
             result.ConfidenceDifference = Math.Abs(result.DetectorAResults.AverageConfidence - result.DetectorBResults.AverageConfidence);
-            
+
             // 推奨判定
             var scoreA = CalculateAbTestScore(result.DetectorAResults);
             var scoreB = CalculateAbTestScore(result.DetectorBResults);
             result.RecommendedDetector = scoreA > scoreB ? detectorA : detectorB;
             result.ScoreDifference = Math.Abs(scoreA - scoreB);
-            
+
             _logger.LogInformation("A/Bテスト完了: 推奨={Recommended}, スコア差={ScoreDiff:F3}",
                 result.RecommendedDetector, result.ScoreDifference);
-                
+
             return result;
         }
         catch (Exception ex)
@@ -228,13 +228,13 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("継続的パフォーマンス監視開始: 間隔={Interval}", interval);
-        
+
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
                 var quickReport = await RunQuickBenchmarkAsync(cancellationToken).ConfigureAwait(false);
-                
+
                 // パフォーマンス劣化の検出
                 if (quickReport.EffectivenessReport != null)
                 {
@@ -242,12 +242,12 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
                     if (overallScore < 0.6) // 閾値以下の場合
                     {
                         _logger.LogWarning("パフォーマンス劣化検出: スコア={Score:F3} < 0.6。チューニングが必要", overallScore);
-                        
+
                         // アラート処理（将来的にはイベント発行）
                         await TriggerPerformanceAlertAsync(quickReport).ConfigureAwait(false);
                     }
                 }
-                
+
                 await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -260,7 +260,7 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
                 await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken).ConfigureAwait(false);
             }
         }
-        
+
         _logger.LogInformation("継続的パフォーマンス監視終了");
     }
 
@@ -269,16 +269,16 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
     private List<ITextRegionDetector> GetAvailableDetectors()
     {
         var detectors = new List<ITextRegionDetector>();
-        
+
         try
         {
             // 個別検出器を取得
             var adaptiveDetector = _serviceProvider.GetService<AdaptiveTextRegionDetector>();
             if (adaptiveDetector != null)
                 detectors.Add(adaptiveDetector);
-            
+
             // FastTextRegionDetectorは古いインターフェースのため一時的に無効化
-            
+
             // ファクトリ経由での検出器取得
             var detectorFactory = _serviceProvider.GetService<Func<string, ITextRegionDetector>>();
             if (detectorFactory != null)
@@ -302,10 +302,10 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
         {
             _logger.LogError(ex, "検出器取得中にエラー");
         }
-        
-        _logger.LogInformation("利用可能検出器: {DetectorNames}", 
+
+        _logger.LogInformation("利用可能検出器: {DetectorNames}",
             string.Join(", ", detectors.Select(d => d.Name)));
-            
+
         return detectors;
     }
 
@@ -327,12 +327,12 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
     private List<DetectorComparison> GeneratePerformanceComparison(EffectivenessReport report)
     {
         var comparisons = new List<DetectorComparison>();
-        
+
         foreach (var (detectorName, perfMetrics) in report.PerformanceResults)
         {
             var accuracyMetrics = report.DetectionAccuracyResults.GetValueOrDefault(detectorName);
             var adaptationMetrics = report.AdaptationEffectResults.GetValueOrDefault(detectorName);
-            
+
             comparisons.Add(new DetectorComparison
             {
                 DetectorName = detectorName,
@@ -343,7 +343,7 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
                 OverallRank = CalculateOverallRank(perfMetrics, accuracyMetrics, adaptationMetrics)
             });
         }
-        
+
         return [.. comparisons.OrderBy(c => c.OverallRank)];
     }
 
@@ -351,7 +351,7 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
     {
         var bestDetector = report.ComprehensiveAnalysis.MostAccurateDetector;
         var fastestDetector = report.ComprehensiveAnalysis.FastestDetector;
-        
+
         return new RecommendedConfiguration
         {
             PrimaryDetector = bestDetector,
@@ -366,10 +366,10 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
     private Dictionary<string, object> GenerateOptimalSettings(EffectivenessReport report)
     {
         var settings = new Dictionary<string, object>();
-        
+
         // パフォーマンス結果から最適化設定を推定
         var avgProcessingTime = report.PerformanceResults.Values.Average(p => p.AverageProcessingTimeMs);
-        
+
         if (avgProcessingTime > 500)
         {
             settings["AdaptiveSensitivity"] = 0.6; // 感度を下げて高速化
@@ -380,30 +380,30 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
             settings["AdaptiveSensitivity"] = 0.8; // 高精度設定
             settings["MaxRegionsPerImage"] = 50;
         }
-        
+
         // 適応効果が高い場合は適応機能を強化
         var hasGoodAdaptation = report.AdaptationEffectResults.Values
             .Any(a => a.TimeImprovementPercent > 15);
-        
+
         if (hasGoodAdaptation)
         {
             settings["TemplateUpdateThreshold"] = 0.7;
             settings["HistoryConfidenceThreshold"] = 0.4;
         }
-        
+
         return settings;
     }
 
     private int CalculateOverallRank(
-        PerformanceMetrics perfMetrics, 
-        DetectionAccuracyMetrics? accuracyMetrics, 
+        PerformanceMetrics perfMetrics,
+        DetectionAccuracyMetrics? accuracyMetrics,
         AdaptationEffectMetrics? adaptationMetrics)
     {
         var speedScore = Math.Max(0, (2000 - perfMetrics.AverageProcessingTimeMs) / 2000 * 100);
         var accuracyScore = (accuracyMetrics?.AverageF1Score ?? 0) * 100;
         var stabilityScore = Math.Max(0, (1 - perfMetrics.StabilityIndex) * 100);
         var adaptationScore = Math.Min(100, (adaptationMetrics?.TimeImprovementPercent ?? 0) * 2);
-        
+
         var totalScore = speedScore * 0.3 + accuracyScore * 0.4 + stabilityScore * 0.2 + adaptationScore * 0.1;
         return (int)(100 - totalScore); // 小さいほど良いランク
     }
@@ -413,7 +413,7 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
         var speedScore = Math.Max(0, (1000 - result.ProcessingTimeMs) / 1000 * 40);
         var confidenceScore = result.AverageConfidence * 30;
         var regionScore = Math.Min(30, result.RegionCount * 2); // 15個程度が理想
-        
+
         return speedScore + confidenceScore + regionScore;
     }
 
@@ -428,11 +428,11 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
                 Issues = report.EffectivenessReport?.ImprovementSuggestions ?? [],
                 RecommendedAction = "Parameter tuning or detector switching recommended"
             };
-            
+
             // 将来的には外部システムへの通知を実装
             var alertJson = System.Text.Json.JsonSerializer.Serialize(alertData, JsonOptions);
             _logger.LogCritical("パフォーマンスアラート: {AlertData}", alertJson);
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -447,13 +447,13 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
         {
             var reportDir = "benchmark_reports";
             Directory.CreateDirectory(reportDir);
-            
+
             var fileName = $"text_detection_benchmark_{DateTime.Now:yyyyMMdd_HHmmss}.json";
             var filePath = Path.Combine(reportDir, fileName);
-            
+
             var json = System.Text.Json.JsonSerializer.Serialize(report, ReportJsonOptions);
             await File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
-            
+
             _logger.LogInformation("ベンチマークレポート保存完了: {FilePath}", filePath);
         }
         catch (Exception ex)
@@ -467,11 +467,11 @@ public sealed class TextDetectionBenchmarkRunner : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _effectivenessAnalyzer?.Dispose();
         _testCaseGenerator?.Dispose();
         _disposed = true;
-        
+
         _logger.LogInformation("テキスト領域検出ベンチマークシステムをクリーンアップ");
         GC.SuppressFinalize(this);
     }

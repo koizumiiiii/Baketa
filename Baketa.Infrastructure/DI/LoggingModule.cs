@@ -1,7 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
 using Baketa.Core.Abstractions.Dependency;
 using Baketa.Core.Abstractions.Logging;
 using Baketa.Infrastructure.Services.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.DI;
 
@@ -18,7 +18,7 @@ public sealed class LoggingModule : IServiceModule
     {
         // 統一ログサービス（Console/File/ILoggerの統一）
         services.AddSingleton<IUnifiedLoggingService, UnifiedLoggingService>();
-        
+
         Console.WriteLine("✅ LoggingModule: 統一ログサービス登録完了");
     }
 }

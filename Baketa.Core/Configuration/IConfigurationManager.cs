@@ -12,22 +12,22 @@ public interface IConfigurationManager
     /// 型安全な設定取得
     /// </summary>
     T GetSettings<T>() where T : class, new();
-    
+
     /// <summary>
     /// 型安全な設定取得（セクション名指定）
     /// </summary>
     T GetSettings<T>(string sectionName) where T : class, new();
-    
+
     /// <summary>
     /// 設定の存在確認
     /// </summary>
     bool SectionExists(string sectionName);
-    
+
     /// <summary>
     /// 設定値の直接取得
     /// </summary>
     string? GetValue(string key);
-    
+
     /// <summary>
     /// 設定読み込み状況のデバッグ情報取得
     /// </summary>

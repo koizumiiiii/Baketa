@@ -14,20 +14,20 @@ public interface ISettingsMigrationManager
     /// 現在サポートされている最新のスキーマバージョン
     /// </summary>
     int LatestSchemaVersion { get; }
-    
+
     /// <summary>
     /// 利用可能なマイグレーションを登録します
     /// </summary>
     /// <param name="migration">マイグレーション実装</param>
     void RegisterMigration(ISettingsMigration migration);
-    
+
     /// <summary>
     /// 指定されたバージョンからのマイグレーションが必要かどうかを確認します
     /// </summary>
     /// <param name="currentVersion">現在のスキーマバージョン</param>
     /// <returns>マイグレーションが必要な場合はtrue</returns>
     bool RequiresMigration(int currentVersion);
-    
+
     /// <summary>
     /// 指定されたバージョンから最新バージョンまでのマイグレーションパスを取得します
     /// </summary>
@@ -35,7 +35,7 @@ public interface ISettingsMigrationManager
     /// <param name="toVersion">終了バージョン（nullで最新）</param>
     /// <returns>マイグレーションパス</returns>
     IReadOnlyList<ISettingsMigration> GetMigrationPath(int fromVersion, int? toVersion = null);
-    
+
     /// <summary>
     /// マイグレーションをドライラン（実行せずに検証のみ）します
     /// </summary>
@@ -44,10 +44,10 @@ public interface ISettingsMigrationManager
     /// <param name="toVersion">終了バージョン（nullで最新）</param>
     /// <returns>ドライラン結果</returns>
     Task<MigrationPlanResult> DryRunMigrationAsync(
-        Dictionary<string, object?> currentSettings, 
-        int fromVersion, 
+        Dictionary<string, object?> currentSettings,
+        int fromVersion,
         int? toVersion = null);
-    
+
     /// <summary>
     /// マイグレーションを実行します
     /// </summary>
@@ -56,16 +56,16 @@ public interface ISettingsMigrationManager
     /// <param name="toVersion">終了バージョン（nullで最新）</param>
     /// <returns>マイグレーション結果</returns>
     Task<MigrationPlanResult> ExecuteMigrationAsync(
-        Dictionary<string, object?> currentSettings, 
-        int fromVersion, 
+        Dictionary<string, object?> currentSettings,
+        int fromVersion,
         int? toVersion = null);
-    
+
     /// <summary>
     /// 利用可能な全マイグレーションの情報を取得します
     /// </summary>
     /// <returns>マイグレーション情報</returns>
     IReadOnlyList<MigrationInfo> GetAvailableMigrations();
-    
+
     /// <summary>
     /// マイグレーション実行時のイベント
     /// </summary>

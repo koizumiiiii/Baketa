@@ -1,11 +1,11 @@
-﻿using Microsoft.Extensions.ObjectPool;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Models.OCR;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 
@@ -28,7 +28,7 @@ public sealed class PooledOcrService : IOcrEngine
         _enginePool = enginePool ?? throw new ArgumentNullException(nameof(enginePool));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrSettings = ocrSettings ?? throw new ArgumentNullException(nameof(ocrSettings));
-        
+
         _logger.LogInformation("🏊 PooledOcrService初期化完了 - プール化OCRサービス開始");
     }
 
@@ -43,14 +43,14 @@ public sealed class PooledOcrService : IOcrEngine
     public async Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         // プール化されたサービスでは、各エンジンインスタンスが個別に初期化される
         // このメソッドは互換性のためのスタブ実装
         _logger.LogDebug("📋 PooledOcrService.InitializeAsync: プール化環境では個別エンジンが初期化されます");
-        
+
         return await Task.FromResult(true);
     }
-    
+
     public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -98,7 +98,7 @@ public sealed class PooledOcrService : IOcrEngine
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         ArgumentNullException.ThrowIfNull(image);
 
         var engine = _enginePool.Get();
@@ -110,21 +110,21 @@ public sealed class PooledOcrService : IOcrEngine
 
         try
         {
-            _logger.LogDebug("🔄 PooledOcrService: エンジンプールから取得 - 型: {EngineType}, Hash: {EngineHash}", 
+            _logger.LogDebug("🔄 PooledOcrService: エンジンプールから取得 - 型: {EngineType}, Hash: {EngineHash}",
                 engine.GetType().Name, engine.GetHashCode());
-            
+
             var startTime = DateTime.UtcNow;
             var results = await engine.RecognizeAsync(image, regionOfInterest, progressCallback, cancellationToken);
             var duration = DateTime.UtcNow - startTime;
-            
-            _logger.LogDebug("✅ PooledOcrService: OCR処理完了 - 処理時間: {Duration}ms, 結果数: {ResultCount}", 
+
+            _logger.LogDebug("✅ PooledOcrService: OCR処理完了 - 処理時間: {Duration}ms, 結果数: {ResultCount}",
                 duration.TotalMilliseconds, results.TextRegions.Count);
-            
+
             return results;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ PooledOcrService: OCR処理でエラーが発生 - エンジン: {EngineType}", 
+            _logger.LogError(ex, "❌ PooledOcrService: OCR処理でエラーが発生 - エンジン: {EngineType}",
                 engine.GetType().Name);
             throw;
         }
@@ -134,12 +134,12 @@ public sealed class PooledOcrService : IOcrEngine
             try
             {
                 _enginePool.Return(engine);
-                _logger.LogDebug("♻️ PooledOcrService: エンジンをプールに返却 - Hash: {EngineHash}", 
+                _logger.LogDebug("♻️ PooledOcrService: エンジンをプールに返却 - Hash: {EngineHash}",
                     engine.GetHashCode());
             }
             catch (Exception returnEx)
             {
-                _logger.LogWarning(returnEx, "⚠️ PooledOcrService: エンジン返却時にエラー - Hash: {EngineHash}", 
+                _logger.LogWarning(returnEx, "⚠️ PooledOcrService: エンジン返却時にエラー - Hash: {EngineHash}",
                     engine.GetHashCode());
                 // 返却エラーは処理を中断しない
             }
@@ -166,9 +166,9 @@ public sealed class PooledOcrService : IOcrEngine
     public OcrEngineSettings GetSettings()
     {
         ThrowIfDisposed();
-        
+
         var settings = _ocrSettings.CurrentValue;
-        
+
         // appsettings.jsonから統一設定を取得
         return new OcrEngineSettings
         {
@@ -275,24 +275,24 @@ public sealed class PooledOcrService : IOcrEngine
 
         try
         {
-            _logger.LogDebug("🔄 PooledOcrService: 検出専用エンジンプールから取得 - 型: {EngineType}, Hash: {EngineHash}", 
+            _logger.LogDebug("🔄 PooledOcrService: 検出専用エンジンプールから取得 - 型: {EngineType}, Hash: {EngineHash}",
                 engine.GetType().Name, engine.GetHashCode());
-            
+
             var startTime = DateTime.UtcNow;
-            
+
             // ✅ 効率的な検出専用処理: 認識処理をスキップしてリソースを大幅節約
             var results = await engine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
-            
+
             var duration = DateTime.UtcNow - startTime;
-            
-            _logger.LogDebug("✅ PooledOcrService: 効率的検出専用処理完了 - 処理時間: {Duration}ms, 結果数: {ResultCount}", 
+
+            _logger.LogDebug("✅ PooledOcrService: 効率的検出専用処理完了 - 処理時間: {Duration}ms, 結果数: {ResultCount}",
                 duration.TotalMilliseconds, results.TextRegions.Count);
-            
+
             return results;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ PooledOcrService: 検出専用処理でエラーが発生 - エンジン: {EngineType}", 
+            _logger.LogError(ex, "❌ PooledOcrService: 検出専用処理でエラーが発生 - エンジン: {EngineType}",
                 engine.GetType().Name);
             throw;
         }
@@ -302,12 +302,12 @@ public sealed class PooledOcrService : IOcrEngine
             try
             {
                 _enginePool.Return(engine);
-                _logger.LogDebug("♻️ PooledOcrService: 検出専用エンジンをプールに返却 - Hash: {EngineHash}", 
+                _logger.LogDebug("♻️ PooledOcrService: 検出専用エンジンをプールに返却 - Hash: {EngineHash}",
                     engine.GetHashCode());
             }
             catch (Exception returnEx)
             {
-                _logger.LogWarning(returnEx, "⚠️ PooledOcrService: 検出専用エンジン返却時にエラー - Hash: {EngineHash}", 
+                _logger.LogWarning(returnEx, "⚠️ PooledOcrService: 検出専用エンジン返却時にエラー - Hash: {EngineHash}",
                     engine.GetHashCode());
                 // 返却エラーは処理を中断しない
             }
@@ -317,15 +317,15 @@ public sealed class PooledOcrService : IOcrEngine
     public async Task<bool> SwitchLanguageAsync(string language, CancellationToken _ = default)
     {
         ThrowIfDisposed();
-        
+
         _logger.LogDebug("🔄 PooledOcrService: 言語切り替え要求 - {Language}", language);
-        
+
         // プール化環境での言語切り替えは複雑なため、現在は固定言語（日本語）のみサポート
         if (language == "jpn" || language == "japanese")
         {
             return await Task.FromResult(true);
         }
-        
+
         _logger.LogWarning("⚠️ PooledOcrService: プール化環境では日本語のみサポート - 要求言語: {Language}", language);
         return await Task.FromResult(false);
     }
@@ -333,14 +333,14 @@ public sealed class PooledOcrService : IOcrEngine
     public void Dispose()
     {
         if (IsDisposed) return;
-        
+
         try
         {
             _logger.LogInformation("🧹 PooledOcrService: リソース解放開始");
-            
+
             // ObjectPoolは自動的にクリーンアップされるため、明示的な処理は不要
             // 各エンジンインスタンスのDisposeはObjectPoolPolicyで管理される
-            
+
             IsDisposed = true;
             _logger.LogInformation("✅ PooledOcrService: リソース解放完了");
         }

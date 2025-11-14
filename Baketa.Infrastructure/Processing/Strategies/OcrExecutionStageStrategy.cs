@@ -1,25 +1,25 @@
-﻿using Baketa.Core.Abstractions.Processing;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.OCR.Results; // 🔧 [TRANSLATION_FIX] PositionedTextResult用
-using Baketa.Core.Abstractions.Platform.Windows; // 🎯 UltraThink: IWindowsImage用
-using Baketa.Core.Abstractions.Memory; // 🎯 UltraThink Phase 75: SafeImage統合
-using Baketa.Core.Abstractions.Factories; // 🎯 UltraThink Phase 76: IImageFactory for SafeImage→IImage変換
-using Baketa.Core.Abstractions.Imaging; // 🔧 [PHASE3.2_FIX] IImage用
-using Baketa.Core.Abstractions.Translation; // 🔧 [TRANSLATION_FIX] ITextChunkAggregatorService, TextChunk用
-using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
-using Baketa.Core.Extensions; // 🔥 [PHASE5.2C] ToPooledByteArrayWithLengthAsync拡張メソッド用
-using Baketa.Core.Models.Processing;
-using Baketa.Core.Models.OCR;
-using Baketa.Core.Utilities; // 🎯 [OCR_DEBUG_LOG] DebugLogUtility用
-using Microsoft.Extensions.Logging;
 using System.Buffers; // 🔥 [PHASE5.2C] ArrayPool<byte>用
 using System.Diagnostics;
 using System.Drawing; // 🎯 UltraThink Phase 77.6: Bitmap用 + ROI_IMAGE_SAVE Graphics, Pen, Color等用
 using System.Drawing.Imaging; // 🎯 [ROI_IMAGE_SAVE] ImageFormat用
 using System.IO; // 🎯 [ROI_IMAGE_SAVE] Directory, Path用
 using System.Linq;
-using Rectangle = System.Drawing.Rectangle; // 🎯 UltraThink Phase 75: 名前空間競合回避
+using Baketa.Core.Abstractions.Factories; // 🎯 UltraThink Phase 76: IImageFactory for SafeImage→IImage変換
+using Baketa.Core.Abstractions.Imaging; // 🔧 [PHASE3.2_FIX] IImage用
+using Baketa.Core.Abstractions.Memory; // 🎯 UltraThink Phase 75: SafeImage統合
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.OCR.Results; // 🔧 [TRANSLATION_FIX] PositionedTextResult用
+using Baketa.Core.Abstractions.Platform.Windows; // 🎯 UltraThink: IWindowsImage用
+using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
+using Baketa.Core.Abstractions.Translation; // 🔧 [TRANSLATION_FIX] ITextChunkAggregatorService, TextChunk用
+using Baketa.Core.Extensions; // 🔥 [PHASE5.2C] ToPooledByteArrayWithLengthAsync拡張メソッド用
+using Baketa.Core.Models.OCR;
+using Baketa.Core.Models.Processing;
+using Baketa.Core.Utilities; // 🎯 [OCR_DEBUG_LOG] DebugLogUtility用
+using Microsoft.Extensions.Logging;
 using IImageFactoryInterface = Baketa.Core.Abstractions.Factories.IImageFactory; // 🔧 [PHASE3.2_FIX] 名前空間競合回避
+using Rectangle = System.Drawing.Rectangle; // 🎯 UltraThink Phase 75: 名前空間競合回避
 
 namespace Baketa.Infrastructure.Processing.Strategies;
 
@@ -36,7 +36,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     private readonly IImageFactoryInterface _imageFactory; // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
     private readonly ITextChunkAggregatorService? _textChunkAggregator; // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
     private readonly ICoordinateTransformationService _coordinateTransformationService; // 🔥 [COORDINATE_FIX] ROI→スクリーン座標変換
-    private int _nextChunkId = 1; // 🔧 [TRANSLATION_FIX] チャンクID生成用
+    private readonly int _nextChunkId = 1; // 🔧 [TRANSLATION_FIX] チャンクID生成用
 
     // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出結果のMetadataキー
     private const string METADATA_KEY_BORDERLESS = "IsBorderlessOrFullscreen";
@@ -180,7 +180,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             // 実際のOCRサービス統合
             string detectedText;
             List<object> textChunks = [];
-            
+
             // 🔧 [PHASE3.2_FIX] OCRエンジン内部での非同期画像アクセス時のObjectDisposedException対応
             OcrResults ocrResults;
             try
@@ -191,7 +191,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                     // 最低限の画像状態確認のみ実行
                     var testWidth = ocrImage.Width;
                     var testHeight = ocrImage.Height;
-                    
+
                     // 🎯 UltraThink Phase 35: Empty span防止のため画像サイズ検証
                     if (testWidth <= 0 || testHeight <= 0)
                     {
@@ -199,7 +199,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                         _logger.LogError(error);
                         return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
                     }
-                    
+
                     // 🔥 [PHASE5] ROI/全画面条件分岐削除 - FullScreenOcr統一で常に全画面最小サイズ要件
                     // FullScreenOcr: 50x50ピクセル（Detection + Recognition の安全マージン）
                     const int minimumOcrImageSize = 50;
@@ -234,7 +234,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                 // OCR結果から文字列とチャンクを取得
                 detectedText = string.Join(" ", ocrResults.TextRegions.Select(r => r.Text));
-                textChunks = ocrResults.TextRegions.Cast<object>().ToList();
+                textChunks = [.. ocrResults.TextRegions.Cast<object>()];
 
                 _logger.LogInformation("✅ [PHASE5_COMPLETE] 全画面OCR完了 - テキスト長: {TextLength}文字, 領域数: {RegionCount}個",
                     detectedText.Length, textChunks.Count);

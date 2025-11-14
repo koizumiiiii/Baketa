@@ -17,7 +17,7 @@ public static class ConfigurationTestHelper
     public static IConfiguration CreateTestConfiguration(Dictionary<string, string> configData)
     {
         // CS8620警告解決：明示的にnull許容型に変換
-        var nullableConfigData = configData.Select(kvp => 
+        var nullableConfigData = configData.Select(kvp =>
             new KeyValuePair<string, string?>(kvp.Key, kvp.Value));
 
         return new ConfigurationBuilder()
@@ -43,7 +43,7 @@ public static class ConfigurationTestHelper
     public static Dictionary<string, string> DefaultConnectionPoolConfig => new()
     {
         ["Translation:MaxConnections"] = "8",
-        ["Translation:MinConnections"] = "1", 
+        ["Translation:MinConnections"] = "1",
         ["Translation:OptimalChunksPerConnection"] = "4",
         ["Translation:ConnectionTimeoutMs"] = "5000"
     };

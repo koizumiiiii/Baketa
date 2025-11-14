@@ -17,7 +17,7 @@ namespace Baketa.Application.Services.UI.Overlay;
 public class StubOverlayRenderer : IOverlayRenderer
 {
     private readonly ILogger<StubOverlayRenderer> _logger;
-    
+
     /// <summary>
     /// スタブで管理するオーバーレイ情報
     /// 実際の UI 要素は作成せず、情報のみ保持
@@ -49,12 +49,12 @@ public class StubOverlayRenderer : IOverlayRenderer
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("🚀 [STUB_RENDERER] スタブレンダラー初期化開始");
-        
+
         // スタブでは実際の UI 初期化は行わない
         _stubOverlays.Clear();
         _totalRendered = 0;
         _totalRemoved = 0;
-        
+
         _logger.LogInformation("✅ [STUB_RENDERER] スタブレンダラー初期化完了");
         await Task.CompletedTask;
     }

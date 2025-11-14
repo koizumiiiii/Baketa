@@ -4,12 +4,12 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform;
 using Baketa.Core.Abstractions.UI.Overlay;
-using Microsoft.Extensions.Logging;
 using Baketa.UI.Overlay.Positioning;
+using Microsoft.Extensions.Logging;
 using DrawingPoint = System.Drawing.Point;
 
 namespace Baketa.UI.Services.Overlay;
@@ -22,25 +22,25 @@ public class MonitorFallbackSettings
 {
     /// <summary>デフォルト解像度幅</summary>
     public int DefaultWidth { get; set; } = 1920;
-    
+
     /// <summary>デフォルト解像度高さ</summary>
     public int DefaultHeight { get; set; } = 1080;
-    
+
     /// <summary>タスクバー高さ（作業領域計算用）</summary>
     public int TaskbarHeight { get; set; } = 40;
-    
+
     /// <summary>デフォルトDPIスケーリング</summary>
     public double DefaultDpiScale { get; set; } = 1.0;
-    
+
     /// <summary>デフォルト色深度</summary>
     public int DefaultColorDepth { get; set; } = 32;
-    
+
     /// <summary>デフォルトリフレッシュレート</summary>
     public int DefaultRefreshRate { get; set; } = 60;
-    
+
     /// <summary>フォールバック有効化フラグ</summary>
     public bool EnableFallback { get; set; } = true;
-    
+
     /// <summary>フォールバック使用時の警告ログ出力</summary>
     public bool LogFallbackUsage { get; set; } = true;
 }
@@ -81,7 +81,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fallbackSettings = fallbackSettings ?? new MonitorFallbackSettings();
-        
+
         // 既存の位置管理システムを取得（オプション）
         try
         {
@@ -91,7 +91,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
         {
             _logger.LogWarning(ex, "🚧 [AVALONIA_POSITION] 既存OverlayPositionManager取得失敗 - スタンドアロンで動作");
         }
-        
+
         _logger.LogInformation("🎭 [AVALONIA_POSITION] AvaloniaOverlayPositionCalculator 初期化 - 既存システム統合");
     }
 
@@ -99,20 +99,20 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         _logger.LogInformation("🚀 [AVALONIA_POSITION] Avalonia 位置計算器初期化開始");
-        
+
         try
         {
             // モニター情報の初期化
             await RefreshMonitorInfoAsync(cancellationToken);
-            
+
             _totalCalculations = 0;
             _collisionAvoidanceCount = 0;
             _offScreenCorrectionCount = 0;
             _multiMonitorPlacementCount = 0;
-            
-            _logger.LogInformation("✅ [AVALONIA_POSITION] Avalonia 位置計算器初期化完了 - モニター数: {MonitorCount}", 
+
+            _logger.LogInformation("✅ [AVALONIA_POSITION] Avalonia 位置計算器初期化完了 - モニター数: {MonitorCount}",
                 _cachedMonitors?.Count ?? 0);
         }
         catch (Exception ex)
@@ -126,7 +126,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     public async Task<Rectangle> CalculateOptimalPositionAsync(PositionCalculationRequest request, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         ArgumentNullException.ThrowIfNull(request);
 
         try
@@ -137,7 +137,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
                 request.Id, request.Strategy);
 
             await EnsureMonitorInfoFreshAsync(cancellationToken);
-            
+
             var optimizedArea = request.DesiredArea;
 
             // モニター情報取得
@@ -157,11 +157,11 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
                 case PositionStrategy.CenterScreen:
                     optimizedArea = CenterOnScreen(optimizedArea, targetMonitor);
                     break;
-                    
+
                 case PositionStrategy.AvoidCollision:
                     optimizedArea = await AvoidCollisionAdvanced(optimizedArea, request, targetMonitor, cancellationToken);
                     break;
-                    
+
                 case PositionStrategy.KeepOriginal:
                 default:
                     // 元位置を維持（境界調整のみ適用済み）
@@ -171,7 +171,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
             // DPI スケーリング適用
             optimizedArea = await ConvertLogicalToPhysicalAsync(optimizedArea, targetMonitor.Id, cancellationToken);
 
-            _logger.LogDebug("✅ [AVALONIA_POSITION] 最適位置計算完了 - ID: {Id}, OptimizedArea: {Area}", 
+            _logger.LogDebug("✅ [AVALONIA_POSITION] 最適位置計算完了 - ID: {Id}, OptimizedArea: {Area}",
                 request.Id, optimizedArea);
 
             return optimizedArea;
@@ -187,9 +187,9 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     public async Task<IEnumerable<Rectangle>> CalculateBatchPositionsAsync(IEnumerable<PositionCalculationRequest> requests, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         var results = new List<Rectangle>();
-        
+
         foreach (var request in requests ?? Enumerable.Empty<PositionCalculationRequest>())
         {
             var optimizedPosition = await CalculateOptimalPositionAsync(request, cancellationToken);
@@ -204,13 +204,13 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     public async Task<bool> DetectCollisionAsync(Rectangle area, IEnumerable<OverlayPositionInfo> existingOverlays, IEnumerable<string>? excludeIds = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             var excludeIdSet = excludeIds?.ToHashSet() ?? new HashSet<string>();
-            
-            var hasCollision = existingOverlays?.Any(overlay => 
-                !excludeIdSet.Contains(overlay.Id) && 
+
+            var hasCollision = existingOverlays?.Any(overlay =>
+                !excludeIdSet.Contains(overlay.Id) &&
                 overlay.Area.IntersectsWith(area)) ?? false;
 
             await Task.CompletedTask;
@@ -227,11 +227,11 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     public async Task<Rectangle> AdjustToScreenBoundsAsync(Rectangle area, int? targetMonitor = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             await EnsureMonitorInfoFreshAsync(cancellationToken);
-            
+
             var monitor = GetMonitorById(targetMonitor) ?? GetPrimaryMonitor();
             if (monitor == null)
             {
@@ -270,7 +270,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
                 _offScreenCorrectionCount++;
             }
 
-            _logger.LogDebug("🎭 [AVALONIA_POSITION] 画面境界調整 - Original: {Original}, Adjusted: {Adjusted}, WasAdjusted: {WasAdjusted}", 
+            _logger.LogDebug("🎭 [AVALONIA_POSITION] 画面境界調整 - Original: {Original}, Adjusted: {Adjusted}, WasAdjusted: {WasAdjusted}",
                 area, adjustedArea, wasAdjusted);
 
             return adjustedArea;
@@ -286,11 +286,11 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     public async Task<MonitorInfo?> GetMonitorFromPointAsync(DrawingPoint point, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             await EnsureMonitorInfoFreshAsync(cancellationToken);
-            
+
             var monitor = _cachedMonitors?.FirstOrDefault(m => m.FullArea.Contains(point)) ?? GetPrimaryMonitor();
             return monitor;
         }
@@ -305,7 +305,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     public async Task<IEnumerable<MonitorInfo>> GetAvailableMonitorsAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         await EnsureMonitorInfoFreshAsync(cancellationToken);
         return _cachedMonitors ?? Enumerable.Empty<MonitorInfo>();
     }
@@ -314,11 +314,11 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     public async Task<Rectangle> ConvertLogicalToPhysicalAsync(Rectangle logicalArea, int? targetMonitor = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             await EnsureMonitorInfoFreshAsync(cancellationToken);
-            
+
             var monitor = GetMonitorById(targetMonitor) ?? GetPrimaryMonitor();
             if (monitor == null)
             {
@@ -339,7 +339,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
                 (int)(logicalArea.Height * scale)
             );
 
-            _logger.LogDebug("🎭 [AVALONIA_POSITION] DPI変換 - Logical: {Logical}, Physical: {Physical}, Scale: {Scale}", 
+            _logger.LogDebug("🎭 [AVALONIA_POSITION] DPI変換 - Logical: {Logical}, Physical: {Physical}, Scale: {Scale}",
                 logicalArea, physicalArea, scale);
 
             return physicalArea;
@@ -364,13 +364,13 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var screens = desktop.MainWindow?.Screens?.All ?? Array.Empty<Screen>();
-                
+
                 for (int i = 0; i < screens.Count; i++)
                 {
                     var screen = screens[i];
                     var bounds = screen.Bounds;
                     var workingArea = screen.WorkingArea;
-                    
+
                     monitors.Add(new MonitorInfo
                     {
                         Id = i,
@@ -399,15 +399,15 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
                     ColorDepth = _fallbackSettings.DefaultColorDepth,
                     RefreshRate = _fallbackSettings.DefaultRefreshRate
                 };
-                
+
                 monitors.Add(fallbackMonitor);
-                
+
                 // 設定に応じてフォールバック使用を警告ログ出力
                 if (_fallbackSettings.LogFallbackUsage)
                 {
                     _logger.LogWarning("⚠️ [POSITION_CALC] モニター情報取得失敗: フォールバック使用 - Resolution: {Width}x{Height}, DPI: {DpiScale}",
-                        _fallbackSettings.DefaultWidth, 
-                        _fallbackSettings.DefaultHeight, 
+                        _fallbackSettings.DefaultWidth,
+                        _fallbackSettings.DefaultHeight,
                         _fallbackSettings.DefaultDpiScale);
                 }
             }
@@ -419,7 +419,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
 
             _cachedMonitors = monitors;
             _lastMonitorUpdate = DateTime.Now;
-            
+
             _logger.LogDebug("🖥️ [AVALONIA_POSITION] モニター情報更新完了 - 検出数: {Count}", monitors.Count);
             await Task.CompletedTask;
         }
@@ -457,7 +457,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     {
         if (!monitorId.HasValue || _cachedMonitors == null)
             return null;
-        
+
         return _cachedMonitors.FirstOrDefault(m => m.Id == monitorId.Value);
     }
 
@@ -477,7 +477,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
         var workingArea = monitor.WorkingArea;
         var centerX = workingArea.X + (workingArea.Width - area.Width) / 2;
         var centerY = workingArea.Y + (workingArea.Height - area.Height) / 2;
-        
+
         return new Rectangle(centerX, centerY, area.Width, area.Height);
     }
 
@@ -485,15 +485,15 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     /// 高度な衝突回避アルゴリズム
     /// </summary>
     private async Task<Rectangle> AvoidCollisionAdvanced(
-        Rectangle area, 
-        PositionCalculationRequest request, 
-        MonitorInfo monitor, 
+        Rectangle area,
+        PositionCalculationRequest request,
+        MonitorInfo monitor,
         CancellationToken cancellationToken)
     {
         try
         {
             _collisionAvoidanceCount++;
-            
+
             // 基本的な衝突回避（既存システムの詳細情報なしでの簡易実装）
             if (request.MaxDisplacement > 0)
             {
@@ -515,38 +515,38 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     /// 衝突しない位置を探索
     /// </summary>
     private async Task<Rectangle> FindNonCollidingPosition(
-        Rectangle originalArea, 
-        PositionCalculationRequest request, 
-        MonitorInfo monitor, 
+        Rectangle originalArea,
+        PositionCalculationRequest request,
+        MonitorInfo monitor,
         CancellationToken cancellationToken)
     {
         const int stepSize = 10; // 10ピクセルずつ移動
         var maxDisplacement = Math.Min(request.MaxDisplacement, 200); // 最大200ピクセル
-        
+
         var workingArea = monitor.WorkingArea;
-        
+
         // 螺旋状に探索
         for (int radius = stepSize; radius <= maxDisplacement; radius += stepSize)
         {
             var positions = GenerateSpiralPositions(originalArea, radius, stepSize);
-            
+
             foreach (var position in positions)
             {
                 // 画面境界内チェック
                 if (!workingArea.Contains(position))
                     continue;
-                
+
                 // 衝突チェック（簡易実装 - 既存システムの詳細情報なしで基本的なチェック）
                 var hasCollision = false; // Phase 16 では簡易実装
                 if (!hasCollision)
                 {
-                    _logger.LogDebug("✅ [AVALONIA_POSITION] 衝突回避位置発見 - Original: {Original}, Adjusted: {Adjusted}", 
+                    _logger.LogDebug("✅ [AVALONIA_POSITION] 衝突回避位置発見 - Original: {Original}, Adjusted: {Adjusted}",
                         originalArea, position);
                     return position;
                 }
             }
         }
-        
+
         // 適切な位置が見つからない場合は元の位置を返す
         _logger.LogDebug("⚠️ [AVALONIA_POSITION] 衝突回避位置が見つからず - 元位置を使用");
         return originalArea;
@@ -558,7 +558,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
     private IEnumerable<Rectangle> GenerateSpiralPositions(Rectangle center, int radius, int stepSize)
     {
         var positions = new List<Rectangle>();
-        
+
         // 上下左右の基本方向
         var directions = new[]
         {
@@ -567,7 +567,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
             new DrawingPoint(0, stepSize),  // 下
             new DrawingPoint(-stepSize, 0)  // 左
         };
-        
+
         foreach (var direction in directions)
         {
             for (int distance = stepSize; distance <= radius; distance += stepSize)
@@ -577,7 +577,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
                 positions.Add(new Rectangle(newX, newY, center.Width, center.Height));
             }
         }
-        
+
         return positions;
     }
 
@@ -618,7 +618,7 @@ public class AvaloniaOverlayPositionCalculator : IOverlayPositionCalculator, IDi
             _cachedMonitors?.Clear();
             _cachedMonitors = null;
             _disposed = true;
-            
+
             _logger.LogInformation("🧹 [AVALONIA_POSITION] AvaloniaOverlayPositionCalculator リソース解放完了");
         }
         catch (Exception ex)

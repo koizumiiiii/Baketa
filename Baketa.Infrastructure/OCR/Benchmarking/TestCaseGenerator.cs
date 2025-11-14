@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Memory;
 using Baketa.Infrastructure.Imaging;
 using Baketa.Infrastructure.OCR.MultiScale;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.Benchmarking;
 
@@ -35,7 +35,7 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
     public async Task<IEnumerable<TestCase>> GenerateJapaneseMixedTextTestCasesAsync()
     {
         _logger.LogInformation("日本語・英語混在テキストのテストケース生成開始");
-        
+
         var testTexts = new[]
         {
             // 実際の問題として報告されたテキスト
@@ -75,21 +75,21 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
             "複数列 | 区切り | テスト",
             "タブ区切り\tテスト\tデータ"
         };
-        
+
         var testCases = new List<TestCase>();
-        
+
         foreach (var text in testTexts)
         {
             try
             {
                 // 各テキストに対して複数のフォントサイズで画像を生成
                 var fontSizes = new[] { 12, 16, 20, 24 };
-                
+
                 foreach (var fontSize in fontSizes)
                 {
                     var testName = $"{text}_{fontSize}px";
                     var image = await GenerateTextImageAsync(text, fontSize).ConfigureAwait(false);
-                    
+
                     var testCase = new TestCase(testName, image, text);
                     testCases.Add(testCase);
                 }
@@ -99,18 +99,18 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
                 _logger.LogError(ex, "テストケース生成エラー: {Text}", text);
             }
         }
-        
+
         _logger.LogInformation("テストケース生成完了: {Count}件", testCases.Count);
         return testCases;
     }
-    
+
     /// <summary>
     /// 特定の誤認識パターンをテストするテストケースを生成
     /// </summary>
     public async Task<IEnumerable<TestCase>> GenerateErrorPatternTestCasesAsync()
     {
         _logger.LogInformation("誤認識パターンテストケース生成開始");
-        
+
         // 実際に報告された誤認識パターン
         var errorPatterns = new[]
         {
@@ -132,16 +132,16 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
             ("恐", "設"),
             ("計", "計")
         };
-        
+
         var testCases = new List<TestCase>();
-        
+
         foreach (var (correctText, _) in errorPatterns)
         {
             try
             {
                 var testName = $"ErrorPattern_{correctText}";
                 var image = await GenerateTextImageAsync(correctText, 16).ConfigureAwait(false);
-                
+
                 var testCase = new TestCase(testName, image, correctText);
                 testCases.Add(testCase);
             }
@@ -150,11 +150,11 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
                 _logger.LogError(ex, "誤認識パターンテストケース生成エラー: {Text}", correctText);
             }
         }
-        
+
         _logger.LogInformation("誤認識パターンテストケース生成完了: {Count}件", testCases.Count);
         return testCases;
     }
-    
+
     /// <summary>
     /// テキストから画像を生成（プレースホルダー実装）
     /// </summary>
@@ -165,35 +165,35 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
             // プレースホルダー実装: 実際の画像生成の代わりに
             // テキストメタデータを保持するダミー画像を作成
             var imageData = System.Text.Encoding.UTF8.GetBytes($"PlaceholderImage:{text}:{fontSize}");
-            
+
             // 最低限の画像サイズを計算
             var width = Math.Max(200, text.Length * fontSize / 2);
             var height = Math.Max(50, fontSize + 20);
-            
+
             return new PlaceholderImageWithSize(imageData, width, height);
         }).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// 実際のゲーム画面のスクリーンショットからテストケースを生成
     /// </summary>
     public async Task<IEnumerable<TestCase>> GenerateFromScreenshotsAsync(string screenshotDirectory)
     {
         _logger.LogInformation("スクリーンショットからテストケース生成開始: {Directory}", screenshotDirectory);
-        
+
         var testCases = new List<TestCase>();
-        
+
         if (!Directory.Exists(screenshotDirectory))
         {
             _logger.LogWarning("スクリーンショットディレクトリが存在しません: {Directory}", screenshotDirectory);
             return testCases;
         }
-        
+
         var imageFiles = Directory.GetFiles(screenshotDirectory, "*.png")
             .Concat(Directory.GetFiles(screenshotDirectory, "*.jpg"))
             .Concat(Directory.GetFiles(screenshotDirectory, "*.jpeg"))
             .ToArray();
-        
+
         foreach (var imageFile in imageFiles)
         {
             try
@@ -201,10 +201,10 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
                 var fileName = Path.GetFileNameWithoutExtension(imageFile);
                 var imageBytes = await File.ReadAllBytesAsync(imageFile).ConfigureAwait(false);
                 var image = new BitmapImage(imageBytes);
-                
+
                 // ファイル名からテキストを抽出（例：expected_text_単体テスト.png）
                 var expectedText = ExtractExpectedTextFromFilename(fileName);
-                
+
                 var testCase = new TestCase($"Screenshot_{fileName}", image, expectedText);
                 testCases.Add(testCase);
             }
@@ -213,11 +213,11 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
                 _logger.LogError(ex, "スクリーンショットテストケース生成エラー: {File}", imageFile);
             }
         }
-        
+
         _logger.LogInformation("スクリーンショットテストケース生成完了: {Count}件", testCases.Count);
         return testCases;
     }
-    
+
     /// <summary>
     /// ファイル名から期待テキストを抽出
     /// </summary>
@@ -229,11 +229,11 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
         {
             return string.Join("_", parts.Skip(2));
         }
-        
+
         // デフォルトでファイル名をそのまま使用
         return filename;
     }
-    
+
     /// <summary>
     /// 小さいテキストの画像を生成
     /// </summary>
@@ -243,15 +243,15 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
         {
             // 小さいフォントサイズのテキスト画像を生成
             var imageData = System.Text.Encoding.UTF8.GetBytes($"SmallText:{text}:{fontSize}px");
-            
+
             // テキストサイズに基づいて画像サイズを計算
             var width = Math.Max(100, text.Length * fontSize);
             var height = Math.Max(fontSize + 10, 30);
-            
+
             return new Core.Services.Imaging.AdvancedImage(imageData, width, height, Core.Abstractions.Imaging.ImageFormat.Rgb24);
         }).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// 複数サイズのテキストが混在する画像を生成
     /// </summary>
@@ -262,16 +262,16 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
             // 混在テキストのメタデータを構築
             var metadata = string.Join(";", textItems.Select(t => $"{t.text}:{t.fontSize}px"));
             var imageData = System.Text.Encoding.UTF8.GetBytes($"MixedText:{metadata}");
-            
+
             // 最大フォントサイズと合計高さを計算
             var maxFontSize = textItems.Max(t => t.fontSize);
             var totalHeight = textItems.Sum(t => t.fontSize + 5) + 20;
             var maxWidth = textItems.Max(t => t.text.Length * t.fontSize);
-            
+
             return new Core.Services.Imaging.AdvancedImage(imageData, maxWidth, totalHeight, Core.Abstractions.Imaging.ImageFormat.Rgb24);
         }).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// UI要素（ボタン、ラベル等）を含む画像を生成
     /// </summary>
@@ -281,15 +281,15 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
         {
             // UI要素のサンプルテキスト
             var uiTexts = UiTexts;
-            
+
             var metadata = string.Join(";", uiTexts);
             var imageData = System.Text.Encoding.UTF8.GetBytes($"UIElements:{metadata}");
-            
+
             // UI要素を含む画像のサイズ
             return new Core.Services.Imaging.AdvancedImage(imageData, 400, 300, Core.Abstractions.Imaging.ImageFormat.Rgb24);
         }).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// グラフやチャートのラベルを含む画像を生成
     /// </summary>
@@ -299,10 +299,10 @@ public class TestCaseGenerator(ILogger<TestCaseGenerator> logger)
         {
             // チャートラベルのサンプル
             var labels = ChartLabels;
-            
+
             var metadata = string.Join(";", labels);
             var imageData = System.Text.Encoding.UTF8.GetBytes($"ChartLabels:{metadata}");
-            
+
             // チャート画像のサイズ
             return new Core.Services.Imaging.AdvancedImage(imageData, 600, 400, Core.Abstractions.Imaging.ImageFormat.Rgb24);
         }).ConfigureAwait(false);
@@ -396,21 +396,21 @@ public class BitmapImage(byte[] imageBytes) : IImage
     {
         return Task.FromResult(_imageBytes);
     }
-    
+
     public IImage Clone()
     {
         var clonedBytes = new byte[_imageBytes.Length];
         Array.Copy(_imageBytes, clonedBytes, _imageBytes.Length);
         return new BitmapImage(clonedBytes);
     }
-    
+
     public Task<IImage> ResizeAsync(int width, int height)
     {
         // プレースホルダー実装：リサイズ処理
         var resizedImage = new BitmapImage(_imageBytes);
         return Task.FromResult<IImage>(resizedImage);
     }
-    
+
     public void Dispose()
     {
         // バイト配列は自動的にガベージコレクションされるため、特別な処理は不要
@@ -451,21 +451,21 @@ public class PlaceholderImageWithSize(byte[] imageBytes, int width, int height) 
     {
         return Task.FromResult(_imageBytes);
     }
-    
+
     public IImage Clone()
     {
         var clonedBytes = new byte[_imageBytes.Length];
         Array.Copy(_imageBytes, clonedBytes, _imageBytes.Length);
         return new PlaceholderImageWithSize(clonedBytes, width, height);
     }
-    
+
     public Task<IImage> ResizeAsync(int width, int height)
     {
         // プレースホルダー実装：リサイズ処理
         var resizedImage = new PlaceholderImageWithSize(_imageBytes, width, height);
         return Task.FromResult<IImage>(resizedImage);
     }
-    
+
     public void Dispose()
     {
         // バイト配列は自動的にガベージコレクションされるため、特別な処理は不要

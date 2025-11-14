@@ -1,9 +1,9 @@
 using System;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using FluentAssertions;
-using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -27,14 +27,14 @@ public class TranslationPipelineMigrationTests
         // Arrange
         var services = new ServiceCollection();
         services.AddLogging();
-        
+
         // Mock dependencies
         services.AddSingleton(Mock.Of<IEventAggregator>());
         services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>());
         services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>());
         // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
         services.AddSingleton(Mock.Of<Baketa.Core.Abstractions.UI.Overlays.IOverlayManager>());
-        
+
         // Phase 4 Migration DI configuration
         services.AddSingleton<TranslationPipelineService>();
         services.AddSingleton<IEventProcessor<OcrCompletedEvent>>(
@@ -50,7 +50,7 @@ public class TranslationPipelineMigrationTests
         eventProcessor.Should().NotBeNull("IEventProcessor<OcrCompletedEvent> should be registered");
         pipelineService.Should().NotBeNull("TranslationPipelineService should be registered");
         eventProcessor.Should().BeSameAs(pipelineService, "IEventProcessor should resolve to TranslationPipelineService");
-        
+
         // Cleanup
         serviceProvider.Dispose();
     }
@@ -83,7 +83,7 @@ public class TranslationPipelineMigrationTests
         service.Should().NotBeNull();
         service.Priority.Should().Be(0);
         service.SynchronousExecution.Should().BeFalse();
-        
+
         // Cleanup
         service.Dispose();
     }

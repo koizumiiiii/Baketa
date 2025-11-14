@@ -137,7 +137,7 @@ public static partial class InputValidator
         var sanitized = HttpUtility.HtmlEncode(input.Trim());
 
         // 制御文字の除去（改行・タブ以外）
-        sanitized = new string([..sanitized.Where(c => !char.IsControl(c) || c == '\r' || c == '\n' || c == '\t')]);
+        sanitized = new string([.. sanitized.Where(c => !char.IsControl(c) || c == '\r' || c == '\n' || c == '\t')]);
 
         return sanitized;
     }

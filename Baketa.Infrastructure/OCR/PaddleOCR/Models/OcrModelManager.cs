@@ -1,10 +1,10 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.OCR;
 using System.Collections.Concurrent;
+using System.IO;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Net.Http;
-using System.IO;
+using Baketa.Core.Abstractions.OCR;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Models;
 
@@ -17,13 +17,13 @@ public class OcrModelManager : IOcrModelManager
     private readonly string _tempDirectory;
     private readonly HttpClient _httpClient;
     private readonly ILogger<OcrModelManager>? _logger;
-    
+
     // キャッシュされたモデルリスト
     private readonly Lazy<List<OcrModelInfo>> _availableModels;
-    
+
     // ダウンロード進行中のモデル管理
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeDownloads = new();
-    
+
     // 統計情報
     private DateTime _lastMetadataUpdate = DateTime.UtcNow;
     private DateTime _lastCleanup = DateTime.UtcNow;
@@ -38,10 +38,10 @@ public class OcrModelManager : IOcrModelManager
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _tempDirectory = tempDirectory ?? Path.Combine(Path.GetTempPath(), "BaketaOcrModels");
         _logger = logger;
-        
+
         // ディレクトリの存在確認
         _modelPathResolver.EnsureDirectoryExists(_tempDirectory);
-        
+
         // 初期実装では固定のモデルリスト
         _availableModels = new Lazy<List<OcrModelInfo>>(CreateInitialModelList);
     }
@@ -62,9 +62,9 @@ public class OcrModelManager : IOcrModelManager
     {
         if (string.IsNullOrEmpty(languageCode))
             throw new ArgumentException("言語コードを指定してください", nameof(languageCode));
-            
+
         await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのため
-            
+
         return [.. _availableModels.Value.Where(m => m.LanguageCode == languageCode || m.LanguageCode == null)];
     }
 
@@ -74,14 +74,14 @@ public class OcrModelManager : IOcrModelManager
     public async Task<bool> IsModelDownloadedAsync(OcrModelInfo modelInfo, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(modelInfo);
-            
+
         await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのため
-            
+
         var filePath = GetModelFilePath(modelInfo);
-        
+
         if (!File.Exists(filePath))
             return false;
-            
+
         // ファイルサイズ確認
         var fileInfo = new FileInfo(filePath);
         if (fileInfo.Length != modelInfo.FileSize)
@@ -90,7 +90,7 @@ public class OcrModelManager : IOcrModelManager
                 filePath, modelInfo.FileSize, fileInfo.Length);
             return false;
         }
-            
+
         // 簡易ハッシュ検証（完全ではないが基本チェック）
         if (!string.IsNullOrEmpty(modelInfo.Hash))
         {
@@ -110,7 +110,7 @@ public class OcrModelManager : IOcrModelManager
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -123,12 +123,12 @@ public class OcrModelManager : IOcrModelManager
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(modelInfo);
-            
+
         if (!modelInfo.IsValid())
         {
             throw new ModelManagementException($"モデル情報が無効です: {modelInfo.Id}");
         }
-            
+
         // 既にダウンロード済みの場合はスキップ
         if (await IsModelDownloadedAsync(modelInfo, cancellationToken).ConfigureAwait(false))
         {
@@ -181,11 +181,11 @@ public class OcrModelManager : IOcrModelManager
         {
             var model = models[i];
             var overallProgress = (double)i / models.Count;
-            
+
             try
             {
                 // 個別の進捗をグローバル進捗にマッピング
-                var wrappedProgress = progressCallback != null ? new Progress<ModelDownloadProgress>(progress => 
+                var wrappedProgress = progressCallback != null ? new Progress<ModelDownloadProgress>(progress =>
                 {
                     var globalProgress = overallProgress + (progress.Progress / models.Count);
                     var wrappedProgressReport = new ModelDownloadProgress(
@@ -230,7 +230,7 @@ public class OcrModelManager : IOcrModelManager
 
         var allSuccess = successCount == models.Count;
         _logger?.LogInformation("一括ダウンロード完了: {Success}/{Total}個成功", successCount, models.Count);
-        
+
         return allSuccess;
     }
 
@@ -240,7 +240,7 @@ public class OcrModelManager : IOcrModelManager
     public async Task<IReadOnlyList<OcrModelInfo>> GetDownloadedModelsAsync(CancellationToken cancellationToken = default)
     {
         List<OcrModelInfo> downloadedModels = [];
-        
+
         foreach (var model in _availableModels.Value)
         {
             if (await IsModelDownloadedAsync(model, cancellationToken).ConfigureAwait(false))
@@ -248,7 +248,7 @@ public class OcrModelManager : IOcrModelManager
                 downloadedModels.Add(model);
             }
         }
-        
+
         return downloadedModels;
     }
 
@@ -258,21 +258,21 @@ public class OcrModelManager : IOcrModelManager
     public async Task<bool> DeleteModelAsync(OcrModelInfo modelInfo, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(modelInfo);
-            
+
         await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのため
-            
+
         var filePath = GetModelFilePath(modelInfo);
-        
+
         if (!File.Exists(filePath))
             return true; // 既に存在しない場合は成功とみなす
-            
+
         try
         {
             File.Delete(filePath);
-            
+
             _logger?.LogInformation("モデル {ModelName} を削除しました: {FilePath}",
                 modelInfo.Name, filePath);
-            
+
             return true;
         }
         catch (IOException ex)
@@ -294,9 +294,9 @@ public class OcrModelManager : IOcrModelManager
     {
         if (string.IsNullOrEmpty(languageCode))
             return false;
-            
+
         var requiredModels = await GetModelsForLanguageAsync(languageCode, cancellationToken).ConfigureAwait(false);
-        
+
         foreach (var model in requiredModels.Where(m => m.IsRequired))
         {
             if (!await IsModelDownloadedAsync(model, cancellationToken).ConfigureAwait(false))
@@ -304,7 +304,7 @@ public class OcrModelManager : IOcrModelManager
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -316,7 +316,7 @@ public class OcrModelManager : IOcrModelManager
         ArgumentNullException.ThrowIfNull(modelInfo);
 
         var filePath = GetModelFilePath(modelInfo);
-        
+
         if (!File.Exists(filePath))
         {
             return new ModelValidationResult
@@ -375,13 +375,13 @@ public class OcrModelManager : IOcrModelManager
         try
         {
             _logger?.LogInformation("モデルメタデータの更新を開始");
-            
+
             // 将来的には外部ソースからメタデータを取得
             // 現在は固定リストなので何もしない
             await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-            
+
             _lastMetadataUpdate = DateTime.UtcNow;
-            
+
             _logger?.LogInformation("モデルメタデータの更新完了");
             return true;
         }
@@ -405,21 +405,21 @@ public class OcrModelManager : IOcrModelManager
         try
         {
             _logger?.LogInformation("未使用モデルファイルのクリーンアップを開始");
-            
+
             await Task.Delay(1, cancellationToken).ConfigureAwait(false); // 非同期メソッドのため
-            
+
             var cleanedCount = 0;
             var modelsRoot = _modelPathResolver.GetModelsRootDirectory();
-            
+
             if (Directory.Exists(modelsRoot))
             {
                 var allFiles = Directory.GetFiles(modelsRoot, "*", SearchOption.AllDirectories);
                 var knownFiles = new HashSet<string>(_availableModels.Value.Select(GetModelFilePath), StringComparer.OrdinalIgnoreCase);
-                
+
                 foreach (var file in allFiles)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    
+
                     if (!knownFiles.Contains(file))
                     {
                         try
@@ -444,7 +444,7 @@ public class OcrModelManager : IOcrModelManager
                     }
                 }
             }
-            
+
             // 一時ディレクトリのクリーンアップ
             if (Directory.Exists(_tempDirectory))
             {
@@ -466,9 +466,9 @@ public class OcrModelManager : IOcrModelManager
                     }
                 }
             }
-            
+
             _lastCleanup = DateTime.UtcNow;
-            
+
             _logger?.LogInformation("クリーンアップ完了: {Count}個のファイルを削除", cleanedCount);
             return cleanedCount;
         }
@@ -494,7 +494,7 @@ public class OcrModelManager : IOcrModelManager
         var totalDownloadSize = _availableModels.Value.Sum(m => m.FileSize);
         var usedDiskSpace = downloadedModels.Sum(m => m.FileSize);
         var availableLanguages = _availableModels.Value.Select(m => m.LanguageCode).Where(l => l != null).Distinct().Count();
-        
+
         var completedLanguages = 0;
         var uniqueLanguages = _availableModels.Value.Select(m => m.LanguageCode).Where(l => l != null).Distinct();
         foreach (var language in uniqueLanguages)
@@ -529,28 +529,28 @@ public class OcrModelManager : IOcrModelManager
         {
             // より厳格なテスト環境検出
             var processName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
-            
+
             // 実行中のプロセス名による検出
             var isTestProcess = processName.Contains("testhost", StringComparison.OrdinalIgnoreCase) ||
                                processName.Contains("vstest", StringComparison.OrdinalIgnoreCase) ||
                                processName.Contains("dotnet", StringComparison.OrdinalIgnoreCase);
-            
+
             // スタックトレースによるテスト検出（より確実）
             var stackTrace = Environment.StackTrace;
             var isTestFromStack = stackTrace.Contains("xunit", StringComparison.OrdinalIgnoreCase) ||
                                  stackTrace.Contains(".Tests.", StringComparison.OrdinalIgnoreCase) ||
                                  stackTrace.Contains("Microsoft.TestPlatform", StringComparison.OrdinalIgnoreCase) ||
                                  stackTrace.Contains("TestMethodInvoker", StringComparison.OrdinalIgnoreCase);
-            
+
             // 環境変数による検出
             var isTestEnvironmentVar = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")) ||
                                       !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TF_BUILD")) || // Azure DevOps
                                       !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_ACTIONS")) || // GitHub Actions
                                       !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CI")) ||
                                       !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BUILD_BUILDID"));
-            
+
             var isTest = isTestProcess || isTestFromStack || isTestEnvironmentVar;
-            
+
             return isTest;
         }
         catch (System.Security.SecurityException)
@@ -582,15 +582,15 @@ public class OcrModelManager : IOcrModelManager
         if (IsTestEnvironment())
         {
             _logger?.LogDebug("テスト環境: モデルダウンロードをシミュレート");
-            
+
             progressCallback?.Report(new ModelDownloadProgress(
                 modelInfo, ModelDownloadStatus.Downloading, 0.5, "テスト環境でのダウンロードシミュレート中..."));
-            
+
             await Task.Delay(10, cancellationToken).ConfigureAwait(false);
-            
+
             progressCallback?.Report(new ModelDownloadProgress(
                 modelInfo, ModelDownloadStatus.Completed, 1.0, "テスト環境でのダウンロード完了"));
-            
+
             return true;
         }
 
@@ -602,12 +602,12 @@ public class OcrModelManager : IOcrModelManager
 
         try
         {
-            _logger?.LogInformation("モデル {ModelName} のダウンロードを開始: {Url}", 
+            _logger?.LogInformation("モデル {ModelName} のダウンロードを開始: {Url}",
                 modelInfo.Name, modelInfo.DownloadUrl);
 
             // ダウンロード開始
             using var response = await _httpClient.GetAsync(
-                modelInfo.DownloadUrl, 
+                modelInfo.DownloadUrl,
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken).ConfigureAwait(false);
 
@@ -642,9 +642,9 @@ public class OcrModelManager : IOcrModelManager
                     var estimatedTimeRemaining = speed > 0 ? TimeSpan.FromSeconds(remainingBytes / speed) : (TimeSpan?)null;
 
                     progressCallback?.Report(new ModelDownloadProgress(
-                        modelInfo, 
-                        ModelDownloadStatus.Downloading, 
-                        progress, 
+                        modelInfo,
+                        ModelDownloadStatus.Downloading,
+                        progress,
                         $"ダウンロード中...",
                         null,
                         totalBytesRead,
@@ -702,7 +702,7 @@ public class OcrModelManager : IOcrModelManager
             _logger?.LogInformation("モデル {ModelName} のダウンロードがキャンセルされました", modelInfo.Name);
             progressCallback?.Report(new ModelDownloadProgress(
                 modelInfo, ModelDownloadStatus.Cancelled, 0, "ダウンロードがキャンセルされました"));
-            
+
             CleanupTempFile(tempFilePath);
             throw;
         }

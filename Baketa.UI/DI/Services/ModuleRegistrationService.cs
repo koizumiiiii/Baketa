@@ -1,13 +1,13 @@
+using System.Diagnostics;
+using Baketa.Application.DI.Modules;
+using Baketa.Core.DI;
+using Baketa.Core.DI.Modules;
+using Baketa.Infrastructure.DI;
+using Baketa.Infrastructure.DI.Modules;
+using Baketa.Infrastructure.Platform.DI;
+using Baketa.UI.DI.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Baketa.Core.DI.Modules;
-using Baketa.Core.DI;
-using Baketa.Infrastructure.DI.Modules;
-using Baketa.Infrastructure.DI;
-using Baketa.Infrastructure.Platform.DI;
-using Baketa.Application.DI.Modules;
-using Baketa.UI.DI.Modules;
-using System.Diagnostics;
 
 namespace Baketa.UI.DI.Services;
 
@@ -27,7 +27,7 @@ public sealed class ModuleRegistrationService(IServiceCollection services)
     public void RegisterAllModules()
     {
         LogRegistrationStart();
-        
+
         // Phase 1: Core基盤モジュール
         RegisterCoreModules();
 
@@ -39,24 +39,24 @@ public sealed class ModuleRegistrationService(IServiceCollection services)
 
         // Phase 4: UI/Presentation
         RegisterUIModules();
-        
+
         // Phase 5: 特殊機能モジュール
         RegisterSpecializedModules();
-        
+
         LogRegistrationComplete();
     }
 
     private void RegisterCoreModules()
     {
         Console.WriteLine("🏗️ Phase 1: Core基盤モジュール登録開始");
-        
+
         // Core基盤
         var coreModule = new CoreModule();
         coreModule.RegisterWithDependencies(_services, _registeredModules, _moduleStack);
-        
+
         // 設定システム
         _services.AddSettingsSystem();
-        
+
         Console.WriteLine("✅ Core基盤モジュール登録完了");
     }
 
@@ -101,18 +101,18 @@ public sealed class ModuleRegistrationService(IServiceCollection services)
     private void RegisterUIModules()
     {
         Console.WriteLine("🎨 Phase 4: UI/Presentation登録開始");
-        
+
         // UI基盤
         var uiModule = new UIModule();
         uiModule.RegisterWithDependencies(_services, _registeredModules, _moduleStack);
-        
+
         // オーバーレイUI
         var overlayUIModule = new OverlayUIModule();
         overlayUIModule.RegisterServices(_services);
-        
+
         // アダプターサービス
         _services.AddAdapterServices();
-        
+
         Console.WriteLine("✅ UI/Presentation登録完了");
     }
 
@@ -137,15 +137,15 @@ public sealed class ModuleRegistrationService(IServiceCollection services)
         // バッチOCR
         var batchOcrModule = new BatchOcrModule();
         batchOcrModule.RegisterServices(_services);
-        
+
         // OCR前処理
         var ocrProcessingModule = new OcrProcessingModule();
         ocrProcessingModule.RegisterServices(_services);
-        
+
         // OpenCV処理（IOcrPreprocessingService上書き）
         var openCvProcessingModule = new Baketa.Infrastructure.DI.Modules.OpenCvProcessingModule();
         openCvProcessingModule.RegisterServices(_services);
-        
+
         // PaddleOCR統合
         var paddleOcrModule = new PaddleOcrModule();
         paddleOcrModule.RegisterServices(_services);
@@ -158,7 +158,7 @@ public sealed class ModuleRegistrationService(IServiceCollection services)
         var stagedOcrModule = new StagedOcrStrategyModule();
         stagedOcrModule.RegisterWithDependencies(_services, _registeredModules, _moduleStack);
         Console.WriteLine("✅ [GEMINI] StagedOcrStrategyModule登録完了！");
-        
+
         // Gemini推奨Step3: 高度キャッシング戦略
         Console.WriteLine("🔍 [GEMINI] AdvancedCachingModule登録開始...");
         var advancedCachingModule = new AdvancedCachingModule();

@@ -12,13 +12,13 @@ public interface IGpuEnvironmentDetector
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>GPU環境情報</returns>
     Task<GpuEnvironmentInfo> DetectEnvironmentAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// キャッシュ済みGPU環境情報を取得します（高速アクセス用）
     /// </summary>
     /// <returns>キャッシュ済み環境情報、未検出の場合はnull</returns>
     GpuEnvironmentInfo? GetCachedEnvironment();
-    
+
     /// <summary>
     /// GPU環境情報の再検出を強制実行します
     /// </summary>

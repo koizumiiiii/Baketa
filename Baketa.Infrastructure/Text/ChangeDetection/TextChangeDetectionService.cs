@@ -1,7 +1,7 @@
-using Baketa.Core.Abstractions.Processing;
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Baketa.Core.Abstractions.Processing;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Text.ChangeDetection;
 
@@ -14,7 +14,7 @@ public class TextChangeDetectionService : ITextChangeDetectionService
 {
     private readonly ILogger<TextChangeDetectionService> _logger;
     private readonly ConcurrentDictionary<string, string> _previousTextCache = new();
-    
+
     public TextChangeDetectionService(ILogger<TextChangeDetectionService> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -23,7 +23,7 @@ public class TextChangeDetectionService : ITextChangeDetectionService
     public async Task<TextChangeResult> DetectTextChangeAsync(string previousText, string currentText, string contextId)
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             // 入力検証
@@ -46,7 +46,7 @@ public class TextChangeDetectionService : ITextChangeDetectionService
             // どちらか一方が空文字列の場合
             if (string.IsNullOrEmpty(previousText) || string.IsNullOrEmpty(currentText))
             {
-                _logger.LogDebug("テキスト変化検知 (一方が空) - Context: {ContextId}, Previous: {PrevLen}, Current: {CurrLen}", 
+                _logger.LogDebug("テキスト変化検知 (一方が空) - Context: {ContextId}, Previous: {PrevLen}, Current: {CurrLen}",
                     contextId, previousText?.Length ?? 0, currentText.Length);
                 return TextChangeResult.CreateSignificantChange(previousText, currentText, 1.0f, stopwatch.Elapsed);
             }
@@ -58,7 +58,7 @@ public class TextChangeDetectionService : ITextChangeDetectionService
 
             var hasChanged = IsSignificantTextChange(changePercentage);
 
-            _logger.LogDebug("テキスト変化検知完了 - Context: {ContextId}, 変化: {HasChanged}, 変化率: {ChangePercentage:F3}, 編集距離: {EditDistance}", 
+            _logger.LogDebug("テキスト変化検知完了 - Context: {ContextId}, 変化: {HasChanged}, 変化率: {ChangePercentage:F3}, 編集距離: {EditDistance}",
                 contextId, hasChanged, changePercentage, editDistance);
 
             // キャッシュ更新（スレッドセーフ）
@@ -96,7 +96,7 @@ public class TextChangeDetectionService : ITextChangeDetectionService
 
         var len1 = text1.Length;
         var len2 = text2.Length;
-        
+
         // 効率化: 片方が著しく長い場合は早期リターン
         if (Math.Abs(len1 - len2) > Math.Max(len1, len2) * 0.8)
         {

@@ -56,7 +56,7 @@ public static class BaketaExceptionHandler
         Func<Exception, string, Task>? onError = null)
     {
         ArgumentNullException.ThrowIfNull(strategies);
-        
+
         if (strategies.Count == 0)
             throw new ArgumentException("At least one strategy must be provided", nameof(strategies));
 
@@ -71,7 +71,7 @@ public static class BaketaExceptionHandler
             catch (Exception ex)
             {
                 lastException = ex;
-                
+
                 // 最後の戦略以外での失敗はログ出力のみ
                 if (i < strategies.Count - 1 && onError != null)
                 {
@@ -126,7 +126,7 @@ public static class BaketaExceptionHandler
     public static string GetUserFriendlyErrorMessage(Exception ex, string context)
     {
         ArgumentNullException.ThrowIfNull(ex);
-        
+
         return ex switch
         {
             TimeoutException => $"{context}中にタイムアウトが発生しました。処理に時間がかかっています。",

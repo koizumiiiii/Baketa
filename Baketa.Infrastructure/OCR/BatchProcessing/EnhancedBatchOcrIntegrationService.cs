@@ -1,19 +1,19 @@
-﻿using System.Collections.Concurrent;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.UI;
+using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Settings;
-using Baketa.Core.Settings;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
+using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR; // 🔥 [FIX7_STEP3] OcrContext統合
+using Baketa.Core.Settings;
+using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
 using Baketa.Infrastructure.OCR.PostProcessing;
-using Baketa.Core.Events.EventTypes;
-using Baketa.Core.Translation.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ITranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
-using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 
 namespace Baketa.Infrastructure.OCR.BatchProcessing;
 
@@ -34,7 +34,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
     private readonly ILogger<EnhancedBatchOcrIntegrationService> _logger;
     private readonly TimedAggregatorSettings _settings;
     private readonly ILanguageConfigurationService _languageConfig;
-    
+
     // パフォーマンス監視用
     private readonly ConcurrentDictionary<string, ProcessingStatistics> _processingStats;
     private long _totalProcessedImages;
@@ -109,12 +109,12 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
             if (_settings.IsFeatureEnabled)
             {
                 var aggregationResults = new List<TextChunk>();
-                
+
                 foreach (var chunk in ocrChunks)
                 {
                     // TimedChunkAggregatorにチャンクを追加
                     var added = await _timedChunkAggregator.TryAddChunkAsync(chunk, context.CancellationToken).ConfigureAwait(false);
-                    
+
                     if (!added)
                     {
                         // Feature Flag無効またはエラー時は直接結果に追加
@@ -128,7 +128,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
                     _logger.LogInformation("📊 TimedAggregator無効 - 直接処理: {ChunkCount}個", aggregationResults.Count);
                     return aggregationResults;
                 }
-                
+
                 // TimedAggregatorに追加されたチャンクは集約後に別途処理される
                 _logger.LogDebug("⏱️ チャンク集約待機中 - {ChunkCount}個がTimedAggregatorに追加済み", ocrChunks.Count);
             }
@@ -330,10 +330,10 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
     public (long TotalImages, long TotalAggregatedChunks, TimeSpan AverageProcessingTime) GetEnhancedStatistics()
     {
         ThrowIfDisposed();
-        
+
         var totalImages = Interlocked.Read(ref _totalProcessedImages);
         var totalChunks = Interlocked.Read(ref _totalAggregatedChunks);
-        
+
         var avgProcessingTime = _processingStats.Values.Count > 0
             ? TimeSpan.FromTicks((long)_processingStats.Values.Average(s => s.ProcessingTime.Ticks))
             : TimeSpan.Zero;
@@ -382,7 +382,7 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
         {
             var (totalImages, totalChunks, avgTime) = GetEnhancedStatistics();
             var (timedChunks, timedEvents) = GetAggregatorStatistics();
-            
+
             _logger.LogInformation("📊 EnhancedBatchOcrIntegrationService最終統計 - " +
                 "処理画像: {Images}, 集約チャンク: {Chunks}, 平均処理時間: {AvgTime}ms, " +
                 "TimedAggregator - チャンク: {TimedChunks}, イベント: {TimedEvents}",
@@ -394,9 +394,9 @@ public sealed class EnhancedBatchOcrIntegrationService : ITextChunkAggregatorSer
         _baseBatchService?.Dispose();
         _timedChunkAggregator?.Dispose();
         _processingStats.Clear();
-        
+
         _disposed = true;
-        
+
         _logger.LogInformation("🧹 EnhancedBatchOcrIntegrationService disposed");
     }
 }

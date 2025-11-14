@@ -14,7 +14,7 @@ public static class SafeFileLogger
     private static readonly SemaphoreSlim _semaphore = new(1, 1);
     private const int MaxRetryAttempts = 3;
     private const int RetryDelayMs = 10;
-    
+
     /// <summary>
     /// ファイルに安全にログを追記（同期版）
     /// </summary>
@@ -24,7 +24,7 @@ public static class SafeFileLogger
     {
         AppendLogAsync(fileName, message).GetAwaiter().GetResult();
     }
-    
+
     /// <summary>
     /// ファイルに安全にログを追記（非同期版）
     /// </summary>
@@ -66,7 +66,7 @@ public static class SafeFileLogger
             _semaphore.Release();
         }
     }
-    
+
     /// <summary>
     /// タイムスタンプ付きでログを追記（同期版）
     /// </summary>
@@ -77,7 +77,7 @@ public static class SafeFileLogger
         var timestampedMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}";
         AppendLog(fileName, timestampedMessage);
     }
-    
+
     /// <summary>
     /// タイムスタンプ付きでログを追記（非同期版）
     /// </summary>

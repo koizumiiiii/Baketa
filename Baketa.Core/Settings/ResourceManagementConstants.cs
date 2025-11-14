@@ -17,7 +17,7 @@ public static class ResourceManagementConstants
         public const long DefaultCapacityMB = 8192; // 8GB
 
         /// <summary>一般的なVRAMサイズ（MB）</summary>
-        public static readonly long[] CommonCapacityMB = 
+        public static readonly long[] CommonCapacityMB =
         [
             4096,   // 4GB
             6144,   // 6GB  
@@ -178,7 +178,7 @@ public static class ResourceManagementConstants
     public static class Fallback
     {
         /// <summary>フォールバックVRAM容量情報</summary>
-        public static readonly (long Total, long Used, long Available, double UsagePercent) 
+        public static readonly (long Total, long Used, long Available, double UsagePercent)
             DefaultVramInfo = (8192, 0, 8192, 0.0);
 
         /// <summary>デフォルト統計値</summary>

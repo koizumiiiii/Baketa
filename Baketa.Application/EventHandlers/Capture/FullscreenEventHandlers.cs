@@ -1,9 +1,9 @@
 using System;
 using System.Globalization;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events.EventTypes;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.EventHandlers.Capture;
 
@@ -23,21 +23,21 @@ public sealed class FullscreenStateChangedEventHandler(ILogger<FullscreenStateCh
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
-    
+
     public int Priority => 0;
     public bool SynchronousExecution => false;
-    
+
     private async Task HandleInternal(FullscreenStateChangedEvent eventData)
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        
+
         var info = eventData.FullscreenInfo;
-        
+
         if (info.IsFullscreen)
         {
             _logger?.LogInformation("Fullscreen detected: {ProcessName} ({WindowTitle}) - Confidence: {Confidence:F2}",
                 info.ProcessName, info.WindowTitle, info.Confidence);
-            
+
             if (info.IsLikelyGame)
             {
                 _logger?.LogInformation("Game detected in fullscreen mode: {ProcessName}", info.ProcessName);
@@ -47,10 +47,10 @@ public sealed class FullscreenStateChangedEventHandler(ILogger<FullscreenStateCh
         {
             _logger?.LogInformation("Windowed mode detected: {ProcessName}", info.ProcessName);
         }
-        
+
         // 追加の処理（必要に応じて）
         // 例: システム通知、統計記録、他のサービスへの通知など
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }
@@ -71,21 +71,21 @@ public sealed class FullscreenOptimizationAppliedEventHandler(ILogger<Fullscreen
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
-    
+
     public int Priority => 0;
     public bool SynchronousExecution => false;
-    
+
     private async Task HandleInternal(FullscreenOptimizationAppliedEvent eventData)
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        
+
         var info = eventData.FullscreenInfo;
         var settings = eventData.OptimizedSettings;
-        
+
         _logger?.LogInformation("Fullscreen optimization applied for {ProcessName}: " +
                                "Interval={IntervalMs}ms, Quality={Quality}%, GridSize={GridSize}",
             info.ProcessName, settings.CaptureIntervalMs, settings.CaptureQuality, settings.DifferenceDetectionGridSize);
-        
+
         // パフォーマンス向上の通知や記録
         if (eventData.OriginalSettings != null)
         {
@@ -95,7 +95,7 @@ public sealed class FullscreenOptimizationAppliedEventHandler(ILogger<Fullscreen
                 _logger?.LogDebug("Capture interval optimized: +{Improvement}ms for performance", intervalImprovement);
             }
         }
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }
@@ -116,22 +116,22 @@ public sealed class FullscreenOptimizationRemovedEventHandler(ILogger<Fullscreen
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
-    
+
     public int Priority => 0;
     public bool SynchronousExecution => false;
-    
+
     private async Task HandleInternal(FullscreenOptimizationRemovedEvent eventData)
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        
+
         _logger?.LogInformation("Fullscreen optimization removed: {Reason}", eventData.Reason);
-        
+
         if (eventData.RestoredSettings != null)
         {
             _logger?.LogDebug("Settings restored: Interval={IntervalMs}ms, Quality={Quality}%",
                 eventData.RestoredSettings.CaptureIntervalMs, eventData.RestoredSettings.CaptureQuality);
         }
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }
@@ -152,20 +152,20 @@ public sealed class FullscreenOptimizationErrorEventHandler(ILogger<FullscreenOp
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
-    
+
     public int Priority => 0;
     public bool SynchronousExecution => false;
-    
+
     private async Task HandleInternal(FullscreenOptimizationErrorEvent eventData)
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        
+
         _logger?.LogError(eventData.Exception, "Fullscreen optimization error in {Context}: {Message}",
             eventData.Context, eventData.ErrorMessage);
-        
+
         // エラー統計の記録や復旧処理（必要に応じて）
         // 例: エラー回数のカウント、自動復旧の試行など
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }
@@ -181,17 +181,17 @@ public sealed class FullscreenDetectionStartedEventHandler(ILogger<FullscreenDet
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
-    
+
     public int Priority => 0;
     public bool SynchronousExecution => false;
-    
+
     private async Task HandleInternal(FullscreenDetectionStartedEvent eventData)
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        
+
         _logger?.LogInformation("Fullscreen detection started: Interval={IntervalMs}ms, MinConfidence={MinConfidence:F2}",
             eventData.Settings.DetectionIntervalMs, eventData.Settings.MinConfidence);
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }
@@ -207,18 +207,18 @@ public sealed class FullscreenDetectionStoppedEventHandler(ILogger<FullscreenDet
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
-    
+
     public int Priority => 0;
     public bool SynchronousExecution => false;
-    
+
     private async Task HandleInternal(FullscreenDetectionStoppedEvent eventData)
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        
+
         var duration = eventData.RunDuration?.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture) ?? "Unknown";
         _logger?.LogInformation("Fullscreen detection stopped: {Reason} (Duration: {Duration})",
             eventData.Reason, duration);
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }

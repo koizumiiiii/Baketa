@@ -6,23 +6,22 @@ using System.Threading.Tasks;
 using Baketa.Application.Models;
 using Baketa.Application.Services.Translation;
 using Baketa.Application.Tests.TestUtilities;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
-using Baketa.Core.Abstractions.Factories;
-using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Services;
-using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
-
-// 名前空間競合を解決するためのエイリアス
-using MSLogLevel = Microsoft.Extensions.Logging.LogLevel;
 using ApplicationTranslationSettings = Baketa.Application.Services.Translation.TranslationSettings;
 using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
+// 名前空間競合を解決するためのエイリアス
+using MSLogLevel = Microsoft.Extensions.Logging.LogLevel;
+using TranslationAbstractions = Baketa.Core.Abstractions.Translation;
 
 namespace Baketa.Application.Tests.Services.Translation;
 
@@ -40,7 +39,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
     private readonly Mock<IImage> _imageMock;
     private readonly CoordinateBasedTranslationService? _coordinateBasedTranslationService;
-    
+
     private readonly TranslationOrchestrationService _service;
     private bool _disposed;
 
@@ -61,10 +60,10 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // CaptureService のモック設定
         SetupCaptureServiceMocks();
-        
+
         // Settings Service のモック設定
         SetupSettingsServiceMocks();
-        
+
         // OCR Engine のモック設定
         SetupOcrEngineMocks();
 
@@ -74,11 +73,11 @@ public class TranslationOrchestrationServiceTests : IDisposable
         // テスト対象サービスのインスタンス作成
         // OcrSettings用のモック作成
         var ocrSettingsMock = new Mock<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
-        ocrSettingsMock.Setup(x => x.CurrentValue).Returns(new Baketa.Core.Settings.OcrSettings 
-        { 
-            DetectionThreshold = 0.03 
+        ocrSettingsMock.Setup(x => x.CurrentValue).Returns(new Baketa.Core.Settings.OcrSettings
+        {
+            DetectionThreshold = 0.03
         });
-        
+
         _service = new TranslationOrchestrationService(
             _captureServiceMock.Object,
             _settingsServiceMock.Object,
@@ -125,7 +124,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert
         _service.IsAutomaticTranslationActive.Should().BeTrue();
-        
+
         // ログの検証
         VerifyLogCall(MSLogLevel.Warning, Times.Once());
 
@@ -165,7 +164,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert
         _service.IsAutomaticTranslationActive.Should().BeFalse();
-        
+
         // 警告ログが出ることを確認
         VerifyLogCall(MSLogLevel.Warning, Times.Once());
     }
@@ -187,13 +186,13 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Act
         await _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
-        
+
         // 翻訳処理の完了を待機（模擬処理で約500ms + 800ms = 1300ms）
         await Task.Delay(1500);
 
         // Assert
         _captureServiceMock.Verify(
-            x => x.CaptureScreenAsync(), 
+            x => x.CaptureScreenAsync(),
             Times.Once);
 
         // 翻訳結果が発行されることを確認
@@ -225,7 +224,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert - セマフォにより順次実行されることを確認
         _captureServiceMock.Verify(
-            x => x.CaptureScreenAsync(), 
+            x => x.CaptureScreenAsync(),
             Times.Exactly(2));
     }
 
@@ -237,7 +236,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     {
         // Arrange
         using var cts = new CancellationTokenSource();
-        
+
         _captureServiceMock
             .Setup(x => x.CaptureScreenAsync())
             .Returns(async () =>
@@ -273,7 +272,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert - 単発翻訳が実行されたことを確認
         _captureServiceMock.Verify(
-            x => x.CaptureScreenAsync(), 
+            x => x.CaptureScreenAsync(),
             Times.AtLeastOnce);
 
         // Cleanup
@@ -288,7 +287,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     {
         // Arrange
         await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
-        
+
         // キャプチャに時間がかかるように設定
         _captureServiceMock
             .Setup(x => x.CaptureScreenAsync())
@@ -300,7 +299,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Act
         var singleTranslationTask = _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
-        
+
         // 単発翻訳の完了を待機
         await singleTranslationTask;
 
@@ -420,7 +419,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Act
         await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
-        
+
         // エラー発生後も処理が継続されるまで少し待機
         await Task.Delay(300);
 
@@ -449,7 +448,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert - Disposeが正常に完了することを確認
         _service.IsAutomaticTranslationActive.Should().BeFalse();
-        
+
         // サービス停止ログが出力されていることを確認
         VerifyLogCall(MSLogLevel.Information, Times.AtLeastOnce());
     }
@@ -558,7 +557,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
         // 翻訳関連設定のモック
         _settingsServiceMock.Setup(x => x.GetValue("Translation:SingleTranslationDisplaySeconds", It.IsAny<int>()))
             .Returns(5);
-        
+
         _settingsServiceMock.Setup(x => x.GetValue("Translation:AutomaticTranslationIntervalMs", It.IsAny<int>()))
             .Returns(2000);
     }
@@ -624,7 +623,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         _service?.Dispose();
         _imageMock?.Object?.Dispose();
-        
+
         _disposed = true;
     }
 

@@ -2,11 +2,11 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
 using Baketa.Infrastructure.OCR.Scaling;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using Baketa.Core.Abstractions.OCR;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 

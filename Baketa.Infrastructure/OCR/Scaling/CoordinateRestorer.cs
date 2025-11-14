@@ -1,7 +1,7 @@
 using System.Drawing;
-using Baketa.Core.Models.OCR;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Models.OCR;
 
 namespace Baketa.Infrastructure.OCR.Scaling;
 
@@ -59,7 +59,7 @@ public static class CoordinateRestorer
 
         return new Rectangle(x1, y1, finalWidth, finalHeight);
     }
-    
+
     /// <summary>
     /// OCRテキスト領域の座標を復元（境界クリッピング対応）
     /// </summary>
@@ -86,7 +86,7 @@ public static class CoordinateRestorer
             confidence: scaledRegion.Confidence
         );
     }
-    
+
     /// <summary>
     /// OCR結果全体の座標を復元（境界クリッピング対応）
     /// </summary>
@@ -139,7 +139,7 @@ public static class CoordinateRestorer
             scaledResults.Text // テキスト内容は変更なし
         );
     }
-    
+
     /// <summary>
     /// 複数の座標を一括で復元（境界クリッピング対応）
     /// </summary>
@@ -154,11 +154,9 @@ public static class CoordinateRestorer
     {
         ArgumentNullException.ThrowIfNull(scaledRectangles);
 
-        return scaledRectangles
-            .Select(rect => RestoreOriginalCoordinates(rect, scaleFactor, originalImageSize))
-            .ToList();
+        return [.. scaledRectangles.Select(rect => RestoreOriginalCoordinates(rect, scaleFactor, originalImageSize))];
     }
-    
+
     /// <summary>
     /// スケーリング情報のログ用文字列を生成
     /// </summary>
@@ -167,17 +165,17 @@ public static class CoordinateRestorer
     /// <param name="restoredRect">復元後の座標</param>
     /// <param name="scaleFactor">スケール係数</param>
     /// <returns>座標復元情報の詳細文字列</returns>
-    public static string GetRestorationInfo(Rectangle originalRect, Rectangle scaledRect, 
+    public static string GetRestorationInfo(Rectangle originalRect, Rectangle scaledRect,
         Rectangle restoredRect, double scaleFactor)
     {
         var accuracy = CalculateRestorationAccuracy(originalRect, restoredRect);
-        
+
         return $"座標復元: 元({originalRect.X},{originalRect.Y},{originalRect.Width}x{originalRect.Height}) " +
                $"→ 処理({scaledRect.X},{scaledRect.Y},{scaledRect.Width}x{scaledRect.Height}) " +
                $"→ 復元({restoredRect.X},{restoredRect.Y},{restoredRect.Width}x{restoredRect.Height}) " +
                $"[スケール: {scaleFactor:F3}, 精度: {accuracy:F1}%]";
     }
-    
+
     /// <summary>
     /// 座標復元の精度を計算
     /// </summary>
@@ -188,20 +186,20 @@ public static class CoordinateRestorer
     {
         if (original.IsEmpty || restored.IsEmpty)
             return 0.0;
-        
+
         // 位置とサイズの差分を計算
         double positionError = Math.Sqrt(
-            Math.Pow(original.X - restored.X, 2) + 
+            Math.Pow(original.X - restored.X, 2) +
             Math.Pow(original.Y - restored.Y, 2)
         );
-        
-        double sizeError = Math.Abs(original.Width - restored.Width) + 
+
+        double sizeError = Math.Abs(original.Width - restored.Width) +
                           Math.Abs(original.Height - restored.Height);
-        
+
         // 元画像サイズに対する相対誤差
         double imageSize = Math.Sqrt(original.Width * original.Width + original.Height * original.Height);
         double totalError = (positionError + sizeError) / imageSize;
-        
+
         // 精度として表現（100% - 誤差率）
         return Math.Max(0, Math.Min(100, (1.0 - totalError) * 100));
     }

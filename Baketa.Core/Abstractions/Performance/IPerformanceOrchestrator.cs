@@ -18,7 +18,7 @@ public interface IPerformanceOrchestrator
     /// <param name="cancellationToken">キャンセレーション トークン</param>
     /// <returns>最適化されたOCR結果</returns>
     Task<OptimizedOcrResult> ExecuteOptimizedOcrAsync(
-        byte[] imageData, 
+        byte[] imageData,
         PerformanceOptimizationOptions? options = null,
         CancellationToken cancellationToken = default);
 
@@ -299,12 +299,12 @@ public enum PerformancePriority
     /// 品質優先
     /// </summary>
     Quality,
-    
+
     /// <summary>
     /// バランス
     /// </summary>
     Balanced,
-    
+
     /// <summary>
     /// 速度優先
     /// </summary>
@@ -320,22 +320,22 @@ public enum QualitySpeedTradeoff
     /// 最高品質
     /// </summary>
     MaxQuality,
-    
+
     /// <summary>
     /// 高品質
     /// </summary>
     HighQuality,
-    
+
     /// <summary>
     /// バランス
     /// </summary>
     Balanced,
-    
+
     /// <summary>
     /// 高速
     /// </summary>
     HighSpeed,
-    
+
     /// <summary>
     /// 最高速
     /// </summary>
@@ -352,17 +352,17 @@ public enum HealthStatus
     /// 正常
     /// </summary>
     Healthy,
-    
+
     /// <summary>
     /// 警告
     /// </summary>
     Warning,
-    
+
     /// <summary>
     /// エラー
     /// </summary>
     Error,
-    
+
     /// <summary>
     /// クリティカル
     /// </summary>
@@ -378,17 +378,17 @@ public enum IssueSeverity
     /// 情報
     /// </summary>
     Info,
-    
+
     /// <summary>
     /// 警告
     /// </summary>
     Warning,
-    
+
     /// <summary>
     /// エラー
     /// </summary>
     Error,
-    
+
     /// <summary>
     /// クリティカル
     /// </summary>

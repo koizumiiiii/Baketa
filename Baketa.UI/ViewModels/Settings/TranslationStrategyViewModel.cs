@@ -5,14 +5,14 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using ReactiveUI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using ReactiveUI;
 using EngineStatus = Baketa.UI.Services.TranslationEngineStatus;
 using StatusUpdate = Baketa.UI.Services.TranslationEngineStatusUpdate;
 
@@ -166,7 +166,7 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
         ArgumentNullException.ThrowIfNull(notificationService);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
-        
+
         _statusService = statusService;
         _notificationService = notificationService;
         _logger = logger;
@@ -183,7 +183,7 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
 
         // コマンドの作成
         var canExecute = this.WhenAnyValue(x => x.IsLoading).Select(loading => !loading);
-        
+
         SelectStrategyCommand = ReactiveCommand.CreateFromTask<TranslationStrategy>(
             SelectStrategyAsync, canExecute);
 
@@ -249,7 +249,7 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
             {
                 HasStrategyWarning = true;
                 StrategyWarningMessage = warning;
-                
+
                 await _notificationService.ShowWarningAsync(
                     "翻訳戦略の注意事項",
                     warning).ConfigureAwait(false);
@@ -398,7 +398,7 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
             _logger.LogInformation("Fallback to Direct strategy due to language pair change: {Pair}", languagePair);
         }
 
-        _logger.LogDebug("Language pair changed to {Pair}, TwoStage available: {Available}", 
+        _logger.LogDebug("Language pair changed to {Pair}, TwoStage available: {Available}",
             languagePair, IsTwoStageAvailable);
     }
 
@@ -409,7 +409,7 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
     {
         // 現在の戦略を再検証
         var warning = ValidateStrategyAsync(SelectedStrategy).ConfigureAwait(false).GetAwaiter().GetResult();
-        
+
         if (!string.IsNullOrEmpty(warning))
         {
             HasStrategyWarning = true;
@@ -422,8 +422,8 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
         }
 
         UpdateStrategyDescription();
-        
-        _logger.LogDebug("Strategy warning updated: {HasWarning}, Message: {Message}", 
+
+        _logger.LogDebug("Strategy warning updated: {HasWarning}, Message: {Message}",
             HasStrategyWarning, StrategyWarningMessage);
     }
 
@@ -459,12 +459,12 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
     private string GetDirectStrategyDescription()
     {
         var baseDesc = "単一モデルによる直接翻訳。最高速度、最低レイテンシ。";
-        
+
         if (HasStrategyWarning)
         {
             return $"{baseDesc}\n⚠️ {StrategyWarningMessage}";
         }
-        
+
         return $"{baseDesc}\n✅ 推定レイテンシ: < 50ms";
     }
 
@@ -479,12 +479,12 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
         }
 
         var baseDesc = "2段階翻訳（日本語→英語→中国語）。高品質だが時間がかかる。";
-        
+
         if (HasStrategyWarning)
         {
             return $"{baseDesc}\n⚠️ {StrategyWarningMessage}";
         }
-        
+
         return $"{baseDesc}\n✅ 推定レイテンシ: < 100ms";
     }
 
@@ -551,7 +551,7 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
     {
         return strategy switch
         {
-            TranslationStrategy.Direct => 
+            TranslationStrategy.Direct =>
                 "【直接翻訳】\n" +
                 "• 単一の翻訳モデルを使用\n" +
                 "• 最高速度（< 50ms）\n" +
@@ -559,7 +559,7 @@ public sealed class TranslationStrategyViewModel : Framework.ViewModelBase, IAct
                 "• メモリ使用量: 最小\n" +
                 "• 推奨用途: 日常的な翻訳、リアルタイム翻訳",
 
-            TranslationStrategy.TwoStage => 
+            TranslationStrategy.TwoStage =>
                 "【2段階翻訳】\n" +
                 "• 中継言語（英語）経由の翻訳\n" +
                 "• 高品質（< 100ms）\n" +

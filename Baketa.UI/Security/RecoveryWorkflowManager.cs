@@ -5,8 +5,8 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Auth;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Security;
 
@@ -186,7 +186,7 @@ public sealed class RecoveryWorkflowManager : IDisposable
             // 復旧ワークフローの作成
             var workflowId = Guid.NewGuid().ToString();
             var verificationCode = GenerateVerificationCode();
-            
+
             var workflow = new RecoveryWorkflow(
                 Id: workflowId,
                 Email: normalizedEmail,
@@ -203,7 +203,7 @@ public sealed class RecoveryWorkflowManager : IDisposable
                     new("監視強化", false, null, null)
                 ],
                 Data: new()
-                { 
+                {
                     { "VerificationCode", verificationCode },
                     { "ProtectionActivated", true }
                 },
@@ -260,7 +260,7 @@ public sealed class RecoveryWorkflowManager : IDisposable
         try
         {
             // 確認コードの検証
-            if (!workflow.Data.TryGetValue("VerificationCode", out var storedCode) || 
+            if (!workflow.Data.TryGetValue("VerificationCode", out var storedCode) ||
                 !string.Equals(storedCode.ToString(), verificationCode, StringComparison.Ordinal))
             {
                 // 疑わしい確認試行をログ
@@ -279,8 +279,8 @@ public sealed class RecoveryWorkflowManager : IDisposable
                 updatedSteps[index] = identityStep with { IsCompleted = true, CompletedAt = DateTime.UtcNow, Notes = "身元確認完了" };
             }
 
-            var updatedWorkflow = workflow with 
-            { 
+            var updatedWorkflow = workflow with
+            {
                 Status = WorkflowStatus.IdentityVerified,
                 Steps = updatedSteps
             };
@@ -383,7 +383,7 @@ public sealed class RecoveryWorkflowManager : IDisposable
 
         // パスワードリセットの実行
         var resetResult = await _passwordResetManager.ExecutePasswordResetAsync(
-            workflow.Email, 
+            workflow.Email,
             workflow.Data["ResetToken"].ToString()!,
             newPassword,
             workflow.IPAddress).ConfigureAwait(false);
@@ -429,7 +429,7 @@ public sealed class RecoveryWorkflowManager : IDisposable
     {
         var now = DateTime.UtcNow;
         var windowStart = now.AddDays(-1);
-        
+
         var recentAttempts = _activeWorkflows.Values
             .Count(w => w.Email == email && w.CreatedAt >= windowStart);
 
@@ -482,7 +482,7 @@ public sealed class RecoveryWorkflowManager : IDisposable
         foreach (var kvp in expiredWorkflows)
         {
             _activeWorkflows.TryRemove(kvp.Key, out _);
-            
+
             if (_logger != null)
                 _logWorkflowFailed(_logger, kvp.Value.Email, "期限切れ", null);
         }

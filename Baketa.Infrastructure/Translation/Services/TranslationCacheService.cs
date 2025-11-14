@@ -18,7 +18,7 @@ public interface ITranslationCacheService
     /// <param name="engineName">エンジン名</param>
     /// <returns>キャッシュされた翻訳結果</returns>
     Task<string?> GetCachedTranslationAsync(string sourceText, string sourceLang, string targetLang, string engineName);
-    
+
     /// <summary>
     /// 翻訳結果をキャッシュに保存
     /// </summary>
@@ -30,7 +30,7 @@ public interface ITranslationCacheService
     /// <param name="expirationMinutes">有効期限（分）</param>
     /// <returns>保存完了を示すタスク</returns>
     Task SetCachedTranslationAsync(string sourceText, string sourceLang, string targetLang, string engineName, string translatedText, int expirationMinutes);
-    
+
     /// <summary>
     /// キャッシュをクリア
     /// </summary>
@@ -45,7 +45,7 @@ public class MemoryTranslationCacheService : ITranslationCacheService
 {
     private readonly Dictionary<string, (string Translation, DateTimeOffset Expiration)> _cache = new(StringComparer.Ordinal);
     private readonly object _lock = new();
-    
+
     /// <inheritdoc/>
     public Task<string?> GetCachedTranslationAsync(string sourceText, string sourceLang, string targetLang, string engineName)
     {
@@ -54,7 +54,7 @@ public class MemoryTranslationCacheService : ITranslationCacheService
         ArgumentNullException.ThrowIfNull(targetLang);
         ArgumentNullException.ThrowIfNull(engineName);
         var key = GenerateKey(sourceText, sourceLang, targetLang, engineName);
-        
+
         lock (_lock)
         {
             if (_cache.TryGetValue(key, out var cached))
@@ -69,10 +69,10 @@ public class MemoryTranslationCacheService : ITranslationCacheService
                 }
             }
         }
-        
+
         return Task.FromResult<string?>(null);
     }
-    
+
     /// <inheritdoc/>
     public Task SetCachedTranslationAsync(string sourceText, string sourceLang, string targetLang, string engineName, string translatedText, int expirationMinutes)
     {
@@ -83,15 +83,15 @@ public class MemoryTranslationCacheService : ITranslationCacheService
         ArgumentNullException.ThrowIfNull(translatedText);
         var key = GenerateKey(sourceText, sourceLang, targetLang, engineName);
         var expiration = DateTimeOffset.UtcNow.AddMinutes(expirationMinutes);
-        
+
         lock (_lock)
         {
             _cache[key] = (translatedText, expiration);
         }
-        
+
         return Task.CompletedTask;
     }
-    
+
     /// <inheritdoc/>
     public Task ClearCacheAsync()
     {
@@ -99,10 +99,10 @@ public class MemoryTranslationCacheService : ITranslationCacheService
         {
             _cache.Clear();
         }
-        
+
         return Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// キャッシュキーを生成
     /// </summary>

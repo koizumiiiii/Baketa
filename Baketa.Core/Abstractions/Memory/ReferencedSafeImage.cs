@@ -5,8 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using GdiImageFormat = System.Drawing.Imaging.ImageFormat;
-using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
 using GdiImageLockMode = System.Drawing.Imaging.ImageLockMode;
+using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
 
 namespace Baketa.Core.Abstractions.Memory;
 

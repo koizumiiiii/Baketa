@@ -1,9 +1,9 @@
 using System.Drawing;
 using System.Net.Http;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Models.OCR;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Services.OCR;
 
@@ -16,12 +16,12 @@ public interface IOcrApplicationService
     /// OCRエンジンが利用可能かどうか
     /// </summary>
     bool IsAvailable { get; }
-    
+
     /// <summary>
     /// 現在の言語設定
     /// </summary>
     string? CurrentLanguage { get; }
-    
+
     /// <summary>
     /// OCRサービスを初期化
     /// </summary>
@@ -29,7 +29,7 @@ public interface IOcrApplicationService
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>初期化が成功した場合はtrue</returns>
     Task<bool> InitializeAsync(string language = "jpn", CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 画像からテキストを認識
     /// </summary>
@@ -41,7 +41,7 @@ public interface IOcrApplicationService
         IImage image,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 画像の指定領域からテキストを認識（ROI指定）
     /// </summary>
@@ -55,7 +55,7 @@ public interface IOcrApplicationService
         Rectangle regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 言語を変更
     /// </summary>
@@ -63,13 +63,13 @@ public interface IOcrApplicationService
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>変更が成功した場合はtrue</returns>
     Task<bool> SwitchLanguageAsync(string language, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 利用可能な言語一覧を取得
     /// </summary>
     /// <returns>言語コードのリスト</returns>
     IReadOnlyList<string> GetAvailableLanguages();
-    
+
     /// <summary>
     /// 指定言語のモデルが利用可能かチェック
     /// </summary>
@@ -77,20 +77,20 @@ public interface IOcrApplicationService
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>利用可能な場合はtrue</returns>
     Task<bool> IsLanguageAvailableAsync(string language, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// OCRエンジンの設定を取得
     /// </summary>
     /// <returns>現在の設定</returns>
     OcrEngineSettings GetSettings();
-    
+
     /// <summary>
     /// OCRエンジンの設定を適用
     /// </summary>
     /// <param name="settings">新しい設定</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     Task ApplySettingsAsync(OcrEngineSettings settings, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// パフォーマンス統計を取得
     /// </summary>
@@ -120,7 +120,7 @@ public sealed class OcrApplicationService(
     public async Task<bool> InitializeAsync(string language = "jpn", CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             _logger?.LogInformation("OCRサービスの初期化を開始: 言語={Language}", language);
@@ -129,24 +129,24 @@ public sealed class OcrApplicationService(
             if (!await _modelManager.IsLanguageCompleteAsync(language, cancellationToken).ConfigureAwait(false))
             {
                 _logger?.LogWarning("言語 {Language} の必要なモデルが不足しています", language);
-                
+
                 // 必要なモデルを自動ダウンロード
                 var modelsForLanguage = await _modelManager.GetModelsForLanguageAsync(language, cancellationToken).ConfigureAwait(false);
                 var requiredModels = modelsForLanguage.Where(m => m.IsRequired).ToList();
-                
+
                 if (requiredModels.Count > 0)
                 {
                     _logger?.LogInformation("必要なモデルを自動ダウンロード中: {Count}個", requiredModels.Count);
-                    
+
                     var downloadProgress = new Progress<ModelDownloadProgress>(progress =>
                     {
-                        _logger?.LogDebug("モデルダウンロード進捗: {ModelName} - {Progress:P0}", 
+                        _logger?.LogDebug("モデルダウンロード進捗: {ModelName} - {Progress:P0}",
                             progress.ModelInfo.Name, progress.Progress);
                     });
-                    
+
                     var downloadSuccess = await _modelManager.DownloadModelsAsync(
                         requiredModels, downloadProgress, cancellationToken).ConfigureAwait(false);
-                    
+
                     if (!downloadSuccess)
                     {
                         _logger?.LogError("必要なモデルのダウンロードに失敗しました");
@@ -158,7 +158,7 @@ public sealed class OcrApplicationService(
             // OCRエンジンの初期化
             var settings = new OcrEngineSettings { Language = language };
             var success = await _ocrEngine.InitializeAsync(settings, cancellationToken).ConfigureAwait(false);
-            
+
             if (success)
             {
                 _logger?.LogInformation("OCRサービスの初期化が完了しました");
@@ -167,7 +167,7 @@ public sealed class OcrApplicationService(
             {
                 _logger?.LogError("OCRエンジンの初期化に失敗しました");
             }
-            
+
             return success;
         }
         catch (ModelManagementException ex)
@@ -197,7 +197,7 @@ public sealed class OcrApplicationService(
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(image);
-        
+
         if (!IsAvailable)
         {
             throw new InvalidOperationException("OCRサービスが初期化されていません。InitializeAsync()を先に呼び出してください。");
@@ -206,12 +206,12 @@ public sealed class OcrApplicationService(
         try
         {
             _logger?.LogDebug("OCR認識を開始: 画像サイズ={Width}x{Height}", image.Width, image.Height);
-            
+
             var result = await _ocrEngine.RecognizeAsync(image, progressCallback, cancellationToken).ConfigureAwait(false);
-            
-            _logger?.LogDebug("OCR認識完了: テキスト領域数={Count}, 処理時間={ElapsedMs}ms", 
+
+            _logger?.LogDebug("OCR認識完了: テキスト領域数={Count}, 処理時間={ElapsedMs}ms",
                 result.TextRegions.Count, result.ProcessingTime.TotalMilliseconds);
-            
+
             return result;
         }
         catch (OcrException ex)
@@ -237,7 +237,7 @@ public sealed class OcrApplicationService(
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(image);
-        
+
         if (!IsAvailable)
         {
             throw new InvalidOperationException("OCRサービスが初期化されていません。InitializeAsync()を先に呼び出してください。");
@@ -245,14 +245,14 @@ public sealed class OcrApplicationService(
 
         try
         {
-            _logger?.LogDebug("ROI指定OCR認識を開始: 画像サイズ={Width}x{Height}, ROI={ROI}", 
+            _logger?.LogDebug("ROI指定OCR認識を開始: 画像サイズ={Width}x{Height}, ROI={ROI}",
                 image.Width, image.Height, regionOfInterest);
-            
+
             var result = await _ocrEngine.RecognizeAsync(image, regionOfInterest, progressCallback, cancellationToken).ConfigureAwait(false);
-            
-            _logger?.LogDebug("ROI指定OCR認識完了: テキスト領域数={Count}, 処理時間={ElapsedMs}ms", 
+
+            _logger?.LogDebug("ROI指定OCR認識完了: テキスト領域数={Count}, 処理時間={ElapsedMs}ms",
                 result.TextRegions.Count, result.ProcessingTime.TotalMilliseconds);
-            
+
             return result;
         }
         catch (OcrException ex)
@@ -273,7 +273,7 @@ public sealed class OcrApplicationService(
     public async Task<bool> SwitchLanguageAsync(string language, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrWhiteSpace(language))
         {
             throw new ArgumentException("言語コードが無効です", nameof(language));
@@ -299,9 +299,9 @@ public sealed class OcrApplicationService(
             // 設定を更新
             var currentSettings = _ocrEngine.GetSettings();
             currentSettings.Language = language;
-            
+
             await _ocrEngine.ApplySettingsAsync(currentSettings, cancellationToken).ConfigureAwait(false);
-            
+
             _logger?.LogInformation("言語切り替えが完了しました: {Language}", language);
             return true;
         }
@@ -332,7 +332,7 @@ public sealed class OcrApplicationService(
     public async Task<bool> IsLanguageAvailableAsync(string language, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrWhiteSpace(language))
             return false;
 
@@ -378,9 +378,9 @@ public sealed class OcrApplicationService(
         try
         {
             _logger?.LogDebug("OCR設定を適用中: 言語={Language}, GPU={UseGpu}", settings.Language, settings.UseGpu);
-            
+
             await _ocrEngine.ApplySettingsAsync(settings, cancellationToken).ConfigureAwait(false);
-            
+
             _logger?.LogInformation("OCR設定の適用が完了しました");
         }
         catch (OcrException ex)

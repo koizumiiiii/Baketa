@@ -109,27 +109,27 @@ public sealed class SettingsSavedEventArgs : EventArgs
     /// 保存ファイルパス
     /// </summary>
     public string FilePath { get; }
-    
+
     /// <summary>
     /// 保存された設定の数
     /// </summary>
     public int SettingCount { get; }
-    
+
     /// <summary>
     /// 保存時間（ミリ秒）
     /// </summary>
     public long SaveTimeMs { get; }
-    
+
     /// <summary>
     /// 保存日時
     /// </summary>
     public DateTime Timestamp { get; }
-    
+
     /// <summary>
     /// 保存が成功したかどうか
     /// </summary>
     public bool Success { get; }
-    
+
     /// <summary>
     /// エラーメッセージ（保存失敗時）
     /// </summary>
@@ -150,7 +150,7 @@ public sealed class SettingsSavedEventArgs : EventArgs
         ErrorMessage = null;
         Timestamp = DateTime.Now;
     }
-    
+
     /// <summary>
     /// SettingsSavedEventArgsを初期化します（失敗時）
     /// </summary>
@@ -177,47 +177,47 @@ public enum SettingChangeType
     /// 新規作成
     /// </summary>
     Created,
-    
+
     /// <summary>
     /// 値の更新
     /// </summary>
     Updated,
-    
+
     /// <summary>
     /// 削除
     /// </summary>
     Deleted,
-    
+
     /// <summary>
     /// リセット（デフォルト値に戻す）
     /// </summary>
     Reset,
-    
+
     /// <summary>
     /// 復元（バックアップから復元）
     /// </summary>
     Restored,
-    
+
     /// <summary>
     /// マイグレーション（スキーマ更新）
     /// </summary>
     Migrated,
-    
+
     /// <summary>
     /// プロファイル切り替え
     /// </summary>
     ProfileSwitched,
-    
+
     /// <summary>
     /// 一括インポート
     /// </summary>
     BatchImport,
-    
+
     /// <summary>
     /// 一括エクスポート
     /// </summary>
     BatchExport,
-    
+
     /// <summary>
     /// 自動調整（システムによる最適化）
     /// </summary>
@@ -233,32 +233,32 @@ public enum ProfileChangeType
     /// プロファイルの作成
     /// </summary>
     Created,
-    
+
     /// <summary>
     /// プロファイルの更新
     /// </summary>
     Updated,
-    
+
     /// <summary>
     /// プロファイルの削除
     /// </summary>
     Deleted,
-    
+
     /// <summary>
     /// アクティブプロファイルの変更
     /// </summary>
     ActivationChanged,
-    
+
     /// <summary>
     /// プロファイルの複製
     /// </summary>
     Duplicated,
-    
+
     /// <summary>
     /// プロファイルのインポート
     /// </summary>
     Imported,
-    
+
     /// <summary>
     /// プロファイルのエクスポート
     /// </summary>

@@ -54,13 +54,13 @@ public class PipelineContext(
         IPipelineEventListener? eventListener = null,
         CancellationToken cancellationToken = default)
 {
-        private readonly Dictionary<string, object> _data = [];
-        private readonly HashSet<string> _stepsToSaveResults = [];
-        
-        /// <summary>
-        /// パイプライン実行に関連するデータを保存する辞書
-        /// </summary>
-        public IDictionary<string, object> Data => _data;
+    private readonly Dictionary<string, object> _data = [];
+    private readonly HashSet<string> _stepsToSaveResults = [];
+
+    /// <summary>
+    /// パイプライン実行に関連するデータを保存する辞書
+    /// </summary>
+    public IDictionary<string, object> Data => _data;
 
     /// <summary>
     /// ロガー
@@ -102,85 +102,85 @@ public class PipelineContext(
     /// </summary>
     /// <param name="stepName">ステップ名</param>
     public void SaveIntermediateResultForStep(string stepName)
+    {
+        if (!string.IsNullOrEmpty(stepName))
         {
-            if (!string.IsNullOrEmpty(stepName))
-            {
-                _stepsToSaveResults.Add(stepName);
-            }
-        }
-        
-        /// <summary>
-        /// 特定のステップの中間結果を保存するかどうかを判断します
-        /// </summary>
-        /// <param name="stepName">ステップ名</param>
-        /// <returns>保存する場合はtrue、そうでない場合はfalse</returns>
-        public bool ShouldSaveIntermediateResult(string stepName)
-        {
-            if (IntermediateResultMode == IntermediateResultMode.None)
-            {
-                return false;
-            }
-            
-            if (IntermediateResultMode == IntermediateResultMode.All)
-            {
-                return true;
-            }
-            
-            if (IntermediateResultMode == IntermediateResultMode.SelectedSteps)
-            {
-                return _stepsToSaveResults.Contains(stepName);
-            }
-            
-            // DebugOnlyとOnErrorの場合は別途評価
-            return false;
-        }
-        
-        /// <summary>
-        /// ジェネリックなデータ値を取得します
-        /// </summary>
-        /// <typeparam name="T">取得するデータの型</typeparam>
-        /// <param name="key">キー</param>
-        /// <param name="defaultValue">キーが存在しない場合のデフォルト値</param>
-        /// <returns>取得したデータ、またはデフォルト値</returns>
-        /// <exception cref="ArgumentNullException">keyがnullの場合</exception>
-        [return: MaybeNull]
-        public T RetrieveDataValue<T>(string key, [AllowNull] T defaultValue = default)
-        {
-            ArgumentNullException.ThrowIfNull(key);
-
-            if (_data.TryGetValue(key, out var value) && value is T typedValue)
-            {
-                return typedValue;
-            }
-            
-            return defaultValue;
-        }
-        
-        /// <summary>
-        /// ステップの実行をキャンセルするかどうかを判断します
-        /// </summary>
-        /// <returns>キャンセルする場合はtrue、そうでない場合はfalse</returns>
-        public bool ShouldCancelExecution()
-        {
-            return CancellationToken.IsCancellationRequested;
-        }
-
-        /// <summary>
-        /// 空のイベントリスナー実装
-        /// </summary>
-        private sealed class NullPipelineEventListener : IPipelineEventListener
-        {
-            public Task OnPipelineStartAsync(IImagePipeline pipeline, IAdvancedImage input) => Task.CompletedTask;
-            public Task OnPipelineCompleteAsync(IImagePipeline pipeline, PipelineResult result) => Task.CompletedTask;
-            public Task OnStepStartAsync(IImagePipelineStep pipelineStep, IAdvancedImage input, PipelineContext context) => Task.CompletedTask;
-            public Task OnStepCompleteAsync(IImagePipelineStep pipelineStep, IAdvancedImage output, PipelineContext context, long elapsedMilliseconds) => Task.CompletedTask;
-            
-            public Task<IAdvancedImage?> OnStepErrorAsync(IImagePipelineStep pipelineStep, Exception exception, PipelineContext context)
-            {
-                // nullを返すためのTask<IAdvancedImage?>を安全に作成
-                return Task.FromResult<IAdvancedImage?>(null);
-            }
-            
-            public Task OnPipelineErrorAsync(IImagePipeline pipeline, Exception exception, PipelineContext context) => Task.CompletedTask;
+            _stepsToSaveResults.Add(stepName);
         }
     }
+
+    /// <summary>
+    /// 特定のステップの中間結果を保存するかどうかを判断します
+    /// </summary>
+    /// <param name="stepName">ステップ名</param>
+    /// <returns>保存する場合はtrue、そうでない場合はfalse</returns>
+    public bool ShouldSaveIntermediateResult(string stepName)
+    {
+        if (IntermediateResultMode == IntermediateResultMode.None)
+        {
+            return false;
+        }
+
+        if (IntermediateResultMode == IntermediateResultMode.All)
+        {
+            return true;
+        }
+
+        if (IntermediateResultMode == IntermediateResultMode.SelectedSteps)
+        {
+            return _stepsToSaveResults.Contains(stepName);
+        }
+
+        // DebugOnlyとOnErrorの場合は別途評価
+        return false;
+    }
+
+    /// <summary>
+    /// ジェネリックなデータ値を取得します
+    /// </summary>
+    /// <typeparam name="T">取得するデータの型</typeparam>
+    /// <param name="key">キー</param>
+    /// <param name="defaultValue">キーが存在しない場合のデフォルト値</param>
+    /// <returns>取得したデータ、またはデフォルト値</returns>
+    /// <exception cref="ArgumentNullException">keyがnullの場合</exception>
+    [return: MaybeNull]
+    public T RetrieveDataValue<T>(string key, [AllowNull] T defaultValue = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (_data.TryGetValue(key, out var value) && value is T typedValue)
+        {
+            return typedValue;
+        }
+
+        return defaultValue;
+    }
+
+    /// <summary>
+    /// ステップの実行をキャンセルするかどうかを判断します
+    /// </summary>
+    /// <returns>キャンセルする場合はtrue、そうでない場合はfalse</returns>
+    public bool ShouldCancelExecution()
+    {
+        return CancellationToken.IsCancellationRequested;
+    }
+
+    /// <summary>
+    /// 空のイベントリスナー実装
+    /// </summary>
+    private sealed class NullPipelineEventListener : IPipelineEventListener
+    {
+        public Task OnPipelineStartAsync(IImagePipeline pipeline, IAdvancedImage input) => Task.CompletedTask;
+        public Task OnPipelineCompleteAsync(IImagePipeline pipeline, PipelineResult result) => Task.CompletedTask;
+        public Task OnStepStartAsync(IImagePipelineStep pipelineStep, IAdvancedImage input, PipelineContext context) => Task.CompletedTask;
+        public Task OnStepCompleteAsync(IImagePipelineStep pipelineStep, IAdvancedImage output, PipelineContext context, long elapsedMilliseconds) => Task.CompletedTask;
+
+        public Task<IAdvancedImage?> OnStepErrorAsync(IImagePipelineStep pipelineStep, Exception exception, PipelineContext context)
+        {
+            // nullを返すためのTask<IAdvancedImage?>を安全に作成
+            return Task.FromResult<IAdvancedImage?>(null);
+        }
+
+        public Task OnPipelineErrorAsync(IImagePipeline pipeline, Exception exception, PipelineContext context) => Task.CompletedTask;
+    }
+}

@@ -1,12 +1,12 @@
-using OpenCvSharp;
-using Baketa.Core.Utilities;
-using Baketa.Infrastructure.OCR.Preprocessing;
-using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
-using Baketa.Core.Abstractions.OCR;
+using System.IO;
+using System.Text.Json;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Memory;
-using System.Text.Json;
-using System.IO;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Utilities;
+using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.Preprocessing;
+using OpenCvSharp;
 
 namespace Baketa.Infrastructure.OCR.Optimization;
 
@@ -113,18 +113,18 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
         var gaussianSigmas = new[] { 0.3, 0.5, 0.7, 1.0 };
 
         foreach (var clipLimit in clipLimits)
-        foreach (var blockSize in blockSizes)
-        foreach (var sigmaColor in sigmaColors)
-        foreach (var gaussianSigma in gaussianSigmas)
-        {
-            configurations.Add(new PreprocessingConfiguration
-            {
-                CLAHEClipLimit = clipLimit,
-                AdaptiveThresholdBlockSize = blockSize,
-                BilateralSigmaColor = sigmaColor,
-                GaussianBlurSigma = gaussianSigma
-            });
-        }
+            foreach (var blockSize in blockSizes)
+                foreach (var sigmaColor in sigmaColors)
+                    foreach (var gaussianSigma in gaussianSigmas)
+                    {
+                        configurations.Add(new PreprocessingConfiguration
+                        {
+                            CLAHEClipLimit = clipLimit,
+                            AdaptiveThresholdBlockSize = blockSize,
+                            BilateralSigmaColor = sigmaColor,
+                            GaussianBlurSigma = gaussianSigma
+                        });
+                    }
 
         return configurations;
     }
@@ -188,10 +188,10 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
         {
             // Matを一時的に画像ファイルとして保存
             Cv2.ImWrite(tempImagePath, image);
-            
+
             // 暫定的な画像ラッパー実装
             var imageWrapper = new TempImageWrapper(tempImagePath, image.Width, image.Height);
-            
+
             var ocrResults = await _ocrEngine.RecognizeAsync(imageWrapper, cancellationToken: cancellationToken).ConfigureAwait(false);
             return ocrResults.TextRegions;
         }

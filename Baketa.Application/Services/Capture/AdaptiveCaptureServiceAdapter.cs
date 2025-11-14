@@ -1,8 +1,8 @@
 using System.Drawing;
 using System.IO;
+using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
-using Baketa.Core.Abstractions.Capture;
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Models.Capture削除
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Adapters;
@@ -37,18 +37,18 @@ public partial class AdaptiveCaptureServiceAdapter(
 
             // 画面全体キャプチャ用のCaptureOptionsを作成
             var adaptiveCaptureOptions = CreateAdaptiveCaptureOptions();
-            
+
             // デスクトップのHWNDを取得（画面全体キャプチャ用）
             var desktopHwnd = GetDesktopWindowHandle();
-            
+
             var result = await _adaptiveCaptureService.CaptureAsync(desktopHwnd, adaptiveCaptureOptions).ConfigureAwait(false);
-            
+
             if (!result.Success || result.CapturedImages == null || result.CapturedImages.Count == 0)
             {
                 throw new InvalidOperationException($"適応的画面キャプチャに失敗: {result.ErrorDetails}");
             }
 
-            _logger.LogInformation("適応的画面キャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms", 
+            _logger.LogInformation("適応的画面キャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms",
                 result.StrategyUsed, result.ProcessingTime.TotalMilliseconds);
 
             // IWindowsImageをIImageアダプターでラップして返す
@@ -71,18 +71,18 @@ public partial class AdaptiveCaptureServiceAdapter(
             var adaptiveCaptureOptions = CreateAdaptiveCaptureOptions();
             // 注意: 現在のCaptureOptionsにはTargetRegionプロパティがないため、ROI処理を有効化のみ
             adaptiveCaptureOptions.AllowROIProcessing = true;
-            
+
             // デスクトップのHWNDを使用
             var desktopHwnd = GetDesktopWindowHandle();
-            
+
             var result = await _adaptiveCaptureService.CaptureAsync(desktopHwnd, adaptiveCaptureOptions).ConfigureAwait(false);
-            
+
             if (!result.Success || result.CapturedImages == null || result.CapturedImages.Count == 0)
             {
                 throw new InvalidOperationException($"適応的領域キャプチャに失敗: {result.ErrorDetails}");
             }
 
-            _logger.LogInformation("適応的領域キャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms", 
+            _logger.LogInformation("適応的領域キャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms",
                 result.StrategyUsed, result.ProcessingTime.TotalMilliseconds);
 
             // IWindowsImageをIImageアダプターでラップして返す
@@ -100,15 +100,15 @@ public partial class AdaptiveCaptureServiceAdapter(
         try
         {
             Console.WriteLine("🔥🔥🔥 [ADAPTER] CaptureWindowAsync呼び出されました！HWND=0x{0:X}", windowHandle.ToInt64());
-        
-        // ログファイルにも出力
-        try 
-        {
-            var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
-            var logPath = loggingSettings.GetFullDebugLogPath();
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥🔥🔥 [ADAPTER] CaptureWindowAsync呼び出されました！HWND=0x{windowHandle.ToInt64():X}{Environment.NewLine}");
-        }
-        catch { /* ログファイル書き込み失敗は無視 */ }
+
+            // ログファイルにも出力
+            try
+            {
+                var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
+                var logPath = loggingSettings.GetFullDebugLogPath();
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔥🔥🔥 [ADAPTER] CaptureWindowAsync呼び出されました！HWND=0x{windowHandle.ToInt64():X}{Environment.NewLine}");
+            }
+            catch { /* ログファイル書き込み失敗は無視 */ }
             _logger.LogInformation("🔥 適応的キャプチャサービスアダプター: CaptureWindowAsync呼び出され - HWND=0x{WindowHandle:X}", windowHandle.ToInt64());
             _logger.LogDebug("適応的ウィンドウキャプチャ開始: HWND=0x{WindowHandle:X}", windowHandle.ToInt64());
 
@@ -117,13 +117,13 @@ public partial class AdaptiveCaptureServiceAdapter(
             adaptiveCaptureOptions.ROIScaleFactor = CalculateOptimalROIScaleFactor(windowHandle);
 
             var result = await _adaptiveCaptureService.CaptureAsync(windowHandle, adaptiveCaptureOptions).ConfigureAwait(false);
-            
+
             if (!result.Success || result.CapturedImages == null || result.CapturedImages.Count == 0)
             {
                 throw new InvalidOperationException($"適応的ウィンドウキャプチャに失敗: {result.ErrorDetails}");
             }
 
-            _logger.LogInformation("適応的ウィンドウキャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms", 
+            _logger.LogInformation("適応的ウィンドウキャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms",
                 result.StrategyUsed, result.ProcessingTime.TotalMilliseconds);
 
             // 🔥 [PHASE2.5_ROI_FIX] result.DetectedTextRegionsからCaptureRegionを取得
@@ -166,15 +166,15 @@ public partial class AdaptiveCaptureServiceAdapter(
             // クライアント領域キャプチャ用のCaptureOptionsを作成
             var adaptiveCaptureOptions = CreateAdaptiveCaptureOptions();
             // 注意: 現在のCaptureOptionsにはCaptureClientAreaOnlyプロパティがないため、通常のキャプチャを使用
-            
+
             var result = await _adaptiveCaptureService.CaptureAsync(windowHandle, adaptiveCaptureOptions).ConfigureAwait(false);
-            
+
             if (!result.Success || result.CapturedImages == null || result.CapturedImages.Count == 0)
             {
                 throw new InvalidOperationException($"適応的クライアント領域キャプチャに失敗: {result.ErrorDetails}");
             }
 
-            _logger.LogInformation("適応的クライアント領域キャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms", 
+            _logger.LogInformation("適応的クライアント領域キャプチャ成功: 戦略={Strategy}, 処理時間={ProcessingTime}ms",
                 result.StrategyUsed, result.ProcessingTime.TotalMilliseconds);
 
             // IWindowsImageをIImageアダプターでラップして返す
@@ -241,10 +241,10 @@ public partial class AdaptiveCaptureServiceAdapter(
     public void SetCaptureOptions(ServicesCaptureOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        
+
         _currentOptions = options;
-        
-        _logger.LogDebug("キャプチャオプション設定: 間隔={Interval}ms, 品質={Quality}", 
+
+        _logger.LogDebug("キャプチャオプション設定: 間隔={Interval}ms, 品質={Quality}",
             options.CaptureInterval, options.Quality);
     }
 
@@ -313,7 +313,7 @@ public partial class AdaptiveCaptureServiceAdapter(
         // WindowsNativeServiceを通じてUser32Methods.GetDesktopWindow()を呼び出し
         return WindowsNativeService.GetDesktopWindowHandle();
     }
-    
+
     /// <summary>
     /// キャプチャサービスを停止
     /// </summary>
@@ -321,7 +321,7 @@ public partial class AdaptiveCaptureServiceAdapter(
     {
         if (_disposed)
             return;
-            
+
         try
         {
             _logger.LogInformation("AdaptiveCaptureServiceAdapter停止処理開始");
@@ -333,7 +333,7 @@ public partial class AdaptiveCaptureServiceAdapter(
             _logger.LogError(ex, "AdaptiveCaptureServiceAdapter停止中にエラー");
         }
     }
-    
+
     /// <summary>
     /// リソースを解放
     /// </summary>
@@ -341,23 +341,23 @@ public partial class AdaptiveCaptureServiceAdapter(
     {
         if (_disposed)
             return;
-            
+
         try
         {
             StopAsync().Wait(TimeSpan.FromSeconds(5));
-            
+
             if (_adaptiveCaptureService is IDisposable disposableService)
             {
                 disposableService.Dispose();
             }
-            
+
             _disposed = true;
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "AdaptiveCaptureServiceAdapter破棄中にエラー");
         }
-        
+
         GC.SuppressFinalize(this);
     }
 }

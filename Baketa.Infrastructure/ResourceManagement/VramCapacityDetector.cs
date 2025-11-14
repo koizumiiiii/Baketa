@@ -18,7 +18,7 @@ public sealed class VramCapacityDetector : IDisposable
     private readonly ILogger<VramCapacityDetector> _logger;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly IGpuEnvironmentDetector? _gpuEnvironmentDetector;
-    
+
     private long? _cachedVramCapacityMB;
     private DateTime _lastDetectionTime = DateTime.MinValue;
     private readonly TimeSpan _cacheValidityDuration = ResourceManagementConstants.Vram.CacheValidityDuration;
@@ -45,13 +45,13 @@ public sealed class VramCapacityDetector : IDisposable
     /// </summary>
     public async Task<long> DetectVramCapacityAsync(CancellationToken cancellationToken = default)
     {
-        if (_disposed) 
+        if (_disposed)
             throw new ObjectDisposedException(nameof(VramCapacityDetector));
 
         lock (_detectionLock)
         {
             // キャッシュが有効な場合は再利用
-            if (_cachedVramCapacityMB.HasValue && 
+            if (_cachedVramCapacityMB.HasValue &&
                 DateTime.UtcNow - _lastDetectionTime < _cacheValidityDuration)
             {
                 return _cachedVramCapacityMB.Value;
@@ -62,7 +62,7 @@ public sealed class VramCapacityDetector : IDisposable
         {
             // 検出実行
             var detectedCapacity = await PerformVramDetectionAsync(cancellationToken).ConfigureAwait(false);
-            
+
             lock (_detectionLock)
             {
                 _cachedVramCapacityMB = detectedCapacity;
@@ -87,7 +87,7 @@ public sealed class VramCapacityDetector : IDisposable
         try
         {
             var metrics = await _resourceMonitor.GetCurrentMetricsAsync(cancellationToken).ConfigureAwait(false);
-            
+
             if (!metrics.GpuMemoryUsageMB.HasValue)
             {
                 return 0.0;
@@ -95,7 +95,7 @@ public sealed class VramCapacityDetector : IDisposable
 
             var totalCapacity = await DetectVramCapacityAsync(cancellationToken).ConfigureAwait(false);
             var usagePercent = (double)metrics.GpuMemoryUsageMB.Value / totalCapacity * 100.0;
-            
+
             return Math.Min(100.0, Math.Max(0.0, usagePercent));
         }
         catch (Exception ex)
@@ -143,7 +143,7 @@ public sealed class VramCapacityDetector : IDisposable
             var gpuInfo = await _gpuEnvironmentDetector.DetectEnvironmentAsync(cancellationToken).ConfigureAwait(false);
             if (gpuInfo?.AvailableMemoryMB > 0)
             {
-                _logger.LogDebug("🎯 [VRAM] IGpuEnvironmentDetector検出成功: {CapacityMB}MB", 
+                _logger.LogDebug("🎯 [VRAM] IGpuEnvironmentDetector検出成功: {CapacityMB}MB",
                     gpuInfo.AvailableMemoryMB);
                 return gpuInfo.AvailableMemoryMB;
             }
@@ -175,7 +175,7 @@ public sealed class VramCapacityDetector : IDisposable
                 {
                     maxObservedUsage = metrics.GpuMemoryUsageMB.Value;
                 }
-                
+
                 if (i < 2) // 最後の繰り返し以外で待機
                     await Task.Delay(ResourceManagementConstants.Timing.DefaultDelayMs, cancellationToken).ConfigureAwait(false);
             }
@@ -213,7 +213,7 @@ public sealed class VramCapacityDetector : IDisposable
         // 適切なサイズが見つからない場合、使用量から推定
         // 使用量が総容量の50%程度と仮定
         var estimatedTotal = observedUsageMB * 2;
-        
+
         // 最も近い一般的なサイズに丸める
         foreach (var commonSize in CommonVramSizes)
         {
@@ -235,7 +235,7 @@ public sealed class VramCapacityDetector : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
         _logger.LogDebug("🔄 [VRAM] 動的VRAM容量検出システム終了");
     }

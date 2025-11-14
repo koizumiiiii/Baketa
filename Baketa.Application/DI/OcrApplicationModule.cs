@@ -1,6 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
-using Baketa.Core.Abstractions.Dependency;
 using Baketa.Application.Services.OCR;
+using Baketa.Core.Abstractions.Dependency;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Application.DI;
 

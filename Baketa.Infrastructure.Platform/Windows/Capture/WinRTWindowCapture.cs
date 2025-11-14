@@ -2,20 +2,20 @@ using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Platform.Windows;
-using IWindowsImageFactory = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
 using Microsoft.Extensions.Logging;
+using SharpDX;
+using SharpDX.Direct3D11;
+using SharpDX.DXGI;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
 using Windows.Graphics.DirectX.Direct3D11;
 using WinRT;
-using System.Runtime.InteropServices.WindowsRuntime;
 using WinRT.Interop;
-using SharpDX;
-using SharpDX.Direct3D11;
-using SharpDX.DXGI;
-using System.Runtime.Versioning;
+using IWindowsImageFactory = Baketa.Core.Abstractions.Factories.IWindowsImageFactory;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
 
@@ -76,12 +76,12 @@ public class WinRTWindowCapture : IDisposable
 
             // フレームキャプチャの実行
             var bitmap = await CaptureFrameAsync(captureItem).ConfigureAwait(false);
-            
+
             // IWindowsImage に変換
             var windowsImage = _imageFactory.CreateFromBitmap(bitmap);
-            
+
             _logger?.LogDebug("WinRT ウィンドウキャプチャ完了: {Width}x{Height}", windowsImage.Width, windowsImage.Height);
-            
+
             return windowsImage;
         }
         catch (Exception ex)
@@ -100,7 +100,7 @@ public class WinRTWindowCapture : IDisposable
         {
             // .NET 8 + CsWinRT 2.1.6 対応の正しいWinRT相互運用
             _logger?.LogDebug("WinRT相互運用でGraphicsCaptureItem作成開始: HWND={Hwnd}", hWnd);
-            
+
             // 方法1: WinRT.Interop.InitializeWithWindow を使用したアプローチ
             var captureItem = TryCreateWithInitializeWithWindow(hWnd);
             if (captureItem != null)
@@ -108,7 +108,7 @@ public class WinRTWindowCapture : IDisposable
                 _logger?.LogDebug("InitializeWithWindow方式で成功");
                 return captureItem;
             }
-            
+
             // 方法2: 直接的なActivationFactory + Interop アプローチ
             captureItem = TryCreateWithActivationFactory(hWnd);
             if (captureItem != null)
@@ -116,7 +116,7 @@ public class WinRTWindowCapture : IDisposable
                 _logger?.LogDebug("ActivationFactory方式で成功");
                 return captureItem;
             }
-            
+
             // 方法3: ComWrappers経由のアプローチ
             captureItem = TryCreateWithComWrappers(hWnd);
             if (captureItem != null)
@@ -124,7 +124,7 @@ public class WinRTWindowCapture : IDisposable
                 _logger?.LogDebug("ComWrappers方式で成功");
                 return captureItem;
             }
-            
+
             _logger?.LogWarning("すべてのWinRT相互運用方式が失敗しました");
             return null;
         }
@@ -152,7 +152,7 @@ public class WinRTWindowCapture : IDisposable
 
             // .NET 8対応：より直接的なIGraphicsCaptureItemInterop呼び出し
             _logger?.LogDebug("直接的なWinRT相互運用での作成を試行: Handle=0x{Handle:X8}", hWnd.ToInt64());
-            
+
             // このメソッドでは直接的なWinRT相互運用は複雑すぎるため、
             // より確実なActivationFactory方式に委譲
             _logger?.LogDebug("ActivationFactory方式に委譲して確実な作成を実行");
@@ -176,7 +176,7 @@ public class WinRTWindowCapture : IDisposable
         try
         {
             _logger?.LogDebug(".NET 8 対応のGraphicsCaptureItem作成を試行: HWND=0x{Hwnd:X8}", hWnd.ToInt64());
-            
+
             // .NET 8 + CsWinRT 2.2.0対応: 直接的なWinRT相互運用
             // ComWrappersを使用した安全な相互運用
             var captureItem = TryCreateWithDirectWinRT(hWnd);
@@ -185,7 +185,7 @@ public class WinRTWindowCapture : IDisposable
                 _logger?.LogDebug("直接WinRT相互運用成功");
                 return captureItem;
             }
-            
+
             // フォールバック: 従来のCOM相互運用（.NET 8で安全化）
             return TryCreateWithSafeCOM(hWnd);
         }
@@ -204,12 +204,12 @@ public class WinRTWindowCapture : IDisposable
         try
         {
             _logger?.LogDebug("改良されたWinRT相互運用を試行: HWND=0x{Hwnd:X8}", hWnd.ToInt64());
-            
+
             // .NET 8 対応: より直接的なWinRT Activation Factory取得
             // CsWinRT 2.2.0の正しい方法を使用
             var factoryClassName = "Windows.Graphics.Capture.GraphicsCaptureItem";
             var activationFactoryIid = new Guid("00000035-0000-0000-C000-000000000046");
-            
+
             var hr = RoGetActivationFactory(factoryClassName, ref activationFactoryIid, out var factoryPtr);
             if (hr != 0 || factoryPtr == IntPtr.Zero)
             {
@@ -222,7 +222,7 @@ public class WinRTWindowCapture : IDisposable
                 // IGraphicsCaptureItemInterop にQueryInterface（安全版）
                 var interopIid = new Guid("3628E81B-3CAC-4C60-B7F4-23CE0E0C3356");
                 hr = Marshal.QueryInterface(factoryPtr, ref interopIid, out var interopPtr);
-                
+
                 if (hr != 0 || interopPtr == IntPtr.Zero)
                 {
                     _logger?.LogDebug("QueryInterface to IGraphicsCaptureItemInterop失敗: HRESULT=0x{Hr:X8}", hr);
@@ -234,12 +234,12 @@ public class WinRTWindowCapture : IDisposable
                     // vtableから関数ポインタを直接取得（マーシャリング問題を回避）
                     var vtable = Marshal.ReadIntPtr(interopPtr);
                     var createForWindowPtr = Marshal.ReadIntPtr(vtable, 3 * IntPtr.Size); // CreateForWindow is 3rd method
-                    
+
                     var createForWindow = Marshal.GetDelegateForFunctionPointer<CreateForWindowDelegate>(createForWindowPtr);
-                    
+
                     var itemIid = new Guid("79C3F95B-31F7-4EC2-A464-632EF5D30760");
                     hr = createForWindow(interopPtr, hWnd, ref itemIid, out var itemPtr);
-                    
+
                     if (hr >= 0 && itemPtr != IntPtr.Zero)
                     {
                         try
@@ -268,7 +268,7 @@ public class WinRTWindowCapture : IDisposable
             {
                 Marshal.Release(factoryPtr);
             }
-            
+
             return null;
         }
         catch (Exception ex)
@@ -286,11 +286,11 @@ public class WinRTWindowCapture : IDisposable
         try
         {
             _logger?.LogDebug("安全なCOM相互運用を試行");
-            
+
             // ComWrappersを使用しない従来方式だが、例外ハンドリングを強化
             const string factoryId = "Windows.Graphics.Capture.GraphicsCaptureItem";
             var activationFactoryGuid = new Guid("00000035-0000-0000-C000-000000000046");
-            
+
             var hr = RoGetActivationFactory(factoryId, ref activationFactoryGuid, out var factoryPtr);
             if (hr != 0 || factoryPtr == IntPtr.Zero)
             {
@@ -303,7 +303,7 @@ public class WinRTWindowCapture : IDisposable
                 // より安全なQueryInterface実行
                 var interopGuid = new Guid("3628E81B-3CAC-4C60-B7F4-23CE0E0C3356");
                 hr = Marshal.QueryInterface(factoryPtr, ref interopGuid, out var interopPtr);
-                
+
                 if (hr != 0 || interopPtr == IntPtr.Zero)
                 {
                     _logger?.LogDebug("QueryInterface失敗: HRESULT=0x{Hr:X8}", hr);
@@ -315,10 +315,10 @@ public class WinRTWindowCapture : IDisposable
                     // COM インターフェースの直接呼び出し（マーシャリング回避）
                     var createForWindow = Marshal.GetDelegateForFunctionPointer<CreateForWindowDelegate>(
                         Marshal.ReadIntPtr(Marshal.ReadIntPtr(interopPtr), 3 * IntPtr.Size));
-                    
+
                     var itemGuid = new Guid("79C3F95B-31F7-4EC2-A464-632EF5D30760");
                     hr = createForWindow(interopPtr, hWnd, ref itemGuid, out var itemPtr);
-                    
+
                     if (hr >= 0 && itemPtr != IntPtr.Zero)
                     {
                         try
@@ -346,7 +346,7 @@ public class WinRTWindowCapture : IDisposable
             {
                 Marshal.Release(factoryPtr);
             }
-            
+
             return null;
         }
         catch (Exception ex)
@@ -387,14 +387,14 @@ public class WinRTWindowCapture : IDisposable
             // Windows Runtime のActivation Factory取得
             var className = "Windows.Graphics.Capture.GraphicsCaptureItem";
             var activationFactoryIID = new Guid("00000035-0000-0000-C000-000000000046"); // IActivationFactory
-            
+
             var hr = RoGetActivationFactory(className, ref activationFactoryIID, out var factoryPtr);
-            
+
             if (hr == 0 && factoryPtr != IntPtr.Zero)
             {
                 return factoryPtr;
             }
-            
+
             _logger?.LogDebug("RoGetActivationFactory失敗: 0x{Hr:X8}", hr);
             return IntPtr.Zero;
         }
@@ -418,17 +418,17 @@ public class WinRTWindowCapture : IDisposable
     {
         // Direct3D11 デバイスの作成
         var d3dDevice = CreateDirect3DDevice();
-        
+
         // フレームプールの作成
         using var framePool = Direct3D11CaptureFramePool.CreateFreeThreaded(
             d3dDevice,
             DirectXPixelFormat.B8G8R8A8UIntNormalized,
             1, // フレーム数
             captureItem.Size);
-        
+
         // フレームキャプチャの実行
         var tcs = new TaskCompletionSource<Bitmap>();
-        
+
         framePool.FrameArrived += (sender, args) =>
         {
             try
@@ -449,13 +449,13 @@ public class WinRTWindowCapture : IDisposable
         // キャプチャセッションの作成と開始
         using var session = framePool.CreateCaptureSession(captureItem);
         session.StartCapture();
-        
+
         // フレーム取得を待機（タイムアウト 5秒）
         var timeoutTask = Task.Delay(5000);
         var completedTask = await Task.WhenAny(tcs.Task, timeoutTask).ConfigureAwait(false);
-        
+
         session.Dispose();
-        
+
         if (completedTask == timeoutTask)
         {
             throw new TimeoutException("フレームキャプチャがタイムアウトしました");
@@ -473,16 +473,16 @@ public class WinRTWindowCapture : IDisposable
         {
             // Direct3D11デバイスを作成
             var d3dDevice = CreateD3D11Device();
-            
+
             // WinRTのIDirect3DDeviceに変換
             var dxgiDevice = d3dDevice.QueryInterface<SharpDX.DXGI.Device>();
             var hr = CreateDirect3DDeviceFromDXGIDevice(dxgiDevice.NativePointer, out var graphicsDevice);
-            
+
             if (hr != 0)
             {
                 throw new InvalidOperationException($"CreateDirect3DDeviceFromDXGIDevice failed with HRESULT: 0x{hr:X8}");
             }
-            
+
             return WinRT.MarshalInterface<IDirect3DDevice>.FromAbi(graphicsDevice);
         }
         catch (Exception ex)
@@ -526,17 +526,17 @@ public class WinRTWindowCapture : IDisposable
         {
             // フレームサーフェスを取得
             var frameSurface = frame.Surface;
-            
+
             // テクスチャの説明を取得
             var texture = frameSurface.As<SharpDX.Direct3D11.Texture2D>();
             var desc = texture.Description;
-            
+
             // ステージングテクスチャを作成
             var stagingTexture = CreateStagingTexture(texture.Device, desc);
-            
+
             // GPU -> CPU にコピー
             texture.Device.ImmediateContext.CopyResource(texture, stagingTexture);
-            
+
             // ビットマップに変換
             return ConvertTextureToBitmap(stagingTexture, desc);
         }

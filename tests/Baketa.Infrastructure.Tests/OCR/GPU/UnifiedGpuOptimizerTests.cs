@@ -2,9 +2,9 @@ using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.OCR.GPU;
 using Baketa.Infrastructure.OCR.GPU.Providers;
 using Microsoft.Extensions.Logging;
+using Microsoft.ML.OnnxRuntime;
 using Moq;
 using Xunit;
-using Microsoft.ML.OnnxRuntime;
 
 namespace Baketa.Infrastructure.Tests.OCR.GPU;
 
@@ -45,7 +45,7 @@ public sealed class UnifiedGpuOptimizerTests : IDisposable
         _mockEnvironmentDetector
             .Setup(x => x.DetectEnvironmentAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(_testEnvironment);
-            
+
         _mockEnvironmentDetector
             .Setup(x => x.GetCachedEnvironment())
             .Returns(_testEnvironment);
@@ -79,7 +79,7 @@ public sealed class UnifiedGpuOptimizerTests : IDisposable
 
         // Assert
         Assert.Same(result1, result2);
-        
+
         // 環境検出またはキャッシュアクセスが呼ばれることを確認
         _mockEnvironmentDetector.Verify(x => x.GetCachedEnvironment(), Times.AtLeastOnce);
     }
@@ -92,7 +92,7 @@ public sealed class UnifiedGpuOptimizerTests : IDisposable
 
         // Assert
         Assert.Equal(3, fallbackProviders.Count);
-        
+
         // 優先度順で並んでいることを確認
         Assert.Equal(ExecutionProvider.TensorRT, fallbackProviders[0].Type);   // Priority: 95
         Assert.Equal(ExecutionProvider.CUDA, fallbackProviders[1].Type);       // Priority: 90
@@ -109,7 +109,7 @@ public sealed class UnifiedGpuOptimizerTests : IDisposable
         // Assert
         Assert.NotNull(optimalProvider);
         Assert.Equal(ExecutionProvider.TensorRT, optimalProvider.Type);
-        
+
         // 最高優先度のTensorRTプロバイダーが選択されることを確認
         var tensorrtProvider = _mockProviderFactories.First(m => m.Object.Type == ExecutionProvider.TensorRT);
         tensorrtProvider.Verify(x => x.IsSupported(_testEnvironment), Times.AtLeastOnce);
@@ -126,7 +126,7 @@ public sealed class UnifiedGpuOptimizerTests : IDisposable
         // Assert
         Assert.NotNull(preferredProvider);
         Assert.Equal(ExecutionProvider.DirectML, preferredProvider.Type);
-        
+
         // DirectMLプロバイダーが利用可能なことを確認
         var directmlProvider = _mockProviderFactories.First(m => m.Object.Type == ExecutionProvider.DirectML);
         directmlProvider.Verify(x => x.IsSupported(_testEnvironment), Times.AtLeastOnce);
@@ -144,13 +144,13 @@ public sealed class UnifiedGpuOptimizerTests : IDisposable
 
         // Assert
         Assert.NotEmpty(fallbackProviders);
-        
+
         // TensorRTは利用不可なので除外されることを確認
         Assert.DoesNotContain(fallbackProviders, p => p.Type == ExecutionProvider.TensorRT);
-        
+
         // フォールバックで次に優先度の高いCUDAが最初に来ることを確認
         Assert.Equal(ExecutionProvider.CUDA, fallbackProviders[0].Type);
-        
+
         // TensorRTの利用可否チェックが呼ばれることを確認
         tensorrtProvider.Verify(x => x.IsSupported(_testEnvironment), Times.AtLeastOnce);
     }
@@ -163,12 +163,12 @@ public sealed class UnifiedGpuOptimizerTests : IDisposable
 
         // Assert
         Assert.Equal(4, providerStatuses.Count); // CUDA, OpenVINO, DirectML, TensorRT
-        
+
         // 優先度順でソートされていることを確認
         Assert.Equal(ExecutionProvider.TensorRT, providerStatuses[0].Type);
         Assert.Equal(95, providerStatuses[0].Priority);
         Assert.True(providerStatuses[0].IsSupported);
-        
+
         Assert.Equal(ExecutionProvider.CUDA, providerStatuses[1].Type);
         Assert.Equal(90, providerStatuses[1].Priority);
         Assert.True(providerStatuses[1].IsSupported);
@@ -279,7 +279,7 @@ public sealed class OpenVINOExecutionProviderFactoryTests
             EnableCpuOptimization = true,
             EnableGpuOptimization = true
         };
-        
+
         _factory = new OpenVINOExecutionProviderFactory(_mockLogger.Object, _settings);
     }
 
@@ -358,7 +358,7 @@ public sealed class OpenVINOExecutionProviderFactoryTests
         Assert.True(sessionOptions.EnableMemoryPattern); // 共通最適化設定
         Assert.Equal(ExecutionMode.ORT_SEQUENTIAL, sessionOptions.ExecutionMode); // CPU系プロバイダー
         Assert.Equal(Environment.ProcessorCount, sessionOptions.IntraOpNumThreads); // OpenVINO設定反映
-        
+
         // リソースクリーンアップ
         sessionOptions.Dispose();
     }

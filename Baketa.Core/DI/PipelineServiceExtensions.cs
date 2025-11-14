@@ -7,162 +7,162 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Core.DI;
 
+/// <summary>
+/// パイプライン関連サービスの登録拡張メソッドを提供します
+/// </summary>
+public static class PipelineServiceExtensions
+{
     /// <summary>
-    /// パイプライン関連サービスの登録拡張メソッドを提供します
+    /// パイプライン関連のサービスをDIコンテナに登録します
     /// </summary>
-    public static class PipelineServiceExtensions
+    /// <param name="services">サービスコレクション</param>
+    /// <returns>サービスコレクション</returns>
+    public static IServiceCollection AddPipelineServices(this IServiceCollection services)
     {
-        /// <summary>
-        /// パイプライン関連のサービスをDIコンテナに登録します
-        /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        /// <returns>サービスコレクション</returns>
-        public static IServiceCollection AddPipelineServices(this IServiceCollection services)
-        {
-            // パイプラインの基本サービス
-            services.AddSingleton<IImagePipeline, ImagePipeline>();
-            services.AddSingleton<IPipelineProfileManager, PipelineProfileManager>();
+        // パイプラインの基本サービス
+        services.AddSingleton<IImagePipeline, ImagePipeline>();
+        services.AddSingleton<IPipelineProfileManager, PipelineProfileManager>();
 
-            // 条件評価クラスのファクトリーを登録
-            services.AddTransient<IAndConditionFactory, AndConditionFactory>();
-            services.AddTransient<IOrConditionFactory, OrConditionFactory>();
-            services.AddTransient<INotConditionFactory, NotConditionFactory>();
-            services.AddTransient<IImagePropertyConditionFactory, ImagePropertyConditionFactory>();
+        // 条件評価クラスのファクトリーを登録
+        services.AddTransient<IAndConditionFactory, AndConditionFactory>();
+        services.AddTransient<IOrConditionFactory, OrConditionFactory>();
+        services.AddTransient<INotConditionFactory, NotConditionFactory>();
+        services.AddTransient<IImagePropertyConditionFactory, ImagePropertyConditionFactory>();
 
-            // OCR最適化フィルターを登録
-            RegisterOcrFilters(services);
-            
-            // OCRパイプラインビルダーを登録
-            services.AddSingleton<IOcrPipelineBuilder, OcrPipelineBuilder>();
+        // OCR最適化フィルターを登録
+        RegisterOcrFilters(services);
 
-            return services;
-        }
+        // OCRパイプラインビルダーを登録
+        services.AddSingleton<IOcrPipelineBuilder, OcrPipelineBuilder>();
 
-        /// <summary>
-        /// OCR最適化フィルターをDIコンテナに登録します
-        /// </summary>
-        /// <param name="services">サービスコレクション</param>
-        /// <returns>サービスコレクション</returns>
-        public static IServiceCollection RegisterOcrFilters(this IServiceCollection services)
-        {
-            // OCRフィルタークラスを登録
-            services.AddSingleton<OcrGrayscaleFilter>();
-            services.AddSingleton<OcrContrastEnhancementFilter>();
-            services.AddSingleton<OcrNoiseReductionFilter>();
-            services.AddSingleton<OcrThresholdFilter>();
-            services.AddSingleton<OcrMorphologyFilter>();
-            services.AddSingleton<OcrEdgeDetectionFilter>();
-            
-            // OCRフィルターファクトリーを登録
-            services.AddSingleton<IOcrFilterFactory, OcrFilterFactory>();
-
-            return services;
-        }
+        return services;
     }
 
     /// <summary>
-    /// AND条件のファクトリーインターフェース
+    /// OCR最適化フィルターをDIコンテナに登録します
     /// </summary>
-    public interface IAndConditionFactory
+    /// <param name="services">サービスコレクション</param>
+    /// <returns>サービスコレクション</returns>
+    public static IServiceCollection RegisterOcrFilters(this IServiceCollection services)
     {
-        /// <summary>
-        /// AND条件を作成します
-        /// </summary>
-        /// <param name="left">左辺条件</param>
-        /// <param name="right">右辺条件</param>
-        /// <returns>AND条件</returns>
-        IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right);
-    }
+        // OCRフィルタークラスを登録
+        services.AddSingleton<OcrGrayscaleFilter>();
+        services.AddSingleton<OcrContrastEnhancementFilter>();
+        services.AddSingleton<OcrNoiseReductionFilter>();
+        services.AddSingleton<OcrThresholdFilter>();
+        services.AddSingleton<OcrMorphologyFilter>();
+        services.AddSingleton<OcrEdgeDetectionFilter>();
 
-    /// <summary>
-    /// AND条件のファクトリークラス
-    /// </summary>
-    internal sealed class AndConditionFactory : IAndConditionFactory
-    {
-        /// <inheritdoc/>
-        public IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right)
-        {
-            return new AndCondition(left, right);
-        }
-    }
+        // OCRフィルターファクトリーを登録
+        services.AddSingleton<IOcrFilterFactory, OcrFilterFactory>();
 
-    /// <summary>
-    /// OR条件のファクトリーインターフェース
-    /// </summary>
-    public interface IOrConditionFactory
-    {
-        /// <summary>
-        /// OR条件を作成します
-        /// </summary>
-        /// <param name="left">左辺条件</param>
-        /// <param name="right">右辺条件</param>
-        /// <returns>OR条件</returns>
-        IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right);
+        return services;
     }
+}
 
+/// <summary>
+/// AND条件のファクトリーインターフェース
+/// </summary>
+public interface IAndConditionFactory
+{
     /// <summary>
-    /// OR条件のファクトリークラス
+    /// AND条件を作成します
     /// </summary>
-    internal sealed class OrConditionFactory : IOrConditionFactory
-    {
-        /// <inheritdoc/>
-        public IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right)
-        {
-            return new OrCondition(left, right);
-        }
-    }
+    /// <param name="left">左辺条件</param>
+    /// <param name="right">右辺条件</param>
+    /// <returns>AND条件</returns>
+    IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right);
+}
 
-    /// <summary>
-    /// NOT条件のファクトリーインターフェース
-    /// </summary>
-    public interface INotConditionFactory
+/// <summary>
+/// AND条件のファクトリークラス
+/// </summary>
+internal sealed class AndConditionFactory : IAndConditionFactory
+{
+    /// <inheritdoc/>
+    public IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right)
     {
-        /// <summary>
-        /// NOT条件を作成します
-        /// </summary>
-        /// <param name="condition">対象条件</param>
-        /// <returns>NOT条件</returns>
-        IPipelineCondition Create(IPipelineCondition condition);
+        return new AndCondition(left, right);
     }
+}
 
+/// <summary>
+/// OR条件のファクトリーインターフェース
+/// </summary>
+public interface IOrConditionFactory
+{
     /// <summary>
-    /// NOT条件のファクトリークラス
+    /// OR条件を作成します
     /// </summary>
-    internal sealed class NotConditionFactory : INotConditionFactory
-    {
-        /// <inheritdoc/>
-        public IPipelineCondition Create(IPipelineCondition condition)
-        {
-            return new NotCondition(condition);
-        }
-    }
+    /// <param name="left">左辺条件</param>
+    /// <param name="right">右辺条件</param>
+    /// <returns>OR条件</returns>
+    IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right);
+}
 
-    /// <summary>
-    /// 画像プロパティ条件のファクトリーインターフェース
-    /// </summary>
-    public interface IImagePropertyConditionFactory
+/// <summary>
+/// OR条件のファクトリークラス
+/// </summary>
+internal sealed class OrConditionFactory : IOrConditionFactory
+{
+    /// <inheritdoc/>
+    public IPipelineCondition Create(IPipelineCondition left, IPipelineCondition right)
     {
-        /// <summary>
-        /// 画像プロパティ条件を作成します
-        /// </summary>
-        /// <param name="propertyName">プロパティ名</param>
-        /// <param name="comparisonOperator">比較演算子</param>
-        /// <param name="value">比較値</param>
-        /// <returns>画像プロパティ条件</returns>
-        IPipelineCondition Create(string propertyName, ComparisonOperator comparisonOperator, object value);
+        return new OrCondition(left, right);
     }
+}
 
+/// <summary>
+/// NOT条件のファクトリーインターフェース
+/// </summary>
+public interface INotConditionFactory
+{
     /// <summary>
-    /// 画像プロパティ条件のファクトリークラス
+    /// NOT条件を作成します
     /// </summary>
-    internal sealed class ImagePropertyConditionFactory : IImagePropertyConditionFactory
+    /// <param name="condition">対象条件</param>
+    /// <returns>NOT条件</returns>
+    IPipelineCondition Create(IPipelineCondition condition);
+}
+
+/// <summary>
+/// NOT条件のファクトリークラス
+/// </summary>
+internal sealed class NotConditionFactory : INotConditionFactory
+{
+    /// <inheritdoc/>
+    public IPipelineCondition Create(IPipelineCondition condition)
     {
-        /// <inheritdoc/>
-        public IPipelineCondition Create(string propertyName, ComparisonOperator comparisonOperator, object value)
-        {
-            return new ImagePropertyCondition(
-                ImagePropertyCondition.PropertyType.Width, // プロパティ名から適切な値に変換する必要あり
-                (ImagePropertyCondition.ComparisonOperator)comparisonOperator, // 列挙型の変換
-                value);
-        }
+        return new NotCondition(condition);
     }
+}
+
+/// <summary>
+/// 画像プロパティ条件のファクトリーインターフェース
+/// </summary>
+public interface IImagePropertyConditionFactory
+{
+    /// <summary>
+    /// 画像プロパティ条件を作成します
+    /// </summary>
+    /// <param name="propertyName">プロパティ名</param>
+    /// <param name="comparisonOperator">比較演算子</param>
+    /// <param name="value">比較値</param>
+    /// <returns>画像プロパティ条件</returns>
+    IPipelineCondition Create(string propertyName, ComparisonOperator comparisonOperator, object value);
+}
+
+/// <summary>
+/// 画像プロパティ条件のファクトリークラス
+/// </summary>
+internal sealed class ImagePropertyConditionFactory : IImagePropertyConditionFactory
+{
+    /// <inheritdoc/>
+    public IPipelineCondition Create(string propertyName, ComparisonOperator comparisonOperator, object value)
+    {
+        return new ImagePropertyCondition(
+            ImagePropertyCondition.PropertyType.Width, // プロパティ名から適切な値に変換する必要あり
+            (ImagePropertyCondition.ComparisonOperator)comparisonOperator, // 列挙型の変換
+            value);
+    }
+}

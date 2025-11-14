@@ -1,19 +1,19 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Abstractions.UI.Overlay;
-using Baketa.Core.Abstractions.UI;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlay;
 using Baketa.Core.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.UI.Services;
-using Microsoft.Extensions.Logging;
 using Baketa.UI.Views.Overlay;
-using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Services.Overlay;
 
@@ -74,23 +74,23 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             _window = window;
         }
 
-        public bool IsVisible 
-        { 
-            get => _window?.IsVisible ?? false; 
-            set 
+        public bool IsVisible
+        {
+            get => _window?.IsVisible ?? false;
+            set
             {
-                if (_window != null) 
+                if (_window != null)
                 {
-                    try 
-                    { 
-                        _window.IsVisible = value; 
-                    } 
-                    catch (Exception) 
-                    { 
+                    try
+                    {
+                        _window.IsVisible = value;
+                    }
+                    catch (Exception)
+                    {
                         // UIスレッド外からのアクセスエラーを無視
                     }
                 }
-            } 
+            }
         }
 
         public void Show()
@@ -146,7 +146,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
         public void Dispose()
         {
             if (_disposed) return;
-            
+
             try
             {
                 _window?.Dispose();
@@ -155,7 +155,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             {
                 // Dispose エラーを無視
             }
-            
+
             _disposed = true;
         }
     }
@@ -167,34 +167,34 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     {
         private readonly object _lock = new();
         private bool _isVisible = true;
-        
+
         public OverlayInfo OverlayInfo { get; set; } = null!;
         public int LegacyChunkId { get; set; }
         public ILegacyOverlayWindow? LegacyWindow { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
-        
+
         /// <summary>
         /// スレッドセーフな可視性プロパティ
         /// UIスレッドとバックグラウンドスレッド間での競合状態を防止
         /// </summary>
-        public bool IsVisible 
-        { 
-            get 
-            { 
-                lock (_lock) 
-                { 
-                    return _isVisible; 
-                } 
-            } 
-            set 
-            { 
-                lock (_lock) 
-                { 
-                    _isVisible = value; 
-                } 
-            } 
+        public bool IsVisible
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _isVisible;
+                }
+            }
+            set
+            {
+                lock (_lock)
+                {
+                    _isVisible = value;
+                }
+            }
         }
-        
+
         /// <summary>
         /// スレッドセーフなウィンドウ更新
         /// レガシーウィンドウとプロパティを同期的に更新 (インターフェース経由)
@@ -238,7 +238,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     {
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         _logger.LogInformation("🎭 [AVALONIA_RENDERER] AvaloniaOverlayRenderer 初期化 - Phase 16 統一実装");
     }
 
@@ -246,21 +246,21 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public int RenderedCount => _phase15Overlays.Count;
 
     /// <inheritdoc />
-    public RendererCapabilities Capabilities => 
-        RendererCapabilities.HardwareAcceleration | 
-        RendererCapabilities.Transparency | 
-        RendererCapabilities.Animation | 
-        RendererCapabilities.MultiMonitor | 
-        RendererCapabilities.HighDpi | 
+    public RendererCapabilities Capabilities =>
+        RendererCapabilities.HardwareAcceleration |
+        RendererCapabilities.Transparency |
+        RendererCapabilities.Animation |
+        RendererCapabilities.MultiMonitor |
+        RendererCapabilities.HighDpi |
         RendererCapabilities.TouchSupport; // Avalonia UI は全機能をサポート
 
     /// <inheritdoc />
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         _logger.LogInformation("🚀 [AVALONIA_RENDERER] Avalonia レンダラー初期化開始 - Phase 16 統一実装");
-        
+
         try
         {
             // 既存オーバーレイマネージャーの初期化は不要（DI で管理済み）
@@ -268,7 +268,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             _chunkIdToOverlayId.Clear();
             _totalRendered = 0;
             _totalRemoved = 0;
-            
+
             _logger.LogInformation("✅ [AVALONIA_RENDERER] Avalonia レンダラー初期化完了 - Phase 16 統一実装準備完了");
         }
         catch (Exception ex)
@@ -276,7 +276,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             _logger.LogError(ex, "❌ [AVALONIA_RENDERER] 初期化中にエラー");
             throw;
         }
-        
+
         await Task.CompletedTask;
     }
 
@@ -284,7 +284,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task<bool> RenderOverlayAsync(OverlayInfo info, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (info == null)
         {
             _logger.LogWarning("[AVALONIA_RENDERER] OverlayInfo が null");
@@ -302,7 +302,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
 
             // 既存システムでオーバーレイ作成・表示 (インターフェース経由)
             var legacyWindow = await CreateLegacyOverlayAsync(textChunk, cancellationToken);
-            
+
             if (legacyWindow != null)
             {
                 // Phase 15 管理情報に登録
@@ -313,14 +313,14 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
                     LegacyWindow = legacyWindow,
                     IsVisible = true
                 };
-                
+
                 _phase15Overlays[info.Id] = phase15Info;
                 _chunkIdToOverlayId[legacyChunkId] = info.Id; // ChunkId -> OverlayId マッピング
                 _totalRendered++;
 
-                _logger.LogInformation("✅ [AVALONIA_RENDERER] オーバーレイ描画成功 - ID: {Id}, Text: '{Text}'", 
+                _logger.LogInformation("✅ [AVALONIA_RENDERER] オーバーレイ描画成功 - ID: {Id}, Text: '{Text}'",
                     info.Id, info.Text.Substring(0, Math.Min(30, info.Text.Length)));
-                
+
                 return true;
             }
             else
@@ -340,7 +340,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task<bool> UpdateOverlayAsync(string overlayId, OverlayRenderUpdate updateInfo, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrEmpty(overlayId) || updateInfo == null)
             return false;
 
@@ -381,7 +381,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task<bool> SetVisibilityAsync(string overlayId, bool visible, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrEmpty(overlayId))
             return false;
 
@@ -390,7 +390,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             if (_phase15Overlays.TryGetValue(overlayId, out var phase15Info))
             {
                 phase15Info.IsVisible = visible;
-                
+
                 // 既存システムでの可視性制御
                 if (phase15Info.LegacyWindow != null)
                 {
@@ -414,7 +414,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task<int> SetAllVisibilityAsync(bool visible, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             var overlayIds = _phase15Overlays.Keys.ToList();
@@ -442,7 +442,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task<bool> RemoveOverlayAsync(string overlayId, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrEmpty(overlayId))
             return false;
 
@@ -477,12 +477,12 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task<int> RemoveOverlaysInAreaAsync(Rectangle area, IEnumerable<string>? excludeIds = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             var excludeIdSet = excludeIds?.ToHashSet() ?? new HashSet<string>();
             var overlaysToRemove = _phase15Overlays.Values
-                .Where(info => !excludeIdSet.Contains(info.OverlayInfo.Id) && 
+                .Where(info => !excludeIdSet.Contains(info.OverlayInfo.Id) &&
                                info.OverlayInfo.DisplayArea.IntersectsWith(area))
                 .Select(info => info.OverlayInfo.Id)
                 .ToList();
@@ -510,12 +510,12 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task RemoveAllOverlaysAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             var overlayCount = _phase15Overlays.Count;
             var overlayIds = _phase15Overlays.Keys.ToList();
-            
+
             foreach (var overlayId in overlayIds)
             {
                 await RemoveOverlayAsync(overlayId, cancellationToken);
@@ -533,7 +533,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task<Rectangle?> GetOverlayBoundsAsync(string overlayId, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrEmpty(overlayId))
             return null;
 
@@ -559,7 +559,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task ShowInPlaceOverlayAsync(TextChunk textChunk, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (textChunk == null)
         {
             _logger.LogWarning("[AVALONIA_RENDERER] TextChunk が null");
@@ -570,8 +570,8 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
         {
             // TextChunk を Phase15 OverlayInfo に変換
             var overlayInfo = ConvertFromTextChunk(textChunk);
-            
-            _logger.LogDebug("🔄 [AVALONIA_RENDERER] Legacy互換 ShowInPlaceOverlayAsync - ChunkId: {ChunkId}, Text: '{Text}'", 
+
+            _logger.LogDebug("🔄 [AVALONIA_RENDERER] Legacy互換 ShowInPlaceOverlayAsync - ChunkId: {ChunkId}, Text: '{Text}'",
                 textChunk.ChunkId, textChunk.TranslatedText.Substring(0, Math.Min(30, textChunk.TranslatedText.Length)));
 
             // 内部的にPhase15システムでレンダリング
@@ -587,7 +587,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task HideInPlaceOverlayAsync(int chunkId, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             // ChunkId から OverlayId を検索
@@ -611,7 +611,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             // excludeChunkId を OverlayId に変換
@@ -622,7 +622,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             }
 
             var excludeIds = excludeOverlayId != null ? new[] { excludeOverlayId } : null;
-            
+
             _logger.LogDebug("🔄 [AVALONIA_RENDERER] Legacy互換 HideOverlaysInAreaAsync - Area: {Area}, ExcludeChunkId: {ExcludeChunkId}", area, excludeChunkId);
             await RemoveOverlaysInAreaAsync(area, excludeIds, cancellationToken);
         }
@@ -636,7 +636,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task HideAllInPlaceOverlaysAsync()
     {
         ThrowIfDisposed();
-        
+
         try
         {
             _logger.LogDebug("🔄 [AVALONIA_RENDERER] Legacy互換 HideAllInPlaceOverlaysAsync");
@@ -652,7 +652,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task SetAllOverlaysVisibilityAsync(bool visible, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         try
         {
             _logger.LogDebug("🔄 [AVALONIA_RENDERER] Legacy互換 SetAllOverlaysVisibilityAsync - Visible: {Visible}", visible);
@@ -668,7 +668,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     public async Task ResetAsync()
     {
         ThrowIfDisposed();
-        
+
         try
         {
             _logger.LogDebug("🔄 [AVALONIA_RENDERER] Legacy互換 ResetAsync");
@@ -697,19 +697,19 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
 
     /// <inheritdoc />
     public int Priority => 100; // 標準優先度（UIイベントは高優先度）
-    
+
     /// <inheritdoc />
     public bool SynchronousExecution => false; // 非同期実行（UIスレッド負荷軽減）
 
     /// <inheritdoc />
-    public async Task HandleAsync(OverlayUpdateEvent eventData) => 
+    public async Task HandleAsync(OverlayUpdateEvent eventData) =>
         await HandleAsync(eventData, CancellationToken.None);
 
     /// <inheritdoc />
     public async Task HandleAsync(OverlayUpdateEvent eventData, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (eventData == null)
         {
             _logger.LogWarning("[AVALONIA_RENDERER] OverlayUpdateEvent が null - イベント処理をスキップ");
@@ -718,7 +718,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
 
         try
         {
-            _logger.LogDebug("🎯 [AVALONIA_RENDERER] OverlayUpdateEvent 処理開始 - Text: '{Text}', Area: {Area}", 
+            _logger.LogDebug("🎯 [AVALONIA_RENDERER] OverlayUpdateEvent 処理開始 - Text: '{Text}', Area: {Area}",
                 eventData.Text.Substring(0, Math.Min(30, eventData.Text.Length)), eventData.DisplayArea);
 
             // OverlayUpdateEvent を OverlayInfo に変換してレンダリング
@@ -732,7 +732,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
 
             // 統一レンダリングシステムでオーバーレイを表示
             var success = await RenderOverlayAsync(overlayInfo, cancellationToken);
-            
+
             if (success)
             {
                 _logger.LogInformation("✅ [AVALONIA_RENDERER] OverlayUpdateEvent 処理完了 - ID: {Id}", overlayInfo.Id);
@@ -795,23 +795,23 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     /// レガシーシステムとの具象クラス依存を削減
     /// </summary>
     private async Task<ILegacyOverlayWindow?> CreateLegacyOverlayAsync(
-        TextChunk textChunk, 
+        TextChunk textChunk,
         CancellationToken cancellationToken)
     {
         try
         {
             _logger.LogDebug("🔗 [AVALONIA_RENDERER] レガシーオーバーレイ作成要求 - ChunkId: {ChunkId}", textChunk.ChunkId);
-            
+
             // 既存のオーバーレイマネージャーでレガシーウィンドウ作成
             // 注意: InPlaceTranslationOverlayManager の実際の API に合わせて実装
             InPlaceTranslationOverlayWindow? legacyWindow = null;
-            
+
             try
             {
                 // 既存マネージャーでの作成処理
                 // 実際のAPI呼び出しは InPlaceTranslationOverlayManager の仕様に依存
                 // legacyWindow = await _overlayManager.CreateOverlayAsync(textChunk, cancellationToken);
-                
+
                 // 暫定実装: 将来の統合時に実際のAPI呼び出しを実装
                 await Task.CompletedTask;
             }
@@ -819,7 +819,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             {
                 _logger.LogWarning("⚠️ [AVALONIA_RENDERER] レガシーウィンドウ作成失敗: {Message}", ex.Message);
             }
-            
+
             // アダプターでラップしてインターフェース経由で返す
             return legacyWindow != null ? new LegacyOverlayWindowAdapter(legacyWindow) : null;
         }
@@ -834,8 +834,8 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     /// 既存システムでオーバーレイ更新
     /// </summary>
     private async Task UpdateLegacyOverlayAsync(
-        ILegacyOverlayWindow legacyWindow, 
-        OverlayInfo updatedInfo, 
+        ILegacyOverlayWindow legacyWindow,
+        OverlayInfo updatedInfo,
         CancellationToken cancellationToken)
     {
         try
@@ -843,7 +843,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             // インターフェース経由で既存オーバーレイウィンドウを更新
             legacyWindow.UpdateContent(updatedInfo.Text);
             legacyWindow.UpdatePosition(updatedInfo.DisplayArea.X, updatedInfo.DisplayArea.Y);
-            
+
             _logger.LogDebug("🔄 [AVALONIA_RENDERER] レガシーオーバーレイ更新完了");
             await Task.CompletedTask;
         }
@@ -857,8 +857,8 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     /// 既存システムで可視性制御
     /// </summary>
     private async Task SetLegacyVisibilityAsync(
-        ILegacyOverlayWindow legacyWindow, 
-        bool visible, 
+        ILegacyOverlayWindow legacyWindow,
+        bool visible,
         CancellationToken cancellationToken)
     {
         try
@@ -872,7 +872,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             {
                 legacyWindow.Hide();
             }
-            
+
             _logger.LogDebug("👁️ [AVALONIA_RENDERER] レガシー可視性制御完了 - Visible: {Visible}", visible);
             await Task.CompletedTask;
         }
@@ -886,15 +886,15 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
     /// 既存システムでオーバーレイ削除
     /// </summary>
     private async Task RemoveLegacyOverlayAsync(
-        ILegacyOverlayWindow legacyWindow, 
-        int legacyChunkId, 
+        ILegacyOverlayWindow legacyWindow,
+        int legacyChunkId,
         CancellationToken cancellationToken)
     {
         try
         {
             // インターフェース経由で既存オーバーレイウィンドウを削除
             legacyWindow?.Dispose();
-            
+
             _logger.LogDebug("🗑️ [AVALONIA_RENDERER] レガシーオーバーレイ削除 - ChunkId: {ChunkId}", legacyChunkId);
             await Task.CompletedTask;
         }
@@ -944,7 +944,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             _phase15Overlays.Clear();
             _chunkIdToOverlayId.Clear();
             _disposed = true;
-            
+
             _logger.LogInformation("🧹 [AVALONIA_RENDERER] AvaloniaOverlayRenderer 非同期リソース解放完了");
         }
         catch (Exception ex)
@@ -974,7 +974,7 @@ public class AvaloniaOverlayRenderer : IOverlayRenderer, IInPlaceTranslationOver
             _phase15Overlays.Clear();
             _chunkIdToOverlayId.Clear();
             _disposed = true;
-            
+
             _logger.LogInformation("🧹 [AVALONIA_RENDERER] AvaloniaOverlayRenderer 同期リソース解放完了");
         }
         catch (Exception ex)

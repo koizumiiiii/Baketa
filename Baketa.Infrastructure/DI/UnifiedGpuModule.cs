@@ -1,15 +1,15 @@
+using System.IO;
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.DI;
+using Baketa.Infrastructure.OCR.Benchmarking;
 using Baketa.Infrastructure.OCR.GPU;
 using Baketa.Infrastructure.OCR.GPU.Providers;
-using Baketa.Infrastructure.OCR.Benchmarking;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.IO;
 
 namespace Baketa.Infrastructure.DI;
 
@@ -23,13 +23,13 @@ public sealed class UnifiedGpuModule : ServiceModuleBase
     {
         // 設定登録（ServiceProviderからIConfigurationを取得）
         RegisterSettings(services);
-        
+
         // Execution Provider Factories登録
         RegisterExecutionProviderFactories(services);
-        
+
         // 統合GPU最適化システム
         RegisterUnifiedGpuOptimizer(services);
-        
+
         // パフォーマンス測定システム
         RegisterBenchmarkingSystem(services);
 
@@ -104,7 +104,7 @@ public sealed class UnifiedGpuModule : ServiceModuleBase
             var providerFactories = serviceProvider.GetServices<IExecutionProviderFactory>();
             var environmentDetector = serviceProvider.GetRequiredService<IGpuEnvironmentDetector>();
             var logger = serviceProvider.GetRequiredService<ILogger<UnifiedGpuOptimizer>>();
-            
+
             return new UnifiedGpuOptimizer(providerFactories, environmentDetector, logger);
         });
     }
@@ -116,7 +116,7 @@ public sealed class UnifiedGpuModule : ServiceModuleBase
             var gpuOptimizer = serviceProvider.GetRequiredService<IUnifiedGpuOptimizer>();
             var environmentDetector = serviceProvider.GetRequiredService<IGpuEnvironmentDetector>();
             var logger = serviceProvider.GetRequiredService<ILogger<UnifiedGpuBenchmarkRunner>>();
-            
+
             return new UnifiedGpuBenchmarkRunner(gpuOptimizer, environmentDetector, logger);
         });
 
@@ -133,7 +133,7 @@ public sealed class UnifiedGpuModule : ServiceModuleBase
             var benchmarkRunner = serviceProvider.GetRequiredService<IUnifiedGpuBenchmarkRunner>();
             var settings = serviceProvider.GetRequiredService<UnifiedGpuSettings>();
             var logger = serviceProvider.GetRequiredService<ILogger<UnifiedGpuInitializer>>();
-            
+
             return new UnifiedGpuInitializer(optimizer, benchmarkRunner, settings, logger);
         });
     }
@@ -209,7 +209,7 @@ public sealed class UnifiedGpuInitializer(
                 testImages, benchmarkSettings, cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("📈 Startup benchmark completed. Optimal: {Provider} ({Time}ms avg)",
-                result.OptimalProvider, 
+                result.OptimalProvider,
                 result.ProviderResults.FirstOrDefault(r => r.ProviderType == result.OptimalProvider)?.AverageInferenceTimeMs);
         }
         catch (Exception ex)
@@ -235,12 +235,12 @@ internal sealed class MockImage : IImage
     public int Width => 800;
     public int Height => 600;
     public ImageFormat Format => ImageFormat.Rgb24;
-    
+
     /// <summary>
     /// PixelFormat property for IImage extension
     /// </summary>
     public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgb24;
-    
+
     /// <summary>
     /// GetImageMemory method for IImage extension
     /// </summary>
@@ -294,14 +294,14 @@ public sealed class GpuBenchmarkReporter : IGpuBenchmarkReporter
 | Provider | Status | Avg Time (ms) | Throughput (img/sec) | Speedup |
 |----------|--------|---------------|---------------------|---------|
 ";
-        
+
         foreach (var result in report.ProviderResults)
         {
             var status = result.IsSuccessful ? "✅" : "❌";
             var avgTime = result.IsSuccessful ? $"{result.AverageInferenceTimeMs:F2}" : "Failed";
             var throughput = result.IsSuccessful ? $"{result.ThroughputImagesPerSecond:F1}" : "-";
             var speedup = report.PerformanceGains.TryGetValue(result.ProviderType.ToString(), out var gain) ? $"{gain:F1}x" : "-";
-            
+
             markdown += $"| {result.ProviderType} | {status} | {avgTime} | {throughput} | {speedup} |\n";
         }
 

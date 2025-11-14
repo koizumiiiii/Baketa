@@ -1,8 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using System.Reflection;
 using Baketa.Core.Configuration;
 using Microsoft.Extensions.Configuration;
-using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.DI;
 
@@ -14,7 +14,7 @@ namespace Baketa.Core.DI;
 public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
 {
     protected Configuration.IConfigurationManager ConfigurationManager { get; private set; } = null!;
-    
+
     /// <summary>
     /// サービス登録（設定システム自動初期化）
     /// </summary>
@@ -46,12 +46,12 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
 
         Console.WriteLine($"✅ [PHASE12.2_DIAG] {GetType().Name}.RegisterServices() 完全完了");
     }
-    
+
     /// <summary>
     /// サブクラスで実装すべき設定可能サービス登録
     /// </summary>
     protected abstract void RegisterConfigurableServices(IServiceCollection services);
-    
+
     /// <summary>
     /// 設定システムの初期化（Gemini指摘反映: BuildServiceProvider回避）
     /// パフォーマンス改善: IConfigurationをコンストラクタから受け取るよう変更予定
@@ -61,7 +61,7 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
     {
         // Gemini指摘: BuildServiceProviderアンチパターンの一時的対応
         // 将来的にはコンストラクタでIConfigurationを受け取る設計に変更
-        
+
         // 既存の登録からIConfigurationを探す
         var configurationDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IConfiguration));
         if (configurationDescriptor == null)
@@ -82,40 +82,40 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
             // ファクトリーまたは型ベースの登録の場合の対応（非推奨パターンだが必要）
             var serviceProvider = services.BuildServiceProvider();
             var fallbackConfiguration = serviceProvider.GetService<IConfiguration>();
-            
+
             if (fallbackConfiguration == null)
             {
                 throw new InvalidOperationException("IConfigurationインスタンスの取得に失敗しました。");
             }
-            
+
             var configManager = new CoreConfigurationManager(fallbackConfiguration);
             services.AddSingleton<Configuration.IConfigurationManager>(configManager);
             ConfigurationManager = configManager;
             serviceProvider.Dispose(); // リソースリーク防止
         }
-        
+
         Console.WriteLine($"✅ [MODULE] {GetType().Name} - 設定システム初期化完了");
     }
-    
+
     // DetectConfigurationBasePathは使用されないため削除
-    
+
     /// <summary>
     /// 型安全な設定登録ヘルパー
     /// </summary>
-    protected void RegisterSettings<T>(IServiceCollection services, string? sectionName = null) 
+    protected void RegisterSettings<T>(IServiceCollection services, string? sectionName = null)
         where T : class, new()
     {
         var section = sectionName ?? typeof(T).Name.Replace("Settings", "");
-        
+
         Console.WriteLine($"🔧 [MODULE] {GetType().Name} - {typeof(T).Name} 設定登録開始 (セクション: {section})");
-        
+
         if (!ConfigurationManager.SectionExists(section))
         {
             Console.WriteLine($"⚠️ [MODULE] {GetType().Name} - セクション '{section}' が見つかりません - デフォルト値使用");
         }
-        
+
         var settings = ConfigurationManager.GetSettings<T>(section);
-        
+
         // IOptionsMonitorのみ登録（IOptions削除でDI曖昧性解決）
         services.Configure<T>(options =>
         {
@@ -129,14 +129,14 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
                 }
             }
         });
-        
+
         // 直接インスタンスも登録
         services.AddSingleton(settings);
-        
+
         Console.WriteLine($"✅ [MODULE] {GetType().Name} - {typeof(T).Name} 設定登録完了");
         Console.WriteLine($"🔧 [MODULE] {GetType().Name} - 設定値: {System.Text.Json.JsonSerializer.Serialize(settings)}");
     }
-    
+
     /// <summary>
     /// 設定存在チェック
     /// </summary>
@@ -144,7 +144,7 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
     {
         return ConfigurationManager.SectionExists(sectionName);
     }
-    
+
     /// <summary>
     /// 設定値直接取得
     /// </summary>
@@ -152,7 +152,7 @@ public abstract class ConfigurableServiceModuleBase : ServiceModuleBase
     {
         return ConfigurationManager.GetValue(key);
     }
-    
+
     /// <summary>
     /// デバッグ情報出力
     /// </summary>

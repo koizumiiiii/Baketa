@@ -1,8 +1,8 @@
 using System.Diagnostics;
+using System.IO;
 using System.Net.NetworkInformation;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using System.IO;
 
 namespace Baketa.Infrastructure.Translation.Services;
 
@@ -14,15 +14,15 @@ public sealed class EnhancedDiagnosticReport
 {
     private readonly ILogger<EnhancedDiagnosticReport> _logger;
     private readonly PythonEnvironmentResolver _pythonResolver;
-    
+
     public EnhancedDiagnosticReport(
-        ILogger<EnhancedDiagnosticReport> logger, 
+        ILogger<EnhancedDiagnosticReport> logger,
         PythonEnvironmentResolver pythonResolver)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _pythonResolver = pythonResolver ?? throw new ArgumentNullException(nameof(pythonResolver));
     }
-    
+
     /// <summary>
     /// 完全診断レポートの生成
     /// </summary>
@@ -33,23 +33,23 @@ public sealed class EnhancedDiagnosticReport
             Timestamp = DateTime.UtcNow,
             ReportVersion = "1.0.0"
         };
-        
+
         try
         {
             _logger.LogInformation("🔍 拡張診断レポート生成開始");
-            
+
             // 並列実行で高速化
             var task1 = Task.Run(async () => result.PythonDiagnostics = await GetPythonDiagnosticsAsync());
             var task2 = Task.Run(async () => result.GpuDiagnostics = await GetGpuDiagnosticsAsync());
             var task3 = Task.Run(async () => result.NetworkDiagnostics = await GetNetworkDiagnosticsAsync());
             var task4 = Task.Run(async () => result.ProcessDiagnostics = await GetProcessDiagnosticsAsync());
             var task5 = Task.Run(() => result.SystemDiagnostics = GetSystemDiagnostics());
-            
+
             await Task.WhenAll(task1, task2, task3, task4, task5);
-            
+
             // 自動修復アクションの生成
             result.SuggestedActions = GenerateSuggestedActions(result);
-            
+
             _logger.LogInformation("✅ 拡張診断レポート生成完了");
         }
         catch (Exception ex)
@@ -57,158 +57,157 @@ public sealed class EnhancedDiagnosticReport
             _logger.LogError(ex, "❌ 診断レポート生成エラー");
             result.GeneralError = ex.Message;
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// Python環境詳細診断
     /// </summary>
     private async Task<PythonDiagnosticsResult> GetPythonDiagnosticsAsync()
     {
         var result = new PythonDiagnosticsResult();
-        
+
         try
         {
             var envDiagnostics = await _pythonResolver.GetEnvironmentDiagnosticsAsync();
-            
+
             result.ExecutablePath = envDiagnostics.PythonExecutablePath;
             result.Version = envDiagnostics.PythonVersion;
             result.InstalledPackages = envDiagnostics.InstalledPackages;
             result.PyenvStatus = envDiagnostics.PyenvStatus;
             result.EnvironmentVariables = envDiagnostics.EnvironmentVariables;
-            
+
             // 必須パッケージの確認
             result.RequiredPackagesStatus = CheckRequiredPackages(envDiagnostics.InstalledPackages);
-            
+
             // トーチのCUDA対応確認
             result.TorchCudaAvailable = await CheckTorchCudaAvailabilityAsync(envDiagnostics.PythonExecutablePath);
-            
-            result.IsHealthy = !string.IsNullOrEmpty(result.Version) && 
+
+            result.IsHealthy = !string.IsNullOrEmpty(result.Version) &&
                              result.RequiredPackagesStatus.All(kvp => kvp.Value);
         }
         catch (Exception ex)
         {
             result.Error = ex.Message;
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// GPU/CUDA環境診断（Gemini推奨追加項目）
     /// </summary>
     private async Task<GpuDiagnosticsResult> GetGpuDiagnosticsAsync()
     {
         var result = new GpuDiagnosticsResult();
-        
+
         try
         {
             // nvidia-smi コマンド実行
             result.NvidiaSmiOutput = await ExecuteCommandAsync("nvidia-smi", "--query-gpu=name,memory.total,memory.used,memory.free --format=csv");
             result.IsNvidiaGpuDetected = !string.IsNullOrEmpty(result.NvidiaSmiOutput) && !result.NvidiaSmiOutput.Contains("not found");
-            
+
             // CUDA環境変数確認
             result.CudaHome = Environment.GetEnvironmentVariable("CUDA_HOME");
             result.CudaPath = Environment.GetEnvironmentVariable("CUDA_PATH");
-            
+
             // DirectML可用性確認（Windows）
             if (OperatingSystem.IsWindows())
             {
                 result.IsDirectMlAvailable = CheckDirectMlAvailability();
             }
-            
+
             result.IsHealthy = result.IsNvidiaGpuDetected || result.IsDirectMlAvailable;
         }
         catch (Exception ex)
         {
             result.Error = ex.Message;
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// ネットワーク診断
     /// </summary>
     private async Task<NetworkDiagnosticsResult> GetNetworkDiagnosticsAsync()
     {
         var result = new NetworkDiagnosticsResult();
-        
+
         try
         {
             // ポート使用状況確認
             result.PortStatus = await GetPortStatusAsync([5557, 5558, 5559, 5560, 5561]);
-            
+
             // ファイアウォール状態確認（Windows）
             if (OperatingSystem.IsWindows())
             {
                 result.FirewallRules = await GetFirewallRulesAsync();
             }
-            
+
             // インターネット接続確認
             result.InternetConnectivity = await TestInternetConnectivityAsync();
-            
+
             result.IsHealthy = result.PortStatus.Any(kvp => kvp.Value == "Available") && result.InternetConnectivity;
         }
         catch (Exception ex)
         {
             result.Error = ex.Message;
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// プロセス診断
     /// </summary>
     private async Task<ProcessDiagnosticsResult> GetProcessDiagnosticsAsync()
     {
         var result = new ProcessDiagnosticsResult();
-        
+
         try
         {
             // Python関連プロセス確認
             var pythonProcesses = Process.GetProcessesByName("python")
                 .Concat(Process.GetProcessesByName("py"))
                 .ToArray();
-            
-            result.ActivePythonProcesses = pythonProcesses.Select(p => new ProcessInfo
+
+            result.ActivePythonProcesses = [.. pythonProcesses.Select(p => new ProcessInfo
             {
                 ProcessId = p.Id,
                 ProcessName = p.ProcessName,
                 StartTime = p.StartTime,
                 WorkingSet = p.WorkingSet64,
                 CommandLine = GetProcessCommandLine(p)
-            }).ToArray();
-            
+            })];
+
             // NLLB翻訳サーバープロセス特定
-            result.TranslationServerProcesses = result.ActivePythonProcesses
+            result.TranslationServerProcesses = [.. result.ActivePythonProcesses
                 .Where(p => p.CommandLine?.Contains("nllb_translation_server") == true ||
-                           p.CommandLine?.Contains("optimized_translation_server") == true)
-                .ToArray();
-            
+                           p.CommandLine?.Contains("optimized_translation_server") == true)];
+
             // リソース使用量
             result.SystemMemoryUsage = GC.GetTotalMemory(false);
             result.AvailableMemory = GetAvailableMemory();
-            
+
             result.IsHealthy = result.TranslationServerProcesses.Length <= 1; // 重複プロセスなし
         }
         catch (Exception ex)
         {
             result.Error = ex.Message;
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// システム診断
     /// </summary>
     private SystemDiagnosticsResult GetSystemDiagnostics()
     {
         var result = new SystemDiagnosticsResult();
-        
+
         try
         {
             result.OperatingSystem = Environment.OSVersion.ToString();
@@ -218,27 +217,27 @@ public sealed class EnhancedDiagnosticReport
             result.UserName = Environment.UserName;
             result.CurrentDirectory = Environment.CurrentDirectory;
             result.DotNetVersion = Environment.Version.ToString();
-            
+
             // ディスク容量
             var drives = DriveInfo.GetDrives().Where(d => d.IsReady).ToArray();
-            result.DriveInfo = drives.Select(d => new DriveInfoResult
+            result.DriveInfo = [.. drives.Select(d => new DriveInfoResult
             {
                 Name = d.Name,
                 TotalSize = d.TotalSize,
                 AvailableSpace = d.AvailableFreeSpace,
                 DriveType = d.DriveType.ToString()
-            }).ToArray();
-            
+            })];
+
             result.IsHealthy = drives.Any(d => d.AvailableFreeSpace > 5L * 1024 * 1024 * 1024); // 5GB以上
         }
         catch (Exception ex)
         {
             result.Error = ex.Message;
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// 必須パッケージの確認
     /// </summary>
@@ -246,15 +245,15 @@ public sealed class EnhancedDiagnosticReport
     {
         var requiredPackages = new[] { "torch", "transformers", "sentencepiece", "fastapi", "uvicorn" };
         var result = new Dictionary<string, bool>();
-        
+
         foreach (var package in requiredPackages)
         {
             result[package] = installedPackages.Any(p => p.StartsWith($"{package}==", StringComparison.OrdinalIgnoreCase));
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// PyTorchのCUDA対応確認
     /// </summary>
@@ -271,10 +270,10 @@ public sealed class EnhancedDiagnosticReport
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            
+
             using var process = Process.Start(startInfo);
             await process!.WaitForExitAsync();
-            
+
             if (process.ExitCode == 0)
             {
                 var output = (await process.StandardOutput.ReadToEndAsync()).Trim();
@@ -285,10 +284,10 @@ public sealed class EnhancedDiagnosticReport
         {
             // torch未インストールまたは実行エラー
         }
-        
+
         return false;
     }
-    
+
     /// <summary>
     /// コマンド実行ヘルパー
     /// </summary>
@@ -305,9 +304,9 @@ public sealed class EnhancedDiagnosticReport
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            
+
             using var process = Process.Start(startInfo);
-            
+
             using var cts = new CancellationTokenSource(timeoutMs);
             try
             {
@@ -318,8 +317,8 @@ public sealed class EnhancedDiagnosticReport
                 process.Kill();
                 return "Command timed out";
             }
-            
-            return process.ExitCode == 0 
+
+            return process.ExitCode == 0
                 ? await process.StandardOutput.ReadToEndAsync()
                 : await process.StandardError.ReadToEndAsync();
         }
@@ -328,14 +327,14 @@ public sealed class EnhancedDiagnosticReport
             return $"Command error: {ex.Message}";
         }
     }
-    
+
     /// <summary>
     /// ポート使用状況確認
     /// </summary>
     private async Task<Dictionary<int, string>> GetPortStatusAsync(int[] ports)
     {
         var result = new Dictionary<int, string>();
-        
+
         foreach (var port in ports)
         {
             try
@@ -348,10 +347,10 @@ public sealed class EnhancedDiagnosticReport
                 result[port] = "Unknown";
             }
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// ファイアウォールルール確認（Windows）
     /// </summary>
@@ -367,7 +366,7 @@ public sealed class EnhancedDiagnosticReport
             return ["Firewall check failed"];
         }
     }
-    
+
     /// <summary>
     /// インターネット接続確認
     /// </summary>
@@ -384,7 +383,7 @@ public sealed class EnhancedDiagnosticReport
             return false;
         }
     }
-    
+
     /// <summary>
     /// DirectML可用性確認
     /// </summary>
@@ -397,7 +396,7 @@ public sealed class EnhancedDiagnosticReport
         }
         return false;
     }
-    
+
     /// <summary>
     /// プロセスコマンドライン取得
     /// </summary>
@@ -412,7 +411,7 @@ public sealed class EnhancedDiagnosticReport
             return null;
         }
     }
-    
+
     /// <summary>
     /// 利用可能メモリ取得
     /// </summary>
@@ -428,41 +427,41 @@ public sealed class EnhancedDiagnosticReport
             return -1;
         }
     }
-    
+
     /// <summary>
     /// 推奨アクションの生成
     /// </summary>
     private string[] GenerateSuggestedActions(ComprehensiveDiagnosticResult result)
     {
         var actions = new List<string>();
-        
+
         // Python関連
         if (result.PythonDiagnostics?.IsHealthy != true)
         {
             actions.Add("Python 3.10以上をインストールしてください");
             actions.Add("必須パッケージ（torch, transformers, sentencepiece）をインストールしてください");
         }
-        
+
         // GPU関連
         if (result.GpuDiagnostics?.IsHealthy != true)
         {
             actions.Add("NVIDIA ドライバーまたはCUDAをインストールしてください");
         }
-        
+
         // ネットワーク関連
         if (result.NetworkDiagnostics?.IsHealthy != true)
         {
             actions.Add("ポート5557-5561が利用可能であることを確認してください");
             actions.Add("ファイアウォールでPythonの通信を許可してください");
         }
-        
+
         // プロセス関連
         if (result.ProcessDiagnostics?.IsHealthy != true)
         {
             actions.Add("重複したPython翻訳サーバープロセスを終了してください");
         }
-        
-        return actions.Count > 0 ? actions.ToArray() : ["システムは正常です"];
+
+        return actions.Count > 0 ? [.. actions] : ["システムは正常です"];
     }
 }
 

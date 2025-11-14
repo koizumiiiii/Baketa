@@ -1,7 +1,7 @@
 using System.Runtime.Versioning;
-using Baketa.Infrastructure.Platform.Windows.Overlay;
-using Baketa.Core.UI.Overlay;
 using Baketa.Core.Abstractions.UI.Overlays;
+using Baketa.Core.UI.Overlay;
+using Baketa.Infrastructure.Platform.Windows.Overlay;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

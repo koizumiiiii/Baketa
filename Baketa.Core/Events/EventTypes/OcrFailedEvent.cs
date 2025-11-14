@@ -1,5 +1,5 @@
-using Baketa.Core.Abstractions.Imaging;
 using System;
+using Baketa.Core.Abstractions.Imaging;
 
 namespace Baketa.Core.Events.EventTypes;
 
@@ -14,7 +14,7 @@ namespace Baketa.Core.Events.EventTypes;
 /// <param name="errorMessage">エラーメッセージ</param>
 /// <param name="elapsedTime">経過時間</param>
 public class OcrFailedEvent(IImage? sourceImage, Exception? exception, string? errorMessage = null, TimeSpan elapsedTime = default) : EventBase
-    {
+{
     /// <summary>
     /// OCR処理元の画像
     /// </summary>
@@ -37,7 +37,7 @@ public class OcrFailedEvent(IImage? sourceImage, Exception? exception, string? e
 
     /// <inheritdoc />
     public override string Name => "OcrFailed";
-        
-        /// <inheritdoc />
-        public override string Category => "OCR";
-    }
+
+    /// <inheritdoc />
+    public override string Category => "OCR";
+}

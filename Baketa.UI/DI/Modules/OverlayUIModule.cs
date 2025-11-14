@@ -1,7 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
-using Baketa.Core.DI;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.DI;
 using Baketa.UI.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.UI.DI.Modules;
 

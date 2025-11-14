@@ -4,8 +4,8 @@ using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.UI.Overlays;
 using Baketa.Core.UI.Overlay;
-using CoreGeometry = Baketa.Core.UI.Geometry;
 using Microsoft.Extensions.Logging;
+using CoreGeometry = Baketa.Core.UI.Geometry;
 
 namespace Baketa.Infrastructure.Platform.Windows.Overlay;
 

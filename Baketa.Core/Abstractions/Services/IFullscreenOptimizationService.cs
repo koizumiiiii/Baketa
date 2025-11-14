@@ -14,32 +14,32 @@ public enum FullscreenOptimizationStatus
     /// 無効状態
     /// </summary>
     Disabled,
-    
+
     /// <summary>
     /// 待機中
     /// </summary>
     Standby,
-    
+
     /// <summary>
     /// フルスクリーン検出中
     /// </summary>
     Detecting,
-    
+
     /// <summary>
     /// 最適化適用中
     /// </summary>
     Optimizing,
-    
+
     /// <summary>
     /// 最適化中
     /// </summary>
     Active,
-    
+
     /// <summary>
     /// 復元中
     /// </summary>
     Restoring,
-    
+
     /// <summary>
     /// エラー状態
     /// </summary>
@@ -55,32 +55,32 @@ public class FullscreenOptimizationStats
     /// 最適化が適用された回数
     /// </summary>
     public int OptimizationAppliedCount { get; set; }
-    
+
     /// <summary>
     /// 最適化が解除された回数
     /// </summary>
     public int OptimizationRemovedCount { get; set; }
-    
+
     /// <summary>
     /// エラー発生回数
     /// </summary>
     public int ErrorCount { get; set; }
-    
+
     /// <summary>
     /// 最後の最適化適用時刻
     /// </summary>
     public DateTime? LastOptimizationTime { get; set; }
-    
+
     /// <summary>
     /// 最後のエラー発生時刻
     /// </summary>
     public DateTime? LastErrorTime { get; set; }
-    
+
     /// <summary>
     /// 現在最適化が適用されているウィンドウ
     /// </summary>
     public string? CurrentOptimizedWindow { get; set; }
-    
+
     /// <summary>
     /// 統計をリセットします
     /// </summary>
@@ -93,7 +93,7 @@ public class FullscreenOptimizationStats
         LastErrorTime = null;
         CurrentOptimizedWindow = null;
     }
-    
+
     /// <summary>
     /// 統計情報の概要を文字列で返します
     /// </summary>
@@ -116,69 +116,69 @@ public interface IFullscreenOptimizationService
     /// 現在の最適化状態
     /// </summary>
     FullscreenOptimizationStatus Status { get; }
-    
+
     /// <summary>
     /// 最適化統計情報
     /// </summary>
     FullscreenOptimizationStats Statistics { get; }
-    
+
     /// <summary>
     /// 最適化サービスが有効かどうか
     /// </summary>
     bool IsEnabled { get; set; }
-    
+
     /// <summary>
     /// 現在フルスクリーン最適化が適用されているかどうか
     /// </summary>
     bool IsOptimizationActive { get; }
-    
+
     /// <summary>
     /// 現在のフルスクリーン情報
     /// </summary>
     FullscreenInfo? CurrentFullscreenInfo { get; }
-    
+
     /// <summary>
     /// フルスクリーン最適化を開始します
     /// </summary>
     /// <param name="cancellationToken">キャンセルトークン</param>
     Task StartOptimizationAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// フルスクリーン最適化を停止します
     /// </summary>
     Task StopOptimizationAsync();
-    
+
     /// <summary>
     /// 指定されたフルスクリーン情報に基づいて最適化を手動適用します
     /// </summary>
     /// <param name="fullscreenInfo">フルスクリーン情報</param>
     Task ApplyOptimizationAsync(FullscreenInfo fullscreenInfo);
-    
+
     /// <summary>
     /// 現在の最適化を手動で解除し、元の設定に復元します
     /// </summary>
     Task RemoveOptimizationAsync();
-    
+
     /// <summary>
     /// 最適化設定を強制的にリセットします
     /// </summary>
     Task ForceResetAsync();
-    
+
     /// <summary>
     /// 統計情報をリセットします
     /// </summary>
     void ResetStatistics();
-    
+
     /// <summary>
     /// フルスクリーン最適化が適用されたときのイベント
     /// </summary>
     event EventHandler<FullscreenOptimizationAppliedEventArgs>? OptimizationApplied;
-    
+
     /// <summary>
     /// フルスクリーン最適化が解除されたときのイベント
     /// </summary>
     event EventHandler<FullscreenOptimizationRemovedEventArgs>? OptimizationRemoved;
-    
+
     /// <summary>
     /// 最適化処理でエラーが発生したときのイベント
     /// </summary>

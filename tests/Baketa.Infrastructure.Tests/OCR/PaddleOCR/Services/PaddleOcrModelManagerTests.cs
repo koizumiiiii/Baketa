@@ -1,9 +1,9 @@
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
-using Baketa.Infrastructure.OCR.PaddleOCR.Services;
 using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
+using Baketa.Infrastructure.OCR.PaddleOCR.Services;
+using Microsoft.Extensions.Logging;
+using Moq;
 using Sdcb.PaddleOCR.Models;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Services;
 

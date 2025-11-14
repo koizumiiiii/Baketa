@@ -1,10 +1,10 @@
-using Xunit;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Moq;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.GPU;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.GPU;
 
@@ -21,7 +21,7 @@ public class DefaultOnnxModelConfigurationTests
     public DefaultOnnxModelConfigurationTests()
     {
         _mockLogger = new Mock<ILogger<DefaultOnnxModelConfiguration>>();
-        
+
         _testSettings = new OcrSettings
         {
             GpuSettings = new GpuOcrSettings
@@ -31,7 +31,7 @@ public class DefaultOnnxModelConfigurationTests
                 LanguageIdentificationModelPath = @"test_models\language_id.onnx"
             }
         };
-        
+
         var options = new OptionsWrapper<OcrSettings>(_testSettings);
         _configuration = new DefaultOnnxModelConfiguration(_mockLogger.Object, options);
     }
@@ -41,7 +41,7 @@ public class DefaultOnnxModelConfigurationTests
     {
         // Act & Assert
         Assert.NotNull(_configuration);
-        
+
         // デフォルトモデルが初期化されていることを確認
         var availableModels = _configuration.GetAvailableModels();
         Assert.Contains("TextDetection", availableModels);
@@ -62,13 +62,13 @@ public class DefaultOnnxModelConfigurationTests
         Assert.Contains("save_infer_model/scale_0.tmp_1", modelInfo.OutputTensorNames);
         Assert.Equal(1, modelInfo.RecommendedBatchSize);
         Assert.Equal("PP-OCRv4", modelInfo.ModelVersion);
-        
+
         // 前処理設定確認
         Assert.NotNull(modelInfo.PreprocessingConfig);
         Assert.True(modelInfo.PreprocessingConfig.EnableNormalization);
         Assert.NotNull(modelInfo.PreprocessingConfig.ResizeConfig);
         Assert.Equal(960, modelInfo.PreprocessingConfig.ResizeConfig.TargetWidth);
-        
+
         // 後処理設定確認
         Assert.NotNull(modelInfo.PostprocessingConfig);
         Assert.Equal(0.3f, modelInfo.PostprocessingConfig.ConfidenceThreshold);
@@ -88,12 +88,12 @@ public class DefaultOnnxModelConfigurationTests
         Assert.Contains("save_infer_model/scale_0.tmp_1", modelInfo.OutputTensorNames);
         Assert.Equal(8, modelInfo.RecommendedBatchSize);
         Assert.Equal("PP-OCRv4", modelInfo.ModelVersion);
-        
+
         // 入力形状確認
         Assert.True(modelInfo.InputShapes.ContainsKey("x"));
         var inputShape = modelInfo.InputShapes["x"];
         Assert.Equal(new[] { 1, 3, 48, 320 }, inputShape);
-        
+
         // メタデータ確認
         Assert.Equal("TextRecognition", modelInfo.Metadata["ModelType"]);
         Assert.Equal("CTC", modelInfo.Metadata["OutputFormat"]);
@@ -110,11 +110,11 @@ public class DefaultOnnxModelConfigurationTests
         Assert.Equal(_testSettings.GpuSettings.LanguageIdentificationModelPath, modelInfo.ModelPath);
         Assert.Equal(16, modelInfo.RecommendedBatchSize); // 軽量なので大きなバッチサイズ
         Assert.Equal(64, modelInfo.EstimatedMemoryUsageMB); // 軽量
-        
+
         // 言語識別特有の設定確認
         Assert.Equal(0.9f, modelInfo.PostprocessingConfig!.ConfidenceThreshold); // 高い信頼度要求
         Assert.Equal("LanguageIdentification", modelInfo.Metadata["ModelType"]);
-        
+
         // 入力サイズが言語識別用に最適化されていることを確認
         var inputShape = modelInfo.InputShapes["x"];
         Assert.Equal(new[] { 1, 3, 48, 192 }, inputShape);
@@ -131,7 +131,7 @@ public class DefaultOnnxModelConfigurationTests
             OutputTensorNames = ["output"],
             ModelVersion = "1.0"
         };
-        
+
         _configuration.UpdateModelInfo("CustomModel", customModel);
 
         // Act
@@ -191,7 +191,7 @@ public class DefaultOnnxModelConfigurationTests
     public void UpdateModelInfo_WithNullModelInfo_ShouldThrowException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _configuration.UpdateModelInfo("TestModel", null!));
     }
 
@@ -202,7 +202,7 @@ public class DefaultOnnxModelConfigurationTests
         var modelInfo = new OnnxModelInfo();
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
+        Assert.Throws<ArgumentException>(() =>
             _configuration.UpdateModelInfo("", modelInfo));
     }
 
@@ -251,7 +251,7 @@ public class DefaultOnnxModelConfigurationTests
             EstimatedMemoryUsageMB = 512,
             ModelVersion = "1.0"
         };
-        
+
         _configuration.UpdateModelInfo("TestModel", modelInfo);
 
         // Act
@@ -260,11 +260,11 @@ public class DefaultOnnxModelConfigurationTests
         // Assert
         Assert.False(result.IsValid); // ファイルが存在しないため
         Assert.Contains(result.ValidationErrors, e => e.Contains("モデルファイルが存在しません"));
-        
+
         // 警告チェック
         Assert.Contains(result.ValidationWarnings, w => w.Contains("入力テンソル 'input2' の形状が定義されていません"));
         Assert.Contains(result.ValidationWarnings, w => w.Contains("出力テンソル 'output1' の形状が定義されていません"));
-        
+
         // 詳細情報チェック
         Assert.Equal(2, result.ValidationDetails["InputTensorCount"]);
         Assert.Equal(1, result.ValidationDetails["OutputTensorCount"]);
@@ -283,7 +283,7 @@ public class DefaultOnnxModelConfigurationTests
             EstimatedMemoryUsageMB = 20480, // 20GB
             ModelVersion = "1.0"
         };
-        
+
         _configuration.UpdateModelInfo("LargeModel", modelInfo);
 
         // Act
@@ -304,7 +304,7 @@ public class DefaultOnnxModelConfigurationTests
             OutputTensorNames = [], // 空
             ModelVersion = "1.0"
         };
-        
+
         _configuration.UpdateModelInfo("EmptyTensorsModel", modelInfo);
 
         // Act

@@ -37,13 +37,13 @@ public class BatchTranslationRequestEvent(IReadOnlyList<OcrResult> ocrResults, s
     /// <summary>
     /// バッチ内のテキストの概要（デバッグ用）
     /// </summary>
-    public string BatchSummary => OcrResults.Count > 0 
+    public string BatchSummary => OcrResults.Count > 0
         ? $"[{string.Join(", ", OcrResults.Take(3).Select(r => r.Text[..Math.Min(10, r.Text.Length)]))}]{(OcrResults.Count > 3 ? $" and {OcrResults.Count - 3} more" : "")}"
         : "Empty batch";
 
     /// <inheritdoc />
     public override string Name => "BatchTranslationRequest";
-        
+
     /// <inheritdoc />
     public override string Category => "Translation";
 

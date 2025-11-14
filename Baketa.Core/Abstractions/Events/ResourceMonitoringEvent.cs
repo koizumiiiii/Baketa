@@ -70,20 +70,20 @@ public sealed class ResourceMonitoringEvent(
     /// リソースメトリクス変更イベント作成
     /// </summary>
     public static ResourceMonitoringEvent CreateMetricsChanged(
-        ResourceMetrics currentMetrics, 
+        ResourceMetrics currentMetrics,
         ResourceMetrics? previousMetrics = null)
     {
-        var changeDescription = previousMetrics != null 
+        var changeDescription = previousMetrics != null
             ? $"リソース状況変化 - CPU:{previousMetrics.CpuUsagePercent:F1}%→{currentMetrics.CpuUsagePercent:F1}% MEM:{previousMetrics.MemoryUsagePercent:F1}%→{currentMetrics.MemoryUsagePercent:F1}%"
             : $"リソース状況更新 - {currentMetrics}";
-            
+
         return new ResourceMonitoringEvent(
             ResourceMonitoringEventType.MetricsChanged,
             currentMetrics,
             changeDescription,
             previousMetrics);
     }
-    
+
     /// <summary>
     /// リソース警告イベント作成
     /// </summary>
@@ -97,7 +97,7 @@ public sealed class ResourceMonitoringEvent(
             $"リソース警告: {warning.Message}",
             warning: warning);
     }
-    
+
     /// <summary>
     /// 監視開始イベント作成
     /// </summary>
@@ -108,7 +108,7 @@ public sealed class ResourceMonitoringEvent(
             initialMetrics,
             "リソース監視を開始しました");
     }
-    
+
     /// <summary>
     /// 監視停止イベント作成
     /// </summary>
@@ -119,7 +119,7 @@ public sealed class ResourceMonitoringEvent(
             finalMetrics,
             "リソース監視を停止しました");
     }
-    
+
     /// <summary>
     /// 監視エラーイベント作成
     /// </summary>
@@ -129,7 +129,7 @@ public sealed class ResourceMonitoringEvent(
     {
         var fallbackMetrics = currentMetrics ?? new ResourceMetrics(
             DateTime.UtcNow, 0, 0, 0, 0);
-            
+
         return new ResourceMonitoringEvent(
             ResourceMonitoringEventType.MonitoringError,
             fallbackMetrics,
@@ -172,7 +172,7 @@ public sealed record ResourceWarning(
     /// <summary>
     /// 警告の文字列表現
     /// </summary>
-    public override string ToString() => 
+    public override string ToString() =>
         $"{Type} ({Severity}): {Message} [Current:{CurrentValue:F1}% Threshold:{Threshold:F1}%]";
 }
 

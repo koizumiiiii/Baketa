@@ -20,16 +20,16 @@ public sealed class GameLoadPatternLearner : IDisposable
     private readonly ILogger<GameLoadPatternLearner> _logger;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly IOptionsMonitor<PredictiveControlSettings> _settings;
-    
+
     // ゲーム別学習データストレージ
     private readonly Dictionary<string, GameLearningSession> _activeSessions = new();
     private readonly Dictionary<string, GameLoadPattern> _learnedPatterns = new();
     private readonly object _dataLock = new();
-    
+
     // パフォーマンス追跡
     private readonly Dictionary<string, List<LoadMeasurement>> _recentMeasurements = new();
     private readonly System.Threading.Timer _cleanupTimer;
-    
+
     private bool _disposed;
 
     public GameLoadPatternLearner(
@@ -97,7 +97,7 @@ public sealed class GameLoadPatternLearner : IDisposable
         if (session != null && measurements?.Count > 0)
         {
             var pattern = await AnalyzeAndLearnFromSession(session, measurements, cancellationToken).ConfigureAwait(false);
-            
+
             lock (_dataLock)
             {
                 _learnedPatterns[gameProcessName] = pattern;
@@ -131,7 +131,7 @@ public sealed class GameLoadPatternLearner : IDisposable
                 if (_recentMeasurements.TryGetValue(gameProcessName, out var measurements))
                 {
                     measurements.Add(measurement);
-                    
+
                     // メモリ効率のため最新1000件に制限
                     if (measurements.Count > 1000)
                     {
@@ -171,7 +171,7 @@ public sealed class GameLoadPatternLearner : IDisposable
     public double GetPredictedLoad(string gameProcessName, TimeSpan gameTime)
     {
         var pattern = GetLearnedPattern(gameProcessName);
-        
+
         return pattern?.GetPredictedLoad(gameTime) ?? 50.0; // デフォルト50%負荷
     }
 
@@ -200,7 +200,7 @@ public sealed class GameLoadPatternLearner : IDisposable
     }
 
     private async Task<GameLoadPattern> AnalyzeAndLearnFromSession(
-        GameLearningSession session, 
+        GameLearningSession session,
         List<LoadMeasurement> measurements,
         CancellationToken cancellationToken)
     {
@@ -216,7 +216,7 @@ public sealed class GameLoadPatternLearner : IDisposable
 
         // 負荷プロファイル生成（時間経過 → 負荷率のマップ）
         var loadProfile = GenerateLoadProfile(measurements, sessionDuration, settings);
-        
+
         // 統計値計算
         var averageLoad = measurements.Average(m => m.CompositeLoad);
         var peakLoad = measurements.Max(m => m.CompositeLoad);
@@ -238,12 +238,12 @@ public sealed class GameLoadPatternLearner : IDisposable
     }
 
     private static Dictionary<TimeSpan, double> GenerateLoadProfile(
-        List<LoadMeasurement> measurements, 
+        List<LoadMeasurement> measurements,
         TimeSpan sessionDuration,
         PredictiveControlSettings settings)
     {
         var profile = new Dictionary<TimeSpan, double>();
-        
+
         if (measurements.Count == 0) return profile;
 
         // セッションを時間帯に分割してプロファイル作成
@@ -254,8 +254,8 @@ public sealed class GameLoadPatternLearner : IDisposable
         {
             var slotStart = TimeSpan.FromMilliseconds(i * slotDuration);
             var slotEnd = TimeSpan.FromMilliseconds((i + 1) * slotDuration);
-            
-            var slotMeasurements = measurements.Where(m => 
+
+            var slotMeasurements = measurements.Where(m =>
             {
                 var measurementTime = m.Timestamp - measurements.First().Timestamp;
                 return measurementTime >= slotStart && measurementTime < slotEnd;
@@ -277,7 +277,7 @@ public sealed class GameLoadPatternLearner : IDisposable
     {
         var valuesList = values.ToList();
         if (valuesList.Count == 0) return 0.0;
-        
+
         if (valuesList.Count <= windowSize)
             return valuesList.Average();
 
@@ -299,7 +299,7 @@ public sealed class GameLoadPatternLearner : IDisposable
         // ピーク負荷時刻を特定
         var peakMeasurement = measurements.OrderByDescending(m => m.CompositeLoad).First();
         var startTime = measurements.First().Timestamp;
-        
+
         return peakMeasurement.Timestamp - startTime;
     }
 
@@ -308,7 +308,7 @@ public sealed class GameLoadPatternLearner : IDisposable
         var cpuLoad = metrics.CpuUsagePercent;
         var memoryLoad = metrics.MemoryUsagePercent;
         var gpuLoad = metrics.GpuUsagePercent ?? 0.0;
-        var vramLoad = metrics.GpuMemoryUsageMB.HasValue 
+        var vramLoad = metrics.GpuMemoryUsageMB.HasValue
             ? Math.Min(100.0, (double)metrics.GpuMemoryUsageMB.Value / 8192.0 * 100.0) // 8GB仮定
             : 0.0;
 
@@ -338,7 +338,7 @@ public sealed class GameLoadPatternLearner : IDisposable
             {
                 // 期限切れデータのクリーンアップ
                 var expiredGames = _learnedPatterns.Keys.ToList();
-                
+
                 foreach (var gameName in expiredGames)
                 {
                     // Note: 実装では永続化されたデータの最終更新時刻をチェックすべき
@@ -362,10 +362,10 @@ public sealed class GameLoadPatternLearner : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
         _cleanupTimer?.Dispose();
-        
+
         lock (_dataLock)
         {
             _activeSessions.Clear();

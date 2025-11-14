@@ -29,7 +29,7 @@ public interface IOverlayPositioningService
         MonitorInfo targetMonitor,
         IReadOnlyList<Rectangle>? existingOverlayBounds = null,
         OverlayPositioningOptions? options = null);
-    
+
     /// <summary>
     /// 基本位置調整（従来互換）
     /// 既存コードとの互換性維持用
@@ -42,7 +42,7 @@ public interface IOverlayPositioningService
         TextChunk textChunk,
         Size overlaySize,
         Rectangle screenBounds);
-    
+
     /// <summary>
     /// 衝突回避付き位置調整（従来互換）
     /// 既存コードとの互換性維持用

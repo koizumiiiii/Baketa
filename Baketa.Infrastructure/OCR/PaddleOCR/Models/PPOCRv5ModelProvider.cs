@@ -1,10 +1,10 @@
+using System.IO;
+using System.Reflection;
+using Baketa.Core.Utilities;
 using Sdcb.PaddleOCR;
 using Sdcb.PaddleOCR.Models;
 using Sdcb.PaddleOCR.Models.Details;
 using Sdcb.PaddleOCR.Models.Local;
-using System.IO;
-using System.Reflection;
-using Baketa.Core.Utilities;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Models;
 
@@ -15,13 +15,13 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Models;
 public static class PPOCRv5ModelProvider
 {
     private static readonly string ModelsBasePath = GetModelsBasePath();
-    
+
     private static string GetModelsBasePath()
     {
         // 実行ファイルの場所からmodelsフォルダを探す
         var assemblyLocation = Assembly.GetExecutingAssembly().Location;
         var baseDir = Path.GetDirectoryName(assemblyLocation) ?? "";
-        
+
         // 開発環境とリリース環境の両方に対応
         var possiblePaths = new[]
         {
@@ -29,7 +29,7 @@ public static class PPOCRv5ModelProvider
             Path.Combine(baseDir, "models", "pp-ocrv5"),
             Path.Combine(Environment.CurrentDirectory, "models", "pp-ocrv5"),
         };
-        
+
         foreach (var path in possiblePaths)
         {
             var fullPath = Path.GetFullPath(path);
@@ -38,11 +38,11 @@ public static class PPOCRv5ModelProvider
                 return fullPath;
             }
         }
-        
+
         // デフォルトパス
         return Path.Combine(baseDir, "models", "pp-ocrv5");
     }
-    
+
     /// <summary>
     /// PP-OCRv5多言語モデルを取得
     /// </summary>
@@ -53,40 +53,40 @@ public static class PPOCRv5ModelProvider
         {
             Console.WriteLine("🔍 GetPPOCRv5MultilingualModel開始");
             Console.WriteLine($"🔍 ModelsBasePath = {ModelsBasePath}");
-            
+
             var detModelPath = Path.Combine(ModelsBasePath, "PP-OCRv5_server_det");
             var recModelPath = Path.Combine(ModelsBasePath, "PP-OCRv5_server_rec");
             var clsModelPath = Path.Combine(ModelsBasePath, "ch_ppocr_mobile_v2.0_cls_infer");
-            
+
             Console.WriteLine($"🔍 検出モデルパス: {detModelPath}");
             Console.WriteLine($"🔍 認識モデルパス: {recModelPath}");
             Console.WriteLine($"🔍 分類モデルパス: {clsModelPath}");
-            
+
             // モデルファイルの存在確認
             var detExists = Directory.Exists(detModelPath);
             var recExists = Directory.Exists(recModelPath);
             var clsExists = Directory.Exists(clsModelPath);
-            
+
             Console.WriteLine($"🔍 検出モデル存在: {detExists}");
             Console.WriteLine($"🔍 認識モデル存在: {recExists}");
             Console.WriteLine($"🔍 分類モデル存在: {clsExists}");
-            
+
             if (!detExists || !recExists || !clsExists)
             {
                 Console.WriteLine("❌ PP-OCRv5必要ファイルが不足しています");
                 return null;
             }
-            
+
             // PP-OCRv5モデルを構築 - 安全な実装戦略
             Console.WriteLine("🔍 LocalFullModels.ChineseV5取得試行");
             var chineseV5 = LocalFullModels.ChineseV5;
             Console.WriteLine($"🔍 LocalFullModels.ChineseV5 = {chineseV5 != null}");
-            
+
             if (chineseV5 != null)
             {
                 Console.WriteLine("✅ PP-OCRv5 (多言語対応モデル) を使用 - 保守的設定で安定化");
             }
-            
+
             return chineseV5;
         }
         catch (Exception ex)
@@ -97,7 +97,7 @@ public static class PPOCRv5ModelProvider
             return null;
         }
     }
-    
+
     /// <summary>
     /// PP-OCRv5モデルが利用可能かチェック
     /// </summary>
@@ -106,14 +106,14 @@ public static class PPOCRv5ModelProvider
         try
         {
             Console.WriteLine("🔍 IsAvailable開始");
-            
+
             // LocalFullModels.ChineseV5が利用可能かチェック
             var chineseV5 = LocalFullModels.ChineseV5;
             var result = chineseV5 != null;
-            
+
             Console.WriteLine($"🔍 LocalFullModels.ChineseV5 = {chineseV5 != null}");
             Console.WriteLine($"🔍 IsAvailable結果 = {result}");
-            
+
             return result;
         }
         catch (Exception ex)

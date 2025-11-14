@@ -41,11 +41,11 @@ public sealed class OcrAccuracyBenchmarkTests(ITestOutputHelper output)
                 var dummyFile = imagePath + ".txt";
                 Assert.True(System.IO.File.Exists(dummyFile), $"ダミーファイルが存在しません: {dummyFile}");
                 Assert.False(string.IsNullOrEmpty(expectedText), "期待テキストが空です");
-                
+
                 // ダミーファイルの内容確認
                 var content = await System.IO.File.ReadAllTextAsync(dummyFile);
                 Assert.Contains(expectedText, content);
-                
+
                 output.WriteLine($"✅ テストケース: {System.IO.Path.GetFileName(imagePath)} -> '{expectedText}'");
             }
         }
@@ -75,7 +75,7 @@ public sealed class OcrAccuracyBenchmarkTests(ITestOutputHelper output)
         var partialMatch = await TestAccuracyCalculation("Hello World", "Hello Wold"); // 'r'が欠落
         Assert.True(partialMatch.OverallAccuracy > 0.8, $"部分一致精度が低すぎます: {partialMatch.OverallAccuracy}");
         Assert.True(partialMatch.CharacterAccuracy > 0.7, $"文字精度が低すぎます: {partialMatch.CharacterAccuracy}");
-        
+
         // 完全不一致のケース
         var noMatch = await TestAccuracyCalculation("Hello World", "Goodbye");
         Assert.True(noMatch.OverallAccuracy < 0.5, $"不一致の精度が高すぎます: {noMatch.OverallAccuracy}");
@@ -136,7 +136,7 @@ public sealed class OcrAccuracyBenchmarkTests(ITestOutputHelper output)
 
         // 日本語・英語・数字・混合テキストが含まれていることを確認
         var texts = gameTestCases.Select(tc => tc.ExpectedText).ToList();
-        
+
         Assert.Contains(texts, text => ContainsJapanese(text));
         Assert.Contains(texts, text => ContainsEnglish(text));
         Assert.Contains(texts, text => ContainsNumbers(text));
@@ -145,7 +145,7 @@ public sealed class OcrAccuracyBenchmarkTests(ITestOutputHelper output)
         {
             output.WriteLine($"🎮 ゲームテストケース: {System.IO.Path.GetFileName(imagePath)} -> '{expectedText}'");
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -154,12 +154,12 @@ public sealed class OcrAccuracyBenchmarkTests(ITestOutputHelper output)
         // プライベートメソッドのテスト用 - リフレクションを使用
         _ = new OcrAccuracyMeasurement(_mockImageFactory.Object, _mockMeasurementLogger.Object);
         var type = typeof(OcrAccuracyMeasurement);
-        
-        var calculateAccuracyMethod = type.GetMethod("CalculateAccuracy", 
+
+        var calculateAccuracyMethod = type.GetMethod("CalculateAccuracy",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        var calculateCharAccuracyMethod = type.GetMethod("CalculateCharacterAccuracy", 
+        var calculateCharAccuracyMethod = type.GetMethod("CalculateCharacterAccuracy",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        var calculateWordAccuracyMethod = type.GetMethod("CalculateWordAccuracy", 
+        var calculateWordAccuracyMethod = type.GetMethod("CalculateWordAccuracy",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
 
         var overallAccuracy = (double)calculateAccuracyMethod!.Invoke(null, [expected, detected])!;
@@ -237,13 +237,13 @@ public sealed class OcrAccuracyIntegrationBenchmarkTests(ITestOutputHelper outpu
     {
         // このテストは実際のPaddleOCRエンジンが利用可能な場合にのみ実行
         // 継続的インテグレーションでは通常スキップされる
-        
+
         output.WriteLine("⚠️ 実際のOCRエンジンを使用した統合テストは手動実行が必要です");
         output.WriteLine("手動実行方法:");
         output.WriteLine("1. PaddleOCRモデルが適切にセットアップされていることを確認");
         output.WriteLine("2. [Fact(Skip = \"...\")] の Skip 属性を削除");
         output.WriteLine("3. テストを個別実行");
-        
+
         await Task.CompletedTask;
     }
 }

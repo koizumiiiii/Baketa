@@ -1,9 +1,9 @@
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Management;
 using Baketa.Core.Abstractions.GPU;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Windows.GPU;
 
@@ -24,11 +24,11 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
     public WindowsGpuDeviceManager(ILogger<WindowsGpuDeviceManager> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // 🔧 [CRASH_FIX] セグメンテーションフォルト回避のため一時的にタイマー無効化
         // キャッシュリフレッシュタイマー（30秒間隔）
         _cacheRefreshTimer = new Timer(RefreshCacheCallback, null, Timeout.Infinite, Timeout.Infinite);
-        
+
         _logger.LogInformation("🎮 WindowsGpuDeviceManager初期化完了 - Multi-GPU管理開始");
     }
 
@@ -37,14 +37,14 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
         try
         {
             _logger.LogDebug("🔍 利用可能GPU デバイス検索開始");
-            
+
             var devices = new List<GpuDeviceInfo>();
-            
+
             await Task.Run(() =>
             {
                 using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController");
                 var collection = searcher.Get();
-                
+
                 int deviceIndex = 0;
                 foreach (ManagementObject obj in collection.Cast<ManagementObject>())
                 {
@@ -63,7 +63,7 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
                     }
                 }
             }, cancellationToken).ConfigureAwait(false);
-            
+
             _logger.LogInformation("✅ GPU デバイス検索完了 - 発見数: {Count}", devices.Count);
             return devices.AsReadOnly();
         }
@@ -79,14 +79,14 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
         try
         {
             _logger.LogDebug("🎯 最適GPU選択開始 - 負荷タイプ: {WorkloadType}, メモリ: {MemoryMB}MB", workloadType, estimatedMemoryMB);
-            
+
             var devices = await GetAvailableGpuDevicesAsync(cancellationToken).ConfigureAwait(false);
             if (!devices.Any())
             {
                 _logger.LogWarning("利用可能なGPU デバイスがありません - CPU実行にフォールバック");
                 return CreateCpuFallbackEnvironment();
             }
-            
+
             // 負荷タイプに基づくスコアリング
             var scoredDevices = await Task.Run(() => devices
                 .Select(device => new
@@ -96,12 +96,12 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
                 })
                 .OrderByDescending(x => x.Score)
                 .ToList(), cancellationToken).ConfigureAwait(false);
-            
+
             var bestDevice = scoredDevices.First().Device;
-            
-            _logger.LogInformation("✅ 最適GPU選択完了 - 選択GPU: {GpuName} (スコア: {Score})", 
+
+            _logger.LogInformation("✅ 最適GPU選択完了 - 選択GPU: {GpuName} (スコア: {Score})",
                 bestDevice.Name, scoredDevices.First().Score);
-            
+
             return ConvertToGpuEnvironmentInfo(bestDevice);
         }
         catch (Exception ex)
@@ -116,29 +116,29 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
         try
         {
             _logger.LogDebug("🎯 指定GPU選択開始 - 候補数: {Count}", pnpDeviceIds.Length);
-            
+
             var allDevices = await GetAvailableGpuDevicesAsync(cancellationToken).ConfigureAwait(false);
             List<GpuDeviceInfo> candidateDevices = [.. allDevices.Where(d => pnpDeviceIds.Contains(d.PnpDeviceId))];
-            
+
             if (!candidateDevices.Any())
             {
                 _logger.LogWarning("指定されたPNPDeviceIDに該当するGPU が見つかりません");
                 return CreateCpuFallbackEnvironment();
             }
-            
+
             // 可用性とパフォーマンスでソート
             var bestDevice = candidateDevices
                 .Where(d => d.AvailableMemoryMB > 1024) // 最低1GB空きメモリ
                 .OrderByDescending(d => d.PerformanceScore)
                 .ThenByDescending(d => d.AvailableMemoryMB)
                 .FirstOrDefault();
-            
+
             if (bestDevice == null)
             {
                 _logger.LogWarning("十分なメモリを持つGPU が見つかりません");
                 return CreateCpuFallbackEnvironment();
             }
-            
+
             _logger.LogInformation("✅ 指定GPU選択完了 - 選択GPU: {GpuName}", bestDevice.Name);
             return ConvertToGpuEnvironmentInfo(bestDevice);
         }
@@ -154,14 +154,14 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
         try
         {
             _logger.LogDebug("🔍 GPU可用性検証開始 - PNP ID: {PnpDeviceId}", pnpDeviceId);
-            
+
             var device = _deviceCache.GetValueOrDefault(pnpDeviceId);
             if (device == null)
             {
                 var devices = await GetAvailableGpuDevicesAsync(cancellationToken).ConfigureAwait(false);
                 device = devices.FirstOrDefault(d => d.PnpDeviceId == pnpDeviceId);
             }
-            
+
             if (device == null)
             {
                 return new GpuAvailabilityStatus
@@ -171,11 +171,11 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
                     LastCheckedAt = DateTime.UtcNow
                 };
             }
-            
+
             // ドライバー状態とTDR状態をチェック
             var isDriverHealthy = await CheckDriverHealthAsync(pnpDeviceId, cancellationToken).ConfigureAwait(false);
             var isInTdrState = await CheckTdrStateAsync(pnpDeviceId, cancellationToken).ConfigureAwait(false);
-            
+
             var status = new GpuAvailabilityStatus
             {
                 IsAvailable = isDriverHealthy && !isInTdrState && device.AvailableMemoryMB > 512,
@@ -184,7 +184,7 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
                 IsDriverHealthy = isDriverHealthy,
                 LastCheckedAt = DateTime.UtcNow
             };
-            
+
             _logger.LogDebug("✅ GPU可用性検証完了 - 利用可能: {IsAvailable}", status.IsAvailable);
             return status;
         }
@@ -213,19 +213,19 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
                     return cachedStatus;
                 }
             }
-            
+
             _logger.LogDebug("📊 GPU負荷状況取得開始 - PNP ID: {PnpDeviceId}", pnpDeviceId);
-            
+
             var status = await Task.Run(async () =>
             {
                 // Performance Counterを使用してGPU使用率を取得
                 var gpuUtilization = await GetGpuUtilizationAsync(pnpDeviceId, cancellationToken).ConfigureAwait(false);
                 var memoryUtilization = await GetMemoryUtilizationAsync(pnpDeviceId, cancellationToken).ConfigureAwait(false);
                 var activeProcessCount = await GetActiveProcessCountAsync(pnpDeviceId, cancellationToken).ConfigureAwait(false);
-                
+
                 var device = _deviceCache.GetValueOrDefault(pnpDeviceId);
                 var estimatedFreeMemory = device?.AvailableMemoryMB ?? 0;
-                
+
                 return new GpuWorkloadStatus
                 {
                     GpuUtilization = gpuUtilization,
@@ -235,13 +235,13 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
                     TemperatureCelsius = null // Windows APIでは取得困難
                 };
             }, cancellationToken).ConfigureAwait(false);
-            
+
             // キャッシュに保存
             _workloadCache.AddOrUpdate(pnpDeviceId, status, (_, _) => status);
-            
-            _logger.LogDebug("✅ GPU負荷状況取得完了 - GPU使用率: {GpuUtil}%, メモリ使用率: {MemUtil}%", 
+
+            _logger.LogDebug("✅ GPU負荷状況取得完了 - GPU使用率: {GpuUtil}%, メモリ使用率: {MemUtil}%",
                 status.GpuUtilization, status.MemoryUtilization);
-            
+
             return status;
         }
         catch (Exception ex)
@@ -262,13 +262,13 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
         try
         {
             _logger.LogDebug("🎲 GPU配置最適化開始 - 処理負荷数: {Count}", workloads.Count);
-            
+
             var devices = await GetAvailableGpuDevicesAsync(cancellationToken).ConfigureAwait(false);
             var allocations = new List<GpuAllocationItem>();
-            
+
             // 優先度でソートされた処理負荷
             List<GpuWorkloadRequest> sortedWorkloads = [.. workloads.OrderByDescending(w => w.Priority)];
-            
+
             foreach (var workload in sortedWorkloads)
             {
                 var bestDevice = await SelectBestDeviceForWorkload(devices, workload, allocations, cancellationToken).ConfigureAwait(false);
@@ -284,19 +284,19 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
                     allocations.Add(allocation);
                 }
             }
-            
+
             var totalScore = allocations.Sum(a => a.Confidence * a.WorkloadRequest.Priority);
-            
+
             var recommendation = new GpuAllocationRecommendation
             {
                 Allocations = allocations,
                 Reason = GenerateAllocationReason(allocations),
                 TotalPerformanceScore = totalScore
             };
-            
-            _logger.LogInformation("✅ GPU配置最適化完了 - 配置数: {Count}, 総スコア: {Score:F2}", 
+
+            _logger.LogInformation("✅ GPU配置最適化完了 - 配置数: {Count}, 総スコア: {Score:F2}",
                 allocations.Count, totalScore);
-            
+
             return recommendation;
         }
         catch (Exception ex)
@@ -314,10 +314,10 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _cacheRefreshTimer?.Dispose();
         _disposed = true;
-        
+
         _logger.LogInformation("🧹 WindowsGpuDeviceManager リソース解放完了");
     }
 
@@ -328,14 +328,14 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
             var pnpDeviceId = obj["PNPDeviceID"]?.ToString() ?? string.Empty;
             var name = obj["Name"]?.ToString() ?? string.Format(CultureInfo.InvariantCulture, "Unknown GPU {0}", deviceIndex);
             var adapterRAM = Convert.ToInt64(obj["AdapterRAM"] ?? 0);
-            
+
             // ベンダー判定
             var vendor = DetermineVendor(name, pnpDeviceId);
             var isDedicated = adapterRAM > 1024 * 1024 * 1024; // 1GB以上は専用GPU扱い
-            
+
             var supportedProviders = DetermineSupportedProviders(vendor, name);
             var performanceScore = CalculatePerformanceScore(vendor, name, adapterRAM);
-            
+
             return new GpuDeviceInfo
             {
                 PnpDeviceId = pnpDeviceId,
@@ -362,24 +362,24 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
     {
         var nameUpper = name.ToUpperInvariant();
         var pnpUpper = pnpDeviceId.ToUpperInvariant();
-        
+
         if (nameUpper.Contains("NVIDIA") || pnpUpper.Contains("VEN_10DE"))
             return "NVIDIA";
         if (nameUpper.Contains("AMD") || nameUpper.Contains("RADEON") || pnpUpper.Contains("VEN_1002"))
             return "AMD";
         if (nameUpper.Contains("INTEL") || pnpUpper.Contains("VEN_8086"))
             return "Intel";
-        
+
         return "Unknown";
     }
 
     private List<ExecutionProvider> DetermineSupportedProviders(string vendor, string name)
     {
         List<ExecutionProvider> providers = [ExecutionProvider.CPU];
-        
+
         // すべてのGPUでDirectMLサポート（Windows 10以降）
         providers.Add(ExecutionProvider.DirectML);
-        
+
         if (vendor == "NVIDIA")
         {
             providers.Add(ExecutionProvider.CUDA);
@@ -388,23 +388,23 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
                 providers.Add(ExecutionProvider.TensorRT);
             }
         }
-        
+
         if (vendor == "Intel")
         {
             providers.Add(ExecutionProvider.OpenVINO);
         }
-        
+
         return providers;
     }
 
     private int CalculatePerformanceScore(string vendor, string name, long adapterRAM)
     {
         var score = 10; // ベーススコア
-        
+
         // メモリ容量ボーナス
         var memoryGB = adapterRAM / (1024 * 1024 * 1024);
         score += (int)Math.Min(memoryGB * 5, 40); // 最大40点
-        
+
         // ベンダー・モデル固有ボーナス
         if (vendor == "NVIDIA")
         {
@@ -423,20 +423,20 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
             if (name.Contains("Arc")) score += 15;
             else score += 5; // 統合GPU
         }
-        
+
         return Math.Min(score, 100);
     }
 
     private double CalculateWorkloadScore(GpuDeviceInfo device, GpuWorkloadType workloadType, int estimatedMemoryMB)
     {
         var score = (double)device.PerformanceScore;
-        
+
         // メモリ要件チェック
         if (device.AvailableMemoryMB < estimatedMemoryMB)
         {
             score *= 0.1; // 大幅減点
         }
-        
+
         // 負荷タイプ固有調整
         score *= workloadType switch
         {
@@ -446,7 +446,7 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
             GpuWorkloadType.LanguageIdentification => 0.9, // CPUの方が効率的
             _ => 1.0
         };
-        
+
         return score;
     }
 
@@ -518,18 +518,18 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
         return Random.Shared.Next(0, 5); // プレースホルダー実装
     }
 
-    private async Task<GpuDeviceInfo?> SelectBestDeviceForWorkload(IReadOnlyList<GpuDeviceInfo> devices, 
+    private async Task<GpuDeviceInfo?> SelectBestDeviceForWorkload(IReadOnlyList<GpuDeviceInfo> devices,
         GpuWorkloadRequest workload, List<GpuAllocationItem> existingAllocations, CancellationToken cancellationToken)
     {
         await Task.Delay(10, cancellationToken).ConfigureAwait(false);
-        
+
         // 既存配置を考慮した最適デバイス選択
-        var availableDevices = devices.Where(d => 
+        var availableDevices = devices.Where(d =>
             d.AvailableMemoryMB >= workload.EstimatedMemoryMB &&
-            !existingAllocations.Any(a => a.RecommendedPnpDeviceId == d.PnpDeviceId && 
+            !existingAllocations.Any(a => a.RecommendedPnpDeviceId == d.PnpDeviceId &&
                                         a.WorkloadRequest.EstimatedMemoryMB + workload.EstimatedMemoryMB > d.AvailableMemoryMB))
             .ToList();
-        
+
         return availableDevices.OrderByDescending(d => CalculateWorkloadScore(d, workload.WorkloadType, workload.EstimatedMemoryMB))
                               .FirstOrDefault();
     }
@@ -538,17 +538,17 @@ public sealed class WindowsGpuDeviceManager : IGpuDeviceManager, IDisposable
     {
         var memoryFit = (double)device.AvailableMemoryMB / Math.Max(workload.EstimatedMemoryMB, 1);
         var performanceFit = device.PerformanceScore / 100.0;
-        
+
         return Math.Min(memoryFit * performanceFit, 1.0);
     }
 
     private string GenerateAllocationReason(List<GpuAllocationItem> allocations)
     {
         if (!allocations.Any()) return "配置可能なGPU が見つかりませんでした";
-        
+
         var gpuCount = allocations.Select(a => a.RecommendedPnpDeviceId).Distinct().Count();
         var avgConfidence = allocations.Average(a => a.Confidence);
-        
+
         return $"{gpuCount}個のGPU に{allocations.Count}個の処理を配置。平均信頼度: {avgConfidence:P1}";
     }
 

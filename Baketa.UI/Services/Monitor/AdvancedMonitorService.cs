@@ -39,7 +39,6 @@ public sealed class AdvancedMonitorService : IAdvancedMonitorService
     /// <inheritdoc />
     public MonitorType DetectMonitorType(MonitorInfo monitor)
     {
-        ArgumentNullException.ThrowIfNull(monitor);
 
         var width = monitor.Bounds.Width;
         var height = monitor.Bounds.Height;
@@ -75,7 +74,6 @@ public sealed class AdvancedMonitorService : IAdvancedMonitorService
     /// <inheritdoc />
     public AdvancedDpiInfo GetAdvancedDpiInfo(MonitorInfo monitor)
     {
-        ArgumentNullException.ThrowIfNull(monitor);
 
         var cacheKey = GetMonitorCacheKey(monitor);
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,12 +9,12 @@ using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTra
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager統一インターフェース用
-using Baketa.Core.Events.Translation;
 using Baketa.Core.Events.EventTypes; // 🔥 [INDIVIDUAL_TRANSLATION_EVENT] TranslationWithBoundsCompletedEvent用
+using Baketa.Core.Events.Translation;
+using Baketa.Core.Models.Translation;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
-using Baketa.Core.Models.Translation;
 using Language = Baketa.Core.Translation.Models.Language;
 
 namespace Baketa.Application.EventHandlers.Translation;
@@ -331,7 +331,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 var failedEvent = new AggregatedChunksFailedEvent
                 {
                     SessionId = eventData.SessionId,
-                    FailedChunks = eventData.AggregatedChunks.ToList(),
+                    FailedChunks = [.. eventData.AggregatedChunks],
                     SourceLanguage = sourceLanguage,
                     TargetLanguage = targetLanguage,
                     ErrorMessage = ex.Message,

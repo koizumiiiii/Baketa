@@ -1,7 +1,7 @@
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Models.OCR;
 using System;
 using System.Collections.Generic;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Models.OCR;
 
 namespace Baketa.Core.Events.EventTypes;
 
@@ -16,7 +16,7 @@ namespace Baketa.Core.Events.EventTypes;
 /// <param name="processingTime">OCR処理時間</param>
 /// <exception cref="ArgumentNullException">sourceImageまたはresultsがnullの場合</exception>
 public class OcrCompletedEvent(IImage sourceImage, IReadOnlyList<OcrResult> results, TimeSpan processingTime) : EventBase
-    {
+{
     /// <summary>
     /// OCR処理元の画像
     /// </summary>
@@ -34,7 +34,7 @@ public class OcrCompletedEvent(IImage sourceImage, IReadOnlyList<OcrResult> resu
 
     /// <inheritdoc />
     public override string Name => "OcrCompleted";
-        
-        /// <inheritdoc />
-        public override string Category => "OCR";
-    }
+
+    /// <inheritdoc />
+    public override string Category => "OCR";
+}

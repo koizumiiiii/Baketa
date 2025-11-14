@@ -5,9 +5,9 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Logging;
 using Baketa.Core.Settings;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Logging;
 
@@ -21,7 +21,7 @@ public sealed class BaketaLogger : IBaketaLogger, IDisposable
     private readonly string _debugLogFilePath;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
-    
+
     private BaketaLogLevel _currentLogLevel = BaketaLogLevel.Information;
     private bool _debugModeEnabled;
     private bool _disposed;
@@ -30,7 +30,7 @@ public sealed class BaketaLogger : IBaketaLogger, IDisposable
     /// デバッグログの出力パス
     /// </summary>
     private static readonly string DefaultDebugLogPath = Path.Combine(
-        BaketaSettingsPaths.LogDirectory, 
+        BaketaSettingsPaths.LogDirectory,
         $"baketa_debug_{DateTime.Now:yyyyMMdd}.log");
 
     public BaketaLogger(
@@ -91,7 +91,7 @@ public sealed class BaketaLogger : IBaketaLogger, IDisposable
 
         var level = success ? BaketaLogLevel.Information : BaketaLogLevel.Warning;
         var message = $"📊 {operation}: {duration.TotalMilliseconds:F1}ms ({(success ? "成功" : "失敗")})";
-        
+
         var entry = new BaketaLogEntry(level, "Performance", message, logData);
         WriteLogEntry(entry);
     }
@@ -224,7 +224,7 @@ public sealed class BaketaLogger : IBaketaLogger, IDisposable
         {
             var logLevel = ConvertToMicrosoftLogLevel(entry.Level);
             using var scope = _microsoftLogger.BeginScope(entry.Data);
-            
+
             if (entry.Exception != null)
             {
                 _microsoftLogger.Log(logLevel, entry.Exception, "{Component}: {Message}", entry.Component, entry.Message);

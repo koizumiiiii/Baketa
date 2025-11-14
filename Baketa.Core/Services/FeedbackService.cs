@@ -24,10 +24,10 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
     private readonly IOptionsMonitor<FeedbackSettings> _optionsMonitor;
     private readonly IPrivacyConsentService _privacyConsentService;
     private readonly ILogger<FeedbackService> _logger;
-    
+
     private readonly SemaphoreSlim _submissionSemaphore = new(1, 1);
     private readonly Dictionary<string, DateTime> _lastSubmissionTimes = [];
-    
+
     private FeedbackSettings _currentSettings;
     private bool _disposed;
 
@@ -43,20 +43,20 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _currentSettings = _optionsMonitor.CurrentValue;
-        
+
         // HttpClient設定
         ConfigureHttpClient();
-        
+
         // 設定変更の監視
         _optionsMonitor.OnChange((settings, _) => OnSettingsChanged(settings));
-        
+
         _logger.LogInformation("FeedbackService初期化完了");
     }
 
     #region IFeedbackService実装
 
-    public bool CanSubmitFeedback => 
-        _currentSettings.EnableFeedback && 
+    public bool CanSubmitFeedback =>
+        _currentSettings.EnableFeedback &&
         _privacyConsentService.HasConsentFor(DataCollectionType.Feedback);
 
     public async Task<FeedbackSubmissionResult> SubmitBugReportAsync(BugReport report, CancellationToken cancellationToken = default)
@@ -88,7 +88,7 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
 
             var issueData = await CreateBugReportIssueAsync(report, cancellationToken).ConfigureAwait(false);
             var result = await SubmitIssueToGitHubAsync(issueData, cancellationToken).ConfigureAwait(false);
-            
+
             if (result.IsSuccess)
             {
                 RecordSubmissionTime("bug_report");
@@ -136,7 +136,7 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
 
             var issueData = CreateFeatureRequestIssue(request);
             var result = await SubmitIssueToGitHubAsync(issueData, cancellationToken).ConfigureAwait(false);
-            
+
             if (result.IsSuccess)
             {
                 RecordSubmissionTime("feature_request");
@@ -184,7 +184,7 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
 
             var issueData = await CreateGeneralFeedbackIssueAsync(feedback, cancellationToken).ConfigureAwait(false);
             var result = await SubmitIssueToGitHubAsync(issueData, cancellationToken).ConfigureAwait(false);
-            
+
             if (result.IsSuccess)
             {
                 RecordSubmissionTime("general_feedback");
@@ -216,9 +216,9 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
 
         _currentSettings = settings;
         ConfigureHttpClient();
-        
+
         _logger.LogInformation("フィードバック設定が更新されました");
-        
+
         return Task.CompletedTask;
     }
 
@@ -517,11 +517,11 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
         {
             try
             {
-                _logger.LogDebug("GitHub Issues APIを呼び出します: {Url} (試行 {Retry}/{MaxRetry})", 
+                _logger.LogDebug("GitHub Issues APIを呼び出します: {Url} (試行 {Retry}/{MaxRetry})",
                     url, retryCount + 1, _currentSettings.RetryCount + 1);
 
                 var response = await _httpClient.PostAsJsonAsync(url, issueData, cancellationToken).ConfigureAwait(false);
-                
+
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
                     _logger.LogWarning("GitHub API制限に達しました。しばらく待機します");
@@ -539,21 +539,21 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
 
                 var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 var issueResponse = JsonSerializer.Deserialize<GitHubIssueResponse>(responseContent);
-                
+
                 var issueUrl = issueResponse?.HtmlUrl != null ? new Uri(issueResponse.HtmlUrl) : null;
-                
+
                 _logger.LogInformation("GitHub Issueが正常に作成されました: {IssueUrl}", issueUrl);
-                
+
                 return new SubmissionResult(FeedbackSubmissionResult.Success, issueUrl, null);
             }
             catch (Exception ex) when (retryCount < _currentSettings.RetryCount)
             {
                 retryCount++;
                 var delay = TimeSpan.FromSeconds((double)_currentSettings.RetryDelaySeconds * retryCount);
-                
-                _logger.LogWarning(ex, "GitHub API呼び出しが失敗しました。{Delay}秒後にリトライします（{Retry}/{MaxRetry}）", 
+
+                _logger.LogWarning(ex, "GitHub API呼び出しが失敗しました。{Delay}秒後にリトライします（{Retry}/{MaxRetry}）",
                     delay.TotalSeconds, retryCount, _currentSettings.RetryCount);
-                
+
                 await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             }
             catch (HttpRequestException ex)
@@ -578,7 +578,7 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
             }
         }
 
-        return new SubmissionResult(FeedbackSubmissionResult.NetworkError, null, 
+        return new SubmissionResult(FeedbackSubmissionResult.NetworkError, null,
             new HttpRequestException($"GitHub API呼び出しが{_currentSettings.RetryCount + 1}回失敗しました"));
     }
 
@@ -591,7 +591,7 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
 
         var elapsed = DateTime.UtcNow - lastTime;
         var minInterval = TimeSpan.FromMinutes(_currentSettings.MinSubmissionIntervalMinutes);
-        
+
         return elapsed >= minInterval;
     }
 
@@ -634,7 +634,7 @@ public sealed class FeedbackService : IFeedbackService, IDisposable
             return;
 
         _submissionSemaphore.Dispose();
-        
+
         _disposed = true;
         _logger.LogInformation("FeedbackService disposed");
     }

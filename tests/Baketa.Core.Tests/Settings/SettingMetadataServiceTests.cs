@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
-using Baketa.Core.Settings;
 
 namespace Baketa.Core.Tests.Settings;
 
@@ -221,7 +221,7 @@ public class SettingMetadataServiceTests
     {
         // Arrange
         var metadata = _service.GetMetadata<TestSettings>().First(m => m.Property.Name == "Name");
-        
+
         // Act
         var result = _service.ValidateValue(metadata, "Valid Name");
 
@@ -235,7 +235,7 @@ public class SettingMetadataServiceTests
     {
         // Arrange
         var metadata = _service.GetMetadata<TestSettings>().First(m => m.Property.Name == "Age");
-        
+
         // Act
         var result = _service.ValidateValue(metadata, -1);
 

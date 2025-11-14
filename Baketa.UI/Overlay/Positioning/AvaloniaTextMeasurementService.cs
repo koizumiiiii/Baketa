@@ -1,6 +1,6 @@
 using Avalonia;
-using Avalonia.Media;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Baketa.Core.UI.Geometry;
 using Baketa.Core.UI.Overlay.Positioning;
 using Microsoft.Extensions.Logging;
@@ -16,12 +16,12 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
     private readonly ILogger<AvaloniaTextMeasurementService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly SemaphoreSlim _measurementSemaphore = new(1, 1);
     private bool _disposed;
-    
+
     /// <inheritdoc/>
     public async Task<TextMeasurementResult> MeasureTextAsync(string text, TextMeasurementOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
-        
+
         await _measurementSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -32,7 +32,7 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
             _measurementSemaphore.Release();
         }
     }
-    
+
     /// <summary>
     /// 内部テキスト測定実装
     /// </summary>
@@ -44,7 +44,7 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
             var fontFamily = ResolveFontFamily(options.FontFamily);
             var fontSize = options.FontSize;
             var fontWeight = ResolveFontWeight(options.FontWeight);
-            
+
             // テキストブロック作成
             var textBlock = new TextBlock
             {
@@ -61,26 +61,26 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
                     options.Padding.Bottom
                 )
             };
-            
+
             // レイアウト測定
             var availableSize = new Avalonia.Size(options.MaxWidth, double.PositiveInfinity);
             textBlock.Measure(availableSize);
-            
+
             var measuredSize = textBlock.DesiredSize;
             var lineCount = CountLines(text, options.MaxWidth, fontSize, fontFamily);
-            
+
             var result = new TextMeasurementResult(
                 Size: new CoreSize(measuredSize.Width, measuredSize.Height),
                 LineCount: lineCount,
                 ActualFontSize: fontSize,
                 MeasuredWith: options
             );
-            
+
             _logger.LogDebug("テキスト測定完了: {Text} → {Size}, {LineCount}行",
                 text.Length > 50 ? text[..50] + "..." : text,
                 result.Size,
                 result.LineCount);
-            
+
             return result;
         }
         catch (ArgumentException ex)
@@ -99,7 +99,7 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
             return CreateFallbackMeasurement(text, options);
         }
     }
-    
+
     /// <summary>
     /// フォントファミリーを解決します
     /// </summary>
@@ -120,7 +120,7 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
             return FontFamily.Default;
         }
     }
-    
+
     /// <summary>
     /// フォントウェイトを解決します
     /// </summary>
@@ -141,7 +141,7 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
             _ => FontWeight.Normal
         };
     }
-    
+
     /// <summary>
     /// 行数をカウントします
     /// </summary>
@@ -153,7 +153,7 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
             // より正確な計算が必要な場合はFormattedTextを使用
             var lines = text.Split(['\r', '\n'], StringSplitOptions.None);
             var totalLines = 0;
-            
+
             foreach (var line in lines)
             {
                 if (string.IsNullOrEmpty(line))
@@ -161,18 +161,18 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
                     totalLines++;
                     continue;
                 }
-                
+
                 // 概算文字幅を使用した簡易計算
                 var avgCharWidth = fontSize * 0.6; // 日本語混在での概算
                 var charactersPerLine = (int)(maxWidth / avgCharWidth);
-                
+
                 if (charactersPerLine <= 0)
                     charactersPerLine = 1;
-                
+
                 var lineCount = Math.Max(1, (int)Math.Ceiling((double)line.Length / charactersPerLine));
                 totalLines += lineCount;
             }
-            
+
             return Math.Max(1, totalLines);
         }
         catch (ArgumentException)
@@ -186,7 +186,7 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
             return Math.Max(1, text.Split(['\r', '\n'], StringSplitOptions.None).Length);
         }
     }
-    
+
     /// <summary>
     /// フォールバック測定を作成します
     /// </summary>
@@ -195,18 +195,18 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
         // 概算計算
         var avgCharWidth = options.FontSize * 0.6;
         var lineHeight = options.FontSize * 1.2;
-        
+
         var lines = text.Split(['\r', '\n'], StringSplitOptions.None);
         var lineCount = Math.Max(1, lines.Length);
-        
+
         var maxLineLength = lines.Length > 0 ? lines.Max(l => l.Length) : text.Length;
         var estimatedWidth = Math.Min(maxLineLength * avgCharWidth, options.MaxWidth);
         var estimatedHeight = lineCount * lineHeight;
-        
+
         // パディング追加
         estimatedWidth += options.Padding.Horizontal;
         estimatedHeight += options.Padding.Vertical;
-        
+
         return new TextMeasurementResult(
             Size: new CoreSize(estimatedWidth, estimatedHeight),
             LineCount: lineCount,
@@ -214,7 +214,7 @@ public sealed class AvaloniaTextMeasurementService(ILogger<AvaloniaTextMeasureme
             MeasuredWith: options
         );
     }
-    
+
     /// <summary>
     /// リソースを解放します
     /// </summary>
@@ -261,7 +261,7 @@ public static class TextMeasurementOptionsExtensions
             FontWeight = "Normal"
         };
     }
-    
+
     /// <summary>
     /// デフォルト英語フォント設定を取得します
     /// </summary>
@@ -274,7 +274,7 @@ public static class TextMeasurementOptionsExtensions
             FontWeight = "Normal"
         };
     }
-    
+
     /// <summary>
     /// 大きめの表示用設定を取得します
     /// </summary>
@@ -286,7 +286,7 @@ public static class TextMeasurementOptionsExtensions
             Padding = new CoreThickness(15)
         };
     }
-    
+
     /// <summary>
     /// コンパクト表示用設定を取得します
     /// </summary>

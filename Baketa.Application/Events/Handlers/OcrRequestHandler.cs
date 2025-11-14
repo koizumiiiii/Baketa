@@ -1,11 +1,11 @@
+using System;
+using System.Threading.Tasks;
+using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR; // 🔥 [FIX7_STEP4] OcrContext統合
-using Baketa.Application.Services.Translation;
 using Baketa.Infrastructure.OCR.BatchProcessing;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Threading.Tasks;
 
 namespace Baketa.Application.Events.Handlers;
 
@@ -38,9 +38,9 @@ public sealed class OcrRequestHandler(
 
         try
         {
-            _logger.LogInformation("🚀 [ULTRATHINK_FIX] OcrRequestHandler: TimedChunkAggregator統合OCR処理開始 - Image: {Width}x{Height}", 
+            _logger.LogInformation("🚀 [ULTRATHINK_FIX] OcrRequestHandler: TimedChunkAggregator統合OCR処理開始 - Image: {Width}x{Height}",
                 eventData.CapturedImage.Width, eventData.CapturedImage.Height);
-            
+
             Console.WriteLine($"🧩 [ULTRATHINK_FIX] OcrRequestHandler: EnhancedBatchOcrIntegrationService統合フロー開始");
 
             // 🎯 UltraThink緊急修正: EnhancedBatchOcrIntegrationServiceによる時間軸統合OCR処理
@@ -51,7 +51,7 @@ public sealed class OcrRequestHandler(
                 await _translationService.TriggerSingleTranslationAsync(eventData.TargetWindowHandle).ConfigureAwait(false);
                 return;
             }
-            
+
             var targetWindowHandle = eventData.TargetWindowHandle ?? IntPtr.Zero;
 
             // 🔥 [FIX7_STEP4] OcrContext生成 - CaptureRegion情報を含むコンテキストオブジェクト作成
@@ -71,7 +71,7 @@ public sealed class OcrRequestHandler(
                 // TimedChunkAggregator無効時: 直接翻訳処理実行（フォールバック）
                 _logger.LogInformation("📊 [ULTRATHINK_FIX] TimedAggregator無効モード - 直接翻訳処理: {ChunkCount}個", enhancedChunks.Count);
                 Console.WriteLine($"📊 [ULTRATHINK_FIX] 直接翻訳処理実行: {enhancedChunks.Count}個のチャンク");
-                
+
                 // 従来フロー（フォールバック処理）
                 await _translationService.TriggerSingleTranslationAsync(eventData.TargetWindowHandle).ConfigureAwait(false);
             }
@@ -80,7 +80,7 @@ public sealed class OcrRequestHandler(
                 // TimedChunkAggregator有効時: 集約待機中（別途集約完了時に翻訳処理実行）
                 _logger.LogInformation("⏱️ [ULTRATHINK_FIX] TimedChunkAggregator集約待機中 - バッファリング処理完了");
                 Console.WriteLine("⏱️ [ULTRATHINK_FIX] TimedChunkAggregator集約待機中 - 時間軸統合による翻訳品質向上処理");
-                
+
                 // 注意: 集約完了時の翻訳処理は EnhancedBatchOcrIntegrationService.OnChunksAggregatedHandler で実行される
             }
 
@@ -89,11 +89,11 @@ public sealed class OcrRequestHandler(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ [ULTRATHINK_FIX] OcrRequestHandler統合処理エラー - フォールバック実行: {ErrorType} - {Message}", 
+            _logger.LogError(ex, "❌ [ULTRATHINK_FIX] OcrRequestHandler統合処理エラー - フォールバック実行: {ErrorType} - {Message}",
                 ex.GetType().Name, ex.Message);
-            
+
             Console.WriteLine($"❌ [ULTRATHINK_FIX] OcrRequestHandler統合エラー - フォールバック実行: {ex.GetType().Name} - {ex.Message}");
-            
+
             try
             {
                 // エラー時フォールバック: 従来の翻訳フロー実行

@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Strategies;
 
@@ -27,15 +27,15 @@ public sealed class ParallelTranslationStrategy(
     {
         // 中規模バッチ処理に適用
         // バッチ処理閾値未満でかつ並列処理閾値以上
-        return context.IsBatchRequest 
+        return context.IsBatchRequest
                && context.TextCount >= _settings.ParallelThreshold
                && context.TextCount < _settings.BatchThreshold;
     }
 
     public async Task<TranslationResult> ExecuteAsync(
-        string text, 
-        string? sourceLanguage, 
-        string? targetLanguage, 
+        string text,
+        string? sourceLanguage,
+        string? targetLanguage,
         CancellationToken cancellationToken = default)
     {
         // 単一要求の場合は並列処理の意味がないので、直接実行
@@ -49,7 +49,7 @@ public sealed class ParallelTranslationStrategy(
             var defaultTargetLanguage = languagePair.TargetCode;
             var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
             var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
-            
+
             var request = new TranslationRequest
             {
                 SourceText = text,
@@ -68,7 +68,7 @@ public sealed class ParallelTranslationStrategy(
         catch (Exception ex)
         {
             _logger.LogError(ex, "並列翻訳でエラーが発生しました");
-            
+
             return new TranslationResult(
                 OriginalText: text,
                 TranslatedText: string.Empty,
@@ -78,12 +78,12 @@ public sealed class ParallelTranslationStrategy(
     }
 
     public async Task<IReadOnlyList<TranslationResult>> ExecuteBatchAsync(
-        IReadOnlyList<string> texts, 
-        string? sourceLanguage, 
-        string? targetLanguage, 
+        IReadOnlyList<string> texts,
+        string? sourceLanguage,
+        string? targetLanguage,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("⚡ 並列翻訳戦略実行 - 件数: {Count}, 並列度: {Parallel}", 
+        _logger.LogInformation("⚡ 並列翻訳戦略実行 - 件数: {Count}, 並列度: {Parallel}",
             texts.Count, _settings.MaxDegreeOfParallelism);
 
         var options = new ParallelOptions
@@ -148,7 +148,7 @@ public sealed class ParallelTranslationStrategy(
                 .ToList();
 
             _logger.LogInformation("⚡ 並列翻訳完了 - 成功: {Success}/{Total}, 並列度: {Parallel}",
-                sortedResults.Count(r => r.Success), 
+                sortedResults.Count(r => r.Success),
                 sortedResults.Count,
                 _settings.MaxDegreeOfParallelism);
 

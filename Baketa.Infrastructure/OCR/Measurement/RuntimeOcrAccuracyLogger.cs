@@ -14,7 +14,7 @@ public sealed class RuntimeOcrAccuracyLogger(
     private readonly IOcrAccuracyMeasurement _accuracyMeasurement = accuracyMeasurement ?? throw new ArgumentNullException(nameof(accuracyMeasurement));
     private readonly AccuracyImprovementReporter _reporter = reporter ?? throw new ArgumentNullException(nameof(reporter));
     private readonly ILogger<RuntimeOcrAccuracyLogger> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    
+
     private readonly List<(DateTime Timestamp, OcrResults Results, string? ExpectedText)> _ocrHistory = [];
     private readonly object _lockObject = new();
 
@@ -28,7 +28,7 @@ public sealed class RuntimeOcrAccuracyLogger(
         lock (_lockObject)
         {
             _ocrHistory.Add((DateTime.Now, results, null));
-            
+
             // 信頼度フィルタリング警告
             var lowConfidenceRegions = results.TextRegions.Where(r => r.Confidence < 0.7).ToList();
             if (lowConfidenceRegions.Count > 0)
@@ -39,7 +39,7 @@ public sealed class RuntimeOcrAccuracyLogger(
                         region.Text, region.Confidence);
                 }
             }
-            
+
             // 期待テキストの推定試行
             var expectedText = ExtractExpectedTextFromImagePath(imagePath);
             if (!string.IsNullOrEmpty(expectedText))
@@ -47,7 +47,7 @@ public sealed class RuntimeOcrAccuracyLogger(
                 _logger.LogInformation("🎯 期待テキスト推定: '{Expected}' vs 検出: '{Detected}'",
                     expectedText, results.Text);
             }
-            
+
             _logger.LogInformation("📊 OCR結果記録: テキスト='{Text}', 処理時間={ProcessingTime}ms, 信頼度={Confidence:P2}, 画像={ImagePath}",
                 results.Text.Length > 50 ? results.Text[..50] + "..." : results.Text,
                 results.ProcessingTime.TotalMilliseconds,
@@ -87,7 +87,7 @@ public sealed class RuntimeOcrAccuracyLogger(
 
             _logger.LogInformation("🎯 OCR精度測定完了: 全体精度={OverallAccuracy:P2}, 文字精度={CharAccuracy:P2}, 単語精度={WordAccuracy:P2}",
                 measurement.OverallAccuracy,
-                measurement.CharacterAccuracy, 
+                measurement.CharacterAccuracy,
                 measurement.WordAccuracy);
 
             // 精度が低い場合は警告
@@ -104,7 +104,7 @@ public sealed class RuntimeOcrAccuracyLogger(
         {
             _logger.LogError(ex, "OCR精度測定中にエラーが発生しました");
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -117,7 +117,7 @@ public sealed class RuntimeOcrAccuracyLogger(
         lock (_lockObject)
         {
             var withExpected = _ocrHistory.Where(h => !string.IsNullOrEmpty(h.ExpectedText)).ToList();
-            
+
             if (withExpected.Count == 0)
             {
                 return new OcrAccuracyStats
@@ -158,14 +158,14 @@ public sealed class RuntimeOcrAccuracyLogger(
     public async Task<string> GenerateDetailedReportAsync(string outputPath)
     {
         List<(DateTime Timestamp, OcrResults Results, string? ExpectedText)> historySnapshot;
-        
+
         lock (_lockObject)
         {
             historySnapshot = [.. _ocrHistory];
         }
 
         var withExpected = historySnapshot.Where(h => !string.IsNullOrEmpty(h.ExpectedText)).ToList();
-        
+
         if (withExpected.Count == 0)
         {
             _logger.LogWarning("期待テキスト付きの測定データがないため、詳細レポートを生成できません");
@@ -176,11 +176,11 @@ public sealed class RuntimeOcrAccuracyLogger(
 
         // 精度測定を並列で実行
         var comparisonResults = new List<(string ImprovementName, AccuracyComparisonResult Result)>();
-        
+
         for (int i = 0; i < withExpected.Count && i < 10; i++) // 最大10件まで処理
         {
             var (timestamp, results, expectedText) = withExpected[i];
-            
+
             try
             {
                 var measurement = new AccuracyMeasurementResult
@@ -226,7 +226,7 @@ public sealed class RuntimeOcrAccuracyLogger(
         }
 
         var reportPath = await _reporter.GenerateImprovementReportAsync(comparisonResults, outputPath).ConfigureAwait(false);
-        
+
         _logger.LogInformation("📄 詳細精度レポート生成完了: {ReportPath}", reportPath);
         return reportPath;
     }
@@ -337,7 +337,7 @@ public sealed class RuntimeOcrAccuracyLogger(
 
         return matrix[source.Length, target.Length];
     }
-    
+
     /// <summary>
     /// 画像パスから期待テキストを推定
     /// </summary>
@@ -347,29 +347,29 @@ public sealed class RuntimeOcrAccuracyLogger(
     {
         if (string.IsNullOrEmpty(imagePath))
             return null;
-            
+
         var filename = System.IO.Path.GetFileNameWithoutExtension(imagePath).ToLowerInvariant();
-        
+
         return filename switch
         {
             // デバッグ画像パターン
             "clear_jp_text" => "戦",
-            "multi_jp_text" => "戦闘開始", 
+            "multi_jp_text" => "戦闘開始",
             "clear_en_text" => "Battle Start",
             "low_contrast" => "戦",
             "noise_only" => "",
-            
+
             // テスト画像パターン
             var name when name.Contains("hello_jp") => "こんにちは",
             var name when name.Contains("hello_en") => "Hello World",
             var name when name.Contains("test_mixed") => "テスト123",
             var name when name.Contains("ocr_accuracy") => "OCR精度測定",
-            
+
             // ゲーム画面パターン（推定）
             var name when name.Contains("battle") => "戦闘",
             var name when name.Contains("menu") => "メニュー",
             var name when name.Contains("dialog") => "会話",
-            
+
             _ => null // 不明
         };
     }
@@ -384,27 +384,27 @@ public sealed class OcrAccuracyStats
     /// 総測定回数
     /// </summary>
     public int TotalMeasurements { get; init; }
-    
+
     /// <summary>
     /// 期待テキスト付き測定回数（精度計算可能）
     /// </summary>
     public int MeasurementsWithExpected { get; init; }
-    
+
     /// <summary>
     /// 平均全体精度
     /// </summary>
     public double AverageOverallAccuracy { get; init; }
-    
+
     /// <summary>
     /// 平均処理時間
     /// </summary>
     public TimeSpan AverageProcessingTime { get; init; }
-    
+
     /// <summary>
     /// 最初の測定時刻
     /// </summary>
     public DateTime? FirstMeasurement { get; init; }
-    
+
     /// <summary>
     /// 最後の測定時刻
     /// </summary>

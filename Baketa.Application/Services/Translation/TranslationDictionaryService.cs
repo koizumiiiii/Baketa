@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Settings;
-using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Application.Services.Translation;
 
@@ -14,7 +14,7 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
 {
     private readonly IOptionsMonitor<CommonTranslationsSettings> _optionsMonitor;
     private readonly ILogger<TranslationDictionaryService> _logger;
-    
+
     // パフォーマンス最適化: 翻訳結果をメモリキャッシュ
     private readonly ConcurrentDictionary<string, string> _translationCache = new();
     private CommonTranslationsSettings? _cachedSettings;
@@ -26,10 +26,10 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
     {
         _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // 設定変更の監視
         _optionsMonitor.OnChange(OnSettingsChanged);
-        
+
         _logger.LogInformation("📚 TranslationDictionaryService初期化完了 - 設定ファイルベース翻訳開始");
     }
 
@@ -42,7 +42,7 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
         ArgumentNullException.ThrowIfNull(targetLanguage);
 
         var cacheKey = $"{sourceLanguage}:{targetLanguage}:{text}";
-        
+
         // キャッシュから検索
         if (_translationCache.TryGetValue(cacheKey, out var cachedTranslation))
         {
@@ -57,7 +57,7 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
         if (!string.Equals(text, translatedText, StringComparison.Ordinal))
         {
             _translationCache.TryAdd(cacheKey, translatedText);
-            _logger.LogTrace("📚 翻訳成功: '{Text}' -> '{Translation}' ({SourceLang} -> {TargetLang})", 
+            _logger.LogTrace("📚 翻訳成功: '{Text}' -> '{Translation}' ({SourceLang} -> {TargetLang})",
                 text, translatedText, sourceLanguage, targetLanguage);
         }
 
@@ -71,27 +71,27 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
 
         var settings = GetCurrentSettings();
         var dictionary = GetTranslationDictionary(settings, sourceLanguage, targetLanguage);
-        
+
         return dictionary != null && ContainsInAnyCategory(dictionary, text);
     }
 
     public async Task ReloadConfigurationAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("🔄 翻訳辞書設定を再読み込み中...");
-        
+
         lock (_settingsLock)
         {
             _cachedSettings = null;
         }
-        
+
         // キャッシュをクリア
         _translationCache.Clear();
-        
+
         // 新しい設定を取得（次回アクセス時に読み込まれる）
         _ = GetCurrentSettings();
-        
+
         _logger.LogInformation("✅ 翻訳辞書設定再読み込み完了");
-        
+
         await Task.CompletedTask;
     }
 
@@ -99,14 +99,14 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
     {
         var settings = GetCurrentSettings();
         var dictionary = GetTranslationDictionary(settings, sourceLanguage, targetLanguage);
-        
+
         if (dictionary == null)
             return 0;
 
-        return dictionary.UI.Count + 
-               dictionary.Game.Count + 
-               dictionary.Actions.Count + 
-               dictionary.Common.Count + 
+        return dictionary.UI.Count +
+               dictionary.Game.Count +
+               dictionary.Actions.Count +
+               dictionary.Common.Count +
                dictionary.Custom.Count;
     }
 
@@ -118,14 +118,14 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
         // 日本語 ⇄ 英語の双方向サポート
         if (HasAnyTranslations(settings.JapaneseToEnglish))
             supportedPairs.Add(("ja", "en"));
-            
+
         if (HasAnyTranslations(settings.EnglishToJapanese))
             supportedPairs.Add(("en", "ja"));
 
         // 言語コード正規化でサポートされている全バリエーションを追加
         var normalizer = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.GetSupportedLanguageCodes();
         var additionalPairs = new List<(string, string)>();
-        
+
         foreach (var sourceCode in normalizer.Where(code => code.StartsWith("ja") || code.StartsWith("en")))
         {
             foreach (var targetCode in normalizer.Where(code => code.StartsWith("ja") || code.StartsWith("en")))
@@ -134,12 +134,12 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
                 {
                     var normalizedSource = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.Normalize(sourceCode);
                     var normalizedTarget = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.Normalize(targetCode);
-                    
+
                     // 基本ペアとして既にサポートしている場合のみ追加
                     if ((normalizedSource == "ja" && normalizedTarget == "en" && HasAnyTranslations(settings.JapaneseToEnglish)) ||
                         (normalizedSource == "en" && normalizedTarget == "ja" && HasAnyTranslations(settings.EnglishToJapanese)))
                     {
-                        if (!supportedPairs.Contains((sourceCode, targetCode)) && 
+                        if (!supportedPairs.Contains((sourceCode, targetCode)) &&
                             !additionalPairs.Contains((sourceCode, targetCode)))
                         {
                             additionalPairs.Add((sourceCode, targetCode));
@@ -148,10 +148,10 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
                 }
             }
         }
-        
+
         supportedPairs.AddRange(additionalPairs);
         _logger.LogTrace("📚 サポート言語ペア数: {Count} (正規化バリエーション含む)", supportedPairs.Count);
-        
+
         return supportedPairs.AsReadOnly();
     }
 
@@ -171,19 +171,19 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
     private void OnSettingsChanged(CommonTranslationsSettings newSettings)
     {
         _logger.LogInformation("🔄 翻訳辞書設定が変更されました - キャッシュをクリア");
-        
+
         lock (_settingsLock)
         {
             _cachedSettings = null;
         }
-        
+
         _translationCache.Clear();
     }
 
     private string PerformTranslation(string text, string sourceLanguage, string targetLanguage, CommonTranslationsSettings settings)
     {
         var dictionary = GetTranslationDictionary(settings, sourceLanguage, targetLanguage);
-        
+
         if (dictionary == null)
         {
             _logger.LogTrace("📚 サポートされていない言語ペア: {SourceLang} -> {TargetLang}", sourceLanguage, targetLanguage);
@@ -192,7 +192,7 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
 
         // カテゴリ別に翻訳を検索（優先度順）
         var translation = FindTranslationInCategories(dictionary, text);
-        
+
         if (translation != null)
         {
             return translation;
@@ -208,7 +208,7 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
         var normalizedSource = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.Normalize(sourceLanguage);
         var normalizedTarget = Baketa.Core.Abstractions.Translation.LanguageCodeNormalizer.Normalize(targetLanguage);
 
-        _logger.LogTrace("📚 言語コード正規化: {OriginalSource} -> {NormalizedSource}, {OriginalTarget} -> {NormalizedTarget}", 
+        _logger.LogTrace("📚 言語コード正規化: {OriginalSource} -> {NormalizedSource}, {OriginalTarget} -> {NormalizedTarget}",
             sourceLanguage, normalizedSource, targetLanguage, normalizedTarget);
 
         return (normalizedSource, normalizedTarget) switch
@@ -262,7 +262,7 @@ public sealed class TranslationDictionaryService : ITranslationDictionaryService
 
     private string HandleFallback(string text, string sourceLanguage, string targetLanguage, FallbackSettings fallback)
     {
-        _logger.LogTrace("📚 翻訳が見つかりません - フォールバック処理: '{Text}' ({SourceLang} -> {TargetLang})", 
+        _logger.LogTrace("📚 翻訳が見つかりません - フォールバック処理: '{Text}' ({SourceLang} -> {TargetLang})",
             text, sourceLanguage, targetLanguage);
 
         return fallback.NotFoundBehavior switch

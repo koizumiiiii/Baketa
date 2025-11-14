@@ -35,7 +35,7 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
     public StubOverlayPositionCalculator(ILogger<StubOverlayPositionCalculator> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // スタブモニター情報を初期化
         _stubMonitors = new List<MonitorInfo>
         {
@@ -51,7 +51,7 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
                 RefreshRate = 60
             }
         };
-        
+
         _logger.LogInformation("🎭 [STUB_POSITION] StubOverlayPositionCalculator 初期化");
     }
 
@@ -59,11 +59,11 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("🚀 [STUB_POSITION] スタブ位置計算器初期化開始");
-        
+
         // スタブでは実際のモニター検出は行わない
         _totalCalculations = 0;
         _collisionAvoidanceCount = 0;
-        
+
         _logger.LogInformation("✅ [STUB_POSITION] スタブ位置計算器初期化完了 - モニター数: {MonitorCount}", _stubMonitors.Count);
         await Task.CompletedTask;
     }
@@ -93,18 +93,18 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
                 case PositionStrategy.CenterScreen:
                     optimizedArea = CenterOnScreen(optimizedArea, primaryMonitor);
                     break;
-                    
+
                 case PositionStrategy.AvoidCollision:
                     optimizedArea = await AvoidCollisionStub(optimizedArea, request, cancellationToken);
                     break;
-                    
+
                 case PositionStrategy.KeepOriginal:
                 default:
                     // 元位置を維持
                     break;
             }
 
-            _logger.LogDebug("✅ [STUB_POSITION] 最適位置計算完了 - ID: {Id}, OptimizedArea: {Area}", 
+            _logger.LogDebug("✅ [STUB_POSITION] 最適位置計算完了 - ID: {Id}, OptimizedArea: {Area}",
                 request.Id, optimizedArea);
 
             return optimizedArea;
@@ -120,7 +120,7 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
     public async Task<IEnumerable<Rectangle>> CalculateBatchPositionsAsync(IEnumerable<PositionCalculationRequest> requests, CancellationToken cancellationToken = default)
     {
         var results = new List<Rectangle>();
-        
+
         foreach (var request in requests ?? Enumerable.Empty<PositionCalculationRequest>())
         {
             var optimizedPosition = await CalculateOptimalPositionAsync(request, cancellationToken);
@@ -137,9 +137,9 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
         try
         {
             var excludeIdSet = excludeIds?.ToHashSet() ?? new HashSet<string>();
-            
-            var hasCollision = existingOverlays?.Any(overlay => 
-                !excludeIdSet.Contains(overlay.Id) && 
+
+            var hasCollision = existingOverlays?.Any(overlay =>
+                !excludeIdSet.Contains(overlay.Id) &&
                 overlay.Area.IntersectsWith(area)) ?? false;
 
             await Task.CompletedTask;
@@ -157,7 +157,7 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
     {
         try
         {
-            var monitor = targetMonitor.HasValue ? 
+            var monitor = targetMonitor.HasValue ?
                 _stubMonitors.FirstOrDefault(m => m.Id == targetMonitor.Value) ?? _stubMonitors.First() :
                 _stubMonitors.First(m => m.IsPrimary);
 
@@ -221,7 +221,7 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
         var workingArea = monitor.WorkingArea;
         var centerX = workingArea.X + (workingArea.Width - area.Width) / 2;
         var centerY = workingArea.Y + (workingArea.Height - area.Height) / 2;
-        
+
         return new Rectangle(centerX, centerY, area.Width, area.Height);
     }
 
@@ -232,7 +232,7 @@ public class StubOverlayPositionCalculator : IOverlayPositionCalculator
     {
         // スタブでは簡単なオフセット調整のみ実装
         var adjustedArea = area;
-        
+
         // 少しずらして衝突回避をシミュレート
         if (request.MaxDisplacement > 0)
         {

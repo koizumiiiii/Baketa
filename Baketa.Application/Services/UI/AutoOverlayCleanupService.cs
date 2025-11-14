@@ -7,13 +7,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 using Baketa.Core.Events.Capture;
 using Baketa.Core.Settings;
 // using Baketa.UI.Services; // UI層への直接参照は避ける（Clean Architecture違反）
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 
 namespace Baketa.Application.Services.UI;
 
@@ -32,11 +32,11 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AutoOverlayCleanupService> _logger;
     private readonly IOptionsMonitor<AutoOverlayCleanupSettings> _settings;
-    
+
     // Circuit Breaker設定（IOptions経由で動的取得）
     private float MinConfidenceScore => _settings.CurrentValue.MinConfidenceScore;
     private int MaxCleanupPerSecond => _settings.CurrentValue.MaxCleanupPerSecond;
-    
+
     // 統計・監視用
     private readonly object _statsLock = new();
     private int _totalEventsProcessed;
@@ -46,21 +46,21 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     private double _totalProcessingTime;
     private DateTime? _lastEventProcessedAt;
     private int _errorCount;
-    
+
     // レート制限用
     private readonly Queue<DateTime> _recentCleanups = new();
-    
+
     // 初期化状態
     private volatile bool _isInitialized = false;
     private bool _disposed = false;
-    
+
     // IEventProcessor<T>の必須プロパティ
     /// <summary>イベント処理優先度（高優先度でオーバーレイを迅速に削除）</summary>
     public int Priority => 100;
-    
+
     /// <summary>同期実行（UI操作のため非同期実行を使用）</summary>
     public bool SynchronousExecution => false;
-    
+
     public AutoOverlayCleanupService(
         // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
         IOverlayManager overlayManager,
@@ -73,7 +73,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     }
-    
+
     /// <inheritdoc />
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -82,12 +82,12 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             _logger.LogWarning("AutoOverlayCleanupServiceは既に初期化済みです");
             return;
         }
-        
+
         try
         {
             // TextDisappearanceEventイベント購読
             _eventAggregator.Subscribe<TextDisappearanceEvent>(this);
-            
+
             _isInitialized = true;
             _logger.LogInformation("🎯 AutoOverlayCleanupService初期化完了 - 信頼度閾値: {MinConfidence:F2}, 最大削除レート: {MaxRate}/秒, 設定外部化: 有効",
                 MinConfidenceScore, MaxCleanupPerSecond);
@@ -98,7 +98,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             throw;
         }
     }
-    
+
     /// <inheritdoc />
     /// <summary>
     /// TextDisappearanceEventハンドラー（IEventProcessorとして実装）
@@ -108,19 +108,19 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     {
         if (_disposed || textDisappearanceEvent == null)
             return;
-            
+
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             // 統計更新
             Interlocked.Increment(ref _totalEventsProcessed);
-            
+
             _logger.LogDebug("🔍 テキスト消失イベント受信 - RegionId: {RegionId}, 信頼度: {Confidence:F3}, 領域数: {RegionCount}",
-                textDisappearanceEvent.RegionId ?? "未指定", 
-                textDisappearanceEvent.ConfidenceScore, 
+                textDisappearanceEvent.RegionId ?? "未指定",
+                textDisappearanceEvent.ConfidenceScore,
                 textDisappearanceEvent.DisappearedRegions.Count);
-            
+
             // Circuit Breaker: 信頼度チェック
             if (textDisappearanceEvent.ConfidenceScore < MinConfidenceScore)
             {
@@ -129,7 +129,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
                     textDisappearanceEvent.ConfidenceScore, MinConfidenceScore);
                 return;
             }
-            
+
             // Circuit Breaker: レート制限チェック
             if (!IsWithinRateLimit())
             {
@@ -137,18 +137,18 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
                 _logger.LogDebug("🚦 レート制限により削除要求を却下 - 最大レート: {MaxRate}/秒", MaxCleanupPerSecond);
                 return;
             }
-            
+
             // 実際のオーバーレイ削除実行
             var cleanedCount = await CleanupOverlaysInRegionAsync(
                 textDisappearanceEvent.SourceWindowHandle,
                 textDisappearanceEvent.DisappearedRegions).ConfigureAwait(false);
-            
+
             // 削除成功時の統計更新
             if (cleanedCount > 0)
             {
                 Interlocked.Add(ref _overlaysCleanedUp, cleanedCount);
                 RecordCleanupTime();
-                
+
                 _logger.LogInformation("✅ オーバーレイ自動削除完了 - RegionId: {RegionId}, 削除数: {CleanedCount}, 処理時間: {ProcessingTime}ms",
                     textDisappearanceEvent.RegionId ?? "未指定", cleanedCount, stopwatch.ElapsedMilliseconds);
             }
@@ -163,18 +163,18 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         {
             stopwatch.Stop();
             UpdateProcessingTime(stopwatch.Elapsed.TotalMilliseconds);
-            
+
             lock (_statsLock)
             {
                 _lastEventProcessedAt = DateTime.UtcNow;
             }
         }
     }
-    
+
     /// <inheritdoc />
     public async Task<int> CleanupOverlaysInRegionAsync(
-        IntPtr windowHandle, 
-        IReadOnlyList<Rectangle> regions, 
+        IntPtr windowHandle,
+        IReadOnlyList<Rectangle> regions,
         CancellationToken cancellationToken = default)
     {
         if (!_isInitialized)
@@ -182,15 +182,15 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             _logger.LogWarning("サービス未初期化のため削除要求をスキップ");
             return 0;
         }
-        
+
         if (regions == null || !regions.Any())
         {
             _logger.LogDebug("削除対象領域が指定されていません");
             return 0;
         }
-        
+
         int totalCleaned = 0;
-        
+
         try
         {
             // 🔧 [OVERLAY_UNIFICATION] TODO: IOverlayManagerには領域指定削除機能がないため、Phase 4で実装必要
@@ -220,19 +220,19 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             _logger.LogError(ex, "❌ 領域指定オーバーレイ削除エラー - WindowHandle: {WindowHandle}", windowHandle);
             throw;
         }
-        
+
         return totalCleaned;
     }
-    
+
     /// <inheritdoc />
     public AutoOverlayCleanupStatistics GetStatistics()
     {
         lock (_statsLock)
         {
-            var avgProcessingTime = _totalEventsProcessed > 0 
-                ? _totalProcessingTime / _totalEventsProcessed 
+            var avgProcessingTime = _totalEventsProcessed > 0
+                ? _totalProcessingTime / _totalEventsProcessed
                 : 0.0;
-            
+
             return new AutoOverlayCleanupStatistics
             {
                 TotalEventsProcessed = _totalEventsProcessed,
@@ -245,7 +245,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             };
         }
     }
-    
+
     /// <inheritdoc />
     /// <remarks>
     /// Gemini Review: 実行時設定更新はIOptionsMonitor.CurrentValue経由となったため、
@@ -255,14 +255,14 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     {
         if (minConfidenceScore < 0.0f || minConfidenceScore > 1.0f)
             throw new ArgumentOutOfRangeException(nameof(minConfidenceScore), "信頼度は0.0-1.0の範囲で指定してください");
-            
+
         if (maxCleanupRate < 1 || maxCleanupRate > 100)
             throw new ArgumentOutOfRangeException(nameof(maxCleanupRate), "削除レートは1-100の範囲で指定してください");
-        
+
         _logger.LogWarning("⚠️ UpdateCircuitBreakerSettings呼び出し検出 - 設定外部化により、appsettings.jsonでの設定変更を推奨します。" +
             "要求値: 信頼度閾値={MinConfidence:F2}, 最大削除レート={MaxRate}/秒", minConfidenceScore, maxCleanupRate);
     }
-    
+
     /// <summary>
     /// レート制限チェック
     /// </summary>
@@ -270,7 +270,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     {
         var now = DateTime.UtcNow;
         var oneSecondAgo = now.AddSeconds(-1);
-        
+
         lock (_recentCleanups)
         {
             // 1秒以前のレコードを削除
@@ -278,24 +278,24 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             {
                 _recentCleanups.Dequeue();
             }
-            
+
             return _recentCleanups.Count < MaxCleanupPerSecond;
         }
     }
-    
+
     /// <summary>
     /// 削除時刻記録（レート制限用）
     /// </summary>
     private void RecordCleanupTime()
     {
         var now = DateTime.UtcNow;
-        
+
         lock (_recentCleanups)
         {
             _recentCleanups.Enqueue(now);
         }
     }
-    
+
     /// <summary>
     /// 処理時間統計更新
     /// </summary>
@@ -306,7 +306,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             _totalProcessingTime += processingTimeMs;
         }
     }
-    
+
     /// <summary>
     /// IHostedService実装: アプリケーション開始時の初期化処理
     /// Gemini Review: InitializeAsync呼び出し保証のためのパターン
@@ -324,7 +324,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             throw;
         }
     }
-    
+
     /// <summary>
     /// IHostedService実装: アプリケーション終了時の終了処理
     /// </summary>
@@ -342,13 +342,13 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             return Task.FromException(ex);
         }
     }
-    
+
     /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)
             return;
-        
+
         try
         {
             if (_isInitialized)
@@ -356,12 +356,12 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
                 _eventAggregator.Unsubscribe<TextDisappearanceEvent>(this);
                 _logger.LogInformation("🔌 AutoOverlayCleanupService購読解除完了");
             }
-            
+
             lock (_recentCleanups)
             {
                 _recentCleanups.Clear();
             }
-            
+
             _disposed = true;
             _logger.LogInformation("🛑 AutoOverlayCleanupService破棄完了");
         }

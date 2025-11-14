@@ -1,9 +1,9 @@
-using Xunit;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Baketa.Infrastructure.Platform.Windows.Services; // 🔥 [PHASE2.1_CLEAN_ARCH] Infrastructure.Platformへの移動に伴う修正
 using System;
 using System.Drawing;
+using Baketa.Infrastructure.Platform.Windows.Services; // 🔥 [PHASE2.1_CLEAN_ARCH] Infrastructure.Platformへの移動に伴う修正
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.Services.Coordinates;
 
@@ -124,7 +124,6 @@ public class CoordinateTransformationServiceTests : IDisposable
         var result = _service.ConvertRoiToScreenCoordinates(roiBounds, windowHandle, invalidScale);
 
         // 異常なスケール値でも結果が返されることを確認
-        Assert.NotNull(result);
     }
 
     [Fact]

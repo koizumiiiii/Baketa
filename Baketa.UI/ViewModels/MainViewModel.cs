@@ -1,7 +1,7 @@
+using System;
 using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
-using System;
 
 namespace Baketa.UI.ViewModels;
 
@@ -11,7 +11,7 @@ namespace Baketa.UI.ViewModels;
 internal sealed class MainViewModel : Framework.ViewModelBase
 {
     private readonly ILogger<MainViewModel> _logger;
-    
+
     // LoggerMessageデリゲートの定義
     private static readonly Action<ILogger, Exception?> _logInitialized =
         LoggerMessage.Define(LogLevel.Information, new EventId(1, nameof(MainViewModel)),
@@ -32,7 +32,7 @@ internal sealed class MainViewModel : Framework.ViewModelBase
         IEventAggregator eventAggregator) : base(eventAggregator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         _logInitialized(_logger, null);
     }
 }

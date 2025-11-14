@@ -1,11 +1,11 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
-using Moq;
-using Moq.Protected;
+using System.Drawing;
 using System.Net;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
-using System.Drawing;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Moq.Protected;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR;
 
@@ -24,7 +24,7 @@ public class OcrModelManagerTests : IDisposable
     {
         _mockModelPathResolver = new Mock<IModelPathResolver>();
         _mockHttpMessageHandler = new Mock<HttpMessageHandler>();
-        
+
         // Root cause solution: Proper HTTP mock configuration to prevent 404 errors
         _mockHttpMessageHandler.Protected()
             .Setup<Task<HttpResponseMessage>>(
@@ -41,7 +41,7 @@ public class OcrModelManagerTests : IDisposable
                 };
                 return response;
             });
-            
+
         // Root cause solution: Provide success responses for valid model requests
         _mockHttpMessageHandler.Protected()
             .Setup<Task<HttpResponseMessage>>(
@@ -58,10 +58,10 @@ public class OcrModelManagerTests : IDisposable
                 };
                 return response;
             });
-        
+
         _httpClient = new HttpClient(_mockHttpMessageHandler.Object);
         _tempDirectory = Path.Combine(Path.GetTempPath(), "BaketaOcrModelsTest", Guid.NewGuid().ToString());
-        
+
         // モデルパス解決のモック設定
         _mockModelPathResolver.Setup(x => x.GetModelsRootDirectory())
             .Returns("test/models");
@@ -74,11 +74,11 @@ public class OcrModelManagerTests : IDisposable
         _mockModelPathResolver.Setup(x => x.FileExists(It.IsAny<string>()))
             .Returns(false); // テスト環境ではファイルは存在しない
         _mockModelPathResolver.Setup(x => x.EnsureDirectoryExists(It.IsAny<string>()));
-        
+
         _modelManager = new OcrModelManager(
-            _mockModelPathResolver.Object, 
-            _httpClient, 
-            _tempDirectory, 
+            _mockModelPathResolver.Object,
+            _httpClient,
+            _tempDirectory,
             NullLogger<OcrModelManager>.Instance);
     }
 
@@ -87,9 +87,9 @@ public class OcrModelManagerTests : IDisposable
     {
         // Arrange & Act
         var manager = new OcrModelManager(
-            _mockModelPathResolver.Object, 
-            _httpClient, 
-            _tempDirectory, 
+            _mockModelPathResolver.Object,
+            _httpClient,
+            _tempDirectory,
             NullLogger<OcrModelManager>.Instance);
 
         // Assert
@@ -121,7 +121,7 @@ public class OcrModelManagerTests : IDisposable
         // Assert
         Assert.NotNull(models);
         Assert.True(models.Count > 0);
-        
+
         // 固定モデルリストの確認
         Assert.Contains(models, m => m.Id == "det_db_standard");
         Assert.Contains(models, m => m.Id == "rec_english_standard");
@@ -137,9 +137,9 @@ public class OcrModelManagerTests : IDisposable
         // Assert
         Assert.NotNull(models);
         Assert.True(models.Count > 0);
-        
+
         // 日本語または言語非依存のモデルのみが含まれることを確認
-        Assert.All(models, model => 
+        Assert.All(models, model =>
         {
             Assert.True(string.Equals(model.LanguageCode, "jpn", StringComparison.Ordinal) || model.LanguageCode == null);
         });
@@ -370,7 +370,7 @@ public class OcrModelManagerTests : IDisposable
             if (disposing)
             {
                 _httpClient?.Dispose();
-                
+
                 // テスト用の一時ディレクトリをクリーンアップ
                 if (Directory.Exists(_tempDirectory))
                 {
@@ -450,7 +450,7 @@ public class OcrModelInfoTests
     [InlineData("valid_id", "Valid Model", "test.onnx", "ftp://example.com/test.tar", 1024, "abcdef123456", false)] // FTPは無効なURLスキーム
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1054:URI-like parameters should not be strings", Justification = "Test method needs to validate both valid and invalid URL strings")]
     public void IsValid_ShouldReturnCorrectResult(
-        string id, string name, string fileName, string addressText, 
+        string id, string name, string fileName, string addressText,
         long fileSize, string hash, bool expected)
     {
         try

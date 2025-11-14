@@ -1,13 +1,13 @@
+using System.Reactive.Linq;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
+using Baketa.UI.Tests.TestUtilities;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ReactiveUI.Testing;
 using Xunit;
-using Baketa.Core.Settings;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.ViewModels.Settings;
-using Baketa.UI.Tests.TestUtilities;
-using System.Reactive.Linq;
 
 namespace Baketa.UI.Tests.ViewModels.Settings;
 
@@ -46,7 +46,7 @@ public class OcrSettingsViewModelTests
     public void Constructor_WithNullSettings_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new OcrSettingsViewModel(null!, _mockEventAggregator.Object, _mockLogger.Object));
     }
 
@@ -54,7 +54,7 @@ public class OcrSettingsViewModelTests
     public void Constructor_WithNullEventAggregator_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new OcrSettingsViewModel(_testSettings, null!, _mockLogger.Object));
     }
 
@@ -129,7 +129,7 @@ public class OcrSettingsViewModelTests
         // Arrange
         var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
         var defaultSettings = new OcrSettings();
-        
+
         // 初期値を変更
         viewModel.EnableOcr = !defaultSettings.EnableOcr;
         viewModel.ConfidenceThreshold = 0.9;

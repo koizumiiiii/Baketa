@@ -15,12 +15,12 @@ public sealed class ModelCacheManager
 {
     private readonly ILogger<ModelCacheManager> _logger;
     private readonly IConfiguration _configuration;
-    
+
     public ModelCacheManager(ILogger<ModelCacheManager> logger, IConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        
+
         // 起動時に設定からカスタムキャッシュパスを自動適用
         ApplyCacheConfigurationFromSettings();
     }
@@ -35,20 +35,20 @@ public sealed class ModelCacheManager
         {
             var cacheDir = GetHuggingFaceCacheDirectory();
             var modelPath = Path.Combine(cacheDir, "models--facebook--nllb-200-distilled-600M");
-            
+
             _logger.LogInformation("🔍 NLLB-200モデルキャッシュ確認: {CacheDir}", cacheDir);
-            
+
             if (Directory.Exists(modelPath) && HasValidModelFiles(modelPath))
             {
                 _logger.LogInformation("✅ NLLB-200モデル確認済み: {ModelPath}", modelPath);
                 _logger.LogInformation("🚀 キャッシュから高速読み込み可能 - 30秒再起動問題解決");
                 return true;
             }
-            
+
             _logger.LogWarning("⚠️ NLLB-200モデル未キャッシュ");
             _logger.LogInformation("📥 初回起動時に自動ダウンロードされます（約2.4GB）");
             _logger.LogInformation("💡 2回目以降の起動は高速化されます");
-            
+
             // Pythonサーバー起動時に自動でダウンロードされる（transformers標準動作）
             return true;
         }
@@ -68,7 +68,7 @@ public sealed class ModelCacheManager
         {
             var cacheDir = GetHuggingFaceCacheDirectory();
             var modelPath = Path.Combine(cacheDir, "models--facebook--nllb-200-distilled-600M");
-            
+
             var info = new ModelCacheInfo
             {
                 CacheDirectory = cacheDir,
@@ -76,10 +76,10 @@ public sealed class ModelCacheManager
                 IsModelCached = Directory.Exists(modelPath) && HasValidModelFiles(modelPath),
                 CacheSize = await CalculateCacheSizeAsync(modelPath).ConfigureAwait(false)
             };
-            
-            _logger.LogDebug("📊 モデルキャッシュ情報: Cached={IsCached}, Size={Size:F1}MB", 
+
+            _logger.LogDebug("📊 モデルキャッシュ情報: Cached={IsCached}, Size={Size:F1}MB",
                 info.IsModelCached, info.CacheSize / 1024.0 / 1024.0);
-                
+
             return info;
         }
         catch (Exception ex)
@@ -96,7 +96,7 @@ public sealed class ModelCacheManager
     {
         if (string.IsNullOrWhiteSpace(customPath))
             throw new ArgumentException("カスタムパスが無効です", nameof(customPath));
-            
+
         Environment.SetEnvironmentVariable("HF_HOME", customPath);
         _logger.LogInformation("🗂️ HF_HOMEを設定: {CustomPath}", customPath);
     }
@@ -110,14 +110,14 @@ public sealed class ModelCacheManager
         {
             var cacheDir = GetHuggingFaceCacheDirectory();
             var modelPath = Path.Combine(cacheDir, "models--facebook--nllb-200-distilled-600M");
-            
+
             if (Directory.Exists(modelPath))
             {
                 Directory.Delete(modelPath, recursive: true);
                 _logger.LogInformation("🗑️ モデルキャッシュクリーンアップ完了: {ModelPath}", modelPath);
                 return true;
             }
-            
+
             _logger.LogInformation("ℹ️ クリーンアップ対象なし: キャッシュが存在しません");
             return true;
         }
@@ -137,19 +137,19 @@ public sealed class ModelCacheManager
         {
             var useCustomPath = _configuration.GetValue<bool>("Translation:NLLB200:ModelCache:UseCustomPath");
             var customPath = _configuration.GetValue<string>("Translation:NLLB200:ModelCache:CustomCachePath");
-            
+
             if (useCustomPath && !string.IsNullOrWhiteSpace(customPath))
             {
                 // パス環境変数を展開（%AppData%など）
                 var expandedPath = Environment.ExpandEnvironmentVariables(customPath);
-                
+
                 // ディレクトリが存在しない場合は作成
                 if (!Directory.Exists(expandedPath))
                 {
                     Directory.CreateDirectory(expandedPath);
                     _logger.LogInformation("📁 カスタムキャッシュディレクトリを作成: {Path}", expandedPath);
                 }
-                
+
                 SetCustomCacheDirectory(expandedPath);
                 _logger.LogInformation("⚙️ appsettings.jsonからカスタムキャッシュパス適用: {Path}", expandedPath);
             }
@@ -169,8 +169,8 @@ public sealed class ModelCacheManager
     /// </summary>
     private static string GetHuggingFaceCacheDirectory()
     {
-        return Environment.GetEnvironmentVariable("HF_HOME") 
-               ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
+        return Environment.GetEnvironmentVariable("HF_HOME")
+               ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                               ".cache", "huggingface", "hub");
     }
 
@@ -219,7 +219,7 @@ public sealed class ModelCacheManager
 
             long size = 0;
             var files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
-            
+
             foreach (var file in files)
             {
                 var fileInfo = new FileInfo(file);

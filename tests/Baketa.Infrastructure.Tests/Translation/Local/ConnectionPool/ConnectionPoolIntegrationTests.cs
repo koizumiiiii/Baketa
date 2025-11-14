@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Tests.TestUtilities;
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Microsoft.Extensions.Configuration;
-using Baketa.Infrastructure.Tests.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -99,7 +99,7 @@ public class ConnectionPoolIntegrationTests(ITestOutputHelper output) : IAsyncDi
         // Assert - 破棄後のメトリクス取得は例外をスローしない
         var metrics = connectionPool.GetMetrics();
         Assert.NotNull(metrics);
-        
+
         output.WriteLine("ServiceProvider disposed successfully");
     }
 
@@ -116,7 +116,7 @@ public class ConnectionPoolIntegrationTests(ITestOutputHelper output) : IAsyncDi
 
         // Assert - シングルトンとして登録されているため、同じインスタンスが返される
         Assert.Same(connectionPool1, connectionPool2);
-        
+
         output.WriteLine("Singleton behavior confirmed");
     }
 
@@ -135,7 +135,7 @@ public class ConnectionPoolIntegrationTests(ITestOutputHelper output) : IAsyncDi
         Assert.NotNull(currentOptions);
         Assert.True(currentOptions.MaxConnections >= 1 || currentOptions.MaxConnections == null);
         Assert.True(currentOptions.MinConnections >= 1);
-        
+
         output.WriteLine($"Current MaxConnections: {currentOptions.MaxConnections}");
         output.WriteLine($"Current MinConnections: {currentOptions.MinConnections}");
     }
@@ -230,12 +230,12 @@ public class ConnectionPoolIntegrationTests(ITestOutputHelper output) : IAsyncDi
 
         // Act
         using var cts = new CancellationTokenSource(30000); // 30秒タイムアウト
-        
+
         try
         {
             var connection = await connectionPool.GetConnectionAsync(cts.Token);
             await connectionPool.ReturnConnectionAsync(connection, CancellationToken.None);
-            
+
             output.WriteLine("✅ 接続プール統合テスト成功 - Pythonサーバーとの接続確認完了");
         }
         catch (Exception ex)
@@ -268,13 +268,13 @@ public class ConnectionPoolIntegrationTests(ITestOutputHelper output) : IAsyncDi
         {
             // デフォルト設定
             var defaultConfig = ConfigurationTestHelper.CreateTestConfiguration(new Dictionary<string, string>
-                {
-                    ["Translation:MaxConnections"] = "", // null (自動計算)
-                    ["Translation:MinConnections"] = "1",
-                    ["Translation:OptimalChunksPerConnection"] = "4",
-                    ["Translation:ConnectionTimeoutMs"] = "30000",
-                    ["Translation:HealthCheckIntervalMs"] = "30000"
-                });
+            {
+                ["Translation:MaxConnections"] = "", // null (自動計算)
+                ["Translation:MinConnections"] = "1",
+                ["Translation:OptimalChunksPerConnection"] = "4",
+                ["Translation:ConnectionTimeoutMs"] = "30000",
+                ["Translation:HealthCheckIntervalMs"] = "30000"
+            });
             services.AddSingleton<IConfiguration>(defaultConfig);
         }
 
@@ -283,7 +283,7 @@ public class ConnectionPoolIntegrationTests(ITestOutputHelper output) : IAsyncDi
         {
             var config = services.BuildServiceProvider().GetRequiredService<IConfiguration>();
             var maxConnectionsStr = config["Translation:MaxConnections"];
-            
+
             options.MaxConnections = string.IsNullOrEmpty(maxConnectionsStr) ? null : int.Parse(maxConnectionsStr);
             options.MinConnections = int.Parse(config["Translation:MinConnections"] ?? "1");
             options.OptimalChunksPerConnection = int.Parse(config["Translation:OptimalChunksPerConnection"] ?? "4");

@@ -1,14 +1,14 @@
-using Xunit;
+using System.Drawing;
+using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Settings;
+using Baketa.Infrastructure.OCR.PostProcessing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Baketa.Core.Settings;
-using Baketa.Infrastructure.OCR.PostProcessing;
-using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Abstractions.OCR.Results;
-using Baketa.Core.Abstractions.Services;
-using System.Drawing;
 using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PostProcessing;
 
@@ -105,23 +105,23 @@ public class TimedChunkAggregatorTests : IDisposable
         // Act
         var result1 = await _aggregator.TryAddChunkAsync(chunk1);
         var result2 = await _aggregator.TryAddChunkAsync(chunk2);
-        
+
         // Wait for aggregation timeout
         await Task.Delay(1200);
 
         // Assert
         Assert.True(result1, "First chunk should be accepted");
         Assert.True(result2, "Second chunk should be accepted");
-        
+
         // Verify aggregation occurred
         Assert.True(aggregationEventCount >= 1, "At least one aggregation event should have occurred");
         Assert.NotEmpty(aggregatedChunks);
-        
+
         // Verify aggregated content contains both texts
         var allAggregatedText = string.Join(" ", aggregatedChunks.Select(c => c.CombinedText));
         Assert.Contains("Hello", allAggregatedText);
         Assert.Contains("World", allAggregatedText);
-        
+
         // Verify statistics
         var stats = _aggregator.GetStatistics();
         Assert.True(stats.TotalChunksProcessed >= 2, $"Expected at least 2 processed chunks, got {stats.TotalChunksProcessed}");
@@ -144,21 +144,21 @@ public class TimedChunkAggregatorTests : IDisposable
         // Act
         var result1 = await _aggregator.TryAddChunkAsync(chunk1);
         var result2 = await _aggregator.TryAddChunkAsync(chunk2);
-        
+
         // Wait for aggregation
         await Task.Delay(1200);
 
         // Assert
         Assert.True(result1, "Chunk from window 1 should be accepted");
         Assert.True(result2, "Chunk from window 2 should be accepted");
-        
+
         // Verify separate processing - should have separate aggregation events for different windows
         Assert.True(aggregatedChunksByEvent.Count >= 1, "Should have at least one aggregation event");
-        
+
         // Verify that chunks from different windows are processed separately
         var allChunks = aggregatedChunksByEvent.SelectMany(list => list).ToList();
         Assert.True(allChunks.Count >= 1, "Should have aggregated chunks");
-        
+
         // Verify statistics
         var stats = _aggregator.GetStatistics();
         Assert.True(stats.TotalChunksProcessed >= 2, $"Expected at least 2 processed chunks, got {stats.TotalChunksProcessed}");
@@ -222,14 +222,14 @@ public class TimedChunkAggregatorTests : IDisposable
         // Act
         await testAggregator.TryAddChunkAsync(chunk1);
         await testAggregator.TryAddChunkAsync(chunk2);
-        
+
         // Short wait to allow immediate aggregation processing
         await Task.Delay(100);
 
         // Assert
         Assert.True(aggregationEventCount >= 1, "Should trigger aggregation when MaxChunkCount is reached");
         Assert.True(aggregatedChunks.Count >= 1, "Should have aggregated chunks");
-        
+
         var stats = testAggregator.GetStatistics();
         Assert.True(stats.TotalChunksProcessed >= 2, $"Expected at least 2 processed chunks, got {stats.TotalChunksProcessed}");
         Assert.True(stats.TotalAggregationEvents >= 1, $"Expected at least 1 aggregation event, got {stats.TotalAggregationEvents}");
@@ -246,7 +246,7 @@ public class TimedChunkAggregatorTests : IDisposable
         };
         var optionsMonitorMock = new Mock<IOptionsMonitor<TimedAggregatorSettings>>();
         optionsMonitorMock.Setup(x => x.CurrentValue).Returns(disabledSettings);
-        
+
         var eventAggregatorMock = new Mock<Baketa.Core.Abstractions.Events.IEventAggregator>();
 
         using var testAggregator = new TimedChunkAggregator(
@@ -306,7 +306,7 @@ public class TimedChunkAggregatorTests : IDisposable
         // Act - First batch should trigger exception
         await _aggregator.TryAddChunkAsync(chunk1);
         await Task.Delay(1200); // Wait for first aggregation attempt
-        
+
         // Second batch should work normally despite previous exception
         await _aggregator.TryAddChunkAsync(chunk2);
         await Task.Delay(1200); // Wait for second aggregation
@@ -314,7 +314,7 @@ public class TimedChunkAggregatorTests : IDisposable
         // Assert
         Assert.True(aggregationAttempts >= 1, "Should have attempted aggregation at least once");
         Assert.True(successfulAggregations >= 1, "Should have successful aggregations after exception");
-        
+
         // Aggregator should still be functional
         var stats = _aggregator.GetStatistics();
         Assert.True(stats.TotalChunksProcessed >= 1, "Aggregator should continue processing after exception");

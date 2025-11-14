@@ -6,9 +6,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Settings;
-using Baketa.Core.Services;
 using Baketa.Core.Abstractions.Patterns;
+using Baketa.Core.Services;
+using Baketa.Core.Settings;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -27,20 +27,20 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase2: サーキットブレーカー連携
     private System.Threading.Timer? _healthCheckTimer;
     private readonly SemaphoreSlim _restartLock = new(1, 1);
-    
+
     private int _consecutiveFailures = 0;
     private bool _isRestartInProgress = false;
     private bool _disposed = false;
     private Process? _managedServerProcess;
     private int _currentServerPort = 5556; // デフォルト動的ポート範囲に統一（NLLB-200動的ポート対応）
-    
+
     // 🔧 [PROCESS_DUPLICATION_PREVENTION] プロセス重複防止システム
     private static readonly string PidFilePath = Path.Combine(Path.GetTempPath(), "baketa_translation_server.pid");
     private static readonly string LockFilePath = Path.Combine(Path.GetTempPath(), "baketa_translation_server.lock");
-    
+
     // 動的に取得した設定を保持
     private TranslationSettings? _cachedSettings;
-    
+
     // ヘルスチェック統計
     private long _totalHealthChecks = 0;
     private long _totalFailures = 0;
@@ -53,14 +53,14 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         ICircuitBreaker<TranslationResponse>? circuitBreaker = null)
     {
         Console.WriteLine("🔍 [HEALTH_MONITOR] コンストラクタ開始");
-        
+
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _circuitBreaker = circuitBreaker; // Phase2: サーキットブレーカー連携（オプション）
-        
+
         Console.WriteLine($"🔍 [HEALTH_MONITOR] settingsService パラメータ: {settingsService?.GetType().Name ?? "null"}");
         Console.WriteLine($"🔧 [PHASE2] サーキットブレーカー連携: {(_circuitBreaker != null ? "有効" : "無効")}");
-        
+
         // 設定の遅延取得（StartAsync時に実際に取得）
         Console.WriteLine("✅ [HEALTH_MONITOR] コンストラクタ完了 - 設定は StartAsync で取得");
     }
@@ -68,7 +68,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("✅ PythonServerHealthMonitor開始");
-        
+
         // 設定を動的に取得
         var settings = await _settingsService.GetAsync<TranslationSettings>().ConfigureAwait(false);
         if (settings == null)
@@ -77,19 +77,19 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             Console.WriteLine("⚠️ [HEALTH_MONITOR] TranslationSettings が取得できません");
             return;
         }
-        
+
         // 設定をキャッシュ
         _cachedSettings = settings;
-        
+
         Console.WriteLine($"🔍 [HEALTH_MONITOR] 取得した設定: EnableServerAutoRestart={settings.EnableServerAutoRestart}");
         Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckIntervalMs: {settings.HealthCheckIntervalMs}ms");
-        
+
         if (settings.EnableServerAutoRestart)
         {
             // ヘルスチェックタイマーを開始
             var interval = TimeSpan.FromMilliseconds(settings.HealthCheckIntervalMs);
             _healthCheckTimer = new System.Threading.Timer(PerformHealthCheckCallback, null, interval, interval);
-            
+
             _logger.LogInformation("🔍 ヘルスチェック開始 - 間隔: {IntervalMs}ms", settings.HealthCheckIntervalMs);
             Console.WriteLine("✅ [HEALTH_MONITOR] ヘルスチェック有効 - 自動監視開始");
         }
@@ -103,9 +103,9 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("🛑 PythonServerHealthMonitor停止開始");
-        
+
         _healthCheckTimer?.Change(Timeout.Infinite, 0);
-        
+
         // 管理しているサーバープロセスがあれば停止
         if (_managedServerProcess != null && !_managedServerProcess.HasExited)
         {
@@ -120,7 +120,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 _logger.LogWarning(ex, "⚠️ サーバープロセス停止時にエラー");
             }
         }
-        
+
         await Task.CompletedTask;
     }
 
@@ -130,7 +130,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private async void PerformHealthCheckCallback(object? state)
     {
         Console.WriteLine($"🔍 [HEALTH_MONITOR] ヘルスチェック実行開始 - {DateTime.Now:HH:mm:ss.fff}");
-        
+
         if (_disposed || _cachedSettings == null || !_cachedSettings.EnableServerAutoRestart)
         {
             Console.WriteLine($"⚠️ [HEALTH_MONITOR] スキップ - disposed:{_disposed}, enabled:{_cachedSettings?.EnableServerAutoRestart ?? false}");
@@ -140,11 +140,11 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         try
         {
             var isHealthy = await PerformHealthCheckAsync();
-            
+
             Interlocked.Increment(ref _totalHealthChecks);
-            
+
             Console.WriteLine($"🔍 [HEALTH_MONITOR] ヘルスチェック結果: {(isHealthy ? "✅ 正常" : "❌ 異常")} - Port: {_currentServerPort}");
-            
+
             if (isHealthy)
             {
                 // 成功時はカウンターリセット
@@ -154,15 +154,15 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                         _consecutiveFailures);
                     Console.WriteLine($"✅ [HEALTH_MONITOR] サーバー復旧確認 - 連続失敗回数リセット ({_consecutiveFailures} → 0)");
                 }
-                
+
                 _consecutiveFailures = 0;
                 _lastSuccessfulCheck = DateTime.UtcNow;
-                
+
                 // Phase2: サーキットブレーカー統計情報ログ
                 if (_circuitBreaker != null)
                 {
                     var stats = _circuitBreaker.GetStats();
-                    _logger.LogDebug("🔧 [PHASE2] サーキットブレーカー統計 - State: {State}, FailureRate: {FailureRate:P2}, TotalExecutions: {TotalExecutions}", 
+                    _logger.LogDebug("🔧 [PHASE2] サーキットブレーカー統計 - State: {State}, FailureRate: {FailureRate:P2}, TotalExecutions: {TotalExecutions}",
                         _circuitBreaker.State, stats.FailureRate, stats.TotalExecutions);
                 }
             }
@@ -170,11 +170,11 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             {
                 _consecutiveFailures++;
                 Interlocked.Increment(ref _totalFailures);
-                
+
                 _logger.LogWarning("🚨 サーバーヘルスチェック失敗 ({Current}/{Max}) - Port: {Port}",
                     _consecutiveFailures, _cachedSettings.MaxConsecutiveFailures, _currentServerPort);
                 Console.WriteLine($"🚨 [HEALTH_MONITOR] サーバーヘルスチェック失敗 ({_consecutiveFailures}/{_cachedSettings.MaxConsecutiveFailures}) - Port: {_currentServerPort}");
-                
+
                 // 最大失敗回数に達したら再起動
                 if (_consecutiveFailures >= _cachedSettings.MaxConsecutiveFailures)
                 {
@@ -199,7 +199,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         {
             using var client = new TcpClient();
             var connectTask = client.ConnectAsync("127.0.0.1", _currentServerPort);
-            
+
             // 短時間での接続テスト
             if (await Task.WhenAny(connectTask, Task.Delay(2000)) == connectTask)
             {
@@ -209,15 +209,15 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                     var testRequest = new { text = "test", source = "en", target = "ja" };
                     var requestJson = JsonSerializer.Serialize(testRequest);
                     var requestBytes = Encoding.UTF8.GetBytes(requestJson + "\n");
-                    
+
                     var stream = client.GetStream();
                     await stream.WriteAsync(requestBytes);
                     await stream.FlushAsync();
-                    
+
                     // レスポンス読み取り（タイムアウト付き）
                     var buffer = new byte[1024];
                     var readTask = stream.ReadAsync(buffer, 0, buffer.Length);
-                    
+
                     if (await Task.WhenAny(readTask, Task.Delay(3000)) == readTask)
                     {
                         var bytesRead = await readTask;
@@ -235,7 +235,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         {
             _logger.LogDebug("ヘルスチェック接続失敗 (Port {Port}): {Error}", _currentServerPort, ex.Message);
         }
-        
+
         return false;
     }
 
@@ -254,27 +254,27 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         try
         {
             if (_isRestartInProgress) return;
-            
+
             _isRestartInProgress = true;
             _lastRestartAttempt = DateTime.UtcNow;
-            
+
             _logger.LogError("🚨 サーバー自動再起動開始 - 連続失敗: {Failures}回, Port: {Port}",
                 _consecutiveFailures, _currentServerPort);
-            
+
             // 既存プロセスの強制終了
             await TerminateExistingServerAsync();
-            
+
             // バックオフ待機
             await Task.Delay(_cachedSettings?.RestartBackoffMs ?? 5000);
-            
+
             // 新しいサーバー起動
             var restartSuccess = await StartNewServerAsync();
-            
+
             if (restartSuccess)
             {
                 _logger.LogInformation("✅ サーバー自動再起動成功 - Port: {Port}", _currentServerPort);
                 _consecutiveFailures = 0; // 成功時はカウンターリセット
-                
+
                 // Phase2: サーキットブレーカーのリセット
                 if (_circuitBreaker != null)
                 {
@@ -303,17 +303,17 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         {
             // 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイルベースの既存プロセス終了
             await TerminateExistingServersByPidFileAsync();
-            
+
             if (_managedServerProcess != null && !_managedServerProcess.HasExited)
             {
                 _managedServerProcess.Kill();
                 _managedServerProcess.WaitForExit(3000);
                 _logger.LogInformation("🔄 既存サーバープロセス終了完了");
             }
-            
+
             // 🚨 [CRITICAL_FIX] Python翻訳サーバーの完全終了（プロセス重複防止）
             await TerminateAllTranslationServerProcessesAsync();
-            
+
             await Task.Delay(1000); // プロセス終了後の安定化待機
         }
         catch (Exception ex)
@@ -321,7 +321,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             _logger.LogWarning(ex, "⚠️ 既存プロセス終了時にエラー");
         }
     }
-    
+
     /// <summary>
     /// 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイルベースの既存プロセス終了
     /// </summary>
@@ -350,12 +350,12 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                         _logger.LogDebug("PIDファイル内のプロセス (PID: {ProcessId}) は既に終了済み", existingPid);
                     }
                 }
-                
+
                 // PIDファイル削除
                 File.Delete(PidFilePath);
                 _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイル削除完了");
             }
-            
+
             // ロックファイルも削除
             if (File.Exists(LockFilePath))
             {
@@ -368,7 +368,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             _logger.LogWarning(ex, "⚠️ PIDファイルベースの既存プロセス終了時にエラー");
         }
     }
-    
+
     /// <summary>
     /// 🚨 [CRITICAL_FIX] 全てのPython翻訳サーバープロセスの完全終了
     /// 🔧 [GEMINI_REVIEW] ポート使用状況ベースの確実なプロセス特定
@@ -380,7 +380,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             // 🔧 [GEMINI_REVIEW] ポート5557を使用するプロセスIDを特定
             var processIdsUsingPort = await GetProcessIdsUsingPortAsync(_currentServerPort);
             var terminatedCount = 0;
-            
+
             foreach (var pid in processIdsUsingPort)
             {
                 try
@@ -388,7 +388,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                     var process = Process.GetProcessById(pid);
                     if (!process.HasExited && process.ProcessName.Equals("python", StringComparison.OrdinalIgnoreCase))
                     {
-                        _logger.LogWarning("🔄 [PROCESS_CLEANUP] ポート{Port}使用Python翻訳サーバープロセス終了: PID {ProcessId}", 
+                        _logger.LogWarning("🔄 [PROCESS_CLEANUP] ポート{Port}使用Python翻訳サーバープロセス終了: PID {ProcessId}",
                             _currentServerPort, process.Id);
                         process.Kill();
                         process.WaitForExit(2000);
@@ -405,13 +405,13 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                     _logger.LogDebug("プロセス終了時にエラー (PID {ProcessId}): {Error}", pid, ex.Message);
                 }
             }
-            
+
             // 🔧 [GEMINI_REVIEW] フォールバック: プロセス名ベースの確認（非推奨だが保険）
             if (terminatedCount == 0)
             {
                 await TerminateByProcessNameFallbackAsync();
             }
-            
+
             if (terminatedCount > 0)
             {
                 _logger.LogInformation("✅ [PROCESS_CLEANUP] Python翻訳サーバープロセス終了完了: {Count}個", terminatedCount);
@@ -423,14 +423,14 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             _logger.LogWarning(ex, "⚠️ 全Python翻訳サーバープロセス終了時にエラー");
         }
     }
-    
+
     /// <summary>
     /// 🔧 [GEMINI_REVIEW] 指定ポートを使用するプロセスIDを取得
     /// </summary>
     private async Task<List<int>> GetProcessIdsUsingPortAsync(int port)
     {
         var processIds = new List<int>();
-        
+
         try
         {
             // netstat -ano コマンドでポート使用状況を取得
@@ -442,13 +442,13 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            
+
             using var process = Process.Start(startInfo);
             if (process != null)
             {
                 var output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
-                
+
                 var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                 foreach (var line in lines)
                 {
@@ -467,10 +467,10 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         {
             _logger.LogDebug("ポート使用プロセス取得エラー: {Error}", ex.Message);
         }
-        
+
         return processIds;
     }
-    
+
     /// <summary>
     /// 🔧 [GEMINI_REVIEW] フォールバック: プロセス名ベースの終了（非推奨）
     /// </summary>
@@ -480,7 +480,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         {
             var processes = Process.GetProcessesByName("python");
             var terminatedCount = 0;
-            
+
             foreach (var process in processes)
             {
                 try
@@ -500,7 +500,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                     process.Dispose();
                 }
             }
-            
+
             if (terminatedCount > 0)
             {
                 _logger.LogInformation("✅ [FALLBACK] Python프로세ス終了完了: {Count}個", terminatedCount);
@@ -526,13 +526,13 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 _logger.LogWarning("⚠️ [PROCESS_DUPLICATION_PREVENTION] 他のサーバーインスタンスが既に動作中のため起動をスキップ");
                 return false;
             }
-            
+
             var pythonPath = "py"; // Windows Python Launcher使用
-            
+
             // 🎯 [NLLB-200] モデル設定に基づくサーバースクリプト選択
             string serverScriptPath;
             var defaultEngine = _cachedSettings?.DefaultEngine ?? TranslationEngine.NLLB200;
-            
+
             if (defaultEngine == TranslationEngine.NLLB200)
             {
                 // CTranslate2版NLLB-200サーバー優先使用
@@ -554,17 +554,17 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             else
             {
                 // 従来のOPUS-MTサーバー使用
-                serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
+                serverScriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
                     @"..\..\..\..\scripts\optimized_translation_server.py");
-                    
+
                 if (!File.Exists(serverScriptPath))
                 {
                     serverScriptPath = @"scripts\optimized_translation_server.py";
                 }
-                
+
                 _logger.LogInformation("🔧 [OPUS-MT] 従来の翻訳サーバーを起動: {ScriptPath}", serverScriptPath);
             }
-            
+
             var processInfo = new ProcessStartInfo
             {
                 FileName = pythonPath,
@@ -576,22 +576,22 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 CreateNoWindow = true,
                 StandardOutputEncoding = Encoding.UTF8
             };
-            
+
             _managedServerProcess = new Process { StartInfo = processInfo };
             _managedServerProcess.Start();
-            
+
             // 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイル作成
             await CreatePidFileAsync(_managedServerProcess.Id);
-            
+
             _logger.LogInformation("🚀 [PROCESS_DUPLICATION_PREVENTION] 新しいサーバー起動開始 - PID: {ProcessId}, Port: {Port}",
                 _managedServerProcess.Id, _currentServerPort);
-            
+
             // 起動完了待機（タイムアウト付き）
             var startupTask = WaitForServerStartupAsync();
             var timeoutTask = Task.Delay(_cachedSettings?.ServerStartupTimeoutMs ?? 30000);
-            
+
             var completedTask = await Task.WhenAny(startupTask, timeoutTask);
-            
+
             if (completedTask == startupTask)
             {
                 var success = await startupTask;
@@ -615,7 +615,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             return false;
         }
     }
-    
+
     /// <summary>
     /// 🔧 [PROCESS_DUPLICATION_PREVENTION] サーバーロック取得
     /// </summary>
@@ -628,15 +628,15 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             {
                 Directory.CreateDirectory(lockFileDir!);
             }
-            
+
             // ロックファイルが存在する場合は既に他のインスタンスが動作中
             if (File.Exists(LockFilePath))
             {
                 // ロックファイルの内容をチェック（古いロックファイルかどうか）
                 var lockContent = await File.ReadAllTextAsync(LockFilePath).ConfigureAwait(false);
                 var lines = lockContent.Split('\n');
-                
-                if (lines.Length >= 2 && 
+
+                if (lines.Length >= 2 &&
                     int.TryParse(lines[0], out var lockedPid) &&
                     DateTime.TryParse(lines[1], out var lockTime))
                 {
@@ -665,11 +665,11 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                     }
                 }
             }
-            
+
             // ロックファイル作成
             var newLockContent = $"{Environment.ProcessId}\n{DateTime.UtcNow:O}";
             await File.WriteAllTextAsync(LockFilePath, newLockContent).ConfigureAwait(false);
-            
+
             _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] サーバーロック取得成功: {LockFilePath}", LockFilePath);
             return true;
         }
@@ -679,7 +679,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             return false;
         }
     }
-    
+
     /// <summary>
     /// 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイル作成
     /// </summary>
@@ -692,7 +692,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             {
                 Directory.CreateDirectory(pidFileDir!);
             }
-            
+
             await File.WriteAllTextAsync(PidFilePath, processId.ToString()).ConfigureAwait(false);
             _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイル作成: {PidFilePath} (PID: {ProcessId})", PidFilePath, processId);
         }
@@ -701,7 +701,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             _logger.LogWarning(ex, "⚠️ PIDファイル作成時にエラー: {PidFilePath}", PidFilePath);
         }
     }
-    
+
     /// <summary>
     /// 🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイルクリーンアップ
     /// </summary>
@@ -714,7 +714,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 File.Delete(PidFilePath);
                 _logger.LogDebug("🔧 [PROCESS_DUPLICATION_PREVENTION] PIDファイルクリーンアップ完了");
             }
-            
+
             if (File.Exists(LockFilePath))
             {
                 File.Delete(LockFilePath);
@@ -725,7 +725,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         {
             _logger.LogWarning(ex, "⚠️ PIDファイルクリーンアップ時にエラー");
         }
-        
+
         await Task.CompletedTask;
     }
 
@@ -736,7 +736,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     {
         var maxAttempts = 30;
         var attemptDelay = 1000;
-        
+
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
             if (await PerformHealthCheckAsync())
@@ -744,10 +744,10 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 _logger.LogInformation("✅ サーバー起動確認完了 - 試行回数: {Attempt}/{Max}", attempt, maxAttempts);
                 return true;
             }
-            
+
             await Task.Delay(attemptDelay);
         }
-        
+
         return false;
     }
 
@@ -777,11 +777,11 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
         _healthCheckTimer?.Dispose();
         _restartLock?.Dispose();
-        
+
         // 🔧 [GEMINI_REVIEW] 非同期クリーンアップによるデッドロック防止
         try
         {
@@ -791,7 +791,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         {
             _logger.LogWarning(ex, "⚠️ DisposeAsync時のPIDファイルクリーンアップエラー");
         }
-        
+
         if (_managedServerProcess != null && !_managedServerProcess.HasExited)
         {
             try
@@ -808,10 +808,10 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 _managedServerProcess?.Dispose();
             }
         }
-        
+
         GC.SuppressFinalize(this);
     }
-    
+
     /// <summary>
     /// 🔧 [GEMINI_REVIEW] 同期Disposeパターンの保持（後方互換性）
     /// </summary>
@@ -844,10 +844,10 @@ public record HealthMonitorStats
     public DateTime LastRestartAttempt { get; init; }
     public bool IsRestartInProgress { get; init; }
     public int CurrentServerPort { get; init; }
-    
+
     public double FailureRate => TotalHealthChecks > 0 ? (double)TotalFailures / TotalHealthChecks : 0.0;
     public TimeSpan TimeSinceLastSuccess => DateTime.UtcNow - LastSuccessfulCheck;
-    
+
     // Phase2: サーキットブレーカー統計情報
     public CircuitBreakerState? CircuitBreakerState { get; init; }
     public CircuitBreakerStats? CircuitBreakerStats { get; init; }

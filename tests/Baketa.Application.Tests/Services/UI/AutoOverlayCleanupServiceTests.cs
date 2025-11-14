@@ -37,7 +37,7 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         _eventAggregatorMock = new Mock<IEventAggregator>();
         _loggerMock = new Mock<ILogger<AutoOverlayCleanupService>>();
         _settingsMock = new Mock<IOptionsMonitor<AutoOverlayCleanupSettings>>();
-        
+
         // Setup default settings values
         var defaultSettings = new AutoOverlayCleanupSettings
         {
@@ -48,7 +48,7 @@ public class AutoOverlayCleanupServiceTests : IDisposable
             InitializationTimeoutMs = 10000
         };
         _settingsMock.Setup(s => s.CurrentValue).Returns(defaultSettings);
-        
+
         _service = new AutoOverlayCleanupService(
             _overlayManagerMock.Object,
             _eventAggregatorMock.Object,
@@ -156,14 +156,14 @@ public class AutoOverlayCleanupServiceTests : IDisposable
     {
         // Arrange
         await _service.InitializeAsync();
-        
+
         // Act - Call the deprecated update method
         _service.UpdateCircuitBreakerSettings(0.9f, 5);
 
         // Assert - Should log warning about deprecated usage but not affect current runtime behavior
         // Note: With configuration externalization, runtime updates should be done via appsettings.json
         // This method now only validates parameters and logs warnings
-        
+
         // Test still uses original settings from mock
         var regions = new List<Rectangle> { new(10, 10, 50, 50) };
         var highConfidenceEvent = new TextDisappearanceEvent(
@@ -172,9 +172,9 @@ public class AutoOverlayCleanupServiceTests : IDisposable
             regionId: "test-region",
             confidenceScore: 0.8f // Above default threshold of 0.7
         );
-        
+
         await _service.HandleAsync(highConfidenceEvent);
-        
+
         var statistics = _service.GetStatistics();
         statistics.RejectedByConfidence.Should().Be(0); // Should pass with default settings
         statistics.OverlaysCleanedUp.Should().Be(1); // One region cleaned up

@@ -10,32 +10,32 @@ public interface ITranslationError
     /// エラーの種類
     /// </summary>
     TranslationErrorCategory Category { get; }
-    
+
     /// <summary>
     /// エラーコード
     /// </summary>
     string ErrorCode { get; }
-    
+
     /// <summary>
     /// エラーメッセージ
     /// </summary>
     string Message { get; }
-    
+
     /// <summary>
     /// ユーザー向けメッセージ
     /// </summary>
     string UserFriendlyMessage { get; }
-    
+
     /// <summary>
     /// リトライ可能かどうか
     /// </summary>
     bool IsRetryable { get; }
-    
+
     /// <summary>
     /// 推奨されるリトライ遅延（ミリ秒）
     /// </summary>
     int? SuggestedRetryDelayMs { get; }
-    
+
     /// <summary>
     /// エラーの詳細情報
     /// </summary>
@@ -51,37 +51,37 @@ public enum TranslationErrorCategory
     /// OCR処理エラー
     /// </summary>
     OcrProcessing,
-    
+
     /// <summary>
     /// サーバー起動エラー
     /// </summary>
     ServerStartup,
-    
+
     /// <summary>
     /// ネットワーク接続エラー
     /// </summary>
     NetworkConnection,
-    
+
     /// <summary>
     /// 翻訳処理エラー
     /// </summary>
     TranslationProcessing,
-    
+
     /// <summary>
     /// 設定エラー
     /// </summary>
     Configuration,
-    
+
     /// <summary>
     /// リソース不足
     /// </summary>
     ResourceExhaustion,
-    
+
     /// <summary>
     /// タイムアウト
     /// </summary>
     Timeout,
-    
+
     /// <summary>
     /// 不明なエラー
     /// </summary>
@@ -100,7 +100,7 @@ public sealed class EnhancedTranslationError : ITranslationError
     public bool IsRetryable { get; init; }
     public int? SuggestedRetryDelayMs { get; init; }
     public Dictionary<string, object>? Details { get; init; }
-    
+
     /// <summary>
     /// OCRエラー用のファクトリメソッド
     /// </summary>
@@ -114,12 +114,12 @@ public sealed class EnhancedTranslationError : ITranslationError
             UserFriendlyMessage = "画像からテキストを読み取れませんでした",
             IsRetryable = true,
             SuggestedRetryDelayMs = 2000,
-            Details = innerException != null 
+            Details = innerException != null
                 ? new Dictionary<string, object> { ["InnerException"] = innerException.ToString() }
                 : null
         };
     }
-    
+
     /// <summary>
     /// サーバー起動エラー用のファクトリメソッド
     /// </summary>
@@ -136,7 +136,7 @@ public sealed class EnhancedTranslationError : ITranslationError
             Details = new Dictionary<string, object> { ["RetryCount"] = retryCount }
         };
     }
-    
+
     /// <summary>
     /// ネットワーク接続エラー用のファクトリメソッド
     /// </summary>

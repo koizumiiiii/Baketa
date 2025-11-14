@@ -1,13 +1,13 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.Translation;
 using Baketa.Core.Settings;
 using Baketa.Core.Utilities;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.OCR.PostProcessing;
 
@@ -52,11 +52,11 @@ public sealed class TimedChunkAggregator : IDisposable
         _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService));
         _proximityGroupingService = proximityGroupingService ?? throw new ArgumentNullException(nameof(proximityGroupingService));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        
+
         // 🔍 設定デバッグ情報出力
         _logger.LogDebug("🔍 [CONFIG_DEBUG] TimedChunkAggregator設定デバッグ開始");
         _logger.LogDebug("🔍 [CONFIG_DEBUG] settings parameter: {IsNull}", settings == null ? "NULL" : "NOT NULL");
-        
+
         if (settings != null)
         {
             _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue: {IsNull}", settings.CurrentValue == null ? "NULL" : "NOT NULL");
@@ -69,7 +69,7 @@ public sealed class TimedChunkAggregator : IDisposable
                 _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue.ProximityGrouping.HorizontalDistanceFactor: {HFactor}", settings.CurrentValue.ProximityGrouping.HorizontalDistanceFactor);
             }
         }
-        
+
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
         // 設定変更の動的反映を購読
@@ -79,12 +79,12 @@ public sealed class TimedChunkAggregator : IDisposable
             _logger.LogDebug("⚙️ 新しい設定 - IsFeatureEnabled: {Enabled}, BufferDelayMs: {DelayMs}, ProximityGrouping.Enabled: {ProximityEnabled}",
                 newSettings.IsFeatureEnabled, newSettings.BufferDelayMs, newSettings.ProximityGrouping.Enabled);
         });
-        
+
         // フォールバック後の設定値も確認
         _logger.LogDebug("🔍 [CONFIG_DEBUG] Final _settings.CurrentValue.IsFeatureEnabled: {Enabled}", _settings.CurrentValue.IsFeatureEnabled);
         _logger.LogDebug("🔍 [CONFIG_DEBUG] Final _settings.CurrentValue.BufferDelayMs: {DelayMs}", _settings.CurrentValue.BufferDelayMs);
         _logger.LogDebug("🔍 [CONFIG_DEBUG] TimedAggregatorSettings.Development.IsFeatureEnabled: {DevEnabled}", TimedAggregatorSettings.Development.IsFeatureEnabled);
-        
+
         _pendingChunksByWindow = new ConcurrentDictionary<IntPtr, List<TextChunk>>();
         _processingLock = new SemaphoreSlim(1, 1);
         _performanceStopwatch = new System.Diagnostics.Stopwatch();
@@ -291,7 +291,7 @@ public sealed class TimedChunkAggregator : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "チャンク追加処理中にエラーが発生: ChunkId={ChunkId}, WindowHandle={WindowHandle}", 
+            _logger.LogError(ex, "チャンク追加処理中にエラーが発生: ChunkId={ChunkId}, WindowHandle={WindowHandle}",
                 chunk?.ChunkId, chunk?.SourceWindowHandle);
             throw;
         }
@@ -435,7 +435,7 @@ public sealed class TimedChunkAggregator : IDisposable
                         CombinedBounds = allChunks.First().CombinedBounds,
                         SourceWindowHandle = allChunks.First().SourceWindowHandle,
                         DetectedLanguage = allChunks.First().DetectedLanguage,
-                        TextResults = allChunks.SelectMany(c => c.TextResults).ToList(),
+                        TextResults = [.. allChunks.SelectMany(c => c.TextResults)],
                         CaptureRegion = allChunks.First().CaptureRegion // 🔥 [FIX6_CONTEXT_INFO] CaptureRegion情報を引き継ぐ
                     };
 
@@ -502,7 +502,7 @@ public sealed class TimedChunkAggregator : IDisposable
                 chunksToProcessByWindow[handle] = chunks;
             }
         }
-        
+
         // 🚨 [CRITICAL_DEBUG] Line 496診断
         try { Console.WriteLine("🚨 [LINE496_BEFORE] Sum計算直前"); } catch { }
         var totalInputChunks = chunksToProcessByWindow.Values.Sum(list => list.Count);
@@ -561,12 +561,12 @@ public sealed class TimedChunkAggregator : IDisposable
                         Console.WriteLine($"  ✅ [OUTPUT_CHUNK_{i}] ID:{chunk.ChunkId}, Text:「{chunk.CombinedText}」, Bounds:(X:{chunk.CombinedBounds.X}, Y:{chunk.CombinedBounds.Y}, W:{chunk.CombinedBounds.Width}, H:{chunk.CombinedBounds.Height})");
                     }
                     allAggregatedChunks.AddRange(aggregatedChunks);
-                    
+
                     _logger.LogDebug("ウィンドウ {WindowHandle}: {InputCount}個→{OutputCount}個のチャンク統合",
                         windowHandle, chunksForWindow.Count, aggregatedChunks.Count);
                 }
             }
-            
+
             // 統合されたチャンクを翻訳パイプラインに送信
             if (allAggregatedChunks.Count > 0)
             {
@@ -592,10 +592,10 @@ public sealed class TimedChunkAggregator : IDisposable
             }
 
             Interlocked.Increment(ref _totalAggregationEvents);
-            
-            _logger.LogInformation("🎯 統合処理完了 - {InputCount}個→{OutputCount}個のチャンク", 
+
+            _logger.LogInformation("🎯 統合処理完了 - {InputCount}個→{OutputCount}個のチャンク",
                 totalInputChunks, allAggregatedChunks.Count);
-                
+
             // パフォーマンス統計ログ
             if (_settings.CurrentValue.EnablePerformanceLogging && _totalAggregationEvents % 10 == 0)
             {
@@ -605,26 +605,26 @@ public sealed class TimedChunkAggregator : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "チャンク統合処理中にエラーが発生");
-            
+
             // データロスト防止: エラー時は処理失敗したチャンクをキューに戻す
             foreach (var kvp in chunksToProcessByWindow)
             {
                 var windowHandle = kvp.Key;
                 var failedChunks = kvp.Value;
-                
+
                 // 既存のエントリがあれば先頭に挿入、なければ新規作成
-                _pendingChunksByWindow.AddOrUpdate(windowHandle, 
-                    failedChunks, 
-                    (key, existingChunks) => 
+                _pendingChunksByWindow.AddOrUpdate(windowHandle,
+                    failedChunks,
+                    (key, existingChunks) =>
                     {
                         failedChunks.AddRange(existingChunks);
                         return failedChunks;
                     });
-                    
-                _logger.LogWarning("エラー時データ復旧 - ウィンドウ {WindowHandle}: {Count}個のチャンクをキューに復元", 
+
+                _logger.LogWarning("エラー時データ復旧 - ウィンドウ {WindowHandle}: {Count}個のチャンクをキューに復元",
                     windowHandle, failedChunks.Count);
             }
-            
+
             throw;
         }
     }
@@ -715,7 +715,7 @@ public sealed class TimedChunkAggregator : IDisposable
         var combinedChunk = new TextChunk
         {
             ChunkId = GenerateNewChunkId(),
-            TextResults = groupChunks.SelectMany(c => c.TextResults).ToList(),
+            TextResults = [.. groupChunks.SelectMany(c => c.TextResults)],
             CombinedBounds = combinedBounds,
             CombinedText = combinedText,
             SourceWindowHandle = groupChunks[0].SourceWindowHandle,
@@ -748,7 +748,7 @@ public sealed class TimedChunkAggregator : IDisposable
         var combinedChunk = new TextChunk
         {
             ChunkId = GenerateNewChunkId(),
-            TextResults = chunks.SelectMany(c => c.TextResults).ToList(),
+            TextResults = [.. chunks.SelectMany(c => c.TextResults)],
             CombinedBounds = combinedBounds,
             CombinedText = combinedText,
             SourceWindowHandle = chunks[0].SourceWindowHandle,
@@ -806,7 +806,7 @@ public sealed class TimedChunkAggregator : IDisposable
     {
         return Interlocked.Increment(ref _nextChunkId);
     }
-    
+
     /// <summary>
     /// パフォーマンス統計をログ出力
     /// </summary>
@@ -815,7 +815,7 @@ public sealed class TimedChunkAggregator : IDisposable
         var totalProcessedChunks = Interlocked.Read(ref _totalChunksProcessed);
         var totalEvents = Interlocked.Read(ref _totalAggregationEvents);
         var averageChunksPerEvent = totalEvents > 0 ? totalProcessedChunks / (double)totalEvents : 0;
-        
+
         _logger.LogInformation("📊 TimedChunkAggregator統計 - 処理チャンク: {Total}, 集約イベント: {Events}, 平均: {Avg:F1}チャンク/イベント",
             totalProcessedChunks, totalEvents, averageChunksPerEvent);
     }
@@ -833,13 +833,13 @@ public sealed class TimedChunkAggregator : IDisposable
         _aggregationTimer?.Dispose();
         _processingLock?.Dispose();
         _settingsChangeSubscription?.Dispose();
-        
+
         if (_settings.CurrentValue.EnablePerformanceLogging)
         {
             LogPerformanceStatistics();
         }
-        
-        _logger.LogInformation("🧹 TimedChunkAggregator disposed - 最終統計: {Chunks}チャンク, {Events}イベント", 
+
+        _logger.LogInformation("🧹 TimedChunkAggregator disposed - 最終統計: {Chunks}チャンク, {Events}イベント",
             _totalChunksProcessed, _totalAggregationEvents);
     }
 }

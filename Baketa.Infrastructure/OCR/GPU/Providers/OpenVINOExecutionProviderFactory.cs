@@ -1,8 +1,8 @@
-using Microsoft.ML.OnnxRuntime;
+using System.IO;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
-using System.IO;
+using Microsoft.ML.OnnxRuntime;
 
 namespace Baketa.Infrastructure.OCR.GPU.Providers;
 
@@ -68,7 +68,7 @@ public sealed class OpenVINOExecutionProviderFactory(
             // パフォーマンス最適化設定
             openvinoOptions["num_of_threads"] = _settings.NumThreads.ToString();
             openvinoOptions["cache_dir"] = _settings.CacheDirectory;
-            
+
             if (_settings.EnableDynamicShapes)
             {
                 openvinoOptions["enable_dynamic_shapes"] = "true";
@@ -102,14 +102,14 @@ public sealed class OpenVINOExecutionProviderFactory(
     {
         // Gemini推奨: 設定ファイルから基本優先度を取得し、環境に応じて微調整
         var basePriority = _settings.Priority;
-        
+
         if (IsIntelEnvironment())
         {
             // Intel環境: 統合GPU vs CPU の違いを考慮
             var intelBonus = environment.IsIntegratedGpu ? 5 : 0;
             return basePriority + intelBonus;
         }
-        
+
         // AMD/その他環境では大幅に優先度を下げる
         return Math.Max(basePriority - 50, 10);
     }

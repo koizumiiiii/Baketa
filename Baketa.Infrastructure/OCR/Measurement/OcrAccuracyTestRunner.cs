@@ -25,44 +25,44 @@ public sealed class OcrAccuracyTestRunner(
         try
         {
             outputDir ??= System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BaketaOcrAccuracyTest");
-            
+
             _logger.LogInformation("🚀 OCR精度測定テスト開始 - 出力先: {OutputDir}", outputDir);
-            
+
             // テスト画像の生成
             _logger.LogInformation("📷 テスト画像生成中...");
             var testCases = await _imageGenerator.GenerateTestCasesAsync(outputDir).ConfigureAwait(false);
-            
+
             _logger.LogInformation("✅ テスト画像生成完了: {Count}件", testCases.Count);
-            
+
             // 各テストケースについてOCR結果をシミュレート
             foreach (var (imagePath, expectedText) in testCases)
             {
                 // 実際のOCRエンジンの代わりにシミュレート結果を生成
                 var simulatedOcrResult = await SimulateOcrResultAsync(imagePath, expectedText).ConfigureAwait(false);
-                
+
                 // OCR結果を記録（期待テキスト付き）
                 await _accuracyLogger.LogOcrResultWithExpectedAsync(
-                    simulatedOcrResult, 
-                    expectedText, 
+                    simulatedOcrResult,
+                    expectedText,
                     imagePath).ConfigureAwait(false);
-                
-                _logger.LogInformation("📊 OCR結果記録: {ImagePath} -> '{ExpectedText}'", 
+
+                _logger.LogInformation("📊 OCR結果記録: {ImagePath} -> '{ExpectedText}'",
                     System.IO.Path.GetFileName(imagePath), expectedText);
             }
-            
+
             // 統計情報の取得
             var stats = _accuracyLogger.GetAccuracyStats();
             _logger.LogInformation("📈 測定統計: 総数={Total}, 期待テキスト付き={WithExpected}, 平均精度={AvgAccuracy:P2}",
                 stats.TotalMeasurements,
                 stats.MeasurementsWithExpected,
                 stats.AverageOverallAccuracy);
-            
+
             // 詳細レポートの生成
             var reportPath = System.IO.Path.Combine(outputDir, "ocr_accuracy_test_report.md");
             var generatedReportPath = await _accuracyLogger.GenerateDetailedReportAsync(reportPath).ConfigureAwait(false);
-            
+
             _logger.LogInformation("🎯 OCR精度測定テスト完了 - レポート: {ReportPath}", generatedReportPath);
-            
+
             return generatedReportPath;
         }
         catch (Exception ex)
@@ -81,7 +81,7 @@ public sealed class OcrAccuracyTestRunner(
     private async Task<OcrResults> SimulateOcrResultAsync(string imagePath, string expectedText)
     {
         await Task.Delay(50).ConfigureAwait(false); // OCR処理時間をシミュレート
-        
+
         // 画像ファイル名から精度をシミュレート
         var fileName = System.IO.Path.GetFileName(imagePath);
         var accuracy = fileName switch
@@ -91,19 +91,19 @@ public sealed class OcrAccuracyTestRunner(
             var name when name.Contains("game") => 0.80,   // ゲーム風は中精度
             _ => 0.90 // デフォルト
         };
-        
+
         // 精度に基づいてテキストを変更（エラーシミュレート）
         var detectedText = SimulateTextRecognitionErrors(expectedText, accuracy);
-        
+
         // ダミー画像オブジェクト（実際の実装では実際のIImageが必要）
         var dummyImage = new DummyImage(imagePath);
-        
+
         // OCR領域の生成
         var textRegion = new OcrTextRegion(
             detectedText,
             new System.Drawing.Rectangle(10, 10, 280, 80),
             accuracy);
-        
+
         return new OcrResults(
             [textRegion],
             dummyImage,
@@ -122,16 +122,16 @@ public sealed class OcrAccuracyTestRunner(
     private static string SimulateTextRecognitionErrors(string originalText, double accuracy)
     {
         if (accuracy >= 0.98) return originalText; // ほぼ完璧
-        
+
         var random = Random.Shared;
         var chars = originalText.ToCharArray();
         var errorRate = 1.0 - accuracy;
         var errorsToIntroduce = (int)(chars.Length * errorRate);
-        
+
         for (int i = 0; i < errorsToIntroduce && i < chars.Length; i++)
         {
             var index = random.Next(chars.Length);
-            
+
             // ランダムにエラーを導入
             switch (random.Next(4))
             {
@@ -150,7 +150,7 @@ public sealed class OcrAccuracyTestRunner(
                     break;
             }
         }
-        
+
         return new string([.. chars.Where(c => c != '\0')]);
     }
 
@@ -217,17 +217,17 @@ internal sealed class DummyImage(string path) : Baketa.Core.Abstractions.Imaging
     public System.Drawing.Bitmap ToBitmap() => new(Width, Height);
     public Baketa.Core.Abstractions.Imaging.IImage Clone() => new DummyImage(FilePath ?? string.Empty);
 
-    public Baketa.Core.Abstractions.Imaging.IImage Crop(System.Drawing.Rectangle _) => 
+    public Baketa.Core.Abstractions.Imaging.IImage Crop(System.Drawing.Rectangle _) =>
         new DummyImage(FilePath ?? string.Empty);
 
-    public Baketa.Core.Abstractions.Imaging.IImage Resize(int _1, int _2) => 
+    public Baketa.Core.Abstractions.Imaging.IImage Resize(int _1, int _2) =>
         new DummyImage(FilePath ?? string.Empty);
-        
-    public Task<Baketa.Core.Abstractions.Imaging.IImage> ResizeAsync(int _1, int _2) => 
+
+    public Task<Baketa.Core.Abstractions.Imaging.IImage> ResizeAsync(int _1, int _2) =>
         Task.FromResult<Baketa.Core.Abstractions.Imaging.IImage>(new DummyImage(FilePath ?? string.Empty));
 
     public void SaveToFile(string _) { }
 
-    public Task SaveToFileAsync(string _1, CancellationToken _2 = default) => 
+    public Task SaveToFileAsync(string _1, CancellationToken _2 = default) =>
         Task.CompletedTask;
 }

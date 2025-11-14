@@ -1,13 +1,13 @@
 using System;
 using System.Linq;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
+using Baketa.UI.Tests.TestUtilities;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
-using Baketa.Core.Settings;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.ViewModels.Settings;
-using Baketa.UI.Tests.TestUtilities;
 
 namespace Baketa.UI.Tests.ViewModels.Settings;
 
@@ -46,7 +46,7 @@ public class CaptureSettingsViewModelTests
     public void Constructor_WithNullSettings_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new CaptureSettingsViewModel(null!, _mockEventAggregator.Object, _mockLogger.Object));
     }
 
@@ -87,7 +87,7 @@ public class CaptureSettingsViewModelTests
         // Arrange
         var originalSettings = TestDataFactory.CreateCaptureSettings();
         var viewModel = new CaptureSettingsViewModel(originalSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
+
         var newSettings = new CaptureSettings
         {
             IsEnabled = false,

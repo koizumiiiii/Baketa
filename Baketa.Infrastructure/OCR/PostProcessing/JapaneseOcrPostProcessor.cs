@@ -17,7 +17,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
     private readonly ConcurrentDictionary<string, int> _correctionStats = new();
     private int _totalProcessed;
     private int _correctionsApplied;
-    
+
     /// <summary>
     /// 一般的な漢字誤認識パターン（左が誤認識、右が正しい文字）
     /// </summary>
@@ -65,7 +65,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
         { "利良", "制限" },      // 「制限」→「利良"
         { "横印限", "機能限" },  // 「機能限」→「横印限"
     };
-    
+
     /// <summary>
     /// カタカナ誤認識パターン
     /// </summary>
@@ -85,7 +85,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
         { "ロゴ", "ロゴ" },  // 確認用（既に正しい）
         { "口ゴ", "ロゴ" },  // 「ロゴ」→「口ゴ」
     };
-    
+
     /// <summary>
     /// 英語混在パターンの修正
     /// </summary>
@@ -117,7 +117,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
         { "sirgupnopotF", "signup" },  // 「signup」→「sirgupnopotF」
         { "sirgupnopoxF", "signup" },  // 「signup」→「sirgupnopoxF」
     };
-    
+
     /// <summary>
     /// 文脈を考慮した単語レベルの修正
     /// </summary>
@@ -181,19 +181,19 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
     {
         if (string.IsNullOrWhiteSpace(rawText))
             return rawText;
-        
+
         _totalProcessed++;
-        
+
         try
         {
             _logger.LogDebug("OCR後処理開始: 信頼度={Confidence:F3}, テキスト長={Length}", confidence, rawText.Length);
-            
+
             // 非同期処理として実装（将来的にネットワーク辞書参照などに対応）
             var processedText = await Task.Run(() => CorrectCommonErrors(rawText)).ConfigureAwait(false);
-            
-            _logger.LogDebug("OCR後処理完了: 修正前='{Original}', 修正後='{Processed}'", 
+
+            _logger.LogDebug("OCR後処理完了: 修正前='{Original}', 修正後='{Processed}'",
                 rawText.Replace("\n", "\\n"), processedText.Replace("\n", "\\n"));
-            
+
             return processedText;
         }
         catch (Exception ex)
@@ -202,7 +202,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
             return rawText; // エラーの場合は元のテキストを返す
         }
     }
-    
+
     /// <summary>
     /// よくある誤認識パターンを修正
     /// </summary>
@@ -210,10 +210,10 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
     {
         if (string.IsNullOrWhiteSpace(text))
             return text;
-        
+
         var correctedText = text;
         var correctionCount = 0;
-        
+
         // 1. 文脈を考慮した単語レベルの修正（最も優先度が高い）
         foreach (var pattern in ContextualCorrections)
         {
@@ -224,7 +224,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
                 correctionCount++;
             }
         }
-        
+
         // 2. 漢字レベルの修正
         foreach (var pattern in KanjiCorrectionPatterns)
         {
@@ -235,7 +235,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
                 correctionCount++;
             }
         }
-        
+
         // 3. カタカナレベルの修正
         foreach (var pattern in KatakanaCorrectionPatterns)
         {
@@ -246,7 +246,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
                 correctionCount++;
             }
         }
-        
+
         // 4. 英語混在パターンの修正
         foreach (var pattern in EnglishMixedPatterns)
         {
@@ -257,27 +257,27 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
                 correctionCount++;
             }
         }
-        
+
         // 5. 基本的な文字修正（ひらがな・句読点など）
         correctedText = ApplyBasicCorrections(correctedText, ref correctionCount);
-        
+
         if (correctionCount > 0)
         {
             _correctionsApplied++;
-            _logger.LogDebug("テキスト修正適用: {Count}個の修正, '{Original}' → '{Corrected}'", 
+            _logger.LogDebug("テキスト修正適用: {Count}個の修正, '{Original}' → '{Corrected}'",
                 correctionCount, text, correctedText);
         }
-        
+
         return correctedText;
     }
-    
+
     /// <summary>
     /// 基本的な文字レベルの修正を適用
     /// </summary>
     private string ApplyBasicCorrections(string text, ref int correctionCount)
     {
         var corrected = text;
-        
+
         // 一般的な句読点の修正
         var basicPatterns = new Dictionary<string, string>
         {
@@ -295,7 +295,7 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
             { "～", "〜" },    // 波ダッシュの正規化
             { "・", "・" },    // 中点の正規化
         };
-        
+
         foreach (var pattern in basicPatterns)
         {
             if (corrected.Contains(pattern.Key) && pattern.Key != pattern.Value)
@@ -305,10 +305,10 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
                 correctionCount++;
             }
         }
-        
+
         return corrected;
     }
-    
+
     /// <summary>
     /// 修正統計を記録
     /// </summary>
@@ -316,23 +316,23 @@ public class JapaneseOcrPostProcessor(ILogger<JapaneseOcrPostProcessor> logger) 
     {
         _correctionStats.AddOrUpdate(correctionPattern, 1, (key, value) => value + 1);
     }
-    
+
     /// <summary>
     /// 後処理統計を取得
     /// </summary>
     public PostProcessingStats GetStats()
     {
         var topPatterns = new Dictionary<string, int>();
-        
+
         // 上位5つの修正パターンを取得
         var sortedStats = _correctionStats.ToList();
         sortedStats.Sort((x, y) => y.Value.CompareTo(x.Value));
-        
+
         for (int i = 0; i < Math.Min(5, sortedStats.Count); i++)
         {
             topPatterns[sortedStats[i].Key] = sortedStats[i].Value;
         }
-        
+
         return new PostProcessingStats
         {
             TotalProcessed = _totalProcessed,

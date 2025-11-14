@@ -13,14 +13,14 @@ public interface IPaddleOcrEngineFactory
     /// </summary>
     /// <returns>新しいIOcrEngineインスタンス</returns>
     Task<IOcrEngine> CreateAsync();
-    
+
     /// <summary>
     /// エンジンインスタンスをクリーンアップします
     /// プールへの返却時に呼び出されます
     /// </summary>
     /// <param name="engine">クリーンアップ対象エンジン</param>
     Task CleanupAsync(IOcrEngine engine);
-    
+
     /// <summary>
     /// エンジンインスタンスが再利用可能かどうかを判定します
     /// </summary>

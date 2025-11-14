@@ -1,8 +1,8 @@
+using System.Diagnostics;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Patterns;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
-using Baketa.Core.Abstractions.Patterns;
-using Baketa.Core.Abstractions.OCR;
 
 namespace Baketa.Infrastructure.Patterns;
 
@@ -17,7 +17,7 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
     private readonly OcrCircuitBreakerOptions _options;
     private readonly object _lock = new();
     private readonly System.Threading.Timer _resetTimer;
-    
+
     private CircuitBreakerState _state = CircuitBreakerState.Closed;
     private int _failureCount = 0;
     private DateTime? _lastFailureTime;
@@ -32,63 +32,63 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
     {
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // 定期的なリセット処理タイマー
         _resetTimer = new System.Threading.Timer(CheckForReset, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-        
+
         _logger.LogInformation("🔧 OcrCircuitBreaker初期化完了 - 失敗閾値: {Threshold}, オープン時間: {OpenTime}, " +
             "半開き復帰間隔: {HalfOpenInterval}, 自動フォールバック: {AutoFallback}",
             _options.FailureThreshold, _options.OpenTimeout, _options.HalfOpenRetryInterval, _options.AutoFallbackEnabled);
     }
 
-    public CircuitBreakerState State 
-    { 
-        get 
-        { 
-            lock (_lock) 
-            { 
-                return _state; 
-            } 
-        } 
+    public CircuitBreakerState State
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _state;
+            }
+        }
     }
-    
-    public bool IsCircuitOpen 
-    { 
-        get 
-        { 
-            lock (_lock) 
-            { 
-                return _state == CircuitBreakerState.Open; 
-            } 
-        } 
+
+    public bool IsCircuitOpen
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _state == CircuitBreakerState.Open;
+            }
+        }
     }
-    
-    public int FailureCount 
-    { 
-        get 
-        { 
-            lock (_lock) 
-            { 
-                return _failureCount; 
-            } 
-        } 
+
+    public int FailureCount
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _failureCount;
+            }
+        }
     }
-    
-    public DateTime? LastFailureTime 
-    { 
-        get 
-        { 
-            lock (_lock) 
-            { 
-                return _lastFailureTime; 
-            } 
-        } 
+
+    public DateTime? LastFailureTime
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _lastFailureTime;
+            }
+        }
     }
 
     public async Task<OcrResults> ExecuteAsync(Func<CancellationToken, Task<OcrResults>> operation, CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _totalExecutions);
-        
+
         lock (_lock)
         {
             // Circuit Breaker状態チェック
@@ -97,7 +97,7 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
                 var timeSinceOpen = DateTime.UtcNow - _lastOpenTime;
                 if (timeSinceOpen < _options.OpenTimeout)
                 {
-                    _logger.LogDebug("⚠️ Circuit Breaker開放中 - 残り時間: {Remaining}s", 
+                    _logger.LogDebug("⚠️ Circuit Breaker開放中 - 残り時間: {Remaining}s",
                         (_options.OpenTimeout - timeSinceOpen).TotalSeconds);
                     throw new CircuitBreakerOpenException($"Circuit breaker is open. Time remaining: {(_options.OpenTimeout - timeSinceOpen).TotalSeconds:F1}s");
                 }
@@ -111,23 +111,23 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
         }
 
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             _logger.LogDebug("🔧 OCR Circuit Breaker実行 - 状態: {State}, 失敗数: {Failures}", _state, _failureCount);
-            
+
             var result = await operation(cancellationToken);
             stopwatch.Stop();
-            
+
             // 成功時の処理
             OnSuccess(stopwatch.Elapsed);
-            
+
             return result;
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            
+
             // 失敗時の処理
             OnFailure(ex, stopwatch.Elapsed);
             throw;
@@ -140,7 +140,7 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
         {
             _failureCount = 0;
             _lastSuccessTime = DateTime.UtcNow;
-            
+
             if (_state == CircuitBreakerState.HalfOpen)
             {
                 _state = CircuitBreakerState.Closed;
@@ -156,23 +156,23 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
     private void OnFailure(Exception ex, TimeSpan executionTime)
     {
         Interlocked.Increment(ref _totalFailures);
-        
+
         lock (_lock)
         {
             _failureCount++;
             _lastFailureTime = DateTime.UtcNow;
-            
-            _logger.LogWarning(ex, "❌ OCR実行失敗 - 失敗数: {Failures}/{Threshold}, 実行時間: {Time}ms", 
+
+            _logger.LogWarning(ex, "❌ OCR実行失敗 - 失敗数: {Failures}/{Threshold}, 実行時間: {Time}ms",
                 _failureCount, _options.FailureThreshold, executionTime.TotalMilliseconds);
-            
+
             if (_failureCount >= _options.FailureThreshold && _state != CircuitBreakerState.Open)
             {
                 _state = CircuitBreakerState.Open;
                 _lastOpenTime = DateTime.UtcNow;
                 Interlocked.Increment(ref _circuitOpenCount);
-                
+
                 _logger.LogError("🚨 Circuit Breaker開放 - 失敗閾値到達: {Failures}, 開放時間: {OpenTime}, " +
-                    "自動フォールバック: {AutoFallback}", 
+                    "自動フォールバック: {AutoFallback}",
                     _failureCount, _options.OpenTimeout, _options.AutoFallbackEnabled);
             }
         }
@@ -186,7 +186,7 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
             _failureCount = 0;
             _state = CircuitBreakerState.Closed;
             _lastFailureTime = null;
-            
+
             _logger.LogInformation("🔄 Circuit Breaker手動リセット - 前状態: {PreviousState} → 正常状態", previousState);
         }
     }
@@ -195,8 +195,8 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
     {
         lock (_lock)
         {
-            var circuitOpenDuration = _state == CircuitBreakerState.Open ? 
-                DateTime.UtcNow - _lastOpenTime : 
+            var circuitOpenDuration = _state == CircuitBreakerState.Open ?
+                DateTime.UtcNow - _lastOpenTime :
                 TimeSpan.Zero;
 
             return new CircuitBreakerStats
@@ -215,7 +215,7 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
     private void CheckForReset(object? state)
     {
         if (_disposed) return;
-        
+
         try
         {
             lock (_lock)
@@ -240,11 +240,11 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         try
         {
             _resetTimer?.Dispose();
-            
+
             // 最終統計
             var stats = GetStats();
             _logger.LogInformation("📊 OcrCircuitBreaker統計 - " +
@@ -255,7 +255,7 @@ public sealed class OcrCircuitBreaker : ICircuitBreaker<OcrResults>, IDisposable
         {
             _logger.LogError(ex, "❌ OcrCircuitBreaker解放エラー");
         }
-        
+
         _disposed = true;
         _logger.LogInformation("✅ OcrCircuitBreaker解放完了");
     }
@@ -270,27 +270,27 @@ public class OcrCircuitBreakerOptions
     /// 失敗閾値（この回数失敗するとサーキットオープン）
     /// </summary>
     public int FailureThreshold { get; set; } = 5;
-    
+
     /// <summary>
     /// サーキットオープン時間
     /// </summary>
     public TimeSpan OpenTimeout { get; set; } = TimeSpan.FromMinutes(1);
-    
+
     /// <summary>
     /// 半開き復帰テスト間隔
     /// </summary>
     public TimeSpan HalfOpenRetryInterval { get; set; } = TimeSpan.FromSeconds(30);
-    
+
     /// <summary>
     /// 自動フォールバックが有効かどうか
     /// </summary>
     public bool AutoFallbackEnabled { get; set; } = true;
-    
+
     /// <summary>
     /// GPU失敗時の即座フォールバック有効
     /// </summary>
     public bool ImmediateFallbackOnGpuError { get; set; } = true;
-    
+
     /// <summary>
     /// 詳細ログ出力
     /// </summary>

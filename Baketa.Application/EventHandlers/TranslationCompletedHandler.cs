@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
 using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Translation;
 
 namespace Baketa.Application.EventHandlers;
 
@@ -38,7 +38,7 @@ public class TranslationCompletedHandler(
     {
         try
         {
-            _logger.LogInformation("🔄 [中継] TranslationCompletedEvent受信 - ID: {EventId}, テキスト長: {TextLength}", 
+            _logger.LogInformation("🔄 [中継] TranslationCompletedEvent受信 - ID: {EventId}, テキスト長: {TextLength}",
                 eventData?.Id, eventData?.TranslatedText?.Length ?? 0);
             Console.WriteLine($"🔄 [中継] TranslationCompletedEvent受信 - ID: {eventData?.Id}");
 
@@ -65,14 +65,14 @@ public class TranslationCompletedHandler(
                 engineName: eventData.EngineName ?? "Default"
             );
 
-            _logger.LogInformation("🎯 [中継] TranslationWithBoundsCompletedEvent発行 - ID: {EventId}, Bounds: ({X},{Y},{W},{H})", 
-                boundsEvent.Id, boundsEvent.Bounds.X, boundsEvent.Bounds.Y, 
+            _logger.LogInformation("🎯 [中継] TranslationWithBoundsCompletedEvent発行 - ID: {EventId}, Bounds: ({X},{Y},{W},{H})",
+                boundsEvent.Id, boundsEvent.Bounds.X, boundsEvent.Bounds.Y,
                 boundsEvent.Bounds.Width, boundsEvent.Bounds.Height);
             Console.WriteLine($"🎯 [中継] TranslationWithBoundsCompletedEvent発行 - ID: {boundsEvent.Id}");
 
             // UI表示用イベントを発行
             await _eventAggregator.PublishAsync(boundsEvent).ConfigureAwait(false);
-            
+
             _logger.LogInformation("✅ [中継] TranslationCompletedEvent → TranslationWithBoundsCompletedEvent変換完了");
             Console.WriteLine($"✅ [中継] イベント変換完了 - {eventData.Id} → {boundsEvent.Id}");
         }

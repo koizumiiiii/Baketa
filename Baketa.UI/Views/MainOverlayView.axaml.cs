@@ -1,11 +1,11 @@
+using System;
+using System.IO;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
-using Baketa.UI.ViewModels;
 using Baketa.UI.Utils;
-using System;
-using System.IO;
+using Baketa.UI.ViewModels;
 
 namespace Baketa.UI.Views;
 
@@ -15,22 +15,22 @@ public partial class MainOverlayView : Window
     {
         Console.WriteLine("🔧 MainOverlayView初期化開始");
         SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 MainOverlayView初期化開始");
-        
+
         InitializeComponent();
-        
+
         Console.WriteLine("🔧 MainOverlayView - InitializeComponent完了");
         SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 MainOverlayView - InitializeComponent完了");
-        
+
         // 画面左端から16px、縦中央に配置
         ConfigurePosition();
-        
+
         // 可視性確認
         Console.WriteLine($"🔧 MainOverlayView - IsVisible: {IsVisible}");
         SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 MainOverlayView - IsVisible: {IsVisible}");
         Console.WriteLine($"🔧 MainOverlayView - WindowState: {WindowState}");
         SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 MainOverlayView - WindowState: {WindowState}");
     }
-    
+
     private void ConfigurePosition()
     {
         // 画面サイズを取得
@@ -39,17 +39,17 @@ public partial class MainOverlayView : Window
         {
             var bounds = screen.WorkingArea;
             var windowHeight = 380; // 展開時の高さ値を使用（Exitボタンを含む）
-            
+
             // X座標: 画面左端から16px
             var x = 16;
-            
+
             // Y座標: 画面縦中央（オーバーレイ中央が画面中央に来るよう配置）
             var y = (bounds.Height - windowHeight) / 2;
-            
+
             Position = new Avalonia.PixelPoint(x, (int)y);
         }
     }
-    
+
     protected override void OnLoaded(RoutedEventArgs e)
     {
         Console.WriteLine("🔧 MainOverlayView - OnLoaded呼び出し");
@@ -107,8 +107,8 @@ public partial class MainOverlayView : Window
             SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 MainOverlayView - Show/Activate失敗: {ex.Message}");
         }
     }
-    
-    
+
+
     private void OnExitButtonClick(object? sender, RoutedEventArgs e)
     {
         Console.WriteLine("🔴 ExitButtonClick呼び出し");

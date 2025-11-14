@@ -15,22 +15,22 @@ public interface ICircuitBreaker<T>
     /// サーキットブレーカーの現在の状態
     /// </summary>
     CircuitBreakerState State { get; }
-    
+
     /// <summary>
     /// サーキットが開いているかどうか
     /// </summary>
     bool IsCircuitOpen { get; }
-    
+
     /// <summary>
     /// 失敗カウント
     /// </summary>
     int FailureCount { get; }
-    
+
     /// <summary>
     /// 最後の失敗時刻
     /// </summary>
     DateTime? LastFailureTime { get; }
-    
+
     /// <summary>
     /// 操作を実行し、サーキットブレーカーロジックを適用
     /// </summary>
@@ -38,12 +38,12 @@ public interface ICircuitBreaker<T>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>操作の結果</returns>
     Task<T> ExecuteAsync(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// サーキットを手動でリセット
     /// </summary>
     void Reset();
-    
+
     /// <summary>
     /// サーキットブレーカーの統計情報を取得
     /// </summary>
@@ -59,12 +59,12 @@ public enum CircuitBreakerState
     /// 閉じている（正常動作）
     /// </summary>
     Closed,
-    
+
     /// <summary>
     /// 開いている（障害状態）
     /// </summary>
     Open,
-    
+
     /// <summary>
     /// 半開き（復旧テスト中）
     /// </summary>
@@ -80,37 +80,37 @@ public record CircuitBreakerStats
     /// 総実行回数
     /// </summary>
     public long TotalExecutions { get; init; }
-    
+
     /// <summary>
     /// 総失敗回数
     /// </summary>
     public long TotalFailures { get; init; }
-    
+
     /// <summary>
     /// 連続失敗回数
     /// </summary>
     public int ConsecutiveFailures { get; init; }
-    
+
     /// <summary>
     /// 失敗率
     /// </summary>
     public double FailureRate => TotalExecutions > 0 ? (double)TotalFailures / TotalExecutions : 0.0;
-    
+
     /// <summary>
     /// 最後の成功時刻
     /// </summary>
     public DateTime? LastSuccessTime { get; init; }
-    
+
     /// <summary>
     /// 最後の失敗時刻
     /// </summary>
     public DateTime? LastFailureTime { get; init; }
-    
+
     /// <summary>
     /// サーキットが開いている時間
     /// </summary>
     public TimeSpan? CircuitOpenDuration { get; init; }
-    
+
     /// <summary>
     /// サーキットブレーカーがオープンした回数
     /// </summary>

@@ -1,11 +1,11 @@
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using System.IO;
-using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.Memory;
+using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Adapters;
 using Microsoft.Extensions.Logging;
@@ -33,7 +33,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
     private static bool _hasBeenShutdown;
     private static bool _isApplicationExiting;
     private static bool _globalInitialized;
-    
+
     // 🔒 ウィンドウ選択時の安全化: キャプチャ一時停止機能
     private static bool _isPausedForWindowSelection;
     private static readonly object _pauseLock = new();
@@ -116,7 +116,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 _initialized = true;
                 _activeInstances++;
                 _logger?.LogInformation("ネイティブ Windows Graphics Capture インスタンス初期化 (ActiveInstances={ActiveInstances})", _activeInstances);
-                
+
                 return true;
             }
         }
@@ -177,11 +177,11 @@ public class NativeWindowsCaptureWrapper : IDisposable
             if (result != NativeWindowsCapture.ErrorCodes.Success)
             {
                 string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
-                
+
                 // システムダイアログやセキュリティウィンドウのキャプチャ失敗は想定内のためDebugレベル
                 // Windows Graphics Capture APIの仕様により、これらは意図的に保護されている
                 bool isExpectedFailure = false;
-                
+
                 // HRESULTエラーコードから判定（E_ACCESSDENIED, E_INVALIDARG など）
                 if (result == -2147024891 || // E_ACCESSDENIED (0x80070005)
                     result == -2147024809 || // E_INVALIDARG (0x80070057)
@@ -189,7 +189,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 {
                     isExpectedFailure = true;
                 }
-                
+
                 // 2560x1080などの大画面解像度の場合のメモリ不足エラーを特定
                 if (result == NativeWindowsCapture.ErrorCodes.Memory)
                 {
@@ -212,7 +212,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
             }
 
             _windowHandle = windowHandle;
-            _logger?.LogDebug("キャプチャセッションを作成しました: SessionId={SessionId}, WindowHandle=0x{WindowHandle:X8}", 
+            _logger?.LogDebug("キャプチャセッションを作成しました: SessionId={SessionId}, WindowHandle=0x{WindowHandle:X8}",
                 _sessionId, windowHandle.ToInt64());
             return true;
         }
@@ -247,11 +247,11 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     return null;
                 }
             }
-            
+
             // 🚀 安全化: フレーム構造体を初期化
             var frame = new NativeWindowsCapture.BaketaCaptureFrame();
             bool frameValid = false;
-            
+
             try
             {
                 int result = NativeWindowsCapture.BaketaCapture_CaptureFrame(_sessionId, out frame, timeoutMs);
@@ -426,7 +426,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
             _logger?.LogError(ex, "キャプチャセッション停止中にエラー");
         }
     }
-    
+
     /// <summary>
     /// リソースを解放
     /// </summary>

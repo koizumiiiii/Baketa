@@ -8,16 +8,16 @@ namespace Baketa.Infrastructure.Platform.Adapters.Factory;
 public class WindowsAdapterFactory(IServiceProvider serviceProvider) : IAdapterFactory
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-    
+
     /// <inheritdoc/>
-    public IWindowsImageAdapter CreateImageAdapter() => 
+    public IWindowsImageAdapter CreateImageAdapter() =>
         _serviceProvider.GetRequiredService<IWindowsImageAdapter>();
-        
+
     /// <inheritdoc/>
-    public ICaptureAdapter CreateCaptureAdapter() => 
+    public ICaptureAdapter CreateCaptureAdapter() =>
         _serviceProvider.GetRequiredService<ICaptureAdapter>();
-        
+
     /// <inheritdoc/>
-    public IWindowManagerAdapter CreateWindowManagerAdapter() => 
+    public IWindowManagerAdapter CreateWindowManagerAdapter() =>
         _serviceProvider.GetRequiredService<IWindowManagerAdapter>();
 }

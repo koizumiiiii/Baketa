@@ -14,7 +14,7 @@ public interface IGpuDeviceManager
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>GPU デバイス情報一覧</returns>
     Task<IReadOnlyList<GpuDeviceInfo>> GetAvailableGpuDevicesAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 指定された処理負荷に最適なGPUを選択
     /// 現在の負荷状況とGPU性能を考慮した自動選択
@@ -24,7 +24,7 @@ public interface IGpuDeviceManager
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>最適なGPU環境情報</returns>
     Task<GpuEnvironmentInfo> SelectOptimalGpuAsync(GpuWorkloadType workloadType, int estimatedMemoryMB = 0, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 複数のPNPDeviceIDから最適なGPUを選択
     /// 明示的なデバイス指定での最適化
@@ -33,7 +33,7 @@ public interface IGpuDeviceManager
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>選択されたGPU環境情報</returns>
     Task<GpuEnvironmentInfo> SelectOptimalGpuAsync(string[] pnpDeviceIds, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 指定されたGPUの可用性を検証
     /// TDR状態やドライバー問題の検出
@@ -42,7 +42,7 @@ public interface IGpuDeviceManager
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>GPU可用性情報</returns>
     Task<GpuAvailabilityStatus> ValidateGpuAvailabilityAsync(string pnpDeviceId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// GPUの現在の負荷状況を取得
     /// リアルタイム監視とスケジューリング用
@@ -51,7 +51,7 @@ public interface IGpuDeviceManager
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>GPU負荷状況</returns>
     Task<GpuWorkloadStatus> GetGpuWorkloadStatusAsync(string pnpDeviceId, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// GPU負荷分散のための推奨配置を取得
     /// 複数処理の効率的なGPU配置戦略
@@ -71,52 +71,52 @@ public class GpuDeviceInfo
     /// PNP Device ID（一意識別子）
     /// </summary>
     public string PnpDeviceId { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// GPU 名称
     /// </summary>
     public string Name { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// ベンダー名
     /// </summary>
     public string Vendor { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// 専用VRAM容量（MB）
     /// </summary>
     public long DedicatedMemoryMB { get; init; }
-    
+
     /// <summary>
     /// 共有メモリ容量（MB）
     /// </summary>
     public long SharedMemoryMB { get; init; }
-    
+
     /// <summary>
     /// 現在の利用可能メモリ（MB）
     /// </summary>
     public long AvailableMemoryMB { get; init; }
-    
+
     /// <summary>
     /// デバイスインデックス
     /// </summary>
     public int DeviceIndex { get; init; }
-    
+
     /// <summary>
     /// 専用GPU（統合GPUでない）
     /// </summary>
     public bool IsDedicatedGpu { get; init; }
-    
+
     /// <summary>
     /// 対応実行プロバイダー
     /// </summary>
     public List<ExecutionProvider> SupportedProviders { get; init; } = [];
-    
+
     /// <summary>
     /// パフォーマンス評価スコア（0-100）
     /// </summary>
     public int PerformanceScore { get; init; }
-    
+
     /// <summary>
     /// ドライバーバージョン
     /// </summary>
@@ -132,22 +132,22 @@ public enum GpuWorkloadType
     /// テキスト検出処理
     /// </summary>
     TextDetection,
-    
+
     /// <summary>
     /// テキスト認識処理
     /// </summary>
     TextRecognition,
-    
+
     /// <summary>
     /// 画像前処理
     /// </summary>
     ImagePreprocessing,
-    
+
     /// <summary>
     /// 言語識別
     /// </summary>
     LanguageIdentification,
-    
+
     /// <summary>
     /// 汎用推論処理
     /// </summary>
@@ -163,22 +163,22 @@ public class GpuAvailabilityStatus
     /// 利用可能かどうか
     /// </summary>
     public bool IsAvailable { get; init; }
-    
+
     /// <summary>
     /// 詳細ステータス
     /// </summary>
     public string StatusMessage { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// TDR状態にあるかどうか
     /// </summary>
     public bool IsInTdrState { get; init; }
-    
+
     /// <summary>
     /// ドライバーが正常かどうか
     /// </summary>
     public bool IsDriverHealthy { get; init; }
-    
+
     /// <summary>
     /// 最後の可用性チェック時刻
     /// </summary>
@@ -194,22 +194,22 @@ public class GpuWorkloadStatus
     /// GPU使用率（0-100%）
     /// </summary>
     public double GpuUtilization { get; init; }
-    
+
     /// <summary>
     /// メモリ使用率（0-100%）
     /// </summary>
     public double MemoryUtilization { get; init; }
-    
+
     /// <summary>
     /// 現在実行中のプロセス数
     /// </summary>
     public int ActiveProcessCount { get; init; }
-    
+
     /// <summary>
     /// 推定空き容量（MB）
     /// </summary>
     public long EstimatedFreeMemoryMB { get; init; }
-    
+
     /// <summary>
     /// GPU温度（摂氏、取得可能な場合）
     /// </summary>
@@ -225,17 +225,17 @@ public class GpuWorkloadRequest
     /// 処理負荷タイプ
     /// </summary>
     public GpuWorkloadType WorkloadType { get; init; }
-    
+
     /// <summary>
     /// 推定メモリ使用量（MB）
     /// </summary>
     public int EstimatedMemoryMB { get; init; }
-    
+
     /// <summary>
     /// 優先度（1-10、高いほど優先）
     /// </summary>
     public int Priority { get; init; } = 5;
-    
+
     /// <summary>
     /// 要求ID（追跡用）
     /// </summary>
@@ -251,12 +251,12 @@ public class GpuAllocationRecommendation
     /// 推奨GPU配置一覧
     /// </summary>
     public List<GpuAllocationItem> Allocations { get; init; } = [];
-    
+
     /// <summary>
     /// 配置理由
     /// </summary>
     public string Reason { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// 総予想パフォーマンススコア
     /// </summary>
@@ -272,17 +272,17 @@ public class GpuAllocationItem
     /// 処理負荷要求
     /// </summary>
     public GpuWorkloadRequest WorkloadRequest { get; init; } = new();
-    
+
     /// <summary>
     /// 推奨GPU Device ID
     /// </summary>
     public string RecommendedPnpDeviceId { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// 推奨実行プロバイダー
     /// </summary>
     public List<ExecutionProvider> RecommendedProviders { get; init; } = [];
-    
+
     /// <summary>
     /// 配置信頼度（0-1）
     /// </summary>

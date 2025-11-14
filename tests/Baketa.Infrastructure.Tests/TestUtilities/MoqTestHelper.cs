@@ -1,7 +1,7 @@
 using System.Drawing;
-using Moq;
-using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
+using Moq;
 
 namespace Baketa.Infrastructure.Tests.TestUtilities;
 
@@ -35,7 +35,7 @@ public static class MoqTestHelper
         mockOcrEngine
             .Setup(x => x.RecognizeAsync(It.IsAny<IImage>(), It.IsAny<IProgress<OcrProgress>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(result);
-        
+
         mockOcrEngine
             .Setup(x => x.RecognizeAsync(It.IsAny<IImage>(), It.IsAny<Rectangle?>(), It.IsAny<IProgress<OcrProgress>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(result);
@@ -63,7 +63,7 @@ public static class MoqTestHelper
         mockOcrEngine
             .Setup(x => x.RecognizeAsync(It.IsAny<IImage>(), It.IsAny<IProgress<OcrProgress>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(exception);
-            
+
         mockOcrEngine
             .Setup(x => x.RecognizeAsync(It.IsAny<IImage>(), It.IsAny<Rectangle?>(), It.IsAny<IProgress<OcrProgress>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(exception);
@@ -77,14 +77,14 @@ public static class MoqTestHelper
     /// <param name="successResult">成功時の結果</param>
     /// <param name="failureResult">失敗時の結果</param>
     public static void SetupConditionalOcrEngineDetect(
-        Mock<IOcrEngine> mockOcrEngine, 
+        Mock<IOcrEngine> mockOcrEngine,
         Func<IImage, bool> predicate,
         OcrResults successResult,
         OcrResults failureResult)
     {
         mockOcrEngine
             .Setup(x => x.DetectTextRegionsAsync(It.IsAny<IImage>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IImage frame, CancellationToken _) => 
+            .ReturnsAsync((IImage frame, CancellationToken _) =>
                 predicate(frame) ? successResult : failureResult);
     }
 
@@ -99,14 +99,14 @@ public static class MoqTestHelper
         var mockImage = new Mock<IImage>();
         mockImage.Setup(x => x.Width).Returns(100);
         mockImage.Setup(x => x.Height).Returns(50);
-        
-        var textRegions = string.IsNullOrEmpty(text) ? 
+
+        var textRegions = string.IsNullOrEmpty(text) ?
             new List<OcrTextRegion>() :
             new List<OcrTextRegion>
             {
                 new(text, new System.Drawing.Rectangle(0, 0, 100, 20), confidence)
             };
-        
+
         return new OcrResults(
             textRegions,
             mockImage.Object,

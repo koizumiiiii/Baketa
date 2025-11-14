@@ -1,17 +1,17 @@
+using System;
+using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Auth;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.UI.Security;
+using Baketa.UI.Services;
+using Baketa.UI.Tests.Infrastructure;
+using Baketa.UI.ViewModels;
+using Baketa.UI.ViewModels.Auth;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System;
-using System.Threading.Tasks;
 using Xunit;
-using Baketa.Core.Abstractions.Auth;
-using Baketa.Core.Abstractions.Translation;
-using Baketa.UI.ViewModels;
-using Baketa.UI.ViewModels.Auth;
-using Baketa.UI.Services;
-using Baketa.UI.Security;
-using Baketa.UI.Tests.Infrastructure;
 
 namespace Baketa.UI.Tests.Services;
 
@@ -43,7 +43,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         _signupViewModel = CreateStubSignupViewModel();
         // sealed ViewModelsのため、実際のインスタンスを使用（正しいコンストラクタ引数で）
         var mockEventAggregator = Mock.Of<Core.Abstractions.Events.IEventAggregator>();
-        
+
         // 🔥 [PHASE2_PROBLEM2] MainWindowViewModel削除 - MainOverlayViewModelに統合完了
         // シンプルなMockで必要最小限のViewModel構成に変更してインスタンス化エラーを回避
         // _mainWindowViewModel = new MainWindowViewModel(
@@ -161,7 +161,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     public void Constructor_WithNullServiceProvider_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new AvaloniaNavigationService(null!, _mockLogger.Object));
     }
 
@@ -169,7 +169,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new AvaloniaNavigationService(_mockServiceProvider.Object, null!));
     }
 
@@ -197,7 +197,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         // Arrange
         _mockServiceProvider.Setup(x => x.GetService(typeof(LoginViewModel)))
             .Returns((object?)null); // GetServiceがnullを返すとGetRequiredServiceはInvalidOperationExceptionを投げる
-        
+
         var navigationService = CreateNavigationService();
 
         // Act
@@ -244,7 +244,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         // Arrange
         _mockServiceProvider.Setup(x => x.GetService(typeof(SignupViewModel)))
             .Returns((object?)null); // GetServiceがnullを返すとGetRequiredServiceはInvalidOperationExceptionを投げる
-        
+
         var navigationService = CreateNavigationService();
 
         // Act
@@ -403,7 +403,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         // Arrange
         _mockAuthService.Setup(x => x.SignOutAsync(default))
             .ThrowsAsync(new InvalidOperationException("Logout failed"));
-        
+
         var navigationService = CreateNavigationService();
 
         // Act
@@ -436,7 +436,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         // Arrange
         _mockServiceProvider.Setup(x => x.GetService(typeof(LoginViewModel)))
             .Throws(new OutOfMemoryException("System out of memory"));
-        
+
         var navigationService = CreateNavigationService();
 
         // Act
@@ -453,7 +453,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         // Arrange
         _mockServiceProvider.Setup(x => x.GetService(typeof(SignupViewModel)))
             .Throws(new UnauthorizedAccessException("Access denied"));
-        
+
         var navigationService = CreateNavigationService();
 
         // Act
@@ -524,7 +524,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
             await navigationService.ShowLoginAsync();
             await navigationService.ShowSignupAsync();
         }
-        
+
         stopwatch.Stop();
 
         // Assert - 1秒以内で完了すること

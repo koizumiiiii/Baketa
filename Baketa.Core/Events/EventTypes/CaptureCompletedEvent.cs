@@ -1,6 +1,6 @@
-using Baketa.Core.Abstractions.Imaging;
 using System;
 using System.Drawing;
+using Baketa.Core.Abstractions.Imaging;
 
 namespace Baketa.Core.Events.EventTypes;
 
@@ -15,7 +15,7 @@ namespace Baketa.Core.Events.EventTypes;
 /// <param name="captureTime">キャプチャ処理時間</param>
 /// <exception cref="ArgumentNullException">capturedImageがnullの場合</exception>
 public class CaptureCompletedEvent(IImage capturedImage, Rectangle captureRegion, TimeSpan captureTime) : EventBase
-    {
+{
     /// <summary>
     /// キャプチャされた画像
     /// </summary>
@@ -42,6 +42,6 @@ public class CaptureCompletedEvent(IImage capturedImage, Rectangle captureRegion
     /// <inheritdoc />
     public override string Name => "CaptureCompleted";
 
-        /// <inheritdoc />
-        public override string Category => "Capture";
-    }
+    /// <inheritdoc />
+    public override string Category => "Capture";
+}

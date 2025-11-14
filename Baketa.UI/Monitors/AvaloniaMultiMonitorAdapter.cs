@@ -14,22 +14,22 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
     private readonly ILogger<AvaloniaMultiMonitorAdapter> _logger;
     private readonly Subject<MonitorChangedEventArgs> _monitorChangedSubject = new();
     private readonly object _lockObject = new();
-    
+
     private IMonitorManager? _platformManager;
     private bool _disposed;
-    
+
     /// <summary>
     /// AvaloniaMultiMonitorAdapterを初期化
     /// </summary>
     /// <param name="serviceProvider">サービスプロバイダー</param>
     /// <param name="logger">ロガー</param>
     public AvaloniaMultiMonitorAdapter(
-        IServiceProvider serviceProvider, 
+        IServiceProvider serviceProvider,
         ILogger<AvaloniaMultiMonitorAdapter> logger)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
-        
+
         // 初期化タスクを非同期で実行
         _ = Task.Run(async () =>
         {
@@ -57,7 +57,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
 #pragma warning restore CA1031
         });
     }
-    
+
     /// <summary>
     /// プラットフォーム固有のマネージャーを遅延初期化で取得
     /// </summary>
@@ -71,32 +71,32 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
             }
         }
     }
-    
+
     /// <summary>
     /// 利用可能なモニターのコレクション
     /// </summary>
     public IReadOnlyList<MonitorInfo> Monitors => PlatformManager.Monitors;
-    
+
     /// <summary>
     /// プライマリモニター情報
     /// </summary>
     public MonitorInfo? PrimaryMonitor => PlatformManager.PrimaryMonitor;
-    
+
     /// <summary>
     /// アクティブなモニター数
     /// </summary>
     public int MonitorCount => PlatformManager.MonitorCount;
-    
+
     /// <summary>
     /// モニター監視が開始されているかどうか
     /// </summary>
     public bool IsMonitoring => PlatformManager.IsMonitoring;
-    
+
     /// <summary>
     /// モニター変更のObservable（ReactiveUI統合）
     /// </summary>
     public IObservable<MonitorChangedEventArgs> MonitorChanged => _monitorChangedSubject.AsObservable();
-    
+
     /// <summary>
     /// ウィンドウが表示されているモニターを取得
     /// </summary>
@@ -131,7 +131,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// 座標が含まれるモニターを取得
     /// </summary>
@@ -166,7 +166,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// Avaloniaスクリーンから最適なモニターを取得
     /// </summary>
@@ -175,7 +175,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
     public MonitorInfo? GetMonitorFromAvaloniaScreen(Screen screen)
     {
         ArgumentNullException.ThrowIfNull(screen);
-        
+
         try
         {
             var bounds = new CoreRect(
@@ -183,8 +183,8 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
                 screen.Bounds.Y,
                 screen.Bounds.Width,
                 screen.Bounds.Height);
-            
-            return Monitors.FirstOrDefault(m => 
+
+            return Monitors.FirstOrDefault(m =>
                 Math.Abs(m.Bounds.X - bounds.X) < 1 &&
                 Math.Abs(m.Bounds.Y - bounds.Y) < 1 &&
                 Math.Abs(m.Bounds.Width - bounds.Width) < 1 &&
@@ -213,7 +213,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// ゲームウィンドウに最適なモニターを決定
     /// ウィンドウ中心点優先、表示面積フォールバック方式
@@ -249,7 +249,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// モニター間でのオーバーレイ位置変換
     /// DPIスケーリングを考慮した座標変換
@@ -290,7 +290,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// DPI変更検出
     /// モニター間移動時のDPIスケール変更を検出
@@ -300,7 +300,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
     /// <returns>DPI変更があった場合true</returns>
     public bool HasDpiChanged(MonitorInfo oldMonitor, MonitorInfo newMonitor) =>
         MonitorManagerExtensions.HasDpiChanged(oldMonitor, newMonitor);
-    
+
     /// <summary>
     /// モニター情報を手動更新
     /// </summary>
@@ -336,7 +336,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// モニター監視を開始
     /// </summary>
@@ -372,7 +372,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// モニター監視を停止
     /// </summary>
@@ -408,7 +408,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// 初期化処理
     /// </summary>
@@ -417,17 +417,17 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         try
         {
             _logger.LogDebug("Initializing AvaloniaMultiMonitorAdapter");
-            
+
             // プラットフォームマネージャーの取得と初期化
             var manager = PlatformManager;
-            
+
             // イベント購読
             manager.MonitorChanged += OnPlatformMonitorChanged;
-            
+
             // 監視開始
             await manager.StartMonitoringAsync().ConfigureAwait(false);
-            
-            _logger.LogInformation("AvaloniaMultiMonitorAdapter initialized successfully with {Count} monitors", 
+
+            _logger.LogInformation("AvaloniaMultiMonitorAdapter initialized successfully with {Count} monitors",
                 manager.MonitorCount);
         }
         catch (TaskCanceledException ex)
@@ -458,7 +458,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// プラットフォーム固有のマネージャーを取得
     /// </summary>
@@ -483,7 +483,7 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <summary>
     /// プラットフォームマネージャーからのモニター変更イベントを処理
     /// </summary>
@@ -492,10 +492,10 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         try
         {
             _logger.LogDebug("Monitor change detected: {Change}", e.ToString());
-            
+
             // ReactiveUIのObservableストリームに通知
             _monitorChangedSubject.OnNext(e);
-            
+
             // プロパティ変更通知（ReactiveUI）
             this.RaisePropertyChanged(nameof(Monitors));
             this.RaisePropertyChanged(nameof(PrimaryMonitor));
@@ -512,15 +512,15 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
         }
 #pragma warning restore CA1031
     }
-    
+
     /// <inheritdoc/>
     public void Dispose()
     {
         if (_disposed)
             return;
-        
+
         _disposed = true;
-        
+
         try
         {
             if (_platformManager is not null)
@@ -528,9 +528,9 @@ public sealed class AvaloniaMultiMonitorAdapter : ReactiveObject, IDisposable
                 _platformManager.MonitorChanged -= OnPlatformMonitorChanged;
                 _platformManager.Dispose();
             }
-            
+
             _monitorChangedSubject.Dispose();
-            
+
             _logger.LogInformation("AvaloniaMultiMonitorAdapter disposed");
         }
         catch (InvalidOperationException ex)

@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Auth;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Security;
 
@@ -30,7 +30,7 @@ public sealed class HijackingDetectionManager : IDisposable
     private const int MaxConcurrentSessions = 3;
     private const int MaxPasswordChangesPerDay = 3;
     private const double SuspiciousScoreThreshold = 0.7;
-    
+
     // 地理的異常検出設定
     private const int ImpossibleTravelDistanceKm = 1000; // 1時間で1000km以上の移動は物理的に不可能
     private const int SuspiciousVelocityKmPerHour = 500; // 500km/h以上は疑わしい（商用航空機レベル）
@@ -77,7 +77,7 @@ public sealed class HijackingDetectionManager : IDisposable
     /// <param name="ipAddress">IPアドレス</param>
     /// <param name="userAgent">ユーザーエージェント</param>
     /// <param name="geoLocation">地理的位置情報（オプション）</param>
-    public void RecordUserActivity(string email, UserActivityType activityType, 
+    public void RecordUserActivity(string email, UserActivityType activityType,
         string? ipAddress = null, string? userAgent = null, GeoLocation? geoLocation = null)
     {
         ThrowIfDisposed();
@@ -101,7 +101,7 @@ public sealed class HijackingDetectionManager : IDisposable
             (key, existing) =>
             {
                 var updatedActivities = new List<UserActivity>(existing.Activities) { activity };
-                
+
                 // 古い活動を削除（30日以内のもののみ保持）
                 var cutoffTime = now - ActivityRetentionPeriod;
                 updatedActivities = [.. updatedActivities.Where(a => a.Timestamp >= cutoffTime)];
@@ -213,7 +213,7 @@ public sealed class HijackingDetectionManager : IDisposable
             return;
 
         var suspiciousScore = CalculateSuspiciousScore(profile, activity);
-        
+
         if (suspiciousScore >= SuspiciousScoreThreshold)
         {
             var suspiciousActivity = new SuspiciousActivity(
@@ -224,7 +224,7 @@ public sealed class HijackingDetectionManager : IDisposable
                 LastActivity: activity
             );
 
-            _suspiciousActivities.AddOrUpdate(email, suspiciousActivity, (key, existing) => 
+            _suspiciousActivities.AddOrUpdate(email, suspiciousActivity, (key, existing) =>
                 suspiciousActivity with { DetectedAt = existing.DetectedAt });
 
             if (_logger != null)
@@ -299,7 +299,7 @@ public sealed class HijackingDetectionManager : IDisposable
         // 距離と時間を計算
         var distance = CalculateDistance(lastActivity.GeoLocation, currentActivity.GeoLocation);
         var timeDiff = currentActivity.Timestamp - lastActivity.Timestamp;
-        
+
         if (timeDiff.TotalHours <= 0)
             return 0.0;
 
@@ -332,14 +332,14 @@ public sealed class HijackingDetectionManager : IDisposable
             .ToHashSet();
 
         var currentHour = currentActivity.Timestamp.Hour;
-        
+
         // 地理的位置による時差を考慮
         if (currentActivity.GeoLocation != null)
         {
             // 大まかな時差補正（詳細な実装では実際のタイムゾーンAPIを使用）
             var timeZoneOffset = EstimateTimeZoneOffset(currentActivity.GeoLocation);
             var adjustedHour = (currentHour + timeZoneOffset + 24) % 24;
-            
+
             if (typicalHours.Contains(adjustedHour))
                 return 0.0;
         }
@@ -357,7 +357,7 @@ public sealed class HijackingDetectionManager : IDisposable
     {
         // 簡易的なVPN検出（実際の実装では外部VPN検出サービスを使用）
         var ipAddress = activity.IPAddress;
-        
+
         // よく知られたVPNサービスのIP範囲をチェック
         var knownVpnRanges = new[]
         {
@@ -377,16 +377,16 @@ public sealed class HijackingDetectionManager : IDisposable
     private static double CalculateDistance(GeoLocation loc1, GeoLocation loc2)
     {
         const double EarthRadiusKm = 6371.0;
-        
+
         var dLat = ToRadians(loc2.Latitude - loc1.Latitude);
         var dLon = ToRadians(loc2.Longitude - loc1.Longitude);
-        
+
         var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
                 Math.Cos(ToRadians(loc1.Latitude)) * Math.Cos(ToRadians(loc2.Latitude)) *
                 Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-        
+
         var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-        
+
         return EarthRadiusKm * c;
     }
 

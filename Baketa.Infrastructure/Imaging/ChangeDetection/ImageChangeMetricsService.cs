@@ -42,7 +42,7 @@ public class ImageChangeMetricsService : IImageChangeMetricsService
         {
             var totalTime = _totalSkippedTime.Add(_totalExecutedTime);
             var totalCount = _ocrSkippedCount + _ocrExecutedCount;
-            
+
             return new ImageChangeMetrics
             {
                 TotalSkippedCount = _ocrSkippedCount,

@@ -1,8 +1,8 @@
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
-using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
@@ -18,7 +18,7 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
     private readonly ILogger<DiagnosticReportGenerator> _logger;
     private readonly IBatchOcrProcessor? _batchOcrProcessor;
     private static readonly string ReportsDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "Baketa", "Reports");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -38,7 +38,7 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
     }
 
     public async Task<string> GenerateReportAsync(
-        IEnumerable<PipelineDiagnosticEvent> events, 
+        IEnumerable<PipelineDiagnosticEvent> events,
         string reportType,
         string? userComment = null,
         CancellationToken cancellationToken = default)
@@ -56,17 +56,17 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
         CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"🔧 [DIAGNOSTIC] レポート生成開始: reportType='{reportType}'");
-        
+
         // ディレクトリ存在確認を明示的に実行
         EnsureReportsDirectoryExists();
-        
+
         var eventsList = events.ToList();
         Console.WriteLine($"🔧 [DIAGNOSTIC] イベント数: {eventsList.Count}");
-        
+
         var reportId = GenerateReportId(reportType);
         var fileName = $"{reportType}_{DateTime.Now:yyyyMMdd_HHmmss}_{reportId[..8]}.json";
         var filePath = Path.Combine(ReportsDirectory, fileName);
-        
+
         Console.WriteLine($"🔧 [DIAGNOSTIC] 生成ファイルパス: '{filePath}'");
 
         // ROI画像情報を収集
@@ -101,29 +101,29 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
         try
         {
             var jsonContent = JsonSerializer.Serialize(report, JsonOptions);
-            
+
             // 🧪 [DEBUG] SafeFileWriter呼び出し前の詳細ログ
             Console.WriteLine($"🧪 [DEBUG] SafeFileWriter呼び出し前 - filePath: '{filePath}'");
             Console.WriteLine($"🧪 [DEBUG] SafeFileWriter呼び出し前 - jsonContent.Length: {jsonContent?.Length ?? 0}");
             Console.WriteLine($"🧪 [DEBUG] SafeFileWriter呼び出し前 - jsonContent IsNullOrEmpty: {string.IsNullOrEmpty(jsonContent)}");
             Console.WriteLine($"🧪 [DEBUG] SafeFileWriter呼び出し前 - filePath IsNullOrEmpty: {string.IsNullOrEmpty(filePath)}");
-            
+
             // SafeFileWriterを使用してファイル競合を回避
             Console.WriteLine($"🧪 [DEBUG] SafeFileWriter.AppendTextSafely実行中...");
             SafeFileWriter.AppendTextSafely(filePath, jsonContent);
             Console.WriteLine($"🧪 [DEBUG] SafeFileWriter.AppendTextSafely完了");
-            
+
             // ファイル存在確認
             var fileExists = File.Exists(filePath);
             Console.WriteLine($"🧪 [DEBUG] ファイル存在確認: {fileExists}");
-            
+
             if (fileExists)
             {
                 var fileInfo = new FileInfo(filePath);
                 Console.WriteLine($"🧪 [DEBUG] ファイルサイズ: {fileInfo.Length} bytes");
             }
-            
-            _logger.LogInformation("診断レポート生成完了: {FilePath}, イベント数: {EventCount}", 
+
+            _logger.LogInformation("診断レポート生成完了: {FilePath}, イベント数: {EventCount}",
                 filePath, eventsList.Count);
 
             return filePath;
@@ -131,13 +131,13 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
         catch (Exception ex)
         {
             _logger.LogError(ex, "診断レポート生成エラー: {ReportType}", reportType);
-            
+
             // フォールバック: エラー情報だけでも保存
             var errorReport = CreateErrorFallbackReport(reportType, ex, eventsList.Count);
             var errorFilePath = Path.Combine(ReportsDirectory, $"error_{DateTime.Now:yyyyMMdd_HHmmss}.json");
-            
+
             SafeFileWriter.AppendTextSafely(errorFilePath, JsonSerializer.Serialize(errorReport, JsonOptions));
-            
+
             return errorFilePath;
         }
     }
@@ -204,13 +204,13 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
         try
         {
             Console.WriteLine($"🔧 [DIAGNOSTIC] レポートディレクトリチェック開始: '{ReportsDirectory}'");
-            
+
             if (!Directory.Exists(ReportsDirectory))
             {
                 Console.WriteLine($"🔧 [DIAGNOSTIC] ディレクトリが存在しません。作成中...");
                 Directory.CreateDirectory(ReportsDirectory);
                 Console.WriteLine($"✅ [DIAGNOSTIC] ディレクトリ作成成功: '{ReportsDirectory}'");
-                
+
                 // 作成後の確認
                 if (Directory.Exists(ReportsDirectory))
                 {

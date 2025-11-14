@@ -1,16 +1,16 @@
 using System;
 using System.Reactive.Linq;
+using Baketa.Core.Abstractions.Events;
+using Baketa.UI.Configuration;
+using Baketa.UI.Models;
+using Baketa.UI.Services;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using ReactiveUI.Testing;
 using Xunit;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.Configuration;
-using Baketa.UI.Models;
-using Baketa.UI.Services;
-using Baketa.UI.ViewModels.Settings;
 using EngineStatus = Baketa.UI.Services.TranslationEngineStatus;
 using StatusUpdate = Baketa.UI.Services.TranslationEngineStatusUpdate;
 
@@ -47,7 +47,7 @@ public class TranslationStrategyViewModelTests
         // デフォルトのモック設定
         var localStatus = new EngineStatus { IsOnline = true, IsHealthy = true };
         var cloudStatus = new EngineStatus { IsOnline = false, IsHealthy = false };
-        
+
         _mockStatusService.Setup(x => x.LocalEngineStatus).Returns(localStatus);
         _mockStatusService.Setup(x => x.CloudEngineStatus).Returns(cloudStatus);
         _mockStatusService.Setup(x => x.StatusUpdates).Returns(Observable.Never<StatusUpdate>());
@@ -78,7 +78,7 @@ public class TranslationStrategyViewModelTests
     public void Constructor_WithNullStatusService_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new TranslationStrategyViewModel(
                 null!,
                 _mockNotificationService.Object,
@@ -91,7 +91,7 @@ public class TranslationStrategyViewModelTests
     public void Constructor_WithNullNotificationService_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new TranslationStrategyViewModel(
                 _mockStatusService.Object,
                 null!,
@@ -104,7 +104,7 @@ public class TranslationStrategyViewModelTests
     public void Constructor_WithNullOptions_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new TranslationStrategyViewModel(
                 _mockStatusService.Object,
                 _mockNotificationService.Object,
@@ -117,7 +117,7 @@ public class TranslationStrategyViewModelTests
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new TranslationStrategyViewModel(
                 _mockStatusService.Object,
                 _mockNotificationService.Object,

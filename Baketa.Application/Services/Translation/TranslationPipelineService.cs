@@ -1,21 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
-using System.Drawing;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Settings;
-using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.OCR.Results;
-using ITranslationServiceCore = Baketa.Core.Abstractions.Translation.ITranslationService;
+using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.EventTypes;
-using Baketa.Core.Translation.Models;
 using Baketa.Core.Models.OCR;
+using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Pipeline;
+using Microsoft.Extensions.Logging;
+using ITranslationServiceCore = Baketa.Core.Abstractions.Translation.ITranslationService;
 using PipelineTranslationResult = Baketa.Core.Translation.Pipeline.TranslationResult;
 
 namespace Baketa.Application.Services.Translation;
@@ -42,7 +42,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     private readonly ILogger<TranslationPipelineService> _logger;
     private readonly ILanguageConfigurationService _languageConfig;
     private readonly CancellationTokenSource _cancellationTokenSource;
-    
+
     // TPL Dataflow Pipeline Components
     private readonly BufferBlock<OcrResult> _entryBlock;
     private readonly TransformBlock<OcrResult, TranslationJob> _preprocessingBlock;
@@ -50,7 +50,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     private readonly TransformBlock<TranslationJob[], PipelineTranslationResult[]> _translationBlock;
     private readonly ActionBlock<PipelineTranslationResult[]> _uiUpdateBlock;
     private readonly System.Threading.Timer _batchTimer;
-    
+
     // Pipeline Configuration (from design document)
     private const int BatchSize = 3;
     private const int BatchTimeoutMs = 100;
@@ -59,10 +59,10 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     private const int BatchBlockCapacity = 100;
     private const int TranslationBlockCapacity = 10;
     private const int UIUpdateBlockCapacity = 10;
-    
+
     /// <inheritdoc />
     public int Priority => 0;
-    
+
     /// <inheritdoc />
     public bool SynchronousExecution => false;
 
@@ -239,8 +239,8 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
 
             // ROI座標情報の判定（CoordinateBasedTranslationServiceロジック移植）
             var hasCoordinateInfo = HasValidCoordinateInfo(ocrResult);
-            var displayMode = hasCoordinateInfo 
-                ? TranslationDisplayMode.InPlace 
+            var displayMode = hasCoordinateInfo
+                ? TranslationDisplayMode.InPlace
                 : TranslationDisplayMode.Default;
 
             CoordinateInfo? coordinateInfo = null;
@@ -267,7 +267,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         {
             _logger.LogError(ex, "OCR結果前処理でエラー: '{Text}'",
                 ocrResult.Text[..Math.Min(20, ocrResult.Text.Length)]);
-            
+
             // エラー時は空のジョブを返す（フィルタリングで除外される）
             return TranslationJob.Empty;
         }
@@ -309,8 +309,8 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
 
             // Direct translation service call to get actual results
             var translationResponses = await _translationService.TranslateBatchAsync(
-                textsToTranslate.AsReadOnly(), 
-                sourceLanguage, 
+                textsToTranslate.AsReadOnly(),
+                sourceLanguage,
                 targetLanguage).ConfigureAwait(false);
 
             // Convert translation results to pipeline format
@@ -327,7 +327,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
                         if (response.IsSuccess && !string.IsNullOrEmpty(response.TranslatedText))
                         {
                             results.Add(PipelineTranslationResult.FromJob(
-                                job, 
+                                job,
                                 response.TranslatedText,
                                 TimeSpan.FromMilliseconds(response.ProcessingTimeMs),
                                 response.ConfidenceScore));
@@ -359,7 +359,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
             _logger.LogDebug("Direct translation completed: {ResultCount} results generated",
                 results.Count);
 
-            return results.ToArray();
+            return [.. results];
         }
         catch (Exception ex)
         {
@@ -448,13 +448,13 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
             {
                 try
                 {
-                    _logger.LogDebug("個別翻訳実行: '{Text}'", 
+                    _logger.LogDebug("個別翻訳実行: '{Text}'",
                         ocrResult.Text[..Math.Min(20, ocrResult.Text.Length)]);
 
                     // 🔧 DIRECT CALL: ITranslationServiceの単一翻訳メソッドを直接呼び出し
                     var response = await _translationService.TranslateAsync(
-                        ocrResult.Text, 
-                        sourceLanguage, 
+                        ocrResult.Text,
+                        sourceLanguage,
                         targetLanguage,
                         context: null,
                         cancellationToken: CancellationToken.None).ConfigureAwait(false);
@@ -462,8 +462,8 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
                     if (response.IsSuccess && !string.IsNullOrEmpty(response.TranslatedText))
                     {
                         results.Add(PipelineTranslationResult.FromJob(
-                            job, 
-                            response.TranslatedText, 
+                            job,
+                            response.TranslatedText,
                             TimeSpan.FromMilliseconds(response.ProcessingTimeMs),
                             response.ConfidenceScore));
 
@@ -489,8 +489,8 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
                 {
                     _logger.LogError(ex, "個別フォールバック翻訳でエラー: '{Text}'", ocrResult.Text);
                     results.Add(PipelineTranslationResult.CreateError(
-                        ocrResult.Text, 
-                        ex.Message, 
+                        ocrResult.Text,
+                        ex.Message,
                         job.JobId,
                         job.DisplayMode,
                         job.CoordinateInfo));
@@ -499,7 +499,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         }
 
         _logger.LogInformation("個別フォールバック処理完了: {ResultCount}個の結果を生成", results.Count);
-        return results.ToArray();
+        return [.. results];
     }
 
     /// <summary>
@@ -516,7 +516,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
             // こちらでの直接表示は無効化
             _logger.LogDebug("InPlace表示はOverlayUpdateEvent経由で実行されます - 直接表示をスキップ: '{Text}'",
                 result.OriginalText[..Math.Min(20, result.OriginalText.Length)]);
-            
+
             // CoordinateInfo が存在しない場合の警告ログは残す
             if (result.CoordinateInfo == null)
             {
@@ -527,7 +527,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
 
             // 🔄 [DISPLAY_FLOW] 表示フローの詳細をログ出力
             _logger.LogDebug("InPlace表示フロー: TranslationPipelineService → (スキップ) → TranslationWithBoundsCompletedHandler → OverlayUpdateEvent → InPlaceTranslationOverlayManager");
-            
+
             // ✅ 重複表示回避のため、この処理は何もせず正常終了
             await Task.CompletedTask.ConfigureAwait(false);
         }
@@ -535,7 +535,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         {
             _logger.LogError(ex, "InPlace表示スキップ処理でエラー: '{Text}'",
                 result.OriginalText[..Math.Min(30, result.OriginalText.Length)]);
-            
+
             // エラー時もフォールバックは行わない（OverlayUpdateEvent経由で表示される）
         }
     }
@@ -555,7 +555,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
         }
 
         var coord = result.CoordinateInfo;
-        
+
         // PositionedTextResultを作成
         var positionedTextResult = new PositionedTextResult
         {

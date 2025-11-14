@@ -4,10 +4,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 
@@ -19,16 +19,16 @@ public sealed class PPOCRv5DiagnosticService : IDisposable
 {
     private readonly ILogger<PPOCRv5DiagnosticService> _logger;
     private readonly ImageDiagnosticsSaver _imageSaver;
-    
+
     // 診断統計
     private readonly DiagnosticStatistics _statistics = new();
     private readonly object _statisticsLock = new();
-    
+
     // タイムアウト監視
     private readonly CancellationTokenSource _timeoutCts = new();
     private readonly List<ActiveOperation> _activeOperations = [];
     private readonly object _operationsLock = new();
-    
+
     private bool _disposed;
 
     public PPOCRv5DiagnosticService(
@@ -37,7 +37,7 @@ public sealed class PPOCRv5DiagnosticService : IDisposable
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _imageSaver = imageSaver ?? throw new ArgumentNullException(nameof(imageSaver));
-        
+
         // タイムアウト監視タスクを開始
         _ = Task.Run(MonitorTimeoutsAsync, _timeoutCts.Token);
     }
@@ -53,11 +53,11 @@ public sealed class PPOCRv5DiagnosticService : IDisposable
     {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(image);
-        
+
         var operationId = Guid.NewGuid().ToString("N")[..8];
         var stopwatch = Stopwatch.StartNew();
-        
-        _logger.LogDebug("OCR診断開始: OperationId={OperationId}, ImageSize={Width}x{Height}", 
+
+        _logger.LogDebug("OCR診断開始: OperationId={OperationId}, ImageSize={Width}x{Height}",
             operationId, image.Width, image.Height);
 
         var operation = new ActiveOperation
@@ -78,7 +78,7 @@ public sealed class PPOCRv5DiagnosticService : IDisposable
 
             // 診断情報付きで画像を保存
             var imageFileName = await _imageSaver.SaveDiagnosticImageAsync(
-                image, $"ocr_input_{operationId}", 
+                image, $"ocr_input_{operationId}",
                 new Dictionary<string, object>
                 {
                     ["OperationId"] = operationId,
@@ -112,9 +112,9 @@ public sealed class PPOCRv5DiagnosticService : IDisposable
             operation.Duration = stopwatch.Elapsed;
             operation.Success = false;
             operation.ErrorType = "Cancelled";
-            
+
             UpdateStatistics(operation, null);
-            
+
             _logger.LogWarning("OCR診断キャンセル: OperationId={OperationId}, Duration={Duration}ms",
                 operationId, stopwatch.ElapsedMilliseconds);
             throw;
@@ -126,9 +126,9 @@ public sealed class PPOCRv5DiagnosticService : IDisposable
             operation.Success = false;
             operation.ErrorType = ex.GetType().Name;
             operation.ErrorMessage = ex.Message;
-            
+
             UpdateStatistics(operation, null);
-            
+
             _logger.LogError(ex, "OCR診断エラー: OperationId={OperationId}, Duration={Duration}ms",
                 operationId, stopwatch.ElapsedMilliseconds);
 
@@ -225,17 +225,17 @@ public sealed class PPOCRv5DiagnosticService : IDisposable
         lock (_statisticsLock)
         {
             _statistics.TotalOperations++;
-            
+
             if (operation.Success)
             {
                 _statistics.SuccessfulOperations++;
                 _statistics.TotalProcessingTime += operation.ProcessingTime ?? TimeSpan.Zero;
                 _statistics.TotalTextRegions += operation.TextRegionsCount;
-                
+
                 if (result != null)
                 {
                     _statistics.UpdateAverageConfidence(
-                        result.TextRegions.Count > 0 
+                        result.TextRegions.Count > 0
                             ? result.TextRegions.Average(r => r.Confidence)
                             : 0.0);
                 }
@@ -276,7 +276,7 @@ public sealed class PPOCRv5DiagnosticService : IDisposable
         _timeoutCts.Cancel();
         _timeoutCts.Dispose();
         _imageSaver?.Dispose();
-        
+
         _disposed = true;
     }
 }
@@ -310,10 +310,10 @@ public class DiagnosticStatistics
     public int TotalTextRegions { get; set; }
     public TimeSpan TotalProcessingTime { get; set; }
     public DateTime LastUpdated { get; set; }
-    
+
     // エラー分類
     private readonly Dictionary<string, int> _errorCounts = [];
-    
+
     // 処理時間統計
     public TimeSpan MinProcessingTime { get; private set; } = TimeSpan.MaxValue;
     public TimeSpan MaxProcessingTime { get; private set; } = TimeSpan.Zero;
@@ -322,7 +322,7 @@ public class DiagnosticStatistics
     private int _confidenceCount;
 
     public double SuccessRate => TotalOperations > 0 ? (double)SuccessfulOperations / TotalOperations * 100 : 0;
-    public TimeSpan AverageProcessingTime => SuccessfulOperations > 0 ? 
+    public TimeSpan AverageProcessingTime => SuccessfulOperations > 0 ?
         TimeSpan.FromTicks(TotalProcessingTime.Ticks / SuccessfulOperations) : TimeSpan.Zero;
 
     public IReadOnlyDictionary<string, int> ErrorCounts => _errorCounts.AsReadOnly();
@@ -395,7 +395,7 @@ public static class PPOCRv5DiagnosticServiceFactory
     {
         var imageSaver = new ImageDiagnosticsSaver(
             diagnosticsOutputPath ?? Path.Combine(Environment.CurrentDirectory, "ocr_diagnostics"));
-        
+
         return new PPOCRv5DiagnosticService(logger, imageSaver);
     }
 }

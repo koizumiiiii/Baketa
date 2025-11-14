@@ -12,12 +12,12 @@ public interface IGameStateProvider
     /// 現在ゲームがアクティブかどうか
     /// </summary>
     bool IsGameActive();
-    
+
     /// <summary>
     /// 現在のゲーム情報
     /// </summary>
     GameInfo? CurrentGameInfo { get; }
-    
+
     /// <summary>
     /// ゲーム状態変化イベント
     /// </summary>
@@ -42,7 +42,7 @@ public class GameStateChangedEventArgs : EventArgs
     public GameInfo? PreviousGame { get; }
     public GameInfo? CurrentGame { get; }
     public bool IsGameActivated { get; }
-    
+
     public GameStateChangedEventArgs(GameInfo? previousGame, GameInfo? currentGame)
     {
         PreviousGame = previousGame;

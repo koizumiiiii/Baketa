@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
+using Baketa.Core.Services.Imaging;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using Baketa.Core.Services.Imaging;
 
 namespace Baketa.Infrastructure.Imaging.Filters;
 
@@ -65,7 +65,7 @@ public sealed class OpenCvEdgeEnhancementFilter : BaseImageFilter
     /// </summary>
     protected override IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
     {
-        return 
+        return
         [
             new PipelineStepParameter("Method", "エッジ検出方法", typeof(string), "Canny", allowedValues: ["Canny", "Sobel", "Laplacian", "Scharr", "StructuralEdge"]),
             new PipelineStepParameter("LowThreshold", "Canny用低閾値", typeof(int), 50, minValue: 10, maxValue: 150),
@@ -100,7 +100,7 @@ public sealed class OpenCvEdgeEnhancementFilter : BaseImageFilter
         var gaussianSigma = GetParameter<double>("GaussianSigma");
         var postProcessing = GetParameter<bool>("PostProcessing");
 
-        _logger?.LogInformation("OpenCVエッジ強化開始: Method={Method}, EnhanceStrength={EnhanceStrength}, BlendRatio={BlendRatio}", 
+        _logger?.LogInformation("OpenCVエッジ強化開始: Method={Method}, EnhanceStrength={EnhanceStrength}, BlendRatio={BlendRatio}",
             method, enhanceStrength, blendRatio);
 
         try
@@ -110,15 +110,15 @@ public sealed class OpenCvEdgeEnhancementFilter : BaseImageFilter
             switch (method)
             {
                 case "Canny":
-                    _logger?.LogInformation("Cannyエッジ検出完了: LowThreshold={Low}, HighThreshold={High}", 
+                    _logger?.LogInformation("Cannyエッジ検出完了: LowThreshold={Low}, HighThreshold={High}",
                         lowThreshold, highThreshold);
                     break;
                 case "Sobel":
-                    _logger?.LogInformation("Sobelエッジ検出完了: ApertureSize={Aperture}, Scale={Scale}, Delta={Delta}", 
+                    _logger?.LogInformation("Sobelエッジ検出完了: ApertureSize={Aperture}, Scale={Scale}, Delta={Delta}",
                         apertureSize, scale, delta);
                     break;
                 case "Laplacian":
-                    _logger?.LogInformation("Laplacianエッジ検出完了: ApertureSize={Aperture}, Scale={Scale}", 
+                    _logger?.LogInformation("Laplacianエッジ検出完了: ApertureSize={Aperture}, Scale={Scale}",
                         apertureSize, scale);
                     break;
                 case "Scharr":

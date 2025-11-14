@@ -1,6 +1,6 @@
-using Microsoft.ML.OnnxRuntime;
-using System.Text;
 using System.IO;
+using System.Text;
+using Microsoft.ML.OnnxRuntime;
 
 namespace Baketa.Infrastructure.OCR.Benchmarking;
 
@@ -20,18 +20,18 @@ public static class MockOnnxModelGenerator
         try
         {
             var modelPath = Path.Combine(Path.GetTempPath(), "baketa_benchmark_model.onnx");
-            
+
             // 既に存在する場合は再利用
             if (File.Exists(modelPath))
             {
                 return modelPath;
             }
-            
+
             // 簡単なONNXモデル（Identity操作）をバイナリで作成
             // 実際のOCR処理と類似した入力形状: [1, 3, 224, 224] (NCHW)
             var modelBytes = CreateMinimalOnnxModelBytes();
             File.WriteAllBytes(modelPath, modelBytes);
-            
+
             return modelPath;
         }
         catch (Exception ex)
@@ -40,7 +40,7 @@ public static class MockOnnxModelGenerator
             throw new InvalidOperationException($"Failed to create benchmark ONNX model: {ex.Message}", ex);
         }
     }
-    
+
     /// <summary>
     /// 実用的なベンチマーク用軽量ONNXモデルのバイト配列を生成
     /// </summary>
@@ -55,7 +55,7 @@ Y2htYXJrLU1pbmltYWxPY3ItSWRlbnRpdHktVjEuMC4wGhIIARIJaWRlbnRpdHkSBklkZW50aXR5
 QAIKCAM6CTEuMC4wOmJhc2VkUgJ0ZmJhACINCgRpbnB1dBIFZmxvYXQqDQoGb3V0cHV0EgVmbG9h
 dDoVCghJZGVudGl0eRIDYXJnEgZvdXRwdXQ=");
     }
-    
+
     /// <summary>
     /// インメモリの最小限ONNXモデルを作成（フォールバック用）
     /// </summary>
@@ -65,7 +65,7 @@ dDoVCghJZGVudGl0eRIDYXJnEgZvdXRwdXQ=");
         // 極めて単純なIdentity操作のONNXモデル
         // 入力をそのまま出力に渡すだけだが、実際のONNX Runtimeで処理される
         var modelBuilder = new StringBuilder();
-        
+
         // Protocol Buffersベースの最小限のONNXグラフ定義
         var minimalOnnxBytes = new byte[]
         {
@@ -75,10 +75,10 @@ dDoVCghJZGVudGl0eRIDYXJnEgZvdXRwdXQ=");
             0x6e, 0x74, 0x69, 0x74, 0x79, 0x12, 0x03, 0x61, 0x72, 0x67, 0x1a, 0x06, 0x6f, 0x75, 0x74, 0x70,
             0x75, 0x74
         };
-        
+
         return minimalOnnxBytes;
     }
-    
+
     /// <summary>
     /// ベンチマーク用テスト画像データを生成
     /// OCR処理に近いランダムデータで実際のメモリアクセスパターンをシミュレート
@@ -92,7 +92,7 @@ dDoVCghJZGVudGl0eRIDYXJnEgZvdXRwdXQ=");
         var random = new Random(42); // 再現可能な結果のため固定シード
         var imageSize = width * height * channels;
         var imageData = new float[imageSize];
-        
+
         // OCR前処理後のような正規化されたデータパターンを生成
         // テキスト領域をシミュレートした構造的なパターン
         for (int c = 0; c < channels; c++)
@@ -102,17 +102,17 @@ dDoVCghJZGVudGl0eRIDYXJnEgZvdXRwdXQ=");
                 for (int w = 0; w < width; w++)
                 {
                     var index = c * width * height + h * width + w;
-                    
+
                     // テキスト様パターン生成（文字境界、背景、前景をシミュレート）
                     var textPattern = Math.Sin(h * 0.1) * Math.Cos(w * 0.08);
                     var noiseLevel = (random.NextDouble() - 0.5) * 0.1; // 10%のランダムノイズ
-                    
+
                     // OCR前処理後の正規化された値範囲 [-1.0, 1.0]
                     imageData[index] = (float)Math.Tanh(textPattern + noiseLevel);
                 }
             }
         }
-        
+
         return imageData;
     }
 }

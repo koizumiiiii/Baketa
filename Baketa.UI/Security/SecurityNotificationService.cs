@@ -53,8 +53,8 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
                 Email: email,
                 Subject: "Baketa - パスワードリセット要求",
                 Message: GeneratePasswordResetMessage(resetToken, ipAddress),
-                Data: new Dictionary<string, object> 
-                { 
+                Data: new Dictionary<string, object>
+                {
                     { "ResetToken", resetToken },
                     { "IPAddress", ipAddress ?? "Unknown" }
                 }
@@ -76,7 +76,7 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
         catch (Exception ex)
         {
             logger?.LogError(ex, "パスワードリセット通知送信エラー: {Email}", email);
-            
+
             if (logger != null)
                 _logNotificationFailed(logger, email, SecurityNotificationType.PasswordReset, ex);
 
@@ -107,8 +107,8 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
                 Email: email,
                 Subject: "Baketa - アカウントセキュリティ警告【緊急】",
                 Message: GenerateHijackingAlertMessage(verificationCode, suspiciousReasons, ipAddress),
-                Data: new Dictionary<string, object> 
-                { 
+                Data: new Dictionary<string, object>
+                {
                     { "VerificationCode", verificationCode },
                     { "SuspiciousReasons", suspiciousReasons },
                     { "IPAddress", ipAddress ?? "Unknown" }
@@ -131,7 +131,7 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
         catch (Exception ex)
         {
             logger?.LogError(ex, "乗っ取り警告通知送信エラー: {Email}", email);
-            
+
             if (logger != null)
                 _logNotificationFailed(logger, email, SecurityNotificationType.HijackingAlert, ex);
 
@@ -161,8 +161,8 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
                 Email: email,
                 Subject: "Baketa - アカウント復旧完了",
                 Message: GenerateRecoveryCompletedMessage(recoveryType, ipAddress),
-                Data: new Dictionary<string, object> 
-                { 
+                Data: new Dictionary<string, object>
+                {
                     { "RecoveryType", recoveryType },
                     { "IPAddress", ipAddress ?? "Unknown" }
                 }
@@ -184,7 +184,7 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
         catch (Exception ex)
         {
             logger?.LogError(ex, "復旧完了通知送信エラー: {Email}", email);
-            
+
             if (logger != null)
                 _logNotificationFailed(logger, email, SecurityNotificationType.RecoveryCompleted, ex);
 
@@ -215,8 +215,8 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
                 Email: email,
                 Subject: "Baketa - 疑わしい活動を検出",
                 Message: GenerateSuspiciousActivityMessage(suspiciousScore, reasons, ipAddress),
-                Data: new Dictionary<string, object> 
-                { 
+                Data: new Dictionary<string, object>
+                {
                     { "SuspiciousScore", suspiciousScore },
                     { "Reasons", reasons },
                     { "IPAddress", ipAddress ?? "Unknown" }
@@ -238,7 +238,7 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
         catch (Exception ex)
         {
             logger?.LogError(ex, "疑わしい活動通知送信エラー: {Email}", email);
-            
+
             if (logger != null)
                 _logNotificationFailed(logger, email, SecurityNotificationType.SuspiciousActivity, ex);
 
@@ -363,8 +363,8 @@ public sealed class SecurityNotificationService(SecurityAuditLogger auditLogger,
         // TODO: 実際の通知送信処理を実装
         // メール送信、プッシュ通知、SMS送信など
         await Task.Delay(100).ConfigureAwait(false); // Placeholder
-        
-        logger?.LogInformation("通知送信: {Email} - {Subject}", 
+
+        logger?.LogInformation("通知送信: {Email} - {Subject}",
             notification.Email, notification.Subject);
     }
 

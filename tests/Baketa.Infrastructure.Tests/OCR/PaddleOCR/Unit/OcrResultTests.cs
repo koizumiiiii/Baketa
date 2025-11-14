@@ -1,7 +1,7 @@
-using Xunit;
-using Baketa.Infrastructure.OCR.PaddleOCR.Results;
 using System.Drawing;
+using Baketa.Infrastructure.OCR.PaddleOCR.Results;
 using Sdcb.PaddleOCR;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Unit;
 
@@ -90,7 +90,7 @@ public class OcrResultTests
         // Assert - 期待されるフォーマット: "Text: 'Sample Text', Confidence: 87.0%, BoundingBox: {X=5,Y=10,Width=80,Height=20}"
         var expectedFormat = "Text: 'Sample Text', Confidence: 87.0%, BoundingBox: {X=5,Y=10,Width=80,Height=20}";
         Assert.Equal(expectedFormat, stringResult);
-        
+
         // 追加の部分文字列チェック
         Assert.Contains(text, stringResult, StringComparison.Ordinal);
         Assert.Contains("87.0%", stringResult, StringComparison.Ordinal);

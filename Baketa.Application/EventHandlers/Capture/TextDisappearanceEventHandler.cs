@@ -15,77 +15,77 @@ namespace Baketa.Application.EventHandlers.Capture;
 /// </remarks>
 /// <param name="logger">ロガー</param>
 public sealed class TextDisappearanceEventHandler(ILogger<TextDisappearanceEventHandler>? logger = null) : IEventProcessor<IEvent>
-    {
-        private readonly ILogger<TextDisappearanceEventHandler>? _logger = logger;
+{
+    private readonly ILogger<TextDisappearanceEventHandler>? _logger = logger;
 
     /// <summary>
     /// イベントを処理します
     /// </summary>
     /// <param name="event">テキスト消失イベント</param>
     public async Task HandleAsync(IEvent eventData)
+    {
+        ArgumentNullException.ThrowIfNull(eventData, nameof(eventData));
+
+        // TextDisappearanceEvent型にキャスト
+        if (eventData is TextDisappearanceEvent textDisappearanceEvent)
         {
-            ArgumentNullException.ThrowIfNull(eventData, nameof(eventData));
-                
-            // TextDisappearanceEvent型にキャスト
-            if (eventData is TextDisappearanceEvent textDisappearanceEvent)
+            try
             {
-                try
-                {
-                    _logger?.LogDebug("テキスト消失イベントを処理: {Count}個の領域, ウィンドウ: {WindowHandle}",
-                        textDisappearanceEvent.DisappearedRegions.Count, textDisappearanceEvent.SourceWindowHandle);
-                    
-                    // テキスト消失時の処理
-                    // 例：翻訳ウィンドウの非表示処理
-                    await HideTranslationWindowsAsync(textDisappearanceEvent).ConfigureAwait(false);
-                    
-                    _logger?.LogInformation("テキスト消失イベント処理完了");
-                }
-                catch (ArgumentException ex)
-                {
-                    _logger?.LogError(ex, "テキスト消失イベント処理中に引数エラーが発生しました: {Message}", ex.Message);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    _logger?.LogError(ex, "テキスト消失イベント処理中に操作エラーが発生しました: {Message}", ex.Message);
-                }
-                catch (IOException ex)
-                {
-                    _logger?.LogError(ex, "テキスト消失イベント処理中にIO例外が発生しました: {Message}", ex.Message);
-                }
-                catch (Exception ex) when (ex is not ApplicationException)
-                {
-                    _logger?.LogError(ex, "テキスト消失イベント処理中にエラーが発生しました");
-                }
+                _logger?.LogDebug("テキスト消失イベントを処理: {Count}個の領域, ウィンドウ: {WindowHandle}",
+                    textDisappearanceEvent.DisappearedRegions.Count, textDisappearanceEvent.SourceWindowHandle);
+
+                // テキスト消失時の処理
+                // 例：翻訳ウィンドウの非表示処理
+                await HideTranslationWindowsAsync(textDisappearanceEvent).ConfigureAwait(false);
+
+                _logger?.LogInformation("テキスト消失イベント処理完了");
             }
-            else
+            catch (ArgumentException ex)
             {
-                _logger?.LogWarning("サポートされていないイベントタイプ: {EventType}", eventData.GetType().Name);
+                _logger?.LogError(ex, "テキスト消失イベント処理中に引数エラーが発生しました: {Message}", ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger?.LogError(ex, "テキスト消失イベント処理中に操作エラーが発生しました: {Message}", ex.Message);
+            }
+            catch (IOException ex)
+            {
+                _logger?.LogError(ex, "テキスト消失イベント処理中にIO例外が発生しました: {Message}", ex.Message);
+            }
+            catch (Exception ex) when (ex is not ApplicationException)
+            {
+                _logger?.LogError(ex, "テキスト消失イベント処理中にエラーが発生しました");
             }
         }
-        
-        /// <summary>
-        /// 消失したテキスト領域に対応する翻訳ウィンドウを非表示にします
-        /// </summary>
-        private async Task HideTranslationWindowsAsync(TextDisappearanceEvent _)
+        else
         {
-            // ここでは実際の実装は省略（UI層と連携する必要あり）
-            // 実際の実装では、以下の処理を行う
-            // 1. テキスト領域に対応する翻訳ウィンドウを特定
-            // 2. ウィンドウの非表示処理を実行
-            
-            // 例：イベント発火で他のコンポーネントに通知
-            // await _eventAggregator.PublishAsync(new TranslationHideEvent(...))
-            
-            await Task.Delay(1).ConfigureAwait(false); // 非同期メソッドの要件
+            _logger?.LogWarning("サポートされていないイベントタイプ: {EventType}", eventData.GetType().Name);
         }
-
-        /// <summary>
-        /// このハンドラーの優先度
-        /// </summary>
-        public int Priority => 0;
-
-        /// <summary>
-        /// 処理を同期的に実行するかどうか
-        /// </summary>
-        public bool SynchronousExecution => false;
     }
+
+    /// <summary>
+    /// 消失したテキスト領域に対応する翻訳ウィンドウを非表示にします
+    /// </summary>
+    private async Task HideTranslationWindowsAsync(TextDisappearanceEvent _)
+    {
+        // ここでは実際の実装は省略（UI層と連携する必要あり）
+        // 実際の実装では、以下の処理を行う
+        // 1. テキスト領域に対応する翻訳ウィンドウを特定
+        // 2. ウィンドウの非表示処理を実行
+
+        // 例：イベント発火で他のコンポーネントに通知
+        // await _eventAggregator.PublishAsync(new TranslationHideEvent(...))
+
+        await Task.Delay(1).ConfigureAwait(false); // 非同期メソッドの要件
+    }
+
+    /// <summary>
+    /// このハンドラーの優先度
+    /// </summary>
+    public int Priority => 0;
+
+    /// <summary>
+    /// 処理を同期的に実行するかどうか
+    /// </summary>
+    public bool SynchronousExecution => false;
+}

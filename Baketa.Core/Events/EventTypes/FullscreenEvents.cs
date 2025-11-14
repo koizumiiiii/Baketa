@@ -22,7 +22,7 @@ public class FullscreenStateChangedEvent(FullscreenInfo fullscreenInfo, bool? pr
 
     public override string Name => "FullscreenStateChanged";
     public override string Category => "Capture";
-    
+
     public override string ToString()
     {
         return $"{Name}: {FullscreenInfo.ProcessName} - {(FullscreenInfo.IsFullscreen ? "Fullscreen" : "Windowed")} " +
@@ -55,7 +55,7 @@ public class FullscreenOptimizationAppliedEvent(
 
     public override string Name => "FullscreenOptimizationApplied";
     public override string Category => "Capture";
-    
+
     public override string ToString()
     {
         return $"{Name}: {FullscreenInfo.ProcessName} - Interval: {OptimizedSettings.CaptureIntervalMs}ms, " +
@@ -88,10 +88,10 @@ public class FullscreenOptimizationRemovedEvent(
 
     public override string Name => "FullscreenOptimizationRemoved";
     public override string Category => "Capture";
-    
+
     public override string ToString()
     {
-        var settingsInfo = RestoredSettings != null 
+        var settingsInfo = RestoredSettings != null
             ? $"Restored: Interval {RestoredSettings.CaptureIntervalMs}ms"
             : "No settings restored";
         return $"{Name}: {Reason} - {settingsInfo}";
@@ -120,7 +120,7 @@ public class FullscreenOptimizationErrorEvent(Exception exception, string contex
 
     public override string Name => "FullscreenOptimizationError";
     public override string Category => "Capture";
-    
+
     public override string ToString()
     {
         return $"{Name}: {ErrorMessage} (Context: {Context})";
@@ -139,7 +139,7 @@ public class FullscreenDetectionStartedEvent(FullscreenDetectionSettings setting
 
     public override string Name => "FullscreenDetectionStarted";
     public override string Category => "Capture";
-    
+
     public override string ToString()
     {
         return $"{Name}: Detection interval {Settings.DetectionIntervalMs}ms, " +
@@ -164,7 +164,7 @@ public class FullscreenDetectionStoppedEvent(string reason = "", TimeSpan? runDu
 
     public override string Name => "FullscreenDetectionStopped";
     public override string Category => "Capture";
-    
+
     public override string ToString()
     {
         var duration = RunDuration?.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture) ?? "Unknown";

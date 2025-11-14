@@ -25,7 +25,7 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
     private readonly ConcurrentDictionary<string, DateTime> _accessTimes;
     private readonly ReaderWriterLockSlim _cleanupLock;
     private readonly System.Threading.Timer _cleanupTimer;
-    
+
     // 🎯 Step3設定値
     private const int MaxCacheSize = 10000; // 最大キャッシュエントリ数
     private const int CacheExpiryMinutes = 60; // キャッシュ有効期限
@@ -37,9 +37,9 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
         _cache = new ConcurrentDictionary<string, CachedOcrResult>();
         _accessTimes = new ConcurrentDictionary<string, DateTime>();
         _cleanupLock = new ReaderWriterLockSlim();
-        
+
         // 定期クリーンアップタイマー設定
-        _cleanupTimer = new System.Threading.Timer(PerformCleanup, null, 
+        _cleanupTimer = new System.Threading.Timer(PerformCleanup, null,
             TimeSpan.FromMinutes(CleanupIntervalMinutes),
             TimeSpan.FromMinutes(CleanupIntervalMinutes));
 
@@ -52,18 +52,18 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
     public string GenerateImageHash(byte[] imageData)
     {
         ArgumentNullException.ThrowIfNull(imageData);
-        
+
         var stopwatch = Stopwatch.StartNew();
-        
+
         using var sha256 = SHA256.Create();
         var hashBytes = sha256.ComputeHash(imageData);
         var hash = Convert.ToBase64String(hashBytes);
-        
+
         stopwatch.Stop();
-        
-        _logger.LogDebug("🔍 画像ハッシュ生成: {Hash} - 時間: {ElapsedMs}ms, サイズ: {Size}bytes", 
+
+        _logger.LogDebug("🔍 画像ハッシュ生成: {Hash} - 時間: {ElapsedMs}ms, サイズ: {Size}bytes",
             hash[..12], stopwatch.ElapsedMilliseconds, imageData.Length);
-        
+
         return hash;
     }
 
@@ -76,7 +76,7 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
         ArgumentNullException.ThrowIfNull(result);
 
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             var cached = new CachedOcrResult
@@ -95,12 +95,12 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
             });
 
             _accessTimes[imageHash] = DateTime.UtcNow;
-            
+
             stopwatch.Stop();
-            
-            _logger.LogDebug("💾 OCR結果キャッシュ保存: {Hash} - 時間: {ElapsedMs}ms, 認識数: {TextCount}", 
+
+            _logger.LogDebug("💾 OCR結果キャッシュ保存: {Hash} - 時間: {ElapsedMs}ms, 認識数: {TextCount}",
                 imageHash[..12], stopwatch.ElapsedMilliseconds, result.TextRegions.Count);
-            
+
             // 容量チェック（非同期で実行）
             _ = Task.Run(CheckCacheSize);
         }
@@ -116,9 +116,9 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
     public OcrResults? GetCachedResult(string imageHash)
     {
         ArgumentException.ThrowIfNullOrEmpty(imageHash);
-        
+
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             if (!_cache.TryGetValue(imageHash, out var cached))
@@ -140,12 +140,12 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
             cached.AccessCount++;
             cached.LastAccessAt = DateTime.UtcNow;
             _accessTimes[imageHash] = DateTime.UtcNow;
-            
+
             stopwatch.Stop();
-            
-            _logger.LogInformation("⚡ キャッシュヒット: {Hash} - 時間: {ElapsedMs}ms, アクセス数: {AccessCount}, 認識数: {TextCount}", 
+
+            _logger.LogInformation("⚡ キャッシュヒット: {Hash} - 時間: {ElapsedMs}ms, アクセス数: {AccessCount}, 認識数: {TextCount}",
                 imageHash[..12], stopwatch.ElapsedMilliseconds, cached.AccessCount, cached.Result.TextRegions.Count);
-            
+
             return cached.Result;
         }
         catch (Exception ex)
@@ -170,7 +170,7 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
                 var entriesToRemove = _cache.Count - (MaxCacheSize * 3 / 4); // 75%まで削減
                 if (entriesToRemove <= 0) return;
 
-                _logger.LogInformation("🧹 キャッシュサイズ超過 - {CurrentCount}/{MaxSize}、{RemoveCount}エントリを削除", 
+                _logger.LogInformation("🧹 キャッシュサイズ超過 - {CurrentCount}/{MaxSize}、{RemoveCount}エントリを削除",
                     _cache.Count, MaxCacheSize, entriesToRemove);
 
                 var sortedEntries = new List<(string Key, DateTime LastAccess)>();
@@ -192,7 +192,7 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
                     }
                 }
 
-                _logger.LogInformation("✅ キャッシュクリーンアップ完了 - {RemovedCount}エントリ削除、現在のサイズ: {CurrentSize}", 
+                _logger.LogInformation("✅ キャッシュクリーンアップ完了 - {RemovedCount}エントリ削除、現在のサイズ: {CurrentSize}",
                     removedCount, _cache.Count);
             }
             finally
@@ -210,10 +210,10 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
         try
         {
             _cleanupLock.EnterWriteLock();
-            
+
             var expiredKeys = new List<string>();
             var expiryCutoff = DateTime.UtcNow.AddMinutes(-CacheExpiryMinutes);
-            
+
             foreach (var kvp in _cache)
             {
                 if (kvp.Value.LastAccessAt.GetValueOrDefault(kvp.Value.CachedAt) < expiryCutoff)
@@ -264,7 +264,7 @@ public sealed class AdvancedOcrCacheService : IAdvancedOcrCacheService
             foreach (var entry in _cache.Values)
             {
                 totalHits += entry.AccessCount;
-                
+
                 var entryTime = entry.LastAccessAt ?? entry.CachedAt;
                 if (entryTime < oldestEntry) oldestEntry = entryTime;
                 if (entryTime > newestEntry) newestEntry = entryTime;

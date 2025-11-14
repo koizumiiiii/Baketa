@@ -20,8 +20,8 @@ public interface IImageChangeDetectionService
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>詳細な変化検知結果</returns>
     Task<ImageChangeResult> DetectChangeAsync(
-        IImage? previousImage, 
-        IImage currentImage, 
+        IImage? previousImage,
+        IImage currentImage,
         string contextId = "default",
         CancellationToken cancellationToken = default);
 
@@ -34,8 +34,8 @@ public interface IImageChangeDetectionService
     /// <param name="contextId">コンテキストID</param>
     /// <returns>高速フィルタ結果</returns>
     Task<QuickFilterResult> QuickFilterAsync(
-        IImage? previousImage, 
-        IImage currentImage, 
+        IImage? previousImage,
+        IImage currentImage,
         string contextId = "default");
 
     /// <summary>
@@ -85,8 +85,8 @@ public interface IImageChangeDetectionService
     /// <returns>変化検知の結果</returns>
     [Obsolete("Use DetectChangeAsync(IImage, IImage, string, CancellationToken) instead")]
     Task<ImageChangeResult> DetectChangeAsync(
-        byte[] previousImage, 
-        byte[] currentImage, 
+        byte[] previousImage,
+        byte[] currentImage,
         CancellationToken cancellationToken = default);
 }
 
@@ -98,31 +98,31 @@ public record ImageChangeDetectionStatistics
 {
     /// <summary>総処理回数</summary>
     public long TotalProcessed { get; init; }
-    
+
     /// <summary>Stage 1で除外された回数</summary>
     public long Stage1Filtered { get; init; }
-    
+
     /// <summary>Stage 2で除外された回数</summary>
     public long Stage2Filtered { get; init; }
-    
+
     /// <summary>Stage 3まで進んだ回数</summary>
     public long Stage3Processed { get; init; }
-    
+
     /// <summary>平均処理時間（Stage 1）</summary>
     public TimeSpan AverageStage1Time { get; init; }
-    
+
     /// <summary>平均処理時間（Stage 2）</summary>
     public TimeSpan AverageStage2Time { get; init; }
-    
+
     /// <summary>平均処理時間（Stage 3）</summary>
     public TimeSpan AverageStage3Time { get; init; }
-    
+
     /// <summary>キャッシュヒット率</summary>
     public float CacheHitRate { get; init; }
-    
+
     /// <summary>現在のキャッシュサイズ</summary>
     public int CurrentCacheSize { get; init; }
-    
+
     /// <summary>フィルタリング効率（Stage 1での除外率）</summary>
     public float FilteringEfficiency { get; init; }
 }

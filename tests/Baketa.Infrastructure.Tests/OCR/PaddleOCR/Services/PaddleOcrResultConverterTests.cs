@@ -1,10 +1,10 @@
-using Xunit;
-using Moq;
-using Baketa.Infrastructure.OCR.PaddleOCR.Services;
-using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
-using Baketa.Core.Abstractions.Imaging;
-using Sdcb.PaddleOCR;
 using System.Drawing;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
+using Baketa.Infrastructure.OCR.PaddleOCR.Services;
+using Moq;
+using Sdcb.PaddleOCR;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Services;
 

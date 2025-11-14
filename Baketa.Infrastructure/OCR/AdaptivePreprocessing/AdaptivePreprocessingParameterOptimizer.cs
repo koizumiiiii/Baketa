@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Imaging;
 using System.Diagnostics;
+using Baketa.Core.Abstractions.Imaging;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 
@@ -25,7 +25,7 @@ public class AdaptivePreprocessingParameterOptimizer(
     /// 画像品質指標に基づいて前処理パラメータを調整します
     /// </summary>
     public async Task<AdaptivePreprocessingParameters> AdjustParametersAsync(
-        ImageQualityMetrics qualityMetrics, 
+        ImageQualityMetrics qualityMetrics,
         TextDensityMetrics textDensityMetrics)
     {
         return await Task.Run(() =>
@@ -37,10 +37,10 @@ public class AdaptivePreprocessingParameterOptimizer(
 
             // 画像品質に基づくパラメータ調整
             parameters = AdjustForImageQuality(parameters, qualityMetrics);
-            
+
             // テキスト特性に基づくパラメータ調整
             parameters = AdjustForTextCharacteristics(parameters, textDensityMetrics);
-            
+
             // 総合的な最適化
             parameters = ApplyFinalOptimization(parameters, qualityMetrics, textDensityMetrics);
 
@@ -58,7 +58,7 @@ public class AdaptivePreprocessingParameterOptimizer(
     public async Task<AdaptivePreprocessingResult> OptimizeWithDetailsAsync(IAdvancedImage image)
     {
         var sw = Stopwatch.StartNew();
-        
+
         try
         {
             logger.LogInformation("適応的前処理最適化開始: {Width}x{Height}", image.Width, image.Height);
@@ -110,7 +110,7 @@ public class AdaptivePreprocessingParameterOptimizer(
     /// 画像品質に基づくパラメータ調整
     /// </summary>
     private AdaptivePreprocessingParameters AdjustForImageQuality(
-        AdaptivePreprocessingParameters baseParameters, 
+        AdaptivePreprocessingParameters baseParameters,
         ImageQualityMetrics qualityMetrics)
     {
         var brightness = qualityMetrics.Brightness;
@@ -120,16 +120,16 @@ public class AdaptivePreprocessingParameterOptimizer(
 
         // 明度調整
         var brightnessAdjustment = CalculateBrightnessAdjustment(brightness);
-        
+
         // コントラスト調整
         var contrastAdjustment = CalculateContrastAdjustment(contrast);
-        
+
         // ガンマ補正
         var gammaAdjustment = CalculateGammaAdjustment(brightness, contrast);
-        
+
         // ノイズ除去
         var noiseReductionLevel = CalculateNoiseReductionLevel(noise);
-        
+
         // シャープニング
         var sharpeningLevel = CalculateSharpeningLevel(sharpness, noise);
 
@@ -147,7 +147,7 @@ public class AdaptivePreprocessingParameterOptimizer(
     /// テキスト特性に基づくパラメータ調整
     /// </summary>
     private AdaptivePreprocessingParameters AdjustForTextCharacteristics(
-        AdaptivePreprocessingParameters baseParameters, 
+        AdaptivePreprocessingParameters baseParameters,
         TextDensityMetrics textMetrics)
     {
         var textSize = textMetrics.EstimatedTextSize;
@@ -310,8 +310,8 @@ public class AdaptivePreprocessingParameterOptimizer(
     }
 
     private string GenerateOptimizationReason(
-        ImageQualityMetrics _, 
-        TextDensityMetrics _2, 
+        ImageQualityMetrics _,
+        TextDensityMetrics _2,
         AdaptivePreprocessingParameters parameters)
     {
         var reasons = new List<string>();
@@ -331,8 +331,8 @@ public class AdaptivePreprocessingParameterOptimizer(
     }
 
     private double EstimateExpectedImprovement(
-        ImageQualityMetrics qualityMetrics, 
-        TextDensityMetrics textMetrics, 
+        ImageQualityMetrics qualityMetrics,
+        TextDensityMetrics textMetrics,
         AdaptivePreprocessingParameters parameters)
     {
         var baseImprovement = 0.1; // 基本改善
@@ -346,7 +346,7 @@ public class AdaptivePreprocessingParameterOptimizer(
             baseImprovement += 0.2;
 
         // パラメータ調整強度に応じた改善期待
-        var adjustmentIntensity = 
+        var adjustmentIntensity =
             Math.Abs(parameters.Brightness) +
             Math.Abs(parameters.Contrast - 1.0) +
             Math.Abs(parameters.Gamma - 1.0) +

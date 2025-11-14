@@ -22,7 +22,7 @@ public class PortManagementService : IPortManagementService
     private const string GlobalRegistryFile = "translation_ports_global.json";
     private const int HeartbeatIntervalSeconds = 30;
     private const int StaleEntryThresholdSeconds = 90; // 🔧 [GEMINI_FEEDBACK] 60秒→90秒に拡大
-    
+
     private readonly ILogger<PortManagementService> logger;
     private readonly string _globalRegistryPath = Path.Combine(Environment.CurrentDirectory, GlobalRegistryFile);
     private readonly Mutex _globalMutex;
@@ -35,22 +35,22 @@ public class PortManagementService : IPortManagementService
     public PortManagementService(ILogger<PortManagementService> logger)
     {
         this.logger = logger;
-        
+
         try
         {
             _globalMutex = new Mutex(false, MutexName);
-            
+
             // 起動時: 孤立ファイルと古いエントリのクリーンアップ
             CleanupLegacyFiles();
             CleanupStaleEntries();
-            
+
             // Heartbeatタイマー開始
             _heartbeatTimer = new System.Threading.Timer(
                 UpdateHeartbeat,
                 null,
                 TimeSpan.FromSeconds(HeartbeatIntervalSeconds),
                 TimeSpan.FromSeconds(HeartbeatIntervalSeconds));
-                
+
             logger.LogInformation("🚀 ポート管理サービス初期化完了 (PID={ProcessId})", _currentProcessId);
         }
         catch (Exception ex)
@@ -59,27 +59,27 @@ public class PortManagementService : IPortManagementService
             throw;
         }
     }
-    
+
     /// <inheritdoc />
     public async Task<int> AcquireAvailablePortAsync(int startPort = 5556, int endPort = 5562)
     {
         logger.LogDebug("🔍 ポート取得開始: 範囲 {StartPort}-{EndPort}", startPort, endPort);
-        
+
         if (!_globalMutex.WaitOne(_mutexTimeout))
         {
             throw new TimeoutException($"グローバルMutex取得がタイムアウトしました（{_mutexTimeout.TotalSeconds}秒）");
         }
-        
+
         try
         {
             var registry = LoadGlobalRegistry();
-            
+
             // 古いエントリをクリーンアップ
             CleanupStaleEntriesInRegistry(registry);
-            
+
             for (int port = startPort; port <= endPort; port++)
             {
-                if (await IsPortAvailableInternalAsync(port).ConfigureAwait(false) && 
+                if (await IsPortAvailableInternalAsync(port).ConfigureAwait(false) &&
                     !registry.Ports.ContainsKey(port.ToString()))
                 {
                     // ポートエントリ追加
@@ -88,10 +88,10 @@ public class PortManagementService : IPortManagementService
                         Pid = _currentProcessId,
                         LastHeartbeat = DateTime.UtcNow
                     };
-                    
+
                     SaveGlobalRegistryAtomic(registry);
                     _acquiredPorts.Add(port);
-                    
+
                     logger.LogInformation("🔌 ポート {Port} を取得しました (PID={ProcessId})", port, _currentProcessId);
                     return port;
                 }
@@ -100,7 +100,7 @@ public class PortManagementService : IPortManagementService
                     logger.LogDebug("⚠️ ポート {Port} は利用できません", port);
                 }
             }
-            
+
             throw new InvalidOperationException($"ポート範囲 {startPort}-{endPort} に利用可能なポートがありません");
         }
         finally
@@ -113,22 +113,22 @@ public class PortManagementService : IPortManagementService
     public async Task ReleasePortAsync(int port)
     {
         logger.LogDebug("🔓 ポート {Port} の解放開始", port);
-        
+
         if (!_globalMutex.WaitOne(_mutexTimeout))
         {
             logger.LogWarning("⚠️ ポート解放時のMutex取得がタイムアウトしました: Port {Port}", port);
             return;
         }
-        
+
         try
         {
             var registry = LoadGlobalRegistry();
-            
+
             if (registry.Ports.Remove(port.ToString()))
             {
                 SaveGlobalRegistryAtomic(registry);
                 _acquiredPorts.Remove(port);
-                
+
                 logger.LogInformation("🔓 ポート {Port} を解放しました (PID={ProcessId})", port, _currentProcessId);
             }
             else
@@ -140,7 +140,7 @@ public class PortManagementService : IPortManagementService
         {
             _globalMutex.ReleaseMutex();
         }
-        
+
         await Task.CompletedTask;
     }
 
@@ -158,12 +158,12 @@ public class PortManagementService : IPortManagementService
             logger.LogWarning("⚠️ アクティブポート取得時のMutex取得がタイムアウトしました");
             return [];
         }
-        
+
         try
         {
             var registry = LoadGlobalRegistry();
             CleanupStaleEntriesInRegistry(registry);
-            
+
             var activePorts = registry.Ports
                 .Select(kvp => int.Parse(kvp.Key))
                 .ToList()
@@ -191,18 +191,18 @@ public class PortManagementService : IPortManagementService
     private void UpdateHeartbeat(object? state)
     {
         if (_disposed) return;
-        
+
         if (!_globalMutex.WaitOne(TimeSpan.FromSeconds(5)))
         {
             logger.LogWarning("⚠️ Heartbeat更新時のMutex取得がタイムアウトしました");
             return;
         }
-        
+
         try
         {
             var registry = LoadGlobalRegistry();
             var updated = false;
-            
+
             foreach (var port in _acquiredPorts)
             {
                 if (registry.Ports.TryGetValue(port.ToString(), out var entry) && entry.Pid == _currentProcessId)
@@ -211,7 +211,7 @@ public class PortManagementService : IPortManagementService
                     updated = true;
                 }
             }
-            
+
             if (updated)
             {
                 SaveGlobalRegistryAtomic(registry);
@@ -227,7 +227,7 @@ public class PortManagementService : IPortManagementService
             _globalMutex.ReleaseMutex();
         }
     }
-    
+
     /// <summary>
     /// 🔧 [HYBRID_DESIGN] レガシーファイルのクリーンアップ
     /// 旧設計のプロセス別ファイルを削除
@@ -239,18 +239,18 @@ public class PortManagementService : IPortManagementService
             var currentDirectory = Environment.CurrentDirectory;
             var registryFiles = Directory.GetFiles(currentDirectory, "translation_ports_*.json");
             var cleanupCount = 0;
-            
+
             logger.LogInformation("🧹 レガシーファイルクリーンアップ開始: {Count}個の旧形式ファイル検出", registryFiles.Length);
-            
+
             foreach (var filePath in registryFiles)
             {
                 var fileName = Path.GetFileName(filePath);
-                
+
                 // ファイル名からプロセスID抽出: translation_ports_{PID}.json
                 if (fileName.StartsWith("translation_ports_") && fileName.EndsWith(".json"))
                 {
                     var pidString = fileName.Substring("translation_ports_".Length, fileName.Length - "translation_ports_".Length - ".json".Length);
-                    
+
                     if (int.TryParse(pidString, out var pid))
                     {
                         // 現在のプロセスIDは除外
@@ -272,7 +272,7 @@ public class PortManagementService : IPortManagementService
                     }
                 }
             }
-            
+
             if (cleanupCount > 0)
             {
                 logger.LogInformation("🧹 レガシーファイルクリーンアップ完了: {Count}個の旧形式ファイルを削除", cleanupCount);
@@ -294,7 +294,7 @@ public class PortManagementService : IPortManagementService
             logger.LogWarning("⚠️ 古いエントリクリーンアップ時のMutex取得がタイムアウトしました");
             return;
         }
-        
+
         try
         {
             var registry = LoadGlobalRegistry();
@@ -306,7 +306,7 @@ public class PortManagementService : IPortManagementService
             _globalMutex.ReleaseMutex();
         }
     }
-    
+
     /// <summary>
     /// 🔧 [HYBRID_DESIGN] レジストリ内の古いエントリをクリーンアップ
     /// </summary>
@@ -315,7 +315,7 @@ public class PortManagementService : IPortManagementService
         var now = DateTime.UtcNow;
         var staleThreshold = TimeSpan.FromSeconds(StaleEntryThresholdSeconds);
         var staleEntries = new List<string>();
-        
+
         foreach (var (portStr, entry) in registry.Ports)
         {
             if (now - entry.LastHeartbeat > staleThreshold)
@@ -325,19 +325,19 @@ public class PortManagementService : IPortManagementService
                 staleEntries.Add(portStr);
             }
         }
-        
+
         foreach (var portStr in staleEntries)
         {
             registry.Ports.Remove(portStr);
             logger.LogInformation("🧹 古いエントリ削除: Port={Port}", portStr);
         }
-        
+
         if (staleEntries.Count > 0)
         {
             registry.LastUpdated = DateTime.UtcNow;
         }
     }
-    
+
     /// <summary>
     /// 🔧 [HYBRID_DESIGN] グローバルレジストリ読み込み
     /// </summary>
@@ -350,10 +350,10 @@ public class PortManagementService : IPortManagementService
                 logger.LogDebug("グローバルレジストリファイルが存在しません。新規作成します: {File}", _globalRegistryPath);
                 return new GlobalPortRegistry();
             }
-            
+
             var json = File.ReadAllText(_globalRegistryPath);
             var registry = JsonSerializer.Deserialize<GlobalPortRegistry>(json);
-            
+
             return registry ?? new GlobalPortRegistry();
         }
         catch (Exception ex)
@@ -362,7 +362,7 @@ public class PortManagementService : IPortManagementService
             return new GlobalPortRegistry();
         }
     }
-    
+
     /// <summary>
     /// 🔧 [GEMINI_FEEDBACK] アトミックなファイル保存
     /// 一時ファイル → リネームで破損防止
@@ -376,14 +376,14 @@ public class PortManagementService : IPortManagementService
                 WriteIndented = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
             };
-            
+
             var json = JsonSerializer.Serialize(registry, options);
             var tempFile = $"{_globalRegistryPath}.tmp";
-            
+
             // 🔧 [GEMINI_FEEDBACK] アトミック書き込み
             File.WriteAllText(tempFile, json);
             File.Move(tempFile, _globalRegistryPath, true);
-            
+
             logger.LogDebug("📁 グローバルレジストリファイルを保存しました: {File}", _globalRegistryPath);
         }
         catch (Exception ex)
@@ -392,7 +392,7 @@ public class PortManagementService : IPortManagementService
             throw;
         }
     }
-    
+
 
     /// <summary>
     /// ポートが利用可能かチェック（内部用）
@@ -405,11 +405,11 @@ public class PortManagementService : IPortManagementService
             using var tcpListener = new TcpListener(IPAddress.Loopback, port);
             tcpListener.Start();
             tcpListener.Stop();
-            
+
             // 念のためNetworkInformationでも確認
             var ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
             var tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
-            
+
             return !tcpConnInfoArray.Any(endpoint => endpoint.Port == port);
         }
         catch (SocketException)
@@ -487,11 +487,11 @@ public class PortManagementService : IPortManagementService
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         try
         {
             _heartbeatTimer?.Dispose();
-            
+
             // 🔧 [HYBRID_DESIGN] 獲得したポートを確実に解放
             if (_globalMutex.WaitOne(TimeSpan.FromSeconds(5)))
             {
@@ -499,7 +499,7 @@ public class PortManagementService : IPortManagementService
                 {
                     var registry = LoadGlobalRegistry();
                     var removedCount = 0;
-                    
+
                     foreach (var port in _acquiredPorts)
                     {
                         if (registry.Ports.Remove(port.ToString()))
@@ -507,7 +507,7 @@ public class PortManagementService : IPortManagementService
                             removedCount++;
                         }
                     }
-                    
+
                     if (removedCount > 0)
                     {
                         SaveGlobalRegistryAtomic(registry);
@@ -519,14 +519,14 @@ public class PortManagementService : IPortManagementService
                     _globalMutex.ReleaseMutex();
                 }
             }
-            
+
             _globalMutex?.Dispose();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "❌ Disposeエラー");
         }
-        
+
         _disposed = true;
     }
 }

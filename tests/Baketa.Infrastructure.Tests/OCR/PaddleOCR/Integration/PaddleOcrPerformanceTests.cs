@@ -1,18 +1,18 @@
-using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
-using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
-using Baketa.Infrastructure.DI;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Security;
 using Baketa.Core.Abstractions.Dependency;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Infrastructure.DI;
+using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
-using System.Drawing;
-using System.Diagnostics;
-using System.IO;
-using System.Security;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Integration;
 
@@ -36,14 +36,14 @@ public class PaddleOcrPerformanceTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information));
-        
+
         // 安全なモックリゾルバーを使用
-        services.AddSingleton<IModelPathResolver>(provider => 
+        services.AddSingleton<IModelPathResolver>(provider =>
             new SafeTestModelPathResolver(_testBaseDirectory));
 
         _serviceProvider = services.BuildServiceProvider();
         _logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrPerformanceTests>>();
-        
+
         // テスト用ディレクトリ構造を作成
         CreateSafeTestDirectoryStructure();
     }
@@ -68,7 +68,7 @@ public class PaddleOcrPerformanceTests : IDisposable
             Directory.CreateDirectory(recognitionEngDirectory);
             Directory.CreateDirectory(recognitionJpnDirectory);
             Directory.CreateDirectory(tempDirectory);
-            
+
             _logger.LogInformation("テスト用ディレクトリ構造を作成完了: {BaseDir}", _testBaseDirectory);
         }
         catch (DirectoryNotFoundException ex)
@@ -97,15 +97,15 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var stopwatch = Stopwatch.StartNew();
 
         // Act - 安全なエンジンのみを初期化
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         var engineInitResult = await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
-        
+
         stopwatch.Stop();
         var elapsedMs = stopwatch.ElapsedMilliseconds;
 
@@ -113,7 +113,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         Assert.True(engineInitResult, "Engine should initialize successfully");
         Assert.True(elapsedMs < 1000, // テスト用エンジンの初期化時間を現実的な値に調整
             $"Initialization took {elapsedMs}ms, expected less than 1000ms");
-        
+
         _logger.LogInformation("初期化時間: {ElapsedMs}ms", elapsedMs);
     }
 
@@ -141,10 +141,10 @@ public class PaddleOcrPerformanceTests : IDisposable
         }).ConfigureAwait(false);
 
         // Assert - テスト用エンジンでは基本的に同じ性能
-        Assert.True(coldStartTime >= 0 && warmStartTime >= 0, 
+        Assert.True(coldStartTime >= 0 && warmStartTime >= 0,
             $"Both start times should be non-negative: cold={coldStartTime}ms, warm={warmStartTime}ms");
-        
-        _logger.LogInformation("コールドスタート: {ColdStart}ms, ウォームスタート: {WarmStart}ms", 
+
+        _logger.LogInformation("コールドスタート: {ColdStart}ms, ウォームスタート: {WarmStart}ms",
             coldStartTime, warmStartTime);
     }
 
@@ -158,9 +158,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -174,7 +174,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         Assert.True(switchTime < 50, // テスト用エンジンは非常に高速
             $"Language switching took {switchTime}ms, expected less than 50ms");
         Assert.Equal("jpn", safeOcrEngine.CurrentLanguage);
-        
+
         _logger.LogInformation("言語切り替え時間: {SwitchTime}ms", switchTime);
     }
 
@@ -184,9 +184,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -206,13 +206,13 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Assert
         var averageTime = switchTimes.Average();
         var maxTime = switchTimes.Max();
-        
+
         Assert.True(averageTime < 50, // テスト用エンジンは非常に高速
             $"Average language switching time {averageTime:F1}ms exceeded limit 50ms");
         Assert.True(maxTime < 75, // 最大時間も高速
             $"Maximum language switching time {maxTime}ms was too high");
-        
-        _logger.LogInformation("言語切り替え平均時間: {AvgTime:F1}ms, 最大時間: {MaxTime}ms", 
+
+        _logger.LogInformation("言語切り替え平均時間: {AvgTime:F1}ms, 最大時間: {MaxTime}ms",
             averageTime, maxTime);
     }
 
@@ -226,9 +226,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -244,7 +244,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Assert
         Assert.True(ocrTime < 50, // テスト用エンジンは非常に高速
             $"Single OCR execution took {ocrTime}ms, expected less than 50ms");
-        
+
         _logger.LogInformation("単一OCR実行時間: {OcrTime}ms", ocrTime);
     }
 
@@ -254,9 +254,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -274,28 +274,28 @@ public class PaddleOcrPerformanceTests : IDisposable
         foreach (var size in imageSizes)
         {
             var mockImage = PaddleOcrTestHelper.CreateMockImage(size.Width, size.Height);
-            
+
             var ocrTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
             {
                 var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
                 Assert.NotNull(results);
             }).ConfigureAwait(false);
 
-            performanceResults.Add(new (size, ocrTime));
+            performanceResults.Add(new(size, ocrTime));
         }
 
         // Assert
         foreach (var (size, time) in performanceResults)
         {
-            _logger.LogInformation("画像サイズ {Width}x{Height}: {Time}ms", 
+            _logger.LogInformation("画像サイズ {Width}x{Height}: {Time}ms",
                 size.Width, size.Height, time);
         }
 
         // テスト用エンジンでは基本的な動作確認のみ
         var smallestTime = performanceResults.First().time;
         var largestTime = performanceResults.Last().time;
-        
-        Assert.True(largestTime >= 0 && smallestTime >= 0, 
+
+        Assert.True(largestTime >= 0 && smallestTime >= 0,
             "All execution times should be non-negative");
     }
 
@@ -305,9 +305,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -329,12 +329,12 @@ public class PaddleOcrPerformanceTests : IDisposable
         }).ConfigureAwait(false);
 
         // Assert - テスト用エンジンでは両方が正常に完了することを確認
-        Assert.True(roiTime >= 0 && fullImageTime >= 0, 
+        Assert.True(roiTime >= 0 && fullImageTime >= 0,
             $"Both processing times should be non-negative: ROI={roiTime}ms, Full={fullImageTime}ms");
-        
-        _logger.LogInformation("全画像処理: {FullTime}ms, ROI処理: {RoiTime}ms", 
+
+        _logger.LogInformation("全画像処理: {FullTime}ms, ROI処理: {RoiTime}ms",
             fullImageTime, roiTime);
-        
+
         // テスト用エンジンでは両方とも高速であることを確認
         Assert.True(roiTime < 100, $"ROI processing should be fast: {roiTime}ms");
         Assert.True(fullImageTime < 100, $"Full image processing should be fast: {fullImageTime}ms");
@@ -350,9 +350,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 4 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false); // マルチスレッド有効
 
@@ -364,7 +364,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Act & Measure
         var concurrentTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
-            var tasks = mockImages.Select(async mockImage => 
+            var tasks = mockImages.Select(async mockImage =>
                 await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false))
                 .ToArray();
 
@@ -375,9 +375,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Assert
         Assert.True(concurrentTime < 200, // テスト用エンジンは高速
             $"Concurrent OCR execution took {concurrentTime}ms, expected less than 200ms");
-        
+
         var throughput = (double)concurrentRequests / concurrentTime * 1000; // requests per second
-        _logger.LogInformation("同時実行性能: {ConcurrentTime}ms for {Requests} requests, スループット: {Throughput:F2} req/sec", 
+        _logger.LogInformation("同時実行性能: {ConcurrentTime}ms for {Requests} requests, スループット: {Throughput:F2} req/sec",
             concurrentTime, concurrentRequests, throughput);
     }
 
@@ -387,10 +387,10 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         // シングルスレッドエンジン
         using var singleThreadEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         // マルチスレッドエンジン
         using var multiThreadEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
 
@@ -417,7 +417,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Act & Measure - マルチスレッド
         var multiThreadTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
         {
-            var tasks = mockImages.Select(async mockImage => 
+            var tasks = mockImages.Select(async mockImage =>
                 await multiThreadEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false))
                 .ToArray();
 
@@ -426,9 +426,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         }).ConfigureAwait(false);
 
         // Assert
-        _logger.LogInformation("シングルスレッド: {SingleTime}ms, マルチスレッド: {MultiTime}ms", 
+        _logger.LogInformation("シングルスレッド: {SingleTime}ms, マルチスレッド: {MultiTime}ms",
             singleThreadTime, multiThreadTime);
-        
+
         // テスト用エンジンでは基本的な動作確認のみ
         Assert.True(multiThreadTime > 0, "Multi-thread execution should complete");
         Assert.True(singleThreadTime > 0, "Single-thread execution should complete");
@@ -445,9 +445,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -475,13 +475,13 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Assert
         var memoryIncrease = finalMemory - initialMemory;
         var memoryIncreaseMB = memoryIncrease / (1024.0 * 1024.0);
-        
-        _logger.LogInformation("メモリ使用量変化: {MemoryIncrease:F2} MB ({Iterations} iterations)", 
+
+        _logger.LogInformation("メモリ使用量変化: {MemoryIncrease:F2} MB ({Iterations} iterations)",
             memoryIncreaseMB, iterations);
-        
+
         // テスト用エンジンではメモリリークは最小限（500KB/iteration以下）
         var maxAcceptableIncrease = iterations * 500 * 1024; // 500KB per iteration
-        Assert.True(memoryIncrease < maxAcceptableIncrease, 
+        Assert.True(memoryIncrease < maxAcceptableIncrease,
             $"Memory increase {memoryIncreaseMB:F2}MB exceeded acceptable limit of {maxAcceptableIncrease / (1024.0 * 1024.0):F2}MB");
     }
 
@@ -495,9 +495,9 @@ public class PaddleOcrPerformanceTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -508,7 +508,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         for (int i = 0; i < longRunIterations; i++)
         {
             var mockImage = PaddleOcrTestHelper.CreateMockImage(640, 480);
-            
+
             var executionTime = await PaddleOcrTestHelper.MeasureExecutionTimeAsync(async () =>
             {
                 var results = await safeOcrEngine.RecognizeAsync(mockImage.Object, null, CancellationToken.None).ConfigureAwait(false);
@@ -531,13 +531,13 @@ public class PaddleOcrPerformanceTests : IDisposable
         var standardDeviation = Math.Sqrt(executionTimes.Average(t => Math.Pow(t - averageTime, 2)));
         var coefficientOfVariation = standardDeviation / averageTime;
 
-        _logger.LogInformation("長時間運用結果: 平均 {AvgTime:F1}ms, 標準偏差 {StdDev:F1}ms, 変動係数 {CV:F3}", 
+        _logger.LogInformation("長時間運用結果: 平均 {AvgTime:F1}ms, 標準偏差 {StdDev:F1}ms, 変動係数 {CV:F3}",
             averageTime, standardDeviation, coefficientOfVariation);
 
         // テスト用エンジンでは変動が比較的小さいことを確認（実際のOCRでは1.5程度の変動は許容）
         Assert.True(coefficientOfVariation < 1.5, // 実際のOCR処理では多少の変動は許容
             $"Performance variation too high: {coefficientOfVariation:F3}");
-        
+
         // 最後でもエンジンが正常動作することを確認
         Assert.True(safeOcrEngine.IsInitialized);
         Assert.NotNull(safeOcrEngine.CurrentLanguage);
@@ -647,7 +647,7 @@ public class PaddleOcrPerformanceTests : IDisposable
         var isCI = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CI")) ||
                    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_ACTIONS")) ||
                    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BUILD_BUILDID"));
-        
+
         if (isCI)
         {
             return false;
@@ -663,7 +663,7 @@ public class PaddleOcrPerformanceTests : IDisposable
             if (disposing)
             {
                 _serviceProvider?.Dispose();
-                
+
                 // テスト用ディレクトリのクリーンアップ
                 try
                 {
@@ -685,7 +685,7 @@ public class PaddleOcrPerformanceTests : IDisposable
                     // I/Oエラーは無視
                 }
             }
-            
+
             _disposed = true;
         }
     }

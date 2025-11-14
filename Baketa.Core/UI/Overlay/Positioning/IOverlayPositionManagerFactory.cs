@@ -21,6 +21,6 @@ public interface IOverlayPositionManagerFactory
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>オーバーレイ位置管理システム</returns>
     Task<IOverlayPositionManager> CreateWithSettingsAsync(
-        OverlayPositionSettings settings, 
+        OverlayPositionSettings settings,
         CancellationToken cancellationToken = default);
 }

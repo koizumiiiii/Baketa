@@ -1,7 +1,7 @@
 using System.Drawing;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.Strategies;
 
@@ -18,7 +18,7 @@ public sealed class OcrRegionGenerator(ITileStrategy strategy, ILogger<OcrRegion
     /// 画像から OCR 処理用の領域画像リストを生成
     /// </summary>
     public async Task<List<RegionImagePair>> GenerateRegionImagesAsync(
-        IAdvancedImage sourceImage, 
+        IAdvancedImage sourceImage,
         TileGenerationOptions options,
         CancellationToken cancellationToken = default)
     {
@@ -44,18 +44,18 @@ public sealed class OcrRegionGenerator(ITileStrategy strategy, ILogger<OcrRegion
                 {
                     var regionImage = await sourceImage.ExtractRegionAsync(region.Bounds.ToMemoryRectangle())
                         .ConfigureAwait(false);
-                    
+
                     regionImages.Add(new RegionImagePair(region, regionImage));
                     successCount++;
 
-                    _logger?.LogTrace("✅ 領域画像切り出し成功: {RegionId}, サイズ: {Width}x{Height}", 
+                    _logger?.LogTrace("✅ 領域画像切り出し成功: {RegionId}, サイズ: {Width}x{Height}",
                         region.RegionId, region.Bounds.Width, region.Bounds.Height);
                 }
                 catch (Exception ex)
                 {
                     errorCount++;
-                    _logger?.LogWarning(ex, "❌ 領域画像切り出しエラー: {RegionId}, 座標: ({X},{Y}), サイズ: {Width}x{Height}", 
-                        region.RegionId, region.Bounds.X, region.Bounds.Y, 
+                    _logger?.LogWarning(ex, "❌ 領域画像切り出しエラー: {RegionId}, 座標: ({X},{Y}), サイズ: {Width}x{Height}",
+                        region.RegionId, region.Bounds.X, region.Bounds.Y,
                         region.Bounds.Width, region.Bounds.Height);
                     // エラー領域はスキップして処理継続
                 }

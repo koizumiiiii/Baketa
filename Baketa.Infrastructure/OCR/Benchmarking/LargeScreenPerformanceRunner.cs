@@ -20,13 +20,13 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     private readonly ILogger<LargeScreenPerformanceRunner> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
-    
+
     // サポートする解像度種別
     private static readonly List<ResolutionProfile> SupportedResolutions = [
         new ResolutionProfile { Name = "Full HD", Width = 1920, Height = 1080, Category = "Standard" },
@@ -45,33 +45,33 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
     public async Task<LargeScreenPerformanceReport> RunAsync()
     {
         _logger.LogInformation("=== 大画面パフォーマンステスト開始 ===");
-        
+
         var report = new LargeScreenPerformanceReport
         {
             ExecutionTime = DateTime.Now,
             DisplayConfiguration = await AnalyzeDisplayConfigurationAsync().ConfigureAwait(false)
         };
-        
+
         try
         {
             // 現在のディスプレイ設定に基づいてテスト
             report.CurrentDisplayResults = await TestCurrentDisplayAsync().ConfigureAwait(false);
-            
+
             // シミュレートされた解像度でのテスト
             report.SimulatedResolutionResults = await TestSimulatedResolutionsAsync().ConfigureAwait(false);
-            
+
             // メモリスケーリングテスト
             report.MemoryScalingResults = await TestMemoryScalingAsync().ConfigureAwait(false);
-            
+
             // 結果分析
             report.Analysis = AnalyzeResults(report);
             report.Recommendations = GenerateRecommendations(report);
-            
+
             // レポート出力
             await OutputReportAsync(report).ConfigureAwait(false);
-            
+
             _logger.LogInformation("=== 大画面パフォーマンステスト完了 ===");
-            
+
             return report;
         }
         catch (Exception ex)
@@ -80,22 +80,22 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
             throw;
         }
     }
-    
+
     /// <summary>
     /// ディスプレイ設定分析
     /// </summary>
     private async Task<DisplayConfiguration> AnalyzeDisplayConfigurationAsync()
     {
         _logger.LogInformation("ディスプレイ設定分析開始");
-        
+
         await Task.Delay(100).ConfigureAwait(false); // 初期化待機
-        
+
         var config = new DisplayConfiguration();
-        
+
         try
         {
             var screens = System.Windows.Forms.Screen.AllScreens;
-            
+
             for (int i = 0; i < screens.Length; i++)
             {
                 var screen = screens[i];
@@ -108,13 +108,13 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
                     BitsPerPixel = screen.BitsPerPixel,
                     TotalPixels = screen.Bounds.Width * screen.Bounds.Height
                 };
-                
+
                 // 解像度カテゴリ判定
                 displayInfo.Category = ClassifyResolution(displayInfo.Width, displayInfo.Height);
-                
+
                 config.Displays.Add(displayInfo);
             }
-            
+
             // 総合情報計算
             config.TotalDisplays = config.Displays.Count;
             config.TotalPixels = config.Displays.Sum(d => d.TotalPixels);
@@ -122,7 +122,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
             config.MaxHeight = config.Displays.Max(d => d.Height);
             config.HasHighDPI = config.Displays.Any(d => d.Category == "UltraHighDef");
             config.HasUltraWide = config.Displays.Any(d => d.Category == "UltraWide");
-            
+
             _logger.LogInformation("ディスプレイ設定分析完了: {DisplayCount}台, 最大={MaxResolution}, 総ピクセル={TotalPixels:N0}",
                 config.TotalDisplays, $"{config.MaxWidth}x{config.MaxHeight}", config.TotalPixels);
         }
@@ -130,10 +130,10 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
         {
             _logger.LogError(ex, "ディスプレイ設定取得エラー");
         }
-        
+
         return config;
     }
-    
+
     /// <summary>
     /// 解像度カテゴリ判定
     /// </summary>
@@ -141,11 +141,11 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
     {
         var totalPixels = width * height;
         var aspectRatio = (double)width / height;
-        
+
         // アスペクト比でウルトラワイドを判定
         if (aspectRatio > 2.5)
             return "UltraWide";
-        
+
         // ピクセル数で判定
         return totalPixels switch
         {
@@ -154,21 +154,21 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
             _ => "UltraHighDef"           // 4K以上
         };
     }
-    
+
     /// <summary>
     /// 現在のディスプレイでのテスト
     /// </summary>
     private async Task<List<DisplayTestResult>> TestCurrentDisplayAsync()
     {
         _logger.LogInformation("現在のディスプレイテスト開始");
-        
+
         var results = new List<DisplayTestResult>();
         // スタブ実装: サービスは使用しないためコメントアウト
         // var captureService = new object();
         // var ocrEngine = new object();
-        
+
         var screens = System.Windows.Forms.Screen.AllScreens;
-        
+
         for (int i = 0; i < screens.Length; i++)
         {
             var screen = screens[i];
@@ -179,16 +179,16 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
                 Height = screen.Bounds.Height,
                 Category = ClassifyResolution(screen.Bounds.Width, screen.Bounds.Height)
             };
-            
+
             try
             {
                 // スタブ実装: パフォーマンステストをシミュレート
                 result.CaptureMetrics = await SimulateCapturePerformanceAsync(screen.Bounds).ConfigureAwait(false);
                 result.OcrMetrics = await SimulateOcrPerformanceAsync(screen.Bounds).ConfigureAwait(false);
                 result.MemoryMetrics = await MeasureMemoryUsageAsync(screen.Bounds).ConfigureAwait(false);
-                
+
                 _logger.LogInformation("ディスプレイ{Index} ({Resolution}) テスト完了: キャプチャ={CaptureMs}ms, OCR={OcrMs}ms",
-                    i, $"{screen.Bounds.Width}x{screen.Bounds.Height}", 
+                    i, $"{screen.Bounds.Width}x{screen.Bounds.Height}",
                     result.CaptureMetrics.AverageTimeMs, result.OcrMetrics?.AverageTimeMs ?? 0);
             }
             catch (Exception ex)
@@ -196,24 +196,24 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
                 _logger.LogError(ex, "ディスプレイ{Index}テストエラー", i);
                 result.ErrorMessage = ex.Message;
             }
-            
+
             results.Add(result);
         }
-        
+
         _logger.LogInformation("現在のディスプレイテスト完了: {DisplayCount}台テスト", results.Count);
         return results;
     }
-    
+
     /// <summary>
     /// シミュレートされた解像度でのテスト
     /// </summary>
     private async Task<List<SimulatedResolutionResult>> TestSimulatedResolutionsAsync()
     {
         _logger.LogInformation("シミュレート解像度テスト開始");
-        
+
         var results = new List<SimulatedResolutionResult>();
         // スタブ実装: キャプチャサービスの代わりにシミュレーションを使用
-        
+
         foreach (var resolution in SupportedResolutions)
         {
             var result = new SimulatedResolutionResult
@@ -223,19 +223,19 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
                 Height = resolution.Height,
                 Category = resolution.Category
             };
-            
+
             try
             {
                 // 指定解像度でのキャプチャシミュレーション
                 var simulatedBounds = new Rectangle(0, 0, resolution.Width, resolution.Height);
                 result.CaptureMetrics = await SimulateCapturePerformanceForResolutionAsync(simulatedBounds).ConfigureAwait(false);
-                
+
                 // メモリスケーリング理論値計算
                 result.EstimatedMemoryMB = CalculateEstimatedMemoryUsage(resolution.Width, resolution.Height);
-                
+
                 // パフォーマンススコア計算
                 result.PerformanceScore = CalculatePerformanceScore(result);
-                
+
                 _logger.LogInformation("解像度 {ResolutionName} テスト完了: スコア={Score}, メモリ={MemoryMB}MB",
                     resolution.Name, result.PerformanceScore, result.EstimatedMemoryMB);
             }
@@ -244,24 +244,24 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
                 _logger.LogError(ex, "解像度 {ResolutionName} テストエラー", resolution.Name);
                 result.ErrorMessage = ex.Message;
             }
-            
+
             results.Add(result);
         }
-        
+
         _logger.LogInformation("シミュレート解像度テスト完了: {ResolutionCount}種類テスト", results.Count);
         return results;
     }
-    
+
     /// <summary>
     /// メモリスケーリングテスト
     /// </summary>
     private async Task<MemoryScalingResult> TestMemoryScalingAsync()
     {
         _logger.LogInformation("メモリスケーリングテスト開始");
-        
+
         await Task.Delay(50).ConfigureAwait(false); // 非同期メソッドのためのawait追加
         var result = new MemoryScalingResult();
-        
+
         try
         {
             // 各解像度でのメモリ使用量理論値計算
@@ -276,58 +276,58 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
                     EstimatedOcrMemoryMB = CalculateOcrMemoryUsage(resolution.Width, resolution.Height),
                     EstimatedTotalMemoryMB = CalculateEstimatedMemoryUsage(resolution.Width, resolution.Height)
                 };
-                
+
                 result.ResolutionMemoryData.Add(memoryData);
             }
-            
+
             // メモリスケーリング率計算
             var baseResolution = result.ResolutionMemoryData.First(r => r.ResolutionName == "Full HD");
-            
+
             foreach (var data in result.ResolutionMemoryData)
             {
                 data.MemoryScalingFactor = data.EstimatedTotalMemoryMB / baseResolution.EstimatedTotalMemoryMB;
             }
-            
+
             // システムメモリ制約分析
             result.SystemMemoryLimitGB = Environment.WorkingSet / (1024 * 1024 * 1024);
             result.RecommendedMaxResolution = DetermineRecommendedMaxResolution(result.ResolutionMemoryData, result.SystemMemoryLimitGB);
-            
+
             _logger.LogInformation("メモリスケーリングテスト完了: 推奨最大解像度={MaxResolution}", result.RecommendedMaxResolution);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "メモリスケーリングテストエラー");
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// キャプチャパフォーマンス測定（スタブ版）
     /// </summary>
     private async Task<PerformanceMetrics> SimulateCapturePerformanceAsync(Rectangle bounds)
     {
         var measurements = new List<double>();
-        
+
         // スタブ実装: 解像度に基づいたシミュレーション
         await Task.Delay(50).ConfigureAwait(false);
-        
+
         for (int i = 0; i < 5; i++)
         {
             var stopwatch = Stopwatch.StartNew();
-            
+
             // 解像度に比例した処理時間をシミュレート
             var pixelCount = bounds.Width * bounds.Height;
             var baseTime = 100.0; // 1920x1080のベースタイム
             var scalingFactor = (double)pixelCount / (1920 * 1080);
             var simulatedTime = (int)(baseTime * Math.Sqrt(scalingFactor));
-            
+
             await Task.Delay(Random.Shared.Next(simulatedTime * 8 / 10, simulatedTime * 12 / 10)).ConfigureAwait(false);
             stopwatch.Stop();
-            
+
             measurements.Add(stopwatch.Elapsed.TotalMilliseconds);
         }
-        
+
         return new PerformanceMetrics
         {
             AverageTimeMs = measurements.Average(),
@@ -337,7 +337,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
             MeasurementCount = measurements.Count
         };
     }
-    
+
     /// <summary>
     /// OCRパフォーマンス測定（スタブ版Ｉ
     /// </summary>
@@ -346,26 +346,26 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
         try
         {
             var measurements = new List<double>();
-            
+
             // スタブ実装: OCR処理時間をシミュレート
             await Task.Delay(100).ConfigureAwait(false);
-            
+
             for (int i = 0; i < 3; i++)
             {
                 var stopwatch = Stopwatch.StartNew();
-                
+
                 // 解像度に比例したOCR処理時間をシミュレート
                 var pixelCount = bounds.Width * bounds.Height;
                 var baseTime = 3000.0; // 1920x1080のOCRベースタイム
                 var scalingFactor = (double)pixelCount / (1920 * 1080);
                 var simulatedTime = (int)(baseTime * scalingFactor);
-                
+
                 await Task.Delay(Random.Shared.Next(simulatedTime * 8 / 10, simulatedTime * 12 / 10)).ConfigureAwait(false);
                 stopwatch.Stop();
-                
+
                 measurements.Add(stopwatch.Elapsed.TotalMilliseconds);
             }
-            
+
             return new PerformanceMetrics
             {
                 AverageTimeMs = measurements.Average(),
@@ -381,20 +381,20 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
             return null;
         }
     }
-    
+
     /// <summary>
     /// メモリ使用量測定
     /// </summary>
     private async Task<MemoryMetrics> MeasureMemoryUsageAsync(Rectangle bounds)
     {
         await Task.Delay(100).ConfigureAwait(false); // GC安定化待機
-        
+
         var beforeGC = GC.GetTotalMemory(false);
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
         var afterGC = GC.GetTotalMemory(false);
-        
+
         return new MemoryMetrics
         {
             BeforeGCBytes = beforeGC,
@@ -403,7 +403,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
             WorkingSetBytes = Environment.WorkingSet
         };
     }
-    
+
     /// <summary>
     /// キャプチャパフォーマンスシミュレーション（解像度用）
     /// </summary>
@@ -411,14 +411,14 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
     {
         // 解像度ベースの理論値計算
         await Task.Delay(10).ConfigureAwait(false); // シミュレーション待機
-        
+
         var pixelCount = bounds.Width * bounds.Height;
         var baseTimeMs = 100.0; // 1920x1080のベースタイム
         var scalingFactor = (double)pixelCount / (1920 * 1080);
-        
+
         // ピクセル数に比例して処理時間が増加すると仮定
         var estimatedTimeMs = baseTimeMs * Math.Sqrt(scalingFactor); // 平方根スケーリング
-        
+
         return new PerformanceMetrics
         {
             AverageTimeMs = estimatedTimeMs,
@@ -428,7 +428,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
             MeasurementCount = 1
         };
     }
-    
+
     /// <summary>
     /// テスト用画像生成
     /// </summary>
@@ -436,31 +436,31 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
     {
         var bitmap = new System.Drawing.Bitmap(width, height);
         using var graphics = System.Drawing.Graphics.FromImage(bitmap);
-        
+
         graphics.Clear(System.Drawing.Color.White);
-        
+
         // 解像度に応じたフォントサイズ調整
         var fontSize = Math.Max(12, Math.Min(48, width / 80));
         using var font = new System.Drawing.Font("Arial", fontSize);
-        
-        graphics.DrawString($"テスト用テキスト Test Text {width}x{height}", 
+
+        graphics.DrawString($"テスト用テキスト Test Text {width}x{height}",
             font, System.Drawing.Brushes.Black, new System.Drawing.PointF(50, 50));
-        
+
         return bitmap;
     }
-    
+
     /// <summary>
     /// 標準偏差計算
     /// </summary>
     private static double CalculateStandardDeviation(List<double> values)
     {
         if (values.Count <= 1) return 0;
-        
+
         var mean = values.Average();
         var sumOfSquares = values.Sum(x => Math.Pow(x - mean, 2));
         return Math.Sqrt(sumOfSquares / (values.Count - 1));
     }
-    
+
     /// <summary>
     /// 推定メモリ使用量計算
     /// </summary>
@@ -470,7 +470,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
         var ocrMemory = CalculateOcrMemoryUsage(width, height);
         return imageMemory + ocrMemory;
     }
-    
+
     /// <summary>
     /// 画像メモリ使用量計算
     /// </summary>
@@ -481,7 +481,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
         var bufferMultiplier = 2.0; // ダブルバッファ等
         return (width * height * bytesPerPixel * bufferMultiplier) / (1024 * 1024);
     }
-    
+
     /// <summary>
     /// OCRメモリ使用量計算
     /// </summary>
@@ -492,7 +492,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
         var pixelScalingFactor = (double)(width * height) / (1920 * 1080);
         return baseOcrMemory * Math.Sqrt(pixelScalingFactor);
     }
-    
+
     /// <summary>
     /// パフォーマンススコア計算
     /// </summary>
@@ -501,32 +501,32 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
         // 100点満点でスコア計算
         var timeScore = Math.Max(0, 100 - (result.CaptureMetrics.AverageTimeMs / 10));
         var memoryScore = Math.Max(0, 100 - (result.EstimatedMemoryMB / 20));
-        
+
         return (int)((timeScore + memoryScore) / 2);
     }
-    
+
     /// <summary>
     /// 推奨最大解像度決定
     /// </summary>
     private string DetermineRecommendedMaxResolution(List<ResolutionMemoryData> memoryData, long systemMemoryGB)
     {
         var maxMemoryMB = systemMemoryGB * 1024 * 0.8; // システムメモリの80%を上限とする
-        
+
         var suitableResolutions = memoryData
             .Where(r => r.EstimatedTotalMemoryMB <= maxMemoryMB)
             .OrderByDescending(r => r.Width * r.Height)
             .ToList();
-        
+
         return suitableResolutions.FirstOrDefault()?.ResolutionName ?? "Full HD";
     }
-    
+
     /// <summary>
     /// 結果分析
     /// </summary>
     private LargeScreenAnalysis AnalyzeResults(LargeScreenPerformanceReport report)
     {
         var analysis = new LargeScreenAnalysis();
-        
+
         // 現在のディスプレイ分析
         if (report.CurrentDisplayResults.Count > 0)
         {
@@ -536,7 +536,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
                 .Where(r => r.OcrMetrics != null)
                 .Average(r => r.OcrMetrics!.AverageTimeMs);
         }
-        
+
         // シミュレーション結果分析
         if (report.SimulatedResolutionResults.Count > 0)
         {
@@ -544,65 +544,65 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
                 .Where(r => string.IsNullOrEmpty(r.ErrorMessage))
                 .OrderByDescending(r => r.PerformanceScore)
                 .FirstOrDefault();
-            
+
             analysis.BestPerformanceResolution = bestPerformance?.ResolutionName ?? "Unknown";
             analysis.BestPerformanceScore = bestPerformance?.PerformanceScore ?? 0;
         }
-        
+
         // メモリ制約分析
         analysis.MemoryConstrainedResolution = report.MemoryScalingResults.RecommendedMaxResolution;
-        
+
         return analysis;
     }
-    
+
     /// <summary>
     /// 推奨設定生成
     /// </summary>
     private List<string> GenerateRecommendations(LargeScreenPerformanceReport report)
     {
         var recommendations = new List<string>();
-        
+
         // ディスプレイ設定に基づく推奨
         if (report.DisplayConfiguration.HasHighDPI)
         {
             recommendations.Add("高DPI環境ではキャプチャ間隔を長めに設定することを推奨");
             recommendations.Add("OCR処理前の画像リサイズを積極的に活用してパフォーマンスを向上");
         }
-        
+
         if (report.DisplayConfiguration.HasUltraWide)
         {
             recommendations.Add("ウルトラワイド環境ではROI（関心領域）ベースのキャプチャが効果的");
         }
-        
+
         if (report.DisplayConfiguration.TotalDisplays > 1)
         {
             recommendations.Add("マルチディスプレイ環境ではプライマリディスプレイのみをターゲットにすることを推奨");
         }
-        
+
         // パフォーマンス結果に基づく推奨
         if (report.Analysis.AverageCaptureTimeMs > 300)
         {
             recommendations.Add("キャプチャ時間が長いため、解像度を下げるかキャプチャ間隔を延ばすことを推奨");
         }
-        
+
         if (report.Analysis.AverageOcrTimeMs > 5000)
         {
             recommendations.Add("OCR処理時間が長いため、バッチ処理の最適化が必要");
         }
-        
+
         // メモリ制約に基づく推奨
         recommendations.Add($"現在のシステムでは{report.MemoryScalingResults.RecommendedMaxResolution}が推奨最大解像度です");
-        
+
         return recommendations;
     }
-    
+
     /// <summary>
     /// レポート出力
     /// </summary>
     private async Task OutputReportAsync(LargeScreenPerformanceReport report)
     {
         _logger.LogInformation("大画面パフォーマンステストレポート出力開始");
-        
+
         // コンソール出力
         Console.WriteLine("=== 大画面パフォーマンステスト結果 ===");
         Console.WriteLine($"実行時間: {report.ExecutionTime:yyyy-MM-dd HH:mm:ss}");
@@ -611,7 +611,7 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
         Console.WriteLine($"総ピクセル数: {report.DisplayConfiguration.TotalPixels:N0}");
         Console.WriteLine($"プライマリカテゴリ: {report.Analysis.PrimaryDisplayCategory}");
         Console.WriteLine();
-        
+
         Console.WriteLine("=== パフォーマンス結果 ===");
         Console.WriteLine($"平均キャプチャ時間: {report.Analysis.AverageCaptureTimeMs:F1}ms");
         Console.WriteLine($"平均OCR時間: {report.Analysis.AverageOcrTimeMs:F1}ms");
@@ -619,18 +619,18 @@ public class LargeScreenPerformanceRunner(IServiceProvider serviceProvider, ILog
         Console.WriteLine($"パフォーマンススコア: {report.Analysis.BestPerformanceScore}");
         Console.WriteLine($"メモリ制約解像度: {report.Analysis.MemoryConstrainedResolution}");
         Console.WriteLine();
-        
+
         Console.WriteLine("=== 推奨設定 ===");
         foreach (var recommendation in report.Recommendations)
         {
             Console.WriteLine($"• {recommendation}");
         }
-        
+
         // ファイル出力
         var reportJson = JsonSerializer.Serialize(report, JsonOptions);
         var reportFileName = $"large_screen_performance_report_{DateTime.Now:yyyyMMdd_HHmmss}.json";
         await System.IO.File.WriteAllTextAsync(reportFileName, reportJson).ConfigureAwait(false);
-        
+
         _logger.LogInformation("大画面パフォーマンステストレポート出力完了: {FileName}", reportFileName);
     }
 }

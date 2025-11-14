@@ -1,5 +1,5 @@
-using Microsoft.ML.OnnxRuntime;
 using Baketa.Core.Abstractions.GPU;
+using Microsoft.ML.OnnxRuntime;
 
 namespace Baketa.Infrastructure.OCR.GPU.Providers;
 
@@ -25,7 +25,7 @@ public static class ExecutionProviderExtensions
         {
             // プロバイダー設定を取得
             var providerOptions = factory.GetProviderOptions(environment);
-            
+
             // ONNX Runtime制限対応: 一部プロバイダーは直接追加できない
             if (CanAppendDirectly(factory.Type))
             {
@@ -106,7 +106,7 @@ public static class ExecutionProviderExtensions
         return providerType switch
         {
             ExecutionProvider.CPU => true,
-            ExecutionProvider.CUDA => true, 
+            ExecutionProvider.CUDA => true,
             ExecutionProvider.DirectML => true,
             ExecutionProvider.TensorRT => true,
             ExecutionProvider.OpenVINO => false, // 実行環境依存
@@ -128,7 +128,7 @@ public static class ExecutionProviderExtensions
             {
                 sessionOptions.IntraOpNumThreads = threads;
             }
-            
+
             // CPU最適化設定
             if (providerOptions.ContainsKey("enable_cpu_mem_arena"))
             {

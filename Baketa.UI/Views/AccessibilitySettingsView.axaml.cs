@@ -5,21 +5,21 @@ using Baketa.UI.ViewModels;
 
 namespace Baketa.UI.Views;
 
+/// <summary>
+/// アクセシビリティ設定ビューのコードビハインド
+/// </summary>
+public partial class AccessibilitySettingsView : UserControl
+{
     /// <summary>
-    /// アクセシビリティ設定ビューのコードビハインド
+    /// 新しいアクセシビリティ設定ビューを初期化します。
     /// </summary>
-    public partial class AccessibilitySettingsView : UserControl
+    public AccessibilitySettingsView()
     {
-        /// <summary>
-        /// 新しいアクセシビリティ設定ビューを初期化します。
-        /// </summary>
-        public AccessibilitySettingsView()
-        {
-            InitializeComponent();
-        }
-
-        private void InitializeComponent()
-        {
-            AvaloniaXamlLoader.Load(this);
-        }
+        InitializeComponent();
     }
+
+    private void InitializeComponent()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
+}

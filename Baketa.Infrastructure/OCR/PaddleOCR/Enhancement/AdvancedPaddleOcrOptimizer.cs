@@ -1,6 +1,6 @@
 using System;
-using System.Globalization;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -21,7 +21,7 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
     public void ApplySmallTextOptimization(PaddleOcrAll ocrEngine)
     {
         _logger.LogInformation("小さい文字最適化パラメータを適用中...");
-        
+
         var parameters = new Dictionary<string, object>
         {
             // 検出関連パラメータ
@@ -45,17 +45,17 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
             { "gpu_mem", 500 },                     // GPU メモリ
             { "cpu_math_library_num_threads", 4 },  // CPU スレッド数
         };
-        
+
         ApplyParameters(ocrEngine, parameters);
     }
-    
+
     /// <summary>
     /// 高精度処理に最適化されたパラメータを適用
     /// </summary>
     public void ApplyHighPrecisionOptimization(PaddleOcrAll ocrEngine)
     {
         _logger.LogInformation("高精度最適化パラメータを適用中...");
-        
+
         var parameters = new Dictionary<string, object>
         {
             // 検出関連パラメータ（高精度）
@@ -79,17 +79,17 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
             { "cls_thresh", 0.9f },                 // 分類閾値
             { "cls_batch_num", 1 },                 // 分類バッチサイズ
         };
-        
+
         ApplyParameters(ocrEngine, parameters);
     }
-    
+
     /// <summary>
     /// 高速処理に最適化されたパラメータを適用
     /// </summary>
     public void ApplyFastProcessingOptimization(PaddleOcrAll ocrEngine)
     {
         _logger.LogInformation("高速処理最適化パラメータを適用中...");
-        
+
         var parameters = new Dictionary<string, object>
         {
             // 検出関連パラメータ（高速）
@@ -109,17 +109,17 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
             { "mkldnn_cache_capacity", 10 },        // MKLDNN キャッシュ容量
             { "cpu_math_library_num_threads", 8 },  // CPU スレッド数を増加
         };
-        
+
         ApplyParameters(ocrEngine, parameters);
     }
-    
+
     /// <summary>
     /// 日本語特化の最適化パラメータを適用
     /// </summary>
     public void ApplyJapaneseOptimization(PaddleOcrAll ocrEngine)
     {
         _logger.LogInformation("日本語特化最適化パラメータを適用中...");
-        
+
         var parameters = new Dictionary<string, object>
         {
             // 日本語固有パラメータ
@@ -143,10 +143,10 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
             { "drop_score", 0.05f },                // 日本語の信頼度閾値
             { "use_angle_cls", false },             // 角度分類無効
         };
-        
+
         ApplyParameters(ocrEngine, parameters);
     }
-    
+
     /// <summary>
     /// カスタムパラメータセットを適用
     /// </summary>
@@ -155,7 +155,7 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
         _logger.LogInformation("カスタム最適化パラメータを適用中: {Count}個のパラメータ", customParameters.Count);
         ApplyParameters(ocrEngine, customParameters);
     }
-    
+
     /// <summary>
     /// リフレクションを使用してパラメータを適用
     /// </summary>
@@ -163,14 +163,14 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
     {
         var engineType = ocrEngine.GetType();
         var appliedCount = 0;
-        
+
         foreach (var parameter in parameters)
         {
             try
             {
                 // プロパティの検索
                 var property = engineType.GetProperty(parameter.Key, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                
+
                 if (property != null && property.CanWrite)
                 {
                     // 型変換
@@ -183,7 +183,7 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
                 {
                     // フィールドの検索
                     var field = engineType.GetField(parameter.Key, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    
+
                     if (field != null)
                     {
                         var convertedValue = ConvertValue(parameter.Value, field.FieldType);
@@ -202,32 +202,32 @@ public class AdvancedPaddleOcrOptimizer(ILogger<AdvancedPaddleOcrOptimizer> logg
                 _logger.LogError(ex, "パラメータ適用エラー: {Key} = {Value}", parameter.Key, parameter.Value);
             }
         }
-        
+
         _logger.LogInformation("パラメータ適用完了: {Applied}/{Total}個のパラメータを適用", appliedCount, parameters.Count);
     }
-    
+
     /// <summary>
     /// 値を指定された型に変換
     /// </summary>
     private object? ConvertValue(object value, Type targetType)
     {
         if (value == null) return null;
-        
+
         if (targetType == typeof(string))
             return value.ToString();
-        
+
         if (targetType == typeof(bool))
             return Convert.ToBoolean(value, CultureInfo.InvariantCulture);
-        
+
         if (targetType == typeof(int))
             return Convert.ToInt32(value, CultureInfo.InvariantCulture);
-        
+
         if (targetType == typeof(float))
             return Convert.ToSingle(value, CultureInfo.InvariantCulture);
-        
+
         if (targetType == typeof(double))
             return Convert.ToDouble(value, CultureInfo.InvariantCulture);
-        
+
         return Convert.ChangeType(value, targetType, CultureInfo.InvariantCulture);
     }
 }

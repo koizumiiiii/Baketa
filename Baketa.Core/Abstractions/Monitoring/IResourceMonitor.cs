@@ -12,36 +12,36 @@ public interface IResourceMonitor : IInitializable, IDisposable
     /// 現在のリソース監視状態
     /// </summary>
     bool IsMonitoring { get; }
-    
+
     /// <summary>
     /// 監視間隔（ミリ秒）
     /// デフォルト: 5000ms (5秒間隔)
     /// </summary>
     int MonitoringIntervalMs { get; set; }
-    
+
     /// <summary>
     /// 最新のリソースメトリクス取得
     /// </summary>
     ResourceMetrics? CurrentMetrics { get; }
-    
+
     /// <summary>
     /// リソース監視開始
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     Task StartMonitoringAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// リソース監視停止
     /// </summary>
     Task StopMonitoringAsync();
-    
+
     /// <summary>
     /// 現在のリソース状況を即座に取得
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>現在のシステムリソースメトリクス</returns>
     Task<ResourceMetrics> GetCurrentMetricsAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// リソース履歴取得（指定期間内）
     /// </summary>
@@ -49,13 +49,13 @@ public interface IResourceMonitor : IInitializable, IDisposable
     /// <param name="toTime">終了時刻</param>
     /// <returns>指定期間内のリソースメトリクス履歴</returns>
     IEnumerable<ResourceMetrics> GetMetricsHistory(DateTime fromTime, DateTime toTime);
-    
+
     /// <summary>
     /// リソース状況変化イベント
     /// 閾値を超えた場合や重要な変化が発生した場合に発火
     /// </summary>
     event EventHandler<ResourceMetricsChangedEventArgs>? ResourceMetricsChanged;
-    
+
     /// <summary>
     /// リソース警告イベント
     /// CPU/メモリ使用率が高い場合など警告レベルの状況で発火

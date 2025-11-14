@@ -34,42 +34,42 @@ public sealed class SettingMetadataAttribute(SettingLevel level, string category
     /// 説明文（ヘルプテキスト）
     /// </summary>
     public string Description { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// 再起動が必要かどうか
     /// </summary>
     public bool RequiresRestart { get; set; }
-    
+
     /// <summary>
     /// ヘルプURL（詳細ドキュメントへのリンク）
     /// </summary>
     public string? HelpUrl { get; set; }
-    
+
     /// <summary>
     /// 表示順序（小さい値ほど上に表示）
     /// </summary>
     public int DisplayOrder { get; set; }
-    
+
     /// <summary>
     /// 最小値（数値型の場合）
     /// </summary>
     public object? MinValue { get; set; }
-    
+
     /// <summary>
     /// 最大値（数値型の場合）
     /// </summary>
     public object? MaxValue { get; set; }
-    
+
     /// <summary>
     /// 有効な値のリスト（選択肢型の場合）
     /// </summary>
     public object[]? ValidValues { get; set; }
-    
+
     /// <summary>
     /// 単位文字列（数値型の場合）
     /// </summary>
     public string? Unit { get; set; }
-    
+
     /// <summary>
     /// 設定変更時の警告メッセージ
     /// </summary>

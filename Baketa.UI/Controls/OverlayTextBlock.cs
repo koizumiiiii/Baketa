@@ -16,13 +16,13 @@ public class OverlayTextBlock : ContentControl
     /// <summary>表示テキストプロパティ</summary>
     public static readonly StyledProperty<string> TextProperty =
         AvaloniaProperty.Register<OverlayTextBlock, string>(
-            nameof(Text), 
+            nameof(Text),
             defaultValue: string.Empty);
 
     /// <summary>テーマプリセットプロパティ</summary>
     public new static readonly StyledProperty<OverlayTheme> ThemeProperty =
         AvaloniaProperty.Register<OverlayTextBlock, OverlayTheme>(
-            nameof(Theme), 
+            nameof(Theme),
             defaultValue: OverlayTheme.Auto);
 
     /// <summary>表示テキスト</summary>
@@ -62,25 +62,25 @@ public class OverlayTextBlock : ContentControl
         AvaloniaProperty.Register<OverlayTextBlock, bool>(
             nameof(ToggleVisibilityEnabled),
             defaultValue: true);
-            
+
     /// <summary>行間プロパティ</summary>
     public static readonly StyledProperty<double> LineHeightProperty =
         AvaloniaProperty.Register<OverlayTextBlock, double>(
             nameof(LineHeight),
             defaultValue: 1.4);
-            
+
     /// <summary>テキスト折り返しプロパティ</summary>
     public static readonly StyledProperty<TextWrapping> TextWrappingProperty =
         AvaloniaProperty.Register<OverlayTextBlock, TextWrapping>(
             nameof(TextWrapping),
             defaultValue: TextWrapping.Wrap);
-            
+
     /// <summary>ボックスシャドウプロパティ</summary>
     public static readonly StyledProperty<BoxShadows> BoxShadowProperty =
         AvaloniaProperty.Register<OverlayTextBlock, BoxShadows>(
             nameof(BoxShadow),
             defaultValue: default);
-            
+
     /// <summary>段落間スペーシングプロパティ</summary>
     public static readonly StyledProperty<double> ParagraphSpacingProperty =
         AvaloniaProperty.Register<OverlayTextBlock, double>(
@@ -100,28 +100,28 @@ public class OverlayTextBlock : ContentControl
         get => GetValue(ToggleVisibilityEnabledProperty);
         set => SetValue(ToggleVisibilityEnabledProperty, value);
     }
-    
+
     /// <summary>行間</summary>
     public double LineHeight
     {
         get => GetValue(LineHeightProperty);
         set => SetValue(LineHeightProperty, value);
     }
-    
+
     /// <summary>テキスト折り返し</summary>
     public TextWrapping TextWrapping
     {
         get => GetValue(TextWrappingProperty);
         set => SetValue(TextWrappingProperty, value);
     }
-    
+
     /// <summary>ボックスシャドウ</summary>
     public BoxShadows BoxShadow
     {
         get => GetValue(BoxShadowProperty);
         set => SetValue(BoxShadowProperty, value);
     }
-    
+
     /// <summary>段落間スペーシング</summary>
     public double ParagraphSpacing
     {
@@ -132,7 +132,7 @@ public class OverlayTextBlock : ContentControl
     // アニメーション制御用フィールド
     private bool _isVisible = true;
     private readonly object _animationLock = new();
-    
+
     /// <summary>
     /// コンストラクター
     /// </summary>
@@ -146,11 +146,11 @@ public class OverlayTextBlock : ContentControl
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
-        
+
         // テーマに基づくスタイル適用
         ApplyTheme();
     }
-    
+
     /// <summary>
     /// テーマを適用します
     /// </summary>
@@ -164,11 +164,11 @@ public class OverlayTextBlock : ContentControl
             OverlayTheme.Auto => DetectAutoTheme(),
             _ => "Dark"
         };
-        
+
         Classes.Clear();
         Classes.Add(themeClass);
     }
-    
+
     /// <summary>
     /// 自動テーマ検出
     /// </summary>
@@ -186,7 +186,7 @@ public class OverlayTextBlock : ContentControl
     public void ToggleVisibility()
     {
         if (!ToggleVisibilityEnabled) return;
-        
+
         lock (_animationLock)
         {
             if (_isVisible)
@@ -200,7 +200,7 @@ public class OverlayTextBlock : ContentControl
             _isVisible = !_isVisible;
         }
     }
-    
+
     /// <summary>
     /// アニメーション付きで表示
     /// </summary>
@@ -215,7 +215,7 @@ public class OverlayTextBlock : ContentControl
                 Duration = TimeSpan.FromMilliseconds(200),
                 Easing = new QuadraticEaseOut()
             };
-            
+
             Opacity = 0;
             IsVisible = true;
             Transitions = [fadeIn];
@@ -227,7 +227,7 @@ public class OverlayTextBlock : ContentControl
             Opacity = DefaultOverlayAppearance.Opacity;
         }
     }
-    
+
     /// <summary>
     /// アニメーション付きで非表示
     /// </summary>
@@ -242,10 +242,10 @@ public class OverlayTextBlock : ContentControl
                 Duration = TimeSpan.FromMilliseconds(200),
                 Easing = new QuadraticEaseIn()
             };
-            
+
             Transitions = [fadeOut];
             Opacity = 0;
-            
+
             // アニメーション完了後に非表示（TaskScheduler.Defaultを明示指定）
             Task.Delay(200).ContinueWith(_ =>
             {

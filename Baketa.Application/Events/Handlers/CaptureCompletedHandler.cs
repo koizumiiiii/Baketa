@@ -1,15 +1,15 @@
+using System;
+using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
-using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
-using System.Threading.Tasks;
 
 namespace Baketa.Application.Events.Handlers;
 
@@ -19,97 +19,97 @@ namespace Baketa.Application.Events.Handlers;
 /// P1: 段階的フィルタリングシステム統合済み
 /// </summary>
 public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
-    {
-        private readonly IEventAggregator _eventAggregator;
-        private readonly ISmartProcessingPipelineService? _smartPipeline;
-        private readonly ILogger<CaptureCompletedHandler>? _logger;
-        private readonly IOptionsMonitor<ProcessingPipelineSettings>? _settings;
-        private readonly ImageDiagnosticsSaver? _diagnosticsSaver;
-        private readonly IOptionsMonitor<RoiDiagnosticsSettings>? _roiSettings;
-        private readonly IImageToReferencedSafeImageConverter? _imageToReferencedConverter;
-        private readonly ITextChunkAggregatorService _chunkAggregatorService;
-        private readonly ILanguageConfigurationService _languageConfig;
+{
+    private readonly IEventAggregator _eventAggregator;
+    private readonly ISmartProcessingPipelineService? _smartPipeline;
+    private readonly ILogger<CaptureCompletedHandler>? _logger;
+    private readonly IOptionsMonitor<ProcessingPipelineSettings>? _settings;
+    private readonly ImageDiagnosticsSaver? _diagnosticsSaver;
+    private readonly IOptionsMonitor<RoiDiagnosticsSettings>? _roiSettings;
+    private readonly IImageToReferencedSafeImageConverter? _imageToReferencedConverter;
+    private readonly ITextChunkAggregatorService _chunkAggregatorService;
+    private readonly ILanguageConfigurationService _languageConfig;
 
-        public CaptureCompletedHandler(
-            IEventAggregator eventAggregator,
-            ITextChunkAggregatorService chunkAggregatorService,
-            ILanguageConfigurationService languageConfig,
-            ISmartProcessingPipelineService? smartPipeline = null,
-            ILogger<CaptureCompletedHandler>? logger = null,
-            IOptionsMonitor<ProcessingPipelineSettings>? settings = null,
-            ImageDiagnosticsSaver? diagnosticsSaver = null,
-            IOptionsMonitor<RoiDiagnosticsSettings>? roiSettings = null,
-            IImageToReferencedSafeImageConverter? imageToReferencedConverter = null)
-        {
-            _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-            _chunkAggregatorService = chunkAggregatorService ?? throw new ArgumentNullException(nameof(chunkAggregatorService));
-            _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
-            _smartPipeline = smartPipeline;
-            _logger = logger;
-            _settings = settings;
-            _diagnosticsSaver = diagnosticsSaver;
-            _roiSettings = roiSettings;
-            _imageToReferencedConverter = imageToReferencedConverter;
-        }
-        
-        /// <inheritdoc />
-        public int Priority => 0;
-        
-        /// <inheritdoc />
-        public bool SynchronousExecution => false;
+    public CaptureCompletedHandler(
+        IEventAggregator eventAggregator,
+        ITextChunkAggregatorService chunkAggregatorService,
+        ILanguageConfigurationService languageConfig,
+        ISmartProcessingPipelineService? smartPipeline = null,
+        ILogger<CaptureCompletedHandler>? logger = null,
+        IOptionsMonitor<ProcessingPipelineSettings>? settings = null,
+        ImageDiagnosticsSaver? diagnosticsSaver = null,
+        IOptionsMonitor<RoiDiagnosticsSettings>? roiSettings = null,
+        IImageToReferencedSafeImageConverter? imageToReferencedConverter = null)
+    {
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+        _chunkAggregatorService = chunkAggregatorService ?? throw new ArgumentNullException(nameof(chunkAggregatorService));
+        _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
+        _smartPipeline = smartPipeline;
+        _logger = logger;
+        _settings = settings;
+        _diagnosticsSaver = diagnosticsSaver;
+        _roiSettings = roiSettings;
+        _imageToReferencedConverter = imageToReferencedConverter;
+    }
+
+    /// <inheritdoc />
+    public int Priority => 0;
+
+    /// <inheritdoc />
+    public bool SynchronousExecution => false;
 
     /// <inheritdoc />
     public async Task HandleAsync(CaptureCompletedEvent eventData)
-        {
-            // NULLチェック
-            ArgumentNullException.ThrowIfNull(eventData);
+    {
+        // NULLチェック
+        ArgumentNullException.ThrowIfNull(eventData);
 
-            // 🔥 [PHASE5] ROI関連チェック削除 - ROI廃止により不要
+        // 🔥 [PHASE5] ROI関連チェック削除 - ROI廃止により不要
+
+        try
+        {
+            _logger?.LogDebug("キャプチャ完了イベント処理開始 - Image: {Width}x{Height}",
+                eventData.CapturedImage.Width, eventData.CapturedImage.Height);
+
+            // 🎯 キャプチャ画像保存（設定が有効な場合）
+            await SaveCaptureImagesIfEnabledAsync(eventData).ConfigureAwait(false);
+
+            // 🔄 P1: 段階的フィルタリングシステム使用判定
+            if (_smartPipeline != null)
+            {
+                _logger?.LogDebug("段階的フィルタリングシステム使用開始");
+                await HandleWithStagedFilteringAsync(eventData).ConfigureAwait(false);
+            }
+            else
+            {
+                _logger?.LogDebug("従来処理モード使用（段階的フィルタリング無効）");
+                await HandleLegacyModeAsync(eventData).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "CaptureCompletedHandler処理エラー: {ErrorType} - {ErrorMessage}", ex.GetType().Name, ex.Message);
+
+            // エラー通知イベントを発行
+            var errorNotificationEvent = new NotificationEvent(
+                $"キャプチャ後の処理でエラーが発生しました: {ex.Message}",
+                NotificationType.Error,
+                "処理エラー",
+                displayTime: 5000);
 
             try
             {
-                _logger?.LogDebug("キャプチャ完了イベント処理開始 - Image: {Width}x{Height}",
-                    eventData.CapturedImage.Width, eventData.CapturedImage.Height);
-
-                // 🎯 キャプチャ画像保存（設定が有効な場合）
-                await SaveCaptureImagesIfEnabledAsync(eventData).ConfigureAwait(false);
-
-                // 🔄 P1: 段階的フィルタリングシステム使用判定
-                if (_smartPipeline != null)
-                {
-                    _logger?.LogDebug("段階的フィルタリングシステム使用開始");
-                    await HandleWithStagedFilteringAsync(eventData).ConfigureAwait(false);
-                }
-                else
-                {
-                    _logger?.LogDebug("従来処理モード使用（段階的フィルタリング無効）");
-                    await HandleLegacyModeAsync(eventData).ConfigureAwait(false);
-                }
+                await _eventAggregator.PublishAsync(errorNotificationEvent).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch
             {
-                _logger?.LogError(ex, "CaptureCompletedHandler処理エラー: {ErrorType} - {ErrorMessage}", ex.GetType().Name, ex.Message);
-                
-                // エラー通知イベントを発行
-                var errorNotificationEvent = new NotificationEvent(
-                    $"キャプチャ後の処理でエラーが発生しました: {ex.Message}",
-                    NotificationType.Error,
-                    "処理エラー",
-                    displayTime: 5000);
-                    
-                try
-                {
-                    await _eventAggregator.PublishAsync(errorNotificationEvent).ConfigureAwait(false);
-                }
-                catch
-                {
-                    // 通知イベント発行失敗は無視（ログ出力済み）
-                }
-                
-                // 例外は再スローして上位で処理
-                throw;
+                // 通知イベント発行失敗は無視（ログ出力済み）
             }
+
+            // 例外は再スローして上位で処理
+            throw;
         }
+    }
 
     /// <summary>
     /// P1: 段階的フィルタリングシステムを使用した処理
@@ -118,7 +118,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     {
         ProcessingPipelineInput? input = null;
         ReferencedSafeImage? referencedSafeImage = null;
-        
+
         try
         {
             // 🎯 Phase 3.15: IImageToReferencedSafeImageConverter を使用した統合変換
@@ -181,7 +181,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             // 段階的処理パイプライン実行
             // 🔧 [PHASE3.2_FIX] 非同期処理完了まで画像を保持、完了後に手動でDispose
             var pipelineResult = await _smartPipeline!.ExecuteAsync(input).ConfigureAwait(false);
-            
+
             _logger?.LogDebug("段階的処理完了 - 最終段階: {LastStage}, 総処理時間: {TotalTime}ms, 早期終了: {EarlyTerminated}",
                 pipelineResult.LastCompletedStage, pipelineResult.TotalElapsedTime.TotalMilliseconds, pipelineResult.Metrics.EarlyTerminated);
 
@@ -218,7 +218,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             // 🔧 [PHASE3.2_FIX] ProcessingPipelineInput の手動Dispose
             // OwnsImage=false なので画像自体は破棄されず、ProcessingPipelineInput オブジェクトのみ破棄
             input?.Dispose();
-            
+
             // 🔧 [PHASE3.2_FIX] ReferencedSafeImage の参照カウント管理を修正
             // OCR処理完了後のみ参照を解放（処理中の早期解放を防止）
             if (referencedSafeImage != null)
@@ -226,10 +226,10 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                 var finalRefCount = referencedSafeImage.ReferenceCount;
                 _logger?.LogInformation("🔧 [PHASE3.2_FIX] CaptureCompletedHandler処理完了 - 参照解放前カウント: {RefCount}",
                     finalRefCount);
-                
+
                 // OCR処理が完全に終了してから参照を解放
                 referencedSafeImage.ReleaseReference();
-                
+
                 _logger?.LogInformation("🔧 [PHASE3.2_FIX] CaptureCompletedHandler参照解放完了 - 最終カウント: {RefCount}",
                     referencedSafeImage.ReferenceCount);
             }
@@ -516,38 +516,38 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         if (eventData.ImageChangeSkipped)
         {
             _logger?.LogDebug("画像変化なし - OCR処理スキップ");
-            
+
             var skipNotification = new NotificationEvent(
                 "画像変化なし - OCR処理をスキップしました",
                 NotificationType.Information,
                 "OCRスキップ",
                 displayTime: 1000);
-                
+
             await _eventAggregator.PublishAsync(skipNotification).ConfigureAwait(false);
             return; // OCRRequestEventを発行せずに終了
         }
-        
+
         // キャプチャ完了通知
         var notificationEvent = new NotificationEvent(
             $"キャプチャが完了しました: {eventData.CapturedImage.Width}x{eventData.CapturedImage.Height}",
             NotificationType.Success,
             "キャプチャ完了",
             displayTime: 3000);
-            
+
         await _eventAggregator.PublishAsync(notificationEvent).ConfigureAwait(false);
-        
+
         // OCR処理要求イベント発行（従来方式）
-        _logger?.LogDebug("OCR要求イベント発行 - Image: {Width}x{Height}", 
+        _logger?.LogDebug("OCR要求イベント発行 - Image: {Width}x{Height}",
             eventData.CapturedImage.Width, eventData.CapturedImage.Height);
-        
+
         var ocrRequestEvent = new OcrRequestEvent(
             eventData.CapturedImage,
             eventData.CaptureRegion,
             targetWindowHandle: null
         );
-        
+
         await _eventAggregator.PublishAsync(ocrRequestEvent).ConfigureAwait(false);
-        
+
         _logger?.LogDebug("OcrRequestEvent発行完了");
     }
 
@@ -734,7 +734,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         for (int i = 0; i < groups.Count; i++)
         {
             var group = groups[i];
-            debugText += $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [GROUPING_DEBUG] グループ{i+1}: {group.Count}個のチャンク{Environment.NewLine}";
+            debugText += $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [GROUPING_DEBUG] グループ{i + 1}: {group.Count}個のチャンク{Environment.NewLine}";
             foreach (var chunk in group)
             {
                 debugText += $"   - '{chunk.text}' at ({chunk.bounds.X},{chunk.bounds.Y}){Environment.NewLine}";

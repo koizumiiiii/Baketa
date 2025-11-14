@@ -1,13 +1,13 @@
-using OpenCvSharp;
-using Baketa.Core.Utilities;
-using Baketa.Infrastructure.OCR.Preprocessing;
-using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Imaging;
-using System.Text.Json;
+using System.Globalization;
 using System.IO;
 using System.Text;
-using System.Globalization;
+using System.Text.Json;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Utilities;
+using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.Preprocessing;
+using OpenCvSharp;
 
 namespace Baketa.Infrastructure.OCR.Optimization;
 
@@ -47,31 +47,31 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
 
         // 1. ベースライン（現在の前処理）
         Console.WriteLine("📊 ベースライン測定開始");
-        var baselineResult = await TestPreprocessingMethod(originalImage, "ベースライン（PP-OCRv5標準）", 
+        var baselineResult = await TestPreprocessingMethod(originalImage, "ベースライン（PP-OCRv5標準）",
             image => PPOCRv5Preprocessor.ProcessGameImageForV5(image), cancellationToken).ConfigureAwait(false);
         results.BaselineResult = baselineResult;
 
         // 2. 小さなテキスト強化
         Console.WriteLine("📊 小さなテキスト強化テスト開始");
-        var smallTextResult = await TestPreprocessingMethod(originalImage, "小さなテキスト強化", 
+        var smallTextResult = await TestPreprocessingMethod(originalImage, "小さなテキスト強化",
             image => EnhanceSmallText(image), cancellationToken).ConfigureAwait(false);
         results.SmallTextResult = smallTextResult;
 
         // 3. 漢字認識強化
         Console.WriteLine("📊 漢字認識強化テスト開始");
-        var kanjiResult = await TestPreprocessingMethod(originalImage, "漢字認識強化", 
+        var kanjiResult = await TestPreprocessingMethod(originalImage, "漢字認識強化",
             image => OptimizeForKanji(image), cancellationToken).ConfigureAwait(false);
         results.KanjiResult = kanjiResult;
 
         // 4. 低コントラスト改善
         Console.WriteLine("📊 低コントラスト改善テスト開始");
-        var contrastResult = await TestPreprocessingMethod(originalImage, "低コントラスト改善", 
+        var contrastResult = await TestPreprocessingMethod(originalImage, "低コントラスト改善",
             image => ImproveContrast(image), cancellationToken).ConfigureAwait(false);
         results.ContrastResult = contrastResult;
 
         // 5. 全手法統合
         Console.WriteLine("📊 全手法統合テスト開始");
-        var combinedResult = await TestPreprocessingMethod(originalImage, "全手法統合", 
+        var combinedResult = await TestPreprocessingMethod(originalImage, "全手法統合",
             image => ApplyCombinedOptimizations(image), cancellationToken).ConfigureAwait(false);
         results.CombinedResult = combinedResult;
 
@@ -89,37 +89,37 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     /// 個別前処理手法のテスト実行
     /// </summary>
     private async Task<ProcessingTestResult> TestPreprocessingMethod(
-        Mat originalImage, 
-        string methodName, 
+        Mat originalImage,
+        string methodName,
         Func<Mat, Mat> preprocessingMethod,
         CancellationToken cancellationToken)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
+
         try
         {
             Console.WriteLine($"   🔧 {methodName} 前処理開始");
-            
+
             // 前処理実行
             using var processedImage = preprocessingMethod(originalImage);
             var preprocessingTime = stopwatch.ElapsedMilliseconds;
-            
+
             Console.WriteLine($"   ✅ {methodName} 前処理完了: {preprocessingTime}ms");
-            
+
             // 前処理完了
-            
+
             // OCR実行
             Console.WriteLine($"   🤖 {methodName} OCR実行開始");
             var ocrResults = await ExecuteOcrAsync(processedImage, cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
-            
+
             var recognizedText = string.Join("", ocrResults.Select(r => r.Text));
             var textRegionCount = ocrResults.Count;
             var avgConfidence = ocrResults.Count > 0 ? ocrResults.Average(r => r.Confidence) : 0.0;
-            
+
             Console.WriteLine($"   ✅ {methodName} OCR完了: {textRegionCount}領域, 平均信頼度 {avgConfidence:F3}");
             Console.WriteLine($"   📝 認識テキスト: {recognizedText[..Math.Min(100, recognizedText.Length)]}...");
-            
+
             return new ProcessingTestResult
             {
                 MethodName = methodName,
@@ -137,7 +137,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
         {
             stopwatch.Stop();
             Console.WriteLine($"   ❌ {methodName} テストエラー: {ex.Message}");
-            
+
             return new ProcessingTestResult
             {
                 MethodName = methodName,
@@ -154,9 +154,9 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     private Mat EnhanceSmallText(Mat input)
     {
         Console.WriteLine($"      🔍 小さなテキスト強化処理開始");
-        
+
         var output = new Mat();
-        
+
         try
         {
             // 1. グレースケール変換
@@ -169,26 +169,26 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
             {
                 input.CopyTo(grayInput);
             }
-            
+
             // 2. 2倍アップスケール（小さな文字を拡大）
             using var upscaled = new Mat();
-            Cv2.Resize(grayInput, upscaled, new OpenCvSharp.Size(grayInput.Width * 2, grayInput.Height * 2), 
+            Cv2.Resize(grayInput, upscaled, new OpenCvSharp.Size(grayInput.Width * 2, grayInput.Height * 2),
                        interpolation: InterpolationFlags.Cubic);
-            
+
             // 3. 適応的しきい値処理（文字を鮮明化）
             using var adaptive = new Mat();
-            Cv2.AdaptiveThreshold(upscaled, adaptive, 255, AdaptiveThresholdTypes.GaussianC, 
+            Cv2.AdaptiveThreshold(upscaled, adaptive, 255, AdaptiveThresholdTypes.GaussianC,
                                 ThresholdTypes.Binary, 11, 2);
-            
+
             // 4. 軽微なノイズ除去
             using var kernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(2, 2));
             using var cleaned = new Mat();
             Cv2.MorphologyEx(adaptive, cleaned, MorphTypes.Close, kernel);
-            
+
             // 5. 元サイズに戻す
-            Cv2.Resize(cleaned, output, new OpenCvSharp.Size(input.Width, input.Height), 
+            Cv2.Resize(cleaned, output, new OpenCvSharp.Size(input.Width, input.Height),
                        interpolation: InterpolationFlags.Area);
-            
+
             Console.WriteLine($"      ✅ 小さなテキスト強化完了");
             return output;
         }
@@ -207,29 +207,29 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     private Mat OptimizeForKanji(Mat input)
     {
         Console.WriteLine($"      🔍 漢字認識最適化処理開始");
-        
+
         var output = new Mat();
-        
+
         try
         {
             // 1. より細かいCLAHE（漢字の細部強調）
             using var clahe = Cv2.CreateCLAHE(clipLimit: 1.8, tileGridSize: new OpenCvSharp.Size(4, 4));
             using var contrastEnhanced = new Mat();
-            
+
             if (input.Channels() == 3)
             {
                 using var lab = new Mat();
                 Cv2.CvtColor(input, lab, ColorConversionCodes.BGR2Lab);
                 var channels = Cv2.Split(lab);
-                
+
                 using var enhancedL = new Mat();
                 clahe.Apply(channels[0], enhancedL);
-                
+
                 var enhancedChannels = new Mat[] { enhancedL, channels[1], channels[2] };
                 using var enhancedLab = new Mat();
                 Cv2.Merge(enhancedChannels, enhancedLab);
                 Cv2.CvtColor(enhancedLab, contrastEnhanced, ColorConversionCodes.Lab2BGR);
-                
+
                 foreach (var ch in channels) ch.Dispose();
                 foreach (var ch in enhancedChannels.Skip(1)) ch.Dispose();
             }
@@ -237,7 +237,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
             {
                 clahe.Apply(input, contrastEnhanced);
             }
-            
+
             // 2. 方向性フィルタ（漢字の縦横線強調）
             using var gray = new Mat();
             if (contrastEnhanced.Channels() == 3)
@@ -248,28 +248,28 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
             {
                 contrastEnhanced.CopyTo(gray);
             }
-            
+
             // 横線強調カーネル
             var kernelHorizontal = new Mat(3, 3, MatType.CV_32F);
             kernelHorizontal.Set<float>(0, 0, -1); kernelHorizontal.Set<float>(0, 1, -1); kernelHorizontal.Set<float>(0, 2, -1);
-            kernelHorizontal.Set<float>(1, 0, 2);  kernelHorizontal.Set<float>(1, 1, 2);  kernelHorizontal.Set<float>(1, 2, 2);
+            kernelHorizontal.Set<float>(1, 0, 2); kernelHorizontal.Set<float>(1, 1, 2); kernelHorizontal.Set<float>(1, 2, 2);
             kernelHorizontal.Set<float>(2, 0, -1); kernelHorizontal.Set<float>(2, 1, -1); kernelHorizontal.Set<float>(2, 2, -1);
-            
+
             // 縦線強調カーネル
             var kernelVertical = new Mat(3, 3, MatType.CV_32F);
             kernelVertical.Set<float>(0, 0, -1); kernelVertical.Set<float>(0, 1, 2); kernelVertical.Set<float>(0, 2, -1);
             kernelVertical.Set<float>(1, 0, -1); kernelVertical.Set<float>(1, 1, 2); kernelVertical.Set<float>(1, 2, -1);
             kernelVertical.Set<float>(2, 0, -1); kernelVertical.Set<float>(2, 1, 2); kernelVertical.Set<float>(2, 2, -1);
-            
+
             using var horizontalEnhanced = new Mat();
             using var verticalEnhanced = new Mat();
-            
+
             Cv2.Filter2D(gray, horizontalEnhanced, MatType.CV_8U, kernelHorizontal);
             Cv2.Filter2D(gray, verticalEnhanced, MatType.CV_8U, kernelVertical);
-            
+
             // 3. 縦横線を統合
             Cv2.AddWeighted(horizontalEnhanced, 0.5, verticalEnhanced, 0.5, 0, output);
-            
+
             Console.WriteLine($"      ✅ 漢字認識最適化完了");
             return output;
         }
@@ -288,34 +288,34 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     private Mat ImproveContrast(Mat input)
     {
         Console.WriteLine($"      🔍 低コントラスト改善処理開始");
-        
+
         var output = new Mat();
-        
+
         try
         {
             // 1. 複数スケールのCLAHE
             var clipLimits = new[] { 1.5, 2.5, 3.5 };
             var results = new List<Mat>();
-            
+
             foreach (var limit in clipLimits)
             {
                 using var clahe = Cv2.CreateCLAHE(clipLimit: limit, tileGridSize: new OpenCvSharp.Size(8, 8));
                 var result = new Mat();
-                
+
                 if (input.Channels() == 3)
                 {
                     using var lab = new Mat();
                     Cv2.CvtColor(input, lab, ColorConversionCodes.BGR2Lab);
                     var channels = Cv2.Split(lab);
-                    
+
                     using var enhancedL = new Mat();
                     clahe.Apply(channels[0], enhancedL);
-                    
+
                     var enhancedChannels = new Mat[] { enhancedL, channels[1], channels[2] };
                     using var enhancedLab = new Mat();
                     Cv2.Merge(enhancedChannels, enhancedLab);
                     Cv2.CvtColor(enhancedLab, result, ColorConversionCodes.Lab2BGR);
-                    
+
                     foreach (var ch in channels) ch.Dispose();
                     foreach (var ch in enhancedChannels.Skip(1)) ch.Dispose();
                 }
@@ -323,19 +323,19 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
                 {
                     clahe.Apply(input, result);
                 }
-                
+
                 results.Add(result);
             }
-            
+
             // 2. 最適結果を選択（簡易版：中間値を使用）
             results[1].CopyTo(output);
-            
+
             // リソース解放
             foreach (var result in results)
             {
                 result.Dispose();
             }
-            
+
             Console.WriteLine($"      ✅ 低コントラスト改善完了");
             return output;
         }
@@ -354,18 +354,18 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     private Mat ApplyCombinedOptimizations(Mat input)
     {
         Console.WriteLine($"      🔍 全手法統合処理開始");
-        
+
         try
         {
             // 1. 低コントラスト改善
             using var contrastImproved = ImproveContrast(input);
-            
+
             // 2. 漢字認識最適化
             using var kanjiOptimized = OptimizeForKanji(contrastImproved);
-            
+
             // 3. 小さなテキスト強化
             var smallTextEnhanced = EnhanceSmallText(kanjiOptimized);
-            
+
             Console.WriteLine($"      ✅ 全手法統合完了");
             return smallTextEnhanced;
         }
@@ -407,7 +407,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
     private async Task GenerateProgressiveReportAsync(ProgressiveTestResults results)
     {
         var reportPath = Path.Combine(Directory.GetCurrentDirectory(), "progressive_accuracy_report.md");
-        
+
         var report = new StringBuilder();
         report.AppendLine("# OCR前処理最適化 段階的効果測定レポート");
         report.AppendLine();
@@ -422,7 +422,7 @@ public class ProgressiveAccuracyTester(IOcrEngine ocrEngine, string testImagePat
         report.AppendLine();
         report.AppendLine("| 手法 | 処理時間 | OCR時間 | テキスト領域数 | 平均信頼度 | 認識文字数 |");
         report.AppendLine("|------|----------|---------|----------------|------------|------------|");
-        
+
         var allResults = new[]
         {
             results.BaselineResult,
@@ -475,7 +475,7 @@ public class ProgressiveTestResults
     public DateTime TestStartTime { get; set; }
     public DateTime TestEndTime { get; set; }
     public TimeSpan TotalTestDuration { get; set; }
-    
+
     public ProcessingTestResult BaselineResult { get; set; } = new();
     public ProcessingTestResult SmallTextResult { get; set; } = new();
     public ProcessingTestResult KanjiResult { get; set; } = new();

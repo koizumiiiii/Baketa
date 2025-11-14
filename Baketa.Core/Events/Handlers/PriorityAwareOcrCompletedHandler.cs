@@ -4,14 +4,14 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR;
 using Baketa.Core.Models.Translation;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Events.Handlers;
 
@@ -62,78 +62,78 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
 
     /// <inheritdoc />
     public async Task HandleAsync(OcrCompletedEvent eventData)
-{
-    ArgumentNullException.ThrowIfNull(eventData);
-
-    // 🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効時は個別処理をスキップ
-    if (_textChunkAggregatorService.IsFeatureEnabled)
     {
-        _logger.LogInformation("🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効のため個別翻訳処理をスキップ - 統合グルーピング翻訳を使用");
-        Console.WriteLine("🚀 [DUPLICATE_FIX] 統合処理有効: 個別翻訳スキップ → TimedChunkAggregatorグルーピング翻訳使用");
-        return; // 統合処理に委ねる
-    }
+        ArgumentNullException.ThrowIfNull(eventData);
 
-    if (eventData.Results == null || !eventData.Results.Any())
-    {
-        _logger.LogInformation("🎯 [OCR_RESULT_EMPTY] OCR結果が空のためグループ翻訳をスキップ - Results: {ResultsNull}, Count: {Count}",
-            eventData.Results == null, eventData.Results?.Count ?? 0);
-        Console.WriteLine($"🎯 [OCR_RESULT_EMPTY] OCR結果なし - テキスト検出されませんでした");
-        return;
-    }
-
-    try
-    {
-        _logger.LogInformation("🎯 Phase A+処理開始: {Count}個のグループを個別処理", eventData.Results.Count);
-
-        // 統一言語設定サービスから言語ペア取得
-        var languagePair = await _languageConfig.GetLanguagePairAsync().ConfigureAwait(false);
-        var sourceLanguageCode = languagePair.SourceCode;
-        var targetLanguageCode = languagePair.TargetCode;
-
-        // 🎯 Phase A+修正: 各グループを個別に翻訳リクエスト発行
-        var groupIndex = 1;
-        foreach (var ocrResult in eventData.Results)
+        // 🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効時は個別処理をスキップ
+        if (_textChunkAggregatorService.IsFeatureEnabled)
         {
-            if (!string.IsNullOrWhiteSpace(ocrResult.Text))
-            {
-                var logMessage = $"🎯 [GROUP_TRANSLATION] グループ{groupIndex}翻訳リクエスト開始 - テキスト: '{(ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text)}', 座標: ({ocrResult.Bounds.X},{ocrResult.Bounds.Y},{ocrResult.Bounds.Width},{ocrResult.Bounds.Height}), 文字数: {ocrResult.Text.Length}";
-                
-                _logger.LogInformation("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}翻訳リクエスト開始 - テキスト: '{Text}', 座標: ({X},{Y},{W},{H}), 文字数: {Length}",
-                    groupIndex,
-                    ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text,
-                    ocrResult.Bounds.X, ocrResult.Bounds.Y,
-                    ocrResult.Bounds.Width, ocrResult.Bounds.Height,
-                    ocrResult.Text.Length);
-
-                Console.WriteLine($"🎯 [GROUP_TRANSLATION] グループ{groupIndex}翻訳リクエスト - " +
-                    $"テキスト: '{(ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text)}', " +
-                    $"座標: ({ocrResult.Bounds.X},{ocrResult.Bounds.Y},{ocrResult.Bounds.Width},{ocrResult.Bounds.Height})");
-
-                var translationRequest = new TranslationRequestEvent(
-                    ocrResult: ocrResult,
-                    sourceLanguage: sourceLanguageCode,
-                    targetLanguage: targetLanguageCode);
-
-                await _eventAggregator.PublishAsync(translationRequest).ConfigureAwait(false);
-
-                _logger.LogDebug("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}翻訳リクエスト発行完了", groupIndex);
-            }
-            else
-            {
-                _logger.LogDebug("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}をスキップ - 空テキスト", groupIndex);
-            }
-            groupIndex++;
+            _logger.LogInformation("🚀 [DUPLICATE_FIX] TimedChunkAggregator統合処理有効のため個別翻訳処理をスキップ - 統合グルーピング翻訳を使用");
+            Console.WriteLine("🚀 [DUPLICATE_FIX] 統合処理有効: 個別翻訳スキップ → TimedChunkAggregatorグルーピング翻訳使用");
+            return; // 統合処理に委ねる
         }
 
-        var completionMessage = $"🎯 Phase A+完了: {eventData.Results.Count}個の翻訳リクエストを発行";
-        _logger.LogInformation("🎯 Phase A+完了: {Count}個の翻訳リクエストを発行", eventData.Results.Count);
+        if (eventData.Results == null || !eventData.Results.Any())
+        {
+            _logger.LogInformation("🎯 [OCR_RESULT_EMPTY] OCR結果が空のためグループ翻訳をスキップ - Results: {ResultsNull}, Count: {Count}",
+                eventData.Results == null, eventData.Results?.Count ?? 0);
+            Console.WriteLine($"🎯 [OCR_RESULT_EMPTY] OCR結果なし - テキスト検出されませんでした");
+            return;
+        }
+
+        try
+        {
+            _logger.LogInformation("🎯 Phase A+処理開始: {Count}個のグループを個別処理", eventData.Results.Count);
+
+            // 統一言語設定サービスから言語ペア取得
+            var languagePair = await _languageConfig.GetLanguagePairAsync().ConfigureAwait(false);
+            var sourceLanguageCode = languagePair.SourceCode;
+            var targetLanguageCode = languagePair.TargetCode;
+
+            // 🎯 Phase A+修正: 各グループを個別に翻訳リクエスト発行
+            var groupIndex = 1;
+            foreach (var ocrResult in eventData.Results)
+            {
+                if (!string.IsNullOrWhiteSpace(ocrResult.Text))
+                {
+                    var logMessage = $"🎯 [GROUP_TRANSLATION] グループ{groupIndex}翻訳リクエスト開始 - テキスト: '{(ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text)}', 座標: ({ocrResult.Bounds.X},{ocrResult.Bounds.Y},{ocrResult.Bounds.Width},{ocrResult.Bounds.Height}), 文字数: {ocrResult.Text.Length}";
+
+                    _logger.LogInformation("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}翻訳リクエスト開始 - テキスト: '{Text}', 座標: ({X},{Y},{W},{H}), 文字数: {Length}",
+                        groupIndex,
+                        ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text,
+                        ocrResult.Bounds.X, ocrResult.Bounds.Y,
+                        ocrResult.Bounds.Width, ocrResult.Bounds.Height,
+                        ocrResult.Text.Length);
+
+                    Console.WriteLine($"🎯 [GROUP_TRANSLATION] グループ{groupIndex}翻訳リクエスト - " +
+                        $"テキスト: '{(ocrResult.Text.Length > 30 ? ocrResult.Text[..30] + "..." : ocrResult.Text)}', " +
+                        $"座標: ({ocrResult.Bounds.X},{ocrResult.Bounds.Y},{ocrResult.Bounds.Width},{ocrResult.Bounds.Height})");
+
+                    var translationRequest = new TranslationRequestEvent(
+                        ocrResult: ocrResult,
+                        sourceLanguage: sourceLanguageCode,
+                        targetLanguage: targetLanguageCode);
+
+                    await _eventAggregator.PublishAsync(translationRequest).ConfigureAwait(false);
+
+                    _logger.LogDebug("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}翻訳リクエスト発行完了", groupIndex);
+                }
+                else
+                {
+                    _logger.LogDebug("🎯 [GROUP_TRANSLATION] グループ{GroupIndex}をスキップ - 空テキスト", groupIndex);
+                }
+                groupIndex++;
+            }
+
+            var completionMessage = $"🎯 Phase A+完了: {eventData.Results.Count}個の翻訳リクエストを発行";
+            _logger.LogInformation("🎯 Phase A+完了: {Count}個の翻訳リクエストを発行", eventData.Results.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "優先度付きOCR処理でエラーが発生しました");
+            throw;
+        }
     }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "優先度付きOCR処理でエラーが発生しました");
-        throw;
-    }
-}
 
     /// <summary>
     /// OCR結果から優先度付きテキストリストを作成

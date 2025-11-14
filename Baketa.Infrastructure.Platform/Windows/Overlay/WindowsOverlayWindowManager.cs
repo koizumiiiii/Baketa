@@ -5,8 +5,8 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Baketa.Core.UI.Overlay;
-using CoreGeometry = Baketa.Core.UI.Geometry;
 using Microsoft.Extensions.Logging;
+using CoreGeometry = Baketa.Core.UI.Geometry;
 
 namespace Baketa.Infrastructure.Platform.Windows.Overlay;
 
@@ -30,7 +30,7 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager
         _loggerFactory = loggerFactory;
         _layeredWindowFactory = layeredWindowFactory ?? throw new ArgumentNullException(nameof(layeredWindowFactory));
     }
-    
+
     /// <inheritdoc/>
     public async Task<IOverlayWindow> CreateOverlayWindowAsync(
         nint targetWindowHandle,
@@ -78,21 +78,21 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager
             }
         }).ConfigureAwait(false);
     }
-    
+
     /// <inheritdoc/>
     public IOverlayWindow? GetOverlayWindow(nint handle)
     {
         _activeOverlays.TryGetValue(handle, out var overlay);
         return overlay;
     }
-    
+
     /// <inheritdoc/>
     public async Task CloseAllOverlaysAsync()
     {
         _logger.LogInformation("Closing {Count} active overlays", _activeOverlays.Count);
-        
+
         var tasks = new List<Task>();
-        
+
         foreach (var (handle, overlay) in _activeOverlays)
         {
             tasks.Add(Task.Run(() =>
@@ -113,12 +113,12 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager
                 }
             }));
         }
-        
+
         await Task.WhenAll(tasks).ConfigureAwait(false);
-        
+
         _logger.LogInformation("All overlays closed");
     }
-    
+
     /// <inheritdoc/>
     public int ActiveOverlayCount => _activeOverlays.Count;
 }

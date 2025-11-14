@@ -25,7 +25,7 @@ public sealed class SupabaseUserService : IUserService, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         // TODO: Initialize Supabase client when NuGet package is added
         // _supabaseClient = supabaseClient ?? throw new ArgumentNullException(nameof(supabaseClient));
-        
+
         _logger.LogInformation("SupabaseUserService initialized");
     }
 
@@ -223,7 +223,7 @@ public sealed class SupabaseUserService : IUserService, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving usage statistics for user: {UserId}", userId);
-            
+
             // Return empty stats on error rather than throwing
             return new UserUsageStats(
                 UserId: userId,
@@ -254,7 +254,7 @@ public sealed class SupabaseUserService : IUserService, IDisposable
 
         _userSemaphore.Dispose();
         _disposed = true;
-        
+
         _logger.LogInformation("SupabaseUserService disposed");
     }
 }

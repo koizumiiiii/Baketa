@@ -1,9 +1,9 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using System.IO;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
-using System.IO;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Baketa.Infrastructure.Translation.Services;
 
@@ -16,7 +16,7 @@ public interface IConnectionStrategy
     /// サーバーの準備状況を確認
     /// </summary>
     Task<bool> IsServerReady(int port, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 戦略の名前
     /// </summary>
@@ -129,9 +129,9 @@ public class TcpHandshakeStrategy : IConnectionStrategy
             // 🔧 UltraThink Phase 4.8: タイムアウト設定追加（5秒）
             tcpClient.ReceiveTimeout = 5000;
             tcpClient.SendTimeout = 5000;
-            
+
             await tcpClient.ConnectAsync("127.0.0.1", port, cancellationToken);
-            
+
             var stream = tcpClient.GetStream();
             var writer = new StreamWriter(stream, System.Text.Encoding.UTF8);
             var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
@@ -140,11 +140,11 @@ public class TcpHandshakeStrategy : IConnectionStrategy
             var testRequest = "{\"text\":\"test\",\"source_lang\":\"en\",\"target_lang\":\"ja\"}";
             await writer.WriteLineAsync(testRequest);
             await writer.FlushAsync();
-            
+
             // タイムアウト付きレスポンス読み取り
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(TimeSpan.FromSeconds(5));
-            
+
             var response = await reader.ReadLineAsync();
             if (!string.IsNullOrEmpty(response))
             {
@@ -160,7 +160,7 @@ public class TcpHandshakeStrategy : IConnectionStrategy
                     return false;
                 }
             }
-            
+
             _logger.LogDebug("🤷 翻訳テスト無応答: Port {Port}", port);
             return false;
         }
@@ -225,15 +225,15 @@ public sealed class SmartConnectionEstablisher : IDisposable
                     if (await strategy.IsServerReady(port, cancellationToken))
                     {
                         _logger.LogDebug("✅ 戦略成功: {Strategy} (Port {Port})", strategy.StrategyName, port);
-                        
+
                         // Gemini推奨: 2秒ウォームアップ期間
                         _logger.LogDebug("🔥 ウォームアップ期間待機: 2秒");
                         await Task.Delay(2000, cancellationToken);
-                        
+
                         var elapsed = DateTime.UtcNow - startTime;
-                        _logger.LogInformation("🚀 サーバー準備完了: Port {Port}, 経過時間 {Elapsed:F1}秒, 成功戦略: {Strategy}", 
+                        _logger.LogInformation("🚀 サーバー準備完了: Port {Port}, 経過時間 {Elapsed:F1}秒, 成功戦略: {Strategy}",
                             port, elapsed.TotalSeconds, strategy.StrategyName);
-                        
+
                         return true;
                     }
                 }
@@ -251,15 +251,15 @@ public sealed class SmartConnectionEstablisher : IDisposable
             // Exponential Backoff (最大5秒)
             var delay = Math.Min(5000, (int)Math.Pow(2, retryCount) * 500);
             _logger.LogDebug("⏱️ リトライ待機: {Delay}ms (試行回数: {RetryCount})", delay, retryCount + 1);
-            
+
             await Task.Delay(delay, cancellationToken);
             retryCount++;
         }
 
         var totalElapsed = DateTime.UtcNow - startTime;
-        _logger.LogWarning("❌ サーバー準備完了タイムアウト: Port {Port}, 経過時間 {Elapsed:F1}秒", 
+        _logger.LogWarning("❌ サーバー準備完了タイムアウト: Port {Port}, 経過時間 {Elapsed:F1}秒",
             port, totalElapsed.TotalSeconds);
-        
+
         return false;
     }
 

@@ -22,12 +22,12 @@ public sealed class FeatureFlagService : IFeatureFlagService
     {
         _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         _currentSettings = _optionsMonitor.CurrentValue;
-        
+
         // 設定変更の監視
         _optionsMonitor.OnChange((settings, _) => OnSettingsChanged(settings));
-        
+
         _logger.LogInformation("FeatureFlagService初期化完了");
         LogCurrentFeatureFlags();
     }
@@ -110,23 +110,23 @@ public sealed class FeatureFlagService : IFeatureFlagService
     {
         var previousSettings = _currentSettings;
         var changedProperties = GetChangedProperties(previousSettings, newSettings);
-        
+
         _currentSettings = newSettings;
-        
+
         if (changedProperties.Count > 0)
         {
-            _logger.LogInformation("フィーチャーフラグ設定が変更されました: {ChangedProperties}", 
+            _logger.LogInformation("フィーチャーフラグ設定が変更されました: {ChangedProperties}",
                 string.Join(", ", changedProperties));
-            
+
             LogCurrentFeatureFlags();
-            
+
             var eventArgs = new FeatureFlagChangedEventArgs
             {
                 NewSettings = newSettings,
                 PreviousSettings = previousSettings,
                 ChangedProperties = changedProperties
             };
-            
+
             FeatureFlagChanged?.Invoke(this, eventArgs);
         }
     }
@@ -134,21 +134,21 @@ public sealed class FeatureFlagService : IFeatureFlagService
     private static List<string> GetChangedProperties(FeatureFlagSettings previous, FeatureFlagSettings current)
     {
         var changedProperties = new List<string>();
-        
+
         var properties = typeof(FeatureFlagSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.PropertyType == typeof(bool));
-        
+
         foreach (var property in properties)
         {
             var previousValue = (bool)(property.GetValue(previous) ?? false);
             var currentValue = (bool)(property.GetValue(current) ?? false);
-            
+
             if (previousValue != currentValue)
             {
                 changedProperties.Add(property.Name);
             }
         }
-        
+
         return changedProperties;
     }
 

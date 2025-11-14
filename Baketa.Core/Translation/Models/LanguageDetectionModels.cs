@@ -17,19 +17,19 @@ public sealed class LanguageDetection
     /// 検出された言語
     /// </summary>
     public required Language Language { get; set; }
-    
+
     /// <summary>
     /// 検出の信頼度（0-1の範囲）
     /// </summary>
     public float Confidence { get; set; }
-    
+
     /// <summary>
     /// デフォルトコンストラクタ
     /// </summary>
     public LanguageDetection()
     {
     }
-    
+
     /// <summary>
     /// 基本情報を指定して初期化
     /// </summary>
@@ -40,7 +40,7 @@ public sealed class LanguageDetection
         Language = language;
         Confidence = confidence;
     }
-    
+
     /// <summary>
     /// クローンを作成
     /// </summary>
@@ -71,7 +71,7 @@ public static class LanguageDetectionExtensions
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(language);
-        
+
         // 代替言語候補を拡張メソッドで追加
         // 将来的にLanguageDetectionResultに代替候補リスト機能が追加された場合のための拡張ポイント
         // 現在は信頼度を使用して検証のみ実行
@@ -80,7 +80,7 @@ public static class LanguageDetectionExtensions
             // より高い信頼度の言語が提供された場合のログ記録等に利用可能
             System.Diagnostics.Debug.WriteLine($"Higher confidence alternative found: {language.Code} ({confidence:P2})");
         }
-        
+
         return result;
     }
 }

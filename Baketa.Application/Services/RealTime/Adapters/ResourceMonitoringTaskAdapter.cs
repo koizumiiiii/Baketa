@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Infrastructure.ResourceManagement;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Services.RealTime.Adapters;
 

@@ -60,8 +60,8 @@ public sealed record LoggingSettings
     /// </remarks>
     public string GetFullDebugLogPath()
     {
-        return Path.IsPathRooted(DebugLogPath) 
-            ? DebugLogPath 
+        return Path.IsPathRooted(DebugLogPath)
+            ? DebugLogPath
             : Path.Combine(AppContext.BaseDirectory, DebugLogPath);
     }
 

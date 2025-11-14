@@ -1,9 +1,9 @@
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Capture;
-using Baketa.Core.Models.Capture;
-using Baketa.Core.Exceptions.Capture;
-using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Exceptions.Capture;
+using Baketa.Core.Models.Capture;
+using Microsoft.Extensions.Logging;
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
 using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
@@ -35,7 +35,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
             // PrintWindow API は常に利用可能（最終手段）
             var canApply = hwnd != IntPtr.Zero;
 
-            _logger.LogDebug("PrintWindowFallback戦略適用可能性: {CanApply} (HWND: 0x{Hwnd:X})", 
+            _logger.LogDebug("PrintWindowFallback戦略適用可能性: {CanApply} (HWND: 0x{Hwnd:X})",
                 canApply, hwnd.ToInt64());
 
             return canApply;
@@ -62,7 +62,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
             return await Task.Run(() =>
             {
                 var windowExists = IsWindow(hwnd);
-                
+
                 _logger.LogDebug("PrintWindowFallback前提条件: Window存在={WindowExists}", windowExists);
 
                 return windowExists;
@@ -90,7 +90,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
 
             // PrintWindow API を使用した確実なキャプチャ
             var capturedImage = await CaptureWithPrintWindowAsync(hwnd, options).ConfigureAwait(false);
-            
+
             if (capturedImage != null)
             {
                 result.Success = true;
@@ -99,7 +99,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
                 result.Metrics.FrameCount = 1;
                 result.Metrics.PerformanceCategory = "Reliable";
 
-                _logger.LogInformation("PrintWindowFallbackキャプチャ成功: サイズ={Width}x{Height}, 処理時間={ProcessingTime}ms", 
+                _logger.LogInformation("PrintWindowFallbackキャプチャ成功: サイズ={Width}x{Height}, 処理時間={ProcessingTime}ms",
                     capturedImage.Width, capturedImage.Height, stopwatch.ElapsedMilliseconds);
             }
             else

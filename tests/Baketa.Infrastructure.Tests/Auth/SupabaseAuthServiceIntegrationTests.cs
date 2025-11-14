@@ -1,12 +1,12 @@
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using Moq;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Infrastructure.Auth;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.Auth;
 
@@ -22,14 +22,14 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     public SupabaseAuthServiceIntegrationTests()
     {
         _mockLogger = new Mock<ILogger<SupabaseAuthService>>();
-        
+
         // シンプルなモック実装 - 実際のSupabaseクライアントを使用
         var options = new Supabase.SupabaseOptions
         {
             AutoConnectRealtime = false
         };
         var supabaseClient = new Supabase.Client("https://mock.supabase.co", "mock-anon-key", options);
-        
+
         _authService = new SupabaseAuthService(supabaseClient, _mockLogger.Object);
     }
 
@@ -57,7 +57,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     {
         // Arrange
         var mockClient = new Mock<Supabase.Client>("mock-url", "mock-key", new Supabase.SupabaseOptions());
-        
+
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => new SupabaseAuthService(mockClient.Object, null!));
     }
@@ -94,17 +94,17 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     public async Task SignUpWithEmailPasswordAsync_WithInvalidInput_ThrowsArgumentException(string email, string password)
     {
         // Act & Assert - .NET 8のArgumentException.ThrowIfNullOrWhiteSpace()の空文字列/空白ケース
-        await Assert.ThrowsAsync<ArgumentException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() =>
             _authService.SignUpWithEmailPasswordAsync(email, password));
     }
-    
+
     [Theory]
     [InlineData(null, "password")]       // ArgumentNullException
     [InlineData("email@test.com", null)] // ArgumentNullException
     public async Task SignUpWithEmailPasswordAsync_WithNullInput_ThrowsArgumentNullException(string email, string password)
     {
         // Act & Assert - .NET 8のArgumentException.ThrowIfNullOrWhiteSpace()のnullケース
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
             _authService.SignUpWithEmailPasswordAsync(email, password));
     }
 
@@ -136,7 +136,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
 
         // Assert
         result.Should().NotBeNull();
-        
+
         // LoggerMessage delegatesのため、ログ検証をスキップ
     }
 
@@ -148,17 +148,17 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     public async Task SignInWithEmailPasswordAsync_WithInvalidInput_ThrowsArgumentException(string email, string password)
     {
         // Act & Assert - .NET 8のArgumentException.ThrowIfNullOrWhiteSpace()の空文字列/空白ケース
-        await Assert.ThrowsAsync<ArgumentException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() =>
             _authService.SignInWithEmailPasswordAsync(email, password));
     }
-    
+
     [Theory]
     [InlineData(null, "password")]       // ArgumentNullException
     [InlineData("email@test.com", null)] // ArgumentNullException
     public async Task SignInWithEmailPasswordAsync_WithNullInput_ThrowsArgumentNullException(string email, string password)
     {
         // Act & Assert - .NET 8のArgumentException.ThrowIfNullOrWhiteSpace()のnullケース
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
             _authService.SignInWithEmailPasswordAsync(email, password));
     }
 
@@ -190,7 +190,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
 
         // Assert
         result.Should().NotBeNull();
-        
+
         // LoggerMessage delegatesのため、ログ検証をスキップ
     }
 
@@ -228,7 +228,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
 
         // Assert
         await act.Should().NotThrowAsync();
-        
+
         // LoggerMessage delegatesのため、ログ検証をスキップ
     }
 
@@ -240,7 +240,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
 
         // Assert
         await act.Should().NotThrowAsync();
-        
+
         // LoggerMessage delegatesのため、ログ検証をスキップ
     }
 
@@ -277,15 +277,15 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     public async Task SendPasswordResetEmailAsync_WithInvalidEmail_ThrowsArgumentException(string email)
     {
         // Act & Assert - .NET 8のArgumentException.ThrowIfNullOrWhiteSpace()の空文字列/空白ケース
-        await Assert.ThrowsAsync<ArgumentException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() =>
             _authService.SendPasswordResetEmailAsync(email));
     }
-    
+
     [Fact]
     public async Task SendPasswordResetEmailAsync_WithNullEmail_ThrowsArgumentNullException()
     {
         // Act & Assert - .NET 8のArgumentException.ThrowIfNullOrWhiteSpace()のnullケース
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
             _authService.SendPasswordResetEmailAsync(null!));
     }
 
@@ -301,7 +301,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.Should().BeOfType<AuthFailure>(); // Mock implementation returns failure
-        
+
         // LoggerMessage delegatesのため、ログ検証をスキップ
     }
 
@@ -311,15 +311,15 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     public async Task UpdatePasswordAsync_WithInvalidPassword_ThrowsArgumentException(string newPassword)
     {
         // Act & Assert - .NET 8のArgumentException.ThrowIfNullOrWhiteSpace()の空文字列/空白ケース
-        await Assert.ThrowsAsync<ArgumentException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() =>
             _authService.UpdatePasswordAsync(newPassword));
     }
-    
+
     [Fact]
     public async Task UpdatePasswordAsync_WithNullPassword_ThrowsArgumentNullException()
     {
         // Act & Assert - .NET 8のArgumentException.ThrowIfNullOrWhiteSpace()のnullケース
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
             _authService.UpdatePasswordAsync(null!));
     }
 
@@ -336,13 +336,13 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
 
         // Act - Subscribe
         _authService.AuthStatusChanged += handler;
-        
+
         // Verify subscription doesn't throw
         Assert.False(eventRaised); // Event not raised yet
 
         // Act - Unsubscribe
         _authService.AuthStatusChanged -= handler;
-        
+
         // Assert
         Assert.False(eventRaised); // Still not raised
     }
@@ -374,25 +374,25 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             service.SignUpWithEmailPasswordAsync("test@example.com", "password"));
-        
+
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             service.SignInWithEmailPasswordAsync("test@example.com", "password"));
-        
+
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             service.SignInWithOAuthAsync(AuthProvider.Google));
-        
+
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             service.GetCurrentSessionAsync());
-        
+
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             service.RestoreSessionAsync());
-        
+
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             service.SignOutAsync());
-        
+
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             service.SendPasswordResetEmailAsync("test@example.com"));
-        
+
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             service.UpdatePasswordAsync("newPassword"));
     }
@@ -430,7 +430,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
         await _authService.GetCurrentSessionAsync();
         await _authService.SendPasswordResetEmailAsync("test@example.com");
         await _authService.RestoreSessionAsync();
-        
+
         stopwatch.Stop();
 
         // Assert

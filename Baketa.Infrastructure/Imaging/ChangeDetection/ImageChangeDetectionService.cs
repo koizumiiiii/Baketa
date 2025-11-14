@@ -1,11 +1,11 @@
-using Baketa.Core.Abstractions.Services;
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Models.ImageProcessing;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Models.ImageProcessing;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.Imaging.ChangeDetection;
 
@@ -18,7 +18,7 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
 {
     private readonly ILogger<ImageChangeDetectionService> _logger;
     private readonly IImageChangeMetricsService _metricsService;
-    
+
     // レガシー設定用デフォルト値
     private readonly HashAlgorithmType _defaultAlgorithm = HashAlgorithmType.DifferenceHash;
     private readonly float _changeThreshold = 0.1f;
@@ -33,12 +33,12 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
 
     /// <inheritdoc />
     public async Task<ImageChangeResult> DetectChangeAsync(
-        byte[] previousImage, 
-        byte[] currentImage, 
+        byte[] previousImage,
+        byte[] currentImage,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
+
         try
         {
             ArgumentNullException.ThrowIfNull(previousImage, nameof(previousImage));
@@ -60,7 +60,7 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
             var changePercentage = CalculateHammingDistancePercentage(previousHash, currentHash);
             var hasChanged = IsSignificantChange(changePercentage, _changeThreshold);
 
-            var result = hasChanged 
+            var result = hasChanged
                 ? ImageChangeResult.CreateChanged(previousHash, currentHash, changePercentage, algorithm, stopwatch.Elapsed)
                 : ImageChangeResult.CreateNoChange(stopwatch.Elapsed);
 
@@ -83,7 +83,7 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
         {
             stopwatch.Stop();
             _logger.LogError(ex, "💥 画像変化検知エラー: 処理時間 {ProcessingTimeMs}ms", stopwatch.ElapsedMilliseconds);
-            
+
             // エラー時はデフォルトで変化ありとして処理を継続
             return ImageChangeResult.CreateChanged("ERROR", "ERROR", 1.0f, _defaultAlgorithm, stopwatch.Elapsed);
         }
@@ -91,41 +91,41 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
 
     /// <inheritdoc />
     public async Task<ImageChangeResult> DetectChangeAsync(
-        IImage? previousImage, 
-        IImage currentImage, 
+        IImage? previousImage,
+        IImage currentImage,
         string contextId = "default",
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(currentImage);
-        
+
         if (previousImage == null)
         {
             // 初回検知の場合
             var currentHash = GeneratePerceptualHash(await ConvertImageToByteArrayAsync(currentImage), _defaultAlgorithm);
             return ImageChangeResult.CreateFirstTime(currentHash, _defaultAlgorithm, TimeSpan.Zero);
         }
-        
+
         // IImage -> byte[] 変換して既存メソッドを呼び出し
         var prevBytes = await ConvertImageToByteArrayAsync(previousImage);
         var currBytes = await ConvertImageToByteArrayAsync(currentImage);
-        
+
         return await DetectChangeAsync(prevBytes, currBytes, cancellationToken);
     }
 
     /// <inheritdoc />
     public async Task<QuickFilterResult> QuickFilterAsync(
-        IImage? previousImage, 
-        IImage currentImage, 
+        IImage? previousImage,
+        IImage currentImage,
         string contextId = "default")
     {
         if (previousImage == null)
         {
             return QuickFilterResult.PotentialChange;
         }
-        
+
         // 簡易実装：基本的な変化検知結果から判定
         var changeResult = await DetectChangeAsync(previousImage, currentImage, contextId);
-        
+
         return new QuickFilterResult
         {
             HasPotentialChange = changeResult.HasChanged,
@@ -149,14 +149,14 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
     {
         if (previousImage == null || regions.Length == 0)
         {
-            return regions.Select(r => new RegionChangeResult(r, true, 0.0f)).ToArray();
+            return [.. regions.Select(r => new RegionChangeResult(r, true, 0.0f))];
         }
-        
+
         // 簡易実装：全体の変化検知結果を各領域に適用
         var changeResult = await DetectChangeAsync(previousImage, currentImage, "default", cancellationToken);
         var similarity = 1.0f - changeResult.ChangePercentage;
-        
-        return regions.Select(r => new RegionChangeResult(r, changeResult.HasChanged, similarity)).ToArray();
+
+        return [.. regions.Select(r => new RegionChangeResult(r, changeResult.HasChanged, similarity))];
     }
 
     /// <inheritdoc />
@@ -194,7 +194,7 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
         {
             using var ms = new MemoryStream(imageData);
             using var originalBitmap = new Bitmap(ms);
-            
+
             return algorithm switch
             {
                 HashAlgorithmType.AverageHash => GenerateAverageHash(originalBitmap),
@@ -231,11 +231,11 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
     private static string GenerateDifferenceHash(Bitmap bitmap)
     {
         const int size = 8;
-        
+
         // 9x8のグレースケール画像にリサイズ（横の差分を計算するため）
         using var resized = new Bitmap(size + 1, size, PixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
-        
+
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
         graphics.DrawImage(bitmap, 0, 0, size + 1, size);
 
@@ -248,7 +248,7 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
             {
                 var leftPixel = resized.GetPixel(x, y);
                 var rightPixel = resized.GetPixel(x + 1, y);
-                
+
                 var leftGray = (leftPixel.R + leftPixel.G + leftPixel.B) / 3;
                 var rightGray = (rightPixel.R + rightPixel.G + rightPixel.B) / 3;
 
@@ -270,10 +270,10 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
     private static string GenerateAverageHash(Bitmap bitmap)
     {
         const int size = 8;
-        
+
         using var resized = new Bitmap(size, size, PixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
-        
+
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
         graphics.DrawImage(bitmap, 0, 0, size, size);
 
@@ -299,7 +299,7 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
             {
                 var pixel = resized.GetPixel(x, y);
                 var brightness = (pixel.R + pixel.G + pixel.B) / 3;
-                
+
                 if (brightness >= averageBrightness)
                 {
                     hash |= 1UL << bitIndex;
@@ -320,10 +320,10 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
         // 簡易実装：実際のpHashはDCT変換を使用するが、
         // ここでは16x16の拡張版dHashで代用
         const int size = 16;
-        
+
         using var resized = new Bitmap(size + 1, size, PixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
-        
+
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
         graphics.DrawImage(bitmap, 0, 0, size + 1, size);
 
@@ -336,7 +336,7 @@ public sealed class ImageChangeDetectionService : IImageChangeDetectionService
             {
                 var leftPixel = resized.GetPixel(x, y);
                 var rightPixel = resized.GetPixel(x + 1, y);
-                
+
                 var leftGray = (leftPixel.R + leftPixel.G + leftPixel.B) / 3;
                 var rightGray = (rightPixel.R + rightPixel.G + rightPixel.B) / 3;
 

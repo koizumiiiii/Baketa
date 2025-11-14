@@ -10,12 +10,12 @@ public interface IBackgroundTaskQueue
     /// バックグラウンドで実行するタスクをキューに追加
     /// </summary>
     void QueueBackgroundWorkItem(Func<CancellationToken, Task> workItem);
-    
+
     /// <summary>
     /// キューからタスクを取得（ホステッドサービス用）
     /// </summary>
     Task<Func<CancellationToken, Task>> DequeueAsync(CancellationToken cancellationToken);
-    
+
     /// <summary>
     /// キューに蓄積されているタスク数
     /// </summary>

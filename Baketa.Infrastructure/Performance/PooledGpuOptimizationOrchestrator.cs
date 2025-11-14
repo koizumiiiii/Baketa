@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.OCR;
@@ -9,8 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
-using System.Collections.Concurrent;
-using System.Diagnostics;
 
 namespace Baketa.Infrastructure.Performance;
 
@@ -26,19 +26,19 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     private readonly IUnifiedGpuOptimizer _gpuOptimizer;
     // [ROI_DELETION] IPerformanceOrchestrator削除 - 実際に使用されていない依存関係
     private readonly IObjectPoolStatisticsReporter _poolStatistics;
-    
+
     // GPU最適化プール管理
     private readonly ConcurrentDictionary<string, OptimizedPoolConfiguration> _poolConfigurations = new();
     private readonly ConcurrentDictionary<string, GpuMemoryAllocation> _gpuMemoryAllocations = new();
-    
+
     // パフォーマンス監視
     private readonly System.Threading.Timer _optimizationTimer;
     private readonly SemaphoreSlim _optimizationLock = new(1, 1);
-    
+
     // 動的最適化設定
     private AdaptiveOptimizationSettings _currentSettings = new();
     private GpuResourceSnapshot _lastGpuSnapshot = new();
-    
+
     private bool _disposed;
 
     public PooledGpuOptimizationOrchestrator(
@@ -53,10 +53,10 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         _gpuOptimizer = gpuOptimizer ?? throw new ArgumentNullException(nameof(gpuOptimizer));
         // [ROI_DELETION] _performanceOrchestrator初期化削除 - 使用されていない依存関係
         _poolStatistics = poolStatistics ?? throw new ArgumentNullException(nameof(poolStatistics));
-        
+
         // 30秒間隔で最適化実行
         _optimizationTimer = new System.Threading.Timer(PerformOptimizationCycle, null, Timeout.Infinite, Timeout.Infinite);
-        
+
         _logger.LogInformation("🚀 PooledGpuOptimizationOrchestrator初期化完了 - 統合最適化システム開始");
     }
 
@@ -65,19 +65,19 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         try
         {
             _logger.LogInformation("🔥 プール化×GPU最適化システム開始中...");
-            
+
             // 1. GPU環境初期化
             await InitializeGpuEnvironmentAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // 2. プール設定初期化
             await InitializePoolConfigurationsAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // 3. パフォーマンス監視開始
             await InitializePerformanceMonitoringAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // 4. 最適化タイマー開始
             _optimizationTimer.Change(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-            
+
             _logger.LogInformation("✅ プール化×GPU最適化システム開始完了");
         }
         catch (Exception ex)
@@ -92,16 +92,16 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         try
         {
             _logger.LogInformation("⏸️ プール化×GPU最適化システム停止中...");
-            
+
             // 最適化タイマー停止
             await _optimizationTimer.DisposeAsync().ConfigureAwait(false);
-            
+
             // 最終最適化実行
             await PerformOptimizationCycleAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // 統計レポート出力
             await GenerateFinalPerformanceReportAsync().ConfigureAwait(false);
-            
+
             _logger.LogInformation("✅ プール化×GPU最適化システム停止完了");
         }
         catch (Exception ex)
@@ -116,23 +116,23 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     private async Task InitializeGpuEnvironmentAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("🎯 GPU環境初期化開始");
-        
+
         // GPU環境情報取得
         var providerStatus = await _gpuOptimizer.GetProviderStatusAsync(cancellationToken).ConfigureAwait(false);
         var optimalProvider = await _gpuOptimizer.SelectOptimalProviderAsync(cancellationToken).ConfigureAwait(false);
-        
+
         _logger.LogInformation("🔍 利用可能なGPUプロバイダー:");
         foreach (var (type, isSupported, priority, info) in providerStatus)
         {
             _logger.LogInformation("  📌 {ProviderType}: {Status} (優先度: {Priority}) - {Info}",
                 type, isSupported ? "サポート" : "非サポート", priority, info);
         }
-        
+
         _logger.LogInformation("⚡ 選択された最適プロバイダー: {ProviderType}", optimalProvider.Type);
-        
+
         // GPU最適化設定を決定
         _currentSettings = DetermineOptimizationSettings(providerStatus);
-        
+
         _logger.LogInformation("🎛️ 最適化設定決定: プール容量={PoolCapacity}, GPU並列度={GpuParallelism}",
             _currentSettings.OptimalPoolCapacity, _currentSettings.GpuParallelism);
     }
@@ -143,7 +143,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     private async Task InitializePoolConfigurationsAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("🏊 プール設定最適化開始");
-        
+
         // 各プールの最適設定を決定
         var poolTypes = new[]
         {
@@ -160,7 +160,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
             {
                 var config = await OptimizePoolConfigurationAsync(poolName, poolService).ConfigureAwait(false);
                 _poolConfigurations.TryAdd(poolName, config);
-                
+
                 _logger.LogInformation("✅ {PoolName}プール最適化完了 - 容量: {Capacity}, GPU割り当て: {GpuMemoryMB}MB",
                     poolName, config.OptimalCapacity, config.GpuMemoryAllocationMB);
             }
@@ -169,7 +169,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
                 _logger.LogWarning("⚠️ {PoolName}プールサービスが見つかりません", poolName);
             }
         }
-        
+
         await Task.CompletedTask;
     }
 
@@ -221,19 +221,19 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
 
             // 1. プール統計取得
             var poolReport = _poolStatistics.GetReport();
-            
+
             // 2. GPU状態取得
             var currentGpuSnapshot = await CaptureGpuResourceSnapshotAsync().ConfigureAwait(false);
-            
+
             // 3. パフォーマンス分析
             var optimizationRecommendations = AnalyzePerformance(poolReport, currentGpuSnapshot);
-            
+
             // 4. 推奨最適化を適用
             await ApplyOptimizationRecommendationsAsync(optimizationRecommendations, cancellationToken).ConfigureAwait(false);
-            
+
             // 5. スナップショット更新
             _lastGpuSnapshot = currentGpuSnapshot;
-            
+
             stopwatch.Stop();
             _logger.LogDebug("✅ 最適化サイクル完了 - 実行時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
         }
@@ -251,31 +251,31 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         try
         {
             _logger.LogTrace("📊 ワークロードベース動的調整開始");
-            
+
             // 現在のシステム負荷状況を取得
             var currentMetrics = await GetCurrentWorkloadMetricsAsync().ConfigureAwait(false);
             var previousSnapshot = _lastGpuSnapshot;
-            
+
             // GPU使用率とメモリ使用状況をチェック
             var gpuStatus = await _gpuOptimizer.GetProviderStatusAsync(cancellationToken).ConfigureAwait(false);
             var currentSnapshot = CreateGpuResourceSnapshot(currentMetrics, gpuStatus);
-            
+
             // 動的調整の判定と実行
             var adjustments = DetermineOptimizationAdjustments(currentMetrics, previousSnapshot, currentSnapshot);
-            
+
             if (adjustments.Any())
             {
                 _logger.LogInformation("🔧 動的調整実行: {AdjustmentCount}項目", adjustments.Count);
-                
+
                 foreach (var adjustment in adjustments)
                 {
                     await ApplyOptimizationAdjustmentAsync(adjustment, cancellationToken).ConfigureAwait(false);
                 }
-                
+
                 // スナップショット更新
                 _lastGpuSnapshot = currentSnapshot;
             }
-            
+
             _logger.LogTrace("✅ ワークロード動的調整完了");
         }
         catch (Exception ex)
@@ -283,7 +283,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
             _logger.LogError(ex, "❌ ワークロード動的調整エラー");
         }
     }
-    
+
     /// <summary>
     /// 現在のワークロードメトリクス取得
     /// </summary>
@@ -291,40 +291,40 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     {
         var process = Process.GetCurrentProcess();
         var metrics = new WorkloadMetrics();
-        
+
         // CPU使用率計算 (簡易的な実装)
         var startTime = DateTime.UtcNow;
         var startCpuUsage = process.TotalProcessorTime;
         await Task.Delay(100).ConfigureAwait(false); // 短時間待機
         var endTime = DateTime.UtcNow;
         var endCpuUsage = process.TotalProcessorTime;
-        
+
         var cpuUsedMs = (endCpuUsage - startCpuUsage).TotalMilliseconds;
         var totalMsPassed = (endTime - startTime).TotalMilliseconds;
         var cpuUsageTotal = cpuUsedMs / (Environment.ProcessorCount * totalMsPassed);
-        
+
         metrics.CpuUsagePercent = Math.Min(100.0, cpuUsageTotal * 100.0);
         metrics.MemoryUsageMB = process.WorkingSet64 / (1024 * 1024);
         metrics.ThreadCount = process.Threads.Count;
-        
+
         // プール統計情報も含める
         var poolReport = _poolStatistics.GetReport();
         metrics.PoolEfficiencyPercent = CalculateOverallPoolEfficiency(poolReport);
         metrics.ActivePoolObjects = (int)poolReport.TotalObjectCreationsAvoided;
-        
+
         return metrics;
     }
-    
+
     /// <summary>
     /// 最適化調整項目の決定
     /// </summary>
     private List<OptimizationAdjustment> DetermineOptimizationAdjustments(
-        WorkloadMetrics current, 
-        GpuResourceSnapshot previous, 
+        WorkloadMetrics current,
+        GpuResourceSnapshot previous,
         GpuResourceSnapshot current_gpu)
     {
         var adjustments = new List<OptimizationAdjustment>();
-        
+
         // CPU使用率が高い場合のGPU移行調整
         if (current.CpuUsagePercent > 80 && current_gpu.GpuMemoryAvailableMB > 512)
         {
@@ -337,7 +337,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
                 EstimatedImpact = "CPU負荷軽減、処理速度向上"
             });
         }
-        
+
         // GPU使用率が高い場合の負荷分散
         if (current_gpu.GpuMemoryUsagePercent > 85)
         {
@@ -350,7 +350,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
                 EstimatedImpact = "GPU過負荷回避、安定性向上"
             });
         }
-        
+
         // プール効率が低い場合のプール容量調整
         if (current.PoolEfficiencyPercent < 70)
         {
@@ -363,11 +363,11 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
                 EstimatedImpact = "オブジェクト再利用率向上、GC負荷軽減"
             });
         }
-        
+
         // メモリ使用量が急増している場合
-        var memoryGrowthRate = previous.MemoryUsageMB > 0 ? 
+        var memoryGrowthRate = previous.MemoryUsageMB > 0 ?
             (current_gpu.MemoryUsageMB - previous.MemoryUsageMB) / previous.MemoryUsageMB : 0;
-        
+
         if (memoryGrowthRate > 0.5) // 50%以上の増加
         {
             adjustments.Add(new OptimizationAdjustment
@@ -379,10 +379,10 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
                 EstimatedImpact = "メモリ使用量安定化、OOM回避"
             });
         }
-        
+
         return adjustments;
     }
-    
+
     /// <summary>
     /// 最適化調整の適用
     /// </summary>
@@ -391,7 +391,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         _logger.LogInformation("🔧 調整適用: {Type} (優先度: {Priority})", adjustment.Type, adjustment.Priority);
         _logger.LogInformation("   理由: {Reason}", adjustment.Reason);
         _logger.LogInformation("   期待効果: {Impact}", adjustment.EstimatedImpact);
-        
+
         try
         {
             switch (adjustment.Type)
@@ -399,24 +399,24 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
                 case OptimizationAdjustmentType.IncreaseGpuUtilization:
                     await AdjustGpuUtilizationAsync(adjustment.TargetIncrease, cancellationToken).ConfigureAwait(false);
                     break;
-                    
+
                 case OptimizationAdjustmentType.DistributeGpuLoad:
                     await DistributeGpuLoadAsync(adjustment.TargetDecrease, cancellationToken).ConfigureAwait(false);
                     break;
-                    
+
                 case OptimizationAdjustmentType.AdjustPoolCapacity:
                     await AdjustPoolCapacityAsync(adjustment.TargetIncrease, cancellationToken).ConfigureAwait(false);
                     break;
-                    
+
                 case OptimizationAdjustmentType.OptimizeMemoryUsage:
                     await OptimizeMemoryUsageAsync(adjustment.TargetDecrease, cancellationToken).ConfigureAwait(false);
                     break;
-                    
+
                 default:
                     _logger.LogWarning("⚠️ 未対応の調整タイプ: {Type}", adjustment.Type);
                     break;
             }
-            
+
             _logger.LogInformation("✅ 調整適用完了: {Type}", adjustment.Type);
         }
         catch (Exception ex)
@@ -424,7 +424,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
             _logger.LogError(ex, "❌ 調整適用エラー: {Type}", adjustment.Type);
         }
     }
-    
+
     /// <summary>
     /// GPU使用率の動的調整
     /// </summary>
@@ -435,24 +435,24 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         if (newParallelism != _currentSettings.GpuParallelism)
         {
             _currentSettings.GpuParallelism = newParallelism;
-            _logger.LogInformation("📈 GPU並列度を {Old} から {New} に調整", 
+            _logger.LogInformation("📈 GPU並列度を {Old} から {New} に調整",
                 _currentSettings.GpuParallelism, newParallelism);
         }
-        
+
         // GPUメモリ割り当ても調整
         var memoryIncrease = _currentSettings.GpuMemoryAllocationMB * targetIncreasePercent / 100;
         var newMemoryAllocation = Math.Min(4096, _currentSettings.GpuMemoryAllocationMB + memoryIncrease);
-        
+
         if (Math.Abs(newMemoryAllocation - _currentSettings.GpuMemoryAllocationMB) > 50)
         {
             _currentSettings.GpuMemoryAllocationMB = newMemoryAllocation;
             _logger.LogInformation("💾 GPUメモリ割り当てを {Old}MB から {New}MB に調整",
                 _currentSettings.GpuMemoryAllocationMB, newMemoryAllocation);
         }
-        
+
         await Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// GPU負荷分散
     /// </summary>
@@ -463,18 +463,18 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         if (newParallelism != _currentSettings.GpuParallelism)
         {
             _currentSettings.GpuParallelism = newParallelism;
-            _logger.LogInformation("📉 GPU負荷軽減: 並列度を {Old} から {New} に一時調整", 
+            _logger.LogInformation("📉 GPU負荷軽減: 並列度を {Old} から {New} に一時調整",
                 _currentSettings.GpuParallelism, newParallelism);
         }
-        
+
         // バッチサイズも調整
         _currentSettings.OptimalBatchSize = Math.Max(8, _currentSettings.OptimalBatchSize - 4);
-        _logger.LogInformation("📦 GPU負荷軽減: バッチサイズを {BatchSize} に調整", 
+        _logger.LogInformation("📦 GPU負荷軽減: バッチサイズを {BatchSize} に調整",
             _currentSettings.OptimalBatchSize);
-        
+
         await Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// プール容量の動的調整
     /// </summary>
@@ -482,29 +482,29 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     {
         var capacityIncrease = (int)(_currentSettings.OptimalPoolCapacity * targetIncreasePercent / 100);
         var newCapacity = (int)Math.Min(500, _currentSettings.OptimalPoolCapacity + capacityIncrease);
-        
+
         if (newCapacity != (int)_currentSettings.OptimalPoolCapacity)
         {
             _currentSettings.OptimalPoolCapacity = newCapacity;
-            _logger.LogInformation("🏊 プール容量を {Old} から {New} に調整", 
+            _logger.LogInformation("🏊 プール容量を {Old} から {New} に調整",
                 (int)_currentSettings.OptimalPoolCapacity, newCapacity);
-                
+
             // 各プールに新しい設定を適用
             await ApplyPoolCapacityChangesAsync(newCapacity, cancellationToken).ConfigureAwait(false);
         }
     }
-    
+
     /// <summary>
     /// メモリ使用量最適化
     /// </summary>
     private async Task OptimizeMemoryUsageAsync(int targetDecreasePercent, CancellationToken cancellationToken)
     {
         _logger.LogInformation("🧹 メモリ最適化開始 (目標削減: {TargetPercent}%)", targetDecreasePercent);
-        
+
         // 1. 強制GC実行
         GC.Collect(2, GCCollectionMode.Forced, true);
         GC.WaitForPendingFinalizers();
-        
+
         // 2. プールの未使用オブジェクト削減
         foreach (var poolConfig in _poolConfigurations.Values)
         {
@@ -512,14 +512,14 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
             var reductionRatio = 1.0 - (targetDecreasePercent / 100.0);
             poolConfig.MaximumRetained = Math.Max(5, (int)(poolConfig.MaximumRetained * reductionRatio));
         }
-        
+
         // 3. GPUメモリも削減
         var memoryReduction = _currentSettings.GpuMemoryAllocationMB * targetDecreasePercent / 100;
         _currentSettings.GpuMemoryAllocationMB = Math.Max(256, _currentSettings.GpuMemoryAllocationMB - memoryReduction);
-        
-        _logger.LogInformation("✅ メモリ最適化完了 - GPU割り当て: {GpuMemory}MB", 
+
+        _logger.LogInformation("✅ メモリ最適化完了 - GPU割り当て: {GpuMemory}MB",
             _currentSettings.GpuMemoryAllocationMB);
-        
+
         await Task.CompletedTask;
     }
 
@@ -529,24 +529,24 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     private async Task ApplyPoolCapacityChangesAsync(int newCapacity, CancellationToken cancellationToken)
     {
         _logger.LogInformation("🔧 プール容量変更を各プールに適用中: {NewCapacity}", newCapacity);
-        
+
         foreach (var (poolName, config) in _poolConfigurations)
         {
             var previousCapacity = config.OptimalCapacity;
             config.OptimalCapacity = newCapacity;
-            
-            _logger.LogDebug("📦 {PoolName}: {OldCapacity} → {NewCapacity}", 
+
+            _logger.LogDebug("📦 {PoolName}: {OldCapacity} → {NewCapacity}",
                 poolName, previousCapacity, newCapacity);
         }
-        
+
         await Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// GPUリソーススナップショットの作成
     /// </summary>
     private GpuResourceSnapshot CreateGpuResourceSnapshot(
-        WorkloadMetrics workload, 
+        WorkloadMetrics workload,
         IReadOnlyList<(ExecutionProvider Type, bool IsSupported, int Priority, string Info)> gpuStatus)
     {
         var snapshot = new GpuResourceSnapshot
@@ -559,10 +559,10 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
             GpuMemoryUsagePercent = CalculateGpuMemoryUsagePercent(),
             GpuMemoryAvailableMB = CalculateAvailableGpuMemory()
         };
-        
+
         return snapshot;
     }
-    
+
     /// <summary>
     /// GPU メモリ使用率の計算
     /// </summary>
@@ -570,10 +570,10 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     {
         var totalAllocated = _gpuMemoryAllocations.Values.Sum(a => a.AllocatedMemoryMB);
         var totalAvailable = _currentSettings.GpuMemoryAllocationMB;
-        
+
         return totalAvailable > 0 ? (totalAllocated / totalAvailable) * 100.0 : 0.0;
     }
-    
+
     /// <summary>
     /// 利用可能GPUメモリの計算
     /// </summary>
@@ -582,7 +582,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         var totalAllocated = _gpuMemoryAllocations.Values.Sum(a => a.AllocatedMemoryMB);
         return Math.Max(0, _currentSettings.GpuMemoryAllocationMB - totalAllocated);
     }
-    
+
     /// <summary>
     /// 全体的なプール効率の計算
     /// </summary>
@@ -675,7 +675,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         {
             // GPU環境情報を取得（UnifiedGpuOptimizerから）
             var providerStatus = await _gpuOptimizer.GetProviderStatusAsync().ConfigureAwait(false);
-            
+
             return new GpuResourceSnapshot
             {
                 Timestamp = DateTime.UtcNow,
@@ -695,7 +695,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     /// パフォーマンス分析と推奨事項生成
     /// </summary>
     private List<OptimizationRecommendation> AnalyzePerformance(
-        ObjectPoolReport poolReport, 
+        ObjectPoolReport poolReport,
         GpuResourceSnapshot currentSnapshot)
     {
         var recommendations = new List<OptimizationRecommendation>();
@@ -728,7 +728,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         // プール容量不足検出
         var totalCreationsAvoided = poolReport.TotalObjectCreationsAvoided;
         var totalOperations = poolReport.ImagePoolStats.TotalGets + poolReport.TextRegionPoolStats.TotalGets + poolReport.MatPoolStats.TotalGets;
-        
+
         if (totalCreationsAvoided < totalOperations * 0.5)
         {
             recommendations.Add(new OptimizationRecommendation
@@ -747,7 +747,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
     /// 最適化推奨事項の適用
     /// </summary>
     private async Task ApplyOptimizationRecommendationsAsync(
-        List<OptimizationRecommendation> recommendations, 
+        List<OptimizationRecommendation> recommendations,
         CancellationToken cancellationToken)
     {
         foreach (var recommendation in recommendations.OrderByDescending(r => r.Priority))
@@ -823,7 +823,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         {
             var poolReport = _poolStatistics.GetReport();
             var finalSnapshot = await CaptureGpuResourceSnapshotAsync().ConfigureAwait(false);
-            
+
             var overallEfficiency = poolReport.OverallHitRate;
             var totalCreationsAvoided = poolReport.TotalObjectCreationsAvoided;
 
@@ -831,15 +831,15 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
             _logger.LogInformation("  🏊 プール統計:");
             _logger.LogInformation("    📈 総合効率: {Efficiency:P1}", overallEfficiency);
             _logger.LogInformation("    🔄 オブジェクト作成回避: {CreationsAvoided}", totalCreationsAvoided);
-            
+
             _logger.LogInformation("  🎯 GPU最適化統計:");
             _logger.LogInformation("    💾 GPU メモリ使用量: {MemoryMB}MB", finalSnapshot.EstimatedMemoryUsageMB);
             _logger.LogInformation("    🔧 アクティブセッション: {Sessions}", finalSnapshot.ActiveSessions);
-            
+
             _logger.LogInformation("  ⚡ 最適化設定:");
             _logger.LogInformation("    📦 プール容量: {Capacity}", _currentSettings.OptimalPoolCapacity);
             _logger.LogInformation("    🔀 GPU 並列度: {Parallelism}", _currentSettings.GpuParallelism);
-            
+
             var totalOptimizations = _poolConfigurations.Count;
             _logger.LogInformation("  🎉 実行された最適化: {Count}項目", totalOptimizations);
         }
@@ -856,7 +856,7 @@ public sealed class PooledGpuOptimizationOrchestrator : IHostedService, IDisposa
         _optimizationTimer?.Dispose();
         _optimizationLock?.Dispose();
         _disposed = true;
-        
+
         _logger.LogInformation("🏁 PooledGpuOptimizationOrchestrator リソース解放完了");
     }
 }

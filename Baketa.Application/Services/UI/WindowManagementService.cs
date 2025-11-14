@@ -1,8 +1,8 @@
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Microsoft.Extensions.Logging;
-using System.Reactive.Linq;
-using System.Reactive.Subjects;
 
 namespace Baketa.Application.Services.UI;
 
@@ -17,10 +17,10 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<WindowManagementService> _logger;
     private readonly IWindowSelectionDialogService? _dialogService;
-    
+
     private readonly Subject<WindowSelectionChanged> _windowSelectionSubject = new();
     private readonly Subject<bool> _windowSelectionEnabledSubject = new();
-    
+
     private WindowInfo? _selectedWindow;
     private bool _isWindowSelectionEnabled = true;
     private bool _disposed;
@@ -68,10 +68,10 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
                 Console.WriteLine("🔧 _dialogService != null - ShowWindowSelectionDialogAsync呼び出し開始");
                 var result = await _dialogService.ShowWindowSelectionDialogAsync();
                 Console.WriteLine($"🔧 _dialogService.ShowWindowSelectionDialogAsync完了: result={result != null}");
-                
+
                 if (result != null)
                 {
-                    _logger.LogInformation("ウィンドウ選択完了: '{Title}' (Handle={Handle})", 
+                    _logger.LogInformation("ウィンドウ選択完了: '{Title}' (Handle={Handle})",
                         result.Title, result.Handle);
                     Console.WriteLine($"✅ ウィンドウ選択完了: '{result.Title}' (Handle={result.Handle})");
                 }
@@ -80,7 +80,7 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
                     _logger.LogDebug("ウィンドウ選択がキャンセルされました");
                     Console.WriteLine("❌ ウィンドウ選択がキャンセルされました");
                 }
-                
+
                 return result;
             }
             else
@@ -108,20 +108,20 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
         try
         {
             var previousWindow = _selectedWindow;
-            
+
             // ウィンドウの有効性を検証
             var isValid = await ValidateWindowAsync(windowInfo);
             if (!isValid)
             {
-                _logger.LogWarning("無効なウィンドウが選択されました: '{Title}' (Handle={Handle})", 
+                _logger.LogWarning("無効なウィンドウが選択されました: '{Title}' (Handle={Handle})",
                     windowInfo.Title, windowInfo.Handle);
                 return;
             }
 
             // ウィンドウ選択状態を更新
             _selectedWindow = windowInfo;
-            
-            _logger.LogInformation("ウィンドウ選択完了: '{Title}' (Handle={Handle})", 
+
+            _logger.LogInformation("ウィンドウ選択完了: '{Title}' (Handle={Handle})",
                 windowInfo.Title, windowInfo.Handle);
 
             // 変更通知を発行
@@ -132,7 +132,7 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
                 DateTime.UtcNow,
                 "SelectWindowAsync"
             );
-            
+
             _windowSelectionSubject.OnNext(changeEvent);
         }
         catch (Exception ex)
@@ -153,7 +153,7 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
             if (previousWindow == null) return; // 既に未選択状態
 
             _selectedWindow = null;
-            
+
             _logger.LogInformation("ウィンドウ選択解除");
 
             // 変更通知を発行
@@ -164,7 +164,7 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
                 DateTime.UtcNow,
                 "ClearWindowSelectionAsync"
             );
-            
+
             _windowSelectionSubject.OnNext(changeEvent);
         }
         catch (Exception ex)
@@ -196,7 +196,7 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
 
         _isWindowSelectionEnabled = enabled;
         _windowSelectionEnabledSubject.OnNext(enabled);
-        
+
         _logger.LogDebug("ウィンドウ選択可能状態変更: {Enabled}", enabled);
     }
 
@@ -211,12 +211,12 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
             // - ウィンドウが存在するか
             // - ウィンドウがアクセス可能か
             // - セキュリティ制限に引っかからないか
-            
+
             return windowInfo.Handle != IntPtr.Zero && !string.IsNullOrEmpty(windowInfo.Title);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "ウィンドウ有効性検証中にエラーが発生: '{Title}' (Handle={Handle})", 
+            _logger.LogError(ex, "ウィンドウ有効性検証中にエラーが発生: '{Title}' (Handle={Handle})",
                 windowInfo.Title, windowInfo.Handle);
             return false;
         }

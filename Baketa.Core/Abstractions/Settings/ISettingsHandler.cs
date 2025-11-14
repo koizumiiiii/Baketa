@@ -14,22 +14,22 @@ public interface ISettingsHandler
     /// ハンドラーの優先度（数値が小さいほど高優先度）
     /// </summary>
     int Priority { get; }
-    
+
     /// <summary>
     /// 担当するカテゴリのリスト
     /// </summary>
     IReadOnlyList<string> HandledCategories { get; }
-    
+
     /// <summary>
     /// ハンドラーの名前
     /// </summary>
     string Name { get; }
-    
+
     /// <summary>
     /// ハンドラーの説明
     /// </summary>
     string Description { get; }
-    
+
     /// <summary>
     /// 設定変更を適用します
     /// </summary>
@@ -38,7 +38,7 @@ public interface ISettingsHandler
     /// <param name="changedCategory">変更されたカテゴリ（nullの場合は全体変更）</param>
     /// <returns>適用が成功したかどうか</returns>
     Task<SettingsApplicationResult> ApplySettingsAsync(AppSettings oldSettings, AppSettings newSettings, string? changedCategory = null);
-    
+
     /// <summary>
     /// 設定変更をロールバックします
     /// </summary>
@@ -47,14 +47,14 @@ public interface ISettingsHandler
     /// <param name="changedCategory">変更されたカテゴリ（nullの場合は全体変更）</param>
     /// <returns>ロールバックが成功したかどうか</returns>
     Task<SettingsApplicationResult> RollbackSettingsAsync(AppSettings currentSettings, AppSettings previousSettings, string? changedCategory = null);
-    
+
     /// <summary>
     /// 指定されたカテゴリをこのハンドラーが処理可能かどうかを判定します
     /// </summary>
     /// <param name="category">カテゴリ名</param>
     /// <returns>処理可能な場合はtrue</returns>
     bool CanHandle(string category);
-    
+
     /// <summary>
     /// 設定変更前の検証を行います
     /// </summary>
@@ -122,7 +122,7 @@ public sealed class SettingsApplicationResult(
     {
         return new SettingsApplicationResult(true, null, warningMessage, appliedCategory, requiresRestart: requiresRestart);
     }
-    
+
     /// <summary>
     /// 失敗結果を作成します
     /// </summary>

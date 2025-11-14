@@ -100,7 +100,7 @@ public sealed class QueuedHostedService : Microsoft.Extensions.Hosting.Backgroun
             try
             {
                 var workItem = await _taskQueue.DequeueAsync(stoppingToken);
-                
+
                 await workItem(stoppingToken);
             }
             catch (OperationCanceledException)

@@ -102,16 +102,16 @@ public sealed class DefaultFontSettingsTests(ITestOutputHelper output)
     public void FontSettingsShouldMatchIssue69Requirements()
     {
         // Issue #69の統一フォント設定要件の確認
-        
+
         // Assert - フォントファミリーはYu Gothic UI固定
         Assert.Equal("Yu Gothic UI", DefaultFontSettings.Family);
-        
+
         // Assert - フォントサイズは16px固定
         Assert.Equal(16.0, DefaultFontSettings.Size);
-        
+
         // Assert - フォントウェイトはNormal固定
         Assert.Equal(FontWeight.Normal, DefaultFontSettings.Weight);
-        
+
         // Assert - 行間は1.4固定
         Assert.Equal(1.4, DefaultFontSettings.LineHeight);
 
@@ -132,7 +132,7 @@ public sealed class DefaultFontSettingsTests(ITestOutputHelper output)
 
         // Assert - 有効なFontWeight値である
         Assert.InRange(weight, FontWeight.Thin, FontWeight.UltraBlack);
-        
+
         // Assert - Normal値である
         Assert.Equal(FontWeight.Normal, weight);
 
@@ -149,7 +149,7 @@ public sealed class DefaultFontSettingsTests(ITestOutputHelper output)
         // Assert - 正の値である
         Assert.True(size > 0);
         Assert.True(lineHeight > 0);
-        
+
         // Assert - 実用的な範囲内である
         Assert.InRange(size, 8.0, 72.0);
         Assert.InRange(lineHeight, 1.0, 3.0);

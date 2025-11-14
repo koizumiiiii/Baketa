@@ -15,34 +15,34 @@ public interface IHybridResourceManager : IInitializable, IDisposable
 {
     /// <summary>リアルタイムシステムメトリクス取得</summary>
     Task<ResourceMetrics> GetSystemMetricsAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>GPU/VRAM統合監視メトリクス取得</summary>
     Task<GpuVramMetrics> GetGpuVramMetricsAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>現在のリソース状態に基づく最適並列度計算</summary>
     Task<int> CalculateOptimalParallelismAsync(SystemLoad systemLoad, CancellationToken cancellationToken = default);
-    
+
     /// <summary>ヒステリシス制御による安定化された並列度調整</summary>
     Task AdjustParallelismWithHysteresisAsync(SystemLoad systemLoad, CancellationToken cancellationToken = default);
-    
+
     /// <summary>予測的動的クールダウン計算（ゲーム負荷パターン学習統合）</summary>
     Task<TimeSpan> CalculatePredictiveCooldownAsync(GameLoadPattern gamePattern, CancellationToken cancellationToken = default);
-    
+
     /// <summary>ゲーム別プロファイル適用</summary>
     Task ApplyGameProfileAsync(string gameProcessName, CancellationToken cancellationToken = default);
-    
+
     /// <summary>A/Bテスト設定の動的切り替え</summary>
     Task<string> GetActiveConfigurationVariantAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>リソース競合検出と自動制御</summary>
     Task<ResourceConflictResult> DetectAndResolveConflictsAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>リアルタイムリソース状態変更イベント</summary>
     event EventHandler<ResourceStateChangedEventArgs> ResourceStateChanged;
-    
+
     /// <summary>ヒステリシス制御状態変更イベント</summary>
     event EventHandler<HysteresisStateChangedEventArgs> HysteresisStateChanged;
-    
+
     /// <summary>予測制御トリガーイベント</summary>
     event EventHandler<PredictiveControlTriggeredEventArgs> PredictiveControlTriggered;
 }
@@ -68,12 +68,12 @@ public sealed record GpuVramMetrics(
     public VramPressureLevel GetVramPressureLevel() => VramUsagePercent switch
     {
         < 50 => VramPressureLevel.Low,
-        < 70 => VramPressureLevel.Moderate, 
+        < 70 => VramPressureLevel.Moderate,
         < 85 => VramPressureLevel.High,
         < 95 => VramPressureLevel.Critical,
         _ => VramPressureLevel.Emergency
     };
-    
+
     /// <summary>GPU温度状態</summary>
     public GpuTemperatureState GetTemperatureState() => GpuTemperatureCelsius switch
     {
@@ -164,7 +164,7 @@ public sealed record GameLoadPattern(
             .OrderBy(kv => Math.Abs((kv.Key - gameTime).TotalSeconds))
             .Take(2)
             .ToArray();
-            
+
         return nearestPoints.Length switch
         {
             0 => AverageLoad, // データがない場合は平均負荷
@@ -172,7 +172,7 @@ public sealed record GameLoadPattern(
             _ => InterpolateLoad(nearestPoints[0], nearestPoints[1], gameTime) // 線形補間
         };
     }
-    
+
     private static double InterpolateLoad(
         KeyValuePair<TimeSpan, double> point1,
         KeyValuePair<TimeSpan, double> point2,
@@ -180,7 +180,7 @@ public sealed record GameLoadPattern(
     {
         var timeDiff = (point2.Key - point1.Key).TotalSeconds;
         if (Math.Abs(timeDiff) < 0.001) return point1.Value;
-        
+
         var ratio = (targetTime - point1.Key).TotalSeconds / timeDiff;
         return point1.Value + (point2.Value - point1.Value) * ratio;
     }

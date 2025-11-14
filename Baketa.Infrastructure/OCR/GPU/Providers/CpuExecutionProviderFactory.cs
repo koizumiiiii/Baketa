@@ -1,6 +1,6 @@
-using Microsoft.ML.OnnxRuntime;
 using Baketa.Core.Abstractions.GPU;
 using Microsoft.Extensions.Logging;
+using Microsoft.ML.OnnxRuntime;
 
 namespace Baketa.Infrastructure.OCR.GPU.Providers;
 

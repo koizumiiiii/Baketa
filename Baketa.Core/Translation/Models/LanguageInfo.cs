@@ -70,7 +70,7 @@ public class LanguageInfo
     /// <param name="nativeName">ネイティブ名</param>
     /// <param name="opusPrefix">OPUS-MTプレフィックス</param>
     /// <param name="variant">中国語変種</param>
-    public LanguageInfo(string code, string name, string? nativeName = null, 
+    public LanguageInfo(string code, string name, string? nativeName = null,
         string? opusPrefix = null, ChineseVariant? variant = null)
     {
         Code = code;
@@ -91,8 +91,8 @@ public class LanguageInfo
 
         // 中国語変種の判定 - 型安全な方法で行う
         ChineseVariant? variant = null;
-        if (language.Code.StartsWith("zh", StringComparison.OrdinalIgnoreCase) || 
-            language.Code.StartsWith("cmn", StringComparison.OrdinalIgnoreCase) || 
+        if (language.Code.StartsWith("zh", StringComparison.OrdinalIgnoreCase) ||
+            language.Code.StartsWith("cmn", StringComparison.OrdinalIgnoreCase) ||
             language.Code.StartsWith("yue", StringComparison.OrdinalIgnoreCase))
         {
             variant = ChineseVariantExtensions.FromLanguageCode(language.Code);
@@ -136,7 +136,7 @@ public class LanguageInfo
     /// <returns>中国語系の場合はtrue</returns>
     public bool IsChinese()
     {
-        return Variant.HasValue || 
+        return Variant.HasValue ||
                Code.StartsWith("zh", StringComparison.OrdinalIgnoreCase) ||
                Code.StartsWith("cmn", StringComparison.OrdinalIgnoreCase) ||
                Code.StartsWith("yue", StringComparison.OrdinalIgnoreCase);

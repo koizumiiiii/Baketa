@@ -21,9 +21,9 @@ public class PipelineResult(
         long processingTimeMs,
         IntermediateResultMode intermediateResultMode,
         int executedStepCount) : IDisposable
-    {
-        private readonly Dictionary<string, IAdvancedImage> _intermediateResults = intermediateResults ?? [];
-        private bool _disposed;
+{
+    private readonly Dictionary<string, IAdvancedImage> _intermediateResults = intermediateResults ?? [];
+    private bool _disposed;
 
     /// <summary>
     /// パイプライン処理の最終結果
@@ -33,7 +33,7 @@ public class PipelineResult(
     /// <summary>
     /// 各ステップの中間結果
     /// </summary>
-    public IReadOnlyDictionary<string, IAdvancedImage> IntermediateResults => 
+    public IReadOnlyDictionary<string, IAdvancedImage> IntermediateResults =>
             new ReadOnlyDictionary<string, IAdvancedImage>(_intermediateResults);
 
     /// <summary>
@@ -57,67 +57,67 @@ public class PipelineResult(
     /// <param name="stepName">ステップ名</param>
     /// <returns>中間結果、存在しない場合はnull</returns>
     public IAdvancedImage? GetIntermediateResult(string stepName)
-        {
-            return _intermediateResults.TryGetValue(stepName, out var result) ? result : null;
-        }
-
-        /// <summary>
-        /// 中間結果を追加します
-        /// </summary>
-        /// <param name="stepName">ステップ名</param>
-        /// <param name="result">中間結果</param>
-        public void AddIntermediateResult(string stepName, IAdvancedImage result)
-        {
-            if (string.IsNullOrEmpty(stepName))
-            {
-                throw new ArgumentException("ステップ名が無効です", nameof(stepName));
-            }
-            
-            _intermediateResults[stepName] = result ?? throw new ArgumentNullException(nameof(result));
-        }
-
-        /// <summary>
-        /// リソースを解放します
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        /// <summary>
-        /// リソースを解放します
-        /// </summary>
-        /// <param name="disposing">マネージドリソースを解放する場合はtrue</param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            if (disposing)
-            {
-                // 中間結果のリソース解放
-                foreach (var result in _intermediateResults.Values)
-                {
-                    result.Dispose();
-                }
-                
-                _intermediateResults.Clear();
-                
-                // 最終結果のリソース解放（結果は外部で使用される可能性があるため注意）
-                // Result?.Dispose();
-            }
-
-            _disposed = true;
-        }
-
-        /// <summary>
-        /// ファイナライザ
-        /// </summary>
-        ~PipelineResult()
-        {
-            Dispose(false);
-        }
+    {
+        return _intermediateResults.TryGetValue(stepName, out var result) ? result : null;
     }
+
+    /// <summary>
+    /// 中間結果を追加します
+    /// </summary>
+    /// <param name="stepName">ステップ名</param>
+    /// <param name="result">中間結果</param>
+    public void AddIntermediateResult(string stepName, IAdvancedImage result)
+    {
+        if (string.IsNullOrEmpty(stepName))
+        {
+            throw new ArgumentException("ステップ名が無効です", nameof(stepName));
+        }
+
+        _intermediateResults[stepName] = result ?? throw new ArgumentNullException(nameof(result));
+    }
+
+    /// <summary>
+    /// リソースを解放します
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// リソースを解放します
+    /// </summary>
+    /// <param name="disposing">マネージドリソースを解放する場合はtrue</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (disposing)
+        {
+            // 中間結果のリソース解放
+            foreach (var result in _intermediateResults.Values)
+            {
+                result.Dispose();
+            }
+
+            _intermediateResults.Clear();
+
+            // 最終結果のリソース解放（結果は外部で使用される可能性があるため注意）
+            // Result?.Dispose();
+        }
+
+        _disposed = true;
+    }
+
+    /// <summary>
+    /// ファイナライザ
+    /// </summary>
+    ~PipelineResult()
+    {
+        Dispose(false);
+    }
+}

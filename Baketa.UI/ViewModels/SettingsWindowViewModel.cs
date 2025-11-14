@@ -1,4 +1,3 @@
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -7,14 +6,15 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
+using Baketa.UI.Framework;
 using Baketa.UI.Models.Settings;
 using Baketa.UI.Services;
-using Baketa.UI.Framework;
-using Baketa.UI.Views.Settings;
 using Baketa.UI.ViewModels.Settings;
+using Baketa.UI.Views.Settings;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 using UiFramework = Baketa.UI.Framework;
 
 namespace Baketa.UI.ViewModels;
@@ -248,7 +248,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Content = null // 遅延作成
             }
         };
-        
+
         AllCategories = categories;
     }
 
@@ -258,7 +258,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     private static bool IsTestEnvironment()
     {
         return AppDomain.CurrentDomain.GetAssemblies()
-            .Any(a => a.FullName?.Contains("xunit") == true || 
+            .Any(a => a.FullName?.Contains("xunit") == true ||
                      a.FullName?.Contains("Microsoft.TestPlatform") == true ||
                      a.FullName?.Contains("testhost") == true);
     }
@@ -356,7 +356,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// <summary>
     /// オーバーレイ設定Viewを作成します
     /// </summary>
-    [SuppressMessage("IDisposableAnalyzers.Correctness", "CA2000:Dispose objects before losing scope", 
+    [SuppressMessage("IDisposableAnalyzers.Correctness", "CA2000:Dispose objects before losing scope",
         Justification = "UserControlは呼び出し元のUIコンポーネントとして返され、適切に管理されます")]
     private UserControl? CreateOverlaySettingsView()
     {
@@ -390,7 +390,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// <summary>
     /// キャプチャ設定Viewを作成します
     /// </summary>
-    [SuppressMessage("IDisposableAnalyzers.Correctness", "CA2000:Dispose objects before losing scope", 
+    [SuppressMessage("IDisposableAnalyzers.Correctness", "CA2000:Dispose objects before losing scope",
         Justification = "UserControlは呼び出し元のUIコンポーネントとして返され、適切に管理されます")]
     private UserControl? CreateCaptureSettingsView()
     {

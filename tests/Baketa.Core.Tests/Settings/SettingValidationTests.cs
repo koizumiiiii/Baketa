@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Xunit;
 using Baketa.Core.Settings;
+using Xunit;
 
 namespace Baketa.Core.Tests.Settings;
 
@@ -35,7 +35,7 @@ public class SettingValidationResultTests
     public void Constructor_WithNullMetadata_ShouldThrowArgumentNullException()
     {
         // Arrange & Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new SettingValidationResult(null!, "test", true, null, null));
     }
 
@@ -98,7 +98,7 @@ public class SettingValidationResultTests
         var metadata = CreateTestMetadata();
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
+        Assert.Throws<ArgumentException>(() =>
             SettingValidationResult.Failure(metadata, "test", null!));
     }
 
@@ -109,7 +109,7 @@ public class SettingValidationResultTests
         var metadata = CreateTestMetadata();
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
+        Assert.Throws<ArgumentException>(() =>
             SettingValidationResult.Failure(metadata, "test", string.Empty));
     }
 

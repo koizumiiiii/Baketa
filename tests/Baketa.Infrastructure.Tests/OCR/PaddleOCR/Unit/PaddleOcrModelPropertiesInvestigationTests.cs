@@ -1,9 +1,9 @@
-using Xunit;
-using Xunit.Abstractions;
+using System.Reflection;
 using Sdcb.PaddleOCR.Models;
 using Sdcb.PaddleOCR.Models.Local;
 using Sdcb.PaddleOCR.Models.Shared;
-using System.Reflection;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Unit;
 
@@ -18,18 +18,18 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
     {
         // Arrange & Act
         var japanV4 = LocalFullModels.JapanV4;
-        
+
         output.WriteLine("=== LocalFullModels.JapanV4 詳細調査 ===");
         output.WriteLine($"型: {japanV4?.GetType()?.FullName ?? "null"}");
         output.WriteLine($"基底型: {japanV4?.GetType()?.BaseType?.FullName ?? "null"}");
-        
+
         if (japanV4 != null)
         {
             // FullOcrModelのプロパティを調査
             output.WriteLine("\n--- FullOcrModel レベルのプロパティ ---");
             var fullOcrModelType = typeof(FullOcrModel);
             var properties = fullOcrModelType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            
+
             foreach (var prop in properties)
             {
                 try
@@ -42,15 +42,15 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
                     output.WriteLine($"{prop.Name}: アクセス不可 ({ex.Message})");
                 }
             }
-            
+
             // RecognizationModelの詳細調査
             output.WriteLine("\n--- RecognizationModel プロパティ ---");
             InvestigateModelProperties(japanV4.RecognizationModel, "RecognizationModel");
-            
+
             // DetectionModelの詳細調査
             output.WriteLine("\n--- DetectionModel プロパティ ---");
             InvestigateModelProperties(japanV4.DetectionModel, "DetectionModel");
-            
+
             // ClassificationModelの詳細調査
             output.WriteLine("\n--- ClassificationModel プロパティ ---");
             InvestigateModelProperties(japanV4.ClassificationModel, "ClassificationModel");
@@ -62,18 +62,18 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
     {
         // Arrange & Act
         var japanV3 = LocalFullModels.JapanV3;
-        
+
         output.WriteLine("=== LocalFullModels.JapanV3 詳細調査 ===");
         output.WriteLine($"型: {japanV3?.GetType()?.FullName ?? "null"}");
         output.WriteLine($"基底型: {japanV3?.GetType()?.BaseType?.FullName ?? "null"}");
-        
+
         if (japanV3 != null)
         {
             // FullOcrModelのプロパティを調査
             output.WriteLine("\n--- FullOcrModel レベルのプロパティ ---");
             var fullOcrModelType = typeof(FullOcrModel);
             var properties = fullOcrModelType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            
+
             foreach (var prop in properties)
             {
                 try
@@ -86,15 +86,15 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
                     output.WriteLine($"{prop.Name}: アクセス不可 ({ex.Message})");
                 }
             }
-            
+
             // RecognizationModelの詳細調査
             output.WriteLine("\n--- RecognizationModel プロパティ ---");
             InvestigateModelProperties(japanV3.RecognizationModel, "RecognizationModel");
-            
+
             // DetectionModelの詳細調査
             output.WriteLine("\n--- DetectionModel プロパティ ---");
             InvestigateModelProperties(japanV3.DetectionModel, "DetectionModel");
-            
+
             // ClassificationModelの詳細調査
             output.WriteLine("\n--- ClassificationModel プロパティ ---");
             InvestigateModelProperties(japanV3.ClassificationModel, "ClassificationModel");
@@ -107,24 +107,24 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
         // Arrange
         var japanV4 = LocalFullModels.JapanV4;
         var japanV3 = LocalFullModels.JapanV3;
-        
+
         output.WriteLine("=== V4 vs V3 モデル比較 ===");
-        
+
         // 基本型比較
         output.WriteLine($"V4型: {japanV4?.GetType()?.Name ?? "null"}");
         output.WriteLine($"V3型: {japanV3?.GetType()?.Name ?? "null"}");
         output.WriteLine($"型が同じ: {japanV4?.GetType() == japanV3?.GetType()}");
-        
+
         if (japanV4 != null && japanV3 != null)
         {
             // RecognizationModel比較
             output.WriteLine("\n--- RecognizationModel 比較 ---");
             CompareModelDetails(japanV4.RecognizationModel, japanV3.RecognizationModel, "Recognization");
-            
+
             // DetectionModel比較
             output.WriteLine("\n--- DetectionModel 比較 ---");
             CompareModelDetails(japanV4.DetectionModel, japanV3.DetectionModel, "Detection");
-            
+
             // ClassificationModel比較
             output.WriteLine("\n--- ClassificationModel 比較 ---");
             CompareModelDetails(japanV4.ClassificationModel, japanV3.ClassificationModel, "Classification");
@@ -137,21 +137,21 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
         // Arrange
         var japanV4 = LocalFullModels.JapanV4;
         var japanV3 = LocalFullModels.JapanV3;
-        
+
         output.WriteLine("=== V4検出メソッドのテスト ===");
-        
+
         if (japanV4 != null)
         {
             output.WriteLine("\n--- V4モデルでの検出テスト ---");
             TestDetectionMethod(japanV4, "V4");
         }
-        
+
         if (japanV3 != null)
         {
             output.WriteLine("\n--- V3モデルでの検出テスト ---");
             TestDetectionMethod(japanV3, "V3");
         }
-        
+
         // 推奨検出メソッドの提案
         output.WriteLine("\n--- 推奨V4検出メソッド ---");
         if (japanV4 != null && japanV3 != null)
@@ -165,10 +165,10 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
     public void InvestigateAllLocalFullModels()
     {
         output.WriteLine("=== 全LocalFullModels調査 ===");
-        
+
         var localFullModelsType = typeof(LocalFullModels);
         var staticProperties = localFullModelsType.GetProperties(BindingFlags.Public | BindingFlags.Static);
-        
+
         foreach (var prop in staticProperties)
         {
             try
@@ -176,13 +176,13 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
                 var model = prop.GetValue(null) as FullOcrModel;
                 output.WriteLine($"\n--- {prop.Name} ---");
                 output.WriteLine($"型: {model?.GetType()?.Name ?? "null"}");
-                
+
                 if (model != null)
                 {
                     output.WriteLine($"認識モデル型: {model.RecognizationModel?.GetType()?.Name ?? "null"}");
                     output.WriteLine($"検出モデル型: {model.DetectionModel?.GetType()?.Name ?? "null"}");
                     output.WriteLine($"分類モデル型: {model.ClassificationModel?.GetType()?.Name ?? "null"}");
-                    
+
                     // 可能な識別子の探索
                     if (HasProperty(model.RecognizationModel, "Name"))
                     {
@@ -219,7 +219,7 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
         }
 
         output.WriteLine($"{modelType}型: {model.GetType().FullName}");
-        
+
         var properties = model.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
         foreach (var prop in properties)
         {
@@ -233,7 +233,7 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
                 output.WriteLine($"  {prop.Name}: アクセス不可 ({ex.Message})");
             }
         }
-        
+
         // フィールドも調査
         var fields = model.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance);
         if (fields.Length > 0)
@@ -259,7 +259,7 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
         output.WriteLine($"{modelType}モデル1型: {model1?.GetType()?.Name ?? "null"}");
         output.WriteLine($"{modelType}モデル2型: {model2?.GetType()?.Name ?? "null"}");
         output.WriteLine($"型が同じ: {model1?.GetType() == model2?.GetType()}");
-        
+
         if (model1 != null && model2 != null)
         {
             var properties = model1.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
@@ -285,7 +285,7 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
         // 現在のコードで使用されている検出方法をテスト
         var recognizationModel = model.RecognizationModel;
         var detectionModel = model.DetectionModel;
-        
+
         // テスト1: Name プロパティでPP-OCRv4を検出
         var test1Result = false;
         var test1Value = "不明";
@@ -295,7 +295,7 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
             test1Result = test1Value.Contains("PP-OCRv4", StringComparison.OrdinalIgnoreCase);
         }
         output.WriteLine($"認識モデル名PP-OCRv4検出: {test1Result} (値: {test1Value})");
-        
+
         // テスト2: Version プロパティでV4を検出
         var test2Result = false;
         var test2Value = "不明";
@@ -305,7 +305,7 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
             test2Result = test2Value == "V4";
         }
         output.WriteLine($"認識モデルバージョンV4検出: {test2Result} (値: {test2Value})");
-        
+
         // テスト3: DetectionModel Name でPP-OCRv4を検出
         var test3Result = false;
         var test3Value = "不明";
@@ -315,50 +315,50 @@ public class PaddleOcrModelPropertiesInvestigationTests(ITestOutputHelper output
             test3Result = test3Value.Contains("PP-OCRv4", StringComparison.OrdinalIgnoreCase);
         }
         output.WriteLine($"検出モデル名PP-OCRv4検出: {test3Result} (値: {test3Value})");
-        
+
         // テスト4: 型名による検出
         var recognizationTypeName = recognizationModel?.GetType().Name ?? "null";
         var detectionTypeName = detectionModel?.GetType().Name ?? "null";
         var test4Result = recognizationTypeName.Contains("V4") || detectionTypeName.Contains("V4");
         output.WriteLine($"型名V4検出: {test4Result} (認識型: {recognizationTypeName}, 検出型: {detectionTypeName})");
-        
+
         // テスト5: アセンブリ名による検出
         var recognizationAssembly = recognizationModel?.GetType().Assembly.GetName().Name ?? "null";
         var detectionAssembly = detectionModel?.GetType().Assembly.GetName().Name ?? "null";
         var test5Result = recognizationAssembly.Contains("V4") || detectionAssembly.Contains("V4");
         output.WriteLine($"アセンブリ名V4検出: {test5Result} (認識: {recognizationAssembly}, 検出: {detectionAssembly})");
-        
+
         output.WriteLine($"総合判定({version}): {test1Result || test2Result || test3Result || test4Result || test5Result}");
     }
 
     private string GetRecommendedV4DetectionMethod(FullOcrModel v4Model, FullOcrModel v3Model)
     {
         var methods = new List<string>();
-        
+
         // アセンブリ名による検出が最も確実
         var v4Assembly = v4Model.RecognizationModel?.GetType().Assembly.GetName().Name ?? "";
         var v3Assembly = v3Model.RecognizationModel?.GetType().Assembly.GetName().Name ?? "";
-        
+
         if (v4Assembly != v3Assembly && v4Assembly.Contains("V4"))
         {
             methods.Add("アセンブリ名による検出 (推奨)");
         }
-        
+
         // 型名による検出
         var v4TypeName = v4Model.RecognizationModel?.GetType().Name ?? "";
         var v3TypeName = v3Model.RecognizationModel?.GetType().Name ?? "";
-        
+
         if (v4TypeName != v3TypeName)
         {
             methods.Add("型名による検出");
         }
-        
+
         // プロパティによる検出
         if (HasProperty(v4Model.RecognizationModel, "Name") || HasProperty(v4Model.RecognizationModel, "Version"))
         {
             methods.Add("プロパティによる検出");
         }
-        
+
         return methods.Count > 0 ? string.Join(", ", methods) : "検出方法が見つかりません";
     }
 

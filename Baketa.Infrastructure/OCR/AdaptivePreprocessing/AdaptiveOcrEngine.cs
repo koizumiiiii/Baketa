@@ -1,9 +1,9 @@
-using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Models.OCR;
-using System.Diagnostics;
-using System.Drawing;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.AdaptivePreprocessing;
 
@@ -30,9 +30,9 @@ public class AdaptiveOcrEngine(
     {
         logger.LogInformation("適応的OCRエンジン初期化開始");
         _currentSettings = settings;
-        
+
         var result = await baseOcrEngine.InitializeAsync(settings, cancellationToken).ConfigureAwait(false);
-        
+
         if (result)
         {
             logger.LogInformation("適応的OCRエンジン初期化完了");
@@ -41,10 +41,10 @@ public class AdaptiveOcrEngine(
         {
             logger.LogError("ベースOCRエンジンの初期化に失敗しました");
         }
-        
+
         return result;
     }
-    
+
     public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
     {
         return await baseOcrEngine.WarmupAsync(cancellationToken).ConfigureAwait(false);
@@ -60,15 +60,15 @@ public class AdaptiveOcrEngine(
         {
             // 簡易変換（実際のプロジェクトではより適切な変換が必要）
             var imageBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
-            advancedImage = new Core.Services.Imaging.AdvancedImage(imageBytes, image.Width, image.Height, 
-                image.Format == Core.Abstractions.Imaging.ImageFormat.Png 
-                    ? Core.Abstractions.Imaging.ImageFormat.Png 
+            advancedImage = new Core.Services.Imaging.AdvancedImage(imageBytes, image.Width, image.Height,
+                image.Format == Core.Abstractions.Imaging.ImageFormat.Png
+                    ? Core.Abstractions.Imaging.ImageFormat.Png
                     : Core.Abstractions.Imaging.ImageFormat.Rgb24);
         }
-        
+
         return await RecognizeAdvancedAsync(advancedImage, progressCallback, cancellationToken).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// 領域指定での認識
     /// </summary>
@@ -107,7 +107,7 @@ public class AdaptiveOcrEngine(
         {
             // Step 1: 適応的前処理パラメータを最適化
             var optimizationResult = await parameterOptimizer.OptimizeWithDetailsAsync(image).ConfigureAwait(false);
-            
+
             logger.LogInformation(
                 "前処理パラメータ最適化完了: 戦略={Strategy}, 改善予想={Improvement:F2} ({OptimizationMs}ms)",
                 optimizationResult.OptimizationStrategy,
@@ -116,13 +116,13 @@ public class AdaptiveOcrEngine(
 
             // Step 2: 最適化されたパラメータでOCR設定を調整
             var optimizedSettings = CreateOptimizedSettings(optimizationResult.Parameters);
-            
+
             // Step 3: 前処理された画像でOCR実行
             var preprocessedImage = await ApplyPreprocessingAsync(image, optimizationResult.Parameters).ConfigureAwait(false);
-            
+
             // Step 4: 最適化された設定でOCR認識
             var ocrResults = await RecognizeWithOptimizedSettingsAsync(preprocessedImage, optimizedSettings).ConfigureAwait(false);
-            
+
             // Step 5: 結果に最適化情報を付加
             var enhancedResults = EnhanceResultsWithOptimizationInfo(ocrResults, optimizationResult);
 
@@ -138,7 +138,7 @@ public class AdaptiveOcrEngine(
         catch (Exception ex)
         {
             logger.LogError(ex, "適応的OCR認識中にエラーが発生しました");
-            
+
             // フォールバック: 通常のOCR処理
             logger.LogInformation("フォールバック: 通常のOCR処理を実行");
             return await baseOcrEngine.RecognizeAsync(image, progressCallback, cancellationToken).ConfigureAwait(false);
@@ -246,7 +246,7 @@ public class AdaptiveOcrEngine(
     public async ValueTask DisposeAsync()
     {
         logger.LogInformation("適応的OCRエンジンのリソースを解放します");
-        
+
         if (baseOcrEngine is IAsyncDisposable asyncDisposable)
         {
             await asyncDisposable.DisposeAsync().ConfigureAwait(false);
@@ -283,7 +283,7 @@ public class AdaptiveOcrEngine(
     /// 前処理を適用した画像を作成
     /// </summary>
     private async Task<IAdvancedImage> ApplyPreprocessingAsync(
-        IAdvancedImage originalImage, 
+        IAdvancedImage originalImage,
         AdaptivePreprocessingParameters parameters)
     {
         return await Task.Run(() =>
@@ -318,12 +318,12 @@ public class AdaptiveOcrEngine(
     /// 最適化された設定でOCR認識を実行
     /// </summary>
     private async Task<OcrResults> RecognizeWithOptimizedSettingsAsync(
-        IAdvancedImage image, 
+        IAdvancedImage image,
         OcrEngineSettings optimizedSettings)
     {
         // 設定を一時的に変更してOCR実行
         var originalSettings = _currentSettings;
-        
+
         try
         {
             // 最適化された設定で再初期化（必要に応じて）
@@ -352,11 +352,11 @@ public class AdaptiveOcrEngine(
     private bool ShouldReinitialize(OcrEngineSettings? current, OcrEngineSettings? target)
     {
         if (current == null || target == null) return true;
-        
+
         // 閾値の差が大きい場合のみ再初期化
         var detectionDiff = Math.Abs(current.DetectionThreshold - target.DetectionThreshold);
         var recognitionDiff = Math.Abs(current.RecognitionThreshold - target.RecognitionThreshold);
-        
+
         return detectionDiff > 0.1 || recognitionDiff > 0.1;
     }
 
@@ -364,13 +364,13 @@ public class AdaptiveOcrEngine(
     /// OCR結果に最適化情報を付加
     /// </summary>
     private OcrResults EnhanceResultsWithOptimizationInfo(
-        OcrResults originalResults, 
+        OcrResults originalResults,
         AdaptivePreprocessingResult optimizationResult)
     {
         // 最適化情報をメタデータとして追加（簡易実装）
         // 注：OcrResultsには現在Metadataプロパティがないため、元の結果をそのまま返す
         // 実際の実装では、OcrResultsに拡張メタデータ機能を追加する必要があります
-        
+
         logger.LogInformation(
             "適応的前処理メタデータ: 戦略={Strategy}, 理由={Reason}, 改善予想={Improvement:F2}, 信頼度={Confidence:F2}",
             optimizationResult.OptimizationStrategy,

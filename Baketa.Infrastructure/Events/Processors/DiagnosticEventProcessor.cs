@@ -30,7 +30,7 @@ public sealed class DiagnosticEventProcessor : IEventProcessor<PipelineDiagnosti
         try
         {
             Console.WriteLine($"🩺 [DIAGNOSTIC_PROCESSOR] イベント受信: {eventData.Stage} - {eventData.Severity}");
-            
+
             // 診断収集サービスが動作中の場合のみ処理
             if (_diagnosticCollectionService.IsCollecting)
             {
@@ -43,7 +43,7 @@ public sealed class DiagnosticEventProcessor : IEventProcessor<PipelineDiagnosti
                 // 詳細ログ（開発時のみ）
                 if (_logger.IsEnabled(LogLevel.Trace))
                 {
-                    _logger.LogTrace("診断イベント収集: {Stage} - {IsSuccess} ({ProcessingTimeMs}ms)", 
+                    _logger.LogTrace("診断イベント収集: {Stage} - {IsSuccess} ({ProcessingTimeMs}ms)",
                         eventData.Stage, eventData.IsSuccess, eventData.ProcessingTimeMs);
                 }
             }

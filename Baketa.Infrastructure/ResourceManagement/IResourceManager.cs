@@ -23,8 +23,8 @@ public interface IResourceManager : IDisposable
     /// 実際の処理を関数として受け取り、リソース管理下で実行する
     /// </summary>
     Task<TResult> ProcessOcrAsync<TResult>(
-        Func<ProcessingRequest, CancellationToken, Task<TResult>> ocrTaskFactory, 
-        ProcessingRequest request, 
+        Func<ProcessingRequest, CancellationToken, Task<TResult>> ocrTaskFactory,
+        ProcessingRequest request,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -33,7 +33,7 @@ public interface IResourceManager : IDisposable
     /// </summary>
     Task<TResult> ProcessTranslationAsync<TResult>(
         Func<TranslationRequest, CancellationToken, Task<TResult>> translationTaskFactory,
-        TranslationRequest request, 
+        TranslationRequest request,
         CancellationToken cancellationToken = default);
 
     /// <summary>

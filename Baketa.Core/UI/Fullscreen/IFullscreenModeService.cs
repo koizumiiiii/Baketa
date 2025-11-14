@@ -13,35 +13,35 @@ public interface IFullscreenModeService : IDisposable
     /// DirectX/OpenGL等による排他的モード
     /// </summary>
     bool IsExclusiveFullscreen { get; }
-    
+
     /// <summary>
     /// ボーダレスフルスクリーンモードかどうか
     /// ウィンドウモードでフルスクリーンサイズ
     /// </summary>
     bool IsBorderlessFullscreen { get; }
-    
+
     /// <summary>
     /// オーバーレイ表示可能かどうか
     /// 排他的フルスクリーン以外では通常true
     /// </summary>
     bool CanShowOverlay { get; }
-    
+
     /// <summary>
     /// 現在のフルスクリーンモード種別
     /// </summary>
     FullscreenModeType CurrentModeType { get; }
-    
+
     /// <summary>
     /// 監視中のターゲットウィンドウハンドル
     /// </summary>
     nint TargetWindowHandle { get; }
-    
+
     /// <summary>
     /// フルスクリーンモード変更イベント
     /// モード変更時に通知される
     /// </summary>
     event EventHandler<FullscreenModeChangedEventArgs>? FullscreenModeChanged;
-    
+
     /// <summary>
     /// 指定されたウィンドウのフルスクリーンモードを検出
     /// </summary>
@@ -49,7 +49,7 @@ public interface IFullscreenModeService : IDisposable
     /// <param name="targetMonitor">対象モニター（省略可）</param>
     /// <returns>フルスクリーンモード情報</returns>
     FullscreenModeChangedEventArgs DetectFullscreenMode(nint windowHandle, MonitorInfo? targetMonitor = null);
-    
+
     /// <summary>
     /// ターゲットウィンドウを設定してモード監視を開始
     /// </summary>
@@ -57,14 +57,14 @@ public interface IFullscreenModeService : IDisposable
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>監視開始タスク</returns>
     Task StartMonitoringAsync(nint windowHandle, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// モード監視を停止
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>監視停止タスク</returns>
     Task StopMonitoringAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// ユーザーへの推奨表示（ボーダレスフルスクリーン推奨等）
     /// 排他的フルスクリーンでオーバーレイが表示できない場合に使用
@@ -72,7 +72,7 @@ public interface IFullscreenModeService : IDisposable
     /// <param name="currentMode">現在のフルスクリーンモード</param>
     /// <returns>推奨表示タスク</returns>
     Task ShowRecommendationAsync(FullscreenModeChangedEventArgs currentMode);
-    
+
     /// <summary>
     /// フルスクリーンモード情報を手動更新
     /// </summary>
@@ -96,7 +96,7 @@ public static class FullscreenModeServiceExtensions
         ArgumentNullException.ThrowIfNull(service);
         return service.CanShowOverlay && !service.IsExclusiveFullscreen;
     }
-    
+
     /// <summary>
     /// ユーザーアクションが必要かチェック
     /// </summary>
@@ -107,7 +107,7 @@ public static class FullscreenModeServiceExtensions
         ArgumentNullException.ThrowIfNull(service);
         return service.IsExclusiveFullscreen && !service.CanShowOverlay;
     }
-    
+
     /// <summary>
     /// 推奨メッセージを生成
     /// </summary>

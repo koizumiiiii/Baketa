@@ -32,7 +32,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     private readonly ILogger<LayeredOverlayWindow> _logger;
 
     // 🔥 [GEMINI_RECOMMENDATION] STAスレッド関連
-    private Thread? _windowThread;
+    private readonly Thread? _windowThread;
     private IntPtr _hwnd = IntPtr.Zero;
     private readonly ManualResetEventSlim _windowCreatedEvent = new(false);
     private bool _disposed;

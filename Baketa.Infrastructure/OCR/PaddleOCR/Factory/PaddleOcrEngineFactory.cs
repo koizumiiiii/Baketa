@@ -1,18 +1,18 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Settings;
-using Baketa.Core.Abstractions.Settings;
-using Baketa.Core.Abstractions.Performance;
-using Baketa.Core.Abstractions.Logging;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
-using Baketa.Infrastructure.OCR.TextProcessing;
-using Baketa.Infrastructure.OCR.PostProcessing;
+using Baketa.Core.Abstractions.Logging;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Performance;
+using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Settings;
 // [ROI_DELETION] using Baketa.Infrastructure.OCR.StickyRoi; - レガシーROI機能削除
 using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
+using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Baketa.Infrastructure.OCR.PostProcessing;
+using Baketa.Infrastructure.OCR.TextProcessing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using IImageFactoryType = Baketa.Core.Abstractions.Factories.IImageFactory;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Factory;
@@ -55,20 +55,20 @@ public sealed class PaddleOcrEngineFactory(
             var ocrPostProcessor = _serviceProvider.GetRequiredService<IOcrPostProcessor>();
             var gpuMemoryManager = _serviceProvider.GetRequiredService<IGpuMemoryManager>();
             var engineLogger = _serviceProvider.GetService<ILogger<PaddleOcrEngine>>();
-            
+
             // 環境判定（PaddleOcrModuleと同じロジック）
             string? envValue = Environment.GetEnvironmentVariable("BAKETA_FORCE_PRODUCTION_OCR");
             bool forceProduction = envValue == "true";
-            
+
             IOcrEngine engine;
-            
+
             // 🔥 プール化環境では実際のOCRを使用（高機能版で統一）
             _logger.LogDebug("🏊 プール化環境でのエンジン選択 - 環境変数: '{EnvValue}', 強制本番: {ForceProduction}", envValue ?? "null", forceProduction);
-            
+
             if (forceProduction || true) // 🚨 緊急修正: プール化では常に実際のOCRエンジンを使用
             {
                 _logger.LogDebug("⚡ 実際のPaddleOCRエンジン作成（プール化対応）");
-                
+
                 // 🔥 重要: シングルトンパターンを無効化するため、直接インスタンス作成
                 var unifiedSettingsService = _serviceProvider.GetRequiredService<IUnifiedSettingsService>();
                 var eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
@@ -129,9 +129,9 @@ public sealed class PaddleOcrEngineFactory(
                     // ✅ [PHASE2.9.5] unifiedLoggingService削除
                     engineLogger);
             }
-            
+
             _logger.LogDebug("🔧 PaddleOcrEngineFactory: エンジン初期化開始 - 型: {EngineType}", engine.GetType().Name);
-            
+
             // プール化されたエンジンを初期化
             var initialized = await engine.InitializeAsync();
             if (!initialized)
@@ -140,7 +140,7 @@ public sealed class PaddleOcrEngineFactory(
                 engine.Dispose();
                 throw new InvalidOperationException($"OCRエンジンの初期化に失敗しました: {engine.GetType().Name}");
             }
-            
+
             _logger.LogDebug("✅ PaddleOcrEngineFactory: エンジン作成・初期化完了 - 型: {EngineType}", engine.GetType().Name);
             return engine;
         }
@@ -157,14 +157,14 @@ public sealed class PaddleOcrEngineFactory(
     public async Task CleanupAsync(IOcrEngine engine)
     {
         if (engine == null) return;
-        
+
         try
         {
             _logger.LogDebug("🧹 PaddleOcrEngineFactory: エンジンクリーンアップ開始 - 型: {EngineType}", engine.GetType().Name);
-            
+
             // OCRエンジンの状態をリセット（必要に応じて）
             // 現在の実装では特別なクリーンアップは不要
-            
+
             _logger.LogDebug("✅ PaddleOcrEngineFactory: エンジンクリーンアップ完了");
         }
         catch (Exception ex)
@@ -172,7 +172,7 @@ public sealed class PaddleOcrEngineFactory(
             _logger.LogError(ex, "⚠️ PaddleOcrEngineFactory: エンジンクリーンアップでエラー");
             // クリーンアップエラーは致命的ではないため、例外をthrowしない
         }
-        
+
         await Task.CompletedTask;
     }
 
@@ -182,16 +182,16 @@ public sealed class PaddleOcrEngineFactory(
     public bool IsReusable(IOcrEngine engine)
     {
         if (engine == null) return false;
-        
+
         try
         {
             // エンジンの基本状態をチェック
             // IsInitializedプロパティで生存状態を判定
             var isInitialized = engine.IsInitialized;
-            
+
             // 追加の健全性チェック: 設定取得が可能かテスト
             var settings = engine.GetSettings();
-            
+
             return isInitialized && settings != null;
         }
         catch (Exception ex)

@@ -86,19 +86,19 @@ public static class LanguageCodeNormalizer
 
         // トリムしてから正規化
         var trimmedCode = languageCode.Trim();
-        
+
         // 完全一致チェック
         if (NormalizationMap.TryGetValue(trimmedCode, out var normalizedCode))
         {
             return normalizedCode;
         }
-        
+
         // ハイフン区切りの場合、最初の部分のみを正規化
         if (trimmedCode.Contains('-'))
         {
             var parts = trimmedCode.Split('-');
             var primaryCode = parts[0];
-            
+
             if (NormalizationMap.TryGetValue(primaryCode, out var normalizedPrimary))
             {
                 // 既知の地域変種の場合はそのまま返す
@@ -106,7 +106,7 @@ public static class LanguageCodeNormalizer
                 {
                     return trimmedCode.ToLowerInvariant();
                 }
-                
+
                 // それ以外は正規化されたプライマリコードを返す
                 return normalizedPrimary;
             }
@@ -127,7 +127,7 @@ public static class LanguageCodeNormalizer
             return false;
 
         var trimmedCode = languageCode.Trim();
-        return NormalizationMap.ContainsKey(trimmedCode) || 
+        return NormalizationMap.ContainsKey(trimmedCode) ||
                IsKnownRegionalVariant(trimmedCode);
     }
 
@@ -160,7 +160,7 @@ public static class LanguageCodeNormalizer
             .Select(code => code.Split('-')[0])
             .Distinct()
             .Count();
-            
+
         return (NormalizationMap.Count, uniquePrimary);
     }
 
@@ -171,26 +171,26 @@ public static class LanguageCodeNormalizer
     public static IReadOnlyList<string> GetSupportedLanguageCodes()
     {
         var supportedCodes = new HashSet<string>();
-        
+
         // 正規化マップからプライマリコードを追加
         foreach (var value in NormalizationMap.Values)
         {
             supportedCodes.Add(value);
         }
-        
+
         // 既知の地域変種を追加
         var knownVariants = new[]
         {
-            "zh-Hans", "zh-Hant", "en-US", "en-GB", 
-            "es-ES", "es-MX", "fr-FR", "fr-CA", 
+            "zh-Hans", "zh-Hant", "en-US", "en-GB",
+            "es-ES", "es-MX", "fr-FR", "fr-CA",
             "de-DE", "de-AT"
         };
-        
+
         foreach (var variant in knownVariants)
         {
             supportedCodes.Add(variant);
         }
-        
-        return supportedCodes.OrderBy(code => code).ToList();
+
+        return [.. supportedCodes.OrderBy(code => code)];
     }
 }

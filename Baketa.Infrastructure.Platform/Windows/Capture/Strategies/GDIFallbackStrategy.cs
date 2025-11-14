@@ -1,9 +1,9 @@
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Capture;
-using Baketa.Core.Models.Capture;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Exceptions.Capture;
-using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Models.Capture;
+using Microsoft.Extensions.Logging;
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
 using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
@@ -46,11 +46,11 @@ public class GDIFallbackStrategy : ICaptureStrategy
         try
         {
             _logger.LogDebug("GDIFallbackキャプチャ開始（簡易実装）");
-            
+
             // TODO: 実際のGDI実装
             // 現時点ではスタブ実装
             await Task.Delay(100).ConfigureAwait(false); // GDIキャプチャのシミュレート
-            
+
             result.Success = false; // 現在は未実装
             result.ErrorMessage = "GDI戦略は未実装";
             result.Metrics.PerformanceCategory = "LowPerformance";

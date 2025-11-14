@@ -16,7 +16,7 @@ public sealed class TestImageGenerator(ILogger<TestImageGenerator> logger)
     /// <param name="outputPath">出力パス</param>
     /// <returns>画像パス（実際のファイルは存在しない）</returns>
     public async Task<string> GenerateTextImageAsync(
-        string text, 
+        string text,
         string outputPath)
     {
         // ディレクトリが存在しない場合は作成
@@ -41,8 +41,8 @@ public sealed class TestImageGenerator(ILogger<TestImageGenerator> logger)
     /// <param name="gameStyle">ゲームスタイル</param>
     /// <returns>画像パス</returns>
     public async Task<string> GenerateGameStyleImageAsync(
-        string text, 
-        string outputPath, 
+        string text,
+        string outputPath,
         GameImageStyle gameStyle = GameImageStyle.DialogBox)
     {
         var directory = System.IO.Path.GetDirectoryName(outputPath);
@@ -52,7 +52,7 @@ public sealed class TestImageGenerator(ILogger<TestImageGenerator> logger)
         }
 
         // スタイル情報を含むダミーファイル作成
-        await System.IO.File.WriteAllTextAsync(outputPath + ".txt", 
+        await System.IO.File.WriteAllTextAsync(outputPath + ".txt",
             $"Expected: {text}\nStyle: {gameStyle}").ConfigureAwait(false);
 
         _logger.LogInformation("🎮 ゲーム風テスト画像パス生成完了: {OutputPath} - スタイル: {Style}", outputPath, gameStyle);
@@ -121,12 +121,12 @@ public enum GameImageStyle
     /// ダイアログボックス風
     /// </summary>
     DialogBox,
-    
+
     /// <summary>
     /// メニューテキスト風
     /// </summary>
     MenuText,
-    
+
     /// <summary>
     /// ステータステキスト風
     /// </summary>

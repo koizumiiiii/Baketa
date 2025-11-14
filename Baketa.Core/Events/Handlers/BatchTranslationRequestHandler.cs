@@ -1,9 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Events.Handlers;
 
@@ -14,8 +14,8 @@ namespace Baketa.Core.Events.Handlers;
 /// 既存のTranslationRequestHandlerの豊富な処理ロジックを活用
 /// </summary>
 public class BatchTranslationRequestHandler(
-    IEventAggregator eventAggregator, 
-    ILogger<BatchTranslationRequestHandler> logger) 
+    IEventAggregator eventAggregator,
+    ILogger<BatchTranslationRequestHandler> logger)
     : IEventProcessor<BatchTranslationRequestEvent>
 {
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
@@ -30,7 +30,7 @@ public class BatchTranslationRequestHandler(
     /// <inheritdoc />
     public async Task HandleAsync(BatchTranslationRequestEvent eventData)
     {
-        _logger.LogDebug("BatchTranslationRequestHandler.HandleAsync開始: BatchSize={BatchSize}, Summary={Summary}", 
+        _logger.LogDebug("BatchTranslationRequestHandler.HandleAsync開始: BatchSize={BatchSize}, Summary={Summary}",
             eventData.BatchSize, eventData.BatchSummary);
 
         ArgumentNullException.ThrowIfNull(eventData);
@@ -41,7 +41,7 @@ public class BatchTranslationRequestHandler(
             return;
         }
 
-        _logger.LogInformation("バッチ翻訳処理開始: {BatchSize}個の翻訳要求を個別処理に分解", 
+        _logger.LogInformation("バッチ翻訳処理開始: {BatchSize}個の翻訳要求を個別処理に分解",
             eventData.BatchSize);
 
         // バッチ内の各OCR結果を個別のTranslationRequestEventとして発行
@@ -49,7 +49,7 @@ public class BatchTranslationRequestHandler(
         {
             try
             {
-                _logger.LogTrace("個別翻訳要求作成中 [{Index}/{Total}]: '{Text}'", 
+                _logger.LogTrace("個別翻訳要求作成中 [{Index}/{Total}]: '{Text}'",
                     index + 1, eventData.BatchSize, ocrResult.Text[..Math.Min(20, ocrResult.Text.Length)]);
 
                 // 個別のTranslationRequestEventを作成
@@ -61,16 +61,16 @@ public class BatchTranslationRequestHandler(
                 // 既存のTranslationRequestHandlerに処理を委譲
                 await _eventAggregator.PublishAsync(individualEvent).ConfigureAwait(false);
 
-                _logger.LogTrace("個別翻訳要求発行完了 [{Index}/{Total}]: '{Text}'", 
+                _logger.LogTrace("個別翻訳要求発行完了 [{Index}/{Total}]: '{Text}'",
                     index + 1, eventData.BatchSize, ocrResult.Text[..Math.Min(20, ocrResult.Text.Length)]);
 
                 return true; // 成功
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "個別翻訳要求処理中にエラー [{Index}/{Total}]: '{Text}' - {ErrorType}: {ErrorMessage}", 
-                    index + 1, eventData.BatchSize, 
-                    ocrResult.Text[..Math.Min(20, ocrResult.Text.Length)], 
+                _logger.LogError(ex, "個別翻訳要求処理中にエラー [{Index}/{Total}]: '{Text}' - {ErrorType}: {ErrorMessage}",
+                    index + 1, eventData.BatchSize,
+                    ocrResult.Text[..Math.Min(20, ocrResult.Text.Length)],
                     ex.GetType().Name, ex.Message);
 
                 return false; // 失敗
@@ -86,12 +86,12 @@ public class BatchTranslationRequestHandler(
 
         if (failureCount > 0)
         {
-            _logger.LogWarning("バッチ翻訳処理完了 - 成功: {Success}, 失敗: {Failed}/{Total}", 
+            _logger.LogWarning("バッチ翻訳処理完了 - 成功: {Success}, 失敗: {Failed}/{Total}",
                 successCount, failureCount, eventData.BatchSize);
         }
         else
         {
-            _logger.LogInformation("バッチ翻訳処理完了 - 全{Total}件の翻訳要求を正常発行", 
+            _logger.LogInformation("バッチ翻訳処理完了 - 全{Total}件の翻訳要求を正常発行",
                 eventData.BatchSize);
         }
 

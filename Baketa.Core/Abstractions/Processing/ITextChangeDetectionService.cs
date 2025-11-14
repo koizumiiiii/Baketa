@@ -17,7 +17,7 @@ public interface ITextChangeDetectionService
     /// <param name="contextId">処理コンテキストID（ウィンドウハンドル等）</param>
     /// <returns>テキスト変化結果</returns>
     Task<TextChangeResult> DetectTextChangeAsync(string previousText, string currentText, string contextId);
-    
+
     /// <summary>
     /// 編集距離を計算
     /// </summary>
@@ -25,7 +25,7 @@ public interface ITextChangeDetectionService
     /// <param name="text2">比較対象テキスト2</param>
     /// <returns>編集距離</returns>
     float CalculateEditDistance(string text1, string text2);
-    
+
     /// <summary>
     /// 有意なテキスト変化かどうかを判定
     /// </summary>
@@ -33,13 +33,13 @@ public interface ITextChangeDetectionService
     /// <param name="threshold">閾値</param>
     /// <returns>有意な変化かどうか</returns>
     bool IsSignificantTextChange(float changePercentage, float threshold = 0.1f);
-    
+
     /// <summary>
     /// 特定コンテキストの前回テキストをクリア
     /// </summary>
     /// <param name="contextId">処理コンテキストID</param>
     void ClearPreviousText(string contextId);
-    
+
     /// <summary>
     /// 全コンテキストの前回テキストをクリア
     /// </summary>
@@ -55,47 +55,47 @@ public sealed record TextChangeResult
     /// テキストが変化したかどうか
     /// </summary>
     public required bool HasChanged { get; init; }
-    
+
     /// <summary>
     /// 変化率 (0.0-1.0)
     /// </summary>
     public required float ChangePercentage { get; init; }
-    
+
     /// <summary>
     /// 編集距離
     /// </summary>
     public float EditDistance { get; init; }
-    
+
     /// <summary>
     /// 前回テキストの長さ
     /// </summary>
     public int PreviousLength { get; init; }
-    
+
     /// <summary>
     /// 現在テキストの長さ
     /// </summary>
     public int CurrentLength { get; init; }
-    
+
     /// <summary>
     /// 処理時間
     /// </summary>
     public TimeSpan ProcessingTime { get; init; }
-    
+
     /// <summary>
     /// 使用されたアルゴリズム
     /// </summary>
     public TextChangeAlgorithmType AlgorithmUsed { get; init; }
-    
+
     /// <summary>
     /// 前回テキスト（デバッグ用）
     /// </summary>
     public string? PreviousText { get; init; }
-    
+
     /// <summary>
     /// 現在テキスト（デバッグ用）
     /// </summary>
     public string? CurrentText { get; init; }
-    
+
     /// <summary>
     /// 変化なしの結果を作成
     /// </summary>
@@ -114,7 +114,7 @@ public sealed record TextChangeResult
             CurrentText = previousText
         };
     }
-    
+
     /// <summary>
     /// 有意な変化の結果を作成
     /// </summary>
@@ -133,7 +133,7 @@ public sealed record TextChangeResult
             CurrentText = currentText
         };
     }
-    
+
     /// <summary>
     /// 初回実行時の結果を作成
     /// </summary>
@@ -163,12 +163,12 @@ public enum TextChangeAlgorithmType
     /// 編集距離 (Levenshtein Distance)
     /// </summary>
     EditDistance,
-    
+
     /// <summary>
     /// ハッシュ比較
     /// </summary>
     HashComparison,
-    
+
     /// <summary>
     /// 文字列完全一致
     /// </summary>

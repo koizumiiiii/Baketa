@@ -19,32 +19,32 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
     private readonly ILogger<WindowsFullscreenModeService> _logger;
     private readonly object _lockObject = new();
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-    
+
     // ゲームウィンドウイベント監視
     private GameWindowEventTracker? _gameWindowTracker;
     private readonly Timer _periodicCheckTimer;
-    
+
     // キャッシュされた状態とフォールバック
     private readonly Dictionary<nint, FullscreenModeChangedEventArgs> _windowModeCache = [];
-    
+
     private volatile bool _isMonitoring;
     private volatile bool _disposed;
-    
+
     // 現在の状態
     private volatile bool _isExclusiveFullscreen;
     private volatile bool _isBorderlessFullscreen;
     private volatile bool _canShowOverlay = true;
-    
+
     /// <summary>
     /// 監視中のターゲットウィンドウハンドル
     /// </summary>
     public nint TargetWindowHandle { get; private set; }
-    
+
     /// <summary>
     /// 現在のフルスクリーンモード種別
     /// </summary>
     public FullscreenModeType CurrentModeType { get; private set; } = FullscreenModeType.Windowed;
-    
+
     /// <summary>
     /// WindowsFullscreenModeServiceを初期化
     /// </summary>
@@ -56,26 +56,26 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
     {
         _monitorManager = monitorManager;
         _logger = logger;
-        
+
         // 低頻度の定期チェック（30秒間隔）- 万が一のフォールバック用
         _periodicCheckTimer = new Timer(PeriodicFullscreenCheck, null,
             TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-        
+
         _logger.LogInformation("WindowsFullscreenModeService initialized with event-based detection");
     }
-    
+
     /// <inheritdoc/>
     public bool IsExclusiveFullscreen => _isExclusiveFullscreen;
-    
+
     /// <inheritdoc/>
     public bool IsBorderlessFullscreen => _isBorderlessFullscreen;
-    
+
     /// <inheritdoc/>
     public bool CanShowOverlay => _canShowOverlay;
-    
+
     /// <inheritdoc/>
     public event EventHandler<FullscreenModeChangedEventArgs>? FullscreenModeChanged;
-    
+
     /// <inheritdoc/>
     public FullscreenModeChangedEventArgs DetectFullscreenMode(nint windowHandle, MonitorInfo? targetMonitor = null)
     {
@@ -84,7 +84,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             _logger.LogWarning("Invalid window handle provided for fullscreen detection");
             return CreateModeChangedEventArgs(false, false, true, "", targetMonitor);
         }
-        
+
         // キャッシュから前回の結果を確認
         if (_windowModeCache.TryGetValue(windowHandle, out var cachedResult))
         {
@@ -95,7 +95,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
                 return cachedResult;
             }
         }
-        
+
         try
         {
             // ウィンドウが有効かチェック
@@ -106,7 +106,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
                 _windowModeCache[windowHandle] = result;
                 return result;
             }
-            
+
             // ウィンドウの位置とサイズを取得
             if (!User32Methods.GetWindowRect(windowHandle, out var windowRect))
             {
@@ -115,7 +115,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
                 _windowModeCache[windowHandle] = result;
                 return result;
             }
-            
+
             // ウィンドウのモニターを取得
             targetMonitor ??= _monitorManager.GetMonitorFromWindow(windowHandle);
             if (!targetMonitor.HasValue)
@@ -125,15 +125,15 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
                 _windowModeCache[windowHandle] = result;
                 return result;
             }
-            
+
             var monitor = targetMonitor.Value;
-            
+
             // インテリジェント検出ロジック
             var detectionResult = PerformIntelligentDetection(windowHandle, windowRect, monitor);
-            
+
             // 結果をキャッシュ
             _windowModeCache[windowHandle] = detectionResult;
-            
+
             return detectionResult;
         }
         catch (Win32Exception ex)
@@ -179,48 +179,48 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             return fallbackResult;
         }
     }
-    
+
     /// <summary>
     /// インテリジェントなフルスクリーン検出
     /// </summary>
     private FullscreenModeChangedEventArgs PerformIntelligentDetection(
-        nint windowHandle, 
-        RECT windowRect, 
+        nint windowHandle,
+        RECT windowRect,
         MonitorInfo monitor)
     {
         // ウィンドウサイズとモニターサイズを比較
         var windowWidth = windowRect.right - windowRect.left;
         var windowHeight = windowRect.bottom - windowRect.top;
-        var isFullscreenSize = 
+        var isFullscreenSize =
             Math.Abs(windowWidth - monitor.Bounds.Width) <= 2 &&
             Math.Abs(windowHeight - monitor.Bounds.Height) <= 2;
-        
+
         // ウィンドウ位置がモニター境界と一致するかチェック
         var isFullscreenPosition =
             Math.Abs(windowRect.left - monitor.Bounds.X) <= 2 &&
             Math.Abs(windowRect.top - monitor.Bounds.Y) <= 2;
-        
+
         // ウィンドウスタイルを取得
         var windowStyle = User32Methods.GetWindowLong(windowHandle, GetWindowLongIndex.GWL_STYLE);
         var extendedStyle = User32Methods.GetWindowLong(windowHandle, GetWindowLongIndex.GWL_EXSTYLE);
-        
+
         // 排他的フルスクリーンの検出（より厳密な条件）
         bool isExclusive = DetectExclusiveFullscreenEnhanced(
             windowHandle, windowStyle, extendedStyle, isFullscreenSize, isFullscreenPosition);
-        
+
         // ボーダレスフルスクリーンの検出
-        bool isBorderless = !isExclusive && isFullscreenSize && isFullscreenPosition && 
+        bool isBorderless = !isExclusive && isFullscreenSize && isFullscreenPosition &&
             DetectBorderlessFullscreenEnhanced(windowStyle);
-        
+
         // オーバーレイ表示可能性の判定
         bool canShowOverlay = !isExclusive;
-        
+
         // 推奨メッセージの生成
         string recommendationMessage = GenerateRecommendationMessage(isExclusive, isBorderless, canShowOverlay);
-        
+
         return CreateModeChangedEventArgs(isExclusive, isBorderless, canShowOverlay, recommendationMessage, monitor);
     }
-    
+
     /// <inheritdoc/>
     public async Task StartMonitoringAsync(nint windowHandle, CancellationToken cancellationToken = default)
     {
@@ -229,31 +229,31 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             _logger.LogWarning("Fullscreen monitoring is already active");
             return;
         }
-        
+
         if (windowHandle == nint.Zero)
         {
             throw new ArgumentException("Invalid window handle", nameof(windowHandle));
         }
-        
+
         try
         {
             _logger.LogInformation("Starting fullscreen mode monitoring for window 0x{Handle:X} (event-based)", windowHandle);
-            
+
             lock (_lockObject)
             {
                 TargetWindowHandle = windowHandle;
                 _isMonitoring = true;
             }
-            
+
             // ゲームウィンドウイベント監視を開始
             _gameWindowTracker?.Dispose();
             _gameWindowTracker = new GameWindowEventTracker(windowHandle, OnWindowStateChanged, _logger);
-            
+
             // 初回検出
             await RefreshModeAsync(cancellationToken).ConfigureAwait(false);
-            
+
             await Task.Delay(100, cancellationToken).ConfigureAwait(false); // 短い遅延で開始を確認
-            
+
             _logger.LogInformation("Fullscreen mode monitoring started successfully (0.1% CPU usage)");
         }
         catch (OperationCanceledException)
@@ -281,7 +281,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         }
         // 他の予期しない例外は再スローして呼び出し元に委ねる
     }
-    
+
     /// <inheritdoc/>
     public async Task StopMonitoringAsync(CancellationToken cancellationToken = default)
     {
@@ -290,21 +290,21 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             _logger.LogDebug("Fullscreen monitoring is not active");
             return;
         }
-        
+
         try
         {
             _logger.LogInformation("Stopping fullscreen mode monitoring");
-            
+
             lock (_lockObject)
             {
                 _isMonitoring = false;
             }
-            
+
             // イベント監視を停止
             _gameWindowTracker?.StopTracking();
-            
+
             await Task.Delay(50, cancellationToken).ConfigureAwait(false); // 短い遅延で停止を確認
-            
+
             _logger.LogInformation("Fullscreen mode monitoring stopped successfully");
         }
         catch (OperationCanceledException)
@@ -328,7 +328,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             throw;
         }
     }
-    
+
     /// <inheritdoc/>
     public async Task ShowRecommendationAsync(FullscreenModeChangedEventArgs currentMode)
     {
@@ -339,13 +339,13 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
                 _logger.LogDebug("No user action required for current mode: {Mode}", currentMode.ModeType);
                 return;
             }
-            
+
             _logger.LogInformation("Showing fullscreen recommendation: {Message}", currentMode.RecommendationMessage);
-            
+
             // 実際の通知表示は将来的にINotificationServiceを通じて実装
             // 現在はログ出力のみ
             await Task.Delay(100).ConfigureAwait(false);
-            
+
             _logger.LogDebug("Fullscreen recommendation shown");
         }
         catch (OperationCanceledException ex)
@@ -373,7 +373,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             _logger.LogError(ex, "External error showing fullscreen recommendation");
         }
     }
-    
+
     /// <inheritdoc/>
     public async Task RefreshModeAsync(CancellationToken cancellationToken = default)
     {
@@ -384,10 +384,10 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
                 _logger.LogDebug("No target window set for mode refresh");
                 return;
             }
-            
+
             var currentMode = DetectFullscreenMode(TargetWindowHandle);
             await UpdateCurrentModeAsync(currentMode, cancellationToken).ConfigureAwait(false);
-            
+
             _logger.LogDebug("Fullscreen mode refreshed: {Mode}", currentMode.ToString());
         }
         catch (OperationCanceledException)
@@ -411,7 +411,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             throw;
         }
     }
-    
+
     /// <summary>
     /// ゲームウィンドウ状態変更イベント処理
     /// </summary>
@@ -450,7 +450,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         }
 #pragma warning restore CA1031 // Do not catch general exception types
     }
-    
+
     /// <summary>
     /// 定期的なフルスクリーンチェック（フォールバック用）
     /// </summary>
@@ -458,12 +458,12 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
     {
         if (!_isMonitoring || _disposed)
             return;
-        
+
         try
         {
             // キャッシュクリーンアップ
             CleanupStaleCache();
-            
+
             // 万が一イベントが漏れた場合のフォールバック
             if (TargetWindowHandle != nint.Zero)
             {
@@ -498,7 +498,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         }
 #pragma warning restore CA1031 // Do not catch general exception types
     }
-    
+
     /// <summary>
     /// 古いキャッシュエントリのクリーンアップ
     /// </summary>
@@ -510,7 +510,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
                 .Where(kvp => DateTime.UtcNow - kvp.Value.DetectionTime > TimeSpan.FromMinutes(1))
                 .Select(kvp => kvp.Key)
                 .ToList();
-            
+
             foreach (var staleHandle in staleEntries)
             {
                 if (_windowModeCache.Remove(staleHandle))
@@ -539,14 +539,14 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         }
 #pragma warning restore CA1031 // Do not catch general exception types
     }
-    
+
     /// <summary>
     /// 排他的フルスクリーンを検出（強化版）
     /// </summary>
     private static bool DetectExclusiveFullscreenEnhanced(
-        nint windowHandle, 
-        long windowStyle, 
-        long extendedStyle, 
+        nint windowHandle,
+        long windowStyle,
+        long extendedStyle,
         bool isFullscreenSize,
         bool isFullscreenPosition)
     {
@@ -556,16 +556,16 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         // 3. 境界線なし
         // 4. 最大化状態
         // 5. トップモスト（多くの場合）
-        
+
         if (!isFullscreenSize || !isFullscreenPosition)
             return false;
-        
+
         var hasPopupStyle = (windowStyle & (long)WindowStyles.WS_POPUP) != 0;
         var hasBorder = (windowStyle & (long)WindowStyles.WS_BORDER) != 0;
         var hasCaption = (windowStyle & (long)WindowStyles.WS_CAPTION) != 0;
         var isMaximized = User32Methods.IsZoomed(windowHandle);
         var isTopmost = (extendedStyle & (long)ExtendedWindowStyles.WS_EX_TOPMOST) != 0;
-        
+
         // より厳密な排他的フルスクリーン判定
         var exclusiveScore = 0;
         if (hasPopupStyle) exclusiveScore += 2;
@@ -573,11 +573,11 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         if (!hasCaption) exclusiveScore += 1;
         if (isMaximized) exclusiveScore += 2;
         if (isTopmost) exclusiveScore += 1;
-        
+
         // スコア6以上で排他的フルスクリーンと判定
         return exclusiveScore >= 6;
     }
-    
+
     /// <summary>
     /// ボーダレスフルスクリーンを検出（強化版）
     /// </summary>
@@ -588,14 +588,14 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         // 2. 境界線なし
         // 3. タイトルバーなし
         // 4. 通常のZオーダー（トップモストではない場合が多い）
-        
+
         var hasPopupStyle = (windowStyle & (long)WindowStyles.WS_POPUP) != 0;
         var hasBorder = (windowStyle & (long)WindowStyles.WS_BORDER) != 0;
         var hasCaption = (windowStyle & (long)WindowStyles.WS_CAPTION) != 0;
-        
+
         return hasPopupStyle && !hasBorder && !hasCaption;
     }
-    
+
     /// <summary>
     /// 推奨メッセージを生成
     /// </summary>
@@ -609,15 +609,15 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             _ => ""
         };
     }
-    
+
     /// <summary>
     /// フルスクリーンモード変更イベント引数を作成
     /// </summary>
     private static FullscreenModeChangedEventArgs CreateModeChangedEventArgs(
-        bool isExclusive, 
-        bool isBorderless, 
-        bool canShowOverlay, 
-        string recommendationMessage, 
+        bool isExclusive,
+        bool isBorderless,
+        bool canShowOverlay,
+        string recommendationMessage,
         MonitorInfo? monitor)
     {
         return new FullscreenModeChangedEventArgs(
@@ -630,7 +630,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             DetectionTime = DateTime.UtcNow
         };
     }
-    
+
     /// <summary>
     /// 現在のモード状態を更新
     /// </summary>
@@ -639,13 +639,13 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         var oldExclusive = _isExclusiveFullscreen;
         var oldBorderless = _isBorderlessFullscreen;
         var oldCanShowOverlay = _canShowOverlay;
-        
+
         // 状態を更新
         _isExclusiveFullscreen = newMode.IsExclusiveFullscreen;
         _isBorderlessFullscreen = newMode.IsBorderlessFullscreen;
         _canShowOverlay = newMode.CanShowOverlay;
         CurrentModeType = newMode.ModeType;
-        
+
         // 変更があった場合にイベントを発火
         if (oldExclusive != newMode.IsExclusiveFullscreen ||
             oldBorderless != newMode.IsBorderlessFullscreen ||
@@ -654,7 +654,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             await NotifyModeChangedAsync(newMode, cancellationToken).ConfigureAwait(false);
         }
     }
-    
+
     /// <summary>
     /// モード変更イベントを通知
     /// </summary>
@@ -687,12 +687,12 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             return Task.FromException(ex);
         }
     }
-    
+
     /// <inheritdoc/>
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         try
         {
 #pragma warning disable CA1849 // Call async methods when in an async method
@@ -704,27 +704,27 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
         {
             // 既に破棄済み - 無視
         }
-        
+
         GC.SuppressFinalize(this);
     }
-    
+
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
-        
+
         try
         {
 #pragma warning disable CA1849 // Call async methods when in an async method
             _cancellationTokenSource?.Cancel(); // Cancel()に非同期版は存在しない
 #pragma warning restore CA1849 // Call async methods when in an async method
-            
+
             // イベントトラッカーの停止
             _gameWindowTracker?.Dispose();
-            
+
             // タイマーの停止
             await _periodicCheckTimer.DisposeAsync().ConfigureAwait(false);
-            
+
             // 監視の停止
             if (_isMonitoring)
             {
@@ -748,7 +748,7 @@ public sealed class WindowsFullscreenModeService : IFullscreenModeService, IAsyn
             _cancellationTokenSource?.Dispose();
             _disposed = true;
         }
-        
+
         GC.SuppressFinalize(this);
         _logger.LogInformation("WindowsFullscreenModeService disposed asynchronously");
     }
@@ -766,29 +766,29 @@ internal sealed class GameWindowEventTracker : IDisposable
     private const uint EVENT_SYSTEM_MINIMIZESTART = 0x0016;
     private const uint EVENT_SYSTEM_MINIMIZEEND = 0x0017;
     private const uint WINEVENT_OUTOFCONTEXT = 0x0000;
-    
+
     private readonly IntPtr _gameWindow;
     private readonly Action _onWindowStateChanged;
     private readonly ILogger _logger;
     private readonly WinEventDelegate _winEventProc;
     private readonly List<IntPtr> _hooks = [];
     private volatile bool _disposed;
-    
+
     public GameWindowEventTracker(IntPtr gameWindow, Action onWindowStateChanged, ILogger logger)
     {
         _gameWindow = gameWindow;
         _onWindowStateChanged = onWindowStateChanged;
         _logger = logger;
         _winEventProc = WinEventProc;
-        
+
         // 複数のイベントタイプを監視
         RegisterHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_HIDE);
         RegisterHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE);
         RegisterHook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND);
-        
+
         _logger.LogDebug("Started tracking events for game window: 0x{Handle:X}", gameWindow);
     }
-    
+
     private void RegisterHook(uint eventMin, uint eventMax)
     {
         var hook = User32Methods.SetWinEventHook(
@@ -797,7 +797,7 @@ internal sealed class GameWindowEventTracker : IDisposable
             _winEventProc,
             0, 0,
             WINEVENT_OUTOFCONTEXT);
-        
+
         if (hook != IntPtr.Zero)
         {
             _hooks.Add(hook);
@@ -807,17 +807,17 @@ internal sealed class GameWindowEventTracker : IDisposable
             _logger.LogWarning("Failed to register hook for events {EventMin:X}-{EventMax:X}", eventMin, eventMax);
         }
     }
-    
+
     public void StopTracking()
     {
         // フックの解除はDisposeで実行
     }
-    
-    private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, 
+
+    private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd,
         int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
     {
         if (_disposed) return;
-        
+
         try
         {
             if (hwnd == _gameWindow)
@@ -846,12 +846,12 @@ internal sealed class GameWindowEventTracker : IDisposable
         }
 #pragma warning restore CA1031 // Do not catch general exception types
     }
-    
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        
+
         try
         {
             foreach (var hook in _hooks)
@@ -862,7 +862,7 @@ internal sealed class GameWindowEventTracker : IDisposable
                 }
             }
             _hooks.Clear();
-            
+
             _logger.LogDebug("Disposed GameWindowEventTracker for window: 0x{Handle:X}", _gameWindow);
         }
         catch (ObjectDisposedException ex)

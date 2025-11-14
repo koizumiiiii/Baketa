@@ -1,8 +1,8 @@
+using System.Diagnostics;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Models.Processing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
 
 namespace Baketa.Infrastructure.Processing.Strategies;
 
@@ -15,7 +15,7 @@ public class TextChangeDetectionStageStrategy : IProcessingStageStrategy
     private readonly ITextChangeDetectionService _textChangeService;
     private readonly IOptionsMonitor<ProcessingPipelineSettings> _settings;
     private readonly ILogger<TextChangeDetectionStageStrategy> _logger;
-    
+
     public ProcessingStageType StageType => ProcessingStageType.TextChangeDetection;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(1);
 
@@ -32,7 +32,7 @@ public class TextChangeDetectionStageStrategy : IProcessingStageStrategy
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             var ocrResult = context.GetStageResult<OcrExecutionResult>(ProcessingStageType.OcrExecution);
@@ -50,7 +50,7 @@ public class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                 contextId, currentText.Length, previousText?.Length ?? 0);
 
             TextChangeResult changeResult;
-            
+
             if (string.IsNullOrEmpty(previousText))
             {
                 // 初回実行時は変化ありとして処理継続
@@ -78,7 +78,7 @@ public class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                 ProcessingTime = stopwatch.Elapsed,
                 AlgorithmUsed = changeResult.AlgorithmUsed.ToString()
             };
-            
+
             return ProcessingStageResult.CreateSuccess(StageType, result);
         }
         catch (Exception ex)
@@ -100,7 +100,7 @@ public class TextChangeDetectionStageStrategy : IProcessingStageStrategy
         {
             return ocrResult.Success && !string.IsNullOrEmpty(ocrResult.DetectedText);
         }
-        
+
         // OCRステージの結果が存在する場合もチェック
         var existingOcrResult = context.GetStageResult<OcrExecutionResult>(ProcessingStageType.OcrExecution);
         return existingOcrResult?.Success == true && !string.IsNullOrEmpty(existingOcrResult.DetectedText);

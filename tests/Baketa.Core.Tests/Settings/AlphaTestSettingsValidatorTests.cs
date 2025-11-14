@@ -1,10 +1,10 @@
 using System;
-using Xunit;
-using Microsoft.Extensions.Logging;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Validation;
-using Baketa.Core.Abstractions.Settings;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Xunit;
 
 namespace Baketa.Core.Tests.Settings;
 
@@ -393,7 +393,7 @@ public class AlphaTestSettingsValidatorTests
 
         // Assert
         translationRules.Should().NotBeEmpty();
-        translationRules.Should().OnlyContain(rule => 
+        translationRules.Should().OnlyContain(rule =>
             rule.PropertyPath == "DefaultEngine" || rule.PropertyPath == "DefaultSourceLanguage");
     }
 

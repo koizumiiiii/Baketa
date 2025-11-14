@@ -75,73 +75,73 @@ public class PipelineStepParameter(
     /// <param name="value">検証する値</param>
     /// <returns>有効な場合はtrue、そうでない場合はfalse</returns>
     public bool ValidateValue(object? value)
-        {
-            // 必須パラメータのnullチェック
-            if (IsRequired && value == null)
-                return false;
-                
-            // null値が許可されている場合
-            if (!IsRequired && value == null)
-                return true;
-                
-            // 型チェック
-            if (value != null && !ParameterType.IsInstanceOfType(value))
-                return false;
-                
-            // 許容値リストのチェック
-            if (AllowedValues != null && AllowedValues.Count > 0)
-            {
-                return AllowedValues.Contains(value);
-            }
-            
-            // 数値型の場合、最小値・最大値のチェック
-            if (value != null && IsNumericType(ParameterType))
-            {
-                // 全てdoubleに変換して比較
-                double doubleValue = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
-                
-                // 最小値のチェック
-                if (MinValue != null)
-                {
-                    double minValue = Convert.ToDouble(MinValue, System.Globalization.CultureInfo.InvariantCulture);
-                    if (doubleValue < minValue)
-                        return false;
-                }
-                
-                // 最大値のチェック
-                if (MaxValue != null)
-                {
-                    double maxValue = Convert.ToDouble(MaxValue, System.Globalization.CultureInfo.InvariantCulture);
-                    if (doubleValue > maxValue)
-                        return false;
-                }
-            }
-            
-            // すべてのチェックに通過
+    {
+        // 必須パラメータのnullチェック
+        if (IsRequired && value == null)
+            return false;
+
+        // null値が許可されている場合
+        if (!IsRequired && value == null)
             return true;
-        }
-        
-        /// <summary>
-        /// 指定された型が数値型かどうかを判定します
-        /// </summary>
-        /// <param name="type">判定する型</param>
-        /// <returns>数値型の場合はtrue、そうでない場合はfalse</returns>
-        private static bool IsNumericType(Type type)
+
+        // 型チェック
+        if (value != null && !ParameterType.IsInstanceOfType(value))
+            return false;
+
+        // 許容値リストのチェック
+        if (AllowedValues != null && AllowedValues.Count > 0)
         {
-            return Type.GetTypeCode(type) switch
-            {
-                TypeCode.Byte => true,
-                TypeCode.SByte => true,
-                TypeCode.UInt16 => true,
-                TypeCode.UInt32 => true,
-                TypeCode.UInt64 => true,
-                TypeCode.Int16 => true,
-                TypeCode.Int32 => true,
-                TypeCode.Int64 => true,
-                TypeCode.Decimal => true,
-                TypeCode.Double => true,
-                TypeCode.Single => true,
-                _ => false
-            };
+            return AllowedValues.Contains(value);
         }
+
+        // 数値型の場合、最小値・最大値のチェック
+        if (value != null && IsNumericType(ParameterType))
+        {
+            // 全てdoubleに変換して比較
+            double doubleValue = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+
+            // 最小値のチェック
+            if (MinValue != null)
+            {
+                double minValue = Convert.ToDouble(MinValue, System.Globalization.CultureInfo.InvariantCulture);
+                if (doubleValue < minValue)
+                    return false;
+            }
+
+            // 最大値のチェック
+            if (MaxValue != null)
+            {
+                double maxValue = Convert.ToDouble(MaxValue, System.Globalization.CultureInfo.InvariantCulture);
+                if (doubleValue > maxValue)
+                    return false;
+            }
+        }
+
+        // すべてのチェックに通過
+        return true;
     }
+
+    /// <summary>
+    /// 指定された型が数値型かどうかを判定します
+    /// </summary>
+    /// <param name="type">判定する型</param>
+    /// <returns>数値型の場合はtrue、そうでない場合はfalse</returns>
+    private static bool IsNumericType(Type type)
+    {
+        return Type.GetTypeCode(type) switch
+        {
+            TypeCode.Byte => true,
+            TypeCode.SByte => true,
+            TypeCode.UInt16 => true,
+            TypeCode.UInt32 => true,
+            TypeCode.UInt64 => true,
+            TypeCode.Int16 => true,
+            TypeCode.Int32 => true,
+            TypeCode.Int64 => true,
+            TypeCode.Decimal => true,
+            TypeCode.Double => true,
+            TypeCode.Single => true,
+            _ => false
+        };
+    }
+}

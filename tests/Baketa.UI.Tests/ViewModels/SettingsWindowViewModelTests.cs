@@ -1,20 +1,20 @@
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using Moq;
-using ReactiveUI;
 using System;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
-using Baketa.UI.ViewModels;
-using Baketa.UI.Services;
+using Baketa.Core.Settings;
 using Baketa.UI.Models.Settings;
+using Baketa.UI.Services;
 using Baketa.UI.Tests.Infrastructure;
+using Baketa.UI.ViewModels;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+using ReactiveUI;
+using Xunit;
 
 namespace Baketa.UI.Tests.ViewModels;
 
@@ -34,10 +34,10 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         _mockChangeTracker = new Mock<ISettingsChangeTracker>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLogger = new Mock<ILogger<SettingsWindowViewModel>>();
-        
+
         ResetMocks();
     }
-    
+
     /// <summary>
     /// Mockオブジェクトの状態をリセット
     /// </summary>
@@ -46,7 +46,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         _mockChangeTracker.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
-        
+
         // デフォルト設定の再設定
         _mockChangeTracker.Setup(x => x.HasChanges).Returns(false);
     }
@@ -61,7 +61,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         _currentViewModel = RunOnUIThread(() => new Baketa.UI.ViewModels.SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockLogger.Object));
         return _currentViewModel;
     }
-    
+
     public override void Dispose()
     {
         try
@@ -98,8 +98,8 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     public void Constructor_WithNullChangeTracker_ThrowsArgumentNullException()
     {
         // Act & Assert
-        RunOnUIThread(() => 
-            Assert.Throws<ArgumentNullException>(() => 
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
                 new SettingsWindowViewModel(null!, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
@@ -107,8 +107,8 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     public void Constructor_WithNullEventAggregator_ThrowsArgumentNullException()
     {
         // Act & Assert
-        RunOnUIThread(() => 
-            Assert.Throws<ArgumentNullException>(() => 
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
                 new SettingsWindowViewModel(_mockChangeTracker.Object, null!, _mockLogger.Object)));
     }
 
@@ -125,31 +125,31 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
 
             // Assert
             categories.Should().HaveCount(8);
-            
+
             // 基本設定カテゴリの確認（DisplayOrder順）
             categories[0].Id.Should().Be("settings_general");
             categories[0].Level.Should().Be(SettingLevel.Basic);
             categories[0].DisplayOrder.Should().Be(1);
-            
+
             categories[1].Id.Should().Be("settings_appearance");
             categories[1].Level.Should().Be(SettingLevel.Basic);
-            
+
             categories[2].Id.Should().Be("settings_mainui");
             categories[2].Level.Should().Be(SettingLevel.Basic);
-            
+
             categories[3].Id.Should().Be("settings_translation");
             categories[3].Level.Should().Be(SettingLevel.Basic);
-            
+
             categories[4].Id.Should().Be("settings_overlay");
             categories[4].Level.Should().Be(SettingLevel.Basic);
-            
+
             // 詳細設定カテゴリの確認
             categories[5].Id.Should().Be("settings_capture");
             categories[5].Level.Should().Be(SettingLevel.Advanced);
-            
+
             categories[6].Id.Should().Be("settings_ocr");
             categories[6].Level.Should().Be(SettingLevel.Advanced);
-            
+
             categories[7].Id.Should().Be("settings_advanced");
             categories[7].Level.Should().Be(SettingLevel.Advanced);
         }
@@ -173,7 +173,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Assert
         visibleCategories.Should().HaveCount(5);
         visibleCategories.Should().OnlyContain(c => c.Level == SettingLevel.Basic);
-        
+
         var categoryIds = visibleCategories.Select(c => c.Id).ToArray();
         categoryIds.Should().Equal("settings_general", "settings_appearance", "settings_mainui", "settings_translation", "settings_overlay");
     }
@@ -221,7 +221,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Arrange
         var viewModel = CreateViewModel();
         viewModel.ShowAdvancedSettings = true;
-        
+
         // 詳細設定カテゴリを選択
         var advancedCategory = viewModel.VisibleCategories.First(c => c.Level == SettingLevel.Advanced);
         viewModel.SelectedCategory = advancedCategory;
@@ -265,13 +265,13 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
 
         // Act & Assert
         viewModel.HasChanges.Should().BeTrue();
-        
+
         // Change the mock and verify
         _mockChangeTracker.Setup(x => x.HasChanges).Returns(false);
         _mockChangeTracker.Raise(x => x.HasChangesChanged += null, new HasChangesChangedEventArgs(false));
-        
+
         viewModel.HasChanges.Should().BeFalse();
-        
+
         // Cleanup
         viewModel.Dispose();
     }
@@ -326,7 +326,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
             // 変更ありの場合：Mock設定を変更してHasChangesChangedイベントを発火
             _mockChangeTracker.Setup(x => x.HasChanges).Returns(true);
             _mockChangeTracker.Raise(x => x.HasChangesChanged += null, new HasChangesChangedEventArgs(true));
-            
+
             viewModel.HasChanges.Should().BeTrue();
         }
         finally
@@ -364,7 +364,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Assert
         viewModel.StatusMessage.Should().Be("変更をキャンセルしました");
         _mockChangeTracker.Verify(x => x.ConfirmDiscardChangesAsync(), Times.Once);
-        
+
         // Cleanup
         viewModel.Dispose();
     }
@@ -397,7 +397,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Assert
         viewModel.StatusMessage.Should().Be("設定をリセットしました");
         _mockChangeTracker.Verify(x => x.ConfirmDiscardChangesAsync(), Times.Once);
-        
+
         // Cleanup
         viewModel.Dispose();
     }
@@ -493,7 +493,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
             var categoryIndex = i % viewModel.AllCategories.Count;
             viewModel.SelectedCategory = viewModel.AllCategories[categoryIndex];
         }
-        
+
         stopwatch.Stop();
 
         // Assert - 100ms以内で完了すること
@@ -508,7 +508,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     {
         // NOTE: 現在の実装では空のカテゴリになることはないが、
         // 将来的な拡張のために境界条件をテスト
-        
+
         // Arrange
         var viewModel = CreateViewModel();
 

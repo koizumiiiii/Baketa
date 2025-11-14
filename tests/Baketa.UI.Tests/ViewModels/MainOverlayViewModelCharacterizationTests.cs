@@ -1,3 +1,4 @@
+using System.Reactive.Linq;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Translation;
@@ -8,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Reactive.Testing;
 using Moq;
 using ReactiveUI;
-using System.Reactive.Linq;
 using Xunit;
 
 namespace Baketa.UI.Tests.ViewModels;

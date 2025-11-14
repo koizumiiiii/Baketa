@@ -1,8 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Windows.Services;
 
@@ -13,7 +13,7 @@ namespace Baketa.Infrastructure.Platform.Windows.Services;
 public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
 {
     private readonly ILogger<WindowsSystemStateMonitor> _logger;
-    
+
     private SystemResourceState? _lastResourceState;
     private DateTime _lastCheck = DateTime.MinValue;
     private readonly TimeSpan _checkInterval = TimeSpan.FromSeconds(2); // キャッシュ間隔
@@ -34,9 +34,9 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
     public bool IsSystemIdle()
     {
         var resourceState = GetCurrentResourceState();
-        
+
         // アイドル判定条件: CPU < 10%, メモリ < 70%
-        return resourceState.CpuUsagePercent < 10.0 && 
+        return resourceState.CpuUsagePercent < 10.0 &&
                resourceState.MemoryUsagePercent < 70.0;
     }
 
@@ -46,13 +46,13 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
     public SystemResourceState GetCurrentResourceState()
     {
         var now = DateTime.UtcNow;
-        
+
         // キャッシュ間隔チェック（頻繁なリソース取得を避ける）
         if (_lastResourceState != null && now - _lastCheck < _checkInterval)
         {
             return _lastResourceState;
         }
-        
+
         _lastCheck = now;
 
         try
@@ -61,7 +61,7 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
             var memoryUsage = GetMemoryUsage();
             var vramUsage = GetVramUsage();
             var isHighPerformance = IsHighPerformanceMode();
-            
+
             var currentState = new SystemResourceState(
                 CpuUsagePercent: cpuUsage,
                 MemoryUsagePercent: memoryUsage,
@@ -78,20 +78,20 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
                     batteryStatusChanged: false, // TODO: バッテリー状態変化検出
                     performanceModeChanged: _lastResourceState.IsHighPerformanceMode != isHighPerformance
                 );
-                
+
                 SystemStateChanged?.Invoke(this, eventArgs);
-                
-                _logger.LogDebug("📊 システム状態変化: CPU={CpuUsage:F1}%, Memory={MemoryUsage:F1}%, VRAM={VramUsage:F1}%", 
+
+                _logger.LogDebug("📊 システム状態変化: CPU={CpuUsage:F1}%, Memory={MemoryUsage:F1}%, VRAM={VramUsage:F1}%",
                     cpuUsage, memoryUsage, vramUsage);
             }
-            
+
             _lastResourceState = currentState;
             return currentState;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ システムリソース状態取得エラー: {ErrorMessage}", ex.Message);
-            
+
             // エラー時のフォールバック値
             return new SystemResourceState(0, 0, 0, false, now);
         }
@@ -115,7 +115,7 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
         {
             _logger.LogTrace("バッテリー状態取得エラー: {ErrorMessage}", ex.Message);
         }
-        
+
         return false; // デフォルトはAC電源
     }
 
@@ -129,17 +129,17 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
             var process = Process.GetCurrentProcess();
             var startTime = DateTime.UtcNow;
             var startCpuUsage = process.TotalProcessorTime;
-            
+
             // 短時間待機してCPU使用率を計算
             System.Threading.Thread.Sleep(100);
-            
+
             var endTime = DateTime.UtcNow;
             var endCpuUsage = process.TotalProcessorTime;
-            
+
             var cpuUsedMs = (endCpuUsage - startCpuUsage).TotalMilliseconds;
             var totalMsPassed = (endTime - startTime).TotalMilliseconds;
             var cpuUsageTotal = cpuUsedMs / (Environment.ProcessorCount * totalMsPassed);
-            
+
             return Math.Min(100.0, cpuUsageTotal * 100.0);
         }
         catch
@@ -165,7 +165,7 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
         {
             _logger.LogTrace("メモリ使用率取得エラー: {ErrorMessage}", ex.Message);
         }
-        
+
         return 0.0;
     }
 
@@ -210,7 +210,7 @@ public sealed class WindowsSystemStateMonitor : ISystemStateMonitor
     private static bool HasSignificantChange(SystemResourceState previous, SystemResourceState current)
     {
         const double threshold = 10.0; // 10%以上の変化で有意とする
-        
+
         return Math.Abs(previous.CpuUsagePercent - current.CpuUsagePercent) > threshold ||
                Math.Abs(previous.MemoryUsagePercent - current.MemoryUsagePercent) > threshold ||
                Math.Abs(previous.VramUsagePercent - current.VramUsagePercent) > threshold ||

@@ -1,5 +1,5 @@
-using Baketa.Core.UI.Overlay;
 using Baketa.Core.UI.Geometry;
+using Baketa.Core.UI.Overlay;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -16,19 +16,19 @@ public sealed class AvaloniaOverlayWindowAdapter(IServiceProvider serviceProvide
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly ILogger<AvaloniaOverlayWindowAdapter> _logger = logger;
     private IOverlayWindowManager? _platformManager;
-    
+
     /// <summary>
     /// プラットフォーム固有のマネージャーを遅延初期化で取得
     /// </summary>
     private IOverlayWindowManager PlatformManager =>
         _platformManager ??= GetPlatformManager();
-    
+
     /// <summary>
     /// オーバーレイウィンドウを作成します
     /// </summary>
     public async Task<IOverlayWindow> CreateOverlayWindowAsync(
-        nint targetWindowHandle, 
-        CoreSize initialSize, 
+        nint targetWindowHandle,
+        CoreSize initialSize,
         CorePoint initialPosition)
     {
         try
@@ -44,7 +44,7 @@ public sealed class AvaloniaOverlayWindowAdapter(IServiceProvider serviceProvide
             throw;
         }
     }
-    
+
     /// <summary>
     /// 指定されたハンドルのオーバーレイウィンドウを取得します
     /// </summary>
@@ -52,7 +52,7 @@ public sealed class AvaloniaOverlayWindowAdapter(IServiceProvider serviceProvide
     {
         return PlatformManager.GetOverlayWindow(handle);
     }
-    
+
     /// <summary>
     /// すべてのオーバーレイウィンドウを閉じます
     /// </summary>
@@ -69,12 +69,12 @@ public sealed class AvaloniaOverlayWindowAdapter(IServiceProvider serviceProvide
             throw;
         }
     }
-    
+
     /// <summary>
     /// アクティブなオーバーレイウィンドウの数
     /// </summary>
     public int ActiveOverlayCount => PlatformManager.ActiveOverlayCount;
-    
+
     /// <summary>
     /// プラットフォーム固有のマネージャーを取得
     /// </summary>
@@ -108,18 +108,18 @@ public static class OverlayWindowFactory
     /// <param name="targetWindowHandle">ターゲットウィンドウハンドル</param>
     /// <returns>作成されたオーバーレイウィンドウ</returns>
     public static async Task<IOverlayWindow> CreateDefaultOverlayAsync(
-        IOverlayWindowManager manager, 
+        IOverlayWindowManager manager,
         nint targetWindowHandle)
     {
         ArgumentNullException.ThrowIfNull(manager);
-        
+
         // デフォルト設定
         var defaultSize = new CoreSize(600, 100);
         var defaultPosition = new CorePoint(100, 100);
-        
+
         return await manager.CreateOverlayWindowAsync(targetWindowHandle, defaultSize, defaultPosition).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// 翻訳テキスト表示用のオーバーレイウィンドウを作成
     /// </summary>
@@ -133,22 +133,22 @@ public static class OverlayWindowFactory
         CoreRect textBounds)
     {
         ArgumentNullException.ThrowIfNull(manager);
-        
+
         // テキスト境界に基づいてサイズと位置を計算
         var overlaySize = new CoreSize(
-            Math.Max(textBounds.Width, 200), 
+            Math.Max(textBounds.Width, 200),
             Math.Max(textBounds.Height + 20, 60));
-        
+
         var overlayPosition = new CorePoint(
-            textBounds.X, 
+            textBounds.X,
             textBounds.Y + textBounds.Height + 5);
-        
+
         var overlay = await manager.CreateOverlayWindowAsync(targetWindowHandle, overlaySize, overlayPosition).ConfigureAwait(false);
-        
+
         // 翻訳テキスト用のヒットテスト領域を追加
         var hitTestArea = new CoreRect(0, 0, overlaySize.Width, overlaySize.Height);
         overlay.AddHitTestArea(hitTestArea);
-        
+
         return overlay;
     }
 }

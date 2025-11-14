@@ -1,7 +1,7 @@
-using Microsoft.ML.OnnxRuntime;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.ML.OnnxRuntime;
 
 namespace Baketa.Infrastructure.OCR.GPU.Providers;
 
@@ -55,8 +55,8 @@ public sealed class DirectMLExecutionProviderFactory(
                 _logger.LogDebug("No GPU available for DirectML");
                 return false;
             }
-            
-            _logger.LogDebug("DirectML provider supported for {GpuName} (CUDA:{SupportsCuda}, DirectML:{SupportsDirectML})", 
+
+            _logger.LogDebug("DirectML provider supported for {GpuName} (CUDA:{SupportsCuda}, DirectML:{SupportsDirectML})",
                 environment.GpuName, environment.SupportsCuda, environment.SupportsDirectML);
             return true;
         }
@@ -75,7 +75,7 @@ public sealed class DirectMLExecutionProviderFactory(
 
             // GPU デバイス選択
             directmlOptions["device_id"] = environment.GpuDeviceId.ToString();
-            
+
             // メモリ最適化
             if (environment.AvailableMemoryMB > 2048)
             {
@@ -119,7 +119,7 @@ public sealed class DirectMLExecutionProviderFactory(
     {
         // Gemini推奨: 設定ファイルから基本優先度を取得し、環境に応じて微調整
         var basePriority = _settings.Priority;
-        
+
         // 環境に応じた優先度調整
         if (environment.SupportsCuda)
         {

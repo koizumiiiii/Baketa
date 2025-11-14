@@ -1,7 +1,7 @@
-using Microsoft.Extensions.ObjectPool;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Factory;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Pool;
 
@@ -24,14 +24,14 @@ public sealed class PaddleOcrEnginePoolPolicy(
         try
         {
             _logger.LogDebug("🏊 PaddleOcrEnginePoolPolicy: プール用エンジンインスタンス作成開始");
-            
+
             // ファクトリーを使用してエンジンを非同期作成
             // Note: IPooledObjectPolicyは同期メソッドのため、結果を同期取得
             var engine = _engineFactory.CreateAsync().GetAwaiter().GetResult();
-            
-            _logger.LogDebug("✅ PaddleOcrEnginePoolPolicy: エンジンインスタンス作成完了 - Hash: {EngineHash}, 型: {EngineType}", 
+
+            _logger.LogDebug("✅ PaddleOcrEnginePoolPolicy: エンジンインスタンス作成完了 - Hash: {EngineHash}, 型: {EngineType}",
                 engine.GetHashCode(), engine.GetType().Name);
-            
+
             return engine;
         }
         catch (Exception ex)
@@ -54,15 +54,15 @@ public sealed class PaddleOcrEnginePoolPolicy(
 
         try
         {
-            _logger.LogDebug("🔄 PaddleOcrEnginePoolPolicy: エンジン返却処理開始 - Hash: {EngineHash}", 
+            _logger.LogDebug("🔄 PaddleOcrEnginePoolPolicy: エンジン返却処理開始 - Hash: {EngineHash}",
                 engine.GetHashCode());
 
             // エンジンの再利用可能性を確認
             if (!_engineFactory.IsReusable(engine))
             {
-                _logger.LogWarning("⚠️ PaddleOcrEnginePoolPolicy: エンジンが再利用不可 - 破棄 Hash: {EngineHash}", 
+                _logger.LogWarning("⚠️ PaddleOcrEnginePoolPolicy: エンジンが再利用不可 - 破棄 Hash: {EngineHash}",
                     engine.GetHashCode());
-                
+
                 // エンジンを破棄
                 DisposeEngine(engine);
                 return false;
@@ -70,17 +70,17 @@ public sealed class PaddleOcrEnginePoolPolicy(
 
             // クリーンアップを実行（非同期メソッドを同期実行）
             _engineFactory.CleanupAsync(engine).GetAwaiter().GetResult();
-            
-            _logger.LogDebug("✅ PaddleOcrEnginePoolPolicy: エンジン返却処理完了 - プールに復帰 Hash: {EngineHash}", 
+
+            _logger.LogDebug("✅ PaddleOcrEnginePoolPolicy: エンジン返却処理完了 - プールに復帰 Hash: {EngineHash}",
                 engine.GetHashCode());
-            
+
             return true; // プールに返却
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ PaddleOcrEnginePoolPolicy: エンジン返却処理でエラー - 破棄 Hash: {EngineHash}", 
+            _logger.LogError(ex, "❌ PaddleOcrEnginePoolPolicy: エンジン返却処理でエラー - 破棄 Hash: {EngineHash}",
                 engine.GetHashCode());
-            
+
             // エラー時はエンジンを破棄
             DisposeEngine(engine);
             return false;
@@ -94,14 +94,14 @@ public sealed class PaddleOcrEnginePoolPolicy(
     {
         try
         {
-            _logger.LogDebug("🗑️ PaddleOcrEnginePoolPolicy: エンジン破棄開始 - Hash: {EngineHash}", 
+            _logger.LogDebug("🗑️ PaddleOcrEnginePoolPolicy: エンジン破棄開始 - Hash: {EngineHash}",
                 engine.GetHashCode());
-            
+
             if (engine is IDisposable disposableEngine)
             {
                 disposableEngine.Dispose();
             }
-            
+
             _logger.LogDebug("✅ PaddleOcrEnginePoolPolicy: エンジン破棄完了");
         }
         catch (Exception ex)

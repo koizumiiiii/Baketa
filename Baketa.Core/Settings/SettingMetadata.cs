@@ -13,74 +13,74 @@ public sealed class SettingMetadata
     /// プロパティ情報
     /// </summary>
     public PropertyInfo Property { get; }
-    
+
     /// <summary>
     /// 設定レベル
     /// </summary>
     public SettingLevel Level { get; }
-    
+
     /// <summary>
     /// カテゴリ名
     /// </summary>
     public string Category { get; }
-    
+
     /// <summary>
     /// 表示名
     /// </summary>
     public string DisplayName { get; }
-    
+
     /// <summary>
     /// 説明文
     /// </summary>
     public string Description { get; }
-    
+
     /// <summary>
     /// 再起動が必要かどうか
     /// </summary>
     public bool RequiresRestart { get; }
-    
+
     /// <summary>
     /// ヘルプURL
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1056:URI-like properties should not be strings", 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1056:URI-like properties should not be strings",
         Justification = "設定値の柔軟性とメタデータ管理のためstringで保持")]
     public string? HelpUrl { get; }
-    
+
     /// <summary>
     /// 表示順序
     /// </summary>
     public int DisplayOrder { get; }
-    
+
     /// <summary>
     /// 最小値
     /// </summary>
     public object? MinValue { get; }
-    
+
     /// <summary>
     /// 最大値
     /// </summary>
     public object? MaxValue { get; }
-    
+
     /// <summary>
     /// 有効な値のリスト
     /// </summary>
     public object[]? ValidValues { get; }
-    
+
     /// <summary>
     /// 単位文字列
     /// </summary>
     public string? Unit { get; }
-    
+
     /// <summary>
     /// 警告メッセージ
     /// </summary>
     public string? WarningMessage { get; }
-    
+
     /// <summary>
     /// プロパティのフルキー（"Category.PropertyName"形式）
     /// </summary>
     public string FullKey => $"{Category}.{Property.Name}";
-    
+
     /// <summary>
     /// プロパティの型
     /// </summary>
@@ -93,7 +93,7 @@ public sealed class SettingMetadata
     {
         Property = property ?? throw new ArgumentNullException(nameof(property));
         ArgumentNullException.ThrowIfNull(attribute);
-        
+
         Level = attribute.Level;
         Category = attribute.Category;
         DisplayName = attribute.DisplayName;
@@ -107,7 +107,7 @@ public sealed class SettingMetadata
         Unit = attribute.Unit;
         WarningMessage = attribute.WarningMessage;
     }
-    
+
     /// <summary>
     /// 指定したオブジェクトから設定値を取得します
     /// </summary>
@@ -118,7 +118,7 @@ public sealed class SettingMetadata
         ArgumentNullException.ThrowIfNull(settings);
         return Property.GetValue(settings);
     }
-    
+
     /// <summary>
     /// 指定したオブジェクトに設定値を設定します
     /// </summary>
@@ -129,7 +129,7 @@ public sealed class SettingMetadata
         ArgumentNullException.ThrowIfNull(settings);
         Property.SetValue(settings, value);
     }
-    
+
     /// <summary>
     /// 値が有効範囲内かどうかを検証します
     /// </summary>
@@ -138,13 +138,13 @@ public sealed class SettingMetadata
     public bool IsValidValue(object? value)
     {
         if (value == null) return !PropertyType.IsValueType || Nullable.GetUnderlyingType(PropertyType) != null;
-        
+
         // 型チェック
         if (!PropertyType.IsAssignableFrom(value.GetType()))
         {
             return false;
         }
-        
+
         // 範囲チェック（数値型）
         if (MinValue != null || MaxValue != null)
         {
@@ -154,13 +154,13 @@ public sealed class SettingMetadata
                 if (MaxValue != null && comparableValue.CompareTo(MaxValue) > 0) return false;
             }
         }
-        
+
         // 選択肢チェック
         if (ValidValues != null && ValidValues.Length > 0)
         {
             return Array.Exists(ValidValues, v => Equals(v, value));
         }
-        
+
         return true;
     }
 }

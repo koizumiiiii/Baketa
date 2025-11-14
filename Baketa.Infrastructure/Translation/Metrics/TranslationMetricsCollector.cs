@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Baketa.Core.Abstractions.Translation;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Metrics;
 
@@ -16,7 +16,7 @@ public class TranslationMetricsCollector : IDisposable
     private readonly System.Threading.Timer _flushTimer;
     private readonly object _statsLock = new();
     private bool _disposed;
-    
+
     // 集計統計
     private long _totalTranslations;
     private long _successfulTranslations;
@@ -29,10 +29,10 @@ public class TranslationMetricsCollector : IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metricsQueue = new ConcurrentQueue<TranslationMetrics>();
         _strategyStats = new Dictionary<string, StrategyStats>();
-        
+
         // 60秒ごとに統計をログ出力
         _flushTimer = new System.Threading.Timer(FlushMetrics, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
-        
+
         _logger.LogInformation("📊 TranslationMetricsCollector初期化完了");
     }
 
@@ -42,37 +42,37 @@ public class TranslationMetricsCollector : IDisposable
     public void RecordTranslation(TranslationMetrics metrics)
     {
         if (metrics == null) return;
-        
+
         _metricsQueue.Enqueue(metrics);
-        
+
         lock (_statsLock)
         {
             _totalTranslations++;
-            
+
             if (metrics.Success)
                 _successfulTranslations++;
             else
                 _failedTranslations++;
-            
+
             _totalProcessingTimeMs += metrics.ProcessingTime.TotalMilliseconds;
-            
+
             // 戦略別統計を更新
             if (!_strategyStats.TryGetValue(metrics.Strategy, out var strategyStats))
             {
                 strategyStats = new StrategyStats();
                 _strategyStats[metrics.Strategy] = strategyStats;
             }
-            
+
             strategyStats.TotalCount++;
             strategyStats.TotalProcessingTimeMs += metrics.ProcessingTime.TotalMilliseconds;
             strategyStats.TotalCharacters += metrics.TextLength;
-            
+
             if (metrics.Success)
                 strategyStats.SuccessCount++;
             else
                 strategyStats.FailureCount++;
         }
-        
+
         // 100件ごとに簡易ログ出力
         if (_totalTranslations % 100 == 0)
         {
@@ -86,28 +86,28 @@ public class TranslationMetricsCollector : IDisposable
     public void RecordBatchTranslation(BatchTranslationMetrics metrics)
     {
         if (metrics == null) return;
-        
+
         _logger.LogInformation("📊 バッチ翻訳完了 - 戦略: {Strategy}, 件数: {Count}, 成功: {Success}, 失敗: {Failed}, 処理時間: {Time:F2}ms",
             metrics.Strategy,
             metrics.TextCount,
             metrics.SuccessCount,
             metrics.FailureCount,
             metrics.ProcessingTime.TotalMilliseconds);
-        
+
         lock (_statsLock)
         {
             _totalTranslations += metrics.TextCount;
             _successfulTranslations += metrics.SuccessCount;
             _failedTranslations += metrics.FailureCount;
             _totalProcessingTimeMs += metrics.ProcessingTime.TotalMilliseconds;
-            
+
             // 戦略別統計を更新
             if (!_strategyStats.TryGetValue(metrics.Strategy, out var strategyStats))
             {
                 strategyStats = new StrategyStats();
                 _strategyStats[metrics.Strategy] = strategyStats;
             }
-            
+
             var stats = _strategyStats[metrics.Strategy];
             stats.TotalCount += metrics.TextCount;
             stats.BatchCount++;
@@ -125,7 +125,7 @@ public class TranslationMetricsCollector : IDisposable
     {
         _logger.LogError(exception, "翻訳エラー - TextCount: {Count}, TotalChars: {Chars}",
             context.TextCount, context.TotalCharacterCount);
-        
+
         lock (_statsLock)
         {
             _failedTranslations += context.TextCount;
@@ -139,14 +139,14 @@ public class TranslationMetricsCollector : IDisposable
     {
         lock (_statsLock)
         {
-            var avgProcessingTime = _totalTranslations > 0 
-                ? _totalProcessingTimeMs / _totalTranslations 
+            var avgProcessingTime = _totalTranslations > 0
+                ? _totalProcessingTimeMs / _totalTranslations
                 : 0;
-            
-            var successRate = _totalTranslations > 0 
-                ? (double)_successfulTranslations / _totalTranslations * 100 
+
+            var successRate = _totalTranslations > 0
+                ? (double)_successfulTranslations / _totalTranslations * 100
                 : 0;
-            
+
             return new TranslationStatistics
             {
                 TotalTranslations = _totalTranslations,
@@ -166,10 +166,10 @@ public class TranslationMetricsCollector : IDisposable
     {
         lock (_statsLock)
         {
-            var successRate = _totalTranslations > 0 
-                ? (double)_successfulTranslations / _totalTranslations * 100 
+            var successRate = _totalTranslations > 0
+                ? (double)_successfulTranslations / _totalTranslations * 100
                 : 0;
-            
+
             _logger.LogInformation("📊 [Quick Stats] 総翻訳: {Total}, 成功率: {Rate:F1}%, 平均処理時間: {Avg:F2}ms",
                 _totalTranslations,
                 successRate,
@@ -185,26 +185,26 @@ public class TranslationMetricsCollector : IDisposable
         try
         {
             var stats = GetStatistics();
-            
+
             _logger.LogInformation("📊 === 翻訳統計レポート ===");
             _logger.LogInformation("総翻訳数: {Total} (成功: {Success}, 失敗: {Failed})",
                 stats.TotalTranslations, stats.SuccessfulTranslations, stats.FailedTranslations);
             _logger.LogInformation("成功率: {Rate:F2}%, 平均処理時間: {Avg:F2}ms",
                 stats.SuccessRate, stats.AverageProcessingTimeMs);
-            
+
             foreach (var (strategy, stratStats) in stats.StrategyStatistics)
             {
-                var stratSuccessRate = stratStats.TotalCount > 0 
-                    ? (double)stratStats.SuccessCount / stratStats.TotalCount * 100 
+                var stratSuccessRate = stratStats.TotalCount > 0
+                    ? (double)stratStats.SuccessCount / stratStats.TotalCount * 100
                     : 0;
-                var stratAvgTime = stratStats.TotalCount > 0 
-                    ? stratStats.TotalProcessingTimeMs / stratStats.TotalCount 
+                var stratAvgTime = stratStats.TotalCount > 0
+                    ? stratStats.TotalProcessingTimeMs / stratStats.TotalCount
                     : 0;
-                
+
                 _logger.LogInformation("  [{Strategy}] 件数: {Count}, 成功率: {Rate:F1}%, 平均: {Avg:F2}ms, バッチ: {Batch}",
                     strategy, stratStats.TotalCount, stratSuccessRate, stratAvgTime, stratStats.BatchCount);
             }
-            
+
             // キューをクリア
             while (_metricsQueue.TryDequeue(out _)) { }
         }
@@ -217,7 +217,7 @@ public class TranslationMetricsCollector : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _flushTimer?.Dispose();
         FlushMetrics(null); // 最終フラッシュ
         _disposed = true;

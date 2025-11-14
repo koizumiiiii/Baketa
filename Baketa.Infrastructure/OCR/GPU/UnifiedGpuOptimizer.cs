@@ -1,8 +1,8 @@
+using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Infrastructure.OCR.GPU.Providers;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML.OnnxRuntime;
-using System.Collections.Concurrent;
 
 namespace Baketa.Infrastructure.OCR.GPU;
 
@@ -76,12 +76,12 @@ public sealed class UnifiedGpuOptimizer : IUnifiedGpuOptimizer, IDisposable
             }
 
             var selectedProvider = availableProviders.First();
-            
+
             // キャッシュ更新
             _providerCache.TryAdd(cacheKey, selectedProvider);
 
             _logger.LogInformation("Selected optimal provider: {ProviderType} (Priority: {Priority}) for environment: {Environment}",
-                selectedProvider.Type, 
+                selectedProvider.Type,
                 selectedProvider.Priority(environment),
                 selectedProvider.GetProviderInfo(environment));
 
@@ -98,7 +98,7 @@ public sealed class UnifiedGpuOptimizer : IUnifiedGpuOptimizer, IDisposable
     /// 複数プロバイダーを優先度順で取得（フォールバック用）
     /// </summary>
     public async Task<IReadOnlyList<IExecutionProviderFactory>> GetFallbackProvidersAsync(
-        int maxProviders = 3, 
+        int maxProviders = 3,
         CancellationToken cancellationToken = default)
     {
         try
@@ -170,7 +170,7 @@ public sealed class UnifiedGpuOptimizer : IUnifiedGpuOptimizer, IDisposable
         try
         {
             var environment = await GetEnvironmentInfoAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // 優先プロバイダー試行
             var preferredFactory = _providerFactories.FirstOrDefault(f => f.Type == preferredProvider);
             if (preferredFactory != null && preferredFactory.IsSupported(environment))
@@ -193,7 +193,7 @@ public sealed class UnifiedGpuOptimizer : IUnifiedGpuOptimizer, IDisposable
     /// <summary>
     /// 利用可能なプロバイダー一覧を取得
     /// </summary>
-    public async Task<IReadOnlyList<(ExecutionProvider Type, bool IsSupported, int Priority, string Info)>> 
+    public async Task<IReadOnlyList<(ExecutionProvider Type, bool IsSupported, int Priority, string Info)>>
         GetProviderStatusAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -234,7 +234,7 @@ public sealed class UnifiedGpuOptimizer : IUnifiedGpuOptimizer, IDisposable
             {
                 return _cachedEnvironment;
             }
-            
+
             // 先にキャッシュされた環境情報を確認
             var cachedResult = _environmentDetector.GetCachedEnvironment();
             if (cachedResult != null)
@@ -242,7 +242,7 @@ public sealed class UnifiedGpuOptimizer : IUnifiedGpuOptimizer, IDisposable
                 _cachedEnvironment = cachedResult;
                 return cachedResult;
             }
-            
+
             // キャッシュされていない場合は非同期で検出
             var environment = await _environmentDetector.DetectEnvironmentAsync(cancellationToken).ConfigureAwait(false);
             _cachedEnvironment = environment;
@@ -284,7 +284,7 @@ public sealed class UnifiedGpuOptimizer : IUnifiedGpuOptimizer, IDisposable
         _providerCache.Clear();
         _environmentDetectionLock.Dispose();
         _disposed = true;
-        
+
         _logger.LogInformation("UnifiedGpuOptimizer disposed");
     }
 }

@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Services.Logging;
 
@@ -19,7 +19,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     public void LogInformation(string message)
     {
         _logger.LogInformation("{Message}", message);
-        
+
         if (_enableConsoleOutput)
         {
             Console.WriteLine($"[INFO] {message}");
@@ -30,7 +30,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     public void LogInformation(string messageTemplate, params object[] args)
     {
         _logger.LogInformation(messageTemplate, args);
-        
+
         if (_enableConsoleOutput)
         {
             try
@@ -49,7 +49,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     public void LogWarning(string message)
     {
         _logger.LogWarning("{Message}", message);
-        
+
         if (_enableConsoleOutput)
         {
             Console.WriteLine($"[WARN] {message}");
@@ -60,7 +60,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     public void LogWarning(Exception exception, string message)
     {
         _logger.LogWarning(exception, "{Message}", message);
-        
+
         if (_enableConsoleOutput)
         {
             Console.WriteLine($"[WARN] {message}: {exception.Message}");
@@ -71,7 +71,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     public void LogError(string message)
     {
         _logger.LogError("{Message}", message);
-        
+
         if (_enableConsoleOutput)
         {
             Console.WriteLine($"[ERROR] {message}");
@@ -82,7 +82,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     public void LogError(Exception exception, string message)
     {
         _logger.LogError(exception, "{Message}", message);
-        
+
         if (_enableConsoleOutput)
         {
             Console.WriteLine($"[ERROR] {message}: {exception.Message}");
@@ -93,7 +93,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     public void LogDebug(string message)
     {
         _logger.LogDebug("{Message}", message);
-        
+
         if (_enableConsoleOutput)
         {
             Console.WriteLine($"[DEBUG] {message}");
@@ -104,7 +104,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     public void LogDebug(string messageTemplate, params object[] args)
     {
         _logger.LogDebug(messageTemplate, args);
-        
+
         if (_enableConsoleOutput)
         {
             try
@@ -125,9 +125,9 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
         // 旧DebugLogUtilityの互換機能 - ILoggerのDebugレベルとして統一
         var threadId = Environment.CurrentManagedThreadId;
         var formattedMessage = $"[T{threadId:D2}] {message}";
-        
+
         _logger.LogDebug("{DebugMessage}", formattedMessage);
-        
+
         if (_enableConsoleOutput)
         {
             Console.WriteLine($"[DEBUG-FILE] {formattedMessage}");
@@ -139,7 +139,7 @@ public sealed class UnifiedLoggingService(ILogger<UnifiedLoggingService> logger)
     {
         // 開発・デバッグ用のコンソール専用出力
         Console.WriteLine(message);
-        
+
         // 同時にLoggerにも記録（Traceレベル）
         _logger.LogTrace("{ConsoleMessage}", message);
     }

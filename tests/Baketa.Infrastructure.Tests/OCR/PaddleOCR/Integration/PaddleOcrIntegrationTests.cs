@@ -1,17 +1,17 @@
-using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
-using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
-using Baketa.Infrastructure.DI;
+using System.Drawing;
+using System.IO;
 using Baketa.Core.Abstractions.Dependency;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
-using System.Drawing;
-using Moq;
-using System.IO;
+using Baketa.Infrastructure.DI;
+using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Integration;
 
@@ -33,16 +33,16 @@ public class PaddleOcrIntegrationTests : IDisposable
 
         // DIコンテナの設定（安全版）
         var services = new ServiceCollection();
-        
+
         // ロギング設定
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
-        
+
         // 安全なテスト用モデルパスリゾルバのみ登録
-        services.AddSingleton<IModelPathResolver>(provider => 
+        services.AddSingleton<IModelPathResolver>(provider =>
             new DefaultModelPathResolver(_testBaseDirectory));
 
         _serviceProvider = services.BuildServiceProvider();
-        
+
         // 必要なディレクトリを事前作成
         CreateTestDirectories();
     }
@@ -50,7 +50,7 @@ public class PaddleOcrIntegrationTests : IDisposable
     private void CreateTestDirectories()
     {
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
-        
+
         var directories = new[]
         {
             modelPathResolver.GetDetectionModelsDirectory(),
@@ -74,14 +74,14 @@ public class PaddleOcrIntegrationTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
 
         // Act & Assert - OCRエンジン初期化のみをテスト（実際のPaddleOcrInitializerは使用しない）
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = false, WorkerCount = 2 };
         var engineInitResult = await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         Assert.True(engineInitResult, "SafeTestPaddleOcrEngine should initialize successfully");
-        
+
         Assert.True(safeOcrEngine.IsInitialized, "OCR engine should be initialized");
         Assert.Equal("eng", safeOcrEngine.CurrentLanguage);
     }
@@ -92,7 +92,7 @@ public class PaddleOcrIntegrationTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
 
         // Act & Assert - 初期化（安全なエンジンのみ）
@@ -120,9 +120,9 @@ public class PaddleOcrIntegrationTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -143,9 +143,9 @@ public class PaddleOcrIntegrationTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -171,20 +171,20 @@ public class PaddleOcrIntegrationTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Act - 安全なエンジンのみを初期化
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
-        
+
         stopwatch.Stop();
 
         // Assert
         // 初期化は1秒以内に完了すべき（テスト用エンジンの場合）
-        Assert.True(stopwatch.ElapsedMilliseconds < 1000, 
+        Assert.True(stopwatch.ElapsedMilliseconds < 1000,
             $"Initialization took too long: {stopwatch.ElapsedMilliseconds}ms");
     }
 
@@ -194,9 +194,9 @@ public class PaddleOcrIntegrationTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -204,13 +204,13 @@ public class PaddleOcrIntegrationTests : IDisposable
 
         // Act
         await safeOcrEngine.SwitchLanguageAsync("jpn", CancellationToken.None).ConfigureAwait(false);
-        
+
         stopwatch.Stop();
 
         // Assert
         // 言語切り替えは1000ms以内に完了すべき（テスト環境・CI環境を考慮）
         // 実運用では更に最適化が必要だが、テストでは環境差異を許容
-        Assert.True(stopwatch.ElapsedMilliseconds < 1000, 
+        Assert.True(stopwatch.ElapsedMilliseconds < 1000,
             $"Language switching took too long: {stopwatch.ElapsedMilliseconds}ms");
     }
 
@@ -220,9 +220,9 @@ public class PaddleOcrIntegrationTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         using var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 4 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false); // マルチスレッド有効
 
@@ -250,13 +250,13 @@ public class PaddleOcrIntegrationTests : IDisposable
     {
         // Arrange - 無効なパスでエラーを発生させるモックアダプターを使用
         var mockModelPathResolver = new Mock<IModelPathResolver>();
-        
+
         // 存在しないパスを設定してエラーを発生させる
         const string invalidModelsPath = "\\\\invalid\\recovery\\test\\Models";
         const string invalidDetectionPath = "\\\\invalid\\recovery\\test\\Models\\detection";
         const string invalidRecognitionEngPath = "\\\\invalid\\recovery\\test\\Models\\recognition\\eng";
         const string invalidRecognitionJpnPath = "\\\\invalid\\recovery\\test\\Models\\recognition\\jpn";
-        
+
         mockModelPathResolver.Setup(x => x.GetModelsRootDirectory())
             .Returns(invalidModelsPath);
         mockModelPathResolver.Setup(x => x.GetDetectionModelsDirectory())
@@ -274,7 +274,7 @@ public class PaddleOcrIntegrationTests : IDisposable
         mockModelPathResolver.Setup(x => x.EnsureDirectoryExists(It.IsAny<string>()));
 
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         // テスト用の安全なエンジンで初期化失敗をシミュレート
         using var failingEngine = new SafeTestPaddleOcrEngine(mockModelPathResolver.Object, logger, true);
 
@@ -301,7 +301,7 @@ public class PaddleOcrIntegrationTests : IDisposable
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
         using var uninitializedEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var mockImage = CreateMockImage();
 
         // Act & Assert
@@ -319,9 +319,9 @@ public class PaddleOcrIntegrationTests : IDisposable
         // Arrange - テスト用の安全なエンジンのみを使用
         var modelPathResolver = _serviceProvider.GetRequiredService<IModelPathResolver>();
         var logger = _serviceProvider.GetRequiredService<ILogger<PaddleOcrEngine>>();
-        
+
         var safeOcrEngine = new SafeTestPaddleOcrEngine(modelPathResolver, logger, true);
-        
+
         var settings = new OcrEngineSettings { Language = "eng", EnableMultiThread = true, WorkerCount = 2 };
         await safeOcrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
 
@@ -330,7 +330,7 @@ public class PaddleOcrIntegrationTests : IDisposable
 
         // Assert
         Assert.False(safeOcrEngine.IsInitialized);
-        
+
         // 再利用しようとすると例外が発生することを確認
         await Assert.ThrowsAsync<ObjectDisposedException>(
             () => safeOcrEngine.RecognizeAsync(CreateMockImage().Object, null, CancellationToken.None)).ConfigureAwait(false);
@@ -380,7 +380,7 @@ public class PaddleOcrIntegrationTests : IDisposable
         Assert.Contains("rec_english_standard.onnx", englishModelPath, StringComparison.Ordinal);
         Assert.Contains("rec_japan_standard.onnx", japaneseModelPath, StringComparison.Ordinal);
         Assert.Contains("cls_mobile_standard.onnx", classificationModelPath, StringComparison.Ordinal); // 分類モデルパスの検証
-        
+
         Assert.Contains("detection", detectionModelPath, StringComparison.Ordinal);
         Assert.Contains(Path.Combine("recognition", "eng"), englishModelPath, StringComparison.Ordinal);
         Assert.Contains(Path.Combine("recognition", "jpn"), japaneseModelPath, StringComparison.Ordinal);
@@ -498,11 +498,11 @@ public class PaddleOcrIntegrationTests : IDisposable
         var mockImage = new Mock<IImage>();
         mockImage.Setup(x => x.Width).Returns(640);
         mockImage.Setup(x => x.Height).Returns(480);
-        
+
         // 簡単なダミーデータを設定
         var dummyData = new byte[640 * 480 * 3]; // RGB
         mockImage.Setup(x => x.ToByteArrayAsync()).ReturnsAsync(dummyData);
-        
+
         return mockImage;
     }
 
@@ -522,7 +522,7 @@ public class PaddleOcrIntegrationTests : IDisposable
         var isCI = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CI")) ||
                    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_ACTIONS")) ||
                    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BUILD_BUILDID"));
-        
+
         if (isCI)
         {
             return false;
@@ -572,7 +572,7 @@ public class PaddleOcrIntegrationTests : IDisposable
     /// </summary>
     private static async Task ExecuteWithNativeLibraryHandling(Func<Task> action)
     {
-        await ExecuteWithNativeLibraryHandling(async () => 
+        await ExecuteWithNativeLibraryHandling(async () =>
         {
             await action().ConfigureAwait(false);
             return true;
@@ -590,7 +590,7 @@ public class PaddleOcrIntegrationTests : IDisposable
             if (disposing)
             {
                 _serviceProvider?.Dispose();
-                
+
                 // テスト用ディレクトリのクリーンアップ
                 try
                 {
@@ -612,7 +612,7 @@ public class PaddleOcrIntegrationTests : IDisposable
                     // I/Oエラーは無視
                 }
             }
-            
+
             _disposed = true;
         }
     }

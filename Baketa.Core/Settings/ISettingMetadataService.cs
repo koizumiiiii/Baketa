@@ -15,14 +15,14 @@ public interface ISettingMetadataService
     /// <typeparam name="T">設定クラスの型</typeparam>
     /// <returns>メタデータのコレクション</returns>
     IReadOnlyList<SettingMetadata> GetMetadata<T>() where T : class;
-    
+
     /// <summary>
     /// 指定された型からメタデータを取得します
     /// </summary>
     /// <param name="settingsType">設定クラスの型</param>
     /// <returns>メタデータのコレクション</returns>
     IReadOnlyList<SettingMetadata> GetMetadata(Type settingsType);
-    
+
     /// <summary>
     /// 指定されたレベルのメタデータのみを取得します
     /// </summary>
@@ -30,7 +30,7 @@ public interface ISettingMetadataService
     /// <param name="level">取得する設定レベル</param>
     /// <returns>フィルタリングされたメタデータのコレクション</returns>
     IReadOnlyList<SettingMetadata> GetMetadataByLevel<T>(SettingLevel level) where T : class;
-    
+
     /// <summary>
     /// 指定されたカテゴリのメタデータのみを取得します
     /// </summary>
@@ -38,14 +38,14 @@ public interface ISettingMetadataService
     /// <param name="category">取得するカテゴリ</param>
     /// <returns>フィルタリングされたメタデータのコレクション</returns>
     IReadOnlyList<SettingMetadata> GetMetadataByCategory<T>(string category) where T : class;
-    
+
     /// <summary>
     /// 利用可能なカテゴリの一覧を取得します
     /// </summary>
     /// <typeparam name="T">設定クラスの型</typeparam>
     /// <returns>カテゴリ名のコレクション</returns>
     IReadOnlyList<string> GetCategories<T>() where T : class;
-    
+
     /// <summary>
     /// 設定値の検証を実行します
     /// </summary>
@@ -53,7 +53,7 @@ public interface ISettingMetadataService
     /// <param name="value">検証する値</param>
     /// <returns>検証結果</returns>
     SettingValidationResult ValidateValue(SettingMetadata metadata, object? value);
-    
+
     /// <summary>
     /// 設定オブジェクト全体の検証を実行します
     /// </summary>

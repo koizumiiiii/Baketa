@@ -20,8 +20,8 @@ public sealed class AvaloniaFileDialogService(ILogger<AvaloniaFileDialogService>
 
     /// <inheritdoc/>
     public async Task<string?> ShowSaveFileDialogAsync(
-        string title, 
-        string? defaultFileName = null, 
+        string title,
+        string? defaultFileName = null,
         IReadOnlyList<FileTypeFilter>? fileTypeFilters = null)
     {
         try
@@ -64,8 +64,8 @@ public sealed class AvaloniaFileDialogService(ILogger<AvaloniaFileDialogService>
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<string>?> ShowOpenFileDialogAsync(
-        string title, 
-        IReadOnlyList<FileTypeFilter>? fileTypeFilters = null, 
+        string title,
+        IReadOnlyList<FileTypeFilter>? fileTypeFilters = null,
         bool allowMultiple = false)
     {
         try

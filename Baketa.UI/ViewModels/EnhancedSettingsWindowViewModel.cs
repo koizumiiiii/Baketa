@@ -1,4 +1,3 @@
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,15 +6,16 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using Baketa.Core.Settings;
-using Baketa.Core.Services;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Services;
+using Baketa.Core.Settings;
+using Baketa.UI.Framework;
 using Baketa.UI.Models.Settings;
 using Baketa.UI.Services;
-using Baketa.UI.Framework;
-using Baketa.UI.Views.Settings;
 using Baketa.UI.ViewModels.Settings;
+using Baketa.UI.Views.Settings;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels;
 
@@ -112,7 +112,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     public SettingCategory? SelectedCategory
     {
         get => _selectedCategory;
-        set 
+        set
         {
             System.Diagnostics.Debug.WriteLine($"DEBUG: SelectedCategory setter called with {value?.Id ?? "null"}, Content before = {value?.Content?.GetType()?.Name ?? "null"}");
             this.RaiseAndSetIfChanged(ref _selectedCategory, value);
@@ -257,7 +257,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 "パフォーマンスと拡張機能の設定"
             )
         };
-        
+
         AllCategories = categories;
     }
 
@@ -292,7 +292,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         try
         {
-            if (_settingsViewModels.TryGetValue("general", out var cachedViewModel) && 
+            if (_settingsViewModels.TryGetValue("general", out var cachedViewModel) &&
                 cachedViewModel is GeneralSettingsViewModel generalViewModel)
             {
                 return new GeneralSettingsView(generalViewModel);
@@ -317,7 +317,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 settings = new GeneralSettings();
             }
             var viewModel = new GeneralSettingsViewModel(settings, _eventAggregator, _logger as ILogger<GeneralSettingsViewModel>);
-            
+
             _settingsViewModels["general"] = viewModel;
             return new GeneralSettingsView(viewModel);
         }
@@ -336,7 +336,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         try
         {
-            if (_settingsViewModels.TryGetValue("appearance", out var cachedViewModel) && 
+            if (_settingsViewModels.TryGetValue("appearance", out var cachedViewModel) &&
                 cachedViewModel is ThemeSettingsViewModel themeViewModel)
             {
                 return new ThemeSettingsView(themeViewModel);
@@ -361,7 +361,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 settings = new ThemeSettings();
             }
             var viewModel = new ThemeSettingsViewModel(settings, _eventAggregator, _logger as ILogger<ThemeSettingsViewModel>);
-            
+
             _settingsViewModels["appearance"] = viewModel;
             return new ThemeSettingsView(viewModel);
         }
@@ -380,7 +380,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         try
         {
-            if (_settingsViewModels.TryGetValue("mainui", out var cachedViewModel) && 
+            if (_settingsViewModels.TryGetValue("mainui", out var cachedViewModel) &&
                 cachedViewModel is MainUiSettingsViewModel mainUiViewModel)
             {
                 return new MainUiSettingsView(mainUiViewModel);
@@ -405,7 +405,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 settings = new MainUiSettings();
             }
             var viewModel = new MainUiSettingsViewModel(settings, _eventAggregator, _logger as ILogger<MainUiSettingsViewModel>);
-            
+
             _settingsViewModels["mainui"] = viewModel;
             return new MainUiSettingsView(viewModel);
         }
@@ -433,7 +433,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         try
         {
-            if (_settingsViewModels.TryGetValue("overlay", out var cachedViewModel) && 
+            if (_settingsViewModels.TryGetValue("overlay", out var cachedViewModel) &&
                 cachedViewModel is OverlaySettingsViewModel overlayViewModel)
             {
                 return new OverlaySettingsView(overlayViewModel);
@@ -458,7 +458,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 settings = new OverlaySettings();
             }
             var viewModel = new OverlaySettingsViewModel(settings, _eventAggregator, _logger as ILogger<OverlaySettingsViewModel>);
-            
+
             _settingsViewModels["overlay"] = viewModel;
             return new OverlaySettingsView(viewModel);
         }
@@ -477,7 +477,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         try
         {
-            if (_settingsViewModels.TryGetValue("capture", out var cachedViewModel) && 
+            if (_settingsViewModels.TryGetValue("capture", out var cachedViewModel) &&
                 cachedViewModel is CaptureSettingsViewModel captureViewModel)
             {
                 return new CaptureSettingsView(captureViewModel);
@@ -502,7 +502,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 settings = new CaptureSettings();
             }
             var viewModel = new CaptureSettingsViewModel(settings, _eventAggregator, _logger as ILogger<CaptureSettingsViewModel>);
-            
+
             _settingsViewModels["capture"] = viewModel;
             return new CaptureSettingsView(viewModel);
         }
@@ -521,7 +521,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         try
         {
-            if (_settingsViewModels.TryGetValue("ocr", out var cachedViewModel) && 
+            if (_settingsViewModels.TryGetValue("ocr", out var cachedViewModel) &&
                 cachedViewModel is OcrSettingsViewModel ocrViewModel)
             {
                 return new OcrSettingsView(ocrViewModel);
@@ -546,7 +546,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 settings = new OcrSettings();
             }
             var viewModel = new OcrSettingsViewModel(settings, _eventAggregator, _logger as ILogger<OcrSettingsViewModel>);
-            
+
             _settingsViewModels["ocr"] = viewModel;
             return new OcrSettingsView(viewModel);
         }
@@ -565,7 +565,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         try
         {
-            if (_settingsViewModels.TryGetValue("advanced", out var cachedViewModel) && 
+            if (_settingsViewModels.TryGetValue("advanced", out var cachedViewModel) &&
                 cachedViewModel is AdvancedSettingsViewModel advancedViewModel)
             {
                 return new AdvancedSettingsView(advancedViewModel);
@@ -590,7 +590,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 settings = new AdvancedSettings();
             }
             var viewModel = new AdvancedSettingsViewModel(settings, _eventAggregator, _logger as ILogger<AdvancedSettingsViewModel>);
-            
+
             _settingsViewModels["advanced"] = viewModel;
             return new AdvancedSettingsView(viewModel);
         }
@@ -663,7 +663,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
 
             _changeTracker.ClearChanges();
             StatusMessage = "設定を保存しました";
-            
+
             _logger?.LogInformation("設定の保存が完了しました");
         }
         catch (InvalidOperationException ex)
@@ -755,7 +755,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
         try
         {
             StatusMessage = "設定を検証中...";
-            
+
             var validationResults = new List<(string Category, bool IsValid, string? ErrorMessage)>();
 
             // 各設定ViewModelのバリデーションを実行
@@ -784,7 +784,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                             isValid = advanced.ValidateSettings();
                             if (!isValid) errorMessage = "拡張設定に問題があります";
                             break;
-                        // 他の設定ViewModelにもバリデーションメソッドを追加したら、ここに追加
+                            // 他の設定ViewModelにもバリデーションメソッドを追加したら、ここに追加
                     }
                 }
                 catch (ArgumentException ex)
@@ -811,7 +811,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
 
             // バリデーション結果の評価
             var failedValidations = validationResults.Where(r => !r.IsValid).ToList();
-            
+
             if (failedValidations.Count == 0)
             {
                 StatusMessage = "すべての設定が有効です";
@@ -863,7 +863,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     private static bool IsTestEnvironment()
     {
         return AppDomain.CurrentDomain.GetAssemblies()
-            .Any(a => a.FullName?.Contains("xunit") == true || 
+            .Any(a => a.FullName?.Contains("xunit") == true ||
                      a.FullName?.Contains("Microsoft.TestPlatform") == true ||
                      a.FullName?.Contains("testhost") == true);
     }
@@ -890,13 +890,13 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                     }
                 }
             }
-            
+
             _settingsViewModels.Clear();
-            
+
             // イベントハンドラーの解除
             _changeTracker.HasChangesChanged -= OnHasChangesChanged;
         }
-        
+
         base.Dispose(disposing);
     }
 

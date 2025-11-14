@@ -1,5 +1,5 @@
-using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Models.Capture;
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
 using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
@@ -14,22 +14,22 @@ public interface ICaptureStrategy
     /// 戦略名
     /// </summary>
     string StrategyName { get; }
-    
+
     /// <summary>
     /// この戦略が適用可能かチェック
     /// </summary>
     bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd);
-    
+
     /// <summary>
     /// キャプチャを実行
     /// </summary>
     Task<CaptureStrategyResult> ExecuteCaptureAsync(IntPtr hwnd, CaptureOptions options);
-    
+
     /// <summary>
     /// 戦略の優先度（数値が高いほど優先される）
     /// </summary>
     int Priority { get; }
-    
+
     /// <summary>
     /// この戦略に必要な事前条件をチェック
     /// </summary>

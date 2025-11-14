@@ -1,20 +1,20 @@
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using Moq;
-using ReactiveUI;
 using System;
-using Microsoft.Extensions.Logging.Abstractions;
-using Baketa.UI.Security;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
-using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Auth;
-using Baketa.UI.ViewModels.Auth;
+using Baketa.Core.Abstractions.Events;
+using Baketa.UI.Security;
 using Baketa.UI.Services;
 using Baketa.UI.Tests.Infrastructure;
+using Baketa.UI.ViewModels.Auth;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using ReactiveUI;
+using Xunit;
 
 namespace Baketa.UI.Tests.ViewModels.Auth;
 
@@ -36,10 +36,10 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         _mockNavigationService = new Mock<INavigationService>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLogger = new Mock<ILogger<LoginViewModel>>();
-        
+
         ResetMocks();
     }
-    
+
     /// <summary>
     /// Mockオブジェクトの状態をリセット
     /// </summary>
@@ -49,7 +49,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         _mockNavigationService.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
-        
+
         // デフォルト設定
         _mockNavigationService.Setup(x => x.ShowSignupAsync()).ReturnsAsync(true);
     }
@@ -61,20 +61,20 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     {
         ResetMocks(); // 各テスト前にMockをリセット
         _currentViewModel?.Dispose(); // 前のViewModelがあれば破棄
-        
+
         // LoginAttemptTrackerはsealクラスなのMock不可、新しいインスタンスでブロック状態を回避
         var attemptTracker = new LoginAttemptTracker();
-        
+
         _currentViewModel = RunOnUIThread(() => new LoginViewModel(
-            _mockAuthService.Object, 
-            _mockNavigationService.Object, 
+            _mockAuthService.Object,
+            _mockNavigationService.Object,
             attemptTracker,
             new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance),
-            _mockEventAggregator.Object, 
+            _mockEventAggregator.Object,
             _mockLogger.Object));
         return _currentViewModel;
     }
-    
+
     public override void Dispose()
     {
         try
@@ -108,7 +108,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         viewModel.RememberMe.Should().BeTrue();
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.IsLoading.Should().BeFalse();
-        
+
         // コマンドが初期化されていることを確認
         viewModel.LoginWithEmailCommand.Should().NotBeNull();
         viewModel.LoginWithGoogleCommand.Should().NotBeNull();
@@ -122,8 +122,8 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     public void Constructor_WithNullAuthService_ThrowsArgumentNullException()
     {
         // Act & Assert
-        RunOnUIThread(() => 
-            Assert.Throws<ArgumentNullException>(() => 
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
                 new LoginViewModel(null!, _mockNavigationService.Object, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
@@ -131,8 +131,8 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     public void Constructor_WithNullNavigationService_ThrowsArgumentNullException()
     {
         // Act & Assert
-        RunOnUIThread(() => 
-            Assert.Throws<ArgumentNullException>(() => 
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
                 new LoginViewModel(_mockAuthService.Object, null!, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
@@ -140,8 +140,8 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     public void Constructor_WithNullEventAggregator_ThrowsArgumentNullException()
     {
         // Act & Assert
-        RunOnUIThread(() => 
-            Assert.Throws<ArgumentNullException>(() => 
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
                 new LoginViewModel(_mockAuthService.Object, _mockNavigationService.Object, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), null!, _mockLogger.Object)));
     }
 
@@ -203,11 +203,11 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         // Arrange
         _mockAuthService.Setup(x => x.SignInWithEmailPasswordAsync("test@example.com", "password123", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AuthSuccess(new AuthSession(
-                "access_token", 
-                "refresh_token", 
+                "access_token",
+                "refresh_token",
                 DateTime.UtcNow.AddHours(1),
                 new UserInfo("test-user-id", "test@example.com", "Test User"))));
-        
+
         var viewModel = CreateViewModel();
         viewModel.Email = "test@example.com";
         viewModel.Password = "password123";
@@ -225,21 +225,22 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     {
         // Arrange
         var failureResult = new AuthFailure("invalid_credentials", "Invalid credentials");
-        
+
         // SanitizeInputの結果を事前確認
         var originalEmail = "test@example.com";
         var sanitizedEmail = Baketa.UI.Security.InputValidator.SanitizeInput(originalEmail);
         System.Diagnostics.Debug.WriteLine($"Original: {originalEmail}, Sanitized: {sanitizedEmail}");
-        
+
         // Mockの実際の動作を確認するためのCallback設定
         _mockAuthService.Setup(x => x.SignInWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(failureResult)
-            .Callback<string, string, CancellationToken>((email, password, token) => {
+            .Callback<string, string, CancellationToken>((email, password, token) =>
+            {
                 System.Diagnostics.Debug.WriteLine($"Mock呼び出し: Email='{email}', Password='{password}'");
                 System.Diagnostics.Debug.WriteLine($"Mock返却値: {failureResult.ErrorCode} - {failureResult.Message}");
             })
             .Verifiable();
-        
+
         var viewModel = CreateViewModel();
         viewModel.Email = originalEmail;
         viewModel.Password = "wrongpassword";
@@ -249,11 +250,12 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
 
         // 少し待ってからUIThreadでプロパティアクセスを実行
         await Task.Delay(100); // ConfigureAwait(false)の影響を考慮した待機
-        
+
         string? errorMessage = null;
         bool isLoading = true;
-        
-        RunOnUIThread(() => {
+
+        RunOnUIThread(() =>
+        {
             errorMessage = viewModel.ErrorMessage;
             isLoading = viewModel.IsLoading;
             System.Diagnostics.Debug.WriteLine($"UIThread - ErrorMessage: '{errorMessage}'");
@@ -264,28 +266,34 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         _mockAuthService.Verify(x => x.SignInWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce, "AuthServiceが呼び出されていません");
 
         // 直接的なエラーメッセージ設定テストとして、GetAuthFailureMessageの動作を確認
-        var expectedMessage = "invalid_credentials" switch {
+        var expectedMessage = "invalid_credentials" switch
+        {
             "invalid_credentials" => "メールアドレスまたはパスワードが正しくありません",
             _ => "Unknown"
         };
         System.Diagnostics.Debug.WriteLine($"Expected message: '{expectedMessage}'");
-        
+
         // 直接エラーメッセージを設定してテスト
-        RunOnUIThread(() => {
+        RunOnUIThread(() =>
+        {
             viewModel.ErrorMessage = expectedMessage;
             System.Diagnostics.Debug.WriteLine($"Direct set - ErrorMessage: '{viewModel.ErrorMessage}'");
         });
-        
+
         // 直接設定後の値を確認
         string? directSetMessage = null;
-        RunOnUIThread(() => {
+        RunOnUIThread(() =>
+        {
             directSetMessage = viewModel.ErrorMessage;
         });
-        
+
         // Assert - コマンド実行後の値または直接設定値で検証
-        if (!string.IsNullOrEmpty(errorMessage)) {
+        if (!string.IsNullOrEmpty(errorMessage))
+        {
             errorMessage.Should().Contain("メールアドレスまたはパスワードが正しくありません");
-        } else {
+        }
+        else
+        {
             // コマンド実行で設定されなかった場合、直接設定で検証
             directSetMessage.Should().NotBeNullOrEmpty();
             directSetMessage.Should().Contain("メールアドレスまたはパスワードが正しくありません");
@@ -318,11 +326,11 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         var originalEmail = "test@example.com";
         var sanitizedEmail = Baketa.UI.Security.InputValidator.SanitizeInput(originalEmail);
         System.Diagnostics.Debug.WriteLine($"Exception Test - Original: {originalEmail}, Sanitized: {sanitizedEmail}");
-        
+
         _mockAuthService.Setup(x => x.SignInWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new TimeoutException("Connection timeout"))
             .Verifiable();
-        
+
         var viewModel = CreateViewModel();
         viewModel.Email = originalEmail;
         viewModel.Password = "password123";
@@ -330,39 +338,45 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         // Act - ReactiveCommandで例外が発生し、ThrownExceptionsでハンドリングされる
         // ThrownExceptionsはReactiveCommand内で例外が発生した場合のみ発火
         await viewModel.LoginWithEmailCommand.Execute().FirstAsync();
-        
+
         // UIThreadでプロパティアクセスを実行
         string? errorMessage = null;
         bool isLoading = true;
-        
-        RunOnUIThread(() => {
+
+        RunOnUIThread(() =>
+        {
             errorMessage = viewModel.ErrorMessage;
             isLoading = viewModel.IsLoading;
             System.Diagnostics.Debug.WriteLine($"Exception Test UIThread - ErrorMessage: '{errorMessage}'");
             System.Diagnostics.Debug.WriteLine($"Exception Test UIThread - IsLoading: {isLoading}");
         });
-        
+
         // Mock呼び出し確認
         _mockAuthService.Verify(x => x.SignInWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce, "AuthService(Exception)が呼び出されていません");
-        
+
         // 直接的なエラーメッセージ設定テスト
         var expectedMessage = "接続がタイムアウトしました。インターネット接続をご確認ください";
-        
+
         // 直接エラーメッセージを設定してテスト
-        RunOnUIThread(() => {
+        RunOnUIThread(() =>
+        {
             viewModel.ErrorMessage = expectedMessage;
         });
-        
+
         // 直接設定後の値を確認
         string? directSetMessage = null;
-        RunOnUIThread(() => {
+        RunOnUIThread(() =>
+        {
             directSetMessage = viewModel.ErrorMessage;
         });
-        
+
         // Assert - コマンド実行後の値または直接設定値で検証
-        if (!string.IsNullOrEmpty(errorMessage)) {
+        if (!string.IsNullOrEmpty(errorMessage))
+        {
             errorMessage.Should().Contain("接続がタイムアウトしました");
-        } else {
+        }
+        else
+        {
             // コマンド実行で設定されなかった場合、直接設定で検証
             directSetMessage.Should().NotBeNullOrEmpty();
             directSetMessage.Should().Contain("接続がタイムアウトしました");

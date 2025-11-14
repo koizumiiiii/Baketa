@@ -1,7 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Infrastructure.Platform.Windows.Capture;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.DI.Modules;
 
@@ -24,17 +24,17 @@ public static class FullscreenModule
             var logger = provider.GetService<ILogger<WindowsFullscreenDetectionService>>();
             return new WindowsFullscreenDetectionService(logger);
         });
-        
+
         // フルスクリーン最適化サービス
         services.AddSingleton<IFullscreenOptimizationService>(provider =>
         {
             var detectionService = provider.GetRequiredService<IFullscreenDetectionService>();
             var captureService = provider.GetRequiredService<IAdvancedCaptureService>();
             var logger = provider.GetService<ILogger<WindowsFullscreenOptimizationService>>();
-            
+
             return new WindowsFullscreenOptimizationService(detectionService, captureService, logger);
         });
-        
+
         return services;
     }
 }

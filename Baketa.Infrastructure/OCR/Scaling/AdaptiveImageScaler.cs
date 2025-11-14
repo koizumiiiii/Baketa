@@ -15,7 +15,7 @@ public static class AdaptiveImageScaler
     // 3,000,000 (旧) → 0.78スケールでは小文字認識が不十分
     // 🔥 [PHASE5_COORDINATE_FIX] PaddleOcrEngineの予防処理と統一するためpublicに変更
     public const int PADDLE_OCR_MEMORY_LIMIT_PIXELS = 4_000_000;
-    
+
     /// <summary>
     /// PaddleOCR処理に最適な画像サイズを計算
     /// </summary>
@@ -30,29 +30,29 @@ public static class AdaptiveImageScaler
         {
             throw new ArgumentException($"Invalid image dimensions: {originalWidth}x{originalHeight}");
         }
-        
+
         // Step 1: 縦横4096制限チェック
         double dimensionScale = Math.Min(
             (double)PADDLE_OCR_SAFE_MAX_DIMENSION / originalWidth,
             (double)PADDLE_OCR_SAFE_MAX_DIMENSION / originalHeight
         );
-        
+
         // Step 2: ピクセル総数2M制限チェック  
         long totalPixels = (long)originalWidth * originalHeight;
-        double memoryScale = totalPixels > PADDLE_OCR_MEMORY_LIMIT_PIXELS 
+        double memoryScale = totalPixels > PADDLE_OCR_MEMORY_LIMIT_PIXELS
             ? Math.Sqrt((double)PADDLE_OCR_MEMORY_LIMIT_PIXELS / totalPixels)
             : 1.0;
-        
+
         // Step 3: より厳しい制限を採用、拡大は禁止
         double finalScale = Math.Min(Math.Min(dimensionScale, memoryScale), 1.0);
-        
+
         // Step 4: 最終サイズ計算（整数丸め）
         int newWidth = Math.Max(1, (int)(originalWidth * finalScale));
         int newHeight = Math.Max(1, (int)(originalHeight * finalScale));
-        
+
         return (newWidth, newHeight, finalScale);
     }
-    
+
     /// <summary>
     /// スケーリングが必要かどうかを判定
     /// </summary>
@@ -65,7 +65,7 @@ public static class AdaptiveImageScaler
         var (_, _, scaleFactor) = CalculateOptimalSize(originalWidth, originalHeight);
         return scaleFactor < threshold;
     }
-    
+
     /// <summary>
     /// スケーリング情報の詳細ログ用文字列を生成
     /// </summary>
@@ -75,17 +75,17 @@ public static class AdaptiveImageScaler
     /// <param name="newHeight">新しい高さ</param>
     /// <param name="scaleFactor">スケール係数</param>
     /// <returns>ログ用の詳細文字列</returns>
-    public static string GetScalingInfo(int originalWidth, int originalHeight, 
+    public static string GetScalingInfo(int originalWidth, int originalHeight,
         int newWidth, int newHeight, double scaleFactor)
     {
         long originalPixels = (long)originalWidth * originalHeight;
         long newPixels = (long)newWidth * newHeight;
         double pixelReduction = (1.0 - (double)newPixels / originalPixels) * 100;
-        
+
         return $"画面スケーリング: {originalWidth}x{originalHeight} → {newWidth}x{newHeight} " +
                $"(スケール: {scaleFactor:F3}, ピクセル削減: {pixelReduction:F1}%)";
     }
-    
+
     /// <summary>
     /// 縦横制限とメモリ制限のどちらが制約となっているかを判定
     /// </summary>
@@ -98,12 +98,12 @@ public static class AdaptiveImageScaler
             (double)PADDLE_OCR_SAFE_MAX_DIMENSION / originalWidth,
             (double)PADDLE_OCR_SAFE_MAX_DIMENSION / originalHeight
         );
-        
+
         long totalPixels = (long)originalWidth * originalHeight;
-        double memoryScale = totalPixels > PADDLE_OCR_MEMORY_LIMIT_PIXELS 
+        double memoryScale = totalPixels > PADDLE_OCR_MEMORY_LIMIT_PIXELS
             ? Math.Sqrt((double)PADDLE_OCR_MEMORY_LIMIT_PIXELS / totalPixels)
             : 1.0;
-        
+
         if (dimensionScale >= 1.0 && memoryScale >= 1.0)
             return ScalingConstraintType.None;
         else if (dimensionScale < memoryScale)

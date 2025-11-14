@@ -1,15 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using Baketa.Core.Constants;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Constants;
 using Baketa.Core.Settings;
 using Baketa.Core.Utilities;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.Services.Settings;
 
@@ -23,7 +23,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     private readonly ILogger<UnifiedSettingsService>? _logger;
     private readonly FileSystemWatcher? _fileWatcher;
     private readonly SemaphoreSlim _settingsLock = new(1, 1);
-    
+
     private UnifiedTranslationSettings? _cachedTranslationSettings;
     private UnifiedOcrSettings? _cachedOcrSettings;
     private UnifiedAppSettings? _cachedAppSettings;
@@ -54,7 +54,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             _fileWatcher.Created += OnSettingsFileChanged;
         }
 
-        _logger?.LogInformation("UnifiedSettingsService初期化完了 - 監視ディレクトリ: {Directory}", 
+        _logger?.LogInformation("UnifiedSettingsService初期化完了 - 監視ディレクトリ: {Directory}",
             BaketaSettingsPaths.UserSettingsDirectory);
     }
 
@@ -224,7 +224,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     private UnifiedTranslationSettings LoadTranslationSettings()
     {
         var appSettings = _appSettingsOptions.Value.Translation;
-        
+
         // ユーザー設定ファイルが存在する場合は優先
         if (File.Exists(BaketaSettingsPaths.TranslationSettingsPath))
         {
@@ -287,7 +287,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     }
 
     private static UnifiedTranslationSettings CreateTranslationSettingsFromUser(
-        Dictionary<string, object> userSettings, 
+        Dictionary<string, object> userSettings,
         TranslationSettings appSettings)
     {
         var sourceLanguage = LanguageCodeConverter.ToLanguageCode(
@@ -372,7 +372,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             {
                 // ファイル書き込み完了を待つ
                 await Task.Delay(100);
-                
+
                 await ReloadSettingsAsync();
 
                 var settingsType = Path.GetFileNameWithoutExtension(e.Name) switch

@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
-using Sdcb.PaddleOCR;
 using System.IO;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Microsoft.Extensions.Logging;
+using Sdcb.PaddleOCR;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Initialization;
 
@@ -13,14 +13,14 @@ public sealed class PaddleOcrInitializer : IDisposable
     private readonly string _baseDirectory;
     private readonly ILogger<PaddleOcrInitializer>? _logger;
     private readonly IModelPathResolver _modelPathResolver;
-    
+
     /// <summary>
     /// 初期化状態を取得
     /// </summary>
     public bool IsInitialized { get; private set; }
-    
+
     private bool _disposed;
-    
+
     public PaddleOcrInitializer(
         string baseDirectory,
         IModelPathResolver modelPathResolver,
@@ -29,12 +29,12 @@ public sealed class PaddleOcrInitializer : IDisposable
         ArgumentNullException.ThrowIfNull(baseDirectory);
         if (string.IsNullOrWhiteSpace(baseDirectory))
             throw new ArgumentException("Base directory cannot be empty or whitespace.", nameof(baseDirectory));
-            
+
         _baseDirectory = baseDirectory;
         _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
         _logger = logger;
     }
-    
+
     /// <summary>
     /// PaddleOCRエンジンを初期化します
     /// </summary>
@@ -42,29 +42,29 @@ public sealed class PaddleOcrInitializer : IDisposable
     public async Task<bool> InitializeAsync()
     {
         ThrowIfDisposed();
-        
+
         if (IsInitialized)
         {
             _logger?.LogDebug("PaddleOCRエンジンは既に初期化されています");
             return true;
         }
-            
+
         try
         {
             _logger?.LogInformation("PaddleOCRエンジンの初期化を開始");
-            
+
             // ディレクトリの存在確認と作成
             EnsureDirectoryStructure();
-            
+
             // 必要なモデルファイルの確認
             await ValidateRequiredModelsAsync().ConfigureAwait(false);
-            
+
             // ネイティブライブラリの初期化
             InitializeNativeLibraries();
-            
+
             IsInitialized = true;
             _logger?.LogInformation("PaddleOCRエンジンの初期化が完了");
-            
+
             return true;
         }
         catch (DirectoryNotFoundException ex)
@@ -100,7 +100,7 @@ public sealed class PaddleOcrInitializer : IDisposable
         }
 #pragma warning restore CA1031 // Do not catch general exception types
     }
-    
+
     /// <summary>
     /// 必要なディレクトリ構造を確保
     /// </summary>
@@ -113,14 +113,14 @@ public sealed class PaddleOcrInitializer : IDisposable
             _modelPathResolver.GetRecognitionModelsDirectory("jpn"),
             GetTempDirectory()
         };
-        
+
         foreach (var dir in directories)
         {
             try
             {
                 // パスの有効性を事前チェック
                 ValidateDirectoryPath(dir);
-                
+
                 _modelPathResolver.EnsureDirectoryExists(dir);
                 _logger?.LogDebug("ディレクトリを確認/作成: {Directory}", dir);
             }
@@ -146,7 +146,7 @@ public sealed class PaddleOcrInitializer : IDisposable
             }
         }
     }
-    
+
     /// <summary>
     /// 必要なモデルファイルの存在確認
     /// </summary>
@@ -158,7 +158,7 @@ public sealed class PaddleOcrInitializer : IDisposable
             _modelPathResolver.GetRecognitionModelPath("eng", "rec_english_standard"),
             _modelPathResolver.GetRecognitionModelPath("jpn", "rec_japan_standard")
         };
-        
+
         foreach (var modelPath in requiredModels)
         {
             if (!_modelPathResolver.FileExists(modelPath))
@@ -167,10 +167,10 @@ public sealed class PaddleOcrInitializer : IDisposable
                 // モデル自動ダウンロードは Issue #39 で実装するため、ここでは警告のみ
             }
         }
-        
+
         await Task.CompletedTask.ConfigureAwait(false); // 非同期操作の準備（将来のモデルダウンロード対応）
     }
-    
+
     /// <summary>
     /// ネイティブライブラリの初期化
     /// </summary>
@@ -180,7 +180,7 @@ public sealed class PaddleOcrInitializer : IDisposable
         {
             // PaddleOCRライブラリの依存関係チェック
             ValidatePaddleOcrDependencies();
-            
+
             _logger?.LogDebug("ネイティブライブラリの初期化準備完了");
         }
         catch (Exception ex)
@@ -189,7 +189,7 @@ public sealed class PaddleOcrInitializer : IDisposable
             throw new OcrInitializationException("OCRエンジンの初期化に失敗しました", ex);
         }
     }
-    
+
     /// <summary>
     /// PaddleOCRの依存関係を検証
     /// </summary>
@@ -208,17 +208,17 @@ public sealed class PaddleOcrInitializer : IDisposable
             throw new OcrInitializationException("PaddleOCRライブラリの依存関係に問題があります", ex);
         }
     }
-    
+
     /// <summary>
     /// モデルディレクトリを取得
     /// </summary>
     public string GetModelsDirectory() => _modelPathResolver.GetModelsRootDirectory();
-    
+
     /// <summary>
     /// 一時ディレクトリを取得
     /// </summary>
     public string GetTempDirectory() => Path.Combine(_baseDirectory, "Temp");
-    
+
     /// <summary>
     /// オブジェクトが破棄されているかチェック
     /// </summary>
@@ -226,7 +226,7 @@ public sealed class PaddleOcrInitializer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
-    
+
     /// <summary>
     /// リソースの解放
     /// </summary>
@@ -235,7 +235,7 @@ public sealed class PaddleOcrInitializer : IDisposable
         Dispose(true);
         GC.SuppressFinalize(this);
     }
-    
+
     /// <summary>
     /// ディレクトリパスの有効性を検証
     /// </summary>
@@ -250,7 +250,7 @@ public sealed class PaddleOcrInitializer : IDisposable
                 throw new ArgumentException($"無効なネットワークパス: {directoryPath}", nameof(directoryPath));
             }
         }
-        
+
         // その他の無効パターンをチェック
         var invalidPatterns = new[] { "\\\\invalid", "\\\\nonexistent", "\\\\fake" };
         if (invalidPatterns.Any(pattern => directoryPath.StartsWith(pattern, StringComparison.OrdinalIgnoreCase)))
@@ -267,7 +267,7 @@ public sealed class PaddleOcrInitializer : IDisposable
     {
         if (_disposed)
             return;
-            
+
         if (disposing)
         {
             // マネージリソースの解放
@@ -276,10 +276,10 @@ public sealed class PaddleOcrInitializer : IDisposable
                 _logger?.LogInformation("PaddleOCRエンジンのリソースを解放");
             }
         }
-        
+
         // アンマネージリソースの解放
         // （現在は該当なし）
-        
+
         _disposed = true;
     }
 }

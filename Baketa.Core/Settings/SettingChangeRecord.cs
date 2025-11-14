@@ -116,7 +116,7 @@ public sealed class SettingChangeRecord(
     /// 変更の説明を取得します
     /// </summary>
     /// <returns>変更の説明文</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1024:Use properties where appropriate", 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1024:Use properties where appropriate",
         Justification = "計算処理を含むためメソッドとして保持")]
     public string GetDescription()
     {
@@ -134,25 +134,25 @@ public sealed class SettingChangeRecord(
             SettingChangeType.AutoAdjusted => "自動調整",
             _ => "変更"
         };
-        
-        var valueInfo = ChangeType == SettingChangeType.Deleted 
+
+        var valueInfo = ChangeType == SettingChangeType.Deleted
             ? $"値: {OldValue}"
             : $"値: {OldValue} → {NewValue}";
-        
+
         return $"[{action}] {Category}.{SettingKey}: {valueInfo}";
     }
-    
+
     /// <summary>
     /// 変更のサマリーを取得します
     /// </summary>
     /// <returns>短縮されたサマリー</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1024:Use properties where appropriate", 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1024:Use properties where appropriate",
         Justification = "計算処理を含むためメソッドとして保持")]
     public string GetSummary()
     {
         return $"{ChangeType} {Category}.{SettingKey} ({Timestamp:HH:mm:ss})";
     }
-    
+
     /// <summary>
     /// この変更が重要かどうかを判定します
     /// </summary>
@@ -161,14 +161,14 @@ public sealed class SettingChangeRecord(
     {
         return Importance == ChangeImportance.High || Importance == ChangeImportance.Critical;
     }
-    
+
     /// <summary>
     /// この変更が元に戻せるかどうかを判定します
     /// </summary>
     /// <returns>元に戻せる場合はtrue</returns>
     public bool CanUndo()
     {
-        return !string.IsNullOrEmpty(UndoInformation) && 
+        return !string.IsNullOrEmpty(UndoInformation) &&
                ChangeType != SettingChangeType.Migrated &&
                ChangeType != SettingChangeType.Restored &&
                ChangeType != SettingChangeType.BatchExport &&
@@ -185,17 +185,17 @@ public enum ChangeImportance
     /// 低重要度（ログレベル等）
     /// </summary>
     Low,
-    
+
     /// <summary>
     /// 通常重要度
     /// </summary>
     Normal,
-    
+
     /// <summary>
     /// 高重要度（セキュリティ設定等）
     /// </summary>
     High,
-    
+
     /// <summary>
     /// 緊急重要度（システム設定等）
     /// </summary>

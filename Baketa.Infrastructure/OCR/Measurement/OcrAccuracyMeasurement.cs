@@ -17,7 +17,7 @@ public sealed class OcrAccuracyMeasurement(
     ILogger<OcrAccuracyMeasurement> logger) : IOcrAccuracyMeasurement
 {
     private static readonly char[] WordSeparators = [' ', '\t', '\n', '\r'];
-    
+
     private readonly IImageFactory _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
     private readonly ILogger<OcrAccuracyMeasurement> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -33,24 +33,24 @@ public sealed class OcrAccuracyMeasurement(
         }
 
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             // 画像を読み込み
             using var image = await _imageFactory.CreateFromFileAsync(testImagePath).ConfigureAwait(false);
             using var advancedImage = _imageFactory.ConvertToAdvancedImage(image);
-            
+
             // OCR実行
             var ocrResult = await ocrEngine.RecognizeAsync(advancedImage, cancellationToken: cancellationToken).ConfigureAwait(false);
-            
+
             stopwatch.Stop();
-            
+
             // 精度計算
             var detectedText = ocrResult.Text;
             var accuracy = CalculateAccuracy(expectedText, detectedText);
             var characterAccuracy = CalculateCharacterAccuracy(expectedText, detectedText);
             var wordAccuracy = CalculateWordAccuracy(expectedText, detectedText);
-            
+
             var result = new AccuracyMeasurementResult
             {
                 OverallAccuracy = accuracy,
@@ -60,15 +60,15 @@ public sealed class OcrAccuracyMeasurement(
                 CorrectCharacterCount = CalculateCorrectCharacterCount(expectedText, detectedText),
                 ExpectedCharacterCount = expectedText.Length,
                 ProcessingTime = stopwatch.Elapsed,
-                AverageConfidence = ocrResult.TextRegions.Count > 0 
-                    ? ocrResult.TextRegions.Average(r => r.Confidence) 
+                AverageConfidence = ocrResult.TextRegions.Count > 0
+                    ? ocrResult.TextRegions.Average(r => r.Confidence)
                     : 0.0,
                 SettingsHash = GenerateSettingsHash(ocrEngine.GetSettings())
             };
-            
+
             _logger.LogInformation("📊 精度測定完了: 全体精度={OverallAccuracy:P2}, 文字精度={CharacterAccuracy:P2}, 単語精度={WordAccuracy:P2}, 処理時間={ProcessingTime}ms",
                 result.OverallAccuracy, result.CharacterAccuracy, result.WordAccuracy, result.ProcessingTime.TotalMilliseconds);
-            
+
             return result;
         }
         catch (Exception ex)
@@ -84,9 +84,9 @@ public sealed class OcrAccuracyMeasurement(
         CancellationToken cancellationToken = default)
     {
         var results = new List<AccuracyMeasurementResult>();
-        
+
         _logger.LogInformation("🧪 バッチ精度測定開始: {TestCaseCount}件のテストケース", testCases.Count);
-        
+
         foreach (var (imagePath, expectedText) in testCases)
         {
             try
@@ -99,20 +99,20 @@ public sealed class OcrAccuracyMeasurement(
                 _logger.LogWarning(ex, "⚠️ テストケース実行失敗: {ImagePath}", imagePath);
                 // エラーのテストケースはスキップして続行
             }
-            
+
             if (cancellationToken.IsCancellationRequested)
                 break;
         }
-        
+
         if (results.Count > 0)
         {
             var averageAccuracy = results.Average(r => r.OverallAccuracy);
             var averageTime = results.Average(r => r.ProcessingTime.TotalMilliseconds);
-            
+
             _logger.LogInformation("📈 バッチ測定結果: 平均精度={AverageAccuracy:P2}, 平均処理時間={AverageTime}ms, 完了率={CompletionRate:P2}",
                 averageAccuracy, averageTime, (double)results.Count / testCases.Count);
         }
-        
+
         return results;
     }
 
@@ -124,28 +124,28 @@ public sealed class OcrAccuracyMeasurement(
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("🔬 設定比較精度測定開始: {TestCaseCount}件で比較", testCases.Count);
-        
+
         // 基準設定で測定
         await ocrEngine.ApplySettingsAsync(baselineSettings, cancellationToken).ConfigureAwait(false);
         var baselineResults = await MeasureBatchAccuracyAsync(ocrEngine, testCases, cancellationToken).ConfigureAwait(false);
-        
+
         // 改善設定で測定
         await ocrEngine.ApplySettingsAsync(improvedSettings, cancellationToken).ConfigureAwait(false);
         var improvedResults = await MeasureBatchAccuracyAsync(ocrEngine, testCases, cancellationToken).ConfigureAwait(false);
-        
+
         // 結果を統合
         var baselineAverage = CalculateAverageResult(baselineResults, GenerateSettingsHash(baselineSettings));
         var improvedAverage = CalculateAverageResult(improvedResults, GenerateSettingsHash(improvedSettings));
-        
+
         var comparison = new AccuracyComparisonResult
         {
             BaselineResult = baselineAverage,
             ImprovedResult = improvedAverage
         };
-        
+
         _logger.LogInformation("📊 比較測定完了: 精度改善={AccuracyImprovement:+0.00%;-0.00%;+0.00%}, 処理時間変化={ProcessingTimeChange:+0.00%;-0.00%;+0.00%}, 有意な改善={IsSignificant}",
             comparison.AccuracyImprovement, comparison.ProcessingTimeChange, comparison.IsSignificantImprovement);
-        
+
         return comparison;
     }
 
@@ -153,14 +153,14 @@ public sealed class OcrAccuracyMeasurement(
     {
         if (string.IsNullOrEmpty(expected))
             return string.IsNullOrEmpty(detected) ? 1.0 : 0.0;
-        
+
         if (string.IsNullOrEmpty(detected))
             return 0.0;
-        
+
         // 基本的な文字列類似度（Levenshtein距離ベース）
         var distance = CalculateLevenshteinDistance(expected, detected);
         var maxLength = Math.Max(expected.Length, detected.Length);
-        
+
         return maxLength > 0 ? 1.0 - (double)distance / maxLength : 1.0;
     }
 
@@ -168,16 +168,16 @@ public sealed class OcrAccuracyMeasurement(
     {
         if (string.IsNullOrEmpty(expected))
             return string.IsNullOrEmpty(detected) ? 1.0 : 0.0;
-        
+
         var correctChars = 0;
         var minLength = Math.Min(expected.Length, detected.Length);
-        
+
         for (int i = 0; i < minLength; i++)
         {
             if (expected[i] == detected[i])
                 correctChars++;
         }
-        
+
         return expected.Length > 0 ? (double)correctChars / expected.Length : 0.0;
     }
 
@@ -185,10 +185,10 @@ public sealed class OcrAccuracyMeasurement(
     {
         var expectedWords = expected.Split(WordSeparators, StringSplitOptions.RemoveEmptyEntries);
         var detectedWords = detected.Split(WordSeparators, StringSplitOptions.RemoveEmptyEntries);
-        
+
         if (expectedWords.Length == 0)
             return detectedWords.Length == 0 ? 1.0 : 0.0;
-        
+
         var correctWords = expectedWords.Intersect(detectedWords).Count();
         return (double)correctWords / expectedWords.Length;
     }
@@ -197,13 +197,13 @@ public sealed class OcrAccuracyMeasurement(
     {
         var correctChars = 0;
         var minLength = Math.Min(expected.Length, detected.Length);
-        
+
         for (int i = 0; i < minLength; i++)
         {
             if (expected[i] == detected[i])
                 correctChars++;
         }
-        
+
         return correctChars;
     }
 
@@ -211,18 +211,18 @@ public sealed class OcrAccuracyMeasurement(
     {
         if (string.IsNullOrEmpty(source))
             return target?.Length ?? 0;
-        
+
         if (string.IsNullOrEmpty(target))
             return source.Length;
-        
+
         var matrix = new int[source.Length + 1, target.Length + 1];
-        
+
         for (int i = 0; i <= source.Length; i++)
             matrix[i, 0] = i;
-        
+
         for (int j = 0; j <= target.Length; j++)
             matrix[0, j] = j;
-        
+
         for (int i = 1; i <= source.Length; i++)
         {
             for (int j = 1; j <= target.Length; j++)
@@ -233,7 +233,7 @@ public sealed class OcrAccuracyMeasurement(
                     matrix[i - 1, j - 1] + cost);
             }
         }
-        
+
         return matrix[source.Length, target.Length];
     }
 
@@ -255,7 +255,7 @@ public sealed class OcrAccuracyMeasurement(
                 SettingsHash = settingsHash
             };
         }
-        
+
         return new AccuracyMeasurementResult
         {
             OverallAccuracy = results.Average(r => r.OverallAccuracy),

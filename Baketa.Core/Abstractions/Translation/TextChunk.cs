@@ -17,7 +17,7 @@ public sealed class TextChunk
 {
     /// <summary>テキストチャンクの一意ID</summary>
     public required int ChunkId { get; init; }
-    
+
     /// <summary>チャンクを構成するテキスト結果のリスト</summary>
     public required IReadOnlyList<PositionedTextResult> TextResults { get; init; } = [];
 
@@ -51,15 +51,15 @@ public sealed class TextChunk
     /// - Gemini推奨: TextChunkが座標変換に必要な全情報を保持すべき（DDD原則）
     /// </summary>
     public Rectangle? CaptureRegion { get; init; }
-    
+
     /// <summary>チャンクの信頼度（構成テキストの平均信頼度）</summary>
-    public float AverageConfidence => TextResults.Count > 0 
-        ? TextResults.Average(t => t.Confidence) 
+    public float AverageConfidence => TextResults.Count > 0
+        ? TextResults.Average(t => t.Confidence)
         : 0f;
-    
+
     /// <summary>チャンク作成日時</summary>
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
-    
+
     /// <summary>
     /// チャンク中心座標を取得
     /// オーバーレイ表示位置計算用
@@ -67,7 +67,7 @@ public sealed class TextChunk
     public Point GetCenterPoint() => new(
         CombinedBounds.X + CombinedBounds.Width / 2,
         CombinedBounds.Y + CombinedBounds.Height / 2);
-    
+
     /// <summary>
     /// 別のテキストチャンクとの距離を計算
     /// 近接チャンクの統合判定用
@@ -76,13 +76,13 @@ public sealed class TextChunk
     {
         var thisCenter = GetCenterPoint();
         var otherCenter = other.GetCenterPoint();
-        
+
         var dx = thisCenter.X - otherCenter.X;
         var dy = thisCenter.Y - otherCenter.Y;
-        
+
         return Math.Sqrt(dx * dx + dy * dy);
     }
-    
+
     /// <summary>
     /// チャンクが指定領域と重複するかチェック
     /// 表示領域の衝突検出用
@@ -91,12 +91,12 @@ public sealed class TextChunk
     {
         return CombinedBounds.IntersectsWith(region);
     }
-    
+
     /// <summary>
     /// オーバーレイ表示用の最適位置を計算（改良版）
     /// テキスト領域の座標を正確に反映し、画面外に出ない位置を計算
     /// </summary>
-    
+
     /// <summary>
     /// ログ出力用の文字列表現
     /// ユーザー要求: 座標位置もログで確認できるように
@@ -113,7 +113,7 @@ public sealed class TextChunk
                $"{captureInfo} | " +
                $"Confidence: {AverageConfidence:F3} | TextCount: {TextResults.Count} | Language: {DetectedLanguage ?? "unknown"}";
     }
-    
+
     /// <summary>
     /// チャンクの詳細情報をログ出力用に取得
     /// 開発・デバッグ用
@@ -123,19 +123,19 @@ public sealed class TextChunk
         var results = string.Join("; ", TextResults.Select(r => r.ToLogString()));
         return $"{ToLogString()} | Details: [{results}]";
     }
-    
+
     /// <summary>
     /// AR表示用の正確な位置を取得
     /// 元テキストと同じ位置に翻訳テキストを重ね表示するために使用
     /// </summary>
     public Point GetARPosition() => new(CombinedBounds.X, CombinedBounds.Y);
-    
+
     /// <summary>
     /// AR表示用のサイズを取得
     /// 元テキストと同じサイズで翻訳テキストを表示するために使用
     /// </summary>
     public Size GetARSize() => new(CombinedBounds.Width, CombinedBounds.Height);
-    
+
     /// <summary>
     /// AR表示用の最適フォントサイズを計算
     /// OCR領域の高さに基づいて自動的にフォントサイズを決定
@@ -144,7 +144,7 @@ public sealed class TextChunk
     {
         // OCR領域の高さの45%をベースフォントサイズとして計算（さらに保守的に）
         var baseFontSize = (int)(CombinedBounds.Height * 0.45);
-        
+
         // 翻訳テキストの長さを考慮して調整
         if (!string.IsNullOrEmpty(TranslatedText))
         {
@@ -152,7 +152,7 @@ public sealed class TextChunk
             // 日本語文字の幅をより精密に計算
             var estimatedCharWidth = baseFontSize * 0.6; // 日本語は約半角～全角幅
             var requiredWidth = TranslatedText.Length * estimatedCharWidth;
-            
+
             if (requiredWidth > CombinedBounds.Width)
             {
                 // テキストが領域幅を超える場合は縮小
@@ -160,48 +160,48 @@ public sealed class TextChunk
                 baseFontSize = (int)(baseFontSize * scaleFactor * 0.8); // 80%でさらに余裕を持たせる
             }
         }
-        
+
         // 最小8px、最大32pxの範囲に制限（さらに小さく）
         return Math.Max(8, Math.Min(32, baseFontSize));
     }
-    
+
     /// <summary>
     /// AR表示が可能かどうかを判定
     /// 有効な座標情報と翻訳テキストが存在するかチェック
     /// </summary>
     public bool CanShowAR()
     {
-        return CombinedBounds.Width > 0 && 
-               CombinedBounds.Height > 0 && 
+        return CombinedBounds.Width > 0 &&
+               CombinedBounds.Height > 0 &&
                !string.IsNullOrEmpty(TranslatedText) &&
                CombinedBounds.Width >= 10 &&  // 最小表示幅
                CombinedBounds.Height >= 8;    // 最小表示高さ
     }
-    
+
     /// <summary>
     /// AR表示用のログ情報を取得
     /// デバッグ・トラブルシューティング用
     /// </summary>
-    public string ToARLogString() => 
+    public string ToARLogString() =>
         $"AR Display - ChunkId: {ChunkId} | Position: ({GetARPosition().X},{GetARPosition().Y}) | " +
         $"Size: ({GetARSize().Width},{GetARSize().Height}) | FontSize: {CalculateARFontSize()} | " +
         $"CanShow: {CanShowAR()} | TranslatedText: '{TranslatedText}'";
 
     // === InPlace版メソッド（AR技術を使わないため、より適切な名称） ===
-    
+
     /// <summary>
     /// インプレース表示が可能かどうかを判定
     /// 有効な座標情報と翻訳テキストが存在するかチェック
     /// </summary>
     public bool CanShowInPlace()
     {
-        return CombinedBounds.Width > 0 && 
-               CombinedBounds.Height > 0 && 
+        return CombinedBounds.Width > 0 &&
+               CombinedBounds.Height > 0 &&
                !string.IsNullOrEmpty(TranslatedText) &&
                CombinedBounds.Width >= 10 &&  // 最小表示幅
                CombinedBounds.Height >= 8;    // 最小表示高さ
     }
-    
+
     /// <summary>
     /// オーバーレイ表示用の基本位置を取得
     /// UltraThink Phase 10.3: 位置調整ロジックはIOverlayPositioningServiceに分離
@@ -210,27 +210,27 @@ public sealed class TextChunk
     /// </summary>
     /// <returns>テキスト領域の基本位置（左上座標）</returns>
     public Point GetBasicOverlayPosition() => new(CombinedBounds.X, CombinedBounds.Y);
-    
+
     /// <summary>
     /// テキスト領域の中心座標を取得
     /// 位置調整サービスでの位置計算に使用される
     /// </summary>
     /// <returns>テキスト領域の中心座標</returns>
     public Point GetTextCenterPoint() => GetCenterPoint();
-    
+
     /// <summary>
     /// テキスト領域の境界を取得
     /// 位置調整サービスでの衝突検知に使用される
     /// </summary>
     /// <returns>テキスト領域の境界</returns>
     public Rectangle GetTextBounds() => CombinedBounds;
-    
+
     /// <summary>
     /// オーバーレイ表示用のサイズを取得
     /// 元テキストと同じサイズで翻訳テキストを表示するために使用
     /// </summary>
     public Size GetOverlaySize() => new(CombinedBounds.Width, CombinedBounds.Height);
-    
+
     /// <summary>
     /// オーバーレイ表示用の最適フォントサイズを計算
     /// OCR領域の高さに基づいて自動的にフォントサイズを決定
@@ -239,7 +239,7 @@ public sealed class TextChunk
     {
         // OCR領域の高さの45%をベースフォントサイズとして計算（さらに保守的に）
         var baseFontSize = (int)(CombinedBounds.Height * 0.45);
-        
+
         // 翻訳テキストの長さを考慮して調整
         if (!string.IsNullOrEmpty(TranslatedText))
         {
@@ -248,7 +248,7 @@ public sealed class TextChunk
             var estimatedCharWidth = baseFontSize * 0.6; // 日本語は約半角～全角幅
             var availableWidth = CombinedBounds.Width * 0.9; // 余白を考慮
             var maxCharsPerLine = (int)(availableWidth / estimatedCharWidth);
-            
+
             if (maxCharsPerLine > 0 && TranslatedText.Length > maxCharsPerLine)
             {
                 // テキストが長い場合はフォントサイズを縮小
@@ -257,16 +257,16 @@ public sealed class TextChunk
                 baseFontSize = (int)(heightPerLine * 0.4); // より小さく調整
             }
         }
-        
+
         // フォントサイズの範囲制限
         return Math.Max(8, Math.Min(32, baseFontSize));
     }
-    
+
     /// <summary>
     /// インプレース表示用のログ情報を取得
     /// デバッグ・トラブルシューティング用
     /// </summary>
-    public string ToInPlaceLogString() => 
+    public string ToInPlaceLogString() =>
         $"InPlace Display - ChunkId: {ChunkId} | Position: ({GetBasicOverlayPosition().X},{GetBasicOverlayPosition().Y}) | " +
         $"Size: ({GetOverlaySize().Width},{GetOverlaySize().Height}) | FontSize: {CalculateOptimalFontSize()} | " +
         $"CanShow: {CanShowInPlace()} | TranslatedText: '{TranslatedText}'";

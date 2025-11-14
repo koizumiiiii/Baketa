@@ -3,16 +3,16 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Auth;
+using Baketa.Core.Abstractions.Events;
+using Baketa.UI.Framework;
+using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
-using ReactiveUI.Validation.Extensions;
 using ReactiveUI.Validation.Abstractions;
 using ReactiveUI.Validation.Contexts;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Auth;
-using Baketa.UI.Framework;
-using Baketa.UI.Services;
+using ReactiveUI.Validation.Extensions;
 
 namespace Baketa.UI.ViewModels.Auth;
 
@@ -196,7 +196,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         Disposables.Add(SignupWithSteamCommand);
 
         // ログイン画面への遷移コマンド
-        NavigateToLoginCommand = ReactiveCommand.CreateFromTask(async () => 
+        NavigateToLoginCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             await _navigationService.ShowLoginAsync().ConfigureAwait(false);
         });

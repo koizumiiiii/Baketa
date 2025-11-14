@@ -12,17 +12,17 @@ public sealed class PythonServerStatusChangedEvent : EventBase
     /// サーバーが準備完了状態かどうか
     /// </summary>
     public bool IsServerReady { get; init; }
-    
+
     /// <summary>
     /// 状態メッセージ（ユーザー表示用）
     /// </summary>
     public string StatusMessage { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// サーバーポート番号（診断用）
     /// </summary>
     public int ServerPort { get; init; }
-    
+
     /// <summary>
     /// 状態変更の詳細情報（ログ用）
     /// </summary>
@@ -30,7 +30,7 @@ public sealed class PythonServerStatusChangedEvent : EventBase
 
     /// <inheritdoc />
     public override string Name => "PythonServerStatusChanged";
-    
+
     /// <inheritdoc />
     public override string Category => "Translation";
 

@@ -22,12 +22,12 @@ public sealed class PredictiveCooldownCalculator
     private readonly IResourceMonitor _resourceMonitor;
     private readonly IOptionsMonitor<PredictiveControlSettings> _settings;
     private readonly VramCapacityDetector _vramDetector;
-    
+
     // 動的学習データ
     private readonly Dictionary<string, CooldownLearningData> _cooldownHistory = new();
     private readonly Queue<CooldownMeasurement> _recentMeasurements = new();
     private readonly object _dataLock = new();
-    
+
     // 予測精度追跡
     private readonly Queue<PredictionAccuracyMeasurement> _accuracyHistory = new();
     private double _currentPredictionAccuracy = 0.7; // デフォルト70%
@@ -68,7 +68,7 @@ public sealed class PredictiveCooldownCalculator
             var baselineCooldown = CalculateBaselineCooldown(currentMetrics, systemLoad);
 
             // 2. ゲーム負荷パターン学習による調整
-            var gamePatternMultiplier = gameProcessName != null 
+            var gamePatternMultiplier = gameProcessName != null
                 ? CalculateGamePatternMultiplier(gameProcessName, baselineCooldown)
                 : 1.0;
 
@@ -85,9 +85,9 @@ public sealed class PredictiveCooldownCalculator
             var stabilityMultiplier = await CalculateSystemStabilityMultiplierAsync(cancellationToken).ConfigureAwait(false);
 
             // 最終クールダウン時間の計算
-            var totalMultiplier = gamePatternMultiplier * temperatureMultiplier * vramPressureMultiplier * 
+            var totalMultiplier = gamePatternMultiplier * temperatureMultiplier * vramPressureMultiplier *
                                  confidenceMultiplier * stabilityMultiplier * settings.CooldownBaseMultiplier;
-                                 
+
             var finalCooldown = TimeSpan.FromMilliseconds(baselineCooldown.TotalMilliseconds * totalMultiplier);
 
             // 範囲制限（最小500ms、最大30秒）
@@ -133,11 +133,11 @@ public sealed class PredictiveCooldownCalculator
             lock (_dataLock)
             {
                 _accuracyHistory.Enqueue(accuracyMeasurement);
-                
+
                 // 履歴サイズ制限（最新100件）
                 while (_accuracyHistory.Count > 100)
                     _accuracyHistory.Dequeue();
-                
+
                 // 予測精度を動的更新
                 UpdatePredictionAccuracy();
             }
@@ -167,7 +167,7 @@ public sealed class PredictiveCooldownCalculator
             var totalMeasurements = _accuracyHistory.Count;
             var effectiveMeasurements = _accuracyHistory.Count(m => m.WasEffective);
             var averageEffectiveness = totalMeasurements > 0 ? (double)effectiveMeasurements / totalMeasurements : 0.0;
-            
+
             var gameSpecificAccuracy = _cooldownHistory
                 .Where(kvp => kvp.Value.TotalMeasurements > 0)
                 .ToDictionary(
@@ -188,20 +188,20 @@ public sealed class PredictiveCooldownCalculator
     private static TimeSpan CalculateBaselineCooldown(GpuVramMetrics gpuMetrics, SystemLoad systemLoad)
     {
         // システム負荷に基づく基本クールダウン
-        var loadFactor = (systemLoad.CpuUsagePercent + systemLoad.MemoryUsagePercent + 
+        var loadFactor = (systemLoad.CpuUsagePercent + systemLoad.MemoryUsagePercent +
                          systemLoad.GpuUsagePercent + systemLoad.VramUsagePercent) / 4.0;
 
         // 非線形スケーリング（高負荷時により敏感に反応）
         var normalizedLoad = Math.Max(0, Math.Min(100, loadFactor));
         var scaledLoad = Math.Pow(normalizedLoad / 100.0, 1.3); // 1.3乗でカーブ調整
-        
+
         return TimeSpan.FromMilliseconds(1000 + scaledLoad * 4000); // 1-5秒の範囲
     }
 
     private double CalculateGamePatternMultiplier(string gameProcessName, TimeSpan baselineCooldown)
     {
         var gamePattern = _gameLoadLearner.GetLearnedPattern(gameProcessName);
-        
+
         if (gamePattern == null || gamePattern.LearningSessionCount < _settings.CurrentValue.MinLearningSessionCount)
             return 1.0; // 学習データ不足
 
@@ -215,7 +215,7 @@ public sealed class PredictiveCooldownCalculator
             {
                 var historicalAverage = learningData.AverageEffectiveCooldown;
                 var ratio = baselineCooldown.TotalMilliseconds / historicalAverage.TotalMilliseconds;
-                
+
                 // 適度な調整範囲（0.5倍〜2.0倍）
                 return Math.Max(0.5, Math.Min(2.0, ratio));
             }
@@ -265,7 +265,7 @@ public sealed class PredictiveCooldownCalculator
             var deficiency = settings.MinPredictionAccuracy - predictionAccuracy;
             return 1.0 + deficiency * 2.0; // 最大200%延長
         }
-        
+
         // 予測精度が十分な場合は標準または短縮
         return Math.Max(0.8, 1.0 - (predictionAccuracy - settings.MinPredictionAccuracy) * 0.5);
     }
@@ -313,7 +313,7 @@ public sealed class PredictiveCooldownCalculator
     {
         var systemMetrics = await _resourceMonitor.GetCurrentMetricsAsync(cancellationToken).ConfigureAwait(false);
         var vramCapacityInfo = await _vramDetector.GetVramCapacityInfoAsync(cancellationToken).ConfigureAwait(false);
-        
+
         // ResourceMetricsをGpuVramMetricsに変換（動的VRAM容量使用）
         return new GpuVramMetrics(
             GpuUtilizationPercent: systemMetrics.GpuUsagePercent ?? 0.0,
@@ -333,7 +333,7 @@ public sealed class PredictiveCooldownCalculator
     {
         var metrics = await _resourceMonitor.GetCurrentMetricsAsync(cancellationToken).ConfigureAwait(false);
         var vramUsagePercent = await _vramDetector.CalculateVramUsagePercentAsync(cancellationToken).ConfigureAwait(false);
-        
+
         return new SystemLoad(
             CpuUsagePercent: metrics.CpuUsagePercent,
             MemoryUsagePercent: metrics.MemoryUsagePercent,
@@ -346,9 +346,9 @@ public sealed class PredictiveCooldownCalculator
     }
 
     private void RecordCooldownMeasurement(
-        string? gameProcessName, 
-        TimeSpan appliedCooldown, 
-        GpuVramMetrics gpuMetrics, 
+        string? gameProcessName,
+        TimeSpan appliedCooldown,
+        GpuVramMetrics gpuMetrics,
         SystemLoad systemLoad)
     {
         var measurement = new CooldownMeasurement(
@@ -363,7 +363,7 @@ public sealed class PredictiveCooldownCalculator
         lock (_dataLock)
         {
             _recentMeasurements.Enqueue(measurement);
-            
+
             // 履歴サイズ制限（最新50件）
             while (_recentMeasurements.Count > 50)
                 _recentMeasurements.Dequeue();
@@ -371,8 +371,8 @@ public sealed class PredictiveCooldownCalculator
     }
 
     private async Task UpdateGameCooldownLearningAsync(
-        string gameProcessName, 
-        TimeSpan appliedCooldown, 
+        string gameProcessName,
+        TimeSpan appliedCooldown,
         bool wasEffective,
         CancellationToken cancellationToken)
     {

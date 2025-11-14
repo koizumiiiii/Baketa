@@ -27,7 +27,7 @@ public static class ValidationResultsApi
     /// </summary>
     public static SettingsValidationResult CreateSettingsSuccess(IEnumerable<string>? warnings = null)
     {
-        return warnings?.Any() == true 
+        return warnings?.Any() == true
             ? SettingsValidationResult.CreateSuccess(warnings)
             : SettingsValidationResult.CreateSuccess();
     }

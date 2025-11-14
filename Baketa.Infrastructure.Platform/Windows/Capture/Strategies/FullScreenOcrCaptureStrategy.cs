@@ -201,7 +201,7 @@ public class FullScreenOcrCaptureStrategy : ICaptureStrategy
             // 🔥 [PHASE2_STEP3] OcrResults → CaptureStrategyResult 変換
             result.Success = ocrResult.HasText;
             result.Images = [fullImage]; // 全画面画像1つのみ
-            result.TextRegions = ocrResult.TextRegions.Select(r => r.Bounds).ToList(); // 絶対座標（そのまま）
+            result.TextRegions = [.. ocrResult.TextRegions.Select(r => r.Bounds)]; // 絶対座標（そのまま）
             result.Metrics.ActualCaptureTime = totalStopwatch.Elapsed;
             result.Metrics.FrameCount = 1;
             result.Metrics.PerformanceCategory = "Fast";

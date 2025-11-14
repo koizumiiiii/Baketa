@@ -112,7 +112,7 @@ public static partial class NativeWindowsCapture
     /// <param name="buffer">メッセージバッファ</param>
     /// <param name="bufferSize">バッファサイズ</param>
     /// <returns>実際のメッセージ長</returns>
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, 
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl,
               CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
@@ -144,10 +144,10 @@ public static partial class NativeWindowsCapture
         try
         {
             int length = BaketaCapture_GetLastError(buffer, bufferSize);
-            
+
             if (length <= 0)
                 return string.Empty;
-                
+
             return Marshal.PtrToStringAnsi(buffer, Math.Min(length, bufferSize - 1)) ?? string.Empty;
         }
         finally
@@ -166,17 +166,17 @@ public static partial class NativeWindowsCapture
         const int bufferSize = 1024;
         IntPtr windowBuffer = Marshal.AllocHGlobal(bufferSize);
         IntPtr rectBuffer = Marshal.AllocHGlobal(bufferSize);
-        
+
         try
         {
             int result = BaketaCapture_GetWindowDebugInfo(sessionId, windowBuffer, bufferSize, rectBuffer, bufferSize);
-            
+
             if (result == 0)
                 return ("Debug info unavailable", "Debug info unavailable");
-                
+
             string windowInfo = Marshal.PtrToStringAnsi(windowBuffer) ?? "N/A";
             string screenRect = Marshal.PtrToStringAnsi(rectBuffer) ?? "N/A";
-            
+
             return (windowInfo, screenRect);
         }
         finally

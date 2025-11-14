@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
 using Baketa.Core.Abstractions.Imaging.Pipeline;
+using Baketa.Core.Services.Imaging;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using Baketa.Core.Services.Imaging;
 
 namespace Baketa.Infrastructure.Imaging.Filters;
 
@@ -63,7 +63,7 @@ public sealed class OpenCvSharpeningFilter : BaseImageFilter
     /// </summary>
     protected override IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
     {
-        return 
+        return
         [
             new PipelineStepParameter("Method", "シャープニング方法", typeof(string), "UnsharpMask", allowedValues: ["UnsharpMask", "Laplacian", "CustomKernel", "DetailEnhance"]),
             new PipelineStepParameter("Strength", "シャープニング強度", typeof(double), 1.5, minValue: 0.5, maxValue: 3.0),
@@ -94,7 +94,7 @@ public sealed class OpenCvSharpeningFilter : BaseImageFilter
         var alpha = GetParameter<double>("Alpha");
         var sigma = GetParameter<double>("Sigma");
 
-        _logger?.LogInformation("OpenCVシャープニング開始: Method={Method}, Strength={Strength}, KernelType={KernelType}", 
+        _logger?.LogInformation("OpenCVシャープニング開始: Method={Method}, Strength={Strength}, KernelType={KernelType}",
             method, strength, kernelType);
 
         try
@@ -104,14 +104,14 @@ public sealed class OpenCvSharpeningFilter : BaseImageFilter
             switch (method)
             {
                 case "UnsharpMask":
-                    _logger?.LogInformation("アンシャープマスク完了: Radius={Radius}, Amount={Amount}, Threshold={Threshold}", 
+                    _logger?.LogInformation("アンシャープマスク完了: Radius={Radius}, Amount={Amount}, Threshold={Threshold}",
                         radius, amount, threshold);
                     break;
                 case "Laplacian":
                     _logger?.LogInformation("ラプラシアンシャープニング完了: Strength={Strength}", strength);
                     break;
                 case "CustomKernel":
-                    _logger?.LogInformation("カスタムカーネルシャープニング完了: Type={KernelType}, Strength={Strength}", 
+                    _logger?.LogInformation("カスタムカーネルシャープニング完了: Type={KernelType}, Strength={Strength}",
                         kernelType, strength);
                     break;
                 case "DetailEnhance":

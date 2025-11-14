@@ -12,12 +12,12 @@ public sealed class CommonTranslationsSettings
     /// 日本語から英語への翻訳辞書
     /// </summary>
     public TranslationDictionary JapaneseToEnglish { get; set; } = new();
-    
+
     /// <summary>
     /// 英語から日本語への翻訳辞書
     /// </summary>
     public TranslationDictionary EnglishToJapanese { get; set; } = new();
-    
+
     /// <summary>
     /// フォールバック設定
     /// </summary>
@@ -33,22 +33,22 @@ public sealed class TranslationDictionary
     /// UI要素の翻訳
     /// </summary>
     public Dictionary<string, string> UI { get; set; } = new();
-    
+
     /// <summary>
     /// ゲーム用語の翻訳
     /// </summary>
     public Dictionary<string, string> Game { get; set; } = new();
-    
+
     /// <summary>
     /// 動作・アクション関連の翻訳
     /// </summary>
     public Dictionary<string, string> Actions { get; set; } = new();
-    
+
     /// <summary>
     /// 一般的な挨拶・表現の翻訳
     /// </summary>
     public Dictionary<string, string> Common { get; set; } = new();
-    
+
     /// <summary>
     /// その他のカスタム翻訳
     /// </summary>
@@ -64,12 +64,12 @@ public sealed class FallbackSettings
     /// ハードコード辞書をフォールバックとして使用するか
     /// </summary>
     public bool UseHardcodedDictionaryFallback { get; set; } = true;
-    
+
     /// <summary>
     /// 機械翻訳をフォールバックとして使用するか
     /// </summary>
     public bool UseMachineTranslationFallback { get; set; } = true;
-    
+
     /// <summary>
     /// 翻訳が見つからない場合の動作
     /// </summary>
@@ -85,12 +85,12 @@ public enum FallbackBehavior
     /// 元のテキストをそのまま返す
     /// </summary>
     ReturnOriginal,
-    
+
     /// <summary>
     /// 空文字列を返す
     /// </summary>
     ReturnEmpty,
-    
+
     /// <summary>
     /// プレースホルダー文字列を返す
     /// </summary>

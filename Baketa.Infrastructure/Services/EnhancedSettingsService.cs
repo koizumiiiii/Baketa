@@ -4,11 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Migration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 
 namespace Baketa.Infrastructure.Services;
 
@@ -23,11 +23,11 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     private readonly ISettingsMigrationManager _migrationManager;
     private readonly JsonSettingsService _baseSettingsService;
     private readonly object _lockObject = new();
-    
+
     private AppSettings? _cachedAppSettings;
     private DateTime _lastCacheUpdate = DateTime.MinValue;
     private readonly TimeSpan _cacheValidDuration = TimeSpan.FromSeconds(5);
-    
+
     // イベント
     public event EventHandler<SettingChangedEventArgs>? SettingChanged;
     public event EventHandler<GameProfileChangedEventArgs>? GameProfileChanged;
@@ -47,14 +47,14 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metadataService = metadataService ?? throw new ArgumentNullException(nameof(metadataService));
         _migrationManager = migrationManager ?? throw new ArgumentNullException(nameof(migrationManager));
-        
+
         // ベースとなるJsonSettingsServiceを初期化
         using var loggerFactory = LoggerFactory.Create(builder =>
         {
             builder.AddConsole().SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Debug);
         });
         _baseSettingsService = new JsonSettingsService(loggerFactory.CreateLogger<JsonSettingsService>());
-        
+
         // 起動時に自動マイグレーションを実行
         _ = Task.Run(async () =>
         {
@@ -84,12 +84,12 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public void SetValue<T>(string key, T value)
     {
         var oldValue = _baseSettingsService.GetValue<object?>(key, null);
-        
+
         _baseSettingsService.SetValue(key, value);
-        
+
         // キャッシュをクリア
         InvalidateCache();
-        
+
         // イベントを発行
         OnSettingChanged(new SettingChangedEventArgs(
             key, oldValue, value, GetCategoryFromKey(key), SettingChangeType.Updated));
@@ -105,12 +105,12 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public void RemoveValue(string key)
     {
         var oldValue = _baseSettingsService.GetValue<object?>(key, null);
-        
+
         _baseSettingsService.RemoveValue(key);
-        
+
         // キャッシュをクリア
         InvalidateCache();
-        
+
         // イベントを発行
         OnSettingChanged(new SettingChangedEventArgs(
             key, oldValue, null, GetCategoryFromKey(key), SettingChangeType.Deleted));
@@ -126,30 +126,30 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         lock (_lockObject)
         {
             // キャッシュが有効な場合はキャッシュを返す
-            if (_cachedAppSettings != null && 
+            if (_cachedAppSettings != null &&
                 DateTime.Now - _lastCacheUpdate < _cacheValidDuration)
             {
                 return _cachedAppSettings;
             }
-            
+
             try
             {
                 var settings = LoadAppSettingsFromStorage();
-                
+
                 // キャッシュを更新
                 _cachedAppSettings = settings;
                 _lastCacheUpdate = DateTime.Now;
-                
+
                 return settings;
             }
             catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
             {
                 _logger.LogError(ex, "設定の読み込みに失敗しました。デフォルト設定を使用します");
-                
+
                 var defaultSettings = new AppSettings();
                 _cachedAppSettings = defaultSettings;
                 _lastCacheUpdate = DateTime.Now;
-                
+
                 return defaultSettings;
             }
         }
@@ -159,7 +159,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task SetSettingsAsync(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         try
         {
             // 設定の検証
@@ -170,23 +170,23 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
                 _logger.LogError("設定の検証に失敗しました: {Errors}", string.Join(", ", validationResult.Errors));
                 throw new InvalidOperationException(errorMsg);
             }
-            
+
             // タイムスタンプを更新
             settings.LastUpdated = DateTime.Now;
             if (settings.CreatedAt == DateTime.MinValue)
             {
                 settings.CreatedAt = DateTime.Now;
             }
-            
+
             await SaveAppSettingsToStorage(settings).ConfigureAwait(false);
-            
+
             // キャッシュを更新
             lock (_lockObject)
             {
                 _cachedAppSettings = settings;
                 _lastCacheUpdate = DateTime.Now;
             }
-            
+
             _logger.LogInformation("アプリケーション設定を保存しました");
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
@@ -201,7 +201,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         var appSettings = GetSettings();
         var categoryName = typeof(T).Name.Replace("Settings", string.Empty, StringComparison.Ordinal);
-        
+
         try
         {
             var property = typeof(AppSettings).GetProperty(categoryName);
@@ -209,7 +209,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             {
                 return (T)(property.GetValue(appSettings) ?? new T());
             }
-            
+
             _logger.LogWarning("設定カテゴリ {Category} が見つかりません", categoryName);
             return new T();
         }
@@ -224,10 +224,10 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task SetCategorySettingsAsync<T>(T settings) where T : class, new()
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         var appSettings = GetSettings();
         var categoryName = typeof(T).Name.Replace("Settings", string.Empty, StringComparison.Ordinal);
-        
+
         try
         {
             var property = typeof(AppSettings).GetProperty(categoryName);
@@ -235,7 +235,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             {
                 property.SetValue(appSettings, settings);
                 await SetSettingsAsync(appSettings).ConfigureAwait(false);
-                
+
                 _logger.LogDebug("設定カテゴリ {Category} を更新しました", categoryName);
             }
             else
@@ -271,7 +271,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public GameProfileSettings? GetGameProfile(string profileId)
     {
         ArgumentException.ThrowIfNullOrEmpty(profileId);
-        
+
         var settings = GetSettings();
         return settings.GameProfiles.TryGetValue(profileId, out var profile) ? profile : null;
     }
@@ -281,25 +281,25 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(profileId);
         ArgumentNullException.ThrowIfNull(profile);
-        
+
         var settings = GetSettings();
         var isNew = !settings.GameProfiles.ContainsKey(profileId);
-        
+
         // プロファイル情報を更新
         profile.LastModified = DateTime.Now;
         if (isNew)
         {
             profile.CreatedAt = DateTime.Now;
         }
-        
+
         settings.GameProfiles[profileId] = profile;
         await SetSettingsAsync(settings).ConfigureAwait(false);
-        
+
         // イベントを発行
         OnGameProfileChanged(new GameProfileChangedEventArgs(
             profileId, profile, isNew ? ProfileChangeType.Created : ProfileChangeType.Updated));
-        
-        _logger.LogInformation("ゲームプロファイル {ProfileId} を{Action}しました", 
+
+        _logger.LogInformation("ゲームプロファイル {ProfileId} を{Action}しました",
             profileId, isNew ? "作成" : "更新");
     }
 
@@ -307,24 +307,24 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task DeleteGameProfileAsync(string profileId)
     {
         ArgumentException.ThrowIfNullOrEmpty(profileId);
-        
+
         var settings = GetSettings();
         if (settings.GameProfiles.TryGetValue(profileId, out var profile))
         {
             settings.GameProfiles.Remove(profileId);
-            
+
             // アクティブプロファイルの場合は無効化
             if (settings.ActiveGameProfileId == profileId)
             {
                 settings.ActiveGameProfileId = null;
             }
-            
+
             await SetSettingsAsync(settings).ConfigureAwait(false);
-            
+
             // イベントを発行
             OnGameProfileChanged(new GameProfileChangedEventArgs(
                 profileId, profile, ProfileChangeType.Deleted));
-            
+
             _logger.LogInformation("ゲームプロファイル {ProfileId} を削除しました", profileId);
         }
     }
@@ -341,23 +341,23 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         var settings = GetSettings();
         var oldProfileId = settings.ActiveGameProfileId;
-        
+
         if (profileId != null && !settings.GameProfiles.ContainsKey(profileId))
         {
             throw new ArgumentException($"ゲームプロファイル '{profileId}' が存在しません", nameof(profileId));
         }
-        
+
         settings.ActiveGameProfileId = profileId;
         await SetSettingsAsync(settings).ConfigureAwait(false);
-        
+
         // イベントを発行
         if (profileId != null && settings.GameProfiles.TryGetValue(profileId, out var profile))
         {
             OnGameProfileChanged(new GameProfileChangedEventArgs(
                 profileId, profile, ProfileChangeType.ActivationChanged));
         }
-        
-        _logger.LogInformation("アクティブゲームプロファイルを {OldId} から {NewId} に変更しました", 
+
+        _logger.LogInformation("アクティブゲームプロファイルを {OldId} から {NewId} に変更しました",
             oldProfileId ?? "なし", profileId ?? "なし");
     }
 
@@ -365,8 +365,8 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public GameProfileSettings? GetActiveGameProfile()
     {
         var settings = GetSettings();
-        return !string.IsNullOrEmpty(settings.ActiveGameProfileId) 
-            ? GetGameProfile(settings.ActiveGameProfileId) 
+        return !string.IsNullOrEmpty(settings.ActiveGameProfileId)
+            ? GetGameProfile(settings.ActiveGameProfileId)
             : null;
     }
 
@@ -378,24 +378,24 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task SaveAsync()
     {
         var startTime = DateTime.Now;
-        
+
         try
         {
             await _baseSettingsService.SaveAsync().ConfigureAwait(false);
             var elapsedMs = (long)(DateTime.Now - startTime).TotalMilliseconds;
-            
+
             // 統計情報を取得
             var stats = GetStatistics();
-            
+
             // イベントを発行
             OnSettingsSaved(new SettingsSavedEventArgs("settings.json", stats.GameProfileCount, elapsedMs));
-            
+
             _logger.LogDebug("設定保存完了: {ElapsedMs}ms", elapsedMs);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
         {
             _logger.LogError(ex, "設定保存中にエラーが発生しました");
-            
+
             // エラーイベントを発行
             OnSettingsSaved(new SettingsSavedEventArgs("settings.json", ex.Message));
             throw;
@@ -415,7 +415,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         var defaultSettings = new AppSettings();
         await SetSettingsAsync(defaultSettings).ConfigureAwait(false);
-        
+
         _logger.LogInformation("設定をデフォルト値にリセットしました");
     }
 
@@ -427,11 +427,11 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             var settings = GetSettings();
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture);
             var fileName = backupFilePath ?? $"settings_backup_{timestamp}.json";
-            
+
             var json = JsonSerializer.Serialize(settings, GetJsonSerializerOptions());
-            
+
             await File.WriteAllTextAsync(fileName, json).ConfigureAwait(false);
-            
+
             _logger.LogInformation("設定のバックアップを作成しました: {FileName}", fileName);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
@@ -445,17 +445,17 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task RestoreFromBackupAsync(string backupFilePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(backupFilePath);
-        
+
         try
         {
             if (!File.Exists(backupFilePath))
             {
                 throw new FileNotFoundException($"バックアップファイルが見つかりません: {backupFilePath}");
             }
-            
+
             var json = await File.ReadAllTextAsync(backupFilePath).ConfigureAwait(false);
             var settings = JsonSerializer.Deserialize<AppSettings>(json, GetJsonDeserializerOptions());
-            
+
             if (settings != null)
             {
                 await SetSettingsAsync(settings).ConfigureAwait(false);
@@ -505,39 +505,39 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         try
         {
             var currentVersion = _baseSettingsService.GetValue("SchemaVersion", 0);
-            _logger.LogInformation("設定マイグレーションを開始: バージョン {CurrentVersion} → {LatestVersion}", 
+            _logger.LogInformation("設定マイグレーションを開始: バージョン {CurrentVersion} → {LatestVersion}",
                 currentVersion, _migrationManager.LatestSchemaVersion);
-            
+
             // マイグレーション前のバックアップを作成
             await CreateBackupAsync($"settings_pre_migration_v{currentVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}.json").ConfigureAwait(false);
-            
+
             // 現在の設定をディクショナリ形式で取得
             var currentSettings = await LoadSettingsAsDictionary().ConfigureAwait(false);
-            
+
             // マイグレーション可能性を確認
             if (!_migrationManager.RequiresMigration(currentVersion))
             {
                 _logger.LogInformation("マイグレーションは不要です");
                 return;
             }
-            
+
             // マイグレーションを実行
             var result = await _migrationManager.ExecuteMigrationAsync(currentSettings, currentVersion).ConfigureAwait(false);
-            
+
             if (result.Success)
             {
                 // マイグレーション後の設定を保存
                 await SaveSettingsFromDictionary(result.FinalSettings).ConfigureAwait(false);
-                
+
                 // キャッシュをクリア
                 InvalidateCache();
-                
-                _logger.LogInformation("設定マイグレーションが完了しました: {StepCount}ステップ, {ElapsedMs}ms", 
+
+                _logger.LogInformation("設定マイグレーションが完了しました: {StepCount}ステップ, {ElapsedMs}ms",
                     result.StepResults.Count, result.TotalExecutionTimeMs);
-                
+
                 if (result.Warnings.Count > 0)
                 {
-                    _logger.LogWarning("マイグレーション完了時の警告: {Warnings}", 
+                    _logger.LogWarning("マイグレーション完了時の警告: {Warnings}",
                         string.Join(", ", result.Warnings));
                 }
             }
@@ -579,13 +579,13 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task AddToFavoritesAsync(string settingKey)
     {
         ArgumentException.ThrowIfNullOrEmpty(settingKey);
-        
+
         var settings = GetSettings();
         if (!settings.FavoriteSettings.Contains(settingKey))
         {
             settings.FavoriteSettings.Add(settingKey);
             await SetSettingsAsync(settings).ConfigureAwait(false);
-            
+
             _logger.LogDebug("お気に入り設定に追加しました: {SettingKey}", settingKey);
         }
     }
@@ -594,12 +594,12 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task RemoveFromFavoritesAsync(string settingKey)
     {
         ArgumentException.ThrowIfNullOrEmpty(settingKey);
-        
+
         var settings = GetSettings();
         if (settings.FavoriteSettings.Remove(settingKey))
         {
             await SetSettingsAsync(settings).ConfigureAwait(false);
-            
+
             _logger.LogDebug("お気に入り設定から削除しました: {SettingKey}", settingKey);
         }
     }
@@ -634,10 +634,10 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         // 基本実装：JsonSettingsServiceから個別の値を読み取ってAppSettingsを構築
         var settings = new AppSettings();
-        
+
         // TODO: より効率的な実装に改善
         // 現在は基本的なプロパティのみを読み込み、将来的に完全実装
-        
+
         return settings;
     }
 
@@ -648,7 +648,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         // TODO: AppSettingsを個別の設定値に分解してJsonSettingsServiceに保存
         // 現在は基本実装、将来的に完全実装
-        
+
         await _baseSettingsService.SaveAsync().ConfigureAwait(false);
     }
 
@@ -660,16 +660,16 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         // 基本的な設定値をディクショナリ形式で返す（現在は空）
         // 実際のマイグレーションでは、すべての設定値がここで読み込まれる
         Dictionary<string, object?> settings = [];
-        
+
         // Versionキーがない場合は0として扱う（初回マイグレーション用）
         settings["Version"] = _baseSettingsService.GetValue("Version", 0);
-        
+
         // SchemaVersionも確認
         settings["SchemaVersion"] = _baseSettingsService.GetValue("SchemaVersion", 0);
-        
+
         // その他の設定値も読み込み（必要に応じて）
         // 現在は基本実装のため、マイグレーションテストで必要な最小限のみ
-        
+
         return Task.FromResult(settings);
     }
 
@@ -683,7 +683,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         {
             _baseSettingsService.SetValue(kvp.Key, kvp.Value);
         }
-        
+
         return _baseSettingsService.SaveAsync();
     }
 
@@ -752,22 +752,22 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     #endregion
 
     #region JsonSerializerOptions
-    
+
     private static readonly JsonSerializerOptions s_serializerOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
-    
+
     private static readonly JsonSerializerOptions s_deserializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true
     };
-    
+
     private static JsonSerializerOptions GetJsonSerializerOptions() => s_serializerOptions;
     private static JsonSerializerOptions GetJsonDeserializerOptions() => s_deserializerOptions;
-    
+
     #endregion
 
     #region IDisposable

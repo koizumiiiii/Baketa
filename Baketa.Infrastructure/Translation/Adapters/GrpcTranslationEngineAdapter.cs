@@ -266,7 +266,7 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
             _logger.LogError(ex, "[GrpcAdapter] Batch translation failed: {Count} requests", requests.Count);
 
             // エラー時は各リクエストに対してエラーレスポンスを返す
-            return requests.Select(request =>
+            return [.. requests.Select(request =>
                 TranslationResponse.CreateErrorFromException(
                     request,
                     Name,
@@ -274,7 +274,7 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
                     $"Batch translation failed: {ex.Message}",
                     ex
                 )
-            ).ToList();
+            )];
         }
     }
 

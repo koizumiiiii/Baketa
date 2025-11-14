@@ -1,7 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Infrastructure.Processing;
 using Baketa.Infrastructure.Processing.Strategies;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.DI;
 

@@ -37,7 +37,7 @@ public static class TextQualityValidator
     /// 日本語として意味のある最小文字数
     /// </summary>
     private const int MinMeaningfulJapaneseLength = 2;
-    
+
     /// <summary>
     /// 英語として意味のある最小文字数
     /// </summary>
@@ -56,17 +56,17 @@ public static class TextQualityValidator
             return false;
 
         var cleanText = text.Trim();
-        
+
         // ガベージパターンチェック
         foreach (var pattern in s_garbagePatterns)
         {
-            if (System.Text.RegularExpressions.Regex.IsMatch(cleanText, pattern, 
+            if (System.Text.RegularExpressions.Regex.IsMatch(cleanText, pattern,
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase))
             {
                 return false;
             }
         }
-        
+
         // 言語固有の長さチェック
         if (!string.IsNullOrEmpty(sourceLanguage))
         {
@@ -77,7 +77,7 @@ public static class TextQualityValidator
                 _ => cleanText.Length >= 2 // デフォルト最小長
             };
         }
-        
+
         // 言語不明時は汎用チェック
         return cleanText.Length >= 2;
     }
@@ -97,7 +97,7 @@ public static class TextQualityValidator
                 meaningfulChars++;
             }
         }
-        
+
         return meaningfulChars >= MinMeaningfulJapaneseLength;
     }
 
@@ -134,30 +134,30 @@ public static class TextQualityValidator
             return "テキストがnullまたは空文字";
 
         var cleanText = text.Trim();
-        
+
         // ガベージパターンチェック
         foreach (var pattern in s_garbagePatterns)
         {
-            if (System.Text.RegularExpressions.Regex.IsMatch(cleanText, pattern, 
+            if (System.Text.RegularExpressions.Regex.IsMatch(cleanText, pattern,
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase))
             {
                 return $"ガベージパターンに一致: {pattern}";
             }
         }
-        
+
         // 長さチェック
         if (!string.IsNullOrEmpty(sourceLanguage))
         {
             return sourceLanguage.ToLowerInvariant() switch
             {
-                "ja" when !IsJapaneseTextMeaningful(cleanText) => 
+                "ja" when !IsJapaneseTextMeaningful(cleanText) =>
                     $"日本語として短すぎる（意味のある文字数: {cleanText.Count(IsJapaneseCharacter)}）",
-                "en" when !IsEnglishTextMeaningful(cleanText) => 
+                "en" when !IsEnglishTextMeaningful(cleanText) =>
                     $"英語として短すぎる（アルファベット数: {cleanText.Count(char.IsLetter)}）",
                 _ => "品質チェック通過"
             };
         }
-        
+
         return cleanText.Length < 2 ? "汎用最小長未満" : "品質チェック通過";
     }
 }

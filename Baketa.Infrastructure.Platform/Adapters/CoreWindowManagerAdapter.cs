@@ -133,7 +133,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
 
             var windowList = new List<Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo>();
             var activeWindow = GetActiveWindowHandle();
-            
+
             foreach (var window in windows)
             {
                 var handle = window.Key;
@@ -161,7 +161,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
                 bool isVisible = IsWindow(handle) && IsWindowVisible(handle);
                 bool isMinimized = IsIconic(handle);
                 var bounds = _windowManager.GetWindowBounds(handle) ?? Rectangle.Empty;
-                
+
                 // 🚀 UltraThink修正: 最小化ウィンドウも含める（UIでフィルタリング）
                 if (isMinimized)
                 {
@@ -222,9 +222,9 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
         {
             // エラーログを記録
             System.Diagnostics.Debug.WriteLine($"❌ ウィンドウ一覧取得エラー: {ex.Message}");
-            
+
             // エラー時はテスト用のダミーウィンドウを返す（開発時のみ）
-            #if DEBUG
+#if DEBUG
             return
             [
                 new Baketa.Core.Abstractions.Platform.Windows.Adapters.WindowInfo
@@ -258,13 +258,13 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
                     ThumbnailBase64 = GenerateFallbackThumbnail(160, 120)
                 }
             ];
-            #else
+#else
             // リリース時は空の一覧を返す
             return [];
-            #endif
+#endif
         }
     }
-    
+
     /// <summary>
     /// ウィンドウのサムネイル画像を取得
     /// </summary>
@@ -285,7 +285,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
                 System.Diagnostics.Debug.WriteLine($"❌ 無効なウィンドウハンドル: Handle={handle}");
                 return GenerateFallbackThumbnail(maxWidth, maxHeight);
             }
-            
+
             if (!IsWindowVisible(handle))
             {
                 System.Diagnostics.Debug.WriteLine($"❌ ウィンドウが非表示: Handle={handle}");
@@ -298,10 +298,10 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
                 System.Diagnostics.Debug.WriteLine($"❌ GetWindowRect失敗: Handle={handle}");
                 return GenerateFallbackThumbnail(maxWidth, maxHeight);
             }
-                
+
             int width = rect.Right - rect.Left;
             int height = rect.Bottom - rect.Top;
-            
+
             // ウィンドウサイズ検証
             if (width <= 0 || height <= 0 || width > 4096 || height > 4096)
             {
@@ -312,7 +312,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
             // 画面境界チェック
             int screenWidth = GetSystemMetrics(SM_CXSCREEN);
             int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-            
+
             // ウィンドウが完全に画面外にある場合はスキップ
             if (rect.Right < 0 || rect.Bottom < 0 || rect.Left > screenWidth || rect.Top > screenHeight)
             {
@@ -324,7 +324,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
             double scale = Math.Min((double)maxWidth / width, (double)maxHeight / height);
             int thumbWidth = Math.Max(1, (int)(width * scale));
             int thumbHeight = Math.Max(1, (int)(height * scale));
-            
+
             System.Diagnostics.Debug.WriteLine($"🖼️ キャプチャ試行: Handle={handle}, Size={width}x{height}, Thumb={thumbWidth}x{thumbHeight}");
 
             // 方法1: Windows Graphics Capture API（最優先）
@@ -371,16 +371,16 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
         {
             IntPtr desktopDC = GetDC(IntPtr.Zero);
             if (desktopDC == IntPtr.Zero) return null;
-            
+
             IntPtr memoryDC = CreateCompatibleDC(desktopDC);
             IntPtr bitmap = CreateCompatibleBitmap(desktopDC, width, height);
             IntPtr oldBitmap = SelectObject(memoryDC, bitmap);
-            
+
             try
             {
                 // PrintWindow実行 (PW_CLIENTONLY | PW_RENDERFULLCONTENT)
                 bool success = PrintWindow(handle, memoryDC, 0x00000001 | 0x00000002);
-                
+
                 if (success)
                 {
                     return CreateThumbnailFromBitmap(bitmap, thumbWidth, thumbHeight);
@@ -398,7 +398,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
         {
             System.Diagnostics.Debug.WriteLine($"TryPrintWindow例外: {ex.Message}");
         }
-        
+
         return null;
     }
 
@@ -408,7 +408,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
     private string? TryPrintWindowWithForeground(IntPtr handle, int width, int height, int thumbWidth, int thumbHeight)
     {
         IntPtr currentForeground = GetForegroundWindow();
-        
+
         try
         {
             // 最小化されている場合は復元
@@ -423,7 +423,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
             System.Threading.Thread.Sleep(50); // レンダリング待機
 
             var result = TryPrintWindow(handle, width, height, thumbWidth, thumbHeight);
-            
+
             return result;
         }
         finally
@@ -446,11 +446,11 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
             using var originalBitmap = Image.FromHbitmap(bitmap);
             using var thumbnail = new Bitmap(thumbWidth, thumbHeight);
             using var graphics = Graphics.FromImage(thumbnail);
-            
+
             graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
             graphics.DrawImage(originalBitmap, 0, 0, thumbWidth, thumbHeight);
-            
+
             using var stream = new MemoryStream();
             thumbnail.Save(stream, ImageFormat.Png);
             return Convert.ToBase64String(stream.ToArray());
@@ -461,7 +461,7 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
             return null;
         }
     }
-    
+
     /// <summary>
     /// フォールバック用のプレースホルダー画像を生成
     /// </summary>
@@ -471,20 +471,20 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
         {
             using var thumbnail = new Bitmap(maxWidth, maxHeight);
             using var graphics = Graphics.FromImage(thumbnail);
-            
+
             // 背景をライトグレーで塗りつぶし
             graphics.Clear(Color.FromArgb(240, 240, 240));
-            
+
             // 枠線を描画
             using var pen = new Pen(Color.FromArgb(200, 200, 200), 2);
             graphics.DrawRectangle(pen, 1, 1, maxWidth - 2, maxHeight - 2);
-            
+
             // アイコンを描画
             var iconSize = Math.Min(maxWidth, maxHeight) / 3;
             var iconRect = new Rectangle((maxWidth - iconSize) / 2, (maxHeight - iconSize) / 2, iconSize, iconSize);
             using var brush = new SolidBrush(Color.FromArgb(180, 180, 180));
             graphics.FillRectangle(brush, iconRect);
-            
+
             // Base64エンコード
             using var stream = new MemoryStream();
             thumbnail.Save(stream, ImageFormat.Png);
@@ -513,33 +513,33 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
         try
         {
             System.Diagnostics.Debug.WriteLine($"🚀 ネイティブ Windows Graphics Capture API 試行開始: Handle={handle}");
-            
+
             // ネイティブキャプチャラッパーを使用
             using var nativeCapture = new Baketa.Infrastructure.Platform.Windows.Capture.NativeWindowsCaptureWrapper(
                 new Baketa.Infrastructure.Platform.Windows.WindowsImageFactory(null, null),
                 null);
-            
+
             // ライブラリを初期化
             if (!nativeCapture.Initialize())
             {
                 System.Diagnostics.Debug.WriteLine($"❌ ネイティブライブラリの初期化に失敗");
                 return null;
             }
-            
+
             // サポート状況をチェック
             if (!nativeCapture.IsSupported())
             {
                 System.Diagnostics.Debug.WriteLine($"❌ Windows Graphics Capture API がサポートされていません");
                 return null;
             }
-            
+
             // キャプチャセッションを作成
             if (!nativeCapture.CreateCaptureSession(handle))
             {
                 System.Diagnostics.Debug.WriteLine($"❌ キャプチャセッションの作成に失敗");
                 return null;
             }
-            
+
             // フレームをキャプチャ（同期的に実行）
             var windowsImage = nativeCapture.CaptureFrameAsync(5000).GetAwaiter().GetResult();
             if (windowsImage == null)
@@ -547,22 +547,22 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
                 System.Diagnostics.Debug.WriteLine($"❌ フレームキャプチャに失敗");
                 return null;
             }
-            
+
             System.Diagnostics.Debug.WriteLine($"✅ ネイティブキャプチャ成功: {windowsImage.Width}x{windowsImage.Height}");
-            
+
             // サムネイル作成
             using var originalBitmap = windowsImage.GetBitmap();
             using var thumbnail = new Bitmap(thumbWidth, thumbHeight);
             using var graphics = Graphics.FromImage(thumbnail);
-            
+
             graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
             graphics.DrawImage(originalBitmap, 0, 0, thumbWidth, thumbHeight);
-            
+
             using var stream = new MemoryStream();
             thumbnail.Save(stream, ImageFormat.Png);
             var result = Convert.ToBase64String(stream.ToArray());
-            
+
             System.Diagnostics.Debug.WriteLine($"📷 ネイティブ Windows Graphics Capture API 完了: サムネイル={thumbWidth}x{thumbHeight}");
             return result;
         }
@@ -583,80 +583,80 @@ public class CoreWindowManagerAdapter : Baketa.Core.Abstractions.Platform.Window
         // 最小化時の典型的な座標値をチェック
         if (bounds.X <= -30000 || bounds.Y <= -30000)
             return true;
-        
+
         // 画面領域外に完全に配置されている場合
         int screenWidth = GetSystemMetrics(SM_CXSCREEN);
         int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-        
+
         // ウィンドウが画面から完全に外れている場合
-        if (bounds.Right < 0 || bounds.Bottom < 0 || 
+        if (bounds.Right < 0 || bounds.Bottom < 0 ||
             bounds.Left > screenWidth || bounds.Top > screenHeight)
             return true;
-        
+
         return false;
     }
-    
+
     #region Win32 API
-    
+
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-    
+
     [DllImport("user32.dll")]
     private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, int nFlags);
-    
+
     [DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr hWnd);
-    
+
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr hWnd);
-    
+
     [DllImport("user32.dll")]
     private static extern bool IsIconic(IntPtr hWnd);
-    
+
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
-    
+
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
-    
+
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    
+
     [DllImport("user32.dll")]
     private static extern bool IsZoomed(IntPtr hWnd);
-    
+
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);
-    
+
     [DllImport("gdi32.dll")]
     private static extern bool BitBlt(IntPtr hdc, int nXDest, int nYDest, int nWidth, int nHeight, IntPtr hdcSrc, int nXSrc, int nYSrc, uint dwRop);
-    
+
     [DllImport("gdi32.dll")]
     private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-    
+
     [DllImport("gdi32.dll")]
     private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
-    
+
     [DllImport("gdi32.dll")]
     private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
-    
+
     [DllImport("gdi32.dll")]
     private static extern bool DeleteDC(IntPtr hdc);
-    
+
     [DllImport("gdi32.dll")]
     private static extern bool DeleteObject(IntPtr hObject);
-    
+
     [DllImport("user32.dll")]
     private static extern IntPtr GetDC(IntPtr hWnd);
-    
+
     [DllImport("user32.dll")]
     private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-    
+
     // Win32定数
     private const int SM_CXSCREEN = 0;
     private const int SM_CYSCREEN = 1;
     private const int SW_RESTORE = 9;
-    
+
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
     {

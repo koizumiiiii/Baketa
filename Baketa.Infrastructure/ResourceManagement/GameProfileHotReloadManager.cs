@@ -20,25 +20,25 @@ public sealed class GameProfileHotReloadManager : IDisposable
     private readonly ILogger<GameProfileHotReloadManager> _logger;
     private readonly IOptionsMonitor<HysteresisControlSettings> _hysteresisSettings;
     private readonly IOptionsMonitor<PredictiveControlSettings> _predictiveSettings;
-    
+
     // プロファイル管理
     private readonly Dictionary<string, GameProfile> _gameProfiles = new();
     private readonly Dictionary<string, string> _activeVariants = new(); // Game -> Variant
     private readonly object _profileLock = new();
-    
+
     // A/Bテスト管理
     private readonly Dictionary<string, AbTestConfiguration> _abTestConfigs = new();
     private readonly Dictionary<string, AbTestMetrics> _abTestMetrics = new();
-    
+
     // ファイルシステム監視
     private FileSystemWatcher? _profileWatcher;
     private readonly string _profilesDirectory;
     private readonly System.Threading.Timer _performanceEvaluationTimer;
-    
+
     // ホットリロード状態
-    private bool _hotReloadEnabled = true;
+    private readonly bool _hotReloadEnabled = true;
     private DateTime _lastReloadTime = DateTime.UtcNow;
-    
+
     // 非同期初期化制御
     private readonly TaskCompletionSource<bool> _initializationComplete = new();
     private bool _isInitializationStarted;
@@ -57,17 +57,17 @@ public sealed class GameProfileHotReloadManager : IDisposable
         _predictiveSettings = predictiveSettings ?? throw new ArgumentNullException(nameof(predictiveSettings));
 
         // プロファイル保存ディレクトリの設定
-        _profilesDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
+        _profilesDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Baketa", "GameProfiles");
-        
+
         Directory.CreateDirectory(_profilesDirectory);
 
         // パフォーマンス評価タイマー（5分ごと）
-        _performanceEvaluationTimer = new System.Threading.Timer(EvaluatePerformanceAndAdjust, null, 
+        _performanceEvaluationTimer = new System.Threading.Timer(EvaluatePerformanceAndAdjust, null,
             TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
 
         _logger.LogInformation("🎮 [PHASE3] ゲーム別プロファイルホットリロードシステム初期化完了");
-        
+
         // 安全な非同期初期化の開始
         StartSafeInitializationAsync();
     }
@@ -78,9 +78,9 @@ public sealed class GameProfileHotReloadManager : IDisposable
     private void StartSafeInitializationAsync()
     {
         if (_isInitializationStarted) return;
-        
+
         _isInitializationStarted = true;
-        
+
         // 安全な非同期初期化（例外処理付き）
         Task.Run(async () =>
         {
@@ -97,7 +97,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
             }
         });
     }
-    
+
     /// <summary>
     /// 初期化完了の待機
     /// </summary>
@@ -107,7 +107,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
         {
             using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             combinedCts.CancelAfter(TimeSpan.FromSeconds(30)); // 30秒タイムアウト
-            
+
             await _initializationComplete.Task.WaitAsync(combinedCts.Token).ConfigureAwait(false);
         }
         catch (TimeoutException)
@@ -126,7 +126,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
     public async Task<GameProfile> GetGameProfileAsync(string gameProcessName, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-        
+
         lock (_profileLock)
         {
             if (_gameProfiles.TryGetValue(gameProcessName, out var profile))
@@ -137,16 +137,16 @@ public sealed class GameProfileHotReloadManager : IDisposable
             // プロファイルが存在しない場合はデフォルト作成
             var defaultProfile = CreateDefaultGameProfile(gameProcessName);
             _gameProfiles[gameProcessName] = defaultProfile;
-            
+
             _logger.LogInformation("🆕 [PHASE3] デフォルトゲームプロファイル作成: {GameName}", gameProcessName);
-            
+
             // 非同期でファイルに保存
             Task.Run(async () => await SaveGameProfileAsync(defaultProfile).ConfigureAwait(false));
-            
+
             return defaultProfile;
         }
     }
-    
+
     /// <summary>
     /// ゲームプロファイルの動的取得（同期版 - 後方互換性のため）
     /// </summary>
@@ -181,7 +181,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
 
             // バリアント選択ロジック
             var selectedVariant = SelectOptimalVariant(gameProcessName, abConfig);
-            
+
             lock (_profileLock)
             {
                 _activeVariants[gameProcessName] = selectedVariant;
@@ -191,7 +191,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
             await ApplyVariantConfigurationAsync(gameProcessName, selectedVariant, cancellationToken).ConfigureAwait(false);
             InitializeAbTestMetrics(gameProcessName, selectedVariant);
 
-            _logger.LogInformation("🔬 [PHASE3] A/Bテストバリアント適用: {GameName} → {Variant}", 
+            _logger.LogInformation("🔬 [PHASE3] A/Bテストバリアント適用: {GameName} → {Variant}",
                 gameProcessName, selectedVariant);
 
             return selectedVariant;
@@ -211,7 +211,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
         try
         {
             var variant = _activeVariants.TryGetValue(gameProcessName, out var v) ? v : "Default";
-            
+
             if (_abTestMetrics.TryGetValue($"{gameProcessName}_{variant}", out var abMetrics))
             {
                 lock (abMetrics)
@@ -220,11 +220,11 @@ public sealed class GameProfileHotReloadManager : IDisposable
                     abMetrics.TotalCooldownTime += metrics.CooldownTime;
                     abMetrics.TotalProcessingTime += metrics.ProcessingTime;
                     abMetrics.SuccessfulOperations += metrics.WasSuccessful ? 1 : 0;
-                    
+
                     // GPU温度とVRAM使用率の追跡
-                    abMetrics.AverageGpuTemperature = (abMetrics.AverageGpuTemperature * (abMetrics.TotalMeasurements - 1) + 
+                    abMetrics.AverageGpuTemperature = (abMetrics.AverageGpuTemperature * (abMetrics.TotalMeasurements - 1) +
                         metrics.GpuTemperature) / abMetrics.TotalMeasurements;
-                    abMetrics.AverageVramUsage = (abMetrics.AverageVramUsage * (abMetrics.TotalMeasurements - 1) + 
+                    abMetrics.AverageVramUsage = (abMetrics.AverageVramUsage * (abMetrics.TotalMeasurements - 1) +
                         metrics.VramUsagePercent) / abMetrics.TotalMeasurements;
 
                     abMetrics.LastUpdateTime = DateTime.UtcNow;
@@ -315,7 +315,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
         if (variantResults.Count >= 2)
         {
             var statisticalAnalyzer = new StatisticalAnalyzer(_loggerFactory.CreateLogger<StatisticalAnalyzer>());
-            
+
             // 最も有望な2つのバリアントを比較
             var topTwoVariants = variantResults
                 .Where(v => v.TotalMeasurements >= 10)
@@ -328,7 +328,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
             {
                 statisticalResult = statisticalAnalyzer.CompareVariants(topTwoVariants[0], topTwoVariants[1]);
                 _logger.LogInformation("📊 [STATS] 統計検定結果 - {Game}: {TestType}, p={PValue:F6}, 有意差={IsSignificant}, 効果量={EffectSize:F3}({EffectCategory}), 推奨={Recommendation}",
-                    gameProcessName, statisticalResult.TestType, statisticalResult.PValue, 
+                    gameProcessName, statisticalResult.TestType, statisticalResult.PValue,
                     statisticalResult.IsSignificant, statisticalResult.EffectSize, statisticalResult.EffectSizeCategory,
                     statisticalResult.Recommendation);
             }
@@ -344,7 +344,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
     /// 統計的有意性を考慮した最適バリアント決定
     /// </summary>
     private static string DetermineOptimalVariantWithStatistics(
-        List<VariantResult> variantResults, 
+        List<VariantResult> variantResults,
         StatisticalTestResult? statisticalResult)
     {
         var validVariants = variantResults.Where(v => v.TotalMeasurements >= 10).ToList();
@@ -354,7 +354,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
         }
 
         // 統計的有意差がある場合、それを優先
-        if (statisticalResult?.IsSignificant == true && 
+        if (statisticalResult?.IsSignificant == true &&
             statisticalResult.EffectSizeCategory >= EffectSizeCategory.Small)
         {
             // より高い成功率を持つバリアントを選択
@@ -455,7 +455,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
         try
         {
             var gameName = Path.GetFileNameWithoutExtension(e.Name);
-            
+
             lock (_profileLock)
             {
                 if (_gameProfiles.ContainsKey(gameName))
@@ -530,7 +530,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
             var random = new Random();
             var randomValue = random.NextDouble();
             var cumulative = 0.0;
-            
+
             for (int i = 0; i < abConfig.Variants.Count && i < abConfig.TrafficSplit.Count; i++)
             {
                 cumulative += abConfig.TrafficSplit[i];
@@ -548,7 +548,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
         {
             // バリアント固有の設定適用ロジック
             var profile = GetGameProfile(gameProcessName);
-            
+
             // バリアントに基づく設定調整
             var adjustedSettings = variant switch
             {
@@ -560,7 +560,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
 
             // プロファイルの更新（必要に応じて）
             var updatedProfile = profile with { HysteresisSettings = adjustedSettings };
-            
+
             lock (_profileLock)
             {
                 _gameProfiles[gameProcessName] = updatedProfile;
@@ -590,7 +590,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
             if (!File.Exists(filePath)) return null;
 
             var jsonContent = await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false);
-            
+
             var options = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -611,7 +611,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
         try
         {
             var filePath = Path.Combine(_profilesDirectory, $"{profile.GameProcessName}.json");
-            
+
             var options = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -633,11 +633,11 @@ public sealed class GameProfileHotReloadManager : IDisposable
         {
             // 定期的なパフォーマンス評価と自動調整
             var gameNames = _activeVariants.Keys.ToList();
-            
+
             foreach (var gameName in gameNames)
             {
                 var summary = GetAbTestSummary(gameName);
-                
+
                 // 統計的有意性チェックと最適バリアント切り替え
                 if (summary.VariantResults.Count > 1 && ShouldSwitchVariant(summary))
                 {
@@ -668,7 +668,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
         if (bestVariant == null) return false;
 
         var currentOptimal = summary.VariantResults.FirstOrDefault(v => v.VariantName == summary.OptimalVariant);
-        
+
         return bestVariant != currentOptimal && bestVariant.SuccessRate > (currentOptimal?.SuccessRate ?? 0) + 0.05; // 5%以上の改善
     }
 
@@ -676,7 +676,7 @@ public sealed class GameProfileHotReloadManager : IDisposable
     {
         _profileWatcher?.Dispose();
         _performanceEvaluationTimer?.Dispose();
-        
+
         // プロファイルの最終保存
         Task.Run(async () =>
         {

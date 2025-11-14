@@ -1,6 +1,6 @@
-using Baketa.Core.Abstractions.Platform.Windows;
-using Baketa.Core.Abstractions.GPU;
 using System.Drawing;
+using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Abstractions.Platform.Windows;
 
 namespace Baketa.Core.Models.Capture;
 
@@ -30,7 +30,7 @@ public class CaptureMetrics
     public TimeSpan StrategySelectionTime { get; set; }
     public TimeSpan ActualCaptureTime { get; set; }
     public TimeSpan TextureConversionTime { get; set; }
-    
+
     public long MemoryUsedMB { get; set; }
     public int RetryAttempts { get; set; }
     public int FrameCount { get; set; }
@@ -67,7 +67,7 @@ public class AdaptiveCaptureResult
     public CaptureMetrics Metrics { get; set; } = new CaptureMetrics();
     public string ErrorDetails { get; set; } = string.Empty;
     public DateTime CaptureTime { get; set; } = DateTime.Now;
-    
+
     /// <summary>
     /// 画像変化検知によりOCR処理がスキップされたかどうか
     /// Phase 1: OCR処理最適化システム

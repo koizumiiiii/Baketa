@@ -16,7 +16,7 @@ public class PortManagementServiceTests : IDisposable
 {
     private readonly Mock<ILogger<PortManagementService>> _mockLogger;
     private readonly PortManagementService _service;
-    
+
     // テスト専用ポート範囲（他のテストと衝突回避）
     private readonly int _testPortStart = Random.Shared.Next(6000, 8000);
     private readonly int _testPortEnd;
@@ -36,7 +36,7 @@ public class PortManagementServiceTests : IDisposable
 
         // Assert
         Assert.True(port >= _testPortStart && port <= _testPortEnd, $"取得ポート {port} が期待範囲外");
-        
+
         // ポートが実際に利用可能かテスト（レジストリに登録されるが、実際のポートは空いている）
         var isAvailable = await _service.IsPortAvailableAsync(port);
         Assert.True(isAvailable); // PortManagementServiceは論理的な管理のみで、実際のポート占有はしない
@@ -115,12 +115,12 @@ public class PortManagementServiceTests : IDisposable
         // Arrange - テスト専用範囲内でカスタム範囲を設定
         var customStart = _testPortStart + offset;
         var customEnd = Math.Min(customStart + 5, _testPortEnd); // 5ポートの範囲
-        
+
         // Act
         var port = await _service.AcquireAvailablePortAsync(customStart, customEnd);
 
         // Assert
-        Assert.True(port >= customStart && port <= customEnd, 
+        Assert.True(port >= customStart && port <= customEnd,
             $"取得ポート {port} がカスタム範囲 {customStart}-{customEnd} 外");
     }
 
@@ -139,7 +139,7 @@ public class PortManagementServiceIntegrationTests : IDisposable
 {
     private readonly Mock<ILogger<PortManagementService>> _mockLogger;
     private readonly List<PortManagementService> _services;
-    
+
     // 統合テスト専用ポート範囲
     private readonly int _integrationPortStart = Random.Shared.Next(8000, 9000);
     private readonly int _integrationPortEnd;

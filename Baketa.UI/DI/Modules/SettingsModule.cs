@@ -1,6 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
 using Baketa.UI.Services;
 using Baketa.UI.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.UI.DI.Modules;
 

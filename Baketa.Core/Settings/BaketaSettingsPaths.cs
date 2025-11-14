@@ -13,43 +13,43 @@ public static class BaketaSettingsPaths
     /// ユーザー設定ディレクトリのベースパス
     /// </summary>
     public static string UserSettingsDirectory { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
-        ".baketa", 
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".baketa",
         "settings");
 
     /// <summary>
     /// 翻訳設定ファイルのパス
     /// </summary>
     public static string TranslationSettingsPath { get; } = Path.Combine(
-        UserSettingsDirectory, 
+        UserSettingsDirectory,
         "translation-settings.json");
 
     /// <summary>
     /// OCR設定ファイルのパス
     /// </summary>
     public static string OcrSettingsPath { get; } = Path.Combine(
-        UserSettingsDirectory, 
+        UserSettingsDirectory,
         "ocr-settings.json");
 
     /// <summary>
     /// UI設定ファイルのパス
     /// </summary>
     public static string UiSettingsPath { get; } = Path.Combine(
-        UserSettingsDirectory, 
+        UserSettingsDirectory,
         "ui-settings.json");
 
     /// <summary>
     /// キャッシュディレクトリのパス
     /// </summary>
     public static string CacheDirectory { get; } = Path.Combine(
-        UserSettingsDirectory, 
+        UserSettingsDirectory,
         "cache");
 
     /// <summary>
     /// ログファイルディレクトリのパス
     /// </summary>
     public static string LogDirectory { get; } = Path.Combine(
-        UserSettingsDirectory, 
+        UserSettingsDirectory,
         "logs");
 
     /// <summary>

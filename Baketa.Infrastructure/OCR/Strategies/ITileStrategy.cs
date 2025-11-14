@@ -17,8 +17,8 @@ public interface ITileStrategy
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>OCR処理対象領域のリスト</returns>
     Task<List<TileRegion>> GenerateRegionsAsync(
-        IAdvancedImage image, 
-        TileGenerationOptions options, 
+        IAdvancedImage image,
+        TileGenerationOptions options,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -84,7 +84,7 @@ public sealed record TileGenerationOptions
 
     /// <summary>最大領域数制限</summary>
     public int MaxRegionCount { get; init; } = 20;
-    
+
     /// <summary>最大タイルサイズ</summary>
     public int MaxTileSize { get; init; } = 999;
 }

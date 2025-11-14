@@ -17,188 +17,188 @@ namespace Baketa.Infrastructure.Imaging.Filters;
 /// </remarks>
 /// <param name="logger">ロガー</param>
 public abstract class BaseImageFilter(ILogger? logger = null) : IImageFilter, IImagePipelineStep
-    {
-        private readonly Dictionary<string, object> _parameters = [];
-        private readonly ILogger? _logger = logger;
-        
-        /// <summary>
-        /// フィルターの名前
-        /// </summary>
-        public abstract string Name { get; }
-        
-        /// <summary>
-        /// フィルターの説明
-        /// </summary>
-        public abstract string Description { get; }
-        
-        /// <summary>
-        /// フィルターのカテゴリ
-        /// </summary>
-        public virtual FilterCategory Category => FilterCategory.ColorAdjustment;
-        
-        /// <summary>
-        /// ステップのパラメータ定義 (IImagePipelineStep用)
-        /// </summary>
-        public virtual IReadOnlyCollection<PipelineStepParameter> Parameters => GetParameterDefinitions();
-        
-        /// <summary>
-        /// フィルターのエラー処理戦略
-        /// </summary>
-        public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.ContinueExecution;
+{
+    private readonly Dictionary<string, object> _parameters = [];
+    private readonly ILogger? _logger = logger;
+
+    /// <summary>
+    /// フィルターの名前
+    /// </summary>
+    public abstract string Name { get; }
+
+    /// <summary>
+    /// フィルターの説明
+    /// </summary>
+    public abstract string Description { get; }
+
+    /// <summary>
+    /// フィルターのカテゴリ
+    /// </summary>
+    public virtual FilterCategory Category => FilterCategory.ColorAdjustment;
+
+    /// <summary>
+    /// ステップのパラメータ定義 (IImagePipelineStep用)
+    /// </summary>
+    public virtual IReadOnlyCollection<PipelineStepParameter> Parameters => GetParameterDefinitions();
+
+    /// <summary>
+    /// フィルターのエラー処理戦略
+    /// </summary>
+    public StepErrorHandlingStrategy ErrorHandlingStrategy { get; set; } = StepErrorHandlingStrategy.ContinueExecution;
 
     /// <summary>
     /// パラメータをリセットします
     /// </summary>
     public virtual void ResetParameters()
-        {
-            _parameters.Clear();
-            InitializeDefaultParameters();
-        }
-        
-        /// <summary>
-        /// デフォルトパラメータを初期化します
-        /// </summary>
-        protected virtual void InitializeDefaultParameters()
-        {
-            // サブクラスでオーバーライドして実装
-        }
-        
-        /// <summary>
-        /// パラメータ定義を取得します
-        /// </summary>
-        /// <returns>パラメータ定義のコレクション</returns>
-        protected virtual IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
-        {
+    {
+        _parameters.Clear();
+        InitializeDefaultParameters();
+    }
+
+    /// <summary>
+    /// デフォルトパラメータを初期化します
+    /// </summary>
+    protected virtual void InitializeDefaultParameters()
+    {
+        // サブクラスでオーバーライドして実装
+    }
+
+    /// <summary>
+    /// パラメータ定義を取得します
+    /// </summary>
+    /// <returns>パラメータ定義のコレクション</returns>
+    protected virtual IReadOnlyCollection<PipelineStepParameter> GetParameterDefinitions()
+    {
         return [];
-        }
-        
-        /// <summary>
-        /// パラメータ値を設定します
-        /// </summary>
-        /// <param name="parameterName">パラメータ名</param>
-        /// <param name="value">設定する値</param>
-        public virtual void SetParameter(string parameterName, object value)
+    }
+
+    /// <summary>
+    /// パラメータ値を設定します
+    /// </summary>
+    /// <param name="parameterName">パラメータ名</param>
+    /// <param name="value">設定する値</param>
+    public virtual void SetParameter(string parameterName, object value)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(parameterName, nameof(parameterName));
+
+        _parameters[parameterName] = value;
+    }
+
+    /// <summary>
+    /// パラメータ値を取得します
+    /// </summary>
+    /// <param name="parameterName">パラメータ名</param>
+    /// <returns>パラメータ値</returns>
+    public virtual object GetParameter(string parameterName)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(parameterName, nameof(parameterName));
+
+        if (_parameters.TryGetValue(parameterName, out var value))
+            return value;
+
+        throw new KeyNotFoundException($"パラメータ '{parameterName}' が見つかりません");
+    }
+
+    /// <summary>
+    /// パラメータ値をジェネリック型で取得します
+    /// </summary>
+    /// <typeparam name="T">取得する型</typeparam>
+    /// <param name="parameterName">パラメータ名</param>
+    /// <returns>パラメータ値</returns>
+    public virtual T GetParameter<T>(string parameterName)
+    {
+        var value = GetParameter(parameterName);
+
+        if (value is T typedValue)
+            return typedValue;
+
+        try
         {
-            ArgumentNullException.ThrowIfNullOrEmpty(parameterName, nameof(parameterName));
-                
-            _parameters[parameterName] = value;
+            return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
         }
-        
-        /// <summary>
-        /// パラメータ値を取得します
-        /// </summary>
-        /// <param name="parameterName">パラメータ名</param>
-        /// <returns>パラメータ値</returns>
-        public virtual object GetParameter(string parameterName)
+        catch (Exception ex)
         {
-            ArgumentNullException.ThrowIfNullOrEmpty(parameterName, nameof(parameterName));
-                
-            if (_parameters.TryGetValue(parameterName, out var value))
-                return value;
-                
-            throw new KeyNotFoundException($"パラメータ '{parameterName}' が見つかりません");
+            throw new InvalidCastException(
+                $"パラメータ '{parameterName}' を型 {typeof(T).Name} に変換できません", ex);
         }
-        
-        /// <summary>
-        /// パラメータ値をジェネリック型で取得します
-        /// </summary>
-        /// <typeparam name="T">取得する型</typeparam>
-        /// <param name="parameterName">パラメータ名</param>
-        /// <returns>パラメータ値</returns>
-        public virtual T GetParameter<T>(string parameterName)
+    }
+
+    /// <summary>
+    /// すべてのパラメータを取得します
+    /// </summary>
+    /// <returns>パラメータのディクショナリ</returns>
+    public virtual IDictionary<string, object> GetParameters()
+    {
+        return new Dictionary<string, object>(_parameters);
+    }
+
+    /// <summary>
+    /// 画像フォーマットがサポートされているかを確認します
+    /// </summary>
+    /// <param name="format">画像フォーマット</param>
+    /// <returns>サポートされている場合はtrue</returns>
+    public virtual bool SupportsFormat(ImageFormat format)
+    {
+        // デフォルトではすべてのフォーマットをサポート
+        // 特定のフィルターでは、特定のフォーマットのみをサポートする場合にオーバーライド
+        return true;
+    }
+
+    /// <summary>
+    /// フィルターを適用します
+    /// </summary>
+    /// <param name="image">入力画像</param>
+    /// <returns>処理結果画像</returns>
+    public abstract Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage);
+
+    /// <summary>
+    /// ステップを実行します
+    /// </summary>
+    /// <param name="input">入力画像</param>
+    /// <param name="context">パイプライン実行コンテキスト</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>処理結果画像</returns>
+    public virtual async Task<IAdvancedImage> ExecuteAsync(
+        IAdvancedImage input,
+        PipelineContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(context);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
         {
-            var value = GetParameter(parameterName);
-            
-            if (value is T typedValue)
-                return typedValue;
-                
-            try
-            {
-                return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidCastException(
-                    $"パラメータ '{parameterName}' を型 {typeof(T).Name} に変換できません", ex);
-            }
+            // フィルター適用
+            return await ApplyAsync(input).ConfigureAwait(false);
         }
-        
-        /// <summary>
-        /// すべてのパラメータを取得します
-        /// </summary>
-        /// <returns>パラメータのディクショナリ</returns>
-        public virtual IDictionary<string, object> GetParameters()
+        catch (Exception ex) when (ErrorHandlingStrategy == StepErrorHandlingStrategy.ContinueExecution)
         {
-            return new Dictionary<string, object>(_parameters);
+            // エラー記録
+            // 固定メッセージテンプレートを使用
+            _logger?.LogError(ex, "フィルター '{FilterName}' の適用中にエラーが発生しましたが、継続実行戦略に従って処理を続行します", Name);
+
+            // 元の画像を返す
+            return input;
         }
-        
-        /// <summary>
-        /// 画像フォーマットがサポートされているかを確認します
-        /// </summary>
-        /// <param name="format">画像フォーマット</param>
-        /// <returns>サポートされている場合はtrue</returns>
-        public virtual bool SupportsFormat(ImageFormat format)
-        {
-            // デフォルトではすべてのフォーマットをサポート
-            // 特定のフィルターでは、特定のフォーマットのみをサポートする場合にオーバーライド
-            return true;
-        }
-        
-        /// <summary>
-        /// フィルターを適用します
-        /// </summary>
-        /// <param name="image">入力画像</param>
-        /// <returns>処理結果画像</returns>
-        public abstract Task<IAdvancedImage> ApplyAsync(IAdvancedImage inputImage);
-        
-        /// <summary>
-        /// ステップを実行します
-        /// </summary>
-        /// <param name="input">入力画像</param>
-        /// <param name="context">パイプライン実行コンテキスト</param>
-        /// <param name="cancellationToken">キャンセレーショントークン</param>
-        /// <returns>処理結果画像</returns>
-        public virtual async Task<IAdvancedImage> ExecuteAsync(
-            IAdvancedImage input, 
-            PipelineContext context, 
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(input);
-            ArgumentNullException.ThrowIfNull(context);
-                
-            cancellationToken.ThrowIfCancellationRequested();
-            
-            try
-            {
-                // フィルター適用
-                return await ApplyAsync(input).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ErrorHandlingStrategy == StepErrorHandlingStrategy.ContinueExecution)
-            {
-                // エラー記録
-                // 固定メッセージテンプレートを使用
-                _logger?.LogError(ex, "フィルター '{FilterName}' の適用中にエラーが発生しましたが、継続実行戦略に従って処理を続行します", Name);
-                
-                // 元の画像を返す
-                return input;
-            }
-            // その他の例外は上位に伝播
-        }
-        
-        /// <summary>
-        /// 出力画像情報を取得します
-        /// </summary>
-        /// <param name="input">入力画像</param>
-        /// <returns>出力画像の情報</returns>
-        public virtual PipelineImageInfo GetOutputImageInfo(IAdvancedImage input)
-        {
-            ArgumentNullException.ThrowIfNull(input);
-            
-            // 基本的には入力と同じ情報を返す
-            // 特定のフィルターでは、サイズやチャンネル数が変わる場合にオーバーライドする
-            var imageInfo = ((IImageFilter)this).GetOutputImageInfo(input);
-            return PipelineImageInfo.FromImageInfo(imageInfo, PipelineStage.Processing);
-        }
+        // その他の例外は上位に伝播
+    }
+
+    /// <summary>
+    /// 出力画像情報を取得します
+    /// </summary>
+    /// <param name="input">入力画像</param>
+    /// <returns>出力画像の情報</returns>
+    public virtual PipelineImageInfo GetOutputImageInfo(IAdvancedImage input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        // 基本的には入力と同じ情報を返す
+        // 特定のフィルターでは、サイズやチャンネル数が変わる場合にオーバーライドする
+        var imageInfo = ((IImageFilter)this).GetOutputImageInfo(input);
+        return PipelineImageInfo.FromImageInfo(imageInfo, PipelineStage.Processing);
+    }
 
     /// <summary>
     /// フィルター適用後の画像情報を取得します
@@ -208,55 +208,55 @@ public abstract class BaseImageFilter(ILogger? logger = null) : IImageFilter, II
     Baketa.Core.Abstractions.Imaging.ImageInfo IImageFilter.GetOutputImageInfo(IAdvancedImage inputImage)
     {
         ArgumentNullException.ThrowIfNull(inputImage);
-                
+
         // 基本的には入力と同じ情報を返す
         return Baketa.Core.Abstractions.Imaging.ImageInfo.FromImage(inputImage);
     }
-        
-        /// <summary>
-        /// ログを出力します
-        /// </summary>
-        /// <param name="logLevel">ログレベル</param>
-        /// <param name="messageTemplate">メッセージテンプレート</param>
-        /// <param name="args">引数</param>
-        protected void Log(LogLevel logLevel, string messageTemplate, params object[] args)
+
+    /// <summary>
+    /// ログを出力します
+    /// </summary>
+    /// <param name="logLevel">ログレベル</param>
+    /// <param name="messageTemplate">メッセージテンプレート</param>
+    /// <param name="args">引数</param>
+    protected void Log(LogLevel logLevel, string messageTemplate, params object[] args)
+    {
+        if (_logger == null)
+            return;
+
+        // CA2254回避のため、フォーマット済みメッセージを使用
+        var formattedMessage = args.Length > 0 ? string.Format(CultureInfo.InvariantCulture, messageTemplate, args) : messageTemplate;
+
+        switch (logLevel)
         {
-            if (_logger == null)
-                return;
-                
-            // CA2254回避のため、フォーマット済みメッセージを使用
-            var formattedMessage = args.Length > 0 ? string.Format(CultureInfo.InvariantCulture, messageTemplate, args) : messageTemplate;
-            
-            switch (logLevel)
-            {
-                case LogLevel.Debug:
-                    _logger.LogDebug("{Message}", formattedMessage);
-                    break;
-                case LogLevel.Information:
-                    _logger.LogInformation("{Message}", formattedMessage);
-                    break;
-                case LogLevel.Warning:
-                    _logger.LogWarning("{Message}", formattedMessage);
-                    break;
-                case LogLevel.Error:
-                    _logger.LogError("{Message}", formattedMessage);
-                    break;
-                case LogLevel.Critical:
-                    _logger.LogCritical("{Message}", formattedMessage);
-                    break;
-                default:
-                    _logger.LogInformation("{Message}", formattedMessage);
-                    break;
-            }
-        }
-        
-        /// <summary>
-        /// フォーマット済みのメッセージでログを出力します
-        /// </summary>
-        /// <param name="logLevel">ログレベル</param>
-        /// <param name="formattedMessage">フォーマット済みメッセージ</param>
-        protected void LogFormatted(LogLevel logLevel, string formattedMessage)
-        {
-            _logger?.Log(logLevel, "{Message}", formattedMessage);
+            case LogLevel.Debug:
+                _logger.LogDebug("{Message}", formattedMessage);
+                break;
+            case LogLevel.Information:
+                _logger.LogInformation("{Message}", formattedMessage);
+                break;
+            case LogLevel.Warning:
+                _logger.LogWarning("{Message}", formattedMessage);
+                break;
+            case LogLevel.Error:
+                _logger.LogError("{Message}", formattedMessage);
+                break;
+            case LogLevel.Critical:
+                _logger.LogCritical("{Message}", formattedMessage);
+                break;
+            default:
+                _logger.LogInformation("{Message}", formattedMessage);
+                break;
         }
     }
+
+    /// <summary>
+    /// フォーマット済みのメッセージでログを出力します
+    /// </summary>
+    /// <param name="logLevel">ログレベル</param>
+    /// <param name="formattedMessage">フォーマット済みメッセージ</param>
+    protected void LogFormatted(LogLevel logLevel, string formattedMessage)
+    {
+        _logger?.Log(logLevel, "{Message}", formattedMessage);
+    }
+}

@@ -15,7 +15,7 @@ public interface ITranslationProcessingFacade
     /// バッチOCR処理サービス
     /// </summary>
     IBatchOcrProcessor OcrProcessor { get; }
-    
+
     /// <summary>
     /// 翻訳サービス
     /// </summary>

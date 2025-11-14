@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Infrastructure.OCR.AdaptivePreprocessing;
-using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.Ensemble;
 
@@ -55,7 +55,7 @@ public class EnsembleEngineBalancer(
 
             logger.LogInformation(
                 "エンジン重み最適化完了: 精度改善={Accuracy:F3}, 速度改善={Speed:F3}, 信頼度={Confidence:F3} ({ElapsedMs}ms)",
-                result.ExpectedAccuracyImprovement, result.ExpectedSpeedImprovement, 
+                result.ExpectedAccuracyImprovement, result.ExpectedSpeedImprovement,
                 result.ConfidenceScore, sw.ElapsedMilliseconds);
 
             return result;
@@ -200,7 +200,7 @@ public class EnsembleEngineBalancer(
 
             logger.LogInformation(
                 "パフォーマンス調整提案: タイプ={Type}, 緊急度={Urgency}, 期待改善={Improvement:F3}",
-                adjustmentSuggestion.AdjustmentType, adjustmentSuggestion.Urgency, 
+                adjustmentSuggestion.AdjustmentType, adjustmentSuggestion.Urgency,
                 adjustmentSuggestion.ExpectedImprovement);
 
             return adjustmentSuggestion;
@@ -319,7 +319,7 @@ public class EnsembleEngineBalancer(
             var normalizedSuitability = kvp.Value / totalSuitability;
             var weight = Math.Max(parameters.MinimumEngineWeight,
                 Math.Min(parameters.MaximumEngineWeight, normalizedSuitability * 2.0));
-            
+
             optimizedWeights[kvp.Key] = weight;
         }
 
@@ -390,10 +390,10 @@ public class EnsembleEngineBalancer(
     /// 複雑度レベルを判定
     /// </summary>
     private ImageComplexityLevel DetermineComplexityLevel(
-        ImageQualityMetrics qualityMetrics, 
+        ImageQualityMetrics qualityMetrics,
         TextDensityMetrics textDensityMetrics)
     {
-        var complexityScore = 
+        var complexityScore =
             (1.0 - qualityMetrics.OverallQuality) * 0.4 +
             textDensityMetrics.EdgeDensity * 0.3 +
             qualityMetrics.NoiseLevel * 0.3;
@@ -415,7 +415,7 @@ public class EnsembleEngineBalancer(
         TimeSpan processingTime)
     {
         var equalWeights = engines.ToDictionary(e => e.EngineName, e => 1.0);
-        
+
         return new EngineWeightOptimizationResult(
             equalWeights,
             0.0,
@@ -439,8 +439,8 @@ public class EnsembleEngineBalancer(
         0.8;
 
     private EngineWeightLearningResult CreateEmptyLearningResult() =>
-        new([], 0.0, 0, 0.0, new Dictionary<string, double>(), 
-            new LearningInsights(new Dictionary<string, double>(), new Dictionary<string, double>(), 
+        new([], 0.0, 0, 0.0, new Dictionary<string, double>(),
+            new LearningInsights(new Dictionary<string, double>(), new Dictionary<string, double>(),
                 [], [], 0.0));
 
     private List<EnsembleExecutionHistory> FilterRelevantHistory(IReadOnlyList<EnsembleExecutionHistory> history, LearningParameters _) =>
@@ -449,7 +449,7 @@ public class EnsembleEngineBalancer(
     private Dictionary<string, double> AnalyzeEnginePerformance(List<EnsembleExecutionHistory> _) =>
         [];
 
-    private async Task<Dictionary<string, double>> ExecuteWeightLearningAsync(List<EnsembleExecutionHistory> _, 
+    private async Task<Dictionary<string, double>> ExecuteWeightLearningAsync(List<EnsembleExecutionHistory> _,
         Dictionary<string, double> _2, LearningParameters _3) =>
         await Task.FromResult<Dictionary<string, double>>([]).ConfigureAwait(false);
 
@@ -477,7 +477,7 @@ public class EnsembleEngineBalancer(
     private List<PerformanceIssue> DetectPerformanceIssues(IReadOnlyList<IndividualEngineResult> _, MonitoringParameters _2) =>
         [];
 
-    private async Task<PerformanceAdjustmentSuggestion> GenerateAdjustmentSuggestionAsync(List<PerformanceIssue> _, 
+    private async Task<PerformanceAdjustmentSuggestion> GenerateAdjustmentSuggestionAsync(List<PerformanceIssue> _,
         IReadOnlyList<IndividualEngineResult> _2, MonitoringParameters _3) =>
         await Task.FromResult(CreateEmptyAdjustmentSuggestion()).ConfigureAwait(false);
 

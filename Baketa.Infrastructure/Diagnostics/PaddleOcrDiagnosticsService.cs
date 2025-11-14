@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -9,6 +7,8 @@ using Baketa.Core.Abstractions.Diagnostics;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Sdcb.PaddleOCR;
 using Sdcb.PaddleOCR.Models;
 using Sdcb.PaddleOCR.Models.Shared;
@@ -34,7 +34,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrSettings = ocrSettings ?? throw new ArgumentNullException(nameof(ocrSettings));
         _modelPathResolver = modelPathResolver ?? throw new ArgumentNullException(nameof(modelPathResolver));
-        
+
         _logger.LogInformation("🔍 PaddleOCR診断システム初期化完了");
     }
 
@@ -51,15 +51,15 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
             // Phase 1: 依存関係チェック
             _logger.LogInformation("📋 Phase 1: 依存関係チェック実行中...");
             var dependencyResult = await CheckDependenciesAsync(cancellationToken);
-            
+
             // Phase 2: モデルファイル検証
             _logger.LogInformation("📋 Phase 2: モデルファイル検証実行中...");
             var modelResult = await ValidateModelFilesAsync(cancellationToken);
-            
+
             // Phase 3: GPU互換性チェック
             _logger.LogInformation("📋 Phase 3: GPU互換性チェック実行中...");
             var gpuReport = await CheckGpuCompatibilityAsync(cancellationToken);
-            
+
             // Phase 4: 初期化診断（CPU First）
             _logger.LogInformation("📋 Phase 4: 初期化診断実行中（CPU First戦略）...");
             var initResult = await DiagnoseInitializationAsync(useCpuOnly: true, cancellationToken);
@@ -71,7 +71,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
             var healthScore = CalculateOverallHealthScore(dependencyResult, modelResult, gpuReport, initResult);
 
             stopwatch.Stop();
-            
+
             var report = new DiagnosticReport
             {
                 OverallHealthScore = healthScore,
@@ -92,7 +92,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ PaddleOCR包括診断中にエラー");
-            
+
             issues.Add(new DiagnosticIssue
             {
                 Severity = DiagnosticSeverity.Critical,
@@ -130,7 +130,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
             foreach (var (name, pattern, required) in dependencies)
             {
                 var found = await CheckDependencyExistsAsync(assemblyDirectory, pattern, cancellationToken);
-                
+
                 if (!found && required)
                 {
                     allDependenciesOk = false;
@@ -163,7 +163,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
             if (!Directory.Exists(modelCachePath))
             {
                 _logger.LogWarning("⚠️ モデルキャッシュディレクトリが存在しません: {Path}", modelCachePath);
-                
+
                 // ディレクトリ自動作成を試行
                 try
                 {
@@ -216,7 +216,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
                 // 注意: 実際のCUDAチェックは環境に依存するため、簡易実装
                 var cudaDlls = Directory.GetFiles(Directory.GetCurrentDirectory(), "cudart*.dll");
                 cudaAvailable = cudaDlls.Length > 0;
-                
+
                 if (cudaAvailable)
                 {
                     _logger.LogInformation("✅ CUDA DLL検出");
@@ -270,7 +270,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ GPU互換性チェック中にエラー");
-            
+
             return new GpuCompatibilityReport
             {
                 IsCompatible = true, // CPUモードフォールバック
@@ -282,7 +282,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
     public async Task<InitializationDiagnosticResult> DiagnoseInitializationAsync(bool useCpuOnly = true, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("🔍 初期化診断開始（CPU First: {UseCpuOnly}）", useCpuOnly);
-        
+
         var stopwatch = Stopwatch.StartNew();
         var steps = new List<InitializationStep>();
         bool initSuccess = false;
@@ -315,7 +315,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
             steps.Add(step3);
 
             initSuccess = steps.All(s => s.IsSuccess);
-            
+
             if (!initSuccess)
             {
                 var failedSteps = steps.Where(s => !s.IsSuccess).Select(s => s.StepName);
@@ -342,7 +342,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
             Exception = exception
         };
 
-        _logger.LogInformation("📊 初期化診断完了: {Result}, 時間: {Time}ms", 
+        _logger.LogInformation("📊 初期化診断完了: {Result}, 時間: {Time}ms",
             initSuccess ? "成功" : "失敗", stopwatch.ElapsedMilliseconds);
 
         return result;
@@ -418,7 +418,7 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
             // 非常にシンプルな初期化テスト
             // 実際のPaddleOCR初期化は複雑なので、基本的なチェックのみ
             var settings = _ocrSettings.CurrentValue;
-            
+
             // 設定が正常に読み込まれているかチェック
             if (settings == null)
             {
@@ -437,11 +437,11 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
     }
 
     private void CollectIssuesAndActions(
-        bool dependencyResult, 
-        bool modelResult, 
-        GpuCompatibilityReport gpuReport, 
+        bool dependencyResult,
+        bool modelResult,
+        GpuCompatibilityReport gpuReport,
         InitializationDiagnosticResult initResult,
-        List<DiagnosticIssue> issues, 
+        List<DiagnosticIssue> issues,
         List<string> recommendedActions)
     {
         // 依存関係問題
@@ -498,9 +498,9 @@ public sealed class PaddleOcrDiagnosticsService : IPaddleOcrDiagnostics
     }
 
     private double CalculateOverallHealthScore(
-        bool dependencyResult, 
-        bool modelResult, 
-        GpuCompatibilityReport gpuReport, 
+        bool dependencyResult,
+        bool modelResult,
+        GpuCompatibilityReport gpuReport,
         InitializationDiagnosticResult initResult)
     {
         var scores = new[]

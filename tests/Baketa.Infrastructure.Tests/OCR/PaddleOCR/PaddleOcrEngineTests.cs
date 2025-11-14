@@ -1,12 +1,12 @@
 using System.Drawing;
-using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
-using Moq;
-using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR;
 
@@ -23,7 +23,7 @@ public sealed class PaddleOcrEngineTests : IDisposable
     public PaddleOcrEngineTests()
     {
         _mockModelPathResolver = new Mock<IModelPathResolver>();
-        
+
         // 完全なモデルパス解決のモック設定
         _mockModelPathResolver.Setup(x => x.GetModelsRootDirectory())
             .Returns("test/models");
@@ -44,7 +44,7 @@ public sealed class PaddleOcrEngineTests : IDisposable
         _mockModelPathResolver.Setup(x => x.FileExists(It.IsAny<string>()))
             .Returns(false);
         _mockModelPathResolver.Setup(x => x.EnsureDirectoryExists(It.IsAny<string>()));
-        
+
         // 安全なテスト用エンジンのみを使用
         _safeOcrEngine = new TestData.SafeTestPaddleOcrEngine(_mockModelPathResolver.Object, NullLogger<PaddleOcrEngine>.Instance, true);
     }
@@ -67,7 +67,7 @@ public sealed class PaddleOcrEngineTests : IDisposable
     public void Constructor_WithNullModelPathResolver_ShouldThrowArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new TestData.SafeTestPaddleOcrEngine(null!, NullLogger<PaddleOcrEngine>.Instance, true));
     }
 
@@ -105,7 +105,7 @@ public sealed class PaddleOcrEngineTests : IDisposable
         // SafeTestPaddleOcrEngine では検証で例外を投げる
         await Assert.ThrowsAsync<ArgumentException>(() =>
             _safeOcrEngine.InitializeAsync(settings)).ConfigureAwait(false);
-        
+
         Assert.False(_safeOcrEngine.IsInitialized);
     }
 
@@ -142,7 +142,7 @@ public sealed class PaddleOcrEngineTests : IDisposable
         // Arrange
         var settings = new OcrEngineSettings { Language = "eng" };
         await _safeOcrEngine.InitializeAsync(settings).ConfigureAwait(false);
-        
+
         var mockImage = new Mock<IImage>();
         mockImage.Setup(x => x.Width).Returns(100);
         mockImage.Setup(x => x.Height).Returns(100);
@@ -165,7 +165,7 @@ public sealed class PaddleOcrEngineTests : IDisposable
         // Arrange
         var settings = new OcrEngineSettings { Language = "eng" };
         await _safeOcrEngine.InitializeAsync(settings).ConfigureAwait(false);
-        
+
         var mockImage = new Mock<IImage>();
         mockImage.Setup(x => x.Width).Returns(100);
         mockImage.Setup(x => x.Height).Returns(100);
@@ -200,7 +200,7 @@ public sealed class PaddleOcrEngineTests : IDisposable
         // Arrange
         var initialSettings = new OcrEngineSettings { Language = "eng" };
         await _safeOcrEngine.InitializeAsync(initialSettings).ConfigureAwait(false);
-        
+
         var newSettings = new OcrEngineSettings
         {
             Language = "jpn",
@@ -366,7 +366,7 @@ public class OcrEngineSettingsTests
     [InlineData("jpn", 0.3, 0.5, "standard", 200, 0, 2, true)]
     [InlineData("eng", 0.4, 0.6, "v2", 50, 1, 4, true)]
     public void IsValid_WithValidSettings_ShouldReturnTrue(
-        string language, double detThreshold, double recThreshold, 
+        string language, double detThreshold, double recThreshold,
         string modelName, int maxDetections, int gpuDeviceId, int workerCount, bool expected)
     {
         // Arrange
@@ -397,7 +397,7 @@ public class OcrEngineSettingsTests
     [InlineData("jpn", 0.3, 0.5, "standard", 200, -1, 2, false)] // Invalid GPU device ID
     [InlineData("jpn", 0.3, 0.5, "standard", 200, 0, 0, false)] // Invalid worker count
     public void IsValid_WithInvalidSettings_ShouldReturnFalse(
-        string language, double detThreshold, double recThreshold, 
+        string language, double detThreshold, double recThreshold,
         string modelName, int maxDetections, int gpuDeviceId, int workerCount, bool expected)
     {
         // Arrange

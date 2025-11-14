@@ -11,25 +11,25 @@ public enum MonitorChangeType
     /// 新しいモニターがシステムに接続された場合
     /// </summary>
     Added,
-    
+
     /// <summary>
     /// モニターが削除された
     /// モニターがシステムから切断された場合
     /// </summary>
     Removed,
-    
+
     /// <summary>
     /// モニター設定が変更された
     /// 解像度、DPI、配置などが変更された場合
     /// </summary>
     Changed,
-    
+
     /// <summary>
     /// プライマリモニターが変更された
     /// システムのプライマリモニター指定が変更された場合
     /// </summary>
     PrimaryChanged,
-    
+
     /// <summary>
     /// すべてのモニターが更新された
     /// システム全体のモニター構成の完全更新

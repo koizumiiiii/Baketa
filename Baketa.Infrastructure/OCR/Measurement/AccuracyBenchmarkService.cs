@@ -56,7 +56,7 @@ public sealed class AccuracyBenchmarkService(
     public IReadOnlyList<(string ImagePath, string ExpectedText)> GetGameTextTestCases()
     {
         var testDataDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData", "OCR");
-        
+
         return new List<(string, string)>
         {
             // 日本語ゲームテキストのサンプル
@@ -82,15 +82,15 @@ public sealed class AccuracyBenchmarkService(
         string testDataDir)
     {
         _logger.LogInformation("🖼️ 簡易テスト画像生成: {TestDataDir}", testDataDir);
-        
+
         DirectoryExtensions.CreateEnsureExists(testDataDir);
-        
+
         // 注意: 実際の実装では System.Drawing または ImageSharp を使用して
         // プログラマティックにテスト画像を生成する必要があります
         // ここでは構造のみを示します
-        
+
         var testCases = new List<(string, string)>();
-        
+
         // テキストサンプル
         var textSamples = new[]
         {
@@ -99,17 +99,17 @@ public sealed class AccuracyBenchmarkService(
             ("HP: 100", "game_status_simple_1.png"),
             ("レベル: 25", "game_level_jp_1.png")
         };
-        
+
         foreach (var (text, fileName) in textSamples)
         {
             var imagePath = System.IO.Path.Combine(testDataDir, fileName);
-            
+
             // TODO: 実際の画像生成ロジック
             // await GenerateTextImageAsync(text, imagePath);
-            
+
             testCases.Add((imagePath, text));
         }
-        
+
         return Task.FromResult<IReadOnlyList<(string ImagePath, string ExpectedText)>>(testCases);
     }
 
@@ -120,16 +120,16 @@ public sealed class AccuracyBenchmarkService(
     /// <param name="testCases">テストケース</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>各段階の改善結果</returns>
-    public async Task<IReadOnlyList<(string ImprovementName, AccuracyComparisonResult Result)>> 
+    public async Task<IReadOnlyList<(string ImprovementName, AccuracyComparisonResult Result)>>
         BenchmarkProgressiveImprovementsAsync(
             Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
             IReadOnlyList<(string ImagePath, string ExpectedText)> testCases,
             CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("📈 段階的改善効果測定開始");
-        
+
         var results = new List<(string, AccuracyComparisonResult)>();
-        
+
         // ベースライン設定
         var baseline = new OcrEngineSettings
         {
@@ -137,32 +137,32 @@ public sealed class AccuracyBenchmarkService(
             DetectionThreshold = 0.15,
             RecognitionThreshold = 0.25
         };
-        
+
         // 改善段階1: エッジ強調のみ
         var edgeEnhanced = baseline.Clone();
         // Note: 実際のエッジ強調設定は OcrSettings クラスで管理されている
-        
+
         var edgeResult = await _accuracyMeasurement.CompareSettingsAccuracyAsync(
             ocrEngine, baseline, edgeEnhanced, testCases, cancellationToken).ConfigureAwait(false);
         results.Add(("エッジ強調有効化", edgeResult));
-        
+
         // 改善段階2: 画像拡大率向上
         var scaledUp = edgeEnhanced.Clone();
         // Note: 実際の画像拡大設定は OcrSettings クラスで管理されている
-        
+
         var scaleResult = await _accuracyMeasurement.CompareSettingsAccuracyAsync(
             ocrEngine, edgeEnhanced, scaledUp, testCases, cancellationToken).ConfigureAwait(false);
         results.Add(("画像拡大率3.0倍", scaleResult));
-        
+
         // 改善段階3: 閾値最適化
         var optimizedThreshold = scaledUp.Clone();
         optimizedThreshold.DetectionThreshold = 0.3;
         optimizedThreshold.RecognitionThreshold = 0.5;
-        
+
         var thresholdResult = await _accuracyMeasurement.CompareSettingsAccuracyAsync(
             ocrEngine, scaledUp, optimizedThreshold, testCases, cancellationToken).ConfigureAwait(false);
         results.Add(("閾値最適化", thresholdResult));
-        
+
         // 結果サマリーログ
         _logger.LogInformation("📊 段階的改善結果:");
         foreach (var (name, result) in results)
@@ -170,7 +170,7 @@ public sealed class AccuracyBenchmarkService(
             _logger.LogInformation("  {ImprovementName}: 精度改善={AccuracyImprovement:+0.00%;-0.00%;+0.00%}, 時間変化={TimeChange:+0.00%;-0.00%;+0.00%}",
                 name, result.AccuracyImprovement, result.ProcessingTimeChange);
         }
-        
+
         return results;
     }
 }

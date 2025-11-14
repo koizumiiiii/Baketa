@@ -15,16 +15,16 @@ public interface IOcrBenchmark
     /// OCR処理の精度とパフォーマンスを測定
     /// </summary>
     Task<BenchmarkResult> MeasureAsync(string testName, IImage testImage, string expectedText, IOcrEngine ocrEngine);
-    
+
     /// <summary>
     /// 複数のテストケースでベンチマークを実行
     /// </summary>
     Task<BenchmarkSummary> RunBenchmarkSuiteAsync(string suiteName, IEnumerable<TestCase> testCases, IOcrEngine ocrEngine);
-    
+
     /// <summary>
     /// 2つのOCRエンジンの性能を比較
     /// </summary>
-    Task<ComparisonResult> CompareEnginesAsync(string testName, IImage testImage, string expectedText, 
+    Task<ComparisonResult> CompareEnginesAsync(string testName, IImage testImage, string expectedText,
         IOcrEngine baselineEngine, IOcrEngine improvedEngine);
 }
 

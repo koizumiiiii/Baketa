@@ -14,25 +14,25 @@ public interface IPerformanceMetricsCollector : IDisposable
     /// </summary>
     /// <param name="metrics">翻訳メトリクス</param>
     void RecordTranslationMetrics(TranslationPerformanceMetrics metrics);
-    
+
     /// <summary>
     /// OCRメトリクスを記録（高速・ノンブロッキング）
     /// </summary>
     /// <param name="metrics">OCRメトリクス</param>
     void RecordOcrMetrics(OcrPerformanceMetrics metrics);
-    
+
     /// <summary>
     /// リソース調整メトリクスを記録
     /// </summary>
     /// <param name="metrics">リソース調整メトリクス</param>
     void RecordResourceAdjustment(ResourceAdjustmentMetrics metrics);
-    
+
     /// <summary>
     /// 統合パフォーマンスレポートを生成（非同期）
     /// </summary>
     /// <returns>統合パフォーマンスレポート</returns>
     Task<IntegratedPerformanceReport> GenerateReportAsync();
-    
+
     /// <summary>
     /// メトリクスファイルを手動フラッシュ（オプション）
     /// </summary>
@@ -97,31 +97,31 @@ public class IntegratedPerformanceReport
 {
     public DateTime GeneratedAt { get; init; } = DateTime.UtcNow;
     public TimeSpan ReportPeriod { get; init; }
-    
+
     // 翻訳統計
     public long TotalTranslations { get; init; }
     public long SuccessfulTranslations { get; init; }
     public double TranslationSuccessRate { get; init; }
     public TimeSpan AverageTranslationTime { get; init; }
-    
+
     // OCR統計
     public long TotalOcrOperations { get; init; }
     public long SuccessfulOcrOperations { get; init; }
     public double OcrSuccessRate { get; init; }
     public TimeSpan AverageOcrTime { get; init; }
     public double AverageConfidenceScore { get; init; }
-    
+
     // リソース調整統計
     public int ResourceAdjustmentCount { get; init; }
     public int ParallelismIncreases { get; init; }
     public int ParallelismDecreases { get; init; }
-    
+
     // システムリソース統計
     public double AverageCpuUsage { get; init; }
     public double AverageMemoryUsage { get; init; }
     public double AverageGpuUtilization { get; init; }
     public long PeakMemoryUsageMB { get; init; }
-    
+
     // ファイル情報
     public string LogFilePath { get; init; } = string.Empty;
     public long LogFileSizeBytes { get; init; }

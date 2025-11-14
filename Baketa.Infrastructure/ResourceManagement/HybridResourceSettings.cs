@@ -40,14 +40,14 @@ public sealed class HybridResourceSettings
     // === 制御設定 ===
     public bool EnableDynamicParallelism { get; set; } = true;
     public bool EnableDetailedLogging { get; set; } = false;
-    
+
     // === Phase 3: 高度制御設定 ===
     public bool EnableVerboseLogging { get; set; } = false;
-    
+
     // === Phase 3: ホットリロード設定 ===
     public bool EnableHotReload { get; set; } = true;
     public int ConfigurationPollingIntervalMs { get; set; } = 5000;
-    
+
     /// <summary>
     /// 設定値の妥当性を検証する
     /// </summary>
@@ -72,14 +72,14 @@ public sealed class HybridResourceSettings
                SamplingIntervalMs > 0 &&
                ConfigurationPollingIntervalMs > 0;
     }
-    
+
     /// <summary>
     /// 設定の差分を取得する（ホットリロード用）
     /// </summary>
     public IEnumerable<string> GetDifferences(HybridResourceSettings other)
     {
         var differences = new List<string>();
-        
+
         if (OcrChannelCapacity != other.OcrChannelCapacity)
             differences.Add($"OcrChannelCapacity: {OcrChannelCapacity} → {other.OcrChannelCapacity}");
         if (TranslationChannelCapacity != other.TranslationChannelCapacity)
@@ -100,7 +100,7 @@ public sealed class HybridResourceSettings
             differences.Add($"EnableVerboseLogging: {EnableVerboseLogging} → {other.EnableVerboseLogging}");
         if (EnableHotReload != other.EnableHotReload)
             differences.Add($"EnableHotReload: {EnableHotReload} → {other.EnableHotReload}");
-            
+
         return differences;
     }
 }

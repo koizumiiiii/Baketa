@@ -1,15 +1,15 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Baketa.Core.DI;
+using System;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Performance;
+using Baketa.Core.DI;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.OCR.BatchProcessing;
 using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Baketa.Infrastructure.OCR.Strategies;
-using Baketa.Infrastructure.DI.Modules;
-using System;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.DI;
 
@@ -58,11 +58,11 @@ public sealed class BatchOcrModule : ServiceModuleBase
                 roiDiagnosticsOptions,
                 diagnosticsSaver  // 🎯 明示的注入
             );
-            
+
             Console.WriteLine($"✅ [BATCH-DI] BatchOcrProcessor作成完了（diagnosticsSaver注入済み）");
             return processor;
         });
-        
+
         // バッチOCR統合サービス（Phase 2統合: HybridResourceManager依存追加）
         services.AddSingleton<BatchOcrIntegrationService>(serviceProvider =>
         {
@@ -83,10 +83,10 @@ public sealed class BatchOcrModule : ServiceModuleBase
     public override IEnumerable<Type> GetDependentModules()
     {
         yield return typeof(DiagnosticModule);
-        
+
         // 🏭 重要: 新しいファクトリシステムに依存
         yield return typeof(PaddleOcrModule);
-        
+
         // インフラストラクチャモジュールにも依存
         yield return typeof(InfrastructureModule);
     }

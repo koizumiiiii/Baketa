@@ -5,18 +5,18 @@ using ReactiveUI;
 
 namespace Baketa.UI.Views;
 
-    /// <summary>
-    /// キャプチャ設定画面のビュー
-    /// </summary>
-    internal sealed partial class CaptureView : ReactiveUserControl<CaptureViewModel>
+/// <summary>
+/// キャプチャ設定画面のビュー
+/// </summary>
+internal sealed partial class CaptureView : ReactiveUserControl<CaptureViewModel>
+{
+    public CaptureView()
     {
-        public CaptureView()
+        InitializeComponent();
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
-            
-            this.WhenActivated(disposables => 
-            {
-                // ビューモデルとのバインディングを設定
-            });
-        }
+            // ビューモデルとのバインディングを設定
+        });
     }
+}

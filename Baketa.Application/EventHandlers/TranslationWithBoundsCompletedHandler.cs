@@ -1,12 +1,12 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.UI.Overlays;
 using Baketa.Core.Events.EventTypes;
 using Microsoft.Extensions.Logging;
-using System;
-using System.IO;
-using System.Threading.Tasks;
 
 namespace Baketa.Application.EventHandlers;
 
@@ -45,10 +45,10 @@ public class TranslationWithBoundsCompletedHandler(
 
     // インスタンス初期化時のログ
     private readonly string _instanceId = LogConstructorInfo(overlayManager);
-        
+
     /// <inheritdoc />
     public int Priority => 200;
-        
+
     /// <inheritdoc />
     public bool SynchronousExecution => true; // 🔥 [PHASE4.5_FIX] Task.Runのfire-and-forget問題を回避
 
@@ -239,7 +239,7 @@ public class TranslationWithBoundsCompletedHandler(
                     sourceLanguage: eventData.SourceLanguage,
                     targetLanguage: eventData.TargetLanguage,
                     isTranslationResult: isTranslationSuccessful);
-                    
+
                 Console.WriteLine($"🎯 [LEGACY_OVERLAY_SOURCE] OverlayUpdateEvent発行中 - ID: {overlayEvent.Id}");
                 await _eventAggregator.PublishAsync(overlayEvent).ConfigureAwait(false);
                 Console.WriteLine($"🎯 [LEGACY_OVERLAY_SOURCE] OverlayUpdateEvent発行完了 - ID: {overlayEvent.Id}");
@@ -251,7 +251,7 @@ public class TranslationWithBoundsCompletedHandler(
                 NotificationType.Success,
                 "翻訳",
                 displayTime: 2000);
-                
+
             await _eventAggregator.PublishAsync(notificationEvent).ConfigureAwait(false);
         }
         catch (Exception ex)

@@ -1,3 +1,4 @@
+using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Translation;
@@ -5,7 +6,6 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Microsoft.Extensions.Logging;
 using Sdcb.PaddleOCR;
-using System.Drawing;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 

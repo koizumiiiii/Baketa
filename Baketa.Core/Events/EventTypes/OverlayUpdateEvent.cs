@@ -22,7 +22,7 @@ public class OverlayUpdateEvent(
         string? sourceLanguage = null,
         string? targetLanguage = null,
         bool isTranslationResult = false) : EventBase
-    {
+{
     /// <summary>
     /// 更新されたテキスト
     /// </summary>
@@ -55,7 +55,7 @@ public class OverlayUpdateEvent(
 
     /// <inheritdoc />
     public override string Name => "OverlayUpdate";
-        
-        /// <inheritdoc />
-        public override string Category => "UI";
-    }
+
+    /// <inheritdoc />
+    public override string Category => "UI";
+}

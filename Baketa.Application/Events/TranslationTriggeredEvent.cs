@@ -28,7 +28,7 @@ public sealed class TranslationTriggeredEvent(TranslationMode mode, DateTime tri
     /// コンストラクタ - TriggeredAtを現在時刻で初期化
     /// </summary>
     /// <param name="mode">翻訳モード</param>
-    public TranslationTriggeredEvent(TranslationMode mode) 
+    public TranslationTriggeredEvent(TranslationMode mode)
         : this(mode, DateTime.UtcNow)
     {
     }

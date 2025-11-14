@@ -19,13 +19,13 @@ public class OverlayCollisionDetector : IOverlayCollisionDetector
 {
     private readonly ILogger<OverlayCollisionDetector> _logger;
     private readonly CollisionDetectionSettings _settings;
-    
+
     /// <summary>
     /// Phase 13互換: テキストハッシュベース重複検出
     /// Key: テキストハッシュ, Value: 最後の表示時刻
     /// </summary>
     private readonly ConcurrentDictionary<string, DateTimeOffset> _recentTranslations = new();
-    
+
     /// <summary>
     /// 表示中オーバーレイの位置情報管理
     /// Key: オーバーレイID, Value: オーバーレイ情報
@@ -46,7 +46,7 @@ public class OverlayCollisionDetector : IOverlayCollisionDetector
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings ?? new CollisionDetectionSettings();
-        
+
         _logger.LogDebug("🔍 OverlayCollisionDetector インスタンス作成 - 設定: {Settings}", _settings);
     }
 
@@ -63,12 +63,12 @@ public class OverlayCollisionDetector : IOverlayCollisionDetector
         }
 
         var currentTime = DateTimeOffset.UtcNow;
-        
+
         try
         {
             // Phase 13互換: テキストハッシュによる重複検出
             var textHash = GenerateTextHash(request.Text);
-            
+
             if (_recentTranslations.TryGetValue(textHash, out var lastDisplayTime))
             {
                 var timeDiff = currentTime - lastDisplayTime;
@@ -94,7 +94,7 @@ public class OverlayCollisionDetector : IOverlayCollisionDetector
             // 表示許可
             _logger.LogDebug("✅ [PHASE15_COLLISION] 表示許可 - ID: {Id}, Text: '{Text}', Hash: {Hash}",
                 request.Id, request.Text.Substring(0, Math.Min(30, request.Text.Length)), textHash);
-            
+
             return true;
         }
         catch (Exception ex)
@@ -124,11 +124,11 @@ public class OverlayCollisionDetector : IOverlayCollisionDetector
         try
         {
             var currentTime = DateTimeOffset.UtcNow;
-            
+
             // テキストハッシュを登録（Phase 13互換）
             var textHash = GenerateTextHash(info.Text);
             _recentTranslations[textHash] = currentTime;
-            
+
             // オーバーレイ情報を登録
             var registrationInfo = info with { DisplayStartTime = currentTime, LastAccessTime = currentTime };
             _activeOverlays[info.Id] = registrationInfo;
@@ -338,7 +338,7 @@ public class OverlayCollisionDetector : IOverlayCollisionDetector
         // オーバーラップ率の計算
         var intersection = Rectangle.Intersect(rect1, rect2);
         var smallerArea = Math.Min(rect1.Width * rect1.Height, rect2.Width * rect2.Height);
-        
+
         if (smallerArea == 0)
             return false;
 

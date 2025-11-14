@@ -28,7 +28,7 @@ public class EnhancedImageChangeDetectionServiceTests
         _mockPerceptualHashService = new Mock<IPerceptualHashService>();
         _mockMetricsService = new Mock<IImageChangeMetricsService>();
         _mockConfiguration = new Mock<IConfiguration>();
-        
+
         // Setup mock configuration with default values
         _mockConfiguration.Setup(x => x["ImageChangeDetection:Stage1SimilarityThreshold"]).Returns("0.92");
         _mockConfiguration.Setup(x => x["ImageChangeDetection:Stage2ChangePercentageThreshold"]).Returns("0.05");
@@ -38,11 +38,11 @@ public class EnhancedImageChangeDetectionServiceTests
         _mockConfiguration.Setup(x => x["ImageChangeDetection:MaxCacheSize"]).Returns("1000");
         _mockConfiguration.Setup(x => x["ImageChangeDetection:CacheExpirationMinutes"]).Returns("30");
         _mockConfiguration.Setup(x => x["ImageChangeDetection:EnablePerformanceLogging"]).Returns("true");
-        
+
         _mockCurrentImage = new Mock<IImage>();
         _mockCurrentImage.Setup(x => x.Width).Returns(800);
         _mockCurrentImage.Setup(x => x.Height).Returns(600);
-        
+
         _mockPreviousImage = new Mock<IImage>();
         _mockPreviousImage.Setup(x => x.Width).Returns(800);
         _mockPreviousImage.Setup(x => x.Height).Returns(600);
@@ -58,7 +58,7 @@ public class EnhancedImageChangeDetectionServiceTests
     public async Task DetectChangeAsync_WithNullCurrentImage_ThrowsArgumentNullException()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
             _service.DetectChangeAsync(_mockPreviousImage.Object, null!, "test", CancellationToken.None))
             .ConfigureAwait(false);
     }
@@ -110,7 +110,7 @@ public class EnhancedImageChangeDetectionServiceTests
         // Arrange
         var previousHash = "1111111111111111";
         var currentHash = "2222222222222222";
-        
+
         _mockPerceptualHashService.SetupSequence(x => x.ComputeHash(It.IsAny<IImage>(), It.IsAny<HashAlgorithmType>()))
             .Returns(previousHash)
             .Returns(currentHash);
@@ -156,7 +156,7 @@ public class EnhancedImageChangeDetectionServiceTests
     {
         // Act & Assert - Should not throw
         _service.ClearCache();
-        
+
         // Verify we can still get statistics after cache clear
         var stats = _service.GetStatistics();
         Assert.NotNull(stats);

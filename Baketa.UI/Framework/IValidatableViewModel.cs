@@ -1,15 +1,15 @@
-using ReactiveUI.Validation.Contexts;
 using ReactiveUI.Validation.Abstractions;
+using ReactiveUI.Validation.Contexts;
 
 namespace Baketa.UI.Framework;
 
+/// <summary>
+/// バリデーション可能なビューモデルのインターフェース
+/// </summary>
+internal interface IValidatableViewModel
+{
     /// <summary>
-    /// バリデーション可能なビューモデルのインターフェース
+    /// バリデーションコンテキスト
     /// </summary>
-    internal interface IValidatableViewModel
-    {
-        /// <summary>
-        /// バリデーションコンテキスト
-        /// </summary>
-        IValidationContext ValidationContext { get; }
-    }
+    IValidationContext ValidationContext { get; }
+}

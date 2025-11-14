@@ -1,14 +1,14 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection; // 🔥 [PHASE9_FIX] GetRequiredService拡張メソッド用
-using Baketa.Core.Abstractions.Capture;
-using Baketa.Core.Models.Capture;
-using Baketa.Core.Abstractions.GPU;
-using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 using System; // 🔥 [PHASE9_FIX] ArgumentNullException用
+using Baketa.Core.Abstractions.Capture;
+using Baketa.Core.Abstractions.Events; // 🔥 [PHASE9_FIX] IEventAggregator用（修正: Core.Events → Core.Abstractions.Events）
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Memory; // 🔥 [PHASE9_FIX] ISafeImageFactory用
+using Baketa.Core.Models.Capture;
 using Baketa.Core.Settings; // 🔥 [PHASE9_FIX] LoggingSettings用
 using Baketa.Infrastructure.Platform.Windows; // 🔥 [PHASE9_FIX] WindowsImageFactory用
-using Baketa.Core.Abstractions.Events; // 🔥 [PHASE9_FIX] IEventAggregator用（修正: Core.Events → Core.Abstractions.Events）
+using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+using Microsoft.Extensions.DependencyInjection; // 🔥 [PHASE9_FIX] GetRequiredService拡張メソッド用
+using Microsoft.Extensions.Logging;
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: CaptureStrategyUsedのみ使用（CaptureOptionsは不使用）
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
@@ -28,7 +28,7 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        
+
         // 戦略作成関数の初期化
         _strategyCreators = InitializeStrategyCreators();
     }
@@ -37,7 +37,7 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
     {
         try
         {
-            _logger.LogDebug("最適戦略選択開始: GPU={GpuName}, 統合={IsIntegrated}, 専用={IsDedicated}", 
+            _logger.LogDebug("最適戦略選択開始: GPU={GpuName}, 統合={IsIntegrated}, 専用={IsDedicated}",
                 environment.GpuName, environment.IsIntegratedGpu, environment.IsDedicatedGpu);
 
             var strategies = GetStrategiesInOrder();
@@ -85,7 +85,7 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
             if (primaryStrategy != null)
             {
                 reservedPrimary = primaryStrategy;
-                _logger.LogDebug("primaryStrategy予約: {StrategyName} (Priority: {Priority})", 
+                _logger.LogDebug("primaryStrategy予約: {StrategyName} (Priority: {Priority})",
                     primaryStrategy.StrategyName, primaryStrategy.Priority);
             }
 
@@ -119,17 +119,17 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
             {
                 // primaryStrategyと同じ戦略をフォールバックから除去（重複回避）
                 strategies.RemoveAll(s => s.StrategyName == reservedPrimary.StrategyName);
-                
+
                 // primaryStrategyを最優先に配置
                 strategies.Insert(0, reservedPrimary);
-                
-                _logger.LogDebug("🎯 primaryStrategy最優先配置完了: {PrimaryName} → フォールバック: [{FallbackStrategies}]", 
-                    reservedPrimary.StrategyName, 
+
+                _logger.LogDebug("🎯 primaryStrategy最優先配置完了: {PrimaryName} → フォールバック: [{FallbackStrategies}]",
+                    reservedPrimary.StrategyName,
                     string.Join(", ", strategies.Skip(1).Select(s => s.StrategyName)));
             }
             else
             {
-                _logger.LogDebug("primaryStrategy未指定 - 優先度順: [{StrategiesByPriority}]", 
+                _logger.LogDebug("primaryStrategy未指定 - 優先度順: [{StrategiesByPriority}]",
                     string.Join(", ", strategies.Select(s => $"{s.StrategyName}({s.Priority})")));
             }
 
@@ -211,12 +211,12 @@ public class CaptureStrategyFactory : ICaptureStrategyFactory
                 _serviceProvider.GetService(typeof(FullScreenOcrCaptureStrategy)) as ICaptureStrategy ??
                 throw new InvalidOperationException("FullScreenOcrCaptureStrategy が登録されていません"),
 
-            [CaptureStrategyUsed.PrintWindowFallback] = () => 
-                _serviceProvider.GetService(typeof(PrintWindowFallbackStrategy)) as ICaptureStrategy ?? 
+            [CaptureStrategyUsed.PrintWindowFallback] = () =>
+                _serviceProvider.GetService(typeof(PrintWindowFallbackStrategy)) as ICaptureStrategy ??
                 throw new InvalidOperationException("PrintWindowFallbackStrategy が登録されていません"),
-                
-            [CaptureStrategyUsed.GDIFallback] = () => 
-                _serviceProvider.GetService(typeof(GDIFallbackStrategy)) as ICaptureStrategy ?? 
+
+            [CaptureStrategyUsed.GDIFallback] = () =>
+                _serviceProvider.GetService(typeof(GDIFallbackStrategy)) as ICaptureStrategy ??
                 throw new InvalidOperationException("GDIFallbackStrategy が登録されていません")
         };
     }

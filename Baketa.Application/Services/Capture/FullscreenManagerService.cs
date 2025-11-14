@@ -1,10 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Events.EventTypes;
-using Baketa.Core.Abstractions.Events;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Services.Capture;
 
@@ -17,25 +17,25 @@ public sealed class FullscreenManagerService : IDisposable
 {
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<FullscreenManagerService>? _logger;
-    
+
     private bool _isRunning;
     private bool _disposed;
-    
+
     /// <summary>
     /// フルスクリーン管理サービスが実行中かどうか
     /// </summary>
     public bool IsRunning => _isRunning && !_disposed;
-    
+
     /// <summary>
     /// フルスクリーン検出サービス
     /// </summary>
     public IFullscreenDetectionService DetectionService { get; }
-    
+
     /// <summary>
     /// フルスクリーン最適化サービス
     /// </summary>
     public IFullscreenOptimizationService OptimizationService { get; }
-    
+
     public FullscreenManagerService(
         IFullscreenDetectionService detectionService,
         IFullscreenOptimizationService optimizationService,
@@ -46,13 +46,13 @@ public sealed class FullscreenManagerService : IDisposable
         OptimizationService = optimizationService ?? throw new ArgumentNullException(nameof(optimizationService));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger;
-        
+
         // イベントハンドラーを登録
         RegisterEventHandlers();
-        
+
         _logger?.LogDebug("FullscreenManagerService initialized");
     }
-    
+
     /// <summary>
     /// フルスクリーン管理を開始します
     /// </summary>
@@ -62,29 +62,29 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         if (_isRunning)
         {
             _logger?.LogWarning("Fullscreen manager is already running");
             return;
         }
-        
+
         _logger?.LogInformation("Starting fullscreen manager service");
-        
+
         try
         {
             // 検出開始イベントを発行
             var detectionSettings = DetectionService.Settings ?? new FullscreenDetectionSettings();
             await _eventAggregator.PublishAsync(new FullscreenDetectionStartedEvent(detectionSettings)).ConfigureAwait(false);
-            
+
             // フルスクリーン最適化サービスを開始
             await OptimizationService.StartOptimizationAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // フルスクリーン検出サービスを開始
             await DetectionService.StartMonitoringAsync(cancellationToken).ConfigureAwait(false);
-            
+
             _isRunning = true;
-            
+
             _logger?.LogInformation("Fullscreen manager service started successfully");
         }
         catch (OperationCanceledException)
@@ -111,7 +111,7 @@ public sealed class FullscreenManagerService : IDisposable
             throw;
         }
     }
-    
+
     /// <summary>
     /// フルスクリーン管理を停止します
     /// </summary>
@@ -121,26 +121,26 @@ public sealed class FullscreenManagerService : IDisposable
         {
             return;
         }
-        
+
         _logger?.LogInformation("Stopping fullscreen manager service");
-        
+
         try
         {
             var startTime = DateTime.Now;
-            
+
             // フルスクリーン最適化サービスを停止
             await OptimizationService.StopOptimizationAsync().ConfigureAwait(false);
-            
+
             // フルスクリーン検出サービスを停止
             await DetectionService.StopMonitoringAsync().ConfigureAwait(false);
-            
+
             var duration = DateTime.Now - startTime;
-            
+
             // 検出停止イベントを発行
             await _eventAggregator.PublishAsync(new FullscreenDetectionStoppedEvent("Manual stop", duration)).ConfigureAwait(false);
-            
+
             _isRunning = false;
-            
+
             _logger?.LogInformation("Fullscreen manager service stopped successfully");
         }
         catch (ObjectDisposedException)
@@ -158,7 +158,7 @@ public sealed class FullscreenManagerService : IDisposable
             await _eventAggregator.PublishAsync(new FullscreenOptimizationErrorEvent(ex, "FullscreenManagerService.StopAsync")).ConfigureAwait(false);
         }
     }
-    
+
     /// <summary>
     /// 現在のフルスクリーン状態を取得します
     /// </summary>
@@ -168,10 +168,10 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         return await DetectionService.DetectCurrentFullscreenAsync().ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// 指定されたウィンドウのフルスクリーン状態を取得します
     /// </summary>
@@ -182,10 +182,10 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         return await DetectionService.DetectFullscreenAsync(windowHandle).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// フルスクリーン最適化を手動で適用します
     /// </summary>
@@ -195,7 +195,7 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         try
         {
             await OptimizationService.ApplyOptimizationAsync(fullscreenInfo).ConfigureAwait(false);
@@ -219,7 +219,7 @@ public sealed class FullscreenManagerService : IDisposable
             throw;
         }
     }
-    
+
     /// <summary>
     /// フルスクリーン最適化を手動で解除します
     /// </summary>
@@ -228,7 +228,7 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         try
         {
             await OptimizationService.RemoveOptimizationAsync().ConfigureAwait(false);
@@ -252,7 +252,7 @@ public sealed class FullscreenManagerService : IDisposable
             throw;
         }
     }
-    
+
     /// <summary>
     /// フルスクリーン検出設定を更新します
     /// </summary>
@@ -262,11 +262,11 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         DetectionService.UpdateDetectionSettings(settings);
         _logger?.LogDebug("Fullscreen detection settings updated");
     }
-    
+
     /// <summary>
     /// 最適化統計情報をリセットします
     /// </summary>
@@ -275,11 +275,11 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         OptimizationService.ResetStatistics();
         _logger?.LogDebug("Fullscreen optimization statistics reset");
     }
-    
+
     /// <summary>
     /// フルスクリーン最適化を強制的にリセットします
     /// </summary>
@@ -288,7 +288,7 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         try
         {
             await OptimizationService.ForceResetAsync().ConfigureAwait(false);
@@ -310,7 +310,7 @@ public sealed class FullscreenManagerService : IDisposable
             await _eventAggregator.PublishAsync(new FullscreenOptimizationErrorEvent(ex, "Force reset")).ConfigureAwait(false);
         }
     }
-    
+
     /// <summary>
     /// フルスクリーン最適化の有効/無効を切り替えます
     /// </summary>
@@ -320,11 +320,11 @@ public sealed class FullscreenManagerService : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(FullscreenManagerService));
-        
+
         OptimizationService.IsEnabled = enabled;
         _logger?.LogInformation("Fullscreen optimization {Status}", enabled ? "enabled" : "disabled");
     }
-    
+
     /// <summary>
     /// イベントハンドラーを登録
     /// </summary>
@@ -350,7 +350,7 @@ public sealed class FullscreenManagerService : IDisposable
                 _logger?.LogError(ex, "Invalid argument while publishing fullscreen state changed event");
             }
         };
-        
+
         // 最適化適用イベントの処理
         OptimizationService.OptimizationApplied += async (sender, args) =>
         {
@@ -372,7 +372,7 @@ public sealed class FullscreenManagerService : IDisposable
                 _logger?.LogError(ex, "Invalid argument while publishing optimization applied event");
             }
         };
-        
+
         // 最適化解除イベントの処理
         OptimizationService.OptimizationRemoved += async (sender, args) =>
         {
@@ -394,7 +394,7 @@ public sealed class FullscreenManagerService : IDisposable
                 _logger?.LogError(ex, "Invalid argument while publishing optimization removed event");
             }
         };
-        
+
         // 最適化エラーイベントの処理
         OptimizationService.OptimizationError += async (sender, args) =>
         {
@@ -417,7 +417,7 @@ public sealed class FullscreenManagerService : IDisposable
             }
         };
     }
-    
+
     /// <summary>
     /// リソースを解放します
     /// </summary>
@@ -427,7 +427,7 @@ public sealed class FullscreenManagerService : IDisposable
         {
             return;
         }
-        
+
         if (_isRunning)
         {
             // 非同期停止処理を同期実行（Disposeパターンのため）
@@ -453,7 +453,7 @@ public sealed class FullscreenManagerService : IDisposable
                 _logger?.LogError(ex, "Invalid operation during disposal");
             }
         }
-        
+
         _disposed = true;
         _logger?.LogDebug("FullscreenManagerService disposed");
     }

@@ -34,35 +34,35 @@ public sealed record ResourceMetrics(
     /// 使用メモリ容量 (MB)
     /// </summary>
     public long UsedMemoryMB => TotalMemoryMB - AvailableMemoryMB;
-    
+
     /// <summary>
     /// システム全体の負荷レベル算出
     /// CPU・メモリ使用率の重み付け平均
     /// </summary>
     public ResourceLoadLevel LoadLevel => CalculateLoadLevel();
-    
+
     /// <summary>
     /// GPU加速が利用可能かどうか
     /// </summary>
     public bool IsGpuAvailable => GpuUsagePercent.HasValue;
-    
+
     /// <summary>
     /// リソース警告が必要な状況かどうか
     /// </summary>
-    public bool RequiresWarning => 
-        CpuUsagePercent > 85.0 || 
-        MemoryUsagePercent > 90.0 || 
+    public bool RequiresWarning =>
+        CpuUsagePercent > 85.0 ||
+        MemoryUsagePercent > 90.0 ||
         (GpuUsagePercent.HasValue && GpuUsagePercent.Value > 95.0);
-    
+
     /// <summary>
     /// 翻訳処理に適した状況かどうか
     /// リソース使用率が適切な範囲内にある場合true
     /// </summary>
     public bool IsOptimalForTranslation =>
-        CpuUsagePercent < 70.0 && 
-        MemoryUsagePercent < 80.0 && 
+        CpuUsagePercent < 70.0 &&
+        MemoryUsagePercent < 80.0 &&
         (!GpuUsagePercent.HasValue || GpuUsagePercent.Value < 85.0);
-    
+
     /// <summary>
     /// リソース状況の文字列表現
     /// ログ出力用の簡潔な形式
@@ -73,7 +73,7 @@ public sealed record ResourceMetrics(
         var gpu = IsGpuAvailable ? $" GPU:{GpuUsagePercent:F1}%" : " GPU:N/A";
         return $"[{Timestamp:HH:mm:ss}] CPU:{CpuUsagePercent:F1}% MEM:{MemoryUsagePercent:F1}%({UsedMemoryMB:N0}/{TotalMemoryMB:N0}MB){gpu} Load:{LoadLevel}";
     }
-    
+
     /// <summary>
     /// 負荷レベル算出の内部実装
     /// </summary>
@@ -81,13 +81,13 @@ public sealed record ResourceMetrics(
     {
         // CPU・メモリ使用率の重み付け平均（CPU:60%, Memory:40%）
         var weightedAverage = (CpuUsagePercent * 0.6) + (MemoryUsagePercent * 0.4);
-        
+
         // GPU使用率が利用可能な場合は追加考慮（CPU:50%, Memory:30%, GPU:20%）
         if (IsGpuAvailable && GpuUsagePercent.HasValue)
         {
             weightedAverage = (CpuUsagePercent * 0.5) + (MemoryUsagePercent * 0.3) + (GpuUsagePercent.Value * 0.2);
         }
-        
+
         return weightedAverage switch
         {
             < 25.0 => ResourceLoadLevel.Low,

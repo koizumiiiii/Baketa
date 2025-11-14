@@ -1,10 +1,10 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
-using Baketa.Infrastructure.Platform.Windows.Monitors;
-using Baketa.Infrastructure.Platform.Windows.Fullscreen;
-using Baketa.Core.UI.Monitors;
-using Baketa.Core.UI.Fullscreen;
 using System.Diagnostics;
+using Baketa.Core.UI.Fullscreen;
+using Baketa.Core.UI.Monitors;
+using Baketa.Infrastructure.Platform.Windows.Fullscreen;
+using Baketa.Infrastructure.Platform.Windows.Monitors;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -19,24 +19,24 @@ public class MultiMonitorBasicTests : IAsyncDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MultiMonitorBasicTests> _logger;
     private readonly ITestOutputHelper _output;
-    
+
     public MultiMonitorBasicTests(ITestOutputHelper output)
     {
         _output = output;
-        
+
         var services = new ServiceCollection();
         ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
         _logger = _serviceProvider.GetRequiredService<ILogger<MultiMonitorBasicTests>>();
     }
-    
+
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
         services.AddSingleton<IMonitorManager, WindowsMonitorManager>();
         services.AddSingleton<IFullscreenModeService, WindowsFullscreenModeService>();
     }
-    
+
     /// <summary>
     /// モニターマネージャーの基本機能テスト
     /// </summary>
@@ -45,14 +45,14 @@ public class MultiMonitorBasicTests : IAsyncDisposable
     {
         // Arrange & Act
         var monitorManager = _serviceProvider.GetRequiredService<IMonitorManager>();
-        
+
         // Assert
         Assert.NotNull(monitorManager);
         Assert.IsType<WindowsMonitorManager>(monitorManager);
-        
+
         _output.WriteLine("✅ モニターマネージャーの初期化が成功しました");
     }
-    
+
     /// <summary>
     /// フルスクリーンサービスの基本機能テスト
     /// </summary>
@@ -61,14 +61,14 @@ public class MultiMonitorBasicTests : IAsyncDisposable
     {
         // Arrange & Act
         var fullscreenService = _serviceProvider.GetRequiredService<IFullscreenModeService>();
-        
+
         // Assert
         Assert.NotNull(fullscreenService);
         Assert.IsType<WindowsFullscreenModeService>(fullscreenService);
-        
+
         _output.WriteLine("✅ フルスクリーンサービスの初期化が成功しました");
     }
-    
+
     /// <summary>
     /// モニター監視開始・停止のテスト
     /// </summary>
@@ -77,18 +77,18 @@ public class MultiMonitorBasicTests : IAsyncDisposable
     {
         // Arrange
         var monitorManager = _serviceProvider.GetRequiredService<IMonitorManager>();
-        
+
         // Act & Assert - 開始
         await monitorManager.StartMonitoringAsync();
         Assert.True(monitorManager.IsMonitoring);
         _output.WriteLine("✅ モニター監視開始");
-        
+
         // Act & Assert - 停止
         await monitorManager.StopMonitoringAsync();
         Assert.False(monitorManager.IsMonitoring);
         _output.WriteLine("✅ モニター監視停止");
     }
-    
+
     /// <summary>
     /// フルスクリーン監視開始・停止のテスト
     /// </summary>
@@ -98,19 +98,19 @@ public class MultiMonitorBasicTests : IAsyncDisposable
         // Arrange
         var fullscreenService = _serviceProvider.GetRequiredService<IFullscreenModeService>();
         var mockGameWindow = GetMockGameWindowHandle();
-        
+
         // Act & Assert - 開始
         await fullscreenService.StartMonitoringAsync(mockGameWindow);
         _output.WriteLine("✅ フルスクリーン監視開始");
-        
+
         // Act & Assert - 停止
         await fullscreenService.StopMonitoringAsync();
         _output.WriteLine("✅ フルスクリーン監視停止");
-        
+
         // 例外が発生しなければ成功
         Assert.True(true);
     }
-    
+
     /// <summary>
     /// エラーハンドリングの基本テスト
     /// </summary>
@@ -123,12 +123,12 @@ public class MultiMonitorBasicTests : IAsyncDisposable
             _output.WriteLine("⚠️  WindowsMonitorManagerが取得できませんでした。テストをスキップします。");
             return;
         }
-        
+
         var invalidHandle = new nint(0xDEADBEEF);
-        
+
         // Act
         var result = monitorManager.GetMonitorFromWindow(invalidHandle);
-        
+
         // Assert
         if (result.HasValue)
         {
@@ -140,7 +140,7 @@ public class MultiMonitorBasicTests : IAsyncDisposable
             _output.WriteLine("⚠️  フォールバック結果が取得できませんでした");
         }
     }
-    
+
     /// <summary>
     /// リソースの適切な解放テスト
     /// </summary>
@@ -151,23 +151,23 @@ public class MultiMonitorBasicTests : IAsyncDisposable
         var services = new ServiceCollection();
         ConfigureServices(services);
         var provider = services.BuildServiceProvider();
-        
+
         try
         {
             var monitorManager = provider.GetRequiredService<IMonitorManager>();
             var fullscreenService = provider.GetRequiredService<IFullscreenModeService>();
-            
+
             // Act - サービス開始
             await monitorManager.StartMonitoringAsync();
             await fullscreenService.StartMonitoringAsync(GetMockGameWindowHandle());
-            
+
             // 短時間実行（安定した遅延時間を使用）
             await Task.Delay(200);
-            
+
             // サービス停止
             await monitorManager.StopMonitoringAsync();
             await fullscreenService.StopMonitoringAsync();
-            
+
             _output.WriteLine("✅ サービスの開始・停止が正常に完了しました");
         }
         finally
@@ -182,12 +182,12 @@ public class MultiMonitorBasicTests : IAsyncDisposable
                 await Task.Run(disposableProvider.Dispose);
             }
         }
-        
+
         // Assert
         Assert.True(true); // 例外が発生しなければ成功
         _output.WriteLine("✅ リソースの解放が正常に完了しました");
     }
-    
+
     /// <summary>
     /// モックゲームウィンドウハンドルを取得
     /// </summary>
@@ -197,7 +197,7 @@ public class MultiMonitorBasicTests : IAsyncDisposable
         var handle = Process.GetCurrentProcess().MainWindowHandle;
         return handle != nint.Zero ? handle : new nint(1); // フォールバック値
     }
-    
+
     public async ValueTask DisposeAsync()
     {
         if (_serviceProvider is IAsyncDisposable asyncDisposable)
@@ -208,7 +208,7 @@ public class MultiMonitorBasicTests : IAsyncDisposable
         {
             disposable.Dispose();
         }
-        
+
         GC.SuppressFinalize(this);
     }
 }

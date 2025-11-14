@@ -7,8 +7,8 @@ using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 using Sdcb.PaddleOCR;
-using OcrException = Baketa.Core.Abstractions.OCR.OcrException;
 using CoreOcrProgress = Baketa.Core.Abstractions.OCR.OcrProgress;
+using OcrException = Baketa.Core.Abstractions.OCR.OcrException;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 

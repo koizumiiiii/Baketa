@@ -1,5 +1,5 @@
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using System.IO;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 
@@ -61,7 +61,7 @@ public class SafeTestModelPathResolver(string testBaseDirectory) : IModelPathRes
     public void EnsureDirectoryExists(string directoryPath)
     {
         ArgumentException.ThrowIfNullOrEmpty(directoryPath);
-        
+
         try
         {
             if (!Directory.Exists(directoryPath))

@@ -1,5 +1,5 @@
-using Microsoft.ML.OnnxRuntime;
 using Baketa.Core.Abstractions.GPU;
+using Microsoft.ML.OnnxRuntime;
 
 namespace Baketa.Infrastructure.OCR.GPU;
 
@@ -34,14 +34,14 @@ internal sealed class OnnxSessionWrapper(
     public OnnxSessionInfo GetSessionInfo()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         return _sessionInfo;
     }
 
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         try
         {
             InternalSession?.Dispose();
@@ -50,7 +50,7 @@ internal sealed class OnnxSessionWrapper(
         {
             // セッション解放時の例外は無視
         }
-        
+
         _disposed = true;
     }
 
@@ -60,10 +60,10 @@ internal sealed class OnnxSessionWrapper(
         {
             var inputNames = session.InputMetadata?.Keys.ToList() ?? [];
             var outputNames = session.OutputMetadata?.Keys.ToList() ?? [];
-            
+
             // プロバイダー情報は実行時に取得困難なため、推定値を使用
             var usedProviders = new List<string> { "Unknown" };
-            
+
             return new OnnxSessionInfo
             {
                 ModelPath = modelPath,
@@ -97,7 +97,7 @@ internal sealed class OnnxSessionWrapper(
             // 実際の実装では、モデルサイズやテンソルサイズから計算
             var inputCount = session.InputMetadata?.Count ?? 0;
             var outputCount = session.OutputMetadata?.Count ?? 0;
-            
+
             // 基本的な推定値（実際の用途に応じて調整）
             return Math.Max((inputCount + outputCount) * 10, 100); // 最低100MB
         }

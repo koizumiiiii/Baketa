@@ -17,10 +17,10 @@ public partial class WindowSelectionDialogView : Window
         Console.WriteLine("🎯 XAML WindowSelectionDialogView コンストラクタ呼び出し");
         InitializeComponent();
         Console.WriteLine("🎯 XAML WindowSelectionDialogView InitializeComponent完了");
-        
+
         // ViewModelの変更を監視してダイアログを閉じる
         DataContextChanged += OnDataContextChanged;
-        
+
         // ClosedイベントでViewModelに通知
         Closed += OnWindowClosed;
         Console.WriteLine("🎯 XAML WindowSelectionDialogView 初期化完了");
@@ -32,7 +32,7 @@ public partial class WindowSelectionDialogView : Window
         if (DataContext is WindowSelectionDialogViewModel viewModel)
         {
             Console.WriteLine("🎯 XAML WindowSelectionDialogView DataContext設定完了 - ViewModelバインド");
-            
+
             // IsClosed プロパティの変更を監視
             viewModel.PropertyChanged += (s, e) =>
             {
@@ -40,20 +40,20 @@ public partial class WindowSelectionDialogView : Window
                 {
                     Close(viewModel.DialogResult);
                 }
-                
+
                 // 🎯 UltraThink修正: SelectedWindow変更監視（複雑バインディングの代替）
                 if (e.PropertyName == nameof(WindowSelectionDialogViewModel.SelectedWindow))
                 {
                     UpdateSelectionIndicators(viewModel);
                 }
-                
+
                 // 🎯 UltraThink修正: IsLoading変更監視（空状態表示制御）
                 if (e.PropertyName == nameof(WindowSelectionDialogViewModel.IsLoading))
                 {
                     UpdateEmptyState(viewModel);
                 }
             };
-            
+
             // 🎯 UltraThink修正: AvailableWindowsコレクション変更監視
             viewModel.AvailableWindows.CollectionChanged += (s, e) =>
             {
@@ -61,7 +61,7 @@ public partial class WindowSelectionDialogView : Window
                 UpdateEmptyState(viewModel);
                 UpdateSelectionIndicators(viewModel);
             };
-            
+
             // 初期状態設定
             UpdateEmptyState(viewModel);
             Console.WriteLine("🎯 XAML WindowSelectionDialogView ViewModelバインド完了");
@@ -76,7 +76,7 @@ public partial class WindowSelectionDialogView : Window
     {
         Console.WriteLine("🎯 XAML WindowSelectionDialogView OnLoaded開始");
         base.OnLoaded(e);
-        
+
         // ダイアログの位置を画面中央に設定
         if (VisualRoot is Window)
         {
@@ -104,14 +104,14 @@ public partial class WindowSelectionDialogView : Window
                 {
                     // ダブルクリック: 選択して即座に決定
                     viewModel.SelectedWindow = windowInfo;
-                    
+
                     // ダブルクリックで即座に選択を実行
                     viewModel.SelectWindowCommand.Execute(windowInfo);
                 }
             }
         }
     }
-    
+
     /// <summary>
     /// ウィンドウが閉じられた時のViewModel清理
     /// </summary>
@@ -126,7 +126,7 @@ public partial class WindowSelectionDialogView : Window
             });
         }
     }
-    
+
     /// <summary>
     /// 🎯 UltraThink修正: 選択状態インジケーター更新（複雑バインディング代替）
     /// </summary>
@@ -142,7 +142,7 @@ public partial class WindowSelectionDialogView : Window
                 var indicators = itemsControl.GetVisualDescendants()
                     .OfType<Ellipse>()
                     .Where(e => e.Name == "SelectionIndicator");
-                
+
                 foreach (var indicator in indicators)
                 {
                     // 親のDataContextから対象ウィンドウを取得
@@ -160,7 +160,7 @@ public partial class WindowSelectionDialogView : Window
             System.Diagnostics.Debug.WriteLine($"選択状態インジケーター更新エラー: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// 🎯 UltraThink修正: 空状態表示制御（複雑バインディング代替）
     /// </summary>
@@ -170,7 +170,7 @@ public partial class WindowSelectionDialogView : Window
         {
             var emptyStatePanel = this.FindControl<StackPanel>("EmptyStatePanel");
             var itemsControl = this.FindControl<ItemsControl>("AvailableWindowsList");
-            
+
             if (emptyStatePanel != null && itemsControl != null)
             {
                 bool isEmpty = viewModel.AvailableWindows.Count == 0 && !viewModel.IsLoading;

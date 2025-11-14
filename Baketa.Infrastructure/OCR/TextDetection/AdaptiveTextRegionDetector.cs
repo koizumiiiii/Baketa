@@ -6,15 +6,15 @@ using System.Linq;
 using System.Reflection; // 🔥 [ULTRATHINK_PHASE7] リフレクション経由でGetUnderlyingBitmap()呼び出し
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Infrastructure.OCR.Scaling;
+using Microsoft.Extensions.Logging;
+using IImageFactory = Baketa.Core.Abstractions.Factories.IImageFactory;
+using IOcrEngine = Baketa.Core.Abstractions.OCR.IOcrEngine;
+using IWindowsImageFactory = Baketa.Core.Abstractions.Factories.IWindowsImageFactory; // 🔥 [ULTRATHINK_PHASE7] Bitmap直接変換用
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using TextDetectionMethod = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
-using IOcrEngine = Baketa.Core.Abstractions.OCR.IOcrEngine;
-using IImageFactory = Baketa.Core.Abstractions.Factories.IImageFactory;
-using IWindowsImageFactory = Baketa.Core.Abstractions.Factories.IWindowsImageFactory; // 🔥 [ULTRATHINK_PHASE7] Bitmap直接変換用
 using Timer = System.Threading.Timer;
 
 namespace Baketa.Infrastructure.OCR.TextDetection;
@@ -33,7 +33,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     private readonly ConcurrentQueue<DetectionHistoryEntry> _detectionHistory = [];
     private readonly ConcurrentDictionary<string, RegionTemplate> _regionTemplates = [];
     private readonly Timer _adaptationTimer;
-    
+
     private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     /// <summary>
@@ -47,7 +47,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     private int _detectionCount;
     private const int MaxHistorySize = 100;
     private const int AdaptationIntervalMs = 5000; // 5秒間隔で適応
-    
+
     public string Name => "AdaptiveTextRegionDetector";
     public string Description => "適応的テキスト領域検出器 - 履歴ベース最適化と動的調整";
     public TextDetectionMethod Method => TextDetectionMethod.Adaptive;
@@ -81,27 +81,27 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     public async Task<IReadOnlyList<OCRTextRegion>> DetectRegionsAsync(IAdvancedImage image, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var detectionId = Interlocked.Increment(ref _detectionCount);
-        
+
         try
         {
-            _logger.LogInformation("適応的テキスト領域検出開始: ID={DetectionId}, サイズ={Width}x{Height}", 
+            _logger.LogInformation("適応的テキスト領域検出開始: ID={DetectionId}, サイズ={Width}x{Height}",
                 detectionId, image.Width, image.Height);
 
             // Phase 1: テンプレートベース高速検出
             var templateRegions = await DetectUsingTemplatesAsync(image, cancellationToken).ConfigureAwait(false);
-            
+
             // Phase 2: 適応的パラメータによる詳細検出
             var adaptiveRegions = await DetectWithAdaptiveParametersAsync(image, cancellationToken).ConfigureAwait(false);
-            
+
             // Phase 3: 履歴データによる結果最適化
             var optimizedRegions = await OptimizeRegionsWithHistoryAsync(
                 [.. templateRegions, .. adaptiveRegions], image, cancellationToken).ConfigureAwait(false);
-            
+
             stopwatch.Stop();
-            
+
             // 検出履歴に記録
             var historyEntry = new DetectionHistoryEntry
             {
@@ -114,12 +114,12 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 AdaptiveDetectionCount = adaptiveRegions.Count,
                 FinalRegionCount = optimizedRegions.Count
             };
-            
+
             AddToHistory(historyEntry);
-            
-            _logger.LogInformation("適応的テキスト領域検出完了: ID={DetectionId}, 領域数={RegionCount}, 処理時間={ProcessingMs}ms", 
+
+            _logger.LogInformation("適応的テキスト領域検出完了: ID={DetectionId}, 領域数={RegionCount}, 処理時間={ProcessingMs}ms",
                 detectionId, optimizedRegions.Count, stopwatch.ElapsedMilliseconds);
-                
+
             return optimizedRegions;
         }
         catch (Exception ex)
@@ -137,7 +137,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     private async Task<List<OCRTextRegion>> DetectUsingTemplatesAsync(IAdvancedImage image, CancellationToken cancellationToken)
     {
         var regions = new List<OCRTextRegion>();
-        
+
         if (_regionTemplates.IsEmpty)
         {
             _logger.LogDebug("テンプレートが存在しないため、テンプレートベース検出をスキップ");
@@ -155,7 +155,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
             foreach (var template in matchingTemplates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 var templateRegions = template.GenerateRegions(image.Width, image.Height);
                 foreach (var region in templateRegions)
                 {
@@ -168,10 +168,10 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                     });
                 }
             }
-            
+
             _logger.LogDebug("テンプレートベース検出完了: {RegionCount}個の候補領域", regions.Count);
         }, cancellationToken).ConfigureAwait(false);
-        
+
         return regions;
     }
 
@@ -310,9 +310,9 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     private async Task<List<OCRTextRegion>> OptimizeRegionsWithHistoryAsync(List<OCRTextRegion> regions, IAdvancedImage image, CancellationToken cancellationToken)
     {
         if (regions.Count == 0) return regions;
-        
+
         var optimizedRegions = new List<OCRTextRegion>();
-        
+
         await Task.Run(() =>
         {
             var recentHistory = GetRecentHistory(10); // 直近10回の履歴
@@ -321,17 +321,17 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 optimizedRegions.AddRange(regions);
                 return;
             }
-            
+
             // 履歴から成功パターンを分析
             var successPatterns = AnalyzeSuccessPatterns(recentHistory);
-            
+
             foreach (var region in regions)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 // 履歴パターンとのマッチング度を計算
                 var historyScore = CalculateHistoryMatchScore(region, successPatterns, image);
-                
+
                 // スコアに基づく信頼度調整
                 var adjustedRegion = new OCRTextRegion(region.Bounds, (float)Math.Min(1.0, region.Confidence * historyScore))
                 {
@@ -339,7 +339,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                     DetectionMethod = $"{region.DetectionMethod}+History",
                     ProcessedImage = region.ProcessedImage
                 };
-                
+
                 // 閾値以上の領域のみを採用
                 var confidenceThreshold = GetParameter<double>("HistoryConfidenceThreshold");
                 if (adjustedRegion.Confidence >= confidenceThreshold)
@@ -347,14 +347,14 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                     optimizedRegions.Add(adjustedRegion);
                 }
             }
-            
+
             // 成功パターンから新しいテンプレートを生成
             UpdateRegionTemplates(optimizedRegions, image);
-            
-            _logger.LogDebug("履歴ベース最適化完了: {OriginalCount} → {OptimizedCount}個の領域", 
+
+            _logger.LogDebug("履歴ベース最適化完了: {OriginalCount} → {OptimizedCount}個の領域",
                 regions.Count, optimizedRegions.Count);
         }, cancellationToken).ConfigureAwait(false);
-        
+
         return optimizedRegions;
     }
 
@@ -486,10 +486,10 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 Parameters = _parameters,
                 Templates = _regionTemplates.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
             };
-            
+
             var profilePath = $"profiles/{profileName}_adaptive_detector.json";
             var json = System.Text.Json.JsonSerializer.Serialize(profileData, JsonOptions);
-            
+
             await System.IO.File.WriteAllTextAsync(profilePath, json).ConfigureAwait(false);
             _logger.LogInformation("プロファイル保存完了: {ProfileName} → {ProfilePath}", profileName, profilePath);
         }
@@ -510,11 +510,11 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 _logger.LogWarning("プロファイルファイルが存在しません: {ProfilePath}", profilePath);
                 return;
             }
-            
+
             var json = await System.IO.File.ReadAllTextAsync(profilePath).ConfigureAwait(false);
             using var document = System.Text.Json.JsonDocument.Parse(json);
             var root = document.RootElement;
-            
+
             // パラメータの復元
             if (root.TryGetProperty("Parameters", out var parametersElement))
             {
@@ -524,7 +524,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                     _parameters[parameter.Name] = parameter.Value.GetRawText();
                 }
             }
-            
+
             _logger.LogInformation("プロファイル読み込み完了: {ProfileName}", profileName);
         }
         catch (Exception ex)
@@ -540,7 +540,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     private void AddToHistory(DetectionHistoryEntry entry)
     {
         _detectionHistory.Enqueue(entry);
-        
+
         // 履歴サイズの制限
         while (_detectionHistory.Count > MaxHistorySize)
         {
@@ -556,7 +556,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     private List<RegionPattern> AnalyzeSuccessPatterns(List<DetectionHistoryEntry> history)
     {
         var patterns = new List<RegionPattern>();
-        
+
         foreach (var entry in history.Where(h => h.FinalRegionCount > 0))
         {
             foreach (var region in entry.DetectedRegions)
@@ -572,26 +572,26 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 });
             }
         }
-        
+
         return patterns;
     }
 
     private double CalculateHistoryMatchScore(OCRTextRegion region, List<RegionPattern> patterns, IAdvancedImage image)
     {
         if (patterns.Count == 0) return 1.0;
-        
+
         var relativeX = (double)region.Bounds.X / image.Width;
         var relativeY = (double)region.Bounds.Y / image.Height;
         var relativeWidth = (double)region.Bounds.Width / image.Width;
         var relativeHeight = (double)region.Bounds.Height / image.Height;
-        
+
         var bestMatch = patterns.Max(pattern =>
         {
             var positionSimilarity = 1.0 - Math.Abs(relativeX - pattern.RelativeX) - Math.Abs(relativeY - pattern.RelativeY);
             var sizeSimilarity = 1.0 - Math.Abs(relativeWidth - pattern.RelativeWidth) - Math.Abs(relativeHeight - pattern.RelativeHeight);
             return Math.Max(0, (positionSimilarity + sizeSimilarity) / 2.0);
         });
-        
+
         return Math.Max(0.5, bestMatch); // 最低0.5の基準スコア
     }
 
@@ -599,11 +599,11 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     {
         var updateThreshold = GetParameter<double>("TemplateUpdateThreshold");
         var highConfidenceRegions = regions.Where(r => r.Confidence >= updateThreshold);
-        
+
         foreach (var region in highConfidenceRegions)
         {
             var templateKey = GenerateTemplateKey(region, image);
-            
+
             if (_regionTemplates.TryGetValue(templateKey, out var existingTemplate))
             {
                 existingTemplate.UpdateSuccess();
@@ -623,11 +623,11 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                         DetectionMethod = region.DetectionMethod
                     }
                 };
-                
+
                 _regionTemplates.TryAdd(templateKey, newTemplate);
             }
         }
-        
+
         // 成功率の低いテンプレートを削除
         var minSuccessRate = GetParameter<double>("MinTemplateSuccessRate");
         var templatesToRemove = _regionTemplates.Where(kvp => kvp.Value.SuccessRate < minSuccessRate).ToList();
@@ -643,11 +643,11 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
         {
             var recentHistory = GetRecentHistory(20);
             if (recentHistory.Count < 5) return; // 最低5回の履歴が必要
-            
+
             // パフォーマンス分析
             var avgProcessingTime = recentHistory.Average(h => h.ProcessingTimeMs);
             var avgRegionCount = recentHistory.Average(h => h.FinalRegionCount);
-            
+
             // 適応的パラメータ調整
             if (avgProcessingTime > 1000) // 1秒以上かかっている場合
             {
@@ -655,15 +655,15 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
                 SetParameter("AdaptiveSensitivity", Math.Max(0.3, currentSensitivity - 0.1));
                 _logger.LogDebug("処理時間が長いため感度を下げました: {NewSensitivity}", GetParameter<double>("AdaptiveSensitivity"));
             }
-            
+
             if (avgRegionCount < 5) // 検出領域が少ない場合
             {
                 var currentMinArea = GetParameter<int>("AdaptiveMinArea");
                 SetParameter("AdaptiveMinArea", Math.Max(50, currentMinArea - 20));
                 _logger.LogDebug("検出領域が少ないため最小エリアを下げました: {NewMinArea}", GetParameter<int>("AdaptiveMinArea"));
             }
-            
-            _logger.LogTrace("適応処理完了: 平均処理時間={AvgTime}ms, 平均領域数={AvgRegions}", 
+
+            _logger.LogTrace("適応処理完了: 平均処理時間={AvgTime}ms, 平均領域数={AvgRegions}",
                 avgProcessingTime, avgRegionCount);
         }
         catch (Exception ex)
@@ -818,7 +818,7 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     {
         var intersection = Rectangle.Intersect(rect1, rect2);
         if (intersection.IsEmpty) return 0.0;
-        
+
         var unionArea = rect1.Width * rect1.Height + rect2.Width * rect2.Height - intersection.Width * intersection.Height;
         return unionArea > 0 ? (double)(intersection.Width * intersection.Height) / unionArea : 0.0;
     }
@@ -829,13 +829,13 @@ public sealed class AdaptiveTextRegionDetector : ITextRegionDetector, IDisposabl
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _adaptationTimer?.Dispose();
         _disposed = true;
-        
-        _logger.LogInformation("適応的テキスト領域検出器をクリーンアップ: テンプレート数={TemplateCount}, 履歴数={HistoryCount}", 
+
+        _logger.LogInformation("適応的テキスト領域検出器をクリーンアップ: テンプレート数={TemplateCount}, 履歴数={HistoryCount}",
             _regionTemplates.Count, _detectionHistory.Count);
-        
+
         GC.SuppressFinalize(this);
     }
 
@@ -886,35 +886,35 @@ public class RegionTemplate
     public int SuccessCount { get; private set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime LastUsedAt { get; set; } = DateTime.Now;
-    
+
     public double SuccessRate => UsageCount > 0 ? (double)SuccessCount / UsageCount : 0.0;
-    
+
     public void UpdateSuccess()
     {
         UsageCount++;
         SuccessCount++;
         LastUsedAt = DateTime.Now;
     }
-    
+
     public void UpdateFailure()
     {
         UsageCount++;
         LastUsedAt = DateTime.Now;
     }
-    
+
     public bool IsCompatible(int imageWidth, int imageHeight)
     {
         // 画像サイズの互換性チェック（簡素化）
         return imageWidth > 0 && imageHeight > 0;
     }
-    
+
     public List<Rectangle> GenerateRegions(int imageWidth, int imageHeight)
     {
         var x = (int)(RegionPattern.RelativeX * imageWidth);
         var y = (int)(RegionPattern.RelativeY * imageHeight);
         var width = (int)(RegionPattern.RelativeWidth * imageWidth);
         var height = (int)(RegionPattern.RelativeHeight * imageHeight);
-        
+
         return [new Rectangle(x, y, width, height)];
     }
 }

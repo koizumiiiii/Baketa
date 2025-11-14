@@ -73,7 +73,7 @@ public static class DiagnosticExtensions
         var enhancedMetrics = metrics ?? [];
         enhancedMetrics["ExceptionType"] = exception.GetType().Name;
         enhancedMetrics["StackTrace"] = exception.StackTrace ?? "N/A";
-        
+
         var diagnosticEvent = new PipelineDiagnosticEvent
         {
             Stage = stage,
@@ -99,7 +99,7 @@ public static class DiagnosticExtensions
         Action<Dictionary<string, object>, T>? metricsEnhancer = null)
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             var result = await operation().ConfigureAwait(false);
@@ -114,10 +114,10 @@ public static class DiagnosticExtensions
         catch (Exception ex)
         {
             stopwatch.Stop();
-            
-            await eventAggregator.PublishExceptionAsync(stage, ex, stopwatch.ElapsedMilliseconds, 
+
+            await eventAggregator.PublishExceptionAsync(stage, ex, stopwatch.ElapsedMilliseconds,
                 sessionId: sessionId).ConfigureAwait(false);
-            
+
             throw; // Re-throw to maintain original exception flow
         }
     }
@@ -133,23 +133,23 @@ public static class DiagnosticExtensions
         Dictionary<string, object>? additionalMetrics = null)
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             await operation().ConfigureAwait(false);
             stopwatch.Stop();
 
-            await eventAggregator.PublishSuccessAsync(stage, stopwatch.ElapsedMilliseconds, 
+            await eventAggregator.PublishSuccessAsync(stage, stopwatch.ElapsedMilliseconds,
                 additionalMetrics, sessionId).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            
+
             var metrics = additionalMetrics ?? [];
-            await eventAggregator.PublishExceptionAsync(stage, ex, stopwatch.ElapsedMilliseconds, 
+            await eventAggregator.PublishExceptionAsync(stage, ex, stopwatch.ElapsedMilliseconds,
                 metrics, sessionId).ConfigureAwait(false);
-            
+
             throw; // Re-throw to maintain original exception flow
         }
     }
@@ -168,7 +168,7 @@ public static class DiagnosticExtensions
         var enhancedMetrics = metrics ?? [];
         enhancedMetrics["ThresholdMs"] = thresholdMs;
         enhancedMetrics["ExceededBy"] = processingTimeMs - thresholdMs;
-        
+
         var diagnosticEvent = new PipelineDiagnosticEvent
         {
             Stage = stage,

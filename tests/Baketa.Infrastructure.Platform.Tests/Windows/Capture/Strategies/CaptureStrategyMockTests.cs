@@ -1,16 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Linq;
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Models.Capture;
-using Baketa.Core.Abstractions.Platform.Windows;
-using Baketa.Core.Abstractions.GPU;
+using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Models.Capture;
 using Baketa.Infrastructure.Platform.Tests.Windows.GPU;
+using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
 using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
@@ -103,7 +103,7 @@ public class CaptureStrategyMockTests
     {
         // Arrange
         var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object, _mockEventAggregator.Object);
-        
+
         _mockCapturer.Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>()))
             .ThrowsAsync(new InvalidOperationException("キャプチャに失敗しました"));
 
@@ -158,7 +158,7 @@ public class CaptureStrategyMockTests
         var integratedGPU = GPUEnvironmentMockTests.CreateMockIntegratedGpu();
         var dedicatedGPU = GPUEnvironmentMockTests.CreateMockDedicatedGPU();
         var lowEndGPU = GPUEnvironmentMockTests.CreateMockLowEndIntegratedGPU();
-        
+
         var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object, _mockEventAggregator.Object);
         var windowHandle = new IntPtr(0x12345);
 

@@ -1,14 +1,14 @@
-using Microsoft.Extensions.DependencyInjection;
-using Baketa.Core.DI;
-using Baketa.Core.DI.Attributes;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Services;
-using Baketa.Application.Services;
-using Baketa.Application.Services.Cache;
-using Baketa.Infrastructure.OCR.PaddleOCR.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Baketa.Application.Services;
+using Baketa.Application.Services.Cache;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.DI;
+using Baketa.Core.DI.Attributes;
+using Baketa.Infrastructure.OCR.PaddleOCR.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Application.DI.Modules;
 
@@ -27,11 +27,11 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
     {
         // 🚨 DEBUG: モジュール実行確認
         Console.WriteLine("🚀 AdvancedCachingModule.RegisterServices 実行中！");
-        
+
         // ⚡ Step3: 高度キャッシングサービス登録
         services.AddSingleton<IAdvancedOcrCacheService, AdvancedOcrCacheService>();
         Console.WriteLine("✅ IAdvancedOcrCacheService登録完了");
-        
+
         /*
         // 🏭 ファクトリパターン対応のため、古い登録は無効化
         services.AddSingleton<CachedOcrEngine>(provider =>
@@ -57,7 +57,7 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
             var pooledService = provider.GetRequiredService<PooledOcrService>();
             var cacheService = provider.GetRequiredService<IAdvancedOcrCacheService>();
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
-            
+
             Console.WriteLine($"✅ CachedOcrEngine（デコレーター）作成 - ベースサービス: {pooledService.GetType().Name}");
             return new CachedOcrEngine(pooledService, cacheService, logger);
         });
@@ -67,11 +67,11 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
         //    これにより、IOcrEngineを要求する全てのサービスがキャッシュ機能の恩恵を受ける
         services.AddSingleton<IOcrEngine>(provider => provider.GetRequiredService<CachedOcrEngine>());
         Console.WriteLine("✅ IOcrEngineをCachedOcrEngineに解決するよう最終登録完了");
-        
+
         Console.WriteLine("✅ Step3: 高度キャッシング戦略登録完了");
         Console.WriteLine("🎯 期待効果: キャッシュヒット時 数ミリ秒応答");
     }
-    
+
     /// <summary>
     /// このモジュールが依存する他のモジュールの型を取得します
     /// </summary>
@@ -80,10 +80,10 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
     {
         // ❌ 旧プール化システム依存を除去
         // yield return typeof(StagedOcrStrategyModule);
-        
+
         // インフラストラクチャモジュールに依存（新ファクトリシステム）
         yield return typeof(Baketa.Infrastructure.DI.Modules.InfrastructureModule);
-        
+
         // 🏭 新しいPaddleOcrModuleに依存（ファクトリシステム）
         yield return typeof(Baketa.Infrastructure.DI.PaddleOcrModule);
     }

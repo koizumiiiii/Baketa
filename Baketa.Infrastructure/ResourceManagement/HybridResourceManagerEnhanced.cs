@@ -23,15 +23,15 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
     private readonly IOptionsMonitor<HysteresisControlSettings> _hysteresisSettings;
     private readonly IOptionsMonitor<PredictiveControlSettings> _predictiveSettings;
     private readonly VramCapacityDetector _vramDetector;
-    
+
     // ゲーム負荷パターン学習データベース
     private readonly Dictionary<string, GameLoadPattern> _gamePatterns = new();
     private readonly object _gamePatternLock = new();
-    
+
     // A/Bテスト設定管理
-    private string _activeConfigurationVariant = "Default";
+    private readonly string _activeConfigurationVariant = "Default";
     private readonly object _configurationLock = new();
-    
+
     // 初期化状態管理
     private bool _isInitialized;
     private readonly object _initializationLock = new();
@@ -134,7 +134,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
         }
 
         var systemMetrics = await _resourceMonitor.GetCurrentMetricsAsync(cancellationToken).ConfigureAwait(false);
-        
+
         // システムメトリクスをGpuVramMetricsに変換（動的VRAM容量使用）
         var vramCapacityInfo = await _vramDetector.GetVramCapacityInfoAsync(cancellationToken).ConfigureAwait(false);
         var gpuVramMetrics = new GpuVramMetrics(
@@ -161,7 +161,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
         }
 
         var gpuMetrics = await GetGpuVramMetricsAsync(cancellationToken).ConfigureAwait(false);
-        
+
         // ヒステリシス制御による最適並列度計算
         return await _hysteresisController.AdjustParallelismAsync(gpuMetrics, systemLoad, cancellationToken).ConfigureAwait(false);
     }
@@ -175,10 +175,10 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
 
         var gpuMetrics = await GetGpuVramMetricsAsync(cancellationToken).ConfigureAwait(false);
         var previousMetrics = _resourceMonitor.CurrentMetrics;
-        
+
         // ヒステリシス制御実行
         var newParallelism = await _hysteresisController.AdjustParallelismAsync(gpuMetrics, systemLoad, cancellationToken).ConfigureAwait(false);
-        
+
         // リソース状態変更イベント発行
         if (previousMetrics != null)
         {
@@ -202,19 +202,19 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
 
         var settings = _predictiveSettings.CurrentValue;
         var gpuMetrics = await GetGpuVramMetricsAsync(cancellationToken).ConfigureAwait(false);
-        
+
         // 基本クールダウン時間の計算
         var baseCooldown = TimeSpan.FromSeconds(5); // デフォルト5秒
-        
+
         // Phase 3: 高度な予測制御アルゴリズム
         var temperatureMultiplier = CalculateTemperatureMultiplier(gpuMetrics.GpuTemperatureCelsius, settings);
         var vramPressureMultiplier = CalculateVramPressureMultiplier(gpuMetrics.GetVramPressureLevel(), settings);
         var gamePatternMultiplier = CalculateGamePatternMultiplier(gamePattern);
-        
+
         // 総合クールダウン計算
         var totalMultiplier = settings.CooldownBaseMultiplier * temperatureMultiplier * vramPressureMultiplier * gamePatternMultiplier;
         var finalCooldown = TimeSpan.FromMilliseconds(baseCooldown.TotalMilliseconds * totalMultiplier);
-        
+
         // 範囲制限（最小1秒、最大60秒）
         if (finalCooldown < TimeSpan.FromSeconds(1))
             finalCooldown = TimeSpan.FromSeconds(1);
@@ -249,7 +249,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
                     // 新しいゲームの場合、デフォルトプロファイルを作成
                     var defaultProfile = CreateDefaultGameProfile(gameProcessName);
                     _gamePatterns[gameProcessName] = defaultProfile;
-                    
+
                     _logger.LogInformation("🎮 [PHASE3] 新しいゲームプロファイル作成: {GameName}", gameProcessName);
                 }
             }
@@ -267,7 +267,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
     public async Task<string> GetActiveConfigurationVariantAsync(CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask; // 非同期インターフェース対応
-        
+
         lock (_configurationLock)
         {
             return _activeConfigurationVariant;
@@ -285,11 +285,11 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
         {
             var systemMetrics = await GetSystemMetricsAsync(cancellationToken).ConfigureAwait(false);
             var gpuMetrics = await GetGpuVramMetricsAsync(cancellationToken).ConfigureAwait(false);
-            
+
             // リソース競合検出ロジック
             var conflictingProcesses = await DetectConflictingProcessesAsync(cancellationToken).ConfigureAwait(false);
             var hasConflict = conflictingProcesses.Count > 0;
-            
+
             var recommendedAction = DetermineConflictResolutionAction(systemMetrics, gpuMetrics, conflictingProcesses);
             var recommendedParallelism = CalculateConflictAwareParallelism(recommendedAction);
             var recommendedCooldown = CalculateConflictAwareCooldown(recommendedAction);
@@ -321,7 +321,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
     {
         // ヒステリシス状態変更イベントの転送
         HysteresisStateChanged?.Invoke(this, e);
-        
+
         _logger.LogDebug("🎯 [PHASE3] ヒステリシス状態変更通知: {PreviousParallelism} → {NewParallelism}",
             e.PreviousParallelism, e.NewParallelism);
     }
@@ -332,7 +332,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
         {
             // TODO: 将来的には永続化ストレージからゲーム負荷パターンを読み込み
             _logger.LogDebug("🎮 [PHASE3] ゲーム負荷パターン学習システム初期化完了");
-            
+
             await Task.CompletedTask; // 非同期インターフェース対応
         }
         catch (Exception ex)
@@ -345,7 +345,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
     private static double CalculateVramUsagePercent(ResourceMetrics metrics)
     {
         if (!metrics.GpuMemoryUsageMB.HasValue) return 0.0;
-        
+
         // デフォルト8GB仮定（後でGpuEnvironmentDetectorから取得予定）
         const long defaultVramMB = 8192;
         return Math.Min(100.0, (double)metrics.GpuMemoryUsageMB.Value / defaultVramMB * 100.0);
@@ -361,7 +361,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
     {
         var vramUsage = CalculateVramUsagePercent(metrics);
         var gpuUsage = metrics.GpuUsagePercent ?? 0.0;
-        
+
         return vramUsage < 70.0 && gpuUsage < 80.0;
     }
 
@@ -410,7 +410,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
         // ゲーム負荷パターンに基づく係数計算
         if (gamePattern.LearningSessionCount < 3)
             return 1.0; // 学習データ不足
-        
+
         // 平均負荷と最大負荷の差が大きいほど慎重にする
         var loadVariability = gamePattern.PeakLoad - gamePattern.AverageLoad;
         return loadVariability switch
@@ -448,15 +448,15 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
     }
 
     private static RecommendedAction DetermineConflictResolutionAction(
-        ResourceMetrics systemMetrics, 
-        GpuVramMetrics gpuMetrics, 
+        ResourceMetrics systemMetrics,
+        GpuVramMetrics gpuMetrics,
         List<ConflictingProcess> conflictingProcesses)
     {
         if (conflictingProcesses.Count == 0)
             return RecommendedAction.Maintain;
-        
+
         var highSeverityConflicts = conflictingProcesses.Count(p => p.Severity is ConflictSeverity.High or ConflictSeverity.Critical);
-        
+
         return highSeverityConflicts switch
         {
             0 => RecommendedAction.ScaleDown,
@@ -500,7 +500,7 @@ public sealed class HybridResourceManagerEnhanced : IHybridResourceManager
         }
 
         _resourceMonitor?.Dispose();
-        
+
         _logger.LogInformation("🔄 [PHASE3] HybridResourceManagerEnhanced正常終了");
     }
 }

@@ -44,7 +44,7 @@ public sealed class FeatureFlagModule : ServiceModuleBase
         {
             services.Configure<FeatureFlagSettings>(options => { });
         }
-        
+
         // フィーチャーフラグサービス
         services.AddSingleton<IFeatureFlagService, FeatureFlagService>();
     }

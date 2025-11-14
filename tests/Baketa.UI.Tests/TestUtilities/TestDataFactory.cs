@@ -1,11 +1,10 @@
 #pragma warning disable CS0618 // Type or member is obsolete
 using System;
-using Microsoft.Extensions.Logging;
 using Baketa.Application.Events;
 using Baketa.Application.Models;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Settings;
-
+using Microsoft.Extensions.Logging;
 // 名前空間競合を解決するためのエイリアス
 using ApplicationTranslationSettings = Baketa.Application.Services.Translation.TranslationSettings;
 using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;

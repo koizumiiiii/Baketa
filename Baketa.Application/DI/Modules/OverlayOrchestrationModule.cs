@@ -29,7 +29,7 @@ public class OverlayOrchestrationModule : ServiceModuleBase
         {
             // Application層のサービス実装を登録
             RegisterApplicationServices(services, logger);
-            
+
             // 設定オプションの登録
             RegisterConfigurationOptions(services, logger);
 

@@ -19,7 +19,7 @@ public class OverlayOrchestrator : IOverlayOrchestrator
     private readonly IOverlayRenderer _renderer;
     private readonly IOverlayPositionCalculator _positionCalculator;
     private readonly ILogger<OverlayOrchestrator> _logger;
-    
+
     private bool _isInitialized = false;
     private readonly object _initLock = new();
 
@@ -39,7 +39,7 @@ public class OverlayOrchestrator : IOverlayOrchestrator
         _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
         _positionCalculator = positionCalculator ?? throw new ArgumentNullException(nameof(positionCalculator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         _logger.LogDebug("🏗️ OverlayOrchestrator インスタンス作成");
     }
 
@@ -59,7 +59,7 @@ public class OverlayOrchestrator : IOverlayOrchestrator
         {
             if (_isInitialized)
                 return;
-                
+
             _logger.LogInformation("🚀 OverlayOrchestrator 初期化開始");
         }
 
@@ -102,7 +102,7 @@ public class OverlayOrchestrator : IOverlayOrchestrator
         EnsureInitialized();
 
         // デバッグログ
-        _logger.LogDebug("🎯 翻訳結果処理開始 - ID: {Id}, Text: '{Text}', Area: {Area}", 
+        _logger.LogDebug("🎯 翻訳結果処理開始 - ID: {Id}, Text: '{Text}', Area: {Area}",
             result.Id, result.TranslatedText?.Substring(0, Math.Min(50, result.TranslatedText?.Length ?? 0)), result.DisplayArea);
 
         try
@@ -120,7 +120,7 @@ public class OverlayOrchestrator : IOverlayOrchestrator
 
             if (!await _collisionDetector.ShouldDisplayAsync(displayRequest, cancellationToken).ConfigureAwait(false))
             {
-                _logger.LogDebug("🚫 [PHASE15_ORCHESTRATOR] 重複検出により表示をスキップ - ID: {Id}, Text: '{Text}'", 
+                _logger.LogDebug("🚫 [PHASE15_ORCHESTRATOR] 重複検出により表示をスキップ - ID: {Id}, Text: '{Text}'",
                     result.Id, result.TranslatedText?.Substring(0, Math.Min(30, result.TranslatedText?.Length ?? 0)));
                 return false;
             }
@@ -161,7 +161,7 @@ public class OverlayOrchestrator : IOverlayOrchestrator
             // Phase 5: 衝突検出器に登録
             await _collisionDetector.RegisterDisplayedAsync(overlayInfo, cancellationToken).ConfigureAwait(false);
 
-            _logger.LogInformation("✅ [PHASE15_ORCHESTRATOR] オーバーレイ表示成功 - ID: {Id}, Text: '{Text}', Area: {Area}", 
+            _logger.LogInformation("✅ [PHASE15_ORCHESTRATOR] オーバーレイ表示成功 - ID: {Id}, Text: '{Text}', Area: {Area}",
                 result.Id, result.TranslatedText?.Substring(0, Math.Min(30, result.TranslatedText?.Length ?? 0)), optimizedArea);
 
             return true;
@@ -169,7 +169,7 @@ public class OverlayOrchestrator : IOverlayOrchestrator
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ 翻訳結果処理中にエラー発生 - ID: {Id}", result.Id);
-            
+
             // エラー時のクリーンアップ
             try
             {
@@ -196,7 +196,7 @@ public class OverlayOrchestrator : IOverlayOrchestrator
         {
             // 衝突検出器から対象オーバーレイを取得
             var overlaysInArea = await _collisionDetector.DetectCollisionsAsync(area, cancellationToken).ConfigureAwait(false);
-            
+
             int removedCount = 0;
             foreach (var overlayInfo in overlaysInArea)
             {
@@ -211,10 +211,10 @@ public class OverlayOrchestrator : IOverlayOrchestrator
                 {
                     // レンダラーからも削除
                     await _renderer.RemoveOverlayAsync(overlayInfo.Id, cancellationToken).ConfigureAwait(false);
-                    
+
                     // 衝突検出器から登録解除
                     await _collisionDetector.UnregisterAsync(overlayInfo.Id, cancellationToken).ConfigureAwait(false);
-                    
+
                     removedCount++;
                     _logger.LogDebug("オーバーレイ削除完了 - ID: {Id}", overlayInfo.Id);
                 }

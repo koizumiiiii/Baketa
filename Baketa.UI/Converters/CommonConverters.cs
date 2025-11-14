@@ -74,7 +74,7 @@ internal sealed class EnabledCountConverter : IValueConverter
             try
             {
                 return collection.Cast<object>()
-                    .Count(item => 
+                    .Count(item =>
                     {
                         var property = item.GetType().GetProperty("IsEnabled");
                         return property?.GetValue(item) is bool enabled && enabled;

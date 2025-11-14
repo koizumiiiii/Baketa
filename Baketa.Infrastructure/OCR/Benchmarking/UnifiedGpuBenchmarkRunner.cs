@@ -1,13 +1,13 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.IO;
 using Baketa.Core.Abstractions.GPU;
-using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.GPU;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.Collections.Concurrent;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
-using System.IO;
 
 namespace Baketa.Infrastructure.OCR.Benchmarking;
 
@@ -34,7 +34,7 @@ public sealed class UnifiedGpuBenchmarkRunner(
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Starting comprehensive GPU benchmark with {ImageCount} test images", testImages.Count);
-        
+
         var stopwatch = Stopwatch.StartNew();
         var environment = await _environmentDetector.DetectEnvironmentAsync(cancellationToken).ConfigureAwait(false);
         var providerResults = new ConcurrentBag<ProviderBenchmarkResult>();
@@ -59,15 +59,15 @@ public sealed class UnifiedGpuBenchmarkRunner(
                         testImages,
                         settings,
                         cancellationToken).ConfigureAwait(false);
-                    
+
                     providerResults.Add(result);
-                    _logger.LogInformation("Completed benchmark for {Provider}: {AvgTime}ms", 
+                    _logger.LogInformation("Completed benchmark for {Provider}: {AvgTime}ms",
                         providerStatus.Type, result.AverageInferenceTimeMs);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Benchmark failed for provider {Provider}", providerStatus.Type);
-                    
+
                     // エラー結果も記録
                     providerResults.Add(new ProviderBenchmarkResult
                     {
@@ -153,13 +153,13 @@ public sealed class UnifiedGpuBenchmarkRunner(
 
                 var inferenceTime = await MeasureSingleInferenceAsync(
                     session, testImage, cancellationToken).ConfigureAwait(false);
-                
+
                 inferenceTimings.Add(inferenceTime);
 
                 // メモリ使用量監視（設定に応じて）
                 if (settings.MonitorMemoryUsage && inferenceTimings.Count % 10 == 0)
                 {
-                    result.PeakMemoryUsageMB = Math.Max(result.PeakMemoryUsageMB, 
+                    result.PeakMemoryUsageMB = Math.Max(result.PeakMemoryUsageMB,
                         GC.GetTotalMemory(false) / (1024 * 1024));
                 }
             }
@@ -174,7 +174,7 @@ public sealed class UnifiedGpuBenchmarkRunner(
                 result.MedianInferenceTimeMs = CalculateMedian(inferenceTimings);
                 result.StandardDeviationMs = CalculateStandardDeviation(inferenceTimings);
                 result.ThroughputImagesPerSecond = 1000.0 / result.AverageInferenceTimeMs;
-                
+
                 // パーセンタイル計算
                 var sortedTimings = inferenceTimings.OrderBy(t => t).ToList();
                 result.P95InferenceTimeMs = sortedTimings[(int)(sortedTimings.Count * 0.95)];
@@ -226,14 +226,14 @@ public sealed class UnifiedGpuBenchmarkRunner(
             // 実用的な推論処理（Gemini推奨：実際のメモリアクセスパターンをシミュレート）
             var imageData = MockOnnxModelGenerator.GenerateRealisticImageData(
                 testImage.Width, testImage.Height, 3);
-            
+
             // ONNXテンソル作成（実際のOCR前処理に近い形）
             var inputTensor = new DenseTensor<float>(imageData, [1, 3, testImage.Height, testImage.Width]);
             var namedInput = NamedOnnxValue.CreateFromTensor("input", inputTensor);
-            
+
             // 実際のONNX Runtime推論実行（CPU/GPUで処理される）
             using var outputs = session.Run([namedInput]);
-            
+
             // 出力結果を消費（メモリアクセスパターンの完全性確保）
             foreach (var output in outputs)
             {
@@ -254,7 +254,7 @@ public sealed class UnifiedGpuBenchmarkRunner(
             // 推論エラーは測定に含めるが、キャンセルは除外
             _logger.LogWarning(ex, "Inference error during benchmark (included in timing)");
         }
-        
+
         stopwatch.Stop();
         return stopwatch.Elapsed.TotalMilliseconds;
     }
@@ -264,7 +264,7 @@ public sealed class UnifiedGpuBenchmarkRunner(
     {
         var gains = new Dictionary<string, double>();
         var cpuBaseline = results.FirstOrDefault(r => r.ProviderType == ExecutionProvider.CPU && r.IsSuccessful);
-        
+
         if (cpuBaseline == null) return gains;
 
         foreach (var result in results.Where(r => r.IsSuccessful && r.ProviderType != ExecutionProvider.CPU))
@@ -300,12 +300,12 @@ public sealed class UnifiedGpuBenchmarkRunner(
     {
         var sorted = values.OrderBy(v => v).ToList();
         var count = sorted.Count;
-        
+
         if (count % 2 == 0)
         {
             return (sorted[count / 2 - 1] + sorted[count / 2]) / 2.0;
         }
-        
+
         return sorted[count / 2];
     }
 
@@ -357,7 +357,7 @@ public sealed record ProviderBenchmarkResult
     public DateTime EndTime { get; set; }
     public double TotalExecutionTimeMs { get; set; }
     public int TestImageCount { get; set; }
-    
+
     // 推論性能メトリクス
     public double AverageInferenceTimeMs { get; set; }
     public double MinInferenceTimeMs { get; set; }
@@ -367,7 +367,7 @@ public sealed record ProviderBenchmarkResult
     public double P95InferenceTimeMs { get; set; }
     public double P99InferenceTimeMs { get; set; }
     public double ThroughputImagesPerSecond { get; set; }
-    
+
     // リソース使用量
     public long PeakMemoryUsageMB { get; set; }
 }
@@ -381,7 +381,7 @@ public interface IUnifiedGpuBenchmarkRunner
         IReadOnlyList<IImage> testImages,
         BenchmarkSettings settings,
         CancellationToken cancellationToken = default);
-        
+
     Task<ProviderBenchmarkResult> BenchmarkSingleProviderAsync(
         ExecutionProvider providerType,
         IReadOnlyList<IImage> testImages,

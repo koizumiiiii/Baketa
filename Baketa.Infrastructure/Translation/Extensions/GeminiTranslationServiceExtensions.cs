@@ -43,7 +43,7 @@ public static class GeminiTranslationServiceExtensions
         services.AddHttpClient<GeminiTranslationEngine>("GeminiClient", (sp, client) =>
         {
             var options = sp.GetRequiredService<IOptions<GeminiEngineOptions>>().Value;
-            
+
             var baseUrl = options.ApiEndpoint ?? "https://generativelanguage.googleapis.com/v1/models/";
 #pragma warning disable CA1865 // EndsWith メソッドには char 引数のオーバーロードが存在しないため
             if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
@@ -51,14 +51,14 @@ public static class GeminiTranslationServiceExtensions
             {
                 baseUrl += "/";
             }
-            
+
             client.BaseAddress = new Uri(baseUrl);
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));
             client.DefaultRequestHeaders.UserAgent.Add(
                 new ProductInfoHeaderValue("Baketa", "1.0"));
-            
+
             // タイムアウト設定
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         })
@@ -99,7 +99,7 @@ public static class GeminiTranslationServiceExtensions
         services.AddHttpClient<GeminiTranslationEngine>("GeminiClient", (sp, client) =>
         {
             var options = sp.GetRequiredService<IOptions<GeminiEngineOptions>>().Value;
-            
+
             var baseUrl = options.ApiEndpoint ?? "https://generativelanguage.googleapis.com/v1/models/";
 #pragma warning disable CA1865 // EndsWith メソッドには char 引数のオーバーロードが存在しないため
             if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
@@ -107,14 +107,14 @@ public static class GeminiTranslationServiceExtensions
             {
                 baseUrl += "/";
             }
-            
+
             client.BaseAddress = new Uri(baseUrl);
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));
             client.DefaultRequestHeaders.UserAgent.Add(
                 new ProductInfoHeaderValue("Baketa", "1.0"));
-            
+
             // タイムアウト設定
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         })
@@ -138,7 +138,7 @@ public static class GeminiTranslationServiceExtensions
 internal sealed class RetryHandler : DelegatingHandler
 {
     private const int MaxRetries = 3;
-    private static readonly TimeSpan[] RetryDelays = 
+    private static readonly TimeSpan[] RetryDelays =
     [
         TimeSpan.FromSeconds(1),
         TimeSpan.FromSeconds(2),
@@ -146,23 +146,23 @@ internal sealed class RetryHandler : DelegatingHandler
     ];
 
     protected override async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request, 
+        HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
         HttpResponseMessage? response = null;
-        
+
         for (int i = 0; i <= MaxRetries; i++)
         {
             try
             {
                 response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
-                
+
                 // 成功またはリトライ不要な場合は即座に返す
                 if (response.IsSuccessStatusCode || !ShouldRetry(response))
                 {
                     return response;
                 }
-                
+
                 // 最後の試行でない場合は待機
                 if (i < MaxRetries)
                 {
@@ -194,16 +194,16 @@ internal sealed class RetryHandler : DelegatingHandler
                 }
             }
         }
-        
+
         return response ?? throw new InvalidOperationException("レスポンスが取得できませんでした");
     }
-    
+
     /// <summary>
     /// リトライすべきかどうかを判定
     /// </summary>
     private static bool ShouldRetry(HttpResponseMessage response)
     {
-        return response.StatusCode is 
+        return response.StatusCode is
             System.Net.HttpStatusCode.RequestTimeout or
             System.Net.HttpStatusCode.TooManyRequests or
             System.Net.HttpStatusCode.InternalServerError or

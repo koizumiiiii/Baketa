@@ -7,12 +7,12 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
-using Rectangle = System.Drawing.Rectangle;
+using Baketa.Core.Abstractions.OCR.TextDetection;
 using Baketa.Core.Extensions;
+using Microsoft.Extensions.Logging;
+using Rectangle = System.Drawing.Rectangle;
 using TextDetectionMethodAlias = Baketa.Core.Abstractions.OCR.TextDetection.TextDetectionMethod;
 using TextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 
@@ -27,21 +27,21 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     private readonly ILogger<TextDetectionEffectivenessAnalyzer> _logger;
     private readonly Dictionary<string, ITextRegionDetector> _detectors;
     private readonly List<EffectivenessMeasurement> _measurements = [];
-    
+
     private static readonly JsonSerializerOptions ReportJsonOptions = new()
     {
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
     private bool _disposed;
-    
+
     public TextDetectionEffectivenessAnalyzer(
         ILogger<TextDetectionEffectivenessAnalyzer> logger,
         IEnumerable<ITextRegionDetector> detectors)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _detectors = detectors.ToDictionary(d => d.Name.ToLowerInvariant(), d => d);
-        
+
         _logger.LogInformation("テキスト領域検出効果測定システム初期化: 対象検出器数={DetectorCount}", _detectors.Count);
     }
 
@@ -54,7 +54,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("包括的効果測定開始: テストケース数={TestCaseCount}", testCases.Count);
-        
+
         var report = new EffectivenessReport
         {
             ExecutionTime = DateTime.Now,
@@ -66,30 +66,30 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
         {
             // 1. 検出精度測定
             report.DetectionAccuracyResults = await MeasureDetectionAccuracyAsync(testCases, cancellationToken).ConfigureAwait(false);
-            
+
             // 2. 処理速度測定
             report.PerformanceResults = await MeasurePerformanceAsync(testCases, cancellationToken).ConfigureAwait(false);
-            
+
             // 3. OCR結果品質測定（OCRエンジンが提供されている場合）
             if (ocrEngine != null)
             {
                 report.OcrQualityResults = await MeasureOcrQualityAsync(testCases, ocrEngine, cancellationToken).ConfigureAwait(false);
             }
-            
+
             // 4. 適応効果測定
             report.AdaptationEffectResults = await MeasureAdaptationEffectAsync(testCases, cancellationToken).ConfigureAwait(false);
-            
+
             // 5. 総合分析
             report.ComprehensiveAnalysis = AnalyzeOverallEffectiveness(report);
-            
+
             // 6. 改善提案生成
             report.ImprovementSuggestions = GenerateImprovementSuggestions(report);
-            
+
             await SaveReportAsync(report).ConfigureAwait(false);
-            
-            _logger.LogInformation("包括的効果測定完了: 総合スコア={OverallScore:F2}", 
+
+            _logger.LogInformation("包括的効果測定完了: 総合スコア={OverallScore:F2}",
                 report.ComprehensiveAnalysis.OverallEffectivenessScore);
-                
+
             return report;
         }
         catch (Exception ex)
@@ -104,30 +104,30 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     /// Precision, Recall, F1-Scoreを計算
     /// </summary>
     private async Task<Dictionary<string, DetectionAccuracyMetrics>> MeasureDetectionAccuracyAsync(
-        List<TestCase> testCases, 
+        List<TestCase> testCases,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("検出精度測定開始");
-        
+
         var results = new Dictionary<string, DetectionAccuracyMetrics>();
-        
+
         foreach (var (detectorName, detector) in _detectors)
         {
             var metrics = new DetectionAccuracyMetrics { DetectorName = detectorName };
-            
+
             foreach (var testCase in testCases)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 try
                 {
                     var detectedRegions = await detector.DetectRegionsAsync(testCase.Image, cancellationToken).ConfigureAwait(false);
-                    
+
                     // Ground Truthとの比較
                     var accuracy = CalculateAccuracy(detectedRegions, testCase.GroundTruthRegions);
                     metrics.AccuracyMeasurements.Add(accuracy);
-                    
-                    _logger.LogTrace("精度測定完了: {DetectorName}, ケース={TestCaseId}, Precision={Precision:F3}", 
+
+                    _logger.LogTrace("精度測定完了: {DetectorName}, ケース={TestCaseId}, Precision={Precision:F3}",
                         detectorName, testCase.Id, accuracy.Precision);
                 }
                 catch (Exception ex)
@@ -136,7 +136,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                     metrics.ErrorCount++;
                 }
             }
-            
+
             // 平均値計算
             if (metrics.AccuracyMeasurements.Count > 0)
             {
@@ -144,10 +144,10 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                 metrics.AverageRecall = metrics.AccuracyMeasurements.Average(a => a.Recall);
                 metrics.AverageF1Score = metrics.AccuracyMeasurements.Average(a => a.F1Score);
             }
-            
+
             results[detectorName] = metrics;
         }
-        
+
         _logger.LogDebug("検出精度測定完了: 検出器数={DetectorCount}", results.Count);
         return results;
     }
@@ -160,31 +160,31 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("処理速度測定開始");
-        
+
         var results = new Dictionary<string, PerformanceMetrics>();
-        
+
         foreach (var (detectorName, detector) in _detectors)
         {
             var metrics = new PerformanceMetrics { DetectorName = detectorName };
             var processingTimes = new List<double>();
-            
+
             foreach (var testCase in testCases)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 try
                 {
                     var stopwatch = Stopwatch.StartNew();
                     var regions = await detector.DetectRegionsAsync(testCase.Image, cancellationToken).ConfigureAwait(false);
                     stopwatch.Stop();
-                    
+
                     var processingTime = stopwatch.Elapsed.TotalMilliseconds;
                     processingTimes.Add(processingTime);
-                    
+
                     // ピクセル当たりの処理時間計算
                     var pixelCount = testCase.Image.Width * testCase.Image.Height;
                     var timePerPixel = processingTime / pixelCount;
-                    
+
                     metrics.DetailedMeasurements.Add(new PerformanceMeasurement
                     {
                         TestCaseId = testCase.Id,
@@ -199,7 +199,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                     _logger.LogWarning(ex, "処理速度測定エラー: {DetectorName}, ケース={TestCaseId}", detectorName, testCase.Id);
                 }
             }
-            
+
             // 統計値計算
             if (processingTimes.Count > 0)
             {
@@ -207,14 +207,14 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                 metrics.MinProcessingTimeMs = processingTimes.Min();
                 metrics.MaxProcessingTimeMs = processingTimes.Max();
                 metrics.StandardDeviation = CalculateStandardDeviation(processingTimes);
-                
+
                 // パフォーマンス安定性指標（変動係数）
                 metrics.StabilityIndex = metrics.StandardDeviation / metrics.AverageProcessingTimeMs;
             }
-            
+
             results[detectorName] = metrics;
         }
-        
+
         _logger.LogDebug("処理速度測定完了: 検出器数={DetectorCount}", results.Count);
         return results;
     }
@@ -228,24 +228,24 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("OCR品質測定開始");
-        
+
         var results = new Dictionary<string, OcrQualityMetrics>();
-        
+
         foreach (var (detectorName, detector) in _detectors)
         {
             var metrics = new OcrQualityMetrics { DetectorName = detectorName };
-            
+
             foreach (var testCase in testCases.Where(tc => !string.IsNullOrEmpty(tc.ExpectedText)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 try
                 {
                     // テキスト領域検出
                     var regions = await detector.DetectRegionsAsync(testCase.Image, cancellationToken).ConfigureAwait(false);
-                    
+
                     var ocrResults = new List<string>();
-                    
+
                     // 各領域でOCR実行
                     foreach (var region in regions)
                     {
@@ -256,11 +256,11 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                             ocrResults.Add(ocrResults2.Text ?? string.Empty);
                         }
                     }
-                    
+
                     // OCR結果の品質評価
                     var combinedResult = string.Join(" ", ocrResults);
                     var quality = CalculateTextSimilarity(combinedResult, testCase.ExpectedText);
-                    
+
                     metrics.QualityMeasurements.Add(new OcrQualityMeasurement
                     {
                         TestCaseId = testCase.Id,
@@ -276,7 +276,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                     _logger.LogWarning(ex, "OCR品質測定エラー: {DetectorName}, ケース={TestCaseId}", detectorName, testCase.Id);
                 }
             }
-            
+
             // 平均品質スコア計算
             if (metrics.QualityMeasurements.Count > 0)
             {
@@ -284,10 +284,10 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                 metrics.AverageCharacterAccuracy = metrics.QualityMeasurements.Average(q => q.CharacterAccuracy);
                 metrics.AverageWordAccuracy = metrics.QualityMeasurements.Average(q => q.WordAccuracy);
             }
-            
+
             results[detectorName] = metrics;
         }
-        
+
         _logger.LogDebug("OCR品質測定完了: 検出器数={DetectorCount}", results.Count);
         return results;
     }
@@ -301,38 +301,38 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("適応効果測定開始");
-        
+
         var results = new Dictionary<string, AdaptationEffectMetrics>();
-        
+
         // 適応的検出器のみを対象とする
         var adaptiveDetectors = _detectors.Where(d => d.Value.Method == TextDetectionMethodAlias.Adaptive);
-        
+
         foreach (var kvp in adaptiveDetectors)
         {
             var detectorName = kvp.Key;
             var detector = kvp.Value;
             var metrics = new AdaptationEffectMetrics { DetectorName = detectorName };
-            
+
             // 複数回実行して学習効果を測定
             const int iterations = 10;
             var iterationResults = new List<IterationResult>();
-            
+
             for (int iteration = 1; iteration <= iterations; iteration++)
             {
                 var iterationResult = new IterationResult { Iteration = iteration };
                 var processingTimes = new List<double>();
                 var regionCounts = new List<int>();
-                
+
                 foreach (var testCase in testCases)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    
+
                     try
                     {
                         var stopwatch = Stopwatch.StartNew();
                         var regions = await detector.DetectRegionsAsync(testCase.Image, cancellationToken).ConfigureAwait(false);
                         stopwatch.Stop();
-                        
+
                         processingTimes.Add(stopwatch.Elapsed.TotalMilliseconds);
                         regionCounts.Add(regions.Count);
                     }
@@ -341,41 +341,41 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                         _logger.LogWarning(ex, "適応効果測定エラー: {DetectorName}, 反復={Iteration}", detectorName, iteration);
                     }
                 }
-                
+
                 if (processingTimes.Count > 0)
                 {
                     iterationResult.AverageProcessingTime = processingTimes.Average();
                     iterationResult.AverageRegionCount = regionCounts.Average();
                     iterationResult.ProcessingTimeStability = CalculateStandardDeviation(processingTimes);
                 }
-                
+
                 iterationResults.Add(iterationResult);
-                
+
                 // 適応間隔を考慮した待機
                 await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
             }
-            
+
             // 適応効果の分析
             if (iterationResults.Count > 1)
             {
                 var firstHalf = iterationResults.Take(iterations / 2).ToList();
                 var secondHalf = iterationResults.Skip(iterations / 2).ToList();
-                
+
                 metrics.InitialAverageTime = firstHalf.Average(r => r.AverageProcessingTime);
                 metrics.FinalAverageTime = secondHalf.Average(r => r.AverageProcessingTime);
                 metrics.TimeImprovementPercent = ((metrics.InitialAverageTime - metrics.FinalAverageTime) / metrics.InitialAverageTime) * 100;
-                
+
                 metrics.InitialRegionCount = firstHalf.Average(r => r.AverageRegionCount);
                 metrics.FinalRegionCount = secondHalf.Average(r => r.AverageRegionCount);
-                
-                metrics.StabilityImprovement = firstHalf.Average(r => r.ProcessingTimeStability) - 
+
+                metrics.StabilityImprovement = firstHalf.Average(r => r.ProcessingTimeStability) -
                                              secondHalf.Average(r => r.ProcessingTimeStability);
             }
-            
+
             metrics.IterationResults = iterationResults;
             results[detectorName] = metrics;
         }
-        
+
         _logger.LogDebug("適応効果測定完了: 適応検出器数={AdaptiveDetectorCount}", results.Count);
         return results;
     }
@@ -386,7 +386,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     private ComprehensiveAnalysis AnalyzeOverallEffectiveness(EffectivenessReport report)
     {
         var analysis = new ComprehensiveAnalysis();
-        
+
         // 最高性能検出器の特定
         if (report.PerformanceResults.Count > 0)
         {
@@ -396,7 +396,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
             analysis.FastestDetector = fastestDetector.Key;
             analysis.FastestDetectorTime = fastestDetector.Value.AverageProcessingTimeMs;
         }
-        
+
         // 最高精度検出器の特定
         if (report.DetectionAccuracyResults.Count > 0)
         {
@@ -406,34 +406,34 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
             analysis.MostAccurateDetector = mostAccurateDetector.Key;
             analysis.HighestF1Score = mostAccurateDetector.Value.AverageF1Score;
         }
-        
+
         // 適応効果の評価
         if (report.AdaptationEffectResults.Count > 0)
         {
             var bestAdaptation = report.AdaptationEffectResults
                 .OrderByDescending(a => a.Value.TimeImprovementPercent)
                 .FirstOrDefault();
-            
+
             if (bestAdaptation.Value != null)
             {
                 analysis.BestAdaptiveDetector = bestAdaptation.Key;
                 analysis.MaxAdaptationImprovement = bestAdaptation.Value.TimeImprovementPercent;
             }
         }
-        
+
         // 総合効果スコア計算（精度40% + 速度30% + 適応性30%）
         analysis.OverallEffectivenessScore = CalculateOverallScore(report);
-        
+
         // 効果の評価レベル
         analysis.EffectivenessLevel = analysis.OverallEffectivenessScore switch
         {
             >= 0.9 => "Excellent",
-            >= 0.8 => "Very Good", 
+            >= 0.8 => "Very Good",
             >= 0.7 => "Good",
             >= 0.6 => "Fair",
             _ => "Needs Improvement"
         };
-        
+
         return analysis;
     }
 
@@ -443,7 +443,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     private List<string> GenerateImprovementSuggestions(EffectivenessReport report)
     {
         var suggestions = new List<string>();
-        
+
         // 精度改善提案
         if (report.DetectionAccuracyResults.Count > 0)
         {
@@ -453,7 +453,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                 suggestions.Add($"検出精度改善が必要: 平均F1スコア={avgF1:F3} < 0.8。パラメータ調整または訓練データ追加を検討");
             }
         }
-        
+
         // 速度改善提案
         if (report.PerformanceResults.Count > 0)
         {
@@ -463,7 +463,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                 suggestions.Add($"処理速度改善が必要: 平均処理時間={avgTime:F1}ms > 1000ms。並列処理またはアルゴリズム最適化を検討");
             }
         }
-        
+
         // 適応効果改善提案
         if (report.AdaptationEffectResults.Count > 0)
         {
@@ -473,7 +473,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                 suggestions.Add($"適応効果が限定的: 平均改善率={avgImprovement:F1}% < 10%。学習アルゴリズムの見直しが必要");
             }
         }
-        
+
         // OCR品質改善提案
         if (report.OcrQualityResults?.Count > 0)
         {
@@ -483,18 +483,18 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                 suggestions.Add($"OCR品質改善が必要: 平均文字精度={avgAccuracy:F3} < 0.9。前処理フィルターの追加を検討");
             }
         }
-        
+
         // 安定性改善提案
         var unstableDetectors = report.PerformanceResults
             .Where(r => r.Value.StabilityIndex > 0.3)
             .Select(r => r.Key)
             .ToList();
-        
+
         if (unstableDetectors.Count > 0)
         {
             suggestions.Add($"処理時間が不安定な検出器: {string.Join(", ", unstableDetectors)}。パラメータ固定または初期化改善を検討");
         }
-        
+
         return suggestions;
     }
 
@@ -504,10 +504,10 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     {
         if (groundTruth.Count == 0)
             return new AccuracyMeasurement { Precision = 1.0, Recall = 1.0, F1Score = 1.0 };
-        
+
         var truePositives = 0;
         var overlapThreshold = 0.5;
-        
+
         foreach (var detectedRegion in detected)
         {
             foreach (var gtRegion in groundTruth)
@@ -520,11 +520,11 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                 }
             }
         }
-        
+
         var precision = detected.Count > 0 ? (double)truePositives / detected.Count : 0;
         var recall = (double)truePositives / groundTruth.Count;
         var f1Score = precision + recall > 0 ? 2 * (precision * recall) / (precision + recall) : 0;
-        
+
         return new AccuracyMeasurement
         {
             Precision = precision,
@@ -540,7 +540,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     {
         var intersection = Rectangle.Intersect(rect1, rect2);
         if (intersection.IsEmpty) return 0.0;
-        
+
         var unionArea = rect1.Width * rect1.Height + rect2.Width * rect2.Height - intersection.Width * intersection.Height;
         return unionArea > 0 ? (double)(intersection.Width * intersection.Height) / unionArea : 0.0;
     }
@@ -549,19 +549,19 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     {
         if (string.IsNullOrEmpty(expected))
             return new TextSimilarity { SimilarityScore = 1.0, CharacterAccuracy = 1.0, WordAccuracy = 1.0 };
-        
+
         // 文字レベル精度（編集距離ベース）
         var charAccuracy = 1.0 - (double)CalculateLevenshteinDistance(recognized, expected) / Math.Max(recognized.Length, expected.Length);
-        
+
         // 単語レベル精度
         var recognizedWords = recognized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var expectedWords = expected.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var matchingWords = recognizedWords.Intersect(expectedWords).Count();
         var wordAccuracy = expectedWords.Length > 0 ? (double)matchingWords / expectedWords.Length : 1.0;
-        
+
         // 総合類似度スコア
         var similarityScore = (charAccuracy * 0.7 + wordAccuracy * 0.3);
-        
+
         return new TextSimilarity
         {
             SimilarityScore = similarityScore,
@@ -574,12 +574,12 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     {
         if (string.IsNullOrEmpty(s1)) return s2?.Length ?? 0;
         if (string.IsNullOrEmpty(s2)) return s1.Length;
-        
+
         var matrix = new int[s1.Length + 1, s2.Length + 1];
-        
+
         for (int i = 0; i <= s1.Length; i++) matrix[i, 0] = i;
         for (int j = 0; j <= s2.Length; j++) matrix[0, j] = j;
-        
+
         for (int i = 1; i <= s1.Length; i++)
         {
             for (int j = 1; j <= s2.Length; j++)
@@ -590,7 +590,7 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
                     matrix[i - 1, j - 1] + cost);
             }
         }
-        
+
         return matrix[s1.Length, s2.Length];
     }
 
@@ -604,18 +604,18 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
 
     private double CalculateOverallScore(EffectivenessReport report)
     {
-        var accuracyScore = report.DetectionAccuracyResults.Count > 0 
-            ? report.DetectionAccuracyResults.Average(r => r.Value.AverageF1Score) 
+        var accuracyScore = report.DetectionAccuracyResults.Count > 0
+            ? report.DetectionAccuracyResults.Average(r => r.Value.AverageF1Score)
             : 0.0;
-        
+
         var speedScore = report.PerformanceResults.Count > 0
             ? Math.Max(0, (2000 - report.PerformanceResults.Average(r => r.Value.AverageProcessingTimeMs)) / 2000)
             : 0.0;
-        
+
         var adaptationScore = report.AdaptationEffectResults.Count > 0
             ? Math.Max(0, report.AdaptationEffectResults.Average(r => r.Value.TimeImprovementPercent) / 50.0)
             : 0.0;
-        
+
         return accuracyScore * 0.4 + speedScore * 0.3 + adaptationScore * 0.3;
     }
 
@@ -625,13 +625,13 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
         {
             var reportDir = "effectiveness_reports";
             Directory.CreateDirectory(reportDir);
-            
+
             var fileName = $"text_detection_effectiveness_{DateTime.Now:yyyyMMdd_HHmmss}.json";
             var filePath = Path.Combine(reportDir, fileName);
-            
+
             var json = JsonSerializer.Serialize(report, ReportJsonOptions);
             await File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
-            
+
             _logger.LogInformation("効果測定レポート保存完了: {FilePath}", filePath);
         }
         catch (Exception ex)
@@ -645,10 +645,10 @@ public sealed class TextDetectionEffectivenessAnalyzer : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
         _logger.LogInformation("テキスト領域検出効果測定システムをクリーンアップ");
-        
+
         GC.SuppressFinalize(this);
     }
 }
@@ -675,12 +675,12 @@ public class EffectivenessReport
     public DateTime ExecutionTime { get; set; }
     public int TestCaseCount { get; set; }
     public int DetectorCount { get; set; }
-    
+
     public Dictionary<string, DetectionAccuracyMetrics> DetectionAccuracyResults { get; set; } = [];
     public Dictionary<string, PerformanceMetrics> PerformanceResults { get; set; } = [];
     public Dictionary<string, OcrQualityMetrics>? OcrQualityResults { get; set; }
     public Dictionary<string, AdaptationEffectMetrics> AdaptationEffectResults { get; set; } = [];
-    
+
     public ComprehensiveAnalysis ComprehensiveAnalysis { get; set; } = new();
     public List<string> ImprovementSuggestions { get; set; } = [];
 }

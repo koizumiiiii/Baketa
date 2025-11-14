@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Strategies;
 
@@ -27,9 +27,9 @@ public sealed class SingleTranslationStrategy(
     }
 
     public async Task<TranslationResult> ExecuteAsync(
-        string text, 
-        string? sourceLanguage, 
-        string? targetLanguage, 
+        string text,
+        string? sourceLanguage,
+        string? targetLanguage,
         CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("🔄 単一翻訳実行 - テキスト長: {Length}文字", text.Length);
@@ -42,7 +42,7 @@ public sealed class SingleTranslationStrategy(
             var defaultTargetLanguage = languagePair.TargetCode;
             var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
             var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
-            
+
             var request = new TranslationRequest
             {
                 SourceText = text,
@@ -61,7 +61,7 @@ public sealed class SingleTranslationStrategy(
         catch (Exception ex)
         {
             _logger.LogError(ex, "単一翻訳でエラーが発生しました");
-            
+
             return new TranslationResult(
                 OriginalText: text,
                 TranslatedText: string.Empty,
@@ -71,15 +71,15 @@ public sealed class SingleTranslationStrategy(
     }
 
     public async Task<IReadOnlyList<TranslationResult>> ExecuteBatchAsync(
-        IReadOnlyList<string> texts, 
-        string? sourceLanguage, 
-        string? targetLanguage, 
+        IReadOnlyList<string> texts,
+        string? sourceLanguage,
+        string? targetLanguage,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("🔄 単一戦略によるバッチ翻訳 - 件数: {Count}", texts.Count);
 
         var results = new List<TranslationResult>();
-        
+
         foreach (var text in texts)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -89,7 +89,7 @@ public sealed class SingleTranslationStrategy(
             results.Add(result);
         }
 
-        _logger.LogDebug("🔄 単一戦略バッチ翻訳完了 - 成功: {Success}/{Total}", 
+        _logger.LogDebug("🔄 単一戦略バッチ翻訳完了 - 成功: {Success}/{Total}",
             results.Count(r => r.Success), results.Count);
 
         return results;

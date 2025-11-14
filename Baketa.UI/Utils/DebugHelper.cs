@@ -22,10 +22,10 @@ public static class DebugHelper
     {
         var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture);
         var logMessage = $"[{timestamp}] {message}";
-        
+
         // コンソール出力
         Console.WriteLine(logMessage);
-        
+
         // ファイル出力
         try
         {
@@ -36,7 +36,7 @@ public static class DebugHelper
             // ファイル出力失敗は無視
         }
     }
-    
+
     /// <summary>
     /// 重要な情報をMessageBoxで表示
     /// </summary>

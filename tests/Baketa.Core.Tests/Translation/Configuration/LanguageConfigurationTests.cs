@@ -35,7 +35,7 @@ public class LanguageConfigurationTests
         // Assert
         Assert.NotNull(config.SupportedLanguages);
         Assert.NotEmpty(config.SupportedLanguages);
-        
+
         // 主要言語が含まれていることを確認
         Assert.Contains(config.SupportedLanguages, lang => lang.Code == "auto");
         Assert.Contains(config.SupportedLanguages, lang => lang.Code == "en");
@@ -124,8 +124,8 @@ public class LanguageConfigurationTests
     [InlineData("nonexistent", "ja", false)] // 存在しない言語
     [InlineData("en", "nonexistent", false)] // 存在しない言語
     public void IsTranslationPairSupported_ShouldReturnCorrectResult(
-        string sourceLang, 
-        string targetLang, 
+        string sourceLang,
+        string targetLang,
         bool expectedSupported)
     {
         // Arrange

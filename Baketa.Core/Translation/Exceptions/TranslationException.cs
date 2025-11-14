@@ -74,7 +74,7 @@ public class TranslationException : TranslationBaseException
     {
         ErrorType = errorType;
     }
-    
+
     /// <summary>
     /// シリアライズ用コンストラクタ
     /// </summary>
@@ -85,7 +85,7 @@ public class TranslationException : TranslationBaseException
         // シリアライズされたプロパティを取得
         ErrorType = (TranslationErrorType)info.GetInt32(nameof(ErrorType));
     }
-    
+
     /// <summary>
     /// シリアライズ時にオブジェクトデータを保存
     /// </summary>
@@ -94,9 +94,9 @@ public class TranslationException : TranslationBaseException
     public override void GetObjectData(SerializationInfo info, StreamingContext context)
     {
         ArgumentNullException.ThrowIfNull(info, nameof(info));
-            
+
         info.AddValue(nameof(ErrorType), (int)ErrorType);
-        
+
         base.GetObjectData(info, context);
     }
 }

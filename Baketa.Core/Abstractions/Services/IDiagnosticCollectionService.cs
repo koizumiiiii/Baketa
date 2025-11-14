@@ -13,22 +13,22 @@ public interface IDiagnosticCollectionService
     /// メイン処理をブロックしないようバックグラウンドで処理
     /// </summary>
     Task CollectDiagnosticAsync(PipelineDiagnosticEvent diagnosticEvent, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 現在蓄積されている診断データを即座にレポートとして生成
     /// </summary>
     Task<string> GenerateReportAsync(string reportType = "diagnostic", CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 診断データ収集を開始
     /// </summary>
     Task StartCollectionAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 診断データ収集を停止し、蓄積データをフラッシュ
     /// </summary>
     Task StopCollectionAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 診断収集サービスの動作状態
     /// </summary>

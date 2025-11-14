@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
-using System.Threading.Tasks;
 using System.IO;
+using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
@@ -39,7 +39,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
     /// <param name="logger">ロガー</param>
     /// <param name="loggingSettings">ログ設定</param>
     public WindowsGraphicsCapturer(
-        NativeWindowsCaptureWrapper nativeCapture, 
+        NativeWindowsCaptureWrapper nativeCapture,
         ILogger<WindowsGraphicsCapturer>? logger = null,
         LoggingSettings? loggingSettings = null)
     {
@@ -74,7 +74,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 if (!_nativeCapture.IsSupported())
                 {
                     _logger?.LogWarning("Windows Graphics Capture APIがサポートされていません");
-                    
+
                     try
                     {
                         var debugPath = _loggingSettings.GetFullDebugLogPath();
@@ -102,7 +102,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 if (!_nativeCapture.Initialize())
                 {
                     _logger?.LogError("Windows Graphics Captureの初期化に失敗");
-                    
+
                     try
                     {
                         var debugPath = _loggingSettings.GetFullDebugLogPath();
@@ -126,7 +126,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Windows Graphics Capture初期化中にエラーが発生");
-                
+
                 try
                 {
                     var debugPath = _loggingSettings.GetFullDebugLogPath();
@@ -186,10 +186,10 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
             // 全画面キャプチャしてから領域を切り出す方式
             // TODO: 将来的にはネイティブレベルで領域指定キャプチャを実装
             var fullScreenImage = await CaptureScreenAsync().ConfigureAwait(false);
-            
+
             // 領域切り出し処理
             var croppedImage = await CropImageAsync(fullScreenImage, region).ConfigureAwait(false);
-            
+
             _logger?.LogDebug("領域キャプチャが完了");
             return croppedImage;
         }
@@ -225,7 +225,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔧 WindowsGraphicsCapturer: 初期化開始{Environment.NewLine}");
             }
             catch { /* デバッグログ失敗は無視 */ }
-            
+
             var initSuccess = await InitializeAsync().ConfigureAwait(false);
             if (!initSuccess)
             {
@@ -237,7 +237,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 catch { /* デバッグログ失敗は無視 */ }
                 throw new InvalidOperationException("Windows Graphics Captureの初期化に失敗しました");
             }
-            
+
             try
             {
                 var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
@@ -250,7 +250,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
 
         // 🚀 P3: Windows Graphics Capture試行とフォールバック機構
         var wgcFailureReason = "";
-        
+
         try
         {
             // 🎯 P3: Primary Method - Windows Graphics Capture API試行
@@ -264,13 +264,13 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [P3_WGC_SUCCESS] Windows Graphics Capture成功 HWND=0x{windowHandle.ToInt64():X8}, サイズ={capturedImage.Width}x{capturedImage.Height}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
-                
+
                 return capturedImage;
             }
             else
             {
                 wgcFailureReason = capturedImage == null ? "Null image" : "Invalid image quality";
-                
+
                 // 🔍🔍🔍 デバッグ: WGC品質不良
                 try
                 {
@@ -284,7 +284,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
         catch (Exception wgcEx)
         {
             wgcFailureReason = $"Exception: {wgcEx.GetType().Name}: {wgcEx.Message}";
-            
+
             // 🔍🔍🔍 デバッグ: WGC例外
             try
             {
@@ -292,7 +292,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [P3_WGC_EXCEPTION] Windows Graphics Capture例外 HWND=0x{windowHandle.ToInt64():X8}, Exception={wgcEx.GetType().Name}, Message={wgcEx.Message}{Environment.NewLine}");
             }
             catch { /* デバッグログ失敗は無視 */ }
-            
+
             _logger?.LogWarning(wgcEx, "Windows Graphics Capture失敗、フォールバック検討中: 0x{WindowHandle:X8}", windowHandle.ToInt64());
         }
 
@@ -309,10 +309,10 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [P3_FALLBACK_SUCCESS] GDI/PrintWindowフォールバック成功 HWND=0x{windowHandle.ToInt64():X8}, サイズ={fallbackImage.Width}x{fallbackImage.Height}, WGCFailureReason={wgcFailureReason}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
-                
-                _logger?.LogInformation("フォールバックキャプチャ成功: WGC失敗 ({FailureReason}) → GDI成功 ({Width}x{Height})", 
+
+                _logger?.LogInformation("フォールバックキャプチャ成功: WGC失敗 ({FailureReason}) → GDI成功 ({Width}x{Height})",
                     wgcFailureReason, fallbackImage.Width, fallbackImage.Height);
-                
+
                 return fallbackImage;
             }
             else
@@ -325,7 +325,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⚠️ [P3_FALLBACK_QUALITY] GDIフォールバック品質不良 HWND=0x{windowHandle.ToInt64():X8}, Image={imageInfo}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
-                
+
                 _logger?.LogWarning("フォールバックキャプチャ品質不良: WGC失敗 ({WgcReason}) → GDI品質不良", wgcFailureReason);
             }
         }
@@ -338,7 +338,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [P3_FALLBACK_EXCEPTION] GDIフォールバック例外 HWND=0x{windowHandle.ToInt64():X8}, Exception={fallbackEx.GetType().Name}, Message={fallbackEx.Message}{Environment.NewLine}");
             }
             catch { /* デバッグログ失敗は無視 */ }
-            
+
             _logger?.LogError(fallbackEx, "フォールバックキャプチャも失敗: WGC失敗 ({WgcReason}) → GDI例外", wgcFailureReason);
         }
 
@@ -349,7 +349,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
             System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ [P3_COMPLETE_FAILURE] 全キャプチャ方式失敗 HWND=0x{windowHandle.ToInt64():X8}, WGCReason={wgcFailureReason}{Environment.NewLine}");
         }
         catch { /* デバッグログ失敗は無視 */ }
-        
+
         // 全ての方式が失敗
         var finalErrorMessage = $"ウィンドウキャプチャが全て失敗: WGC失敗 ({wgcFailureReason}) → GDI失敗";
         _logger?.LogError(finalErrorMessage + ": 0x{WindowHandle:X8}", windowHandle.ToInt64());
@@ -365,7 +365,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger?.LogDebug("ウィンドウクライアント領域キャプチャを開始: 0x{WindowHandle:X8}（Windows Graphics Capture）", 
+        _logger?.LogDebug("ウィンドウクライアント領域キャプチャを開始: 0x{WindowHandle:X8}（Windows Graphics Capture）",
             windowHandle.ToInt64());
 
         try
@@ -373,7 +373,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
             // Windows Graphics Capture APIではウィンドウ全体がキャプチャされる
             // クライアント領域のみを抽出するための処理
             var fullWindowImage = await CaptureWindowAsync(windowHandle).ConfigureAwait(false);
-            
+
             // クライアント領域の座標を取得
             var clientRect = GetClientAreaBounds(windowHandle);
             if (clientRect.IsEmpty)
@@ -384,13 +384,13 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
 
             // クライアント領域のみを切り出し
             var clientAreaImage = await CropImageAsync(fullWindowImage, clientRect).ConfigureAwait(false);
-            
+
             _logger?.LogDebug("ウィンドウクライアント領域キャプチャが完了");
             return clientAreaImage;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "ウィンドウクライアント領域キャプチャでエラーが発生: 0x{WindowHandle:X8}", 
+            _logger?.LogError(ex, "ウィンドウクライアント領域キャプチャでエラーが発生: 0x{WindowHandle:X8}",
                 windowHandle.ToInt64());
             throw;
         }
@@ -486,7 +486,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
     public void StopCurrentSession()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         try
         {
             _logger?.LogDebug("WindowsGraphicsCapturer セッション停止");
@@ -497,7 +497,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
             _logger?.LogError(ex, "WindowsGraphicsCapturer セッション停止中にエラー");
         }
     }
-    
+
     /// <summary>
     /// 🎯 P3: Windows Graphics Capture API試行（元のロジック）
     /// </summary>
@@ -509,7 +509,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
         {
             // キャプチャセッションを作成
             var sessionCreated = _nativeCapture.CreateCaptureSession(windowHandle);
-            
+
             // 🔍🔍🔍 デバッグ: セッション作成結果
             try
             {
@@ -524,7 +524,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                 }
             }
             catch { /* デバッグログ失敗は無視 */ }
-            
+
             if (!sessionCreated)
             {
                 return null; // セッション作成失敗
@@ -532,7 +532,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
 
             // キャプチャオプションに基づいてタイムアウトを設定（デフォルトは5秒）
             var timeoutMs = 5000;
-            
+
             // フレームキャプチャを実行
             var capturedImage = await _nativeCapture.CaptureFrameAsync(timeoutMs).ConfigureAwait(false);
 
@@ -602,13 +602,13 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                     // PrintWindow APIを使用してキャプチャ
                     using var bitmap = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
                     using var graphics = System.Drawing.Graphics.FromImage(bitmap);
-                    
+
                     var hdc = graphics.GetHdc();
                     try
                     {
                         // PrintWindow APIでウィンドウをキャプチャ
                         var printResult = PrintWindow(windowHandle, hdc, 0);
-                        
+
                         // 🔍🔍🔍 デバッグ: PrintWindow結果
                         try
                         {
@@ -629,7 +629,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
 
                     // BitmapをIWindowsImageに変換
                     var windowsImage = ConvertBitmapToWindowsImage(bitmap);
-                    
+
                     // 🔍🔍🔍 デバッグ: 変換結果
                     try
                     {
@@ -650,7 +650,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
                         System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 [P3_GDI_TRY] GDI処理中例外: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
                     }
                     catch { /* デバッグログ失敗は無視 */ }
-                    
+
                     _logger?.LogWarning(ex, "[P3_GDI_TRY] GDIフォールバック処理中に例外: 0x{WindowHandle:X8}", windowHandle.ToInt64());
                     return null;
                 }
@@ -727,7 +727,7 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
 
             // Bitmapのクローンを作成して所有権を分離
             var clonedBitmap = new System.Drawing.Bitmap(bitmap);
-            
+
             // WindowsImageクラスでラップ
             return new WindowsImage(clonedBitmap);
         }

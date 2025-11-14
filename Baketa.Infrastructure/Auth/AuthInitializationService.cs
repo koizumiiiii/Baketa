@@ -115,8 +115,8 @@ public sealed class AuthInitializationService(IAuthService authService, ILogger<
             };
 
             var userInfo = e.User != null ? $" (User: {e.User.Email}, ID: {e.User.Id})" : "";
-            
-            _logger.LogInformation("{StatusMessage}{UserInfo} at {Timestamp}", 
+
+            _logger.LogInformation("{StatusMessage}{UserInfo} at {Timestamp}",
                 statusMessage, userInfo, e.ChangedAt);
 
             // Additional monitoring could be added here:

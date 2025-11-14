@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Baketa.Core.Settings.Migration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
-using Baketa.Core.Settings.Migration;
 
 namespace Baketa.Core.Tests.Settings.Migration;
 
@@ -157,7 +157,7 @@ public class SettingsMigrationManagerTests
     public async Task ExecuteMigrationAsync_WithNullSettings_ShouldThrowArgumentNullException()
     {
         // Arrange & Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
             _manager.ExecuteMigrationAsync(null!, 0));
     }
 
@@ -200,7 +200,7 @@ public class SettingsMigrationManagerTests
         Assert.NotNull(migrations);
         for (int i = 1; i < migrations.Count; i++)
         {
-            Assert.True(migrations[i-1].FromVersion <= migrations[i].FromVersion);
+            Assert.True(migrations[i - 1].FromVersion <= migrations[i].FromVersion);
         }
     }
 
@@ -266,16 +266,16 @@ public class V0ToV1MigrationTests
         // Assert
         Assert.True(result.Success);
         Assert.NotNull(result.MigratedSettings);
-        
+
         // ホットキー設定が削除されていることを確認
         Assert.DoesNotContain("Hotkey.Enabled", result.MigratedSettings.Keys);
         Assert.DoesNotContain("Hotkey.ModifierKeys", result.MigratedSettings.Keys);
         Assert.DoesNotContain("Hotkey.Key", result.MigratedSettings.Keys);
-        
+
         // 他の設定は保持されていることを確認
         Assert.Contains("General.Language", result.MigratedSettings.Keys);
         Assert.Contains("OCR.Engine", result.MigratedSettings.Keys);
-        
+
         // バージョンが更新されていることを確認
         Assert.Equal(1, result.MigratedSettings["Version"]);
     }

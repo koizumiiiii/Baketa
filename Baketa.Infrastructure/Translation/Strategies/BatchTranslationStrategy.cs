@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Strategies;
 
@@ -25,14 +25,14 @@ public sealed class BatchTranslationStrategy(
     public bool CanHandle(TranslationStrategyContext context)
     {
         // 大規模バッチ処理に適用
-        return context.IsBatchRequest 
+        return context.IsBatchRequest
                && context.TextCount >= _settings.BatchThreshold;
     }
 
     public async Task<TranslationResult> ExecuteAsync(
-        string text, 
-        string? sourceLanguage, 
-        string? targetLanguage, 
+        string text,
+        string? sourceLanguage,
+        string? targetLanguage,
         CancellationToken cancellationToken = default)
     {
         // 単一要求でもバッチ処理を使用（パフォーマンス特性の一貫性のため）
@@ -49,12 +49,12 @@ public sealed class BatchTranslationStrategy(
     }
 
     public async Task<IReadOnlyList<TranslationResult>> ExecuteBatchAsync(
-        IReadOnlyList<string> texts, 
-        string? sourceLanguage, 
-        string? targetLanguage, 
+        IReadOnlyList<string> texts,
+        string? sourceLanguage,
+        string? targetLanguage,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("🚀 バッチ翻訳戦略実行 - 件数: {Count}, 閾値: {Threshold}", 
+        _logger.LogInformation("🚀 バッチ翻訳戦略実行 - 件数: {Count}, 閾値: {Threshold}",
             texts.Count, _settings.BatchThreshold);
 
         try
@@ -111,7 +111,7 @@ public sealed class BatchTranslationStrategy(
                     results.Add(result);
                 }
 
-                _logger.LogInformation("🚀 バッチ翻訳完了 - 成功: {Success}/{Total}", 
+                _logger.LogInformation("🚀 バッチ翻訳完了 - 成功: {Success}/{Total}",
                     results.Count(r => r.Success), results.Count);
 
                 return results;
