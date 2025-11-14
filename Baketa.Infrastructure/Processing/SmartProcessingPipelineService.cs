@@ -467,30 +467,31 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
     /// </summary>
     private static List<ProcessingStageType> GetExecutionOrder(ProcessingPipelineSettings settings, ProcessingPipelineOptions? options = null)
     {
+        // 🔥 [Phase 12.2] TranslationExecutionStageStrategy削除により、TranslationExecution段階も削除
         var order = new List<ProcessingStageType>
         {
             ProcessingStageType.ImageChangeDetection,
             ProcessingStageType.OcrExecution,
-            ProcessingStageType.TextChangeDetection,
-            ProcessingStageType.TranslationExecution
+            ProcessingStageType.TextChangeDetection
+            // TranslationExecution段階は削除済み（新アーキテクチャでは翻訳は別経路で実行）
         };
 
-        // UltraThink Phase 3: 個別翻訳実行時は統合翻訳をスキップ
-        if (options?.SkipIntegratedTranslation == true)
-        {
-            order.Remove(ProcessingStageType.TranslationExecution);
-        }
+        // UltraThink Phase 3: 個別翻訳実行時は統合翻訳をスキップ（削除済みのため不要）
+        // if (options?.SkipIntegratedTranslation == true)
+        // {
+        //     order.Remove(ProcessingStageType.TranslationExecution);
+        // }
 
         // 設定により段階順序をカスタマイズ可能
         if (settings.CustomStageOrder?.Count > 0)
         {
             var customOrder = settings.CustomStageOrder.ToList();
 
-            // カスタム順序でも個別翻訳時は統合翻訳をスキップ
-            if (options?.SkipIntegratedTranslation == true)
-            {
-                customOrder.Remove(ProcessingStageType.TranslationExecution);
-            }
+            // カスタム順序でも個別翻訳時は統合翻訳をスキップ（削除済みのため不要）
+            // if (options?.SkipIntegratedTranslation == true)
+            // {
+            //     customOrder.Remove(ProcessingStageType.TranslationExecution);
+            // }
 
             return customOrder;
         }
