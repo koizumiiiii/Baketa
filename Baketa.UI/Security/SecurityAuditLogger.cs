@@ -17,7 +17,7 @@ namespace Baketa.UI.Security;
 public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
 {
     private readonly ILogger<SecurityAuditLogger> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    
+
     // JsonSerializerOptionsのキャッシュ（パフォーマンス最適化）
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -135,7 +135,7 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     public void LogLoginAttempt(string email, bool success, string? failureReason = null, string? ipAddress = null)
     {
         var eventType = success ? SecurityEventType.LoginSuccess : SecurityEventType.LoginFailure;
-        var details = success 
+        var details = success
             ? $"ログイン成功: {email}"
             : $"ログイン失敗: {email} - {failureReason}";
 
@@ -152,7 +152,7 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     public void LogAccountLockout(string email, int attemptCount, TimeSpan lockoutDuration, string? ipAddress = null)
     {
         var details = $"アカウントロックアウト: {email} - 試行回数: {attemptCount}, ロックアウト期間: {lockoutDuration.TotalMinutes}分";
-        
+
         LogSecurityEvent(SecurityEventType.AccountLockout, details, email, ipAddress, new
         {
             AttemptCount = attemptCount,
@@ -171,7 +171,7 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     public void LogSuspiciousActivity(string activity, string? userInfo = null, string? ipAddress = null, int riskLevel = 5)
     {
         var details = $"疑わしい活動 (リスクレベル: {riskLevel}): {activity}";
-        
+
         LogSecurityEvent(SecurityEventType.SuspiciousActivity, details, userInfo, ipAddress, new
         {
             Activity = activity,
@@ -189,7 +189,7 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     /// <param name="ipAddress">IPアドレス</param>
     public void LogPasswordChange(string email, bool success, string initiatedBy = "User", string? ipAddress = null)
     {
-        var details = success 
+        var details = success
             ? $"パスワード変更成功: {email} (実行者: {initiatedBy})"
             : $"パスワード変更失敗: {email} (実行者: {initiatedBy})";
 
@@ -211,7 +211,7 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     public void LogDataAccess(string resource, string action, string? userInfo = null, bool success = true, string? ipAddress = null)
     {
         var details = $"データアクセス: {action} on {resource} - {(success ? "成功" : "失敗")}";
-        
+
         LogSecurityEvent(SecurityEventType.DataAccess, details, userInfo, ipAddress, new
         {
             Resource = resource,
@@ -229,7 +229,7 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     public void LogSessionExpired(string? userInfo, TimeSpan sessionDuration, string reason = "Timeout")
     {
         var details = $"セッション期限切れ: {userInfo} - 期間: {sessionDuration.TotalMinutes:F1}分, 理由: {reason}";
-        
+
         LogSecurityEvent(SecurityEventType.SessionExpired, details, userInfo, additionalData: new
         {
             SessionDuration = sessionDuration,
@@ -263,16 +263,16 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
         {
             var hostname = Dns.GetHostName();
             var addresses = Dns.GetHostAddresses(hostname);
-            
+
             foreach (var addr in addresses)
             {
-                if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && 
+                if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
                     !IPAddress.IsLoopback(addr))
                 {
                     return addr.ToString();
                 }
             }
-            
+
             return "127.0.0.1";
         }
         catch

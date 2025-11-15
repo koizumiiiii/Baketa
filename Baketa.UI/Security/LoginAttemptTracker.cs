@@ -42,10 +42,10 @@ public sealed class LoginAttemptTracker : IDisposable
     public LoginAttemptTracker(ILogger<LoginAttemptTracker>? logger = null)
     {
         _logger = logger;
-        
+
         // 定期的なクリーンアップタイマー
-        _cleanupTimer = new Timer(CleanupExpiredAttempts, null, 
-            TimeSpan.FromMinutes(CleanupIntervalMinutes), 
+        _cleanupTimer = new Timer(CleanupExpiredAttempts, null,
+            TimeSpan.FromMinutes(CleanupIntervalMinutes),
             TimeSpan.FromMinutes(CleanupIntervalMinutes));
     }
 
@@ -57,12 +57,12 @@ public sealed class LoginAttemptTracker : IDisposable
     public bool IsBlocked(string email)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrWhiteSpace(email))
             return false;
 
         var normalizedEmail = email.ToLowerInvariant().Trim();
-        
+
         if (!_attempts.TryGetValue(normalizedEmail, out var attemptInfo))
             return false;
 
@@ -86,7 +86,7 @@ public sealed class LoginAttemptTracker : IDisposable
     public void RecordFailedAttempt(string email)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrWhiteSpace(email))
             return;
 
@@ -118,7 +118,7 @@ public sealed class LoginAttemptTracker : IDisposable
     public void RecordSuccessfulLogin(string email)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrWhiteSpace(email))
             return;
 
@@ -134,12 +134,12 @@ public sealed class LoginAttemptTracker : IDisposable
     public TimeSpan? GetRemainingLockoutTime(string email)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrWhiteSpace(email))
             return null;
 
         var normalizedEmail = email.ToLowerInvariant().Trim();
-        
+
         if (!_attempts.TryGetValue(normalizedEmail, out var attemptInfo))
             return null;
 
@@ -160,13 +160,13 @@ public sealed class LoginAttemptTracker : IDisposable
     public void ResetAttempts(string email)
     {
         ThrowIfDisposed();
-        
+
         if (string.IsNullOrWhiteSpace(email))
             return;
 
         var normalizedEmail = email.ToLowerInvariant().Trim();
         _attempts.TryRemove(normalizedEmail, out _);
-        
+
         _logger?.LogInformation("手動でログイン試行回数をリセット: {Email}", normalizedEmail);
     }
 
@@ -177,7 +177,7 @@ public sealed class LoginAttemptTracker : IDisposable
     public LoginAttemptStats GetStats()
     {
         ThrowIfDisposed();
-        
+
         int totalTrackedEmails = _attempts.Count;
         int currentlyBlocked = 0;
 
@@ -185,7 +185,7 @@ public sealed class LoginAttemptTracker : IDisposable
         {
             var timeSinceLastAttempt = DateTime.UtcNow - kvp.Value.LastAttempt;
             var lockoutDuration = CalculateLockoutDuration(kvp.Value.Attempts);
-            
+
             if (kvp.Value.Attempts >= MaxAttempts && timeSinceLastAttempt < lockoutDuration)
             {
                 currentlyBlocked++;

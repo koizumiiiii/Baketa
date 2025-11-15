@@ -32,13 +32,13 @@ public class OcrResult(string text, Rectangle bounds, float confidence)
     /// 結果が有効かどうか
     /// </summary>
     public bool IsValid => !string.IsNullOrWhiteSpace(Text) && Confidence > 0.0f;
-    
+
     /// <summary>
     /// 文字列表現
     /// </summary>
     /// <returns>テキスト内容</returns>
     public override string ToString() => Text;
-    
+
     /// <summary>
     /// OcrTextRegionから変換
     /// </summary>
@@ -47,14 +47,14 @@ public class OcrResult(string text, Rectangle bounds, float confidence)
     public static OcrResult FromTextRegion(Baketa.Core.Abstractions.OCR.OcrTextRegion textRegion)
     {
         ArgumentNullException.ThrowIfNull(textRegion);
-            
+
         return new OcrResult(
             textRegion.Text,
             textRegion.Bounds,
             (float)textRegion.Confidence
         );
     }
-    
+
     /// <summary>
     /// OcrTextRegionに変換
     /// </summary>
@@ -91,8 +91,8 @@ public class OcrPerformanceInfo(
     /// <summary>
     /// 秒間処理ピクセル数
     /// </summary>
-    public double PixelsPerSecond => ProcessingTime.TotalSeconds > 0 
-        ? ProcessedPixels / ProcessingTime.TotalSeconds 
+    public double PixelsPerSecond => ProcessingTime.TotalSeconds > 0
+        ? ProcessedPixels / ProcessingTime.TotalSeconds
         : 0.0;
 
     /// <summary>

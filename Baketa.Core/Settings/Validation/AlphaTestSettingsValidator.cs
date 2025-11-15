@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Settings.Validation.Rules;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Settings.Validation;
 
@@ -32,23 +32,23 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     public SettingsValidationResult Validate(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         var results = new List<SettingValidationResult>();
         var context = new ValidationContext(settings, string.Empty, string.Empty, mode: ValidationMode.AlphaTest);
-        
+
         var startTime = DateTime.Now;
-        
+
         try
         {
             // グローバルルールの適用
             ApplyGlobalRules(settings, results, context);
-            
+
             // αテスト対象カテゴリの検証
             ValidateAlphaTestCategories(settings, results, context);
-            
+
             var elapsed = (DateTime.Now - startTime).Milliseconds;
             _logger?.LogDebug("設定検証完了: {ResultCount}件の結果, {ElapsedMs}ms", results.Count, elapsed);
-            
+
             return new SettingsValidationResult(results, validationTimeMs: elapsed);
         }
         catch (Exception ex)
@@ -63,11 +63,11 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     {
         ArgumentException.ThrowIfNullOrEmpty(category);
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         var results = new List<SettingValidationResult>();
         var dummySettings = CreateDummySettings(category, settings);
         var context = new ValidationContext(dummySettings, category, category, mode: ValidationMode.AlphaTest);
-        
+
         try
         {
             ValidateCategory(category, settings, results, context);
@@ -84,17 +84,17 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     public void AddRule(IValidationRule rule)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        
+
         var path = rule.PropertyPath;
         if (!_globalRules.TryGetValue(path, out var rules))
         {
             rules = [];
             _globalRules[path] = rules;
         }
-        
+
         rules.Add(rule);
         SortRules(rules);
-        
+
         _logger?.LogDebug("グローバル検証ルールを追加: {Path}", path);
     }
 
@@ -103,23 +103,23 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     {
         ArgumentException.ThrowIfNullOrEmpty(category);
         ArgumentNullException.ThrowIfNull(rule);
-        
+
         if (!_categoryRules.TryGetValue(category, out var categoryRuleDict))
         {
             categoryRuleDict = [];
             _categoryRules[category] = categoryRuleDict;
         }
-        
+
         var path = rule.PropertyPath;
         if (!categoryRuleDict.TryGetValue(path, out var rules))
         {
             rules = [];
             categoryRuleDict[path] = rules;
         }
-        
+
         rules.Add(rule);
         SortRules(rules);
-        
+
         _logger?.LogDebug("カテゴリ検証ルールを追加: {Category}.{Path}", category, path);
     }
 
@@ -133,12 +133,12 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     public IReadOnlyList<IValidationRule> GetRules(string category)
     {
         ArgumentException.ThrowIfNullOrEmpty(category);
-        
+
         if (_categoryRules.TryGetValue(category, out var categoryRules))
         {
             return [.. categoryRules.Values.SelectMany(rules => rules)];
         }
-        
+
         return [];
     }
 
@@ -152,21 +152,21 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
         // 翻訳設定のルール
         AddRule("Translation", new AlphaTestTranslationEngineRule());
         AddRule("Translation", new AlphaTestLanguagePairRule());
-        
+
         // UI設定のルール
         AddRule("MainUi", new AlphaTestPanelSizeRule());
         // 透明度設定は削除済み（固定値0.9を使用）
-        
+
         // キャプチャ設定のルール
         AddRule("Capture", new AlphaTestCaptureIntervalRule());
-        
+
         // テスト用にグローバルルールとしても追加
         AddRule(new AlphaTestTranslationEngineRule());
         AddRule(new AlphaTestLanguagePairRule());
         AddRule(new AlphaTestPanelSizeRule());
         // AddRule(new AlphaTestOpacityRule()); // 透明度設定は削除済み
         AddRule(new AlphaTestCaptureIntervalRule());
-        
+
         _logger?.LogInformation("αテスト用デフォルト検証ルールを登録しました");
     }
 
@@ -277,10 +277,10 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
         foreach (var part in parts)
         {
             if (current == null) return null;
-            
+
             var property = current.GetType().GetProperty(part);
             if (property == null) return null;
-            
+
             current = property.GetValue(current);
         }
 
@@ -293,11 +293,11 @@ public sealed class AlphaTestSettingsValidator : ISettingsValidator
     private static AppSettings CreateDummySettings<T>(string category, T settings) where T : class
     {
         var dummySettings = new AppSettings();
-        
+
         // カテゴリに応じて適切なプロパティに設定を割り当て
         var property = typeof(AppSettings).GetProperty(category);
         property?.SetValue(dummySettings, settings);
-        
+
         return dummySettings;
     }
 

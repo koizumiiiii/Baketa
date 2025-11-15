@@ -6,14 +6,14 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using ReactiveUI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -174,7 +174,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         ArgumentNullException.ThrowIfNull(exportImportService);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
-        
+
         EngineSelection = engineSelection;
         LanguagePairSelection = languagePairSelection;
         TranslationStrategy = translationStrategy;
@@ -206,10 +206,10 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         ResetCommand = ReactiveCommand.CreateFromTask(ResetSettingsAsync, canExecute);
         ExportCommand = ReactiveCommand.CreateFromTask(ExportSettingsAsync, canExecute);
         ImportCommand = ReactiveCommand.CreateFromTask(ImportSettingsAsync, canExecute);
-        
+
         var canDiscard = this.WhenAnyValue(x => x.HasChanges);
         DiscardChangesCommand = ReactiveCommand.CreateFromTask(DiscardChangesAsync, canDiscard);
-        
+
         ShowHelpCommand = ReactiveCommand.Create(ShowHelp);
 
         // ViewModel活性化時の処理
@@ -472,16 +472,16 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
 
             // ファイルにエクスポート
             await _exportImportService.ExportSettingsAsync(
-                exportableSettings, 
+                exportableSettings,
                 filePath,
                 "手動エクスポート").ConfigureAwait(false);
 
             StatusMessage = "エクスポート完了";
-            
+
             await _notificationService.ShowSuccessAsync(
                 "エクスポート完了",
                 $"翻訳設定を正常にエクスポートしました。\nファイル: {Path.GetFileName(filePath)}").ConfigureAwait(false);
-                
+
             _logger.LogInformation("Settings export completed: {FilePath}", filePath);
         }
         catch (InvalidOperationException ex)
@@ -496,7 +496,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         {
             _logger.LogError(ex, "Unexpected error when exporting settings");
             StatusMessage = "予期しないエラー";
-            
+
             await _notificationService.ShowErrorAsync(
                 "エクスポートエラー",
                 $"設定のエクスポートに失敗しました: {ex.Message}").ConfigureAwait(false);
@@ -535,7 +535,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
 
             // ファイルからインポート
             var importResult = await _exportImportService.ImportSettingsAsync(filePath).ConfigureAwait(false);
-            
+
             if (!importResult.Success)
             {
                 StatusMessage = "インポートに失敗しました";
@@ -573,11 +573,11 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
 
             HasChanges = true;
             StatusMessage = "インポート完了";
-            
+
             await _notificationService.ShowSuccessAsync(
                 "インポート完了",
                 $"翻訳設定を正常にインポートしました。\nファイル: {Path.GetFileName(filePath)}").ConfigureAwait(false);
-                
+
             _logger.LogInformation("Settings import completed: {FilePath}", filePath);
         }
         catch (FileNotFoundException ex)
@@ -628,7 +628,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
             if (!result) return;
 
             await LoadSettingsAsync().ConfigureAwait(false);
-            
+
             await _notificationService.ShowInfoAsync(
                 "変更破棄",
                 "変更を破棄し、保存済み設定に戻しました。").ConfigureAwait(false);
@@ -656,7 +656,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
     /// </summary>
     private void ShowHelp()
     {
-        var helpText = 
+        var helpText =
             "【翻訳設定ヘルプ】\n\n" +
             "🔧 エンジン選択:\n" +
             "• LocalOnly: 高速・無料・オフライン対応\n" +
@@ -723,7 +723,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
             {
                 // 言語ペア変更時の翻訳戦略連携
                 TranslationStrategy.CurrentLanguagePair = languagePair.LanguagePairKey;
-                
+
                 _logger.LogDebug("Language pair integration updated: {Pair}", languagePair.LanguagePairKey);
             });
     }
@@ -749,13 +749,13 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
     private SettingsValidationResult ValidateCurrentSettings()
     {
         // 基本的な妥当性チェック
-        if (EngineSelection.SelectedEngine == TranslationEngine.CloudOnly && 
+        if (EngineSelection.SelectedEngine == TranslationEngine.CloudOnly &&
             !EngineSelection.IsCloudOnlyEnabled)
         {
             return new SettingsValidationResult(false, "CloudOnlyエンジンが選択されていますが、プレミアムプランが必要です。");
         }
 
-        if (TranslationStrategy.SelectedStrategy == Models.TranslationStrategy.TwoStage && 
+        if (TranslationStrategy.SelectedStrategy == Models.TranslationStrategy.TwoStage &&
             !TranslationStrategy.IsTwoStageAvailable)
         {
             return new SettingsValidationResult(false, "2段階翻訳が選択されていますが、現在の言語ペアでは利用できません。");
@@ -823,7 +823,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
             {
                 var languagePair = LanguagePairSelection.LanguagePairs
                     .FirstOrDefault(p => p.LanguagePairKey.Equals(settings.SelectedLanguagePair, StringComparison.OrdinalIgnoreCase));
-                
+
                 if (languagePair != null)
                 {
                     LanguagePairSelection.SelectedLanguagePair = languagePair;
@@ -869,7 +869,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         {
             var languagePair = LanguagePairSelection.SelectedLanguagePair?.LanguagePairKey ?? "ja-en";
             var chineseVariant = LanguagePairSelection.SelectedChineseVariant;
-            
+
             await _settingsFileManager.SaveLanguagePairSettingsAsync(languagePair, chineseVariant).ConfigureAwait(false);
             _logger.LogDebug("言語ペア設定を保存しました: {LanguagePair}, {ChineseVariant}", languagePair, chineseVariant);
         }
@@ -885,10 +885,10 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         try
         {
             await _settingsFileManager.SaveStrategySettingsAsync(
-                TranslationStrategy.SelectedStrategy, 
+                TranslationStrategy.SelectedStrategy,
                 TranslationStrategy.EnableFallback).ConfigureAwait(false);
-                
-            _logger.LogDebug("翻訳戦略設定を保存しました: {Strategy}, Fallback: {EnableFallback}", 
+
+            _logger.LogDebug("翻訳戦略設定を保存しました: {Strategy}, Fallback: {EnableFallback}",
                 TranslationStrategy.SelectedStrategy, TranslationStrategy.EnableFallback);
         }
         catch (Exception ex)
@@ -904,7 +904,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         {
             var engine = await _settingsFileManager.LoadEngineSettingsAsync().ConfigureAwait(false);
             EngineSelection.SelectedEngine = engine;
-            
+
             _logger.LogDebug("エンジン設定を読み込みました: {Engine}", engine);
         }
         catch (Exception ex)
@@ -919,18 +919,18 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         try
         {
             var (languagePair, chineseVariant) = await _settingsFileManager.LoadLanguagePairSettingsAsync().ConfigureAwait(false);
-            
+
             // 言語ペアを検索して設定
             var selectedPair = LanguagePairSelection.LanguagePairs
                 .FirstOrDefault(p => p.LanguagePairKey == languagePair);
-            
+
             if (selectedPair != null)
             {
                 LanguagePairSelection.SelectedLanguagePair = selectedPair;
             }
-            
+
             LanguagePairSelection.SelectedChineseVariant = chineseVariant;
-            
+
             _logger.LogDebug("言語ペア設定を読み込みました: {LanguagePair}, {ChineseVariant}", languagePair, chineseVariant);
         }
         catch (Exception ex)
@@ -945,10 +945,10 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         try
         {
             var (strategy, enableFallback) = await _settingsFileManager.LoadStrategySettingsAsync().ConfigureAwait(false);
-            
+
             TranslationStrategy.SelectedStrategy = strategy;
             TranslationStrategy.EnableFallback = enableFallback;
-            
+
             _logger.LogDebug("翻訳戦略設定を読み込みました: {Strategy}, Fallback: {EnableFallback}", strategy, enableFallback);
         }
         catch (Exception ex)

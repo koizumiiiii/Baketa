@@ -1,7 +1,8 @@
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Infrastructure.Translation.Metrics;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Strategies;
 
@@ -15,6 +16,7 @@ public sealed class HybridTranslationStrategy : IDisposable
     private readonly IReadOnlyList<ITranslationStrategy> _strategies;
     private readonly ILogger<HybridTranslationStrategy> _logger;
     private readonly TranslationMetricsCollector _metricsCollector;
+    private readonly IPerformanceMetricsCollector? _integratedMetricsCollector; // Phase 4.1 統合メトリクス
     private readonly HybridStrategySettings _settings;
     private bool _disposed;
 
@@ -22,14 +24,18 @@ public sealed class HybridTranslationStrategy : IDisposable
         IEnumerable<ITranslationStrategy> strategies,
         TranslationMetricsCollector metricsCollector,
         HybridStrategySettings settings,
-        ILogger<HybridTranslationStrategy> logger)
+        ILogger<HybridTranslationStrategy> logger,
+        IPerformanceMetricsCollector? integratedMetricsCollector = null)
     {
-        _strategies = strategies.OrderByDescending(s => s.Priority).ToList();
+        _strategies = [.. strategies.OrderByDescending(s => s.Priority)];
         _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
+        _integratedMetricsCollector = integratedMetricsCollector;
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
-        _logger.LogInformation("🚀 HybridTranslationStrategy初期化 - 戦略数: {StrategyCount}", _strategies.Count);
+
+        var metricsStatus = _integratedMetricsCollector != null ? "Phase 4.1統合メトリクス有効" : "従来メトリクスのみ";
+        _logger.LogInformation("🚀 HybridTranslationStrategy初期化 - 戦略数: {StrategyCount}, メトリクス: {MetricsStatus}",
+            _strategies.Count, metricsStatus);
     }
 
     /// <summary>
@@ -48,19 +54,19 @@ public sealed class HybridTranslationStrategy : IDisposable
 
         var stopwatch = Stopwatch.StartNew();
         var context = CreateContext(text);
-        
+
         try
         {
             var strategy = SelectStrategy(context);
-            _logger.LogDebug("選択された戦略: {StrategyType} (テキスト長: {Length}文字)", 
+            _logger.LogDebug("選択された戦略: {StrategyType} (テキスト長: {Length}文字)",
                 strategy.GetType().Name, text.Length);
 
             var result = await strategy.ExecuteAsync(
                 text, sourceLanguage, targetLanguage, cancellationToken);
 
             stopwatch.Stop();
-            
-            // メトリクス記録
+
+            // 従来メトリクス記録
             _metricsCollector.RecordTranslation(new TranslationMetrics
             {
                 Strategy = strategy.GetType().Name,
@@ -70,19 +76,33 @@ public sealed class HybridTranslationStrategy : IDisposable
                 Timestamp = DateTime.UtcNow
             });
 
+            // Phase 4.1 統合メトリクス記録
+            _integratedMetricsCollector?.RecordTranslationMetrics(new TranslationPerformanceMetrics
+            {
+                Engine = strategy.GetType().Name,
+                InputTextLength = text.Length,
+                OutputTextLength = result.Success ? result.TranslatedText.Length : 0,
+                TranslationDuration = stopwatch.Elapsed,
+                TotalDuration = stopwatch.Elapsed,
+                MemoryUsageMB = GC.GetTotalMemory(false) / 1024 / 1024,
+                GpuUtilization = 0.0, // TODO: 実際のGPU使用率取得
+                IsSuccess = result.Success,
+                Timestamp = DateTime.UtcNow
+            });
+
             return result with { ProcessingTime = stopwatch.Elapsed };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "翻訳処理中にエラーが発生しました");
             stopwatch.Stop();
-            
+
             _metricsCollector.RecordError(ex, context);
-            
+
             return new TranslationResult(
-                text, 
-                string.Empty, 
-                false, 
+                text,
+                string.Empty,
+                false,
                 $"翻訳エラー: {ex.Message}",
                 stopwatch.Elapsed);
         }
@@ -99,12 +119,12 @@ public sealed class HybridTranslationStrategy : IDisposable
     {
         if (texts == null || texts.Count == 0)
         {
-            return Array.Empty<TranslationResult>();
+            return [];
         }
 
         var stopwatch = Stopwatch.StartNew();
         var context = CreateBatchContext(texts);
-        
+
         try
         {
             var strategy = SelectStrategy(context);
@@ -115,8 +135,8 @@ public sealed class HybridTranslationStrategy : IDisposable
                 texts, sourceLanguage, targetLanguage, cancellationToken);
 
             stopwatch.Stop();
-            
-            // バッチメトリクス記録
+
+            // 従来バッチメトリクス記録
             _metricsCollector.RecordBatchTranslation(new BatchTranslationMetrics
             {
                 Strategy = strategy.GetType().Name,
@@ -128,22 +148,40 @@ public sealed class HybridTranslationStrategy : IDisposable
                 Timestamp = DateTime.UtcNow
             });
 
+            // Phase 4.1 統合メトリクス記録（バッチを個別メトリクスとして記録）
+            if (_integratedMetricsCollector != null)
+            {
+                var totalOutputLength = results.Where(r => r.Success).Sum(r => r.TranslatedText.Length);
+                _integratedMetricsCollector.RecordTranslationMetrics(new TranslationPerformanceMetrics
+                {
+                    Engine = $"{strategy.GetType().Name}_Batch",
+                    InputTextLength = context.TotalCharacterCount,
+                    OutputTextLength = totalOutputLength,
+                    TranslationDuration = stopwatch.Elapsed,
+                    TotalDuration = stopwatch.Elapsed,
+                    MemoryUsageMB = GC.GetTotalMemory(false) / 1024 / 1024,
+                    GpuUtilization = 0.0, // TODO: 実際のGPU使用率取得
+                    IsSuccess = results.All(r => r.Success),
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+
             return results;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "バッチ翻訳処理中にエラーが発生しました");
             stopwatch.Stop();
-            
+
             _metricsCollector.RecordError(ex, context);
-            
+
             // 全件エラーとして返す
-            return texts.Select(t => new TranslationResult(
+            return [..texts.Select(t => new TranslationResult(
                 t,
                 string.Empty,
                 false,
                 $"バッチ翻訳エラー: {ex.Message}",
-                stopwatch.Elapsed)).ToList();
+                stopwatch.Elapsed))];
         }
     }
 
@@ -163,9 +201,9 @@ public sealed class HybridTranslationStrategy : IDisposable
         }
 
         // フォールバック：最も優先度の低い戦略を使用
-        var fallback = _strategies.LastOrDefault() 
+        var fallback = _strategies.LastOrDefault()
             ?? throw new InvalidOperationException("利用可能な翻訳戦略がありません");
-            
+
         _logger.LogWarning("フォールバック戦略を使用: {StrategyType}", fallback.GetType().Name);
         return fallback;
     }
@@ -189,7 +227,7 @@ public sealed class HybridTranslationStrategy : IDisposable
     {
         var totalChars = texts.Sum(t => t?.Length ?? 0);
         var avgLength = texts.Count > 0 ? (double)totalChars / texts.Count : 0;
-        
+
         return new TranslationStrategyContext(
             TextCount: texts.Count,
             TotalCharacterCount: totalChars,
@@ -200,14 +238,14 @@ public sealed class HybridTranslationStrategy : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         foreach (var strategy in _strategies.OfType<IDisposable>())
         {
             strategy.Dispose();
         }
-        
+
         _metricsCollector?.Dispose();
-        
+
         _disposed = true;
     }
 }
@@ -221,17 +259,17 @@ public class HybridStrategySettings
     /// バッチ処理閾値（これ以上の件数でバッチ戦略を使用）
     /// </summary>
     public int BatchThreshold { get; set; } = 5;
-    
+
     /// <summary>
     /// 並列処理閾値（これ以上の件数で並列戦略を使用）
     /// </summary>
     public int ParallelThreshold { get; set; } = 2;
-    
+
     /// <summary>
     /// 最大並列度
     /// </summary>
     public int MaxDegreeOfParallelism { get; set; } = 4;
-    
+
     /// <summary>
     /// メトリクス有効化
     /// </summary>

@@ -10,21 +10,21 @@ public interface ITranslationStrategy
     /// この戦略が指定されたリクエストを処理できるかを判定
     /// </summary>
     bool CanHandle(TranslationStrategyContext context);
-    
+
     /// <summary>
     /// 戦略の優先度（高い値が優先される）
     /// </summary>
     int Priority { get; }
-    
+
     /// <summary>
     /// 翻訳を実行
     /// </summary>
     Task<TranslationResult> ExecuteAsync(
-        string text, 
-        string? sourceLanguage, 
+        string text,
+        string? sourceLanguage,
         string? targetLanguage,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// バッチ翻訳を実行
     /// </summary>

@@ -1,10 +1,10 @@
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Management;
-using Microsoft.Win32;
 using Baketa.Core.Abstractions.GPU;
+using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 
 namespace Baketa.Infrastructure.Platform.Windows.GPU;
 
@@ -34,10 +34,10 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _gpuDeviceManager = gpuDeviceManager ?? throw new ArgumentNullException(nameof(gpuDeviceManager));
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
-        
+
         // TDR監視タイマー（5秒間隔）
         _tdrMonitorTimer = new Timer(TdrMonitorCallback, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
-        
+
         _logger.LogInformation("🛡️ WindowsTdrRecoveryManager初期化完了 - TDR監視開始");
     }
 
@@ -47,7 +47,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         {
             _monitoringCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _logger.LogInformation("🔍 TDR監視開始");
-            
+
             while (!_monitoringCts.Token.IsCancellationRequested)
             {
                 await MonitorTdrEventsAsync(_monitoringCts.Token).ConfigureAwait(false);
@@ -77,16 +77,16 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         try
         {
             _logger.LogDebug("🔍 TDR状態取得: {PnpDeviceId}", pnpDeviceId);
-            
+
             // キャッシュから取得を試行
             if (_tdrStatusCache.TryGetValue(pnpDeviceId, out var cachedStatus))
             {
                 return cachedStatus;
             }
-            
+
             var status = await GetTdrStatusInternal(pnpDeviceId, cancellationToken).ConfigureAwait(false);
             _tdrStatusCache.TryAdd(pnpDeviceId, status);
-            
+
             return status;
         }
         catch (Exception ex)
@@ -106,35 +106,35 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         try
         {
             _logger.LogDebug("🛡️ TDR予防処理開始: {ModelPath}", sessionInfo.ModelPath);
-            
+
             var strategies = new List<TdrPreventionStrategy>();
             var effectiveness = 0.0;
-            
+
             // TDRリスク評価（PnpDeviceIdがないので固定GPU使用）
             var tdrStatus = await GetTdrStatusAsync("default", cancellationToken).ConfigureAwait(false);
-            
+
             if (tdrStatus.RiskLevel >= TdrRiskLevel.Medium)
             {
                 // 高リスク時の予防戦略
                 strategies.AddRange(await GetHighRiskPreventionStrategies(sessionInfo, cancellationToken).ConfigureAwait(false));
                 effectiveness += 0.7;
             }
-            
+
             if (sessionInfo.EstimatedMemoryUsageMB > 4096) // 4GB以上
             {
                 strategies.Add(TdrPreventionStrategy.LimitMemoryUsage);
                 effectiveness += 0.3;
             }
-            
+
             if (sessionInfo.InitializationTimeMs > 5000) // 5秒以上の初期化時間
             {
                 strategies.Add(TdrPreventionStrategy.ReduceBatchSize);
                 effectiveness += 0.4;
             }
-            
+
             // 予防戦略を実行
             await ExecutePreventionStrategies(strategies, sessionInfo, cancellationToken).ConfigureAwait(false);
-            
+
             var result = new TdrPreventionResult
             {
                 PreventionExecuted = strategies.Count > 0,
@@ -142,10 +142,10 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
                 EstimatedEffectiveness = Math.Min(effectiveness, 1.0),
                 PreventionMessage = $"{strategies.Count}個の予防戦略を実行しました"
             };
-            
+
             _logger.LogInformation("✅ TDR予防処理完了: {ModelPath} - 戦略数: {Count}, 効果: {Effectiveness:P1}",
                 sessionInfo.ModelPath, strategies.Count, result.EstimatedEffectiveness);
-            
+
             return result;
         }
         catch (Exception ex)
@@ -172,12 +172,12 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _monitoringCts?.Cancel();
         _monitoringCts?.Dispose();
         _tdrMonitorTimer?.Dispose();
         _disposed = true;
-        
+
         _logger.LogInformation("🧹 WindowsTdrRecoveryManager リソース解放完了");
     }
 
@@ -187,10 +187,10 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         {
             // Windows イベントログからTDR関連イベントを監視
             await CheckWindowsEventLogForTdr(cancellationToken).ConfigureAwait(false);
-            
+
             // レジストリからTDR情報を取得
             await CheckRegistryForTdrInfo(cancellationToken).ConfigureAwait(false);
-            
+
             // アクティブセッションの健全性チェック
             await CheckActiveSessionHealth(cancellationToken).ConfigureAwait(false);
         }
@@ -204,17 +204,17 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
     {
         var stopwatch = Stopwatch.StartNew();
         _logger.LogWarning("🚨 TDR回復開始: {PnpDeviceId} - 原因: {Cause}", tdrContext.PnpDeviceId, tdrContext.EstimatedCause);
-        
+
         try
         {
             // 回復戦略を決定
             var strategy = DetermineRecoveryStrategy(tdrContext);
-            
+
             // 回復戦略を実行
             var success = ExecuteRecoveryStrategy(strategy, tdrContext, cancellationToken);
-            
+
             stopwatch.Stop();
-            
+
             // 履歴に追加
             var historyEntry = new TdrHistoryEntry
             {
@@ -226,13 +226,13 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
                 RecoveryDuration = stopwatch.Elapsed
             };
             _tdrHistory.Enqueue(historyEntry);
-            
+
             // 履歴サイズ制限（最新100件まで）
             while (_tdrHistory.Count > 100)
             {
                 _tdrHistory.TryDequeue(out _);
             }
-            
+
             var result = new TdrRecoveryResult
             {
                 IsSuccessful = success,
@@ -241,17 +241,17 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
                 RecommendedActions = GenerateRecommendedActions(tdrContext, strategy, success),
                 RecoveryMessage = $"TDR回復処理 {(success ? "成功" : "失敗")} - 戦略: {strategy}"
             };
-            
+
             _logger.LogInformation("✅ TDR回復完了: {PnpDeviceId} - 成功: {Success}, 時間: {Duration}ms",
                 tdrContext.PnpDeviceId, success, stopwatch.ElapsedMilliseconds);
-            
+
             return result;
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             _logger.LogError(ex, "❌ TDR回復処理中にエラー: {PnpDeviceId}", tdrContext.PnpDeviceId);
-            
+
             return new TdrRecoveryResult
             {
                 IsSuccessful = false,
@@ -267,10 +267,10 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         // Windows レジストリからTDR情報を取得
         var tdrCount = await GetTdrCountFromRegistry(pnpDeviceId, cancellationToken).ConfigureAwait(false);
         var lastTdrTime = await GetLastTdrTimeFromEventLog(pnpDeviceId, cancellationToken).ConfigureAwait(false);
-        
+
         // リスクレベル計算
         var riskLevel = CalculateTdrRiskLevel(tdrCount, lastTdrTime);
-        
+
         return new TdrStatus
         {
             IsInTdrState = await IsCurrentlyInTdrState(pnpDeviceId, cancellationToken).ConfigureAwait(false),
@@ -284,7 +284,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
     private async Task<List<TdrPreventionStrategy>> GetHighRiskPreventionStrategies(OnnxSessionInfo sessionInfo, CancellationToken cancellationToken)
     {
         await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー
-        
+
         return
         [
             TdrPreventionStrategy.ReduceBatchSize,
@@ -304,7 +304,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
     private async Task ExecutePreventionStrategy(TdrPreventionStrategy strategy, OnnxSessionInfo sessionInfo, CancellationToken cancellationToken)
     {
         await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー実装
-        
+
         switch (strategy)
         {
             case TdrPreventionStrategy.ReduceBatchSize:
@@ -392,19 +392,19 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
     private List<string> GenerateRecommendedActions(TdrContext tdrContext, TdrRecoveryStrategy strategy, bool success)
     {
         var actions = new List<string>();
-        
+
         if (!success)
         {
             actions.Add("システム再起動を検討してください");
             actions.Add("GPU ドライバーの更新を確認してください");
         }
-        
+
         if (tdrContext.EstimatedCause == TdrCause.InsufficientMemory)
         {
             actions.Add("バッチサイズの削減を検討してください");
             actions.Add("他のGPU使用アプリケーションを終了してください");
         }
-        
+
         return actions;
     }
 
@@ -463,7 +463,7 @@ public sealed class WindowsTdrRecoveryManager : ITdrRecoveryManager, IDisposable
         try
         {
             if (_disposed) return;
-            
+
             _ = Task.Run(async () =>
             {
                 try

@@ -18,11 +18,11 @@ public sealed class CustomNamedMockTranslationEngine(
         string customName,
         int simulatedDelayMs = 0,
         float simulatedErrorRate = 0.0f) : MockTranslationEngine(logger, simulatedDelayMs, simulatedErrorRate)
-    {
-        private readonly string _customName = customName ?? throw new ArgumentNullException(nameof(customName));
+{
+    private readonly string _customName = customName ?? throw new ArgumentNullException(nameof(customName));
 
-        /// <summary>
-        /// カスタムエンジン名
-        /// </summary>
-        public override string Name => _customName;
+    /// <summary>
+    /// カスタムエンジン名
+    /// </summary>
+    public override string Name => _customName;
 }

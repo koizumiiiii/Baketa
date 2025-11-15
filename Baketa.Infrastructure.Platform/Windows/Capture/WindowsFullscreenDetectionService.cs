@@ -9,9 +9,9 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Infrastructure.Platform.Windows.NativeMethods;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture;
 
@@ -27,30 +27,30 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
     /// 現在の検出設定
     /// </summary>
     public FullscreenDetectionSettings Settings { get; private set; }
-    
+
     private bool _isRunning;
     private bool _disposed;
     private CancellationTokenSource? _monitoringCancellation;
     private FullscreenInfo? _lastDetectionResult;
-    
+
     /// <summary>
     /// フルスクリーン状態変更イベント
     /// </summary>
     public event EventHandler<FullscreenInfo>? FullscreenStateChanged;
-    
+
     /// <summary>
     /// 検出サービスが実行中かどうか
     /// </summary>
     public bool IsRunning => _isRunning && !_disposed;
-    
+
     public WindowsFullscreenDetectionService(ILogger<WindowsFullscreenDetectionService>? logger = null)
     {
         _logger = logger;
         Settings = new FullscreenDetectionSettings();
-        
+
         _logger?.LogDebug("WindowsFullscreenDetectionService initialized");
     }
-    
+
     /// <summary>
     /// 指定されたウィンドウがフルスクリーンかどうかを検出します
     /// </summary>
@@ -61,17 +61,17 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(WindowsFullscreenDetectionService));
-        
+
         if (windowHandle == IntPtr.Zero)
         {
             _logger?.LogWarning("Invalid window handle provided");
             return CreateEmptyFullscreenInfo();
         }
-        
+
         // 非同期実行でUIスレッドをブロックしない
         return await Task.Run(() => DetectFullscreenInternal(windowHandle)).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// 現在のフォアグラウンドウィンドウがフルスクリーンかどうかを検出します
     /// </summary>
@@ -81,11 +81,11 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(WindowsFullscreenDetectionService));
-        
+
         var foregroundWindow = User32Methods.GetForegroundWindow();
         return await DetectFullscreenAsync(foregroundWindow).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// フルスクリーン状態の変更を監視します
     /// </summary>
@@ -96,20 +96,20 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(WindowsFullscreenDetectionService));
-        
+
         _logger?.LogInformation("Starting fullscreen monitoring with interval {IntervalMs}ms", Settings.DetectionIntervalMs);
-        
+
         FullscreenInfo? lastInfo = null;
-        
+
         while (!cancellationToken.IsCancellationRequested && !_disposed)
         {
             FullscreenInfo? currentInfo = null;
             bool shouldYield = false;
-            
+
             try
             {
                 currentInfo = await DetectCurrentFullscreenAsync().ConfigureAwait(false);
-                
+
                 // 状態が変更された場合のみ通知
                 if (HasStateChanged(lastInfo, currentInfo))
                 {
@@ -117,11 +117,11 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
                     _lastDetectionResult = currentInfo;
                     lastInfo = currentInfo;
                     shouldYield = true;
-                    
+
                     // イベント発行
                     FullscreenStateChanged?.Invoke(this, currentInfo);
                 }
-                
+
                 await Task.Delay(Settings.DetectionIntervalMs, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -148,16 +148,16 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
                 _logger?.LogError(ex, "External exception during fullscreen monitoring");
                 await Task.Delay(Math.Min(Settings.DetectionIntervalMs * 2, 5000), cancellationToken).ConfigureAwait(false);
             }
-            
+
             if (shouldYield && currentInfo != null)
             {
                 yield return currentInfo;
             }
         }
-        
+
         _logger?.LogInformation("Fullscreen monitoring stopped");
     }
-    
+
     /// <summary>
     /// フルスクリーン検出設定を更新します
     /// </summary>
@@ -167,13 +167,13 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(WindowsFullscreenDetectionService));
-        
+
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         Settings = settings.Clone();
         _logger?.LogDebug("Fullscreen detection settings updated");
     }
-    
+
     /// <summary>
     /// 監視を開始します
     /// </summary>
@@ -183,18 +183,18 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(WindowsFullscreenDetectionService));
-        
+
         if (_isRunning)
         {
             _logger?.LogWarning("Fullscreen monitoring is already running");
             return;
         }
-        
+
         _monitoringCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _isRunning = true;
-        
+
         _logger?.LogInformation("Fullscreen monitoring started");
-        
+
         try
         {
             var asyncEnumerator = MonitorFullscreenChangesAsync(_monitoringCancellation.Token).GetAsyncEnumerator(_monitoringCancellation.Token);
@@ -220,7 +220,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             _isRunning = false;
         }
     }
-    
+
     /// <summary>
     /// 監視を停止します
     /// </summary>
@@ -231,12 +231,12 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
         {
             return;
         }
-        
+
         _logger?.LogInformation("Stopping fullscreen monitoring");
-        
+
         _monitoringCancellation?.Cancel();
         _isRunning = false;
-        
+
         // 少し待って監視ループが終了するのを待つ
         if (_monitoringCancellation != null)
         {
@@ -244,10 +244,10 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             _monitoringCancellation.Dispose();
             _monitoringCancellation = null;
         }
-        
+
         _logger?.LogInformation("Fullscreen monitoring stopped");
     }
-    
+
     /// <summary>
     /// フルスクリーン検出の内部実装
     /// </summary>
@@ -262,22 +262,22 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             {
                 return CreateEmptyFullscreenInfo();
             }
-            
+
             var info = new FullscreenInfo
             {
                 WindowHandle = windowHandle,
                 DetectionTime = DateTime.Now
             };
-            
+
             // ウィンドウ情報取得
             GetWindowInfo(windowHandle, info);
-            
+
             // モニター情報取得
             GetMonitorInfo(windowHandle, info);
-            
+
             // フルスクリーン検出実行
             DetectFullscreenState(info);
-            
+
             return info;
         }
         catch (Win32Exception ex)
@@ -301,7 +301,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             return CreateEmptyFullscreenInfo();
         }
     }
-    
+
     /// <summary>
     /// ウィンドウ情報を取得
     /// </summary>
@@ -314,7 +314,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
         {
             info.WindowBounds = new Rectangle(windowRect.left, windowRect.top, windowRect.Width, windowRect.Height);
         }
-        
+
         // ウィンドウタイトル取得
         var titleLength = User32Methods.GetWindowTextLength(windowHandle);
         if (titleLength > 0)
@@ -323,7 +323,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             User32Methods.GetWindowText(windowHandle, titleBuilder, titleLength + 1);
             info.WindowTitle = titleBuilder.ToString();
         }
-        
+
         // プロセス情報取得
         if (User32Methods.GetWindowThreadProcessId(windowHandle, out uint processId) != 0)
         {
@@ -331,7 +331,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             {
                 using var process = Process.GetProcessById((int)processId);
                 info.ProcessName = process.ProcessName;
-                
+
                 // ゲーム判定
                 info.IsLikelyGame = IsLikelyGameProcess(process.ProcessName, info.WindowTitle);
             }
@@ -349,7 +349,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             }
         }
     }
-    
+
     /// <summary>
     /// モニター情報を取得
     /// </summary>
@@ -367,7 +367,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
                 info.MonitorBounds = new Rectangle(rect.left, rect.top, rect.Width, rect.Height);
             }
         }
-        
+
         // フォールバック: プライマリモニター情報を使用
         if (info.MonitorBounds.IsEmpty)
         {
@@ -376,7 +376,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             info.MonitorBounds = new Rectangle(0, 0, screenWidth, screenHeight);
         }
     }
-    
+
     /// <summary>
     /// フルスクリーン状態を検出
     /// </summary>
@@ -385,16 +385,16 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
     {
         double confidence = 0.0;
         var detectionMethod = FullscreenDetectionMethod.Combined;
-        
+
         // 1. ウィンドウサイズによる検出
         double sizeConfidence = DetectByWindowSize(info);
-        
+
         // 2. ウィンドウスタイルによる検出
         double styleConfidence = DetectByWindowStyle(info.WindowHandle);
-        
+
         // 3. 最大化状態による検出
         double maximizedConfidence = DetectByMaximizedState(info.WindowHandle);
-        
+
         // 複合判定と最適な検出方法の決定
         if (sizeConfidence >= styleConfidence && sizeConfidence >= maximizedConfidence)
         {
@@ -411,7 +411,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             confidence = maximizedConfidence;
             detectionMethod = FullscreenDetectionMethod.WindowSize; // Maximizedは内部的にWindowSizeとして分類
         }
-        
+
         // 複数の方法で高い信頼度がある場合はCombinedとして扱う
         var highConfidenceMethods = new[] { sizeConfidence, styleConfidence, maximizedConfidence }
             .Count(c => c >= Settings.MinConfidence);
@@ -420,22 +420,22 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             confidence = Math.Max(sizeConfidence, Math.Max(styleConfidence, maximizedConfidence));
             detectionMethod = FullscreenDetectionMethod.Combined;
         }
-        
+
         // ゲームプロセスの場合は信頼度を上げる
         if (info.IsLikelyGame && confidence > 0.5)
         {
             confidence = Math.Min(1.0, confidence + 0.1);
         }
-        
+
         info.Confidence = confidence;
         info.DetectionMethod = detectionMethod;
         info.IsFullscreen = confidence >= Settings.MinConfidence;
-        
+
         _logger?.LogDebug("Fullscreen detection: Window={Window}, Size={SizeConf:F2}, Style={StyleConf:F2}, " +
                          "Maximized={MaxConf:F2}, Final={FinalConf:F2}, IsFullscreen={IsFullscreen}",
             info.ProcessName, sizeConfidence, styleConfidence, maximizedConfidence, confidence, info.IsFullscreen);
     }
-    
+
     /// <summary>
     /// ウィンドウサイズによるフルスクリーン検出
     /// </summary>
@@ -447,25 +447,25 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
         {
             return 0.0;
         }
-        
+
         var widthDiff = Math.Abs(info.WindowBounds.Width - info.MonitorBounds.Width);
         var heightDiff = Math.Abs(info.WindowBounds.Height - info.MonitorBounds.Height);
-        
+
         var positionMatch = Math.Abs(info.WindowBounds.X - info.MonitorBounds.X) <= Settings.SizeTolerance &&
                           Math.Abs(info.WindowBounds.Y - info.MonitorBounds.Y) <= Settings.SizeTolerance;
-        
+
         if (widthDiff <= Settings.SizeTolerance && heightDiff <= Settings.SizeTolerance && positionMatch)
         {
             return 1.0; // 完全一致
         }
-        
+
         // 部分的一致の評価
         var widthRatio = 1.0 - Math.Min(1.0, (double)widthDiff / info.MonitorBounds.Width);
         var heightRatio = 1.0 - Math.Min(1.0, (double)heightDiff / info.MonitorBounds.Height);
-        
+
         return (widthRatio + heightRatio) / 2.0;
     }
-    
+
     /// <summary>
     /// ウィンドウスタイルによるフルスクリーン検出
     /// </summary>
@@ -476,23 +476,23 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
         try
         {
             var style = (WindowStyles)User32Methods.GetWindowLong(windowHandle, GetWindowLongIndex.GWL_STYLE);
-            
+
             // フルスクリーンの典型的なスタイル: WS_POPUP without borders
             bool isPopup = style.HasFlag(WindowStyles.WS_POPUP);
             bool hasBorder = style.HasFlag(WindowStyles.WS_BORDER);
             bool hasCaption = style.HasFlag(WindowStyles.WS_CAPTION);
             bool hasThickFrame = style.HasFlag(WindowStyles.WS_THICKFRAME);
-            
+
             if (isPopup && !hasBorder && !hasCaption && !hasThickFrame)
             {
                 return 0.9; // 高い信頼度
             }
-            
+
             if (isPopup)
             {
                 return 0.6; // 中程度の信頼度
             }
-            
+
             return 0.0;
         }
         catch (Win32Exception ex)
@@ -506,7 +506,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             return 0.0;
         }
     }
-    
+
     /// <summary>
     /// 最大化状態によるフルスクリーン検出
     /// </summary>
@@ -529,7 +529,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             return 0.0;
         }
     }
-    
+
     /// <summary>
     /// プロセスがゲームかどうかを判定
     /// </summary>
@@ -542,27 +542,27 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
         {
             return false;
         }
-        
+
         // 除外プロセスのチェック
         if (Settings.ExcludedProcesses.Contains(processName))
         {
             return false;
         }
-        
+
         // 既知のゲーム実行ファイルのチェック
-        if (Settings.KnownGameExecutables.Any(exe => 
+        if (Settings.KnownGameExecutables.Any(exe =>
             processName.Contains(exe, StringComparison.OrdinalIgnoreCase)))
         {
             return true;
         }
-        
+
         // ゲームらしいキーワードのチェック
         var gameKeywords = new[] { "game", "ゲーム", "play", "steam", "unity", "unreal" };
-        return gameKeywords.Any(keyword => 
+        return gameKeywords.Any(keyword =>
             processName.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
             windowTitle.Contains(keyword, StringComparison.OrdinalIgnoreCase));
     }
-    
+
     /// <summary>
     /// 状態変更があったかどうかを判定
     /// </summary>
@@ -575,12 +575,12 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
         {
             return true;
         }
-        
+
         return lastInfo.IsFullscreen != currentInfo.IsFullscreen ||
                lastInfo.WindowHandle != currentInfo.WindowHandle ||
                Math.Abs(lastInfo.Confidence - currentInfo.Confidence) > 0.1;
     }
-    
+
     /// <summary>
     /// 空のフルスクリーン情報を作成
     /// </summary>
@@ -596,7 +596,7 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
             DetectionTime = DateTime.Now
         };
     }
-    
+
     /// <summary>
     /// リソースを解放します
     /// </summary>
@@ -606,10 +606,10 @@ public sealed class WindowsFullscreenDetectionService : IFullscreenDetectionServ
         {
             return;
         }
-        
+
         _monitoringCancellation?.Cancel();
         _monitoringCancellation?.Dispose();
-        
+
         _disposed = true;
         _logger?.LogDebug("WindowsFullscreenDetectionService disposed");
     }

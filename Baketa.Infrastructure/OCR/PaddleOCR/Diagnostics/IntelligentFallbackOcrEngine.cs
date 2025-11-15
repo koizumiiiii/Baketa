@@ -4,10 +4,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 
@@ -22,7 +23,7 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
     private readonly List<FallbackStrategy> _strategies;
     private readonly FallbackStatistics _statistics = new();
     private readonly object _statisticsLock = new();
-    
+
     private bool _disposed;
 
     public IntelligentFallbackOcrEngine(
@@ -32,11 +33,11 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _diagnosticService = diagnosticService ?? throw new ArgumentNullException(nameof(diagnosticService));
-        
+
         ArgumentNullException.ThrowIfNull(engines);
-        
+
         _strategies = [.. CreateStrategies(engines)];
-        
+
         if (_strategies.Count == 0)
             throw new ArgumentException("少なくとも1つのOCRエンジンが必要です", nameof(engines));
 
@@ -76,15 +77,15 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
             return false;
         }
 
-        _logger.LogInformation("フォールバック初期化完了: {Available}/{Total}個の戦略が利用可能", 
+        _logger.LogInformation("フォールバック初期化完了: {Available}/{Total}個の戦略が利用可能",
             availableCount, _strategies.Count);
         return true;
     }
-    
+
     public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("IntelligentFallbackOcrEngineウォームアップ開始");
-        
+
         // 初期化済みのエンジンのみウォームアップ
         foreach (var strategy in _strategies.Where(s => s.IsAvailable))
         {
@@ -102,7 +103,7 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
                 _logger.LogWarning(ex, "エンジン {EngineName} のウォームアップ失敗", strategy.Name);
             }
         }
-        
+
         return false;
     }
 
@@ -113,11 +114,11 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
 
         var operationId = Guid.NewGuid().ToString("N")[..8];
         var overallStopwatch = Stopwatch.StartNew();
-        
+
         _logger.LogDebug("インテリジェントフォールバック開始: OperationId={OperationId}", operationId);
 
         var attemptResults = new List<AttemptResult>();
-        
+
         foreach (var strategy in GetOrderedStrategies())
         {
             if (!strategy.IsAvailable)
@@ -132,7 +133,7 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
 
             try
             {
-                _logger.LogDebug("フォールバック戦略実行: {Strategy}, OperationId={OperationId}", 
+                _logger.LogDebug("フォールバック戦略実行: {Strategy}, OperationId={OperationId}",
                     strategy.Name, operationId);
 
                 // 戦略に応じたタイムアウト設定
@@ -156,18 +157,18 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
                 attempt.Duration = attemptStopwatch.Elapsed;
                 attempt.Success = true;
                 attempt.TextRegionsCount = result.TextRegions.Count;
-                attempt.Confidence = result.TextRegions.Count > 0 ? 
+                attempt.Confidence = result.TextRegions.Count > 0 ?
                     result.TextRegions.Average(r => r.Confidence) : 0.0;
 
                 attemptResults.Add(attempt);
-                
+
                 // 成功判定
                 if (IsResultAcceptable(result, strategy))
                 {
                     overallStopwatch.Stop();
-                    
+
                     UpdateStatistics(attemptResults, result, overallStopwatch.Elapsed);
-                    
+
                     _logger.LogInformation("フォールバック成功: {Strategy}, OperationId={OperationId}, Duration={Duration}ms, TextRegions={Count}",
                         strategy.Name, operationId, overallStopwatch.ElapsedMilliseconds, result.TextRegions.Count);
 
@@ -187,7 +188,7 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
                 attempt.Success = false;
                 attempt.ErrorType = "ExternalCancellation";
                 attemptResults.Add(attempt);
-                
+
                 _logger.LogDebug("フォールバック外部キャンセル: OperationId={OperationId}", operationId);
                 throw;
             }
@@ -199,10 +200,10 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
                 attempt.Success = false;
                 attempt.ErrorType = "Timeout";
                 attemptResults.Add(attempt);
-                
+
                 _logger.LogWarning("フォールバック戦略タイムアウト: {Strategy}, Duration={Duration}ms, OperationId={OperationId}",
                     strategy.Name, attemptStopwatch.ElapsedMilliseconds, operationId);
-                
+
                 // 戦略の優先度を下げる
                 strategy.ReducePriority();
                 continue;
@@ -215,10 +216,10 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
                 attempt.ErrorType = ex.GetType().Name;
                 attempt.ErrorMessage = ex.Message;
                 attemptResults.Add(attempt);
-                
+
                 _logger.LogWarning(ex, "フォールバック戦略エラー: {Strategy}, OperationId={OperationId}",
                     strategy.Name, operationId);
-                
+
                 // 戦略を一時的に無効化
                 strategy.MarkTemporaryFailure();
                 continue;
@@ -231,7 +232,7 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
 
         var errorMessage = $"すべてのフォールバック戦略が失敗: 試行={attemptResults.Count}, 処理時間={overallStopwatch.ElapsedMilliseconds}ms";
         _logger.LogError("{ErrorMessage}, OperationId={OperationId}", errorMessage, operationId);
-        
+
         throw new InvalidOperationException(errorMessage);
     }
 
@@ -252,6 +253,23 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
         // ROI指定の場合は、まず最初の戦略でROIサポートをチェック
         // 現在の実装では画像全体を処理
         return await RecognizeAsync(image, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    public async Task<OcrResults> RecognizeAsync(OcrContext context, IProgress<OcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        _logger.LogInformation("🎯 [OPTION_B] IntelligentFallbackOcrEngine - OcrContext使用のRecognizeAsync呼び出し");
+
+        // 既存メソッドに委譲
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
     }
 
     public OcrEngineSettings GetSettings()
@@ -309,14 +327,14 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
     public OcrPerformanceStats GetPerformanceStats()
     {
         var stats = GetStatistics();
-        
+
         return new OcrPerformanceStats
         {
             TotalProcessedImages = stats.TotalOperations,
             AverageProcessingTimeMs = stats.AverageDuration.TotalMilliseconds,
-            MinProcessingTimeMs = stats.TotalOperations > 0 ? 
+            MinProcessingTimeMs = stats.TotalOperations > 0 ?
                 stats.StrategyStats.Values.Where(s => s.TotalAttempts > 0).DefaultIfEmpty().Min(s => s?.AverageDuration.TotalMilliseconds ?? 0) : 0,
-            MaxProcessingTimeMs = stats.TotalOperations > 0 ? 
+            MaxProcessingTimeMs = stats.TotalOperations > 0 ?
                 stats.StrategyStats.Values.Where(s => s.TotalAttempts > 0).DefaultIfEmpty().Max(s => s?.AverageDuration.TotalMilliseconds ?? 0) : 0,
             ErrorCount = stats.FailedOperations,
             SuccessRate = stats.SuccessRate / 100.0,
@@ -358,6 +376,36 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // 次に実行される可能性が最も高い戦略の失敗回数を返す
+        var nextStrategy = GetOrderedStrategies().FirstOrDefault();
+        return nextStrategy?.Engine.GetConsecutiveFailureCount() ?? 0;
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // すべての戦略のエンジンのカウンタをリセット
+        foreach (var strategy in _strategies.Where(s => s.IsAvailable))
+        {
+            try
+            {
+                strategy.Engine.ResetFailureCounter();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "フォールバック戦略失敗カウンタリセット失敗: {StrategyName}", strategy.Name);
+            }
+        }
+    }
+
+    /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// </summary>
     public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
@@ -374,7 +422,7 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
                 _logger.LogDebug(ex, "フォールバック戦略での検出専用処理失敗: {StrategyName}", availableStrategy.Name);
             }
         }
-        
+
         // すべて失敗した場合は空の結果を返す
         return new OcrResults([], image, TimeSpan.Zero, "jpn", null, "");
     }
@@ -483,7 +531,7 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
         if (result.TextRegions.Count < strategy.MinTextRegions)
             return false;
 
-        var averageConfidence = result.TextRegions.Count > 0 ? 
+        var averageConfidence = result.TextRegions.Count > 0 ?
             result.TextRegions.Average(r => r.Confidence) : 0.0;
 
         return averageConfidence >= strategy.MinConfidence;
@@ -495,13 +543,13 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
         {
             _statistics.TotalOperations++;
             _statistics.TotalDuration += totalDuration;
-            
+
             if (result != null)
             {
                 _statistics.SuccessfulOperations++;
                 _statistics.TotalTextRegions += result.TextRegions.Count;
                 _statistics.TotalAttempts += attempts.Count;
-                
+
                 var successfulAttempt = attempts.FirstOrDefault(a => a.Success);
                 if (successfulAttempt != null)
                 {
@@ -512,7 +560,7 @@ public sealed class IntelligentFallbackOcrEngine : IOcrEngine, IDisposable
             {
                 _statistics.FailedOperations++;
                 _statistics.TotalAttempts += attempts.Count;
-                
+
                 foreach (var attempt in attempts)
                 {
                     _statistics.UpdateStrategyStats(attempt.StrategyName, false, attempt.Duration);
@@ -558,12 +606,12 @@ public class FallbackStrategy
     public int MinTextRegions { get; init; }
     public bool UseDiagnostics { get; init; }
     public OcrEngineSettings? Settings { get; init; }
-    
+
     public bool IsAvailable { get; set; }
     public bool IsTemporarilyDisabled { get; private set; }
     public DateTime? LastFailureTime { get; private set; }
     public TimeSpan AverageResponseTime { get; private set; }
-    
+
     private readonly List<TimeSpan> _recentResponseTimes = new(10);
     private int _consecutiveFailures;
 
@@ -588,7 +636,7 @@ public class FallbackStrategy
     {
         _consecutiveFailures++;
         LastFailureTime = DateTime.UtcNow;
-        
+
         if (_consecutiveFailures >= 3)
         {
             IsTemporarilyDisabled = true;
@@ -608,7 +656,7 @@ public class FallbackStrategy
             _recentResponseTimes.Add(responseTime);
             if (_recentResponseTimes.Count > 10)
                 _recentResponseTimes.RemoveAt(0);
-            
+
             AverageResponseTime = TimeSpan.FromTicks((long)_recentResponseTimes.Average(t => t.Ticks));
         }
     }
@@ -646,7 +694,7 @@ public class FallbackStatistics
 
     public double SuccessRate => TotalOperations > 0 ? (double)SuccessfulOperations / TotalOperations * 100 : 0;
     public double AverageAttemptsPerOperation => TotalOperations > 0 ? (double)TotalAttempts / TotalOperations : 0;
-    public TimeSpan AverageDuration => TotalOperations > 0 ? 
+    public TimeSpan AverageDuration => TotalOperations > 0 ?
         TimeSpan.FromTicks(TotalDuration.Ticks / TotalOperations) : TimeSpan.Zero;
 
     public IReadOnlyDictionary<string, StrategyStats> StrategyStats => _strategyStats.AsReadOnly();
@@ -661,7 +709,7 @@ public class FallbackStatistics
 
         stats.TotalAttempts++;
         stats.TotalDuration += duration;
-        
+
         if (success)
             stats.SuccessfulAttempts++;
         else
@@ -702,7 +750,7 @@ public class StrategyStats
     public TimeSpan TotalDuration { get; set; }
 
     public double SuccessRate => TotalAttempts > 0 ? (double)SuccessfulAttempts / TotalAttempts * 100 : 0;
-    public TimeSpan AverageDuration => TotalAttempts > 0 ? 
+    public TimeSpan AverageDuration => TotalAttempts > 0 ?
         TimeSpan.FromTicks(TotalDuration.Ticks / TotalAttempts) : TimeSpan.Zero;
 
     public StrategyStats Clone()

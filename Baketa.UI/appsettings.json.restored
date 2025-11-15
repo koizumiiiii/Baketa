@@ -1,0 +1,565 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft.AspNetCore": "Warning",
+      "Baketa.Infrastructure.Translation": "Debug",
+      "Baketa.Infrastructure.OCR": "Debug",
+      "Baketa.Infrastructure.OCR.PaddleOCR": "Debug",
+      "Baketa.UI.Services": "Debug",
+      "Baketa.Application.Services": "Debug",
+      "Baketa.UI.ViewModels": "Debug"
+    },
+    "DebugLogPath": "debug_app_logs.txt",
+    "EnableDebugFileLogging": true,
+    "MaxDebugLogFileSizeMB": 10,
+    "DebugLogRetentionDays": 7
+  },
+  "ImageChangeDetection": {
+    "Stage1SimilarityThreshold": 0.92,
+    "Stage2ChangePercentageThreshold": 0.05,
+    "Stage3SSIMThreshold": 0.92,
+    "RegionSSIMThreshold": 0.95,
+    "EnableCaching": true,
+    "MaxCacheSize": 1000,
+    "CacheExpirationMinutes": 30,
+    "EnablePerformanceLogging": true
+  },
+  "TimedAggregator": {
+    "IsFeatureEnabled": true,
+    "BufferDelayMs": 150,
+    "MaxChunkCount": 100,
+    "ForceFlushMs": 5000,
+    "EnablePerformanceLogging": true,
+    "PerformanceLogInterval": 10,
+    "ProximityGrouping": {
+      "Enabled": true,
+      "VerticalDistanceFactor": 0.2,
+      "HorizontalDistanceFactor": 3.0,
+      "CrossRowHorizontalDistanceFactor": 2.0,
+      "MaxCrossRowHorizontalGapPixels": 100,
+      "EnableDetailedLogging": true,
+      "MinChunkHeight": 8,
+      "MaxChunkHeight": 200,
+      "StatisticsLogInterval": 10
+    }
+  },
+  "Translation": {
+    "DefaultEngine": "NLLB200",
+    "EnabledEngines": [
+      "Mock",
+      "NLLB200",
+      "Gemini"
+    ],
+    "AutoDetectSourceLanguage": false,
+    "Languages": {
+      "SupportedLanguages": [
+        {
+          "Code": "auto",
+          "Name": "自動検�E",
+          "NativeName": "Auto Detect",
+          "IsAutoDetect": true,
+          "IsSupported": true
+        },
+        {
+          "Code": "en",
+          "Name": "English",
+          "NativeName": "English",
+          "RegionCode": "US",
+          "IsSupported": true
+        },
+        {
+          "Code": "ja",
+          "Name": "日本誁E,
+          "NativeName": "日本誁E,
+          "RegionCode": "JP",
+          "IsSupported": true
+        },
+        {
+          "Code": "zh",
+          "Name": "中国語（�E動！E,
+          "NativeName": "中斁E���E动�E�E,
+          "OpusPrefix": "",
+          "Variant": "Auto",
+          "IsSupported": false
+        },
+        {
+          "Code": "zh-Hans",
+          "Name": "中国語（簡体字！E,
+          "NativeName": "中斁E��简体！E,
+          "OpusPrefix": ">>cmn_Hans<<",
+          "Variant": "Simplified",
+          "RegionCode": "CN",
+          "IsSupported": false
+        },
+        {
+          "Code": "zh-Hant",
+          "Name": "中国語（繁体字！E,
+          "NativeName": "中斁E��繁E��！E,
+          "OpusPrefix": ">>cmn_Hant<<",
+          "Variant": "Traditional",
+          "RegionCode": "TW",
+          "IsSupported": false
+        },
+        {
+          "Code": "yue",
+          "Name": "庁E��誁E,
+          "NativeName": "粵誁E,
+          "OpusPrefix": ">>yue<<",
+          "Variant": "Cantonese",
+          "RegionCode": "HK",
+          "IsSupported": false
+        },
+        {
+          "Code": "ko",
+          "Name": "韓国誁E,
+          "NativeName": "���국�E�",
+          "RegionCode": "KR",
+          "IsSupported": false
+        },
+        {
+          "Code": "es",
+          "Name": "スペイン誁E,
+          "NativeName": "Español",
+          "RegionCode": "ES",
+          "IsSupported": false
+        },
+        {
+          "Code": "fr",
+          "Name": "フランス誁E,
+          "NativeName": "Français",
+          "RegionCode": "FR",
+          "IsSupported": false
+        },
+        {
+          "Code": "de",
+          "Name": "ドイチE��E,
+          "NativeName": "Deutsch",
+          "RegionCode": "DE",
+          "IsSupported": false
+        },
+        {
+          "Code": "ru",
+          "Name": "ロシア誁E,
+          "NativeName": "РусE�E�ий",
+          "RegionCode": "RU",
+          "IsSupported": false
+        },
+        {
+          "Code": "ar",
+          "Name": "アラビア誁E,
+          "NativeName": "افE�ربية",
+          "RegionCode": "SA",
+          "IsRightToLeft": true,
+          "IsSupported": false
+        }
+      ],
+      "DefaultSourceLanguage": "en", 
+      "DefaultTargetLanguage": "ja",
+      "EnableChineseVariantAutoDetection": false,
+      "EnableLanguageDetection": true
+    },
+    "LanguagePairs": {
+      "ja-en": {
+        "Engine": "NLLB200",
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "Priority": 1,
+        "IsSupported": true,
+        "Description": "日本語�E英語NLLB200高品質翻訳"
+      },
+      "en-ja": {
+        "Engine": "NLLB200",
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "Priority": 1,
+        "IsSupported": true,
+        "Description": "英語�E日本語NLLB200高品質翻訳"
+      },
+      "zh-en": {
+        "Engine": "NLLB200",
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "Priority": 1,
+        "IsSupported": false,
+        "Description": "中国語�E英語NLLB200高品質翻訳"
+      },
+      "en-zh": {
+        "Engine": "NLLB200",
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "Priority": 1,
+        "ChineseVariantSupport": true,
+        "IsSupported": false,
+        "Description": "英語�E中国語NLLB200高品質翻訳�E�簡体字�E繁体字対応！E
+      },
+      "zh-ja": {
+        "Engine": "NLLB200",
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "Priority": 1,
+        "IsSupported": false,
+        "Description": "中国語�E日本語NLLB200高品質翻訳"
+      },
+      "ja-zh": {
+        "Engine": "NLLB200",
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "Priority": 1,
+        "IsSupported": false,
+        "Description": "日本語�E中国語NLLB200高品質翻訳"
+      },
+      "ja-zh-Hans": {
+        "Engine": "NLLB200",
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "TargetVariant": "Simplified",
+        "Priority": 1,
+        "IsSupported": false,
+        "Description": "日本語�E簡体字中国語NLLB200高品質翻訳"
+      },
+      "ja-zh-Hant": {
+        "Engine": "NLLB200",
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "TargetVariant": "Traditional",
+        "Priority": 1,
+        "IsSupported": false,
+        "Description": "日本語�E繁体字中国語NLLB200高品質翻訳"
+      }
+    },
+    "TwoStageTranslation": {
+      "EnableFallback": true,
+      "LogIntermediateResults": true,
+      "MaxRetries": 2,
+      "TimeoutSeconds": 30,
+      "QualityThreshold": 0.7
+    },
+    "Models": {
+      "ChineseToJapanese": {
+        "ModelName": "facebook/nllb-200-distilled-600M",
+        "DownloadUrl": "https://huggingface.co/facebook/nllb-200-distilled-600M",
+        "RequiresDownload": false,
+        "Description": "中国語から日本語への翻訳モチE���E�大容量版�E�E,
+        "EstimatedSize": "800KB",
+        "LocalPath": "Models/NLLB200/nllb-200-distilled-600M"
+      }
+    },
+    "TranslationEngine": {
+      "Strategies": {
+        "LocalOnly": {
+          "Description": "NLLB-200のみ使用�E�高品質・無料！E,
+          "UseCase": "短ぁE��キスト、よく知られたフレーズ、一般皁E��翻訳",
+          "Cost": "無斁E,
+          "Speed": "高速！E 50ms�E�E,
+          "Quality": "標準品質",
+          "Offline": true
+        },
+        "CloudOnly": {
+          "Description": "Gemini APIのみ使用�E�高品質・有料�E�E,
+          "UseCase": "褁E��なチE��スト、専門用語、文学皁E��現、E��品質が忁E��な翻訳",
+          "Cost": "有料�E�EPIト�Eクン使用量に応じて�E�E,
+          "Speed": "中速！E 2000ms�E�E,
+          "Quality": "高品質",
+          "Offline": false
+        }
+      }
+    },
+    "NLLB200": {
+      "ServerHost": "127.0.0.1",
+      "ServerPort": 5556,
+      "ModelName": "facebook/nllb-200-distilled-600M",
+      "HealthCheckIntervalSeconds": 30,
+      "ConnectionTimeoutMs": 5000,
+      "RequestTimeoutMs": 30000,
+      "MaxRetries": 3,
+      "RetryDelayMs": 1000,
+      "EnableBatchTranslation": true,
+      "MaxBatchSize": 50,
+      "ServerScriptPath": "scripts/nllb_translation_server_ct2.py",
+      "AutoStartServer": true,
+      "ServerStartTimeoutMs": 60000,
+      "EnableQualityLogging": true,
+      "UseCTranslate2": true,
+      "CTranslate2ModelPath": "models/nllb-200-ct2",
+      "ModelCache": {
+        "UseCustomPath": false,
+        "CustomCachePath": "",
+        "Description": "カスタムキャチE��ュパス設定。UseCustomPathをtrueにしてCustomCachePathを指定すると、指定されたパスにモチE��をキャチE��ュします。空の場合�EHugging FaceチE��ォルト！E/.cache/huggingface�E�を使用します、E,
+        "EstimatedModelSizeMB": 2400,
+        "EnableCacheValidation": true,
+        "AutoCleanupOldModels": false,
+        "MaxCacheRetentionDays": 30,
+        "ManagementLevel": "Standard",
+        "CleanupThresholdRatio": 0.8,
+        "MaxSizeMultiplier": 2.0,
+        "Description_Phase2": "Phase 2: CacheManagementService設宁E- ManagementLevel(Basic/Standard/Aggressive), CleanupThresholdRatio(容量クリーンアチE�E閾値), MaxSizeMultiplier(最大キャチE��ュサイズ倍率)"
+      },
+      "Description": "Meta NLLB-200高品質多言語翻訳モチE��"
+    }
+  },
+  "GeminiApi": {
+    "ApiKey": "your-gemini-api-key-here",
+    "ApiEndpoint": "https://generativelanguage.googleapis.com/v1/models/",
+    "ModelName": "gemini-1.5-pro",
+    "TimeoutSeconds": 30,
+    "RetryCount": 3,
+    "RetryDelaySeconds": 1,
+    "RateLimitPerMinute": 60,
+    "MaxTokens": 1000,
+    "Temperature": 0.3,
+    "EnableFallback": true,
+    "EnableCache": true,
+    "CacheExpirationMinutes": 60,
+    "EnableUsageLogging": true,
+    "EnableCostMonitoring": true,
+    "MaxDailyCostUsd": 10.0,
+    "EnablePromptOptimization": true,
+    "EnableResponseValidation": true,
+    "EnableDebugLogging": false
+  },
+  "HybridTranslation": {
+    "ShortTextThreshold": 50,
+    "LongTextThreshold": 500,
+    "HighComplexityThreshold": 10.0,
+    "LowComplexityThreshold": 3.0,
+    "ShortTextStrategy": "LocalOnly",
+    "LongTextStrategy": "CloudOnly",
+    "HighComplexityStrategy": "CloudOnly",
+    "LowComplexityStrategy": "LocalOnly",
+    "DefaultStrategy": "LocalOnly",
+    "EnableCache": true,
+    "CacheExpirationMinutes": 60
+  },
+  "PerformanceMetrics": {
+    "Enabled": true,
+    "BatchSize": 50,
+    "FlushIntervalSeconds": 5,
+    "MaxQueueSize": 1000,
+    "LogRetentionDays": 30,
+    "EnableStructuredReports": true,
+    "LogLevel": "Information",
+    "Description": "Phase 4.1パフォーマンスメトリクス収集設宁E- 統合メトリクス収集シスチE���E�翻訳・OCR・リソース調整�E�E
+  },
+  "HybridResourceManagement": {
+    "MaxOcrParallelism": 4,
+    "MaxTranslationParallelism": 3,
+    "CpuThresholdHigh": 80.0,
+    "CpuThresholdLow": 60.0,
+    "MemoryThresholdHigh": 85.0,
+    "MemoryThresholdLow": 70.0,
+    "VramThresholdHigh": 75.0,
+    "VramThresholdLow": 50.0,
+    "GpuUtilizationThresholdHigh": 90.0,
+    "GpuUtilizationThresholdLow": 60.0,
+    "AdjustmentCooldownMs": 10000,
+    "EnableHotReload": true,
+    "EnableVerboseLogging": false,
+    "EnablePredictiveAdjustment": true,
+    "MinimumParallelism": 1,
+    "MonitoringIntervalMs": 5000,
+    "TrendAnalysisWindowSize": 10,
+    "Description": "Sprint 3: GPU復旧 + ROI最適匁E- VRAM動的監視�E並列�E琁E�E動調整"
+  },
+  "TranslationEngineStatus": {
+    "MonitoringIntervalSeconds": 30,
+    "NetworkTimeoutMs": 5000,
+    "RateLimitWarningThreshold": 10,
+    "EnableHealthChecks": true,
+    "EnableRealTimeUpdates": true,
+    "MaxRetries": 3,
+    "RetryDelaySeconds": 5
+  },
+  "OCR": {
+    "PaddleOCR": {
+      "EnableHybridMode": true,
+      "Language": "jpn",
+      "DetectionThreshold": 0.6,
+      "RecognitionThreshold": 0.3,
+      "ModelName": "standard",
+      "MaxDetections": 200,
+      "UseGpu": true,
+      "EnableMultiThread": true,
+      "WorkerCount": 2,
+      "MaxGpuMemoryMB": 2048,
+      "EnableGpuMemoryMonitoring": true,
+      "UseLanguageModel": false,
+      "EnablePreprocessing": true,
+      "GpuStagedActivation": {
+        "EnableGradualGpuActivation": true,
+        "InitialGpuUtilization": 0.3,
+        "MaxGpuUtilization": 0.8,
+        "GpuRampUpIntervalMs": 5000,
+        "VramUsageThreshold": 0.7,
+        "AutoFallbackToCpu": true,
+        "GpuHealthCheckIntervalMs": 10000
+      }
+    },
+    "HybridStrategy": {
+      "FastDetectionModel": "V3",
+      "HighQualityModel": "V5",
+      "ImageQualityThreshold": 0.6,
+      "RegionCountThreshold": 5,
+      "FastDetectionTimeoutMs": 500,
+      "HighQualityTimeoutMs": 3000,
+      "EnableDiagnosticLogging": true
+    },
+    "StickyRoiOptimization": {
+      "EnableParallelProcessing": true,
+      "MaxParallelRois": 4,
+      "MaxConcurrentOcrRequests": 1,
+      "RoiProcessingTimeoutMs": 2000,
+      "EnableRoiPrioritization": true,
+      "RoiConfidenceThreshold": 0.6,
+      "MaxRoiCacheSize": 50,
+      "RoiExpirationTimeMinutes": 30,
+      "EnableAdaptiveLearning": true,
+      "LearningRateDecay": 0.95,
+      "RoiMergeDistanceThreshold": 20,
+      "EnableRoiStatistics": true,
+      "StatisticsReportIntervalMinutes": 10,
+      "Description": "Sprint 3: ROI並列�E琁E��適匁E- 3-10倍パフォーマンス向上実現"
+    },
+    "ImageChangeDetection": {
+      "Enabled": true,
+      "DefaultAlgorithm": "DifferenceHash",
+      "ChangeThreshold": 0.1,
+      "EnableMetrics": true,
+      "Description": "Phase 1: OCR処琁E��適化シスチE�� - 画像変化検知による不要なOCR処琁E��キチE�E機�E"
+    },
+    "DiagnosticsSettings": {
+      "EnableRoiImageOutput": true,
+      "RoiImageOutputPath": "%AppData%\\Baketa\\ROI\\Images",
+      "RoiImageFormat": "PNG",
+      "EnableAdvancedDiagnostics": true,
+      "MaxImageFileRetentionDays": 7,
+      "EnableMetadataOutput": true,
+      "EnableAnnotatedImages": true,
+      "AdvancedSettings": {
+        "SaveOriginalImages": true,
+        "SaveProcessedImages": true,
+        "SaveErrorImages": true,
+        "CompressImages": false,
+        "ImageQuality": 95,
+        "EnableTimestampPrefix": true,
+        "EnableOperationIdSuffix": true
+      }
+    },
+    "OcrCircuitBreakerOptions": {
+      "FailureThreshold": 5,
+      "OpenTimeout": "00:01:00",
+      "HalfOpenRetryInterval": "00:00:30",
+      "AutoFallbackEnabled": true,
+      "ImmediateFallbackOnGpuError": true,
+      "EnableVerboseLogging": false
+    }
+  },
+  "CommonTranslations": {
+    "JapaneseToEnglish": {
+      "UI": {
+        "設宁E: "settings",
+        "メニュー": "menu",
+        "ファイル": "file",
+        "編雁E: "edit",
+        "表示": "view",
+        "チE�Eル": "tools",
+        "ヘルチE: "help"
+      },
+      "Game": {
+        "ゲーム": "game",
+        "プレイ": "play",
+        "レベル": "level",
+        "スコア": "score",
+        "ライチE: "life",
+        "ポインチE: "point",
+        "コイン": "coin",
+        "アイチE��": "item",
+        "武器": "weapon",
+        "防具": "armor",
+        "マジチE��": "magic",
+        "スキル": "skill",
+        "キャラクター": "character",
+        "プレイヤー": "player",
+        "エネミー": "enemy",
+        "ボス": "boss",
+        "バトル": "battle",
+        "戦闁E: "fight",
+        "勝利": "victory",
+        "敗北": "defeat",
+        "ゲームオーバ�E": "game over"
+      },
+      "Actions": {
+        "開姁E: "start",
+        "スターチE: "start",
+        "ストッチE: "stop",
+        "ポ�Eズ": "pause",
+        "続衁E: "continue",
+        "保孁E: "save",
+        "読み込み": "load",
+        "終亁E: "end",
+        "退出": "quit"
+      },
+      "Common": {
+        "こんにちは": "hello",
+        "ありがとぁE: "thank you",
+        "さよぁE��めE: "goodbye",
+        "はぁE: "yes",
+        "ぁE��ぁE: "no",
+        "すみません": "excuse me",
+        "お疲れ槁E: "good job"
+      },
+      "Custom": {}
+    },
+    "EnglishToJapanese": {
+      "UI": {
+        "settings": "設宁E,
+        "menu": "メニュー",
+        "file": "ファイル",
+        "edit": "編雁E,
+        "view": "表示",
+        "tools": "チE�Eル",
+        "help": "ヘルチE
+      },
+      "Game": {
+        "game": "ゲーム",
+        "play": "プレイ",
+        "level": "レベル",
+        "score": "スコア",
+        "life": "ライチE,
+        "point": "ポインチE,
+        "coin": "コイン",
+        "item": "アイチE��",
+        "weapon": "武器",
+        "armor": "防具",
+        "magic": "マジチE��",
+        "skill": "スキル",
+        "character": "キャラクター",
+        "player": "プレイヤー",
+        "enemy": "エネミー",
+        "boss": "ボス",
+        "battle": "バトル",
+        "fight": "戦闁E,
+        "victory": "勝利",
+        "defeat": "敗北",
+        "game over": "ゲームオーバ�E"
+      },
+      "Actions": {
+        "start": "開姁E,
+        "stop": "ストッチE,
+        "pause": "ポ�Eズ",
+        "continue": "続衁E,
+        "save": "保孁E,
+        "load": "読み込み",
+        "end": "終亁E,
+        "quit": "終亁E
+      },
+      "Common": {
+        "hello": "こんにちは",
+        "thank you": "ありがとぁE,
+        "goodbye": "さよぁE��めE,
+        "yes": "はぁE,
+        "no": "ぁE��ぁE,
+        "excuse me": "すみません",
+        "good job": "お疲れ槁E
+      },
+      "Custom": {}
+    },
+    "Fallback": {
+      "UseHardcodedDictionaryFallback": true,
+      "UseMachineTranslationFallback": true,
+      "NotFoundBehavior": "ReturnOriginal"
+    }
+  }
+}

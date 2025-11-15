@@ -29,10 +29,10 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     {
         _supabaseClient = supabaseClient ?? throw new ArgumentNullException(nameof(supabaseClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // Subscribe to auth state changes
         _supabaseClient.Auth.AddStateChangedListener(OnAuthStateChanged);
-        
+
         _logger.LogInformation("SupabaseAuthService initialized with Supabase client");
     }
 
@@ -56,13 +56,13 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
             // TODO: Implement Supabase signup when client is available
             // var response = await _supabaseClient.Auth.SignUp(email, password);
-            
+
             // Mock implementation for now
             await Task.Delay(100, cancellationToken).ConfigureAwait(false);
-            
+
             // Simulate email confirmation required
             _logger.LogInformation("Signup confirmation email sent to: {Email}", email);
-            return new AuthFailure(AuthErrorCodes.EmailNotConfirmed, 
+            return new AuthFailure(AuthErrorCodes.EmailNotConfirmed,
                 "サインアップ確認メールを送信しました。メールを確認してください。");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -101,17 +101,17 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
             // TODO: Implement Supabase signin when client is available
             // var response = await _supabaseClient.Auth.SignIn(email, password);
-            
+
             // Mock implementation for now
             await Task.Delay(100, cancellationToken).ConfigureAwait(false);
-            
+
             // Mock successful login
             var mockSession = CreateMockSession(email);
             _logger.LogInformation("Signin successful for user: {Email}", email);
-            
+
             // Fire auth status changed event
             AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, mockSession.User, false));
-            
+
             return new AuthSuccess(mockSession);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -162,12 +162,12 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
             // 3. Capturing callback
             // 4. Extracting tokens from callback
             // 5. Setting session with tokens
-            
+
             // Mock implementation for now
             await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
-            
+
             _logger.LogInformation("OAuth signin successful with provider: {Provider}", provider);
-            return new AuthFailure(AuthErrorCodes.OAuthError, 
+            return new AuthFailure(AuthErrorCodes.OAuthError,
                 $"{providerName}認証は現在実装中です。しばらくお待ちください。");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -199,10 +199,10 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         {
             // TODO: Implement session retrieval when Supabase client is available
             // var session = await _supabaseClient.Auth.RetrieveSessionAsync();
-            
+
             // Mock implementation for now
             await Task.Delay(50, cancellationToken).ConfigureAwait(false);
-            
+
             // Return null for no active session
             return null;
         }
@@ -230,7 +230,7 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         try
         {
             _logger.LogInformation("Attempting to restore user session...");
-            
+
             var session = await GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
             if (session?.IsValid == true)
             {
@@ -271,10 +271,10 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
             // TODO: Implement signout when Supabase client is available
             // await _supabaseClient.Auth.SignOut();
-            
+
             // Mock implementation for now
             await Task.Delay(100, cancellationToken).ConfigureAwait(false);
-            
+
             _logger.LogInformation("User signout completed");
             AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, true));
         }
@@ -317,7 +317,7 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
             // Supabase Auth password reset API call
             await _supabaseClient.Auth.ResetPasswordForEmail(email).ConfigureAwait(false);
-            
+
             _logger.LogInformation("Password reset email sent successfully to: {Email}", email);
             return true;
         }
@@ -351,10 +351,10 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
             // TODO: Implement password update when Supabase client is available
             // var response = await _supabaseClient.Auth.UpdateUser(new UserAttributes { Password = newPassword });
-            
+
             // Mock implementation for now
             await Task.Delay(200, cancellationToken).ConfigureAwait(false);
-            
+
             _logger.LogInformation("Password updated successfully");
             return new AuthFailure(AuthErrorCodes.UnexpectedError, "パスワード更新機能は現在実装中です。");
         }
@@ -384,7 +384,7 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         var userId = Guid.NewGuid().ToString();
         var user = new UserInfo(userId, email, email.Split('@')[0]);
         var expiresAt = DateTime.UtcNow.AddHours(24);
-        
+
         return new AuthSession(
             AccessToken: "mock_access_token",
             RefreshToken: "mock_refresh_token",
@@ -405,7 +405,7 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
             var user = _supabaseClient.Auth.CurrentUser;
 
             bool isLoggedIn = session != null && user != null;
-            
+
             if (isLoggedIn && user != null)
             {
                 var userInfo = new UserInfo(user.Id ?? string.Empty, user.Email ?? string.Empty, user.Email?.Split('@')[0] ?? "User");
@@ -445,7 +445,7 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
         _authSemaphore.Dispose();
         _disposed = true;
-        
+
         _logger.LogInformation("SupabaseAuthService disposed");
     }
 }

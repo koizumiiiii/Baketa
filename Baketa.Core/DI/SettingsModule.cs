@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Baketa.Core.Abstractions.Logging;
+using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Migration;
-using Baketa.Core.Services;
-using Baketa.Core.Abstractions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.DI;
 
@@ -24,23 +24,23 @@ public static class SettingsModule
     {
         // 設定メタデータサービス
         services.AddSingleton<ISettingMetadataService, SettingMetadataService>();
-        
+
         // マイグレーション管理サービス
         services.AddSingleton<ISettingsMigrationManager, SettingsMigrationManager>();
-        
+
         // メイン設定サービス（Coreレイヤーの実装を使用）
         services.AddSingleton<ISettingsService>(provider =>
         {
             var logger = provider.GetRequiredService<ILogger<EnhancedSettingsService>>();
             var metadataService = provider.GetRequiredService<ISettingMetadataService>();
             var migrationManager = provider.GetRequiredService<ISettingsMigrationManager>();
-            
+
             return new EnhancedSettingsService(logger, metadataService, migrationManager);
         });
-        
+
         return services;
     }
-    
+
     /// <summary>
     /// 設定システムのサービスを高度なオプション付きで登録します
     /// </summary>
@@ -48,19 +48,19 @@ public static class SettingsModule
     /// <param name="configAction">設定アクション</param>
     /// <returns>サービスコレクション（メソッドチェーン用）</returns>
     public static IServiceCollection AddSettingsSystem(
-        this IServiceCollection services, 
+        this IServiceCollection services,
         Action<SettingsOptions> configAction)
     {
         ArgumentNullException.ThrowIfNull(configAction);
-        
+
         // 設定オプションを構成
         var options = new SettingsOptions();
         configAction(options);
         services.AddSingleton(options);
-        
+
         // 基本的な設定システムを追加
         services.AddSettingsSystem();
-        
+
         // カスタムマイグレーションを登録
         if (options.CustomMigrations.Count > 0)
         {
@@ -70,10 +70,10 @@ public static class SettingsModule
                 return new SettingsMigrationRegistrar(migrationManager, options.CustomMigrations);
             });
         }
-        
+
         return services;
     }
-    
+
     /// <summary>
     /// 設定関連のイベントハンドラーを登録します
     /// </summary>
@@ -83,10 +83,10 @@ public static class SettingsModule
     {
         // 設定変更イベントハンドラー
         services.AddTransient<ISettingsEventHandler, SettingsEventHandler>();
-        
+
         // ゲームプロファイル変更イベントハンドラー
         services.AddTransient<IGameProfileEventHandler, GameProfileEventHandler>();
-        
+
         return services;
     }
 }
@@ -100,52 +100,52 @@ public sealed class SettingsOptions
     /// 設定ファイルの保存パス（nullでデフォルト）
     /// </summary>
     public string? SettingsFilePath { get; set; }
-    
+
     /// <summary>
     /// 自動バックアップの有効化
     /// </summary>
     public bool EnableAutoBackup { get; set; } = true;
-    
+
     /// <summary>
     /// バックアップ間隔（時間）
     /// </summary>
     public int BackupIntervalHours { get; set; } = 24;
-    
+
     /// <summary>
     /// 最大バックアップ数
     /// </summary>
     public int MaxBackupCount { get; set; } = 10;
-    
+
     /// <summary>
     /// 設定変更履歴の最大保持数
     /// </summary>
     public int MaxChangeHistoryCount { get; set; } = 100;
-    
+
     /// <summary>
     /// 自動マイグレーションの有効化
     /// </summary>
     public bool EnableAutoMigration { get; set; } = true;
-    
+
     /// <summary>
     /// マイグレーション前のバックアップ作成
     /// </summary>
     public bool CreateBackupBeforeMigration { get; set; } = true;
-    
+
     /// <summary>
     /// 詳細ログの有効化
     /// </summary>
     public bool EnableVerboseLogging { get; set; }
-    
+
     /// <summary>
     /// カスタムマイグレーションのリスト
     /// </summary>
     public IList<Type> CustomMigrations { get; set; } = [];
-    
+
     /// <summary>
     /// 設定検証の有効化
     /// </summary>
     public bool EnableSettingsValidation { get; set; } = true;
-    
+
     /// <summary>
     /// 設定変更の監視有効化
     /// </summary>
@@ -161,7 +161,7 @@ public interface ISettingsMigrationRegistrar
     /// 登録されたマイグレーション数
     /// </summary>
     int RegisteredMigrationCount { get; }
-    
+
     /// <summary>
     /// マイグレーションの登録を実行します
     /// </summary>
@@ -180,13 +180,13 @@ internal sealed class SettingsMigrationRegistrar : ISettingsMigrationRegistrar
     public int RegisteredMigrationCount { get; private set; }
 
     public SettingsMigrationRegistrar(
-        ISettingsMigrationManager migrationManager, 
+        ISettingsMigrationManager migrationManager,
         IList<Type> customMigrationTypes,
         ILogger<SettingsMigrationRegistrar>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(migrationManager);
         ArgumentNullException.ThrowIfNull(customMigrationTypes);
-        
+
         _migrationManager = migrationManager;
         _customMigrationTypes = [.. customMigrationTypes];
         _logger = logger;
@@ -261,10 +261,10 @@ internal sealed class SettingsEventHandler : ISettingsEventHandler
     public async Task HandleSettingChangedAsync(SettingChangedEventArgs args)
     {
         _logger.LogDebug("設定変更を処理中: {Key} = {NewValue}", args.SettingKey, args.NewValue);
-        
+
         // ここで設定変更に応じた処理を実装
         // 例：特定の設定変更時の通知、キャッシュクリア、再計算など
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }
@@ -284,12 +284,12 @@ internal sealed class GameProfileEventHandler : IGameProfileEventHandler
 
     public async Task HandleGameProfileChangedAsync(GameProfileChangedEventArgs args)
     {
-        _logger.LogDebug("ゲームプロファイル変更を処理中: {ProfileId} ({ChangeType})", 
+        _logger.LogDebug("ゲームプロファイル変更を処理中: {ProfileId} ({ChangeType})",
             args.ProfileId, args.ChangeType);
-        
+
         // ここでゲームプロファイル変更に応じた処理を実装
         // 例：アクティブプロファイル変更時の設定適用、統計更新など
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }

@@ -26,7 +26,7 @@ public enum MeasurementType
     OverlayDisplay,
     /// <summary>全体処理</summary>
     OverallProcessing,
-    
+
     // 詳細測定用の新しい種類
     /// <summary>画像前処理（リサイズ、フィルタリング等）</summary>
     ImagePreprocessing,
@@ -76,11 +76,11 @@ public sealed class PerformanceMeasurement : IDisposable
 {
     private static readonly string LogFilePath = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "performance_analysis.log");
-    
+
     private static readonly ConcurrentQueue<PerformanceMeasurementResult> Results = new();
     private static readonly object FileLock = new();
     private static int _operationCounter;
-    
+
     private readonly Stopwatch _stopwatch;
     private readonly string _operationId;
     private readonly MeasurementType _type;
@@ -115,9 +115,9 @@ public sealed class PerformanceMeasurement : IDisposable
         _description = description ?? throw new ArgumentNullException(nameof(description));
         _startTime = DateTime.Now;
         _memoryBefore = GC.GetTotalMemory(false);
-        
+
         _stopwatch = Stopwatch.StartNew();
-        
+
         // 開始ログを記録
         LogStart();
     }
@@ -137,10 +137,10 @@ public sealed class PerformanceMeasurement : IDisposable
     public void LogCheckpoint(string checkpointName)
     {
         if (_disposed) return;
-        
+
         var elapsed = _stopwatch.Elapsed;
         var message = $"[{DateTime.Now:HH:mm:ss.fff}] 🔄 CHECKPOINT [{_operationId}] {checkpointName} - Elapsed: {elapsed.TotalMilliseconds:F1}ms";
-        
+
         WriteToFile(message);
         WriteToConsole(message);
     }
@@ -151,11 +151,11 @@ public sealed class PerformanceMeasurement : IDisposable
     public PerformanceMeasurementResult Complete()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         _stopwatch.Stop();
         var endTime = DateTime.Now;
         var memoryAfter = GC.GetTotalMemory(false);
-        
+
         var result = new PerformanceMeasurementResult
         {
             OperationId = _operationId,
@@ -168,17 +168,17 @@ public sealed class PerformanceMeasurement : IDisposable
             MemoryAfter = memoryAfter,
             AdditionalInfo = _additionalInfo
         };
-        
+
         Results.Enqueue(result);
         LogComplete(result);
-        
+
         return result;
     }
 
     private void LogStart()
     {
         var message = $"[{_startTime:HH:mm:ss.fff}] 🚀 START [{_operationId}] {_type}: {_description}";
-        
+
         WriteToFile(message);
         WriteToConsole(message);
     }
@@ -187,19 +187,19 @@ public sealed class PerformanceMeasurement : IDisposable
     {
         var memoryDelta = result.MemoryAfter - result.MemoryBefore;
         var memoryDeltaStr = memoryDelta >= 0 ? $"+{memoryDelta / 1024:N0}KB" : $"{memoryDelta / 1024:N0}KB";
-        
+
         var message = $"[{result.EndTime:HH:mm:ss.fff}] ✅ COMPLETE [{result.OperationId}] " +
                      $"Duration: {result.Duration.TotalMilliseconds:F1}ms, " +
                      $"Memory: {memoryDeltaStr}";
-        
+
         if (!string.IsNullOrEmpty(result.AdditionalInfo))
         {
             message += $", Info: {result.AdditionalInfo}";
         }
-        
+
         WriteToFile(message);
         WriteToConsole(message);
-        
+
         // 重要な測定結果はより詳細にログ
         if (result.Type == MeasurementType.TranslationEngineInitialization ||
             result.Type == MeasurementType.OcrEngineInitialization ||
@@ -238,25 +238,25 @@ public sealed class PerformanceMeasurement : IDisposable
         var summary = new System.Text.StringBuilder();
         summary.AppendLine("📊 PERFORMANCE SUMMARY");
         summary.AppendLine("=" + new string('=', 50));
-        
+
         var groupedResults = results.GroupBy(r => r.Type);
         foreach (var group in groupedResults.OrderByDescending(g => g.Sum(r => r.Duration.TotalMilliseconds)))
         {
             var totalTime = group.Sum(r => r.Duration.TotalMilliseconds);
             var avgTime = group.Average(r => r.Duration.TotalMilliseconds);
             var count = group.Count();
-            
+
             summary.AppendLine(CultureInfo.InvariantCulture, $"{group.Key}: {totalTime:F1}ms total, {avgTime:F1}ms avg, {count} calls");
-            
+
             foreach (var result in group.OrderByDescending(r => r.Duration.TotalMilliseconds))
             {
                 summary.AppendLine(CultureInfo.InvariantCulture, $"  - {result.Description}: {result.Duration.TotalMilliseconds:F1}ms");
             }
         }
-        
+
         var overallTime = results.Sum(r => r.Duration.TotalMilliseconds);
         summary.AppendLine(CultureInfo.InvariantCulture, $"\n🎯 TOTAL MEASURED TIME: {overallTime:F1}ms ({overallTime / 1000:F1}s)");
-        
+
         return summary.ToString();
     }
 
@@ -303,12 +303,12 @@ public sealed class PerformanceMeasurement : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         if (_stopwatch.IsRunning)
         {
             Complete();
         }
-        
+
         _disposed = true;
     }
 }

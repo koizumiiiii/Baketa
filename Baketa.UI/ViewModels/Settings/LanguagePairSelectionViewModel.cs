@@ -6,15 +6,15 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using ReactiveUI;
-using DynamicData;
 using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Models;
 using Baketa.UI.Services;
+using DynamicData;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using ReactiveUI;
 using StatusUpdate = Baketa.UI.Services.TranslationEngineStatusUpdate;
 
 namespace Baketa.UI.ViewModels.Settings;
@@ -30,7 +30,7 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
     private readonly ILogger<LanguagePairSelectionViewModel> _logger;
     private readonly TranslationUIOptions _options;
     private readonly CompositeDisposable _disposables = [];
-    
+
     private readonly SourceList<LanguagePairConfiguration> _languagePairsSource = new();
     private readonly ReadOnlyObservableCollection<LanguagePairConfiguration> _languagePairs;
 
@@ -148,7 +148,7 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
         ArgumentNullException.ThrowIfNull(notificationService);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
-        
+
         _statusService = statusService;
         _localizationService = localizationService;
         _notificationService = notificationService;
@@ -177,35 +177,35 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
 
         // コマンドの作成
         var canExecute = this.WhenAnyValue(x => x.IsLoading).Select(loading => !loading);
-        
+
         SelectLanguagePairCommand = ReactiveCommand.CreateFromTask<LanguagePairConfiguration, Unit>(
-            async languagePair => 
+            async languagePair =>
             {
                 await SelectLanguagePairAsync(languagePair).ConfigureAwait(false);
                 return Unit.Default;
             }, canExecute);
 
         SelectChineseVariantCommand = ReactiveCommand.CreateFromTask<ChineseVariant, Unit>(
-            async variant => 
+            async variant =>
             {
                 await SelectChineseVariantAsync(variant).ConfigureAwait(false);
                 return Unit.Default;
             }, canExecute);
 
         ToggleLanguagePairCommand = ReactiveCommand.CreateFromTask<LanguagePairConfiguration, Unit>(
-            async languagePair => 
+            async languagePair =>
             {
                 await ToggleLanguagePairAsync(languagePair).ConfigureAwait(false);
                 return Unit.Default;
             }, canExecute);
 
-        ClearFilterCommand = ReactiveCommand.Create<Unit, Unit>(_ => 
+        ClearFilterCommand = ReactiveCommand.Create<Unit, Unit>(_ =>
         {
             FilterText = string.Empty;
             return Unit.Default;
         });
 
-        RefreshLanguagePairsCommand = ReactiveCommand.CreateFromTask<Unit, Unit>(async _ => 
+        RefreshLanguagePairsCommand = ReactiveCommand.CreateFromTask<Unit, Unit>(async _ =>
         {
             await RefreshLanguagePairsAsync().ConfigureAwait(false);
             return Unit.Default;
@@ -381,7 +381,7 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
                 "言語ペア設定",
                 $"{languagePair.DisplayName}を{status}にしました。").ConfigureAwait(false);
 
-            _logger.LogInformation("Language pair {Pair} toggled to {Status}", 
+            _logger.LogInformation("Language pair {Pair} toggled to {Status}",
                 languagePair.LanguagePairKey, status);
         }
         catch (InvalidOperationException ex)
@@ -415,16 +415,16 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
         try
         {
             IsLoading = true;
-            
+
             var languagePairsArray = CreateLanguagePairConfigurations().ToArray();
-            
+
             _languagePairsSource.Clear();
             _languagePairsSource.AddRange(languagePairsArray);
 
             // デフォルト言語ペアの選択
-            var defaultPair = languagePairsArray.FirstOrDefault(p => 
+            var defaultPair = languagePairsArray.FirstOrDefault(p =>
             string.Equals(p.LanguagePairKey, _options.DefaultLanguagePair, StringComparison.Ordinal));
-            
+
             if (defaultPair != null)
             {
                 SelectedLanguagePair = defaultPair;
@@ -465,13 +465,13 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
     private void OnLanguagePairSelected(LanguagePairConfiguration languagePair)
     {
         IsChineseRelatedPair = languagePair.IsChineseRelated;
-        
+
         if (IsChineseRelatedPair)
         {
             SelectedChineseVariant = languagePair.ChineseVariant;
         }
 
-        _logger.LogDebug("Language pair selected: {Pair}, IsChineseRelated: {IsChineseRelated}", 
+        _logger.LogDebug("Language pair selected: {Pair}, IsChineseRelated: {IsChineseRelated}",
             languagePair.LanguagePairKey, IsChineseRelatedPair);
     }
 
@@ -496,7 +496,7 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
         if (languagePair.SelectedEngine == "CloudOnly" && update.EngineName == "CloudOnly")
         {
             var isCloudHealthy = _statusService.CloudEngineStatus.IsHealthy;
-            
+
             if (!isCloudHealthy && languagePair.IsEnabled)
             {
                 languagePair.IsEnabled = false;
@@ -568,9 +568,9 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
     private static void UpdateLanguagePairDescription(LanguagePairConfiguration configuration)
     {
         var strategyText = configuration.Strategy == TranslationStrategy.TwoStage ? "（2段階翻訳）" : "";
-        var variantText = configuration.IsChineseRelated && configuration.ChineseVariant != ChineseVariant.Auto 
+        var variantText = configuration.IsChineseRelated && configuration.ChineseVariant != ChineseVariant.Auto
             ? $" - {GetChineseVariantDisplayName(configuration.ChineseVariant)}" : "";
-        
+
         configuration.Description = $"{configuration.DisplayName}{strategyText}{variantText} - {configuration.LatencyDisplayText}";
     }
 
@@ -581,7 +581,7 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
     {
         if (string.IsNullOrWhiteSpace(filterText))
             return _ => true;
-        return pair => 
+        return pair =>
             pair.SourceLanguageDisplay.Contains(filterText, StringComparison.OrdinalIgnoreCase) ||
             pair.TargetLanguageDisplay.Contains(filterText, StringComparison.OrdinalIgnoreCase) ||
             pair.LanguagePairKey.Contains(filterText, StringComparison.Ordinal) ||

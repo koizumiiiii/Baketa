@@ -1,11 +1,16 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Capture;
-using Baketa.Core.Models.Capture;
-using Baketa.Core.Abstractions.Platform.Windows;
-using Baketa.Core.Exceptions.Capture;
-using Baketa.Core.Abstractions.GPU;
-using Baketa.Infrastructure.Platform.Windows;
 using System;
+using Baketa.Core.Abstractions.Capture;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Events.Diagnostics;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Exceptions.Capture;
+using Baketa.Core.Models.Capture;
+using Baketa.Infrastructure.Platform.Windows;
+using Microsoft.Extensions.Logging;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
+using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 
@@ -16,16 +21,19 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
 {
     private readonly ILogger<DirectFullScreenCaptureStrategy> _logger;
     private readonly IWindowsCapturer _windowsCapturer;
+    private readonly IEventAggregator _eventAggregator;
 
     public string StrategyName => "DirectFullScreen";
-    public int Priority => 100; // 最高優先度（統合GPUでは最も効率的）
+    public int Priority => 15; // 🔧 Phase 0 WGC修復: WGC問題対応で低優先度（WGC依存戦略）
 
     public DirectFullScreenCaptureStrategy(
         ILogger<DirectFullScreenCaptureStrategy> logger,
-        IWindowsCapturer windowsCapturer)
+        IWindowsCapturer windowsCapturer,
+        IEventAggregator eventAggregator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _windowsCapturer = windowsCapturer ?? throw new ArgumentNullException(nameof(windowsCapturer));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
     }
 
     public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
@@ -33,11 +41,11 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
         try
         {
             // 統合GPUかつ十分なテクスチャサイズサポートの場合に適用
-            var canApply = environment.IsIntegratedGpu && 
+            var canApply = environment.IsIntegratedGpu &&
                           environment.DirectXFeatureLevel >= DirectXFeatureLevel.D3D111 &&
                           environment.MaximumTexture2DDimension >= 4096;
 
-            _logger.LogDebug("DirectFullScreen戦略適用可能性: {CanApply} (統合GPU: {IsIntegrated}, DX11: {HasDx11}, MaxTexture: {MaxTexture})", 
+            _logger.LogDebug("DirectFullScreen戦略適用可能性: {CanApply} (統合GPU: {IsIntegrated}, DX11: {HasDx11}, MaxTexture: {MaxTexture})",
                 canApply, environment.IsIntegratedGpu, environment.DirectXFeatureLevel >= DirectXFeatureLevel.D3D111, environment.MaximumTexture2DDimension);
 
             return canApply;
@@ -67,7 +75,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                 var windowExists = IsWindow(hwnd);
                 var isVisible = IsWindowVisible(hwnd);
 
-                _logger.LogDebug("DirectFullScreen前提条件: Window存在={WindowExists}, 可視={IsVisible}", 
+                _logger.LogDebug("DirectFullScreen前提条件: Window存在={WindowExists}, 可視={IsVisible}",
                     windowExists, isVisible);
 
                 return windowExists && isVisible;
@@ -83,11 +91,28 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
     public async Task<CaptureStrategyResult> ExecuteCaptureAsync(IntPtr hwnd, CaptureOptions options)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var sessionId = Guid.NewGuid().ToString("N")[..8];
         var result = new CaptureStrategyResult
         {
             StrategyName = StrategyName,
             Metrics = new CaptureMetrics()
         };
+
+        // 📊 [DIAGNOSTIC] 画面キャプチャ開始イベント
+        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+        {
+            Stage = "ScreenCapture",
+            IsSuccess = true,
+            ProcessingTimeMs = 0,
+            SessionId = sessionId,
+            Severity = DiagnosticSeverity.Information,
+            Message = $"DirectFullScreen画面キャプチャ開始: HWND=0x{hwnd.ToInt64():X}",
+            Metrics = new Dictionary<string, object>
+            {
+                { "Strategy", StrategyName },
+                { "HWND", $"0x{hwnd.ToInt64():X}" }
+            }
+        }).ConfigureAwait(false);
 
         try
         {
@@ -95,7 +120,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
 
             // Windows Graphics Capture APIで直接キャプチャ
             var capturedImage = await CaptureDirectFullScreenAsync(hwnd, options).ConfigureAwait(false);
-            
+
             if (capturedImage != null)
             {
                 result.Success = true;
@@ -104,14 +129,51 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                 result.Metrics.FrameCount = 1;
                 result.Metrics.PerformanceCategory = "HighPerformance";
 
-                _logger.LogInformation("DirectFullScreenキャプチャ成功: サイズ={Width}x{Height}, 処理時間={ProcessingTime}ms", 
+                _logger.LogInformation("DirectFullScreenキャプチャ成功: サイズ={Width}x{Height}, 処理時間={ProcessingTime}ms",
                     capturedImage.Width, capturedImage.Height, stopwatch.ElapsedMilliseconds);
+
+                // 📊 [DIAGNOSTIC] 画面キャプチャ成功イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "ScreenCapture",
+                    IsSuccess = true,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    SessionId = sessionId,
+                    Severity = DiagnosticSeverity.Information,
+                    Message = $"DirectFullScreen画面キャプチャ成功: {capturedImage.Width}x{capturedImage.Height}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "Strategy", StrategyName },
+                        { "ImageWidth", capturedImage.Width },
+                        { "ImageHeight", capturedImage.Height },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                        { "FrameCount", 1 },
+                        { "PerformanceCategory", "HighPerformance" }
+                    }
+                }).ConfigureAwait(false);
             }
             else
             {
                 result.Success = false;
                 result.ErrorMessage = "キャプチャイメージの取得に失敗";
                 _logger.LogWarning("DirectFullScreenキャプチャ失敗: イメージが null");
+
+                // 📊 [DIAGNOSTIC] 画面キャプチャ失敗イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "ScreenCapture",
+                    IsSuccess = false,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    ErrorMessage = result.ErrorMessage,
+                    SessionId = sessionId,
+                    Severity = DiagnosticSeverity.Error,
+                    Message = $"DirectFullScreen画面キャプチャ失敗: イメージが null",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "Strategy", StrategyName },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds }
+                    }
+                }).ConfigureAwait(false);
             }
         }
         catch (TDRException ex)
@@ -119,6 +181,26 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             _logger.LogWarning(ex, "DirectFullScreen キャプチャでTDRを検出");
             result.Success = false;
             result.ErrorMessage = $"GPU タイムアウト: {ex.Message}";
+
+            // 📊 [DIAGNOSTIC] TDRエラーイベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ScreenCapture",
+                IsSuccess = false,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                ErrorMessage = result.ErrorMessage,
+                SessionId = sessionId,
+                Severity = DiagnosticSeverity.Critical,
+                Message = $"DirectFullScreen画面キャプチャでTDR検出: {ex.Message}",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "Strategy", StrategyName },
+                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                    { "ErrorType", "TDR" },
+                    { "TDRCode", ex.Data.Contains("ErrorCode") ? ex.Data["ErrorCode"] : "Unknown" }
+                }
+            }).ConfigureAwait(false);
+
             throw; // TDR例外は上位層で特別に処理する必要がある
         }
         catch (GPUConstraintException ex)
@@ -126,12 +208,60 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             _logger.LogWarning(ex, "DirectFullScreen キャプチャでGPU制約を検出");
             result.Success = false;
             result.ErrorMessage = $"GPU制約: {ex.Message}";
+
+            // 📊 [DIAGNOSTIC] GPU制約エラーイベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ScreenCapture",
+                IsSuccess = false,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                ErrorMessage = result.ErrorMessage,
+                SessionId = sessionId,
+                Severity = DiagnosticSeverity.Warning,
+                Message = $"DirectFullScreen画面キャプチャでGPU制約検出: {ex.Message}",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "Strategy", StrategyName },
+                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                    { "ErrorType", "GPUConstraint" },
+                    { "RequestedSize", ex.Data.Contains("RequestedSize") ? ex.Data["RequestedSize"] : "Unknown" },
+                    { "MaxSize", ex.Data.Contains("MaxSize") ? ex.Data["MaxSize"] : "Unknown" }
+                }
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "DirectFullScreenキャプチャ中にエラー");
+            // システムダイアログ等のキャプチャセッション作成失敗は想定内
+            if (ex is InvalidOperationException && ex.Message.Contains("キャプチャセッション作成に失敗"))
+            {
+                _logger.LogDebug("DirectFullScreenキャプチャ制限（システム保護ウィンドウの可能性）: {Message}", ex.Message);
+            }
+            else
+            {
+                _logger.LogError(ex, "DirectFullScreenキャプチャ中にエラー");
+            }
+
             result.Success = false;
             result.ErrorMessage = ex.Message;
+
+            // 📊 [DIAGNOSTIC] 一般エラーイベント（システム制限の場合は警告レベル）
+            var severity = ex is InvalidOperationException ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error;
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "ScreenCapture",
+                IsSuccess = false,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                ErrorMessage = result.ErrorMessage,
+                SessionId = sessionId,
+                Severity = severity,
+                Message = $"DirectFullScreen画面キャプチャ中にエラー: {ex.Message}",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "Strategy", StrategyName },
+                    { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                    { "ErrorType", ex.GetType().Name }
+                }
+            }).ConfigureAwait(false);
         }
         finally
         {
@@ -154,7 +284,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                 System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌯 DirectFullScreen: _windowsCapturerタイプ={_windowsCapturer.GetType().FullName}{Environment.NewLine}");
             }
             catch { /* デバッグログ失敗は無視 */ }
-            
+
             // Windows Graphics Capture APIに最適化されたキャプチャオプションを設定
             var captureOptions = new WindowsCaptureOptions
             {
@@ -167,7 +297,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             {
                 // Windows Graphics Capturerの場合は専用設定を適用
                 graphicsCapturer.SetCaptureOptions(captureOptions);
-                
+
                 // 初期化が必要な場合は実行
                 if (!graphicsCapturer.IsInitialized)
                 {
@@ -182,7 +312,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
 
             // DirectFullScreen戦略に最適化されたキャプチャ実行
             var capturedImage = await ExecuteOptimizedCaptureAsync(hwnd, options).ConfigureAwait(false);
-            
+
             if (capturedImage != null)
             {
                 _logger.LogDebug("DirectFullScreen最適化キャプチャ成功: {Width}x{Height}",
@@ -198,19 +328,19 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
         catch (Exception ex)
         {
             _logger.LogError(ex, "直接フルスクリーンキャプチャ中にエラー");
-            
+
             // エラーメッセージからTDRを検出
             if (IsErrorIndicatingTDR(ex.Message))
             {
                 throw new TDRException(unchecked((int)0x887A0005)); // DXGI_ERROR_DEVICE_REMOVED
             }
-            
+
             // GPU制約エラーの検出
             if (IsErrorIndicatingGPUConstraint(ex.Message))
             {
                 throw new GPUConstraintException(4096, 2048); // 仮の数値：要求サイズ vs 最大サイズ
             }
-            
+
             throw new CaptureStrategyException(StrategyName, "直接キャプチャに失敗しました", ex);
         }
     }
@@ -221,7 +351,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
     private async Task<IWindowsImage?> ExecuteOptimizedCaptureAsync(IntPtr hwnd, CaptureOptions options)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
+
         try
         {
             // ウィンドウがフルスクリーンかチェック
@@ -237,11 +367,11 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                 }
             }
             catch { /* デバッグログ失敗は無視 */ }
-            
+
             if (IsFullScreenWindow(hwnd))
             {
                 _logger.LogDebug("フルスクリーンウィンドウを検出、画面全体キャプチャを実行");
-                
+
                 // 🔍🔍🔍 デバッグ: フルスクリーン判定でもウィンドウキャプチャを使う
                 try
                 {
@@ -249,23 +379,23 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 DirectFullScreen: フルスクリーン検出だがウィンドウキャプチャを実行 HWND=0x{hwnd.ToInt64():X8}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
-                
+
                 // FIXME: 一時的にフルスクリーンでもウィンドウキャプチャを使用
                 var windowCapture = await _windowsCapturer.CaptureWindowAsync(hwnd).ConfigureAwait(false);
-                
+
                 _logger.LogDebug("フルスクリーンウィンドウキャプチャ完了: 処理時間={ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
                 return windowCapture;
             }
             else
             {
                 _logger.LogDebug("通常ウィンドウを検出、ウィンドウキャプチャを実行");
-                
+
                 // 🔍🔍🔍 デバッグ: キャプチャ前ログ
                 try
                 {
                     var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 DirectFullScreen: ウィンドウキャプチャ開始 HWND=0x{hwnd.ToInt64():X8}, Capturer={_windowsCapturer.GetType().Name}{Environment.NewLine}");
-                    
+
                     // WindowsGraphicsCapturerの詳細ステータス
                     if (_windowsCapturer is WindowsGraphicsCapturer wgc)
                     {
@@ -273,7 +403,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                     }
                 }
                 catch { /* デバッグログ失敗は無視 */ }
-                
+
                 // 通常ウィンドウの場合はウィンドウキャプチャ
                 IWindowsImage? windowCapture = null;
                 try
@@ -291,7 +421,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                     catch { /* デバッグログ失敗は無視 */ }
                     throw;
                 }
-                
+
                 // 🔍🔍🔍 デバッグ: キャプチャ後ログ
                 try
                 {
@@ -299,7 +429,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
                     System.IO.File.AppendAllText(debugPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 DirectFullScreen: キャプチャ完了 {(windowCapture != null ? $"{windowCapture.Width}x{windowCapture.Height}" : "null")}{Environment.NewLine}");
                 }
                 catch { /* デバッグログ失敗は無視 */ }
-                
+
                 _logger.LogDebug("ウィンドウキャプチャ完了: 処理時間={ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
                 return windowCapture;
             }
@@ -337,7 +467,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             var windowHeight = windowRect.Bottom - windowRect.Top;
 
             var isFullScreen = windowWidth >= screenWidth && windowHeight >= screenHeight;
-            
+
             _logger.LogDebug("フルスクリーン判定: Window={WindowW}x{WindowH}, Screen={ScreenW}x{ScreenH}, IsFullScreen={IsFullScreen}",
                 windowWidth, windowHeight, screenWidth, screenHeight, isFullScreen);
 
@@ -370,7 +500,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             "display driver stopped responding"
         };
 
-        return tdrPatterns.Any(pattern => 
+        return tdrPatterns.Any(pattern =>
             errorMessage.Contains(pattern, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -393,7 +523,7 @@ public class DirectFullScreenCaptureStrategy : ICaptureStrategy
             "integrated GPU constraint"
         };
 
-        return constraintPatterns.Any(pattern => 
+        return constraintPatterns.Any(pattern =>
             errorMessage.Contains(pattern, StringComparison.OrdinalIgnoreCase));
     }
 

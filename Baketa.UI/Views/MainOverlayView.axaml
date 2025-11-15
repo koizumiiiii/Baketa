@@ -157,11 +157,12 @@
       </Button>
       
       <!-- ホーム/開始ボタン -->
+      <!-- 🔥 [PHASE5.2E] ToolTipを StartButtonTooltip にバインディング（ウォームアップ進捗表示） -->
       <Button Classes="menu-item"
               Command="{Binding StartStopCommand}"
-              ToolTip.Tip="{Binding StartStopText}"
+              ToolTip.Tip="{Binding StartButtonTooltip}"
               Name="StartStopButton"
-              IsEnabled="{Binding IsStartStopEnabled}">
+              PointerPressed="StartStopButton_OnPointerPressed">
         <StackPanel Orientation="Vertical" Spacing="4">
           <PathIcon Width="20" Height="20"
                     Data="{Binding IsTranslationActive, Converter={StaticResource TranslationStateToIconConverter}}"

@@ -27,11 +27,11 @@ public sealed class TranslationModeChangedEventProcessor(ILogger<TranslationMode
     {
         // CA1062: 引数のnullチェックを実施
         ArgumentNullException.ThrowIfNull(eventData);
-        
+
         _logger.LogInformation(
             "翻訳モードが変更されました: {PreviousMode} → {NewMode} (イベントID: {EventId})",
-            eventData.PreviousMode, 
-            eventData.NewMode, 
+            eventData.PreviousMode,
+            eventData.NewMode,
             eventData.Id);
 
         // ここで翻訳モード変更に関連する処理を実装
@@ -44,7 +44,7 @@ public sealed class TranslationModeChangedEventProcessor(ILogger<TranslationMode
         await Task.Delay(1).ConfigureAwait(false); // 非同期処理のサンプル
 
         _logger.LogDebug(
-            "翻訳モード変更イベントの処理が完了しました (イベントID: {EventId})", 
+            "翻訳モード変更イベントの処理が完了しました (イベントID: {EventId})",
             eventData.Id);
     }
 }

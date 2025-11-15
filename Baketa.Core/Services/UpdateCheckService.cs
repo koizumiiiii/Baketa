@@ -23,11 +23,11 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
     private readonly VersionComparisonService _versionComparison;
     private readonly IFeatureFlagService _featureFlagService;
     private readonly ILogger<UpdateCheckService> _logger;
-    
+
     private readonly SemaphoreSlim _checkSemaphore = new(1, 1);
     private readonly CancellationTokenSource _periodicCheckCts = new();
     private readonly System.Threading.Timer _periodicTimer;
-    
+
     private UpdateCheckSettings _currentSettings;
     private UpdateInfo? CachedUpdateInfo { get; set; }
     private DateTime? LastSuccessfulCheck { get; set; }
@@ -48,16 +48,16 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _currentSettings = _optionsMonitor.CurrentValue;
-        
+
         // HttpClient設定
         ConfigureHttpClient();
-        
+
         // 設定変更の監視
         _optionsMonitor.OnChange((settings, _) => OnSettingsChanged(settings));
-        
+
         // 定期チェックタイマー（開始は手動）
         _periodicTimer = new System.Threading.Timer(PeriodicCheckCallback, null, Timeout.Infinite, Timeout.Infinite);
-        
+
         _logger.LogInformation("UpdateCheckService初期化完了");
     }
 
@@ -117,11 +117,11 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
                 LastSuccessfulCheck = DateTime.UtcNow;
                 var duration = DateTime.UtcNow - startTime;
 
-                var result = CachedUpdateInfo != null && IsVersionNewer(CachedUpdateInfo.Version) 
-                    ? UpdateCheckResult.UpdateAvailable 
+                var result = CachedUpdateInfo != null && IsVersionNewer(CachedUpdateInfo.Version)
+                    ? UpdateCheckResult.UpdateAvailable
                     : UpdateCheckResult.UpToDate;
 
-                _logger.LogInformation("更新チェック完了: {Result} (所要時間: {Duration}ms)", 
+                _logger.LogInformation("更新チェック完了: {Result} (所要時間: {Duration}ms)",
                     result, duration.TotalMilliseconds);
 
                 FireUpdateCheckCompleted(result, CachedUpdateInfo, null, duration);
@@ -132,10 +132,10 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
             catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException)
             {
                 _logger.LogWarning(ex, "更新チェックでネットワークエラーが発生しました");
-                
+
                 var duration = DateTime.UtcNow - startTime;
                 var result = HandleOfflineScenario();
-                
+
                 FireUpdateCheckCompleted(result, CachedUpdateInfo, ex, duration);
                 return result;
             }
@@ -199,9 +199,9 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
 
         _currentSettings = settings;
         ConfigureHttpClient();
-        
+
         _logger.LogInformation("更新チェック設定が更新されました");
-        
+
         // 自動チェックの再開
         if (settings.EnableAutoCheck)
         {
@@ -211,7 +211,7 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
         {
             StopPeriodicCheck();
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -225,9 +225,9 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
 
         var interval = TimeSpan.FromHours(_currentSettings.CheckIntervalHours);
         _periodicTimer.Change(interval, interval);
-        
+
         _logger.LogInformation("定期更新チェックを開始しました（間隔: {Interval}時間）", _currentSettings.CheckIntervalHours);
-        
+
         // 初回チェックを実行
         _ = Task.Run(async () =>
         {
@@ -248,7 +248,7 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
                 _logger.LogWarning(ex, "初回更新チェックでネットワークエラーが発生しました");
             }
         }, cancellationToken);
-        
+
         return Task.CompletedTask;
     }
 
@@ -282,11 +282,11 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
         {
             try
             {
-                _logger.LogDebug("GitHub Releases APIを呼び出します: {Url} (試行 {Retry}/{MaxRetry})", 
+                _logger.LogDebug("GitHub Releases APIを呼び出します: {Url} (試行 {Retry}/{MaxRetry})",
                     url, retryCount + 1, _currentSettings.RetryCount + 1);
 
                 var response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-                
+
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
                     _logger.LogWarning("GitHub API制限に達しました。しばらく待機します");
@@ -303,10 +303,10 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
             {
                 retryCount++;
                 var delay = TimeSpan.FromSeconds((double)_currentSettings.RetryDelaySeconds * retryCount);
-                
-                _logger.LogWarning(ex, "GitHub API呼び出しが失敗しました。{Delay}秒後にリトライします（{Retry}/{MaxRetry}）", 
+
+                _logger.LogWarning(ex, "GitHub API呼び出しが失敗しました。{Delay}秒後にリトライします（{Retry}/{MaxRetry}）",
                     delay.TotalSeconds, retryCount, _currentSettings.RetryCount);
-                
+
                 await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -326,7 +326,7 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
     private UpdateInfo ConvertToUpdateInfo(GitHubRelease release)
     {
         var version = _versionComparison.ParseVersion(release.TagName);
-        
+
         return new UpdateInfo
         {
             Version = new Version(version.Major, version.Minor, version.Patch),
@@ -452,7 +452,7 @@ public sealed class UpdateCheckService : IUpdateCheckService, IDisposable
         _periodicCheckCts.Cancel();
         _periodicCheckCts.Dispose();
         _checkSemaphore.Dispose();
-        
+
         _disposed = true;
         _logger.LogInformation("UpdateCheckService disposed");
     }

@@ -22,7 +22,7 @@ public class TranslationCompletedEvent(
         string targetLanguage,
         TimeSpan processingTime,
         string engineName = "Default") : EventBase
-    {
+{
     /// <summary>
     /// 元のテキスト
     /// </summary>
@@ -36,7 +36,7 @@ public class TranslationCompletedEvent(
     /// <summary>
     /// 元言語コード
     /// </summary>
-    public string SourceLanguage { get; } = sourceLanguage ?? "auto";
+    public string SourceLanguage { get; } = sourceLanguage ?? "en";
 
     /// <summary>
     /// 翻訳先言語コード
@@ -55,7 +55,7 @@ public class TranslationCompletedEvent(
 
     /// <inheritdoc />
     public override string Name => "TranslationCompleted";
-        
-        /// <inheritdoc />
-        public override string Category => "Translation";
-    }
+
+    /// <inheritdoc />
+    public override string Category => "Translation";
+}

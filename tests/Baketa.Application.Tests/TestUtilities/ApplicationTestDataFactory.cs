@@ -58,13 +58,13 @@ internal static class ApplicationTestDataFactory
         int height = 1080)
     {
         var imageMock = new Mock<IImage>();
-        
+
         imageMock.SetupGet(x => x.Width).Returns(width);
         imageMock.SetupGet(x => x.Height).Returns(height);
-        
+
         // Dispose メソッドのモック
         imageMock.Setup(x => x.Dispose());
-        
+
         return imageMock;
     }
 
@@ -86,8 +86,8 @@ internal static class ApplicationTestDataFactory
             TargetLanguage = "ja",
             Confidence = isSuccessful ? 0.95f : 0.0f,
             ProcessingTime = TimeSpan.FromMilliseconds(Random.Shared.Next(200, 2000)),
-            DisplayDuration = mode == TranslationMode.Manual 
-                ? TimeSpan.FromSeconds(5) 
+            DisplayDuration = mode == TranslationMode.Manual
+                ? TimeSpan.FromSeconds(5)
                 : TimeSpan.Zero
         };
     }

@@ -1,6 +1,7 @@
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 
 namespace Baketa.Core.Abstractions.Processing;
 
@@ -14,14 +15,15 @@ public interface ITranslationProcessingFacade
     /// バッチOCR処理サービス
     /// </summary>
     IBatchOcrProcessor OcrProcessor { get; }
-    
+
     /// <summary>
     /// 翻訳サービス
     /// </summary>
     ITranslationService TranslationService { get; }
-    
+
     /// <summary>
-    /// インプレース翻訳オーバーレイマネージャー
+    /// 統一オーバーレイマネージャー
     /// </summary>
-    IInPlaceTranslationOverlayManager OverlayManager { get; }
+    // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
+    IOverlayManager OverlayManager { get; }
 }

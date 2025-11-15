@@ -1,9 +1,10 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
-using System.Drawing;
+using Baketa.Core.Models.OCR; // 🎯 [OPTION_B] OcrContext用
+using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 
@@ -24,10 +25,10 @@ public class SafeTestPaddleOcrEngine(
     private readonly ILogger<PaddleOcrEngine>? _logger = logger;
     private readonly bool _skipRealInitialization = skipRealInitialization;
     private bool _disposed;
-    
+
     // 設定管理
     private OcrEngineSettings _settings = new();
-    
+
     // パフォーマンス統計
     private int _totalProcessedImages;
     private readonly List<double> _processingTimes = [];
@@ -62,20 +63,20 @@ public class SafeTestPaddleOcrEngine(
     public async Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
+
         if (_skipRealInitialization)
         {
             settings ??= new OcrEngineSettings();
-            
+
             // 厳密なパラメータ検証を実装（例外を投げる）
             ValidateInitializationSettings(settings);
-            
+
             if (!settings.IsValid())
             {
                 _logger?.LogError("無効な設定でOCRエンジンの初期化が失敗しました");
                 return false;
             }
-            
+
             return await SimulateInitializationAsync(settings, cancellationToken).ConfigureAwait(false);
         }
 
@@ -91,7 +92,7 @@ public class SafeTestPaddleOcrEngine(
         try
         {
             _logger?.LogInformation("SafeTestPaddleOcrEngineウォームアップ開始");
-            
+
             if (_skipRealInitialization)
             {
                 // テストモードではダミーのウォームアップ
@@ -99,7 +100,7 @@ public class SafeTestPaddleOcrEngine(
                 _logger?.LogInformation("SafeTestPaddleOcrEngineウォームアップ完了（テスト用）");
                 return true;
             }
-            
+
             // 実際のウォームアップはスキップ（内部エンジンがnullの場合）
             _logger?.LogWarning("SafeTestPaddleOcrEngineウォームアップスキップ（実エンジン未実装）");
             return false;
@@ -136,28 +137,28 @@ public class SafeTestPaddleOcrEngine(
         ThrowIfNotInitialized();
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
+
         try
         {
             // 進捗通知
             progressCallback?.Report(new OcrProgress(0.0, "OCR処理を開始（テスト用）"));
-            
+
             // テスト用の最短遅延
             await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-            
+
             progressCallback?.Report(new OcrProgress(0.5, "テキスト検出中（テスト用）"));
             await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-            
+
             progressCallback?.Report(new OcrProgress(1.0, "OCR処理完了（テスト用）"));
-            
+
             stopwatch.Stop();
-            
+
             // 統計を更新
             _totalProcessedImages++;
             _processingTimes.Add(stopwatch.Elapsed.TotalMilliseconds);
-            
+
             _logger?.LogDebug("テスト用OCR実行完了 - 処理時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
-            
+
             // 空の結果を返す（テスト用）
             return new OcrResults(
                 [],
@@ -183,6 +184,32 @@ public class SafeTestPaddleOcrEngine(
     }
 
     /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    /// <param name="context">OCRコンテキスト（画像、ウィンドウハンドル、キャプチャ領域を含む）</param>
+    /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
+    /// <returns>OCR結果</returns>
+    /// <remarks>
+    /// テスト用の実装。既存のRecognizeAsyncメソッドに委譲します。
+    /// </remarks>
+    public async Task<OcrResults> RecognizeAsync(
+        OcrContext context,
+        IProgress<OcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        _logger?.LogDebug("🎯 [OPTION_B] SafeTestPaddleOcrEngine - OcrContext使用 - HasCaptureRegion: {HasCaptureRegion}",
+            context.HasCaptureRegion);
+
+        // 既存メソッドに委譲
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// OCRエンジンの設定を取得します
     /// </summary>
     public OcrEngineSettings GetSettings()
@@ -197,7 +224,7 @@ public class SafeTestPaddleOcrEngine(
     {
         ArgumentNullException.ThrowIfNull(settings);
         ThrowIfDisposed();
-        
+
         if (!settings.IsValid())
         {
             throw new ArgumentException("無効な設定です", nameof(settings));
@@ -209,20 +236,20 @@ public class SafeTestPaddleOcrEngine(
         }
 
         await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-        
+
         // 言語変更を検出
         bool languageChanged = _settings.Language != settings.Language;
-        
+
         // 設定をコピー
         _settings = settings.Clone();
-        
+
         // 言語が変更された場合は更新
         if (languageChanged)
         {
             CurrentLanguage = _settings.Language;
             _logger?.LogInformation("言語を変更しました: {Language}（テスト用）", _settings.Language);
         }
-        
+
         _logger?.LogInformation("OCRエンジン設定を更新: 言語={Language}, モデル={Model}（テスト用）",
             _settings.Language, _settings.ModelName);
     }
@@ -250,13 +277,13 @@ public class SafeTestPaddleOcrEngine(
     {
         if (string.IsNullOrEmpty(languageCode))
             return false;
-            
+
         var availableLanguages = GetAvailableLanguages();
         if (!availableLanguages.Contains(languageCode))
             return false;
-            
+
         await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-            
+
         // テスト環境ではモデルファイルの存在確認は行わない
         return true; // テスト用では常に利用可能とする
     }
@@ -269,7 +296,7 @@ public class SafeTestPaddleOcrEngine(
         double averageTime = _processingTimes.Count > 0 ? _processingTimes.Average() : 0.0;
         double minTime = _processingTimes.Count > 0 ? _processingTimes.Min() : 0.0;
         double maxTime = _processingTimes.Count > 0 ? _processingTimes.Max() : 0.0;
-        double successRate = _totalProcessedImages > 0 ? 
+        double successRate = _totalProcessedImages > 0 ?
             (double)(_totalProcessedImages - _errorCount) / _totalProcessedImages : 1.0;
 
         return new OcrPerformanceStats
@@ -296,6 +323,25 @@ public class SafeTestPaddleOcrEngine(
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // テストエンジンは失敗カウントを追跡しないため、常に0を返す
+        return 0;
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // テストエンジンは失敗カウントを追跡しないため、何もしない
+        _logger?.LogDebug("SafeTestPaddleOcrEngine: ResetFailureCounter呼び出し（スタブ実装）");
+    }
+
+    /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// テスト用の簡易実装
     /// </summary>
@@ -304,12 +350,12 @@ public class SafeTestPaddleOcrEngine(
         ArgumentNullException.ThrowIfNull(image);
         ThrowIfDisposed();
         ThrowIfNotInitialized();
-        
+
         _logger?.LogDebug("SafeTestPaddleOcrEngine: DetectTextRegionsAsync実行（テスト用）");
-        
+
         // テスト用の最短遅延
         await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-        
+
         // 空の結果を返す（テスト用）
         return new OcrResults(
             [],
@@ -332,17 +378,17 @@ public class SafeTestPaddleOcrEngine(
     {
         ThrowIfDisposed();
         ThrowIfNotInitialized();
-        
+
         if (string.IsNullOrWhiteSpace(language))
         {
             throw new ArgumentException("言語コードが無効です", nameof(language));
         }
-        
+
         if (language == "invalid")
         {
             throw new ArgumentException($"サポートされていない言語: {language}", nameof(language));
         }
-        
+
         if (!GetAvailableLanguages().Contains(language))
         {
             throw new ArgumentException($"サポートされていない言語: {language}", nameof(language));
@@ -357,9 +403,9 @@ public class SafeTestPaddleOcrEngine(
         // 設定を更新
         var newSettings = _settings.Clone();
         newSettings.Language = language;
-        
+
         await ApplySettingsAsync(newSettings, cancellationToken).ConfigureAwait(false);
-        
+
         _logger?.LogInformation("言語切り替え完了: {Language}（テスト用）", language);
         return true;
     }
@@ -374,52 +420,52 @@ public class SafeTestPaddleOcrEngine(
     private static void ValidateInitializationSettings(OcrEngineSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         // 言語の検証
         if (string.IsNullOrWhiteSpace(settings.Language))
         {
             throw new ArgumentException("言語コードが無効です", nameof(settings));
         }
-        
+
         if (settings.Language == "invalid")
         {
             throw new ArgumentException($"サポートされていない言語: {settings.Language}", nameof(settings));
         }
-        
+
         // ワーカー数の検証
         if (settings.WorkerCount <= 0 || settings.WorkerCount > 10)
         {
-            throw new ArgumentOutOfRangeException(nameof(settings), settings.WorkerCount, 
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.WorkerCount,
                 "ワーカー数は1から10の間で指定してください");
         }
-        
+
         // 閾値の検証
         if (settings.DetectionThreshold < 0.0 || settings.DetectionThreshold > 1.0)
         {
             throw new ArgumentOutOfRangeException(nameof(settings), settings.DetectionThreshold,
                 "検出閾値は0.0から1.0の間で指定してください");
         }
-        
+
         if (settings.RecognitionThreshold < 0.0 || settings.RecognitionThreshold > 1.0)
         {
             throw new ArgumentOutOfRangeException(nameof(settings), settings.RecognitionThreshold,
                 "認識閾値は0.0から1.0の間で指定してください");
         }
-        
+
         // 最大検出数の検証
         if (settings.MaxDetections <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(settings), settings.MaxDetections,
                 "最大検出数は正の値で指定してください");
         }
-        
+
         // GPUデバイスIDの検証
         if (settings.GpuDeviceId < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(settings), settings.GpuDeviceId,
                 "GPUデバイスIDは0以上で指定してください");
         }
-        
+
         // モデル名の検証
         if (string.IsNullOrWhiteSpace(settings.ModelName))
         {
@@ -455,15 +501,15 @@ public class SafeTestPaddleOcrEngine(
         {
             // テスト用のディレクトリ作成シミュレーション
             CreateTestDirectories();
-            
+
             // 設定を適用
             _settings = settings.Clone();
-            
+
             // 成功をシミュレート
             IsInitialized = true;
             CurrentLanguage = settings.Language;
             _startTime = DateTime.UtcNow;
-            
+
             _logger?.LogInformation("PaddleOCRエンジンの初期化完了（テスト用）");
             return true;
         }
@@ -498,7 +544,7 @@ public class SafeTestPaddleOcrEngine(
         {
             var modelsDirectory = _modelPathResolver.GetModelsRootDirectory();
             var detectionDirectory = _modelPathResolver.GetDetectionModelsDirectory();
-            
+
             // ネットワークパスを検出
             if (modelsDirectory.StartsWith(@"\\", StringComparison.Ordinal) ||
                 detectionDirectory.StartsWith(@"\\", StringComparison.Ordinal))
@@ -506,14 +552,14 @@ public class SafeTestPaddleOcrEngine(
                 _logger?.LogWarning("ネットワークパスが検出されました: {ModelsDir}", modelsDirectory);
                 return true;
             }
-            
+
             // 空のパスを検出
             if (string.IsNullOrWhiteSpace(modelsDirectory) || string.IsNullOrWhiteSpace(detectionDirectory))
             {
                 _logger?.LogWarning("空のパスが検出されました");
                 return true;
             }
-            
+
             return false;
         }
         catch (ArgumentException ex)
@@ -551,7 +597,7 @@ public class SafeTestPaddleOcrEngine(
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
-    
+
     /// <summary>
     /// テスト用のディレクトリ作成シミュレーション
     /// </summary>
@@ -566,7 +612,7 @@ public class SafeTestPaddleOcrEngine(
                 _modelPathResolver.GetRecognitionModelsDirectory("eng"),
                 _modelPathResolver.GetRecognitionModelsDirectory("jpn")
             ];
-            
+
             foreach (var directory in testDirectories)
             {
                 try
@@ -628,7 +674,7 @@ public class SafeTestPaddleOcrEngine(
         if (disposing)
         {
             _logger?.LogDebug("SafeTestPaddleOcrEngineのリソースを解放中");
-            
+
             IsInitialized = false;
             CurrentLanguage = null;
             _processingTimes.Clear();

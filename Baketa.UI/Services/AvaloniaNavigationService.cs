@@ -2,12 +2,12 @@ using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Baketa.UI.ViewModels;
+using Baketa.UI.ViewModels.Auth;
+using Baketa.UI.Views;
+using Baketa.UI.Views.Auth;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Baketa.UI.ViewModels.Auth;
-using Baketa.UI.Views.Auth;
-using Baketa.UI.Views;
-using Baketa.UI.ViewModels;
 
 namespace Baketa.UI.Services;
 
@@ -132,25 +132,23 @@ internal sealed class AvaloniaNavigationService(
             Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始");
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
+
             var settingsViewModel = _serviceProvider.GetRequiredService<SimpleSettingsViewModel>();
-            
+
             Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}");
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化.Name ?? "null"}{Environment.NewLine}");
             }
             catch { }
             var settingsWindow = new SimpleSettingsView
             {
                 DataContext = settingsViewModel
             };
-            
+
             Console.WriteLine("🔧 設定画面を表示");
             await ShowDialogAsync(settingsWindow).ConfigureAwait(false);
             Console.WriteLine("🔧 設定画面表示完了");

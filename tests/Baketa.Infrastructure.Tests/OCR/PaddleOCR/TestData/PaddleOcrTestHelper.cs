@@ -1,8 +1,8 @@
 using System.Drawing;
 using System.IO;
+using Baketa.Core.Abstractions.Imaging;
 using Moq;
 using Xunit;
-using Baketa.Core.Abstractions.Imaging;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
 
@@ -26,11 +26,11 @@ public static class PaddleOcrTestHelper
         var mockImage = new Mock<IImage>();
         mockImage.Setup(x => x.Width).Returns(width);
         mockImage.Setup(x => x.Height).Returns(height);
-        
+
         // ダミーの画像データを生成
         var imageData = CreateDummyImageData(width, height, channels);
         mockImage.Setup(x => x.ToByteArrayAsync()).ReturnsAsync(imageData);
-        
+
         return mockImage;
     }
 
@@ -45,13 +45,13 @@ public static class PaddleOcrTestHelper
     {
         var dataSize = width * height * channels;
         var imageData = new byte[dataSize];
-        
+
         // 単純なグラデーションパターンを作成
         for (int i = 0; i < dataSize; i++)
         {
             imageData[i] = (byte)(i % 256);
         }
-        
+
         return imageData;
     }
 
@@ -98,7 +98,7 @@ public static class PaddleOcrTestHelper
         var roiHeight = imageHeight / 2;
         var x = (imageWidth - roiWidth) / 2;
         var y = (imageHeight - roiHeight) / 2;
-        
+
         return new Rectangle(x, y, roiWidth, roiHeight);
     }
 
@@ -203,11 +203,11 @@ public static class PaddleOcrTestHelper
     public static string CreateTestDirectory(string testName)
     {
         var testDirectory = Path.Combine(
-            Path.GetTempPath(), 
-            "BaketaOCRTests", 
-            testName, 
+            Path.GetTempPath(),
+            "BaketaOCRTests",
+            testName,
             Guid.NewGuid().ToString());
-        
+
         Directory.CreateDirectory(testDirectory);
         return testDirectory;
     }
@@ -274,7 +274,7 @@ public static class PaddleOcrTestHelper
     public static long MeasureExecutionTime(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         action();
         stopwatch.Stop();
@@ -289,7 +289,7 @@ public static class PaddleOcrTestHelper
     public static async Task<long> MeasureExecutionTimeAsync(Func<Task> taskFunc)
     {
         ArgumentNullException.ThrowIfNull(taskFunc);
-        
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         await taskFunc().ConfigureAwait(false);
         stopwatch.Stop();
@@ -305,12 +305,12 @@ public static class PaddleOcrTestHelper
     public static double MeasureAverageExecutionTime(Action action, int iterations = 10)
     {
         var times = new List<long>();
-        
+
         for (int i = 0; i < iterations; i++)
         {
             times.Add(MeasureExecutionTime(action));
         }
-        
+
         return times.Average();
     }
 
@@ -326,12 +326,12 @@ public static class PaddleOcrTestHelper
     public static void AssertValidFilePath(string path, string expectedExtension = ".onnx")
     {
         ArgumentNullException.ThrowIfNull(path);
-        
+
         Assert.NotNull(path);
         Assert.NotEmpty(path);
         Assert.True(Path.IsPathRooted(path), $"Path should be rooted: {path}");
         Assert.EndsWith(expectedExtension, path, StringComparison.OrdinalIgnoreCase);
-        
+
         // 無効な文字が含まれていないことを確認
         var invalidChars = Path.GetInvalidPathChars();
         Assert.False(path.Any(c => invalidChars.Contains(c)), $"Path contains invalid characters: {path}");
@@ -344,14 +344,14 @@ public static class PaddleOcrTestHelper
     public static void AssertValidDirectoryPath(string directoryPath)
     {
         ArgumentNullException.ThrowIfNull(directoryPath);
-        
+
         Assert.NotNull(directoryPath);
         Assert.NotEmpty(directoryPath);
         Assert.True(Path.IsPathRooted(directoryPath), $"Directory path should be rooted: {directoryPath}");
-        
+
         // 無効な文字が含まれていないことを確認
         var invalidChars = Path.GetInvalidPathChars();
-        Assert.False(directoryPath.Any(c => invalidChars.Contains(c)), 
+        Assert.False(directoryPath.Any(c => invalidChars.Contains(c)),
             $"Directory path contains invalid characters: {directoryPath}");
     }
 

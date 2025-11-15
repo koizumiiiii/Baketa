@@ -136,7 +136,7 @@ public sealed class SettingsStatistics(
             settingsByLevel: new Dictionary<SettingLevel, int>(),
             activeGameProfileId: null);
     }
-    
+
     /// <summary>
     /// 統計情報のサマリー
     /// </summary>
@@ -148,7 +148,7 @@ public sealed class SettingsStatistics(
                    $"{ModifiedSettingsCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}変更済み, スキーマva{CurrentSchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
         }
     }
-    
+
     /// <summary>
     /// 詳細な統計情報を取得します
     /// </summary>

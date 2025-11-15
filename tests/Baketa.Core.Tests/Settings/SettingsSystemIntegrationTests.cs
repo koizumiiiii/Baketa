@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
+using Baketa.Core.Settings;
+using Baketa.Core.Settings.Migration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
-using Baketa.Core.Settings;
-using Baketa.Core.Settings.Migration;
 
 namespace Baketa.Core.Tests.Settings;
 
@@ -24,15 +24,15 @@ public class SettingsSystemIntegrationTests : IDisposable
     public SettingsSystemIntegrationTests()
     {
         var services = new ServiceCollection();
-        
+
         // ロガーのモックを追加
         services.AddSingleton(Mock.Of<ILogger<SettingMetadataService>>());
         services.AddSingleton(Mock.Of<ILogger<SettingsMigrationManager>>());
-        
+
         // サービスを追加
         services.AddSingleton<ISettingMetadataService, SettingMetadataService>();
         services.AddSingleton<ISettingsMigrationManager, SettingsMigrationManager>();
-        
+
         _serviceProvider = services.BuildServiceProvider();
         _metadataService = _serviceProvider.GetRequiredService<ISettingMetadataService>();
         _migrationManager = _serviceProvider.GetRequiredService<ISettingsMigrationManager>();
@@ -49,13 +49,13 @@ public class SettingsSystemIntegrationTests : IDisposable
         // Assert
         Assert.NotNull(metadata);
         Assert.NotEmpty(metadata);
-        
+
         // 基本設定の確認
         var basicSettings = _metadataService.GetMetadataByLevel<MainUiSettings>(SettingLevel.Basic);
         Assert.NotEmpty(basicSettings);
         Assert.Contains(basicSettings, m => m.Property.Name == nameof(MainUiSettings.PanelPosition));
         Assert.Contains(basicSettings, m => m.Property.Name == nameof(MainUiSettings.PanelOpacity));
-        
+
         // 詳細設定の確認
         var advancedSettings = _metadataService.GetMetadataByLevel<MainUiSettings>(SettingLevel.Advanced);
         Assert.NotEmpty(advancedSettings);
@@ -92,11 +92,11 @@ public class SettingsSystemIntegrationTests : IDisposable
         // Assert
         Assert.True(result.Success);
         Assert.NotNull(result.FinalSettings);
-        
+
         // 既存設定が保持されることを確認
         Assert.Contains("General.Language", result.FinalSettings.Keys);
         Assert.Contains("Overlay.Position", result.FinalSettings.Keys);
-        
+
         // バージョンが更新されることを確認
         Assert.Equal(_migrationManager.LatestSchemaVersion, result.FinalSettings["Version"]);
     }
@@ -141,7 +141,7 @@ public class SettingsSystemIntegrationTests : IDisposable
 
         // Assert
         Assert.NotNull(results);
-        
+
         // 少なくとも一部の検証が失敗することを確認
         // 実際の検証ルールは SettingMetadata の実装に依存
         Assert.NotEmpty(results);
@@ -161,11 +161,11 @@ public class SettingsSystemIntegrationTests : IDisposable
         // Assert
         Assert.Contains("MainUi", categories);
         Assert.NotEmpty(mainUiSettings);
-        
+
         // 基本設定と詳細設定の両方が含まれることを確認
         var basicCount = mainUiSettings.Count(m => m.Level == SettingLevel.Basic);
         var advancedCount = mainUiSettings.Count(m => m.Level == SettingLevel.Advanced);
-        
+
         Assert.True(basicCount > 0, "基本設定が存在する");
         Assert.True(advancedCount > 0, "詳細設定が存在する");
     }
@@ -186,18 +186,18 @@ public class SettingsSystemIntegrationTests : IDisposable
         {
             // Act
             var metadata = _metadataService.GetMetadata(settingsType);
-            
+
             // Assert
             if (metadata.Any()) // メタデータが存在する場合のみチェック
             {
                 // Root cause solution: Use Distinct() to prevent duplicate key errors in collections
                 var basicSettings = metadata.Where(m => m.Level == SettingLevel.Basic).Distinct();
                 var advancedSettings = metadata.Where(m => m.Level == SettingLevel.Advanced).Distinct();
-                
+
                 // すべての設定が適切なレベルに分類されていることを確認
-                Assert.True(basicSettings.Any() || advancedSettings.Any(), 
+                Assert.True(basicSettings.Any() || advancedSettings.Any(),
                     $"{settingsType.Name} should have at least basic or advanced settings");
-                
+
                 // レベル設定の一貫性を確認
                 foreach (var meta in metadata)
                 {
@@ -217,17 +217,17 @@ public class SettingsSystemIntegrationTests : IDisposable
     {
         // Act & Assert - キャッシュが正しく動作することを確認
         var start = DateTime.UtcNow;
-        
+
         for (int i = 0; i < 100; i++)
         {
             var metadata = _metadataService.GetMetadata<MainUiSettings>();
             Assert.NotEmpty(metadata);
         }
-        
+
         var elapsed = DateTime.UtcNow - start;
-        
+
         // 100回のアクセスが1秒未満で完了することを確認（キャッシュが効いている証拠）
-        Assert.True(elapsed.TotalSeconds < 1.0, 
+        Assert.True(elapsed.TotalSeconds < 1.0,
             $"Multiple metadata access took too long: {elapsed.TotalMilliseconds}ms");
     }
 
@@ -240,7 +240,7 @@ public class SettingsSystemIntegrationTests : IDisposable
     {
         // Act & Assert
         Assert.NotNull(_serviceProvider);
-        
+
         // Dispose時に例外が発生しないことを確認
         _serviceProvider.Dispose();
     }
@@ -323,7 +323,7 @@ public class RealWorldSettingsTests
         Assert.NotNull(deserializedSettings);
         Assert.NotNull(deserializedSettings.GameProfiles);
         Assert.True(deserializedSettings.GameProfiles.ContainsKey("TestGame"));
-        
+
         var retrievedProfile = deserializedSettings.GameProfiles["TestGame"];
         Assert.Equal(gameProfile.GameName, retrievedProfile.GameName);
         Assert.Equal(gameProfile.ProcessName, retrievedProfile.ProcessName);

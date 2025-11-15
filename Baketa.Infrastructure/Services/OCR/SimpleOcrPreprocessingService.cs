@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
-using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 using Microsoft.Extensions.Logging;
+using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 
 namespace Baketa.Infrastructure.Services.OCR;
 
@@ -27,15 +27,15 @@ public class SimpleOcrPreprocessingService(ILogger<SimpleOcrPreprocessingService
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>前処理結果（検出されたテキスト領域を含む）</returns>
     public async Task<OcrPreprocessingResult> ProcessImageAsync(
-        IAdvancedImage image, 
-        string? profileName = null, 
+        IAdvancedImage image,
+        string? profileName = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
 
         try
         {
-            logger?.LogDebug("簡単なOCR前処理を開始 (プロファイル: {ProfileName})", 
+            logger?.LogDebug("簡単なOCR前処理を開始 (プロファイル: {ProfileName})",
                 profileName ?? "デフォルト");
 
             // 簡単な前処理：グレースケール変換のみ
@@ -50,7 +50,7 @@ public class SimpleOcrPreprocessingService(ILogger<SimpleOcrPreprocessingService
                 )
             };
 
-            logger?.LogDebug("簡単なOCR前処理が完了 (検出テキスト領域: {RegionCount}個)", 
+            logger?.LogDebug("簡単なOCR前処理が完了 (検出テキスト領域: {RegionCount}個)",
                 detectedRegions.Count);
 
             return new OcrPreprocessingResult(
@@ -96,7 +96,7 @@ public class SimpleOcrPreprocessingService(ILogger<SimpleOcrPreprocessingService
 
         try
         {
-            logger?.LogDebug("簡単なテキスト領域検出を開始 (検出器: {DetectorTypes})", 
+            logger?.LogDebug("簡単なテキスト領域検出を開始 (検出器: {DetectorTypes})",
                 string.Join(", ", detectorTypes));
 
             // 簡単な実装：全体を単一のテキスト領域として返す
@@ -110,7 +110,7 @@ public class SimpleOcrPreprocessingService(ILogger<SimpleOcrPreprocessingService
                 )
             };
 
-            logger?.LogDebug("簡単なテキスト領域検出が完了 (検出領域: {RegionCount}個)", 
+            logger?.LogDebug("簡単なテキスト領域検出が完了 (検出領域: {RegionCount}個)",
                 detectedRegions.Count);
 
             return detectedRegions;

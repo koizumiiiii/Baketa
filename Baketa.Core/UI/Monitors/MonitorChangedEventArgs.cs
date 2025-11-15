@@ -23,12 +23,12 @@ public readonly record struct MonitorChangedEventArgs(
             return primary.Handle != nint.Zero ? primary : null;
         }
     }
-    
+
     /// <summary>
     /// アクティブなモニター数
     /// </summary>
     public int MonitorCount => Monitors.Count;
-    
+
     /// <summary>
     /// 指定されたハンドルのモニターを検索
     /// </summary>
@@ -39,7 +39,7 @@ public readonly record struct MonitorChangedEventArgs(
         var monitor = Monitors.FirstOrDefault(m => m.Handle == handle);
         return monitor.Handle != nint.Zero ? monitor : null;
     }
-    
+
     /// <summary>
     /// 指定されたデバイスIDのモニターを検索
     /// </summary>
@@ -50,7 +50,7 @@ public readonly record struct MonitorChangedEventArgs(
         var monitor = Monitors.FirstOrDefault(m => m.DeviceId.Equals(deviceId, StringComparison.OrdinalIgnoreCase));
         return monitor.Handle != nint.Zero ? monitor : null;
     }
-    
+
     /// <summary>
     /// イベント概要の文字列表現
     /// </summary>

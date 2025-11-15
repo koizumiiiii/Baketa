@@ -3,8 +3,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Auth;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Security;
 
@@ -84,7 +84,7 @@ public sealed class SecureSessionManager(ILogger<SecureSessionManager>? logger =
 
         // タイムアウト時間の決定
         var timeout = customTimeout ?? (rememberMe ? ExtendedSessionTimeout : DefaultSessionTimeout);
-        
+
         // 最大制限の適用
         if (timeout > MaxSessionTimeout)
             timeout = MaxSessionTimeout;

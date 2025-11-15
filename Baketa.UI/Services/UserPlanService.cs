@@ -1,7 +1,7 @@
 using System;
+using Baketa.UI.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Baketa.UI.Configuration;
 
 namespace Baketa.UI.Services;
 
@@ -24,13 +24,13 @@ public class UserPlanService : IUserPlanService
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
-        
+
         _logger = logger;
         _options = options.Value;
-        
+
         // 現在は無料プランとして初期化（将来的にはライセンス確認ロジックを追加）
         CurrentPlan = UserPlanType.Free;
-        
+
         _logger.LogInformation("UserPlanService initialized with plan: {Plan}", CurrentPlan);
     }
 
@@ -79,7 +79,7 @@ public class UserPlanService : IUserPlanService
                 500,
                 false,
                 null),
-            
+
             UserPlanType.Premium => new UserPlanDetails(
                 UserPlanType.Premium,
                 "プレミアムプラン",
@@ -87,7 +87,7 @@ public class UserPlanService : IUserPlanService
                 int.MaxValue,
                 true,
                 DateTime.UtcNow.AddMonths(1)),
-            
+
             _ => throw new InvalidOperationException($"Unknown plan type: {CurrentPlan}")
         };
     }
@@ -108,7 +108,7 @@ public class UserPlanService : IUserPlanService
         CurrentPlan = newPlan;
 
         _logger.LogInformation("Plan changed from {OldPlan} to {NewPlan}", oldPlan, newPlan);
-        
+
         PlanChanged?.Invoke(this, new UserPlanChangedEventArgs(oldPlan, newPlan));
     }
 

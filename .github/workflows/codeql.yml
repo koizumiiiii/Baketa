@@ -26,20 +26,20 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v4
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
         config-file: ./.github/codeql/codeql-config.yml
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
-    - name: Install Windows 10 SDK 19041
+    - name: Install Windows 10 SDK 19041 (with UAP components)
       run: |
         Write-Host "Installing Windows 10 SDK 19041..."
         choco install windows-sdk-10-version-2004-all --yes --no-progress --force
@@ -47,12 +47,12 @@ jobs:
       shell: powershell
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore Baketa.sln
 
     - name: Build solution
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build Baketa.sln --configuration Release --no-restore
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
       with:
         category: "/language:${{matrix.language}}"

@@ -14,14 +14,14 @@ public interface IOcrPostProcessor
     /// <param name="confidence">認識信頼度（0.0～1.0）</param>
     /// <returns>後処理されたテキスト</returns>
     Task<string> ProcessAsync(string rawText, float confidence);
-    
+
     /// <summary>
     /// よくある誤認識パターンを修正
     /// </summary>
     /// <param name="text">入力テキスト</param>
     /// <returns>修正されたテキスト</returns>
     string CorrectCommonErrors(string text);
-    
+
     /// <summary>
     /// 後処理統計を取得
     /// </summary>
@@ -38,12 +38,12 @@ public sealed class PostProcessingStats
     /// 処理した文字列の総数
     /// </summary>
     public int TotalProcessed { get; init; }
-    
+
     /// <summary>
     /// 修正が適用された回数
     /// </summary>
     public int CorrectionsApplied { get; init; }
-    
+
     /// <summary>
     /// 最も多く修正されたパターンのトップ5
     /// </summary>

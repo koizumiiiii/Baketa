@@ -1,10 +1,10 @@
 using System;
-using Xunit;
-using Microsoft.Extensions.Logging;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Validation;
-using Baketa.Core.Abstractions.Settings;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Xunit;
 
 namespace Baketa.Core.Tests.Settings;
 
@@ -24,14 +24,14 @@ public class AlphaTestSettingsValidatorTests
     #region 翻訳エンジン検証テスト
 
     [Fact]
-    public void Validate_ValidLocalEngine_ShouldSucceed()
+    public void Validate_ValidNLLB200Engine_ShouldSucceed()
     {
         // Arrange
         var settings = new AppSettings
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local
+                DefaultEngine = TranslationEngine.NLLB200
             }
         };
 
@@ -61,7 +61,7 @@ public class AlphaTestSettingsValidatorTests
         // Assert
         result.IsValid.Should().BeFalse();
         result.Errors.Should().NotBeEmpty();
-        result.Errors.Should().Contain(e => e.ErrorMessage!.Contains("Local (OPUS-MT)"));
+        result.Errors.Should().Contain(e => e.ErrorMessage!.Contains("NLLB200"));
     }
 
     #endregion
@@ -76,7 +76,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             }
@@ -143,7 +143,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             },
@@ -168,7 +168,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             },
@@ -265,7 +265,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             },
@@ -310,7 +310,7 @@ public class AlphaTestSettingsValidatorTests
         {
             Translation = new TranslationSettings
             {
-                DefaultEngine = TranslationEngine.Local,
+                DefaultEngine = TranslationEngine.NLLB200,
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "en"
             },
@@ -339,7 +339,7 @@ public class AlphaTestSettingsValidatorTests
         // Arrange
         var translationSettings = new TranslationSettings
         {
-            DefaultEngine = TranslationEngine.Local,
+            DefaultEngine = TranslationEngine.NLLB200,
             DefaultSourceLanguage = "ja",
             DefaultTargetLanguage = "en"
         };
@@ -393,7 +393,7 @@ public class AlphaTestSettingsValidatorTests
 
         // Assert
         translationRules.Should().NotBeEmpty();
-        translationRules.Should().OnlyContain(rule => 
+        translationRules.Should().OnlyContain(rule =>
             rule.PropertyPath == "DefaultEngine" || rule.PropertyPath == "DefaultSourceLanguage");
     }
 

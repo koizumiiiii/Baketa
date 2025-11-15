@@ -9,42 +9,42 @@ public sealed class AccuracyMeasurementResult
     /// 全体精度（0.0-1.0）
     /// </summary>
     public double OverallAccuracy { get; init; }
-    
+
     /// <summary>
     /// 文字レベル精度（0.0-1.0）
     /// </summary>
     public double CharacterAccuracy { get; init; }
-    
+
     /// <summary>
     /// 単語レベル精度（0.0-1.0）
     /// </summary>
     public double WordAccuracy { get; init; }
-    
+
     /// <summary>
     /// 検出した文字数
     /// </summary>
     public int DetectedCharacterCount { get; init; }
-    
+
     /// <summary>
     /// 正答した文字数
     /// </summary>
     public int CorrectCharacterCount { get; init; }
-    
+
     /// <summary>
     /// 期待文字数（Ground Truth）
     /// </summary>
     public int ExpectedCharacterCount { get; init; }
-    
+
     /// <summary>
     /// 処理時間
     /// </summary>
     public TimeSpan ProcessingTime { get; init; }
-    
+
     /// <summary>
     /// 信頼度の平均値
     /// </summary>
     public double AverageConfidence { get; init; }
-    
+
     /// <summary>
     /// 測定に使用した設定のハッシュ
     /// </summary>
@@ -69,7 +69,7 @@ public interface IOcrAccuracyMeasurement
         string testImagePath,
         string expectedText,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 複数のテスト画像で一括精度測定
     /// </summary>
@@ -81,7 +81,7 @@ public interface IOcrAccuracyMeasurement
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
         IReadOnlyList<(string ImagePath, string ExpectedText)> testCases,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 設定比較による精度改善効果の測定
     /// </summary>
@@ -108,26 +108,26 @@ public sealed class AccuracyComparisonResult
     /// 基準設定での結果
     /// </summary>
     public AccuracyMeasurementResult BaselineResult { get; init; } = null!;
-    
+
     /// <summary>
     /// 改善設定での結果
     /// </summary>
     public AccuracyMeasurementResult ImprovedResult { get; init; } = null!;
-    
+
     /// <summary>
     /// 精度改善率（-1.0～1.0、正の値が改善）
     /// </summary>
     public double AccuracyImprovement => ImprovedResult.OverallAccuracy - BaselineResult.OverallAccuracy;
-    
+
     /// <summary>
     /// 処理時間変化率（-1.0～∞、負の値が高速化）
     /// </summary>
-    public double ProcessingTimeChange => 
-        BaselineResult.ProcessingTime.TotalMilliseconds > 0 
-            ? (ImprovedResult.ProcessingTime.TotalMilliseconds - BaselineResult.ProcessingTime.TotalMilliseconds) 
+    public double ProcessingTimeChange =>
+        BaselineResult.ProcessingTime.TotalMilliseconds > 0
+            ? (ImprovedResult.ProcessingTime.TotalMilliseconds - BaselineResult.ProcessingTime.TotalMilliseconds)
               / BaselineResult.ProcessingTime.TotalMilliseconds
             : 0.0;
-    
+
     /// <summary>
     /// 改善が統計的に有意かどうか
     /// </summary>

@@ -35,7 +35,7 @@ public sealed class AccuracyImprovementReporter(ILogger<AccuracyImprovementRepor
         // サマリー
         report.AppendLine("## 📊 改善効果サマリー");
         report.AppendLine();
-        
+
         var totalImprovements = comparisonResults.Where(r => r.Result.AccuracyImprovement > 0).Count();
         var avgAccuracyImprovement = comparisonResults.Average(r => r.Result.AccuracyImprovement);
         var avgProcessingTimeChange = comparisonResults.Average(r => r.Result.ProcessingTimeChange);
@@ -55,7 +55,7 @@ public sealed class AccuracyImprovementReporter(ILogger<AccuracyImprovementRepor
         {
             report.AppendLine(CultureInfo.InvariantCulture, $"### {improvementName}");
             report.AppendLine();
-            
+
             // 精度改善
             var accuracyStatus = result.AccuracyImprovement switch
             {
@@ -175,9 +175,9 @@ public sealed class AccuracyImprovementReporter(ILogger<AccuracyImprovementRepor
 
         foreach (var (name, result) in comparisonResults)
         {
-            var statusIcon = result.IsSignificantImprovement ? "✅" : 
+            var statusIcon = result.IsSignificantImprovement ? "✅" :
                            result.AccuracyImprovement > 0 ? "🔵" : "❌";
-            
+
             Console.WriteLine($"{statusIcon} {name}:");
             Console.WriteLine($"   精度改善: {result.AccuracyImprovement:+0.00%;-0.00%;+0.00%}");
             Console.WriteLine($"   時間変化: {result.ProcessingTimeChange:+0.00%;-0.00%;+0.00%}");
@@ -204,7 +204,7 @@ public sealed class AccuracyImprovementReporter(ILogger<AccuracyImprovementRepor
         string csvPath)
     {
         var csv = new StringBuilder();
-        
+
         // ヘッダー
         csv.AppendLine("ImprovementName,AccuracyImprovement,ProcessingTimeChange,IsSignificantImprovement," +
                       "BaselineAccuracy,ImprovedAccuracy,BaselineTime,ImprovedTime," +

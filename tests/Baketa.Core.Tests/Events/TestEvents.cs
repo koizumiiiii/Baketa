@@ -11,7 +11,7 @@ namespace Baketa.Core.Tests.Events;
 /// </remarks>
 /// <param name="data">イベントデータ</param>
 public class TestEvent(string data) : EventBase
-    {
+{
     /// <summary>
     /// イベントデータ
     /// </summary>
@@ -20,9 +20,9 @@ public class TestEvent(string data) : EventBase
     /// <inheritdoc />
     public override string Name => "TestEvent";
 
-        /// <inheritdoc />
-        public override string Category => "Test";
-    }
+    /// <inheritdoc />
+    public override string Category => "Test";
+}
 
 /// <summary>
 /// エラーテスト用イベント
@@ -33,7 +33,7 @@ public class TestEvent(string data) : EventBase
 /// <param name="data">イベントデータ</param>
 /// <param name="shouldThrowError">エラーを発生させるかどうか</param>
 public class ErrorTestEvent(string data, bool shouldThrowError) : EventBase
-    {
+{
     /// <summary>
     /// イベントデータ
     /// </summary>
@@ -47,6 +47,6 @@ public class ErrorTestEvent(string data, bool shouldThrowError) : EventBase
     /// <inheritdoc />
     public override string Name => "ErrorTestEvent";
 
-        /// <inheritdoc />
-        public override string Category => "Test";
-    }
+    /// <inheritdoc />
+    public override string Category => "Test";
+}

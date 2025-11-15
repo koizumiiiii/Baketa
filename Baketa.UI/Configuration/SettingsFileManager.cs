@@ -2,8 +2,8 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.UI.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Configuration;
 
@@ -24,12 +24,12 @@ public sealed class SettingsFileManager
     public SettingsFileManager(ILogger<SettingsFileManager> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // ユーザーローカルディレクトリに設定フォルダーを作成
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         _settingsDirectory = Path.Combine(userProfile, ".baketa", "settings");
         _settingsFilePath = Path.Combine(_settingsDirectory, "translation-settings.json");
-        
+
         // JSONシリアライゼーションオプション
         _jsonOptions = new JsonSerializerOptions
         {
@@ -39,7 +39,7 @@ public sealed class SettingsFileManager
             AllowTrailingCommas = true,
             ReadCommentHandling = JsonCommentHandling.Skip
         };
-        
+
         // 設定フォルダーを作成
         EnsureSettingsDirectoryExists();
     }
@@ -55,9 +55,9 @@ public sealed class SettingsFileManager
             var settings = await LoadAllSettingsAsync().ConfigureAwait(false);
             settings.SelectedEngine = engine;
             settings.LastModified = DateTime.UtcNow;
-            
+
             await SaveAllSettingsAsync(settings).ConfigureAwait(false);
-            
+
             _logger.LogInformation("エンジン設定を保存しました: {Engine}", engine);
         }
         catch (Exception ex)
@@ -98,9 +98,9 @@ public sealed class SettingsFileManager
             settings.SelectedLanguagePair = languagePair;
             settings.SelectedChineseVariant = chineseVariant;
             settings.LastModified = DateTime.UtcNow;
-            
+
             await SaveAllSettingsAsync(settings).ConfigureAwait(false);
-            
+
             _logger.LogInformation("言語ペア設定を保存しました: {LanguagePair}, {ChineseVariant}", languagePair, chineseVariant);
         }
         catch (Exception ex)
@@ -141,9 +141,9 @@ public sealed class SettingsFileManager
             settings.SelectedStrategy = strategy;
             settings.EnableFallback = enableFallback;
             settings.LastModified = DateTime.UtcNow;
-            
+
             await SaveAllSettingsAsync(settings).ConfigureAwait(false);
-            
+
             _logger.LogInformation("翻訳戦略設定を保存しました: {Strategy}, Fallback: {EnableFallback}", strategy, enableFallback);
         }
         catch (Exception ex)
@@ -186,10 +186,10 @@ public sealed class SettingsFileManager
             settings.ShowFallbackInformation = showFallbackInformation;
             settings.EnableStatusAnimations = enableStatusAnimations;
             settings.LastModified = DateTime.UtcNow;
-            
+
             await SaveAllSettingsAsync(settings).ConfigureAwait(false);
-            
-            _logger.LogInformation("通知設定を保存しました: Notifications={EnableNotifications}, Fallback={ShowFallbackInformation}, Animations={EnableStatusAnimations}", 
+
+            _logger.LogInformation("通知設定を保存しました: Notifications={EnableNotifications}, Fallback={ShowFallbackInformation}, Animations={EnableStatusAnimations}",
                 enableNotifications, showFallbackInformation, enableStatusAnimations);
         }
         catch (Exception ex)
@@ -227,9 +227,9 @@ public sealed class SettingsFileManager
         {
             var settings = await LoadAllSettingsAsync().ConfigureAwait(false);
             var json = JsonSerializer.Serialize(settings, _jsonOptions);
-            
+
             await File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
-            
+
             _logger.LogInformation("設定をエクスポートしました: {FilePath}", filePath);
         }
         catch (Exception ex)
@@ -257,12 +257,12 @@ public sealed class SettingsFileManager
 
             // 設定の妥当性検証
             ValidateSettings(importedSettings);
-            
+
             // タイムスタンプを更新
             importedSettings.LastModified = DateTime.UtcNow;
-            
+
             await SaveAllSettingsAsync(importedSettings).ConfigureAwait(false);
-            
+
             _logger.LogInformation("設定をインポートしました: {FilePath}", filePath);
         }
         catch (Exception ex) when (ex is not (FileNotFoundException or JsonException or InvalidOperationException))
@@ -288,7 +288,7 @@ public sealed class SettingsFileManager
         {
             var json = await File.ReadAllTextAsync(_settingsFilePath).ConfigureAwait(false);
             var settings = JsonSerializer.Deserialize<TranslationSettingsData>(json, _jsonOptions);
-            
+
             if (settings == null)
             {
                 _logger.LogWarning("設定ファイルのデシリアライゼーションに失敗しました。デフォルト設定を使用します。");
@@ -297,7 +297,7 @@ public sealed class SettingsFileManager
 
             // 設定の妥当性検証と自動修正
             ValidateAndFixSettings(settings);
-            
+
             return settings;
         }
         catch (JsonException ex)
@@ -321,14 +321,14 @@ public sealed class SettingsFileManager
         try
         {
             EnsureSettingsDirectoryExists();
-            
+
             var json = JsonSerializer.Serialize(settings, _jsonOptions);
-            
+
             // バックアップ作成
             await CreateBackupAsync().ConfigureAwait(false);
-            
+
             await File.WriteAllTextAsync(_settingsFilePath, json).ConfigureAwait(false);
-            
+
             _logger.LogDebug("設定ファイルを保存しました: {FilePath}", _settingsFilePath);
         }
         catch (Exception ex)
@@ -369,17 +369,17 @@ public sealed class SettingsFileManager
         {
             throw new InvalidOperationException("言語ペアが指定されていません");
         }
-        
+
         if (!Enum.IsDefined<TranslationEngine>(settings.SelectedEngine))
         {
             throw new InvalidOperationException($"無効なエンジンが指定されています: {settings.SelectedEngine}");
         }
-        
+
         if (!Enum.IsDefined<TranslationStrategy>(settings.SelectedStrategy))
         {
             throw new InvalidOperationException($"無効な翻訳戦略が指定されています: {settings.SelectedStrategy}");
         }
-        
+
         if (!Enum.IsDefined<ChineseVariant>(settings.SelectedChineseVariant))
         {
             throw new InvalidOperationException($"無効な中国語変種が指定されています: {settings.SelectedChineseVariant}");
@@ -393,7 +393,7 @@ public sealed class SettingsFileManager
     private void ValidateAndFixSettings(TranslationSettingsData settings)
     {
         var hasChanges = false;
-        
+
         // 言語ペアの修正
         if (string.IsNullOrWhiteSpace(settings.SelectedLanguagePair))
         {
@@ -401,7 +401,7 @@ public sealed class SettingsFileManager
             hasChanges = true;
             _logger.LogWarning("空の言語ペアをデフォルト値に修正しました");
         }
-        
+
         // エンジンの修正
         if (!Enum.IsDefined<TranslationEngine>(settings.SelectedEngine))
         {
@@ -409,7 +409,7 @@ public sealed class SettingsFileManager
             hasChanges = true;
             _logger.LogWarning("無効なエンジンをデフォルト値に修正しました");
         }
-        
+
         // 翻訳戦略の修正
         if (!Enum.IsDefined<TranslationStrategy>(settings.SelectedStrategy))
         {
@@ -417,7 +417,7 @@ public sealed class SettingsFileManager
             hasChanges = true;
             _logger.LogWarning("無効な翻訳戦略をデフォルト値に修正しました");
         }
-        
+
         // 中国語変種の修正
         if (!Enum.IsDefined<ChineseVariant>(settings.SelectedChineseVariant))
         {
@@ -425,10 +425,10 @@ public sealed class SettingsFileManager
             hasChanges = true;
             _logger.LogWarning("無効な中国語変種をデフォルト値に修正しました");
         }
-        
+
         // 通知設定のデフォルト値設定（新しい設定ファイルでEnableNotifications等がundefineの場合）
         // これらはbool型なので、既存の設定では適切なデフォルト値が設定されている
-        
+
         // 修正があった場合、タイムスタンプを更新
         if (hasChanges)
         {
@@ -475,7 +475,7 @@ public sealed class SettingsFileManager
             // バックアップの失敗はログに留めるが、例外をスローしない
             _logger.LogWarning(ex, "バックアップの作成に失敗しました");
         }
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 }
@@ -489,47 +489,47 @@ public sealed class TranslationSettingsData
     /// 選択されたエンジン
     /// </summary>
     public TranslationEngine SelectedEngine { get; set; } = TranslationEngine.LocalOnly;
-    
+
     /// <summary>
     /// 選択された言語ペア
     /// </summary>
     public string SelectedLanguagePair { get; set; } = "ja-en";
-    
+
     /// <summary>
     /// 選択された中国語変種
     /// </summary>
     public ChineseVariant SelectedChineseVariant { get; set; } = ChineseVariant.Simplified;
-    
+
     /// <summary>
     /// 選択された翻訳戦略
     /// </summary>
     public TranslationStrategy SelectedStrategy { get; set; } = TranslationStrategy.Direct;
-    
+
     /// <summary>
     /// フォールバック有効フラグ
     /// </summary>
     public bool EnableFallback { get; set; } = true;
-    
+
     /// <summary>
     /// 通知機能の有効/無効
     /// </summary>
     public bool EnableNotifications { get; set; } = true;
-    
+
     /// <summary>
     /// フォールバック情報のユーザー表示有効/無効
     /// </summary>
     public bool ShowFallbackInformation { get; set; } = true;
-    
+
     /// <summary>
     /// エンジン状態変更時のアニメーション有効/無効
     /// </summary>
     public bool EnableStatusAnimations { get; set; } = true;
-    
+
     /// <summary>
     /// 作成日時
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    
+
     /// <summary>
     /// 最終更新日時
     /// </summary>

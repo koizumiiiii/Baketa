@@ -10,6 +10,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         CanResize="False"
+        SizeToContent="Manual"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="-1">
@@ -47,11 +48,11 @@
                  FontFamily="Segoe UI, Meiryo UI, Yu Gothic UI"
                  Foreground="#FF2D2D2D"
                  FontWeight="Medium"
-                 TextWrapping="NoWrap"
+                 TextWrapping="Wrap"
                  TextAlignment="Left"
                  VerticalAlignment="Center"
                  HorizontalAlignment="Left"
-                 TextTrimming="CharacterEllipsis">
+                 TextTrimming="None">
             <TextBlock.Effect>
                 <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="4" Color="#40000000"/>
             </TextBlock.Effect>

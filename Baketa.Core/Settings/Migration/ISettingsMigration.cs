@@ -14,31 +14,31 @@ public interface ISettingsMigration
     /// 移行元のスキーマバージョン
     /// </summary>
     int FromVersion { get; }
-    
+
     /// <summary>
     /// 移行先のスキーマバージョン
     /// </summary>
     int ToVersion { get; }
-    
+
     /// <summary>
     /// マイグレーションの説明
     /// </summary>
     string Description { get; }
-    
+
     /// <summary>
     /// マイグレーションの実行可能性をチェックします
     /// </summary>
     /// <param name="currentSettings">現在の設定データ</param>
     /// <returns>実行可能な場合はtrue</returns>
     bool CanMigrate(Dictionary<string, object?> currentSettings);
-    
+
     /// <summary>
     /// マイグレーションを実行します
     /// </summary>
     /// <param name="currentSettings">現在の設定データ</param>
     /// <returns>マイグレーション結果</returns>
     Task<MigrationResult> MigrateAsync(Dictionary<string, object?> currentSettings);
-    
+
     /// <summary>
     /// マイグレーションをドライラン（実行せずに検証のみ）します
     /// </summary>
@@ -56,47 +56,47 @@ public sealed class MigrationResult
     /// マイグレーションが成功したかどうか
     /// </summary>
     public bool IsSuccess { get; }
-    
+
     /// <summary>
     /// マイグレーションが成功したかどうか（IsSuccessのエイリアス）
     /// </summary>
     public bool Success => IsSuccess;
-    
+
     /// <summary>
     /// マイグレーション後の設定データ
     /// </summary>
     public Dictionary<string, object?> MigratedSettings { get; }
-    
+
     /// <summary>
     /// エラーメッセージ（失敗時）
     /// </summary>
     public string? ErrorMessage { get; }
-    
+
     /// <summary>
     /// 警告メッセージ
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
-    
+
     /// <summary>
     /// 変更された設定項目の一覧
     /// </summary>
     public IReadOnlyList<MigrationSettingChange> Changes { get; }
-    
+
     /// <summary>
     /// 削除された設定項目の一覧
     /// </summary>
     public IReadOnlyList<string> DeletedSettings { get; }
-    
+
     /// <summary>
     /// 追加された設定項目の一覧
     /// </summary>
     public IReadOnlyList<string> AddedSettings { get; }
-    
+
     /// <summary>
     /// マイグレーション実行時間（ミリ秒）
     /// </summary>
     public long ExecutionTimeMs { get; }
-    
+
     /// <summary>
     /// マイグレーション日時
     /// </summary>
@@ -121,16 +121,16 @@ public sealed class MigrationResult
         long executionTimeMs = 0)
     {
         return new MigrationResult(
-            true, 
-            migratedSettings, 
-            null, 
-            warnings ?? [], 
+            true,
+            migratedSettings,
+            null,
+            warnings ?? [],
             changes ?? [],
             deletedSettings ?? [],
             addedSettings ?? [],
             executionTimeMs);
     }
-    
+
     /// <summary>
     /// 失敗したマイグレーション結果を作成します
     /// </summary>
@@ -140,10 +140,10 @@ public sealed class MigrationResult
     public static MigrationResult CreateFailure(string errorMessage, long executionTimeMs = 0)
     {
         return new MigrationResult(
-            false, 
-            [], 
-            errorMessage, 
-            [], 
+            false,
+            [],
+            errorMessage,
+            [],
             [],
             [],
             [],
@@ -151,9 +151,9 @@ public sealed class MigrationResult
     }
 
     private MigrationResult(
-        bool isSuccess, 
-        Dictionary<string, object?> migratedSettings, 
-        string? errorMessage, 
+        bool isSuccess,
+        Dictionary<string, object?> migratedSettings,
+        string? errorMessage,
         IReadOnlyList<string> warnings,
         IReadOnlyList<MigrationSettingChange> changes,
         IReadOnlyList<string> deletedSettings,

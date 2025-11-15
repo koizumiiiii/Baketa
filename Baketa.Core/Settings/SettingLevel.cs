@@ -11,13 +11,13 @@ public enum SettingLevel
     /// 日常的に変更される可能性の高い設定
     /// </summary>
     Basic,
-    
+
     /// <summary>
     /// 詳細設定（上級ユーザー向け）
     /// 高度なカスタマイズや最適化設定
     /// </summary>
     Advanced,
-    
+
     /// <summary>
     /// デバッグ設定（開発者向け）
     /// 開発・診断・デバッグ用設定

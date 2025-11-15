@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Xunit;
 using Baketa.Core.Utilities;
 using FluentAssertions;
+using Xunit;
 
 namespace Baketa.Core.Tests.Utilities;
 
@@ -17,7 +17,7 @@ public class BaketaExceptionHandlerTests
     {
         // Arrange
         const string expectedResult = "プライマリ成功";
-        
+
         // Act
         var result = await BaketaExceptionHandler.HandleWithFallbackAsync(
             primary: () => Task.FromResult(expectedResult),
@@ -33,7 +33,7 @@ public class BaketaExceptionHandlerTests
     {
         // Arrange
         const string expectedResult = "フォールバック成功";
-        
+
         // Act
         var result = await BaketaExceptionHandler.HandleWithFallbackAsync(
             primary: () => Task.FromException<string>(new InvalidOperationException("プライマリ失敗")),
@@ -145,7 +145,7 @@ public class BaketaExceptionHandlerTests
         var exception = await Assert.ThrowsAsync<AggregateException>(() =>
             BaketaExceptionHandler.HandleWithMultipleFallbacksAsync(strategies)
         );
-        
+
         exception.Message.Should().StartWith("All fallback strategies failed");
         exception.InnerException.Should().BeOfType<ArgumentException>();
         exception.InnerException!.Message.Should().Be("戦略3失敗");
@@ -161,7 +161,7 @@ public class BaketaExceptionHandlerTests
         var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
             BaketaExceptionHandler.HandleWithMultipleFallbacksAsync(strategies)
         );
-        
+
         exception.ParamName.Should().Be("strategies");
         exception.Message.Should().StartWith("At least one strategy must be provided");
     }
@@ -200,7 +200,7 @@ public class BaketaExceptionHandlerTests
     {
         // Arrange
         const string expectedResult = "プライマリ成功";
-        
+
         // Act
         var result = BaketaExceptionHandler.HandleWithFallback(
             primary: () => expectedResult,
@@ -216,7 +216,7 @@ public class BaketaExceptionHandlerTests
     {
         // Arrange
         const string expectedResult = "フォールバック成功";
-        
+
         // Act
         var result = BaketaExceptionHandler.HandleWithFallback(
             primary: () => throw new InvalidOperationException("プライマリ失敗"),

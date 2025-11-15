@@ -29,7 +29,7 @@ public sealed class WarmupHostedService(
             // IWarmupServiceを取得してウォームアップ実行
             using var scope = _serviceProvider.CreateScope();
             var warmupService = scope.ServiceProvider.GetService<IWarmupService>();
-            
+
             if (warmupService == null)
             {
                 _logger.LogWarning("IWarmupServiceが見つかりません");
@@ -37,19 +37,19 @@ public sealed class WarmupHostedService(
             }
 
             _logger.LogInformation("バックグラウンドウォームアップを開始します");
-            
+
             // 進捗通知の購読
             warmupService.WarmupProgressChanged += OnWarmupProgressChanged;
-            
+
             try
             {
                 // ウォームアップ開始（非同期実行）
                 await warmupService.StartWarmupAsync(stoppingToken).ConfigureAwait(false);
-                
+
                 // ウォームアップ完了を待機（最大5分）
                 var waitTimeout = TimeSpan.FromMinutes(5);
                 var success = await warmupService.WaitForWarmupAsync(waitTimeout, stoppingToken).ConfigureAwait(false);
-                
+
                 if (success)
                 {
                     _logger.LogInformation("🎉 バックグラウンドウォームアップが正常に完了しました");
@@ -82,25 +82,25 @@ public sealed class WarmupHostedService(
             case WarmupPhase.Starting:
                 _logger.LogDebug("ウォームアップ開始: {Status}", e.Status);
                 break;
-            
+
             case WarmupPhase.GpuDetection:
                 _logger.LogDebug("GPU環境検出: {Progress:P1} - {Status}", e.Progress, e.Status);
                 break;
-            
+
             case WarmupPhase.OcrInitialization:
             case WarmupPhase.OcrWarmup:
                 _logger.LogDebug("OCRウォームアップ: {Progress:P1} - {Status}", e.Progress, e.Status);
                 break;
-            
+
             case WarmupPhase.TranslationInitialization:
             case WarmupPhase.TranslationWarmup:
                 _logger.LogDebug("翻訳ウォームアップ: {Progress:P1} - {Status}", e.Progress, e.Status);
                 break;
-            
+
             case WarmupPhase.Completed:
                 _logger.LogInformation("🎯 ウォームアップ完了: {Progress:P1} - {Status}", e.Progress, e.Status);
                 break;
-            
+
             default:
                 _logger.LogDebug("ウォームアップ進捗: {Progress:P1} - {Status}", e.Progress, e.Status);
                 break;

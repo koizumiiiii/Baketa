@@ -36,7 +36,15 @@ public sealed class GameOptimizedPreprocessingService(
             EnableColorMasking = true,
             AdaptiveBlockSize = 19,        // より大きなブロックで文字の連続性を保持
             AdaptiveC = 6.0,               // より緩い閾値で文字の細部保持
-            ColorMaskingStrength = 0.7f
+            ColorMaskingStrength = 0.7f,
+            // ✨ OCR精度向上機能（標準設定）
+            EnableContrastEnhancement = true,
+            ContrastLimit = 2.0,
+            EnableNoiseReduction = true,
+            NoiseReductionStrength = 3.0,
+            EnableSharpening = true,
+            SharpeningStrength = 0.8,
+            EnableEdgeEnhancement = false    // 標準では軽量化のため無効
         },
         ["darkbackground"] = new GameScreenProfile
         {
@@ -47,7 +55,16 @@ public sealed class GameOptimizedPreprocessingService(
             AdaptiveC = 9.0,         // 適度な閾値調整で文字結合促進
             ColorMaskingStrength = 0.85f,
             PreBlurEnabled = true,
-            PreBlurKernelSize = 3
+            PreBlurKernelSize = 3,
+            // ✨ OCR精度向上機能（暗い背景用）
+            EnableContrastEnhancement = true,
+            ContrastLimit = 3.0,     // 暗い背景では強めのコントラスト強化
+            EnableNoiseReduction = true,
+            NoiseReductionStrength = 4.0,  // 暗い背景のノイズ除去を強化
+            EnableSharpening = true,
+            SharpeningStrength = 1.0,
+            EnableEdgeEnhancement = true,   // 暗い背景ではエッジ強化有効
+            EdgeKernelSize = 3
         },
         ["lightbackground"] = new GameScreenProfile
         {
@@ -58,7 +75,16 @@ public sealed class GameOptimizedPreprocessingService(
             AdaptiveC = 4.0,             // より弱い閾値調整
             ColorMaskingStrength = 0.5f,
             PostMorphEnabled = true,
-            MorphKernelSize = 2
+            MorphKernelSize = 2,
+            // ✨ OCR精度向上機能（明るい背景用）
+            EnableContrastEnhancement = true,
+            ContrastLimit = 1.5,     // 明るい背景では穏やかなコントラスト強化
+            EnableNoiseReduction = false,  // 明るい背景ではノイズ除去不要
+            NoiseReductionStrength = 2.0,
+            EnableSharpening = true,
+            SharpeningStrength = 0.6,   // 明るい背景では控えめなシャープニング
+            EnableEdgeEnhancement = false,  // 明るい背景ではエッジ強化不要
+            EdgeKernelSize = 3
         },
         ["highcontrast"] = new GameScreenProfile
         {
@@ -70,7 +96,16 @@ public sealed class GameOptimizedPreprocessingService(
             ColorMaskingStrength = 0.6f,
             PostMorphEnabled = true,
             MorphKernelSize = 1,
-            MorphIterations = 1          // モルフォロジー処理を軽減
+            MorphIterations = 1,         // モルフォロジー処理を軽減
+            // ✨ OCR精度向上機能（高コントラスト用）
+            EnableContrastEnhancement = false,  // 高コントラストではコントラスト強化不要
+            ContrastLimit = 1.0,
+            EnableNoiseReduction = false,  // 高コントラストではノイズ除去不要
+            NoiseReductionStrength = 2.0,
+            EnableSharpening = false,      // 高コントラストではシャープニング不要
+            SharpeningStrength = 0.5,
+            EnableEdgeEnhancement = false,  // 高コントラストではエッジ強化不要
+            EdgeKernelSize = 3
         },
         ["anime"] = new GameScreenProfile
         {
@@ -83,7 +118,16 @@ public sealed class GameOptimizedPreprocessingService(
             PreBlurEnabled = false,        // アニメ調は鮮明さを保持
             PostMorphEnabled = true,
             MorphKernelSize = 1,           // より軽いモルフォロジー処理
-            MorphIterations = 1
+            MorphIterations = 1,
+            // ✨ OCR精度向上機能（アニメ調用）
+            EnableContrastEnhancement = true,
+            ContrastLimit = 2.5,     // アニメ調ではバランス重視のコントラスト強化
+            EnableNoiseReduction = true,
+            NoiseReductionStrength = 2.5,  // アニメ調では軽めのノイズ除去
+            EnableSharpening = true,
+            SharpeningStrength = 1.2,      // アニメ調では鮮明さのためシャープニング強化
+            EnableEdgeEnhancement = true,   // アニメ調ではエッジ強化有効
+            EdgeKernelSize = 3
         }
     };
 
@@ -95,46 +139,44 @@ public sealed class GameOptimizedPreprocessingService(
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>前処理結果</returns>
     public async Task<OcrPreprocessingResult> ProcessImageAsync(
-        IAdvancedImage image, 
-        string? profileName = null, 
+        IAdvancedImage image,
+        string? profileName = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        
+
         var profile = GetProfile(profileName);
-        
+
         try
         {
             // 🔍 Phase 3診断: 直接ファイル出力で確実にログを残す
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎮 [PHASE3-START] ゲーム最適化前処理開始: プロファイル={profile.Name}, サイズ={image.Width}x{image.Height}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
                 System.Diagnostics.Debug.WriteLine($"Phase 3 開始ログ書き込みエラー: {fileEx.Message}");
             }
-            
-            _logger.LogInformation("ゲーム最適化前処理開始: プロファイル={ProfileName}, サイズ={Width}x{Height}", 
+
+            _logger.LogInformation("ゲーム最適化前処理開始: プロファイル={ProfileName}, サイズ={Width}x{Height}",
                 profile.Name, image.Width, image.Height);
-            
+
             var processedImage = await ApplyGameOptimizedProcessingAsync(image, profile, cancellationToken)
                 .ConfigureAwait(false);
-            
+
             // 🔍 Phase 3診断: 完了ログも直接ファイル出力
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ [PHASE3-END] ゲーム最適化前処理完了: プロファイル={profile.Name}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch (Exception fileEx)
             {
                 System.Diagnostics.Debug.WriteLine($"Phase 3 完了ログ書き込みエラー: {fileEx.Message}");
             }
-            
+
             _logger.LogInformation("ゲーム最適化前処理完了: プロファイル={ProfileName}", profile.Name);
-            
+
             return new OcrPreprocessingResult(
                 false,
                 null,
@@ -174,14 +216,14 @@ public sealed class GameOptimizedPreprocessingService(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        
+
         try
         {
             _logger.LogDebug("テキスト領域検出開始");
-            
+
             // 現在は基本実装のため空のリストを返す
             await Task.CompletedTask.ConfigureAwait(false);
-            
+
             return [];
         }
         catch (OperationCanceledException)
@@ -204,8 +246,8 @@ public sealed class GameOptimizedPreprocessingService(
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>処理済み画像</returns>
     private async Task<IAdvancedImage> ApplyGameOptimizedProcessingAsync(
-        IAdvancedImage image, 
-        GameScreenProfile profile, 
+        IAdvancedImage image,
+        GameScreenProfile profile,
         CancellationToken _)
     {
         var currentImage = image;
@@ -217,13 +259,13 @@ public sealed class GameOptimizedPreprocessingService(
             if (profile.EnableColorMasking)
             {
                 _logger.LogDebug("🎨 色ベースマスキング適用中（プール使用）...");
-                
+
                 var colorMaskingFilter = CreateColorMaskingFilter(profile);
                 var maskedImage = await colorMaskingFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                
+
                 currentImage = maskedImage;
-                
-                _logger.LogDebug("✅ 色ベースマスキング完了（プール効率: HitRate={HitRate:P1}）", 
+
+                _logger.LogDebug("✅ 色ベースマスキング完了（プール効率: HitRate={HitRate:P1}）",
                     _imagePool.Statistics.HitRate);
             }
 
@@ -231,19 +273,29 @@ public sealed class GameOptimizedPreprocessingService(
             if (profile.EnableAdaptiveThreshold)
             {
                 _logger.LogDebug("🔧 適応的二値化適用中（プール使用）...");
-                
+
                 var adaptiveThresholdFilter = CreateAdaptiveThresholdFilter(profile);
                 var thresholdImage = await adaptiveThresholdFilter.ApplyAsync(currentImage).ConfigureAwait(false);
-                
+
                 currentImage = thresholdImage;
-                
-                _logger.LogDebug("✅ 適応的二値化完了（プール効率: HitRate={HitRate:P1}）", 
+
+                _logger.LogDebug("✅ 適応的二値化完了（プール効率: HitRate={HitRate:P1}）",
                     _imagePool.Statistics.HitRate);
             }
 
+            // ✨ Step 3: OCR精度向上処理（新機能）
+            // TODO: OpenCvフィルター実装後に以下の処理を有効化
+            // - Step 3a: コントラスト強化 (CLAHE) - CreateContrastEnhancementFilter
+            // - Step 3b: ノイズ除去 (バイラテラルフィルター) - CreateNoiseReductionFilter
+            // - Step 3c: シャープニング - CreateSharpeningFilter
+            // - Step 3d: エッジ強化 - CreateEdgeEnhancementFilter
+
             _logger.LogInformation("🎮 ゲーム最適化処理完了: ColorMasking={ColorMasking}, AdaptiveThreshold={AdaptiveThreshold}, " +
+                "OCR精度向上={ContrastEnhancement}/{NoiseReduction}/{Sharpening}/{EdgeEnhancement}, " +
                 "PoolObjectsUsed={PoolObjectsUsed}, MemoryEfficiency={MemoryEfficiency:P1}",
-                profile.EnableColorMasking, profile.EnableAdaptiveThreshold, 
+                profile.EnableColorMasking, profile.EnableAdaptiveThreshold,
+                profile.EnableContrastEnhancement, profile.EnableNoiseReduction,
+                profile.EnableSharpening, profile.EnableEdgeEnhancement,
                 pooledImages.Count, _imagePool.Statistics.HitRate);
 
             return currentImage;
@@ -251,19 +303,19 @@ public sealed class GameOptimizedPreprocessingService(
         catch (OperationCanceledException)
         {
             _logger.LogInformation("⏹️ ゲーム最適化処理がキャンセルされました");
-            
+
             // プールから取得した画像をプールに返却
             ReturnPooledImages(pooledImages);
-            
+
             throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ ゲーム最適化処理中にエラーが発生しました");
-            
+
             // プールから取得した画像をプールに返却
             ReturnPooledImages(pooledImages);
-            
+
             throw;
         }
     }
@@ -279,14 +331,14 @@ public sealed class GameOptimizedPreprocessingService(
             try
             {
                 _imagePool.Release(pooledImage);
-                _logger.LogDebug("📥 画像をプールに返却: Size={Width}x{Height}", 
+                _logger.LogDebug("📥 画像をプールに返却: Size={Width}x{Height}",
                     pooledImage.Width, pooledImage.Height);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "⚠️ 画像プール返却時にエラー: Size={Width}x{Height}", 
+                _logger.LogWarning(ex, "⚠️ 画像プール返却時にエラー: Size={Width}x{Height}",
                     pooledImage.Width, pooledImage.Height);
-                
+
                 // プール返却に失敗した場合は直接破棄
                 pooledImage.Dispose();
             }
@@ -301,21 +353,21 @@ public sealed class GameOptimizedPreprocessingService(
     private OpenCvColorBasedMaskingFilter CreateColorMaskingFilter(GameScreenProfile profile)
     {
         var filter = new OpenCvColorBasedMaskingFilter(_logger as ILogger<OpenCvColorBasedMaskingFilter>);
-        
+
         // プロファイルに応じたパラメータ設定
         filter.SetParameter("EnableDetailedLogging", true);
-        
+
         // 色マスク有効性をプロファイルの強度に応じて調整
         var enableAllMasks = profile.ColorMaskingStrength > 0.7f;
         filter.SetParameter("EnableWhiteMask", enableAllMasks);
         filter.SetParameter("EnableYellowMask", enableAllMasks);
         filter.SetParameter("EnableCyanMask", enableAllMasks);
         filter.SetParameter("EnablePinkMask", enableAllMasks);
-        
+
         // 後処理設定
         filter.SetParameter("EnableMorphClosing", true);
         filter.SetParameter("MorphKernelSize", profile.MorphKernelSize);
-        
+
         return filter;
     }
 
@@ -327,7 +379,7 @@ public sealed class GameOptimizedPreprocessingService(
     private OpenCvAdaptiveThresholdFilter CreateAdaptiveThresholdFilter(GameScreenProfile profile)
     {
         var filter = new OpenCvAdaptiveThresholdFilter(_logger as ILogger<OpenCvAdaptiveThresholdFilter>);
-        
+
         // プロファイルパラメータ設定
         filter.SetParameter("BlockSize", profile.AdaptiveBlockSize);
         filter.SetParameter("C", profile.AdaptiveC);
@@ -337,9 +389,77 @@ public sealed class GameOptimizedPreprocessingService(
         filter.SetParameter("MorphKernelSize", profile.MorphKernelSize);
         filter.SetParameter("MorphIterations", profile.MorphIterations);
         filter.SetParameter("EnableDetailedLogging", true);
+
+        return filter;
+    }
+
+    // TODO: OpenCVフィルタークラス実装後に有効化
+    /*
+    /// <summary>
+    /// コントラスト強化フィルターを作成 (CLAHE)
+    /// </summary>
+    /// <param name="profile">プロファイル</param>
+    /// <returns>設定済みフィルター</returns>
+    private OpenCvContrastEnhancementFilter CreateContrastEnhancementFilter(GameScreenProfile profile)
+    {
+        var filter = new OpenCvContrastEnhancementFilter(_logger as ILogger<OpenCvContrastEnhancementFilter>);
+        
+        filter.SetParameter("ContrastLimit", profile.ContrastLimit);
+        filter.SetParameter("TileGridSize", 8); // 8x8 tiles for CLAHE
+        filter.SetParameter("EnableDetailedLogging", true);
         
         return filter;
     }
+
+    /// <summary>
+    /// ノイズ除去フィルターを作成 (バイラテラルフィルター)
+    /// </summary>
+    /// <param name="profile">プロファイル</param>
+    /// <returns>設定済みフィルター</returns>
+    private OpenCvNoiseReductionFilter CreateNoiseReductionFilter(GameScreenProfile profile)
+    {
+        var filter = new OpenCvNoiseReductionFilter(_logger as ILogger<OpenCvNoiseReductionFilter>);
+        
+        filter.SetParameter("D", 9); // フィルターサイズ
+        filter.SetParameter("SigmaColor", profile.NoiseReductionStrength * 20); // 色の違いに対する感度
+        filter.SetParameter("SigmaSpace", profile.NoiseReductionStrength * 20); // 位置の違いに対する感度
+        filter.SetParameter("EnableDetailedLogging", true);
+        
+        return filter;
+    }
+
+    /// <summary>
+    /// シャープニングフィルターを作成
+    /// </summary>
+    /// <param name="profile">プロファイル</param>
+    /// <returns>設定済みフィルター</returns>
+    private OpenCvSharpeningFilter CreateSharpeningFilter(GameScreenProfile profile)
+    {
+        var filter = new OpenCvSharpeningFilter(_logger as ILogger<OpenCvSharpeningFilter>);
+        
+        filter.SetParameter("SharpeningStrength", profile.SharpeningStrength);
+        filter.SetParameter("KernelSize", 3); // 3x3 カーネル
+        filter.SetParameter("EnableDetailedLogging", true);
+        
+        return filter;
+    }
+
+    /// <summary>
+    /// エッジ強化フィルターを作成
+    /// </summary>
+    /// <param name="profile">プロファイル</param>
+    /// <returns>設定済みフィルター</returns>
+    private OpenCvEdgeEnhancementFilter CreateEdgeEnhancementFilter(GameScreenProfile profile)
+    {
+        var filter = new OpenCvEdgeEnhancementFilter(_logger as ILogger<OpenCvEdgeEnhancementFilter>);
+        
+        filter.SetParameter("KernelSize", profile.EdgeKernelSize);
+        filter.SetParameter("EdgeThreshold", 50.0); // エッジ検出閾値
+        filter.SetParameter("EnableDetailedLogging", true);
+        
+        return filter;
+    }
+    */
 
     /// <summary>
     /// プロファイルを取得
@@ -349,9 +469,9 @@ public sealed class GameOptimizedPreprocessingService(
     private static GameScreenProfile GetProfile(string? profileName)
     {
         var normalizedName = profileName?.ToLowerInvariant() ?? "default";
-        
-        return Profiles.TryGetValue(normalizedName, out var profile) 
-            ? profile 
+
+        return Profiles.TryGetValue(normalizedName, out var profile)
+            ? profile
             : Profiles["default"];
     }
 }
@@ -363,34 +483,60 @@ public class GameScreenProfile
 {
     /// <summary>プロファイル名</summary>
     public string Name { get; set; } = string.Empty;
-    
+
     /// <summary>適応的二値化有効</summary>
     public bool EnableAdaptiveThreshold { get; set; } = true;
-    
+
     /// <summary>色ベースマスキング有効</summary>
     public bool EnableColorMasking { get; set; } = true;
-    
+
     /// <summary>適応的二値化ブロックサイズ</summary>
     public int AdaptiveBlockSize { get; set; } = 15;
-    
+
     /// <summary>適応的二値化定数C</summary>
     public double AdaptiveC { get; set; } = 8.0;
-    
+
     /// <summary>色マスキング強度（0.0-1.0）</summary>
     public float ColorMaskingStrength { get; set; } = 0.8f;
-    
+
     /// <summary>前処理ブラー有効</summary>
     public bool PreBlurEnabled { get; set; }
-    
+
     /// <summary>前処理ブラーカーネルサイズ</summary>
     public int PreBlurKernelSize { get; set; } = 3;
-    
+
     /// <summary>後処理モルフォロジー有効</summary>
     public bool PostMorphEnabled { get; set; }
-    
+
     /// <summary>モルフォロジーカーネルサイズ</summary>
     public int MorphKernelSize { get; set; } = 2;
-    
+
     /// <summary>モルフォロジー反復回数</summary>
     public int MorphIterations { get; set; } = 1;
+
+    // ✨ OCR精度向上のための新機能
+
+    /// <summary>コントラスト強化有効（CLAHE）</summary>
+    public bool EnableContrastEnhancement { get; set; }
+
+    /// <summary>コントラスト強化制限値</summary>
+    public double ContrastLimit { get; set; } = 2.0;
+
+    /// <summary>ノイズ除去有効（バイラテラルフィルター）</summary>
+    public bool EnableNoiseReduction { get; set; }
+
+    /// <summary>ノイズ除去強度</summary>
+    public double NoiseReductionStrength { get; set; } = 5.0;
+
+    /// <summary>シャープニング有効</summary>
+    public bool EnableSharpening { get; set; }
+
+    /// <summary>シャープニング強度</summary>
+    public double SharpeningStrength { get; set; } = 1.0;
+
+    /// <summary>エッジ強化有効</summary>
+    public bool EnableEdgeEnhancement { get; set; }
+
+    /// <summary>エッジ強化カーネルサイズ</summary>
+    public int EdgeKernelSize { get; set; } = 3;
 }

@@ -1,7 +1,8 @@
 using System;
-using System.IO;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using Baketa.Core.Settings;
 using Baketa.Core.Utilities;
 
 namespace Baketa.Core.Performance;
@@ -27,13 +28,20 @@ public static class PerformanceLogger
     /// <summary>
     /// 旧ログファイルパス（クリーンアップ用）
     /// </summary>
-    private static readonly string[] ObsoleteLogPaths = [
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-        Path.Combine(Environment.CurrentDirectory, "debug_batch_ocr.txt"),
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
-        Path.Combine(Environment.CurrentDirectory, "bottleneck_analysis.txt"),
-        Path.Combine(Environment.CurrentDirectory, "debug_app_logs.txt")
-    ];
+    private static readonly string[] ObsoleteLogPaths = GetObsoleteLogPaths();
+
+    private static string[] GetObsoleteLogPaths()
+    {
+        var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
+        var debugLogPath = loggingSettings.GetFullDebugLogPath();
+
+        return [
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
+            Path.Combine(Environment.CurrentDirectory, "debug_batch_ocr.txt"),
+            debugLogPath,
+            Path.Combine(Environment.CurrentDirectory, "bottleneck_analysis.txt")
+        ];
+    }
 
     private static readonly object LogLock = new();
     private static bool _initialized;
@@ -44,20 +52,20 @@ public static class PerformanceLogger
     public static void Initialize()
     {
         if (_initialized) return;
-        
+
         lock (LogLock)
         {
             if (_initialized) return;
-            
+
             // 新しいログファイルを初期化
             InitializeLogFile(MainLogPath, "PERFORMANCE ANALYSIS");
             InitializeLogFile(DebugLogPath, "DEBUG DETAILED LOG");
-            
+
             // 既存の分散ログファイルをクリーンアップ（オプション）
             CleanupObsoleteLogs();
-            
+
             _initialized = true;
-            
+
             LogPerformance("📊 Performance Logging System Initialized");
         }
     }
@@ -68,12 +76,12 @@ public static class PerformanceLogger
     public static void LogPerformance(string message)
     {
         var timestampedMessage = $"[{DateTime.Now:HH:mm:ss.fff}] {message}";
-        
+
         WriteToFile(MainLogPath, timestampedMessage);
         Console.WriteLine(timestampedMessage);
-        
+
         // 従来のDebugLogUtility互換性も提供
-        DebugLogUtility.WriteLog(message);
+        Console.WriteLine(message);
     }
 
     /// <summary>
@@ -92,9 +100,9 @@ public static class PerformanceLogger
     {
         var summary = PerformanceMeasurement.GenerateSummary();
         var separator = new string('=', 80);
-        
+
         var fullSummary = $"\n{separator}\n{summary}\n{separator}\n";
-        
+
         WriteToFile(MainLogPath, fullSummary);
         Console.WriteLine(fullSummary);
     }
@@ -107,9 +115,9 @@ public static class PerformanceLogger
         var message = $"🚨 BOTTLENECK DETECTED: {operation} - {duration.TotalMilliseconds:F1}ms";
         if (!string.IsNullOrEmpty(details))
             message += $" | {details}";
-        
+
         LogPerformance(message);
-        
+
         // 1秒以上の処理は特別にハイライト
         if (duration.TotalSeconds >= 1.0)
         {
@@ -125,7 +133,7 @@ public static class PerformanceLogger
     {
         var message = $"🔧 ENGINE INIT: {engineName} - {duration.TotalMilliseconds:F1}ms, Memory: {memoryUsage / 1024:N0}KB";
         LogPerformance(message);
-        
+
         if (duration.TotalSeconds > 5.0)
         {
             LogBottleneck($"{engineName} Initialization", duration, $"Memory: {memoryUsage / 1024:N0}KB");
@@ -145,7 +153,7 @@ public static class PerformanceLogger
             $"📂 WorkDir: {Environment.CurrentDirectory}",
             $"📂 BaseDir: {AppDomain.CurrentDomain.BaseDirectory}"
         };
-        
+
         foreach (var message in messages)
         {
             LogPerformance(message);
@@ -195,7 +203,7 @@ public static class PerformanceLogger
                     var backupPath = obsoletePath + ".old";
                     if (File.Exists(backupPath))
                         File.Delete(backupPath);
-                    
+
                     File.Move(obsoletePath, backupPath);
                     LogDebug($"📁 Moved obsolete log: {Path.GetFileName(obsoletePath)} → {Path.GetFileName(backupPath)}");
                 }

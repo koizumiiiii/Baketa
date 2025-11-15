@@ -1,6 +1,6 @@
 using System;
-using System.Globalization;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,60 +15,60 @@ public class NgramTrainingService
 {
     private readonly ILogger<NgramTrainingService> _logger;
     private readonly string _modelDirectory;
-    
+
     public NgramTrainingService(ILogger<NgramTrainingService> logger, string modelDirectory = "models/ngram")
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _modelDirectory = modelDirectory;
-        
+
         // モデルディレクトリを作成
         if (!Directory.Exists(_modelDirectory))
         {
             Directory.CreateDirectory(_modelDirectory);
         }
     }
-    
+
     /// <summary>
     /// 日本語・英語混在テキスト用のBigramモデルを訓練
     /// </summary>
     public async Task<BigramModel> TrainJapaneseBigramModelAsync()
     {
         _logger.LogInformation("日本語Bigramモデルの訓練開始");
-        
+
         var model = new BigramModel(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<BigramModel>.Instance);
         var trainingTexts = GetJapaneseTrainingData();
-        
+
         await model.TrainAsync(trainingTexts).ConfigureAwait(false);
-        
+
         var modelPath = Path.Combine(_modelDirectory, "japanese_bigram_model.json");
         await model.SaveAsync(modelPath).ConfigureAwait(false);
-        
+
         _logger.LogInformation("日本語Bigramモデルの訓練完了: {ModelPath}", modelPath);
-        
+
         return model;
     }
-    
+
     /// <summary>
     /// 保存されたBigramモデルを読み込み
     /// </summary>
     public async Task<BigramModel> LoadJapaneseBigramModelAsync()
     {
         var modelPath = Path.Combine(_modelDirectory, "japanese_bigram_model.json");
-        
+
         if (!File.Exists(modelPath))
         {
             _logger.LogWarning("日本語Bigramモデルが見つかりません。新規作成します: {ModelPath}", modelPath);
             return await TrainJapaneseBigramModelAsync().ConfigureAwait(false);
         }
-        
+
         var model = new BigramModel(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<BigramModel>.Instance);
         await model.LoadAsync(modelPath).ConfigureAwait(false);
-        
+
         return model;
     }
-    
+
     /// <summary>
     /// 日本語学習データの取得
     /// </summary>
@@ -154,10 +154,10 @@ public class NgramTrainingService
             "ネットワーク速度100Mbps",
             "処理時間1.5秒",
         };
-        
+
         // 文章を拡張
         var extendedTexts = new List<string>(basicTexts);
-        
+
         // 組み合わせ文章を生成
         var combinationPatterns = new[]
         {
@@ -172,10 +172,10 @@ public class NgramTrainingService
             "{0}まで{1}",
             "{0}による{1}",
         };
-        
+
         var nouns = new[] { "システム", "データ", "機能", "処理", "設定", "環境", "管理", "制御" };
         var verbs = new[] { "実行", "確認", "変更", "追加", "削除", "更新", "作成", "取得" };
-        
+
         foreach (var pattern in combinationPatterns)
         {
             foreach (var noun in nouns)
@@ -186,49 +186,49 @@ public class NgramTrainingService
                 }
             }
         }
-        
+
         return extendedTexts;
     }
-    
+
     /// <summary>
     /// カスタム学習データでモデルを再訓練
     /// </summary>
     public async Task<BigramModel> RetrainWithCustomDataAsync(IEnumerable<string> additionalTexts)
     {
         _logger.LogInformation("カスタムデータでBigramモデルを再訓練");
-        
+
         var model = new BigramModel(
             Microsoft.Extensions.Logging.Abstractions.NullLogger<BigramModel>.Instance);
         var baseTrainingTexts = GetJapaneseTrainingData();
         var allTrainingTexts = baseTrainingTexts.Concat(additionalTexts);
-        
+
         await model.TrainAsync(allTrainingTexts).ConfigureAwait(false);
-        
+
         var modelPath = Path.Combine(_modelDirectory, "japanese_bigram_model_custom.json");
         await model.SaveAsync(modelPath).ConfigureAwait(false);
-        
+
         _logger.LogInformation("カスタムBigramモデルの訓練完了: {ModelPath}", modelPath);
-        
+
         return model;
     }
-    
+
     /// <summary>
     /// モデルの品質を評価
     /// </summary>
     public Task<ModelEvaluationResult> EvaluateModelAsync(BigramModel model)
     {
         _logger.LogInformation("Bigramモデルの品質評価開始");
-        
+
         var testTexts = GetTestTexts();
         var results = new List<EvaluationCase>();
-        
+
         foreach (var (correctText, corruptedText) in testTexts)
         {
             var likelihood = model.CalculateLikelihood(correctText);
             var corruptedLikelihood = model.CalculateLikelihood(corruptedText);
-            
+
             var isCorrect = likelihood > corruptedLikelihood;
-            
+
             results.Add(new EvaluationCase(
                 correctText,
                 corruptedText,
@@ -236,14 +236,14 @@ public class NgramTrainingService
                 corruptedLikelihood,
                 isCorrect));
         }
-        
+
         var accuracy = results.Count(r => r.IsCorrect) / (double)results.Count;
-        
+
         _logger.LogInformation("Bigramモデルの品質評価完了: 精度 {Accuracy:F2}%", accuracy * 100);
-        
+
         return Task.FromResult(new ModelEvaluationResult(accuracy, results));
     }
-    
+
     /// <summary>
     /// テストケースを取得
     /// </summary>

@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.Benchmarking;
-using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using TextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
 
 namespace Baketa.Infrastructure.OCR.Ensemble;
@@ -97,7 +97,7 @@ public sealed class EnsembleBenchmark(
             foreach (var strategy in strategies)
             {
                 logger.LogDebug("戦略テスト開始: {StrategyName}", strategy.StrategyName);
-                
+
                 ensembleEngine.SetFusionStrategy(strategy);
                 var results = await RunEnsembleTestsAsync(ensembleEngine, testCases, cancellationToken).ConfigureAwait(false);
                 strategyResults[strategy.StrategyName] = results;
@@ -150,7 +150,7 @@ public sealed class EnsembleBenchmark(
 
                 var ensembleEngine = await ensembleEngineFactory(engineCount).ConfigureAwait(false);
                 var results = await RunEnsembleTestsAsync(ensembleEngine, testCases, cancellationToken).ConfigureAwait(false);
-                
+
                 var dataPoint = CalculateScalabilityMetrics(results, engineCount);
                 scalabilityResults[engineCount] = dataPoint;
             }
@@ -201,7 +201,7 @@ public sealed class EnsembleBenchmark(
 
                 var results = await RunFaultScenarioTestAsync(
                     ensembleEngine, testCases, scenario, cancellationToken).ConfigureAwait(false);
-                
+
                 faultResults[scenario.ScenarioName] = results;
             }
 
@@ -343,7 +343,7 @@ public sealed class EnsembleBenchmark(
                 {
                     logger.LogWarning(ex, "個別エンジンテストエラー: {Engine} - {TestCase}",
                         engine.EngineName, testCase.Name);
-                    
+
                     engineResults.Add(new IndividualEngineTestResult
                     {
                         TestCaseName = testCase.Name,
@@ -424,7 +424,7 @@ public sealed class EnsembleBenchmark(
     private async Task<List<TestCase>> GenerateComplexityTestCasesAsync(int _) =>
         await Task.FromResult<List<TestCase>>([]).ConfigureAwait(false);
 
-    private ComparisonAnalysis AnalyzeComparison(List<EnsembleTestResult> _, 
+    private ComparisonAnalysis AnalyzeComparison(List<EnsembleTestResult> _,
         Dictionary<string, List<IndividualEngineTestResult>> _2) =>
         new() { OverallAccuracyImprovement = 0.1, SpeedRatio = 1.2 };
 

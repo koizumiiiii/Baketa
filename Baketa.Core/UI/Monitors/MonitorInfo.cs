@@ -31,13 +31,13 @@ public readonly record struct MonitorInfo(
     /// 96 DPIを基準とした倍率
     /// </summary>
     public double ScaleFactorX => DpiX / 96.0;
-    
+
     /// <summary>
     /// 垂直スケールファクター（X軸Y軸で異なるDPI設定対応）
     /// 96 DPIを基準とした倍率  
     /// </summary>
     public double ScaleFactorY => DpiY / 96.0;
-    
+
     /// <summary>
     /// 指定したウィンドウがこのモニターにどの程度含まれるかを計算
     /// 複数モニターにまたがる場合のアクティブモニター判定に使用
@@ -49,15 +49,15 @@ public readonly record struct MonitorInfo(
         var intersection = Bounds.Intersect(windowRect);
         if (intersection.IsEmpty)
             return 0.0;
-            
+
         var windowArea = windowRect.Width * windowRect.Height;
         if (windowArea <= 0)
             return 0.0;
-            
+
         var overlapArea = intersection.Width * intersection.Height;
         return overlapArea / windowArea;
     }
-    
+
     /// <summary>
     /// 物理ピクセル座標をDPI非依存論理座標に変換
     /// </summary>
@@ -66,7 +66,7 @@ public readonly record struct MonitorInfo(
     public CorePoint PhysicalToLogical(CorePoint physicalPoint) => new(
         physicalPoint.X / ScaleFactorX,
         physicalPoint.Y / ScaleFactorY);
-    
+
     /// <summary>
     /// DPI非依存論理座標を物理ピクセル座標に変換
     /// </summary>
@@ -75,18 +75,18 @@ public readonly record struct MonitorInfo(
     public CorePoint LogicalToPhysical(CorePoint logicalPoint) => new(
         logicalPoint.X * ScaleFactorX,
         logicalPoint.Y * ScaleFactorY);
-    
+
     /// <summary>
     /// 座標がこのモニター範囲内に含まれるかチェック
     /// </summary>
     /// <param name="point">チェックする座標</param>
     /// <returns>含まれる場合true</returns>
     public bool Contains(CorePoint point) => Bounds.Contains(point);
-    
+
     /// <summary>
     /// 表示名を取得（デバッグ・ログ用）
     /// </summary>
     /// <returns>モニター情報の文字列表現</returns>
-    public override string ToString() => 
+    public override string ToString() =>
         $"{Name} ({Bounds.Width}x{Bounds.Height}, DPI: {DpiX:F0}x{DpiY:F0}{(IsPrimary ? ", Primary" : "")})";
 }

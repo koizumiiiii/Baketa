@@ -71,7 +71,7 @@ public interface INotificationService
     /// <param name="confirmText">確認ボタンテキスト</param>
     /// <param name="cancelText">キャンセルボタンテキスト</param>
     /// <returns>ユーザーが確認を選択した場合true</returns>
-    Task<bool> ShowConfirmationAsync(string title, string message, 
+    Task<bool> ShowConfirmationAsync(string title, string message,
         string confirmText = "OK", string cancelText = "キャンセル");
 
     /// <summary>

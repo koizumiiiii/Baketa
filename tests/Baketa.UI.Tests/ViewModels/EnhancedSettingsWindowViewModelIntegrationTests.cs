@@ -1,15 +1,15 @@
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Services;
+using Baketa.Core.Settings;
+using Baketa.UI.Services;
+using Baketa.UI.Tests.Infrastructure;
+using Baketa.UI.Tests.TestUtilities;
+using Baketa.UI.ViewModels;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ReactiveUI.Testing;
 using Xunit;
-using Baketa.Core.Settings;
-using Baketa.Core.Services;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.ViewModels;
-using Baketa.UI.Services;
-using Baketa.UI.Tests.TestUtilities;
-using Baketa.UI.Tests.Infrastructure;
 
 namespace Baketa.UI.Tests.ViewModels;
 
@@ -35,7 +35,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
         // モックの基本設定
         SetupMockDefaults();
     }
-    
+
     /// <summary>
     /// Mockオブジェクトの状態をリセット
     /// </summary>
@@ -45,10 +45,10 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
         _mockChangeTracker.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
-        
+
         SetupMockDefaults();
     }
-    
+
     /// <summary>
     /// ViewModelを作成するヘルパーメソッド
     /// </summary>
@@ -63,7 +63,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockLogger.Object));
         return _currentViewModel;
     }
-    
+
     public override void Dispose()
     {
         try
@@ -90,25 +90,25 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
         // 設定サービスの基本的なモック設定
         _mockSettingsService.Setup(x => x.GetAsync<GeneralSettings>())
             .ReturnsAsync(TestDataFactory.CreateGeneralSettings());
-        
+
         _mockSettingsService.Setup(x => x.GetAsync<ThemeSettings>())
             .ReturnsAsync(TestDataFactory.CreateThemeSettings());
-        
+
         _mockSettingsService.Setup(x => x.GetAsync<MainUiSettings>())
             .ReturnsAsync(TestDataFactory.CreateMainUiSettings());
-        
+
         _mockSettingsService.Setup(x => x.GetAsync<OcrSettings>())
             .ReturnsAsync(TestDataFactory.CreateOcrSettings());
 
         _mockSettingsService.Setup(x => x.SaveAsync(It.IsAny<GeneralSettings>()))
             .Returns(Task.CompletedTask);
-        
+
         _mockSettingsService.Setup(x => x.SaveAsync(It.IsAny<ThemeSettings>()))
             .Returns(Task.CompletedTask);
-        
+
         _mockSettingsService.Setup(x => x.SaveAsync(It.IsAny<MainUiSettings>()))
             .Returns(Task.CompletedTask);
-        
+
         _mockSettingsService.Setup(x => x.SaveAsync(It.IsAny<OcrSettings>()))
             .Returns(Task.CompletedTask);
     }
@@ -141,7 +141,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
         // Arrange, Act & Assert
         RunOnUIThread(() =>
         {
-            Assert.Throws<ArgumentNullException>(() => 
+            Assert.Throws<ArgumentNullException>(() =>
                 new EnhancedSettingsWindowViewModel(
                     null!,
                     _mockChangeTracker.Object,
@@ -156,7 +156,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
         // Arrange, Act & Assert
         RunOnUIThread(() =>
         {
-            Assert.Throws<ArgumentNullException>(() => 
+            Assert.Throws<ArgumentNullException>(() =>
                 new EnhancedSettingsWindowViewModel(
                     _mockSettingsService.Object,
                     null!,
@@ -248,7 +248,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
 
         // Act
         viewModel.SaveCommand.Execute().Subscribe();
-        
+
         // 非同期処理が完了するまで待機
         await Task.Delay(100);
 
@@ -269,7 +269,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
 
         // Act
         viewModel.CancelCommand.Execute().Subscribe();
-        
+
         // 非同期処理が完了するまで待機
         await Task.Delay(100);
 
@@ -289,7 +289,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
 
         // Act
         viewModel.ResetCommand.Execute().Subscribe();
-        
+
         // 非同期処理が完了するまで待機
         await Task.Delay(100);
 
@@ -308,14 +308,14 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockLogger.Object);
 
         // OCRカテゴリを選択してViewModelを初期化（カテゴリIDの不一致を回避）
-        var ocrCategory = viewModel.AllCategories.FirstOrDefault(c => c.Id == "settings_ocr") ?? 
+        var ocrCategory = viewModel.AllCategories.FirstOrDefault(c => c.Id == "settings_ocr") ??
                          viewModel.AllCategories.FirstOrDefault(c => c.Id.Contains("ocr")) ??
                          viewModel.AllCategories[0]; // フォールバック: 最初のカテゴリ
         viewModel.SelectedCategory = ocrCategory;
 
         // Act
         viewModel.ValidateAllCommand.Execute().Subscribe();
-        
+
         // 非同期処理が完了するまで待機
         await Task.Delay(100);
 
@@ -379,7 +379,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
     {
         // Arrange
         _mockChangeTracker.Setup(x => x.HasChanges).Returns(true);
-        
+
         var viewModel = new EnhancedSettingsWindowViewModel(
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
@@ -388,7 +388,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
 
         // Act & Assert
         viewModel.HasChanges.Should().BeTrue();
-        
+
         // 設定を変更
         _mockChangeTracker.Setup(x => x.HasChanges).Returns(false);
         viewModel.HasChanges.Should().BeFalse();
@@ -400,7 +400,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
         // Arrange
         _mockSettingsService.Setup(x => x.SaveAsync(It.IsAny<GeneralSettings>()))
             .ThrowsAsync(new InvalidOperationException("テストエラー"));
-        
+
         _mockChangeTracker.Setup(x => x.HasChanges).Returns(true);
 
         var viewModel = new EnhancedSettingsWindowViewModel(
@@ -415,7 +415,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
 
         // Act
         viewModel.SaveCommand.Execute().Subscribe();
-        
+
         // 非同期処理が完了するまで待機
         await Task.Delay(100);
 

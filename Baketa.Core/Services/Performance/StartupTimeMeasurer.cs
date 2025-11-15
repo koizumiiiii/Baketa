@@ -35,7 +35,7 @@ public sealed class StartupTimeMeasurer(ILogger<StartupTimeMeasurer> logger)
     {
         var timer = Stopwatch.StartNew();
         _activeTimers.TryAdd(phase, timer);
-        
+
         _logger.LogInformation("⏱️ [STARTUP-PHASE] {Phase} 開始 - {Timestamp}", phase, DateTime.Now);
     }
 
@@ -50,14 +50,14 @@ public sealed class StartupTimeMeasurer(ILogger<StartupTimeMeasurer> logger)
             timer.Stop();
             var elapsed = timer.Elapsed;
             _completedTimings.TryAdd(phase, elapsed);
-            
-            _logger.LogInformation("✅ [STARTUP-PHASE] {Phase} 完了 - 実行時間: {ElapsedMs}ms", 
+
+            _logger.LogInformation("✅ [STARTUP-PHASE] {Phase} 完了 - 実行時間: {ElapsedMs}ms",
                 phase, elapsed.TotalMilliseconds);
-                
+
             // 10秒以上かかったフェーズを警告
             if (elapsed.TotalSeconds >= 10)
             {
-                _logger.LogWarning("🐌 [STARTUP-SLOW] {Phase} が {ElapsedSec}秒かかりました - ボトルネック候補", 
+                _logger.LogWarning("🐌 [STARTUP-SLOW] {Phase} が {ElapsedSec}秒かかりました - ボトルネック候補",
                     phase, elapsed.TotalSeconds);
             }
         }
@@ -70,8 +70,8 @@ public sealed class StartupTimeMeasurer(ILogger<StartupTimeMeasurer> logger)
     {
         _totalTimer.Stop();
         var totalTime = _totalTimer.Elapsed;
-        
-        _logger.LogInformation("🏁 [STARTUP] アプリケーション起動完了 - 総時間: {TotalMs}ms ({TotalSec}秒)", 
+
+        _logger.LogInformation("🏁 [STARTUP] アプリケーション起動完了 - 総時間: {TotalMs}ms ({TotalSec}秒)",
             totalTime.TotalMilliseconds, totalTime.TotalSeconds);
 
         // 詳細分析結果出力
@@ -98,25 +98,25 @@ public sealed class StartupTimeMeasurer(ILogger<StartupTimeMeasurer> logger)
             .ToList();
 
         double totalMeasuredMs = sortedPhases.Sum(kvp => kvp.Value.TotalMilliseconds);
-        
+
         foreach (var (phase, elapsed) in sortedPhases)
         {
             double percentage = (elapsed.TotalMilliseconds / totalTime.TotalMilliseconds) * 100;
-            string status = elapsed.TotalSeconds >= 10 ? "🔴 SLOW" : 
+            string status = elapsed.TotalSeconds >= 10 ? "🔴 SLOW" :
                            elapsed.TotalSeconds >= 5 ? "🟡 MEDIUM" : "🟢 FAST";
-            
-            _logger.LogInformation("  {Status} {Phase}: {ElapsedMs}ms ({Percentage:F1}%)", 
+
+            _logger.LogInformation("  {Status} {Phase}: {ElapsedMs}ms ({Percentage:F1}%)",
                 status, phase, elapsed.TotalMilliseconds, percentage);
         }
 
         _logger.LogInformation("================================================");
-        
+
         // 未測定時間があるかチェック
         double unmeasuredMs = totalTime.TotalMilliseconds - totalMeasuredMs;
         if (unmeasuredMs > 1000) // 1秒以上の未測定時間
         {
             double unmeasuredPercentage = (unmeasuredMs / totalTime.TotalMilliseconds) * 100;
-            _logger.LogWarning("⚠️ [STARTUP-ANALYSIS] 未測定時間: {UnmeasuredMs}ms ({UnmeasuredPercentage:F1}%) - 追加調査が必要", 
+            _logger.LogWarning("⚠️ [STARTUP-ANALYSIS] 未測定時間: {UnmeasuredMs}ms ({UnmeasuredPercentage:F1}%) - 追加調査が必要",
                 unmeasuredMs, unmeasuredPercentage);
         }
 
@@ -124,7 +124,7 @@ public sealed class StartupTimeMeasurer(ILogger<StartupTimeMeasurer> logger)
         var slowestPhase = sortedPhases.FirstOrDefault();
         if (slowestPhase.Value.TotalSeconds >= 10)
         {
-            _logger.LogError("🎯 [STARTUP-BOTTLENECK] 最大のボトルネック: {Phase} ({ElapsedSec:F1}秒)", 
+            _logger.LogError("🎯 [STARTUP-BOTTLENECK] 最大のボトルネック: {Phase} ({ElapsedSec:F1}秒)",
                 slowestPhase.Key, slowestPhase.Value.TotalSeconds);
         }
     }

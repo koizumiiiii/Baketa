@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Threading;
-using Baketa.UI.Views;
 using Baketa.UI.Utils;
+using Baketa.UI.Views;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Services;
@@ -24,7 +24,7 @@ public class LoadingOverlayManager(ILogger<LoadingOverlayManager> logger) : IDis
     {
         Console.WriteLine("🔄 LoadingOverlayManager.ShowAsync開始");
         SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 LoadingOverlayManager.ShowAsync開始");
-        
+
         lock (_lockObject)
         {
             if (_disposed)
@@ -51,7 +51,7 @@ public class LoadingOverlayManager(ILogger<LoadingOverlayManager> logger) : IDis
                     // 新しいローディングウィンドウを作成
                     _loadingWindow = new LoadingOverlayView();
                     _loadingWindow.Show();
-                    
+
                     Console.WriteLine("✅ ローディングオーバーレイ表示完了");
                     SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ ローディングオーバーレイ表示完了");
                 }
@@ -78,7 +78,7 @@ public class LoadingOverlayManager(ILogger<LoadingOverlayManager> logger) : IDis
     {
         Console.WriteLine("🔄 LoadingOverlayManager.HideAsync開始");
         SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 LoadingOverlayManager.HideAsync開始");
-        
+
         lock (_lockObject)
         {
             if (_disposed)
@@ -99,7 +99,7 @@ public class LoadingOverlayManager(ILogger<LoadingOverlayManager> logger) : IDis
                     {
                         _loadingWindow.Close();
                         _loadingWindow = null;
-                        
+
                         Console.WriteLine("✅ ローディングオーバーレイ非表示完了");
                         SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ ローディングオーバーレイ非表示完了");
                     }

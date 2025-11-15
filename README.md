@@ -24,10 +24,13 @@ OCR技術によりゲーム画面からテキストを検出し、翻訳結果�
 - **アダプティブ閾値**: ゲーム画面に応じた動的調整
 
 ### 🌐 翻訳機能
-- **OPUS-MT**: ローカル翻訳エンジン（オフライン対応）
-- **Google Gemini**: クラウド翻訳エンジン（高精度翻訳）
-- **多言語対応**: 日英中韓など主要言語ペア
-- **翻訳履歴**: 過去の翻訳結果管理
+- **NLLB-200**: Meta製多言語翻訳モデル（600M distilled版、ローカル処理）
+- **gRPC通信**: HTTP/2ベースの高速C#↔Python間通信（Keep-Alive対応）
+- **CTranslate2**: メモリ使用量80%削減の最適化版エンジン（2.4GB → 500MB）
+- **Google Gemini**: クラウド翻訳エンジン（高精度翻訳・フォールバック）
+- **多言語対応**: 200言語対応（日英中韓など主要言語ペア最適化）
+- **バッチ翻訳**: 最大32件同時翻訳対応で処理効率向上
+- **自動サーバー起動**: 初回翻訳時にPython gRPCサーバーを自動起動
 
 ### 🖥️ UI・UX
 - **透過オーバーレイ**: ゲームプレイを妨げない表示
@@ -43,22 +46,118 @@ OCR技術によりゲーム画面からテキストを検出し、翻訳結果�
 
 ## 🏗️ アーキテクチャ概要
 
-Baketaは5層クリーンアーキテクチャとモジュラー設計を採用しています：
+Baketaは5層クリーンアーキテクチャとモジュラー設計を採用し、イベント駆動型のリアクティブシステムです：
 
 ### 📦 レイヤー構成
 1. **Baketa.Core**: プラットフォーム非依存のコア機能・抽象化層
-2. **Baketa.Infrastructure**: インフラストラクチャ層（OCR、翻訳、設定管理）
-3. **Baketa.Infrastructure.Platform**: Windows専用プラットフォーム実装
-4. **Baketa.Application**: ビジネスロジック・機能統合層
-5. **Baketa.UI**: Avalonia UIによるプレゼンテーション層
-6. **BaketaCaptureNative**: C++/WinRT ネイティブDLL（Windows Graphics Capture API）
+   - イベント集約システム (`EventAggregator`)
+   - サービスモジュールベースクラス (`ServiceModuleBase`)
+   - 抽象インターフェース (`Abstractions/` 名前空間)
 
-### ⚡ 設計パターン
-- **イベント集約**: `IEventAggregator`による疎結合通信
-- **依存性注入**: モジュール単位のDIコンテナ設計
-- **アダプターパターン**: レイヤー間の互換性確保
-- **リポジトリパターン**: データアクセス抽象化
+2. **Baketa.Infrastructure**: インフラストラクチャ層（OCR、翻訳、設定管理）
+   - PaddleOCR統合、翻訳エンジン (NLLB-200, Gemini, モックエンジン)
+   - **gRPC翻訳クライアント**: Python翻訳サーバーとのHTTP/2通信 (`GrpcTranslationClient`)
+   - **Pythonサーバー管理**: 自動起動・ヘルスチェック (`PythonServerManager`)
+   - 画像処理パイプライン、設定永続化 (JSONベース)
+
+3. **Baketa.Infrastructure.Platform**: Windows専用プラットフォーム実装
+   - GDIスクリーンキャプチャ、Windows用OpenCVラッパー
+   - Windowsオーバーレイシステム、モニタ管理、P/Invokeラッパー
+   - **動的リソース監視**: Windows Performance CounterベースのCPU/メモリ/GPU監視
+
+4. **Baketa.Application**: ビジネスロジック・機能統合層
+   - キャプチャサービス、翻訳オーケストレーション
+   - イベントハンドラー、サービス統合
+   - **サーキットブレーカー**: 翻訳サービス信頼性向上
+
+5. **Baketa.UI**: Avalonia UIによるプレゼンテーション層
+   - ReactiveUIベースのViewModel、設定スクリーン、オーバーレイコンポーネント
+   - ナビゲーションとテーマ
+
+6. **BaketaCaptureNative**: C++/WinRT ネイティブDLL（Windows Graphics Capture API）
+   - ネイティブWindows Graphics Capture API実装
+   - DirectX/OpenGLコンテンツキャプチャ、BGRAピクセルフォーマット変換
+   - メモリ効率的なテクスチャ処理
+
+### ⚡ 設計パターンとアーキテクチャパターン
+- **イベント集約**: `IEventAggregator`による疎結合モジュール間通信
+- **モジュラーDI**: 機能ベースのDIモジュールが`ServiceModuleBase`を継承
+- **アダプターパターン**: レイヤー間のインターフェース互換性確保
+- **ファクトリーパターン**: アダプター作成、テスト用スタブ実装
 - **ReactiveUI**: MVVM + リアクティブプログラミング
+- **設定管理**: 階層的設定と検証・マイグレーション
+- **サーキットブレーカー**: 翻訳システム信頼性向上パターン
+- **動的リソース監視**: CPU/メモリ/GPU使用率リアルタイム監視システム
+
+### 🔄 gRPC翻訳アーキテクチャ
+
+BaketaはgRPC (HTTP/2) による高速C#↔Python間通信で翻訳処理を実現しています：
+
+```mermaid
+graph TB
+    subgraph "Baketa.UI<br/>(Avalonia UI Layer)"
+        UI[UI Components<br/>MainWindow]
+    end
+
+    subgraph "Baketa.Application<br/>(Business Logic Layer)"
+        App[DefaultTranslationService<br/>翻訳サービス統括]
+        EventHandler[AggregatedChunksReadyEventHandler<br/>イベント処理]
+    end
+
+    subgraph "Baketa.Infrastructure<br/>(Infrastructure Layer)"
+        Adapter[GrpcTranslationEngineAdapter<br/>ITranslationEngine実装]
+        Client[GrpcTranslationClient<br/>HTTP/2通信]
+        ServerMgr[PythonServerManager<br/>サーバー自動起動]
+    end
+
+    subgraph "Python gRPC Server<br/>(Translation Engine)"
+        Server[TranslationServicer<br/>gRPC Service]
+        Engine[NLLB Engine<br/>facebook/nllb-200-distilled-600M]
+        CT2[CTranslate2 Engine<br/>メモリ80%削減版]
+    end
+
+    UI -->|翻訳リクエスト| App
+    App -->|ITranslationEngine.TranslateAsync| Adapter
+    EventHandler -->|バッチ翻訳| Adapter
+
+    Adapter -->|1. サーバー起動確認| ServerMgr
+    ServerMgr -.->|python start_server.py| Server
+
+    Adapter -->|2. gRPC Call| Client
+    Client -->|HTTP/2 Keep-Alive<br/>port:50051| Server
+
+    Server -->|translate()| Engine
+    Server -.->|オプション| CT2
+
+    Server -->|TranslateResponse| Client
+    Client -->|TranslationResponse| Adapter
+    Adapter -->|結果| App
+    App -->|表示| UI
+
+    style Server fill:#e1f5fe
+    style Engine fill:#fff3e0
+    style CT2 fill:#fff3e0
+    style Adapter fill:#f3e5f5
+    style Client fill:#f3e5f5
+```
+
+#### gRPC APIメソッド
+
+| メソッド | 説明 | 実装状況 |
+|---------|------|---------|
+| `Translate()` | 単一テキスト翻訳 | ✅ **稼働中** |
+| `TranslateBatch()` | バッチ翻訳（最大32件） | ✅ **稼働中** |
+| `HealthCheck()` | サーバーヘルスチェック | ✅ 実装済み |
+| `IsReady()` | モデル準備状態確認 | ✅ 実装済み |
+
+#### 技術仕様
+- **プロトコル**: HTTP/2 (gRPC)
+- **ポート**: 50051 (デフォルト)
+- **Keep-Alive**: 10秒間隔（C#クライアント）、30秒間隔（Pythonサーバー）
+- **自動起動**: 初回翻訳時にPython gRPCサーバーを自動起動
+- **エラーハンドリング**: 自動再接続、サーキットブレーカーパターン
+- **バッチサイズ**: 最大32件/リクエスト
+- **タイムアウト**: 30秒（翻訳リクエスト）
 
 ## ダウンロード・インストール
 
@@ -68,11 +167,12 @@ Baketaは5層クリーンアーキテクチャとモジュラー設計を採用�
 
 ### 💻 システム要件
 - **OS**: Windows 10/11 (64-bit)
-- **メモリ**: 4GB RAM 推奨（8GB以上を強く推奨）
-- **ストレージ**: 2GB 空き容量（OPUS-MTモデル含む）
+- **メモリ**: 8GB RAM 推奨（16GB以上を強く推奨、NLLB-200モデル用）
+- **ストレージ**: 3GB 空き容量（NLLB-200モデル2.4GB含む）
 - **ランタイム**: .NET 8.0 Windows Desktop Runtime（自己完結型）
+- **Python**: Python 3.10+ (NLLB-200翻訳サーバー用)
 - **VC++ Redistributable**: Visual C++ 2019/2022 Redistributable (x64)（ネイティブDLL用）
-- **GPU**: CUDA対応GPU（オプション、OCR高速化用）
+- **GPU**: CUDA対応GPU（推奨、RTX 4070相当で59倍高速化実績）
 
 ### インストール手順
 1. [Releases](https://github.com/koizumiiiii/Baketa/releases)から最新版をダウンロード
@@ -101,18 +201,26 @@ cd Baketa
 # 2. 依存関係復元
 dotnet restore
 
-# 3. ネイティブDLLビルド（Visual Studio 2022が必要）
+# 3. Python環境セットアップ（NLLB-200用）
+pyenv install 3.10.9
+pyenv global 3.10.9
+pip install -r requirements.txt
+
+# 4. ネイティブDLLビルド（Visual Studio 2022が必要）
 # BaketaCaptureNative.slnをVisual Studio 2022で開いてビルド
 # または MSBuild を使用：
 # msbuild BaketaCaptureNative\BaketaCaptureNative.sln /p:Configuration=Debug /p:Platform=x64
 
-# 4. .NETプロジェクトビルド
+# 5. .NETプロジェクトビルド
 dotnet build --configuration Debug
 
-# 5. テスト実行
+# 6. テスト実行
 dotnet test
 
-# 6. アプリケーション実行
+# 7. NLLB-200翻訳サーバー起動（別ターミナル）
+py scripts/nllb_translation_server.py
+
+# 8. アプリケーション実行
 dotnet run --project Baketa.UI
 ```
 
@@ -150,20 +258,36 @@ dotnet publish Baketa.UI/Baketa.UI.csproj \
 - ✅ **品質**: コード品質チェック、パフォーマンステスト
 - ✅ **リリース**: 自動パッケージング・配布
 
-## 📈 プロジェクト状況
+## 📈 プロジェクト状況と最新成果
+
+### 🚀 最新パフォーマンス実績
+- **GPU最適化**: RTX 4070でOCR処理が59倍高速化達成（CPU: 5,900ms → GPU: 100ms）
+- **翻訳システム統一**: OPUS-MTからNLLB-200へ完全移行完了
+- **サーキットブレーカー**: 翻訳サービス信頼性向上システム実装完了
+- **動的リソース監視**: CPU/メモリ/GPU使用率リアルタイム監視実装完了
+- **CTranslate2最適化**: 翻訳速度40-60%改善提案（次期実装予定）
+
+### 🏆 アーキテクチャと品質への取り組み
+- **5層クリーンアーキテクチャ**: 保守性と拡張性の高い設計
+- **イベント駆動アーキテクチャ**: 疎結合でスケーラブルなコンポーネント間通信
+- **線形依存性管理**: Dependency Injectionコンテナで循環依存防止
+- **包括的テスト戦略**: 1,300+テストケースで高品質を保証
 
 ### 🧪 テスト状況
 - **テストケース数**: 1,300+ 
 - **カバレッジ**: Core 85%+、Infrastructure 80%+、UI 70%+
-- **パフォーマンステスト**: OCR・翻訳速度ベンチマーク
-- **統合テスト**: エンドツーエンド翻訳フロー
+- **パフォーマンステスト**: OCR・翻訳速度ベンチマーク（59倍高速化実績）
+- **統合テスト**: エンドツーエンド翻訳フロー、サーキットブレーカー
+- **リソース監視テスト**: システム負荷・メモリ効率測定
 
 ### 📊 技術スタック
-- **言語**: C# 12.0（最新機能活用）
-- **フレームワーク**: .NET 8.0 Windows
+- **言語**: C# 12.0（最新機能活用）、Python 3.10+（翻訳エンジン）
+- **フレームワーク**: .NET 8.0 Windows、FastAPI（翻訳サーバー）
 - **UI**: Avalonia 11.2.7 + ReactiveUI
-- **OCR**: PaddleOCR + OpenCV最適化
-- **翻訳**: OPUS-MT（ローカル）、Google Gemini（クラウド）
+- **OCR**: PaddleOCR PP-OCRv5 + OpenCV最適化
+- **翻訳**: NLLB-200（Meta製、ローカル）、Google Gemini（クラウド）
+- **パフォーマンス**: CTranslate2最適化（提案中）、GPU最適化（CUDA）
+- **監視**: Windows Performance Counter、動的リソース監視
 - **テスト**: xUnit + Moq + Avalonia.Headless
 
 ## 📁 プロジェクト構造
@@ -216,7 +340,8 @@ Baketa/
 - **PaddleOCR**: 高精度OCRエンジン
 - **OpenCV**: 画像処理ライブラリ
 - **Avalonia**: クロスプラットフォームUIフレームワーク
-- **OPUS-MT**: オープンソース翻訳モデル
+- **Meta NLLB-200**: No Language Left Behind多言語翻訳モデル
+- **Google Gemini**: クラウドAI翻訳サービス
 
 ---
 

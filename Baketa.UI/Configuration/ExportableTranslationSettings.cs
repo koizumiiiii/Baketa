@@ -109,7 +109,7 @@ public sealed class ImportResult
     /// 成功結果を作成
     /// </summary>
     public static ImportResult CreateSuccess(
-        ExportableTranslationSettings settings, 
+        ExportableTranslationSettings settings,
         string? warning = null,
         bool hasAutoCorrections = false,
         string? autoCorrectionDetails = null)

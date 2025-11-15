@@ -2,9 +2,9 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Imaging.Filters;
+using Baketa.Core.Services.Imaging;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
-using Baketa.Core.Services.Imaging;
 
 namespace Baketa.Infrastructure.Imaging.Filters;
 
@@ -52,14 +52,14 @@ public sealed class OpenCvAdaptiveThresholdFilter : ImageFilterBase
         RegisterParameter("MaxValue", 255.0);             // 最大値
         RegisterParameter("AdaptiveMethod", AdaptiveThresholdTypes.GaussianC); // 適応的手法
         RegisterParameter("ThresholdType", ThresholdTypes.Binary);             // 閾値処理タイプ
-        
+
         // ゲーム画面特化パラメータ
         RegisterParameter("PreBlurKernelSize", 3);        // 前処理ブラーカーネルサイズ
         RegisterParameter("PreBlurEnabled", true);        // 前処理ブラー有効化
         RegisterParameter("PostMorphEnabled", true);      // 後処理モルフォロジー有効化
         RegisterParameter("MorphKernelSize", 2);          // モルフォロジーカーネルサイズ
         RegisterParameter("MorphIterations", 1);          // モルフォロジー反復回数
-        
+
         // デバッグ・ログ設定
         RegisterParameter("EnableDetailedLogging", true);  // 詳細ログ有効化
     }
@@ -114,7 +114,7 @@ public sealed class OpenCvAdaptiveThresholdFilter : ImageFilterBase
     public override ImageInfo GetOutputImageInfo(IAdvancedImage inputImage)
     {
         ArgumentNullException.ThrowIfNull(inputImage);
-        
+
         return new ImageInfo
         {
             Width = inputImage.Width,

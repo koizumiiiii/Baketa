@@ -2,8 +2,8 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.UI.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Configuration;
 
@@ -28,8 +28,8 @@ public sealed class SettingsExportImportService(ILogger<SettingsExportImportServ
     /// <param name="filePath">保存先ファイルパス</param>
     /// <param name="comments">エクスポート時のコメント</param>
     public async Task ExportSettingsAsync(
-        ExportableTranslationSettings settings, 
-        string filePath, 
+        ExportableTranslationSettings settings,
+        string filePath,
         string? comments = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -39,15 +39,15 @@ public sealed class SettingsExportImportService(ILogger<SettingsExportImportServ
         try
         {
             // コメントを追加した設定を作成
-            var exportSettings = settings with 
-            { 
+            var exportSettings = settings with
+            {
                 Comments = comments,
                 ExportedAt = DateTime.UtcNow,
                 ApplicationVersion = GetApplicationVersion()
             };
 
             var json = JsonSerializer.Serialize(exportSettings, JsonOptions);
-            
+
             // ディレクトリが存在しない場合は作成
             var directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -56,7 +56,7 @@ public sealed class SettingsExportImportService(ILogger<SettingsExportImportServ
             }
 
             await File.WriteAllTextAsync(filePath, json).ConfigureAwait(false);
-            
+
             _logger.LogInformation("設定をエクスポートしました: {FilePath}", filePath);
         }
         catch (UnauthorizedAccessException ex)
@@ -113,9 +113,9 @@ public sealed class SettingsExportImportService(ILogger<SettingsExportImportServ
 
             // 設定の妥当性検証と自動修正
             var validationResult = ValidateAndCorrectSettings(settings);
-            
+
             _logger.LogInformation("設定をインポートしました: {FilePath}", filePath);
-            
+
             return validationResult;
         }
         catch (FileNotFoundException ex)
@@ -197,9 +197,9 @@ public sealed class SettingsExportImportService(ILogger<SettingsExportImportServ
         if (hasCorrections)
         {
             return ImportResult.CreateSuccess(
-                correctedSettings, 
+                correctedSettings,
                 warning,
-                true, 
+                true,
                 corrections.ToString());
         }
 

@@ -8,558 +8,560 @@ using Baketa.Core.Abstractions.OCR.TextDetection;
 
 namespace Baketa.Infrastructure.Platform.Windows.OpenCv;
 
-    /// <summary>
-    /// Windows プラットフォーム用 OpenCV ラッパーの実装
-    /// プロジェクト内で使用するが、IOpenCvWrapperインターフェースは直接実装しない
-    /// </summary>
-    public class WindowsOpenCvWrapper : IDisposable
+/// <summary>
+/// Windows プラットフォーム用 OpenCV ラッパーの実装
+/// プロジェクト内で使用するが、IOpenCvWrapperインターフェースは直接実装しない
+/// </summary>
+public class WindowsOpenCvWrapper : IDisposable
+{
+    private bool _disposed;
+    // OpenCVライブラリとの実際のインタラクションを処理する内部クラス/メソッド
+    private readonly IWindowsOpenCvLibrary _openCvLib;
+
+    public WindowsOpenCvWrapper(IWindowsOpenCvLibrary openCvLib)
     {
-        private bool _disposed;
-        // OpenCVライブラリとの実際のインタラクションを処理する内部クラス/メソッド
-        private readonly IWindowsOpenCvLibrary _openCvLib;
+        _openCvLib = openCvLib ?? throw new ArgumentNullException(nameof(openCvLib));
+    }
 
-        public WindowsOpenCvWrapper(IWindowsOpenCvLibrary openCvLib)
+    /// <summary>
+    /// 画像をグレースケールに変換します
+    /// </summary>
+    public static async Task<IAdvancedImage> ConvertToGrayscaleAsync(IAdvancedImage source)
+    {
+        ArgumentNullException.ThrowIfNull(source, nameof(source));
+
+        try
         {
-            _openCvLib = openCvLib ?? throw new ArgumentNullException(nameof(openCvLib));
+            return source.IsGrayscale ? source : await Task.FromResult(source).ConfigureAwait(false);
         }
-        
-        /// <summary>
-        /// 画像をグレースケールに変換します
-        /// </summary>
-        public static async Task<IAdvancedImage> ConvertToGrayscaleAsync(IAdvancedImage source)
+        catch (Exception ex)
         {
-            ArgumentNullException.ThrowIfNull(source, nameof(source));
-            
-            try {
-                return source.IsGrayscale ? source : await Task.FromResult(source).ConfigureAwait(false);
-            }
-            catch (Exception ex) {
-                throw new Baketa.Infrastructure.Platform.Windows.OpenCv.Exceptions.OcrProcessingException("グレースケール変換中にエラーが発生しました", ex);
-            }
+            throw new Baketa.Infrastructure.Platform.Windows.OpenCv.Exceptions.OcrProcessingException("グレースケール変換中にエラーが発生しました", ex);
         }
+    }
 
-        /// <summary>
-        /// 画像に閾値処理を適用します
-        /// </summary>
-        public async Task<IAdvancedImage> ApplyThresholdAsync(
-            IAdvancedImage source,
-            double threshold,
-            double maxValue,
-            Baketa.Core.Abstractions.Imaging.ThresholdType type)
-        {
-            ArgumentNullException.ThrowIfNull(source);
+    /// <summary>
+    /// 画像に閾値処理を適用します
+    /// </summary>
+    public async Task<IAdvancedImage> ApplyThresholdAsync(
+        IAdvancedImage source,
+        double threshold,
+        double maxValue,
+        Baketa.Core.Abstractions.Imaging.ThresholdType type)
+    {
+        ArgumentNullException.ThrowIfNull(source);
 
-            var result = await _openCvLib.ThresholdAsync(
-                source,
-                threshold,
-                maxValue,
-                ConvertToOpenCvThresholdType(type)).ConfigureAwait(false);
+        var result = await _openCvLib.ThresholdAsync(
+            source,
+            threshold,
+            maxValue,
+            ConvertToOpenCvThresholdType(type)).ConfigureAwait(false);
 
-            return result;
-        }
-        
-        /// <summary>
-        /// 画像に適応的閾値処理を適用します
-        /// </summary>
-        public async Task<IAdvancedImage> ApplyAdaptiveThresholdAsync(
-            IAdvancedImage source,
-            double maxValue,
-            Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType adaptiveMethod,
-            Baketa.Core.Abstractions.Imaging.ThresholdType thresholdType,
-            int blockSize,
-            double c)
-        {
-            ArgumentNullException.ThrowIfNull(source);
+        return result;
+    }
 
-            var result = await _openCvLib.AdaptiveThresholdAsync(
-                source,
-                maxValue,
-                ConvertToOpenCvAdaptiveThresholdType(adaptiveMethod),
-                ConvertToOpenCvThresholdType(thresholdType),
-                blockSize,
-                c).ConfigureAwait(false);
+    /// <summary>
+    /// 画像に適応的閾値処理を適用します
+    /// </summary>
+    public async Task<IAdvancedImage> ApplyAdaptiveThresholdAsync(
+        IAdvancedImage source,
+        double maxValue,
+        Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType adaptiveMethod,
+        Baketa.Core.Abstractions.Imaging.ThresholdType thresholdType,
+        int blockSize,
+        double c)
+    {
+        ArgumentNullException.ThrowIfNull(source);
 
-            return result;
-        }
+        var result = await _openCvLib.AdaptiveThresholdAsync(
+            source,
+            maxValue,
+            ConvertToOpenCvAdaptiveThresholdType(adaptiveMethod),
+            ConvertToOpenCvThresholdType(thresholdType),
+            blockSize,
+            c).ConfigureAwait(false);
 
-        /// <summary>
-        /// 画像にモルフォロジー演算を適用します
-        /// </summary>
-        public async Task<IAdvancedImage> ApplyMorphologyAsync(
-            IAdvancedImage source,
-            Baketa.Core.Abstractions.Imaging.MorphType morphType,
-            Size kernelSize,
-            int _ = 1)
-        {
-            ArgumentNullException.ThrowIfNull(source);
+        return result;
+    }
 
-            var result = await _openCvLib.MorphologyAsync(
-                source,
-                ConvertToOpenCvMorphType(morphType),
-                kernelSize.Width).ConfigureAwait(false);
+    /// <summary>
+    /// 画像にモルフォロジー演算を適用します
+    /// </summary>
+    public async Task<IAdvancedImage> ApplyMorphologyAsync(
+        IAdvancedImage source,
+        Baketa.Core.Abstractions.Imaging.MorphType morphType,
+        Size kernelSize,
+        int _ = 1)
+    {
+        ArgumentNullException.ThrowIfNull(source);
 
-            return result;
-        }
-        
-        /// <summary>
-        /// 画像にガウシアンブラーを適用します
-        /// </summary>
+        var result = await _openCvLib.MorphologyAsync(
+            source,
+            ConvertToOpenCvMorphType(morphType),
+            kernelSize.Width).ConfigureAwait(false);
+
+        return result;
+    }
+
+    /// <summary>
+    /// 画像にガウシアンブラーを適用します
+    /// </summary>
 #pragma warning disable IDE0060 // Remove unused parameter - parameters will be used in OpenCV implementation
-        public static async Task<IAdvancedImage> ApplyGaussianBlurAsync(
-            IAdvancedImage source, 
-            System.Drawing.Size _1, 
-            double _2 = 0, 
-            double _3 = 0)
-        {
-            ArgumentNullException.ThrowIfNull(source);
-            
-            // TODO: OpenCV実装時に_1, _2, _3を使用
-            
-            // 実装はスタブ化されています
-            return await Task.FromResult(source).ConfigureAwait(false);
-        }
+    public static async Task<IAdvancedImage> ApplyGaussianBlurAsync(
+        IAdvancedImage source,
+        System.Drawing.Size _1,
+        double _2 = 0,
+        double _3 = 0)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        // TODO: OpenCV実装時に_1, _2, _3を使用
+
+        // 実装はスタブ化されています
+        return await Task.FromResult(source).ConfigureAwait(false);
+    }
 #pragma warning restore IDE0060
-        
-        /// <summary>
-        /// 画像にメディアンブラーを適用します
-        /// </summary>
+
+    /// <summary>
+    /// 画像にメディアンブラーを適用します
+    /// </summary>
 #pragma warning disable IDE0060 // Remove unused parameter - parameters will be used in OpenCV implementation
-        public static async Task<IAdvancedImage> ApplyMedianBlurAsync(
-            IAdvancedImage source, 
-            int kernelSize)
-        {
-            ArgumentNullException.ThrowIfNull(source);
-            
-            // TODO: OpenCV実装時にkernelSizeを使用
-            _ = kernelSize;
-            
-            // 実装はスタブ化されています
-            return await Task.FromResult(source).ConfigureAwait(false);
-        }
+    public static async Task<IAdvancedImage> ApplyMedianBlurAsync(
+        IAdvancedImage source,
+        int kernelSize)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        // TODO: OpenCV実装時にkernelSizeを使用
+        _ = kernelSize;
+
+        // 実装はスタブ化されています
+        return await Task.FromResult(source).ConfigureAwait(false);
+    }
 #pragma warning restore IDE0060
-        
-        /// <summary>
-        /// 画像に対してCannyエッジ検出を適用します
-        /// </summary>
-        public static async Task<IAdvancedImage> ApplyCannyEdgeAsync(
-            IAdvancedImage source, 
-            double _1, 
-            double _2, 
-            int _3 = 3, 
-            bool _4 = false)
+
+    /// <summary>
+    /// 画像に対してCannyエッジ検出を適用します
+    /// </summary>
+    public static async Task<IAdvancedImage> ApplyCannyEdgeAsync(
+        IAdvancedImage source,
+        double _1,
+        double _2,
+        int _3 = 3,
+        bool _4 = false)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        // 実装はスタブ化されています
+        return await Task.FromResult(source).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// MSER領域を検出します
+    /// </summary>
+    public IReadOnlyList<Point[]> DetectMSERRegions(
+        IAdvancedImage _,
+        Dictionary<string, object> parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        // パラメーター値を取得（将来のOpenCV実装で使用予定）
+        var delta = parameters.TryGetValue("delta", out var deltaObj) && deltaObj is int deltaVal ? deltaVal : 5;
+        var minArea = parameters.TryGetValue("minArea", out var minAreaObj) && minAreaObj is int minAreaVal ? minAreaVal : 60;
+        var maxArea = parameters.TryGetValue("maxArea", out var maxAreaObj) && maxAreaObj is int maxAreaVal ? maxAreaVal : 14400;
+
+        // TODO: OpenCV実装時にこれらのパラメーターを使用
+        // 現在はスタブ実装でパラメーター検証のみ実行
+        if (delta < 0 || minArea < 0 || maxArea < minArea)
         {
-            ArgumentNullException.ThrowIfNull(source);
-            
-            // 実装はスタブ化されています
-            return await Task.FromResult(source).ConfigureAwait(false);
+            throw new ArgumentException("Invalid MSER parameters provided");
         }
-        
-        /// <summary>
-        /// MSER領域を検出します
-        /// </summary>
-        public IReadOnlyList<Point[]> DetectMSERRegions(
-            IAdvancedImage _, 
-            Dictionary<string, object> parameters)
+
+        return [];
+    }
+
+    /// <summary>
+    /// ポイント配列に基づくバウンディングボックスを取得します
+    /// </summary>
+    public static Rectangle GetBoundingRect(Point[] points)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+
+        if (points.Length == 0)
+            return Rectangle.Empty;
+
+        // 最小、最大値を定めて矩形を返す
+        int minX = int.MaxValue, minY = int.MaxValue;
+        int maxX = int.MinValue, maxY = int.MinValue;
+
+        foreach (var p in points)
         {
-            ArgumentNullException.ThrowIfNull(parameters);
-            
-            // パラメーター値を取得（将来のOpenCV実装で使用予定）
-            var delta = parameters.TryGetValue("delta", out var deltaObj) && deltaObj is int deltaVal ? deltaVal : 5;
-            var minArea = parameters.TryGetValue("minArea", out var minAreaObj) && minAreaObj is int minAreaVal ? minAreaVal : 60;
-            var maxArea = parameters.TryGetValue("maxArea", out var maxAreaObj) && maxAreaObj is int maxAreaVal ? maxAreaVal : 14400;
-            
-            // TODO: OpenCV実装時にこれらのパラメーターを使用
-            // 現在はスタブ実装でパラメーター検証のみ実行
-            if (delta < 0 || minArea < 0 || maxArea < minArea)
+            minX = Math.Min(minX, p.X);
+            minY = Math.Min(minY, p.Y);
+            maxX = Math.Max(maxX, p.X);
+            maxY = Math.Max(maxY, p.Y);
+        }
+
+        return new Rectangle(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    /// <summary>
+    /// Cannyエッジ検出を実行します
+    /// </summary>
+    public static IAdvancedImage CannyEdgeDetection(IAdvancedImage image, double _1, double _2)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        // 実装はスタブ化されています
+        return image;
+    }
+
+    /// <summary>
+    /// ストローク幅変換を適用します
+    /// </summary>
+    public static IAdvancedImage StrokeWidthTransform(
+        IAdvancedImage grayImage,
+        IAdvancedImage edgeImage,
+        float _1,
+        float _2)
+    {
+        ArgumentNullException.ThrowIfNull(grayImage);
+        ArgumentNullException.ThrowIfNull(edgeImage);
+
+        // 実装はスタブ化されています
+        return grayImage;
+    }
+
+    /// <summary>
+    /// ストローク幅の分散を計算します
+    /// </summary>
+    public static float CalculateStrokeWidthVariance(IAdvancedImage _1, Point[] _2)
+    {
+        // TODO: OpenCV実装時に_1と_2を使用
+
+        // 実装はスタブ化されています
+        return 1.0f;
+    }
+
+    /// <summary>
+    /// 平均ストローク幅を計算します
+    /// </summary>
+    public static float CalculateMeanStrokeWidth(IAdvancedImage swtImage, Point[] region)
+    {
+        // TODO: OpenCV実装時にswtImageとregionを使用
+        _ = swtImage;
+        _ = region;
+
+        // 実装はスタブ化されています
+        return 5.0f;
+    }
+
+    /// <summary>
+    /// 画像に適応的二値化を適用します
+    /// </summary>
+    public static IAdvancedImage AdaptiveThreshold(IAdvancedImage image, int _1, double _2)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        // 実装はスタブ化されています
+        return image;
+    }
+
+    /// <summary>
+    /// 画像にガウシアンぼかしを適用します
+    /// </summary>
+    public static IAdvancedImage GaussianBlur(IAdvancedImage image, int _1, double _2)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        // 実装はスタブ化されています
+        return image;
+    }
+
+    /// <summary>
+    /// モルフォロジー演算を適用します
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "OpenCVライブラリの公式メソッド名")]
+    public static IAdvancedImage MorphologyEx(IAdvancedImage image, Baketa.Core.Abstractions.Imaging.MorphologyOperation _1, int _2)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        // 実装はスタブ化されています
+        return image;
+    }
+
+    /// <summary>
+    /// 連結成分を抽出します
+    /// </summary>
+    public static IReadOnlyList<Point[]> ExtractConnectedComponents(
+        IAdvancedImage image,
+        int _1,
+        int _2)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        // スタブ実装
+        return [];
+    }
+
+    /// <summary>
+    /// OCR処理用の閾値処理を適用します
+    /// </summary>
+    public async Task<IAdvancedImage> ApplyOcrThresholdAsync(
+        IAdvancedImage source,
+        double threshold,
+        double maxValue,
+        Baketa.Core.Abstractions.OCR.ThresholdType type)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        // OCR用のThresholdTypeをImaging用に変換する
+        var imagingThresholdType = ConvertOcrToImagingThresholdType(type);
+        var result = await _openCvLib.ThresholdAsync(
+            source,
+            threshold,
+            maxValue,
+            ConvertToOpenCvThresholdType(imagingThresholdType)).ConfigureAwait(false);
+
+        return result;
+    }
+
+    /// <summary>
+    /// OCR処理用の適応的閾値処理を適用します
+    /// </summary>
+    public async Task<IAdvancedImage> ApplyOcrAdaptiveThresholdAsync(
+        IAdvancedImage source,
+        double maxValue,
+        Baketa.Core.Abstractions.OCR.AdaptiveThresholdType adaptiveMethod,
+        Baketa.Core.Abstractions.OCR.ThresholdType thresholdType,
+        int blockSize,
+        double c)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        // OCR用の型をImaging用の型に変換
+        var imagingAdaptiveMethod = ConvertOcrToImagingAdaptiveThresholdType(adaptiveMethod);
+        var imagingThresholdType = ConvertOcrToImagingThresholdType(thresholdType);
+
+        var result = await _openCvLib.AdaptiveThresholdAsync(
+            source,
+            maxValue,
+            ConvertToOpenCvAdaptiveThresholdType(imagingAdaptiveMethod),
+            ConvertToOpenCvThresholdType(imagingThresholdType),
+            blockSize,
+            c).ConfigureAwait(false);
+
+        return result;
+    }
+
+    /// <summary>
+    /// 連結コンポーネントを抽出します（OCR用）
+    /// </summary>
+    public IReadOnlyList<Point[]> ExtractOcrConnectedComponents(
+        IAdvancedImage image,
+        int minComponentSize,
+        int maxComponentSize)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        // OpenCV による連結コンポーネント抽出処理
+        var components = _openCvLib.FindConnectedComponents(
+            image,
+            minComponentSize,
+            maxComponentSize);
+
+        return components;
+    }
+
+    /// <summary>
+    /// Cannyエッジ検出を実行します (OCR用)
+    /// </summary>
+    public static IAdvancedImage CannyEdgeDetection(IAdvancedImage image, int _1, int _2)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        // 実装はスタブ化
+        return image;
+    }
+
+    /// <summary>
+    /// MSERアルゴリズムを使用してテキスト領域を検出します
+    /// </summary>
+    public IReadOnlyList<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion> DetectTextRegionsWithMser(
+        IAdvancedImage image,
+        int delta,
+        int minArea,
+        int maxArea)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(WindowsOpenCvWrapper), "このオブジェクトは既に破棄されています。");
+        ArgumentNullException.ThrowIfNull(image, nameof(image));
+
+        // MSERによるテキスト領域検出の実装
+        var regions = _openCvLib.DetectMserRegions(
+            image,
+            delta,
+            minArea,
+            maxArea);
+
+        // 検出結果をTextRegionに変換
+        var textRegions = new List<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion>([]);
+        foreach (var region in regions)
+        {
+            textRegions.Add(new Baketa.Core.Abstractions.OCR.TextDetection.TextRegion
             {
-                throw new ArgumentException("Invalid MSER parameters provided");
-            }
-            
-            return [];
+                Bounds = region.Bounds,
+                Contour = region.Points,
+                ConfidenceScore = region.Confidence
+            });
         }
-        
-        /// <summary>
-        /// ポイント配列に基づくバウンディングボックスを取得します
-        /// </summary>
-        public static Rectangle GetBoundingRect(Point[] points)
+
+        return textRegions;
+    }
+
+    /// <summary>
+    /// SWTアルゴリズムを使用してテキスト領域を検出します
+    /// </summary>
+    public IReadOnlyList<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion> DetectTextRegionsWithSwt(
+        IAdvancedImage image,
+        bool darkTextOnLight,
+        float strokeWidthRatio)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        // SWTによるテキスト領域検出の実装
+        var regions = _openCvLib.DetectSwtRegions(
+            image,
+            darkTextOnLight,
+            strokeWidthRatio);
+
+        // 検出結果をTextRegionに変換
+        var textRegions = new List<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion>([]);
+        foreach (var region in regions)
         {
-            ArgumentNullException.ThrowIfNull(points);
-            
-            if (points.Length == 0)
-                return Rectangle.Empty;
-            
-            // 最小、最大値を定めて矩形を返す
-            int minX = int.MaxValue, minY = int.MaxValue;
-            int maxX = int.MinValue, maxY = int.MinValue;
-            
-            foreach (var p in points)
+            textRegions.Add(new Baketa.Core.Abstractions.OCR.TextDetection.TextRegion
             {
-                minX = Math.Min(minX, p.X);
-                minY = Math.Min(minY, p.Y);
-                maxX = Math.Max(maxX, p.X);
-                maxY = Math.Max(maxY, p.Y);
-            }
-            
-            return new Rectangle(minX, minY, maxX - minX, maxY - minY);
-        }
-        
-        /// <summary>
-        /// Cannyエッジ検出を実行します
-        /// </summary>
-        public static IAdvancedImage CannyEdgeDetection(IAdvancedImage image, double _1, double _2)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-            
-            // 実装はスタブ化されています
-            return image;
-        }
-        
-        /// <summary>
-        /// ストローク幅変換を適用します
-        /// </summary>
-        public static IAdvancedImage StrokeWidthTransform(
-            IAdvancedImage grayImage, 
-            IAdvancedImage edgeImage, 
-            float _1, 
-            float _2)
-        {
-            ArgumentNullException.ThrowIfNull(grayImage);
-            ArgumentNullException.ThrowIfNull(edgeImage);
-            
-            // 実装はスタブ化されています
-            return grayImage;
-        }
-        
-        /// <summary>
-        /// ストローク幅の分散を計算します
-        /// </summary>
-        public static float CalculateStrokeWidthVariance(IAdvancedImage _1, Point[] _2)
-        {
-            // TODO: OpenCV実装時に_1と_2を使用
-            
-            // 実装はスタブ化されています
-            return 1.0f;
-        }
-        
-        /// <summary>
-        /// 平均ストローク幅を計算します
-        /// </summary>
-        public static float CalculateMeanStrokeWidth(IAdvancedImage swtImage, Point[] region)
-        {
-            // TODO: OpenCV実装時にswtImageとregionを使用
-            _ = swtImage;
-            _ = region;
-            
-            // 実装はスタブ化されています
-            return 5.0f;
-        }
-        
-        /// <summary>
-        /// 画像に適応的二値化を適用します
-        /// </summary>
-        public static IAdvancedImage AdaptiveThreshold(IAdvancedImage image, int _1, double _2)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-            
-            // 実装はスタブ化されています
-            return image;
-        }
-        
-        /// <summary>
-        /// 画像にガウシアンぼかしを適用します
-        /// </summary>
-        public static IAdvancedImage GaussianBlur(IAdvancedImage image, int _1, double _2)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-            
-            // 実装はスタブ化されています
-            return image;
-        }
-        
-        /// <summary>
-        /// モルフォロジー演算を適用します
-        /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "OpenCVライブラリの公式メソッド名")]
-        public static IAdvancedImage MorphologyEx(IAdvancedImage image, Baketa.Core.Abstractions.Imaging.MorphologyOperation _1, int _2)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-            
-            // 実装はスタブ化されています
-            return image;
-        }
-        
-        /// <summary>
-        /// 連結成分を抽出します
-        /// </summary>
-        public static IReadOnlyList<Point[]> ExtractConnectedComponents(
-            IAdvancedImage image, 
-            int _1, 
-            int _2)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-            
-            // スタブ実装
-            return [];
-        }
-        
-        /// <summary>
-        /// OCR処理用の閾値処理を適用します
-        /// </summary>
-        public async Task<IAdvancedImage> ApplyOcrThresholdAsync(
-            IAdvancedImage source,
-            double threshold,
-            double maxValue,
-            Baketa.Core.Abstractions.OCR.ThresholdType type)
-        {
-            ArgumentNullException.ThrowIfNull(source);
-
-            // OCR用のThresholdTypeをImaging用に変換する
-            var imagingThresholdType = ConvertOcrToImagingThresholdType(type);
-            var result = await _openCvLib.ThresholdAsync(
-                source,
-                threshold,
-                maxValue,
-                ConvertToOpenCvThresholdType(imagingThresholdType)).ConfigureAwait(false);
-
-            return result;
-        }
-
-        /// <summary>
-        /// OCR処理用の適応的閾値処理を適用します
-        /// </summary>
-        public async Task<IAdvancedImage> ApplyOcrAdaptiveThresholdAsync(
-            IAdvancedImage source,
-            double maxValue,
-            Baketa.Core.Abstractions.OCR.AdaptiveThresholdType adaptiveMethod,
-            Baketa.Core.Abstractions.OCR.ThresholdType thresholdType,
-            int blockSize,
-            double c)
-        {
-            ArgumentNullException.ThrowIfNull(source);
-
-            // OCR用の型をImaging用の型に変換
-            var imagingAdaptiveMethod = ConvertOcrToImagingAdaptiveThresholdType(adaptiveMethod);
-            var imagingThresholdType = ConvertOcrToImagingThresholdType(thresholdType);
-            
-            var result = await _openCvLib.AdaptiveThresholdAsync(
-                source,
-                maxValue,
-                ConvertToOpenCvAdaptiveThresholdType(imagingAdaptiveMethod),
-                ConvertToOpenCvThresholdType(imagingThresholdType),
-                blockSize,
-                c).ConfigureAwait(false);
-
-            return result;
-        }
-        
-        /// <summary>
-        /// 連結コンポーネントを抽出します（OCR用）
-        /// </summary>
-        public IReadOnlyList<Point[]> ExtractOcrConnectedComponents(
-            IAdvancedImage image,
-            int minComponentSize,
-            int maxComponentSize)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-
-            // OpenCV による連結コンポーネント抽出処理
-            var components = _openCvLib.FindConnectedComponents(
-                image,
-                minComponentSize,
-                maxComponentSize);
-
-            return components;
-        }
-        
-        /// <summary>
-        /// Cannyエッジ検出を実行します (OCR用)
-        /// </summary>
-        public static IAdvancedImage CannyEdgeDetection(IAdvancedImage image, int _1, int _2)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-            
-            // 実装はスタブ化
-            return image;
-        }
-
-        /// <summary>
-        /// MSERアルゴリズムを使用してテキスト領域を検出します
-        /// </summary>
-        public IReadOnlyList<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion> DetectTextRegionsWithMser(
-            IAdvancedImage image,
-            int delta,
-            int minArea,
-            int maxArea)
-        {
-            if (_disposed) throw new ObjectDisposedException(nameof(WindowsOpenCvWrapper), "このオブジェクトは既に破棄されています。");
-            ArgumentNullException.ThrowIfNull(image, nameof(image));
-
-            // MSERによるテキスト領域検出の実装
-            var regions = _openCvLib.DetectMserRegions(
-                image,
-                delta,
-                minArea,
-                maxArea);
-
-            // 検出結果をTextRegionに変換
-            var textRegions = new List<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion>([]);
-            foreach (var region in regions)
-            {
-                textRegions.Add(new Baketa.Core.Abstractions.OCR.TextDetection.TextRegion
-                {
-                    Bounds = region.Bounds,
-                    Contour = region.Points,
-                    ConfidenceScore = region.Confidence
-                });
-            }
-
-            return textRegions;
-        }
-
-        /// <summary>
-        /// SWTアルゴリズムを使用してテキスト領域を検出します
-        /// </summary>
-        public IReadOnlyList<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion> DetectTextRegionsWithSwt(
-            IAdvancedImage image,
-            bool darkTextOnLight,
-            float strokeWidthRatio)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-
-            // SWTによるテキスト領域検出の実装
-            var regions = _openCvLib.DetectSwtRegions(
-                image,
-                darkTextOnLight,
-                strokeWidthRatio);
-
-            // 検出結果をTextRegionに変換
-            var textRegions = new List<Baketa.Core.Abstractions.OCR.TextDetection.TextRegion>([]);
-            foreach (var region in regions)
-            {
-                textRegions.Add(new Baketa.Core.Abstractions.OCR.TextDetection.TextRegion
-                {
-                    Bounds = region.Bounds,
-                    Contour = region.Points,
-                    ConfidenceScore = region.Confidence,
-                    // SWT特有の追加情報
-                    Metadata =
+                Bounds = region.Bounds,
+                Contour = region.Points,
+                ConfidenceScore = region.Confidence,
+                // SWT特有の追加情報
+                Metadata =
                     {
                         ["MeanStrokeWidth"] = region.StrokeWidth,
                         ["StrokeDirection"] = darkTextOnLight ? "DarkOnLight" : "LightOnDark"
                     }
-                });
+            });
+        }
+
+        return textRegions;
+    }
+
+    #region 型変換ヘルパーメソッド
+
+    // ThresholdType から OpenCV の閾値タイプへの変換
+    private static int ConvertToOpenCvThresholdType(Baketa.Core.Abstractions.Imaging.ThresholdType type)
+    {
+        return type switch
+        {
+            Baketa.Core.Abstractions.Imaging.ThresholdType.Binary => 0, // OpenCV ThresholdType.Binary
+            Baketa.Core.Abstractions.Imaging.ThresholdType.BinaryInv => 1, // OpenCV ThresholdType.BinaryInv
+            Baketa.Core.Abstractions.Imaging.ThresholdType.Trunc => 2, // OpenCV ThresholdType.Trunc
+            Baketa.Core.Abstractions.Imaging.ThresholdType.ToZero => 3, // OpenCV ThresholdType.ToZero
+            Baketa.Core.Abstractions.Imaging.ThresholdType.ToZeroInv => 4, // OpenCV ThresholdType.ToZeroInv
+            Baketa.Core.Abstractions.Imaging.ThresholdType.Otsu => 8, // OpenCV ThresholdType.Otsu
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+        };
+    }
+
+    // AdaptiveThresholdType から OpenCV の適応的閾値タイプへの変換
+    private static int ConvertToOpenCvAdaptiveThresholdType(Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType type)
+    {
+        return type switch
+        {
+            Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType.MeanC => 0, // OpenCV AdaptiveThresholdType.Mean
+            Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType.GaussianC => 1, // OpenCV AdaptiveThresholdType.Gaussian
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+        };
+    }
+
+    // MorphType から OpenCV のモルフォロジー演算タイプへの変換
+    private static int ConvertToOpenCvMorphType(Baketa.Core.Abstractions.Imaging.MorphType type)
+    {
+        return type switch
+        {
+            Baketa.Core.Abstractions.Imaging.MorphType.Erode => 0, // OpenCV MorphTypes.Erode
+            Baketa.Core.Abstractions.Imaging.MorphType.Dilate => 1, // OpenCV MorphTypes.Dilate
+            Baketa.Core.Abstractions.Imaging.MorphType.Open => 2, // OpenCV MorphTypes.Open
+            Baketa.Core.Abstractions.Imaging.MorphType.Close => 3, // OpenCV MorphTypes.Close
+            Baketa.Core.Abstractions.Imaging.MorphType.Gradient => 4, // OpenCV MorphTypes.Gradient
+            Baketa.Core.Abstractions.Imaging.MorphType.TopHat => 5, // OpenCV MorphTypes.TopHat
+            Baketa.Core.Abstractions.Imaging.MorphType.BlackHat => 6, // OpenCV MorphTypes.BlackHat
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+        };
+    }
+
+    // OCR.ThresholdType から Imaging.ThresholdType への変換
+    private static Baketa.Core.Abstractions.Imaging.ThresholdType ConvertOcrToImagingThresholdType(Baketa.Core.Abstractions.OCR.ThresholdType type)
+    {
+        return type switch
+        {
+            Baketa.Core.Abstractions.OCR.ThresholdType.Binary => Baketa.Core.Abstractions.Imaging.ThresholdType.Binary,
+            Baketa.Core.Abstractions.OCR.ThresholdType.BinaryInv => Baketa.Core.Abstractions.Imaging.ThresholdType.BinaryInv,
+            Baketa.Core.Abstractions.OCR.ThresholdType.Truncate => Baketa.Core.Abstractions.Imaging.ThresholdType.Trunc,
+            Baketa.Core.Abstractions.OCR.ThresholdType.ToZero => Baketa.Core.Abstractions.Imaging.ThresholdType.ToZero,
+            Baketa.Core.Abstractions.OCR.ThresholdType.ToZeroInv => Baketa.Core.Abstractions.Imaging.ThresholdType.ToZeroInv,
+            Baketa.Core.Abstractions.OCR.ThresholdType.Otsu => Baketa.Core.Abstractions.Imaging.ThresholdType.Otsu,
+            Baketa.Core.Abstractions.OCR.ThresholdType.Adaptive => Baketa.Core.Abstractions.Imaging.ThresholdType.Binary, // 適応的閾値処理の場合はバイナリをデフォルトに
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+        };
+    }
+
+    // OCR.AdaptiveThresholdType から Imaging.AdaptiveThresholdType への変換
+    private static Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType ConvertOcrToImagingAdaptiveThresholdType(Baketa.Core.Abstractions.OCR.AdaptiveThresholdType type)
+    {
+        return type switch
+        {
+            Baketa.Core.Abstractions.OCR.AdaptiveThresholdType.Mean => Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType.MeanC,
+            Baketa.Core.Abstractions.OCR.AdaptiveThresholdType.Gaussian => Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType.GaussianC,
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+        };
+    }
+
+    #endregion
+
+    /// <summary>
+    /// リソースを解放します
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// リソースを解放します
+    /// </summary>
+    /// <param name="disposing">マネージドリソースも解放する場合はtrue</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                // マネージドリソースの解放
+                (_openCvLib as IDisposable)?.Dispose();
             }
 
-            return textRegions;
-        }
+            // アンマネージドリソースの解放（該当なし）
 
-        #region 型変換ヘルパーメソッド
-
-        // ThresholdType から OpenCV の閾値タイプへの変換
-        private static int ConvertToOpenCvThresholdType(Baketa.Core.Abstractions.Imaging.ThresholdType type)
-        {
-            return type switch
-            {
-                Baketa.Core.Abstractions.Imaging.ThresholdType.Binary => 0, // OpenCV ThresholdType.Binary
-                Baketa.Core.Abstractions.Imaging.ThresholdType.BinaryInv => 1, // OpenCV ThresholdType.BinaryInv
-                Baketa.Core.Abstractions.Imaging.ThresholdType.Trunc => 2, // OpenCV ThresholdType.Trunc
-                Baketa.Core.Abstractions.Imaging.ThresholdType.ToZero => 3, // OpenCV ThresholdType.ToZero
-                Baketa.Core.Abstractions.Imaging.ThresholdType.ToZeroInv => 4, // OpenCV ThresholdType.ToZeroInv
-                Baketa.Core.Abstractions.Imaging.ThresholdType.Otsu => 8, // OpenCV ThresholdType.Otsu
-                _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-            };
-        }
-
-        // AdaptiveThresholdType から OpenCV の適応的閾値タイプへの変換
-        private static int ConvertToOpenCvAdaptiveThresholdType(Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType type)
-        {
-            return type switch
-            {
-                Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType.MeanC => 0, // OpenCV AdaptiveThresholdType.Mean
-                Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType.GaussianC => 1, // OpenCV AdaptiveThresholdType.Gaussian
-                _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-            };
-        }
-
-        // MorphType から OpenCV のモルフォロジー演算タイプへの変換
-        private static int ConvertToOpenCvMorphType(Baketa.Core.Abstractions.Imaging.MorphType type)
-        {
-            return type switch
-            {
-                Baketa.Core.Abstractions.Imaging.MorphType.Erode => 0, // OpenCV MorphTypes.Erode
-                Baketa.Core.Abstractions.Imaging.MorphType.Dilate => 1, // OpenCV MorphTypes.Dilate
-                Baketa.Core.Abstractions.Imaging.MorphType.Open => 2, // OpenCV MorphTypes.Open
-                Baketa.Core.Abstractions.Imaging.MorphType.Close => 3, // OpenCV MorphTypes.Close
-                Baketa.Core.Abstractions.Imaging.MorphType.Gradient => 4, // OpenCV MorphTypes.Gradient
-                Baketa.Core.Abstractions.Imaging.MorphType.TopHat => 5, // OpenCV MorphTypes.TopHat
-                Baketa.Core.Abstractions.Imaging.MorphType.BlackHat => 6, // OpenCV MorphTypes.BlackHat
-                _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-            };
-        }
-
-        // OCR.ThresholdType から Imaging.ThresholdType への変換
-        private static Baketa.Core.Abstractions.Imaging.ThresholdType ConvertOcrToImagingThresholdType(Baketa.Core.Abstractions.OCR.ThresholdType type)
-        {
-            return type switch
-            {
-                Baketa.Core.Abstractions.OCR.ThresholdType.Binary => Baketa.Core.Abstractions.Imaging.ThresholdType.Binary,
-                Baketa.Core.Abstractions.OCR.ThresholdType.BinaryInv => Baketa.Core.Abstractions.Imaging.ThresholdType.BinaryInv,
-                Baketa.Core.Abstractions.OCR.ThresholdType.Truncate => Baketa.Core.Abstractions.Imaging.ThresholdType.Trunc,
-                Baketa.Core.Abstractions.OCR.ThresholdType.ToZero => Baketa.Core.Abstractions.Imaging.ThresholdType.ToZero,
-                Baketa.Core.Abstractions.OCR.ThresholdType.ToZeroInv => Baketa.Core.Abstractions.Imaging.ThresholdType.ToZeroInv,
-                Baketa.Core.Abstractions.OCR.ThresholdType.Otsu => Baketa.Core.Abstractions.Imaging.ThresholdType.Otsu,
-                Baketa.Core.Abstractions.OCR.ThresholdType.Adaptive => Baketa.Core.Abstractions.Imaging.ThresholdType.Binary, // 適応的閾値処理の場合はバイナリをデフォルトに
-                _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-            };
-        }
-
-        // OCR.AdaptiveThresholdType から Imaging.AdaptiveThresholdType への変換
-        private static Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType ConvertOcrToImagingAdaptiveThresholdType(Baketa.Core.Abstractions.OCR.AdaptiveThresholdType type)
-        {
-            return type switch
-            {
-                Baketa.Core.Abstractions.OCR.AdaptiveThresholdType.Mean => Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType.MeanC,
-                Baketa.Core.Abstractions.OCR.AdaptiveThresholdType.Gaussian => Baketa.Core.Abstractions.Imaging.AdaptiveThresholdType.GaussianC,
-                _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-            };
-        }
-
-        #endregion
-        
-        /// <summary>
-        /// リソースを解放します
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-        
-        /// <summary>
-        /// リソースを解放します
-        /// </summary>
-        /// <param name="disposing">マネージドリソースも解放する場合はtrue</param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposed)
-            {
-                if (disposing)
-                {
-                    // マネージドリソースの解放
-                    (_openCvLib as IDisposable)?.Dispose();
-                }
-                
-                // アンマネージドリソースの解放（該当なし）
-                
-                _disposed = true;
-            }
-        }
-        
-        /// <summary>
-        /// ファイナライザ
-        /// </summary>
-        ~WindowsOpenCvWrapper()
-        {
-            Dispose(false);
+            _disposed = true;
         }
     }
+
+    /// <summary>
+    /// ファイナライザ
+    /// </summary>
+    ~WindowsOpenCvWrapper()
+    {
+        Dispose(false);
+    }
+}

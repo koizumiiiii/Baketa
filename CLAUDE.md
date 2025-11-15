@@ -61,17 +61,18 @@ dotnet run --project Baketa.UI
 dotnet run --project Baketa.UI --configuration Release
 ```
 
-### OPUS-MT Model Setup
-Before running translation features, download required models:
+### NLLB-200 Model Setup
+Before running translation features, ensure Python environment and models are ready:
 ```cmd
-# Download OPUS-MT models (Windows Command Prompt)
-.\scripts\download_opus_mt_models.ps1
+# Set up Python environment for NLLB-200
+pyenv global 3.10.9
+pip install -r requirements.txt
 
-# Verify model files
-.\scripts\verify_opus_mt_models.ps1
+# Download NLLB-200 model (automatic on first run)
+# Model: facebook/nllb-200-distilled-600M (~2.4GB)
 
-# Run SentencePiece tests
-.\scripts\run_sentencepiece_tests.ps1
+# Run NLLB-200 translation server tests
+py scripts/test_nllb_translation.py
 ```
 
 ### Python Environment Setup
@@ -129,7 +130,7 @@ where python
 
 2. **Baketa.Infrastructure**: Infrastructure layer (OCR, translation)
    - PaddleOCR integration
-   - Translation engines (OPUS-MT, Gemini, mock engines)
+   - Translation engines (NLLB-200, Gemini, mock engines)
    - Image processing pipelines
    - Settings persistence (JSON-based)
 
@@ -199,7 +200,11 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 1. **Screen Capture**: Windows Graphics Capture API (native DLL) with PrintWindow fallback
 2. **Image Processing**: OpenCV filters and preprocessing
 3. **OCR**: PaddleOCR PP-OCRv5 for text detection
-4. **Translation**: Multiple engines (OPUS-MT local, Gemini cloud)
+4. **Translation**: gRPC-based Python translation server
+   - **C# Client**: `GrpcTranslationClient` (HTTP/2 communication)
+   - **Python Server**: NLLB-200 engine with CTranslate2 optimization
+   - **Protocol**: gRPC (port 50051, auto-start, Keep-Alive)
+   - **Fallback**: Google Gemini cloud translation
 5. **Overlay Display**: Transparent Avalonia windows
 
 ### Native DLL Implementation Details
@@ -221,7 +226,7 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 ### Configuration Files
 - `appsettings.json`: Main application configuration
 - `appsettings.Development.json`: Development overrides
-- `appsettings.SentencePiece.json`: OPUS-MT model configuration
+- `appsettings.SentencePiece.json`: Legacy OPUS-MT model configuration (deprecated)
 
 ## Code Style and Standards
 
@@ -250,6 +255,70 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 - Observable patterns for state management
 - Validation through ReactiveUI.Validation
 
+### Logging Standards
+**CRITICAL**: `DebugLogUtility.WriteLog()` is DEPRECATED and must NOT be used in new code.
+
+**Reason**: `DebugLogUtility.WriteLog()` causes thread deadlocks due to synchronous file I/O inside lock blocks, which can freeze event processing and cause hard-to-debug failures.
+
+**Recommended Logging Methods** (in order of priority):
+
+1. **ILogger (Production & Development - HIGHEST PRIORITY)**
+   ```csharp
+   // Dependency injection
+   private readonly ILogger<MyClass> _logger;
+
+   public MyClass(ILogger<MyClass> logger)
+   {
+       _logger = logger;
+   }
+
+   // Usage
+   _logger.LogInformation("Event {EventType} processing started (Count: {Count})", eventType.Name, count);
+   _logger.LogDebug("Debug info: {Value}", debugValue);
+   _logger.LogError(ex, "Error occurred: {Message}", ex.Message);
+   ```
+
+   **Benefits**:
+   - Asynchronous logging (no thread blocking)
+   - Log level control via appsettings.json
+   - Structured logging with parameter serialization
+   - Multiple output targets (file, console, Application Insights)
+
+2. **Console.WriteLine (Debug Only)**
+   ```csharp
+   Console.WriteLine($"Processing event: {eventType.Name}");
+   Console.WriteLine($"Debug: Count = {count}");
+   ```
+
+   **Benefits**:
+   - Real-time output
+   - No deadlock risk
+   - Easy to add/remove
+
+   **Limitations**:
+   - Not suitable for production
+   - No log level control
+
+3. **DebugLogUtility.WriteLog() - PROHIBITED**
+   - ❌ **DO NOT USE** in new code
+   - ❌ Causes thread deadlocks
+   - ❌ Synchronous I/O blocks threads
+   - ❌ Poor scalability
+
+   **Migration Task**: Replace all existing `DebugLogUtility.WriteLog()` calls with `ILogger`
+
+**Example Migration**:
+```csharp
+// ❌ OLD (Causes deadlock)
+Console.WriteLine($"Event {eventType.Name} processing started");
+DebugLogUtility.WriteLog($"Event {eventType.Name} processing started");
+_logger?.LogDebug("Event {EventType} processing started", eventType.Name);
+
+// ✅ NEW (Recommended)
+Console.WriteLine($"Event {eventType.Name} processing started");  // Debug only
+_logger.LogInformation("Event {EventType} processing started (Count: {Count})", eventType.Name, count);  // Production
+```
+
 ## Project Dependencies
 
 ### Core Technologies
@@ -257,7 +326,7 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 - **OCR Engine**: PaddleOCR PP-OCRv5 (native integration)
 - **Image Processing**: OpenCV (Windows wrapper)
 - **Screen Capture**: Windows Graphics Capture API (C++/WinRT native DLL)
-- **Translation**: OPUS-MT (local), Google Gemini (cloud)
+- **Translation**: NLLB-200 (Meta's multilingual model, local), Google Gemini (cloud)
 - **DI Container**: Microsoft.Extensions.DependencyInjection
 - **Logging**: Microsoft.Extensions.Logging
 
@@ -265,6 +334,103 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 - **Unit Testing**: xUnit with Moq
 - **UI Testing**: Avalonia test framework
 - **Performance**: Custom benchmarking
+
+## gRPC Translation System
+
+Baketa uses gRPC (HTTP/2) for high-performance C# ↔ Python communication in translation processing.
+
+### Architecture Components
+
+#### C# Side (Baketa.Infrastructure)
+1. **GrpcTranslationClient** (`Translation/Clients/GrpcTranslationClient.cs`)
+   - HTTP/2 gRPC channel with Keep-Alive (10s interval)
+   - Automatic reconnection with `WithWaitForReady(true)`
+   - Timeout: 30 seconds per request
+
+2. **GrpcTranslationEngineAdapter** (`Translation/Adapters/GrpcTranslationEngineAdapter.cs`)
+   - Implements `ITranslationEngine` interface
+   - Auto-starts Python server on first translation
+   - Batch translation support (max 32 items)
+
+3. **PythonServerManager** (`Translation/Services/PythonServerManager.cs`)
+   - Automatic Python gRPC server startup
+   - Health check and ready state monitoring
+   - Process lifecycle management
+
+#### Python Side (grpc_server/)
+1. **start_server.py**
+   - Entry point for gRPC server
+   - Model: facebook/nllb-200-distilled-600M (2.4GB)
+   - Optional: CTranslate2 engine (80% memory reduction)
+   - Port: 50051 (default)
+
+2. **translation_server.py** - `TranslationServicer`
+   - Implements 4 RPC methods:
+     - `Translate()`: Single text translation ✅ **Active**
+     - `TranslateBatch()`: Batch translation (max 32) ✅ **Active**
+     - `HealthCheck()`: Server health status ✅ Available
+     - `IsReady()`: Model readiness check ✅ Available
+
+3. **engines/ctranslate2_engine.py**
+   - Optimized NLLB-200 engine
+   - Memory: 2.4GB → 500MB (80% reduction)
+   - Launch: `python start_server.py --use-ctranslate2`
+
+### gRPC API Specification
+
+See `Baketa.Infrastructure/Translation/Protos/translation.proto` for full specification.
+
+**Key Message Types**:
+- `TranslateRequest`: source_text, source_language, target_language, request_id
+- `TranslateResponse`: translated_text, confidence_score, is_success, error
+- `BatchTranslateRequest`: repeated TranslateRequest, batch_id
+- `BatchTranslateResponse`: repeated TranslateResponse, success_count
+
+### Configuration
+
+```json
+// appsettings.json
+{
+  "Translation": {
+    "UseGrpcClient": true,
+    "GrpcServerAddress": "http://127.0.0.1:50051"
+  }
+}
+```
+
+### Technical Features
+- **Protocol**: HTTP/2 with Keep-Alive (prevents 112s idle disconnect)
+- **Auto-start**: Python server starts automatically on first translation
+- **Error Handling**: Circuit breaker pattern, automatic retry
+- **Performance**: Batch translation support for efficiency
+- **Monitoring**: Health checks, ready state verification
+
+### Starting Python gRPC Server Manually
+
+```cmd
+# Standard NLLB-200 engine
+python grpc_server/start_server.py
+
+# CTranslate2 optimized engine (80% memory reduction)
+python grpc_server/start_server.py --use-ctranslate2
+
+# Custom port
+python grpc_server/start_server.py --port 50052
+```
+
+### Troubleshooting
+
+**Server won't start**:
+- Check Python 3.10+ is installed: `python --version`
+- Install dependencies: `pip install -r requirements.txt`
+- Check port 50051 is available: `netstat -an | findstr :50051`
+
+**UNAVAILABLE error on first translation**:
+- **Fixed**: Added `WithWaitForReady(true)` in Phase 5.2D
+- Client now waits for TCP connection before sending RPC
+
+**Unicode encoding errors**:
+- **Fixed**: Python server uses UTF-8 encoding (`sys.stdout.reconfigure(encoding='utf-8')`)
 
 ## Common Development Scenarios
 
@@ -452,7 +618,8 @@ gemini -p "実装完了しました。以下のコードについてレビュー
 
 ## Known Issues and Considerations
 
-- OPUS-MT models must be manually downloaded before first run
+- NLLB-200 models are downloaded automatically on first run (~2.4GB)
+- Python 3.10+ environment required for NLLB-200 translation server
 - OpenCV native dependencies are Windows-specific
 - Platform adapters use P/Invoke for Windows APIs
 - Game detection requires specific DPI awareness settings
@@ -485,6 +652,30 @@ This project defines sub-agents responsible for specific areas of expertise to i
 - **Baketa特化**: クリーンアーキテクチャ、C# 12、ReactiveUI特化
 - **即座利用可能**: APIクォータ・ネットワーク問題に影響されない
 - **包括的カバレッジ**: アーキテクチャ〜セキュリティまで全領域
+
+### **🔍 検索ツール使用方針**
+
+**優先順位**:
+1. **Serena MCP**: 意味的検索・シンボル解析が必要な場合
+2. **ripgrep (`rg`)**: テキストパターン検索・Serenaが不要な場合
+3. **grep/find**: 使用非推奨（ripgrepが圧倒的に高速・賢い）
+
+**ripgrep使用例**:
+```bash
+# クラス使用箇所検索
+rg "TranslationEngine" -t cs
+
+# 複雑なパターン検索
+rg "class \w+ : \w*ITranslationEngine" -t cs
+
+# ファイル種別指定検索
+rg "appsettings" -t cs -t json -t csproj
+
+# 除外パターン付き検索
+rg "TODO|FIXME" -t cs --glob="!*Test*"
+```
+
+**⚠️ 重要**: `grep` `find` の代わりに常に `rg` を使用すること。速度が10-50倍向上し、より賢い除外・ファイル種別判定を行う。
 
 ### **🎯 Serena MCP優先戦略 (MCP-First Strategy)**
 

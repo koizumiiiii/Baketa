@@ -1,11 +1,12 @@
 using System.Drawing;
-using Microsoft.Extensions.Logging;
-using Moq;
-using Xunit;
-using FluentAssertions;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.Strategies;
+using Baketa.Infrastructure.Tests.TestUtilities;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.Strategies;
 
@@ -45,7 +46,7 @@ public class AdaptiveTileStrategyTests
     public void Constructor_NullOcrEngine_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new AdaptiveTileStrategy(null!, _mockLogger.Object));
     }
 
@@ -76,7 +77,7 @@ public class AdaptiveTileStrategyTests
 
         // Assert
         result.Should().NotBeEmpty();
-        result.Should().AllSatisfy(region => 
+        result.Should().AllSatisfy(region =>
         {
             region.RegionType.Should().Be(TileRegionType.TextAdaptive);
             region.RegionId.Should().StartWith("adaptive-");
@@ -84,7 +85,7 @@ public class AdaptiveTileStrategyTests
         });
 
         // テキストが検出された「第一のスープ」問題の解決確認
-        var textRegion = result.FirstOrDefault(r => 
+        var textRegion = result.FirstOrDefault(r =>
             r.Bounds.IntersectsWith(new Rectangle(100, 50, 200, 30)));
         textRegion.Should().NotBeNull("「第一のスープ」テキストを含む領域が生成されるべき");
     }
@@ -107,10 +108,10 @@ public class AdaptiveTileStrategyTests
 
         // Assert
         result.Should().NotBeEmpty();
-        result.Should().AllSatisfy(region => 
+        result.Should().AllSatisfy(region =>
         {
-            region.RegionType.Should().Be(TileRegionType.Fallback);
-            region.RegionId.Should().StartWith("fallback-");
+            region.RegionType.Should().Be(TileRegionType.Composite);
+            region.RegionId.Should().StartWith("fullscreen-");
         });
     }
 
@@ -130,8 +131,8 @@ public class AdaptiveTileStrategyTests
 
         // Assert
         result.Should().NotBeEmpty();
-        result.Should().AllSatisfy(region => 
-            region.RegionType.Should().Be(TileRegionType.Fallback));
+        result.Should().AllSatisfy(region =>
+            region.RegionType.Should().Be(TileRegionType.Composite));
     }
 
     [Fact]
@@ -148,8 +149,8 @@ public class AdaptiveTileStrategyTests
 
         // Assert
         result.Should().NotBeEmpty();
-        result.Should().AllSatisfy(region => 
-            region.RegionType.Should().Be(TileRegionType.Fallback));
+        result.Should().AllSatisfy(region =>
+            region.RegionType.Should().Be(TileRegionType.Composite));
 
         // 警告ログ確認（例外は内部でキャッチされWarningになる）
         _mockLogger.Verify(
@@ -166,7 +167,7 @@ public class AdaptiveTileStrategyTests
     public async Task GenerateRegionsAsync_MaxRegionCountExceeded_LimitsRegions()
     {
         // Arrange - 大量のテキスト領域
-        var textRegions = Enumerable.Range(0, 30).Select(i => 
+        var textRegions = Enumerable.Range(0, 30).Select(i =>
             new OcrTextRegion($"Text{i}", new Rectangle(i * 100, i * 50, 80, 20), 0.8)).ToList();
 
         var ocrResult = new OcrResults(textRegions, _mockImage.Object, TimeSpan.FromMilliseconds(100), "ja");
@@ -174,8 +175,8 @@ public class AdaptiveTileStrategyTests
         _mockOcrEngine.Setup(x => x.DetectTextRegionsAsync(It.IsAny<IAdvancedImage>(), It.IsAny<CancellationToken>()))
                      .ReturnsAsync(ocrResult);
 
-        var options = new TileGenerationOptions 
-        { 
+        var options = new TileGenerationOptions
+        {
             DefaultTileSize = 1024,
             MaxRegionCount = 10 // 制限
         };
@@ -185,7 +186,7 @@ public class AdaptiveTileStrategyTests
 
         // Assert
         result.Count.Should().BeLessOrEqualTo(10);
-        
+
         // 信頼度順でトリミングされていることを確認
         if (result.Count > 1)
         {
@@ -218,7 +219,7 @@ public class AdaptiveTileStrategyTests
 
         // Assert
         result.Should().NotBeEmpty();
-        
+
         // デバッグログの確認
         _mockLogger.Verify(
             x => x.Log(
@@ -266,15 +267,15 @@ public class AdaptiveTileStrategyTests
         var options = new TileGenerationOptions { DefaultTileSize = 1024 };
 
         // テキスト検出失敗をシミュレート（フォールバックテスト）
-        _mockOcrEngine.Setup(x => x.DetectTextRegionsAsync(It.IsAny<IAdvancedImage>(), It.IsAny<CancellationToken>()))
-                     .ReturnsAsync((OcrResults?)null);
+        var emptyResult = MoqTestHelper.CreateTestOcrResults("", 0.0);
+        MoqTestHelper.SetupOcrEngineDetectTextRegionsAsync(_mockOcrEngine, emptyResult);
 
         // Act
         var result = await _strategy.GenerateRegionsAsync(smallImage.Object, options);
 
         // Assert
         result.Should().HaveCount(1);
-        result[0].RegionId.Should().Be("fallback-single");
+        result[0].RegionId.Should().StartWith("fullscreen-");
         result[0].Bounds.Should().Be(new Rectangle(0, 0, 500, 300));
     }
 }

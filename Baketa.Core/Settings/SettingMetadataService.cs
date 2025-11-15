@@ -30,7 +30,7 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
     public IReadOnlyList<SettingMetadata> GetMetadata(Type settingsType)
     {
         ArgumentNullException.ThrowIfNull(settingsType);
-        
+
         return _metadataCache.GetOrAdd(settingsType, type =>
         {
             try
@@ -59,13 +59,13 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
     {
         // null値には ArgumentNullException を使用（.NET 慣例）
         ArgumentNullException.ThrowIfNull(category);
-        
+
         // 空文字列には ArgumentException を使用
         if (string.IsNullOrEmpty(category))
         {
             throw new ArgumentException("カテゴリは必須です", nameof(category));
         }
-        
+
         var allMetadata = GetMetadata<T>();
         return [.. allMetadata.Where(m => string.Equals(m.Category, category, StringComparison.OrdinalIgnoreCase))
                          .OrderBy(m => m.DisplayOrder)
@@ -83,7 +83,7 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
     public SettingValidationResult ValidateValue(SettingMetadata metadata, object? value)
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        
+
         try
         {
             // 基本的な値検証
@@ -92,10 +92,10 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
                 var errorMessage = CreateValidationErrorMessage(metadata, value);
                 return SettingValidationResult.Failure(metadata, value, errorMessage);
             }
-            
+
             // 警告メッセージの確認
             var warningMessage = metadata.WarningMessage;
-            
+
             return SettingValidationResult.Success(metadata, value, warningMessage);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
@@ -109,10 +109,10 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
     public IReadOnlyList<SettingValidationResult> ValidateSettings<T>(T settings) where T : class
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         var metadata = GetMetadata<T>();
         var results = new List<SettingValidationResult>();
-        
+
         foreach (var meta in metadata)
         {
             try
@@ -127,7 +127,7 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
                 results.Add(SettingValidationResult.Failure(meta, null, $"プロパティアクセスエラー: {ex.Message}"));
             }
         }
-        
+
         return results;
     }
 
@@ -138,7 +138,7 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
     {
         var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
         var metadataList = new List<SettingMetadata>();
-        
+
         foreach (var property in properties)
         {
             var attribute = property.GetCustomAttribute<SettingMetadataAttribute>();
@@ -148,13 +148,13 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
                 metadataList.Add(metadata);
             }
         }
-        
+
         // 表示順序とカテゴリ、名前でソート
         return [.. metadataList.OrderBy(m => m.Category)
                           .ThenBy(m => m.DisplayOrder)
                           .ThenBy(m => m.DisplayName)];
     }
-    
+
     /// <summary>
     /// 検証エラーメッセージを作成します
     /// </summary>
@@ -164,13 +164,13 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
         {
             return $"{metadata.DisplayName}は必須項目です";
         }
-        
+
         // 型チェック
         if (!metadata.PropertyType.IsAssignableFrom(value.GetType()))
         {
             return $"{metadata.DisplayName}の型が正しくありません。期待される型: {metadata.PropertyType.Name}";
         }
-        
+
         // 範囲チェック
         if (metadata.MinValue != null || metadata.MaxValue != null)
         {
@@ -181,7 +181,7 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
                     var unit = !string.IsNullOrEmpty(metadata.Unit) ? metadata.Unit : "";
                     return $"{metadata.DisplayName}は{metadata.MinValue}{unit}以上である必要があります";
                 }
-                
+
                 if (metadata.MaxValue != null && comparableValue.CompareTo(metadata.MaxValue) > 0)
                 {
                     var unit = !string.IsNullOrEmpty(metadata.Unit) ? metadata.Unit : "";
@@ -189,14 +189,14 @@ public sealed class SettingMetadataService(ILogger<SettingMetadataService> logge
                 }
             }
         }
-        
+
         // 選択肢チェック
         if (metadata.ValidValues != null && metadata.ValidValues.Length > 0)
         {
             var validValuesStr = string.Join(", ", metadata.ValidValues);
             return $"{metadata.DisplayName}は有効な値を選択してください。有効な値: {validValuesStr}";
         }
-        
+
         return $"{metadata.DisplayName}の値が無効です";
     }
 }

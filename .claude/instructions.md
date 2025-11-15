@@ -18,6 +18,46 @@
 - **ALL file edits** in this project are automatically approved
 - **ALWAYS** select "Yes, and don't ask again this session" in file edit confirmation dialogs
 - Safe to auto-approve since backups are managed by Git
+
+### **MANDATORY Log Analysis Protocol**
+**Required procedures for chronological log analysis**
+
+#### **Step 1: Complete chronological analysis (MANDATORY)**
+```bash
+# Must execute: Review entire log chronology
+1. Verify first log entry
+2. Verify last log entry  
+3. Identify time range of issue occurrence
+4. Track process flow: start → progress → result
+```
+
+#### **Step 2: Counter-evidence search requirement**
+```bash
+# Must execute for initial hypothesis:
+1. Explicitly search "Is there evidence contradicting this hypothesis?"
+2. Verify if subsequent chronological information overturns hypothesis
+3. Check for missed state changes (False→True)
+```
+
+#### **Step 3: Temporal information weighting**
+```bash
+# Priority rules:
+1. **Latest state information** > Older state information
+2. **Actual operation logs** > Initial state logs  
+3. **Completion notifications** > Start notifications
+4. **Error logs** > Warning logs
+```
+
+#### **Step 4: Required verification checklist**
+```bash
+□ Did I verify log chronological order?
+□ Did I miss state changes (False→True, etc.)?
+□ Did I search for evidence contradicting initial hypothesis?
+□ Did I check if latest information overwrites older information?
+□ Did I accurately understand actual user operation procedures?
+```
+
+**Penalty for violations**: Must apologize and re-analyze if hasty judgments are made without following this protocol
 - No exceptions - all edits (code, config, documentation, tests) are auto-approved
 - This includes CLAUDE.md, .claude/instructions.md, and all project files
 
@@ -623,6 +663,137 @@ Claude Codeが直接コマンドを実行し、結果を即座に確認できま
 </PropertyGroup>
 ```
 
+### Character Encoding Standards
+
+#### **Prohibited Characters and Symbols**
+**⚠️ IMPORTANT**: The following characters and symbols are prohibited in C# code as they can cause encoding errors
+
+##### **1. Emojis and Unicode Decorative Characters**
+```csharp
+// ❌ PROHIBITED: Using emojis
+// TODO: Implement retry mechanism 🔄
+// WARNING: Performance critical section ⚡
+// SUCCESS: Operation completed ✅
+
+// ✅ RECOMMENDED: ASCII character descriptions
+// TODO: Implement retry mechanism
+// WARNING: Performance critical section
+// SUCCESS: Operation completed
+```
+
+##### **2. Special Unicode Symbols**
+- Arrow symbols: `→ ← ↑ ↓ ⇒ ⇐ ⇑ ⇓`
+- Check marks: `✓ ✗ ☑ ☒`
+- Decorative symbols: `★ ☆ ♦ ♠ ♣ ♥`
+- Mathematical symbols: `∞ ≠ ≤ ≥ ∑ ∏`
+- Greek letters: `α β γ δ λ π`
+
+##### **3. Full-width Characters and Symbols**
+```csharp
+// ❌ PROHIBITED: Using full-width symbols
+var result = DoSomething（param）；
+var message = "エラーが発生しました。";
+
+// ✅ RECOMMENDED: Half-width symbols and English comments
+var result = DoSomething(param);
+// Error occurred during processing
+var message = "エラーが発生しました。"; // Japanese allowed only in string literals
+```
+
+##### **4. Control Characters and Invisible Characters**
+- BOM (Byte Order Mark): `U+FEFF`
+- Zero-Width Space: `U+200B`
+- Non-breaking Space: `U+00A0`
+- Other non-ASCII whitespace characters
+
+#### **Permitted Japanese Usage Locations**
+
+##### **✅ Allowed Locations**
+```csharp
+// 1. String literals (user-facing messages)
+public const string ErrorMessage = "翻訳処理中にエラーが発生しました。";
+public string GetLocalizedMessage() => "設定が保存されました。";
+
+// 2. Resource files (.resx)
+// Resources.ja.resx: "ButtonText" = "実行"
+
+// 3. JSON configuration files
+// appsettings.ja.json: { "Messages": { "Success": "成功しました" } }
+```
+
+##### **❌ Prohibited Locations**
+```csharp
+// 1. Variable names, method names, class names
+public class 翻訳サービス { } // ❌ PROHIBITED
+public void 実行処理() { } // ❌ PROHIBITED
+private string 結果 = ""; // ❌ PROHIBITED
+
+// 2. Code comments (for code understanding)
+// この関数は翻訳を実行します // ❌ PROHIBITED (English preferred)
+// This function executes translation // ✅ RECOMMENDED
+
+// 3. Namespace and assembly names
+namespace Baketa.翻訳.Core; // ❌ PROHIBITED
+```
+
+#### **Encoding Configuration and Validation**
+
+##### **Project File Configuration**
+```xml
+<PropertyGroup>
+  <OutputEncoding>utf-8</OutputEncoding>
+  <FileEncoding>utf-8</FileEncoding>
+  <RunCodeAnalysis>true</RunCodeAnalysis>
+  <CodeAnalysisRuleSet>charset.ruleset</CodeAnalysisRuleSet>
+</PropertyGroup>
+```
+
+##### **Recommended File Encoding**
+- **C# source files**: UTF-8 (without BOM)
+- **Configuration files**: UTF-8 (without BOM)
+- **Resource files**: UTF-8 (with BOM - Visual Studio standard)
+
+##### **Encoding Error Validation Methods**
+```bash
+# File encoding check (PowerShell)
+Get-ChildItem -Recurse -Include "*.cs" | ForEach-Object {
+    $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
+    if ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        Write-Host "BOM detected: $($_.FullName)"
+    }
+}
+
+# Problem character search (using ripgrep)
+rg "[^\x00-\x7F]" --type cs --color always
+rg "[\u{1F000}-\u{1F6FF}]" --type cs  # Emoji detection
+rg "[→←↑↓✓✗★☆]" --type cs           # Decorative symbol detection
+```
+
+#### **Implementation Best Practices**
+
+##### **Alternative Expression Patterns**
+```csharp
+// ❌ Using emojis and decorative symbols
+// Loading... ⏳
+// Success! ✅
+// Error ❌
+// Arrow → Direction
+
+// ✅ ASCII character alternatives
+// Loading... (processing)
+// Success: Operation completed
+// Error: Operation failed
+// Arrow: Direction indicator
+```
+
+##### **Code Review Checklist**
+- [ ] No emojis or decorative Unicode characters in comments
+- [ ] All variable and method names use ASCII characters only
+- [ ] No Japanese characters outside of string literals
+- [ ] File encoding is set to UTF-8 (without BOM)
+
+**Following these character encoding standards prevents build errors, runtime errors, and internationalization issues, ensuring project stability.**
+
 ## 最終リマインダー：常に根本原因を考える / Final Reminder: Always Think Root Cause
 
 コードを書く前に、自分自身に問いかけてください：
@@ -645,6 +816,7 @@ Claude Codeが直接コマンドを実行し、結果を即座に確認できま
 - **`@Test-Generator`**: 単体テストコード生成の専門家。
 - **`@Researcher`**: 技術調査とフィードバックの専門家。
 - **`@Code-Reviewer`**: コードレビューとコード品質分析の専門家（Gemini API代替機能）。
+- **`@Log-Analyzer`**: ログ分析・パフォーマンス診断・システム監視の専門家。
 
 ### **必須ワークフロー: 問題解決と機能実装**
 
@@ -685,6 +857,8 @@ Claude Codeが直接コマンドを実行し、結果を即座に確認できま
 - *例: `Grep "using.*Core.*Application"` でアーキテクチャ層違反発見 → `@Architecture-Guardian` の領域*
 - *例: `Glob "**/*Tests.cs"` でテストケース不足を特定 → `@Test-Generator` の領域*
 - *例: 新技術・ライブラリ調査が必要 → `@Researcher` の領域*
+- *例: `Glob "debug_*.txt"` で大量ログファイル分析が必要 → `@Log-Analyzer` の領域*
+- *例: `Grep "Performance|パフォーマンス|bottleneck|timeout|error"` でパフォーマンス・エラー問題検出 → `@Log-Analyzer` の領域*
 
 **現実的効果（Serena MCP無効下）:**
 - **標準レベルのトークン消費**: MCP効率化は期待できない
@@ -703,3 +877,149 @@ Claude Codeが直接コマンドを実行し、結果を即座に確認できま
 3.  **最終確認:** 最終的に、ビルドとテストを実行し、問題が完全に解決されたことを確認します。
 
 このオーケストレーションモデルに従うことで、各専門家の能力を最大限に引き出し、迅速かつ高品質な開発を実現します。
+
+---
+
+## 🔍 Log-Analyzer サブエージェント詳細仕様
+
+### **専門分野とコア機能**
+
+#### **1. ログ分析・パフォーマンス診断**
+- **ログパターン解析**: Baketa特有のログフォーマット（OCR、翻訳、UI、ネイティブDLL等）の体系的分析
+- **パフォーマンスボトルネック特定**: 実行時間、メモリ使用量、CPU負荷の異常値検出
+- **エラー分類・頻度分析**: エラーパターンの自動分類と発生頻度の統計的解析
+- **時系列トレンド分析**: 継続的パフォーマンス劣化・改善の検出
+
+#### **2. システム監視・予防診断**
+- **異常検知**: 閾値を超えた異常値の自動検出とアラート
+- **品質メトリクス監視**: 翻訳精度、OCR精度、応答速度等の品質指標追跡
+- **リソース使用パターン分析**: メモリリーク、CPU使用率異常等の検出
+- **相関分析**: 複数ログファイル間の関連性・因果関係の特定
+
+#### **3. レポート生成・可視化**
+- **包括的分析レポート**: 経営陣・開発チーム向けの詳細分析レポート
+- **グラフ・チャート生成**: パフォーマンストレンドの可視化
+- **改善提案**: 具体的な最適化アクションアイテムの提示
+- **ベンチマーク比較**: 過去データとの比較による改善効果測定
+
+### **対象ログファイル・データソース**
+
+#### **主要ログファイル**
+- `debug_translation_errors.txt` → 翻訳エラー詳細解析
+- `debug_batch_ocr.txt` → OCRパフォーマンス・精度解析
+- `debug_app_logs.txt` → アプリケーション全体動作解析
+- `performance_benchmark.txt` → 性能目標達成度評価
+- `error_*.log` → システムエラー分類・統計
+- `capture_debug_*.txt` → 画面キャプチャ関連問題解析
+
+#### **画像・メタデータ**
+- **デバッグキャプチャ画像**: OCR対象画像の品質・特性分析
+- **パフォーマンス測定データ**: ベンチマーク結果の統計的評価
+- **設定ファイル変更履歴**: appsettings.json等の設定変更影響分析
+
+### **専用分析手法・ツール**
+
+#### **正規表現パターンライブラリ**
+Baketa特化の高頻度ログパターン:
+```regex
+# 翻訳エラーパターン
+ERROR.*Translation.*timeout|failed|exception
+WARN.*OpusMT.*model.*not.*found
+INFO.*Gemini.*rate.*limit.*exceeded
+
+# OCRパフォーマンスパターン  
+PaddleOCR.*processing.*time.*(\d+)ms
+OCR.*confidence.*score.*(\d+\.\d+)
+Image.*preprocessing.*filter.*(\w+).*(\d+)ms
+
+# システムリソースパターン
+Memory.*usage.*(\d+)MB.*peak.*(\d+)MB
+CPU.*usage.*(\d+)%.*thread.*(\w+)
+GPU.*utilization.*(\d+)%.*memory.*(\d+)MB
+```
+
+#### **統計分析機能**
+- **分布解析**: パフォーマンスメトリクスの統計的分布特性
+- **外れ値検出**: Z-score、IQRベースの異常値特定
+- **回帰分析**: 時系列データの傾向予測
+- **相関分析**: 複数メトリクス間の関連性定量化
+
+#### **パフォーマンス閾値設定**
+```yaml
+# Baketa専用パフォーマンス閾値
+translation_time_ms:
+  warning: 2000
+  critical: 5000
+ocr_processing_ms:  
+  warning: 1000
+  critical: 3000
+memory_usage_mb:
+  warning: 500
+  critical: 1000
+error_rate_percent:
+  warning: 5
+  critical: 15
+```
+
+### **実行ワークフロー例**
+
+#### **ケース1: 翻訳パフォーマンス劣化調査**
+```
+@Log-Analyzer "debug_translation_errors.txt（過去7日分、200+エラー）とdebug_batch_ocr.txt（パフォーマンス測定データ）を分析し、翻訳タイムアウトエラーの根本原因を特定してください。特に以下を重点的に調査：
+1. エラー発生パターンの時系列分析
+2. 言語ペア別エラー率の統計
+3. OCR処理時間と翻訳エラーの相関
+4. 具体的改善アクションの提案"
+```
+
+#### **ケース2: システム全体パフォーマンス監査**
+```
+@Log-Analyzer "debug_app_logs.txt、performance_benchmark.txt、および全てのerror_*.logファイルを包括的に分析し、システム全体のパフォーマンス監査レポートを作成してください。以下を含む：
+1. 各コンポーネント（OCR、翻訳、UI、ネイティブDLL）のパフォーマンス評価
+2. リソース使用効率の分析
+3. ボトルネック特定と優先順位付け
+4. 最適化ロードマップの提案"
+```
+
+#### **ケース3: プロダクション環境異常調査**
+```
+@Log-Analyzer "直近24時間のログデータを緊急分析し、メモリ使用量急増とクラッシュ頻発の原因を特定してください。以下の手順で：
+1. 異常発生時刻の特定と外部要因の調査
+2. メモリリーク候補コンポーネントの絞り込み
+3. クラッシュ直前のシステム状態分析
+4. 即座実行可能な緊急対策の提案"
+```
+
+### **期待成果・効果測定**
+
+#### **即座効果**
+- **ログ分析効率**: 手動分析から自動化への移行（作業時間90%削減）
+- **問題発見速度**: パフォーマンス異常の早期検出（平均2時間→15分）
+- **根本原因特定精度**: 症状ではなく原因への正確なアプローチ
+
+#### **長期効果**
+- **予防的保守**: 潜在問題の事前検出によるシステム安定性向上
+- **継続的改善**: ログベースの品質監視によるプロダクト品質向上
+- **開発効率向上**: データ駆動型意思決定による開発サイクル短縮
+
+### **Log-Analyzer 活用のベストプラクティス**
+
+#### **委任時の指示方法**
+✅ **具体的指示例:**
+- ログファイル名・期間を明確に指定
+- 調査すべき問題・症状を詳細に記述
+- 期待するアウトプット形式を指定
+- 緊急度・優先度を明示
+
+❌ **避けるべき指示例:**
+- "ログを見て何か問題があったら教えて"
+- "パフォーマンスを改善して"
+- "エラーを直して"
+
+#### **結果活用方法**
+1. **分析結果の検証**: 他のサブエージェントとの連携確認
+2. **アクションアイテム実行**: 具体的改善提案の段階的実装
+3. **継続監視**: 改善効果の測定・追跡
+4. **ナレッジ蓄積**: 分析パターンの体系化・再利用
+
+**`@Log-Analyzer`エージェントは、Baketaプロジェクトの運用品質向上と技術的問題の迅速解決において重要な役割を担います。**

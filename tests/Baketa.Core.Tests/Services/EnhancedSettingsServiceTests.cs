@@ -1,14 +1,14 @@
 #pragma warning disable CS0618 // Type or member is obsolete
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using Moq;
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Xunit;
+using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Migration;
-using Baketa.Core.Services;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Baketa.Core.Tests.Services;
 
@@ -47,16 +47,16 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
         ArgumentNullException.ThrowIfNull(_mockLogger?.Object, nameof(_mockLogger));
         ArgumentNullException.ThrowIfNull(_mockMetadataService?.Object, nameof(_mockMetadataService));
         ArgumentNullException.ThrowIfNull(_mockMigrationManager?.Object, nameof(_mockMigrationManager));
-        
+
         var uniquePath = Path.Combine(Path.GetDirectoryName(_tempSettingsPath)!, $"settings_{Guid.NewGuid():N}.json");
-        
+
         // Ensure directory exists before creating service
         var directory = Path.GetDirectoryName(uniquePath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
         }
-        
+
         return new(_mockLogger.Object, _mockMetadataService.Object, _mockMigrationManager.Object, uniquePath);
     }
 
@@ -79,7 +79,7 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
 
         // Assert
         File.Exists(testFilePath).Should().BeTrue();
-        
+
         // ファイル内容の確認
         var fileContent = await File.ReadAllTextAsync(testFilePath);
         fileContent.Should().Contain("true");
@@ -133,7 +133,7 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
         // Arrange
         var service = CreateService();
         var backupPath = Path.Combine(Path.GetTempPath(), $"backup_{Guid.NewGuid():N}.json");
-        
+
         var settings = new AppSettings
         {
             General = new GeneralSettings { AutoStartWithWindows = true }
@@ -145,7 +145,7 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
 
         // Assert
         File.Exists(backupPath).Should().BeTrue();
-        
+
         // バックアップファイルの内容確認
         var backupContent = await File.ReadAllTextAsync(backupPath);
         backupContent.Should().Contain("true");
@@ -270,25 +270,25 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
         reloadedSettings.General.AutoStartWithWindows.Should().BeTrue();
         reloadedSettings.General.MinimizeToTray.Should().BeFalse();
         reloadedSettings.General.ActiveGameProfile.Should().Be("TestGame");
-        
+
         reloadedSettings.MainUi.PanelOpacity.Should().Be(0.75);
         reloadedSettings.MainUi.PanelSize.Should().Be(UiSize.Large);
         reloadedSettings.MainUi.AlwaysOnTop.Should().BeTrue();
         reloadedSettings.MainUi.AutoHideWhenIdle.Should().BeTrue();
         reloadedSettings.MainUi.AutoHideDelaySeconds.Should().Be(30);
-        
+
         reloadedSettings.Theme.AppTheme.Should().Be(UiTheme.Dark);
         reloadedSettings.Theme.EnableAnimations.Should().BeTrue();
-        
+
         reloadedSettings.Translation.Should().NotBeNull();
-        
+
         reloadedSettings.Capture.Should().NotBeNull();
-        
+
         reloadedSettings.Ocr.Should().NotBeNull();
-        
+
         reloadedSettings.Overlay.IsEnabled.Should().BeTrue();
         reloadedSettings.Overlay.Opacity.Should().Be(0.85);
-        
+
         reloadedSettings.Advanced.EnableAdvancedFeatures.Should().BeTrue();
         reloadedSettings.Advanced.EnableProfiling.Should().BeTrue();
 
@@ -305,15 +305,15 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
     {
         // Arrange - Root cause solution: Create service first, then corrupt the file after initialization
         var tempFilePath = Path.Combine(Path.GetDirectoryName(_tempSettingsPath)!, $"corrupted_settings_{Guid.NewGuid():N}.json");
-        
+
         // 最初に有効なJSONファイルを作成してサービスの初期化を成功させる
         await File.WriteAllTextAsync(tempFilePath, "{\"General\":{\"AutoStartWithWindows\":false}}");
-        
+
         var service = new EnhancedSettingsService(_mockLogger.Object, _mockMetadataService.Object, _mockMigrationManager.Object, tempFilePath);
-        
+
         // 初期化が完了するまで少し待機
         await Task.Delay(100);
-        
+
         // 初期化後にファイルを破損させる
         await File.WriteAllTextAsync(tempFilePath, "{ \"invalid\": json content without quotes }");
 
@@ -330,11 +330,11 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
     {
         // Arrange - Root cause solution: Create service with known file path to ensure test consistency
         var readOnlyFilePath = Path.Combine(Path.GetDirectoryName(_tempSettingsPath)!, $"readonly_settings_{Guid.NewGuid():N}.json");
-        
+
         // ファイルを作成して読み取り専用に設定
         await File.WriteAllTextAsync(readOnlyFilePath, "{}");
         File.SetAttributes(readOnlyFilePath, FileAttributes.ReadOnly);
-        
+
         var service = new EnhancedSettingsService(_mockLogger.Object, _mockMetadataService.Object, _mockMigrationManager.Object, readOnlyFilePath);
         var settings = new AppSettings();
 
@@ -342,7 +342,7 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
         {
             // Root cause solution: 初期化完了を待機
             await Task.Delay(100);
-            
+
             // Act & Assert
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.SetSettingsAsync(settings));
         }
@@ -465,10 +465,10 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
 
         // 別のサービスインスタンスで確認（同じファイルパスを使用）
         var verificationService = new EnhancedSettingsService(_mockLogger.Object, _mockMetadataService.Object, _mockMigrationManager.Object, sharedPath);
-        
+
         // Root cause solution: 新しいサービスの初期化完了を待機
         await Task.Delay(200);
-        
+
         // 明示的にファイルから再読み込みを実行
         await verificationService.ReloadAsync();
         var retrievedSettings = verificationService.GetCategorySettings<MainUiSettings>();
@@ -484,7 +484,7 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
     {
         // Arrange
         var service = CreateService();
-        
+
         // カスタム設定を適用
         var customSettings = new AppSettings
         {
@@ -513,7 +513,7 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
         // Arrange
         var service = CreateService();
         const string profileId = "LifecycleTestGame";
-        
+
         var gameProfile = new GameProfileSettings
         {
             GameName = "Lifecycle Test Game",
@@ -559,7 +559,7 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
     {
         // Arrange
         var service = CreateService();
-        
+
         // 最初にプロファイルを設定
         var profileId = "TempProfile";
         var profile = new GameProfileSettings { GameName = "Temp Game" };
@@ -593,10 +593,10 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
                 General = new GeneralSettings { EnableDebugMode = i % 2 == 0 },
                 MainUi = new MainUiSettings { PanelOpacity = 0.1 + (i * 0.01) }
             };
-            
+
             await service.SetSettingsAsync(settings);
         }
-        
+
         stopwatch.Stop();
 
         // Assert - 5秒以内で完了すること
@@ -617,7 +617,7 @@ public sealed class EnhancedSettingsServiceTests : IDisposable
             _ = service.GetCategorySettings<GeneralSettings>();
             _ = service.GetCategorySettings<MainUiSettings>();
         }
-        
+
         stopwatch.Stop();
 
         // Assert - 1秒以内で完了すること

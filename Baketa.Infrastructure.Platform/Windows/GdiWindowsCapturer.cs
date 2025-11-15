@@ -35,9 +35,9 @@ public class GdiWindowsCapturer : IWindowsCapturer, IDisposable
     public async Task<IWindowsImage> CaptureScreenAsync()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         _logger?.LogDebug("画面全体キャプチャを開始");
-        
+
         try
         {
             var result = await _gdiCapturer.CaptureScreenAsync().ConfigureAwait(false);
@@ -59,9 +59,9 @@ public class GdiWindowsCapturer : IWindowsCapturer, IDisposable
     public async Task<IWindowsImage> CaptureRegionAsync(Rectangle region)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         _logger?.LogDebug("領域キャプチャを開始: {Region}", region);
-        
+
         try
         {
             var result = await _gdiCapturer.CaptureRegionAsync(region).ConfigureAwait(false);
@@ -83,9 +83,9 @@ public class GdiWindowsCapturer : IWindowsCapturer, IDisposable
     public async Task<IWindowsImage> CaptureWindowAsync(IntPtr windowHandle)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         _logger?.LogDebug("ウィンドウキャプチャを開始: {WindowHandle}", windowHandle);
-        
+
         try
         {
             var result = await _gdiCapturer.CaptureWindowAsync(windowHandle).ConfigureAwait(false);
@@ -107,9 +107,9 @@ public class GdiWindowsCapturer : IWindowsCapturer, IDisposable
     public async Task<IWindowsImage> CaptureClientAreaAsync(IntPtr windowHandle)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         _logger?.LogDebug("ウィンドウクライアント領域キャプチャを開始: {WindowHandle}", windowHandle);
-        
+
         try
         {
             // GdiScreenCapturerにはCaptureClientAreaAsyncがないため、ウィンドウキャプチャを代替として使用
@@ -131,9 +131,9 @@ public class GdiWindowsCapturer : IWindowsCapturer, IDisposable
     public void SetCaptureOptions(WindowsCaptureOptions options)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _logger?.LogDebug("キャプチャオプションを設定: Quality={Quality}, IncludeCursor={IncludeCursor}", 
+        _logger?.LogDebug("キャプチャオプションを設定: Quality={Quality}, IncludeCursor={IncludeCursor}",
             _options.Quality, _options.IncludeCursor);
     }
 
@@ -153,10 +153,10 @@ public class GdiWindowsCapturer : IWindowsCapturer, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _gdiCapturer?.Dispose();
         _disposed = true;
-        
+
         GC.SuppressFinalize(this);
         _logger?.LogDebug("GdiWindowsCapturerが破棄されました");
     }

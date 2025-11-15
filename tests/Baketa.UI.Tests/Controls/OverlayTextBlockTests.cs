@@ -38,7 +38,7 @@ public sealed class OverlayTextBlockTests(ITestOutputHelper output) : AvaloniaTe
         RunOnUIThread(() =>
         {
             var control = new OverlayTextBlock();
-            
+
             Assert.Equal(string.Empty, control.Text);
             Assert.Equal(OverlayTheme.Auto, control.Theme);
             Assert.True(control.ToggleVisibilityEnabled);
@@ -55,7 +55,7 @@ public sealed class OverlayTextBlockTests(ITestOutputHelper output) : AvaloniaTe
     {
         // Arrange, Act & Assert - すべてを同一UIスレッド内で実行
         const string testText = "テストテキスト";
-        
+
         RunOnUIThread(() =>
         {
             var control = new OverlayTextBlock
@@ -218,7 +218,7 @@ public sealed class OverlayTextBlockTests(ITestOutputHelper output) : AvaloniaTe
         {
             var hour = DateTime.Now.Hour;
             var expectedTheme = (hour >= 6 && hour < 18) ? "Light" : "Dark";
-            
+
             // テーマクラスが適用されているかを確認
             // Note: Headlessモードでは実際のUI要素が作成されないため、
             // クラス適用の詳細検証は統合テストで行う
@@ -284,7 +284,7 @@ public sealed class OverlayTextBlockTests(ITestOutputHelper output) : AvaloniaTe
     {
         // Arrange, Act & Assert - すべてを同一UIスレッド内で実行
         bool testResult = false;
-        
+
         RunOnUIThread(() =>
         {
             try

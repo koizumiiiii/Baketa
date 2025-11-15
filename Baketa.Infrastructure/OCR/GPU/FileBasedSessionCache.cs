@@ -1,14 +1,14 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
-using System.IO;
+using System.Text.Json;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Settings;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.OCR.GPU;
 
@@ -29,7 +29,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly object _statsLock = new();
     private bool _disposed;
-    
+
     // 統計情報
     private int _hitCount;
     private int _missCount;
@@ -41,14 +41,14 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrSettings = ocrSettings?.Value ?? throw new ArgumentNullException(nameof(ocrSettings));
-        
+
         // キャッシュディレクトリ設定
         _cacheRootPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Baketa", "SessionCache");
-        
+
         Directory.CreateDirectory(_cacheRootPath);
-        
+
         // JSON設定
         _jsonOptions = new JsonSerializerOptions
         {
@@ -56,32 +56,32 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             WriteIndented = false,
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
         };
-        
+
         // 定期クリーンアップタイマー（1時間間隔）
         _cleanupTimer = new System.Threading.Timer(CleanupCallback, null, TimeSpan.FromMinutes(5), TimeSpan.FromHours(1));
-        
+
         // 起動時にメタデータキャッシュを初期化
         InitializeMetadataCache();
-        
+
         _logger.LogInformation("💾 FileBasedSessionCache初期化完了 - パス: {CachePath}", _cacheRootPath);
     }
 
     public async Task<CacheStoreResult> StoreSessionAsync(string cacheKey, SessionCacheData sessionData, SessionMetadata metadata, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             _logger.LogDebug("💾 セッションキャッシュ保存開始: {CacheKey}", cacheKey);
-            
+
             var keyHash = GenerateKeyHash(cacheKey);
             var dataFilePath = GetDataFilePath(keyHash);
             var metadataFilePath = GetMetadataFilePath(keyHash);
             var tempDataPath = dataFilePath + ".tmp";
             var tempMetadataPath = metadataFilePath + ".tmp";
-            
+
             await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-            
+
             try
             {
                 var existingSize = 0L;
@@ -90,31 +90,31 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 {
                     existingSize = new System.IO.FileInfo(dataFilePath).Length;
                 }
-                
+
                 // セッションデータの保存
                 await SaveSessionDataToFile(tempDataPath, sessionData, cancellationToken).ConfigureAwait(false);
-                
+
                 // メタデータの保存
                 metadata.LastAccessedAt = DateTime.UtcNow;
                 await SaveMetadataToFile(tempMetadataPath, metadata, cancellationToken).ConfigureAwait(false);
-                
+
                 // アトミックな置換
                 System.IO.File.Move(tempDataPath, dataFilePath, true);
                 System.IO.File.Move(tempMetadataPath, metadataFilePath, true);
-                
+
                 // キャッシュ更新
                 _metadataCache.AddOrUpdate(cacheKey, metadata, (_, _) => metadata);
                 _accessTracker.AddOrUpdate(cacheKey, DateTime.UtcNow, (_, _) => DateTime.UtcNow);
-                
+
                 var storedSize = new System.IO.FileInfo(dataFilePath).Length;
-                
+
                 lock (_statsLock)
                 {
                     _totalStoredSize = _totalStoredSize - existingSize + storedSize;
                 }
-                
+
                 stopwatch.Stop();
-                
+
                 var result = new CacheStoreResult
                 {
                     IsSuccessful = true,
@@ -122,16 +122,16 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     StoredSize = storedSize,
                     OverwroteExisting = overwroteExisting
                 };
-                
+
                 _logger.LogDebug("✅ セッションキャッシュ保存完了: {CacheKey} - サイズ: {Size}B, 時間: {Duration}ms",
                     cacheKey, storedSize, stopwatch.ElapsedMilliseconds);
-                
+
                 return result;
             }
             finally
             {
                 _fileLock.Release();
-                
+
                 // 一時ファイルのクリーンアップ
                 try
                 {
@@ -148,7 +148,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         {
             stopwatch.Stop();
             _logger.LogError(ex, "❌ セッションキャッシュ保存失敗: {CacheKey}", cacheKey);
-            
+
             return new CacheStoreResult
             {
                 IsSuccessful = false,
@@ -161,22 +161,22 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
     public async Task<CacheRetrieveResult> RetrieveSessionAsync(string cacheKey, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             _logger.LogDebug("📥 セッションキャッシュ取得開始: {CacheKey}", cacheKey);
-            
+
             var keyHash = GenerateKeyHash(cacheKey);
             var dataFilePath = GetDataFilePath(keyHash);
             var metadataFilePath = GetMetadataFilePath(keyHash);
-            
+
             if (!System.IO.File.Exists(dataFilePath) || !System.IO.File.Exists(metadataFilePath))
             {
                 lock (_statsLock)
                 {
                     _missCount++;
                 }
-                
+
                 stopwatch.Stop();
                 return new CacheRetrieveResult
                 {
@@ -186,9 +186,9 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     HitRatio = CalculateHitRatio()
                 };
             }
-            
+
             await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-            
+
             try
             {
                 // メタデータを読み込み、有効期限をチェック
@@ -196,7 +196,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 if (metadata.ExpiresAt < DateTime.UtcNow)
                 {
                     _logger.LogDebug("⏰ キャッシュエントリが期限切れ: {CacheKey}", cacheKey);
-                    
+
                     // 期限切れファイルを削除
                     _ = Task.Run(() =>
                     {
@@ -210,12 +210,12 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                             _logger.LogWarning(deleteEx, "期限切れファイル削除警告: {CacheKey}", cacheKey);
                         }
                     }, cancellationToken);
-                    
+
                     lock (_statsLock)
                     {
                         _missCount++;
                     }
-                    
+
                     stopwatch.Stop();
                     return new CacheRetrieveResult
                     {
@@ -225,14 +225,14 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                         HitRatio = CalculateHitRatio()
                     };
                 }
-                
+
                 // セッションデータを読み込み
                 var sessionData = await LoadSessionDataFromFile(dataFilePath, cancellationToken).ConfigureAwait(false);
-                
+
                 // メタデータを更新
                 metadata.LastAccessedAt = DateTime.UtcNow;
                 metadata.UsageCount++;
-                
+
                 // 非同期でメタデータを更新保存
                 _ = Task.Run(async () =>
                 {
@@ -247,14 +247,14 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                         _logger.LogWarning(updateEx, "メタデータ更新警告: {CacheKey}", cacheKey);
                     }
                 }, cancellationToken);
-                
+
                 lock (_statsLock)
                 {
                     _hitCount++;
                 }
-                
+
                 stopwatch.Stop();
-                
+
                 var result = new CacheRetrieveResult
                 {
                     IsSuccessful = true,
@@ -263,10 +263,10 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     RetrieveDuration = stopwatch.Elapsed,
                     HitRatio = CalculateHitRatio()
                 };
-                
+
                 _logger.LogDebug("✅ セッションキャッシュ取得完了: {CacheKey} - 時間: {Duration}ms",
                     cacheKey, stopwatch.ElapsedMilliseconds);
-                
+
                 return result;
             }
             finally
@@ -278,12 +278,12 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         {
             stopwatch.Stop();
             _logger.LogError(ex, "❌ セッションキャッシュ取得失敗: {CacheKey}", cacheKey);
-            
+
             lock (_statsLock)
             {
                 _missCount++;
             }
-            
+
             return new CacheRetrieveResult
             {
                 IsSuccessful = false,
@@ -301,12 +301,12 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             var keyHash = GenerateKeyHash(cacheKey);
             var dataFilePath = GetDataFilePath(keyHash);
             var metadataFilePath = GetMetadataFilePath(keyHash);
-            
+
             if (!System.IO.File.Exists(dataFilePath) || !System.IO.File.Exists(metadataFilePath))
             {
                 return false;
             }
-            
+
             // 期限切れチェック
             var metadata = await LoadMetadataFromFile(metadataFilePath, cancellationToken).ConfigureAwait(false);
             return metadata.ExpiresAt >= DateTime.UtcNow;
@@ -325,35 +325,35 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             var keyHash = GenerateKeyHash(cacheKey);
             var dataFilePath = GetDataFilePath(keyHash);
             var metadataFilePath = GetMetadataFilePath(keyHash);
-            
+
             await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-            
+
             try
             {
                 var existed = System.IO.File.Exists(dataFilePath);
-                
+
                 if (existed)
                 {
                     var fileInfo = new System.IO.FileInfo(dataFilePath);
                     var size = fileInfo.Length;
-                    
+
                     System.IO.File.Delete(dataFilePath);
                     if (System.IO.File.Exists(metadataFilePath))
                     {
                         System.IO.File.Delete(metadataFilePath);
                     }
-                    
+
                     _metadataCache.TryRemove(cacheKey, out _);
                     _accessTracker.TryRemove(cacheKey, out _);
-                    
+
                     lock (_statsLock)
                     {
                         _totalStoredSize -= size;
                     }
-                    
+
                     _logger.LogDebug("🗑️ キャッシュエントリ削除: {CacheKey}", cacheKey);
                 }
-                
+
                 return existed;
             }
             finally
@@ -373,14 +373,14 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         var stopwatch = Stopwatch.StartNew();
         var removedCount = 0;
         var freedSize = 0L;
-        
+
         try
         {
             _logger.LogDebug("🧹 期限切れキャッシュクリーンアップ開始");
-            
+
             var currentTime = DateTime.UtcNow;
             var expiredKeys = new List<string>();
-            
+
             // 期限切れエントリを特定
             await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken).ConfigureAwait(false))
             {
@@ -389,7 +389,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     expiredKeys.Add(key);
                 }
             }
-            
+
             // 期限切れエントリを削除
             foreach (var key in expiredKeys)
             {
@@ -397,13 +397,13 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 {
                     var keyHash = GenerateKeyHash(key);
                     var dataFilePath = GetDataFilePath(keyHash);
-                    
+
                     if (System.IO.File.Exists(dataFilePath))
                     {
                         var size = new System.IO.FileInfo(dataFilePath).Length;
                         freedSize += size;
                     }
-                    
+
                     if (await RemoveAsync(key, cancellationToken).ConfigureAwait(false))
                     {
                         removedCount++;
@@ -414,12 +414,12 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     _logger.LogWarning(ex, "期限切れエントリ削除警告: {Key}", key);
                 }
             }
-            
+
             stopwatch.Stop();
-            
+
             _logger.LogInformation("✅ 期限切れキャッシュクリーンアップ完了 - 削除数: {Count}, 解放サイズ: {Size}B, 時間: {Duration}ms",
                 removedCount, freedSize, stopwatch.ElapsedMilliseconds);
-            
+
             return removedCount;
         }
         catch (Exception ex)
@@ -437,7 +437,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             var totalEntries = _metadataCache.Count;
             var expiredCount = 0;
             var currentTime = DateTime.UtcNow;
-            
+
             await foreach (var (_, metadata) in GetAllMetadataAsync(cancellationToken).ConfigureAwait(false))
             {
                 if (metadata.ExpiresAt < currentTime)
@@ -445,7 +445,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     expiredCount++;
                 }
             }
-            
+
             lock (_statsLock)
             {
                 return new CacheStatistics
@@ -472,11 +472,11 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         var actions = new List<string>();
         var removedEntries = 0;
         var freedSize = 0L;
-        
+
         try
         {
             _logger.LogInformation("⚡ キャッシュ最適化開始");
-            
+
             // 1. 期限切れエントリの削除
             var expiredRemoved = await CleanupExpiredEntriesAsync(cancellationToken).ConfigureAwait(false);
             if (expiredRemoved > 0)
@@ -484,7 +484,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 removedEntries += expiredRemoved;
                 actions.Add($"期限切れエントリ {expiredRemoved} 件を削除");
             }
-            
+
             // 2. 低優先度かつ長期未使用エントリの削除
             var unusedThreshold = DateTime.UtcNow.AddDays(-7);
             var lowPriorityRemoved = await RemoveLowPriorityUnusedEntries(unusedThreshold, cancellationToken).ConfigureAwait(false);
@@ -493,7 +493,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 removedEntries += lowPriorityRemoved;
                 actions.Add($"低優先度未使用エントリ {lowPriorityRemoved} 件を削除");
             }
-            
+
             // 3. ディスク容量チェックとサイズベース削除
             var diskSpaceOptimization = await OptimizeDiskSpace(cancellationToken).ConfigureAwait(false);
             removedEntries += diskSpaceOptimization.removedCount;
@@ -502,9 +502,9 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             {
                 actions.Add($"ディスク容量最適化で {diskSpaceOptimization.removedCount} 件削除");
             }
-            
+
             stopwatch.Stop();
-            
+
             var result = new CacheOptimizationResult
             {
                 OptimizationExecuted = actions.Count > 0,
@@ -514,17 +514,17 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 ExecutedActions = actions,
                 EstimatedPerformanceImprovement = removedEntries > 0 ? 0.1 : 0.0
             };
-            
+
             _logger.LogInformation("✅ キャッシュ最適化完了 - 削除: {Count}件, 解放: {Size}B, 時間: {Duration}ms",
                 removedEntries, freedSize, stopwatch.ElapsedMilliseconds);
-            
+
             return result;
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             _logger.LogError(ex, "❌ キャッシュ最適化失敗");
-            
+
             return new CacheOptimizationResult
             {
                 OptimizationExecuted = false,
@@ -538,7 +538,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         try
         {
             var keys = new List<string>();
-            
+
             await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken).ConfigureAwait(false))
             {
                 if (metadata.ExpiresAt >= DateTime.UtcNow)
@@ -549,7 +549,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     }
                 }
             }
-            
+
             return keys.AsReadOnly();
         }
         catch (Exception ex)
@@ -562,11 +562,11 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _cleanupTimer?.Dispose();
         _fileLock?.Dispose();
         _disposed = true;
-        
+
         _logger.LogInformation("🧹 FileBasedSessionCache リソース解放完了");
     }
 
@@ -576,7 +576,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         {
             var metadataFiles = Directory.GetFiles(_cacheRootPath, "*.metadata.json");
             var loadedCount = 0;
-            
+
             foreach (var metadataFile in metadataFiles)
             {
                 try
@@ -584,7 +584,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     var metadata = LoadMetadataFromFileSync(metadataFile);
                     var keyHash = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(metadataFile));
                     var cacheKey = ReverseKeyHash(keyHash); // 実際は逆変換不可なので別途管理が必要
-                    
+
                     if (metadata.ExpiresAt >= DateTime.UtcNow)
                     {
                         _metadataCache.TryAdd(cacheKey, metadata);
@@ -596,7 +596,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                     _logger.LogWarning(ex, "メタデータ読み込み警告: {File}", metadataFile);
                 }
             }
-            
+
             _logger.LogInformation("📋 メタデータキャッシュ初期化完了 - 読み込み: {Count}件", loadedCount);
         }
         catch (Exception ex)
@@ -670,7 +670,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             yield return (kvp.Key, kvp.Value);
         }
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
@@ -678,16 +678,16 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
     {
         var removedCount = 0;
         var keysToRemove = new List<string>();
-        
+
         await foreach (var (key, metadata) in GetAllMetadataAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (metadata.Priority == CachePriority.Low && 
+            if (metadata.Priority == CachePriority.Low &&
                 metadata.LastAccessedAt < unusedThreshold)
             {
                 keysToRemove.Add(key);
             }
         }
-        
+
         foreach (var key in keysToRemove)
         {
             if (await RemoveAsync(key, cancellationToken).ConfigureAwait(false))
@@ -695,17 +695,17 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
                 removedCount++;
             }
         }
-        
+
         return removedCount;
     }
 
     private async Task<(int removedCount, long freedSize)> OptimizeDiskSpace(CancellationToken cancellationToken)
     {
         await Task.Delay(10, cancellationToken).ConfigureAwait(false); // プレースホルダー実装
-        
+
         // 実装: ディスク容量チェックとサイズベース最適化
         // 例: 使用可能容量が10%以下の場合、古いエントリから削除
-        
+
         return (0, 0L);
     }
 
@@ -714,7 +714,7 @@ public sealed class FileBasedSessionCache : IPersistentSessionCache, IDisposable
         try
         {
             if (_disposed) return;
-            
+
             _ = Task.Run(async () =>
             {
                 try

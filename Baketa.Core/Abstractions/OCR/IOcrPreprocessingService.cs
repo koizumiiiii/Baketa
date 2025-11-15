@@ -19,10 +19,10 @@ public interface IOcrPreprocessingService
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>前処理結果（検出されたテキスト領域を含む）</returns>
     Task<OcrPreprocessingResult> ProcessImageAsync(
-        IAdvancedImage image, 
-        string? profileName = null, 
+        IAdvancedImage image,
+        string? profileName = null,
         CancellationToken cancellationToken = default);
-        
+
     /// <summary>
     /// 複数の検出器を使用してテキスト領域を検出し、結果を集約します
     /// </summary>

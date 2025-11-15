@@ -1,13 +1,13 @@
+using System.Reactive.Linq;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
+using Baketa.UI.Tests.TestUtilities;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ReactiveUI.Testing;
 using Xunit;
-using Baketa.Core.Settings;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.ViewModels.Settings;
-using Baketa.UI.Tests.TestUtilities;
-using System.Reactive.Linq;
 
 namespace Baketa.UI.Tests.ViewModels.Settings;
 
@@ -52,7 +52,7 @@ public class GeneralSettingsViewModelTests
     public void Constructor_WithNullSettings_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new GeneralSettingsViewModel(null!, _mockEventAggregator.Object, _mockLogger.Object));
     }
 
@@ -60,7 +60,7 @@ public class GeneralSettingsViewModelTests
     public void Constructor_WithNullEventAggregator_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new GeneralSettingsViewModel(_testSettings, null!, _mockLogger.Object));
     }
 
@@ -112,7 +112,7 @@ public class GeneralSettingsViewModelTests
     {
         // Arrange
         var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
+
         // 現在の値と異なる値を設定する必要がある
         if (viewModel.LogLevel == newLogLevel)
         {
@@ -120,7 +120,7 @@ public class GeneralSettingsViewModelTests
             var differentLogLevel = newLogLevel == LogLevel.Information ? LogLevel.Debug : LogLevel.Information;
             viewModel.LogLevel = differentLogLevel;
             viewModel.HasChanges.Should().BeTrue("初回の変更でHasChangesがtrueになるべき");
-            
+
             // HasChangesをリセットしてテストを続行
             viewModel.HasChanges = false;
         }
@@ -150,7 +150,7 @@ public class GeneralSettingsViewModelTests
         // Arrange
         var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
         var defaultSettings = new GeneralSettings();
-        
+
         // 初期値を変更
         viewModel.AutoStartWithWindows = !defaultSettings.AutoStartWithWindows;
         viewModel.MaxMemoryUsageMb = defaultSettings.MaxMemoryUsageMb + 100;

@@ -53,7 +53,7 @@ public sealed class SettingValidationResult(SettingMetadata metadata, object? va
     {
         return new SettingValidationResult(metadata, value, true, null, warningMessage);
     }
-    
+
     /// <summary>
     /// 失敗した検証結果を作成します
     /// </summary>
@@ -64,13 +64,13 @@ public sealed class SettingValidationResult(SettingMetadata metadata, object? va
     public static SettingValidationResult Failure(SettingMetadata metadata, object? value, string? errorMessage)
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        
+
         // エラーメッセージの検証を厳密に行う - null/emptyどちらもArgumentExceptionに統一
         if (string.IsNullOrEmpty(errorMessage))
         {
             throw new ArgumentException("エラーメッセージは必須です", nameof(errorMessage));
         }
-        
+
         return new SettingValidationResult(metadata, value, false, errorMessage, null);
     }
 
@@ -83,17 +83,17 @@ public sealed class SettingValidationResult(SettingMetadata metadata, object? va
         var status = IsValid ? "Valid" : "Invalid";
         var displayName = Metadata?.DisplayName ?? "Unknown Setting";
         var result = $"{status}: {displayName}";
-        
+
         if (!IsValid && !string.IsNullOrEmpty(ErrorMessage))
         {
             result += $" - {ErrorMessage}";
         }
-        
+
         if (IsValid && !string.IsNullOrEmpty(WarningMessage))
         {
             result += $" (Warning: {WarningMessage})";
         }
-        
+
         return result;
     }
 }
@@ -112,7 +112,7 @@ public static class SettingValidationResults
     {
         return results.All(r => r.IsValid);
     }
-    
+
     /// <summary>
     /// エラーがある検証結果のみを取得します
     /// </summary>
@@ -122,7 +122,7 @@ public static class SettingValidationResults
     {
         return results.Where(r => !r.IsValid);
     }
-    
+
     /// <summary>
     /// 警告がある検証結果のみを取得します
     /// </summary>
@@ -132,7 +132,7 @@ public static class SettingValidationResults
     {
         return results.Where(r => r.IsValid && !string.IsNullOrEmpty(r.WarningMessage));
     }
-    
+
     /// <summary>
     /// エラーメッセージを文字列として結合します
     /// </summary>

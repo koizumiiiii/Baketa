@@ -5,9 +5,9 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Settings;
 using Baketa.Core.Settings.Migration;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Services;
 
@@ -20,7 +20,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     private readonly ILogger<EnhancedSettingsService> _logger;
     private readonly ISettingMetadataService _metadataService;
     private readonly ISettingsMigrationManager _migrationManager;
-    
+
     private AppSettings _settings;
     private readonly Dictionary<string, SettingChangeRecord> _changeHistory;
     private readonly HashSet<string> _favoriteSettings;
@@ -28,7 +28,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     private readonly SemaphoreSlim _fileSemaphore = new(1, 1);
     private readonly string _settingsFilePath;
     private bool _disposed;
-    
+
     // JsonSerializerOptionsをキャッシュしてパフォーマンスを向上
     private static readonly JsonSerializerOptions s_jsonOptions = new()
     {
@@ -36,16 +36,16 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     };
 
     #region Events
-    
+
     /// <inheritdoc />
     public event EventHandler<SettingChangedEventArgs>? SettingChanged;
-    
+
     /// <inheritdoc />
     public event EventHandler<GameProfileChangedEventArgs>? GameProfileChanged;
-    
+
     /// <inheritdoc />
     public event EventHandler<SettingsSavedEventArgs>? SettingsSaved;
-    
+
     #endregion
 
     /// <summary>
@@ -64,13 +64,13 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metadataService = metadataService ?? throw new ArgumentNullException(nameof(metadataService));
         _migrationManager = migrationManager ?? throw new ArgumentNullException(nameof(migrationManager));
-        
+
         _settings = new AppSettings();
         _changeHistory = [];
         _favoriteSettings = [];
-        
+
         _settingsFilePath = settingsFilePath ?? GetDefaultSettingsFilePath();
-        
+
         // 起動時に設定を読み込み
         _ = InitializeAsync();
     }
@@ -88,7 +88,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
                 {
                     return typedValue;
                 }
-                
+
                 _logger.LogDebug("設定キー '{Key}' が見つからないか型が一致しません。デフォルト値を返します: {DefaultValue}", key, defaultValue);
                 return defaultValue;
             }
@@ -105,13 +105,13 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         if (string.IsNullOrEmpty(key))
             throw new ArgumentException("Setting key cannot be null or empty.", nameof(key));
-            
+
         lock (_lockObject)
         {
             try
             {
                 var oldValue = GetValue(key, default(T)!);
-                
+
                 if (SetSettingValue(key, value))
                 {
                     RecordChange(key, oldValue, value, SettingChangeType.Updated, "SetValue API");
@@ -178,15 +178,15 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task SetSettingsAsync(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         lock (_lockObject)
         {
             var oldSettings = _settings;
             _settings = settings;
-            
+
             RecordChange("AppSettings", oldSettings, settings, SettingChangeType.Updated, "SetSettingsAsync API");
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -211,15 +211,15 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task SetCategorySettingsAsync<T>(T settings) where T : class, new()
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         lock (_lockObject)
         {
             var oldSettings = GetCategorySettingsInternal<T>();
             SetCategorySettingsInternal(settings);
-            
+
             RecordChange(typeof(T).Name, oldSettings, settings, SettingChangeType.Updated, "SetCategorySettingsAsync API");
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -244,7 +244,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public GameProfileSettings? GetGameProfile(string profileId)
     {
         ArgumentNullException.ThrowIfNull(profileId);
-        
+
         lock (_lockObject)
         {
             return _settings.GameProfiles.TryGetValue(profileId, out var profile) ? profile : null;
@@ -256,18 +256,18 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         ArgumentNullException.ThrowIfNull(profileId);
         ArgumentNullException.ThrowIfNull(profile);
-        
+
         GameProfileSettings? oldProfile;
-        
+
         lock (_lockObject)
         {
             oldProfile = GetGameProfile(profileId);
             _settings.GameProfiles[profileId] = profile;
         }
-        
+
         var changeType = oldProfile == null ? ProfileChangeType.Created : ProfileChangeType.Updated;
         OnGameProfileChanged(profileId, profile, changeType);
-        
+
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -275,15 +275,15 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task DeleteGameProfileAsync(string profileId)
     {
         ArgumentNullException.ThrowIfNull(profileId);
-        
+
         GameProfileSettings? oldProfile;
-        
+
         lock (_lockObject)
         {
             oldProfile = GetGameProfile(profileId);
             _settings.GameProfiles.Remove(profileId);
         }
-        
+
         if (oldProfile != null)
         {
             OnGameProfileChanged(profileId, null, ProfileChangeType.Deleted);
@@ -307,7 +307,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         {
             _settings.General.ActiveGameProfile = profileId;
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
         OnGameProfileChanged(profileId ?? string.Empty, null, ProfileChangeType.ActivationChanged);
     }
@@ -331,7 +331,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         var startTime = DateTime.Now;
         var settingCount = 0;
-        
+
         await _fileSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -341,13 +341,13 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
                 json = JsonSerializer.Serialize(_settings, s_jsonOptions);
                 settingCount = CountSettings();
             }
-            
+
             Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
-            
+
             // Root cause solution: Implement retry logic for file access conflicts
             const int maxRetries = 3;
             const int retryDelayMs = 100;
-            
+
             for (int attempt = 0; attempt < maxRetries; attempt++)
             {
                 try
@@ -355,20 +355,20 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
                     await File.WriteAllTextAsync(_settingsFilePath, json).ConfigureAwait(false);
                     break; // Success, exit retry loop
                 }
-                catch (IOException ex) when (attempt < maxRetries - 1 && 
+                catch (IOException ex) when (attempt < maxRetries - 1 &&
                     (ex.Message.Contains("being used by another process", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("access", StringComparison.OrdinalIgnoreCase)))
                 {
-                    _logger.LogWarning("File access conflict on attempt {Attempt}, retrying in {DelayMs}ms: {Message}", 
+                    _logger.LogWarning("File access conflict on attempt {Attempt}, retrying in {DelayMs}ms: {Message}",
                         attempt + 1, retryDelayMs, ex.Message);
                     await Task.Delay(retryDelayMs).ConfigureAwait(false);
                 }
             }
-            
+
             var saveTime = (long)(DateTime.Now - startTime).TotalMilliseconds;
-            
-            _logger.LogInformation("設定を保存しました: {FilePath} ({SettingCount}項目, {SaveTime}ms)", 
+
+            _logger.LogInformation("設定を保存しました: {FilePath} ({SettingCount}項目, {SaveTime}ms)",
                 _settingsFilePath, settingCount, saveTime.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            
+
             OnSettingsSaved(_settingsFilePath, settingCount, saveTime);
         }
         catch (Exception ex)
@@ -397,17 +397,17 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
                 }
                 return;
             }
-            
+
             var json = await File.ReadAllTextAsync(_settingsFilePath).ConfigureAwait(false);
             var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
-            
+
             if (loadedSettings != null)
             {
                 lock (_lockObject)
                 {
                     _settings = loadedSettings;
                 }
-                
+
                 _logger.LogInformation("設定を再読み込みしました: {FilePath}", _settingsFilePath);
             }
         }
@@ -425,10 +425,10 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         {
             var oldSettings = _settings;
             _settings = new AppSettings();
-            
+
             RecordChange("AppSettings", oldSettings, _settings, SettingChangeType.Reset, "ResetToDefaultsAsync API");
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
         _logger.LogInformation("設定をデフォルト値にリセットしました");
     }
@@ -437,12 +437,12 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public Task CreateBackupAsync(string? backupFilePath = null)
     {
         backupFilePath ??= GenerateBackupFilePath();
-        
+
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(backupFilePath)!);
             File.Copy(_settingsFilePath, backupFilePath, true);
-            
+
             _logger.LogInformation("設定のバックアップを作成しました: {BackupPath}", backupFilePath);
             return Task.CompletedTask;
         }
@@ -457,17 +457,17 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task RestoreFromBackupAsync(string backupFilePath)
     {
         ArgumentNullException.ThrowIfNull(backupFilePath);
-        
+
         if (!File.Exists(backupFilePath))
         {
             throw new FileNotFoundException($"バックアップファイルが見つかりません: {backupFilePath}");
         }
-        
+
         try
         {
             File.Copy(backupFilePath, _settingsFilePath, true);
             await ReloadAsync().ConfigureAwait(false);
-            
+
             _logger.LogInformation("設定をバックアップから復元しました: {BackupPath}", backupFilePath);
         }
         catch (Exception ex)
@@ -541,12 +541,12 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task AddToFavoritesAsync(string settingKey)
     {
         ArgumentNullException.ThrowIfNull(settingKey);
-        
+
         lock (_lockObject)
         {
             _favoriteSettings.Add(settingKey);
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -554,12 +554,12 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     public async Task RemoveFromFavoritesAsync(string settingKey)
     {
         ArgumentNullException.ThrowIfNull(settingKey);
-        
+
         lock (_lockObject)
         {
             _favoriteSettings.Remove(settingKey);
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -581,7 +581,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         try
         {
             await ReloadAsync().ConfigureAwait(false);
-            
+
             if (RequiresMigration())
             {
                 _logger.LogInformation("設定のマイグレーションが必要です");
@@ -617,7 +617,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     {
         // 実際のカテゴリ設定取得ロジックを実装
         var categoryName = typeof(T).Name.Replace("Settings", string.Empty, StringComparison.Ordinal);
-        
+
         try
         {
             var property = typeof(AppSettings).GetProperty(categoryName);
@@ -625,7 +625,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             {
                 return (property.GetValue(_settings) as T) ?? new T();
             }
-            
+
             _logger.LogWarning("設定カテゴリ {Category} が見つかりません", categoryName);
             return new T();
         }
@@ -639,7 +639,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
     private void SetCategorySettingsInternal<T>(T settings) where T : class
     {
         var categoryName = typeof(T).Name.Replace("Settings", string.Empty, StringComparison.Ordinal);
-        
+
         try
         {
             var property = typeof(AppSettings).GetProperty(categoryName);
@@ -675,9 +675,9 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             newValue,
             changeType,
             source);
-        
+
         _changeHistory[record.Id] = record;
-        
+
         // 履歴のサイズ制限
         if (_changeHistory.Count > 1000)
         {
@@ -773,7 +773,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
             {
                 _logger.LogError(ex, "設定サービス解放時の保存でエラーが発生しました");
             }
-            
+
             _fileSemaphore?.Dispose();
             _disposed = true;
         }

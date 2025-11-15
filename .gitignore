@@ -674,9 +674,15 @@ simple_*.py
 debug_captures/
 TestDirect/
 nul
-
+claude-code-viewer/
 run_output*.txt
 
 # NLLB-200 model cache (temporary download files)
 Models/cache/**/*.incomplete
 Models/cache/
+
+# Gemini調査ファイル
+gemini_*.txt
+gemini_*.md
+gemini_*.py
+temp_*.txt

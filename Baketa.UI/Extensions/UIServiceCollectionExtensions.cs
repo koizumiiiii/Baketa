@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Baketa.Core.Settings;
+using Baketa.UI.Configuration;
+using Baketa.UI.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Baketa.UI.Configuration;
-using Baketa.UI.Services;
 
 namespace Baketa.UI.Extensions;
 
@@ -32,6 +33,8 @@ public static class UIServiceCollectionExtensions
             configuration.GetSection(TranslationUIOptions.SectionName));
         services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
             configuration.GetSection("TranslationEngineStatus"));
+        services.Configure<GpuSettings>(
+            configuration.GetSection("GpuSettings"));
 
         // 基本サービスの登録
         services.AddSingleton<IUserPlanService, UserPlanService>();
@@ -39,7 +42,7 @@ public static class UIServiceCollectionExtensions
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
         services.AddSingleton<SettingsFileManager>();
-        
+
         // ファイルダイアログ・エクスポート/インポートサービスの登録
         services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
         services.AddSingleton<SettingsExportImportService>();
@@ -84,7 +87,7 @@ public static class UIServiceCollectionExtensions
             options.StatusUpdateIntervalSeconds = 5; // テスト用に短縮
             options.AutoSaveSettings = false; // テスト時は自動保存無効
             options.DefaultEngineStrategy = "LocalOnly";
-            options.DefaultLanguagePair = "ja-en";
+            options.DefaultLanguagePair = "en-ja";
             options.DefaultChineseVariant = "Simplified";
             options.DefaultTranslationStrategy = "Direct";
         });
@@ -103,7 +106,7 @@ public static class UIServiceCollectionExtensions
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
         services.AddSingleton<SettingsFileManager>();
-        
+
         // ファイルダイアログ・エクスポート/インポートサービスの登録
         services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
         services.AddSingleton<SettingsExportImportService>();

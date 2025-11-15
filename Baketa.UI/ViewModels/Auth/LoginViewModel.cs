@@ -3,17 +3,17 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Auth;
+using Baketa.Core.Abstractions.Events;
+using Baketa.UI.Framework;
+using Baketa.UI.Security;
+using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using ReactiveUI.Fody.Helpers;
-using ReactiveUI.Validation.Extensions;
 using ReactiveUI.Validation.Abstractions;
 using ReactiveUI.Validation.Contexts;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Auth;
-using Baketa.UI.Framework;
-using Baketa.UI.Services;
-using Baketa.UI.Security;
+using ReactiveUI.Validation.Extensions;
 
 namespace Baketa.UI.ViewModels.Auth;
 
@@ -180,7 +180,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         Disposables.Add(ForgotPasswordCommand);
 
         // サインアップ画面への遷移コマンド
-        NavigateToSignupCommand = ReactiveCommand.CreateFromTask(async () => 
+        NavigateToSignupCommand = ReactiveCommand.CreateFromTask(async () =>
         {
             await _navigationService.ShowSignupAsync().ConfigureAwait(false);
         });
@@ -254,15 +254,15 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
 
             // セキュリティチェック
             var sanitizedEmail = InputValidator.SanitizeInput(Email);
-            
+
             // ブロック状態の確認
             if (_attemptTracker.IsBlocked(sanitizedEmail))
             {
                 var remainingTime = _attemptTracker.GetRemainingLockoutTime(sanitizedEmail);
-                ErrorMessage = remainingTime.HasValue 
+                ErrorMessage = remainingTime.HasValue
                     ? $"アカウントがロックされています。残り時間: {remainingTime.Value.TotalMinutes:F0}分"
                     : "アカウントがロックされています";
-                
+
                 _auditLogger.LogSecurityEvent(
                     SecurityAuditLogger.SecurityEventType.LoginBlocked,
                     $"ブロック中のアカウントでのログイン試行: {sanitizedEmail}",
@@ -304,8 +304,8 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                 {
                     var stats = _attemptTracker.GetStats();
                     var lockoutTime = _attemptTracker.GetRemainingLockoutTime(sanitizedEmail);
-                    
-                    _auditLogger.LogAccountLockout(sanitizedEmail, 
+
+                    _auditLogger.LogAccountLockout(sanitizedEmail,
                         5, // MaxAttempts based on LoginAttemptTracker
                         lockoutTime ?? TimeSpan.FromMinutes(15));
                 }
@@ -373,15 +373,15 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
 
             // セキュリティチェック
             var sanitizedEmail = InputValidator.SanitizeInput(Email);
-            
+
             // パスワードリセットメール送信
             var success = await _authService.SendPasswordResetEmailAsync(sanitizedEmail).ConfigureAwait(false);
-            
+
             if (success)
             {
                 // 成功メッセージを表示（ErrorMessageフィールドを情報表示にも使用）
                 ErrorMessage = "パスワードリセットメールを送信しました。メールをご確認ください。";
-                
+
                 // セキュリティ監査ログ
                 _auditLogger.LogSecurityEvent(
                     SecurityAuditLogger.SecurityEventType.PasswordChange,
@@ -391,7 +391,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             else
             {
                 ErrorMessage = "パスワードリセットに失敗しました。メールアドレスを確認してください。";
-                
+
                 // 失敗ログ
                 _auditLogger.LogSecurityEvent(
                     SecurityAuditLogger.SecurityEventType.PasswordChange,
@@ -404,7 +404,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             var sanitizedEmail = InputValidator.SanitizeInput(Email);
             _logger?.LogError(ex, "パスワードリセット実行エラー: {Email}", sanitizedEmail);
             ErrorMessage = "パスワードリセットの処理中にエラーが発生しました。";
-            
+
             // エラーログ
             _auditLogger.LogSecurityEvent(
                 SecurityAuditLogger.SecurityEventType.PasswordChange,

@@ -30,7 +30,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
     {
         // Arrange
         var services = new ServiceCollection();
-        
+
         // ログ設定
         services.AddLogging(builder =>
         {
@@ -55,7 +55,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
 
         // テストイベントの作成
         var testEvent = new TranslationModeChangedEvent(
-            TranslationMode.Automatic, 
+            TranslationMode.Automatic,
             TranslationMode.Manual);
 
         // Act
@@ -65,7 +65,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
         // 処理が完了するまで少し待機
         // xUnit1030: テストメソッドではConfigureAwaitを省略します
         await Task.Delay(100);
-        
+
         // 例外が発生しないことで成功とする
         // より詳細なテストは実際のプロセッサー実装に依存する
         Assert.True(true, "イベントが正常に処理されました");
@@ -82,7 +82,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
     {
         // Arrange
         var services = new ServiceCollection();
-        
+
         services.AddLogging(builder =>
         {
             builder.AddXUnit(output);
@@ -98,7 +98,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
         using var scope = serviceProvider.CreateScope();
         var eventAggregator = scope.ServiceProvider.GetRequiredService<IEventAggregator>();
         var processor1 = scope.ServiceProvider.GetRequiredService<TranslationModeChangedEventProcessor>();
-        
+
         // 2つ目のプロセッサーを別途作成
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<TranslationModeChangedEventProcessor>>();
         var processor2 = new TranslationModeChangedEventProcessor(logger);
@@ -108,7 +108,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
         eventAggregator.Subscribe<TranslationModeChangedEvent>(processor2);
 
         var testEvent = new TranslationModeChangedEvent(
-            TranslationMode.Manual, 
+            TranslationMode.Manual,
             TranslationMode.Automatic);
 
         // Act
@@ -130,7 +130,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
     {
         // Arrange
         var services = new ServiceCollection();
-        
+
         services.AddLogging(builder =>
         {
             builder.AddXUnit(output);
@@ -151,7 +151,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
         eventAggregator.Subscribe<TranslationModeChangedEvent>(processor);
 
         var testEvent1 = new TranslationModeChangedEvent(
-            TranslationMode.Automatic, 
+            TranslationMode.Automatic,
             TranslationMode.Manual);
 
         // 最初のイベント発行（登録済み）
@@ -161,7 +161,7 @@ public class EventIntegrationTests(ITestOutputHelper output)
         eventAggregator.Unsubscribe<TranslationModeChangedEvent>(processor);
 
         var testEvent2 = new TranslationModeChangedEvent(
-            TranslationMode.Manual, 
+            TranslationMode.Manual,
             TranslationMode.Automatic);
 
         // Act & Assert
@@ -206,7 +206,7 @@ public sealed class XUnitLoggerProvider(ITestOutputHelper output) : ILoggerProvi
             throw new ObjectDisposedException(nameof(XUnitLoggerProvider));
         }
 #pragma warning restore CA1513
-        
+
         return new XUnitLogger(_output, categoryName);
     }
 
@@ -216,7 +216,7 @@ public sealed class XUnitLoggerProvider(ITestOutputHelper output) : ILoggerProvi
         // CA1816: GC.SuppressFinalizeを呼び出します
         GC.SuppressFinalize(this);
     }
-    
+
     private void Dispose(bool disposing)
     {
         if (!_disposed && disposing)
@@ -249,7 +249,7 @@ public sealed class XUnitLogger(ITestOutputHelper output, string categoryName) :
     {
         // CA1062: 引数のnullチェックを実施
         ArgumentNullException.ThrowIfNull(formatter);
-        
+
         // テスト出力のエラーをログ処理の障害にしないため、一般的な例外をキャッチします
         // CA1031: テスト出力エラーはログ処理を阻害しないように適切に処理されます
 #pragma warning disable CA1031

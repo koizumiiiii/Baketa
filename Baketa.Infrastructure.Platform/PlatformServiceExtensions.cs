@@ -6,43 +6,43 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.Platform;
 
-    public static class PlatformServiceExtensions
+public static class PlatformServiceExtensions
+{
+    /// <summary>
+    /// プラットフォームサービスの登録
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    public static IServiceCollection AddPlatformServices(this IServiceCollection services)
     {
-        /// <summary>
-        /// プラットフォームサービスの登録
-        /// </summary>
-        [SupportedOSPlatform("windows")]
-        public static IServiceCollection AddPlatformServices(this IServiceCollection services)
-        {
-            // Windows専用アプリケーションのため、直接Windows実装を登録
-            // 実際のクラスが実装されたら、コメントアウトを外してください
-            /*
-            services.AddSingleton<IWindowManager, WindowsManager>();
-            services.AddSingleton<IScreenCapturer, WindowsCapturer>();
-            services.AddSingleton<IKeyboardHook, WindowsKeyboardHook>();
-            
-            // イメージファクトリ登録
-            services.AddSingleton<IWindowsImageFactory, WindowsImageFactory>();
-            
-            // アダプター登録
-            services.AddSingleton<IImageFactory, WindowsImageAdapterFactory>();
-            */
-            
-            return services;
-        }
+        // Windows専用アプリケーションのため、直接Windows実装を登録
+        // 実際のクラスが実装されたら、コメントアウトを外してください
+        /*
+        services.AddSingleton<IWindowManager, WindowsManager>();
+        services.AddSingleton<IScreenCapturer, WindowsCapturer>();
+        services.AddSingleton<IKeyboardHook, WindowsKeyboardHook>();
 
-        /// <summary>
-        /// Windows特有のプラットフォームサービスの登録
-        /// </summary>
-        [SupportedOSPlatform("windows")]
-        public static IServiceCollection AddWindowsPlatformServices(this IServiceCollection services)
-        {
-            // Windowsサービス実装の登録
-            services.AddSingleton<Core.Abstractions.Factories.IWindowsImageFactory, Windows.WindowsImageFactory>();
-            // AdaptiveCaptureModuleでWindowsGraphicsCapturerが登録されるため、重複登録を回避
-            // services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowsCapturer, Windows.GdiWindowsCapturer>();
-            services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowManager, Windows.WindowsManagerStub>();
+        // イメージファクトリ登録
+        services.AddSingleton<IWindowsImageFactory, WindowsImageFactory>();
 
-            return services;
-        }
+        // アダプター登録
+        services.AddSingleton<IImageFactory, WindowsImageAdapterFactory>();
+        */
+
+        return services;
     }
+
+    /// <summary>
+    /// Windows特有のプラットフォームサービスの登録
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    public static IServiceCollection AddWindowsPlatformServices(this IServiceCollection services)
+    {
+        // Windowsサービス実装の登録
+        services.AddSingleton<Core.Abstractions.Factories.IWindowsImageFactory, Windows.WindowsImageFactory>();
+        // AdaptiveCaptureModuleでWindowsGraphicsCapturerが登録されるため、重複登録を回避
+        // services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowsCapturer, Windows.GdiWindowsCapturer>();
+        services.AddSingleton<Core.Abstractions.Platform.Windows.IWindowManager, Windows.WindowsManager>();
+
+        return services;
+    }
+}

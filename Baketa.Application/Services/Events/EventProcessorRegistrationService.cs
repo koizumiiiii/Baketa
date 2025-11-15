@@ -1,10 +1,10 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using Baketa.Core.Abstractions.Events;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Application.Services.Events;
 
@@ -102,11 +102,11 @@ public sealed class EventProcessorRegistrationService(
         // IDE0305: C#12 コレクション式を使用して簡潔に表現
         return [
             .. applicationAssembly.GetTypes()
-                .Where(type => 
-                    type.IsClass && 
-                    !type.IsAbstract && 
+                .Where(type =>
+                    type.IsClass &&
+                    !type.IsAbstract &&
                     type.GetInterfaces()
-                        .Any(i => i.IsGenericType && 
+                        .Any(i => i.IsGenericType &&
                                  i.GetGenericTypeDefinition() == typeof(IEventProcessor<>)))
         ];
     }
@@ -127,7 +127,7 @@ public sealed class EventProcessorRegistrationService(
 
         // IEventProcessor<TEvent>インターフェースを取得
         var eventProcessorInterface = processorType.GetInterfaces()
-            .FirstOrDefault(i => i.IsGenericType && 
+            .FirstOrDefault(i => i.IsGenericType &&
                                i.GetGenericTypeDefinition() == typeof(IEventProcessor<>));
 
         if (eventProcessorInterface == null)

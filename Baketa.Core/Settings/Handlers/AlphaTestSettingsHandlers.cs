@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Settings;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Settings.Handlers;
 
@@ -55,9 +55,9 @@ public abstract class AlphaTestSettingsHandlerBase(ILogger logger) : ISettingsHa
         {
             var result = await action().ConfigureAwait(false);
             stopwatch.Stop();
-            
+
             Logger.LogDebug("{HandlerName}による{Category}設定適用完了: {ElapsedMs}ms", Name, category, stopwatch.ElapsedMilliseconds);
-            
+
             return new SettingsApplicationResult(
                 result.IsSuccess,
                 result.ErrorMessage,
@@ -71,7 +71,7 @@ public abstract class AlphaTestSettingsHandlerBase(ILogger logger) : ISettingsHa
         {
             stopwatch.Stop();
             Logger.LogError(ex, "{HandlerName}による{Category}設定適用中にエラーが発生: {ElapsedMs}ms", Name, category, stopwatch.ElapsedMilliseconds);
-            
+
             return new SettingsApplicationResult(
                 false,
                 $"設定適用中にエラーが発生しました: {ex.Message}",
@@ -100,14 +100,14 @@ public sealed class AlphaTestTranslationSettingsHandler(ILogger<AlphaTestTransla
             // エンジン変更の検出
             if (oldSettings.Translation.DefaultEngine != newSettings.Translation.DefaultEngine)
             {
-                Logger.LogInformation("翻訳エンジンを変更: {OldEngine} → {NewEngine}", 
+                Logger.LogInformation("翻訳エンジンを変更: {OldEngine} → {NewEngine}",
                     oldSettings.Translation.DefaultEngine, newSettings.Translation.DefaultEngine);
-                
-                // αテストではOPUS-MTのみなので実際のエンジン切り替えは不要
+
+                // αテストではNLLB-200のみなので実際のエンジン切り替えは不要
                 // ただし設定変更を記録
                 await Task.Delay(50).ConfigureAwait(false); // 設定適用のシミュレート
-                
-                return SettingsApplicationResult.Success("Translation", 
+
+                return SettingsApplicationResult.Success("Translation",
                     "翻訳エンジン設定を適用しました", requiresRestart: false);
             }
 
@@ -115,14 +115,14 @@ public sealed class AlphaTestTranslationSettingsHandler(ILogger<AlphaTestTransla
             if (oldSettings.Translation.DefaultSourceLanguage != newSettings.Translation.DefaultSourceLanguage ||
                 oldSettings.Translation.DefaultTargetLanguage != newSettings.Translation.DefaultTargetLanguage)
             {
-                Logger.LogInformation("言語ペアを変更: {OldPair} → {NewPair}", 
+                Logger.LogInformation("言語ペアを変更: {OldPair} → {NewPair}",
                     $"{oldSettings.Translation.DefaultSourceLanguage}→{oldSettings.Translation.DefaultTargetLanguage}",
                     $"{newSettings.Translation.DefaultSourceLanguage}→{newSettings.Translation.DefaultTargetLanguage}");
-                
+
                 // 言語モデルの準備（シミュレート）
                 await Task.Delay(100).ConfigureAwait(false);
-                
-                return SettingsApplicationResult.Success("Translation", 
+
+                return SettingsApplicationResult.Success("Translation",
                     "言語ペア設定を適用しました");
             }
 
@@ -135,10 +135,10 @@ public sealed class AlphaTestTranslationSettingsHandler(ILogger<AlphaTestTransla
         return ExecuteWithTimingAsync(async () =>
         {
             Logger.LogInformation("翻訳設定をロールバック中");
-            
+
             // ロールバック処理（シミュレート）
             await Task.Delay(30).ConfigureAwait(false);
-            
+
             return SettingsApplicationResult.Success("Translation", "翻訳設定をロールバックしました");
         }, "Translation");
     }
@@ -165,9 +165,9 @@ public sealed class AlphaTestUISettingsHandler(ILogger<AlphaTestUISettingsHandle
             // パネルサイズ変更の検出（フォントサイズの代わり）
             if (oldSettings.MainUi.PanelSize != newSettings.MainUi.PanelSize)
             {
-                Logger.LogInformation("パネルサイズを変更: {OldSize} → {NewSize}", 
+                Logger.LogInformation("パネルサイズを変更: {OldSize} → {NewSize}",
                     oldSettings.MainUi.PanelSize, newSettings.MainUi.PanelSize);
-                
+
                 // パネルサイズ適用（シミュレート）
                 await Task.Delay(20).ConfigureAwait(false);
                 changed = true;
@@ -176,9 +176,9 @@ public sealed class AlphaTestUISettingsHandler(ILogger<AlphaTestUISettingsHandle
             // 透明度変更（MainUiのPanelOpacityを使用）
             if (Math.Abs(oldSettings.MainUi.PanelOpacity - newSettings.MainUi.PanelOpacity) > 0.01)
             {
-                Logger.LogInformation("パネル透明度を変更: {OldOpacity:F1}% → {NewOpacity:F1}%", 
+                Logger.LogInformation("パネル透明度を変更: {OldOpacity:F1}% → {NewOpacity:F1}%",
                     oldSettings.MainUi.PanelOpacity * 100, newSettings.MainUi.PanelOpacity * 100);
-                
+
                 // 透明度適用（シミュレート）
                 await Task.Delay(10).ConfigureAwait(false);
                 changed = true;
@@ -205,10 +205,10 @@ public sealed class AlphaTestUISettingsHandler(ILogger<AlphaTestUISettingsHandle
         return ExecuteWithTimingAsync(async () =>
         {
             Logger.LogInformation("UI設定をロールバック中");
-            
+
             // ロールバック処理（シミュレート）
             await Task.Delay(15).ConfigureAwait(false);
-            
+
             return SettingsApplicationResult.Success(changedCategory ?? "UI", "UI設定をロールバックしました");
         }, changedCategory ?? "UI");
     }
@@ -232,22 +232,22 @@ public sealed class AlphaTestCaptureSettingsHandler(ILogger<AlphaTestCaptureSett
             // キャプチャ間隔変更
             if (oldSettings.Capture.CaptureIntervalMs != newSettings.Capture.CaptureIntervalMs)
             {
-                Logger.LogInformation("キャプチャ間隔を変更: {OldInterval}ms → {NewInterval}ms", 
+                Logger.LogInformation("キャプチャ間隔を変更: {OldInterval}ms → {NewInterval}ms",
                     oldSettings.Capture.CaptureIntervalMs, newSettings.Capture.CaptureIntervalMs);
-                
+
                 // キャプチャサービスの再設定（シミュレート）
                 await Task.Delay(50).ConfigureAwait(false);
-                
-                var warning = newSettings.Capture.CaptureIntervalMs < 500 
-                    ? "短いキャプチャ間隔はシステム負荷を高める可能性があります" 
+
+                var warning = newSettings.Capture.CaptureIntervalMs < 500
+                    ? "短いキャプチャ間隔はシステム負荷を高める可能性があります"
                     : null;
-                
+
                 return SettingsApplicationResult.Success("Capture", warning);
             }
 
             // OCR設定変更の検出（将来の拡張用）
             // 現在はシンプルな処理のみ
-            
+
             return SettingsApplicationResult.Success(changedCategory ?? "Capture");
         }, changedCategory ?? "Capture");
     }
@@ -257,10 +257,10 @@ public sealed class AlphaTestCaptureSettingsHandler(ILogger<AlphaTestCaptureSett
         return ExecuteWithTimingAsync(async () =>
         {
             Logger.LogInformation("キャプチャ設定をロールバック中");
-            
+
             // ロールバック処理（シミュレート）
             await Task.Delay(25).ConfigureAwait(false);
-            
+
             return SettingsApplicationResult.Success(changedCategory ?? "Capture", "キャプチャ設定をロールバックしました");
         }, changedCategory ?? "Capture");
     }

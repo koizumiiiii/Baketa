@@ -1,5 +1,19 @@
 ﻿#include "pch.h"
 
+// 🔍 Phase 0 WGC修復: Windows API関数の必要な宣言
+extern "C" {
+    // ウィンドウ状態確認用API
+    BOOL IsWindow(HWND hWnd);
+    BOOL IsWindowVisible(HWND hWnd);
+    BOOL IsIconic(HWND hWnd);
+    HWND GetForegroundWindow(VOID);
+    BOOL IsChild(HWND hWndParent, HWND hWnd);
+    BOOL GetWindowRect(HWND hWnd, LPRECT lpRect);
+    int GetClassNameA(HWND hWnd, LPSTR lpClassName, int nMaxCount);
+    int GetWindowTextA(HWND hWnd, LPSTR lpString, int nMaxCount);
+    VOID Sleep(DWORD dwMilliseconds); // リトライ遅延用
+}
+
 WindowsCaptureSession::WindowsCaptureSession(int sessionId, HWND hwnd)
     : m_sessionId(sessionId)
     , m_hwnd(hwnd)
@@ -8,6 +22,7 @@ WindowsCaptureSession::WindowsCaptureSession(int sessionId, HWND hwnd)
     , m_frameWidth(0)
     , m_frameHeight(0)
     , m_frameTimestamp(0)
+    , m_lastHResult(S_OK)
 {
 }
 
@@ -28,38 +43,45 @@ bool WindowsCaptureSession::Initialize()
 {
     try
     {
+        SetLastError("DEBUG: Initialize() started");
+        
         // Direct3D デバイスを作成
         if (!CreateD3DDevice())
         {
-            SetLastError("Failed to create D3D device");
+            SetLastError("DEBUG: CreateD3DDevice() failed - " + m_lastError);
             return false;
         }
+
+        SetLastError("DEBUG: CreateD3DDevice() succeeded");
 
         // GraphicsCaptureItem を作成
         if (!CreateCaptureItem())
         {
-            SetLastError("Failed to create capture item");
+            SetLastError("DEBUG: CreateCaptureItem() failed - " + m_lastError);
             return false;
         }
+
+        SetLastError("DEBUG: CreateCaptureItem() succeeded");
 
         // フレームプールを作成
         if (!CreateFramePool())
         {
-            SetLastError("Failed to create frame pool");
+            SetLastError("DEBUG: CreateFramePool() failed - " + m_lastError);
             return false;
         }
 
+        SetLastError("DEBUG: All initialization steps completed successfully");
         m_initialized = true;
         return true;
     }
     catch (const std::exception& e)
     {
-        SetLastError(std::string("Initialize failed: ") + e.what());
+        SetLastError(std::string("DEBUG: Initialize exception caught: ") + e.what());
         return false;
     }
     catch (...)
     {
-        SetLastError("Initialize failed: Unknown error");
+        SetLastError("DEBUG: Initialize unknown exception caught");
         return false;
     }
 }
@@ -78,7 +100,7 @@ bool WindowsCaptureSession::CreateD3DDevice()
 
         UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
-        creationFlags |= D3D11_CREATE_DEVICE_DEBUG;
+        // creationFlags |= D3D11_CREATE_DEVICE_DEBUG; // Graphics Tools未対応環境対策で一時的に無効化
 #endif
 
         HRESULT hr = D3D11CreateDevice(
@@ -96,7 +118,23 @@ bool WindowsCaptureSession::CreateD3DDevice()
 
         if (FAILED(hr))
         {
-            SetLastError("D3D11CreateDevice failed");
+            // HRESULTを保存
+            m_lastHResult = hr;
+            
+            // HRESULTの詳細な値を16進数でログ出力
+            char errorBuffer[256];
+            sprintf_s(errorBuffer, sizeof(errorBuffer), "D3D11CreateDevice failed with HRESULT: 0x%08X", hr);
+            
+            // 特定のエラーの詳細説明を追加
+            if (hr == DXGI_ERROR_SDK_COMPONENT_MISSING) {
+                strcat_s(errorBuffer, sizeof(errorBuffer), " (DXGI_ERROR_SDK_COMPONENT_MISSING - Graphics Tools required for Debug builds)");
+            } else if (hr == E_ACCESSDENIED) {
+                strcat_s(errorBuffer, sizeof(errorBuffer), " (E_ACCESSDENIED - Access denied)");
+            } else if (hr == DXGI_ERROR_UNSUPPORTED) {
+                strcat_s(errorBuffer, sizeof(errorBuffer), " (DXGI_ERROR_UNSUPPORTED - Feature not supported)");
+            }
+            
+            SetLastError(std::string(errorBuffer));
             return false;
         }
 
@@ -105,7 +143,10 @@ bool WindowsCaptureSession::CreateD3DDevice()
         hr = m_d3dDevice.As(&dxgiDevice);
         if (FAILED(hr))
         {
-            SetLastError("Failed to get DXGI device");
+            m_lastHResult = hr;
+            char errorBuffer[256];
+            sprintf_s(errorBuffer, sizeof(errorBuffer), "Failed to get DXGI device with HRESULT: 0x%08X", hr);
+            SetLastError(std::string(errorBuffer));
             return false;
         }
 
@@ -115,7 +156,10 @@ bool WindowsCaptureSession::CreateD3DDevice()
         hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.Get(), reinterpret_cast<IInspectable**>(winrt::put_abi(m_winrtDevice)));
         if (FAILED(hr))
         {
-            SetLastError("Failed to create WinRT Direct3D device");
+            m_lastHResult = hr;
+            char errorBuffer[256];
+            sprintf_s(errorBuffer, sizeof(errorBuffer), "Failed to create WinRT Direct3D device with HRESULT: 0x%08X", hr);
+            SetLastError(std::string(errorBuffer));
             return false;
         }
 
@@ -132,6 +176,13 @@ bool WindowsCaptureSession::CreateCaptureItem()
 {
     try
     {
+        // 🔍 Phase 0 WGC修復: ウィンドウフォーカス状態事前チェック
+        if (!ValidateWindowStateForCapture())
+        {
+            SetLastError("Window validation failed - invalid state for Graphics Capture");
+            return false;
+        }
+
         // C++/WinRT でのGraphicsCaptureItem作成（MarshalDirectiveException回避）
         auto interopFactory = winrt::get_activation_factory<winrt::GraphicsCaptureItem>();
         auto interop = interopFactory.as<::IGraphicsCaptureItemInterop>();
@@ -142,17 +193,59 @@ bool WindowsCaptureSession::CreateCaptureItem()
             return false;
         }
 
-        // GraphicsCaptureItemを作成
+        // 🔍 Phase 0 WGC修復: GraphicsCaptureItem作成前の最終確認
+        SetLastError("DEBUG: About to create GraphicsCaptureItem for validated window");
+
+        // 🔍 Phase 0 WGC修復: リトライメカニズム付きGraphicsCaptureItem作成
         winrt::com_ptr<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem> captureItem;
-        HRESULT hr = interop->CreateForWindow(
-            m_hwnd,
-            winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
-            captureItem.put_void()
-        );
+        HRESULT hr = E_FAIL;
+        const int maxRetries = 3;
+        const int delayMs = 100;
+
+        for (int attempt = 0; attempt < maxRetries; ++attempt)
+        {
+            hr = interop->CreateForWindow(
+                m_hwnd,
+                winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
+                captureItem.put_void()
+            );
+
+            if (SUCCEEDED(hr))
+            {
+                char successMsg[256];
+                sprintf_s(successMsg, sizeof(successMsg), 
+                    "CreateForWindow succeeded on attempt %d", attempt + 1);
+                SetLastError(std::string(successMsg));
+                break;
+            }
+            else
+            {
+                char retryMsg[512];
+                sprintf_s(retryMsg, sizeof(retryMsg),
+                    "CreateForWindow attempt %d failed with HRESULT: 0x%08X - %s", 
+                    attempt + 1, hr, (attempt + 1 < maxRetries) ? "retrying" : "giving up");
+                SetLastError(std::string(retryMsg));
+
+                // 最終試行でなければ少し待つ
+                if (attempt + 1 < maxRetries)
+                {
+                    Sleep(delayMs);
+                    // 次の試行のためにウィンドウ状態を再確認
+                    if (!ValidateWindowStateForCapture())
+                    {
+                        SetLastError("Window state changed during retry - aborting");
+                        return false;
+                    }
+                }
+            }
+        }
 
         if (FAILED(hr))
         {
-            SetLastError("CreateForWindow failed with HRESULT: 0x" + std::to_string(hr));
+            char finalError[256];
+            sprintf_s(finalError, sizeof(finalError),
+                "CreateForWindow failed after %d attempts, final HRESULT: 0x%08X", maxRetries, hr);
+            SetLastError(std::string(finalError));
             return false;
         }
 
@@ -169,6 +262,7 @@ bool WindowsCaptureSession::CreateCaptureItem()
     }
     catch (const winrt::hresult_error& ex)
     {
+        m_lastHResult = ex.code();
         SetLastError("CreateCaptureItem winrt error: 0x" + std::to_string(ex.code()));
         return false;
     }
@@ -227,6 +321,7 @@ bool WindowsCaptureSession::CreateFramePool()
     }
     catch (const winrt::hresult_error& ex)
     {
+        m_lastHResult = ex.code();
         SetLastError("CreateFramePool winrt error: 0x" + std::to_string(ex.code()));
         return false;
     }
@@ -365,6 +460,22 @@ bool WindowsCaptureSession::ConvertTextureToBGRA(ID3D11Texture2D* texture, unsig
         D3D11_TEXTURE2D_DESC desc;
         texture->GetDesc(&desc);
 
+        // 🔍🔍🔍 デバッグ: テクスチャ詳細情報をログ出力
+        std::string windowInfo, screenRect;
+        GetWindowDebugInfo(windowInfo, screenRect);
+        
+        char debugBuffer[1024];
+        sprintf_s(debugBuffer, sizeof(debugBuffer),
+            "DEBUG: ConvertTextureToBGRA - %s | %s | Texture=%dx%d, Format=0x%08X, Usage=%d",
+            windowInfo.c_str(),
+            screenRect.c_str(),
+            desc.Width,
+            desc.Height,
+            static_cast<UINT>(desc.Format),
+            static_cast<UINT>(desc.Usage)
+        );
+        SetLastError(std::string(debugBuffer));
+
         // ステージングテクスチャを作成（CPU読み取り可能）
         D3D11_TEXTURE2D_DESC stagingDesc = {};
         stagingDesc.Width = desc.Width;
@@ -397,30 +508,99 @@ bool WindowsCaptureSession::ConvertTextureToBGRA(ID3D11Texture2D* texture, unsig
             return false;
         }
 
-        // BGRAデータ用のメモリを確保
-        *stride = static_cast<int>(mappedResource.RowPitch);
-        size_t dataSize = desc.Height * (*stride);
-        *bgraData = new unsigned char[dataSize];
+        // 🚀 P2最適化: Row Stride計算とメモリアライメント改善
+        // 安全なRow Strideを計算（16バイトアライメント考慮）
+        UINT pixelRowBytes = desc.Width * 4; // BGRA = 4 bytes per pixel
+        UINT alignedStride = ((pixelRowBytes + 15) / 16) * 16; // 16バイトアライメント
+        
+        // GPU Row Pitchとの整合性チェック
+        UINT actualRowPitch = static_cast<UINT>(mappedResource.RowPitch);
+        UINT safeStride = (actualRowPitch >= alignedStride) ? actualRowPitch : alignedStride;
+        
+        *stride = static_cast<int>(safeStride);
+        size_t dataSize = desc.Height * safeStride;
+        
+        // 🚀 P2最適化: アライメント済みメモリ確保
+        *bgraData = static_cast<unsigned char*>(_aligned_malloc(dataSize, 16));
 
         if (!(*bgraData))
         {
             m_d3dContext->Unmap(stagingTexture.Get(), 0);
-            SetLastError("Failed to allocate BGRA data memory");
+            SetLastError("P2: Failed to allocate aligned BGRA data memory");
             return false;
         }
 
+        // 🔍🔍🔍 P2デバッグ: 最適化されたRow Stride情報
+        char strideBuffer[512];
+        sprintf_s(strideBuffer, sizeof(strideBuffer),
+            "P2_DEBUG: GPURowPitch=%d, PixelRowBytes=%d, AlignedStride=%d, SafeStride=%d, TotalSize=%zu, Aligned16=%s",
+            actualRowPitch,
+            pixelRowBytes, 
+            alignedStride,
+            safeStride,
+            dataSize,
+            ((reinterpret_cast<uintptr_t>(*bgraData) % 16) == 0) ? "YES" : "NO"
+        );
+        
         // ピクセルデータをコピー
         const unsigned char* srcData = static_cast<const unsigned char*>(mappedResource.pData);
         unsigned char* dstData = *bgraData;
+        
+        // 🔍🔍🔍 デバッグ: 最初の数ピクセルをサンプリング（コピー前）
+        std::string pixelSamples = "SrcPixels: ";
+        UINT maxPixels = (desc.Width < 5U) ? desc.Width : 5U;
+        for (UINT i = 0; i < maxPixels; ++i)
+        {
+            if (srcData && (i * 4 + 3) < static_cast<UINT>(mappedResource.RowPitch))
+            {
+                char pixelBuffer[32];
+                sprintf_s(pixelBuffer, sizeof(pixelBuffer), "[%02X,%02X,%02X,%02X] ",
+                    srcData[i * 4 + 0], // B
+                    srcData[i * 4 + 1], // G  
+                    srcData[i * 4 + 2], // R
+                    srcData[i * 4 + 3]  // A
+                );
+                pixelSamples += pixelBuffer;
+            }
+        }
 
+        // 🚀 P2最適化: 効率的な行ごとコピー（アライメント考慮）
         for (UINT y = 0; y < desc.Height; ++y)
         {
-            memcpy(
-                dstData + y * (*stride),
-                srcData + y * mappedResource.RowPitch,
-                desc.Width * 4 // BGRA = 4 bytes per pixel
-            );
+            // 16バイトアライメント済みメモリへの高速コピー
+            unsigned char* dstRowPtr = dstData + y * safeStride;
+            const unsigned char* srcRowPtr = srcData + y * actualRowPitch;
+            
+            // より安全なピクセルデータコピー（最小サイズを使用）
+            UINT bytesToCopy = (pixelRowBytes <= actualRowPitch) ? pixelRowBytes : actualRowPitch;
+            memcpy(dstRowPtr, srcRowPtr, bytesToCopy);
+            
+            // アライメントパディング領域をゼロクリア
+            if (safeStride > bytesToCopy) {
+                memset(dstRowPtr + bytesToCopy, 0, safeStride - bytesToCopy);
+            }
         }
+        
+        // 🔍🔍🔍 デバッグ: コピー後の最初の数ピクセルを確認
+        std::string copiedPixels = "DstPixels: ";
+        for (UINT i = 0; i < maxPixels; ++i)
+        {
+            if (dstData && (i * 4 + 3) < static_cast<UINT>(*stride))
+            {
+                char pixelBuffer[32];
+                sprintf_s(pixelBuffer, sizeof(pixelBuffer), "[%02X,%02X,%02X,%02X] ",
+                    dstData[i * 4 + 0], // B
+                    dstData[i * 4 + 1], // G
+                    dstData[i * 4 + 2], // R
+                    dstData[i * 4 + 3]  // A
+                );
+                copiedPixels += pixelBuffer;
+            }
+        }
+        
+        // 統合デバッグ情報を設定
+        std::string combinedDebug = std::string(strideBuffer) + " | " + pixelSamples + " | " + copiedPixels;
+        SetLastError(combinedDebug);
 
         // テクスチャのマップを解除
         m_d3dContext->Unmap(stagingTexture.Get(), 0);
@@ -442,4 +622,169 @@ bool WindowsCaptureSession::ConvertTextureToBGRA(ID3D11Texture2D* texture, unsig
 void WindowsCaptureSession::SetLastError(const std::string& message)
 {
     m_lastError = message;
+}
+
+/// <summary>
+/// 🔍 Phase 0 WGC修復: ウィンドウ状態をキャプチャ用に検証
+/// </summary>
+bool WindowsCaptureSession::ValidateWindowStateForCapture()
+{
+    if (!m_hwnd)
+    {
+        SetLastError("Invalid window handle for validation");
+        return false;
+    }
+
+    try
+    {
+        // 1. ウィンドウの存在確認
+        if (!IsWindow(m_hwnd))
+        {
+            SetLastError("Window no longer exists");
+            return false;
+        }
+
+        // 2. ウィンドウの可視性確認
+        if (!IsWindowVisible(m_hwnd))
+        {
+            SetLastError("Window is not visible - may cause white image capture");
+            return false;
+        }
+
+        // 3. ウィンドウの最小化状態確認
+        if (IsIconic(m_hwnd))
+        {
+            SetLastError("Window is minimized - Graphics Capture will return white image");
+            return false;
+        }
+
+        // 4. ウィンドウのサイズ確認
+        RECT windowRect;
+        if (!GetWindowRect(m_hwnd, &windowRect))
+        {
+            SetLastError("Failed to get window rectangle");
+            return false;
+        }
+
+        int width = windowRect.right - windowRect.left;
+        int height = windowRect.bottom - windowRect.top;
+        if (width <= 0 || height <= 0)
+        {
+            SetLastError("Invalid window dimensions - zero or negative size");
+            return false;
+        }
+
+        if (width > 7680 || height > 4320) // 8K解像度以上はメモリ不足の可能性
+        {
+            char sizeWarning[256];
+            sprintf_s(sizeWarning, sizeof(sizeWarning), 
+                "Extremely large window detected (%dx%d) - may cause memory issues", width, height);
+            SetLastError(std::string(sizeWarning));
+            // 警告だが継続
+        }
+
+        // 5. ウィンドウのフォーカス状態確認 (重要)
+        HWND foregroundWindow = GetForegroundWindow();
+        bool isInForeground = (m_hwnd == foregroundWindow) || IsChild(foregroundWindow, m_hwnd);
+        
+        if (!isInForeground)
+        {
+            // フォーカスがないと白画像の原因になる場合がある
+            char focusWarning[512];
+            sprintf_s(focusWarning, sizeof(focusWarning), 
+                "Target window (0x%p) is not in foreground (current: 0x%p) - may cause white image", 
+                m_hwnd, foregroundWindow);
+            SetLastError(std::string(focusWarning));
+            // 警告だが継続 (フォーカスなしでもキャプチャできる場合がある)
+        }
+
+        // 6. ウィンドウのクラス名取得 (デバッグ用)
+        char className[256] = {};
+        GetClassNameA(m_hwnd, className, sizeof(className));
+        
+        char windowTitle[256] = {};
+        GetWindowTextA(m_hwnd, windowTitle, sizeof(windowTitle));
+
+        // 7. 統合デバッグ情報
+        char validationResult[1024];
+        sprintf_s(validationResult, sizeof(validationResult),
+            "Window validation PASSED: Class='%s', Title='%s', Size=%dx%d, Visible=%s, Focus=%s",
+            className, windowTitle, width, height,
+            IsWindowVisible(m_hwnd) ? "YES" : "NO",
+            isInForeground ? "YES" : "NO"
+        );
+        SetLastError(std::string(validationResult));
+
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("Window validation exception: ") + ex.what());
+        return false;
+    }
+    catch (...)
+    {
+        SetLastError("Window validation unknown exception");
+        return false;
+    }
+}
+
+bool WindowsCaptureSession::GetWindowDebugInfo(std::string& windowInfo, std::string& screenRect) const
+{
+    if (!m_hwnd)
+    {
+        windowInfo = "Invalid HWND";
+        screenRect = "N/A";
+        return false;
+    }
+
+    try
+    {
+        // ウィンドウクラス名取得
+        char className[256] = {};
+        GetClassNameA(m_hwnd, className, sizeof(className));
+
+        // ウィンドウタイトル取得
+        char windowTitle[256] = {};
+        GetWindowTextA(m_hwnd, windowTitle, sizeof(windowTitle));
+
+        // スクリーン座標取得
+        RECT windowRect = {};
+        GetWindowRect(m_hwnd, &windowRect);
+
+        // クライアント領域サイズ取得
+        RECT clientRect = {};
+        GetClientRect(m_hwnd, &clientRect);
+
+        // ウィンドウ情報を構築
+        char infoBuffer[1024];
+        sprintf_s(infoBuffer, sizeof(infoBuffer),
+            "HWND=0x%p, Class='%s', Title='%s', ClientSize=%dx%d",
+            m_hwnd,
+            className,
+            windowTitle,
+            clientRect.right - clientRect.left,
+            clientRect.bottom - clientRect.top
+        );
+        windowInfo = std::string(infoBuffer);
+
+        // スクリーン座標情報を構築
+        char rectBuffer[256];
+        sprintf_s(rectBuffer, sizeof(rectBuffer),
+            "Screen=(%d,%d)-(%d,%d), Size=%dx%d",
+            windowRect.left, windowRect.top,
+            windowRect.right, windowRect.bottom,
+            windowRect.right - windowRect.left,
+            windowRect.bottom - windowRect.top
+        );
+        screenRect = std::string(rectBuffer);
+
+        return true;
+    }
+    catch (...)
+    {
+        windowInfo = "Exception during debug info retrieval";
+        screenRect = "N/A";
+        return false;
+    }
 }

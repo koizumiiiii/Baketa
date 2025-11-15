@@ -13,47 +13,47 @@ public class TranslationContext
     /// ゲームプロファイルID
     /// </summary>
     public string? GameProfileId { get; set; }
-    
+
     /// <summary>
     /// シーン識別子
     /// </summary>
     public string? SceneId { get; set; }
-    
+
     /// <summary>
     /// 会話ID
     /// </summary>
     public string? DialogueId { get; set; }
-    
+
     /// <summary>
     /// 画面領域
     /// </summary>
     public Rectangle? ScreenRegion { get; set; }
-    
+
     /// <summary>
     /// コンテキストタグ
     /// </summary>
     public readonly Collection<string> Tags = [];
-    
+
     /// <summary>
     /// コンテキスト優先度（0～100）
     /// </summary>
     public int Priority { get; set; } = 50;
-    
+
     /// <summary>
     /// 追加コンテキスト情報
     /// </summary>
     public readonly Dictionary<string, object?> AdditionalContext = [];
-    
+
     /// <summary>
     /// テキストのジャンル（小説、マニュアル、会話など）
     /// </summary>
     public string? Genre { get; set; }
-    
+
     /// <summary>
     /// テキストのドメイン（ゲーム、技術、医学など）
     /// </summary>
     public string? Domain { get; set; }
-    
+
     /// <summary>
     /// 文字列表現を取得します
     /// </summary>
@@ -62,7 +62,7 @@ public class TranslationContext
     {
         return $"Context[Game:{GameProfileId}, Scene:{SceneId}, Tags:{string.Join(",", Tags)}]";
     }
-    
+
     /// <summary>
     /// この翻訳コンテキストのコピーを作成します
     /// </summary>
@@ -79,19 +79,19 @@ public class TranslationContext
             Genre = this.Genre,
             Domain = this.Domain
         };
-        
+
         // コレクションの要素をコピー
         foreach (var tag in this.Tags)
         {
             clone.Tags.Add(tag);
         }
-        
+
         // 追加コンテキストをコピー
         foreach (var item in this.AdditionalContext)
         {
             clone.AdditionalContext[item.Key] = item.Value;
         }
-        
+
         return clone;
     }
 }
@@ -132,17 +132,17 @@ public struct Rectangle(int x, int y, int width, int height) : IEquatable<Rectan
     /// 左端のX座標
     /// </summary>
     public int Left => X;
-    
+
     /// <summary>
     /// 上端のY座標
     /// </summary>
     public int Top => Y;
-    
+
     /// <summary>
     /// 右端のX座標
     /// </summary>
     public int Right => X + Width;
-    
+
     /// <summary>
     /// 下端のY座標
     /// </summary>
@@ -156,7 +156,7 @@ public struct Rectangle(int x, int y, int width, int height) : IEquatable<Rectan
     {
         return $"({X},{Y},{Width},{Height})";
     }
-    
+
     /// <summary>
     /// 型安全な等価性比較を行います
     /// </summary>
@@ -164,9 +164,9 @@ public struct Rectangle(int x, int y, int width, int height) : IEquatable<Rectan
     /// <returns>等しい場合はtrue</returns>
     public bool Equals(Rectangle other)
     {
-        return X == other.X && 
-               Y == other.Y && 
-               Width == other.Width && 
+        return X == other.X &&
+               Y == other.Y &&
+               Width == other.Width &&
                Height == other.Height;
     }
 
@@ -179,7 +179,7 @@ public struct Rectangle(int x, int y, int width, int height) : IEquatable<Rectan
     {
         return obj is Rectangle other && Equals(other);
     }
-    
+
     /// <summary>
     /// ハッシュコードを取得します
     /// </summary>
@@ -188,7 +188,7 @@ public struct Rectangle(int x, int y, int width, int height) : IEquatable<Rectan
     {
         return HashCode.Combine(X, Y, Width, Height);
     }
-    
+
     /// <summary>
     /// 等価性比較演算子
     /// </summary>

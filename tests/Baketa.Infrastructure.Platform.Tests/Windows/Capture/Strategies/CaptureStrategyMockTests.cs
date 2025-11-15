@@ -1,15 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Linq;
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Models.Capture;
-using Baketa.Core.Abstractions.Platform.Windows;
+using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.GPU;
-using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Models.Capture;
 using Baketa.Infrastructure.Platform.Tests.Windows.GPU;
+using Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
+using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
 namespace Baketa.Infrastructure.Platform.Tests.Windows.Capture.Strategies;
 
@@ -20,12 +23,14 @@ public class CaptureStrategyMockTests
 {
     private readonly Mock<IWindowsCapturer> _mockCapturer;
     private readonly Mock<ILogger<DirectFullScreenCaptureStrategy>> _mockLogger;
+    private readonly Mock<IEventAggregator> _mockEventAggregator;
     private readonly CaptureOptions _defaultOptions;
 
     public CaptureStrategyMockTests()
     {
         _mockCapturer = new Mock<IWindowsCapturer>();
         _mockLogger = new Mock<ILogger<DirectFullScreenCaptureStrategy>>();
+        _mockEventAggregator = new Mock<IEventAggregator>();
         _defaultOptions = new CaptureOptions
         {
             AllowDirectFullScreen = true,
@@ -43,7 +48,7 @@ public class CaptureStrategyMockTests
     public void StrategySelection_BasedOnGPUEnvironment(GpuEnvironmentInfo gpuEnv, string expectedStrategy, string testDescription)
     {
         // Arrange
-        var directFullScreenStrategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object);
+        var directFullScreenStrategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object, _mockEventAggregator.Object);
         var windowHandle = new IntPtr(0x12345);
 
         // Act
@@ -68,7 +73,7 @@ public class CaptureStrategyMockTests
     public async Task DirectFullScreenStrategy_ExecuteCapture_SuccessfulCapture()
     {
         // Arrange
-        var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object);
+        var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object, _mockEventAggregator.Object);
         var mockImage = new Mock<IWindowsImage>();
         mockImage.Setup(x => x.Width).Returns(1920);
         mockImage.Setup(x => x.Height).Returns(1080);
@@ -97,8 +102,8 @@ public class CaptureStrategyMockTests
     public async Task DirectFullScreenStrategy_ExecuteCapture_CaptureFailure()
     {
         // Arrange
-        var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object);
-        
+        var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object, _mockEventAggregator.Object);
+
         _mockCapturer.Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>()))
             .ThrowsAsync(new InvalidOperationException("キャプチャに失敗しました"));
 
@@ -135,7 +140,7 @@ public class CaptureStrategyMockTests
     public void CaptureStrategy_Priority_IsCorrect()
     {
         // Arrange
-        var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object);
+        var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object, _mockEventAggregator.Object);
 
         // Act
         var actualPriority = strategy.Priority;
@@ -153,8 +158,8 @@ public class CaptureStrategyMockTests
         var integratedGPU = GPUEnvironmentMockTests.CreateMockIntegratedGpu();
         var dedicatedGPU = GPUEnvironmentMockTests.CreateMockDedicatedGPU();
         var lowEndGPU = GPUEnvironmentMockTests.CreateMockLowEndIntegratedGPU();
-        
-        var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object);
+
+        var strategy = new DirectFullScreenCaptureStrategy(_mockLogger.Object, _mockCapturer.Object, _mockEventAggregator.Object);
         var windowHandle = new IntPtr(0x12345);
 
         // Act & Assert

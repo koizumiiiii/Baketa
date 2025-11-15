@@ -14,37 +14,37 @@ public interface ITranslationEngineStatusService
     /// LocalOnlyエンジンの状態
     /// </summary>
     TranslationEngineStatus LocalEngineStatus { get; }
-    
+
     /// <summary>
     /// CloudOnlyエンジンの状態
     /// </summary>
     TranslationEngineStatus CloudEngineStatus { get; }
-    
+
     /// <summary>
     /// ネットワーク接続状態
     /// </summary>
     NetworkConnectionStatus NetworkStatus { get; }
-    
+
     /// <summary>
     /// 最後のフォールバック情報
     /// </summary>
     FallbackInfo? LastFallback { get; }
-    
+
     /// <summary>
     /// 状態更新イベント
     /// </summary>
     IObservable<TranslationEngineStatusUpdate> StatusUpdates { get; }
-    
+
     /// <summary>
     /// 状態監視を開始
     /// </summary>
     Task StartMonitoringAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 状態監視を停止
     /// </summary>
     Task StopMonitoringAsync();
-    
+
     /// <summary>
     /// 手動で状態を更新
     /// </summary>
@@ -62,7 +62,7 @@ public sealed class TranslationEngineStatus : ReactiveObject
     private TimeSpan _rateLimitReset;
     private string _lastError = string.Empty;
     private DateTime _lastChecked;
-    
+
     /// <summary>
     /// エンジンがオンラインかどうか
     /// </summary>
@@ -71,7 +71,7 @@ public sealed class TranslationEngineStatus : ReactiveObject
         get => _isOnline;
         set => this.RaiseAndSetIfChanged(ref _isOnline, value);
     }
-    
+
     /// <summary>
     /// エンジンが正常に動作しているかどうか
     /// </summary>
@@ -80,7 +80,7 @@ public sealed class TranslationEngineStatus : ReactiveObject
         get => _isHealthy;
         set => this.RaiseAndSetIfChanged(ref _isHealthy, value);
     }
-    
+
     /// <summary>
     /// 残りリクエスト数（CloudOnlyのみ）
     /// </summary>
@@ -89,7 +89,7 @@ public sealed class TranslationEngineStatus : ReactiveObject
         get => _remainingRequests;
         set => this.RaiseAndSetIfChanged(ref _remainingRequests, value);
     }
-    
+
     /// <summary>
     /// レート制限リセット時刻まで
     /// </summary>
@@ -98,7 +98,7 @@ public sealed class TranslationEngineStatus : ReactiveObject
         get => _rateLimitReset;
         set => this.RaiseAndSetIfChanged(ref _rateLimitReset, value);
     }
-    
+
     /// <summary>
     /// 最後のエラーメッセージ
     /// </summary>
@@ -107,7 +107,7 @@ public sealed class TranslationEngineStatus : ReactiveObject
         get => _lastError;
         set => this.RaiseAndSetIfChanged(ref _lastError, value);
     }
-    
+
     /// <summary>
     /// 最後にチェックした時刻
     /// </summary>
@@ -116,11 +116,11 @@ public sealed class TranslationEngineStatus : ReactiveObject
         get => _lastChecked;
         set => this.RaiseAndSetIfChanged(ref _lastChecked, value);
     }
-    
+
     /// <summary>
     /// 総合的な状態
     /// </summary>
-    public EngineHealthStatus OverallStatus => 
+    public EngineHealthStatus OverallStatus =>
         !IsOnline ? EngineHealthStatus.Offline :
         !IsHealthy ? EngineHealthStatus.Error :
         RemainingRequests <= 10 ? EngineHealthStatus.Warning :
@@ -135,7 +135,7 @@ public sealed class NetworkConnectionStatus : ReactiveObject
     private bool _isConnected;
     private int _latencyMs;
     private DateTime _lastChecked;
-    
+
     /// <summary>
     /// インターネットに接続されているかどうか
     /// </summary>
@@ -144,7 +144,7 @@ public sealed class NetworkConnectionStatus : ReactiveObject
         get => _isConnected;
         set => this.RaiseAndSetIfChanged(ref _isConnected, value);
     }
-    
+
     /// <summary>
     /// ネットワークレイテンシ（ミリ秒）
     /// </summary>
@@ -153,7 +153,7 @@ public sealed class NetworkConnectionStatus : ReactiveObject
         get => _latencyMs;
         set => this.RaiseAndSetIfChanged(ref _latencyMs, value);
     }
-    
+
     /// <summary>
     /// 最後にチェックした時刻
     /// </summary>
@@ -173,22 +173,22 @@ public sealed class FallbackInfo
     /// フォールバック発生時刻
     /// </summary>
     public DateTime OccurredAt { get; init; }
-    
+
     /// <summary>
     /// フォールバック理由
     /// </summary>
     public string Reason { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// 元のエンジン
     /// </summary>
     public string FromEngine { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// フォールバック先エンジン
     /// </summary>
     public string ToEngine { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// フォールバック種別
     /// </summary>
@@ -204,17 +204,17 @@ public sealed class TranslationEngineStatusUpdate
     /// 更新されたエンジン名
     /// </summary>
     public string EngineName { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// 更新時刻
     /// </summary>
     public DateTime UpdatedAt { get; init; }
-    
+
     /// <summary>
     /// 更新種別
     /// </summary>
     public StatusUpdateType UpdateType { get; init; }
-    
+
     /// <summary>
     /// 追加情報
     /// </summary>

@@ -1,11 +1,12 @@
-using OpenCvSharp;
-using Baketa.Core.Utilities;
-using Baketa.Infrastructure.OCR.Preprocessing;
-using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Imaging;
-using System.Text.Json;
 using System.IO;
+using System.Text.Json;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
+using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Utilities;
+using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
+using Baketa.Infrastructure.OCR.Preprocessing;
+using OpenCvSharp;
 
 namespace Baketa.Infrastructure.OCR.Optimization;
 
@@ -23,15 +24,15 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
     /// </summary>
     public async Task<OptimalParameters> FindOptimalParametersAsync(CancellationToken cancellationToken = default)
     {
-        DebugLogUtility.WriteLog("🔍 パラメータ最適化開始");
+        Console.WriteLine("🔍 パラメータ最適化開始");
 
         // 1. 正解データセットを読み込み
         var dataset = await LoadGroundTruthDatasetAsync().ConfigureAwait(false);
-        DebugLogUtility.WriteLog($"📚 正解データセット読み込み完了: {dataset.Count}件");
+        Console.WriteLine($"📚 正解データセット読み込み完了: {dataset.Count}件");
 
         // 2. グリッドサーチ用パラメータ範囲を定義
         var parameterGrid = GenerateParameterGrid();
-        DebugLogUtility.WriteLog($"🎯 テスト対象パラメータ組み合わせ: {parameterGrid.Count}通り");
+        Console.WriteLine($"🎯 テスト対象パラメータ組み合わせ: {parameterGrid.Count}通り");
 
         var results = new List<OptimizationResult>();
 
@@ -40,25 +41,25 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
         foreach (var config in parameterGrid)
         {
             tested++;
-            DebugLogUtility.WriteLog($"⚙️ パラメータテスト {tested}/{parameterGrid.Count}: {config}");
+            Console.WriteLine($"⚙️ パラメータテスト {tested}/{parameterGrid.Count}: {config}");
 
             try
             {
                 var accuracy = await EvaluateParameterConfigurationAsync(dataset, config, cancellationToken).ConfigureAwait(false);
                 results.Add(new OptimizationResult(config, accuracy));
 
-                DebugLogUtility.WriteLog($"✅ 精度測定完了: {accuracy:F3}");
+                Console.WriteLine($"✅ 精度測定完了: {accuracy:F3}");
             }
             catch (Exception ex)
             {
-                DebugLogUtility.WriteLog($"❌ パラメータテストエラー: {ex.Message}");
+                Console.WriteLine($"❌ パラメータテストエラー: {ex.Message}");
             }
         }
 
         // 4. 最高精度の設定を選択
         var bestResult = results.OrderByDescending(r => r.Accuracy).First();
-        DebugLogUtility.WriteLog($"🏆 最適パラメータ発見: 精度 {bestResult.Accuracy:F3}");
-        DebugLogUtility.WriteLog($"🏆 最適設定: {bestResult.Configuration}");
+        Console.WriteLine($"🏆 最適パラメータ発見: 精度 {bestResult.Accuracy:F3}");
+        Console.WriteLine($"🏆 最適設定: {bestResult.Configuration}");
 
         // 5. 結果レポートを生成
         await GenerateOptimizationReportAsync(results, bestResult).ConfigureAwait(false);
@@ -112,18 +113,18 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
         var gaussianSigmas = new[] { 0.3, 0.5, 0.7, 1.0 };
 
         foreach (var clipLimit in clipLimits)
-        foreach (var blockSize in blockSizes)
-        foreach (var sigmaColor in sigmaColors)
-        foreach (var gaussianSigma in gaussianSigmas)
-        {
-            configurations.Add(new PreprocessingConfiguration
-            {
-                CLAHEClipLimit = clipLimit,
-                AdaptiveThresholdBlockSize = blockSize,
-                BilateralSigmaColor = sigmaColor,
-                GaussianBlurSigma = gaussianSigma
-            });
-        }
+            foreach (var blockSize in blockSizes)
+                foreach (var sigmaColor in sigmaColors)
+                    foreach (var gaussianSigma in gaussianSigmas)
+                    {
+                        configurations.Add(new PreprocessingConfiguration
+                        {
+                            CLAHEClipLimit = clipLimit,
+                            AdaptiveThresholdBlockSize = blockSize,
+                            BilateralSigmaColor = sigmaColor,
+                            GaussianBlurSigma = gaussianSigma
+                        });
+                    }
 
         return configurations;
     }
@@ -149,7 +150,7 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
 
                 if (image.Empty())
                 {
-                    DebugLogUtility.WriteLog($"⚠️ 画像読み込み失敗: {imagePath}");
+                    Console.WriteLine($"⚠️ 画像読み込み失敗: {imagePath}");
                     continue;
                 }
 
@@ -165,11 +166,11 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
                 totalAccuracy += accuracy;
                 validTests++;
 
-                DebugLogUtility.WriteLog($"   📊 {entry.ImagePath}: 精度 {accuracy:F3} (認識: '{recognizedText}' / 正解: '{entry.GroundTruthText}')");
+                Console.WriteLine($"   📊 {entry.ImagePath}: 精度 {accuracy:F3} (認識: '{recognizedText}' / 正解: '{entry.GroundTruthText}')");
             }
             catch (Exception ex)
             {
-                DebugLogUtility.WriteLog($"❌ テスト実行エラー {entry.ImagePath}: {ex.Message}");
+                Console.WriteLine($"❌ テスト実行エラー {entry.ImagePath}: {ex.Message}");
             }
         }
 
@@ -187,10 +188,10 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
         {
             // Matを一時的に画像ファイルとして保存
             Cv2.ImWrite(tempImagePath, image);
-            
+
             // 暫定的な画像ラッパー実装
             var imageWrapper = new TempImageWrapper(tempImagePath, image.Width, image.Height);
-            
+
             var ocrResults = await _ocrEngine.RecognizeAsync(imageWrapper, cancellationToken: cancellationToken).ConfigureAwait(false);
             return ocrResults.TextRegions;
         }
@@ -381,7 +382,7 @@ public class PreprocessingParameterOptimizer(IOcrEngine ocrEngine, string ground
 ";
 
         await File.WriteAllTextAsync(reportPath, report).ConfigureAwait(false);
-        DebugLogUtility.WriteLog($"📊 最適化レポート生成完了: {reportPath}");
+        Console.WriteLine($"📊 最適化レポート生成完了: {reportPath}");
     }
 
     private double CalculateStandardDeviation(IEnumerable<double> values)
@@ -440,6 +441,25 @@ internal sealed class TempImageWrapper(string filePath, int width, int height) :
     public int Height { get; } = height;
     public bool IsDisposed => false;
     public ImageFormat Format => ImageFormat.Png;
+
+    /// <summary>
+    /// PixelFormat property for IImage extension
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+    /// <summary>
+    /// GetImageMemory method for IImage extension
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        var bytes = File.ReadAllBytes(FilePath);
+        return new ReadOnlyMemory<byte>(bytes);
+    }
+
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (TempImageWrapper is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("TempImageWrapper does not support LockPixelData");
 
     public IImage Clone()
     {

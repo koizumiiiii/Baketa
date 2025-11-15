@@ -1,7 +1,7 @@
-using Avalonia.Data.Converters;
-using Avalonia.Media;
 using System;
 using System.Globalization;
+using Avalonia.Data.Converters;
+using Avalonia.Media;
 using Baketa.Core.Settings;
 
 namespace Baketa.UI.Converters;

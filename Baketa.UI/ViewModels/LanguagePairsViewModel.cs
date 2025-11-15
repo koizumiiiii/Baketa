@@ -31,7 +31,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
 
     // 選択された言語ペア
     private LanguagePairConfiguration? _selectedLanguagePair;
-    
+
     /// <summary>
     /// サポートされる言語のリストを取得
     /// </summary>
@@ -39,12 +39,12 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
     {
         return [.. Baketa.UI.Models.AvailableLanguages.SupportedLanguages];
     }
-    
+
     /// <summary>
     /// 言語ペア設定のコレクション
     /// </summary>
     public ObservableCollection<LanguagePairConfiguration> LanguagePairs { get; }
-    
+
     /// <summary>
     /// 選択された言語ペア
     /// </summary>
@@ -53,27 +53,27 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
         get => _selectedLanguagePair;
         set => ReactiveUI.IReactiveObjectExtensions.RaiseAndSetIfChanged(this, ref _selectedLanguagePair, value);
     }
-    
+
     /// <summary>
     /// 利用可能な言語のリスト
     /// </summary>
     public ObservableCollection<LanguageInfo> AvailableLanguages { get; }
-    
+
     /// <summary>
     /// 利用可能なエンジンのリスト
     /// </summary>
     public ObservableCollection<string> AvailableEngines { get; }
-    
+
     /// <summary>
     /// 利用可能な翻訳戦略のリスト
     /// </summary>
     public ObservableCollection<TranslationStrategy> AvailableStrategies { get; }
-    
+
     /// <summary>
     /// 利用可能な中国語変種のリスト
     /// </summary>
     public ObservableCollection<ChineseVariant> AvailableChineseVariants { get; }
-    
+
     // コマンド
     public ReactiveCommand<Unit, Unit> AddLanguagePairCommand { get; }
     public ReactiveCommand<LanguagePairConfiguration, Unit> RemoveLanguagePairCommand { get; }
@@ -81,7 +81,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
     public ReactiveCommand<Unit, Unit> ResetToDefaultsCommand { get; }
     public ReactiveCommand<Unit, Unit> SaveLanguagePairsCommand { get; }
     public ReactiveCommand<Unit, Unit> LoadPresetCommand { get; }
-    
+
     /// <summary>
     /// 新しいLanguagePairsViewModelを初期化します
     /// </summary>
@@ -94,7 +94,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
         LanguagePairs = [];
         AvailableLanguages = new(GetSupportedLanguages());
         AvailableEngines = new(["LocalOnly", "CloudOnly"]);
-        AvailableStrategies = 
+        AvailableStrategies =
         [
             TranslationStrategy.Direct,
             TranslationStrategy.TwoStage
@@ -106,7 +106,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             ChineseVariant.Traditional,
             ChineseVariant.Cantonese
         ];
-        
+
         // コマンドの初期化
         AddLanguagePairCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteAddLanguagePairAsync);
         RemoveLanguagePairCommand = ReactiveCommand.Create<LanguagePairConfiguration>(ExecuteRemoveLanguagePair);
@@ -114,11 +114,11 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
         ResetToDefaultsCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteResetToDefaultsAsync);
         SaveLanguagePairsCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteSaveLanguagePairsAsync);
         LoadPresetCommand = Baketa.UI.Framework.CommandHelper.CreateCommand(ExecuteLoadPresetAsync);
-        
+
         // デフォルトの言語ペアを読み込み
         LoadDefaultLanguagePairs();
     }
-    
+
     /// <summary>
     /// アクティベーション時の処理
     /// </summary>
@@ -127,7 +127,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
         // 言語ペア設定を読み込む
         LoadLanguagePairSettings();
     }
-    
+
     /// <summary>
     /// デフォルトの言語ペアを読み込み
     /// </summary>
@@ -146,12 +146,12 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
                 CreateLanguagePair("zh-Hans", "ja", "簡体字中国語", "日本語", TranslationStrategy.Direct, 55, 2, "簡体字中国語から日本語への直接翻訳"),
                 CreateLanguagePair("ja", "zh-Hans", "日本語", "簡体字中国語", TranslationStrategy.TwoStage, 120, 3, "日本語から簡体字中国語への2段階翻訳")
             };
-            
+
             foreach (var pair in defaultPairs)
             {
                 LanguagePairs.Add(pair);
             }
-            
+
             Logger?.LogInformation("デフォルトの言語ペア {Count} 個を読み込みました", defaultPairs.Length);
         }
         catch (ArgumentException ex)
@@ -167,17 +167,17 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             Logger?.LogError(ex, "メモリ不足により言語ペアの読み込みに失敗しました");
         }
     }
-    
+
     /// <summary>
     /// 言語ペアを作成
     /// </summary>
     private static LanguagePairConfiguration CreateLanguagePair(
-        string sourceCode, 
-        string targetCode, 
-        string sourceDisplay, 
-        string targetDisplay, 
-        TranslationStrategy strategy, 
-        double latency, 
+        string sourceCode,
+        string targetCode,
+        string sourceDisplay,
+        string targetDisplay,
+        TranslationStrategy strategy,
+        double latency,
         int priority,
         string description)
     {
@@ -194,17 +194,17 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             IsEnabled = true,
             SelectedEngine = "LocalOnly" // デフォルトエンジン
         };
-        
+
         // 中国語関連の場合は中国語変種を設定
         if (pair.IsChineseRelated)
         {
-            pair.ChineseVariant = sourceCode.Contains("Hans", StringComparison.Ordinal) || targetCode.Contains("Hans", StringComparison.Ordinal) ? 
+            pair.ChineseVariant = sourceCode.Contains("Hans", StringComparison.Ordinal) || targetCode.Contains("Hans", StringComparison.Ordinal) ?
                 ChineseVariant.Simplified : ChineseVariant.Auto;
         }
-        
+
         return pair;
     }
-    
+
     /// <summary>
     /// 言語ペア設定を読み込み
     /// </summary>
@@ -213,7 +213,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
         // TODO: 永続化された設定を読み込む処理を実装する
         Logger?.LogDebug("言語ペア設定を読み込みました");
     }
-    
+
     /// <summary>
     /// 言語ペア追加コマンド実行
     /// </summary>
@@ -235,12 +235,12 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
                 IsEnabled = true,
                 SelectedEngine = "LocalOnly"
             };
-            
+
             LanguagePairs.Add(newPair);
             SelectedLanguagePair = newPair;
-            
+
             Logger?.LogDebug("新しい言語ペアを追加しました: {LanguagePair}", newPair.LanguagePairKey);
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (ArgumentException ex)
@@ -259,7 +259,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
-    
+
     /// <summary>
     /// 言語ペア削除コマンド実行
     /// </summary>
@@ -271,14 +271,14 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             {
                 return;
             }
-            
+
             LanguagePairs.Remove(languagePair);
-            
+
             if (SelectedLanguagePair == languagePair)
             {
                 SelectedLanguagePair = LanguagePairs.FirstOrDefault();
             }
-            
+
             Logger?.LogDebug("言語ペアを削除しました: {LanguagePair}", languagePair.LanguagePairKey);
         }
         catch (ArgumentNullException ex)
@@ -292,7 +292,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
-    
+
     /// <summary>
     /// 言語ペア編集コマンド実行
     /// </summary>
@@ -304,9 +304,9 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             {
                 return;
             }
-            
+
             SelectedLanguagePair = languagePair;
-            
+
             Logger?.LogDebug("言語ペアを編集モードにしました: {LanguagePair}", languagePair.LanguagePairKey);
         }
         catch (ArgumentNullException ex)
@@ -315,7 +315,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
-    
+
     /// <summary>
     /// デフォルトにリセットコマンド実行
     /// </summary>
@@ -326,9 +326,9 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             LanguagePairs.Clear();
             LoadDefaultLanguagePairs();
             SelectedLanguagePair = LanguagePairs.FirstOrDefault();
-            
+
             Logger?.LogInformation("言語ペア設定をデフォルトにリセットしました");
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
@@ -342,7 +342,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
-    
+
     /// <summary>
     /// 言語ペア保存コマンド実行
     /// </summary>
@@ -352,7 +352,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
         try
         {
             // TODO: 永続化処理を実装
-            
+
             // 言語ペア設定変更イベントを発行
             var languagePairEvent = new LanguagePairSettingsChangedEvent
             {
@@ -361,9 +361,9 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
                 EnabledPairs = LanguagePairs.Count(p => p.IsEnabled)
             };
             await PublishEventAsync(languagePairEvent).ConfigureAwait(false);
-            
+
             Logger?.LogInformation("言語ペア設定を保存しました: {Count} ペア", LanguagePairs.Count);
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (InvalidOperationException ex)
@@ -386,7 +386,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             IsLoading = false;
         }
     }
-    
+
     /// <summary>
     /// プリセット読み込みコマンド実行
     /// </summary>
@@ -396,7 +396,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
         {
             // TODO: プリセット選択ダイアログの実装
             Logger?.LogDebug("プリセット読み込み機能は今後実装予定です");
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (NotImplementedException ex)
@@ -410,7 +410,7 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
             _logLanguagePairOperationError(Logger ?? NullLogger.Instance, ex.Message, ex);
         }
     }
-    
+
     /// <summary>
     /// 言語コードから表示名を取得
     /// </summary>
@@ -419,40 +419,40 @@ public sealed class LanguagePairsViewModel : Framework.ViewModelBase
         LanguageInfo? language = AvailableLanguages.FirstOrDefault(l => l.Code == languageCode);
         return language?.DisplayName ?? languageCode;
     }
-    
+
     /// <summary>
     /// 言語ペアの妥当性を検証
     /// </summary>
     public bool ValidateLanguagePair(LanguagePairConfiguration pair)
     {
         if (pair == null) return false;
-        
+
         // 同じ言語ペアの重複チェック
-        var duplicate = LanguagePairs.Any(p => 
-        p != pair && 
-        string.Equals(p.SourceLanguage, pair.SourceLanguage, StringComparison.Ordinal) && 
+        var duplicate = LanguagePairs.Any(p =>
+        p != pair &&
+        string.Equals(p.SourceLanguage, pair.SourceLanguage, StringComparison.Ordinal) &&
         string.Equals(p.TargetLanguage, pair.TargetLanguage, StringComparison.Ordinal));
-            
+
         if (duplicate)
         {
             ErrorMessage = "同じ言語ペアが既に存在します";
             return false;
         }
-        
+
         // 無効な言語コードチェック
         if (string.IsNullOrEmpty(pair.SourceLanguage) || string.IsNullOrEmpty(pair.TargetLanguage))
         {
             ErrorMessage = "言語コードが指定されていません";
             return false;
         }
-        
+
         // 同じ言語チェック
         if (string.Equals(pair.SourceLanguage, pair.TargetLanguage, StringComparison.Ordinal))
         {
             ErrorMessage = "ソース言語とターゲット言語が同じです";
             return false;
         }
-        
+
         return true;
     }
 }
@@ -464,20 +464,20 @@ internal sealed class LanguagePairSettingsChangedEvent : Baketa.Core.Events.Even
 {
     /// <inheritdoc/>
     public override string Name => "LanguagePairSettingsChanged";
-    
+
     /// <inheritdoc/>
     public override string Category => "UI.Settings";
-    
+
     /// <summary>
     /// 言語ペアの設定リスト
     /// </summary>
     public List<LanguagePairConfiguration> LanguagePairs { get; set; } = [];
-    
+
     /// <summary>
     /// 総ペア数
     /// </summary>
     public int TotalPairs { get; set; }
-    
+
     /// <summary>
     /// 有効ペア数
     /// </summary>

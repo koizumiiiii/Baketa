@@ -27,7 +27,6 @@
         <FluentTheme />
         <StyleInclude Source="/Styles/FontStyles.axaml"/>
         <StyleInclude Source="/Styles/OverlayStyles.axaml"/>
-        <StyleInclude Source="/Styles/OperationalControlStyles.axaml"/>
         <StyleInclude Source="/Styles/MainOverlayStyles.axaml"/>
         
     </Application.Styles>

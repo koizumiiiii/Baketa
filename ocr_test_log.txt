@@ -1,0 +1,773 @@
+?? [ENCODING_INIT] Failed to configure UTF-8 console: ハンドルが無効です。
+[07:19:02.112] ?? Performance Logging System Initialized
+[07:19:02.121] ???  System: Microsoft Windows NT 10.0.26100.0
+[07:19:02.122] ?? Memory: 0MB
+[07:19:02.124] ???  Runtime: 8.0.19
+[07:19:02.126] ?? WorkDir: E:\dev\Baketa
+[07:19:02.127] ?? BaseDir: E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\
+[07:19:02.136] ?? START [OverallProcessing_0001_071902_136] OverallProcessing: アプリケーション起動全体
+[07:19:02.137] ?? Baketa.UI.exe 起動開始
+[07:19:02.139] ?? CHECKPOINT [OverallProcessing_0001_071902_136] 統一ログシステム初期化完了 - Elapsed: 2.8ms
+?? DIコンテナの初期化開始
+?? ConfigureServices開始
+?? Debugger.IsAttached: False
+?? 環境: Development (OCR設定確保のため強制Development)
+?? [CONFIG_PATH_DEBUG] Base Directory: E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\
+?? [CONFIG_PATH_DEBUG] Current Directory: E:\dev\Baketa
+?? [CONFIG_PATH_DEBUG] appsettings.json exists in BaseDirectory: True
+?? [CONFIG_PATH_DEBUG] appsettings.json exists in CurrentDirectory: True
+?? [CONFIG_PATH_DEBUG] Selected config base path: E:\dev\Baketa
+?? [CONFIG_PATH_DEBUG] Environment config file: appsettings.Development.json
+?? [CONFIG_PATH_DEBUG] Environment config file exists: True
+?? [CONFIG_DETAILED] All configuration keys:
+?? [CONFIG_DETAILED] OCR = 
+?? [CONFIG_DETAILED] OCR:RecognitionThreshold = 0.3
+?? [CONFIG_DETAILED] OCR:PaddleOCR = 
+?? [CONFIG_DETAILED] OCR:PaddleOCR:WorkerCount = 4
+?? [CONFIG_DETAILED] OCR:PaddleOCR:UseLanguageModel = True
+?? [CONFIG_DETAILED] OCR:PaddleOCR:UseGpu = False
+?? [CONFIG_DETAILED] OCR:PaddleOCR:RecognitionThreshold = 0.3
+?? [CONFIG_DETAILED] OCR:PaddleOCR:Language = jpn
+?? [CONFIG_DETAILED] OCR:PaddleOCR:EnablePreprocessing = True
+?? [CONFIG_DETAILED] OCR:PaddleOCR:EnableMultiThread = True
+?? [CONFIG_DETAILED] OCR:PaddleOCR:EnableHybridMode = True
+?? [CONFIG_DETAILED] OCR:PaddleOCR:DetectionThreshold = 0.6
+?? [CONFIG_DETAILED] OCR:LogPerformanceMetrics = True
+?? [CONFIG_DETAILED] OCR:LogModelInfo = True
+?? [CONFIG_DETAILED] OCR:HybridStrategy = 
+?? [CONFIG_DETAILED] OCR:HybridStrategy:RegionCountThreshold = 5
+?? [CONFIG_DETAILED] OCR:HybridStrategy:ImageQualityThreshold = 0.6
+?? [CONFIG_DETAILED] OCR:HybridStrategy:HighQualityTimeoutMs = 3000
+?? [CONFIG_DETAILED] OCR:HybridStrategy:HighQualityModel = V5
+?? [CONFIG_DETAILED] OCR:HybridStrategy:FastDetectionTimeoutMs = 500
+?? [CONFIG_DETAILED] OCR:HybridStrategy:FastDetectionModel = V3
+?? [CONFIG_DETAILED] OCR:EnableDebugLogging = True
+?? [CONFIG_DETAILED] OCR:DetectionThreshold = 0.6
+?? [CONFIG_DETAILED] Logging:LogLevel:Baketa.Infrastructure.OCR = Debug
+?? [FIRST] DiagnosticModule最優先登録開始
+?? [DIAGNOSTIC] 診断レポートシステム登録開始
+?? [DIAGNOSTIC] BackgroundTaskQueue登録完了
+?? [DIAGNOSTIC] DiagnosticServices登録完了
+?? [DIAGNOSTIC] ImageDiagnosticsSaver登録完了
+?? [DIAGNOSTIC] EventProcessors登録完了
+? [DIAGNOSTIC] 診断レポートシステム登録完了
+? [FIRST] DiagnosticModule最優先登録完了
+?? Phase 2-1: 基盤モジュール群登録開始
+??? Core基盤モジュール登録開始
+? Core基盤モジュール登録完了
+?? 設定システム登録開始
+? 設定システム登録完了
+?? Infrastructure基盤モジュール登録開始
+?? [DIAGNOSTIC] 診断レポートシステム登録開始
+?? [DIAGNOSTIC] BackgroundTaskQueue登録完了
+?? [DIAGNOSTIC] DiagnosticServices登録完了
+?? [DIAGNOSTIC] ImageDiagnosticsSaver登録完了
+?? [DIAGNOSTIC] EventProcessors登録完了
+? [DIAGNOSTIC] 診断レポートシステム登録完了
+?? スティッキーROIシステム登録開始 - Issue #143 Week 3
+? IStickyRoiManager登録完了 - InMemory実装
+? StickyRoiEnhancedOcrEngine登録完了 - デコレーター実装
+? スティッキーROIシステム登録完了
+?? OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効
+? FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）
+?? OptimizedPythonTranslationEngine登録完了 - Pythonサーバー接続問題解決済み
+?? Issue #147 Phase 3.2: OptimizedPythonTranslationEngineを使用してハイブリッド戦略を実運用（削除した既存登録数: 0）
+?? [PHASE2] サーキットブレーカー登録開始
+? [PHASE2] TranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s
+?? [DI_DEBUG] PythonServerHealthMonitor登録開始
+? [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能
+?? Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録開始
+? TranslationMetricsCollector登録完了
+? Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録完了
+?? Issue #147 Phase 5: ポート競合防止機構サービス登録開始
+? PortManagementService登録完了 - Mutexプロセス間競合防止
+? PythonServerManager登録完了 - 動的ポート管理・自動復旧
+?? Phase 5: ポート競合防止機構サービス登録完了
+?? ウォームアップサービス登録開始 - Issue #143
+? IWarmupService登録完了
+? WarmupHostedService登録完了
+?? GPU統合サービス登録開始 - Issue #143 Week 2
+? IOnnxSessionFactory登録完了 - DI統合
+? IOnnxModelConfiguration登録完了 - モデル外部化
+? IPersistentSessionCache登録完了 - 永続キャッシュ
+? IGpuOcrEngine登録完了 - Mock実装
+? GPU統合サービス登録完了
+?? 統合パフォーマンス管理システム登録開始 - Issue #143 Week 3 Phase 2
+? IPerformanceOrchestrator登録完了 - 統合最適化システム
+?? PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム
+? 統合パフォーマンス管理システム登録完了（プール化×GPU最適化含む）
+?? [PHASE3] 動的リソース監視システム登録開始
+? [PHASE3] ResourceMonitoringSettings設定完了 - 監視間隔:5s, 履歴保持:60分
+?? [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます
+?? [PHASE3] 動的リソース監視システム登録完了
+? Infrastructure基盤モジュール登録完了
+??? Platform基盤モジュール登録開始
+?? Windows GPU サービス登録開始 - Issue #143
+? WindowsGpuEnvironmentDetector登録完了
+? WindowsGpuDeviceManager登録完了
+? WindowsTdrRecoveryManager登録完了
+? Windows GPU サービス登録完了
+?? [PHASE3 Platform] Windows リソース監視サービス登録開始
+? [PHASE3 Platform] WindowsSystemResourceMonitor登録完了 - パフォーマンスカウンター統合
+?? [PHASE3 Platform] Windows リソース監視サービス登録完了
+? Platform基盤モジュール登録完了
+?? AdaptiveCapture基盤モジュール登録開始
+?????? AdaptiveCaptureModule.RegisterServices 呼び出されました！
+? AdaptiveCapture基盤モジュール登録完了
+?? Auth基盤モジュール登録開始
+? Auth基盤モジュール登録完了
+?? 基盤モジュール登録済み数: 6
+? Phase 2-1: 基盤モジュール群登録完了
+?? Phase 2-2: アプリケーション・特殊機能モジュール群登録開始
+?? ApplicationModule登録開始
+?? [DIAGNOSTIC] 診断レポートシステム登録開始
+?? [DIAGNOSTIC] BackgroundTaskQueue登録完了
+?? [DIAGNOSTIC] DiagnosticServices登録完了
+?? [DIAGNOSTIC] ImageDiagnosticsSaver登録完了
+?? [DIAGNOSTIC] EventProcessors登録完了
+? [DIAGNOSTIC] 診断レポートシステム登録完了
+?? スティッキーROIシステム登録開始 - Issue #143 Week 3
+? IStickyRoiManager登録完了 - InMemory実装
+? StickyRoiEnhancedOcrEngine登録完了 - デコレーター実装
+? スティッキーROIシステム登録完了
+?? OptimizedPythonTranslationEngine登録開始 - モデルロード完了待機機構有効
+? FixedSizeConnectionPool登録完了 - 動的ポート対応（NLLB-200/OPUS-MT自動切り替え）
+?? OptimizedPythonTranslationEngine登録完了 - Pythonサーバー接続問題解決済み
+?? Issue #147 Phase 3.2: OptimizedPythonTranslationEngineを使用してハイブリッド戦略を実運用（削除した既存登録数: 1）
+?? [PHASE2] サーキットブレーカー登録開始
+? [PHASE2] TranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s
+?? [DI_DEBUG] PythonServerHealthMonitor登録開始
+? [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能
+?? Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録開始
+? TranslationMetricsCollector登録完了
+? Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録完了
+?? Issue #147 Phase 5: ポート競合防止機構サービス登録開始
+? PortManagementService登録完了 - Mutexプロセス間競合防止
+? PythonServerManager登録完了 - 動的ポート管理・自動復旧
+?? Phase 5: ポート競合防止機構サービス登録完了
+?? ウォームアップサービス登録開始 - Issue #143
+? IWarmupService登録完了
+? WarmupHostedService登録完了
+?? GPU統合サービス登録開始 - Issue #143 Week 2
+? IOnnxSessionFactory登録完了 - DI統合
+? IOnnxModelConfiguration登録完了 - モデル外部化
+? IPersistentSessionCache登録完了 - 永続キャッシュ
+? IGpuOcrEngine登録完了 - Mock実装
+? GPU統合サービス登録完了
+?? 統合パフォーマンス管理システム登録開始 - Issue #143 Week 3 Phase 2
+? IPerformanceOrchestrator登録完了 - 統合最適化システム
+?? PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム
+? 統合パフォーマンス管理システム登録完了（プール化×GPU最適化含む）
+?? [PHASE3] 動的リソース監視システム登録開始
+? [PHASE3] ResourceMonitoringSettings設定完了 - 監視間隔:5s, 履歴保持:60分
+?? [PHASE3] IResourceMonitor実装はPlatformModuleで登録されます
+?? [PHASE3] 動的リソース監視システム登録完了
+?? Windows GPU サービス登録開始 - Issue #143
+? WindowsGpuEnvironmentDetector登録完了
+? WindowsGpuDeviceManager登録完了
+? WindowsTdrRecoveryManager登録完了
+? Windows GPU サービス登録完了
+?? [PHASE3 Platform] Windows リソース監視サービス登録開始
+? [PHASE3 Platform] WindowsSystemResourceMonitor登録完了 - パフォーマンスカウンター統合
+?? [PHASE3 Platform] Windows リソース監視サービス登録完了
+?? Windows GPU サービス登録開始 - Issue #143
+? WindowsGpuEnvironmentDetector登録完了
+? WindowsGpuDeviceManager登録完了
+? WindowsTdrRecoveryManager登録完了
+? Windows GPU サービス登録完了
+?? [PHASE3 Platform] Windows リソース監視サービス登録開始
+? [PHASE3 Platform] WindowsSystemResourceMonitor登録完了 - パフォーマンスカウンター統合
+?? [PHASE3 Platform] Windows リソース監視サービス登録完了
+?????? AdaptiveCaptureModule.RegisterServices 呼び出されました！
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      キャプチャサービス統合モジュール登録開始
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      キャプチャサービス統合モジュール登録完了 - AdaptiveCaptureServiceをメインとして使用
+?? [DI_DEBUG] StreamingTranslationService登録開始
+? [DI_DEBUG] StreamingTranslationService登録完了
+?? [DI_DEBUG] TranslationDictionaryService登録開始
+? [DI_DEBUG] TranslationDictionaryService登録完了
+? ApplicationModule登録完了
+?? [GEMINI] StagedOcrStrategyModule登録開始...
+?? HighPerformanceOcrModule.RegisterServices 実行中！
+? [GEMINI] StagedOcrStrategyModule登録完了！
+?? [GEMINI] AdvancedCachingModule登録開始...
+?? AdvancedCachingModule.RegisterServices 実行中！
+? IAdvancedOcrCacheService登録完了
+? Step3: 高度キャッシング戦略登録完了
+?? 期待効果: キャッシュヒット時 数ミリ秒応答
+? [GEMINI] AdvancedCachingModule登録完了！
+?? UIModule登録開始
+? UIModule登録完了
+??? OverlayUIModule登録開始
+? OverlayUIModule登録完了
+?? BatchOcrModule登録開始
+? BatchOcrModule登録完了
+?? OcrProcessingModule登録開始
+? OcrProcessingModule登録完了
+?? OpenCvProcessingModule登録開始
+? OpenCvProcessingModule登録完了
+?? PaddleOcrModule登録開始
+?? [DI_FIX] IOcrEngine/PaddleOcrEngineシングルトン登録をObjectPoolに統一
+?? [DI_FIX] 多重インスタンス問題の根本解決 - プールベース管理のみ使用
+?? パフォーマンス改善: OCRエンジンオブジェクトプーリング登録開始
+? IPaddleOcrEngineFactory登録完了（プール用ファクトリ）
+?? [DI_FIX] 既存登録削除ロジックを除去 - シングルトン登録削除により不要
+? IPooledObjectPolicy<IOcrEngine>の登録完了
+? DefaultObjectPoolProviderの登録完了
+? ObjectPool<IOcrEngine>の登録完了
+?? OCRエンジンオブジェクトプーリングの登録が完了しました
+?? 期待効果: AccessViolationException根絶 + パフォーマンス大幅向上
+? PaddleOcrModule登録完了
+?? Phase4: UnifiedGpuModule登録開始
+? Phase4: UnifiedGpuModule登録完了
+?? アダプターサービス登録開始
+? アダプターサービス登録完了
+?? アプリケーション・特殊機能モジュール登録済み数: 11
+? Phase 2-2: アプリケーション・特殊機能モジュール群登録完了
+=== DI Service Registration Debug ===
+ISettingsService registrations count: 1
+  - ServiceType: ISettingsService
+  - ImplementationType: N/A
+  - Lifetime: Singleton
+  - ImplementationFactory: Yes
+ITranslationEngine registrations count: 1
+  - ServiceType: ITranslationEngine
+  - ImplementationType: N/A
+  - Lifetime: Singleton
+  - ImplementationFactory: Yes
+ITranslationService registrations count: 2
+  - ServiceType: ITranslationService
+  - ImplementationType: DefaultTranslationService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+  - ServiceType: ITranslationService
+  - ImplementationType: DefaultTranslationService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+AccessibilitySettingsViewModel registrations count: 1
+IOcrPreprocessingService registrations count: 2
+  - ServiceType: IOcrPreprocessingService
+  - ImplementationType: SimpleOcrPreprocessingService
+  - Lifetime: Transient
+  - ImplementationFactory: No
+  - ServiceType: IOcrPreprocessingService
+  - ImplementationType: Factory
+  - Lifetime: Transient
+  - ImplementationFactory: Yes
+  - Factory details: Likely GameOptimizedPreprocessingService (Phase 3)
+=== ?? Diagnostic Services Registration Debug ===
+IDiagnosticCollectionService registrations count: 3
+  - ServiceType: IDiagnosticCollectionService
+  - ImplementationType: DiagnosticCollectionService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+  - ServiceType: IDiagnosticCollectionService
+  - ImplementationType: DiagnosticCollectionService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+  - ServiceType: IDiagnosticCollectionService
+  - ImplementationType: DiagnosticCollectionService
+  - Lifetime: Singleton
+  - ImplementationFactory: No
+IDiagnosticReportGenerator registrations count: 3
+IBackgroundTaskQueue registrations count: 3
+DiagnosticEventProcessor registrations count: 3
+=== ?? End Diagnostic Services Debug ===
+=== ViewModel Registration Debug ===
+AccessibilitySettingsViewModel: 1 registration(s)
+  - Lifetime: Singleton
+  - ImplementationType: AccessibilitySettingsViewModel
+LanguagePairsViewModel: 1 registration(s)
+  - Lifetime: Singleton
+  - ImplementationType: LanguagePairsViewModel
+??? ServiceProvider構築開始
+? ServiceProvider構築完了
+?? ReactiveUI設定開始
+? ReactiveUI設定完了
+?????? [MAIN_DIAGNOSTIC] 診断システム直接初期化開始！ ??????
+?????? [DIRECT_DEBUG] IDiagnosticCollectionService解決試行中... ??????
+?? ObjectPool<IOcrEngine>インスタンス作成完了
+info: Baketa.Infrastructure.OCR.PaddleOCR.Services.PooledOcrService[0]
+      ?? PooledOcrService初期化完了 - プール化OCRサービス開始
+info: Baketa.Application.Services.Cache.AdvancedOcrCacheService[0]
+      ?? AdvancedOcrCacheService initialized - Step3高度キャッシング戦略
+info: Baketa.Application.Services.CachedOcrEngine[0]
+      ?? CachedOcrEngine初期化完了 - Step3高度キャッシング戦略有効
+info: Baketa.Infrastructure.OCR.GPU.MockGpuOcrEngine[0]
+      ?? MockGpuOcrEngine初期化完了 - 仮想GPU加速OCR開始
+info: Baketa.Infrastructure.OCR.StickyRoi.InMemoryStickyRoiManager[0]
+      ?? InMemoryStickyRoiManager初期化完了 - スティッキーROIシステム開始
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuDeviceManager[0]
+      ?? WindowsGpuDeviceManager初期化完了 - Multi-GPU管理開始
+info: Baketa.Infrastructure.OCR.GPU.DefaultOnnxSessionFactory[0]
+      ?? DefaultOnnxSessionFactory初期化完了 - DI Container統合
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsTdrRecoveryManager[0]
+      ??? WindowsTdrRecoveryManager初期化完了 - TDR監視開始
+info: Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache[0]
+      ?? メタデータキャッシュ初期化完了 - 読み込み: 0件
+info: Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache[0]
+      ?? FileBasedSessionCache初期化完了 - パス: C:\Users\suke0\AppData\Local\Baketa\SessionCache
+info: Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator[0]
+      ?? IntegratedPerformanceOrchestrator初期化完了 - 統合最適化システム開始
+info: Baketa.Infrastructure.Performance.AsyncPerformanceAnalyzer[0]
+      ? AsyncPerformanceAnalyzer initialized for performance monitoring
+dbug: Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator[0]
+      ?? 統合システム初期化開始
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsTdrRecoveryManager[0]
+      ?? TDR監視開始
+?? [DIAGNOSTIC] IOptions<RoiDiagnosticsSettings>取得結果: 成功
+?? [DIAGNOSTIC] RoiDiagnosticsSettings値: 存在
+?? [DIAGNOSTIC] ROI画像出力パス: C:\Users\suke0\AppData\Roaming\Baketa\ROI\Images
+?? [DIAGNOSTIC] ROI画像出力有効: True
+info: Baketa.Infrastructure.DI.Modules.InfrastructureModule[0]
+      ?? AdaptiveTileStrategy登録完了 - 高速テキスト検出→ROIベース認識（ROI画像保存機能付き）
+?? [BATCH-DI] ImageDiagnosticsSaver注入確認: True
+?? [BATCH-DI] 他の依存関係確認: OCR=True, Options=True
+? [BATCH-DI] BatchOcrProcessor作成完了（diagnosticsSaver注入済み）
+?? [DIAGNOSTIC] レポートディレクトリチェック開始: 'C:\Users\suke0\AppData\Roaming\Baketa\Reports'
+? [DIAGNOSTIC] ディレクトリは既に存在
+??? [DIRECT_SUCCESS] IDiagnosticCollectionService解決成功: DiagnosticCollectionService ???
+?? 診断システム直接初期化非同期開始完了
+?????? [MAIN_DIAGNOSTIC] 診断システム直接初期化完了！ ??????
+?? OCRエンジン事前初期化開始（バックグラウンド）
+?? Phase4: 統合GPU最適化システム初期化開始
+?? [DIRECT_DEBUG] 診断データ収集開始中...
+?? [DIAGNOSTIC_COLLECTION] 診断データ収集開始 - IsCollecting=true
+? 診断データ収集開始完了
+info: Baketa.Infrastructure.Services.DiagnosticCollectionService[0]
+      診断データ収集開始
+?? 統合GPU最適化システム初期化開始
+?? OCRエンジン事前初期化開始
+?? OCRエンジンサービス取得成功 - 初期化開始
+[07:19:05.276] ?? CHECKPOINT [OverallProcessing_0001_071902_136] Avalonia アプリケーション開始準備完了 - Elapsed: 3139.2ms
+?? [CONFIG_DEBUG] Configuration available: True
+[07:19:05.277] ?? Avalonia アプリケーション開始
+?? [CONFIG_DEBUG] Top-level section: DebugOptions
+?? [CONFIG_DEBUG] Top-level section: DiagnosticsSettings
+?? [CONFIG_DEBUG] Top-level section: DirectML
+?? [CONFIG_DEBUG] Top-level section: GeminiApi
+?? [CONFIG_DEBUG] Top-level section: GpuBenchmark
+?? [CONFIG_DEBUG] Top-level section: HybridTranslation
+?? [CONFIG_DEBUG] Top-level section: Logging
+?? [CONFIG_DEBUG] Top-level section: OCR
+?? [CONFIG_DEBUG] OCR child: DetectionThreshold
+?? [CONFIG_DEBUG] OCR child: EnableDebugLogging
+?? [CONFIG_DEBUG] OCR child: HybridStrategy
+?? [CONFIG_DEBUG] OCR child: LogModelInfo
+?? [CONFIG_DEBUG] OCR child: LogPerformanceMetrics
+?? [CONFIG_DEBUG] OCR child: PaddleOCR
+?? [CONFIG_DEBUG] OCR child: RecognitionThreshold
+?? [CONFIG_DEBUG] Top-level section: OpenVINO
+?? [CONFIG_DEBUG] Top-level section: ResourceMonitoring
+?? [CONFIG_DEBUG] Top-level section: SentencePiece
+?? [CONFIG_DEBUG] Top-level section: Translation
+?? [CONFIG_DEBUG] Top-level section: TranslationEngineStatus
+?? [CONFIG_DEBUG] Top-level section: UnifiedGpu
+?? [CONFIG_DEBUG] OCR:PaddleOCR section exists: True
+?? [CONFIG_DEBUG] EnableHybridMode raw value: 'True'
+?? [CONFIG_DEBUG] Alternative access OCR.PaddleOCR exists: True
+?? [CONFIG_DEBUG] Alternative EnableHybridMode: 'True'
+? OCRエンジン設定をappsettings.jsonから読み込み完了 - EnableHybridMode: True, Language: jpn
+dbug: Baketa.Infrastructure.OCR.PaddleOCR.Services.PooledOcrService[0]
+      ?? PooledOcrService.InitializeAsync: プール化環境では個別エンジンが初期化されます
+?? OCR設定適用完了 - EnableHybridMode: True
+info: Baketa.Infrastructure.OCR.GPU.UnifiedGpuOptimizer[0]
+      UnifiedGpuOptimizer initialized with 3 providers
+? OCRエンジン事前初期化完了 - 初期化時間: 3ms
+info: Baketa.Application.Services.CachedOcrEngine[0]
+      ? CachedOcrEngine初期化完了 - 時間: 0ms, 結果: True
+?? UnifiedGpuInitializer取得成功 - 初期化開始
+info: Baketa.Infrastructure.DI.UnifiedGpuInitializer[0]
+      ?? Initializing Unified GPU Optimization System
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuEnvironmentDetector[0]
+      GPU環境検出開始
+info: Baketa.Infrastructure.Platform.Windows.GPU.WindowsGpuEnvironmentDetector[0]
+      GPU環境検出完了: NVIDIA GeForce RTX 4070, CUDA:True, DirectML:True, VRAM:4095MB
+dbug: Baketa.Infrastructure.OCR.GPU.Providers.CpuExecutionProviderFactory[0]
+      CPU provider always supported as fallback
+dbug: Baketa.Infrastructure.OCR.GPU.Providers.OpenVINOExecutionProviderFactory[0]
+      OpenVINO not supported by current environment
+dbug: Baketa.Infrastructure.OCR.GPU.Providers.DirectMLExecutionProviderFactory[0]
+      DirectML requires DirectX 11.1 or higher
+info: Baketa.Infrastructure.OCR.GPU.UnifiedGpuOptimizer[0]
+      Selected optimal provider: CPU (Priority: 10) for environment: CPU Provider (16 threads)
+info: Baketa.Infrastructure.DI.UnifiedGpuInitializer[0]
+      ?? Selected optimal provider: CPU
+? 統合GPU最適化システム初期化完了 - 初期化時間: 932ms
+info: Baketa.Infrastructure.DI.UnifiedGpuInitializer[0]
+      ? Unified GPU System initialization completed
+?????? [INIT_DEBUG] App.Initialize() 開始 - ServiceProvider状態確認 ??????
+[INIT_DEBUG] Program.ServiceProvider == null: False
+?? イベント発行: PipelineDiagnosticEvent (ID: 05aaa372-7825-40f3-943f-7c32991dc71e)
+?? イベント PipelineDiagnosticEvent のプロセッサが登録されていません
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント発行: PipelineDiagnosticEvent (ID: 05aaa372-7825-40f3-943f-7c32991dc71e)
+?? 診断テストイベント発行完了（直接初期化版）
+warn: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント PipelineDiagnosticEvent のプロセッサが登録されていません
+[INIT_DEBUG] ServiceProvider利用可能 - サービス取得中
+?????? [INIT_DEBUG] App.Initialize() 完了 ??????
+info: Baketa.UI.App[1]
+      Baketaアプリケーションを初期化中
+?????? [FRAMEWORK] OnFrameworkInitializationCompleted開始！ ??????
+?? OnFrameworkInitializationCompleted開始
+?????? [DESKTOP] デスクトップアプリケーション初期化開始！ ??????
+?? ReactiveUIエラーハンドラー設定完了
+??? IClassicDesktopStyleApplicationLifetime取得成功
+?? Program.ServiceProvider確認開始
+?? Program.ServiceProviderアクセス試行
+?? Program.ServiceProvider取得結果: not null
+? Program.ServiceProvider確認成功
+?? IEventAggregator取得開始
+? IEventAggregator取得成功: EventAggregator
+?? EventHandlerInitializationService実行開始
+info: Baketa.UI.App[0]
+      ? IEventAggregator取得成功: EventAggregator
+?? EventHandlerInitializationService非同期実行開始
+?????? [CRITICAL] 診断システム開始処理 - 重要ポイント！ ??????
+?????? [CRITICAL_DEBUG] IDiagnosticCollectionService解決試行中... ??????
+??? [CRITICAL_SUCCESS] IDiagnosticCollectionService解決成功: DiagnosticCollectionService ???
+?? 診断システム非同期開始完了
+?? MainOverlayViewModel取得開始
+?? [DEBUG] 診断データ収集開始中...
+?? [DIAGNOSTIC_COLLECTION] 診断データ収集開始 - IsCollecting=true
+? 診断データ収集開始完了
+info: Baketa.Infrastructure.Services.DiagnosticCollectionService[0]
+      診断データ収集開始
+?? [DI_DEBUG] EventHandlerInitializationService - EventAggregator取得
+?? [DI_DEBUG] EventAggregator型: Baketa.Core.Events.Implementation.EventAggregator
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      イベントハンドラー初期化を開始します
+?? [DI_DEBUG] EventAggregatorハッシュ: 42715336
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      EventAggregator取得成功
+?? [DI_DEBUG] EventAggregator参照: Baketa.Core.Events.Implementation.EventAggregator
+? プロセッサ OcrCompletedHandler をイベント OcrCompletedEvent に登録しました (現在の登録数: 1)
+?? [DEBUG] OcrCompletedHandlerを登録しました
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ OcrCompletedHandler をイベント OcrCompletedEvent に登録しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      OcrCompletedHandlerを登録しました
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ?? OptimizedPythonTranslationEngine（接続プール統合版）をITranslationEngineとして登録
+info: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      接続プール初期化: 最大接続数=8, 最小接続数=1
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ?? OptimizedPythonTranslationEngine初期化開始 - 接続プール統合版（動的ポート対応）
+info: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      最小接続数(1)の初期化開始
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ?? [NLLB-200] NLLB-200モード - ポート: 5556, スクリプト: nllb_translation_server.py
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      OptimizedPythonTranslationEngine初期化 - Python: py, Script: E:\dev\Baketa\scripts\nllb_translation_server.py
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      モデルロード待機機構を初期化しました
+?? [DEBUG] DefaultTranslationService作成 - エンジン数: 1
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      DefaultTranslationService作成 - エンジン数: 1
+?? [DEBUG] 登録エンジン: NLLB200 (OptimizedPythonTranslationEngine)
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      登録エンジン: NLLB200 (OptimizedPythonTranslationEngine)
+?? [CONFIG] appsettings.json設定読み込み: Translation:DefaultEngine = 'NLLB200'
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      設定からデフォルトエンジン読み込み: NLLB200
+?? [MATCH] 完全一致: NLLB200
+? [CONFIG] 設定マッチ成功: NLLB200 を使用
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      設定マッチ成功: NLLB200 を使用
+?? [CONFIG] アクティブエンジン設定完了: NLLB200 (OptimizedPythonTranslationEngine)
+info: Baketa.Infrastructure.Translation.DefaultTranslationService[0]
+      アクティブエンジン設定完了: NLLB200 (OptimizedPythonTranslationEngine)
+? プロセッサ TranslationRequestHandler をイベント TranslationRequestEvent に登録しました (現在の登録数: 1)
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationRequestHandler をイベント TranslationRequestEvent に登録しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      TranslationRequestHandlerを登録しました
+?? [DEBUG] TranslationRequestHandlerを登録しました
+? プロセッサ TranslationWithBoundsCompletedHandler をイベント TranslationWithBoundsCompletedEvent に登録しました (現在の登録数: 1)
+?? [登録確認] TranslationWithBoundsCompletedEvent用プロセッサ登録:
+?? [登録確認]   - プロセッサ型: Baketa.Core.Events.Handlers.TranslationWithBoundsCompletedHandler
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationWithBoundsCompletedHandler をイベント TranslationWithBoundsCompletedEvent に登録しました
+?? [登録確認]   - イベント型: Baketa.Core.Events.EventTypes.TranslationWithBoundsCompletedEvent
+?? [登録確認]   - プロセッサハッシュ: 14011335
+?? [DEBUG] TranslationWithBoundsCompletedHandlerを登録しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      TranslationWithBoundsCompletedHandlerを登録しました
+? プロセッサ DiagnosticEventProcessor をイベント PipelineDiagnosticEvent に登録しました (現在の登録数: 1)
+?? [DEBUG] DiagnosticEventProcessorを登録しました
+?? [DEBUG] イベントハンドラー初期化が完了しました
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ DiagnosticEventProcessor をイベント PipelineDiagnosticEvent に登録しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      DiagnosticEventProcessorを登録しました
+info: Baketa.Application.Services.Events.EventHandlerInitializationService[0]
+      ?? イベントハンドラー初期化が完了しました
+dbug: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      新規TCP接続を確立: e0dfa30b
+dbug: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      初期接続を作成: e0dfa30b
+info: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      最小接続数の初期化完了: 1個
+?? EventHandlerInitializationService実行完了
+? プロセッサ InlineEventProcessor`1 をイベント TranslationStatusChangedEvent に登録しました (現在の登録数: 1)
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ InlineEventProcessor`1 をイベント TranslationStatusChangedEvent に登録しました
+? プロセッサ InlineEventProcessor`1 をイベント TranslationDisplayVisibilityChangedEvent に登録しました (現在の登録数: 1)
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ InlineEventProcessor`1 をイベント TranslationDisplayVisibilityChangedEvent に登録しました
+? MainOverlayViewModel取得成功: MainOverlayViewModel
+??? MainOverlayView作成開始
+info: Baketa.UI.App[0]
+      ? MainOverlayViewModel取得成功: MainOverlayViewModel
+?? MainOverlayView初期化開始
+?? MainOverlayView - InitializeComponent完了
+?? MainOverlayView - IsVisible: False
+?? MainOverlayView - WindowState: Normal
+??? MainOverlayView作成完了 - DataContext設定済み
+??? desktop.MainWindowに設定完了
+? MainOverlayView.Show()実行完了
+?? InPlaceTranslationOverlayManager初期化設定
+? InPlaceTranslationOverlayManager遅延初期化設定完了
+??? 旧オーバーレイシステムは削除済み - インプレースシステムが自動で管理
+?? TranslationFlowModuleのイベント購読を初期化中
+info: Baketa.UI.App[0]
+      ?? TranslationFlowModuleのイベント購読を初期化中
+?? TranslationFlowModuleインスタンス作成完了
+info: Baketa.UI.App[0]
+      ?? TranslationFlowModuleインスタンス作成完了
+?? InPlaceTranslationOverlayManager非同期初期化開始
+?? TranslationFlowModuleの初期化を開始
+?? InPlaceTranslationOverlayManager.InitializeAsync開始 - _isInitialized: False, _disposed: False
+?? インプレースオーバーレイマネージャー初期化ロック取得、実際の初期化を開始
+?? インプレースオーバーレイマネージャー初期化完了フラグ設定
+?? InPlaceTranslationOverlayManager.InitializeAsync正常完了
+dbug: Baketa.UI.Services.InPlaceTranslationOverlayManager[0]
+      Starting InPlace overlay manager initialization
+? InPlaceTranslationOverlayManager初期化完了
+info: Baketa.UI.Services.InPlaceTranslationOverlayManager[0]
+      InPlace translation overlay manager initialized successfully
+?? TranslationFlowEventProcessorを取得中
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ?? TranslationFlowModuleの初期化を開始
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ?? TranslationFlowEventProcessorを取得中
+dbug: Baketa.Application.Services.Capture.AdaptiveCaptureService[0]
+      AdaptiveCaptureService インスタンス作成
+info: Baketa.Application.Services.Capture.AdaptiveCaptureService[0]
+      AdaptiveCaptureService 登録完了
+dbug: Baketa.Application.Services.Capture.AdaptiveCaptureServiceAdapter[0]
+      AdaptiveCaptureServiceAdapter インスタンス作成
+info: Baketa.Application.Services.Capture.AdaptiveCaptureServiceAdapter[0]
+      AdaptiveCaptureServiceAdapter 登録完了
+info: Baketa.Application.DI.Modules.CaptureModule[0]
+      ICaptureService として AdaptiveCaptureServiceAdapter を登録
+?? [DI_DEBUG] TranslationOrchestrationService Factory開始
+dbug: Baketa.Core.Settings.Migration.SettingsMigrationManager[0]
+      マイグレーションを登録しました: 0→1 (ホットキー機能削除とMainUI設定追加（UX改善対応）)
+dbug: Baketa.Core.Settings.Migration.SettingsMigrationManager[0]
+      デフォルトマイグレーションを登録しました
+info: Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory[0]
+      合計 0 個の翻訳エンジンが利用可能です
+info: Baketa.Application.Services.Translation.TranslationDictionaryService[0]
+      ?? TranslationDictionaryService初期化完了 - 設定ファイルベース翻訳開始
+?? [DI_DEBUG] TranslationOrchestrationService - CoordinateBasedTranslationServiceを正しく注入
+?? [DI_DEBUG] CoordinateBasedTranslationService Factory開始 (Phase 2.1更新版)
+?? [DI_DEBUG] ITranslationProcessingFacade取得中...
+? [DI_DEBUG] ITranslationProcessingFacade取得成功: TranslationProcessingFacade
+?? [DI_DEBUG] IConfigurationFacade取得中...
+info: Baketa.Infrastructure.Services.Settings.UnifiedSettingsService[0]
+      UnifiedSettingsService初期化完了 - 監視ディレクトリ: C:\Users\suke0\.baketa\settings
+? [DI_DEBUG] IConfigurationFacade取得成功: ConfigurationFacade
+?? [DI_DEBUG] IStreamingTranslationService取得中...
+?? [STREAMING] StreamingTranslationService初期化完了
+? [DI_DEBUG] IStreamingTranslationService取得成功: StreamingTranslationService
+?? [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成開始 (Service Locator除去済み)
+info: Baketa.Application.Services.Translation.StreamingTranslationService[0]
+      StreamingTranslationService初期化完了
+?? [STREAMING] ストリーミング翻訳サービスが利用可能
+info: Baketa.Infrastructure.Logging.BaketaLogger[0]
+      CoordinateBasedTranslationService: 統一設定サービス注入完了
+? [DI_DEBUG] CoordinateBasedTranslationService インスタンス作成完了 (Phase 2.1)
+info: Baketa.Application.Services.Translation.CoordinateBasedTranslationService[0]
+      ?? CoordinateBasedTranslationService initialized - Hash: 20602375
+? [DI_DEBUG] CoordinateBasedTranslationService取得成功: CoordinateBasedTranslationService
+? [DI_DEBUG] EventAggregator取得成功: EventAggregator
+? [DI_DEBUG] TranslationDictionaryService取得成功: TranslationDictionaryService
+dbug: Baketa.Core.Services.EnhancedSettingsService[0]
+      設定キー 'Translation:AutomaticTranslationIntervalMs' が見つからないか型が一致しません。デフォルト値を返します: 100
+dbug: Baketa.Application.Services.Capture.AdaptiveCaptureServiceAdapter[0]
+      キャプチャオプション設定: 間隔=100ms, 品質=85
+dbug: Baketa.Application.Services.Translation.TranslationOrchestrationService[0]
+      キャプチャオプションを初期化しました: 間隔=100ms, 品質=85
+dbug: Baketa.Application.Services.Translation.CoordinateBasedTranslationService[0]
+      ?? 座標ベース翻訳システム可用性チェック: True
+info: Baketa.Application.Services.Translation.TranslationOrchestrationService[0]
+      ?? 座標ベース翻訳システムが利用可能です - 座標ベース翻訳表示が有効
+? TranslationFlowEventProcessor取得成功: ハッシュ=51203652
+dbug: Baketa.UI.Services.TranslationFlowEventProcessor[0]
+      TranslationFlowEventProcessor instance created: Hash=51203652
+?? イベント購読を開始
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ? TranslationFlowEventProcessor取得成功
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ?? イベント購読を開始
+? プロセッサ TranslationFlowEventProcessor をイベント StartTranslationRequestEvent に登録しました (現在の登録数: 1)
+? StartTranslationRequestEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationFlowEventProcessor をイベント StartTranslationRequestEvent に登録しました
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ? StartTranslationRequestEvent購読完了
+? プロセッサ TranslationFlowEventProcessor をイベント StopTranslationRequestEvent に登録しました (現在の登録数: 1)
+? StopTranslationRequestEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationFlowEventProcessor をイベント StopTranslationRequestEvent に登録しました
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ? StopTranslationRequestEvent購読完了
+? プロセッサ TranslationFlowEventProcessor をイベント ToggleTranslationDisplayRequestEvent に登録しました (現在の登録数: 1)
+? ToggleTranslationDisplayRequestEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationFlowEventProcessor をイベント ToggleTranslationDisplayRequestEvent に登録しました
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ? ToggleTranslationDisplayRequestEvent購読完了
+? プロセッサ TranslationFlowEventProcessor をイベント SettingsChangedEvent に登録しました (現在の登録数: 1)
+? SettingsChangedEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ TranslationFlowEventProcessor をイベント SettingsChangedEvent に登録しました
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ? SettingsChangedEvent購読完了
+? プロセッサ InPlaceTranslationOverlayManager をイベント OverlayUpdateEvent に登録しました (現在の登録数: 1)
+? OverlayUpdateEvent購読完了
+info: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ InPlaceTranslationOverlayManager をイベント OverlayUpdateEvent に登録しました
+?? 翻訳フローイベントプロセッサーを正常に登録しました
+dbug: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ? OverlayUpdateEvent購読完了
+? TranslationFlowModule初期化完了
+info: Baketa.UI.DI.Modules.TranslationFlowModule[0]
+      ?? 翻訳フローイベントプロセッサーを正常に登録しました
+?? PythonServerHealthMonitor直接開始開始
+info: Baketa.UI.App[0]
+      ? TranslationFlowModule初期化完了
+?? PythonServerHealthMonitor直接開始要求完了
+?? イベント発行: ApplicationStartupEvent (ID: 0f3cf6ad-efe1-454d-8442-7ac551882c6f)
+?? イベント ApplicationStartupEvent のプロセッサが登録されていません
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント発行: ApplicationStartupEvent (ID: 0f3cf6ad-efe1-454d-8442-7ac551882c6f)
+warn: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント ApplicationStartupEvent のプロセッサが登録されていません
+info: Baketa.UI.App[2]
+      アプリケーション起動完了
+info: Baketa.Infrastructure.Patterns.TranslationCircuitBreaker[0]
+      TranslationCircuitBreaker初期化完了 - FailureThreshold: 5, Timeout: 30000ms
+?? [HEALTH_MONITOR] コンストラクタ開始
+?? [HEALTH_MONITOR] settingsService パラメータ: EnhancedSettingsService
+?? [PHASE2] サーキットブレーカー連携: 有効
+? [HEALTH_MONITOR] コンストラクタ完了 - 設定は StartAsync で取得
+? [HEALTH_MONITOR] PythonServerHealthMonitor取得成功
+info: Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor[0]
+      ? PythonServerHealthMonitor開始
+?? [HEALTH_MONITOR] 取得した設定: EnableServerAutoRestart=True
+?? [HEALTH_MONITOR] HealthCheckIntervalMs: 30000ms
+? [HEALTH_MONITOR] ヘルスチェック有効 - 自動監視開始
+?? [HEALTH_MONITOR] PythonServerHealthMonitor開始完了
+info: Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor[0]
+      ?? ヘルスチェック開始 - 間隔: 30000ms
+?? MainOverlayView - OnLoaded呼び出し
+?? MainOverlayView - OnLoaded後: IsVisible=True, IsEnabled=True
+?? MainOverlayView - Position: 16, 350, Width: 70, Height: 430
+?? MainOverlayView - Show()とActivate()を実行
+info: Baketa.Core.Services.EnhancedSettingsService[0]
+      設定を再読み込みしました: C:\Users\suke0\AppData\Roaming\Baketa\settings.json
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      外部Pythonサーバー使用モード - プロセス起動をスキップ
+dbug: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      既存接続を再利用: e0dfa30b
+dbug: Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool[0]
+      接続をプールに返却: e0dfa30b
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      接続プール経由でサーバー接続を確認
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      OptimizedPythonTranslationEngine初期化完了
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      ?? モデルロード完了 - 翻訳リクエスト受付開始
+info: Baketa.Infrastructure.Translation.Local.OptimizedPythonTranslationEngine[0]
+      バックグラウンド初期化完了
+?? [DIAGNOSTIC_COLLECTION] GenerateReportAsync開始 - reportType: direct_init_test, IsCollecting: True
+?? [DIAGNOSTIC_COLLECTION] ExtractAllEvents呼び出し前 - キューサイズ: 0
+?? [DIAGNOSTIC_COLLECTION] ExtractAllEvents完了 - 取得イベント数: 0
+?? [DIAGNOSTIC_COLLECTION] 警告: 生成する診断イベントがありません
+?? 手動レポート生成完了（直接初期化版）: 
+warn: Baketa.Infrastructure.Services.DiagnosticCollectionService[0]
+      生成する診断イベントがありません
+?? イベント発行: PipelineDiagnosticEvent (ID: 92eda8af-84de-4077-baf4-1a53f4a8088f)
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント発行: PipelineDiagnosticEvent (ID: 92eda8af-84de-4077-baf4-1a53f4a8088f)
+?? イベント PipelineDiagnosticEvent の処理を開始 (プロセッサ数: 1)
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント PipelineDiagnosticEvent の処理を開始 (プロセッサ数: 1)
+?? デバッグ: eventProcessors.Count = 1
+?? デバッグ: 登録されたプロセッサ = DiagnosticEventProcessor
+?? デバッグ: DiagnosticEventProcessor は IEventProcessor<PipelineDiagnosticEvent> か? = True
+?? デバッグ: DiagnosticEventProcessor が実装するインターフェース: IEventProcessor`1
+?? デバッグ: 明示的型チェック後の Count = 1
+?? 実際に処理するプロセッサ: DiagnosticEventProcessor
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? プロセッサ DiagnosticEventProcessor でイベント PipelineDiagnosticEvent の処理を開始
+?? ExecuteProcessorAsync内でHandleAsync呼び出し: DiagnosticEventProcessor
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? プロセッサ DiagnosticEventProcessor.HandleAsync() を実行中
+?? [DIAGNOSTIC_PROCESSOR] イベント受信: ApplicationStartup - Information
+?? [DIAGNOSTIC_PROCESSOR] 診断収集サービスが動作中 - 処理開始
+?? [DIAGNOSTIC_COLLECTION] CollectDiagnosticAsync呼び出し - Stage: ApplicationStartup, IsCollecting: True, Disposed: False
+?? [DIAGNOSTIC_COLLECTION] 即座にイベント蓄積開始 - Stage: ApplicationStartup
+?? [DIAGNOSTIC_COLLECTION] ProcessDiagnosticEventAsync開始 - Stage: ApplicationStartup, 現在キューサイズ: 0
+?? [DIAGNOSTIC_COLLECTION] イベント追加完了 - 新キューサイズ: 1
+?? [DIAGNOSTIC_COLLECTION] 即座にイベント蓄積完了 - Stage: ApplicationStartup
+?? [DIAGNOSTIC_PROCESSOR] 診断イベント収集完了: ApplicationStartup
+? ExecuteProcessorAsync内でHandleAsync完了: DiagnosticEventProcessor
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? プロセッサ DiagnosticEventProcessor がイベント PipelineDiagnosticEvent を処理しました (処理時間: 2.1998ms)
+?? 診断テストイベント発行完了
+?? [診断レポート] 2秒待機開始
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント PipelineDiagnosticEvent の非ブロッキング処理を開始しました (プロセッサ数: 1)
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ? イベント PipelineDiagnosticEvent の非同期処理が完了しました (プロセッサ数: 1)
+?? [診断レポート] 2秒待機完了 - サービス取得開始
+?? [診断レポート] IDiagnosticCollectionService取得試行中...
+? [診断レポート] IDiagnosticCollectionService取得成功: DiagnosticCollectionService
+?? 手動レポート生成テスト開始
+?? [DIAGNOSTIC_COLLECTION] GenerateReportAsync開始 - reportType: manual_test, IsCollecting: True
+?? [DIAGNOSTIC_COLLECTION] ExtractAllEvents呼び出し前 - キューサイズ: 1
+?? [DIAGNOSTIC_COLLECTION] ExtractAllEvents完了 - 取得イベント数: 1
+?? [DIAGNOSTIC] レポート生成開始: reportType='manual_test'
+?? [DIAGNOSTIC] レポートディレクトリチェック開始: 'C:\Users\suke0\AppData\Roaming\Baketa\Reports'
+? [DIAGNOSTIC] ディレクトリは既に存在
+?? [DIAGNOSTIC] イベント数: 1
+?? [DIAGNOSTIC] 生成ファイルパス: 'C:\Users\suke0\AppData\Roaming\Baketa\Reports\manual_test_20250826_071915_manual_t.json'
+dbug: Baketa.Infrastructure.OCR.BatchProcessing.BatchOcrProcessor[0]
+      ?? ROI画像情報統合完了: 既存=0個, TileStrategy=0個, 合計=0個
+?? [DIAGNOSTIC] ROI画像情報統合: 0個
+?? [DEBUG] SafeFileWriter呼び出し前 - filePath: 'C:\Users\suke0\AppData\Roaming\Baketa\Reports\manual_test_20250826_071915_manual_t.json'
+?? [DEBUG] SafeFileWriter呼び出し前 - jsonContent.Length: 959
+?? [DEBUG] SafeFileWriter呼び出し前 - jsonContent IsNullOrEmpty: False
+?? [DEBUG] SafeFileWriter呼び出し前 - filePath IsNullOrEmpty: False
+?? [DEBUG] SafeFileWriter.AppendTextSafely実行中...
+?? [DEBUG] SafeFileWriter.AppendTextSafely完了
+?? [DEBUG] ファイル存在確認: True
+?? [DEBUG] ファイルサイズ: 962 bytes
+info: Baketa.Infrastructure.Services.DiagnosticReportGenerator[0]
+      診断レポート生成完了: C:\Users\suke0\AppData\Roaming\Baketa\Reports\manual_test_20250826_071915_manual_t.json, イベント数: 1
+?? イベント発行: DiagnosticReportGeneratedEvent (ID: de80508e-219c-4342-93c1-ea51c2b2f04a)
+?? イベント DiagnosticReportGeneratedEvent のプロセッサが登録されていません
+dbug: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント発行: DiagnosticReportGeneratedEvent (ID: de80508e-219c-4342-93c1-ea51c2b2f04a)
+?? 手動レポート生成完了: C:\Users\suke0\AppData\Roaming\Baketa\Reports\manual_test_20250826_071915_manual_t.json
+warn: Baketa.Core.Events.Implementation.EventAggregator[0]
+      ?? イベント DiagnosticReportGeneratedEvent のプロセッサが登録されていません
+?? [診断レポート] Reports ディレクトリ内ファイル数: 471
+?? [診断レポート] ファイル: direct_init_test_20250822_191106_direct_i.json
+?? [診断レポート] ファイル: direct_init_test_20250822_191739_direct_i.json
+?? [診断レポート] ファイル: direct_init_test_20250823_011044_direct_i.json

@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.OCR.Results;
+using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Models.OCR; // 🔥 [FIX7_STEP2] OcrContext統合
+using Baketa.Infrastructure.ResourceManagement;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.BatchProcessing;
 
@@ -20,95 +22,114 @@ public sealed class BatchOcrIntegrationService : IDisposable
     private readonly IBatchOcrProcessor _batchOcrProcessor;
     private readonly IOcrEngine _fallbackOcrEngine;
     private readonly ILogger<BatchOcrIntegrationService>? _logger;
-    
+    private readonly IResourceManager _resourceManager;
+
     private readonly SemaphoreSlim _processingSemaphore;
     private bool _disposed;
 
     public BatchOcrIntegrationService(
         IBatchOcrProcessor batchOcrProcessor,
         IOcrEngine fallbackOcrEngine,
+        IResourceManager resourceManager,
         ILogger<BatchOcrIntegrationService>? logger = null)
     {
         _batchOcrProcessor = batchOcrProcessor ?? throw new ArgumentNullException(nameof(batchOcrProcessor));
         _fallbackOcrEngine = fallbackOcrEngine ?? throw new ArgumentNullException(nameof(fallbackOcrEngine));
+        _resourceManager = resourceManager ?? throw new ArgumentNullException(nameof(resourceManager));
         _logger = logger;
-        
-        // 並列処理制限（CPUコア数に基づく）
+
+        // 並列処理制限（CPUコア数に基づく）- HybridResourceManagerでの制御に段階的移行予定
         var maxConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
         _processingSemaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
     }
 
     /// <summary>
     /// 統合OCR処理 - バッチ処理とフォールバックの組み合わせ
+    /// Phase 2統合: HybridResourceManager経由でリソース制御付き処理を実行
+    /// FIX7 Step2: OcrContext対応 - CaptureRegion情報を保持
     /// </summary>
     public async Task<IReadOnlyList<TextChunk>> ProcessWithIntegratedOcrAsync(
-        IAdvancedImage image,
-        IntPtr windowHandle,
-        CancellationToken cancellationToken = default)
+        OcrContext context)
     {
         ThrowIfDisposed();
-        
-        await _processingSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-        
-        try
-        {
-            _logger?.LogInformation("🔄 統合OCR処理開始 - 画像: {Width}x{Height}", image.Width, image.Height);
 
-            // 1. バッチOCR処理を試行
-            var chunks = await TryBatchOcrProcessingAsync(image, windowHandle, cancellationToken).ConfigureAwait(false);
-            
-            // 2. バッチ処理結果の検証
-            if (IsValidOcrResult(chunks))
+        _logger?.LogInformation("🔥 [FIX7_STEP2] ProcessWithIntegratedOcrAsync開始 - CaptureRegion: {HasCaptureRegion}, Value: {CaptureRegion}",
+            context.HasCaptureRegion,
+            context.HasCaptureRegion ? $"({context.CaptureRegion!.Value.X},{context.CaptureRegion.Value.Y},{context.CaptureRegion.Value.Width}x{context.CaptureRegion.Value.Height})" : "null");
+
+        // HybridResourceManager経由でリソース制御付きOCR処理を実行
+        var request = new ProcessingRequest(
+            ImagePath: $"InMemory_{DateTime.UtcNow:yyyyMMddHHmmssfff}",
+            OperationId: Guid.NewGuid().ToString(),
+            Timestamp: DateTime.UtcNow
+        );
+
+        return await _resourceManager.ProcessOcrAsync(
+            async (req, ct) =>
             {
-                _logger?.LogInformation("✅ バッチOCR処理成功 - チャンク数: {ChunkCount}", chunks.Count);
-                return chunks;
-            }
+                _logger?.LogInformation("🔄 [HybridResourceManager] 統合OCR処理開始 - 画像: {Width}x{Height}, OperationId: {OperationId}",
+                    context.Image.Width, context.Image.Height, req.OperationId);
 
-            // 3. フォールバック処理
-            _logger?.LogWarning("⚠️ バッチOCR結果不十分、フォールバック処理実行");
-            return await ExecuteFallbackOcrAsync(image, windowHandle, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            _processingSemaphore.Release();
-        }
+                // 1. バッチOCR処理を試行（レガシーセマフォア制御付き）
+                await _processingSemaphore.WaitAsync(ct).ConfigureAwait(false);
+
+                try
+                {
+                    var chunks = await TryBatchOcrProcessingAsync(context, ct).ConfigureAwait(false);
+
+                    // 2. バッチ処理結果の検証
+                    if (IsValidOcrResult(chunks))
+                    {
+                        _logger?.LogInformation("✅ [HybridResourceManager] バッチOCR処理成功 - チャンク数: {ChunkCount}", chunks.Count);
+                        return chunks;
+                    }
+
+                    // 3. フォールバック処理
+                    _logger?.LogWarning("⚠️ [HybridResourceManager] バッチOCR結果不十分、フォールバック処理実行");
+                    return await ExecuteFallbackOcrAsync(context, ct).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _processingSemaphore.Release();
+                }
+            },
+            request,
+            context.CancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// 複数画像の並列バッチ処理
+    /// FIX7 Step2: OcrContext対応
     /// </summary>
     public async Task<IReadOnlyList<IReadOnlyList<TextChunk>>> ProcessMultipleImagesAsync(
-        IReadOnlyList<(IAdvancedImage Image, IntPtr WindowHandle)> imageData,
+        IReadOnlyList<OcrContext> contexts,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        
-        if (imageData.Count == 0)
+
+        if (contexts.Count == 0)
             return [];
 
-        _logger?.LogInformation("📦 複数画像並列処理開始 - 画像数: {ImageCount}", imageData.Count);
+        _logger?.LogInformation("📦 複数画像並列処理開始 - 画像数: {ImageCount}", contexts.Count);
 
         // 並列処理タスクを作成
-        var tasks = imageData.Select(async data =>
+        var tasks = contexts.Select(async context =>
         {
             try
             {
-                return await ProcessWithIntegratedOcrAsync(
-                    data.Image, 
-                    data.WindowHandle, 
-                    cancellationToken).ConfigureAwait(false);
+                return await ProcessWithIntegratedOcrAsync(context).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "❌ 画像処理エラー - サイズ: {Width}x{Height}", 
-                    data.Image.Width, data.Image.Height);
-                return [];
+                _logger?.LogError(ex, "❌ 画像処理エラー - サイズ: {Width}x{Height}",
+                    context.Image.Width, context.Image.Height);
+                return (IReadOnlyList<TextChunk>)[];
             }
         });
 
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-        
-        _logger?.LogInformation("✅ 複数画像並列処理完了 - 総チャンク数: {TotalChunks}", 
+
+        _logger?.LogInformation("✅ 複数画像並列処理完了 - 総チャンク数: {TotalChunks}",
             results.Sum(r => r.Count));
 
         return results;
@@ -118,8 +139,8 @@ public sealed class BatchOcrIntegrationService : IDisposable
     /// バッチ処理性能の最適化設定
     /// </summary>
     public async Task OptimizeBatchPerformanceAsync(
-        int imageWidth, 
-        int imageHeight, 
+        int imageWidth,
+        int imageHeight,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -137,29 +158,35 @@ public sealed class BatchOcrIntegrationService : IDisposable
         };
 
         await _batchOcrProcessor.ConfigureBatchProcessingAsync(options).ConfigureAwait(false);
-        
+
         // cancellationTokenが要求された場合の処理
         cancellationToken.ThrowIfCancellationRequested();
-        
-        _logger?.LogInformation("⚙️ バッチ性能最適化完了 - 並列度: {Parallelism}, 前処理: {Preprocessing}", 
+
+        _logger?.LogInformation("⚙️ バッチ性能最適化完了 - 並列度: {Parallelism}, 前処理: {Preprocessing}",
             options.MaxParallelism, options.EnablePreprocessing);
     }
 
     /// <summary>
     /// バッチOCR処理を試行
+    /// FIX7 Step2: OcrContext対応
     /// </summary>
     private async Task<IReadOnlyList<TextChunk>> TryBatchOcrProcessingAsync(
-        IAdvancedImage image,
-        IntPtr windowHandle,
+        OcrContext context,
         CancellationToken cancellationToken)
     {
         try
         {
             // 画像サイズに基づく最適化
-            await OptimizeBatchPerformanceAsync(image.Width, image.Height, cancellationToken).ConfigureAwait(false);
-            
+            await OptimizeBatchPerformanceAsync(context.Image.Width, context.Image.Height, cancellationToken).ConfigureAwait(false);
+
+            // 🎯 [OPTION_B_PHASE2] IImage → IAdvancedImage キャスト
+            if (context.Image is not IAdvancedImage advancedImage)
+            {
+                throw new InvalidOperationException($"バッチOCR処理にはIAdvancedImageが必要です（実際の型: {context.Image.GetType().Name}）");
+            }
+
             // バッチ処理実行
-            return await _batchOcrProcessor.ProcessBatchAsync(image, windowHandle, cancellationToken).ConfigureAwait(false);
+            return await _batchOcrProcessor.ProcessBatchAsync(advancedImage, context.WindowHandle, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -170,16 +197,16 @@ public sealed class BatchOcrIntegrationService : IDisposable
 
     /// <summary>
     /// フォールバックOCR処理
+    /// FIX7 Step2: OcrContext対応 - **ROOT CAUSE FIX**: CaptureRegionをTextChunkに設定
     /// </summary>
     private async Task<IReadOnlyList<TextChunk>> ExecuteFallbackOcrAsync(
-        IAdvancedImage image,
-        IntPtr windowHandle,
+        OcrContext context,
         CancellationToken cancellationToken)
     {
         try
         {
-            var ocrResults = await _fallbackOcrEngine.RecognizeAsync(image, cancellationToken: cancellationToken).ConfigureAwait(false);
-            
+            var ocrResults = await _fallbackOcrEngine.RecognizeAsync(context.Image, cancellationToken: cancellationToken).ConfigureAwait(false);
+
             if (!ocrResults.HasText)
                 return [];
 
@@ -198,20 +225,24 @@ public sealed class BatchOcrIntegrationService : IDisposable
                     DetectedLanguage = ocrResults.LanguageCode
                 };
 
+                // 🔥 [FIX7_ROOT_CAUSE_FIX] CaptureRegionをTextChunkに設定 - これがFIX7の根本原因修正
                 var chunk = new TextChunk
                 {
                     ChunkId = i,
                     TextResults = [positionedResult],
                     CombinedBounds = region.Bounds,
                     CombinedText = region.Text,
-                    SourceWindowHandle = windowHandle,
-                    DetectedLanguage = ocrResults.LanguageCode
+                    SourceWindowHandle = context.WindowHandle,
+                    DetectedLanguage = ocrResults.LanguageCode,
+                    CaptureRegion = context.CaptureRegion // ✅ [FIX7_CRITICAL] ROI座標ズレ問題の根本原因修正
                 };
 
                 chunks.Add(chunk);
             }
 
-            _logger?.LogInformation("🔄 フォールバックOCR完了 - チャンク数: {ChunkCount}", chunks.Count);
+            _logger?.LogInformation("🔥 [FIX7_STEP2] フォールバックOCR完了 - チャンク数: {ChunkCount}, CaptureRegion設定: {HasCaptureRegion}",
+                chunks.Count, context.HasCaptureRegion);
+
             return chunks;
         }
         catch (Exception ex)
@@ -230,8 +261,8 @@ public sealed class BatchOcrIntegrationService : IDisposable
             return false;
 
         // 有効なテキストを含むチャンクが存在するかチェック
-        var validChunks = chunks.Count(c => 
-            !string.IsNullOrWhiteSpace(c.CombinedText) && 
+        var validChunks = chunks.Count(c =>
+            !string.IsNullOrWhiteSpace(c.CombinedText) &&
             c.AverageConfidence >= 0.1);
 
         return validChunks > 0;

@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.OCR;
 using System.Diagnostics;
+using Baketa.Core.Abstractions.OCR;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.Ensemble.Strategies;
 
@@ -214,7 +214,7 @@ public class WeightedVotingFusionStrategy(ILogger<WeightedVotingFusionStrategy> 
         {
             var correspondingGroup = regionGroups[i];
             var sourceEngines = correspondingGroup.Regions.Select(r => r.EngineName).ToList();
-            
+
             var detail = new RegionFusionDetail(
                 i,
                 sourceEngines,

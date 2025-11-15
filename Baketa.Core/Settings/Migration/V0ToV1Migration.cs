@@ -39,16 +39,16 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
         ArgumentNullException.ThrowIfNull(currentSettings);
         return CanMigrate(currentSettings);
     }
-    
+
     /// <inheritdoc />
     public bool CanMigrate(Dictionary<string, object?> currentSettings)
     {
         ArgumentNullException.ThrowIfNull(currentSettings);
-        
+
         // スキーマバージョンが0または未設定の場合のみマイグレーション可能
         // "Version"と"SchemaVersion"両方をサポート（"SchemaVersion"を優先）
         var versionKeys = new[] { "SchemaVersion", "Version" };
-        
+
         foreach (var key in versionKeys)
         {
             if (currentSettings.TryGetValue(key, out var versionObj))
@@ -58,18 +58,18 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
                     // バージョン0のみマイグレーション可能（厳密なチェック）
                     return version == FromVersion;
                 }
-                
+
                 // nullの場合は初回設定とみなしてマイグレーション可能
                 if (versionObj is null)
                 {
                     return true;
                 }
-                
+
                 // 他の型（stringなど）の場合はマイグレーション不可能
                 return false;
             }
         }
-        
+
         // どちらのバージョンキーも存在しない場合は初回マイグレーション
         return true;
     }
@@ -78,9 +78,9 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
     public async Task<MigrationResult> MigrateAsync(Dictionary<string, object?> currentSettings)
     {
         ArgumentNullException.ThrowIfNull(currentSettings);
-        
+
         _logger?.LogInformation("V0→V1マイグレーションを開始: ホットキー削除とMainUI設定追加");
-        
+
         var startTime = DateTime.Now;
         var migratedSettings = new Dictionary<string, object?>(currentSettings);
         var changes = new List<MigrationSettingChange>();
@@ -92,28 +92,28 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
         {
             // 1. ホットキー関連設定の削除
             await RemoveHotkeySettingsAsync(migratedSettings, changes, deletedSettings, warnings).ConfigureAwait(false);
-            
+
             // 2. MainUI設定の追加
             await AddMainUiSettingsAsync(migratedSettings, changes, addedSettings).ConfigureAwait(false);
-            
+
             // 3. スキーマバージョンの更新（必ずVersionキーを設定）
             UpdateSchemaVersion(migratedSettings, changes);
-            
+
             // 4. 最終更新日時の設定
             UpdateTimestamps(migratedSettings, changes);
-            
+
             var executionTime = (long)(DateTime.Now - startTime).TotalMilliseconds;
-            
+
             _logger?.LogInformation(
-                "V0→V1マイグレーション完了: {ChangedCount}変更, {DeletedCount}削除, {AddedCount}追加, {ExecutionTime}ms", 
+                "V0→V1マイグレーション完了: {ChangedCount}変更, {DeletedCount}削除, {AddedCount}追加, {ExecutionTime}ms",
                 changes.Count, deletedSettings.Count, addedSettings.Count, executionTime);
-            
+
             return MigrationResult.CreateSuccess(
-                migratedSettings, 
-                changes, 
-                deletedSettings, 
-                addedSettings, 
-                warnings, 
+                migratedSettings,
+                changes,
+                deletedSettings,
+                addedSettings,
+                warnings,
                 executionTime);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException))
@@ -128,9 +128,9 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
     public async Task<MigrationResult> DryRunAsync(Dictionary<string, object?> currentSettings)
     {
         ArgumentNullException.ThrowIfNull(currentSettings);
-        
+
         _logger?.LogInformation("V0→V1マイグレーションのドライランを実行");
-        
+
         // 実際のマイグレーションと同じロジックだが、設定は変更しない
         var testSettings = new Dictionary<string, object?>(currentSettings);
         return await MigrateAsync(testSettings).ConfigureAwait(false);
@@ -140,9 +140,9 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
     /// ホットキー関連設定を削除します
     /// </summary>
     private async Task RemoveHotkeySettingsAsync(
-        Dictionary<string, object?> settings, 
-        List<MigrationSettingChange> changes, 
-        List<string> deletedSettings, 
+        Dictionary<string, object?> settings,
+        List<MigrationSettingChange> changes,
+        List<string> deletedSettings,
         List<string> warnings)
     {
         var hotkeyKeys = new[]
@@ -150,7 +150,7 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
             "Hotkey",
             "HotkeySettings",
             "Hotkey.Enabled",
-            "Hotkey.ModifierKeys", 
+            "Hotkey.ModifierKeys",
             "Hotkey.Key",
             "GlobalHotkey",
             "TranslationHotkey",
@@ -164,7 +164,7 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
         };
 
         var removedKeys = new List<string>();
-        
+
         foreach (var key in hotkeyKeys)
         {
             if (settings.TryGetValue(key, out var oldValue))
@@ -190,21 +190,21 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
     /// ネストされたオブジェクト内のホットキー設定を削除します
     /// </summary>
     private async Task RemoveNestedHotkeySettingsAsync(
-        Dictionary<string, object?> settings, 
-        List<MigrationSettingChange> changes, 
-        List<string> deletedSettings, 
+        Dictionary<string, object?> settings,
+        List<MigrationSettingChange> changes,
+        List<string> deletedSettings,
         List<string> warnings)
     {
         // AppSettings内のHotkey系プロパティを削除
         var keysToProcess = settings.Keys.ToList();
         var totalRemovedCount = 0;
-        
+
         foreach (var key in keysToProcess)
         {
             if (settings[key] is Dictionary<string, object?> nestedDict)
             {
                 var nestedKeysToRemove = nestedDict.Keys
-                    .Where(k => k.Contains("Hotkey", StringComparison.OrdinalIgnoreCase) || 
+                    .Where(k => k.Contains("Hotkey", StringComparison.OrdinalIgnoreCase) ||
                                k.Contains("KeyBinding", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
@@ -212,13 +212,13 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
                 {
                     var fullKey = $"{key}.{nestedKey}";
                     var oldValue = nestedDict[nestedKey];
-                    
+
                     nestedDict.Remove(nestedKey);
                     changes.Add(new MigrationSettingChange(fullKey, oldValue, null, "ネストされたホットキー設定の削除"));
                     deletedSettings.Add(fullKey);
                     totalRemovedCount++;
                 }
-                
+
                 // 空のネストオブジェクトになった場合の警告
                 if (nestedDict.Count == 0 && nestedKeysToRemove.Count > 0)
                 {
@@ -226,7 +226,7 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
                 }
             }
         }
-        
+
         // ネストした設定の削除に関する総合警告
         if (totalRemovedCount > 0)
         {
@@ -241,12 +241,12 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
     /// MainUI設定を追加します
     /// </summary>
     private async Task AddMainUiSettingsAsync(
-        Dictionary<string, object?> settings, 
-        List<MigrationSettingChange> changes, 
+        Dictionary<string, object?> settings,
+        List<MigrationSettingChange> changes,
         List<string> addedSettings)
     {
         var mainUiKey = "MainUi";
-        
+
         if (!settings.TryGetValue(mainUiKey, out _))
         {
             var mainUiSettings = new Dictionary<string, object?>
@@ -288,7 +288,7 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
         // 既存バージョンの確認
         var versionKeys = new[] { "SchemaVersion", "Version" };
         object? oldVersion = null;
-        
+
         // 既存のバージョンキーを検索
         foreach (var key in versionKeys)
         {
@@ -298,12 +298,12 @@ public sealed class V0ToV1Migration(ILogger<V0ToV1Migration>? logger = null) : I
                 break;
             }
         }
-        
+
         // Versionキーを必ず設定（テストが期待しているため）
         var newVersion = ToVersion;
         settings["Version"] = newVersion;
         changes.Add(new MigrationSettingChange("Version", oldVersion, newVersion, "マイグレーションによるバージョン更新"));
-        
+
         // SchemaVersionも設定（将来的な一貫性のため）
         if (!settings.ContainsKey("SchemaVersion"))
         {

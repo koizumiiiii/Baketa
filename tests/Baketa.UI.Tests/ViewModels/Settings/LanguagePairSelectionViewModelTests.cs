@@ -1,17 +1,17 @@
 using System;
 using System.Linq;
 using System.Reactive.Linq;
+using Baketa.Core.Abstractions.Events;
+using Baketa.UI.Configuration;
+using Baketa.UI.Models;
+using Baketa.UI.Services;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using ReactiveUI.Testing;
 using Xunit;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.Configuration;
-using Baketa.UI.Models;
-using Baketa.UI.Services;
-using Baketa.UI.ViewModels.Settings;
 using EngineStatus = Baketa.UI.Services.TranslationEngineStatus;
 using StatusUpdate = Baketa.UI.Services.TranslationEngineStatusUpdate;
 
@@ -50,11 +50,11 @@ public class LanguagePairSelectionViewModelTests
         // デフォルトのモック設定
         var localStatus = new EngineStatus { IsOnline = true, IsHealthy = true };
         var cloudStatus = new EngineStatus { IsOnline = false, IsHealthy = false };
-        
+
         _mockStatusService.Setup(x => x.LocalEngineStatus).Returns(localStatus);
         _mockStatusService.Setup(x => x.CloudEngineStatus).Returns(cloudStatus);
         _mockStatusService.Setup(x => x.StatusUpdates).Returns(Observable.Never<StatusUpdate>());
-        
+
         // LocalizationServiceのObservableをモック設定
         _mockLocalizationService.Setup(x => x.CurrentLanguageChanged).Returns(Observable.Never<System.Globalization.CultureInfo>());
     }
@@ -76,7 +76,7 @@ public class LanguagePairSelectionViewModelTests
     public void Constructor_WithNullStatusService_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new LanguagePairSelectionViewModel(
                 null!,
                 _mockLocalizationService.Object,
@@ -90,7 +90,7 @@ public class LanguagePairSelectionViewModelTests
     public void Constructor_WithNullLocalizationService_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new LanguagePairSelectionViewModel(
                 _mockStatusService.Object,
                 null!,
@@ -104,7 +104,7 @@ public class LanguagePairSelectionViewModelTests
     public void Constructor_WithNullNotificationService_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new LanguagePairSelectionViewModel(
                 _mockStatusService.Object,
                 _mockLocalizationService.Object,
@@ -118,7 +118,7 @@ public class LanguagePairSelectionViewModelTests
     public void Constructor_WithNullOptions_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new LanguagePairSelectionViewModel(
                 _mockStatusService.Object,
                 _mockLocalizationService.Object,
@@ -132,7 +132,7 @@ public class LanguagePairSelectionViewModelTests
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new LanguagePairSelectionViewModel(
                 _mockStatusService.Object,
                 _mockLocalizationService.Object,
@@ -158,7 +158,7 @@ public class LanguagePairSelectionViewModelTests
         using (viewModel.Activator.Activate())
         {
             viewModel.SelectedLanguagePair = chinesePair;
-            
+
             // ReactiveUIの処理を完了させるため、少し待機
             System.Threading.Thread.Sleep(50);
         }
@@ -185,7 +185,7 @@ public class LanguagePairSelectionViewModelTests
         using (viewModel.Activator.Activate())
         {
             viewModel.SelectedLanguagePair = nonChinesePair;
-            
+
             // ReactiveUIの処理を完了させるため、少し待機
             System.Threading.Thread.Sleep(50);
         }

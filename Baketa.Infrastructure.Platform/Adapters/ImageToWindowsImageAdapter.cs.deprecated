@@ -1,0 +1,167 @@
+using System.Drawing;
+using System.IO;
+using Microsoft.Extensions.Logging;
+using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.Memory;
+
+namespace Baketa.Infrastructure.Platform.Adapters;
+
+/// <summary>
+/// IImage → IWindowsImage アダプター
+///
+/// 🎯 UltraThink Phase 77.6 完全解決策
+///
+/// 問題: ReferencedSafeImage が IWindowsImage インターフェースを実装していない
+/// 解決: ReferencedSafeImage を IWindowsImage として扱える軽量アダプター
+///
+/// 機能:
+/// - ReferencedSafeImage → IWindowsImage 型変換
+/// - Bitmap 変換による GetBitmap() メソッド実装
+/// - ROI 検出器が要求する IWindowsImage 互換性提供
+/// </summary>
+public sealed class ImageToWindowsImageAdapter : IWindowsImage, IDisposable
+{
+    private readonly IImage _underlyingImage;
+    private readonly ILogger<ImageToWindowsImageAdapter> _logger;
+    private Bitmap? _cachedBitmap;
+    private bool _disposed;
+
+    /// <summary>
+    /// IImage の Width を IWindowsImage として公開
+    /// </summary>
+    public int Width => _underlyingImage.Width;
+
+    /// <summary>
+    /// IImage の Height を IWindowsImage として公開
+    /// </summary>
+    public int Height => _underlyingImage.Height;
+
+    /// <summary>
+    /// IImage の PixelFormat を ImagePixelFormat として公開
+    /// </summary>
+    public Core.Abstractions.Imaging.ImagePixelFormat PixelFormat => _underlyingImage.PixelFormat;
+
+    /// <summary>
+    /// IImage の Format を IWindowsImage 形式で公開
+    /// </summary>
+    public Core.Abstractions.Imaging.ImageFormat Format => _underlyingImage.Format;
+
+    /// <summary>
+    /// IImage の CreatedAt を公開
+    /// </summary>
+    public DateTime CreatedAt => _underlyingImage.CreatedAt;
+
+    /// <summary>
+    /// コンストラクタ
+    /// </summary>
+    /// <param name="underlyingImage">変換元の IImage</param>
+    /// <param name="logger">ログ出力用</param>
+    public ImageToWindowsImageAdapter(
+        IImage underlyingImage,
+        ILogger<ImageToWindowsImageAdapter>? logger = null)
+    {
+        _underlyingImage = underlyingImage ?? throw new ArgumentNullException(nameof(underlyingImage));
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ImageToWindowsImageAdapter>.Instance;
+
+        _logger.LogDebug("🔄 [PHASE77.6] ImageToWindowsImageAdapter 作成 - Size: {Width}x{Height}, Type: {ImageType}",
+            Width, Height, underlyingImage.GetType().Name);
+    }
+
+    /// <summary>
+    /// IWindowsImage として要求される GetBitmap() メソッド実装
+    /// </summary>
+    /// <returns>System.Drawing.Bitmap</returns>
+    public Bitmap GetBitmap()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_cachedBitmap != null)
+        {
+            _logger.LogDebug("🔄 [PHASE77.6] キャッシュ済み Bitmap を返却");
+            return _cachedBitmap;
+        }
+
+        try
+        {
+            _logger.LogDebug("🔄 [PHASE77.6] IImage → Bitmap 変換開始");
+
+            // IImage.ToByteArrayAsync() を同期的に呼び出し
+            var imageBytes = _underlyingImage.ToByteArrayAsync().Result;
+
+            using var memoryStream = new MemoryStream(imageBytes);
+            _cachedBitmap = new Bitmap(memoryStream);
+
+            _logger.LogDebug("✅ [PHASE77.6] Bitmap 変換成功 - Size: {Width}x{Height}",
+                _cachedBitmap.Width, _cachedBitmap.Height);
+
+            return _cachedBitmap;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [PHASE77.6] IImage → Bitmap 変換失敗: {ErrorMessage}", ex.Message);
+            throw new InvalidOperationException($"Failed to convert IImage to Bitmap: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// IImage インターフェースの ToByteArrayAsync() を委譲
+    /// </summary>
+    public Task<byte[]> ToByteArrayAsync() => _underlyingImage.ToByteArrayAsync();
+
+    /// <summary>
+    /// IImage インターフェースの GetImageMemory() を委譲
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory() => _underlyingImage.GetImageMemory();
+
+    /// <summary>
+    /// IImage インターフェースの Clone() を委譲
+    /// </summary>
+    public IImage Clone() => _underlyingImage.Clone();
+
+    /// <summary>
+    /// IImage インターフェースの ResizeAsync() を委譲
+    /// </summary>
+    public Task<IImage> ResizeAsync(int width, int height) => _underlyingImage.ResizeAsync(width, height);
+
+    /// <summary>
+    /// リソース解放
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+
+        try
+        {
+            _cachedBitmap?.Dispose();
+            _cachedBitmap = null;
+
+            _logger.LogDebug("🔄 [PHASE77.6] ImageToWindowsImageAdapter リソース解放完了");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ [PHASE77.6] ImageToWindowsImageAdapter リソース解放で警告: {ErrorMessage}", ex.Message);
+        }
+        finally
+        {
+            _disposed = true;
+        }
+    }
+
+    /// <summary>
+    /// 内部の IImage への安全なアクセス
+    /// </summary>
+    /// <returns>ラップしている IImage インスタンス</returns>
+    public IImage GetUnderlyingImage()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _underlyingImage;
+    }
+
+    /// <summary>
+    /// デバッグ用の文字列表現
+    /// </summary>
+    public override string ToString()
+    {
+        return $"ImageToWindowsImageAdapter[{Width}x{Height}, Type: {_underlyingImage.GetType().Name}, Disposed: {_disposed}]";
+    }
+}

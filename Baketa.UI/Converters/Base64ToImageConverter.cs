@@ -54,15 +54,15 @@ public class Base64ToImageConverter : IValueConverter
     {
         // 64x64のグレープレースホルダー画像を作成
         var bitmap = new WriteableBitmap(new Avalonia.PixelSize(64, 64), new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul);
-        
+
         using var lockedFrameBuffer = bitmap.Lock();
         var ptr = lockedFrameBuffer.Address;
         var stride = lockedFrameBuffer.RowBytes;
-        
+
         unsafe
         {
             byte* buffer = (byte*)ptr.ToPointer();
-            
+
             // グレー色(128, 128, 128, 255)で全体を塗りつぶす
             for (int y = 0; y < 64; y++)
             {
@@ -76,7 +76,7 @@ public class Base64ToImageConverter : IValueConverter
                 }
             }
         }
-        
+
         return bitmap;
     }
 
@@ -88,23 +88,23 @@ public class Base64ToImageConverter : IValueConverter
         // 空文字列チェック
         if (string.IsNullOrWhiteSpace(base64String))
             return false;
-            
+
         // 長さチェック（4の倍数であるべき）
         if (base64String.Length % 4 != 0)
             return false;
-            
+
         // 有効な文字のみかどうかチェック
         return base64String.All(IsValidBase64Char);
     }
-    
+
     /// <summary>
     /// Base64文字で有効な文字かどうかチェック
     /// </summary>
     private static bool IsValidBase64Char(char c)
     {
-        return (c >= 'A' && c <= 'Z') || 
-               (c >= 'a' && c <= 'z') || 
-               (c >= '0' && c <= '9') || 
+        return (c >= 'A' && c <= 'Z') ||
+               (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') ||
                c == '+' || c == '/' || c == '=';
     }
 

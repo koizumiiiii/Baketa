@@ -2,13 +2,13 @@ using System;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using ReactiveUI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -96,7 +96,7 @@ public sealed class EngineStatusViewModel : Framework.ViewModelBase, IActivatabl
         ArgumentNullException.ThrowIfNull(statusService);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
-        
+
         _statusService = statusService;
         _logger = logger;
         _options = options.Value;
@@ -136,21 +136,21 @@ public sealed class EngineStatusViewModel : Framework.ViewModelBase, IActivatabl
 
         // LocalOnlyエンジンの状態
         IsLocalEngineHealthy = localStatus.IsHealthy;
-        LocalEngineStatusText = localStatus.IsHealthy ? 
-            "正常" : 
+        LocalEngineStatusText = localStatus.IsHealthy ?
+            "正常" :
             $"エラー: {localStatus.LastError}";
 
         // CloudOnlyエンジンの状態
         IsCloudEngineHealthy = cloudStatus.IsHealthy && cloudStatus.IsOnline;
-        CloudEngineStatusText = !cloudStatus.IsOnline ? 
-            "オフライン" : 
-            cloudStatus.IsHealthy ? 
-                $"正常 (残り: {cloudStatus.RemainingRequests}回)" : 
+        CloudEngineStatusText = !cloudStatus.IsOnline ?
+            "オフライン" :
+            cloudStatus.IsHealthy ?
+                $"正常 (残り: {cloudStatus.RemainingRequests}回)" :
                 $"エラー: {cloudStatus.LastError}";
 
         LastUpdateTime = DateTime.Now.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
 
-        _logger.LogDebug("Engine status display updated - Local: {LocalHealthy}, Cloud: {CloudHealthy}", 
+        _logger.LogDebug("Engine status display updated - Local: {LocalHealthy}, Cloud: {CloudHealthy}",
             IsLocalEngineHealthy, IsCloudEngineHealthy);
     }
 

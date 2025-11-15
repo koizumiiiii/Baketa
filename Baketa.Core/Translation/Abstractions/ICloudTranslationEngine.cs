@@ -14,24 +14,24 @@ public interface ICloudTranslationEngine : ITranslationEngine
     /// APIのベースURL
     /// </summary>
     Uri ApiBaseUrl { get; }
-    
+
     /// <summary>
     /// APIキーが設定されているかどうか
     /// </summary>
     bool HasApiKey { get; }
-    
+
     /// <summary>
     /// クラウドプロバイダーの種類
     /// </summary>
     CloudProviderType ProviderType { get; }
-    
+
     /// <summary>
     /// 高度な翻訳機能の実行
     /// </summary>
     Task<AdvancedTranslationResponse> TranslateAdvancedAsync(
-        AdvancedTranslationRequest request, 
+        AdvancedTranslationRequest request,
         CancellationToken cancellationToken = default);
-        
+
     /// <summary>
     /// APIのステータスを確認します
     /// </summary>
@@ -47,7 +47,7 @@ public enum CloudProviderType
     /// Google Gemini
     /// </summary>
     Gemini,
-    
+
     /// <summary>
     /// その他のクラウドプロバイダー
     /// </summary>

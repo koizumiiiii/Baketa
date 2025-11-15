@@ -1,9 +1,9 @@
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using System.IO;
 using System.Security;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Unit;
 
@@ -22,11 +22,11 @@ public class PaddleOcrInitializerTests : IDisposable
     {
         _mockLogger = new Mock<ILogger>();
         _mockModelPathResolver = new Mock<IModelPathResolver>();
-        
+
         // テスト用の安全な一時ディレクトリ
         _testBaseDirectory = Path.Combine(Path.GetTempPath(), "BaketaOCRSafeTest", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testBaseDirectory);
-        
+
         SetupSafeModelPathResolverMock();
     }
 
@@ -46,22 +46,22 @@ public class PaddleOcrInitializerTests : IDisposable
 
         _mockModelPathResolver.Setup(x => x.GetModelsRootDirectory())
             .Returns(modelsDirectory);
-        
+
         _mockModelPathResolver.Setup(x => x.GetDetectionModelsDirectory())
             .Returns(detectionDirectory);
-        
+
         _mockModelPathResolver.Setup(x => x.GetRecognitionModelsDirectory("eng"))
             .Returns(recognitionEngDirectory);
-        
+
         _mockModelPathResolver.Setup(x => x.GetRecognitionModelsDirectory("jpn"))
             .Returns(recognitionJpnDirectory);
 
         _mockModelPathResolver.Setup(x => x.GetDetectionModelPath("det_db_standard"))
             .Returns(Path.Combine(detectionDirectory, "det_db_standard.onnx"));
-        
+
         _mockModelPathResolver.Setup(x => x.GetRecognitionModelPath("eng", "rec_english_standard"))
             .Returns(Path.Combine(recognitionEngDirectory, "rec_english_standard.onnx"));
-        
+
         _mockModelPathResolver.Setup(x => x.GetRecognitionModelPath("jpn", "rec_japan_standard"))
             .Returns(Path.Combine(recognitionJpnDirectory, "rec_japan_standard.onnx"));
 
@@ -173,7 +173,7 @@ public class PaddleOcrInitializerTests : IDisposable
     public void Constructor_NullBaseDirectory_SimulatesArgumentNullException()
     {
         // Act & Assert - 無効な引数の検証をシミュレート
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
         {
             if (string.IsNullOrEmpty(null))
                 throw new ArgumentNullException("baseDirectory");
@@ -184,7 +184,7 @@ public class PaddleOcrInitializerTests : IDisposable
     public void Constructor_NullModelPathResolver_SimulatesArgumentNullException()
     {
         // Act & Assert - null引数の検証をシミュレート
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
         {
             IModelPathResolver? nullResolver = null;
             ArgumentNullException.ThrowIfNull(nullResolver);
@@ -211,7 +211,7 @@ public class PaddleOcrInitializerTests : IDisposable
 
         // Assert
         Assert.True(result, "Safe test initialization should succeed");
-        
+
         // ディレクトリが作成されることを確認
         var modelsDirectory = _mockModelPathResolver.Object.GetModelsRootDirectory();
         Assert.True(Directory.Exists(modelsDirectory));
@@ -222,7 +222,7 @@ public class PaddleOcrInitializerTests : IDisposable
     {
         // Arrange - 初回初期化
         await SafeTestInitializeAsync().ConfigureAwait(false);
-        
+
         // Act - 2回目の初期化
         var result = await SafeTestInitializeAsync().ConfigureAwait(false);
 
@@ -260,15 +260,15 @@ public class PaddleOcrInitializerTests : IDisposable
     {
         // Arrange - 安全なエラーシミュレーション
         var errorSimulationModelPathResolver = new Mock<IModelPathResolver>();
-        
+
         // 存在しない安全なパス（ネットワークパスではない）
         var safeInvalidPath = Path.Combine("C:", "NonExistentSafePath", Guid.NewGuid().ToString());
-        
+
         errorSimulationModelPathResolver.Setup(x => x.GetDetectionModelsDirectory())
             .Returns(Path.Combine(safeInvalidPath, "detection"));
         errorSimulationModelPathResolver.Setup(x => x.GetRecognitionModelsDirectory(It.IsAny<string>()))
             .Returns(Path.Combine(safeInvalidPath, "recognition", "eng"));
-        
+
         // エラーをシミュレート
         errorSimulationModelPathResolver.Setup(x => x.EnsureDirectoryExists(It.IsAny<string>()))
             .Throws(new UnauthorizedAccessException("テスト用: アクセスが拒否されました"));
@@ -321,7 +321,7 @@ public class PaddleOcrInitializerTests : IDisposable
         // Act & Assert - 複数回呼び出しても安全であることをシミュレート
         Dispose(true);
         Dispose(true); // 2回目の呼び出し
-        
+
         Assert.True(true); // 例外が発生しないことを確認
     }
 
@@ -361,7 +361,7 @@ public class PaddleOcrInitializerTests : IDisposable
     {
         // Arrange - エラーログのシミュレーション
         var testException = new UnauthorizedAccessException("テスト用: ディレクトリ作成エラー");
-        
+
         // Act - エラー処理をシミュレート
         _mockLogger.Object?.LogError(testException, "初期化に失敗: アクセス拒否");
 
@@ -429,7 +429,7 @@ public class PaddleOcrInitializerTests : IDisposable
                     // I/Oエラーは無視
                 }
             }
-            
+
             _disposed = true;
         }
     }

@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Settings;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.OCR.GPU;
 
@@ -24,7 +24,7 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrSettings = ocrSettings?.Value ?? throw new ArgumentNullException(nameof(ocrSettings));
-        
+
         InitializeDefaultModels();
         _logger.LogInformation("🔧 DefaultOnnxModelConfiguration初期化完了 - モデル外部化対応");
     }
@@ -51,7 +51,7 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
             _logger.LogWarning("モデル名が指定されていません");
             return null;
         }
-        
+
         return _modelCache.GetValueOrDefault(modelName);
     }
 
@@ -66,9 +66,9 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
         {
             throw new ArgumentException("モデル名が指定されていません", nameof(modelName));
         }
-        
+
         ArgumentNullException.ThrowIfNull(modelInfo);
-        
+
         lock (_configLock)
         {
             _modelCache.AddOrUpdate(modelName, modelInfo, (_, _) => modelInfo);
@@ -81,7 +81,7 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
         try
         {
             _logger.LogDebug("🔍 モデル検証開始: {ModelName}", modelName);
-            
+
             var modelInfo = GetCustomModelInfo(modelName);
             if (modelInfo == null)
             {
@@ -91,11 +91,11 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
                     ValidationErrors = [$"モデル '{modelName}' が見つかりません"]
                 };
             }
-            
+
             var errors = new List<string>();
             var warnings = new List<string>();
             var details = new Dictionary<string, object>();
-            
+
             // モデルファイル存在チェック
             if (!System.IO.File.Exists(modelInfo.ModelPath))
             {
@@ -105,18 +105,18 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
             {
                 details["ModelFileSize"] = new System.IO.FileInfo(modelInfo.ModelPath).Length;
             }
-            
+
             // テンソル名検証
             if (modelInfo.InputTensorNames.Count == 0)
             {
                 warnings.Add("入力テンソル名が定義されていません");
             }
-            
+
             if (modelInfo.OutputTensorNames.Count == 0)
             {
                 warnings.Add("出力テンソル名が定義されていません");
             }
-            
+
             // 形状定義検証
             foreach (var inputName in modelInfo.InputTensorNames)
             {
@@ -125,7 +125,7 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
                     warnings.Add($"入力テンソル '{inputName}' の形状が定義されていません");
                 }
             }
-            
+
             foreach (var outputName in modelInfo.OutputTensorNames)
             {
                 if (!modelInfo.OutputShapes.ContainsKey(outputName))
@@ -133,17 +133,17 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
                     warnings.Add($"出力テンソル '{outputName}' の形状が定義されていません");
                 }
             }
-            
+
             // メモリ使用量チェック
             if (modelInfo.EstimatedMemoryUsageMB > 16384) // 16GB以上
             {
                 warnings.Add($"推定メモリ使用量が大きすぎます: {modelInfo.EstimatedMemoryUsageMB}MB");
             }
-            
+
             details["InputTensorCount"] = modelInfo.InputTensorNames.Count;
             details["OutputTensorCount"] = modelInfo.OutputTensorNames.Count;
             details["ModelVersion"] = modelInfo.ModelVersion;
-            
+
             var result = new ModelValidationResult
             {
                 IsValid = errors.Count == 0,
@@ -151,10 +151,10 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
                 ValidationWarnings = warnings,
                 ValidationDetails = details
             };
-            
+
             _logger.LogInformation("✅ モデル検証完了: {ModelName} - 有効: {IsValid}, エラー: {ErrorCount}, 警告: {WarningCount}",
                 modelName, result.IsValid, errors.Count, warnings.Count);
-            
+
             return result;
         }
         catch (Exception ex)
@@ -173,19 +173,19 @@ public sealed class DefaultOnnxModelConfiguration : IOnnxModelConfiguration
         try
         {
             _logger.LogDebug("🏗️ デフォルトモデル設定初期化開始");
-            
+
             // PaddleOCR PP-OCRv4 検出モデル
             var detectionModel = CreateDetectionModelInfo();
             _modelCache.TryAdd("TextDetection", detectionModel);
-            
+
             // PaddleOCR PP-OCRv4 認識モデル
             var recognitionModel = CreateRecognitionModelInfo();
             _modelCache.TryAdd("TextRecognition", recognitionModel);
-            
+
             // 言語識別モデル
             var languageIdModel = CreateLanguageIdentificationModelInfo();
             _modelCache.TryAdd("LanguageIdentification", languageIdModel);
-            
+
             _logger.LogInformation("✅ デフォルトモデル設定初期化完了 - 登録モデル数: {Count}", _modelCache.Count);
         }
         catch (Exception ex)

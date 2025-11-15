@@ -4,14 +4,16 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Imaging.Pipeline;
+using Baketa.Core.Abstractions.Memory;
+using Baketa.Core.Abstractions.OCR.TextDetection;
+using Baketa.Infrastructure.OCR.TextDetection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
-using Baketa.Infrastructure.OCR.TextDetection;
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.Imaging.Pipeline;
-using Baketa.Core.Abstractions.OCR.TextDetection;
 using OCRTextRegion = Baketa.Core.Abstractions.OCR.TextDetection.TextRegion;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Infrastructure.Tests.OCR.TextDetection;
 
@@ -54,7 +56,7 @@ public class AdaptiveTextRegionDetectorTests : IDisposable
         {
             var regions = await _detector.DetectRegionsAsync(_testImage);
             results.Add(regions);
-            
+
             // 少し間隔を空けて履歴ベースの最適化を発動させる
             await Task.Delay(100);
         }
@@ -117,7 +119,7 @@ public class AdaptiveTextRegionDetectorTests : IDisposable
         {
             // Act - 一時的なファイル名でプロファイル保存をテスト
             await _detector.SaveProfileAsync(profileName);
-            
+
             // Assert - 例外が発生しないことを確認
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or DirectoryNotFoundException)
@@ -158,17 +160,17 @@ public class AdaptiveTextRegionDetectorTests : IDisposable
     {
         // Arrange - キャンセルトークンを遅延して適用
         using var cancellationTokenSource = new CancellationTokenSource();
-        
+
         // Act - 非同期でキャンセルして適切なタイミングで例外を発生させる
         var detectionTask = _detector.DetectRegionsAsync(_testImage, cancellationTokenSource.Token);
-        
+
         // 短い遅延でキャンセルを申請（税理処理開始後）
-        _ = Task.Run(async () => 
+        _ = Task.Run(async () =>
         {
             await Task.Delay(50); // 処理開始を待つ
             cancellationTokenSource.Cancel();
         });
-        
+
         // Assert - キャンセル例外または正常完了を許可
         try
         {
@@ -233,18 +235,43 @@ internal sealed class TestImage(int width, int height) : IAdvancedImage
     public int Height { get; } = height;
     public int Channels => 3;
     public Type PixelType => typeof(byte);
-    
+
     // IAdvancedImage specific properties
     public bool IsGrayscale => false;
     public int BitsPerPixel => 24;
     public int ChannelCount => 3;
     public ImageFormat Format => ImageFormat.Rgb24;
 
+    /// <summary>
+    /// ピクセルフォーマット（Gemini推奨拡張）
+    /// </summary>
+    public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgb24;
+
+    /// <summary>
+    /// Phase 2.5: ROI座標変換対応 - テスト用画像なのでnull
+    /// </summary>
+    public System.Drawing.Rectangle? CaptureRegion => null;
+
+    /// <summary>
+    /// 画像データの読み取り専用メモリを取得（Gemini推奨拡張）
+    /// </summary>
+    public ReadOnlyMemory<byte> GetImageMemory()
+    {
+        // テスト用のダミー画像データを生成
+        var imageData = new byte[Width * Height * 3];
+        return new ReadOnlyMemory<byte>(imageData);
+    }
+
+    /// <summary>
+    /// 🔥 [PHASE5.2G-A] LockPixelData (TestImage is test-only, not supported)
+    /// </summary>
+    public PixelDataLock LockPixelData() => throw new NotSupportedException("TestImage does not support LockPixelData");
+
     // IImage methods
     IImage IImage.Clone() => new TestImage(Width, Height);
     public async Task<IImage> ResizeAsync(int newWidth, int newHeight) => await Task.FromResult(new TestImage(newWidth, newHeight)).ConfigureAwait(false);
     public async Task<byte[]> ToByteArrayAsync() => await Task.FromResult(new byte[Width * Height * 3]).ConfigureAwait(false);
-    
+
     // IAdvancedImage methods
     public IAdvancedImage Clone() => new TestImage(Width, Height);
     public async Task<IAdvancedImage> ToGrayscaleAsync() => await Task.FromResult(new TestImage(Width, Height)).ConfigureAwait(false);
@@ -256,8 +283,8 @@ internal sealed class TestImage(int width, int height) : IAdvancedImage
     public async Task<float> EvaluateTextProbabilityAsync(Rectangle region) { _ = region; return await Task.FromResult(0.7f).ConfigureAwait(false); }
     public async Task<IAdvancedImage> RotateAsync(float angle) { _ = angle; return await Task.FromResult(this).ConfigureAwait(false); }
     public async Task<IAdvancedImage> EnhanceAsync(ImageEnhancementOptions options) { _ = options; return await Task.FromResult(this).ConfigureAwait(false); }
-    public async Task<List<Rectangle>> DetectTextRegionsAsync() => await Task.FromResult<List<Rectangle>>([]);
-    
+    public async Task<List<Rectangle>> DetectTextRegionsAsync() => await Task.FromResult(new List<Rectangle>());
+
     // 不足しているメンバー
     public Color GetPixel(int x, int y) { _ = x; _ = y; return Color.Black; }
     public void SetPixel(int x, int y, Color value) { _ = x; _ = y; _ = value; /* スタブ実装 */ }
@@ -265,7 +292,7 @@ internal sealed class TestImage(int width, int height) : IAdvancedImage
     public async Task<IAdvancedImage> ApplyFiltersAsync(IEnumerable<IImageFilter> filters) { _ = filters; return await Task.FromResult(this).ConfigureAwait(false); }
     public async Task<int[]> ComputeHistogramAsync(ColorChannel channel) { _ = channel; return await Task.FromResult(new int[256]).ConfigureAwait(false); }
     public IAdvancedImage ToGrayscale() => this;
-    
+
     // Legacy methods
     public void Save(string filePath) { _ = filePath; /* スタブ実装 */ }
     public T GetPixel<T>(int x, int y) { _ = x; _ = y; return default!; }

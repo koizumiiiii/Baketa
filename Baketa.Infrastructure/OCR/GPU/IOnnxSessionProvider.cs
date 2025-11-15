@@ -1,5 +1,5 @@
-using Microsoft.ML.OnnxRuntime;
 using Baketa.Core.Abstractions.GPU;
+using Microsoft.ML.OnnxRuntime;
 
 namespace Baketa.Infrastructure.OCR.GPU;
 

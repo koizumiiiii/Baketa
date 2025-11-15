@@ -18,6 +18,9 @@
 		<!-- イベントArgs/Handlerクラスとstaticメソッド警告を抑制 - 最適化版 -->
 		<!-- AVLN5001警告を抑制: AR風翻訳UIへの移行中のため廃止予定警告を抑制 -->
 		<NoWarn>$(NoWarn);CA1848;CA1711;AVLN5001</NoWarn>
+		<!-- Fody警告を抑制: ReactiveUIは意図的に無効化 (OutOfMemoryException回避) -->
+		<FodyVerifyIgnoreCodes>True</FodyVerifyIgnoreCodes>
+		<DisableFody>true</DisableFody>
 		
 		<!-- リリース用設定 -->
 		<AssemblyTitle>Baketa - Game Translation Overlay</AssemblyTitle>
@@ -87,7 +90,8 @@
     </PackageReference>
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.2.7" />
     <PackageReference Include="ReactiveUI" Version="20.1.63" />
-    <PackageReference Include="ReactiveUI.Fody" Version="19.5.41" />
+    <!-- ReactiveUI.Fodyは意図的に無効化 (OutOfMemoryException回避) - PrivateAssetsで警告抑制 -->
+    <PackageReference Include="ReactiveUI.Fody" Version="19.5.41" PrivateAssets="All" />
     <PackageReference Include="ReactiveUI.Validation" Version="4.1.1" />
     <PackageReference Include="Splat.Microsoft.Extensions.DependencyInjection" Version="15.0.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />

@@ -1,13 +1,13 @@
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -19,19 +19,19 @@ public sealed class CaptureSettingsViewModel : Framework.ViewModelBase
 {
     private readonly CaptureSettings _originalSettings;
     private readonly ILogger<CaptureSettingsViewModel>? _logger;
-    
+
     // バッキングフィールド - 基本設定
     private bool _isEnabled;
     private int _captureIntervalMs;
     private int _captureQuality;
     private bool _autoDetectCaptureArea;
-    
+
     // バッキングフィールド - 固定領域設定
     private int _fixedCaptureAreaX;
     private int _fixedCaptureAreaY;
     private int _fixedCaptureAreaWidth;
     private int _fixedCaptureAreaHeight;
-    
+
     // バッキングフィールド - 詳細設定
     private int _targetMonitor;
     private bool _considerDpiScaling;
@@ -40,19 +40,19 @@ public sealed class CaptureSettingsViewModel : Framework.ViewModelBase
     private int _differenceDetectionSensitivity;
     private double _differenceThreshold;
     private int _differenceDetectionGridSize;
-    
+
     // バッキングフィールド - ゲーム対応
     private bool _fullscreenOptimization;
     private bool _autoOptimizeForGames;
-    
+
     // バッキングフィールド - 履歴設定
     private bool _saveCaptureHistory;
     private int _maxCaptureHistoryCount;
-    
+
     // バッキングフィールド - デバッグ設定
     private bool _saveDebugCaptures;
     private string _debugCaptureSavePath;
-    
+
     // UI制御フィールド
     private bool _showAdvancedSettings;
     private bool _hasChanges;
@@ -434,55 +434,57 @@ public sealed class CaptureSettingsViewModel : Framework.ViewModelBase
         this.WhenAnyValue(x => x.IsEnabled)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.CaptureIntervalMs)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.CaptureQuality)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.AutoDetectCaptureArea)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => {
+            .Subscribe(_ =>
+            {
                 HasChanges = true;
                 this.RaisePropertyChanged(nameof(IsFixedAreaEnabled));
             });
-        
+
         // 固定領域設定の変更追跡
-        this.WhenAnyValue(x => x.FixedCaptureAreaX, x => x.FixedCaptureAreaY, 
+        this.WhenAnyValue(x => x.FixedCaptureAreaX, x => x.FixedCaptureAreaY,
                           x => x.FixedCaptureAreaWidth, x => x.FixedCaptureAreaHeight)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 詳細設定プロパティの変更追跡
         this.WhenAnyValue(x => x.TargetMonitor)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => {
+            .Subscribe(_ =>
+            {
                 HasChanges = true;
                 this.RaisePropertyChanged(nameof(SelectedMonitorOption));
             });
-        
+
         this.WhenAnyValue(x => x.ConsiderDpiScaling, x => x.UseHardwareAcceleration, x => x.EnableDifferenceDetection)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
-        this.WhenAnyValue(x => x.DifferenceDetectionSensitivity, x => x.DifferenceThreshold, 
+
+        this.WhenAnyValue(x => x.DifferenceDetectionSensitivity, x => x.DifferenceThreshold,
                           x => x.DifferenceDetectionGridSize)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // ゲーム対応設定の変更追跡
         this.WhenAnyValue(x => x.FullscreenOptimization, x => x.AutoOptimizeForGames)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 履歴設定の変更追跡
         this.WhenAnyValue(x => x.SaveCaptureHistory, x => x.MaxCaptureHistoryCount)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // デバッグ設定の変更追跡
         this.WhenAnyValue(x => x.SaveDebugCaptures, x => x.DebugCaptureSavePath)
             .Skip(1).DistinctUntilChanged()
@@ -546,13 +548,13 @@ public sealed class CaptureSettingsViewModel : Framework.ViewModelBase
             new() { Index = -1, Name = "自動選択" },
             new() { Index = 0, Name = "プライマリモニター" }
         };
-        
+
         // TODO: 実際のモニター検出ロジックを実装
         for (int i = 1; i <= 3; i++)
         {
             monitors.Add(new MonitorOption { Index = i, Name = $"モニター {i + 1}" });
         }
-        
+
         return monitors;
     }
 
@@ -569,25 +571,25 @@ public sealed class CaptureSettingsViewModel : Framework.ViewModelBase
                 _logger?.LogWarning("キャプチャ間隔が範囲外です: {Interval}ms", CaptureIntervalMs);
                 return false;
             }
-            
+
             // キャプチャ品質の検証
             if (CaptureQuality < 1 || CaptureQuality > 100)
             {
                 _logger?.LogWarning("キャプチャ品質が範囲外です: {Quality}", CaptureQuality);
                 return false;
             }
-            
+
             // 固定領域設定の検証
             if (!AutoDetectCaptureArea)
             {
                 if (FixedCaptureAreaWidth <= 0 || FixedCaptureAreaHeight <= 0)
                 {
-                    _logger?.LogWarning("固定キャプチャ領域のサイズが無効です: {Width}x{Height}", 
+                    _logger?.LogWarning("固定キャプチャ領域のサイズが無効です: {Width}x{Height}",
                         FixedCaptureAreaWidth, FixedCaptureAreaHeight);
                     return false;
                 }
             }
-            
+
             return true;
         }
         catch (ArgumentOutOfRangeException ex)
@@ -637,7 +639,7 @@ public sealed class CaptureSettingsViewModel : Framework.ViewModelBase
     public void UpdateSettings(CaptureSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         InitializeFromSettings(settings);
         HasChanges = false;
         _logger?.LogDebug("キャプチャ設定を更新しました");
@@ -655,7 +657,7 @@ public record MonitorOption
     /// モニターのインデックス
     /// </summary>
     public int Index { get; init; }
-    
+
     /// <summary>
     /// モニターの表示名
     /// </summary>

@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Infrastructure.OCR.PostProcessing.NgramModels;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.PostProcessing;
 
@@ -16,7 +16,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
     private readonly INgramModel _ngramModel;
     private readonly Dictionary<string, List<string>> _confusionMatrix;
     private readonly double _correctionThreshold;
-    
+
     public NgramOcrPostProcessor(
         ILogger<NgramOcrPostProcessor> logger,
         INgramModel ngramModel,
@@ -27,7 +27,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
         _correctionThreshold = correctionThreshold;
         _confusionMatrix = InitializeConfusionMatrix();
     }
-    
+
     /// <summary>
     /// OCR結果テキストの後処理
     /// </summary>
@@ -35,16 +35,16 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
     {
         if (string.IsNullOrWhiteSpace(rawText))
             return rawText;
-        
+
         _logger.LogDebug("N-gramベース後処理開始: {Text} (信頼度: {Confidence})", rawText, confidence);
-        
+
         var correctedText = await Task.Run(() => CorrectText(rawText)).ConfigureAwait(false);
-        
+
         _logger.LogDebug("N-gramベース後処理完了: {OriginalText} -> {CorrectedText}", rawText, correctedText);
-        
+
         return correctedText;
     }
-    
+
     /// <summary>
     /// OCR結果テキストの後処理（信頼度なし）
     /// </summary>
@@ -52,7 +52,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
     {
         return await ProcessAsync(ocrText, 1.0f).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// 複数のOCR結果テキストを並行処理
     /// </summary>
@@ -61,7 +61,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
         var tasks = ocrTexts.Select(text => ProcessAsync(text));
         return await Task.WhenAll(tasks).ConfigureAwait(false);
     }
-    
+
     /// <summary>
     /// よくある誤認識パターンを修正
     /// </summary>
@@ -69,7 +69,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
     {
         return CorrectText(text);
     }
-    
+
     /// <summary>
     /// 後処理統計を取得
     /// </summary>
@@ -82,7 +82,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
             TopCorrectionPatterns = []
         };
     }
-    
+
     /// <summary>
     /// テキストを修正
     /// </summary>
@@ -90,9 +90,9 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
     {
         if (string.IsNullOrEmpty(text))
             return text;
-        
+
         var corrections = new List<TextCorrection>();
-        
+
         // 各位置での修正候補を検討
         for (int i = 0; i < text.Length; i++)
         {
@@ -102,48 +102,48 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
                 corrections.Add(correction);
             }
         }
-        
+
         // 重複する修正を除去し、最適な修正を選択
         var finalCorrections = SelectBestCorrections(corrections);
-        
+
         // 修正を適用
         return ApplyCorrections(text, finalCorrections);
     }
-    
+
     /// <summary>
     /// 指定位置での最適な修正を探索
     /// </summary>
     private TextCorrection? FindBestCorrection(string text, int position)
     {
         var currentChar = text[position].ToString(System.Globalization.CultureInfo.InvariantCulture);
-        
+
         // 混同行列から候補文字を取得
         if (!_confusionMatrix.TryGetValue(currentChar, out var candidates))
             return null;
         var bestCorrection = (string.Empty, double.MinValue);
-        
+
         foreach (var candidate in candidates)
         {
             var modifiedText = text[..position] + candidate + text[(position + 1)..];
             var originalLikelihood = CalculateLocalLikelihood(text, position);
             var candidateLikelihood = CalculateLocalLikelihood(modifiedText, position);
-            
+
             var improvement = candidateLikelihood - originalLikelihood;
-            
+
             if (improvement > bestCorrection.MinValue && improvement > _correctionThreshold)
             {
                 bestCorrection = (candidate, improvement);
             }
         }
-        
+
         if (bestCorrection.MinValue > double.MinValue)
         {
             return new TextCorrection(position, 1, bestCorrection.Empty, bestCorrection.MinValue);
         }
-        
+
         return null;
     }
-    
+
     /// <summary>
     /// 局所的な尤度を計算
     /// </summary>
@@ -152,10 +152,10 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
         var startPos = Math.Max(0, position - 2);
         var endPos = Math.Min(text.Length, position + 3);
         var localText = text[startPos..endPos];
-        
+
         return _ngramModel.CalculateLikelihood(localText);
     }
-    
+
     /// <summary>
     /// 最適な修正の組み合わせを選択
     /// </summary>
@@ -164,22 +164,22 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
         // 重複する修正を除去（より高いスコアの修正を優先）
         var nonOverlapping = new List<TextCorrection>();
         var sortedCorrections = corrections.OrderByDescending(c => c.Score).ToList();
-        
+
         foreach (var correction in sortedCorrections)
         {
-            var overlaps = nonOverlapping.Any(existing => 
+            var overlaps = nonOverlapping.Any(existing =>
                 correction.Position < existing.Position + existing.Length &&
                 correction.Position + correction.Length > existing.Position);
-            
+
             if (!overlaps)
             {
                 nonOverlapping.Add(correction);
             }
         }
-        
+
         return [.. nonOverlapping.OrderBy(c => c.Position)];
     }
-    
+
     /// <summary>
     /// 修正をテキストに適用
     /// </summary>
@@ -187,29 +187,29 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
     {
         if (corrections.Count == 0)
             return text;
-        
+
         var result = text;
         var offset = 0;
-        
+
         foreach (var correction in corrections)
         {
             var adjustedPosition = correction.Position + offset;
             var before = result[..adjustedPosition];
             var after = result[(adjustedPosition + correction.Length)..];
-            
+
             result = before + correction.ReplacementText + after;
             offset += correction.ReplacementText.Length - correction.Length;
-            
-            _logger.LogDebug("修正適用: 位置{Position} '{Original}' -> '{Corrected}' (スコア: {Score:F3})", 
-                correction.Position, 
-                text.Substring(correction.Position, correction.Length), 
-                correction.ReplacementText, 
+
+            _logger.LogDebug("修正適用: 位置{Position} '{Original}' -> '{Corrected}' (スコア: {Score:F3})",
+                correction.Position,
+                text.Substring(correction.Position, correction.Length),
+                correction.ReplacementText,
                 correction.Score);
         }
-        
+
         return result;
     }
-    
+
     /// <summary>
     /// 混同行列を初期化
     /// </summary>
@@ -229,7 +229,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
             ["験"] = ["勝"],
             ["体"] = ["体"],
             ["計"] = ["計"],
-            
+
             // ひらがな・カタカナの混同パターン
             ["ツ"] = ["ツ", "シ"],
             ["シ"] = ["シ", "ツ"],
@@ -241,7 +241,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
             ["ィ"] = ["ィ", "イ"],
             ["グ"] = ["グ", "ク"],
             ["ク"] = ["ク", "グ"],
-            
+
             // 英数字の混同パターン
             ["0"] = ["O", "o"],
             ["O"] = ["0", "o"],
@@ -253,7 +253,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
             ["B"] = ["8"],
             ["5"] = ["S"],
             ["S"] = ["5"],
-            
+
             // 形状が似ている文字
             ["未"] = ["末"],
             ["末"] = ["未"],
@@ -265,7 +265,7 @@ public sealed class NgramOcrPostProcessor : IOcrPostProcessor
             ["士"] = ["土"],
         };
     }
-    
+
     /// <summary>
     /// 日本語文字学習用のサンプルデータを生成
     /// </summary>

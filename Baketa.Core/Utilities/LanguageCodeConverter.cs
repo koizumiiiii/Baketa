@@ -126,7 +126,7 @@ public static class LanguageCodeConverter
     public static Language ToLanguageEnum(string languageCode, Language? defaultLanguage = null)
     {
         var fallbackLanguage = defaultLanguage ?? Language.English;
-        
+
         if (string.IsNullOrWhiteSpace(languageCode))
             return fallbackLanguage;
 

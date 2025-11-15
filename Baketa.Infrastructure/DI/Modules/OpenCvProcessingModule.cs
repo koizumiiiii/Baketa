@@ -1,11 +1,11 @@
-using Microsoft.Extensions.DependencyInjection;
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.Abstractions.OCR;
-using Baketa.Infrastructure.Imaging.Filters;
-using Baketa.Infrastructure.Imaging.Services;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
+using Baketa.Infrastructure.Imaging.Filters;
+using Baketa.Infrastructure.Imaging.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -25,7 +25,7 @@ public sealed class OpenCvProcessingModule : ServiceModuleBase
     {
         // OpenCV画像フィルターを登録
         RegisterOpenCvFilters(services);
-        
+
         // ゲーム最適化前処理サービスを登録
         RegisterPreprocessingServices(services);
     }
@@ -42,7 +42,7 @@ public sealed class OpenCvProcessingModule : ServiceModuleBase
             var logger = provider.GetService<ILogger<OpenCvAdaptiveThresholdFilter>>();
             return new OpenCvAdaptiveThresholdFilter(logger);
         });
-        
+
         // 色ベースマスキングフィルター
         services.AddTransient<OpenCvColorBasedMaskingFilter>(provider =>
         {

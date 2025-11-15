@@ -1,6 +1,6 @@
-using Xunit;
-using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using System.IO;
+using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Unit;
 
@@ -45,7 +45,7 @@ public class ModelPathResolverTests : IDisposable
     {
         // Root cause solution: Avoid network paths in tests
         // Use local invalid paths instead of network paths to prevent access issues
-        
+
         // Act & Assert
         Assert.Throws<ArgumentException>(() => new DefaultModelPathResolver(baseDirectory));
     }
@@ -421,7 +421,7 @@ public class ModelPathResolverTests : IDisposable
                     // I/Oエラーは無視
                 }
             }
-            
+
             _disposed = true;
         }
     }

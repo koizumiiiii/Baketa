@@ -1,0 +1,77 @@
+Phase 5.2 改訂版分析報告書のレビューをお願いします。
+
+## レビュー対象ドキュメント
+E:\dev\Baketa\docs\refactoring\PHASE5.2_REVISED_ANALYSIS.md
+
+## レビュー観点
+
+### 1. **根本原因分析の妥当性**
+- 初期仮説（SafeImageAdapterキャスト問題）が誤りだったという結論は正しいか？
+- 真の根本原因（ToByteArrayAsync × 3回 + ArrayPool未使用）の診断は正しいか？
+- InlineImageToWindowsImageAdapter.GetBitmap()の.Result使用が191スレッド爆発の原因という分析は妥当か？
+
+### 2. **修正方針（ArrayPool<byte> + async/await）の技術的妥当性**
+- ArrayPool<byte>導入による効果は期待通りか？
+- InlineImageToWindowsImageAdapterのasync化（GetBitmapAsync）は適切か？
+- ToPooledByteArrayAsync()拡張メソッド設計は正しいか？
+- ScaleImageWithLanczosの修正（PNG圧縮スキップ）は妥当か？
+
+### 3. **実装計画の現実性**
+- Phase 5.2C: 4-6時間の見積もりは妥当か？
+- Step 1-5の実装順序は適切か？
+- 各ステップの工数見積もりは現実的か？
+
+### 4. **期待効果の評価**
+- メモリ使用量: 2,420MB → 50MB以下という目標は達成可能か？
+- スレッド数: 191 → 20以下という目標は現実的か？
+- OCRエラー（"PaddlePredictor(Detector) run failed"）解消の根拠は妥当か？
+
+### 5. **見落としている問題**
+- 他に調査すべき観点はないか？
+- ArrayPool<byte>導入によるバグや副作用のリスクは？
+- async/await伝播による破壊的変更の影響範囲は？
+
+### 6. **実装リスク**
+- Phase 5.2C実装時の潜在的リスクは何か？
+- TextRegionDetectorAdapter修正の波及範囲は？
+- Mat.FromImageData()がArrayPoolから借りたbyte[]を正しく扱えるか？
+
+## 調査データ
+
+### メモリリーク実測値
+- **RAM使用量**: 17 MB → 2,420 MB（142倍、1分以内）
+- **Private Bytes**: 5.72 MB → 3,352 MB（586倍）
+- **スレッド数**: 9 → 191（21倍）
+- **ハンドル数**: 166 → 1,734（10倍）
+
+### OCRエラーログ
+```
+[14:22:24.988][T17] 🔍 [ROI_OCR] 領域OCRエラー - 座標=(0,0), エラー=OCR処理中にエラーが発生しました: PaddlePredictor(Detector) run failed.
+[14:22:24.990][T17] 📝 [OCR_RESULT] 認識完了 - 処理時間: 8012ms
+[14:22:24.993][T17] 📝 [OCR_RESULT] 検出テキスト: ''
+```
+
+### バッチ翻訳結果
+- 最初の3チャンク（0-2）: エラー
+- 残り10チャンク（3-12）: 成功
+- 成功率: 10/13 = 76.9%
+
+## 技術的背景
+
+### コードベース情報
+- **画像サイズ**: 2560x1080 RGB = 約8MB/画像
+- **変換回数**: スケーリング有り時 = 3-4回のToByteArrayAsync()呼び出し
+- **PaddleOCR制約**: 大画面ではスケーリング必須
+- **既存実装**: InlineImageToWindowsImageAdapter（Phase 77.6で実装済み）
+
+### .NET技術スタック
+- **.NET 8.0**: ArrayPool<T>標準API
+- **OpenCvSharp**: Mat.FromImageData()使用
+- **System.Drawing**: Bitmap使用
+
+技術的な観点から以下を評価してください：
+1. 根本原因分析の正確性
+2. 修正方針（ArrayPool + async/await）の適切性
+3. 実装計画の実現可能性
+4. 期待効果の妥当性
+5. 潜在的リスクの特定

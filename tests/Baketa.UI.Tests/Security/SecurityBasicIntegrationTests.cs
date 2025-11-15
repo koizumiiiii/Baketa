@@ -1,13 +1,13 @@
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using Moq;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.UI.Security;
 using Baketa.UI.Tests.Infrastructure;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Baketa.UI.Tests.Security;
 
@@ -57,7 +57,7 @@ public sealed class SecurityBasicIntegrationTests : AvaloniaTestBase
 
         // Assert
         token.Should().NotBeNullOrEmpty();
-        
+
         // ロガー呼び出し検証を削除 - LoggerMessage使用時の呼び出し回数は環境依存のため
     }
 
@@ -80,11 +80,11 @@ public sealed class SecurityBasicIntegrationTests : AvaloniaTestBase
     {
         // Arrange
         const string email = "test@example.com";
-        
+
         // まず正常なリセット要求を作成
         var validToken = await _passwordResetManager.RequestPasswordResetAsync(email);
         validToken.Should().NotBeNullOrEmpty();
-        
+
         const string invalidToken = "invalid-token";
 
         // Act - 無効なトークンで検証
@@ -107,10 +107,10 @@ public sealed class SecurityBasicIntegrationTests : AvaloniaTestBase
 
         // Act
         Action act = () => _hijackingDetectionManager.RecordUserActivity(
-            email, 
-            UserActivityType.Login, 
-            "192.168.1.1", 
-            "Mozilla/5.0", 
+            email,
+            UserActivityType.Login,
+            "192.168.1.1",
+            "Mozilla/5.0",
             location);
 
         // Assert
@@ -142,12 +142,12 @@ public sealed class SecurityBasicIntegrationTests : AvaloniaTestBase
 
         // Act
         Action act = () => _securityAuditLogger.LogSecurityEvent(
-            SecurityAuditLogger.SecurityEventType.LoginAttempt, 
+            SecurityAuditLogger.SecurityEventType.LoginAttempt,
             eventData);
 
         // Assert
         act.Should().NotThrow();
-        
+
         // Verify logging
         _mockAuditLogger.Verify(
             x => x.Log(

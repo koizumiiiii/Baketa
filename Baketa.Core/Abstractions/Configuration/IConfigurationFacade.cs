@@ -14,12 +14,12 @@ public interface IConfigurationFacade
     /// 統一設定サービス
     /// </summary>
     IUnifiedSettingsService SettingsService { get; }
-    
+
     /// <summary>
     /// イベントアグリゲーター
     /// </summary>
     IEventAggregator EventAggregator { get; }
-    
+
     /// <summary>
     /// Baketaロガー
     /// </summary>

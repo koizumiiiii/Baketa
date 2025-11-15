@@ -1,14 +1,14 @@
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reactive;
 using System.Text;
 using System.Threading.Tasks;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -20,7 +20,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
 {
     private readonly OcrSettings _originalSettings;
     private readonly ILogger<OcrSettingsViewModel>? _logger;
-    
+
     // バッキングフィールド
     private bool _enableOcr;
     private string _ocrLanguage = "Japanese"; // デフォルト値で初期化
@@ -29,7 +29,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
     private bool _enableTextFiltering;
     private bool _showAdvancedSettings;
     private bool _hasChanges;
-    
+
     // 詳細設定のバッキングフィールド
     private bool _enableImagePreprocessing;
     private bool _convertToGrayscale;
@@ -310,7 +310,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
         _targetLanguage = "Japanese"; // デフォルト値
         _confidenceThreshold = settings.ConfidenceThreshold;
         _enableTextFiltering = settings.EnableTextFiltering;
-        
+
         // 詳細設定の初期化
         _enableImagePreprocessing = settings.EnableImagePreprocessing;
         _convertToGrayscale = settings.ConvertToGrayscale;
@@ -337,76 +337,76 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
         this.WhenAnyValue(x => x.EnableOcr)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.OcrLanguage)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.TargetLanguage)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.ConfidenceThreshold)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableTextFiltering)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 詳細設定の変更追跡
         this.WhenAnyValue(x => x.EnableImagePreprocessing)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.ConvertToGrayscale)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableBinarization)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.BinarizationThreshold)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableNoiseReduction)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnhanceContrast)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnhanceEdges)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.ImageScaleFactor)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableParallelProcessing)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.MaxParallelThreads)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableTextAreaDetection)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.MinTextLineHeight)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.MaxTextLineHeight)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.TimeoutSeconds)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
@@ -434,7 +434,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
         try
         {
             _logger?.LogInformation("OCR設定テストを開始します");
-            
+
             // 設定のバリデーション
             if (!ValidateSettings())
             {
@@ -442,7 +442,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
                 await ShowTestResultAsync("設定エラー", "OCR設定にエラーがあります。設定を確認してください。", false).ConfigureAwait(true);
                 return;
             }
-            
+
             // 基本設定の確認
             var testResults = new StringBuilder();
             testResults.AppendLine("=== OCR設定テスト結果 ===");
@@ -451,7 +451,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
             testResults.AppendLine(string.Format(CultureInfo.CurrentCulture, "翻訳先言語: {0}", TargetLanguage));
             testResults.AppendLine(string.Format(CultureInfo.CurrentCulture, "信頼度閾値: {0:P0}", ConfidenceThreshold));
             testResults.AppendLine(string.Format(CultureInfo.CurrentCulture, "テキストフィルタリング: {0}", EnableTextFiltering ? "有効" : "無効"));
-            
+
             if (ShowAdvancedSettings)
             {
                 testResults.AppendLine();
@@ -471,10 +471,10 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
                 testResults.AppendLine(string.Format(CultureInfo.CurrentCulture, "最大行高さ: {0}px", MaxTextLineHeight));
                 testResults.AppendLine(string.Format(CultureInfo.CurrentCulture, "タイムアウト時間: {0}秒", TimeoutSeconds));
             }
-            
+
             testResults.AppendLine();
             testResults.AppendLine("✅ 設定は正常です。OCRエンジンの動作準備が完了しています。");
-            
+
             await ShowTestResultAsync("OCRテスト完了", testResults.ToString(), true).ConfigureAwait(true);
             _logger?.LogInformation("OCR設定テストが正常に完了しました");
         }
@@ -484,7 +484,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
             await ShowTestResultAsync("テストエラー", $"テスト実行中にエラーが発生しました: {ex.Message}", false).ConfigureAwait(true);
         }
     }
-    
+
     /// <summary>
     /// テスト結果を表示
     /// </summary>
@@ -494,7 +494,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
         // 現在は一時的な実装として、ログ出力のみ
         _logger?.LogInformation("=== {Title} ===", title);
         _logger?.LogInformation("{Message}", message);
-        
+
         // 非同期処理のシミュレーション
         await Task.Delay(100).ConfigureAwait(true);
     }
@@ -531,7 +531,7 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
     public void UpdateSettings(OcrSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         InitializeFromSettings(settings);
         HasChanges = false;
         _logger?.LogDebug("OCR設定を更新しました");

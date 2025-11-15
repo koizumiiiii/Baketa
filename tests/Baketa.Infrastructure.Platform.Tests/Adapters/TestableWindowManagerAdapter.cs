@@ -20,8 +20,8 @@ namespace Baketa.Infrastructure.Platform.Tests.Adapters;
 public class TestableWindowManagerAdapter(
         Core.Abstractions.Platform.Windows.IWindowManager windowsManager,
         ILogger<WindowManagerAdapter>? logger = null) : WindowManagerAdapter(windowsManager, logger)
-    {
-        private readonly Dictionary<IntPtr, WindowType> _windowTypes = [];
+{
+    private readonly Dictionary<IntPtr, WindowType> _windowTypes = [];
 
     /// <summary>
     /// ウィンドウタイプをテスト用に設定
@@ -29,24 +29,24 @@ public class TestableWindowManagerAdapter(
     /// <param name="handle">ウィンドウハンドル</param>
     /// <param name="type">設定するウィンドウタイプ</param>
     public void SetWindowType(IntPtr handle, WindowType type)
-        {
-            _windowTypes[handle] = type;
-        }
-        
-        /// <summary>
-        /// 内部的なウィンドウタイプの判定メソッドをオーバーライド
-        /// </summary>
-        /// <param name="handle">ウィンドウハンドル</param>
-        /// <returns>ウィンドウタイプ</returns>
-        protected internal override WindowType GetWindowTypeInternal(IntPtr handle)
-        {
-            // テスト用に設定された値があればそれを返す
-            if (_windowTypes.TryGetValue(handle, out WindowType type))
-            {
-                return type;
-            }
-            
-            // なければ基底クラスの実装を使用
-            return base.GetWindowTypeInternal(handle);
-        }
+    {
+        _windowTypes[handle] = type;
     }
+
+    /// <summary>
+    /// 内部的なウィンドウタイプの判定メソッドをオーバーライド
+    /// </summary>
+    /// <param name="handle">ウィンドウハンドル</param>
+    /// <returns>ウィンドウタイプ</returns>
+    protected internal override WindowType GetWindowTypeInternal(IntPtr handle)
+    {
+        // テスト用に設定された値があればそれを返す
+        if (_windowTypes.TryGetValue(handle, out WindowType type))
+        {
+            return type;
+        }
+
+        // なければ基底クラスの実装を使用
+        return base.GetWindowTypeInternal(handle);
+    }
+}

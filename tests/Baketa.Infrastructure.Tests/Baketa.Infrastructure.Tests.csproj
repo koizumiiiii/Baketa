@@ -8,6 +8,8 @@
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- 🔥 [PHASE7.2-B] Mat変換ベンチマークでunsafeコード使用のため有効化 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- xUnit1030警告を抑制: テストプロジェクトでのConfigureAwait(false)使用のため -->
     <!-- CA2007警告を抑制: ConfigureAwait(false)はテストで使用すべきではないため -->
     <!-- CA1848警告を抑制: LoggerMessageパターンはテストでは不要 -->
@@ -42,6 +44,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Baketa.Core\Baketa.Core.csproj" />
     <ProjectReference Include="..\..\Baketa.Infrastructure\Baketa.Infrastructure.csproj" />
+    <!-- 🔥 [PHASE2.1_CLEAN_ARCH] CoordinateTransformationService移動に伴う参照追加 -->
+    <ProjectReference Include="..\..\Baketa.Infrastructure.Platform\Baketa.Infrastructure.Platform.csproj" />
   </ItemGroup>
 
   <!-- 重要: テストで必要なPaddleOCR依存関係を明示的に追加（最新バージョンに統合） -->

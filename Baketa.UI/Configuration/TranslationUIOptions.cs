@@ -56,7 +56,7 @@ public class TranslationUIOptions
     /// <summary>
     /// 初期表示時の言語ペア
     /// </summary>
-    public string DefaultLanguagePair { get; set; } = "ja-en";
+    public string DefaultLanguagePair { get; set; } = "en-ja";
 
     /// <summary>
     /// 初期表示時の中国語変種（Simplified, Traditional）

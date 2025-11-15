@@ -111,7 +111,7 @@ public sealed class FeatureFlagServiceTests
         // Arrange
         var initialSettings = new FeatureFlagSettings { EnableDebugFeatures = false };
         var newSettings = new FeatureFlagSettings { EnableDebugFeatures = true };
-        
+
         // OnChange拡張メソッドを直接モックする代わりに、テストダブルを使用
         var testOptionsMonitor = new TestOptionsMonitor<FeatureFlagSettings>(initialSettings);
         var service = new FeatureFlagService(testOptionsMonitor, _loggerMock.Object);

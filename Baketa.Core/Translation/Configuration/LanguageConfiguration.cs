@@ -258,13 +258,13 @@ public sealed class LanguageConfiguration
     /// <returns>サポートされている場合はtrue</returns>
     public bool IsLanguagePairSupportedInstance(string sourceLang, string targetLang)
     {
-        var sourceSupported = SupportedLanguages.Any(l => 
-            string.Equals(l.Code, sourceLang, StringComparison.OrdinalIgnoreCase) && 
+        var sourceSupported = SupportedLanguages.Any(l =>
+            string.Equals(l.Code, sourceLang, StringComparison.OrdinalIgnoreCase) &&
             (l.IsAutoDetect || l.IsSupported));
-        var targetSupported = SupportedLanguages.Any(l => 
-            string.Equals(l.Code, targetLang, StringComparison.OrdinalIgnoreCase) && 
+        var targetSupported = SupportedLanguages.Any(l =>
+            string.Equals(l.Code, targetLang, StringComparison.OrdinalIgnoreCase) &&
             l.IsSupported);
-        
+
         return sourceSupported && targetSupported;
     }
 
@@ -285,8 +285,8 @@ public sealed class LanguageConfiguration
         // 自動検出の場合は、ターゲット言語がサポートされているかのみチェック
         if (string.Equals(sourceLang, "auto", StringComparison.OrdinalIgnoreCase))
         {
-            return SupportedLanguages.Any(l => 
-                string.Equals(l.Code, targetLang, StringComparison.OrdinalIgnoreCase) && 
+            return SupportedLanguages.Any(l =>
+                string.Equals(l.Code, targetLang, StringComparison.OrdinalIgnoreCase) &&
                 l.IsSupported);
         }
 
@@ -306,7 +306,7 @@ public sealed class LanguageConfiguration
             return null;
         }
 
-        return SupportedLanguages.FirstOrDefault(l => 
+        return SupportedLanguages.FirstOrDefault(l =>
             string.Equals(l.Code, languageCode, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -349,7 +349,7 @@ public sealed class LanguageConfiguration
     {
         ArgumentNullException.ThrowIfNull(language);
 
-        var existing = SupportedLanguages.FirstOrDefault(l => 
+        var existing = SupportedLanguages.FirstOrDefault(l =>
             string.Equals(l.Code, language.Code, StringComparison.OrdinalIgnoreCase));
 
         if (existing != null)
@@ -377,7 +377,7 @@ public sealed class LanguageConfiguration
             return false;
         }
 
-        var language = SupportedLanguages.FirstOrDefault(l => 
+        var language = SupportedLanguages.FirstOrDefault(l =>
             string.Equals(l.Code, languageCode, StringComparison.OrdinalIgnoreCase));
 
         if (language != null)
@@ -530,13 +530,13 @@ public sealed class LanguageConfiguration
     public static bool IsLanguagePairSupported(string sourceLang, string targetLang)
     {
         var supportedLanguages = GetDefaultSupportedLanguages();
-        var sourceSupported = supportedLanguages.Any(l => 
-            string.Equals(l.Code, sourceLang, StringComparison.OrdinalIgnoreCase) && 
+        var sourceSupported = supportedLanguages.Any(l =>
+            string.Equals(l.Code, sourceLang, StringComparison.OrdinalIgnoreCase) &&
             (l.IsAutoDetect || l.IsSupported));
-        var targetSupported = supportedLanguages.Any(l => 
-            string.Equals(l.Code, targetLang, StringComparison.OrdinalIgnoreCase) && 
+        var targetSupported = supportedLanguages.Any(l =>
+            string.Equals(l.Code, targetLang, StringComparison.OrdinalIgnoreCase) &&
             l.IsSupported);
-        
+
         return sourceSupported && targetSupported;
     }
 
@@ -553,7 +553,7 @@ public sealed class LanguageConfiguration
         }
 
         var supportedLanguages = GetDefaultSupportedLanguages();
-        return supportedLanguages.FirstOrDefault(l => 
+        return supportedLanguages.FirstOrDefault(l =>
             string.Equals(l.Code, languageCode, StringComparison.OrdinalIgnoreCase));
     }
 }

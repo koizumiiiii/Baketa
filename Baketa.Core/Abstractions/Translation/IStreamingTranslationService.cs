@@ -27,7 +27,7 @@ public interface IStreamingTranslationService
         Language targetLanguage,
         Action<int, string> onChunkCompleted,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 翻訳の進行状況を取得
     /// </summary>

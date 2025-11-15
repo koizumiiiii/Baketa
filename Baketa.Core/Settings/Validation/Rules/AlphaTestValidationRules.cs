@@ -59,12 +59,12 @@ public abstract class AlphaTestValidationRuleBase : IValidationRule
 
 /// <summary>
 /// αテスト翻訳エンジン検証ルール
-/// OPUS-MTエンジンのみ許可
+/// NLLB-200エンジンのみ許可
 /// </summary>
 public sealed class AlphaTestTranslationEngineRule : AlphaTestValidationRuleBase
 {
     public override string PropertyPath => "DefaultEngine";
-    public override string Description => "翻訳エンジン選択（αテストではOPUS-MTのみ）";
+    public override string Description => "翻訳エンジン選択（αテストではNLLB-200のみ）";
 
     public override SettingValidationResult Validate(object? value, ValidationContext context)
     {
@@ -73,11 +73,11 @@ public sealed class AlphaTestTranslationEngineRule : AlphaTestValidationRuleBase
             return CreateFailure(value, "翻訳エンジンが設定されていません");
         }
 
-        // αテストではLocalエンジン（OPUS-MT）のみ許可
-        // 新仕様：Geminiも追加されるが、αテストはローカルのみ
-        if (engine != TranslationEngine.Local)
+        // αテストではNLLB-200エンジン（高品質ローカル翻訳）のみ許可
+        // OPUS-MTは廃止され、NLLB-200に完全移行完了
+        if (engine != TranslationEngine.NLLB200)
         {
-            return CreateFailure(value, $"αテストでは翻訳エンジンは'Local (OPUS-MT)'のみ利用可能です。現在の設定: '{engine}'");
+            return CreateFailure(value, $"αテストでは翻訳エンジンは'NLLB200 (高品質ローカル翻訳)'のみ利用可能です。現在の設定: '{engine}'");
         }
 
         return CreateSuccess(value);
@@ -102,7 +102,7 @@ public sealed class AlphaTestLanguagePairRule : AlphaTestValidationRuleBase
 
         // αテストでは日本語↔英語のみ許可
         var allowedLanguages = new[] { "Japanese", "English", "ja", "en", "jp", "日本語", "英語" };
-        
+
         if (!allowedLanguages.Contains(sourceLanguage, StringComparer.OrdinalIgnoreCase))
         {
             return CreateFailure(value, $"αテストでは日本語↔英語の翻訳のみ利用可能です。現在の設定: '{sourceLanguage}'");
@@ -220,7 +220,7 @@ public sealed class AlphaTestOpacityRule : AlphaTestValidationRuleBase
         {
             return CreateSuccess(value, $"透明度{opacity:F1}%は非常に薄く、テキストが見えにくい可能性があります");
         }
-        
+
         if (opacity > 80.0)
         {
             return CreateSuccess(value, $"透明度{opacity:F1}%は非常に濃く、背景が見えにくい可能性があります");

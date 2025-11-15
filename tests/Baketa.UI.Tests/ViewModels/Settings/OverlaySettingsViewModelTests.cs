@@ -1,12 +1,12 @@
 #pragma warning disable CS0618 // Type or member is obsolete
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
+using Baketa.UI.Tests.TestUtilities;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
-using Baketa.Core.Settings;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.ViewModels.Settings;
-using Baketa.UI.Tests.TestUtilities;
 
 namespace Baketa.UI.Tests.ViewModels.Settings;
 
@@ -45,7 +45,7 @@ public class OverlaySettingsViewModelTests
     public void Constructor_WithNullSettings_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new OverlaySettingsViewModel(null!, _mockEventAggregator.Object, _mockLogger.Object));
     }
 
@@ -116,7 +116,7 @@ public class OverlaySettingsViewModelTests
         // Arrange
         var originalSettings = TestDataFactory.CreateOverlaySettings();
         var viewModel = new OverlaySettingsViewModel(originalSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
+
         var newSettings = new OverlaySettings
         {
             IsEnabled = false,

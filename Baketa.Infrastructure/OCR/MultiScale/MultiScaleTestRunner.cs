@@ -1,9 +1,9 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Services.Imaging;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.MultiScale;
 
@@ -30,7 +30,7 @@ public class MultiScaleTestRunner(
         {
             // テスト用の小さい画像を作成
             var testImage = CreateTestImage();
-            
+
             _logger.LogInformation("📷 テスト画像作成完了: {Width}x{Height}", testImage.Width, testImage.Height);
 
             // 1. 通常のOCR処理
@@ -38,8 +38,8 @@ public class MultiScaleTestRunner(
             var normalStart = DateTime.Now;
             var normalResult = await _ocrEngine.RecognizeAsync(testImage).ConfigureAwait(false);
             var normalTime = DateTime.Now - normalStart;
-            
-            _logger.LogInformation("⚪ 通常OCR結果: リージョン数={RegionCount}, 処理時間={Time}ms", 
+
+            _logger.LogInformation("⚪ 通常OCR結果: リージョン数={RegionCount}, 処理時間={Time}ms",
                 normalResult.TextRegions.Count, normalTime.TotalMilliseconds);
 
             // 2. マルチスケールOCR処理
@@ -48,7 +48,7 @@ public class MultiScaleTestRunner(
             var multiScaleDetailResult = await _multiScaleProcessor.ProcessWithDetailsAsync(testImage, _ocrEngine).ConfigureAwait(false);
             var multiScaleTime = DateTime.Now - multiScaleStart;
 
-            _logger.LogInformation("🔍 マルチスケールOCR結果: 統合後リージョン数={MergedRegions}, 処理時間={Time}ms", 
+            _logger.LogInformation("🔍 マルチスケールOCR結果: 統合後リージョン数={MergedRegions}, 処理時間={Time}ms",
                 multiScaleDetailResult.MergedResult.TextRegions.Count, multiScaleTime.TotalMilliseconds);
 
             // 3. 詳細結果の分析
@@ -70,11 +70,11 @@ public class MultiScaleTestRunner(
     private void LogDetailedResults(OcrResults _, MultiScaleOcrResult multiScaleResult)
     {
         _logger.LogInformation("📊 詳細結果分析:");
-        
+
         // 各スケールの結果
         foreach (var scaleResult in multiScaleResult.ScaleResults)
         {
-            _logger.LogInformation("   スケール {Scale}x: {Regions}リージョン, 信頼度平均: {Confidence:F2}", 
+            _logger.LogInformation("   スケール {Scale}x: {Regions}リージョン, 信頼度平均: {Confidence:F2}",
                 scaleResult.ScaleFactor, scaleResult.DetectedRegions, scaleResult.AverageConfidence);
         }
 
@@ -97,9 +97,9 @@ public class MultiScaleTestRunner(
         var processingTimeRatio = multiScaleTime.TotalMilliseconds / normalTime.TotalMilliseconds;
 
         _logger.LogInformation("🎯 改善効果分析:");
-        _logger.LogInformation("   検出リージョン数の変化: {Normal} → {MultiScale} (差分: {Diff})", 
+        _logger.LogInformation("   検出リージョン数の変化: {Normal} → {MultiScale} (差分: {Diff})",
             normalResult.TextRegions.Count, multiScaleResult.TextRegions.Count, regionCountImprovement);
-        _logger.LogInformation("   処理時間比: {Ratio:F2}x (通常: {Normal}ms, マルチスケール: {Multi}ms)", 
+        _logger.LogInformation("   処理時間比: {Ratio:F2}x (通常: {Normal}ms, マルチスケール: {Multi}ms)",
             processingTimeRatio, normalTime.TotalMilliseconds, multiScaleTime.TotalMilliseconds);
 
         if (regionCountImprovement > 0)
@@ -125,7 +125,7 @@ public class MultiScaleTestRunner(
     private void CheckSpecificTextDetection(OcrResults normalResult, OcrResults multiScaleResult)
     {
         var targetTexts = new[] { "単体テスト", "E2E", "設計", "データ", "分析" };
-        
+
         _logger.LogInformation("🎯 特定テキスト検出確認:");
 
         foreach (var targetText in targetTexts)

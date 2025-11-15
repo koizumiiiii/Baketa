@@ -5,18 +5,18 @@ using ReactiveUI;
 
 namespace Baketa.UI.Views;
 
-    /// <summary>
-    /// ホーム画面のビュー
-    /// </summary>
-    internal sealed partial class HomeView : ReactiveUserControl<HomeViewModel>
+/// <summary>
+/// ホーム画面のビュー
+/// </summary>
+internal sealed partial class HomeView : ReactiveUserControl<HomeViewModel>
+{
+    public HomeView()
     {
-        public HomeView()
+        InitializeComponent();
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
-            
-            this.WhenActivated(disposables => 
-            {
-                // ビューモデルとのバインディングを設定
-            });
-        }
+            // ビューモデルとのバインディングを設定
+        });
     }
+}

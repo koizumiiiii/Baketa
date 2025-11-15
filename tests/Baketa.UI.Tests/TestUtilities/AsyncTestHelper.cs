@@ -17,19 +17,19 @@ internal static class AsyncTestHelper
     /// <param name="pollIntervalMs">ポーリング間隔（ミリ秒）</param>
     /// <returns>条件が満たされた場合はtrue、タイムアウトした場合はfalse</returns>
     public static async Task<bool> WaitForConditionAsync(
-        Func<bool> condition, 
-        int timeoutMs = 5000, 
+        Func<bool> condition,
+        int timeoutMs = 5000,
         int pollIntervalMs = 50)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
-        
+
         try
         {
             while (!cts.Token.IsCancellationRequested)
             {
                 if (condition())
                     return true;
-                    
+
                 await Task.Delay(pollIntervalMs, cts.Token);
             }
         }
@@ -37,7 +37,7 @@ internal static class AsyncTestHelper
         {
             // タイムアウト
         }
-        
+
         return false;
     }
 
@@ -49,16 +49,16 @@ internal static class AsyncTestHelper
     /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
     /// <returns>発行された値。タイムアウトした場合はdefault(T)</returns>
     public static async Task<T?> WaitForObservableAsync<T>(
-        IObservable<T> observable, 
+        IObservable<T> observable,
         int timeoutMs = 5000)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
         var tcs = new TaskCompletionSource<T?>();
-        
+
         using var subscription = observable.Subscribe(
             value => tcs.TrySetResult(value),
             error => tcs.TrySetException(error));
-        
+
         try
         {
             cts.Token.Register(() => tcs.TrySetResult(default));
@@ -77,11 +77,11 @@ internal static class AsyncTestHelper
     /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
     /// <returns>操作が時間内に完了した場合はtrue</returns>
     public static async Task<bool> CompletesWithinTimeoutAsync(
-        Func<Task> operation, 
+        Func<Task> operation,
         int timeoutMs = 1000)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
-        
+
         try
         {
             await operation().WaitAsync(cts.Token);
@@ -100,11 +100,11 @@ internal static class AsyncTestHelper
     /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
     /// <returns>すべての操作が時間内に完了した場合はtrue</returns>
     public static async Task<bool> AllCompleteWithinTimeoutAsync(
-        Func<Task>[] operations, 
+        Func<Task>[] operations,
         int timeoutMs = 5000)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
-        
+
         try
         {
             var tasks = Array.ConvertAll(operations, op => op());

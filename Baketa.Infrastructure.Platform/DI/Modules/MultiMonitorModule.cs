@@ -26,7 +26,7 @@ public static class MultiMonitorModule
             var logger = serviceProvider.GetRequiredService<ILogger<WindowsMonitorManager>>();
             return new WindowsMonitorManager(logger);
         });
-        
+
         // フルスクリーンモードサービスをシングルトンとして登録
         services.AddSingleton<IFullscreenModeService>(serviceProvider =>
         {
@@ -34,7 +34,7 @@ public static class MultiMonitorModule
             var logger = serviceProvider.GetRequiredService<ILogger<WindowsFullscreenModeService>>();
             return new WindowsFullscreenModeService(monitorManager, logger);
         });
-        
+
         return services;
     }
 }

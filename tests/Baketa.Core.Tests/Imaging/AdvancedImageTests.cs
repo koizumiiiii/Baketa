@@ -4,20 +4,22 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Xunit;
+using Rectangle = Baketa.Core.Abstractions.Memory.Rectangle;
 
 namespace Baketa.Core.Tests.Imaging;
 
+/// <summary>
+/// IAdvancedImageインターフェースの実装に対する単体テスト
+/// </summary>
+public class AdvancedImageTests
+{
     /// <summary>
-    /// IAdvancedImageインターフェースの実装に対する単体テスト
+    /// テスト用のモック画像クラス
     /// </summary>
-    public class AdvancedImageTests
+    private sealed class MockAdvancedImage(int width, int height) : IAdvancedImage
     {
-        /// <summary>
-        /// テスト用のモック画像クラス
-        /// </summary>
-        private sealed class MockAdvancedImage(int width, int height) : IAdvancedImage
-        {
         private readonly Dictionary<(int x, int y), Color> _pixels = [];
         private bool _isDisposed = false;
 
@@ -27,7 +29,7 @@ namespace Baketa.Core.Tests.Imaging;
         public bool IsGrayscale => false;
         public int BitsPerPixel => 32;
         public int ChannelCount => 4;
-        
+
         public IAdvancedImage ToGrayscale()
         {
             // グレースケール変換の同期版実装
@@ -158,12 +160,31 @@ namespace Baketa.Core.Tests.Imaging;
             // 弾化処理のモック動作
             return Task.FromResult((IAdvancedImage)new MockAdvancedImage(Width, Height));
         }
-        
+
         public Task<List<Rectangle>> DetectTextRegionsAsync()
         {
             // テキスト領域検出のモック動作
             return Task.FromResult(new List<Rectangle> { new(10, 10, 20, 20) });
         }
+
+        // IImageの追加メンバー
+        public ReadOnlyMemory<byte> GetImageMemory()
+        {
+            // モック実装: 画像データのメモリを返す
+            return new ReadOnlyMemory<byte>(new byte[Width * Height * 4]);
+        }
+
+        public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32;
+
+        /// <summary>
+        /// Phase 2.5: ROI座標変換対応 - モック画像なのでnull
+        /// </summary>
+        public System.Drawing.Rectangle? CaptureRegion => null;
+
+        /// <summary>
+        /// 🔥 [PHASE5.2G-A] LockPixelData (MockAdvancedImage is test-only, not supported)
+        /// </summary>
+        public PixelDataLock LockPixelData() => throw new NotSupportedException("MockAdvancedImage does not support LockPixelData");
     }
 
     /// <summary>
@@ -251,246 +272,246 @@ namespace Baketa.Core.Tests.Imaging;
         }
     }
 
-        [Fact]
-        public void GetPixel_ValidCoordinates_ReturnsExpectedColor()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            var expectedColor = Color.Red;
-            image.SetPixel(50, 50, expectedColor);
+    [Fact]
+    public void GetPixel_ValidCoordinates_ReturnsExpectedColor()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        var expectedColor = Color.Red;
+        image.SetPixel(50, 50, expectedColor);
 
-            // Act
-            var actualColor = image.GetPixel(50, 50);
+        // Act
+        var actualColor = image.GetPixel(50, 50);
 
-            // Assert
-            Assert.Equal(expectedColor, actualColor);
-        }
-
-        [Fact]
-        public void GetPixel_InvalidCoordinates_ThrowsArgumentOutOfRangeException()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-
-            // Act & Assert
-            Assert.Throws<ArgumentOutOfRangeException>(() => image.GetPixel(-1, 50));
-            Assert.Throws<ArgumentOutOfRangeException>(() => image.GetPixel(50, -1));
-            Assert.Throws<ArgumentOutOfRangeException>(() => image.GetPixel(100, 50));
-            Assert.Throws<ArgumentOutOfRangeException>(() => image.GetPixel(50, 100));
-        }
-
-        [Fact]
-        public void SetPixel_ValidCoordinates_SetsExpectedColor()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            var expectedColor = Color.Blue;
-
-            // Act
-            image.SetPixel(30, 40, expectedColor);
-            var actualColor = image.GetPixel(30, 40);
-
-            // Assert
-            Assert.Equal(expectedColor, actualColor);
-        }
-
-        [Fact]
-        public void SetPixel_InvalidCoordinates_ThrowsArgumentOutOfRangeException()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-
-            // Act & Assert
-            Assert.Throws<ArgumentOutOfRangeException>(() => image.SetPixel(-1, 50, Color.Red));
-            Assert.Throws<ArgumentOutOfRangeException>(() => image.SetPixel(50, -1, Color.Red));
-            Assert.Throws<ArgumentOutOfRangeException>(() => image.SetPixel(100, 50, Color.Red));
-            Assert.Throws<ArgumentOutOfRangeException>(() => image.SetPixel(50, 100, Color.Red));
-        }
-
-        [Fact]
-        public async Task ApplyFilterAsync_ReturnsNewImage()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            var filter = new MockImageFilter();
-
-            // Act
-            var result = await image.ApplyFilterAsync(filter);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.IsType<MockAdvancedImage>(result);
-            Assert.NotSame(image, result);
-        }
-
-        [Fact]
-        public async Task ApplyFiltersAsync_ReturnsNewImage()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            List<IImageFilter> filters = [new MockImageFilter(), new MockImageFilter()];
-
-            // Act
-            var result = await image.ApplyFiltersAsync(filters);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.IsType<MockAdvancedImage>(result);
-            Assert.NotSame(image, result);
-        }
-
-        [Fact]
-        public async Task ToGrayscaleAsync_ReturnsNewImage()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-
-            // Act
-            var result = await image.ToGrayscaleAsync();
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.IsType<MockAdvancedImage>(result);
-            Assert.NotSame(image, result);
-        }
-
-        [Fact]
-        public async Task ToBinaryAsync_ReturnsNewImage()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            byte threshold = 128;
-
-            // Act
-            var result = await image.ToBinaryAsync(threshold);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.IsType<MockAdvancedImage>(result);
-            Assert.NotSame(image, result);
-        }
-
-        [Fact]
-        public async Task ExtractRegionAsync_ValidRectangle_ReturnsNewImage()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            var rectangle = new Rectangle(10, 10, 50, 50);
-
-            // Act
-            var result = await image.ExtractRegionAsync(rectangle);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.Equal(rectangle.Width, result.Width);
-            Assert.Equal(rectangle.Height, result.Height);
-        }
-
-        [Fact]
-        public async Task OptimizeForOcrAsync_ReturnsNewImage()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-
-            // Act
-            var result = await image.OptimizeForOcrAsync();
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.IsType<MockAdvancedImage>(result);
-            Assert.NotSame(image, result);
-        }
-
-        [Fact]
-        public async Task OptimizeForOcrAsync_WithOptions_ReturnsNewImage()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            var options = new OcrImageOptions
-            {
-                BinarizationThreshold = 150,
-                ContrastEnhancement = 1.2f,
-                NoiseReduction = 0.3f
-            };
-
-            // Act
-            var result = await image.OptimizeForOcrAsync(options);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.IsType<MockAdvancedImage>(result);
-            Assert.NotSame(image, result);
-        }
-
-        [Fact]
-        public async Task RotateAsync_ReturnsNewImage()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            float degrees = 90f;
-
-            // Act
-            var result = await image.RotateAsync(degrees);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.IsType<MockAdvancedImage>(result);
-            Assert.NotSame(image, result);
-        }
-
-        [Fact]
-        public async Task CalculateSimilarityAsync_SameSize_ReturnsHighSimilarity()
-        {
-            // Arrange
-            using var image1 = new MockAdvancedImage(100, 100);
-            using var image2 = new MockAdvancedImage(100, 100);
-
-            // Act
-            var similarity = await image1.CalculateSimilarityAsync(image2);
-
-            // Assert
-            Assert.True(similarity > 0.5f);
-        }
-
-        [Fact]
-        public async Task CalculateSimilarityAsync_DifferentSize_ReturnsLowSimilarity()
-        {
-            // Arrange
-            using var image1 = new MockAdvancedImage(100, 100);
-            using var image2 = new MockAdvancedImage(200, 200);
-
-            // Act
-            var similarity = await image1.CalculateSimilarityAsync(image2);
-
-            // Assert
-            Assert.True(similarity < 0.5f);
-        }
-
-        [Fact]
-        public async Task ComputeHistogramAsync_ReturnsValidHistogram()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-
-            // Act
-            var histogram = await image.ComputeHistogramAsync();
-
-            // Assert
-            Assert.NotNull(histogram);
-            Assert.Equal(256, histogram.Length);
-        }
-
-        [Fact]
-        public async Task EvaluateTextProbabilityAsync_ReturnsValidProbability()
-        {
-            // Arrange
-            using var image = new MockAdvancedImage(100, 100);
-            var rectangle = new Rectangle(10, 10, 50, 50);
-
-            // Act
-            var probability = await image.EvaluateTextProbabilityAsync(rectangle);
-
-            // Assert
-            Assert.True(probability >= 0f && probability <= 1f);
-        }
+        // Assert
+        Assert.Equal(expectedColor, actualColor);
     }
+
+    [Fact]
+    public void GetPixel_InvalidCoordinates_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+
+        // Act & Assert
+        Assert.Throws<ArgumentOutOfRangeException>(() => image.GetPixel(-1, 50));
+        Assert.Throws<ArgumentOutOfRangeException>(() => image.GetPixel(50, -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => image.GetPixel(100, 50));
+        Assert.Throws<ArgumentOutOfRangeException>(() => image.GetPixel(50, 100));
+    }
+
+    [Fact]
+    public void SetPixel_ValidCoordinates_SetsExpectedColor()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        var expectedColor = Color.Blue;
+
+        // Act
+        image.SetPixel(30, 40, expectedColor);
+        var actualColor = image.GetPixel(30, 40);
+
+        // Assert
+        Assert.Equal(expectedColor, actualColor);
+    }
+
+    [Fact]
+    public void SetPixel_InvalidCoordinates_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+
+        // Act & Assert
+        Assert.Throws<ArgumentOutOfRangeException>(() => image.SetPixel(-1, 50, Color.Red));
+        Assert.Throws<ArgumentOutOfRangeException>(() => image.SetPixel(50, -1, Color.Red));
+        Assert.Throws<ArgumentOutOfRangeException>(() => image.SetPixel(100, 50, Color.Red));
+        Assert.Throws<ArgumentOutOfRangeException>(() => image.SetPixel(50, 100, Color.Red));
+    }
+
+    [Fact]
+    public async Task ApplyFilterAsync_ReturnsNewImage()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        var filter = new MockImageFilter();
+
+        // Act
+        var result = await image.ApplyFilterAsync(filter);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<MockAdvancedImage>(result);
+        Assert.NotSame(image, result);
+    }
+
+    [Fact]
+    public async Task ApplyFiltersAsync_ReturnsNewImage()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        List<IImageFilter> filters = [new MockImageFilter(), new MockImageFilter()];
+
+        // Act
+        var result = await image.ApplyFiltersAsync(filters);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<MockAdvancedImage>(result);
+        Assert.NotSame(image, result);
+    }
+
+    [Fact]
+    public async Task ToGrayscaleAsync_ReturnsNewImage()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+
+        // Act
+        var result = await image.ToGrayscaleAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<MockAdvancedImage>(result);
+        Assert.NotSame(image, result);
+    }
+
+    [Fact]
+    public async Task ToBinaryAsync_ReturnsNewImage()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        byte threshold = 128;
+
+        // Act
+        var result = await image.ToBinaryAsync(threshold);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<MockAdvancedImage>(result);
+        Assert.NotSame(image, result);
+    }
+
+    [Fact]
+    public async Task ExtractRegionAsync_ValidRectangle_ReturnsNewImage()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        var rectangle = new Rectangle(10, 10, 50, 50);
+
+        // Act
+        var result = await image.ExtractRegionAsync(rectangle);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(rectangle.Width, result.Width);
+        Assert.Equal(rectangle.Height, result.Height);
+    }
+
+    [Fact]
+    public async Task OptimizeForOcrAsync_ReturnsNewImage()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+
+        // Act
+        var result = await image.OptimizeForOcrAsync();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<MockAdvancedImage>(result);
+        Assert.NotSame(image, result);
+    }
+
+    [Fact]
+    public async Task OptimizeForOcrAsync_WithOptions_ReturnsNewImage()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        var options = new OcrImageOptions
+        {
+            BinarizationThreshold = 150,
+            ContrastEnhancement = 1.2f,
+            NoiseReduction = 0.3f
+        };
+
+        // Act
+        var result = await image.OptimizeForOcrAsync(options);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<MockAdvancedImage>(result);
+        Assert.NotSame(image, result);
+    }
+
+    [Fact]
+    public async Task RotateAsync_ReturnsNewImage()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        float degrees = 90f;
+
+        // Act
+        var result = await image.RotateAsync(degrees);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<MockAdvancedImage>(result);
+        Assert.NotSame(image, result);
+    }
+
+    [Fact]
+    public async Task CalculateSimilarityAsync_SameSize_ReturnsHighSimilarity()
+    {
+        // Arrange
+        using var image1 = new MockAdvancedImage(100, 100);
+        using var image2 = new MockAdvancedImage(100, 100);
+
+        // Act
+        var similarity = await image1.CalculateSimilarityAsync(image2);
+
+        // Assert
+        Assert.True(similarity > 0.5f);
+    }
+
+    [Fact]
+    public async Task CalculateSimilarityAsync_DifferentSize_ReturnsLowSimilarity()
+    {
+        // Arrange
+        using var image1 = new MockAdvancedImage(100, 100);
+        using var image2 = new MockAdvancedImage(200, 200);
+
+        // Act
+        var similarity = await image1.CalculateSimilarityAsync(image2);
+
+        // Assert
+        Assert.True(similarity < 0.5f);
+    }
+
+    [Fact]
+    public async Task ComputeHistogramAsync_ReturnsValidHistogram()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+
+        // Act
+        var histogram = await image.ComputeHistogramAsync();
+
+        // Assert
+        Assert.NotNull(histogram);
+        Assert.Equal(256, histogram.Length);
+    }
+
+    [Fact]
+    public async Task EvaluateTextProbabilityAsync_ReturnsValidProbability()
+    {
+        // Arrange
+        using var image = new MockAdvancedImage(100, 100);
+        var rectangle = new Rectangle(10, 10, 50, 50);
+
+        // Act
+        var probability = await image.EvaluateTextProbabilityAsync(rectangle);
+
+        // Assert
+        Assert.True(probability >= 0f && probability <= 1f);
+    }
+}

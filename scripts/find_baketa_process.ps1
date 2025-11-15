@@ -1,0 +1,1 @@
+Get-Process | Where-Object { $_.ProcessName -like '*Baketa*' -or $_.ProcessName -like '*dotnet*' } | Select-Object ProcessName, Id, @{Name='WorkingSet(MB)';Expression={[math]::Round($_.WorkingSet64/1MB,2)}}, @{Name='PrivateMemory(MB)';Expression={[math]::Round($_.PrivateMemorySize64/1MB,2)}} | Format-Table -AutoSize

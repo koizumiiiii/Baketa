@@ -19,10 +19,10 @@ public static class UIMultiMonitorModule
     {
         // AvaloniaUI統合アダプターをシングルトンとして登録
         services.AddSingleton<AvaloniaMultiMonitorAdapter>();
-        
+
         // マルチモニター対応オーバーレイマネージャーをシングルトンとして登録
         services.AddSingleton<MultiMonitorOverlayManager>();
-        
+
         return services;
     }
 }

@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
-using Baketa.Core.Models.Capture;
 using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Models.Capture;
 
 namespace Baketa.Integration.Tests.GPU;
 
@@ -19,21 +19,21 @@ public static class GPUEnvironmentTestHelper
     {
         // 実機での簡易GPU検出（詳細な検出は実際のGPUEnvironmentDetectorで実行）
         // CIやテスト環境での実行を想定した簡易判定
-        
+
         var hasNvidiaCuda = HasNvidiaRuntime();
         var hasAmdAcceleration = HasAmdAcceleration();
         var availableMemory = GetApproximateVideoMemory();
 
         if (hasNvidiaCuda || hasAmdAcceleration)
         {
-            return availableMemory > 4000 ? 
-                GPUEnvironmentCategory.HighEndDedicated : 
+            return availableMemory > 4000 ?
+                GPUEnvironmentCategory.HighEndDedicated :
                 GPUEnvironmentCategory.MidRangeDedicated;
         }
 
         // 統合GPUと推定
-        return availableMemory > 1000 ? 
-            GPUEnvironmentCategory.ModernIntegrated : 
+        return availableMemory > 1000 ?
+            GPUEnvironmentCategory.ModernIntegrated :
             GPUEnvironmentCategory.LegacyIntegrated;
     }
 
@@ -60,14 +60,14 @@ public static class GPUEnvironmentTestHelper
         var ciIndicators = new[]
         {
             "CI",
-            "CONTINUOUS_INTEGRATION", 
+            "CONTINUOUS_INTEGRATION",
             "GITHUB_ACTIONS",
             "AZURE_DEVOPS",
             "JENKINS_URL",
             "TEAMCITY_VERSION"
         };
 
-        return ciIndicators.Any(indicator => 
+        return ciIndicators.Any(indicator =>
             !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(indicator)));
     }
 
@@ -116,7 +116,7 @@ public static class GPUEnvironmentTestHelper
                 ComputeCapability = ComputeCapability.Compute75,
                 RecommendedProviders = [ExecutionProvider.CUDA, ExecutionProvider.TensorRT]
             },
-            
+
             GPUEnvironmentCategory.MidRangeDedicated => new GpuEnvironmentInfo
             {
                 IsIntegratedGpu = false,
@@ -134,7 +134,7 @@ public static class GPUEnvironmentTestHelper
                 ComputeCapability = ComputeCapability.Compute61,
                 RecommendedProviders = [ExecutionProvider.CUDA, ExecutionProvider.DirectML]
             },
-            
+
             GPUEnvironmentCategory.ModernIntegrated => new GpuEnvironmentInfo
             {
                 IsIntegratedGpu = true,
@@ -152,7 +152,7 @@ public static class GPUEnvironmentTestHelper
                 ComputeCapability = ComputeCapability.Unknown,
                 RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
             },
-            
+
             GPUEnvironmentCategory.LegacyIntegrated => new GpuEnvironmentInfo
             {
                 IsIntegratedGpu = true,
@@ -170,7 +170,7 @@ public static class GPUEnvironmentTestHelper
                 ComputeCapability = ComputeCapability.Unknown,
                 RecommendedProviders = [ExecutionProvider.DirectML, ExecutionProvider.CPU]
             },
-            
+
             _ => throw new ArgumentException($"Unsupported GPU category: {category}")
         };
     }
@@ -220,12 +220,12 @@ public static class GPUEnvironmentTestHelper
             // システムメモリベースの簡易推定
             // 実際のビデオメモリ検出は複雑なため、システムメモリから推定
             var totalMemory = GC.GetTotalMemory(false) / (1024 * 1024); // MB
-            
+
             // システムメモリベースでビデオメモリを推定
             if (totalMemory > 16000) return 4096; // 16GB以上 → 4GB VRAM推定
             if (totalMemory > 8000) return 2048;  // 8GB以上 → 2GB VRAM推定
             if (totalMemory > 4000) return 1024;  // 4GB以上 → 1GB VRAM推定
-            
+
             return 512; // それ以下 → 512MB推定
         }
         catch

@@ -116,8 +116,8 @@ internal sealed class BoolToBackgroundConverter : IValueConverter
         if (value is bool isEnabled)
         {
             // TODO: 実際のブラシリソースに置き換える
-            return isEnabled ? 
-                new SolidColorBrush(Colors.Transparent) : 
+            return isEnabled ?
+                new SolidColorBrush(Colors.Transparent) :
                 new SolidColorBrush(Color.FromArgb(50, 128, 128, 128));
         }
         return new SolidColorBrush(Colors.Transparent);
@@ -141,7 +141,7 @@ internal sealed class CollectionCountConverter : IValueConverter
             try
             {
                 var items = collection.Cast<object>().ToList();
-                
+
                 // 条件解析（例: "IsEnabled=True"）
                 if (condition.Contains('=', StringComparison.Ordinal))
                 {
@@ -150,23 +150,23 @@ internal sealed class CollectionCountConverter : IValueConverter
                     {
                         var propertyName = parts[0].Trim();
                         var expectedValue = parts[1].Trim();
-                        
-                        return items.Count(item => 
+
+                        return items.Count(item =>
                         {
                             var property = item.GetType().GetProperty(propertyName);
                             if (property != null)
                             {
                                 var propertyValue = property.GetValue(item);
                                 return string.Equals(
-                                    propertyValue?.ToString(), 
-                                    expectedValue, 
+                                    propertyValue?.ToString(),
+                                    expectedValue,
                                     StringComparison.OrdinalIgnoreCase);
                             }
                             return false;
                         });
                     }
                 }
-                
+
                 return items.Count;
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or InvalidCastException)
@@ -175,12 +175,12 @@ internal sealed class CollectionCountConverter : IValueConverter
                 return 0;
             }
         }
-        
+
         if (value is IEnumerable simpleCollection)
         {
             return simpleCollection.Cast<object>().Count();
         }
-        
+
         return 0;
     }
 
@@ -203,21 +203,21 @@ internal sealed class CollectionAverageConverter : IValueConverter
             {
                 var items = collection.Cast<object>().ToList();
                 var values = new List<double>();
-                
+
                 foreach (var item in items)
                 {
                     var property = item.GetType().GetProperty(propertyName);
                     if (property != null)
                     {
                         var propertyValue = property.GetValue(item);
-                        if (propertyValue != null && 
+                        if (propertyValue != null &&
                             double.TryParse(propertyValue.ToString(), out var numericValue))
                         {
                             values.Add(numericValue);
                         }
                     }
                 }
-                
+
                 return values.Count > 0 ? values.Average() : 0.0;
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or InvalidCastException or FormatException)
@@ -226,7 +226,7 @@ internal sealed class CollectionAverageConverter : IValueConverter
                 return 0.0;
             }
         }
-        
+
         return 0.0;
     }
 

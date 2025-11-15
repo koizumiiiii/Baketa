@@ -1,5 +1,6 @@
 using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Models.OCR;
 
 namespace Baketa.Core.Abstractions.OCR;
 
@@ -12,27 +13,27 @@ public enum OcrPhase
     /// 初期化フェーズ
     /// </summary>
     Initializing = 0,
-    
+
     /// <summary>
     /// 前処理フェーズ（画像処理）
     /// </summary>
     Preprocessing = 1,
-    
+
     /// <summary>
     /// テキスト検出フェーズ
     /// </summary>
     TextDetection = 2,
-    
+
     /// <summary>
     /// テキスト認識フェーズ
     /// </summary>
     TextRecognition = 3,
-    
+
     /// <summary>
     /// 後処理フェーズ
     /// </summary>
     PostProcessing = 4,
-    
+
     /// <summary>
     /// 完了
     /// </summary>
@@ -105,17 +106,17 @@ public enum TextDirection
     /// 水平（左から右）
     /// </summary>
     Horizontal,
-    
+
     /// <summary>
     /// 垂直（上から下）
     /// </summary>
     Vertical,
-    
+
     /// <summary>
     /// 180度回転
     /// </summary>
     Rotated180,
-    
+
     /// <summary>
     /// 不明
     /// </summary>
@@ -163,7 +164,7 @@ public class OcrResults(
     /// 高度なテキスト結合アルゴリズムが適用されている場合はその結果、そうでなければ改行区切り結合
     /// </summary>
     public string Text => mergedText ?? string.Join(Environment.NewLine, TextRegions.Select(r => r.Text));
-    
+
     /// <summary>
     /// 有効なテキストが検出されているかどうか
     /// </summary>
@@ -235,7 +236,7 @@ public class OcrResults(
         for (int i = 0; i < lines.Count; i++)
         {
             var line = lines[i];
-            
+
             if (currentParagraph.Count == 0)
             {
                 currentParagraph.Add(line);
@@ -270,7 +271,7 @@ public class OcrResults(
         }
 
         // 段落を2つの改行で区切る
-        return string.Join(Environment.NewLine + Environment.NewLine, 
+        return string.Join(Environment.NewLine + Environment.NewLine,
             paragraphs.Select(p => string.Join(Environment.NewLine, p.Select(GetLineText))));
     }
 
@@ -323,73 +324,94 @@ public class OcrEngineSettings
     /// 認識する言語コード
     /// </summary>
     public string Language { get; set; } = "jpn"; // デフォルトは日本語
-    
+
     /// <summary>
     /// テキスト検出の信頼度閾値（0.0～1.0）
     /// より低い値で広範囲のテキスト領域を検出
     /// </summary>
-    public double DetectionThreshold { get; set; } = 0.09;
-    
+    public double DetectionThreshold { get; set; } = 0.6;
+
     /// <summary>
     /// テキスト認識の信頼度閾値（0.0～1.0）
     /// より低い値で文字結合を促進し、完全なフレーズ認識を向上
     /// </summary>
-    public double RecognitionThreshold { get; set; } = 0.16;
-    
+    public double RecognitionThreshold { get; set; } = 0.3;
+
     /// <summary>
     /// 使用するモデル名
     /// </summary>
     public string ModelName { get; set; } = "standard";
-    
+
     /// <summary>
     /// 最大テキスト検出数
     /// </summary>
     public int MaxDetections { get; set; } = 200;
-    
+
     /// <summary>
     /// 方向分類を使用するか（将来拡張用）
     /// </summary>
     public bool UseDirectionClassification { get; set; }
-    
+
     /// <summary>
     /// GPU使用設定（将来拡張用）
     /// </summary>
     public bool UseGpu { get; set; }
-    
+
     /// <summary>
     /// GPUデバイスID（将来拡張用）
     /// </summary>
     public int GpuDeviceId { get; set; }
-    
+
     /// <summary>
     /// GPU最大メモリ使用量（MB）- ゲーム競合回避用
     /// </summary>
     public int MaxGpuMemoryMB { get; set; } = 2048; // デフォルト2GB
-    
+
     /// <summary>
     /// GPUメモリ使用量監視を有効にするか
     /// </summary>
     public bool EnableGpuMemoryMonitoring { get; set; } = true;
-    
+
     /// <summary>
     /// マルチスレッド処理を有効にするか
     /// </summary>
     public bool EnableMultiThread { get; set; }
-    
+
     /// <summary>
     /// マルチスレッド時のワーカー数
     /// </summary>
     public int WorkerCount { get; set; } = 2;
-    
+
     /// <summary>
     /// 言語モデルを使用するか（PaddleOCR use_lm=True）
     /// </summary>
     public bool UseLanguageModel { get; set; }
-    
+
     /// <summary>
     /// 前処理を有効にするか
     /// </summary>
     public bool EnablePreprocessing { get; set; } = true;
+
+    /// <summary>
+    /// ハイブリッドモードを有効にするか（V3高速検出 + V5高精度認識）
+    /// </summary>
+    public bool EnableHybridMode { get; set; }
+
+    /// <summary>
+    /// 🔥 [P4-B_FIX] QueuedPaddleOcrAll並列ワーカー数（スレッドセーフ実行）
+    /// - デフォルト: 4（Gemini推奨、Phase 3最適化結果）
+    /// - 推奨範囲: 2-8（CPUコア数に応じて調整）
+    /// - 各ワーカーが独立したPaddleOcrAllインスタンスを保持
+    /// </summary>
+    public int QueuedOcrConsumerCount { get; set; } = 4;
+
+    /// <summary>
+    /// 🔥 [P4-B_FIX] QueuedPaddleOcrAll内部キューの最大容量
+    /// - デフォルト: 64（ライブラリデフォルト値）
+    /// - 推奨範囲: 32-128（メモリとレイテンシのバランス）
+    /// - キューが満杯の場合、新規リクエストはブロックされる
+    /// </summary>
+    public int QueuedOcrBoundedCapacity { get; set; } = 64;
 
     /// <summary>
     /// 設定の妥当性を検証する
@@ -399,28 +421,35 @@ public class OcrEngineSettings
     {
         if (string.IsNullOrWhiteSpace(Language))
             return false;
-            
+
         if (DetectionThreshold < 0.0 || DetectionThreshold > 1.0)
             return false;
-            
+
         if (RecognitionThreshold < 0.0 || RecognitionThreshold > 1.0)
             return false;
-            
+
         if (string.IsNullOrWhiteSpace(ModelName))
             return false;
-            
+
         if (MaxDetections < 1 || MaxDetections > 1000)
             return false;
-            
+
         if (GpuDeviceId < 0)
             return false;
-            
+
         if (MaxGpuMemoryMB < 128 || MaxGpuMemoryMB > 16384) // 128MB～16GB
             return false;
-            
+
         if (WorkerCount < 1 || WorkerCount > 10)
             return false;
-            
+
+        // 🔥 [P4-B_FIX] QueuedPaddleOcrAll設定バリデーション
+        if (QueuedOcrConsumerCount < 1 || QueuedOcrConsumerCount > 16)
+            return false;
+
+        if (QueuedOcrBoundedCapacity < 8 || QueuedOcrBoundedCapacity > 256)
+            return false;
+
         return true;
     }
 
@@ -445,7 +474,11 @@ public class OcrEngineSettings
             EnableMultiThread = EnableMultiThread,
             WorkerCount = WorkerCount,
             UseLanguageModel = UseLanguageModel,
-            EnablePreprocessing = EnablePreprocessing
+            EnablePreprocessing = EnablePreprocessing,
+            EnableHybridMode = EnableHybridMode,
+            // 🔥 [P4-B_FIX] QueuedPaddleOcrAll設定
+            QueuedOcrConsumerCount = QueuedOcrConsumerCount,
+            QueuedOcrBoundedCapacity = QueuedOcrBoundedCapacity
         };
     }
 }
@@ -456,9 +489,9 @@ public class OcrEngineSettings
 public class OcrException : Exception
 {
     public OcrException() { }
-    
+
     public OcrException(string message) : base(message) { }
-    
+
     public OcrException(string message, Exception innerException) : base(message, innerException) { }
 }
 
@@ -471,17 +504,17 @@ public interface IOcrEngine : IDisposable
     /// OCRエンジンの名前
     /// </summary>
     string EngineName { get; }
-    
+
     /// <summary>
     /// OCRエンジンのバージョン
     /// </summary>
     string EngineVersion { get; }
-    
+
     /// <summary>
     /// エンジンが初期化済みかどうか
     /// </summary>
     bool IsInitialized { get; }
-    
+
     /// <summary>
     /// 現在の言語設定
     /// </summary>
@@ -494,14 +527,14 @@ public interface IOcrEngine : IDisposable
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>初期化が成功した場合はtrue</returns>
     Task<bool> InitializeAsync(OcrEngineSettings? settings = null, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// エンジンのウォームアップを実行（初回実行時の遅延を解消）
     /// </summary>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>ウォームアップが成功した場合はtrue</returns>
     Task<bool> WarmupAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 画像からテキストを認識します
     /// </summary>
@@ -513,7 +546,7 @@ public interface IOcrEngine : IDisposable
         IImage image,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 画像の指定領域からテキストを認識します（ゲームOCR最重要機能）
     /// </summary>
@@ -527,32 +560,46 @@ public interface IOcrEngine : IDisposable
         Rectangle? regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default);
-    
+
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    /// <param name="context">OCRコンテキスト（画像、ウィンドウハンドル、キャプチャ領域を含む）</param>
+    /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
+    /// <returns>OCR結果</returns>
+    /// <remarks>
+    /// OcrContext.CaptureRegionを使用してROI座標変換を一元管理します。
+    /// CaptureRegionが設定されている場合、OCR結果の座標は元画像での絶対座標に変換されます。
+    /// </remarks>
+    Task<OcrResults> RecognizeAsync(
+        OcrContext context,
+        IProgress<OcrProgress>? progressCallback = null);
+
     /// <summary>
     /// OCRエンジンの設定を取得します
     /// </summary>
     /// <returns>現在の設定</returns>
     OcrEngineSettings GetSettings();
-    
+
     /// <summary>
     /// OCRエンジンの設定を適用します
     /// </summary>
     /// <param name="settings">設定</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     Task ApplySettingsAsync(OcrEngineSettings settings, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 使用可能な言語のリストを取得します
     /// </summary>
     /// <returns>言語コードのリスト</returns>
     IReadOnlyList<string> GetAvailableLanguages();
-    
+
     /// <summary>
     /// 使用可能なモデルのリストを取得します
     /// </summary>
     /// <returns>モデル名のリスト</returns>
     IReadOnlyList<string> GetAvailableModels();
-    
+
     /// <summary>
     /// 指定言語のモデルが利用可能かを確認します
     /// </summary>
@@ -560,19 +607,19 @@ public interface IOcrEngine : IDisposable
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>利用可能な場合はtrue</returns>
     Task<bool> IsLanguageAvailableAsync(string languageCode, CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// エンジンのパフォーマンス統計を取得
     /// </summary>
     /// <returns>パフォーマンス統計</returns>
     OcrPerformanceStats GetPerformanceStats();
-    
+
     /// <summary>
     /// 進行中のOCRタイムアウト処理をキャンセル
     /// 翻訳結果が表示された際に呼び出されます
     /// </summary>
     void CancelCurrentOcrTimeout();
-    
+
     /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// AdaptiveTileStrategy等での高速テキスト領域検出用
@@ -583,6 +630,17 @@ public interface IOcrEngine : IDisposable
     Task<OcrResults> DetectTextRegionsAsync(
         IImage image,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    int GetConsecutiveFailureCount();
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    void ResetFailureCounter();
 }
 
 /// <summary>
@@ -594,37 +652,37 @@ public class OcrPerformanceStats
     /// 処理した画像の総数
     /// </summary>
     public int TotalProcessedImages { get; init; }
-    
+
     /// <summary>
     /// 平均処理時間（ミリ秒）
     /// </summary>
     public double AverageProcessingTimeMs { get; init; }
-    
+
     /// <summary>
     /// 最小処理時間（ミリ秒）
     /// </summary>
     public double MinProcessingTimeMs { get; init; }
-    
+
     /// <summary>
     /// 最大処理時間（ミリ秒）
     /// </summary>
     public double MaxProcessingTimeMs { get; init; }
-    
+
     /// <summary>
     /// エラー回数
     /// </summary>
     public int ErrorCount { get; init; }
-    
+
     /// <summary>
     /// 成功率（0.0～1.0）
     /// </summary>
     public double SuccessRate { get; init; }
-    
+
     /// <summary>
     /// 統計開始時刻
     /// </summary>
     public DateTime StartTime { get; init; }
-    
+
     /// <summary>
     /// 最終更新時刻
     /// </summary>

@@ -16,12 +16,12 @@ public interface IFontManagerService
     /// 指定した言語に適したフォントファミリーを取得
     /// </summary>
     FontFamily GetFontFamily(string language, bool isBold = false);
-    
+
     /// <summary>
     /// 現在の設定に基づくデフォルトフォントファミリーを取得
     /// </summary>
     FontFamily GetDefaultFontFamily(bool isBold = false);
-    
+
     /// <summary>
     /// 翻訳結果表示用のフォントファミリーを取得
     /// </summary>
@@ -42,12 +42,12 @@ public class FontManagerService(ILogger<FontManagerService> logger) : IFontManag
         try
         {
             var fontKey = GetFontResourceKey(language, isBold);
-            
+
             // Avaloniaのアプリケーションリソースからフォントを取得
-            if (Avalonia.Application.Current?.Resources?.TryGetResource(fontKey, null, out var resource) == true 
+            if (Avalonia.Application.Current?.Resources?.TryGetResource(fontKey, null, out var resource) == true
                 && resource is FontFamily fontFamily)
             {
-                _logger.LogDebug("フォント取得成功: 言語={Language}, 太字={IsBold}, フォント={FontKey}", 
+                _logger.LogDebug("フォント取得成功: 言語={Language}, 太字={IsBold}, フォント={FontKey}",
                     language, isBold, fontKey);
                 return fontFamily;
             }
@@ -80,7 +80,7 @@ public class FontManagerService(ILogger<FontManagerService> logger) : IFontManag
     private static string GetFontResourceKey(string language, bool isBold)
     {
         var suffix = isBold ? "-Bold" : "";
-        
+
         return NormalizeLanguageCode(language) switch
         {
             "japanese" => $"JapaneseFont{suffix}",
@@ -114,8 +114,8 @@ public class FontManagerService(ILogger<FontManagerService> logger) : IFontManag
         {
             _currentSourceLanguage = settingsEvent.SourceLanguage;
             _currentTargetLanguage = settingsEvent.TargetLanguage;
-            
-            _logger.LogInformation("フォント設定更新: 翻訳元={SourceLanguage}, 翻訳先={TargetLanguage}", 
+
+            _logger.LogInformation("フォント設定更新: 翻訳元={SourceLanguage}, 翻訳先={TargetLanguage}",
                 _currentSourceLanguage, _currentTargetLanguage);
         }
     }

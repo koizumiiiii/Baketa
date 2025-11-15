@@ -11,12 +11,12 @@ public interface IResultFusionStrategy
     /// 戦略名
     /// </summary>
     string StrategyName { get; }
-    
+
     /// <summary>
     /// 戦略の説明
     /// </summary>
     string Description { get; }
-    
+
     /// <summary>
     /// 複数の認識結果を融合して最終結果を生成
     /// </summary>
@@ -24,12 +24,12 @@ public interface IResultFusionStrategy
         IReadOnlyList<IndividualEngineResult> individualResults,
         FusionParameters parameters,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// 戦略が指定されたエンジン構成に適用可能かチェック
     /// </summary>
     bool IsApplicable(IReadOnlyList<EnsembleEngineInfo> engines);
-    
+
     /// <summary>
     /// 戦略の推奨パラメータを取得
     /// </summary>
@@ -115,9 +115,9 @@ public abstract class ResultFusionStrategyBase : IResultFusionStrategy
     {
         var intersection = System.Drawing.Rectangle.Intersect(bounds1, bounds2);
         var union = System.Drawing.Rectangle.Union(bounds1, bounds2);
-        
+
         if (union.Width == 0 || union.Height == 0) return 0.0;
-        
+
         return (double)(intersection.Width * intersection.Height) / (union.Width * union.Height);
     }
 
@@ -131,7 +131,7 @@ public abstract class ResultFusionStrategyBase : IResultFusionStrategy
 
         var distance = CalculateLevenshteinDistance(text1, text2);
         var maxLength = Math.Max(text1.Length, text2.Length);
-        
+
         return 1.0 - (double)distance / maxLength;
     }
 
@@ -142,10 +142,10 @@ public abstract class ResultFusionStrategyBase : IResultFusionStrategy
     {
         var area1 = bounds1.Width * bounds1.Height;
         var area2 = bounds2.Width * bounds2.Height;
-        
+
         if (area1 == 0 && area2 == 0) return 1.0;
         if (area1 == 0 || area2 == 0) return 0.0;
-        
+
         var ratio = (double)Math.Min(area1, area2) / Math.Max(area1, area2);
         return ratio;
     }
@@ -195,7 +195,7 @@ public abstract class ResultFusionStrategyBase : IResultFusionStrategy
         {
             var weight = weights[i] / totalWeight;
             var bounds = regions[i].Bounds;
-            
+
             weightedX += bounds.X * weight;
             weightedY += bounds.Y * weight;
             weightedRight += (bounds.X + bounds.Width) * weight;

@@ -175,10 +175,10 @@ public sealed class SettingsChangeTracker : ISettingsChangeTracker
 
         messageBox.Content = content;
 
-        var owner = App.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop 
-            ? desktop.MainWindow 
+        var owner = App.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.MainWindow
             : null;
-        
+
         if (owner != null)
         {
             await messageBox.ShowDialog(owner).ConfigureAwait(false);

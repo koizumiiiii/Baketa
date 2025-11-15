@@ -21,7 +21,7 @@ public static class TranslationServiceExtensions
         // 翻訳モジュールの登録
         var translationModule = new TranslationModule(configuration);
         translationModule.RegisterServices(services);
-        
+
         return services;
     }
 }

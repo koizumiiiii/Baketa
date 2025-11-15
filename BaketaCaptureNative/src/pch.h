@@ -15,6 +15,8 @@
 #include <chrono>
 #include <condition_variable>
 #include <string>
+#include <algorithm>
+#include <cstdio>
 
 // Windows Runtime
 #include <winrt/base.h>

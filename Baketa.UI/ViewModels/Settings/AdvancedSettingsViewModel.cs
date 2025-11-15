@@ -1,13 +1,13 @@
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -19,45 +19,45 @@ public sealed class AdvancedSettingsViewModel : Framework.ViewModelBase
 {
     private readonly AdvancedSettings _originalSettings;
     private readonly ILogger<AdvancedSettingsViewModel>? _logger;
-    
+
     // バッキングフィールド - 基本設定
     private bool _enableAdvancedFeatures;
     private bool _optimizeMemoryUsage;
     private bool _optimizeGarbageCollection;
-    
+
     // バッキングフィールド - CPU/プロセス設定
     private int _cpuAffinityMask;
     private ProcessPriority _processPriority;
     private int _workerThreadCount;
     private int _ioThreadCount;
-    
+
     // バッキングフィールド - メモリ/バッファリング設定
     private BufferingStrategy _bufferingStrategy;
     private int _maxQueueSize;
-    
+
     // バッキングフィールド - ネットワーク設定
     private int _networkTimeoutSeconds;
     private int _maxHttpConnections;
-    
+
     // バッキングフィールド - リトライ設定
     private RetryStrategy _retryStrategy;
     private int _maxRetryCount;
     private int _retryDelayMs;
-    
+
     // バッキングフィールド - 統計/監視設定
     private bool _enableStatisticsCollection;
     private int _statisticsRetentionDays;
     private bool _enableProfiling;
     private bool _enableAnomalyDetection;
     private bool _enableAutoRecovery;
-    
+
     // バッキングフィールド - 実験的/デバッグ設定
     private bool _enableExperimentalFeatures;
     private bool _exposeInternalApis;
     private bool _enableDebugBreaks;
     private bool _generateMemoryDumps;
     private string _customConfigPath;
-    
+
     // UI制御フィールド
     private bool _showAdvancedSettings;
     private bool _showExperimentalSettings;
@@ -488,49 +488,50 @@ public sealed class AdvancedSettingsViewModel : Framework.ViewModelBase
     private void SetupChangeTracking()
     {
         // 基本設定プロパティの変更追跡
-        this.WhenAnyValue(x => x.EnableAdvancedFeatures, x => x.OptimizeMemoryUsage, 
+        this.WhenAnyValue(x => x.EnableAdvancedFeatures, x => x.OptimizeMemoryUsage,
                           x => x.OptimizeGarbageCollection)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // CPU/プロセス設定の変更追跡
-        this.WhenAnyValue(x => x.CpuAffinityMask, x => x.ProcessPriority, 
+        this.WhenAnyValue(x => x.CpuAffinityMask, x => x.ProcessPriority,
                           x => x.WorkerThreadCount, x => x.IoThreadCount)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // メモリ/バッファリング設定の変更追跡
         this.WhenAnyValue(x => x.BufferingStrategy, x => x.MaxQueueSize)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // ネットワーク設定の変更追跡
         this.WhenAnyValue(x => x.NetworkTimeoutSeconds, x => x.MaxHttpConnections)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // リトライ設定の変更追跡
         this.WhenAnyValue(x => x.RetryStrategy)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => {
+            .Subscribe(_ =>
+            {
                 HasChanges = true;
                 this.RaisePropertyChanged(nameof(IsRetryConfigEnabled));
             });
-        
+
         this.WhenAnyValue(x => x.MaxRetryCount, x => x.RetryDelayMs)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 統計/監視設定の変更追跡
         this.WhenAnyValue(x => x.EnableStatisticsCollection, x => x.StatisticsRetentionDays,
-                          x => x.EnableProfiling, x => x.EnableAnomalyDetection, 
+                          x => x.EnableProfiling, x => x.EnableAnomalyDetection,
                           x => x.EnableAutoRecovery)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 実験的/デバッグ設定の変更追跡
         this.WhenAnyValue(x => x.EnableExperimentalFeatures, x => x.ExposeInternalApis,
-                          x => x.EnableDebugBreaks, x => x.GenerateMemoryDumps, 
+                          x => x.EnableDebugBreaks, x => x.GenerateMemoryDumps,
                           x => x.CustomConfigPath)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
@@ -605,27 +606,27 @@ public sealed class AdvancedSettingsViewModel : Framework.ViewModelBase
                 _logger?.LogWarning("CPU親和性マスクが範囲外です: {Mask}", CpuAffinityMask);
                 return false;
             }
-            
+
             // スレッド数の検証
             if (WorkerThreadCount < 0 || WorkerThreadCount > 32)
             {
                 _logger?.LogWarning("ワーカースレッド数が範囲外です: {Count}", WorkerThreadCount);
                 return false;
             }
-            
+
             if (IoThreadCount < 0 || IoThreadCount > 16)
             {
                 _logger?.LogWarning("I/Oスレッド数が範囲外です: {Count}", IoThreadCount);
                 return false;
             }
-            
+
             // タイムアウトの検証
             if (NetworkTimeoutSeconds < 5 || NetworkTimeoutSeconds > 300)
             {
                 _logger?.LogWarning("ネットワークタイムアウトが範囲外です: {Timeout}秒", NetworkTimeoutSeconds);
                 return false;
             }
-            
+
             return true;
         }
         catch (ArgumentOutOfRangeException ex)
@@ -678,7 +679,7 @@ public sealed class AdvancedSettingsViewModel : Framework.ViewModelBase
     public void UpdateSettings(AdvancedSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         InitializeFromSettings(settings);
         HasChanges = false;
         _logger?.LogDebug("拡張設定を更新しました");

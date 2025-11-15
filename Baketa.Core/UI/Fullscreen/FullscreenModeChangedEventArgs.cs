@@ -31,12 +31,12 @@ public readonly record struct FullscreenModeChangedEventArgs(
         (false, false) => FullscreenModeType.Windowed,
         (true, true) => FullscreenModeType.Unknown // 通常はありえない組み合わせ
     };
-    
+
     /// <summary>
     /// ユーザーアクションが必要かどうか
     /// </summary>
     public bool RequiresUserAction => IsExclusiveFullscreen && !string.IsNullOrEmpty(RecommendationMessage);
-    
+
     /// <summary>
     /// イベント概要の文字列表現
     /// </summary>
@@ -59,17 +59,17 @@ public enum FullscreenModeType
     /// ウィンドウモード
     /// </summary>
     Windowed,
-    
+
     /// <summary>
     /// ボーダレスフルスクリーンモード
     /// </summary>
     Borderless,
-    
+
     /// <summary>
     /// 排他的フルスクリーンモード
     /// </summary>
     Exclusive,
-    
+
     /// <summary>
     /// 不明なモード
     /// </summary>

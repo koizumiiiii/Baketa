@@ -28,12 +28,12 @@ public sealed class JsonSettingsService : ISettingsService
     public JsonSettingsService(ILogger<JsonSettingsService> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // ユーザー設定ディレクトリを取得
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var settingsDirectory = Path.Combine(userProfile, ".baketa", "settings");
         _settingsFilePath = Path.Combine(settingsDirectory, "user-settings.json");
-        
+
         // JSON シリアライゼーションオプション
         _jsonOptions = new JsonSerializerOptions
         {
@@ -43,12 +43,12 @@ public sealed class JsonSettingsService : ISettingsService
             AllowTrailingCommas = true,
             ReadCommentHandling = JsonCommentHandling.Skip
         };
-        
+
         _settings = [];
-        
+
         // 設定ディレクトリを作成
         EnsureSettingsDirectoryExists();
-        
+
         // 初期設定を読み込み
         _ = Task.Run(async () =>
         {
@@ -83,7 +83,7 @@ public sealed class JsonSettingsService : ISettingsService
     public T GetValue<T>(string key, T defaultValue)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
-        
+
         lock (_lockObject)
         {
             if (_settings.TryGetValue(key, out var value))
@@ -95,19 +95,19 @@ public sealed class JsonSettingsService : ISettingsService
                     {
                         return ConvertJsonElement<T>(jsonElement, defaultValue);
                     }
-                    
+
                     // 直接変換可能な場合
                     if (value is T directValue)
                     {
                         return directValue;
                     }
-                    
+
                     // 型変換を試行
                     if (typeof(T) == typeof(string))
                     {
                         return (T)(object)value.ToString()!;
                     }
-                    
+
                     // その他の型変換
                     return (T)Convert.ChangeType(value, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
                 }
@@ -137,7 +137,7 @@ public sealed class JsonSettingsService : ISettingsService
                     return defaultValue;
                 }
             }
-            
+
             return defaultValue;
         }
     }
@@ -146,7 +146,7 @@ public sealed class JsonSettingsService : ISettingsService
     public void SetValue<T>(string key, T value)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
-        
+
         lock (_lockObject)
         {
             if (value == null)
@@ -158,7 +158,7 @@ public sealed class JsonSettingsService : ISettingsService
                 _settings[key] = value;
             }
         }
-        
+
         _logger.LogDebug("設定値を更新しました: Key={Key}, Value={Value}", key, value);
     }
 
@@ -166,7 +166,7 @@ public sealed class JsonSettingsService : ISettingsService
     public bool HasValue(string key)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
-        
+
         lock (_lockObject)
         {
             return _settings.ContainsKey(key);
@@ -177,12 +177,12 @@ public sealed class JsonSettingsService : ISettingsService
     public void RemoveValue(string key)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
-        
+
         lock (_lockObject)
         {
             _settings.Remove(key);
         }
-        
+
         _logger.LogDebug("設定値を削除しました: Key={Key}", key);
     }
 
@@ -192,21 +192,21 @@ public sealed class JsonSettingsService : ISettingsService
         try
         {
             Dictionary<string, object> settingsToSave;
-            
+
             lock (_lockObject)
             {
                 settingsToSave = new Dictionary<string, object>(_settings);
             }
-            
+
             EnsureSettingsDirectoryExists();
-            
+
             // バックアップ作成
             await CreateBackupAsync().ConfigureAwait(false);
-            
+
             // JSON に変換して保存
             var json = JsonSerializer.Serialize(settingsToSave, _jsonOptions);
             await File.WriteAllTextAsync(_settingsFilePath, json).ConfigureAwait(false);
-            
+
             _logger.LogInformation("設定を保存しました: {FilePath}", _settingsFilePath);
         }
         catch (Exception ex)
@@ -224,7 +224,7 @@ public sealed class JsonSettingsService : ISettingsService
             if (!File.Exists(_settingsFilePath))
             {
                 _logger.LogDebug("設定ファイルが存在しません。新規作成します: {FilePath}", _settingsFilePath);
-                
+
                 lock (_lockObject)
                 {
                     _settings.Clear();
@@ -234,7 +234,7 @@ public sealed class JsonSettingsService : ISettingsService
 
             var json = await File.ReadAllTextAsync(_settingsFilePath).ConfigureAwait(false);
             var loadedSettings = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json, _jsonOptions);
-            
+
             if (loadedSettings != null)
             {
                 lock (_lockObject)
@@ -245,17 +245,17 @@ public sealed class JsonSettingsService : ISettingsService
                         _settings[kvp.Key] = kvp.Value;
                     }
                 }
-                
+
                 _logger.LogInformation("設定を読み込みました: {Count} 項目", loadedSettings.Count);
             }
         }
         catch (JsonException ex)
         {
             _logger.LogError(ex, "設定ファイルのJSONパースに失敗しました");
-            
+
             // 破損した設定ファイルのバックアップを作成
             await CreateCorruptBackupAsync().ConfigureAwait(false);
-            
+
             // 設定をクリア
             lock (_lockObject)
             {
@@ -268,7 +268,7 @@ public sealed class JsonSettingsService : ISettingsService
             throw;
         }
     }
-    
+
     /// <summary>
     /// JsonElement から指定された型に変換します
     /// </summary>
@@ -277,7 +277,7 @@ public sealed class JsonSettingsService : ISettingsService
         try
         {
             var targetType = typeof(T);
-            
+
             // null許容型の処理
             if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
@@ -285,10 +285,10 @@ public sealed class JsonSettingsService : ISettingsService
                 {
                     return defaultValue;
                 }
-                
+
                 targetType = Nullable.GetUnderlyingType(targetType)!;
             }
-            
+
             // 型別の変換
             return targetType.Name switch
             {
@@ -319,7 +319,7 @@ public sealed class JsonSettingsService : ISettingsService
             return defaultValue;
         }
     }
-    
+
     /// <summary>
     /// 設定ディレクトリの存在を確認し、必要に応じて作成します
     /// </summary>
@@ -340,7 +340,7 @@ public sealed class JsonSettingsService : ISettingsService
             throw;
         }
     }
-    
+
     /// <summary>
     /// 設定ファイルのバックアップを作成します
     /// </summary>
@@ -367,10 +367,10 @@ public sealed class JsonSettingsService : ISettingsService
         {
             _logger.LogWarning(ex, "バックアップファイルの入出力エラーが発生しました");
         }
-        
+
         return Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// 破損した設定ファイルのバックアップを作成します
     /// </summary>
@@ -398,7 +398,7 @@ public sealed class JsonSettingsService : ISettingsService
         {
             _logger.LogWarning(ex, "破損ファイルのバックアップ作成中に入出力エラーが発生しました");
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -481,7 +481,7 @@ public sealed class JsonSettingsService : ISettingsService
         {
             _settings.Clear();
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
         _logger.LogInformation("設定をデフォルト値にリセットしました");
     }
@@ -490,7 +490,7 @@ public sealed class JsonSettingsService : ISettingsService
     public Task CreateBackupAsync(string? backupFilePath = null)
     {
         backupFilePath ??= $"{_settingsFilePath}.backup_{DateTime.Now.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture)}";
-        
+
         try
         {
             if (File.Exists(_settingsFilePath))
@@ -504,7 +504,7 @@ public sealed class JsonSettingsService : ISettingsService
             _logger.LogError(ex, "設定のバックアップ作成に失敗しました");
             throw;
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -512,17 +512,17 @@ public sealed class JsonSettingsService : ISettingsService
     public async Task RestoreFromBackupAsync(string backupFilePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(backupFilePath);
-        
+
         if (!File.Exists(backupFilePath))
         {
             throw new FileNotFoundException($"バックアップファイルが見つかりません: {backupFilePath}");
         }
-        
+
         try
         {
             File.Copy(backupFilePath, _settingsFilePath, true);
             await ReloadAsync().ConfigureAwait(false);
-            
+
             _logger.LogInformation("バックアップから設定を復元しました: {BackupPath}", backupFilePath);
         }
         catch (Exception ex)

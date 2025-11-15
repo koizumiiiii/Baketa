@@ -32,7 +32,7 @@ public sealed partial class VersionComparisonService(ILogger<VersionComparisonSe
 
         // プレフィックス除去（v1.0.0 → 1.0.0）
         var cleanVersion = VersionPrefixRegex().Match(versionString).Groups[1].Value;
-        
+
         var match = SemverRegex().Match(cleanVersion);
         if (!match.Success)
         {
@@ -277,13 +277,13 @@ public sealed record SemverVersion
     public string ToNormalizedString()
     {
         var baseVersion = $"{Major}.{Minor}.{Patch}";
-        
+
         if (!string.IsNullOrEmpty(Prerelease))
             baseVersion += $"-{Prerelease}";
-            
+
         if (!string.IsNullOrEmpty(BuildMetadata))
             baseVersion += $"+{BuildMetadata}";
-            
+
         return baseVersion;
     }
 

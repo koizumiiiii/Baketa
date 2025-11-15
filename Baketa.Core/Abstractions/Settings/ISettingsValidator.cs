@@ -15,7 +15,7 @@ public interface ISettingsValidator
     /// <param name="settings">検証する設定</param>
     /// <returns>検証結果</returns>
     SettingsValidationResult Validate(AppSettings settings);
-    
+
     /// <summary>
     /// 特定のカテゴリの設定を検証します
     /// </summary>
@@ -24,26 +24,26 @@ public interface ISettingsValidator
     /// <param name="settings">検証する設定</param>
     /// <returns>検証結果</returns>
     SettingsValidationResult Validate<T>(string category, T settings) where T : class;
-    
+
     /// <summary>
     /// 検証ルールを追加します
     /// </summary>
     /// <param name="rule">検証ルール</param>
     void AddRule(IValidationRule rule);
-    
+
     /// <summary>
     /// 特定のカテゴリに対する検証ルールを追加します
     /// </summary>
     /// <param name="category">カテゴリ名</param>
     /// <param name="rule">検証ルール</param>
     void AddRule(string category, IValidationRule rule);
-    
+
     /// <summary>
     /// 登録済みの検証ルールを取得します
     /// </summary>
     /// <returns>検証ルールのコレクション</returns>
     IReadOnlyList<IValidationRule> GetRules();
-    
+
     /// <summary>
     /// 特定カテゴリの検証ルールを取得します
     /// </summary>

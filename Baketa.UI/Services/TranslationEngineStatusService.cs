@@ -25,22 +25,22 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
     private readonly Subject<TranslationEngineStatusUpdate> _statusUpdateSubject;
     private readonly Timer _monitoringTimer;
     private readonly CancellationTokenSource _cancellationTokenSource;
-    
+
     private bool _isMonitoring;
     private bool _disposed;
 
     /// <inheritdoc/>
     public TranslationEngineStatus LocalEngineStatus { get; }
-    
+
     /// <inheritdoc/>
     public TranslationEngineStatus CloudEngineStatus { get; }
-    
+
     /// <inheritdoc/>
     public NetworkConnectionStatus NetworkStatus { get; }
-    
+
     /// <inheritdoc/>
     public FallbackInfo? LastFallback { get; private set; }
-    
+
     /// <inheritdoc/>
     public IObservable<TranslationEngineStatusUpdate> StatusUpdates => _statusUpdateSubject.AsObservable();
 
@@ -55,7 +55,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
         _logger = logger;
         _statusUpdateSubject = new Subject<TranslationEngineStatusUpdate>();
         _cancellationTokenSource = new CancellationTokenSource();
-        
+
         LocalEngineStatus = new TranslationEngineStatus
         {
             IsOnline = true, // LocalOnlyは基本的に常にオンライン
@@ -63,7 +63,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             RemainingRequests = -1, // 無制限
             LastChecked = DateTime.Now
         };
-        
+
         CloudEngineStatus = new TranslationEngineStatus
         {
             IsOnline = false, // 初期状態は未確認
@@ -71,19 +71,19 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             RemainingRequests = 0,
             LastChecked = DateTime.Now
         };
-        
+
         NetworkStatus = new NetworkConnectionStatus
         {
             IsConnected = false,
             LatencyMs = -1,
             LastChecked = DateTime.Now
         };
-        
+
         // 定期監視タイマーを設定
         _monitoringTimer = new Timer(
-            MonitoringCallback, 
-            null, 
-            Timeout.InfiniteTimeSpan, 
+            MonitoringCallback,
+            null,
+            Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
     }
 
@@ -97,19 +97,19 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
         }
 
         _logger.LogInformation("翻訳エンジン状態監視を開始します");
-        
+
         _isMonitoring = true;
-        
+
         // 初回チェック実行
         await RefreshStatusAsync().ConfigureAwait(false);
-        
+
         // 定期監視開始
         _monitoringTimer.Change(
-            TimeSpan.Zero, 
+            TimeSpan.Zero,
             TimeSpan.FromSeconds(_options.MonitoringIntervalSeconds));
-        
+
         _logger.LogInformation(
-            "翻訳エンジン状態監視を開始しました。監視間隔: {Interval}秒", 
+            "翻訳エンジン状態監視を開始しました。監視間隔: {Interval}秒",
             _options.MonitoringIntervalSeconds);
     }
 
@@ -122,14 +122,14 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
         }
 
         _logger.LogInformation("翻訳エンジン状態監視を停止します");
-        
+
         _isMonitoring = false;
-        
+
         // タイマー停止
         _monitoringTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
-        
+
         _logger.LogInformation("翻訳エンジン状態監視を停止しました");
     }
 
@@ -152,7 +152,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             };
 
             await Task.WhenAll(checkTasks).ConfigureAwait(false);
-            
+
             _logger.LogDebug("エンジン状態の更新が完了しました");
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
@@ -178,13 +178,13 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             // LocalOnlyエンジンは基本的に常に利用可能
             // モデルファイルの存在確認などを行う
             var wasHealthy = LocalEngineStatus.IsHealthy;
-            
+
             // TODO: 実際のローカルエンジンヘルスチェック実装
             LocalEngineStatus.IsOnline = true;
             LocalEngineStatus.IsHealthy = await CheckLocalEngineHealthAsync().ConfigureAwait(false);
             LocalEngineStatus.LastChecked = DateTime.Now;
             LocalEngineStatus.LastError = string.Empty;
-            
+
             if (wasHealthy != LocalEngineStatus.IsHealthy)
             {
                 await PublishStatusUpdateAsync("LocalOnly", StatusUpdateType.HealthCheck).ConfigureAwait(false);
@@ -196,9 +196,9 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             LocalEngineStatus.IsHealthy = false;
             LocalEngineStatus.LastError = $"モデルファイルエラー: {ex.Message}";
             LocalEngineStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogWarning(ex, "LocalOnlyエンジンのモデルファイルアクセスに失敗しました");
-            
+
             await PublishStatusUpdateAsync("LocalOnly", StatusUpdateType.ErrorOccurred, ex.Message).ConfigureAwait(false);
         }
         catch (UnauthorizedAccessException ex)
@@ -207,9 +207,9 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             LocalEngineStatus.IsHealthy = false;
             LocalEngineStatus.LastError = $"アクセス権限エラー: {ex.Message}";
             LocalEngineStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogError(ex, "LocalOnlyエンジンのファイルアクセス権限が不足しています");
-            
+
             await PublishStatusUpdateAsync("LocalOnly", StatusUpdateType.ErrorOccurred, ex.Message).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
@@ -218,7 +218,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             LocalEngineStatus.IsHealthy = false;
             LocalEngineStatus.LastError = "ヘルスチェックが中断されました";
             LocalEngineStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogDebug(ex, "LocalOnlyエンジンのヘルスチェックが中断されました");
         }
     }
@@ -232,7 +232,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
         {
             var wasOnline = CloudEngineStatus.IsOnline;
             var wasHealthy = CloudEngineStatus.IsHealthy;
-            
+
             // ネットワーク接続が必要
             if (!NetworkStatus.IsConnected)
             {
@@ -244,25 +244,25 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             {
                 // TODO: 実際のクラウドエンジンAPI呼び出し実装
                 var healthCheckResult = await CheckCloudEngineHealthAsync().ConfigureAwait(false);
-                
+
                 CloudEngineStatus.IsOnline = healthCheckResult.IsOnline;
                 CloudEngineStatus.IsHealthy = healthCheckResult.IsHealthy;
                 CloudEngineStatus.RemainingRequests = healthCheckResult.RemainingRequests;
                 CloudEngineStatus.RateLimitReset = healthCheckResult.RateLimitReset;
                 CloudEngineStatus.LastError = healthCheckResult.LastError;
             }
-            
+
             CloudEngineStatus.LastChecked = DateTime.Now;
-            
+
             if (wasOnline != CloudEngineStatus.IsOnline || wasHealthy != CloudEngineStatus.IsHealthy)
             {
                 await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.HealthCheck).ConfigureAwait(false);
             }
-            
+
             // レート制限警告
             if (CloudEngineStatus.RemainingRequests <= _options.RateLimitWarningThreshold)
             {
-                await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.RateLimitUpdate, 
+                await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.RateLimitUpdate,
                     CloudEngineStatus.RemainingRequests).ConfigureAwait(false);
             }
         }
@@ -273,9 +273,9 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             CloudEngineStatus.IsHealthy = false;
             CloudEngineStatus.LastError = "接続タイムアウト";
             CloudEngineStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogWarning(ex, "CloudOnlyエンジンの接続がタイムアウトしました");
-            
+
             await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.ErrorOccurred, "接続タイムアウト").ConfigureAwait(false);
         }
         catch (System.Net.Http.HttpRequestException ex)
@@ -285,9 +285,9 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             CloudEngineStatus.IsHealthy = false;
             CloudEngineStatus.LastError = $"HTTP通信エラー: {ex.Message}";
             CloudEngineStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogWarning(ex, "CloudOnlyエンジンのHTTP通信に失敗しました");
-            
+
             await PublishStatusUpdateAsync("CloudOnly", StatusUpdateType.ErrorOccurred, ex.Message).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
@@ -297,7 +297,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             CloudEngineStatus.IsHealthy = false;
             CloudEngineStatus.LastError = "ヘルスチェックが中断されました";
             CloudEngineStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogDebug(ex, "CloudOnlyエンジンのヘルスチェックが中断されました");
         }
     }
@@ -310,17 +310,17 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
         try
         {
             var wasConnected = NetworkStatus.IsConnected;
-            
+
             using var ping = new Ping();
             var reply = await ping.SendPingAsync("8.8.8.8", _options.NetworkTimeoutMs).ConfigureAwait(false);
-            
+
             NetworkStatus.IsConnected = reply.Status == IPStatus.Success;
             NetworkStatus.LatencyMs = reply.Status == IPStatus.Success ? (int)reply.RoundtripTime : -1;
             NetworkStatus.LastChecked = DateTime.Now;
-            
+
             if (wasConnected != NetworkStatus.IsConnected)
             {
-                await PublishStatusUpdateAsync("Network", StatusUpdateType.HealthCheck, 
+                await PublishStatusUpdateAsync("Network", StatusUpdateType.HealthCheck,
                     NetworkStatus.IsConnected).ConfigureAwait(false);
             }
         }
@@ -330,7 +330,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             NetworkStatus.IsConnected = false;
             NetworkStatus.LatencyMs = -1;
             NetworkStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogDebug(ex, "ネットワークPingに失敗しました");
         }
         catch (System.Net.Sockets.SocketException ex)
@@ -339,7 +339,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             NetworkStatus.IsConnected = false;
             NetworkStatus.LatencyMs = -1;
             NetworkStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogDebug(ex, "ネットワークソケットエラーが発生しました");
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
@@ -348,7 +348,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             NetworkStatus.IsConnected = false;
             NetworkStatus.LatencyMs = -1;
             NetworkStatus.LastChecked = DateTime.Now;
-            
+
             _logger.LogDebug(ex, "ネットワーク状態チェックが中断されました");
         }
     }
@@ -362,17 +362,17 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
         {
             // 1. 基本的なモデルファイル存在確認
             var modelsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "SentencePiece");
-            
+
             if (!Directory.Exists(modelsDirectory))
             {
                 _logger.LogWarning("モデルディレクトリが存在しません: {Directory}", modelsDirectory);
                 return false;
             }
-            
+
             // 2. 主要なモデルファイルの存在確認
             var criticalModels = new[] { "opus-mt-ja-en.model", "opus-mt-en-ja.model" };
             var availableModels = 0;
-            
+
             foreach (var modelName in criticalModels)
             {
                 var modelPath = Path.Combine(modelsDirectory, modelName);
@@ -387,16 +387,16 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                             // 4. ファイル読み取り可能性の確認
                             using var fileStream = File.OpenRead(modelPath);
                             var buffer = new byte[1024];
-                            await fileStream.ReadAsync(buffer.AsMemory(0, Math.Min(1024, (int)fileInfo.Length)), 
+                            await fileStream.ReadAsync(buffer.AsMemory(0, Math.Min(1024, (int)fileInfo.Length)),
                                 _cancellationTokenSource.Token).ConfigureAwait(false);
-                            
+
                             availableModels++;
-                            _logger.LogDebug("モデルファイル確認成功: {Model} ({Size:N0} bytes)", 
+                            _logger.LogDebug("モデルファイル確認成功: {Model} ({Size:N0} bytes)",
                                 modelName, fileInfo.Length);
                         }
                         else
                         {
-                            _logger.LogWarning("モデルファイルサイズ異常: {Model} ({Size:N0} bytes)", 
+                            _logger.LogWarning("モデルファイルサイズ異常: {Model} ({Size:N0} bytes)",
                                 modelName, fileInfo.Length);
                         }
                     }
@@ -414,11 +414,11 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                     _logger.LogDebug("モデルファイルが見つかりません: {Model}", modelName);
                 }
             }
-            
+
             // 5. メモリ使用量チェック（基本的な確認）
             var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
             var memoryUsageMB = currentProcess.WorkingSet64 / (1024 * 1024);
-            
+
             if (memoryUsageMB > 2048) // 2GB以上の場合は警告
             {
                 _logger.LogWarning("メモリ使用量が高い: {MemoryMB}MB", memoryUsageMB);
@@ -427,13 +427,13 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             {
                 _logger.LogDebug("メモリ使用量正常: {MemoryMB}MB", memoryUsageMB);
             }
-            
+
             // 6. ヘルス判定
             var isHealthy = availableModels >= 1; // 最低1つのモデルがあれば健康
-            
-            _logger.LogDebug("LocalOnlyエンジンヘルスチェック完了: {IsHealthy} (利用可能モデル: {Count}/{Total})", 
+
+            _logger.LogDebug("LocalOnlyエンジンヘルスチェック完了: {IsHealthy} (利用可能モデル: {Count}/{Total})",
                 isHealthy, availableModels, criticalModels.Length);
-                
+
             return isHealthy;
         }
         catch (OperationCanceledException)
@@ -493,14 +493,14 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                     LastError = "ネットワーク接続なし"
                 };
             }
-            
+
             // 2. Gemini API軽量ヘルスチェック
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(10); // 短いタイムアウト
-            
+
             // 3. APIキー設定の確認（実際の設定から取得を試みる）
             var apiKey = Environment.GetEnvironmentVariable("GEMINI_TRANSLATION_API_KEY") ?? "demo_key";
-            
+
             if (string.IsNullOrEmpty(apiKey) || apiKey == "demo_key")
             {
                 _logger.LogWarning("CloudOnlyエンジンヘルスチェック - APIキーが設定されていません");
@@ -513,18 +513,18 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                     LastError = "APIキー未設定"
                 };
             }
-            
+
             // 4. 軽量なモデル情報リクエストでAPI状態確認
             var apiUrl = new Uri("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro?key=" + apiKey);
-            
+
             using var response = await httpClient.GetAsync(apiUrl, _cancellationTokenSource.Token).ConfigureAwait(false);
-            
+
             var isOnline = response.IsSuccessStatusCode;
             var isHealthy = isOnline;
             var remainingRequests = 1000; // Gemini APIでは明示的なレート制限情報なし
             var rateLimitReset = TimeSpan.FromHours(1);
             var lastError = string.Empty;
-            
+
             // 5. レスポンス詳細分析
             if (response.IsSuccessStatusCode)
             {
@@ -536,7 +536,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                         remainingRequests = remaining;
                     }
                 }
-                
+
                 if (response.Headers.TryGetValues("X-RateLimit-Reset", out var resetValues))
                 {
                     if (long.TryParse(resetValues.FirstOrDefault(), out var resetTime))
@@ -546,8 +546,8 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                         if (rateLimitReset < TimeSpan.Zero) rateLimitReset = TimeSpan.Zero;
                     }
                 }
-                
-                _logger.LogDebug("CloudOnlyエンジンヘルスチェック成功: レスポンス {StatusCode}", 
+
+                _logger.LogDebug("CloudOnlyエンジンヘルスチェック成功: レスポンス {StatusCode}",
                     response.StatusCode);
             }
             else
@@ -563,7 +563,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                     System.Net.HttpStatusCode.GatewayTimeout => "ゲートウェイタイムアウト",
                     _ => $"HTTPエラー: {response.StatusCode}"
                 };
-                
+
                 // レート制限の場合はオンラインだが非健康状態
                 if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
@@ -576,11 +576,11 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                     isOnline = false;
                     isHealthy = false;
                 }
-                
-                _logger.LogWarning("CloudOnlyエンジンヘルスチェック失敗: {StatusCode} - {Error}", 
+
+                _logger.LogWarning("CloudOnlyエンジンヘルスチェック失敗: {StatusCode} - {Error}",
                     response.StatusCode, lastError);
             }
-            
+
             return new CloudEngineHealthResult
             {
                 IsOnline = isOnline,
@@ -661,7 +661,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             {
                 _logger.LogError(ex, "CloudOnlyエンジンヘルスチェック - 無効な操作");
             }
-            
+
             return new CloudEngineHealthResult
             {
                 IsOnline = false,
@@ -687,9 +687,9 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
                 UpdateType = updateType,
                 AdditionalData = additionalData
             };
-            
+
             _statusUpdateSubject.OnNext(update);
-            
+
             await Task.CompletedTask.ConfigureAwait(false);
         }
         catch (ObjectDisposedException ex)
@@ -726,7 +726,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
         catch (AggregateException ex)
         {
             // Task.WhenAllからのAggregateExceptionを解析
-            _logger.LogError(ex, "複数のヘルスチェックでエラーが発生しました: {InnerExceptions}", 
+            _logger.LogError(ex, "複数のヘルスチェックでエラーが発生しました: {InnerExceptions}",
                 string.Join(", ", ex.InnerExceptions.Select(e => e.GetType().Name)));
         }
         catch (TaskCanceledException ex)
@@ -754,9 +754,9 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
             ToEngine = toEngine,
             Type = type
         };
-        
+
         _ = PublishStatusUpdateAsync(fromEngine, StatusUpdateType.FallbackTriggered, LastFallback);
-        
+
         _logger.LogWarning(
             "フォールバックが発生しました: {FromEngine} → {ToEngine}, 理由: {Reason}",
             fromEngine, toEngine, reason);
@@ -771,7 +771,7 @@ internal sealed class TranslationEngineStatusService : ITranslationEngineStatusS
         }
 
         _disposed = true;
-        
+
         _monitoringTimer?.Dispose();
         _cancellationTokenSource?.Cancel();
         _cancellationTokenSource?.Dispose();
@@ -800,17 +800,17 @@ public sealed class TranslationEngineStatusOptions
     /// 監視間隔（秒）
     /// </summary>
     public int MonitoringIntervalSeconds { get; set; } = 30;
-    
+
     /// <summary>
     /// ネットワークタイムアウト（ミリ秒）
     /// </summary>
     public int NetworkTimeoutMs { get; set; } = 5000;
-    
+
     /// <summary>
     /// レート制限警告しきい値
     /// </summary>
     public int RateLimitWarningThreshold { get; set; } = 10;
-    
+
     /// <summary>
     /// ヘルスチェック有効化
     /// </summary>

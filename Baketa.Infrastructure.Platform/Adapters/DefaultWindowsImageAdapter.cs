@@ -8,9 +8,9 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Common;
 using Baketa.Infrastructure.Platform.Windows;
-using Rectangle = System.Drawing.Rectangle;
-using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
 using CoreImageFormat = Baketa.Core.Abstractions.Imaging.ImageFormat;
+using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
+using Rectangle = System.Drawing.Rectangle;
 
 namespace Baketa.Infrastructure.Platform.Adapters;
 
@@ -52,6 +52,102 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
     }
 
     /// <summary>
+    /// Windows画像をコア画像に変換
+    /// </summary>
+    /// <param name="windowsImage">Windows画像</param>
+    /// <returns>コア画像インターフェース</returns>
+    public IImage AdaptToImage(IWindowsImage windowsImage)
+    {
+        return ToImage(windowsImage);
+    }
+
+    /// <summary>
+    /// コア画像をWindows画像に変換（可能な場合）
+    /// </summary>
+    /// <param name="image">コア画像</param>
+    /// <returns>Windows画像、変換できない場合はnull</returns>
+    public IWindowsImage AdaptToWindowsImage(IImage image)
+    {
+        if (image is WindowsImageAdapter adapter)
+        {
+            return GetWindowsImage(adapter);
+        }
+
+        throw new NotSupportedException("この画像タイプからWindowsImageへの変換はサポートされていません");
+    }
+
+    /// <summary>
+    /// 非同期でWindows画像をコア画像に変換
+    /// </summary>
+    /// <param name="windowsImage">Windows画像</param>
+    /// <returns>コア画像インターフェース</returns>
+    public Task<IImage> AdaptToImageAsync(IWindowsImage windowsImage)
+    {
+        return Task.FromResult(AdaptToImage(windowsImage));
+    }
+
+    /// <summary>
+    /// 非同期でコア画像をWindows画像に変換（可能な場合）
+    /// </summary>
+    /// <param name="image">コア画像</param>
+    /// <returns>Windows画像</returns>
+    public Task<IWindowsImage> AdaptToWindowsImageAsync(IImage image)
+    {
+        return Task.FromResult(AdaptToWindowsImage(image));
+    }
+
+    /// <summary>
+    /// アダプターがサポートする機能名
+    /// </summary>
+    public string FeatureName => "Windows画像変換アダプター";
+
+    /// <summary>
+    /// 特定の型変換をサポートするかどうか
+    /// </summary>
+    /// <typeparam name="TSource">ソース型</typeparam>
+    /// <typeparam name="TTarget">ターゲット型</typeparam>
+    /// <returns>サポートする場合はtrue</returns>
+    public bool SupportsConversion<TSource, TTarget>()
+    {
+        return (typeof(TSource) == typeof(IWindowsImage) && typeof(TTarget) == typeof(IImage)) ||
+               (typeof(TSource) == typeof(IImage) && typeof(TTarget) == typeof(IWindowsImage));
+    }
+
+    /// <summary>
+    /// 変換を試行
+    /// </summary>
+    /// <typeparam name="TSource">ソース型</typeparam>
+    /// <typeparam name="TTarget">ターゲット型</typeparam>
+    /// <param name="source">ソースオブジェクト</param>
+    /// <param name="target">変換結果（出力）</param>
+    /// <returns>変換成功時はtrue</returns>
+    public bool TryConvert<TSource, TTarget>(TSource source, out TTarget target) where TSource : class where TTarget : class
+    {
+        target = null!;
+
+        try
+        {
+            if (source is IWindowsImage windowsImage && typeof(TTarget) == typeof(IImage))
+            {
+                target = (TTarget)(object)AdaptToImage(windowsImage);
+                return true;
+            }
+
+            if (source is IImage image && typeof(TTarget) == typeof(IWindowsImage))
+            {
+                target = (TTarget)(object)AdaptToWindowsImage(image);
+                return true;
+            }
+        }
+        catch
+        {
+            // 変換失敗時はfalseを返す
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// コアイメージ(IAdvancedImage)をWindowsネイティブイメージに変換します
     /// 最適化された変換処理を使用します
     /// </summary>
@@ -60,7 +156,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
     public async Task<IWindowsImage> FromAdvancedImageAsync(IAdvancedImage advancedImage)
     {
         ArgumentNullException.ThrowIfNull(advancedImage, nameof(advancedImage));
-        
+
         // WindowsImageAdapterからの変換を最適化
         if (advancedImage is WindowsImageAdapter windowsAdapter)
         {
@@ -72,17 +168,17 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
                 return new WindowsImage(clonedBitmap);
             }
         }
-        
+
         // バイト配列を経由して変換する場合は、再利用可能なストリームを使用
         var imageBytes = await advancedImage.ToByteArrayAsync().ConfigureAwait(false);
         var stream = _recycledMemoryStream.Value!;
-        try 
+        try
         {
             stream.Position = 0;
             stream.SetLength(0);
             await stream.WriteAsync(imageBytes.AsMemory()).ConfigureAwait(false);
             stream.Position = 0;
-            
+
             using var bitmap = new Bitmap(stream);
             using var persistentBitmap = (Bitmap)bitmap.Clone();
             return new WindowsImage(persistentBitmap);
@@ -102,23 +198,23 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
     public async Task<IWindowsImage> FromImageAsync(IImage image)
     {
         ArgumentNullException.ThrowIfNull(image, nameof(image));
-        
+
         // IAdvancedImageの場合は特化したメソッドを使用
         if (image is IAdvancedImage advancedImage)
         {
             return await FromAdvancedImageAsync(advancedImage).ConfigureAwait(false);
         }
-        
+
         // バイト配列を経由して変換する場合は、再利用可能なストリームを使用
         var imageBytes = await image.ToByteArrayAsync().ConfigureAwait(false);
         var stream = _recycledMemoryStream.Value!;
-        try 
+        try
         {
             stream.Position = 0;
             stream.SetLength(0);
             await stream.WriteAsync(imageBytes.AsMemory()).ConfigureAwait(false);
             stream.Position = 0;
-            
+
             using var bitmap = new Bitmap(stream);
             var persistentBitmap = (Bitmap)bitmap.Clone();
             return new WindowsImage(persistentBitmap);
@@ -137,7 +233,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
     public IAdvancedImage CreateAdvancedImageFromBitmap(Bitmap bitmap)
     {
         ArgumentNullException.ThrowIfNull(bitmap, nameof(bitmap));
-        
+
         // BitmapをWindowsImageに変換し、それをAdvancedImageに変換
         var windowsImage = new WindowsImage((Bitmap)bitmap.Clone());
         return ToAdvancedImage(windowsImage);
@@ -152,7 +248,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
     public async Task<IAdvancedImage> CreateAdvancedImageFromBytesAsync(byte[] imageData)
     {
         ArgumentNullException.ThrowIfNull(imageData, nameof(imageData));
-        
+
         try
         {
             // 再利用可能なストリームを使用
@@ -161,35 +257,36 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
             stream.SetLength(0);
             await stream.WriteAsync(imageData.AsMemory()).ConfigureAwait(false);
             stream.Position = 0;
-            
+
             // 画像フォーマットを検出（ヘッダー解析）
             var imageFormat = DetectImageFormat(imageData);
-            
+
             // 画像作成前にストリームの有効性をチェック
             if (stream.Length == 0 || stream.Length < 8)
             {
-            throw new ArgumentException("無効な画像データです", nameof(imageData));
+                throw new ArgumentException("無効な画像データです", nameof(imageData));
             }
 
-            try {
-            // 通常サイズの画像は標準的な処理
+            try
+            {
+                // 通常サイズの画像は標準的な処理
                 using var bitmap = new Bitmap(stream);
                 // Bitmapの有効性を確認
                 if (bitmap.Width <= 0 || bitmap.Height <= 0)
-            {
-                throw new ArgumentException("無効なBitmapが生成されました");
-            }
-            
-            // 所有権移転のためのクローン作成
-            using var persistentBitmap = (Bitmap)bitmap.Clone();
-            var windowsImage = new WindowsImage(persistentBitmap);
+                {
+                    throw new ArgumentException("無効なBitmapが生成されました");
+                }
+
+                // 所有権移転のためのクローン作成
+                using var persistentBitmap = (Bitmap)bitmap.Clone();
+                var windowsImage = new WindowsImage(persistentBitmap);
                 var result = ToAdvancedImage(windowsImage);
-            return result;
-        }
-        catch (ArgumentException ex)
-        {
-            throw new ArgumentException("画像データからBitmapの作成に失敗しました", ex);
-        }
+                return result;
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ArgumentException("画像データからBitmapの作成に失敗しました", ex);
+            }
         }
         catch (ArgumentException ex)
         {
@@ -210,7 +307,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
     public async Task<IAdvancedImage> CreateAdvancedImageFromFileAsync(string filePath)
     {
         ArgumentNullException.ThrowIfNull(filePath, nameof(filePath));
-        
+
         if (!File.Exists(filePath))
         {
             throw new FileNotFoundException("指定されたファイルが見つかりません", filePath);
@@ -245,7 +342,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
             throw new InvalidOperationException($"ファイル '{filePath}' から画像を作成できませんでした", ex);
         }
     }
-    
+
     /// <summary>
     /// バイト配列から画像フォーマットを検出
     /// </summary>
@@ -318,26 +415,26 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
         {
             // PropertyItemsを使用する場合はここで処理
         }
-        
+
         // 実際の読み込み
         var bitmap = new Bitmap(stream);
-        
+
         // フォーマット固有の最適化
         if (format == DrawingImageFormat.Jpeg)
         {
             // JPEGの場合は特別な処理（必要であれば）
         }
-        
+
         return bitmap;
     }
-    
+
     /// <summary>
     /// WindowsImageAdapterからWindowsImageを取得するための拡張メソッド
     /// </summary>
     private static IWindowsImage GetWindowsImage(WindowsImageAdapter adapter)
     {
         ArgumentNullException.ThrowIfNull(adapter, nameof(adapter));
-    
+
         // リフレクションを使用して非公開フィールドにアクセス
         // 注：本番コードではこのような方法は通常避けるべきですが、性能最適化のために使用
         var field = typeof(WindowsImageAdapter).GetField("_windowsImage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -347,7 +444,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
         }
         throw new InvalidOperationException("WindowsImageAdapterから内部のWindowsImageを取得できません");
     }
-        
+
     /// <summary>
     /// CoreフォーマットからDrawing.Imagingフォーマットへの変換
     /// </summary>
@@ -361,7 +458,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
             _ => DrawingImageFormat.Png // デフォルト
         };
     }
-        
+
     /// <summary>
     /// Drawing.Imagingフォーマットからコアフォーマットへの変換
     /// </summary>
@@ -372,7 +469,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
         if (format == DrawingImageFormat.Bmp) return CoreImageFormat.Bmp;
         return CoreImageFormat.Unknown;
     }
-    
+
     /// <summary>
     /// Disposeパターンの実装 - アンマネージリソースの開放
     /// </summary>
@@ -393,7 +490,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
             {
                 // 既に破棄済みの場合は何もしない
             }
-            
+
             // CA2213対応：作成した全てのWindowsImageAdapterを破棄
             try
             {
@@ -411,7 +508,7 @@ public class DefaultWindowsImageAdapter : DisposableBase, IWindowsImageAdapter
                 // 既に破棄済みの場合は何もしない
             }
         }
-        
+
         base.Dispose(disposing);
     }
 }

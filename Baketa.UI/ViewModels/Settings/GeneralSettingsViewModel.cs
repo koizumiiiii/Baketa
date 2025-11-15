@@ -1,14 +1,14 @@
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -20,7 +20,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 {
     private readonly GeneralSettings _originalSettings;
     private readonly ILogger<GeneralSettingsViewModel>? _logger;
-    
+
     // バッキングフィールド
     private bool _autoStartWithWindows;
     private bool _minimizeToTray;
@@ -242,39 +242,39 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         this.WhenAnyValue(x => x.AutoStartWithWindows)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.MinimizeToTray)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.ShowExitConfirmation)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.AllowUsageStatistics)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.CheckForUpdatesAutomatically)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.PerformanceMode)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.MaxMemoryUsageMb)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.LogLevel)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.LogRetentionDays)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableDebugMode)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
@@ -307,7 +307,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     {
         // TODO: 実際のログフォルダパスを取得して開く
         var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Baketa", "Logs");
-        
+
         try
         {
             if (Directory.Exists(logPath))
@@ -363,7 +363,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     public void UpdateSettings(GeneralSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         InitializeFromSettings(settings);
         HasChanges = false;
         _logger?.LogDebug("一般設定を更新しました");

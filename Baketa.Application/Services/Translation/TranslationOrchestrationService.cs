@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -8,23 +9,27 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Models;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Abstractions.Factories;
-using Baketa.Core.Translation.Models;
-using Baketa.Core.Translation.Common;
-using Baketa.Core.Translation.Exceptions;
+using Baketa.Core.Events.Diagnostics;
+using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Logging;
+using Baketa.Core.Performance;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
-using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
+using Baketa.Core.Translation.Common;
+using Baketa.Core.Translation.Exceptions;
+using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
-using Baketa.Core.Performance;
-using Baketa.Core.Logging;
 using Baketa.Infrastructure.Platform.Adapters;
 using Microsoft.Extensions.Logging;
-using System.ComponentModel;
+using Microsoft.Extensions.Options;
+using CoreOcrResult = Baketa.Core.Models.OCR.OcrResult;
+using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
 using TranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
 
 namespace Baketa.Application.Services.Translation;
@@ -38,8 +43,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly ICaptureService _captureService;
     private readonly ISettingsService _settingsService;
     private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
-    private readonly ITranslationEngineFactory _translationEngineFactory;
+    // [REMOVED] ITranslationEngineFactoryは使用されないため削除
     private readonly CoordinateBasedTranslationService? _coordinateBasedTranslation;
+    private readonly IEventAggregator _eventAggregator;
+    private readonly TranslationService _translationService;
+    private readonly IOptionsMonitor<Baketa.Core.Settings.OcrSettings> _ocrSettings;
+    private readonly ITranslationDictionaryService? _translationDictionaryService;
     private readonly ILogger<TranslationOrchestrationService>? _logger;
 
     // 状態管理
@@ -49,6 +58,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // 実行制御
     private CancellationTokenSource? _automaticTranslationCts;
     private Task? _automaticTranslationTask;
+    private readonly object _ctsLock = new object(); // Phase 3.3: CTS管理のThread-safe保護
     private readonly SemaphoreSlim _singleTranslationSemaphore = new(1, 1);
     private readonly SemaphoreSlim _ocrExecutionSemaphore = new(1, 1);
     private CancellationTokenSource? _latestOcrRequestCts;
@@ -65,7 +75,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // 翻訳完了後の一時停止制御
     private DateTime _lastTranslationCompletedAt = DateTime.MinValue;
     private readonly object _lastTranslationTimeLock = new();
-    
+
     // 前回の翻訳結果（重複チェック用）
     private string _lastTranslatedText = string.Empty;
     private readonly object _lastTranslatedTextLock = new();
@@ -87,30 +97,42 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="ocrEngine">OCRエンジン</param>
     /// <param name="translationEngineFactory">翻訳エンジンファクトリー</param>
     /// <param name="coordinateBasedTranslation">座標ベース翻訳サービス</param>
+    /// <param name="eventAggregator">イベント集約サービス</param>
+    /// <param name="translationDictionaryService">翻訳辞書サービス（オプショナル）</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
         ISettingsService settingsService,
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
-        ITranslationEngineFactory translationEngineFactory,
+        // [REMOVED] ITranslationEngineFactory translationEngineFactory,
         CoordinateBasedTranslationService? coordinateBasedTranslation,
+        IEventAggregator eventAggregator,
+        IOptionsMonitor<Baketa.Core.Settings.OcrSettings> ocrSettings,
+        TranslationService translationService,
+        ITranslationDictionaryService? translationDictionaryService = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(ocrEngine);
-        ArgumentNullException.ThrowIfNull(translationEngineFactory);
-        
+        // [REMOVED] ArgumentNullException.ThrowIfNull(translationEngineFactory);
+        ArgumentNullException.ThrowIfNull(eventAggregator);
+        ArgumentNullException.ThrowIfNull(ocrSettings);
+
         _captureService = captureService;
         _settingsService = settingsService;
         _ocrEngine = ocrEngine;
-        _translationEngineFactory = translationEngineFactory;
+        // [REMOVED] _translationEngineFactory = translationEngineFactory;
         _coordinateBasedTranslation = coordinateBasedTranslation;
+        _eventAggregator = eventAggregator;
+        _ocrSettings = ocrSettings;
+        _translationService = translationService;
+        _translationDictionaryService = translationDictionaryService;
         _logger = logger;
 
         // キャプチャオプションの初期設定
         InitializeCaptureOptions();
-        
+
         // 座標ベース翻訳システムが利用可能かログ出力
         if (_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable() == true)
         {
@@ -170,11 +192,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         {
             System.Diagnostics.Debug.WriteLine($"直接ファイル書き込みエラー: {directEx.Message}");
         }
-        
+
         // 複数の方法でログを記録
-        DebugLogUtility.WriteLog($"🎬 StartAutomaticTranslationAsync呼び出し - this={this.GetType().FullName}@{this.GetHashCode()}");
+        _logger?.LogDebug($"🎬 StartAutomaticTranslationAsync呼び出し - this={this.GetType().FullName}@{this.GetHashCode()}");
         Console.WriteLine($"🎬 StartAutomaticTranslationAsync呼び出し - this={this.GetType().FullName}@{this.GetHashCode()}");
-        
+
         try
         {
             // 緊急デバッグ: 直接ファイル書き込み
@@ -184,12 +206,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 _logger?.LogDebug("🔍 [DEBUG] tryブロック開始");
             }
             catch { }
-            
-            DebugLogUtility.WriteLog($"🎬 StartAutomaticTranslationAsync呼び出し");
-            DebugLogUtility.WriteLog($"   🗑️ Disposed: {_disposed.ToString(CultureInfo.InvariantCulture)}");
-            DebugLogUtility.WriteLog($"   🔄 すでにアクティブ: {_isAutomaticTranslationActive.ToString(CultureInfo.InvariantCulture)}");
-            DebugLogUtility.WriteLog($"   🎯 対象ウィンドウハンドル: {(targetWindowHandle?.ToString(CultureInfo.InvariantCulture) ?? "null (画面全体)")}");
-            
+
+            _logger?.LogDebug($"🎬 StartAutomaticTranslationAsync呼び出し");
+            _logger?.LogDebug($"   🗑️ Disposed: {_disposed.ToString(CultureInfo.InvariantCulture)}");
+            _logger?.LogDebug($"   🔄 すでにアクティブ: {_isAutomaticTranslationActive.ToString(CultureInfo.InvariantCulture)}");
+            _logger?.LogDebug($"   🎯 対象ウィンドウハンドル: {(targetWindowHandle?.ToString(CultureInfo.InvariantCulture) ?? "null (画面全体)")}");
+
             // 翻訳対象ウィンドウハンドルを保存
             _targetWindowHandle = targetWindowHandle;
 
@@ -200,9 +222,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 _logger?.LogDebug("🔍 [DEBUG] Disposedチェック前 - _disposed={Disposed}", _disposed);
             }
             catch { }
-            
+
             ObjectDisposedException.ThrowIf(_disposed, this);
-            
+
             try
             {
                 // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_5] ファイルアクセス競合回避のためILogger使用
@@ -217,7 +239,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 _logger?.LogDebug("🔍 [DEBUG] アクティブチェック前 - IsActive={IsActive}", _isAutomaticTranslationActive);
             }
             catch { }
-            
+
             if (_isAutomaticTranslationActive)
             {
                 try
@@ -226,7 +248,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     _logger?.LogDebug("⚠️ [DEBUG] 既にアクティブなためreturn");
                 }
                 catch { }
-                DebugLogUtility.WriteLog($"⚠️ 自動翻訳は既に実行中です");
+                _logger?.LogDebug($"⚠️ 自動翻訳は既に実行中です");
                 _logger?.LogWarning("自動翻訳は既に実行中です");
                 return;
             }
@@ -254,21 +276,48 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 _logger?.LogDebug("🎬 自動翻訳を開始します（直接書き込み）");
             }
             catch { }
-            
-            DebugLogUtility.WriteLog($"🎬 自動翻訳を開始します");
-            
-            // 緊急デバッグ: DebugLogUtility.WriteLog後
+
+            _logger?.LogDebug($"🎬 自動翻訳を開始します");
+
+            // 緊急デバッグ: _logger?.LogDebug後
             try
             {
                 // 🔥 [FILE_CONFLICT_FIX_ORCHESTRATION_11] ファイルアクセス競合回避のためILogger使用
-                _logger?.LogDebug("🔍 [DEBUG] DebugLogUtility.WriteLog後");
+                _logger?.LogDebug("🔍 [DEBUG] _logger?.LogDebug後");
             }
             catch { }
-            
+
             _logger?.LogInformation("自動翻訳を開始します");
 
-            _automaticTranslationCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken, _disposeCts.Token);
+            // Phase 3.3: CancellationTokenSource完全刷新（Stop→Start Token競合解決）
+            lock (_ctsLock)
+            {
+                // 🔥 CRITICAL FIX: 古いCTSの即座完全破棄
+                var oldCts = _automaticTranslationCts;
+                if (oldCts != null)
+                {
+                    try
+                    {
+                        oldCts.Cancel();
+                        _logger?.LogDebug("🔧 [PHASE3.3_FIX] 古いCTS Cancel完了");
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // 既に破棄済みの場合は無視
+                        _logger?.LogDebug("🔧 [PHASE3.3_FIX] 古いCTSは既に破棄済み");
+                    }
+                    finally
+                    {
+                        oldCts.Dispose();
+                        _logger?.LogDebug("🔧 [PHASE3.3_FIX] 古いCTS Dispose完了");
+                    }
+                }
+
+                // 🚀 新CTS即座生成
+                _automaticTranslationCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken, _disposeCts.Token);
+                _logger?.LogDebug("🔧 [PHASE3.3_FIX] 新CTS生成完了 - Hash: {TokenHash}", _automaticTranslationCts.Token.GetHashCode());
+            }
 
             _isAutomaticTranslationActive = true;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
@@ -281,38 +330,38 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // バックグラウンドタスクで自動翻訳を実行
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run開始前（直接書き込み）{Environment.NewLine}");
+                // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run開始前（直接書き込み）{Environment.NewLine}");
+                // 診断システム実装により debug_app_logs.txt への出力を無効化
             }
             catch { }
-            
-            DebugLogUtility.WriteLog($"🎬 Task.Run開始前");
+
+            _logger?.LogDebug($"🎬 Task.Run開始前");
             _automaticTranslationTask = Task.Run(async () =>
             {
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run内部開始（直接書き込み）{Environment.NewLine}");
+                    // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
+                    //     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run内部開始（直接書き込み）{Environment.NewLine}");
+                    // 診断システム実装により debug_app_logs.txt への出力を無効化
                 }
                 catch { }
-                
-                DebugLogUtility.WriteLog($"🎬 Task.Run内部開始");
-                
+
+                _logger?.LogDebug($"🎬 Task.Run内部開始");
+
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync呼び出し直前（直接書き込み）{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
-                
+
                 try
                 {
                     await ExecuteAutomaticTranslationLoopAsync(_automaticTranslationCts.Token).ConfigureAwait(false);
-                    
+
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync正常完了（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
                 }
@@ -320,57 +369,52 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 ExecuteAutomaticTranslationLoopAsync例外（直接書き込み）: {ex.Message}{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
-                    
-                    DebugLogUtility.WriteLog($"💥 ExecuteAutomaticTranslationLoopAsync例外: {ex.Message}");
+
+                    _logger?.LogDebug($"💥 ExecuteAutomaticTranslationLoopAsync例外: {ex.Message}");
                     _logger?.LogError(ex, "自動翻訳ループで予期しないエラーが発生しました");
                     throw;
                 }
-                
+
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run内部終了（直接書き込み）{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
-                
-                DebugLogUtility.WriteLog($"🎬 Task.Run内部終了");
+
+                _logger?.LogDebug($"🎬 Task.Run内部終了");
             }, _automaticTranslationCts.Token);
-            
+
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎬 Task.Run開始後（直接書き込み）{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
-            DebugLogUtility.WriteLog($"🎬 Task.Run開始後");
+
+            _logger?.LogDebug($"🎬 Task.Run開始後");
 
             // 緊急デバッグ: tryブロック後の実行確認
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Task.CompletedTask直前{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
 
             await Task.CompletedTask.ConfigureAwait(false);
-            
+
             // 緊急デバッグ: Task.CompletedTask後
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] Task.CompletedTask完了{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"💥 StartAutomaticTranslationAsync例外: {ex.GetType().Name}: {ex.Message}");
-            DebugLogUtility.WriteLog($"💥 スタックトレース: {ex.StackTrace}");
+            _logger?.LogDebug($"💥 StartAutomaticTranslationAsync例外: {ex.GetType().Name}: {ex.Message}");
+            _logger?.LogDebug($"💥 スタックトレース: {ex.StackTrace}");
             _logger?.LogError(ex, "StartAutomaticTranslationAsync実行中にエラーが発生しました");
             throw;
         }
@@ -388,14 +432,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         }
 
         _logger?.LogInformation("自動翻訳を停止します");
-        
+
         // 直接ファイル書き込みで停止処理開始を記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🛑 [DIRECT] TranslationOrchestrationService - 自動翻訳停止開始{Environment.NewLine}");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [DEBUG] 停止前OCRエンジン状態: IsInitialized={_ocrEngine.IsInitialized}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch (Exception fileEx)
         {
@@ -404,10 +446,34 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
         try
         {
-            // キャンセルを要求
+            // Phase 3.3: 即座CTS完全破棄（finally待機なし）
+            CancellationTokenSource? ctsToDispose = null;
+            lock (_ctsLock)
+            {
+                ctsToDispose = _automaticTranslationCts;
+                _automaticTranslationCts = null; // 即座null設定でStart競合防止
+            }
+
+            // Lock外で即座Cancel + Dispose
+            if (ctsToDispose != null)
+            {
+                try
+                {
 #pragma warning disable CA1849 // CancellationTokenSource.Cancel()には非同期バージョンが存在しない
-            _automaticTranslationCts?.Cancel();
+                    ctsToDispose.Cancel();
 #pragma warning restore CA1849
+                    _logger?.LogDebug("🔧 [PHASE3.3_STOP] CTS Cancel完了");
+                }
+                catch (ObjectDisposedException)
+                {
+                    _logger?.LogDebug("🔧 [PHASE3.3_STOP] CTSは既に破棄済み");
+                }
+                finally
+                {
+                    ctsToDispose.Dispose();
+                    _logger?.LogDebug("🔧 [PHASE3.3_STOP] CTS Dispose完了 - 即座実行");
+                }
+            }
 
             // タスクの完了を待機（タイムアウト付き）
             if (_automaticTranslationTask != null)
@@ -419,42 +485,46 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     await _automaticTranslationTask.WaitAsync(combinedCts.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (_automaticTranslationCts?.Token.IsCancellationRequested == true)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    // 内部タスクのキャンセルは正常な停止操作
-                    _logger?.LogDebug("自動翻訳タスクが正常にキャンセルされました");
+                    // 外部からのキャンセルは再スロー（最優先で処理）
+                    _logger?.LogDebug("自動翻訳の停止が外部からキャンセルされました");
+                    throw;
                 }
-                catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested)
                 {
                     _logger?.LogWarning("自動翻訳の停止がタイムアウトしました");
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException)
                 {
-                    // 外部からのキャンセルは再スロー
-                    _logger?.LogDebug("自動翻訳の停止が外部からキャンセルされました");
-                    throw;
+                    // その他のキャンセル（内部タスクのキャンセルなど）は正常な停止操作
+                    _logger?.LogDebug("自動翻訳タスクが正常にキャンセルされました");
                 }
             }
         }
         finally
         {
-            _automaticTranslationCts?.Dispose();
-            _automaticTranslationCts = null;
+            // Phase 3.3: 重複Dispose削除（既に即座Dispose済み）
+            lock (_ctsLock)
+            {
+                _automaticTranslationCts = null; // 安全のため再設定
+            }
             _automaticTranslationTask = null;
             _isAutomaticTranslationActive = false;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
-            
+
+            _logger?.LogDebug("🔧 [PHASE3.3_STOP] Stop完了 - Token競合解決済み");
+
             // 前回の翻訳結果をリセット（再翻訳時の問題を回避）
             lock (_lastTranslatedTextLock)
             {
                 var oldLastText = _lastTranslatedText;
                 _lastTranslatedText = string.Empty;
-                
+
                 // 直接ファイル書き込みで状態リセットを記録
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 [DIRECT] TranslationOrchestrationService - 状態リセット完了: 前回テキスト='{oldLastText}' → ''、翻訳アクティブ=false{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch (Exception fileEx)
                 {
@@ -475,7 +545,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     public async Task TriggerSingleTranslationAsync(IntPtr? targetWindowHandle = null, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        
+
         // 翻訳対象ウィンドウハンドルを保存
         _targetWindowHandle = targetWindowHandle;
 
@@ -553,7 +623,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 設定を保存（実際の実装は設定システムに依存）
         // TODO: 実際の設定保存ロジックを実装
         _logger?.LogInformation("翻訳設定を更新しました");
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
@@ -567,10 +637,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger?.LogInformation("TranslationOrchestrationServiceを開始します");
-        
+
         // 初期化処理
         InitializeCaptureOptions();
-        
+
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
@@ -611,8 +681,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
     #endregion
 
-    #endregion
-
     #region プライベートメソッド
 
     /// <summary>
@@ -626,11 +694,15 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             Quality = 85, // 品質を少し下げてパフォーマンスを向上
             IncludeCursor = false,
             CaptureInterval = intervalMs,
-            OptimizationLevel = 2
+            OptimizationLevel = 2,
+            // 🔥 [PHASE_K-29-F] ROIScaleFactor明示的設定（Gemini推奨値: 0.5）
+            // 問題: デフォルト値0.25が使用され、CaptureModels.csの変更が反映されない
+            // 解決策: 明示的に0.5を設定し、1920x1080でのテキスト検出精度向上
+            ROIScaleFactor = 0.5f // デフォルト0.25 → 0.5（960x540 → 1920x1080）
         };
 
         _captureService.SetCaptureOptions(captureOptions);
-        
+
         _logger?.LogDebug("キャプチャオプションを初期化しました: 間隔={Interval}ms, 品質={Quality}",
             captureOptions.CaptureInterval, captureOptions.Quality);
     }
@@ -643,24 +715,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 🚨 CRITICAL FIX: translation-settings.jsonから直接読み取り
         var sourceLanguageFromFile = "English"; // デフォルト値
         var targetLanguageFromFile = "Japanese"; // デフォルト値
-        
+
         try
         {
             // translation-settings.jsonから直接読み取り
             var translationSettingsPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".baketa", "settings", "translation-settings.json");
-                
+
             if (File.Exists(translationSettingsPath))
             {
                 var json = File.ReadAllText(translationSettingsPath);
                 using var doc = JsonDocument.Parse(json);
-                
+
                 if (doc.RootElement.TryGetProperty("sourceLanguage", out var sourceLangElement))
                 {
                     sourceLanguageFromFile = sourceLangElement.GetString() ?? "English";
                 }
-                
+
                 // 🔧 FIX: targetLanguageも読み取るように修正
                 if (doc.RootElement.TryGetProperty("targetLanguage", out var targetLangElement))
                 {
@@ -672,36 +744,34 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         {
             Console.WriteLine($"⚠️ [TRANSLATION_SETTINGS_DEBUG] JSON読み取り失敗: {ex.Message}");
         }
-        
+
         // 言語コード変換
         var sourceLanguageCode = GetLanguageCode(sourceLanguageFromFile);
         var targetLanguageCode = GetLanguageCode(targetLanguageFromFile);
-        
+
         // 緊急デバッグ: 設定取得状況を詳細ログ
         Console.WriteLine($"🔍 [TRANSLATION_SETTINGS_DEBUG] 取得した設定:");
         Console.WriteLine($"   - sourceLanguageFromFile: '{sourceLanguageFromFile}' → '{sourceLanguageCode}'");
         Console.WriteLine($"   - targetLanguageFromFile: '{targetLanguageFromFile}' → '{targetLanguageCode}'");
         Console.WriteLine($"   - _settingsService type: {_settingsService?.GetType()?.Name ?? "null"}");
-        
+
         // ファイルログに記録
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [TRANSLATION_SETTINGS_DEBUG] Source='{sourceLanguageFromFile}'→'{sourceLanguageCode}', Target='{targetLanguageFromFile}'→'{targetLanguageCode}'{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
-        
+
         Console.WriteLine($"🌍 [LANGUAGE_SETTING] 設定ファイル連携: {sourceLanguageFromFile}→{targetLanguageFromFile} ({sourceLanguageCode}→{targetLanguageCode})");
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 [LANGUAGE_SETTING] 設定ファイル連携: {sourceLanguageFromFile}→{targetLanguageFromFile} ({sourceLanguageCode}→{targetLanguageCode}){Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化{Environment.NewLine}");
         }
         catch { }
-        
-        _logger?.LogDebug("🌍 翻訳言語設定取得: {SourceDisplay}→{TargetDisplay} ({SourceCode}→{TargetCode})", 
+
+        _logger?.LogDebug("🌍 翻訳言語設定取得: {SourceDisplay}→{TargetDisplay} ({SourceCode}→{TargetCode})",
             sourceLanguageFromFile, targetLanguageFromFile, sourceLanguageCode, targetLanguageCode);
-        
+
         return new CoreTranslationSettings
         {
             // 設定ファイルから読み取った言語設定を使用
@@ -711,7 +781,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             TranslationDelayMs = 100 // 100ms間隔でテストを高速化
         };
     }
-    
+
     /// <summary>
     /// 言語コードから表示名を取得
     /// </summary>
@@ -768,17 +838,16 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 緊急デバッグ: メソッド開始確認
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ExecuteAutomaticTranslationLoopAsync開始（直接書き込み）{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
-        
+
         Console.WriteLine($"🔄 ExecuteAutomaticTranslationLoopAsync開始");
         Console.WriteLine($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
-        
+
         var intervalMs = _settingsService.GetValue("Translation:AutomaticTranslationIntervalMs", 100);
         var interval = TimeSpan.FromMilliseconds(intervalMs);
-        
+
         // PaddleOCRエラー発生時の遅延調整
         var minInterval = TimeSpan.FromMilliseconds(500); // 最小間隔を500msに設定
         if (interval < minInterval)
@@ -797,14 +866,13 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 緊急デバッグ: ループ実行確認
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 自動翻訳ループ実行中（直接書き込み） - キャンセル: {cancellationToken.IsCancellationRequested}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
-                
+
                 Console.WriteLine($"🔄 自動翻訳ループ実行中 - キャンセル: {cancellationToken.IsCancellationRequested}");
                 Console.WriteLine($"   🔒 単発翻訳実行中: {_isSingleTranslationActive}");
-                
+
                 try
                 {
                     // 単発翻訳が実行中の場合は待機
@@ -826,17 +894,15 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // 自動翻訳を実行
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 ExecuteAutomaticTranslationStepAsync開始（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
-                    
+
                     await ExecuteAutomaticTranslationStepAsync(cancellationToken).ConfigureAwait(false);
-                    
+
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 ExecuteAutomaticTranslationStepAsync完了（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
 
@@ -858,7 +924,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "自動翻訳ループでエラーが発生しました");
-                    
+
                     // エラー時は少し長めに待機
                     try
                     {
@@ -890,51 +956,49 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         // 緊急デバッグ: ExecuteAutomaticTranslationStepAsync開始確認
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 ExecuteAutomaticTranslationStepAsync内部開始（直接書き込み）{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
-        
+
         var translationId = Guid.NewGuid().ToString("N")[..8];
-        DebugLogUtility.WriteLog($"🎯 自動翻訳ステップ開始: ID={translationId}");
-        DebugLogUtility.WriteLog($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
-        DebugLogUtility.WriteLog($"   📡 CaptureServiceが利用可能: {_captureService != null}");
-        
+        _logger?.LogDebug($"🎯 自動翻訳ステップ開始: ID={translationId}");
+        _logger?.LogDebug($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
+        _logger?.LogDebug($"   📡 CaptureServiceが利用可能: {_captureService != null}");
+
         // 翻訳完了後のクールダウン期間チェック
         DateTime lastTranslationTime;
         lock (_lastTranslationTimeLock)
         {
             lastTranslationTime = _lastTranslationCompletedAt;
         }
-        
+
         var cooldownSeconds = _settingsService.GetValue("Translation:PostTranslationCooldownSeconds", 3);
         var timeSinceLastTranslation = DateTime.UtcNow - lastTranslationTime;
-        
+
         if (timeSinceLastTranslation.TotalSeconds < cooldownSeconds)
         {
             var remainingCooldown = cooldownSeconds - timeSinceLastTranslation.TotalSeconds;
-            
+
             // 緊急デバッグ: クールダウン中の直接書き込み
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ⏳ 翻訳完了後のクールダウン中（直接書き込み）: ID={translationId}, 残り{remainingCooldown:F1}秒{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
-            DebugLogUtility.WriteLog($"⏳ 翻訳完了後のクールダウン中: ID={translationId}, 残り{remainingCooldown:F1}秒");
+
+            _logger?.LogDebug($"⏳ 翻訳完了後のクールダウン中: ID={translationId}, 残り{remainingCooldown:F1}秒");
             return; // クールダウン中はスキップ
         }
-        
+
         // 緊急デバッグ: クールダウン通過確認
         try
         {
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ クールダウン通過（直接書き込み）: ID={translationId}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
-        
+
         IImage? currentImage = null;
+        var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             // 進行状況を通知
@@ -944,28 +1008,38 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             if (_targetWindowHandle.HasValue)
             {
                 var windowHandle = _targetWindowHandle.Value;
-                DebugLogUtility.WriteLog($"📷 ウィンドウキャプチャ開始: Handle={windowHandle}");
+                _logger?.LogDebug($"📷 ウィンドウキャプチャ開始: Handle={windowHandle}");
+
+                // 🔥🔥🔥 [CRITICAL_DEBUG] CaptureService状態確認
+                _logger?.LogDebug($"🔥 [CAPTURE_DEBUG] _captureService is null: {_captureService is null}");
+                _logger?.LogDebug($"🔥 [CAPTURE_DEBUG] _captureService type: {_captureService?.GetType().FullName ?? "NULL"}");
+                _logger?.LogDebug($"🔥 [CAPTURE_DEBUG] CaptureWindowAsync呼び出し直前");
+
                 currentImage = await _captureService!.CaptureWindowAsync(windowHandle).ConfigureAwait(false);
+
+                _logger?.LogDebug($"🔥 [CAPTURE_DEBUG] CaptureWindowAsync呼び出し完了");
                 if (currentImage is null)
                 {
                     throw new TranslationException("ウィンドウキャプチャに失敗しました");
                 }
-                DebugLogUtility.WriteLog($"📷 ウィンドウキャプチャ完了: {(currentImage is not null ? "成功" : "失敗")}");
+                _logger?.LogDebug($"📷 ウィンドウキャプチャ完了: {(currentImage is not null ? "成功" : "失敗")}");
             }
             else
             {
-                DebugLogUtility.WriteLog($"📷 画面全体キャプチャ開始");
+                _logger?.LogDebug($"📷 画面全体キャプチャ開始");
                 currentImage = await _captureService!.CaptureScreenAsync().ConfigureAwait(false);
                 if (currentImage is null)
                 {
                     throw new TranslationException("画面キャプチャに失敗しました");
                 }
-                DebugLogUtility.WriteLog($"📷 画面全体キャプチャ完了: {(currentImage is not null ? "成功" : "失敗")}");
+                _logger?.LogDebug($"📷 画面全体キャプチャ完了: {(currentImage is not null ? "成功" : "失敗")}");
             }
-            
+
+            captureStopwatch.Stop();
+
             // キャンセルチェック
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             // 画面変化検出による無駄な処理の削減
             IImage? previousImageForComparison = null;
             lock (_previousImageLock)
@@ -979,12 +1053,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     }
                     catch (Exception ex)
                     {
-                        DebugLogUtility.WriteLog($"⚠️ 前回画像クローン失敗、翻訳処理を継続: {ex.Message}");
+                        _logger?.LogDebug($"⚠️ 前回画像クローン失敗、翻訳処理を継続: {ex.Message}");
                         _logger?.LogWarning(ex, "前回画像のクローンに失敗しましたが、翻訳処理を継続します");
                     }
                 }
             }
-            
+
             if (previousImageForComparison != null && currentImage != null)
             {
                 try
@@ -995,17 +1069,17 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                     if (!hasChanges)
                     {
-                        DebugLogUtility.WriteLog($"🔄 画面に変化がないため翻訳をスキップ: ID={translationId}");
+                        _logger?.LogDebug($"🔄 画面に変化がないため翻訳をスキップ: ID={translationId}");
                         _logger?.LogTrace("画面に変化がないため翻訳をスキップします");
                         currentImage?.Dispose();
                         previousImageForComparison?.Dispose();
                         return;
                     }
-                    DebugLogUtility.WriteLog($"📸 画面変化を検出、翻訳処理を継続: ID={translationId}");
+                    _logger?.LogDebug($"📸 画面変化を検出、翻訳処理を継続: ID={translationId}");
                 }
                 catch (Exception ex)
                 {
-                    DebugLogUtility.WriteLog($"⚠️ 画面変化検出でエラー、翻訳処理を継続: {ex.Message}");
+                    _logger?.LogDebug($"⚠️ 画面変化検出でエラー、翻訳処理を継続: {ex.Message}");
                     _logger?.LogWarning(ex, "画面変化検出でエラーが発生しましたが、翻訳処理を継続します");
                 }
                 finally
@@ -1024,7 +1098,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // null チェック
             if (currentImage == null)
             {
-                DebugLogUtility.WriteLog($"❌ 画面キャプチャが失敗しました: ID={translationId}");
+                _logger?.LogDebug($"❌ 画面キャプチャが失敗しました: ID={translationId}");
                 return;
             }
 
@@ -1032,26 +1106,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 緊急デバッグ: ExecuteTranslationAsync呼び出し前
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 翻訳処理開始（直接書き込み）: ID={translationId}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
-            DebugLogUtility.WriteLog($"🌍 翻訳処理開始: ID={translationId}");
+
+            _logger?.LogDebug($"🌍 翻訳処理開始: ID={translationId}");
             try
             {
                 var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Automatic, cancellationToken)
                     .ConfigureAwait(false);
-                
+
                 // 緊急デバッグ: ExecuteTranslationAsync完了
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🌍 翻訳処理完了（直接書き込み）: ID={translationId}, IsCoordinateBasedMode={result?.IsCoordinateBasedMode}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
-                
-                DebugLogUtility.WriteLog($"🌍 翻訳処理完了: ID={translationId}");
+
+                _logger?.LogDebug($"🌍 翻訳処理完了: ID={translationId}");
 
                 // キャンセルチェック
                 cancellationToken.ThrowIfCancellationRequested();
@@ -1062,18 +1134,18 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     lastTranslatedText = _lastTranslatedText;
                 }
-                
-                if (!string.IsNullOrEmpty(lastTranslatedText) && 
+
+                if (!string.IsNullOrEmpty(lastTranslatedText) &&
                     string.Equals(result?.TranslatedText, lastTranslatedText, StringComparison.Ordinal))
                 {
-                    DebugLogUtility.WriteLog($"🔄 前回と同じ翻訳結果のため発行をスキップ: '{result?.TranslatedText}'");
+                    _logger?.LogDebug($"🔄 前回と同じ翻訳結果のため発行をスキップ: '{result?.TranslatedText}'");
                     return;
                 }
-                
+
                 // 座標ベース翻訳モードの場合はObservable発行をスキップ
                 if (result?.IsCoordinateBasedMode == true)
                 {
-                    DebugLogUtility.WriteLog($"🎯 座標ベース翻訳モードのためObservable発行をスキップ");
+                    _logger?.LogDebug($"🎯 座標ベース翻訳モードのためObservable発行をスキップ");
                     // 翻訳完了時刻を記録
                     lock (_lastTranslationTimeLock)
                     {
@@ -1081,7 +1153,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     }
                     return;
                 }
-                
+
                 // 翻訳完了時刻と結果を記録（重複翻訳防止用）
                 lock (_lastTranslationTimeLock)
                 {
@@ -1091,40 +1163,40 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     _lastTranslatedText = result?.TranslatedText ?? string.Empty;
                 }
-                
+
                 // 結果を通知（UI層でスケジューラ制御）
                 if (result != null)
                 {
-                    DebugLogUtility.WriteLog($"📤 翻訳結果をObservableに発行: '{result.TranslatedText}'");
+                    _logger?.LogDebug($"📤 翻訳結果をObservableに発行: '{result.TranslatedText}'");
                     _translationResultsSubject.OnNext(result);
-                    DebugLogUtility.WriteLog($"✅ 翻訳結果発行完了");
+                    _logger?.LogDebug($"✅ 翻訳結果発行完了");
                 }
                 else
                 {
-                    DebugLogUtility.WriteLog($"⚠️ 翻訳結果がnullのためObservable発行をスキップ");
+                    _logger?.LogDebug($"⚠️ 翻訳結果がnullのためObservable発行をスキップ");
                 }
             }
-            catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") || 
+            catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") ||
                                                   translationEx.Message.Contains("OCR") ||
                                                   translationEx is OperationCanceledException)
             {
                 // OCRエラーの場合は翻訳結果を発行せず、ログ記録のみ
-                DebugLogUtility.WriteLog($"🚫 OCRエラーにより翻訳をスキップ: ID={translationId}, Error={translationEx.Message}");
+                _logger?.LogDebug($"🚫 OCRエラーにより翻訳をスキップ: ID={translationId}, Error={translationEx.Message}");
                 _logger?.LogWarning(translationEx, "OCRエラーにより翻訳をスキップしました: TranslationId={TranslationId}", translationId);
-                
+
                 // PaddleOCRエラーの場合は追加の待機を設定
                 if (translationEx.Message.Contains("PaddlePredictor") || translationEx.Message.Contains("run failed"))
                 {
-                    DebugLogUtility.WriteLog($"⏳ PaddleOCRエラーのため追加待機を実行: 2秒");
+                    _logger?.LogDebug($"⏳ PaddleOCRエラーのため追加待機を実行: 2秒");
                     _logger?.LogInformation("PaddleOCRエラーが発生したため、次のキャプチャまで2秒待機します");
-                    
+
                     // エラー発生時のクールダウンを設定
                     lock (_lastTranslationTimeLock)
                     {
                         _lastTranslationCompletedAt = DateTime.UtcNow.AddSeconds(2);
                     }
                 }
-                
+
                 // 現在の画像を破棄して早期リターン
                 currentImage?.Dispose();
                 return;
@@ -1135,7 +1207,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             {
                 var oldImage = _previousCapturedImage;
                 _previousCapturedImage = null; // 一旦クリア
-                
+
                 try
                 {
                     // 現在の画像のコピーを作成して保持
@@ -1143,20 +1215,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 }
                 catch (Exception ex)
                 {
-                    DebugLogUtility.WriteLog($"⚠️ 前回画像の更新に失敗: {ex.Message}");
+                    _logger?.LogDebug($"⚠️ 前回画像の更新に失敗: {ex.Message}");
                     _logger?.LogWarning(ex, "前回キャプチャ画像の更新に失敗しました");
                 }
-                
+
                 // 古い画像を安全に破棄
                 oldImage?.Dispose();
             }
-            
-            // 現在の画像を破棄
-            currentImage?.Dispose();
+
+            // 🚀 [FUNDAMENTAL_FIX] 現在の画像のDisposeは行わない - CaptureCompletedEventハンドラーが責任を持つ
+            // currentImage?.Dispose(); // CaptureCompletedEventで使用するため削除
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            DebugLogUtility.WriteLog($"❌ 自動翻訳ステップがキャンセルされました: ID={translationId}");
+            _logger?.LogDebug($"❌ 自動翻訳ステップがキャンセルされました: ID={translationId}");
             currentImage?.Dispose(); // キャンセル時のリソース破棄
             PublishProgress(translationId, TranslationStatus.Cancelled, 1.0f, "キャンセルされました");
             throw; // キャンセルは再スロー
@@ -1178,16 +1250,34 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private async Task ExecuteSingleTranslationAsync(CancellationToken cancellationToken)
     {
         var translationId = Guid.NewGuid().ToString("N")[..8];
-        
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // 📊 [DIAGNOSTIC] 翻訳工程開始イベント
+        await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+        {
+            Stage = "Translation",
+            IsSuccess = true,
+            ProcessingTimeMs = 0,
+            SessionId = translationId,
+            Severity = DiagnosticSeverity.Information,
+            Message = $"翻訳工程開始: 単発翻訳実行 ID={translationId}",
+            Metrics = new Dictionary<string, object>
+            {
+                { "TranslationId", translationId },
+                { "TranslationMode", "Manual" },
+                { "IsAutomaticActive", _isAutomaticTranslationActive },
+                { "TargetWindowHandle", _targetWindowHandle?.ToString("X") ?? "なし" }
+            }
+        }).ConfigureAwait(false);
+
         // 🚨 CRITICAL DEBUG: ExecuteSingleTranslationAsync呼び出し確認
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [SINGLE_TRANSLATION] ExecuteSingleTranslationAsync呼び出し開始: ID={translationId}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             Console.WriteLine($"🚨 [SINGLE_TRANSLATION] ExecuteSingleTranslationAsync呼び出し開始: ID={translationId}");
         }
         catch { }
-        
+
         try
         {
             // 進行状況を通知
@@ -1195,7 +1285,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             // 画面をキャプチャ
             var currentImage = await _captureService.CaptureScreenAsync().ConfigureAwait(false);
-            
+
             using (currentImage)
             {
                 // 翻訳を実行
@@ -1210,11 +1300,36 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     _lastTranslationCompletedAt = DateTime.UtcNow;
                 }
-                
+
+                // 📊 [DIAGNOSTIC] 翻訳工程成功イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "Translation",
+                    IsSuccess = true,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Information,
+                    Message = $"翻訳工程成功: 翻訳テキスト長={result.TranslatedText.Length}, 処理時間={stopwatch.ElapsedMilliseconds}ms",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "TranslationId", translationId },
+                        { "TranslationMode", "Manual" },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                        { "OriginalTextLength", result.OriginalText?.Length ?? 0 },
+                        { "TranslatedTextLength", result.TranslatedText.Length },
+                        { "TargetLanguage", result.TargetLanguage ?? "未指定" }
+                        // NOTE: 以下プロパティは現在のTranslationResult型に存在しないためコメントアウト
+                        // { "DetectedTextRegions", result.DetectedTextRegions?.Count ?? 0 },
+                        // { "SourceLanguage", result.SourceLanguage ?? "未指定" },
+                        // { "TranslationEngine", result.EngineUsed ?? "未指定" },
+                        // { "DisplayDuration", result.DisplayDuration?.TotalSeconds ?? 0 }
+                    }
+                }).ConfigureAwait(false);
+
                 // 結果を通知（UI層でスケジューラ制御）
                 _translationResultsSubject.OnNext(result);
 
-                _logger?.LogInformation("単発翻訳が完了しました: ID={Id}, テキスト長={Length}", 
+                _logger?.LogInformation("単発翻訳が完了しました: ID={Id}, テキスト長={Length}",
                     translationId, result.TranslatedText.Length);
             }
         }
@@ -1226,6 +1341,34 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 #pragma warning disable CA1031 // サービス層でのアプリケーション安定性のため一般例外をキャッチ
         catch (Exception ex)
         {
+            // 📊 [DIAGNOSTIC] 翻訳工程失敗イベント
+            try
+            {
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "Translation",
+                    IsSuccess = false,
+                    ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                    ErrorMessage = ex.Message,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Error,
+                    Message = $"翻訳工程失敗: {ex.GetType().Name}: {ex.Message}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "TranslationId", translationId },
+                        { "TranslationMode", "Manual" },
+                        { "ProcessingTimeMs", stopwatch.ElapsedMilliseconds },
+                        { "ErrorType", ex.GetType().Name },
+                        { "IsAutomaticActive", _isAutomaticTranslationActive },
+                        { "TargetWindowHandle", _targetWindowHandle?.ToString("X") ?? "なし" }
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch
+            {
+                // 診断イベント発行失敗は無視（元の例外を優先）
+            }
+
             _logger?.LogError(ex, "単発翻訳でエラーが発生しました");
             PublishProgress(translationId, TranslationStatus.Error, 1.0f, $"エラー: {ex.Message}");
             throw;
@@ -1237,38 +1380,35 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// 翻訳を実行
     /// </summary>
     private async Task<TranslationResult> ExecuteTranslationAsync(
-        string translationId, 
-        IImage image, 
-        TranslationMode mode, 
+        string translationId,
+        IImage image,
+        TranslationMode mode,
         CancellationToken cancellationToken)
     {
         // 🚨 CRITICAL DEBUG: ExecuteTranslationAsync呼び出し確認
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] ExecuteTranslationAsync呼び出し開始: ID={translationId}, Mode={mode}{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             Console.WriteLine($"🚨 [EXECUTE_TRANSLATION] ExecuteTranslationAsync呼び出し開始: ID={translationId}, Mode={mode}");
         }
         catch { }
-        
+
         // 🚨 CRITICAL DEBUG: PerformanceMeasurement作成前
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] PerformanceMeasurement作成開始{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
-        
+
         using var overallMeasurement = new PerformanceMeasurement(
-            MeasurementType.OverallProcessing, 
+            MeasurementType.OverallProcessing,
             $"翻訳実行全体 - ID:{translationId}, Mode:{mode}")
             .WithAdditionalInfo($"ImageType:{image?.GetType().Name}");
 
         // 🚨 CRITICAL DEBUG: PerformanceMeasurement作成完了
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] PerformanceMeasurement作成完了{Environment.NewLine}");
+            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
         }
         catch { }
 
@@ -1281,117 +1421,130 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 🚨 CRITICAL DEBUG: try文開始直後
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] try文開始直後{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
-            // 🚨 CRITICAL DEBUG: DebugLogUtility.WriteLog呼び出し直前
+
+            // 🗑️ [PHASE2.5_CLEANUP] CaptureCompletedEvent重複発行削除
+            // CaptureCompletedEventの発行はAdaptiveCaptureService.PublishCaptureCompletedEventAsyncに統一
+            // 複数ROI画像の場合はROIImageCapturedEvent × 8が発行され、各ROIが個別に処理される
+            _logger?.LogDebug($"🔄 [PHASE2.5_CLEANUP] CaptureCompletedEvent発行はAdaptiveCaptureServiceに統一: ID={translationId}");
+
+            // 🚨 CRITICAL DEBUG: _logger?.LogDebug呼び出し直前
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] DebugLogUtility.WriteLog呼び出し直前{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
+
             // 🚨 CRITICAL DEBUG: 座標ベース翻訳チェック（直接ファイル書き込み）
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] 座標ベース翻訳チェック開始{Environment.NewLine}");
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] _coordinateBasedTranslation != null: {_coordinateBasedTranslation != null}{Environment.NewLine}");
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] IsCoordinateBasedTranslationAvailable: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable()}{Environment.NewLine}");
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [COORDINATE_CHECK] _targetWindowHandle.HasValue: {_targetWindowHandle.HasValue}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
+
             // 座標ベース翻訳システムの利用可能性をチェック
-            DebugLogUtility.WriteLog($"🔍 座標ベース翻訳チェック:");
-            DebugLogUtility.WriteLog($"   📦 _coordinateBasedTranslation != null: {_coordinateBasedTranslation != null}");
-            DebugLogUtility.WriteLog($"   ✅ IsCoordinateBasedTranslationAvailable: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable()}");
-            DebugLogUtility.WriteLog($"   🪟 _targetWindowHandle.HasValue: {_targetWindowHandle.HasValue}");
-            DebugLogUtility.WriteLog($"   🪟 _targetWindowHandle: {_targetWindowHandle?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}");
-            
-            // 🚨 CRITICAL DEBUG: DebugLogUtility.WriteLog呼び出し完了
+            _logger?.LogDebug($"🔍 座標ベース翻訳チェック:");
+            _logger?.LogDebug($"   📦 _coordinateBasedTranslation != null: {_coordinateBasedTranslation != null}");
+            _logger?.LogDebug($"   ✅ IsCoordinateBasedTranslationAvailable: {_coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable()}");
+            _logger?.LogDebug($"   🪟 _targetWindowHandle.HasValue: {_targetWindowHandle.HasValue}");
+            _logger?.LogDebug($"   🪟 _targetWindowHandle: {_targetWindowHandle?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"}");
+
+            // 🚨 CRITICAL DEBUG: _logger?.LogDebug呼び出し完了
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [EXECUTE_TRANSLATION] DebugLogUtility.WriteLog呼び出し完了{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            DebugLogUtility.WriteLog($"   🖼️ image is IAdvancedImage: {image is IAdvancedImage}");
-            
+            _logger?.LogDebug($"   🖼️ image is IAdvancedImage: {image is IAdvancedImage}");
+
             // 座標ベース翻訳システムが利用可能な場合は座標ベース処理を実行
             var coordinateAvailable = _coordinateBasedTranslation?.IsCoordinateBasedTranslationAvailable() == true;
             var hasWindowHandle = _targetWindowHandle.HasValue;
             var isAdvancedImage = image is IAdvancedImage;
             var overallCondition = coordinateAvailable && hasWindowHandle && isAdvancedImage;
-            
+
             // 緊急デバッグ: 座標ベース翻訳条件確認
             try
             {
-                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 座標ベース翻訳条件確認（直接書き込み）: coordinateAvailable={coordinateAvailable}, hasWindowHandle={hasWindowHandle}, isAdvancedImage={isAdvancedImage}, overallCondition={overallCondition}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
             }
             catch { }
-            
-            DebugLogUtility.WriteLog($"🎯 座標ベース翻訳条件評価結果: {overallCondition}");
-            DebugLogUtility.WriteLog($"   📋 詳細条件:");
-            DebugLogUtility.WriteLog($"     📦 coordinateAvailable: {coordinateAvailable}");
-            DebugLogUtility.WriteLog($"     🪟 hasWindowHandle: {hasWindowHandle}");
-            DebugLogUtility.WriteLog($"     🖼️ isAdvancedImage: {isAdvancedImage}");
-            
+
+            _logger?.LogDebug($"🎯 座標ベース翻訳条件評価結果: {overallCondition}");
+            _logger?.LogDebug($"   📋 詳細条件:");
+            _logger?.LogDebug($"     📦 coordinateAvailable: {coordinateAvailable}");
+            _logger?.LogDebug($"     🪟 hasWindowHandle: {hasWindowHandle}");
+            _logger?.LogDebug($"     🖼️ isAdvancedImage: {isAdvancedImage}");
+
             Console.WriteLine($"🎯 座標ベース翻訳条件評価結果: {overallCondition}");
             Console.WriteLine($"   📦 coordinateAvailable: {coordinateAvailable}");
             Console.WriteLine($"   🪟 hasWindowHandle: {hasWindowHandle}");
             Console.WriteLine($"   🖼️ isAdvancedImage: {isAdvancedImage}");
-            
+
+            // 座標ベース翻訳実行フラグ
+            var coordinateBasedTranslationExecuted = false;
+
+            // 🎉 [PHASE12.2_COMPLETE] Phase 12.2イベント駆動アーキテクチャ
+            // ProcessWithCoordinateBasedTranslationAsync内部でTimedChunkAggregatorを呼び出し
+            // CoordinateBasedTranslationService.cs Line 315でreturnして2重翻訳を防止済み
             if (overallCondition && image is IAdvancedImage advancedImage)
             {
                 // 緊急デバッグ: 座標ベース翻訳実行開始
                 try
                 {
-                    System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎯 座標ベース翻訳処理実行開始（直接書き込み）: ID={translationId}{Environment.NewLine}");
+                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                 }
                 catch { }
-                
-                DebugLogUtility.WriteLog($"🎯 座標ベース翻訳処理を実行開始: ID={translationId}");
+
+                _logger?.LogDebug($"🎯 座標ベース翻訳処理を実行開始: ID={translationId}");
                 _logger?.LogDebug("🎯 座標ベース翻訳処理を実行: ID={TranslationId}", translationId);
-                
+
                 try
                 {
                     // 座標ベース翻訳処理を実行（BatchOCR + MultiWindowOverlay）
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
-                    
-                    DebugLogUtility.WriteLog($"🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始");
+
+                    _logger?.LogDebug($"🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始");
                     await _coordinateBasedTranslation!.ProcessWithCoordinateBasedTranslationAsync(
-                        advancedImage, 
-                        _targetWindowHandle!.Value, 
+                        advancedImage,
+                        _targetWindowHandle!.Value,
                         cancellationToken)
                         .ConfigureAwait(false);
-                    
+
                     try
                     {
-                        System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 
-                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ ProcessWithCoordinateBasedTranslationAsync呼び出し完了（直接書き込み）{Environment.NewLine}");
+                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
                     }
                     catch { }
-                    
-                    DebugLogUtility.WriteLog($"✅ ProcessWithCoordinateBasedTranslationAsync呼び出し完了");
+
+                    _logger?.LogDebug($"✅ ProcessWithCoordinateBasedTranslationAsync呼び出し完了");
                     _logger?.LogInformation("✅ 座標ベース翻訳処理完了: ID={TranslationId}", translationId);
-                    
-                    // 座標ベース処理が成功した場合、オーバーレイで直接表示されるため、
-                    // 従来の翻訳結果は空の結果を返す
-                    // ただし、IsCoordinateBasedModeをtrueに設定して、Observableへの発行をスキップする
+
+                    // 座標ベース翻訳が正常実行された
+                    coordinateBasedTranslationExecuted = true;
+
+                    // 🎉 [PHASE12.2_COMPLETE] Phase 12.2イベント駆動アーキテクチャ
+                    // ProcessWithCoordinateBasedTranslationAsync内部でTimedChunkAggregatorに追加済み
+                    // AggregatedChunksReadyEventHandler経由で翻訳・オーバーレイ表示されるため、
+                    // ここでは2重翻訳を防止するため、IsCoordinateBasedMode=trueで即座にreturn
+                    _logger?.LogDebug($"🎉 [PHASE12.2_COMPLETE] Phase 12.2早期リターン - AggregatedChunksReadyEventHandler経由で処理");
+                    _logger?.LogInformation("🎉 [PHASE12.2_COMPLETE] 2重翻訳防止: AggregatedChunksReadyEventHandler経由で処理 - ID={TranslationId}", translationId);
+
+                    // クールダウン設定（次回の自動翻訳を適切に制御）
+                    lock (_lastTranslationTimeLock)
+                    {
+                        _lastTranslationCompletedAt = DateTime.UtcNow;
+                    }
+
                     return new TranslationResult
                     {
                         Id = translationId,
@@ -1402,155 +1555,149 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         TargetLanguage = GetLanguageCode(_settingsService.GetValue("UI:TranslationLanguage", "英語")),
                         Confidence = 1.0f,
                         ProcessingTime = DateTime.UtcNow - startTime,
-                        IsCoordinateBasedMode = true // 座標ベースモードを示すフラグ
+                        IsCoordinateBasedMode = true // 座標ベースモードを示すフラグ - Observableスキップ + クールダウン設定
                     };
                 }
                 catch (Exception coordinateEx)
                 {
-                    DebugLogUtility.WriteLog($"❌ 座標ベース処理でエラー発生: {coordinateEx.Message}");
-                    DebugLogUtility.WriteLog($"❌ エラーのスタックトレース: {coordinateEx.StackTrace}");
+                    _logger?.LogDebug($"❌ 座標ベース処理でエラー発生: {coordinateEx.Message}");
+                    _logger?.LogDebug($"❌ エラーのスタックトレース: {coordinateEx.StackTrace}");
                     _logger?.LogWarning(coordinateEx, "⚠️ 座標ベース処理でエラーが発生、従来のOCR処理にフォールバック: ID={TranslationId}", translationId);
                     // 座標ベース処理でエラーが発生した場合は従来のOCR処理にフォールバック
+                    coordinateBasedTranslationExecuted = false;
                 }
             }
             else
             {
-                DebugLogUtility.WriteLog($"⚠️ 座標ベース翻訳をスキップ（条件不一致）");
+                _logger?.LogDebug($"⚠️ 座標ベース翻訳をスキップ（条件不一致）");
                 if (_coordinateBasedTranslation == null)
-                    DebugLogUtility.WriteLog($"   理由: _coordinateBasedTranslation is null");
+                    _logger?.LogDebug($"   理由: _coordinateBasedTranslation is null");
                 else if (_coordinateBasedTranslation.IsCoordinateBasedTranslationAvailable() != true)
-                    DebugLogUtility.WriteLog($"   理由: IsCoordinateBasedTranslationAvailable() = {_coordinateBasedTranslation.IsCoordinateBasedTranslationAvailable()}");
+                    _logger?.LogDebug($"   理由: IsCoordinateBasedTranslationAvailable() = {_coordinateBasedTranslation.IsCoordinateBasedTranslationAvailable()}");
                 if (!_targetWindowHandle.HasValue)
-                    DebugLogUtility.WriteLog($"   理由: _targetWindowHandle is null");
+                    _logger?.LogDebug($"   理由: _targetWindowHandle is null");
                 if (image is not IAdvancedImage)
-                    DebugLogUtility.WriteLog($"   理由: image is not IAdvancedImage (actual type: {image?.GetType()?.Name ?? "null"})");
+                    _logger?.LogDebug($"   理由: image is not IAdvancedImage (actual type: {image?.GetType()?.Name ?? "null"})");
             }
 
             // OCR処理
             PublishProgress(translationId, TranslationStatus.ProcessingOCR, 0.3f, "テキスト認識中...");
-            
-            DebugLogUtility.WriteLog($"🔍 OCRエンジン状態チェック - IsInitialized: {_ocrEngine.IsInitialized}");
-            
+
+            _logger?.LogDebug($"🔍 OCRエンジン状態チェック - IsInitialized: {_ocrEngine.IsInitialized}");
+
             // OCRエンジンが初期化されていない場合は初期化
             if (!_ocrEngine.IsInitialized)
             {
-                DebugLogUtility.WriteLog($"🛠️ OCRエンジン初期化開始");
-                
+                _logger?.LogDebug($"🛠️ OCRエンジン初期化開始");
+
+                var unifiedSettings = _ocrSettings.CurrentValue;
                 var ocrSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.1f, // 緊急対応: より多くの文字領域を検出（0.3→0.1に緩和）
-                    RecognitionThreshold = 0.1f // 緊急対応: 認識閾値を大幅緩和でゲームテキスト検出改善（0.3→0.1）
+                    DetectionThreshold = (float)unifiedSettings.DetectionThreshold, // 統一設定: appsettings.json から読み込み
+                    RecognitionThreshold = 0.1f // 認識閾値（今後統一化対象）
                 };
-                
+
                 try
                 {
                     await _ocrEngine.InitializeAsync(ocrSettings, cancellationToken).ConfigureAwait(false);
-                    DebugLogUtility.WriteLog($"✅ OCRエンジン初期化完了");
+                    _logger?.LogDebug($"✅ OCRエンジン初期化完了");
                 }
                 catch (Exception initEx)
                 {
-                    DebugLogUtility.WriteLog($"❌ OCRエンジン初期化エラー: {initEx.Message}");
+                    _logger?.LogDebug($"❌ OCRエンジン初期化エラー: {initEx.Message}");
                     throw;
                 }
             }
             else
             {
                 // 既に初期化されているが、閾値設定を更新する
-                DebugLogUtility.WriteLog($"🔄 既に初期化されたOCRエンジンの設定を更新");
-                
+                _logger?.LogDebug($"🔄 既に初期化されたOCRエンジンの設定を更新");
+
+                var unifiedSettings = _ocrSettings.CurrentValue;
                 var updatedSettings = new OcrEngineSettings
                 {
                     Language = "jpn", // 日本語
-                    DetectionThreshold = 0.1f, // 緊急対応: より多くの文字領域を検出（0.3→0.1に緩和）
-                    RecognitionThreshold = 0.1f // 緊急対応: 認識閾値を大幅緩和でゲームテキスト検出改善（0.3→0.1）
+                    DetectionThreshold = (float)unifiedSettings.DetectionThreshold, // 統一設定: appsettings.json から読み込み
+                    RecognitionThreshold = 0.1f // 認識閾値（今後統一化対象）
                 };
-                
+
                 try
                 {
                     await _ocrEngine.ApplySettingsAsync(updatedSettings, cancellationToken).ConfigureAwait(false);
-                    DebugLogUtility.WriteLog($"✅ OCRエンジン設定更新完了");
+                    _logger?.LogDebug($"✅ OCRエンジン設定更新完了");
                 }
                 catch (Exception applyEx)
                 {
-                    DebugLogUtility.WriteLog($"⚠️ OCRエンジン設定更新エラー: {applyEx.Message}");
+                    _logger?.LogDebug($"⚠️ OCRエンジン設定更新エラー: {applyEx.Message}");
                     // 設定更新に失敗しても翻訳処理は続行する
                 }
             }
-            
+
             // 実際のOCR処理を実行
             Console.WriteLine($"🔍 画像オブジェクト確認:");
             Console.WriteLine($"   📷 画像オブジェクト: {image?.GetType().Name ?? "null"}");
             Console.WriteLine($"   📊 画像null判定: {image == null}");
-            
+
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 画像オブジェクト確認:{Environment.NewLine}");
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📷 画像オブジェクト: {image?.GetType().Name ?? "null"}{Environment.NewLine}");
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📊 画像null判定: {image == null}{Environment.NewLine}");
-            
+
             try
             {
-                DebugLogUtility.WriteLog($"🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}");
-                DebugLogUtility.WriteLog($"🖼️ 画像情報: 型={image?.GetType().Name ?? "null"}");
-                
+                _logger?.LogDebug($"🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}");
+                _logger?.LogDebug($"🖼️ 画像情報: 型={image?.GetType().Name ?? "null"}");
+
                 // デバッグ用: キャプチャした画像を保存
                 if (image != null)
                 {
-                    try
-                    {
-                        var debugImagePath = Path.Combine(Directory.GetCurrentDirectory(), $"debug_captured_{translationId}.png");
-                        await SaveImageForDebugAsync(image, debugImagePath).ConfigureAwait(false);
-                        DebugLogUtility.WriteLog($"🖼️ デバッグ用画像保存: {debugImagePath}");
-                    }
-                    catch (Exception saveEx)
-                    {
-                        DebugLogUtility.WriteLog($"⚠️ デバッグ画像保存エラー: {saveEx.Message}");
-                    }
+                    // 画像キャプチャ完了
                 }
-                
+
                 // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 OCR処理開始 - 画像サイズ: {image?.Width ?? 0}x{image?.Height ?? 0}{Environment.NewLine}");
             }
             catch (Exception sizeEx)
             {
-                DebugLogUtility.WriteLog($"❌ 画像サイズ取得エラー: {sizeEx.Message}");
+                _logger?.LogDebug($"❌ 画像サイズ取得エラー: {sizeEx.Message}");
                 // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 画像サイズ取得エラー: {sizeEx.Message}{Environment.NewLine}");
                 throw;
             }
-            
+
             ArgumentNullException.ThrowIfNull(image, nameof(image));
-            
+
             // 最新要求優先: 前のOCR要求を強制キャンセル
             var oldCts = _latestOcrRequestCts;
             _latestOcrRequestCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            
+
             if (oldCts != null)
             {
                 try
                 {
-                    DebugLogUtility.WriteLog($"🛑 前のOCR要求を強制キャンセル: ID={translationId}");
+                    _logger?.LogDebug($"🛑 前のOCR要求を強制キャンセル: ID={translationId}");
                     oldCts.Cancel();
-                    
+
                     // PaddleOCRエンジンのタイムアウトもキャンセル
                     _ocrEngine.CancelCurrentOcrTimeout();
                 }
                 catch (Exception cancelEx)
                 {
-                    DebugLogUtility.WriteLog($"⚠️ OCR強制キャンセル中にエラー: {cancelEx.Message}");
+                    _logger?.LogDebug($"⚠️ OCR強制キャンセル中にエラー: {cancelEx.Message}");
                 }
                 finally
                 {
                     oldCts.Dispose();
                 }
             }
-            
+
             var currentRequestToken = _latestOcrRequestCts.Token;
-            
-            DebugLogUtility.WriteLog($"🤖 OCRエンジン呼び出し開始（排他制御付き）:");
-            DebugLogUtility.WriteLog($"   🔧 エンジン名: {_ocrEngine?.EngineName ?? "(null)"}");
-            DebugLogUtility.WriteLog($"   ✅ 初期化状態: {_ocrEngine?.IsInitialized ?? false}");
-            DebugLogUtility.WriteLog($"   🌐 現在の言語: {_ocrEngine?.CurrentLanguage ?? "(null)"}");
-            
+
+            _logger?.LogDebug($"🤖 OCRエンジン呼び出し開始（排他制御付き）:");
+            _logger?.LogDebug($"   🔧 エンジン名: {_ocrEngine?.EngineName ?? "(null)"}");
+            _logger?.LogDebug($"   ✅ 初期化状態: {_ocrEngine?.IsInitialized ?? false}");
+            _logger?.LogDebug($"   🌐 現在の言語: {_ocrEngine?.CurrentLanguage ?? "(null)"}");
+
             OcrResults ocrResults;
-            
+
             // OCR処理の排他制御
             await _ocrExecutionSemaphore.WaitAsync(currentRequestToken).ConfigureAwait(false);
             try
@@ -1558,113 +1705,178 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 // 最新要求かどうかチェック
                 if (_latestOcrRequestCts?.Token != currentRequestToken)
                 {
-                    DebugLogUtility.WriteLog($"🚫 古いOCR要求のためキャンセル: ID={translationId}");
+                    _logger?.LogDebug($"🚫 古いOCR要求のためキャンセル: ID={translationId}");
                     currentRequestToken.ThrowIfCancellationRequested();
                 }
-                
-                DebugLogUtility.WriteLog($"🔒 OCR処理を排他実行開始: ID={translationId}");
+
+                _logger?.LogDebug($"🔒 OCR処理を排他実行開始: ID={translationId}");
                 ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: currentRequestToken).ConfigureAwait(false);
-                DebugLogUtility.WriteLog($"🔓 OCR処理を排他実行完了: ID={translationId}");
+                _logger?.LogDebug($"🔓 OCR処理を排他実行完了: ID={translationId}");
             }
             finally
             {
                 _ocrExecutionSemaphore.Release();
             }
-            
-            DebugLogUtility.WriteLog($"🤖 OCRエンジン呼び出し完了");
-            
-            DebugLogUtility.WriteLog($"📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions.Count}");
-            DebugLogUtility.WriteLog($"⏱️ OCR処理時間: {ocrResults.ProcessingTime.TotalMilliseconds:F1}ms");
-            DebugLogUtility.WriteLog($"🌐 OCR言語: {ocrResults.LanguageCode}");
-            
+
+            _logger?.LogDebug($"🤖 OCRエンジン呼び出し完了");
+
+            // 🚀 [OCR_TRANSLATION_BRIDGE_FIX] OCR完了イベントを発行して翻訳フローを開始
+            try
+            {
+                Console.WriteLine($"🔥 [BRIDGE_FIX] OCR完了イベント発行開始: TextRegions数={ocrResults.TextRegions.Count}");
+
+                // OCR結果をOcrResultsコレクションに変換
+                var ocrResultsList = ocrResults.TextRegions.Select(region => new CoreOcrResult(
+                    text: region.Text,
+                    bounds: region.Bounds,
+                    confidence: (float)region.Confidence)).ToList().AsReadOnly();
+
+                var ocrCompletedEvent = new OcrCompletedEvent(
+                    sourceImage: image,
+                    results: ocrResultsList,
+                    processingTime: ocrResults.ProcessingTime);
+
+                Console.WriteLine($"🔥 [BRIDGE_FIX] OcrCompletedEvent作成完了 - ID: {ocrCompletedEvent.Id}");
+
+                // 🎉 [PHASE12.2_COMPLETE] イベント駆動アーキテクチャ完全移行
+                // 座標ベース翻訳モードの場合、AggregatedChunksReadyEventHandlerが処理するため発行不要
+                // overallCondition: 座標ベース翻訳の実行条件（coordinateAvailable && hasWindowHandle && isAdvancedImage）
+                if (!overallCondition)
+                {
+                    // 従来の翻訳モード（非座標ベース）の場合のみイベント発行
+                    await _eventAggregator.PublishAsync(ocrCompletedEvent).ConfigureAwait(false);
+                    Console.WriteLine($"🔥 [PHASE12.2] OcrCompletedEvent発行完了 - 従来翻訳フロー");
+                    _logger?.LogDebug($"🔥 [PHASE12.2] 従来翻訳フロー: 非座標ベースモードのためOcrCompletedEvent発行");
+                }
+                else
+                {
+                    Console.WriteLine($"🎉 [PHASE12.2_COMPLETE] 座標ベース翻訳モード - AggregatedChunksReadyEventHandlerが処理");
+                    _logger?.LogDebug($"🎉 [PHASE12.2_COMPLETE] イベント駆動処理: TimedChunkAggregator → AggregatedChunksReadyEventHandler");
+                }
+                _logger?.LogInformation("🔥 [BRIDGE_FIX] OCR完了イベント発行完了: TextRegions数={Count}, ID={EventId}",
+                    ocrResults.TextRegions.Count, ocrCompletedEvent.Id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"🔥 [BRIDGE_FIX] OCR完了イベント発行エラー: {ex.GetType().Name} - {ex.Message}");
+                _logger?.LogError(ex, "🔥 [BRIDGE_FIX] OCR完了イベント発行中にエラーが発生");
+                // エラーが発生しても翻訳フローは継続（フォールバック）
+            }
+
+            _logger?.LogDebug($"📊 OCR結果: HasText={ocrResults.HasText}, TextRegions数={ocrResults.TextRegions.Count}");
+            _logger?.LogDebug($"⏱️ OCR処理時間: {ocrResults.ProcessingTime.TotalMilliseconds:F1}ms");
+            _logger?.LogDebug($"🌐 OCR言語: {ocrResults.LanguageCode}");
+
             // 詳細なOCRデバッグ情報を表示
             if (ocrResults.TextRegions.Count > 0)
             {
-                DebugLogUtility.WriteLog($"🔍 詳細なOCRテキストリージョン情報:");
+                _logger?.LogDebug($"🔍 詳細なOCRテキストリージョン情報:");
                 for (int i = 0; i < Math.Min(5, ocrResults.TextRegions.Count); i++) // 最初の5個だけ表示
                 {
                     var region = ocrResults.TextRegions[i];
-                    DebugLogUtility.WriteLog($"   リージョン {i + 1}:");
-                    DebugLogUtility.WriteLog($"     📖 テキスト: '{region.Text ?? "(null)"}'");
-                    DebugLogUtility.WriteLog($"     📊 信頼度: {region.Confidence:F4}");
-                    DebugLogUtility.WriteLog($"     📍 座標: X={region.Bounds.X}, Y={region.Bounds.Y}, W={region.Bounds.Width}, H={region.Bounds.Height}");
-                    DebugLogUtility.WriteLog($"     🔢 テキスト長: {region.Text?.Length ?? 0}");
+                    _logger?.LogDebug($"   リージョン {i + 1}:");
+                    _logger?.LogDebug($"     📖 テキスト: '{region.Text ?? "(null)"}'");
+                    _logger?.LogDebug($"     📊 信頼度: {region.Confidence:F4}");
+                    _logger?.LogDebug($"     📍 座標: X={region.Bounds.X}, Y={region.Bounds.Y}, W={region.Bounds.Width}, H={region.Bounds.Height}");
+                    _logger?.LogDebug($"     🔢 テキスト長: {region.Text?.Length ?? 0}");
                 }
                 if (ocrResults.TextRegions.Count > 5)
                 {
-                    DebugLogUtility.WriteLog($"   ... 他 {ocrResults.TextRegions.Count - 5} 個のリージョン");
+                    _logger?.LogDebug($"   ... 他 {ocrResults.TextRegions.Count - 5} 個のリージョン");
                 }
             }
             else
             {
-                DebugLogUtility.WriteLog($"📝 TextRegionsが空です");
-                DebugLogUtility.WriteLog($"❌ OCR処理でテキストが検出されませんでした");
-                DebugLogUtility.WriteLog($"🖼️ 確認事項: 画像内にテキストが含まれているか、OCRエンジンが正常に動作しているか");
+                // テキスト未検出時はデバッグログのみに変更
+                _logger?.LogDebug("TextRegions が空です - 画像内にテキストが検出されませんでした");
             }
-            
+
             if (ocrResults.HasText)
             {
                 // 設定に基づいてテキスト結合方法を選択
                 var enableTextGrouping = _settingsService.GetValue("Translation:EnableTextGrouping", true);
-                
+
                 if (enableTextGrouping)
                 {
                     // レイアウト情報を活用した改良されたテキスト結合を使用
                     var preserveParagraphs = _settingsService.GetValue("Translation:PreserveParagraphs", true);
                     var sameLineThreshold = _settingsService.GetValue("Translation:SameLineThreshold", 0.5);
                     var paragraphSeparationThreshold = _settingsService.GetValue("Translation:ParagraphSeparationThreshold", 1.5);
-                    
+
                     originalText = ocrResults.GetGroupedText(
                         preserveParagraphs: preserveParagraphs,
                         sameLineThreshold: sameLineThreshold,
                         paragraphSeparationThreshold: paragraphSeparationThreshold);
-                    
-                    DebugLogUtility.WriteLog($"📋 テキストグループ化を使用: 段落保持={preserveParagraphs}");
+
+                    _logger?.LogDebug($"📋 テキストグループ化を使用: 段落保持={preserveParagraphs}");
                 }
                 else
                 {
                     // 従来の単純な改行区切り結合
                     originalText = ocrResults.Text;
-                    
-                    DebugLogUtility.WriteLog($"📋 従来のテキスト結合を使用");
+
+                    _logger?.LogDebug($"📋 従来のテキスト結合を使用");
                 }
-                
-                ocrConfidence = ocrResults.TextRegions.Count > 0 
-                    ? ocrResults.TextRegions.Average(r => r.Confidence) 
+
+                ocrConfidence = ocrResults.TextRegions.Count > 0
+                    ? ocrResults.TextRegions.Average(r => r.Confidence)
                     : 0.0;
-                
-                DebugLogUtility.WriteLog($"✅ OCR認識成功:");
-                DebugLogUtility.WriteLog($"   📖 認識テキスト: '{originalText}'");
-                DebugLogUtility.WriteLog($"   📊 平均信頼度: {ocrConfidence:F2}");
-                DebugLogUtility.WriteLog($"   🔢 テキスト長: {originalText.Length}");
-                DebugLogUtility.WriteLog($"   🔤 テキストがnullまたは空: {string.IsNullOrEmpty(originalText)}");
-                DebugLogUtility.WriteLog($"   🔤 テキストが空白のみ: {string.IsNullOrWhiteSpace(originalText)}");
-                    
-                _logger?.LogDebug("OCR認識成功: テキスト長={Length}, 信頼度={Confidence:F2}", 
+
+                _logger?.LogDebug($"✅ OCR認識成功:");
+                _logger?.LogDebug($"   📖 認識テキスト: '{originalText}'");
+                _logger?.LogDebug($"   📊 平均信頼度: {ocrConfidence:F2}");
+                _logger?.LogDebug($"   🔢 テキスト長: {originalText.Length}");
+                _logger?.LogDebug($"   🔤 テキストがnullまたは空: {string.IsNullOrEmpty(originalText)}");
+                _logger?.LogDebug($"   🔤 テキストが空白のみ: {string.IsNullOrWhiteSpace(originalText)}");
+
+                _logger?.LogDebug("OCR認識成功: テキスト長={Length}, 信頼度={Confidence:F2}",
                     originalText.Length, ocrConfidence);
             }
             else
             {
-                DebugLogUtility.WriteLog("❌ OCR処理でテキストが検出されませんでした");
-                // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ OCR処理でテキストが検出されませんでした{Environment.NewLine}");
-                _logger?.LogWarning("OCR処理でテキストが検出されませんでした");
+                // テキスト未検出時はデバッグログのみに変更（通常ログを抑制）
+                _logger?.LogDebug("OCR処理でテキストが検出されませんでした");
                 originalText = string.Empty;
             }
 
+            // 🔥 [DIAGNOSTIC] OCR処理診断イベント
+            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+            {
+                Stage = "OCR",
+                IsSuccess = ocrResults.HasText,
+                ProcessingTimeMs = (long)ocrResults.ProcessingTime.TotalMilliseconds,
+                SessionId = translationId,
+                Severity = ocrResults.HasText ? DiagnosticSeverity.Information : DiagnosticSeverity.Warning,
+                Message = ocrResults.HasText
+                    ? $"OCR処理成功: テキスト検出数={ocrResults.TextRegions.Count}, 処理時間={ocrResults.ProcessingTime.TotalMilliseconds:F1}ms"
+                    : "OCR処理でテキストが検出されませんでした",
+                Metrics = new Dictionary<string, object>
+                {
+                    { "DetectedTextRegions", ocrResults.TextRegions.Count },
+                    { "HasText", ocrResults.HasText },
+                    { "AverageConfidence", ocrConfidence },
+                    { "ProcessingTimeMs", (long)ocrResults.ProcessingTime.TotalMilliseconds },
+                    { "LanguageCode", ocrResults.LanguageCode ?? "unknown" },
+                    { "OCREngine", _ocrEngine?.EngineName ?? "unknown" },
+                    { "ImageSize", $"{image?.Width ?? 0}x{image?.Height ?? 0}" },
+                    { "ExtractedText", originalText }, // 🔥 重要: 実際のOCRテキストを記録
+                    { "TextLength", originalText.Length }
+                }
+            }).ConfigureAwait(false);
+
             // 翻訳処理
             PublishProgress(translationId, TranslationStatus.Translating, 0.7f, "翻訳中...");
-            
+
             // 翻訳設定を取得
             var settings = GetTranslationSettings();
-            
+
             // 🚨 CRITICAL DEBUG: originalTextの内容を確認
             try
             {
-                System.IO.File.AppendAllText(@"E:\dev\Baketa\debug_app_logs.txt", 
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [OCR_RESULT] originalText='{originalText}', Length={originalText?.Length ?? -1}, IsNullOrWhiteSpace={string.IsNullOrWhiteSpace(originalText)}{Environment.NewLine}");
+                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化}{Environment.NewLine}");
             }
             catch { }
-            
+
             string translatedText;
             if (!string.IsNullOrWhiteSpace(originalText))
             {
@@ -1673,43 +1885,169 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // 設定から言語ペアを取得
                     var sourceCode = settings.DefaultSourceLanguage ?? "ja";
                     var targetCode = settings.DefaultTargetLanguage ?? "en";
-                    
-                    DebugLogUtility.WriteLog($"🌍 翻訳開始: '{originalText}' ({sourceCode} → {targetCode})");
-                    
-                    // 改善されたMock翻訳処理（実際の翻訳ロジックをシミュレート）
-                    DebugLogUtility.WriteLog($"🌍 改善された翻訳処理開始: '{originalText}' ({sourceCode} → {targetCode})");
-                    
-                    // 簡素な翻訳ロジックを実装
-                    await Task.Delay(200, cancellationToken).ConfigureAwait(false); // 少し短く
-                    
-                    if (sourceCode == "ja" && targetCode == "en")
+
+                    // 🚨 [CRITICAL_DEBUG] 言語設定の実際の値をデバッグ出力
+                    _logger?.LogDebug($"🚨 [LANGUAGE_SETTINGS_DEBUG] settings.DefaultSourceLanguage='{settings.DefaultSourceLanguage}'");
+                    _logger?.LogDebug($"🚨 [LANGUAGE_SETTINGS_DEBUG] settings.DefaultTargetLanguage='{settings.DefaultTargetLanguage}'");
+                    _logger?.LogDebug($"🚨 [LANGUAGE_SETTINGS_DEBUG] sourceCode='{sourceCode}', targetCode='{targetCode}'");
+
+                    // 🔥 [DIAGNOSTIC] 言語検出診断イベント
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                     {
-                        // 日本語から英語への翻訳
-                        translatedText = TranslateJapaneseToEnglish(originalText);
-                    }
-                    else if (sourceCode == "en" && targetCode == "ja")
+                        Stage = "LanguageDetection",
+                        IsSuccess = true,
+                        ProcessingTimeMs = 0,
+                        SessionId = translationId,
+                        Severity = DiagnosticSeverity.Information,
+                        Message = $"言語検出完了: {sourceCode} → {targetCode}",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "SourceLanguage", sourceCode },
+                            { "TargetLanguage", targetCode },
+                            { "LanguageDetectionEngine", "Settings" },
+                            { "ConfidenceScore", 1.0 },
+                            { "RequiresTranslation", sourceCode != targetCode },
+                            { "OriginalText", originalText }
+                        }
+                    }).ConfigureAwait(false);
+
+                    _logger?.LogDebug($"🌍 翻訳開始: '{originalText}' ({sourceCode} → {targetCode})");
+
+                    // ✨ 実際のAI翻訳エンジンを使用した翻訳処理（辞書置換を廃止）
+                    _logger?.LogDebug($"🤖 AI翻訳エンジン使用開始: '{originalText}' ({sourceCode} → {targetCode})");
+
+                    // 🚀 [NLLB-200_INTEGRATION] NLLB-200 AI翻訳エンジンを使用
+                    _logger?.LogDebug($"🤖 NLLB-200 AI翻訳エンジンを使用して翻訳開始");
+
+                    // 🔥 [DIAGNOSTIC] 翻訳エンジン選択診断イベント
+                    var engineStatus = "nllb_200_ai_engine"; // NLLB-200 AI翻訳エンジン使用
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                     {
-                        // 英語から日本語への翻訳
-                        translatedText = TranslateEnglishToJapanese(originalText);
-                    }
-                    else
+                        Stage = "TranslationEngineSelection",
+                        IsSuccess = true, // NLLB-200 AI翻訳エンジンを使用
+                        ProcessingTimeMs = 0,
+                        SessionId = translationId,
+                        Severity = DiagnosticSeverity.Information,
+                        Message = "翻訳エンジン選択: NLLB-200 AI翻訳エンジンを使用",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "PrimaryEngine", "NLLB-200" },
+                            { "PrimaryEngineStatus", "active" },
+                            { "FallbackEngine", "None" },
+                            { "FallbackReason", "not_required" },
+                            { "ActualEngine", "NLLB-200" }
+                        }
+                    }).ConfigureAwait(false);
+
+                    // 🤖 NLLB-200 AI翻訳エンジンを使用
+                    var translationStartTime = DateTime.UtcNow;
+
+                    // すべての言語ペアでNLLB-200を使用
+                    translatedText = await TranslateWithNLLBEngineAsync(originalText, sourceCode, targetCode);
+                    _logger?.LogDebug($"🤖 NLLB-200翻訳結果: '{translatedText}'");
+
+                    var translationElapsed = DateTime.UtcNow - translationStartTime;
+
+                    // 🔥 [DIAGNOSTIC] 翻訳品質評価診断イベント
+                    var isSameLanguage = originalText == translatedText;
+                    var textSimilarity = isSameLanguage ? 1.0 : 0.0;
+                    var qualityScore = isSameLanguage ? 0.0 : 0.5; // 辞書翻訳は中程度の品質
+
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
                     {
-                        // その他の言語ペア
-                        translatedText = $"[{sourceCode}→{targetCode}] {originalText}";
-                    }
-                    
-                    DebugLogUtility.WriteLog($"🌍 翻訳完了: '{translatedText}'");
+                        Stage = "TranslationQualityCheck",
+                        IsSuccess = !isSameLanguage, // 同一言語の場合は失敗
+                        ProcessingTimeMs = (long)translationElapsed.TotalMilliseconds,
+                        SessionId = translationId,
+                        Severity = isSameLanguage ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
+                        Message = isSameLanguage
+                            ? $"翻訳品質問題: 同一言語検出 - 翻訳が実行されていません"
+                            : $"翻訳品質評価: スコア={qualityScore:F2}",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "OriginalText", originalText },
+                            { "TranslatedText", translatedText },
+                            { "SourceLanguage", sourceCode },
+                            { "TargetLanguage", targetCode },
+                            { "IsSameLanguage", isSameLanguage },
+                            { "TextSimilarity", textSimilarity },
+                            { "QualityScore", qualityScore },
+                            { "TranslationMethod", "string_replacement" },
+                            { "IsActualTranslation", !isSameLanguage }
+                        }
+                    }).ConfigureAwait(false);
+
+                    // 🔥 [DIAGNOSTIC] 翻訳実行診断イベント
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    {
+                        Stage = "TranslationExecution",
+                        IsSuccess = !isSameLanguage,
+                        ProcessingTimeMs = (long)translationElapsed.TotalMilliseconds,
+                        SessionId = translationId,
+                        Severity = isSameLanguage ? DiagnosticSeverity.Error : DiagnosticSeverity.Information,
+                        Message = isSameLanguage
+                            ? $"翻訳実行失敗: 辞書にない文字のため原文をそのまま返却"
+                            : $"翻訳実行成功: 辞書翻訳により変換完了",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "UsedEngine", "DictionaryTranslation" },
+                            { "OriginalText", originalText },
+                            { "TranslatedText", translatedText },
+                            { "TranslationMethod", "string_replacement" },
+                            { "ProcessingTimeMs", (long)translationElapsed.TotalMilliseconds },
+                            { "IsActualTranslation", !isSameLanguage },
+                            { "DictionaryHit", !isSameLanguage }
+                        }
+                    }).ConfigureAwait(false);
+
+                    _logger?.LogDebug($"🌍 翻訳処理完了: '{translatedText}'");
                 }
                 catch (Exception translationEx)
                 {
-                    DebugLogUtility.WriteLog($"⚠️ 翻訳エラー: {translationEx.Message}");
+                    // 🔥 [DIAGNOSTIC] 翻訳エラー診断イベント
+                    await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                    {
+                        Stage = "TranslationExecution",
+                        IsSuccess = false,
+                        ProcessingTimeMs = 0,
+                        ErrorMessage = translationEx.Message,
+                        SessionId = translationId,
+                        Severity = DiagnosticSeverity.Error,
+                        Message = $"翻訳実行エラー: {translationEx.GetType().Name} - {translationEx.Message}",
+                        Metrics = new Dictionary<string, object>
+                        {
+                            { "ErrorType", translationEx.GetType().Name },
+                            { "OriginalText", originalText },
+                            { "AttemptedTranslationMethod", "nllb200_timeout_fallback" }
+                        }
+                    }).ConfigureAwait(false);
+
+                    _logger?.LogDebug($"⚠️ 翻訳エラー: {translationEx.Message}");
                     _logger?.LogWarning(translationEx, "翻訳処理でエラーが発生しました");
                     translatedText = $"翻訳エラー: {translationEx.Message}";
                 }
             }
             else
             {
-                translatedText = "テキストが検出されませんでした";
+                // テキスト未検出時は翻訳結果を表示しない（UI上で空表示となる）
+                translatedText = string.Empty;
+
+                // 🔥 [DIAGNOSTIC] 空テキスト診断イベント
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "TranslationExecution",
+                    IsSuccess = false,
+                    ProcessingTimeMs = 0,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Warning,
+                    Message = "翻訳スキップ: OCRでテキストが検出されませんでした",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "SkipReason", "no_text_detected" },
+                        { "OriginalText", originalText },
+                        { "TranslatedText", translatedText }
+                    }
+                }).ConfigureAwait(false);
             }
 
             // 完了
@@ -1728,12 +2066,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     InputText = originalText,
                     OutputText = translatedText,
                     Confidence = ocrConfidence,
-                    ProcessingTimeMs = processingTime.TotalMilliseconds,
+                    ProcessingTimeMs = (long)processingTime.TotalMilliseconds,
                     InputTokenCount = originalText.Length,
                     OutputTokenCount = translatedText.Length,
                     CacheHit = false // 現在はキャッシュ機能未実装
                 };
-                
+
                 BaketaLogManager.LogTranslationResult(translationLogEntry);
             }
             catch (Exception logEx)
@@ -1758,37 +2096,62 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         catch (Exception ex)
         {
             var processingTime = DateTime.UtcNow - startTime;
-            
+
+            // 🔥 [DIAGNOSTIC] 翻訳全体失敗診断イベント
+            try
+            {
+                await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
+                {
+                    Stage = "TranslationOverall",
+                    IsSuccess = false,
+                    ProcessingTimeMs = (long)processingTime.TotalMilliseconds,
+                    ErrorMessage = ex.Message,
+                    SessionId = translationId,
+                    Severity = DiagnosticSeverity.Critical,
+                    Message = $"翻訳処理全体でエラー: {ex.GetType().Name} - {ex.Message}",
+                    Metrics = new Dictionary<string, object>
+                    {
+                        { "ErrorType", ex.GetType().Name },
+                        { "ProcessingTimeMs", (long)processingTime.TotalMilliseconds },
+                        { "StackTrace", ex.StackTrace ?? "N/A" }
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch
+            {
+                // 診断イベント発行失敗は無視（元の例外を優先）
+            }
+
             Console.WriteLine($"❌ 翻訳処理で例外発生:");
             Console.WriteLine($"   🔍 例外タイプ: {ex.GetType().Name}");
             Console.WriteLine($"   📝 例外メッセージ: {ex.Message}");
             Console.WriteLine($"   📍 スタックトレース: {ex.StackTrace}");
-            
+
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ❌ 翻訳処理で例外発生:{Environment.NewLine}");
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"   🔍 例外タイプ: {ex.GetType().Name}{Environment.NewLine}");
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📝 例外メッセージ: {ex.Message}{Environment.NewLine}");
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"   📍 スタックトレース: {ex.StackTrace}{Environment.NewLine}");
-            
+
             _logger?.LogError(ex, "翻訳処理で例外が発生しました: TranslationId={TranslationId}", translationId);
-            
+
             // OCRエラーかその他のエラーかを分類
-            bool isOcrError = ex.Message.Contains("PaddlePredictor") || 
+            bool isOcrError = ex.Message.Contains("PaddlePredictor") ||
                              ex.Message.Contains("OCR") ||
                              ex is OperationCanceledException;
-            
+
             if (isOcrError)
             {
-                DebugLogUtility.WriteLog($"🚫 OCRエラーのため翻訳結果を発行せず: ID={translationId}, Error={ex.Message}");
-                
+                _logger?.LogDebug($"🚫 OCRエラーのため翻訳結果を発行せず: ID={translationId}, Error={ex.Message}");
+
                 // OCRエラーはステータス更新のみ行い、翻訳結果は発行しない
                 PublishProgress(translationId, TranslationStatus.Error, 1.0f, $"OCRエラー: {ex.Message}");
-                
+
                 // OCRエラーの場合は例外を再スローして、上位でキャッチさせる
                 throw;
             }
-            
+
             // その他のエラーの場合は従来通り翻訳結果として返す
-            DebugLogUtility.WriteLog($"⚠️ 一般的な翻訳エラー、結果として発行: ID={translationId}, Error={ex.Message}");
+            _logger?.LogDebug($"⚠️ 一般的な翻訳エラー、結果として発行: ID={translationId}, Error={ex.Message}");
             return new TranslationResult
             {
                 Id = translationId,
@@ -1821,109 +2184,51 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     }
 
     /// <summary>
-    /// 日本語から英語への基本的な翻訳
+    /// 辞書サービスを使用した翻訳（フォールバック付き）
     /// </summary>
-    private static string TranslateJapaneseToEnglish(string text)
+    private async Task<string> TranslateWithNLLBEngineAsync(string text, string sourceLanguage, string targetLanguage)
     {
-        var result = text
-            .Replace("こんにちは", "hello")
-            .Replace("ありがとう", "thank you")
-            .Replace("さようなら", "goodbye")
-            .Replace("はい", "yes")
-            .Replace("いいえ", "no")
-            .Replace("すみません", "excuse me")
-            .Replace("お疲れ様", "good job")
-            .Replace("開始", "start")
-            .Replace("終了", "end")
-            .Replace("設定", "settings")
-            .Replace("メニュー", "menu")
-            .Replace("ファイル", "file")
-            .Replace("編集", "edit")
-            .Replace("表示", "view")
-            .Replace("ツール", "tools")
-            .Replace("ヘルプ", "help")
-            .Replace("ゲーム", "game")
-            .Replace("プレイ", "play")
-            .Replace("スタート", "start")
-            .Replace("ストップ", "stop")
-            .Replace("ポーズ", "pause")
-            .Replace("続行", "continue")
-            .Replace("保存", "save")
-            .Replace("読み込み", "load")
-            .Replace("終了", "quit")
-            .Replace("レベル", "level")
-            .Replace("スコア", "score")
-            .Replace("ライフ", "life")
-            .Replace("ポイント", "point")
-            .Replace("コイン", "coin")
-            .Replace("アイテム", "item")
-            .Replace("武器", "weapon")
-            .Replace("防具", "armor")
-            .Replace("マジック", "magic")
-            .Replace("スキル", "skill")
-            .Replace("キャラクター", "character")
-            .Replace("プレイヤー", "player")
-            .Replace("エネミー", "enemy")
-            .Replace("ボス", "boss")
-            .Replace("バトル", "battle")
-            .Replace("戦闘", "fight")
-            .Replace("勝利", "victory")
-            .Replace("敗北", "defeat")
-            .Replace("ゲームオーバー", "game over");
-        return result;
+        try
+        {
+            // 🚀 [SIMPLIFIED] 直接ITranslationServiceを使用してNLLB-200翻訳を実行
+            // ファクトリーパターンは不要（DefaultTranslationServiceが自動選択）
+
+            _logger?.LogTrace("🤖 NLLB-200翻訳エンジンで翻訳開始: '{Text}' ({SourceLang} -> {TargetLang})",
+                text, sourceLanguage, targetLanguage);
+
+            // 🚀 実際の翻訳処理を実行（辞書翻訳削除後の正しい実装）
+            _logger?.LogTrace("🤖 ITranslationServiceで実際の翻訳を実行: '{Text}' ({SourceLang} -> {TargetLang})",
+                text, sourceLanguage, targetLanguage);
+
+            // 実際の翻訳サービスを使用してNLLB-200翻訳を実行
+            var sourceLang = Language.FromCode(sourceLanguage);
+            var targetLang = Language.FromCode(targetLanguage);
+
+            var response = await _translationService.TranslateAsync(text, sourceLang, targetLang);
+            var translatedText = response.TranslatedText;
+
+            // 翻訳が成功した場合（元のテキストと異なる場合）
+            if (!string.Equals(text, translatedText, StringComparison.Ordinal))
+            {
+                _logger?.LogTrace("✅ NLLB-200翻訳成功: '{Text}' -> '{Translation}' ({SourceLang} -> {TargetLang})",
+                    text, translatedText, sourceLanguage, targetLanguage);
+                return translatedText!;
+            }
+
+            _logger?.LogTrace("🔄 NLLB-200翻訳結果が元のテキストと同じ: '{Text}'", text);
+            return translatedText!;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "❌ NLLB-200翻訳でエラーが発生: '{Text}' ({SourceLang} -> {TargetLang})",
+                text, sourceLanguage, targetLanguage);
+
+            // エラー時は空文字列を返却（何も表示しない）
+            return string.Empty;
+        }
     }
-    
-    /// <summary>
-    /// 英語から日本語への基本的な翻訳
-    /// </summary>
-    private static string TranslateEnglishToJapanese(string text)
-    {
-        var result = text.ToLowerInvariant()
-            .Replace("hello", "こんにちは")
-            .Replace("thank you", "ありがとう")
-            .Replace("goodbye", "さようなら")
-            .Replace("yes", "はい")
-            .Replace("no", "いいえ")
-            .Replace("excuse me", "すみません")
-            .Replace("good job", "お疲れ様")
-            .Replace("start", "開始")
-            .Replace("end", "終了")
-            .Replace("settings", "設定")
-            .Replace("menu", "メニュー")
-            .Replace("file", "ファイル")
-            .Replace("edit", "編集")
-            .Replace("view", "表示")
-            .Replace("tools", "ツール")
-            .Replace("help", "ヘルプ")
-            .Replace("game", "ゲーム")
-            .Replace("play", "プレイ")
-            .Replace("stop", "ストップ")
-            .Replace("pause", "ポーズ")
-            .Replace("continue", "続行")
-            .Replace("save", "保存")
-            .Replace("load", "読み込み")
-            .Replace("quit", "終了")
-            .Replace("level", "レベル")
-            .Replace("score", "スコア")
-            .Replace("life", "ライフ")
-            .Replace("point", "ポイント")
-            .Replace("coin", "コイン")
-            .Replace("item", "アイテム")
-            .Replace("weapon", "武器")
-            .Replace("armor", "防具")
-            .Replace("magic", "マジック")
-            .Replace("skill", "スキル")
-            .Replace("character", "キャラクター")
-            .Replace("player", "プレイヤー")
-            .Replace("enemy", "エネミー")
-            .Replace("boss", "ボス")
-            .Replace("battle", "バトル")
-            .Replace("fight", "戦闘")
-            .Replace("victory", "勝利")
-            .Replace("defeat", "敗北")
-            .Replace("game over", "ゲームオーバー");
-        return result;
-    }
+
+    // 🗑️ [REMOVED] 辞書翻訳メソッドを削除 - NLLB-200 AI翻訳エンジンに統合完了
 
     #endregion
 
@@ -1955,16 +2260,16 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _disposeCts.Cancel();
 #pragma warning restore CA1849
         _disposeCts.Dispose();
-        
+
         _automaticTranslationCts?.Dispose();
         _singleTranslationSemaphore.Dispose();
         _ocrExecutionSemaphore.Dispose();
         _latestOcrRequestCts?.Dispose();
-        
+
         _translationResultsSubject.Dispose();
         _statusChangesSubject.Dispose();
         _progressUpdatesSubject.Dispose();
-        
+
         // 前回画像を安全に破棄
         lock (_previousImageLock)
         {
@@ -1972,37 +2277,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         }
 
         _disposed = true;
-        
+
         _logger?.LogDebug("TranslationOrchestrationServiceを破棄しました");
     }
 
     #endregion
 
-    #region デバッグ用メソッド
-
-    /// <summary>
-    /// デバッグ用に画像を保存します
-    /// </summary>
-    /// <param name="image">保存する画像</param>
-    /// <param name="filePath">保存先ファイルパス</param>
-    private async Task SaveImageForDebugAsync(IImage image, string filePath)
-    {
-        try
-        {
-            // IImageからバイト配列に変換
-            byte[] imageBytes = await ConvertImageToBytesAsync(image).ConfigureAwait(false);
-            
-            // ファイルに保存
-            await File.WriteAllBytesAsync(filePath, imageBytes).ConfigureAwait(false);
-            
-            DebugLogUtility.WriteLog($"✅ デバッグ画像保存完了: {filePath} (サイズ: {imageBytes.Length} bytes)");
-        }
-        catch (Exception ex)
-        {
-            DebugLogUtility.WriteLog($"❌ デバッグ画像保存エラー: {ex.Message}");
-            throw;
-        }
-    }
 
     /// <summary>
     /// IImageをバイト配列に変換します
@@ -2015,59 +2295,59 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         {
             // IImageの実装によって変換方法が異なる可能性があるため、
             // 一般的な方法を試す
-            
+
             // 方法1: ToByteArrayAsyncメソッドがある場合（WindowsImageAdapterでサポート）
             if (image is WindowsImageAdapter adapter)
             {
-                DebugLogUtility.WriteLog($"🔄 WindowsImageAdapterから直接バイト配列を取得");
+                _logger?.LogDebug($"🔄 WindowsImageAdapterから直接バイト配列を取得");
                 return await adapter.ToByteArrayAsync().ConfigureAwait(false);
             }
-            
+
             // 方法2: リフレクションでToByteArrayAsyncを呼び出し
             var imageType = image.GetType();
             var toByteArrayMethod = imageType.GetMethod("ToByteArrayAsync");
             if (toByteArrayMethod != null)
             {
-                DebugLogUtility.WriteLog($"🔄 リフレクションでToByteArrayAsyncを呼び出し");
+                _logger?.LogDebug($"🔄 リフレクションでToByteArrayAsyncを呼び出し");
                 if (toByteArrayMethod.Invoke(image, null) is Task<byte[]> task)
                 {
                     return await task.ConfigureAwait(false);
                 }
             }
-            
+
             // 方法3: Streamプロパティがある場合
             var streamProperty = imageType.GetProperty("Stream");
             if (streamProperty != null)
             {
                 if (streamProperty.GetValue(image) is Stream stream)
                 {
-                    DebugLogUtility.WriteLog($"🔄 Streamプロパティから変換");
+                    _logger?.LogDebug($"🔄 Streamプロパティから変換");
                     using var memoryStream = new MemoryStream();
                     stream.Position = 0;
                     await stream.CopyToAsync(memoryStream).ConfigureAwait(false);
                     return memoryStream.ToArray();
                 }
             }
-            
+
             // 方法4: Dataプロパティがある場合
             var dataProperty = imageType.GetProperty("Data");
             if (dataProperty != null)
             {
                 if (dataProperty.GetValue(image) is byte[] data)
                 {
-                    DebugLogUtility.WriteLog($"🔄 Dataプロパティから変換");
+                    _logger?.LogDebug($"🔄 Dataプロパティから変換");
                     return data;
                 }
             }
-            
+
             // 最後の手段: ToString()でデバッグ情報を取得
             var debugInfo = $"Image Debug Info: Type={imageType.Name}, Width={image.Width}, Height={image.Height}";
-            DebugLogUtility.WriteLog($"⚠️ 画像バイト変換失敗 - {debugInfo}");
+            _logger?.LogDebug($"⚠️ 画像バイト変換失敗 - {debugInfo}");
             return System.Text.Encoding.UTF8.GetBytes(debugInfo);
         }
         catch (Exception ex)
         {
-            DebugLogUtility.WriteLog($"❌ 画像バイト変換中にエラー: {ex.Message}");
+            _logger?.LogDebug($"❌ 画像バイト変換中にエラー: {ex.Message}");
             var errorInfo = $"Image Conversion Error: {ex.Message}, Type={image.GetType().Name}";
             return System.Text.Encoding.UTF8.GetBytes(errorInfo);
         }

@@ -5,18 +5,18 @@ using ReactiveUI;
 
 namespace Baketa.UI.Views;
 
-    /// <summary>
-    /// オーバーレイ設定画面のビュー
-    /// </summary>
-    internal sealed partial class OverlayView : ReactiveUserControl<OverlayViewModel>
+/// <summary>
+/// オーバーレイ設定画面のビュー
+/// </summary>
+internal sealed partial class OverlayView : ReactiveUserControl<OverlayViewModel>
+{
+    public OverlayView()
     {
-        public OverlayView()
+        InitializeComponent();
+
+        this.WhenActivated(disposables =>
         {
-            InitializeComponent();
-            
-            this.WhenActivated(disposables => 
-            {
-                // ビューモデルとのバインディングを設定
-            });
-        }
+            // ビューモデルとのバインディングを設定
+        });
     }
+}

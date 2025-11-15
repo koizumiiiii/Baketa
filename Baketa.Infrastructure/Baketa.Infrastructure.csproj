@@ -18,7 +18,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Protobuf Include="Translation\Local\Onnx\SentencePiece\Proto\sentencepiece_model.proto" GrpcServices="None" Access="Internal" />
+		<!-- Phase 2.1: gRPC翻訳サービス定義 -->
+		<Protobuf Include="Translation\Protos\translation.proto" GrpcServices="Client" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -27,36 +28,44 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.ObjectPool" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Extensions.ObjectPool" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
 		
 		<!-- OpenCV Sharp パッケージ - 重要: PaddleOCRで使用 -->
-		<PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
-		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
 		
 		<!-- ONNX Runtime パッケージ -->
 		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.1" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.17.1" />
+		<PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
+		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
+		<PackageReference Include="Sdcb.PaddleInference" Version="3.0.1" />
+		<PackageReference Include="Sdcb.PaddleInference.runtime.win64.mkl" Version="3.1.0.54" />
+		<PackageReference Include="Sdcb.PaddleOCR" Version="3.0.1" />
+		<PackageReference Include="Sdcb.PaddleOCR.Models.Local" Version="3.0.1" />
 		<!-- GPU環境検出・テンソル処理用パッケージ（Issue #143対応） -->
 		<PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.17.1" />
+		<!-- Phase 3.3: WMI GPU利用率監視用 -->
+		<PackageReference Include="System.Management" Version="8.0.0" />
 		
 		<!-- SentencePiece トークナイザー -->
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="0.21.0" />
 		
 		<!-- Google.Protobuf for SentencePiece model parsing -->
-		<PackageReference Include="Google.Protobuf" Version="3.25.2" />
-		<PackageReference Include="Google.Protobuf.Tools" Version="3.25.2">
+		<PackageReference Include="Google.Protobuf" Version="3.32.1" />
+		<PackageReference Include="Google.Protobuf.Tools" Version="3.32.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
 		</PackageReference>
+
+		<!-- Phase 2.1: gRPC クライアント通信 -->
+		<PackageReference Include="Grpc.Net.Client" Version="2.70.0" />
+		<PackageReference Include="Grpc.Tools" Version="2.70.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 		
-		<!-- PaddleOCR パッケージ -->
-		<PackageReference Include="Sdcb.PaddleOCR" Version="3.0.1" />
-		<PackageReference Include="Sdcb.PaddleOCR.Models.Local" Version="3.0.1" />
-		<PackageReference Include="Sdcb.PaddleInference" Version="3.0.1" />
-		<PackageReference Include="Sdcb.PaddleInference.runtime.win64.mkl" Version="3.1.0.54" />
-		<PackageReference Include="Sdcb.PaddleOCR.Models.Online" Version="3.0.1" />
+		<!-- PaddleOCR パッケージ - 3.0.1統一 (runtime: 3.1.0.54強制) -->
 		
 		<!-- Supabase Authentication パッケージ -->
 		<PackageReference Include="supabase-csharp" Version="0.16.2" />

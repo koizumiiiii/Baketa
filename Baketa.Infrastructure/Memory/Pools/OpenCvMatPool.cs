@@ -29,7 +29,7 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _maxCapacity = maxCapacity;
         Statistics.MaxCapacity = maxCapacity;
-        
+
         _logger.LogInformation("🖼️ OpenCvMatPool initialized with capacity: {MaxCapacity}", maxCapacity);
     }
 
@@ -38,9 +38,9 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
     public IMatWrapper Acquire()
     {
         ThrowIfDisposed();
-        
+
         _getTimeWatch.Restart();
-        
+
         lock (_statsLock)
         {
             Statistics.TotalGets++;
@@ -50,32 +50,32 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
         {
             _getTimeWatch.Stop();
             Interlocked.Add(ref _totalGetTime, _getTimeWatch.ElapsedTicks);
-            
+
             lock (_statsLock)
             {
                 Statistics.PooledCount--;
             }
-            
-            _logger.LogDebug("📤 Mat retrieved from pool: Size={Width}x{Height}, Type={MatType}, PoolHit=true", 
+
+            _logger.LogDebug("📤 Mat retrieved from pool: Size={Width}x{Height}, Type={MatType}, PoolHit=true",
                 pooledItem.Mat.Width, pooledItem.Mat.Height, pooledItem.MatType);
-            
+
             return pooledItem.Mat;
         }
 
         // プールにない場合は新規作成
         var newMat = CreateNewMat(640, 480, MatType.Cv8UC3); // デフォルトサイズ
-        
+
         _getTimeWatch.Stop();
         Interlocked.Add(ref _totalGetTime, _getTimeWatch.ElapsedTicks);
-        
+
         lock (_statsLock)
         {
             Statistics.TotalCreations++;
         }
-        
-        _logger.LogDebug("🆕 New Mat created: Size={Width}x{Height}, Type={Type}, PoolHit=false", 
+
+        _logger.LogDebug("🆕 New Mat created: Size={Width}x{Height}, Type={Type}, PoolHit=false",
             newMat.Width, newMat.Height, MatType.Cv8UC3);
-        
+
         return newMat;
     }
 
@@ -85,9 +85,9 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
     public IMatWrapper AcquireWithSize(int width, int height, MatType matType)
     {
         ThrowIfDisposed();
-        
+
         _getTimeWatch.Restart();
-        
+
         lock (_statsLock)
         {
             Statistics.TotalGets++;
@@ -101,21 +101,21 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
             {
                 _getTimeWatch.Stop();
                 Interlocked.Add(ref _totalGetTime, _getTimeWatch.ElapsedTicks);
-                
+
                 lock (_statsLock)
                 {
                     Statistics.PooledCount--;
                 }
-                
+
                 // 互換性のないMatはプールに戻す
                 foreach (var incompatibleItem in incompatibleMats)
                 {
                     _pool.Enqueue(incompatibleItem);
                 }
-                
-                _logger.LogDebug("📤 Compatible Mat retrieved from pool: Requested={Width}x{Height}:{Type}, Found={ActualWidth}x{ActualHeight}:{ActualType}", 
+
+                _logger.LogDebug("📤 Compatible Mat retrieved from pool: Requested={Width}x{Height}:{Type}, Found={ActualWidth}x{ActualHeight}:{ActualType}",
                     width, height, matType, item.Mat.Width, item.Mat.Height, item.MatType);
-                
+
                 return item.Mat;
             }
             incompatibleMats.Add(item);
@@ -129,18 +129,18 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
 
         // 互換性のあるMatがない場合は新規作成
         var newMat = CreateNewMat(width, height, matType);
-        
+
         _getTimeWatch.Stop();
         Interlocked.Add(ref _totalGetTime, _getTimeWatch.ElapsedTicks);
-        
+
         lock (_statsLock)
         {
             Statistics.TotalCreations++;
         }
-        
-        _logger.LogDebug("🆕 New compatible Mat created: Size={Width}x{Height}, Type={Type}", 
+
+        _logger.LogDebug("🆕 New compatible Mat created: Size={Width}x{Height}, Type={Type}",
             width, height, matType);
-        
+
         return newMat;
     }
 
@@ -150,23 +150,23 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
             return;
 
         _returnTimeWatch.Restart();
-        
+
         lock (_statsLock)
         {
             Statistics.TotalReturns++;
-            
+
             // 容量チェック
             if (Statistics.PooledCount >= _maxCapacity)
             {
-                _logger.LogDebug("🗑️ OpenCvMatPool at capacity, disposing returned Mat: Size={Width}x{Height}", 
+                _logger.LogDebug("🗑️ OpenCvMatPool at capacity, disposing returned Mat: Size={Width}x{Height}",
                     item.Width, item.Height);
-                
+
                 item.Dispose();
                 _returnTimeWatch.Stop();
                 Interlocked.Add(ref _totalReturnTime, _returnTimeWatch.ElapsedTicks);
                 return;
             }
-            
+
             Statistics.PooledCount++;
         }
 
@@ -176,39 +176,39 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
             MatType = EstimateMatType(item),
             ReturnedAt = DateTime.UtcNow
         };
-        
+
         // Matをクリーンな状態にリセット
         item.SetTo(0); // すべてのピクセルを0で初期化
-        
+
         _pool.Enqueue(pooledItem);
-        
+
         _returnTimeWatch.Stop();
         Interlocked.Add(ref _totalReturnTime, _returnTimeWatch.ElapsedTicks);
-        
-        _logger.LogDebug("📥 Mat returned to pool: Size={Width}x{Height}, Type={Type}, PoolSize={PoolSize}", 
+
+        _logger.LogDebug("📥 Mat returned to pool: Size={Width}x{Height}, Type={Type}, PoolSize={PoolSize}",
             item.Width, item.Height, pooledItem.MatType, Statistics.PooledCount);
     }
 
     public void Clear()
     {
         _logger.LogInformation("🧹 Clearing OpenCvMatPool");
-        
+
         var clearedCount = 0;
         while (_pool.TryDequeue(out var item))
         {
             item.Mat.Dispose();
             clearedCount++;
         }
-        
+
         lock (_statsLock)
         {
             Statistics.PooledCount = 0;
             Statistics.Clear();
         }
-        
+
         _totalGetTime = 0;
         _totalReturnTime = 0;
-        
+
         _logger.LogInformation("✅ OpenCvMatPool cleared: {ClearedCount} Mats disposed", clearedCount);
     }
 
@@ -218,19 +218,19 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
             return;
 
         _disposed = true;
-        
+
         LogFinalStatistics();
         Clear();
-        
+
         _logger.LogInformation("🏁 OpenCvMatPool disposed");
     }
 
     private void LogFinalStatistics()
     {
-        var avgGetTime = Statistics.TotalGets > 0 ? 
+        var avgGetTime = Statistics.TotalGets > 0 ?
             new TimeSpan(_totalGetTime / Statistics.TotalGets).TotalMicroseconds : 0;
-        
-        var avgReturnTime = Statistics.TotalReturns > 0 ? 
+
+        var avgReturnTime = Statistics.TotalReturns > 0 ?
             new TimeSpan(_totalReturnTime / Statistics.TotalReturns).TotalMicroseconds : 0;
 
         _logger.LogInformation("📊 OpenCvMatPool Final Statistics:\n" +
@@ -247,8 +247,8 @@ public sealed class OpenCvMatPool : IObjectPool<IMatWrapper>
 
     private static bool IsCompatible(PooledMatItem item, int width, int height, MatType matType)
     {
-        return item.Mat.Width == width && 
-               item.Mat.Height == height && 
+        return item.Mat.Width == width &&
+               item.Mat.Height == height &&
                item.MatType == matType;
     }
 

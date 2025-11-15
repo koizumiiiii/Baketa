@@ -5,7 +5,7 @@ namespace Baketa.Core.Abstractions.Performance;
 
 /// <summary>
 /// パフォーマンス最適化オーケストレーター
-/// GPU加速 + スティッキーROI + TDR対策の統合管理
+/// GPU加速 + TDR対策の統合管理
 /// Issue #143 Week 3 Phase 2: 統合システム制御
 /// </summary>
 public interface IPerformanceOrchestrator
@@ -18,7 +18,7 @@ public interface IPerformanceOrchestrator
     /// <param name="cancellationToken">キャンセレーション トークン</param>
     /// <returns>最適化されたOCR結果</returns>
     Task<OptimizedOcrResult> ExecuteOptimizedOcrAsync(
-        byte[] imageData, 
+        byte[] imageData,
         PerformanceOptimizationOptions? options = null,
         CancellationToken cancellationToken = default);
 
@@ -59,10 +59,8 @@ public record PerformanceOptimizationOptions
     /// </summary>
     public bool PreferGpuAcceleration { get; init; } = true;
 
-    /// <summary>
-    /// スティッキーROIを使用するか
-    /// </summary>
-    public bool UseStickyRoi { get; init; } = true;
+    // [ROI_DELETION] スティッキーROI機能削除 - レガシー機能除去
+    // public bool UseStickyRoi { get; init; } = true;
 
     /// <summary>
     /// TDR保護を有効にするか
@@ -136,10 +134,8 @@ public class IntegratedPerformanceMetrics
     /// </summary>
     public double GpuUtilization { get; init; }
 
-    /// <summary>
-    /// ROI効率率
-    /// </summary>
-    public double RoiEfficiency { get; init; }
+    // [ROI_DELETION] ROI効率率削除 - レガシー機能除去
+    // public double RoiEfficiency { get; init; }
 
     /// <summary>
     /// 平均処理時間
@@ -218,10 +214,8 @@ public class SystemHealthReport
     /// </summary>
     public ComponentHealth GpuHealth { get; init; } = new();
 
-    /// <summary>
-    /// ROIシステム健全性
-    /// </summary>
-    public ComponentHealth RoiSystemHealth { get; init; } = new();
+    // [ROI_DELETION] ROIシステム健全性削除 - レガシー機能除去
+    // public ComponentHealth RoiSystemHealth { get; init; } = new();
 
     /// <summary>
     /// メモリ健全性
@@ -305,12 +299,12 @@ public enum PerformancePriority
     /// 品質優先
     /// </summary>
     Quality,
-    
+
     /// <summary>
     /// バランス
     /// </summary>
     Balanced,
-    
+
     /// <summary>
     /// 速度優先
     /// </summary>
@@ -326,22 +320,22 @@ public enum QualitySpeedTradeoff
     /// 最高品質
     /// </summary>
     MaxQuality,
-    
+
     /// <summary>
     /// 高品質
     /// </summary>
     HighQuality,
-    
+
     /// <summary>
     /// バランス
     /// </summary>
     Balanced,
-    
+
     /// <summary>
     /// 高速
     /// </summary>
     HighSpeed,
-    
+
     /// <summary>
     /// 最高速
     /// </summary>
@@ -358,17 +352,17 @@ public enum HealthStatus
     /// 正常
     /// </summary>
     Healthy,
-    
+
     /// <summary>
     /// 警告
     /// </summary>
     Warning,
-    
+
     /// <summary>
     /// エラー
     /// </summary>
     Error,
-    
+
     /// <summary>
     /// クリティカル
     /// </summary>
@@ -384,17 +378,17 @@ public enum IssueSeverity
     /// 情報
     /// </summary>
     Info,
-    
+
     /// <summary>
     /// 警告
     /// </summary>
     Warning,
-    
+
     /// <summary>
     /// エラー
     /// </summary>
     Error,
-    
+
     /// <summary>
     /// クリティカル
     /// </summary>

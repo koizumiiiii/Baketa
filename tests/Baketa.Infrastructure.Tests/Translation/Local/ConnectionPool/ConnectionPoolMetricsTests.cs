@@ -29,16 +29,17 @@ public class ConnectionPoolMetricsTests
     public void Properties_ShouldBeSettableAndGettable()
     {
         // Arrange
-        var metrics = new ConnectionPoolMetrics();
-
-        // Act
-        metrics.ActiveConnections = 5;
-        metrics.QueuedConnections = 3;
-        metrics.TotalConnectionsCreated = 10;
-        metrics.MaxConnections = 8;
-        metrics.MinConnections = 2;
-        metrics.ConnectionUtilization = 0.625; // 5/8
-        metrics.AvailableConnections = 3;
+        var metrics = new ConnectionPoolMetrics
+        {
+            // Act
+            ActiveConnections = 5,
+            QueuedConnections = 3,
+            TotalConnectionsCreated = 10,
+            MaxConnections = 8,
+            MinConnections = 2,
+            ConnectionUtilization = 0.625, // 5/8
+            AvailableConnections = 3
+        };
 
         // Assert
         Assert.Equal(5, metrics.ActiveConnections);
@@ -73,16 +74,17 @@ public class ConnectionPoolMetricsTests
     public void Properties_ShouldSupportNegativeValues()
     {
         // Arrange
-        var metrics = new ConnectionPoolMetrics();
-
-        // Act - 理論的には負の値は発生しないが、プロパティとしては設定可能
-        metrics.ActiveConnections = -1;
-        metrics.QueuedConnections = -2;
-        metrics.TotalConnectionsCreated = -3;
-        metrics.MaxConnections = -4;
-        metrics.MinConnections = -5;
-        metrics.ConnectionUtilization = -0.5;
-        metrics.AvailableConnections = -6;
+        var metrics = new ConnectionPoolMetrics
+        {
+            // Act - 理論的には負の値は発生しないが、プロパティとしては設定可能
+            ActiveConnections = -1,
+            QueuedConnections = -2,
+            TotalConnectionsCreated = -3,
+            MaxConnections = -4,
+            MinConnections = -5,
+            ConnectionUtilization = -0.5,
+            AvailableConnections = -6
+        };
 
         // Assert
         Assert.Equal(-1, metrics.ActiveConnections);
@@ -98,16 +100,17 @@ public class ConnectionPoolMetricsTests
     public void Properties_ShouldSupportLargeValues()
     {
         // Arrange
-        var metrics = new ConnectionPoolMetrics();
-
-        // Act
-        metrics.ActiveConnections = int.MaxValue;
-        metrics.QueuedConnections = int.MaxValue - 1;
-        metrics.TotalConnectionsCreated = int.MaxValue - 2;
-        metrics.MaxConnections = int.MaxValue - 3;
-        metrics.MinConnections = int.MaxValue - 4;
-        metrics.ConnectionUtilization = double.MaxValue;
-        metrics.AvailableConnections = int.MaxValue - 5;
+        var metrics = new ConnectionPoolMetrics
+        {
+            // Act
+            ActiveConnections = int.MaxValue,
+            QueuedConnections = int.MaxValue - 1,
+            TotalConnectionsCreated = int.MaxValue - 2,
+            MaxConnections = int.MaxValue - 3,
+            MinConnections = int.MaxValue - 4,
+            ConnectionUtilization = double.MaxValue,
+            AvailableConnections = int.MaxValue - 5
+        };
 
         // Assert
         Assert.Equal(int.MaxValue, metrics.ActiveConnections);
@@ -123,10 +126,11 @@ public class ConnectionPoolMetricsTests
     public void ConnectionUtilization_ShouldSupportSpecialDoubleValues()
     {
         // Arrange
-        var metrics = new ConnectionPoolMetrics();
-
-        // Act & Assert - 特殊な double 値のサポート
-        metrics.ConnectionUtilization = double.NaN;
+        var metrics = new ConnectionPoolMetrics
+        {
+            // Act & Assert - 特殊な double 値のサポート
+            ConnectionUtilization = double.NaN
+        };
         Assert.True(double.IsNaN(metrics.ConnectionUtilization));
 
         metrics.ConnectionUtilization = double.PositiveInfinity;

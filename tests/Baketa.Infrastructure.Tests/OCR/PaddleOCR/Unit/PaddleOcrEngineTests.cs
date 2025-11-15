@@ -1,12 +1,12 @@
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
+using System.Drawing;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Engine;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
 using Baketa.Infrastructure.Tests.OCR.PaddleOCR.TestData;
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Abstractions.OCR;
-using System.Drawing;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Unit;
 
@@ -25,14 +25,14 @@ public class PaddleOcrEngineTests : IDisposable
     {
         _mockLogger = new Mock<ILogger<PaddleOcrEngine>>();
         _mockModelPathResolver = new Mock<IModelPathResolver>();
-        
+
         // モックセットアップ
         SetupModelPathResolverMock();
-        
+
         // 安全なテスト用エンジンのみを使用
         _ocrEngine = new TestData.SafeTestPaddleOcrEngine(
-            _mockModelPathResolver.Object, 
-            _mockLogger.Object, 
+            _mockModelPathResolver.Object,
+            _mockLogger.Object,
             skipRealInitialization: true);
     }
 
@@ -40,13 +40,13 @@ public class PaddleOcrEngineTests : IDisposable
     {
         _mockModelPathResolver.Setup(x => x.GetModelsRootDirectory())
             .Returns(@"E:\dev\Baketa\tests\TestModels");
-        
+
         _mockModelPathResolver.Setup(x => x.GetDetectionModelsDirectory())
             .Returns(@"E:\dev\Baketa\tests\TestModels\detection");
-        
+
         _mockModelPathResolver.Setup(x => x.GetRecognitionModelsDirectory("eng"))
             .Returns(@"E:\dev\Baketa\tests\TestModels\recognition\eng");
-        
+
         _mockModelPathResolver.Setup(x => x.GetRecognitionModelsDirectory("jpn"))
             .Returns(@"E:\dev\Baketa\tests\TestModels\recognition\jpn");
 
@@ -54,7 +54,7 @@ public class PaddleOcrEngineTests : IDisposable
         // 代わりにGetClassificationModelPathメソッドをモック
         _mockModelPathResolver.Setup(x => x.GetClassificationModelPath(It.IsAny<string>()))
             .Returns(@"E:\dev\Baketa\tests\TestModels\classification\model.onnx");
-            
+
         // ファイル存在チェックのモック設定（テスト用）
         _mockModelPathResolver.Setup(x => x.FileExists(It.IsAny<string>()))
             .Returns(false); // テストではモデルファイルが存在しない想定
@@ -89,7 +89,8 @@ public class PaddleOcrEngineTests : IDisposable
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(
-            () => {
+            () =>
+            {
                 var settings = new OcrEngineSettings { Language = language!, UseGpu = false, EnableMultiThread = true, WorkerCount = 1 };
                 return _ocrEngine.InitializeAsync(settings, CancellationToken.None);
             }).ConfigureAwait(false);
@@ -103,7 +104,8 @@ public class PaddleOcrEngineTests : IDisposable
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => {
+            () =>
+            {
                 var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = consumerCount };
                 return _ocrEngine.InitializeAsync(settings, CancellationToken.None);
             }).ConfigureAwait(false);
@@ -138,7 +140,7 @@ public class PaddleOcrEngineTests : IDisposable
         // Arrange
         var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
         await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
-        
+
         // Act
         var result = await _ocrEngine.SwitchLanguageAsync("jpn", CancellationToken.None).ConfigureAwait(false);
 
@@ -176,7 +178,7 @@ public class PaddleOcrEngineTests : IDisposable
         // Arrange
         var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
         await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
-        
+
         // Act
         var result = await _ocrEngine.SwitchLanguageAsync("eng", CancellationToken.None).ConfigureAwait(false);
 
@@ -254,7 +256,7 @@ public class PaddleOcrEngineTests : IDisposable
         var settings = new OcrEngineSettings { Language = "eng", UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
         await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
         var mockImage = CreateMockImage();
-        
+
         _ocrEngine.Dispose();
 
         // Act & Assert
@@ -278,7 +280,7 @@ public class PaddleOcrEngineTests : IDisposable
     {
         // Arrange
         const string expectedLanguage = "eng";
-        
+
         // Act
         var settings = new OcrEngineSettings { Language = expectedLanguage, UseGpu = false, EnableMultiThread = true, WorkerCount = 2 };
         await _ocrEngine.InitializeAsync(settings, CancellationToken.None).ConfigureAwait(false);
@@ -346,11 +348,11 @@ public class PaddleOcrEngineTests : IDisposable
         var mockImage = new Mock<IImage>();
         mockImage.Setup(x => x.Width).Returns(640);
         mockImage.Setup(x => x.Height).Returns(480);
-        
+
         // 簡単なダミーデータを設定
         var dummyData = new byte[640 * 480 * 3]; // RGB
         mockImage.Setup(x => x.ToByteArrayAsync()).ReturnsAsync(dummyData);
-        
+
         return mockImage;
     }
 
@@ -366,7 +368,7 @@ public class PaddleOcrEngineTests : IDisposable
             {
                 _ocrEngine?.Dispose();
             }
-            
+
             _disposed = true;
         }
     }

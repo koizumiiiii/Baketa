@@ -22,7 +22,7 @@ public readonly record struct OverlayPositionInfo(
     /// 有効な位置情報かどうか
     /// </summary>
     public bool IsValid => Size.Width > 0 && Size.Height > 0;
-    
+
     /// <summary>
     /// 境界矩形
     /// </summary>
@@ -50,37 +50,37 @@ public sealed class OverlayPositionUpdatedEventArgs(
     /// 前回の位置
     /// </summary>
     public CorePoint PreviousPosition { get; } = previousPosition;
-    
+
     /// <summary>
     /// 新しい位置
     /// </summary>
     public CorePoint NewPosition { get; } = newPosition;
-    
+
     /// <summary>
     /// 前回のサイズ
     /// </summary>
     public CoreSize PreviousSize { get; } = previousSize;
-    
+
     /// <summary>
     /// 新しいサイズ
     /// </summary>
     public CoreSize NewSize { get; } = newSize;
-    
+
     /// <summary>
     /// 更新理由
     /// </summary>
     public PositionUpdateReason Reason { get; } = reason;
-    
+
     /// <summary>
     /// 更新時刻
     /// </summary>
     public DateTimeOffset Timestamp { get; } = timestamp;
-    
+
     /// <summary>
     /// 位置が変更されたかどうか
     /// </summary>
     public bool PositionChanged => PreviousPosition != NewPosition;
-    
+
     /// <summary>
     /// サイズが変更されたかどうか
     /// </summary>
@@ -96,62 +96,62 @@ public sealed class GameWindowInfo
     /// ウィンドウハンドル
     /// </summary>
     public required nint WindowHandle { get; init; }
-    
+
     /// <summary>
     /// ウィンドウタイトル
     /// </summary>
     public required string WindowTitle { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// ウィンドウ位置
     /// </summary>
     public required CorePoint Position { get; init; }
-    
+
     /// <summary>
     /// ウィンドウサイズ
     /// </summary>
     public required CoreSize Size { get; init; }
-    
+
     /// <summary>
     /// クライアント領域位置
     /// </summary>
     public required CorePoint ClientPosition { get; init; }
-    
+
     /// <summary>
     /// クライアント領域サイズ
     /// </summary>
     public required CoreSize ClientSize { get; init; }
-    
+
     /// <summary>
     /// フルスクリーンかどうか
     /// </summary>
     public required bool IsFullScreen { get; init; }
-    
+
     /// <summary>
     /// 最大化されているかどうか
     /// </summary>
     public required bool IsMaximized { get; init; }
-    
+
     /// <summary>
     /// 最小化されているかどうか
     /// </summary>
     public required bool IsMinimized { get; init; }
-    
+
     /// <summary>
     /// アクティブかどうか
     /// </summary>
     public required bool IsActive { get; init; }
-    
+
     /// <summary>
     /// ディスプレイモニター情報（Issue 71 MonitorInfoクラスとの整合性確保）
     /// </summary>
     public required MonitorInfo Monitor { get; init; }
-    
+
     /// <summary>
     /// クライアント領域の境界矩形
     /// </summary>
     public CoreRect ClientBounds => new(ClientPosition.X, ClientPosition.Y, ClientSize.Width, ClientSize.Height);
-    
+
     /// <summary>
     /// ウィンドウ境界矩形
     /// </summary>
@@ -167,32 +167,32 @@ public sealed class TranslationInfo
     /// 元テキスト
     /// </summary>
     public required string SourceText { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// 翻訳テキスト
     /// </summary>
     public required string TranslatedText { get; init; } = string.Empty;
-    
+
     /// <summary>
     /// 関連するOCR検出領域
     /// </summary>
     public TextRegion? SourceRegion { get; init; }
-    
+
     /// <summary>
     /// 翻訳リクエストID
     /// </summary>
     public Guid TranslationId { get; init; } = Guid.NewGuid();
-    
+
     /// <summary>
     /// テキスト測定情報（自動計算される）
     /// </summary>
     public TextMeasurementInfo? MeasurementInfo { get; init; }
-    
+
     /// <summary>
     /// 翻訳完了時刻
     /// </summary>
     public DateTimeOffset CompletedAt { get; init; } = DateTimeOffset.Now;
-    
+
     /// <summary>
     /// 有効な翻訳情報かどうか
     /// </summary>
@@ -220,7 +220,7 @@ public readonly record struct TextMeasurementInfo(
     /// 有効な測定結果かどうか
     /// </summary>
     public bool IsValid => TextSize.Width > 0 && TextSize.Height > 0 && LineCount > 0;
-    
+
     /// <summary>
     /// 推奨オーバーレイサイズ（パディング考慮）
     /// </summary>
@@ -247,7 +247,7 @@ public readonly record struct TextRegion(
     /// 有効なテキスト領域かどうか
     /// </summary>
     public bool IsValid => Bounds.Width > 0 && Bounds.Height > 0 && !string.IsNullOrWhiteSpace(Text);
-    
+
     /// <summary>
     /// 中心点
     /// </summary>
@@ -266,27 +266,27 @@ public enum PositionCalculationMethod
     /// OCR領域ベース - 直下配置
     /// </summary>
     OcrBelowText,
-    
+
     /// <summary>
     /// OCR領域ベース - 上部配置
     /// </summary>
     OcrAboveText,
-    
+
     /// <summary>
     /// OCR領域ベース - 右側配置
     /// </summary>
     OcrRightOfText,
-    
+
     /// <summary>
     /// OCR領域ベース - 左側配置
     /// </summary>
     OcrLeftOfText,
-    
+
     /// <summary>
     /// 固定位置
     /// </summary>
     FixedPosition,
-    
+
     /// <summary>
     /// フォールバック（安全位置）
     /// </summary>
@@ -302,27 +302,27 @@ public enum PositionUpdateReason
     /// OCR検出による更新
     /// </summary>
     OcrDetection,
-    
+
     /// <summary>
     /// 翻訳完了による更新
     /// </summary>
     TranslationCompleted,
-    
+
     /// <summary>
     /// ゲームウィンドウ変更による更新
     /// </summary>
     GameWindowChanged,
-    
+
     /// <summary>
     /// モニター変更による更新
     /// </summary>
     MonitorChanged,
-    
+
     /// <summary>
     /// 手動調整による更新
     /// </summary>
     ManualAdjustment,
-    
+
     /// <summary>
     /// 設定変更による更新
     /// </summary>

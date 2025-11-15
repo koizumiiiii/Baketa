@@ -11,48 +11,48 @@ public class LanguageDetectionResult
     /// 検出された言語
     /// </summary>
     public required Language DetectedLanguage { get; set; }
-    
+
     /// <summary>
     /// 検出の信頼度スコア
     /// </summary>
     public double ConfidenceScore { get; set; }
-    
+
     /// <summary>
     /// 検出時の信頼度（0～1）
     /// </summary>
-    public double Confidence 
-    { 
+    public double Confidence
+    {
         get => ConfidenceScore;
-        set => ConfidenceScore = value; 
+        set => ConfidenceScore = value;
     }
-    
+
     /// <summary>
     /// 検出結果が信頼できるかどうか
     /// </summary>
     public bool IsReliable { get; set; }
-    
+
     /// <summary>
     /// 検出が成功したかどうか
     /// </summary>
     public bool IsSuccessful { get; set; } = true;
-    
+
     /// <summary>
     /// エラー情報（検出失敗時）
     /// </summary>
     public TranslationError? Error { get; set; }
-    
+
     /// <summary>
     /// 翻訳エンジン名
     /// </summary>
     public string? EngineName { get; set; }
-    
+
     /// <summary>
     /// デフォルトコンストラクタ
     /// </summary>
     public LanguageDetectionResult()
     {
     }
-    
+
     /// <summary>
     /// 成功結果を作成
     /// </summary>
@@ -66,7 +66,7 @@ public class LanguageDetectionResult
         bool isReliable = true)
     {
         ArgumentNullException.ThrowIfNull(language);
-        
+
         return new LanguageDetectionResult
         {
             DetectedLanguage = language,
@@ -75,7 +75,7 @@ public class LanguageDetectionResult
             IsSuccessful = true
         };
     }
-    
+
     /// <summary>
     /// エラー結果を作成
     /// </summary>
@@ -85,7 +85,7 @@ public class LanguageDetectionResult
         TranslationError error)
     {
         ArgumentNullException.ThrowIfNull(error);
-        
+
         return new LanguageDetectionResult
         {
             DetectedLanguage = new Language { Code = "unknown", DisplayName = "Unknown" },
@@ -95,7 +95,7 @@ public class LanguageDetectionResult
             Error = error
         };
     }
-    
+
     /// <summary>
     /// 例外からエラー結果を作成
     /// </summary>
@@ -110,7 +110,7 @@ public class LanguageDetectionResult
     {
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(exception);
-        
+
         return CreateError(new TranslationError
         {
             ErrorCode = errorType.ToString(),

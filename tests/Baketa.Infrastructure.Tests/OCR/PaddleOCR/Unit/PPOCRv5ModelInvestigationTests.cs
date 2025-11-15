@@ -1,9 +1,9 @@
-using Xunit;
-using Xunit.Abstractions;
-using Sdcb.PaddleOCR.Models.Local;
 using System;
 using System.Reflection;
 using Baketa.Infrastructure.OCR.PaddleOCR.Models;
+using Sdcb.PaddleOCR.Models.Local;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Baketa.Infrastructure.Tests.OCR.PaddleOCR.Unit;
 
@@ -17,20 +17,20 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
     public void Investigation_LocalFullModels_ChineseV5_Basic()
     {
         output.WriteLine("=== LocalFullModels.ChineseV5 基本調査 ===");
-        
+
         try
         {
             // 1. LocalFullModels.ChineseV5へのアクセステスト
             output.WriteLine("1. LocalFullModels.ChineseV5アクセステスト");
             var chineseV5 = LocalFullModels.ChineseV5;
             output.WriteLine($"   ChineseV5は利用可能: {chineseV5 != null}");
-            
+
             if (chineseV5 != null)
             {
                 output.WriteLine($"   型: {chineseV5.GetType().FullName}");
                 output.WriteLine($"   基底型: {chineseV5.GetType().BaseType?.FullName}");
                 output.WriteLine($"   アセンブリ: {chineseV5.GetType().Assembly.GetName().Name}");
-                
+
                 // 2. 各モデルコンポーネントの詳細調査
                 output.WriteLine("\n2. モデルコンポーネント詳細");
                 InvestigateModelComponent(chineseV5.RecognizationModel, "認識モデル");
@@ -53,20 +53,20 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
     public void Investigation_PPOCRv5ModelProvider_IsAvailable()
     {
         output.WriteLine("=== PPOCRv5ModelProvider.IsAvailable() 調査 ===");
-        
+
         try
         {
             output.WriteLine("1. PPOCRv5ModelProvider.IsAvailable()呼び出し");
             var isAvailable = PPOCRv5ModelProvider.IsAvailable();
             output.WriteLine($"   結果: {isAvailable}");
-            
+
             output.WriteLine("\n2. IsAvailable()内部での例外確認");
             // IsAvailable()メソッドの実装を詳細に確認
             try
             {
                 var chineseV5 = LocalFullModels.ChineseV5;
                 output.WriteLine($"   LocalFullModels.ChineseV5直接アクセス: {chineseV5 != null}");
-                
+
                 if (chineseV5 != null)
                 {
                     output.WriteLine($"   型情報: {chineseV5.GetType().FullName}");
@@ -88,13 +88,13 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
     public void Investigation_PPOCRv5ModelProvider_GetPPOCRv5MultilingualModel()
     {
         output.WriteLine("=== PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel() 調査 ===");
-        
+
         try
         {
             output.WriteLine("1. GetPPOCRv5MultilingualModel()呼び出し");
             var model = PPOCRv5ModelProvider.GetPPOCRv5MultilingualModel();
             output.WriteLine($"   結果: {model != null}");
-            
+
             if (model != null)
             {
                 output.WriteLine($"   型: {model.GetType().FullName}");
@@ -105,7 +105,7 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
             else
             {
                 output.WriteLine("   ❌ モデルはnullが返されました");
-                
+
                 // モデル取得失敗の詳細調査
                 output.WriteLine("\n2. 失敗原因の詳細調査");
                 InvestigateModelPathsAndFiles();
@@ -115,7 +115,7 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
         {
             output.WriteLine($"❌ GetPPOCRv5MultilingualModel()エラー: {ex.GetType().Name}: {ex.Message}");
             output.WriteLine($"   スタックトレース: {ex.StackTrace}");
-            
+
             // 詳細な失敗原因調査
             InvestigateModelPathsAndFiles();
         }
@@ -125,30 +125,30 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
     public void Investigation_Compare_V4_vs_V5_Models()
     {
         output.WriteLine("=== V4 vs V5 モデル比較調査 ===");
-        
+
         try
         {
-            // V4モデル調査
-            output.WriteLine("1. V4モデル調査（参照用）");
-            var japanV4 = LocalFullModels.JapanV4;
-            var englishV4 = LocalFullModels.EnglishV4;
-            var chineseV4 = LocalFullModels.ChineseV4;
-            
-            output.WriteLine($"   JapanV4: {japanV4 != null}");
-            output.WriteLine($"   EnglishV4: {englishV4 != null}");
-            output.WriteLine($"   ChineseV4: {chineseV4 != null}");
-            
+            // V5統一モデル調査（旧V4から移行）
+            output.WriteLine("1. V5統一モデル調査（旧V4から統一移行）");
+            var japanV5 = LocalFullModels.ChineseV5; // V5統一モデル
+            var englishV5 = LocalFullModels.ChineseV5; // V5統一モデル
+            var chineseV5 = LocalFullModels.ChineseV5;
+
+            output.WriteLine($"   JapanV5（V5統一）: {japanV5 != null}");
+            output.WriteLine($"   EnglishV5（V5統一）: {englishV5 != null}");
+            output.WriteLine($"   ChineseV5: {chineseV5 != null}");
+
             // V5モデル調査
             output.WriteLine("\n2. V5モデル調査");
             try
             {
-                var chineseV5 = LocalFullModels.ChineseV5;
+                // 既にchineseV5は上で定義済みなので削除
                 output.WriteLine($"   ChineseV5: {chineseV5 != null}");
-                
-                if (chineseV5 != null && japanV4 != null)
+
+                if (chineseV5 != null && japanV5 != null)
                 {
-                    output.WriteLine("\n3. V4とV5の詳細比較");
-                    CompareModels(japanV4, "JapanV4", chineseV5, "ChineseV5");
+                    output.WriteLine("\n3. V5統一モデルの詳細比較");
+                    CompareModels(japanV5, "JapanV5（V5統一）", chineseV5, "ChineseV5");
                 }
             }
             catch (Exception v5Ex)
@@ -166,32 +166,32 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
     public void Investigation_Assembly_Dependencies()
     {
         output.WriteLine("=== アセンブリ依存関係調査 ===");
-        
+
         try
         {
             // 現在読み込まれているSdcb関連アセンブリ
             var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies()
                 .Where(a => a.GetName().Name?.Contains("Sdcb") == true)
                 .ToList();
-            
+
             output.WriteLine($"1. 読み込み済みSdcbアセンブリ数: {loadedAssemblies.Count}");
-            
+
             foreach (var assembly in loadedAssemblies)
             {
                 var name = assembly.GetName();
                 output.WriteLine($"   - {name.Name} (Version: {name.Version})");
             }
-            
+
             // LocalFullModelsの定義アセンブリ
             output.WriteLine("\n2. LocalFullModelsアセンブリ情報");
             var localFullModelsType = typeof(LocalFullModels);
             var localFullModelsAssembly = localFullModelsType.Assembly;
             var assemblyName = localFullModelsAssembly.GetName();
-            
+
             output.WriteLine($"   アセンブリ名: {assemblyName.Name}");
             output.WriteLine($"   バージョン: {assemblyName.Version}");
             output.WriteLine($"   場所: {localFullModelsAssembly.Location}");
-            
+
             // LocalFullModelsの静的プロパティ一覧
             output.WriteLine("\n3. LocalFullModels利用可能プロパティ");
             var properties = localFullModelsType.GetProperties(BindingFlags.Public | BindingFlags.Static);
@@ -225,11 +225,11 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
 
         output.WriteLine($"     型: {component.GetType().FullName}");
         output.WriteLine($"     アセンブリ: {component.GetType().Assembly.GetName().Name}");
-        
+
         // 主要プロパティの調査
         var properties = component.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
         var importantProps = properties.Take(5);
-        
+
         foreach (var prop in importantProps)
         {
             try
@@ -249,12 +249,12 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
     private void CompareModels(object model1, string name1, object model2, string name2)
     {
         output.WriteLine($"   {name1} vs {name2} 比較:");
-        
+
         // 型比較
         output.WriteLine($"     型一致: {model1.GetType() == model2.GetType()}");
         output.WriteLine($"     {name1}型: {model1.GetType().FullName}");
         output.WriteLine($"     {name2}型: {model2.GetType().FullName}");
-        
+
         // アセンブリ比較
         var assembly1 = model1.GetType().Assembly.GetName().Name;
         var assembly2 = model2.GetType().Assembly.GetName().Name;
@@ -266,29 +266,29 @@ public class PPOCRv5ModelInvestigationTests(ITestOutputHelper output)
     private void InvestigateModelPathsAndFiles()
     {
         output.WriteLine("\n   モデルパスとファイル存在確認:");
-        
+
         try
         {
             // PPOCRv5ModelProviderの内部パス情報を取得（リフレクション使用）
             var providerType = typeof(PPOCRv5ModelProvider);
             var modelsBasePathField = providerType.GetField("ModelsBasePath", BindingFlags.NonPublic | BindingFlags.Static);
-            
+
             if (modelsBasePathField != null)
             {
                 var basePath = modelsBasePathField.GetValue(null) as string;
                 output.WriteLine($"     ModelsBasePath: {basePath}");
-                
+
                 if (!string.IsNullOrEmpty(basePath))
                 {
                     output.WriteLine($"     BasePath存在: {System.IO.Directory.Exists(basePath)}");
-                    
+
                     var expectedPaths = new[]
                     {
                         System.IO.Path.Combine(basePath, "PP-OCRv5_server_det"),
                         System.IO.Path.Combine(basePath, "PP-OCRv5_server_rec"),
                         System.IO.Path.Combine(basePath, "ch_ppocr_mobile_v2.0_cls_infer")
                     };
-                    
+
                     foreach (var path in expectedPaths)
                     {
                         output.WriteLine($"     {System.IO.Path.GetFileName(path)}: {System.IO.Directory.Exists(path)}");

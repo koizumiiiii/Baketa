@@ -1,9 +1,11 @@
-using Microsoft.Extensions.Logging;
 using Baketa.Core.Abstractions.Capture;
-using Baketa.Core.Models.Capture;
-using Baketa.Core.Exceptions.Capture;
-using Baketa.Core.Abstractions.Platform.Windows;
 using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Exceptions.Capture;
+using Baketa.Core.Models.Capture;
+using Microsoft.Extensions.Logging;
+// 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Abstractions.Servicesから取得
+using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 
@@ -16,7 +18,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
     private readonly IWindowsCapturer _windowsCapturer;
 
     public string StrategyName => "PrintWindowFallback";
-    public int Priority => 10; // 低優先度（確実だが低速）
+    public int Priority => 75; // 🔧 Phase 0 WGC修復: WGC問題対応で高優先度（確実な代替手段）
 
     public PrintWindowFallbackStrategy(
         ILogger<PrintWindowFallbackStrategy> logger,
@@ -33,7 +35,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
             // PrintWindow API は常に利用可能（最終手段）
             var canApply = hwnd != IntPtr.Zero;
 
-            _logger.LogDebug("PrintWindowFallback戦略適用可能性: {CanApply} (HWND: 0x{Hwnd:X})", 
+            _logger.LogDebug("PrintWindowFallback戦略適用可能性: {CanApply} (HWND: 0x{Hwnd:X})",
                 canApply, hwnd.ToInt64());
 
             return canApply;
@@ -60,7 +62,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
             return await Task.Run(() =>
             {
                 var windowExists = IsWindow(hwnd);
-                
+
                 _logger.LogDebug("PrintWindowFallback前提条件: Window存在={WindowExists}", windowExists);
 
                 return windowExists;
@@ -88,7 +90,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
 
             // PrintWindow API を使用した確実なキャプチャ
             var capturedImage = await CaptureWithPrintWindowAsync(hwnd, options).ConfigureAwait(false);
-            
+
             if (capturedImage != null)
             {
                 result.Success = true;
@@ -97,7 +99,7 @@ public class PrintWindowFallbackStrategy : ICaptureStrategy
                 result.Metrics.FrameCount = 1;
                 result.Metrics.PerformanceCategory = "Reliable";
 
-                _logger.LogInformation("PrintWindowFallbackキャプチャ成功: サイズ={Width}x{Height}, 処理時間={ProcessingTime}ms", 
+                _logger.LogInformation("PrintWindowFallbackキャプチャ成功: サイズ={Width}x{Height}, 処理時間={ProcessingTime}ms",
                     capturedImage.Width, capturedImage.Height, stopwatch.ElapsedMilliseconds);
             }
             else

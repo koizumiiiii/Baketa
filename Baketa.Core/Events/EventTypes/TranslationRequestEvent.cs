@@ -1,6 +1,6 @@
+using System;
 using Baketa.Core.Events;
 using Baketa.Core.Models.OCR;
-using System;
 
 namespace Baketa.Core.Events.EventTypes;
 
@@ -34,7 +34,7 @@ public class TranslationRequestEvent(OcrResult ocrResult, string sourceLanguage,
 
     /// <inheritdoc />
     public override string Name => "TranslationRequest";
-        
+
     /// <inheritdoc />
     public override string Category => "Translation";
 }

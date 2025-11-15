@@ -21,7 +21,7 @@ public class TranslationFailedEvent(
         string? engineName,
         Exception? exception,
         string? errorMessage = null) : EventBase
-    {
+{
     /// <summary>
     /// 元のテキスト
     /// </summary>
@@ -30,7 +30,7 @@ public class TranslationFailedEvent(
     /// <summary>
     /// 元言語コード
     /// </summary>
-    public string SourceLanguage { get; } = sourceLanguage ?? "auto";
+    public string SourceLanguage { get; } = sourceLanguage ?? "en";
 
     /// <summary>
     /// 翻訳先言語コード
@@ -54,7 +54,7 @@ public class TranslationFailedEvent(
 
     /// <inheritdoc />
     public override string Name => "TranslationFailed";
-        
-        /// <inheritdoc />
-        public override string Category => "Translation";
-    }
+
+    /// <inheritdoc />
+    public override string Category => "Translation";
+}

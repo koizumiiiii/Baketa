@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Strategies;
 
@@ -10,21 +10,16 @@ namespace Baketa.Infrastructure.Translation.Strategies;
 /// 中規模リクエスト（2-10件）を並列処理
 /// Issue #147 Phase 3.2
 /// </summary>
-public sealed class ParallelTranslationStrategy : ITranslationStrategy
+public sealed class ParallelTranslationStrategy(
+    ITranslationEngine translationEngine,
+    HybridStrategySettings settings,
+    ILogger<ParallelTranslationStrategy> logger,
+    ILanguageConfigurationService languageConfig) : ITranslationStrategy
 {
-    private readonly ITranslationEngine _translationEngine;
-    private readonly HybridStrategySettings _settings;
-    private readonly ILogger<ParallelTranslationStrategy> _logger;
-
-    public ParallelTranslationStrategy(
-        ITranslationEngine translationEngine,
-        HybridStrategySettings settings,
-        ILogger<ParallelTranslationStrategy> logger)
-    {
-        _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ITranslationEngine _translationEngine = translationEngine ?? throw new ArgumentNullException(nameof(translationEngine));
+    private readonly HybridStrategySettings _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+    private readonly ILogger<ParallelTranslationStrategy> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILanguageConfigurationService _languageConfig = languageConfig ?? throw new ArgumentNullException(nameof(languageConfig));
 
     public int Priority => 50; // 中優先度
 
@@ -32,15 +27,15 @@ public sealed class ParallelTranslationStrategy : ITranslationStrategy
     {
         // 中規模バッチ処理に適用
         // バッチ処理閾値未満でかつ並列処理閾値以上
-        return context.IsBatchRequest 
+        return context.IsBatchRequest
                && context.TextCount >= _settings.ParallelThreshold
                && context.TextCount < _settings.BatchThreshold;
     }
 
     public async Task<TranslationResult> ExecuteAsync(
-        string text, 
-        string? sourceLanguage, 
-        string? targetLanguage, 
+        string text,
+        string? sourceLanguage,
+        string? targetLanguage,
         CancellationToken cancellationToken = default)
     {
         // 単一要求の場合は並列処理の意味がないので、直接実行
@@ -48,10 +43,13 @@ public sealed class ParallelTranslationStrategy : ITranslationStrategy
 
         try
         {
-            // TranslationRequestを作成
-            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? "auto");
-            var targetLanguageModel = Language.FromCode(targetLanguage ?? "ja");
-            
+            // TranslationRequestを作成（言語設定サービスから取得）
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+            var defaultSourceLanguage = languagePair.SourceCode;
+            var defaultTargetLanguage = languagePair.TargetCode;
+            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
+            var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
+
             var request = new TranslationRequest
             {
                 SourceText = text,
@@ -70,7 +68,7 @@ public sealed class ParallelTranslationStrategy : ITranslationStrategy
         catch (Exception ex)
         {
             _logger.LogError(ex, "並列翻訳でエラーが発生しました");
-            
+
             return new TranslationResult(
                 OriginalText: text,
                 TranslatedText: string.Empty,
@@ -80,12 +78,12 @@ public sealed class ParallelTranslationStrategy : ITranslationStrategy
     }
 
     public async Task<IReadOnlyList<TranslationResult>> ExecuteBatchAsync(
-        IReadOnlyList<string> texts, 
-        string? sourceLanguage, 
-        string? targetLanguage, 
+        IReadOnlyList<string> texts,
+        string? sourceLanguage,
+        string? targetLanguage,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("⚡ 並列翻訳戦略実行 - 件数: {Count}, 並列度: {Parallel}", 
+        _logger.LogInformation("⚡ 並列翻訳戦略実行 - 件数: {Count}, 並列度: {Parallel}",
             texts.Count, _settings.MaxDegreeOfParallelism);
 
         var options = new ParallelOptions
@@ -98,9 +96,12 @@ public sealed class ParallelTranslationStrategy : ITranslationStrategy
 
         try
         {
-            // 言語モデルを作成
-            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? "auto");
-            var targetLanguageModel = Language.FromCode(targetLanguage ?? "ja");
+            // 言語モデルを作成（言語設定サービスから取得）
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+            var defaultSourceLanguage = languagePair.SourceCode;
+            var defaultTargetLanguage = languagePair.TargetCode;
+            var sourceLanguageModel = Language.FromCode(sourceLanguage ?? defaultSourceLanguage);
+            var targetLanguageModel = Language.FromCode(targetLanguage ?? defaultTargetLanguage);
 
             await Parallel.ForEachAsync(
                 texts.Select((text, index) => new { Text = text, Index = index }),
@@ -147,7 +148,7 @@ public sealed class ParallelTranslationStrategy : ITranslationStrategy
                 .ToList();
 
             _logger.LogInformation("⚡ 並列翻訳完了 - 成功: {Success}/{Total}, 並列度: {Parallel}",
-                sortedResults.Count(r => r.Success), 
+                sortedResults.Count(r => r.Success),
                 sortedResults.Count,
                 _settings.MaxDegreeOfParallelism);
 
@@ -163,12 +164,12 @@ public sealed class ParallelTranslationStrategy : ITranslationStrategy
             _logger.LogError(ex, "並列翻訳でエラーが発生しました");
 
             // 全件エラーとして返す
-            return texts.Select(t => new TranslationResult(
+            return [..texts.Select(t => new TranslationResult(
                 OriginalText: t,
                 TranslatedText: string.Empty,
                 Success: false,
                 ErrorMessage: $"並列処理エラー: {ex.Message}"
-            )).ToList();
+            ))];
         }
     }
 }

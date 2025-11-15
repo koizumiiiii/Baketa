@@ -1,18 +1,18 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Services;
+using Baketa.Core.Settings;
+using Baketa.Core.Settings.Migration;
+using Baketa.UI.Services;
+using Baketa.UI.ViewModels;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Xunit;
-using Baketa.Core.Settings;
-using Baketa.Core.Settings.Migration;
-using Baketa.Core.Services;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.Services;
-using Baketa.UI.ViewModels;
-using Baketa.UI.ViewModels.Settings;
 
 namespace Baketa.UI.Tests.Integration;
 
@@ -52,7 +52,7 @@ public sealed class SettingsIntegrationTests : IDisposable
     {
         // Core services
         services.AddSingleton(_mockEventAggregator.Object);
-        
+
         // Settings services
         services.AddSingleton<ISettingsService>(provider =>
             new EnhancedSettingsService(
@@ -63,10 +63,10 @@ public sealed class SettingsIntegrationTests : IDisposable
 
         // UI services  
         services.AddSingleton<ISettingsChangeTracker, SettingsChangeTracker>();
-        
+
         // Add missing migration service dependency
         services.AddSingleton(Mock.Of<ISettingsMigrationManager>());
-        
+
         // ViewModels
         services.AddTransient<SettingsWindowViewModel>();
         services.AddTransient<MainUiSettingsViewModel>();
@@ -80,7 +80,7 @@ public sealed class SettingsIntegrationTests : IDisposable
         // Arrange
         var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
         _ = _serviceProvider.GetRequiredService<ISettingsChangeTracker>();
-        
+
         // Act 1: 初期設定の作成と保存
         var initialSettings = new AppSettings
         {
@@ -151,7 +151,7 @@ public sealed class SettingsIntegrationTests : IDisposable
     {
         // Arrange
         var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
-        
+
         // 初期設定
         var initialSettings = new AppSettings
         {
@@ -159,7 +159,7 @@ public sealed class SettingsIntegrationTests : IDisposable
             General = new GeneralSettings { AutoStartWithWindows = false },
             Theme = new ThemeSettings { AppTheme = UiTheme.Light }
         };
-        
+
         await settingsService.SetSettingsAsync(initialSettings);
 
         // Act: 複数のViewModelを同時に作成
@@ -192,7 +192,7 @@ public sealed class SettingsIntegrationTests : IDisposable
         var updatedMainUi = new MainUiSettings { PanelOpacity = mainUiViewModel.PanelOpacity };
         var updatedGeneral = new GeneralSettings { AutoStartWithWindows = generalViewModel.AutoStartWithWindows };
         var updatedTheme = new ThemeSettings { AppTheme = themeViewModel.AppTheme };
-        
+
         await settingsService.SetCategorySettingsAsync(updatedMainUi);
         await settingsService.SetCategorySettingsAsync(updatedGeneral);
         await settingsService.SetCategorySettingsAsync(updatedTheme);
@@ -259,7 +259,7 @@ public sealed class SettingsIntegrationTests : IDisposable
 
         // 設定サービスが無効な値を適切に処理するか確認
         Func<Task> act = async () => await settingsService.SetSettingsAsync(invalidSettings);
-        
+
         // 実際の実装では、バリデーション機能により例外がスローされるか、
         // 自動的に有効な値に修正される
         await act.Should().NotThrowAsync("設定サービスは無効な値を適切に処理する必要があります");
@@ -318,7 +318,7 @@ public sealed class SettingsIntegrationTests : IDisposable
         // Arrange
         var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
         const string profileId = "TestGame";
-        
+
         var gameProfile = new GameProfileSettings
         {
             GameName = "Test Game",
@@ -375,7 +375,7 @@ public sealed class SettingsIntegrationTests : IDisposable
     public void Dispose()
     {
         _serviceProvider?.Dispose();
-        
+
         // テスト用ファイルのクリーンアップ
         try
         {

@@ -1,18 +1,18 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
+using Baketa.Application.Services.Translation;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Platform.Windows.Adapters;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Services;
+using Baketa.UI.Framework.Events;
+using Baketa.UI.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Platform.Windows.Adapters;
-using Baketa.UI.Framework.Events;
-using Baketa.UI.Services;
-using Baketa.Application.Services.Translation;
-using Baketa.Core.Abstractions.Services;
-using Baketa.Core.Abstractions.Imaging;
-using Baketa.Core.Services;
+using Xunit;
 
 namespace Baketa.UI.Tests.Integration;
 
@@ -31,30 +31,30 @@ public class TranslationFlowIntegrationTests
     public TranslationFlowIntegrationTests()
     {
         var services = new ServiceCollection();
-        
+
         // ロガーのモック
         _mockLogger = new Mock<ILogger<TranslationFlowEventProcessor>>();
         services.AddSingleton(_mockLogger.Object);
-        
+
         // EventAggregatorの実装
         services.AddSingleton<IEventAggregator, Baketa.Core.Events.Implementation.EventAggregator>();
-        
+
         // TranslationResultOverlayManagerは不要（TestTranslationFlowEventProcessorが独立クラスのため）
-        
+
         // ICaptureServiceのモック
         _mockCaptureService = new Mock<ICaptureService>();
         services.AddSingleton(_mockCaptureService.Object);
-        
+
         // ITranslationOrchestrationServiceのモック（簡略化）
         _mockTranslationService = new Mock<ITranslationOrchestrationService>();
         services.AddSingleton(_mockTranslationService.Object);
-        
+
         // TestTranslationFlowEventProcessor - 独立したテスト用実装
         services.AddTransient<TestTranslationFlowEventProcessor>();
-        
+
         _serviceProvider = services.BuildServiceProvider();
         _eventAggregator = _serviceProvider.GetRequiredService<IEventAggregator>();
-        
+
         // TestTranslationFlowEventProcessorをイベント購読に登録
         var processor = _serviceProvider.GetRequiredService<TestTranslationFlowEventProcessor>();
         _eventAggregator.Subscribe<StartTranslationRequestEvent>(processor);
@@ -64,28 +64,28 @@ public class TranslationFlowIntegrationTests
     public async Task StartTranslationRequestEvent_Should_BeHandledSuccessfully()
     {
         // Arrange
-        var testWindow = new WindowInfo 
-        { 
+        var testWindow = new WindowInfo
+        {
             Handle = new IntPtr(12345),
             Title = "Test Window",
             IsVisible = true,
             IsMinimized = false
         };
-        
+
         var startEvent = new StartTranslationRequestEvent(testWindow);
-        
+
         // キャプチャサービスのモック設定
         var mockImage = new Mock<IImage>();
         _mockCaptureService
             .Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>()))
             .ReturnsAsync(mockImage.Object);
-        
+
         // Act
         await _eventAggregator.PublishAsync(startEvent);
-        
+
         // 簡略化されたテスト処理の完了を待機
         await Task.Delay(50);
-        
+
         // Assert - ログが正常に呼ばれたことを確認
         _mockLogger.Verify(
             x => x.Log(
@@ -95,10 +95,10 @@ public class TranslationFlowIntegrationTests
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.AtLeastOnce);
-        
+
         // キャプチャサービスが呼ばれたことを確認
         _mockCaptureService.Verify(
-            x => x.CaptureWindowAsync(testWindow.Handle), 
+            x => x.CaptureWindowAsync(testWindow.Handle),
             Times.Once);
     }
 
@@ -106,27 +106,27 @@ public class TranslationFlowIntegrationTests
     public async Task TranslationFlow_Should_HandleCaptureFailure()
     {
         // Arrange
-        var testWindow = new WindowInfo 
-        { 
+        var testWindow = new WindowInfo
+        {
             Handle = new IntPtr(99999),
             Title = "Capture Failed Window",
             IsVisible = true,
             IsMinimized = false
         };
-        
+
         var startEvent = new StartTranslationRequestEvent(testWindow);
-        
+
         // キャプチャ失敗をシミュレート
         _mockCaptureService
             .Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>()))
             .ThrowsAsync(new InvalidOperationException("キャプチャに失敗しました"));
-        
+
         // Act
         await _eventAggregator.PublishAsync(startEvent);
-        
+
         // 非同期処理の完了を待機
         await Task.Delay(100);
-        
+
         // Assert - エラー処理のログが記録されることを確認
         _mockLogger.Verify(
             x => x.Log(
@@ -144,25 +144,25 @@ public class TranslationFlowIntegrationTests
         // Arrange
         var eventReceived = false;
         var testEventProcessor = new TestEventProcessor(() => eventReceived = true);
-        
+
         _eventAggregator.Subscribe<StartTranslationRequestEvent>(testEventProcessor);
-        
-        var testWindow = new WindowInfo 
-        { 
+
+        var testWindow = new WindowInfo
+        {
             Handle = new IntPtr(11111),
             Title = "EventAggregator Test Window",
             IsVisible = true,
             IsMinimized = false
         };
-        
+
         var startEvent = new StartTranslationRequestEvent(testWindow);
-        
+
         // Act
         await _eventAggregator.PublishAsync(startEvent);
-        
+
         // 非同期処理の完了を待機
         await Task.Delay(50);
-        
+
         // Assert
         Assert.True(eventReceived, "イベントが正常に受信・処理されていません");
     }
@@ -217,7 +217,7 @@ public class TestTranslationFlowEventProcessor(
 
     public async Task HandleAsync(StartTranslationRequestEvent eventData)
     {
-        logger.LogInformation("Processing translation start request for window: {WindowTitle} (Handle={Handle})", 
+        logger.LogInformation("Processing translation start request for window: {WindowTitle} (Handle={Handle})",
             eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
 
         try
@@ -225,7 +225,7 @@ public class TestTranslationFlowEventProcessor(
             // 簡略化されたテスト用処理
             // 1. キャプチャサービスを呼び出してモックが動作することを確認
             var captureResult = await captureService.CaptureWindowAsync(eventData.TargetWindow.Handle).ConfigureAwait(false);
-            
+
             if (captureResult != null)
             {
                 logger.LogInformation("Translation completed successfully for test");

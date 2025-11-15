@@ -1,15 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using Baketa.Core.Abstractions.OCR;
-using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Platform.Windows;
+using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Extensions;
+using Baketa.Core.Models.OCR; // 🎯 [OPTION_B] OcrContext用
 using Microsoft.Extensions.Logging;
-using System.Drawing;
 
 namespace Baketa.Application.Services;
 
@@ -22,7 +25,7 @@ public sealed class CachedOcrEngine : IOcrEngine
     private readonly IOcrEngine _baseEngine;
     private readonly IAdvancedOcrCacheService _cacheService;
     private readonly ILogger<CachedOcrEngine> _logger;
-    
+
     // パフォーマンス統計
     private long _totalRequests = 0;
     private long _cacheHits = 0;
@@ -36,7 +39,7 @@ public sealed class CachedOcrEngine : IOcrEngine
         _baseEngine = baseEngine ?? throw new ArgumentNullException(nameof(baseEngine));
         _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         _logger.LogInformation("🚀 CachedOcrEngine初期化完了 - Step3高度キャッシング戦略有効");
     }
 
@@ -51,11 +54,11 @@ public sealed class CachedOcrEngine : IOcrEngine
         var stopwatch = Stopwatch.StartNew();
         var result = await _baseEngine.InitializeAsync(settings, cancellationToken).ConfigureAwait(false);
         stopwatch.Stop();
-        
+
         _logger.LogInformation("⚡ CachedOcrEngine初期化完了 - 時間: {ElapsedMs}ms, 結果: {Result}", stopwatch.ElapsedMilliseconds, result);
         return result;
     }
-    
+
     public async Task<bool> WarmupAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("🔥 CachedOcrEngine: ウォームアップ処理を内部エンジンに委譲");
@@ -76,97 +79,187 @@ public sealed class CachedOcrEngine : IOcrEngine
 
     public async Task<OcrResults> RecognizeAsync(
         IImage image,
-        Rectangle? regionOfInterest,
+        System.Drawing.Rectangle? regionOfInterest,
         IProgress<OcrProgress>? progressCallback = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        
+
         var totalStopwatch = Stopwatch.StartNew();
         var requestId = ++_totalRequests;
-        
+
         try
         {
             // 🎯 Step 1: 画像データを取得してハッシュ化
             var hashStopwatch = Stopwatch.StartNew();
             byte[] imageData;
-            
-            using (var memoryStream = new MemoryStream())
+
+            // 🔧 [PHASE3.5_FIX] ReferencedSafeImage防御的処理 - ObjectDisposedException完全対応
+            if (image is ReferencedSafeImage referencedSafeImage)
             {
-                // IImageから画像データを抽出
-                if (image is IWindowsImage windowsImage)
+                // 🛡️ 段階的防御的アクセス - オーバーレイ表示修正の決定的対応
+                try
                 {
-                    using var bitmap = windowsImage.GetBitmap();
-                    
-                    // ROIが指定されている場合は切り取り
-                    if (regionOfInterest.HasValue)
+                    // Step 1: 参照カウント検証
+                    var refCount = referencedSafeImage.ReferenceCount;
+                    if (refCount <= 0)
                     {
-                        var roi = regionOfInterest.Value;
-                        using var croppedBitmap = new Bitmap(roi.Width, roi.Height);
-                        using var graphics = Graphics.FromImage(croppedBitmap);
-                        graphics.DrawImage(bitmap, 0, 0, roi, GraphicsUnit.Pixel);
-                        croppedBitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+                        _logger.LogWarning("🔧 [PHASE3.5_FIX] ReferencedSafeImage参照カウントが無効: {RefCount} - 処理スキップ", refCount);
+                        throw new InvalidOperationException($"ReferencedSafeImage has invalid reference count: {refCount}");
                     }
-                    else
+
+                    // Step 2: SafeImage本体の有効性確認
+                    var safeImage = referencedSafeImage.GetUnderlyingSafeImage();
+                    if (safeImage == null || safeImage.IsDisposed)
                     {
-                        bitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+                        _logger.LogWarning("🔧 [PHASE3.5_FIX] SafeImage本体が無効または破棄済み - 処理スキップ");
+                        throw new InvalidOperationException("Underlying SafeImage is null or disposed");
                     }
+
+                    // Step 3: 画像データの安全な取得
+                    try
+                    {
+                        imageData = safeImage.GetImageData().ToArray();
+                        _logger.LogDebug("🎯 [PHASE3.5_FIX] ReferencedSafeImage処理成功 - データ取得: {Size}bytes, RefCount: {RefCount}",
+                            imageData.Length, refCount);
+                    }
+                    catch (ObjectDisposedException imageDataEx)
+                    {
+                        _logger.LogError(imageDataEx, "🔧 [PHASE3.5_FIX] 画像データ取得中にObjectDisposedException - SafeImage内部で破棄済み");
+                        throw new InvalidOperationException("SafeImage data access failed due to disposal", imageDataEx);
+                    }
+                }
+                catch (ObjectDisposedException disposedEx)
+                {
+                    // 🔥 [PHASE3.5_FIX] ObjectDisposedException統一ハンドリング - オーバーレイ非表示問題の根本修正
+                    _logger.LogError(disposedEx, "💀 [SAFE_IMAGE] IImage変換でObjectDisposedException発生 - 画像が破棄済み");
+                    throw new InvalidOperationException("ReferencedSafeImage has been disposed and cannot be used for OCR caching", disposedEx);
+                }
+                catch (Exception unexpectedEx)
+                {
+                    _logger.LogError(unexpectedEx, "🔧 [PHASE3.5_FIX] ReferencedSafeImage処理で予期しないエラー: {ErrorType}", unexpectedEx.GetType().Name);
+                    throw new InvalidOperationException($"Unexpected error in ReferencedSafeImage processing: {unexpectedEx.Message}", unexpectedEx);
+                }
+            }
+            // 🧠 [ULTRATHINK_TYPE_FIX] IAdvancedImage対応 - WindowsImageAdapter型不一致解決
+            else if (regionOfInterest.HasValue && image is IAdvancedImage advancedImage)
+            {
+                // ROIが指定されている場合は切り取り処理
+                using var croppedImage = await advancedImage.ExtractRegionAsync(regionOfInterest.Value.ToMemoryRectangle()).ConfigureAwait(false);
+                imageData = await croppedImage.ToByteArrayAsync().ConfigureAwait(false);
+            }
+            else if (image is IAdvancedImage advancedImageFull)
+            {
+                // 🎯 [TYPE_COMPATIBILITY] IAdvancedImage.ToByteArrayAsync()使用でWindowsImageAdapter対応
+                imageData = await advancedImageFull.ToByteArrayAsync().ConfigureAwait(false);
+            }
+            else if (image is IWindowsImage windowsImage)
+            {
+                // 🔄 [FALLBACK_COMPATIBILITY] 従来のIWindowsImage対応維持
+                using var memoryStream = new MemoryStream();
+                using var bitmap = windowsImage.GetBitmap();
+
+                if (regionOfInterest.HasValue)
+                {
+                    var roi = regionOfInterest.Value;
+                    using var croppedBitmap = new Bitmap(roi.Width, roi.Height);
+                    using var graphics = Graphics.FromImage(croppedBitmap);
+                    graphics.DrawImage(bitmap, 0, 0, roi, GraphicsUnit.Pixel);
+                    croppedBitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
                 }
                 else
                 {
-                    // フォールバック: 汎用IImage処理
-                    throw new NotSupportedException($"IImage type {image.GetType().Name} is not supported for caching");
+                    bitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
                 }
-                
+
                 imageData = memoryStream.ToArray();
             }
-            
+            else if (image.GetType().Name == "WindowsImageToIImageAdapter")
+            {
+                // 🔥 [ADAPTER_FIX] WindowsImageToIImageAdapter対応
+                // FullScreenOcrCaptureStrategy内のアダプタークラスをサポート
+                // IImageインターフェース経由でToByteArrayAsync()を使用
+                imageData = await image.ToByteArrayAsync().ConfigureAwait(false);
+
+                // ROI指定時は切り取り処理を適用
+                if (regionOfInterest.HasValue)
+                {
+                    using var memoryStream = new MemoryStream(imageData);
+                    using var bitmap = new Bitmap(memoryStream);
+
+                    var roi = regionOfInterest.Value;
+                    using var croppedBitmap = new Bitmap(roi.Width, roi.Height);
+                    using var graphics = Graphics.FromImage(croppedBitmap);
+                    graphics.DrawImage(bitmap, 0, 0, roi, GraphicsUnit.Pixel);
+
+                    using var outputStream = new MemoryStream();
+                    croppedBitmap.Save(outputStream, System.Drawing.Imaging.ImageFormat.Png);
+                    imageData = outputStream.ToArray();
+                }
+            }
+            else
+            {
+                // エラーメッセージ改善 - WindowsImageToIImageAdapter対応を明記
+                throw new NotSupportedException($"IImage type {image.GetType().Name} is not supported for caching. Supported types: ReferencedSafeImage, IAdvancedImage, IWindowsImage, WindowsImageToIImageAdapter");
+            }
+
             var imageHash = _cacheService.GenerateImageHash(imageData);
             hashStopwatch.Stop();
-            
-            _logger.LogDebug("🔍 [Req:{RequestId}] 画像ハッシュ生成: {Hash} - 時間: {ElapsedMs}ms, サイズ: {Size}bytes", 
+
+            _logger.LogDebug("🔍 [Req:{RequestId}] 画像ハッシュ生成: {Hash} - 時間: {ElapsedMs}ms, サイズ: {Size}bytes",
                 requestId, imageHash[..12], hashStopwatch.ElapsedMilliseconds, imageData.Length);
 
             // 🎯 Step 2: キャッシュチェック
             var cacheStopwatch = Stopwatch.StartNew();
             var cachedResult = _cacheService.GetCachedResult(imageHash);
             cacheStopwatch.Stop();
-            
+
             if (cachedResult != null)
             {
                 // ✅ キャッシュヒット
                 Interlocked.Increment(ref _cacheHits);
                 totalStopwatch.Stop();
-                
-                _logger.LogInformation("⚡ [Req:{RequestId}] キャッシュヒット成功 - 総時間: {TotalMs}ms (ハッシュ: {HashMs}ms, キャッシュ: {CacheMs}ms), 認識数: {TextCount}", 
+
+                _logger.LogInformation("⚡ [Req:{RequestId}] キャッシュヒット成功 - 総時間: {TotalMs}ms (ハッシュ: {HashMs}ms, キャッシュ: {CacheMs}ms), 認識数: {TextCount}",
                     requestId, totalStopwatch.ElapsedMilliseconds, hashStopwatch.ElapsedMilliseconds, cacheStopwatch.ElapsedMilliseconds, cachedResult.TextRegions.Count);
-                
+
                 // プログレスコールバック（即座に完了を通知）
                 progressCallback?.Report(new OcrProgress(1.0, "キャッシュから取得済み"));
-                
+
                 return cachedResult;
             }
-            
+
             // ❌ キャッシュミス - 実際のOCR処理を実行
             Interlocked.Increment(ref _cacheMisses);
-            
+
             _logger.LogDebug("🔄 [Req:{RequestId}] キャッシュミス - OCR処理開始: {Hash}", requestId, imageHash[..12]);
-            
+
             // 🎯 Step 3: 実際のOCR処理
             var ocrStopwatch = Stopwatch.StartNew();
             var ocrResult = await _baseEngine.RecognizeAsync(image, regionOfInterest, progressCallback, cancellationToken).ConfigureAwait(false);
             ocrStopwatch.Stop();
-            
-            // 🎯 Step 4: 結果をキャッシュに保存
-            var saveCacheStopwatch = Stopwatch.StartNew();
-            _cacheService.CacheResult(imageHash, ocrResult);
-            saveCacheStopwatch.Stop();
-            
+
+            // 🎯 Step 4: 結果をキャッシュに保存 (品質チェック付き)
+            const double confidenceThreshold = 0.85;
+            var isHighConfidence = ocrResult.TextRegions.All(r => r.Confidence >= confidenceThreshold);
+
+            if (isHighConfidence && ocrResult.TextRegions.Any())
+            {
+                var saveCacheStopwatch = Stopwatch.StartNew();
+                _cacheService.CacheResult(imageHash, ocrResult);
+                saveCacheStopwatch.Stop();
+                _logger.LogInformation("💾 [Req:{RequestId}] 高信頼度結果をキャッシュに保存 - 保存時間: {SaveMs}ms", requestId, saveCacheStopwatch.ElapsedMilliseconds);
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ [Req:{RequestId}] 低信頼度のためキャッシュをスキップ - 信頼度 < {Threshold} の領域あり", requestId, confidenceThreshold);
+            }
+
             totalStopwatch.Stop();
-            
-            _logger.LogInformation("💾 [Req:{RequestId}] OCR処理+キャッシュ保存完了 - 総時間: {TotalMs}ms (ハッシュ: {HashMs}ms, OCR: {OcrMs}ms, 保存: {SaveMs}ms), 認識数: {TextCount}", 
-                requestId, totalStopwatch.ElapsedMilliseconds, hashStopwatch.ElapsedMilliseconds, ocrStopwatch.ElapsedMilliseconds, saveCacheStopwatch.ElapsedMilliseconds, ocrResult.TextRegions.Count);
-            
+
+            _logger.LogInformation("✅ [Req:{RequestId}] OCR処理完了 - 総時間: {TotalMs}ms (ハッシュ: {HashMs}ms, OCR: {OcrMs}ms), 認識数: {TextCount}",
+                requestId, totalStopwatch.ElapsedMilliseconds, hashStopwatch.ElapsedMilliseconds, ocrStopwatch.ElapsedMilliseconds, ocrResult.TextRegions.Count);
+
             return ocrResult;
         }
         catch (Exception ex)
@@ -175,6 +268,50 @@ public sealed class CachedOcrEngine : IOcrEngine
             _logger.LogError(ex, "❌ [Req:{RequestId}] CachedOcrEngine処理エラー - 総時間: {TotalMs}ms", requestId, totalStopwatch.ElapsedMilliseconds);
             throw;
         }
+    }
+
+    /// <summary>
+    /// [Option B] OcrContextを使用してテキストを認識します（座標問題恒久対応）
+    /// </summary>
+    /// <param name="context">OCRコンテキスト（画像、ウィンドウハンドル、キャプチャ領域を含む）</param>
+    /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
+    /// <returns>OCR結果</returns>
+    /// <remarks>
+    /// OcrContextにCaptureRegionが設定されている場合、キャッシュをスキップします。
+    /// 理由: ベースエンジンが返す絶対座標をキャッシュすると、後続処理で相対座標として誤認される座標ズレ問題を防ぐため。
+    /// </remarks>
+    public async Task<OcrResults> RecognizeAsync(
+        OcrContext context,
+        IProgress<OcrProgress>? progressCallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var requestId = ++_totalRequests;
+        _logger.LogInformation("🎯 [OPTION_B] CachedOcrEngine - OcrContext使用 (Req:{RequestId}) - HasCaptureRegion: {HasCaptureRegion}",
+            requestId, context.HasCaptureRegion);
+
+        // 🔥 [ROI_COORDINATE_FIX] CaptureRegion指定時はキャッシュスキップ
+        // 既存のRecognizeAsync(IImage, Rectangle?)と同様のポリシーを適用
+        if (context.HasCaptureRegion)
+        {
+            _logger.LogDebug("🔧 [ROI_FIX] CaptureRegion指定検出 - キャッシュスキップして直接OCR実行 (座標ズレ防止)");
+            var stopwatch = Stopwatch.StartNew();
+            var result = await _baseEngine.RecognizeAsync(context, progressCallback).ConfigureAwait(false);
+            stopwatch.Stop();
+
+            _logger.LogInformation("✅ [ROI_FIX] CaptureRegion直接OCR完了 - 時間: {ElapsedMs}ms, 認識数: {TextCount}",
+                stopwatch.ElapsedMilliseconds, result.TextRegions.Count);
+
+            return result;
+        }
+
+        // CaptureRegion未指定の場合は、既存のキャッシング実装を使用
+        // OcrContext.Imageを使用してキャッシュキーを生成
+        return await RecognizeAsync(
+            context.Image,
+            context.CaptureRegion,
+            progressCallback,
+            context.CancellationToken).ConfigureAwait(false);
     }
 
     public OcrEngineSettings GetSettings()
@@ -213,15 +350,34 @@ public sealed class CachedOcrEngine : IOcrEngine
     }
 
     /// <summary>
+    /// 連続失敗回数を取得（診断・フォールバック判定用）
+    /// </summary>
+    /// <returns>連続失敗回数</returns>
+    public int GetConsecutiveFailureCount()
+    {
+        // ベースエンジンに委譲
+        return _baseEngine.GetConsecutiveFailureCount();
+    }
+
+    /// <summary>
+    /// 失敗カウンタをリセット（緊急時復旧用）
+    /// </summary>
+    public void ResetFailureCounter()
+    {
+        // ベースエンジンに委譲
+        _baseEngine.ResetFailureCounter();
+    }
+
+    /// <summary>
     /// テキスト検出のみを実行（認識処理をスキップ）
     /// キャッシュ対応版
     /// </summary>
     public async Task<OcrResults> DetectTextRegionsAsync(IImage image, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        
+
         _logger.LogDebug("🔍 CachedOcrEngine: DetectTextRegionsAsync - ベースエンジンに委譲");
-        
+
         // キャッシングは複雑になるため、現在は直接ベースエンジンに委譲
         // TODO: 将来的には検出専用キャッシュの実装を検討
         return await _baseEngine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
@@ -233,7 +389,7 @@ public sealed class CachedOcrEngine : IOcrEngine
     public void LogCacheStatistics()
     {
         var hitRate = _totalRequests > 0 ? (double)_cacheHits / _totalRequests * 100 : 0;
-        _logger.LogInformation("📊 キャッシュ統計 - 総リクエスト: {TotalRequests}, ヒット: {Hits}, ミス: {Misses}, ヒット率: {HitRate:F1}%", 
+        _logger.LogInformation("📊 キャッシュ統計 - 総リクエスト: {TotalRequests}, ヒット: {Hits}, ミス: {Misses}, ヒット率: {HitRate:F1}%",
             _totalRequests, _cacheHits, _cacheMisses, hitRate);
     }
 

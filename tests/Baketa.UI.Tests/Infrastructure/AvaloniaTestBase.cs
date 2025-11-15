@@ -1,11 +1,11 @@
+using System;
+using System.Reactive.Concurrency;
+using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using ReactiveUI;
-using System;
-using System.Reactive.Concurrency;
-using System.Threading;
 using Xunit;
 
 namespace Baketa.UI.Tests.Infrastructure;
@@ -48,7 +48,7 @@ public abstract class AvaloniaTestBase : IDisposable
                         {
                             UseHeadlessDrawing = false, // 描画処理を無効化してパフォーマンス向上
                         };
-                        
+
                         AppBuilder.Configure<TestApplication>()
                             .UseHeadless(headlessOptions)
                             .SetupWithoutStarting();
@@ -62,7 +62,7 @@ public abstract class AvaloniaTestBase : IDisposable
                     }
                 }
             }
-            
+
             _instanceInitialized = true;
         }
     }
@@ -93,7 +93,7 @@ public abstract class AvaloniaTestBase : IDisposable
     protected static void RunOnUIThread(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        
+
         if (Dispatcher.UIThread.CheckAccess())
         {
             action();
@@ -113,7 +113,7 @@ public abstract class AvaloniaTestBase : IDisposable
     protected static T RunOnUIThread<T>(Func<T> func)
     {
         ArgumentNullException.ThrowIfNull(func);
-        
+
         if (Dispatcher.UIThread.CheckAccess())
         {
             return func();
@@ -131,7 +131,7 @@ public abstract class AvaloniaTestBase : IDisposable
         {
             _instanceInitialized = false;
         }
-        
+
         // ガベージコレクションの実行を促す
         GC.Collect();
         GC.WaitForPendingFinalizers();

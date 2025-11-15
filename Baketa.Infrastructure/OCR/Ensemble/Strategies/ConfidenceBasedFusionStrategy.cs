@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Logging;
-using Baketa.Core.Abstractions.OCR;
 using System.Diagnostics;
+using Baketa.Core.Abstractions.OCR;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.Ensemble.Strategies;
 
@@ -31,12 +31,12 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
 
             // エンジンごとの信頼度スコアを計算
             var engineScores = CalculateEngineConfidenceScores(successfulResults);
-            logger.LogDebug("エンジン信頼度スコア: {Scores}", 
+            logger.LogDebug("エンジン信頼度スコア: {Scores}",
                 string.Join(", ", engineScores.Select(kvp => $"{kvp.Key}={kvp.Value:F3}")));
 
             // 信頼度ベースの融合を実行
             var fusedRegions = await PerformConfidenceBasedFusionAsync(successfulResults, engineScores, parameters).ConfigureAwait(false);
-            
+
             // 融合詳細情報を作成
             var fusionDetails = CreateFusionDetails(successfulResults, fusedRegions, engineScores);
 
@@ -85,10 +85,10 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
             // 平均信頼度とエンジン重みを組み合わせ
             var averageConfidence = result.Results.TextRegions.Average(r => r.Confidence);
             var weightedScore = averageConfidence * result.Weight;
-            
+
             // 領域数による補正（多すぎても少なすぎても減点）
             var regionCountFactor = CalculateRegionCountFactor(result.Results.TextRegions.Count);
-            
+
             engineScores[result.EngineName] = weightedScore * regionCountFactor;
         }
 
@@ -103,10 +103,10 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
         // 最適な領域数を5-15と仮定
         if (regionCount >= 5 && regionCount <= 15)
             return 1.0;
-        
+
         if (regionCount < 5)
             return 0.8 + (regionCount / 5.0) * 0.2; // 少ない場合は減点
-        
+
         // 多すぎる場合も減点（ノイズの可能性）
         return Math.Max(0.5, 1.0 - (regionCount - 15) * 0.02);
     }
@@ -125,8 +125,8 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
         var sortedEngines = engineScores.OrderByDescending(kvp => kvp.Value).ToList();
         var bestEngine = sortedEngines[0].Key;
         var bestResult = results.First(r => r.EngineName == bestEngine);
-        
-        logger.LogDebug("最高信頼度エンジン: {EngineName} (スコア: {Score:F3})", 
+
+        logger.LogDebug("最高信頼度エンジン: {EngineName} (スコア: {Score:F3})",
             bestEngine, engineScores[bestEngine]);
 
         // 基準となる領域を取得
@@ -172,7 +172,7 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
             foreach (var region in result.Results.TextRegions)
             {
                 var similarity = CalculateRegionSimilarity(baseRegion, region);
-                
+
                 if (similarity.OverallSimilarity >= parameters.SimilarityThreshold)
                 {
                     correspondingRegions.Add(new CorrespondingRegion(
@@ -203,7 +203,7 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
         {
             var engineScore = engineScores.GetValueOrDefault(corrRegion.EngineName, 0.0);
             var adjustedConfidence = corrRegion.Region.Confidence * corrRegion.Similarity * engineScore;
-            
+
             candidates.Add(new CandidateSelection(
                 corrRegion.Region, corrRegion.EngineName, corrRegion.Similarity, adjustedConfidence));
         }
@@ -211,9 +211,9 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
         // 最も調整信頼度の高い候補を選択
         var sortedCandidates = candidates.OrderByDescending(c => c.AdjustedConfidence).ToList();
         var bestCandidate = sortedCandidates[0];
-        
-        return bestCandidate.AdjustedConfidence >= parameters.MinimumConfidenceThreshold 
-            ? bestCandidate.Region 
+
+        return bestCandidate.AdjustedConfidence >= parameters.MinimumConfidenceThreshold
+            ? bestCandidate.Region
             : null;
     }
 
@@ -229,11 +229,11 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
         foreach (var result in results)
         {
             var engineScore = engineScores.GetValueOrDefault(result.EngineName, 0.0);
-            
+
             foreach (var region in result.Results.TextRegions)
             {
                 var adjustedConfidence = region.Confidence * engineScore;
-                
+
                 // 高信頼度で既存領域と重複しない場合のみ追加
                 if (adjustedConfidence >= parameters.ConflictResolutionThreshold &&
                     !HasSignificantOverlap(region, fusedRegions, parameters.OverlapThreshold))
@@ -242,7 +242,7 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
                 }
             }
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -251,7 +251,7 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
     /// </summary>
     private bool HasSignificantOverlap(OcrTextRegion newRegion, List<OcrTextRegion> existingRegions, double threshold)
     {
-        return existingRegions.Any(existing => 
+        return existingRegions.Any(existing =>
             CalculateLocationSimilarity(newRegion.Bounds, existing.Bounds) > threshold);
     }
 
@@ -270,7 +270,7 @@ public class ConfidenceBasedFusionStrategy(ILogger<ConfidenceBasedFusionStrategy
         {
             var region = fusedRegions[i];
             var sourceEngine = FindSourceEngine(region, results);
-            
+
             var detail = new RegionFusionDetail(
                 i,
                 [sourceEngine],

@@ -1,13 +1,13 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Baketa.UI.Configuration;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
+using Baketa.UI.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.UI.Services;
 
@@ -32,10 +32,10 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
-        
+
         _logger = logger;
         _options = options.Value;
-        
+
         // UIスレッドで通知マネージャーを初期化
         InitializeNotificationManager();
     }
@@ -91,7 +91,7 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
                     MaxItems = 5,
                     Margin = new Thickness(0, 0, 15, 40)
                 };
-                
+
                 _logger.LogDebug("WindowNotificationManager が正常に初期化されました");
             }
             else
@@ -120,9 +120,9 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
             return;
 
         _logger.LogInformation("Success notification: {Title} - {Message}", title, message);
-        
+
         await ShowNotificationAsync(NotificationType.Success, title, message, duration).ConfigureAwait(false);
-        
+
         NotificationShown?.Invoke(this, new NotificationEventArgs(NotificationType.Success, title, message, duration));
     }
 
@@ -133,9 +133,9 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
             return;
 
         _logger.LogInformation("Information notification: {Title} - {Message}", title, message);
-        
+
         await ShowNotificationAsync(NotificationType.Information, title, message, duration).ConfigureAwait(false);
-        
+
         NotificationShown?.Invoke(this, new NotificationEventArgs(NotificationType.Information, title, message, duration));
     }
 
@@ -153,9 +153,9 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
             return;
 
         _logger.LogWarning("Warning notification: {Title} - {Message}", title, message);
-        
+
         await ShowNotificationAsync(NotificationType.Warning, title, message, duration).ConfigureAwait(false);
-        
+
         NotificationShown?.Invoke(this, new NotificationEventArgs(NotificationType.Warning, title, message, duration));
     }
 
@@ -166,9 +166,9 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
             return;
 
         _logger.LogError("Error notification: {Title} - {Message}", title, message);
-        
+
         await ShowNotificationAsync(NotificationType.Error, title, message, duration).ConfigureAwait(false);
-        
+
         NotificationShown?.Invoke(this, new NotificationEventArgs(NotificationType.Error, title, message, duration));
     }
 
@@ -180,12 +180,12 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
 
         var title = "翻訳エンジン切り替え";
         var message = $"{fromEngine} から {toEngine} に切り替えました。理由: {reason}";
-        
-        _logger.LogInformation("Fallback notification: {FromEngine} -> {ToEngine}, Reason: {Reason}", 
+
+        _logger.LogInformation("Fallback notification: {FromEngine} -> {ToEngine}, Reason: {Reason}",
             fromEngine, toEngine, reason);
-        
+
         await ShowInformationAsync(title, message, 4000).ConfigureAwait(false);
-        
+
         NotificationShown?.Invoke(this, new NotificationEventArgs(NotificationType.FallbackNotification, title, message, 4000));
     }
 
@@ -197,28 +197,28 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
 
         var title = "エンジン状態変更";
         var message = $"{engineName}: {status}";
-        
+
         _logger.LogDebug("Engine status change notification: {Engine} - {Status}", engineName, status);
-        
+
         await ShowInformationAsync(title, message, 3000).ConfigureAwait(false);
-        
+
         NotificationShown?.Invoke(this, new NotificationEventArgs(NotificationType.EngineStatusChange, title, message, 3000));
     }
 
     /// <inheritdoc />
-    public async Task<bool> ShowConfirmationAsync(string title, string message, 
+    public async Task<bool> ShowConfirmationAsync(string title, string message,
         string confirmText = "OK", string cancelText = "キャンセル")
     {
         _logger.LogInformation("Confirmation dialog: {Title} - {Message}", title, message);
-        
+
         try
         {
             // UIスレッドで確認ダイアログを表示
             var result = Dispatcher.UIThread.CheckAccess()
                 ? await ShowConfirmationDialogAsync(title, message, confirmText, cancelText).ConfigureAwait(true)
-                : await Dispatcher.UIThread.InvokeAsync(async () => 
+                : await Dispatcher.UIThread.InvokeAsync(async () =>
                     await ShowConfirmationDialogAsync(title, message, confirmText, cancelText).ConfigureAwait(true)).ConfigureAwait(true);
-            
+
             return result;
         }
         catch (InvalidOperationException ex)
@@ -397,10 +397,10 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
             Padding = new Thickness(20, 5),
             IsDefault = true
         };
-        confirmButton.Click += (_, _) => 
+        confirmButton.Click += (_, _) =>
         {
-            if (confirmButton.Parent is Panel panel && 
-                panel.Parent is StackPanel sp && 
+            if (confirmButton.Parent is Panel panel &&
+                panel.Parent is StackPanel sp &&
                 sp.Parent is Window window)
             {
                 window.Close(true);
@@ -414,10 +414,10 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
             Padding = new Thickness(20, 5),
             IsCancel = true
         };
-        cancelButton.Click += (_, _) => 
+        cancelButton.Click += (_, _) =>
         {
-            if (cancelButton.Parent is Panel panel && 
-                panel.Parent is StackPanel sp && 
+            if (cancelButton.Parent is Panel panel &&
+                panel.Parent is StackPanel sp &&
                 sp.Parent is Window window)
             {
                 window.Close(false);
@@ -482,7 +482,7 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
                 // NotificationManagerは特別な解放処理は不要
                 _notificationManager = null;
                 _disposed = true;
-                
+
                 _logger.LogDebug("AvaloniaNotificationService が正常に解放されました");
             }
             catch (ObjectDisposedException ex)

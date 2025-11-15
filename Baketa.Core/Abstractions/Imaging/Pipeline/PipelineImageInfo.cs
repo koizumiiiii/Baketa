@@ -41,65 +41,65 @@ public class PipelineImageInfo(int width, int height, int channels, ImageFormat 
     /// 標準的な画像情報からパイプライン画像情報を作成
     /// </summary>
     public static PipelineImageInfo FromImageInfo(ImageInfo imageInfo, PipelineStage stage)
-        {
-            ArgumentNullException.ThrowIfNull(imageInfo);
+    {
+        ArgumentNullException.ThrowIfNull(imageInfo);
 
-            return new PipelineImageInfo(
-                imageInfo.Width,
-                imageInfo.Height,
-                imageInfo.Channels,
-                imageInfo.Format,
-                stage
-            );
-        }
-
-        /// <summary>
-        /// 画像から直接パイプライン画像情報を作成
-        /// </summary>
-        public static PipelineImageInfo FromImage(IAdvancedImage image, PipelineStage stage)
-        {
-            ArgumentNullException.ThrowIfNull(image);
-
-            var imageInfo = ImageInfo.FromImage(image);
-            return FromImageInfo(imageInfo, stage);
-        }
-
-        /// <summary>
-        /// 標準的な画像情報に変換
-        /// </summary>
-        public ImageInfo ToImageInfo()
-        {
-            return new ImageInfo(Width, Height, Format, Channels);
-        }
+        return new PipelineImageInfo(
+            imageInfo.Width,
+            imageInfo.Height,
+            imageInfo.Channels,
+            imageInfo.Format,
+            stage
+        );
     }
 
     /// <summary>
-    /// パイプライン処理の段階を表す列挙型
+    /// 画像から直接パイプライン画像情報を作成
     /// </summary>
-    public enum PipelineStage
+    public static PipelineImageInfo FromImage(IAdvancedImage image, PipelineStage stage)
     {
-        /// <summary>
-        /// 入力段階（未処理）
-        /// </summary>
-        Input,
+        ArgumentNullException.ThrowIfNull(image);
 
-        /// <summary>
-        /// 前処理段階
-        /// </summary>
-        Preprocessing,
-
-        /// <summary>
-        /// 処理段階
-        /// </summary>
-        Processing,
-
-        /// <summary>
-        /// 後処理段階
-        /// </summary>
-        Postprocessing,
-
-        /// <summary>
-        /// 出力段階（処理済み）
-        /// </summary>
-        Output
+        var imageInfo = ImageInfo.FromImage(image);
+        return FromImageInfo(imageInfo, stage);
     }
+
+    /// <summary>
+    /// 標準的な画像情報に変換
+    /// </summary>
+    public ImageInfo ToImageInfo()
+    {
+        return new ImageInfo(Width, Height, Format, Channels);
+    }
+}
+
+/// <summary>
+/// パイプライン処理の段階を表す列挙型
+/// </summary>
+public enum PipelineStage
+{
+    /// <summary>
+    /// 入力段階（未処理）
+    /// </summary>
+    Input,
+
+    /// <summary>
+    /// 前処理段階
+    /// </summary>
+    Preprocessing,
+
+    /// <summary>
+    /// 処理段階
+    /// </summary>
+    Processing,
+
+    /// <summary>
+    /// 後処理段階
+    /// </summary>
+    Postprocessing,
+
+    /// <summary>
+    /// 出力段階（処理済み）
+    /// </summary>
+    Output
+}

@@ -47,25 +47,25 @@ public class AdvancedCaptureServiceStatusChangedEvent(
 
     /// <inheritdoc />
     public override string Name => "AdvancedCaptureServiceStatusChanged";
-    
+
     /// <inheritdoc />
     public override string Category => "Capture";
-    
+
     /// <summary>
     /// ステータス変更がエラー関連かどうかを判定します
     /// </summary>
     public bool IsErrorStatus => CurrentStatus == CaptureServiceStatus.Error;
-    
+
     /// <summary>
     /// キャプチャが実行中かどうかを判定します
     /// </summary>
     public bool IsRunning => CurrentStatus == CaptureServiceStatus.Running;
-    
+
     /// <summary>
     /// キャプチャが停止中かどうかを判定します
     /// </summary>
     public bool IsStopped => CurrentStatus == CaptureServiceStatus.Stopped;
-    
+
     /// <summary>
     /// キャプチャが一時停止中かどうかを判定します
     /// </summary>

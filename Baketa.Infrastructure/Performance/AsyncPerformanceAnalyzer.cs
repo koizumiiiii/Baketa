@@ -46,12 +46,12 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
         try
         {
             _logger.LogDebug("⏱️ Starting measurement for operation: {OperationName}", operationName);
-            
+
             await operation(cancellationToken).ConfigureAwait(false);
-            
+
             stopwatch.Stop();
             var endTime = DateTime.UtcNow;
-            
+
             measurement = measurement with
             {
                 ExecutionTime = stopwatch.Elapsed,
@@ -62,14 +62,47 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             // カウンターを更新
             UpdateOperationCounter(operationName, stopwatch.Elapsed, true);
 
-            _logger.LogDebug("✅ Operation completed successfully: {OperationName} in {ExecutionTime:F2}ms", 
+            _logger.LogDebug("✅ Operation completed successfully: {OperationName} in {ExecutionTime:F2}ms",
+                operationName, stopwatch.Elapsed.TotalMilliseconds);
+        }
+        catch (OperationCanceledException oce)
+        {
+            stopwatch.Stop();
+            var endTime = DateTime.UtcNow;
+
+            measurement = measurement with
+            {
+                ExecutionTime = stopwatch.Elapsed,
+                EndTime = endTime,
+                IsSuccessful = false,
+                ErrorMessage = "Operation Canceled"
+            };
+
+            // エラーカウンターを更新
+            UpdateOperationCounter(operationName, stopwatch.Elapsed, false);
+
+            // 🔥 UltraThink Phase 9.1: 確実なログ出力（Console + ファイル + Logger）
+            var cancelMessage = $"⏸️ [PERF_CANCEL] Operation '{operationName}' was canceled after {stopwatch.Elapsed.TotalMilliseconds:F2}ms";
+            Console.WriteLine($"🚨🚨🚨 {cancelMessage}");
+
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_performance.txt",
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {cancelMessage}{Environment.NewLine}" +
+                    $"  Exception: {oce.GetType().Name}{Environment.NewLine}" +
+                    $"  Message: {oce.Message}{Environment.NewLine}" +
+                    $"  StackTrace: {oce.StackTrace}{Environment.NewLine}");
+            }
+            catch { /* ファイル書き込み失敗を無視 */ }
+
+            _logger.LogInformation(oce, "⏸️ Operation '{OperationName}' was canceled after {ExecutionTime:F2}ms",
                 operationName, stopwatch.Elapsed.TotalMilliseconds);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             var endTime = DateTime.UtcNow;
-            
+
             measurement = measurement with
             {
                 ExecutionTime = stopwatch.Elapsed,
@@ -81,7 +114,21 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             // エラーカウンターを更新
             UpdateOperationCounter(operationName, stopwatch.Elapsed, false);
 
-            _logger.LogWarning(ex, "❌ Operation failed: {OperationName} after {ExecutionTime:F2}ms", 
+            // 🔥 UltraThink Phase 9.1: 確実なログ出力（Console + ファイル + Logger）
+            var errorMessage = $"❌ [PERF_ERROR] Operation '{operationName}' failed after {stopwatch.Elapsed.TotalMilliseconds:F2}ms - {ex.GetType().Name}: {ex.Message}";
+            Console.WriteLine($"🚨🚨🚨 {errorMessage}");
+
+            try
+            {
+                System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_performance.txt",
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {errorMessage}{Environment.NewLine}" +
+                    $"  Exception: {ex.GetType().FullName}{Environment.NewLine}" +
+                    $"  Message: {ex.Message}{Environment.NewLine}" +
+                    $"  StackTrace: {ex.StackTrace}{Environment.NewLine}");
+            }
+            catch { /* ファイル書き込み失敗を無視 */ }
+
+            _logger.LogWarning(ex, "❌ Operation failed: {OperationName} after {ExecutionTime:F2}ms",
                 operationName, stopwatch.Elapsed.TotalMilliseconds);
         }
 
@@ -110,8 +157,8 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
 
         var totalStopwatch = Stopwatch.StartNew();
         var measurements = new List<PerformanceMeasurement>();
-        var semaphore = maxDegreeOfParallelism > 0 
-            ? new SemaphoreSlim(maxDegreeOfParallelism, maxDegreeOfParallelism) 
+        var semaphore = maxDegreeOfParallelism > 0
+            ? new SemaphoreSlim(maxDegreeOfParallelism, maxDegreeOfParallelism)
             : null;
 
         _logger.LogInformation("🚀 Starting parallel operations: {OperationGroup} with {Count} operations, MaxParallelism={MaxParallelism}",
@@ -128,7 +175,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
 
                 try
                 {
-                    return await MeasureAsync(async ct => 
+                    return await MeasureAsync(async ct =>
                     {
                         var result = await operation(ct).ConfigureAwait(false);
                         return result;
@@ -156,8 +203,8 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
         {
             OperationGroupName = operationGroupName,
             TotalExecutionTime = totalStopwatch.Elapsed,
-            AverageExecutionTime = executionTimes.Count > 0 
-                ? TimeSpan.FromTicks((long)executionTimes.Average(t => t.Ticks)) 
+            AverageExecutionTime = executionTimes.Count > 0
+                ? TimeSpan.FromTicks((long)executionTimes.Average(t => t.Ticks))
                 : TimeSpan.Zero,
             MaxExecutionTime = executionTimes.Count > 0 ? executionTimes.Max() : TimeSpan.Zero,
             MinExecutionTime = executionTimes.Count > 0 ? executionTimes.Min() : TimeSpan.Zero,
@@ -165,8 +212,8 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             SuccessfulOperations = successfulMeasurements.Count,
             FailedOperations = measurements.Count - successfulMeasurements.Count,
             ActualDegreeOfParallelism = CalculateActualParallelism(measurements),
-            Throughput = totalStopwatch.Elapsed.TotalSeconds > 0 
-                ? successfulMeasurements.Count / totalStopwatch.Elapsed.TotalSeconds 
+            Throughput = totalStopwatch.Elapsed.TotalSeconds > 0
+                ? successfulMeasurements.Count / totalStopwatch.Elapsed.TotalSeconds
                 : 0,
             IndividualMeasurements = measurements
         };
@@ -174,7 +221,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
         _logger.LogInformation("📊 Parallel operations completed: {OperationGroup} - " +
             "Total={Total}, Successful={Successful}, Failed={Failed}, " +
             "TotalTime={TotalTime:F2}ms, AvgTime={AvgTime:F2}ms, Throughput={Throughput:F1}ops/s",
-            operationGroupName, parallelMeasurement.TotalOperations, 
+            operationGroupName, parallelMeasurement.TotalOperations,
             parallelMeasurement.SuccessfulOperations, parallelMeasurement.FailedOperations,
             parallelMeasurement.TotalExecutionTime.TotalMilliseconds,
             parallelMeasurement.AverageExecutionTime.TotalMilliseconds,
@@ -203,7 +250,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
                     OperationName = group.Key,
                     Count = measurements.Count,
                     TotalTime = TimeSpan.FromTicks(executionTimes.Sum(t => t.Ticks)),
-                    AverageTime = executionTimes.Count > 0 
+                    AverageTime = executionTimes.Count > 0
                         ? TimeSpan.FromTicks((long)executionTimes.Average(t => t.Ticks))
                         : TimeSpan.Zero,
                     MinTime = executionTimes.Count > 0 ? executionTimes.Min() : TimeSpan.Zero,
@@ -219,7 +266,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
             SuccessfulOperations = measurementsList.Count(m => m.IsSuccessful),
             FailedOperations = measurementsList.Count(m => !m.IsSuccessful),
             TotalExecutionTime = TimeSpan.FromTicks(measurementsList.Sum(m => m.ExecutionTime.Ticks)),
-            AverageExecutionTime = measurementsList.Count > 0 
+            AverageExecutionTime = measurementsList.Count > 0
                 ? TimeSpan.FromTicks((long)measurementsList.Average(m => m.ExecutionTime.Ticks))
                 : TimeSpan.Zero,
             OperationStats = operationStats
@@ -236,10 +283,10 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
     public void ClearStatistics()
     {
         ThrowIfDisposed();
-        
+
         _measurements.Clear();
         _operationCounters.Clear();
-        
+
         _logger.LogInformation("🧹 Performance statistics cleared");
     }
 
@@ -304,7 +351,7 @@ public sealed class AsyncPerformanceAnalyzer : IAsyncPerformanceAnalyzer
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
         _logger.LogInformation("🏁 AsyncPerformanceAnalyzer disposed");
     }

@@ -112,11 +112,26 @@ public static partial class NativeWindowsCapture
     /// <param name="buffer">メッセージバッファ</param>
     /// <param name="bufferSize">バッファサイズ</param>
     /// <returns>実際のメッセージ長</returns>
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, 
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl,
               CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
     public static extern int BaketaCapture_GetLastError([Out] IntPtr buffer, int bufferSize);
+
+    /// <summary>
+    /// セッションのウィンドウデバッグ情報を取得
+    /// </summary>
+    /// <param name="sessionId">セッションID</param>
+    /// <param name="windowInfoBuffer">ウィンドウ情報バッファ</param>
+    /// <param name="windowInfoSize">ウィンドウ情報バッファサイズ</param>
+    /// <param name="screenRectBuffer">スクリーン座標バッファ</param>
+    /// <param name="screenRectSize">スクリーン座標バッファサイズ</param>
+    /// <returns>成功時は 1、失敗時は 0</returns>
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl,
+              CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
+    public static extern int BaketaCapture_GetWindowDebugInfo(int sessionId, [Out] IntPtr windowInfoBuffer, int windowInfoSize, [Out] IntPtr screenRectBuffer, int screenRectSize);
 
     /// <summary>
     /// 最後のエラーメッセージを取得（文字列版）
@@ -129,15 +144,45 @@ public static partial class NativeWindowsCapture
         try
         {
             int length = BaketaCapture_GetLastError(buffer, bufferSize);
-            
+
             if (length <= 0)
                 return string.Empty;
-                
+
             return Marshal.PtrToStringAnsi(buffer, Math.Min(length, bufferSize - 1)) ?? string.Empty;
         }
         finally
         {
             Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    /// <summary>
+    /// セッションのデバッグ情報を取得（文字列版）
+    /// </summary>
+    /// <param name="sessionId">セッションID</param>
+    /// <returns>デバッグ情報（ウィンドウ情報, スクリーン座標）</returns>
+    public static (string windowInfo, string screenRect) GetSessionDebugInfo(int sessionId)
+    {
+        const int bufferSize = 1024;
+        IntPtr windowBuffer = Marshal.AllocHGlobal(bufferSize);
+        IntPtr rectBuffer = Marshal.AllocHGlobal(bufferSize);
+
+        try
+        {
+            int result = BaketaCapture_GetWindowDebugInfo(sessionId, windowBuffer, bufferSize, rectBuffer, bufferSize);
+
+            if (result == 0)
+                return ("Debug info unavailable", "Debug info unavailable");
+
+            string windowInfo = Marshal.PtrToStringAnsi(windowBuffer) ?? "N/A";
+            string screenRect = Marshal.PtrToStringAnsi(rectBuffer) ?? "N/A";
+
+            return (windowInfo, screenRect);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(windowBuffer);
+            Marshal.FreeHGlobal(rectBuffer);
         }
     }
 }

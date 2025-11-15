@@ -1,14 +1,14 @@
 #pragma warning disable CS0618 // Type or member is obsolete
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -20,20 +20,20 @@ public sealed class OverlaySettingsViewModel : Framework.ViewModelBase
 {
     private readonly OverlaySettings _originalSettings;
     private readonly ILogger<OverlaySettingsViewModel>? _logger;
-    
+
     // バッキングフィールド - 基本設定
     private bool _isEnabled;
     private double _opacity;
     private int _fontSize;
     private uint _backgroundColor;
     private uint _textColor;
-    
+
     // バッキングフィールド - 自動非表示設定
     private bool _enableAutoHideForAutoTranslation;
     private int _autoHideDelayForAutoTranslation;
     private bool _enableAutoHideForSingleShot;
     private int _autoHideDelayForSingleShot;
-    
+
     // バッキングフィールド - 詳細設定
     private int _maxWidth;
     private int _maxHeight;
@@ -41,21 +41,21 @@ public sealed class OverlaySettingsViewModel : Framework.ViewModelBase
     private bool _allowManualClose;
     private bool _enableClickThrough;
     private int _fadeOutDurationMs;
-    
+
     // バッキングフィールド - 位置設定
     private OverlayPositionMode _positionMode;
     private int _fixedPositionX;
     private int _fixedPositionY;
-    
+
     // バッキングフィールド - 外観設定
     private bool _showBorder;
     private uint _borderColor;
     private int _borderThickness;
     private int _cornerRadius;
-    
+
     // バッキングフィールド - デバッグ設定
     private bool _showDebugBounds;
-    
+
     // UI制御フィールド
     private bool _showAdvancedSettings;
     private bool _hasChanges;
@@ -464,41 +464,42 @@ public sealed class OverlaySettingsViewModel : Framework.ViewModelBase
     private void SetupChangeTracking()
     {
         // 基本設定プロパティの変更追跡
-        this.WhenAnyValue(x => x.IsEnabled, x => x.Opacity, x => x.FontSize, 
+        this.WhenAnyValue(x => x.IsEnabled, x => x.Opacity, x => x.FontSize,
                           x => x.BackgroundColor, x => x.TextColor)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 自動非表示設定の変更追跡
         this.WhenAnyValue(x => x.EnableAutoHideForAutoTranslation, x => x.AutoHideDelayForAutoTranslation,
                           x => x.EnableAutoHideForSingleShot, x => x.AutoHideDelayForSingleShot)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 詳細設定プロパティの変更追跡
         this.WhenAnyValue(x => x.MaxWidth, x => x.MaxHeight, x => x.EnableTextTruncation,
                           x => x.AllowManualClose, x => x.EnableClickThrough, x => x.FadeOutDurationMs)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 位置設定プロパティの変更追跡
         this.WhenAnyValue(x => x.PositionMode)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => {
+            .Subscribe(_ =>
+            {
                 HasChanges = true;
                 this.RaisePropertyChanged(nameof(IsFixedPositionEnabled));
             });
-        
+
         this.WhenAnyValue(x => x.FixedPositionX, x => x.FixedPositionY)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // 外観設定プロパティの変更追跡
-        this.WhenAnyValue(x => x.ShowBorder, x => x.BorderColor, 
+        this.WhenAnyValue(x => x.ShowBorder, x => x.BorderColor,
                           x => x.BorderThickness, x => x.CornerRadius)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         // デバッグ設定の変更追跡
         this.WhenAnyValue(x => x.ShowDebugBounds)
             .Skip(1).DistinctUntilChanged()
@@ -574,27 +575,27 @@ public sealed class OverlaySettingsViewModel : Framework.ViewModelBase
                 _logger?.LogWarning("透明度が範囲外です: {Opacity}", Opacity);
                 return false;
             }
-            
+
             // フォントサイズの検証
             if (FontSize < 8 || FontSize > 48)
             {
                 _logger?.LogWarning("フォントサイズが範囲外です: {FontSize}", FontSize);
                 return false;
             }
-            
+
             // 自動非表示時間の検証
             if (AutoHideDelayForAutoTranslation < 2 || AutoHideDelayForAutoTranslation > 30)
             {
                 _logger?.LogWarning("自動翻訳の自動非表示時間が範囲外です: {Delay}秒", AutoHideDelayForAutoTranslation);
                 return false;
             }
-            
+
             if (AutoHideDelayForSingleShot < 3 || AutoHideDelayForSingleShot > 60)
             {
                 _logger?.LogWarning("単発翻訳の自動非表示時間が範囲外です: {Delay}秒", AutoHideDelayForSingleShot);
                 return false;
             }
-            
+
             return true;
         }
         catch (ArgumentOutOfRangeException ex)
@@ -646,7 +647,7 @@ public sealed class OverlaySettingsViewModel : Framework.ViewModelBase
     public void UpdateSettings(OverlaySettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         InitializeFromSettings(settings);
         HasChanges = false;
         _logger?.LogDebug("オーバーレイ設定を更新しました");

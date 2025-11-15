@@ -1,13 +1,13 @@
+using System.Reactive.Linq;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
+using Baketa.UI.Tests.TestUtilities;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ReactiveUI.Testing;
 using Xunit;
-using Baketa.Core.Settings;
-using Baketa.Core.Abstractions.Events;
-using Baketa.UI.ViewModels.Settings;
-using Baketa.UI.Tests.TestUtilities;
-using System.Reactive.Linq;
 
 namespace Baketa.UI.Tests.ViewModels.Settings;
 
@@ -55,7 +55,7 @@ public class ThemeSettingsViewModelTests
     public void Constructor_WithNullSettings_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new ThemeSettingsViewModel(null!, _mockEventAggregator.Object, _mockLogger.Object));
     }
 
@@ -63,7 +63,7 @@ public class ThemeSettingsViewModelTests
     public void Constructor_WithNullEventAggregator_ThrowsArgumentNullException()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new ThemeSettingsViewModel(_testSettings, null!, _mockLogger.Object));
     }
 
@@ -75,7 +75,7 @@ public class ThemeSettingsViewModelTests
     {
         // Arrange
         var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
+
         // 現在の値と異なる値を設定する必要がある
         if (viewModel.AppTheme == theme)
         {
@@ -83,7 +83,7 @@ public class ThemeSettingsViewModelTests
             var differentTheme = theme == UiTheme.Auto ? UiTheme.Light : UiTheme.Auto;
             viewModel.AppTheme = differentTheme;
             viewModel.HasChanges.Should().BeTrue("初回の変更でHasChangesがtrueになるべき");
-            
+
             // HasChangesをリセットしてテストを続行
             viewModel.HasChanges = false;
         }
@@ -105,7 +105,7 @@ public class ThemeSettingsViewModelTests
     {
         // Arrange
         var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
+
         // 現在の値と異なる値を設定する必要がある
         if (viewModel.AnimationSpeed == speed)
         {
@@ -113,7 +113,7 @@ public class ThemeSettingsViewModelTests
             var differentSpeed = speed == AnimationSpeed.Normal ? AnimationSpeed.Fast : AnimationSpeed.Normal;
             viewModel.AnimationSpeed = differentSpeed;
             viewModel.HasChanges.Should().BeTrue("初回の変更でHasChangesがtrueになるべき");
-            
+
             // HasChangesをリセットしてテストを続行
             viewModel.HasChanges = false;
         }
@@ -178,7 +178,7 @@ public class ThemeSettingsViewModelTests
     {
         // Arrange
         var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
+
         // 現在の値と異なる値を設定する必要がある
         if (viewModel.FontFamily == fontFamily)
         {
@@ -186,7 +186,7 @@ public class ThemeSettingsViewModelTests
             var differentFont = fontFamily == "Yu Gothic UI" ? "Arial" : "Yu Gothic UI";
             viewModel.FontFamily = differentFont;
             viewModel.HasChanges.Should().BeTrue("初回の変更でHasChangesがtrueになるべき");
-            
+
             // HasChangesをリセットしてテストを続行
             viewModel.HasChanges = false;
         }
@@ -210,7 +210,7 @@ public class ThemeSettingsViewModelTests
     {
         // Arrange
         var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        
+
         // 現在の値と異なる値を設定する必要がある
         if (viewModel.BaseFontSize == fontSize)
         {
@@ -218,7 +218,7 @@ public class ThemeSettingsViewModelTests
             var differentFontSize = fontSize == 12 ? 16 : 12;
             viewModel.BaseFontSize = differentFontSize;
             viewModel.HasChanges.Should().BeTrue("初回の変更でHasChangesがtrueになるべき");
-            
+
             // HasChangesをリセットしてテストを続行
             viewModel.HasChanges = false;
         }
@@ -291,7 +291,7 @@ public class ThemeSettingsViewModelTests
         // Arrange
         var viewModel = new ThemeSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
         var defaultSettings = new ThemeSettings();
-        
+
         // 初期値を変更
         viewModel.AppTheme = UiTheme.Light;
         viewModel.BaseFontSize = 20;

@@ -17,17 +17,17 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     /// アクティベーション処理
     /// </summary>
     public ViewModelActivator Activator { get; } = new ViewModelActivator();
-    
+
     /// <summary>
     /// イベント集約器
     /// </summary>
     protected IEventAggregator EventAggregator { get; }
-    
+
     /// <summary>
     /// ロガー
     /// </summary>
     protected ILogger? Logger { get; }
-    
+
     /// <summary>
     /// エラーメッセージ
     /// </summary>
@@ -37,7 +37,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         get => _errorMessage;
         set { SetPropertySafe(ref _errorMessage, value); }
     }
-    
+
     /// <summary>
     /// 読み込み中フラグ
     /// </summary>
@@ -47,17 +47,17 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         get => _isLoading;
         set { SetPropertySafe(ref _isLoading, value); }
     }
-    
+
     /// <summary>
     /// リソース破棄用コレクション
     /// </summary>
     protected CompositeDisposable Disposables { get; } = [];
-    
+
     /// <summary>
     /// 廃棄フラグ
     /// </summary>
     private bool _disposed;
-    
+
     /// <summary>
     /// UIスレッド安全なプロパティ設定メソッド
     /// </summary>
@@ -83,7 +83,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         {
             // UIスレッド外の場合は値のみ設定し、後でUIスレッドで通知
             field = value;
-            
+
             // UIスレッドで非同期に通知を送信
             if (!string.IsNullOrEmpty(propertyName))
             {
@@ -99,11 +99,11 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
                     }
                 });
             }
-            
+
             return true;
         }
     }
-    
+
     /// <summary>
     /// 新しいビューモデルを初期化します（イベント集約器のみ）
     /// </summary>
@@ -112,7 +112,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     {
         EventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         Logger = null;
-        
+
         // アクティベーション処理の設定
         this.WhenActivated(disposables =>
         {
@@ -120,7 +120,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
             Disposable.Create(HandleDeactivation).DisposeWith(disposables);
         });
     }
-    
+
     /// <summary>
     /// 新しいビューモデルを初期化します（フルパラメータ）
     /// </summary>
@@ -130,7 +130,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     {
         EventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         Logger = logger;
-        
+
         // アクティベーション処理の設定
         this.WhenActivated(disposables =>
         {
@@ -138,7 +138,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
             Disposable.Create(HandleDeactivation).DisposeWith(disposables);
         });
     }
-    
+
     /// <summary>
     /// ビューモデルがアクティブ化されたときの処理
     /// </summary>
@@ -146,7 +146,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     {
         // 派生クラスでオーバーライド
     }
-    
+
     /// <summary>
     /// ビューモデルが非アクティブ化されたときの処理
     /// </summary>
@@ -154,7 +154,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     {
         // 派生クラスでオーバーライド
     }
-    
+
     /// <summary>
     /// リソースを解放します
     /// </summary>
@@ -163,7 +163,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         Dispose(true);
         GC.SuppressFinalize(this);
     }
-    
+
     /// <summary>
     /// リソースを解放します
     /// </summary>
@@ -172,16 +172,16 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     {
         if (_disposed)
             return;
-            
+
         if (disposing)
         {
             // マネージドリソースの解放
             Disposables.Dispose();
         }
-        
+
         _disposed = true;
     }
-    
+
 
     /// <summary>
     /// イベントを発行します
@@ -192,13 +192,19 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     protected async Task PublishEventAsync<TEvent>(TEvent eventData) where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(eventData);
+
+        // 🔥 [PHASE6.1_EVENTAG_INSTANCE_CHECK] EventAggregatorインスタンス確認
+        var eventAggregatorHash = EventAggregator?.GetHashCode() ?? -1;
         Console.WriteLine($"🚀 ViewModelBase.PublishEventAsync開始: {typeof(TEvent).Name} (ID: {eventData.Id})");
+        Console.WriteLine($"🔍 [INSTANCE_CHECK] EventAggregator HashCode: {eventAggregatorHash}");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚀 ViewModelBase.PublishEventAsync開始: {typeof(TEvent).Name} (ID: {eventData.Id})");
+        Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [INSTANCE_CHECK] EventAggregator HashCode: {eventAggregatorHash}");
+
         await EventAggregator.PublishAsync(eventData).ConfigureAwait(false);
         Console.WriteLine($"✅ ViewModelBase.PublishEventAsync呼び出し完了: {typeof(TEvent).Name}");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ ViewModelBase.PublishEventAsync呼び出し完了: {typeof(TEvent).Name}");
     }
-    
+
     /// <summary>
     /// イベントをサブスクライブします（プロセッサー版）
     /// </summary>
@@ -210,7 +216,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         ArgumentNullException.ThrowIfNull(processor);
         EventAggregator.Subscribe<TEvent>(processor);
     }
-    
+
     /// <summary>
     /// イベントをサブスクライブします（ハンドラ版）
     /// </summary>
@@ -220,15 +226,15 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     protected IDisposable SubscribeToEvent<TEvent>(Func<TEvent, Task> handler) where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(handler);
-        
+
         try
         {
             // インラインプロセッサーを作成
             var processor = new InlineEventProcessor<TEvent>(handler);
             EventAggregator.Subscribe<TEvent>(processor);
-            
+
             // 購読解除用のDisposableを返す
-            var subscription = Disposable.Create(() => 
+            var subscription = Disposable.Create(() =>
             {
                 try
                 {
@@ -248,7 +254,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
             throw;
         }
     }
-    
+
     /// <summary>
     /// インラインイベントプロセッサー
     /// </summary>
@@ -257,16 +263,16 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         where TEvent : IEvent
     {
         private readonly Func<TEvent, Task> _handler;
-        
+
         public InlineEventProcessor(Func<TEvent, Task> handler)
         {
             ArgumentNullException.ThrowIfNull(handler);
             _handler = handler;
         }
-        
+
         public int Priority => 100;
         public bool SynchronousExecution => false;
-        
+
         public Task HandleAsync(TEvent eventData)
         {
             try

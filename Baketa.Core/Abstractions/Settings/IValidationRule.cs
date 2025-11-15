@@ -13,17 +13,17 @@ public interface IValidationRule
     /// ルールの対象となるプロパティパス
     /// </summary>
     string PropertyPath { get; }
-    
+
     /// <summary>
     /// ルールの優先度（数値が小さいほど高優先度）
     /// </summary>
     int Priority { get; }
-    
+
     /// <summary>
     /// ルールの説明
     /// </summary>
     string Description { get; }
-    
+
     /// <summary>
     /// 値を検証します
     /// </summary>
@@ -31,7 +31,7 @@ public interface IValidationRule
     /// <param name="context">検証コンテキスト</param>
     /// <returns>検証結果</returns>
     SettingValidationResult Validate(object? value, ValidationContext context);
-    
+
     /// <summary>
     /// このルールが指定されたプロパティパスに適用可能かどうかを判定します
     /// </summary>

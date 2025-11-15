@@ -1,5 +1,5 @@
-using OpenCvSharp;
 using System.Runtime.InteropServices;
+using OpenCvSharp;
 
 namespace Baketa.Infrastructure.OCR.Preprocessing;
 
@@ -129,7 +129,7 @@ public static class FontSpecificPreprocessor
     public static Mat ProcessWithFontDetection(Mat input)
     {
         var characteristics = AnalyzeFontCharacteristics(input);
-        
+
         Console.WriteLine($"🔍 フォント分析結果:");
         Console.WriteLine($"   📝 フォントタイプ: {characteristics.DetectedType}");
         Console.WriteLine($"   📏 ストローク幅: {characteristics.AverageStrokeWidth:F2}");
@@ -158,7 +158,7 @@ public static class FontSpecificPreprocessor
 
             var totalPixels = Cv2.CountNonZero(dilated);
             var imageArea = gray.Width * gray.Height;
-            
+
             return (double)totalPixels / imageArea * 100; // パーセンテージで返す
         }
         catch
@@ -176,7 +176,7 @@ public static class FontSpecificPreprocessor
         {
             // 水平方向の投影でスペースを検出
             var horizontalProfile = new float[gray.Width];
-            
+
             for (int x = 0; x < gray.Width; x++)
             {
                 float sum = 0;
@@ -225,7 +225,7 @@ public static class FontSpecificPreprocessor
         {
             // 垂直方向の投影でテキスト行を検出
             var verticalProfile = new float[gray.Height];
-            
+
             for (int y = 0; y < gray.Height; y++)
             {
                 float sum = 0;
@@ -287,7 +287,7 @@ public static class FontSpecificPreprocessor
             Cv2.Magnitude(sobelX, sobelY, magnitude);
 
             var meanMagnitude = Cv2.Mean(magnitude).Val0;
-            
+
             // セリフがあると細かいエッジが多くなる
             return meanMagnitude > 15.0;
         }
@@ -306,7 +306,7 @@ public static class FontSpecificPreprocessor
         {
             var characterSpacing = AnalyzeCharacterSpacing(gray);
             var strokeWidth = AnalyzeStrokeWidth(gray);
-            
+
             // 等幅フォントは文字間隔が一定
             return characterSpacing < 30 && strokeWidth > 3;
         }
@@ -325,10 +325,10 @@ public static class FontSpecificPreprocessor
         {
             using var laplacian = new Mat();
             Cv2.Laplacian(gray, laplacian, MatType.CV_64F);
-            
+
             using var abs_laplacian = new Mat();
             Cv2.ConvertScaleAbs(laplacian, abs_laplacian);
-            
+
             return Cv2.Mean(abs_laplacian).Val0;
         }
         catch
@@ -402,47 +402,47 @@ public static class FontSpecificPreprocessor
     private static Mat ProcessSmallThinFont(Mat input)
     {
         var output = new Mat();
-        
+
         // 2倍拡大
         using var upscaled = new Mat();
         Cv2.Resize(input, upscaled, new OpenCvSharp.Size(input.Width * 2, input.Height * 2), interpolation: InterpolationFlags.Cubic);
-        
+
         // 鮮明化
         using var kernel = new Mat(3, 3, MatType.CV_32F);
         var kernelData = new float[] { 0, -1, 0, -1, 5, -1, 0, -1, 0 };
         kernel.SetArray(kernelData);
         using var sharpened = new Mat();
         Cv2.Filter2D(upscaled, sharpened, -1, kernel);
-        
+
         // 元サイズに戻す
         Cv2.Resize(sharpened, output, new OpenCvSharp.Size(input.Width, input.Height), interpolation: InterpolationFlags.Area);
-        
+
         return output;
     }
 
     private static Mat ProcessBoldFont(Mat input)
     {
         var output = new Mat();
-        
+
         // コントラスト強化
         input.ConvertTo(output, -1, 1.3, -20);
-        
+
         // 軽いブラー除去
         using var temp = new Mat();
         Cv2.GaussianBlur(output, temp, new OpenCvSharp.Size(3, 3), 0.5);
         Cv2.AddWeighted(output, 1.5, temp, -0.5, 0, output);
-        
+
         return output;
     }
 
     private static Mat ProcessPixelFont(Mat input)
     {
         var output = new Mat();
-        
+
         // ニアレストネイバー拡大でピクセル感を保持
         using var upscaled = new Mat();
         Cv2.Resize(input, upscaled, new OpenCvSharp.Size(input.Width * 2, input.Height * 2), interpolation: InterpolationFlags.Nearest);
-        
+
         // 二値化で明確化
         using var gray = new Mat();
         if (upscaled.Channels() == 3)
@@ -453,13 +453,13 @@ public static class FontSpecificPreprocessor
         {
             upscaled.CopyTo(gray);
         }
-        
+
         using var binary = new Mat();
         Cv2.Threshold(gray, binary, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
-        
+
         // 元サイズに戻す
         Cv2.Resize(binary, output, new OpenCvSharp.Size(input.Width, input.Height), interpolation: InterpolationFlags.Area);
-        
+
         return output;
     }
 
@@ -472,16 +472,16 @@ public static class FontSpecificPreprocessor
     private static Mat ProcessHandwrittenFont(Mat input)
     {
         var output = new Mat();
-        
+
         // 手書き風は強力なノイズ除去と鮮明化
         using var denoised = new Mat();
         Cv2.FastNlMeansDenoising(input, denoised, 10, 7, 21);
-        
+
         // アンシャープマスク
         using var blurred = new Mat();
         Cv2.GaussianBlur(denoised, blurred, new OpenCvSharp.Size(5, 5), 1.0);
         Cv2.AddWeighted(denoised, 2.0, blurred, -1.0, 0, output);
-        
+
         return output;
     }
 

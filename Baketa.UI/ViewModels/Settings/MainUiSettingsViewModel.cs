@@ -1,13 +1,13 @@
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -19,7 +19,7 @@ public sealed class MainUiSettingsViewModel : Framework.ViewModelBase
 {
     private readonly MainUiSettings _originalSettings;
     private readonly ILogger<MainUiSettingsViewModel>? _logger;
-    
+
     // バッキングフィールド
     private double _panelOpacity;
     private bool _autoHideWhenIdle;
@@ -76,37 +76,37 @@ public sealed class MainUiSettingsViewModel : Framework.ViewModelBase
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.AutoHideWhenIdle)
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.AutoHideDelaySeconds)
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.PanelSize)
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.ThemeStyle)
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.AlwaysOnTop)
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableDragging)
             .Skip(1)
             .DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableAnimations)
             .Skip(1)
             .DistinctUntilChanged()
@@ -329,7 +329,7 @@ public sealed class MainUiSettingsViewModel : Framework.ViewModelBase
     private void ResetToDefaults()
     {
         var defaultSettings = new MainUiSettings();
-        
+
         PanelOpacity = defaultSettings.PanelOpacity;
         AutoHideWhenIdle = defaultSettings.AutoHideWhenIdle;
         AutoHideDelaySeconds = defaultSettings.AutoHideDelaySeconds;
@@ -345,7 +345,7 @@ public sealed class MainUiSettingsViewModel : Framework.ViewModelBase
         ThemeStyle = defaultSettings.ThemeStyle;
         ShowDebugInfo = defaultSettings.ShowDebugInfo;
         ShowFrameRate = defaultSettings.ShowFrameRate;
-        
+
         HasChanges = true;
     }
 
@@ -367,18 +367,18 @@ public sealed class MainUiSettingsViewModel : Framework.ViewModelBase
             return new MainUiSettings
             {
                 PanelOpacity = PanelOpacity,
-            AutoHideWhenIdle = AutoHideWhenIdle,
-            AutoHideDelaySeconds = AutoHideDelaySeconds,
-            HighlightOnHover = HighlightOnHover,
-            PanelSize = PanelSize,
-            AlwaysOnTop = AlwaysOnTop,
-            SingleShotDisplayTime = SingleShotDisplayTime,
-            EnableDragging = EnableDragging,
-            EnableBoundarySnap = EnableBoundarySnap,
-            BoundarySnapDistance = BoundarySnapDistance,
-            EnableAnimations = EnableAnimations,
-            AnimationDurationMs = AnimationDurationMs,
-            ThemeStyle = ThemeStyle,
+                AutoHideWhenIdle = AutoHideWhenIdle,
+                AutoHideDelaySeconds = AutoHideDelaySeconds,
+                HighlightOnHover = HighlightOnHover,
+                PanelSize = PanelSize,
+                AlwaysOnTop = AlwaysOnTop,
+                SingleShotDisplayTime = SingleShotDisplayTime,
+                EnableDragging = EnableDragging,
+                EnableBoundarySnap = EnableBoundarySnap,
+                BoundarySnapDistance = BoundarySnapDistance,
+                EnableAnimations = EnableAnimations,
+                AnimationDurationMs = AnimationDurationMs,
+                ThemeStyle = ThemeStyle,
                 ShowDebugInfo = ShowDebugInfo,
                 ShowFrameRate = ShowFrameRate
             };
@@ -392,7 +392,7 @@ public sealed class MainUiSettingsViewModel : Framework.ViewModelBase
     public void UpdateSettings(MainUiSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         PanelOpacity = settings.PanelOpacity;
         AutoHideWhenIdle = settings.AutoHideWhenIdle;
         AutoHideDelaySeconds = settings.AutoHideDelaySeconds;
@@ -408,7 +408,7 @@ public sealed class MainUiSettingsViewModel : Framework.ViewModelBase
         ThemeStyle = settings.ThemeStyle;
         ShowDebugInfo = settings.ShowDebugInfo;
         ShowFrameRate = settings.ShowFrameRate;
-        
+
         HasChanges = false;
     }
 

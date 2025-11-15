@@ -28,16 +28,16 @@ public sealed class AuthModule : ServiceModuleBase
 
         // Core authentication services
         RegisterAuthenticationServices(services);
-        
+
         // User management services
         RegisterUserServices(services);
-        
+
         // Authentication configuration
         RegisterAuthConfiguration(services);
-        
+
         // Background services
         RegisterBackgroundServices(services);
-        
+
         // Environment-specific services
         RegisterEnvironmentSpecificServices(services, environment);
     }
@@ -112,7 +112,10 @@ public sealed class AuthModule : ServiceModuleBase
     {
         // Authentication initialization service
         services.AddSingleton<AuthInitializationService>();
-        services.AddHostedService<AuthInitializationService>();
+        // TEMPORARY: Disable AuthInitializationService for Phase 1 testing
+        // Phase 1 Goal: Focus on translation pipeline functionality
+        // Will re-enable after Phase 4 completion for premium membership features
+        // services.AddHostedService<AuthInitializationService>();
 
         // Session refresh service (future extension)
         // services.AddSingleton<SessionRefreshService>();
@@ -136,15 +139,15 @@ public sealed class AuthModule : ServiceModuleBase
             case BaketaEnvironment.Development:
                 RegisterDevelopmentServices(services);
                 break;
-                
+
             case BaketaEnvironment.Test:
                 RegisterTestServices(services);
                 break;
-                
+
             case BaketaEnvironment.Production:
                 RegisterProductionServices(services);
                 break;
-                
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(environment), environment, "Unsupported environment");
         }
@@ -158,10 +161,10 @@ public sealed class AuthModule : ServiceModuleBase
     {
         // Development auth debugging tools
         // services.AddSingleton<IAuthDebugService, AuthDebugService>();
-        
+
         // Mock services for offline development
         // services.AddSingleton<IMockAuthProvider, MockAuthProvider>();
-        
+
         // Development auth logging
         // services.AddSingleton<IAuthLogger, VerboseAuthLogger>();
     }
@@ -174,10 +177,10 @@ public sealed class AuthModule : ServiceModuleBase
     {
         // Test authentication providers
         // services.AddSingleton<ITestAuthProvider, InMemoryTestAuthProvider>();
-        
+
         // Test user factories
         // services.AddSingleton<ITestUserFactory, TestUserFactory>();
-        
+
         // Authentication state reset services
         // services.AddSingleton<IAuthStateResetService, AuthStateResetService>();
     }
@@ -190,10 +193,10 @@ public sealed class AuthModule : ServiceModuleBase
     {
         // Production monitoring
         // services.AddSingleton<IAuthMonitoringService, AuthMonitoringService>();
-        
+
         // Security audit logging
         // services.AddSingleton<IAuthAuditLogger, AuthAuditLogger>();
-        
+
         // Production rate limiting
         // services.AddSingleton<IAuthRateLimiter, AuthRateLimiter>();
     }
@@ -224,13 +227,13 @@ public sealed class AuthSettingsValidator : IValidateOptions<AuthSettings>
     public ValidateOptionsResult Validate(string? name, AuthSettings options)
     {
         var validationResult = options.ValidateSettings();
-        
+
         if (!validationResult.IsValid)
         {
             var errors = validationResult.GetErrorMessages();
             return ValidateOptionsResult.Fail($"Authentication settings validation failed: {errors}");
         }
-        
+
         if (validationResult.HasWarnings)
         {
             var _ = validationResult.GetWarningMessages();
@@ -238,7 +241,7 @@ public sealed class AuthSettingsValidator : IValidateOptions<AuthSettings>
             // TODO: Add logging when available
             // _logger.LogWarning("Authentication settings warnings: {Warnings}", warnings);
         }
-        
+
         return ValidateOptionsResult.Success;
     }
 }

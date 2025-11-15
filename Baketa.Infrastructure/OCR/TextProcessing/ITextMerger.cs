@@ -14,7 +14,7 @@ public interface ITextMerger
     /// <param name="textRegions">OCRで検出されたテキスト領域のリスト</param>
     /// <returns>結合されたテキスト</returns>
     string MergeTextRegions(IReadOnlyList<OcrTextRegion> textRegions);
-    
+
     /// <summary>
     /// テキスト領域を行単位でグループ化
     /// </summary>

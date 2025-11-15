@@ -76,6 +76,17 @@ __declspec(dllexport) int BaketaCapture_IsSupported();
 /// <returns>実際のメッセージ長</returns>
 __declspec(dllexport) int BaketaCapture_GetLastError(char* buffer, int bufferSize);
 
+/// <summary>
+/// セッションのウィンドウデバッグ情報を取得
+/// </summary>
+/// <param name="sessionId">セッションID</param>
+/// <param name="windowInfoBuffer">ウィンドウ情報バッファ</param>
+/// <param name="windowInfoSize">ウィンドウ情報バッファサイズ</param>
+/// <param name="screenRectBuffer">スクリーン座標バッファ</param>
+/// <param name="screenRectSize">スクリーン座標バッファサイズ</param>
+/// <returns>成功時は 1、失敗時は 0</returns>
+__declspec(dllexport) int BaketaCapture_GetWindowDebugInfo(int sessionId, char* windowInfoBuffer, int windowInfoSize, char* screenRectBuffer, int screenRectSize);
+
 #ifdef __cplusplus
 }
 #endif

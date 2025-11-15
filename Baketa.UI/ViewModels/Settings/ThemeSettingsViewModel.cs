@@ -1,13 +1,13 @@
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
-using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
 
@@ -19,7 +19,7 @@ public sealed class ThemeSettingsViewModel : Framework.ViewModelBase
 {
     private readonly ThemeSettings _originalSettings;
     private readonly ILogger<ThemeSettingsViewModel>? _logger;
-    
+
     // バッキングフィールド
     private UiTheme _appTheme;
     private uint _accentColor;
@@ -300,51 +300,51 @@ public sealed class ThemeSettingsViewModel : Framework.ViewModelBase
         this.WhenAnyValue(x => x.AppTheme)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.AccentColor)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.FontFamily)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.BaseFontSize)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.HighContrastMode)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableDpiScaling)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.CustomScaleFactor)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableAnimations)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.AnimationSpeed)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.RoundedWindowCorners)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableBlurEffect)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.EnableCustomCss)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
-        
+
         this.WhenAnyValue(x => x.CustomCssFilePath)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
@@ -416,7 +416,7 @@ public sealed class ThemeSettingsViewModel : Framework.ViewModelBase
     public void UpdateSettings(ThemeSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        
+
         InitializeFromSettings(settings);
         HasChanges = false;
         _logger?.LogDebug("テーマ設定を更新しました");
