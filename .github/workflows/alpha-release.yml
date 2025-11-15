@@ -124,6 +124,10 @@ jobs:
         Write-Host "Native DLL copied to publish directory"
       shell: powershell
 
+    # 🔥 [ALPHA_0.1.2] Modelsディレクトリコピーを削除
+    # HuggingFace Hub統合により、モデルは初回起動時に自動ダウンロードされます
+    # これにより配布パッケージが軽量化（~600MB削減）されます
+
     - name: Create alpha package
       run: |
         $version = "${{ steps.version.outputs.version }}"

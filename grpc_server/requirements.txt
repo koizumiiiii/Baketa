@@ -26,6 +26,9 @@ pynvml>=11.5.0
 # Phase 2.2.1: CTranslate2 for optimized inference (80% memory reduction: 2.4GB -> 500MB)
 ctranslate2>=3.20.0
 
+# 🔥 [ALPHA_0.1.2] HuggingFace Hub integration for automatic model download
+huggingface_hub>=0.20.0
+
 # Development & Testing
 pytest>=7.0.0
 pytest-asyncio>=0.23.0

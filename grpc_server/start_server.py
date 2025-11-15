@@ -106,14 +106,52 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
     # エンジン選択
     if use_ctranslate2:
         logger.info("Initializing CTranslate2 translation engine...")
-        # 🔥 [PATH_FIX] スクリプトの場所から絶対パスを構築
-        script_dir = Path(__file__).parent  # E:\dev\Baketa\grpc_server
-        project_root = script_dir.parent  # E:\dev\Baketa
-        model_path = project_root / "Models" / "nllb-200-ct2"
+
+        # 🔥 [ALPHA_0.1.2] HuggingFace Hub統合: モデル保存先を%APPDATA%\Baketa\Modelsに変更
+        # Gemini推奨: インストール先への書き込みは管理者権限が必要なため、APPDATAを使用
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-ct2"
         logger.info(f"Model path resolved: {model_path}")
 
+        # モデル存在チェック・自動ダウンロード
+        if not model_path.exists() or not (model_path / "model.bin").exists():
+            logger.info("=" * 80)
+            logger.info("Model not found. Downloading from HuggingFace Hub...")
+            logger.info("Repository: JustFrederik/nllb-200-distilled-600M-ct2-int8")
+            logger.info("Size: ~600MB | This may take several minutes...")
+            logger.info("=" * 80)
+            model_path.mkdir(parents=True, exist_ok=True)
+
+            try:
+                # 🔥 [GEMINI_RECOMMENDATION] 非同期ダウンロード（イベントループブロッキング回避）
+                from huggingface_hub import snapshot_download
+                from functools import partial
+
+                loop = asyncio.get_running_loop()
+                download_func = partial(
+                    snapshot_download,
+                    repo_id="JustFrederik/nllb-200-distilled-600M-ct2-int8",
+                    local_dir=str(model_path),
+                    revision="main"  # TODO: 特定のコミットハッシュに固定（セキュリティ向上）
+                )
+                await loop.run_in_executor(None, download_func)
+                logger.info("=" * 80)
+                logger.info("Model download completed successfully.")
+                logger.info("=" * 80)
+            except Exception as e:
+                logger.error("=" * 80)
+                logger.error(f"Model download failed: {e}")
+                logger.error("Please check:")
+                logger.error("  1. Internet connection is available")
+                logger.error("  2. Disk space is sufficient (~600MB)")
+                logger.error("  3. HuggingFace Hub is accessible")
+                logger.error("=" * 80)
+                raise RuntimeError(f"Failed to download model from HuggingFace Hub: {e}")
+        else:
+            logger.info("Model found locally. Skipping download.")
+
         engine = CTranslate2Engine(
-            model_path=str(model_path),  # 絶対パス
+            model_path=str(model_path),  # %APPDATA%\Baketa\Models\nllb-200-ct2
             device="cuda" if torch.cuda.is_available() else "cpu",
             compute_type="int8"
         )
