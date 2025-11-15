@@ -48,12 +48,12 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
     
     - name: Restore dependencies
-      run: dotnet restore --verbosity minimal
-    
+      run: dotnet restore Baketa.sln --verbosity minimal
+
     - name: Build and test
       run: |
-        dotnet build --configuration Release --no-restore --verbosity minimal --arch x64
-        dotnet test --configuration Release --no-build --verbosity minimal
+        dotnet build Baketa.sln --configuration Release --no-restore --verbosity minimal --arch x64
+        dotnet test Baketa.sln --configuration Release --no-build --verbosity minimal
     
     - name: Publish UI application
       run: |
