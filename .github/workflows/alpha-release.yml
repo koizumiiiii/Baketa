@@ -68,8 +68,8 @@ jobs:
     
     - name: Restore and build
       run: |
-        dotnet restore --verbosity minimal
-        dotnet build --configuration Release --no-restore --verbosity minimal --arch x64
+        dotnet restore Baketa.sln --verbosity minimal
+        dotnet build Baketa.sln --configuration Release --no-restore --verbosity minimal --arch x64
     
     - name: Run essential tests
       run: |
