@@ -307,8 +307,9 @@ public class PythonServerManager(
         var startInfo = new ProcessStartInfo
         {
             FileName = pythonExecutable, // Step 1: py.exe優先戦略適用
-            // 🔥 [CTRANSLATE2_FIX] CTranslate2エンジン使用（int8量子化、80%メモリ削減、GPU access violation解消）
-            Arguments = $"\"{scriptPath}\" --port {port} --use-ctranslate2",
+            // 🔥 [ALPHA_RELEASE_FIX] 標準NllbEngine使用（モデル自動ダウンロード対応）
+            // CTranslate2は事前変換済みモデルが必要なため、リリース版では非使用
+            Arguments = $"\"{scriptPath}\" --port {port}",
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
