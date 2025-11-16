@@ -86,14 +86,14 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
     
-    - name: Restore and build
+    - name: Restore dependencies
       run: |
         dotnet restore Baketa.sln --verbosity minimal
-        dotnet build Baketa.sln --configuration Release --no-restore --verbosity minimal
-    
+
     - name: Run essential tests
       run: |
         # Run core tests only for alpha releases (exclude LocalOnly and Integration tests)
+        # Note: Build happens as part of test execution
         dotnet test tests/Baketa.Core.Tests --configuration Release --verbosity minimal --filter "Category!=LocalOnly&Category!=Integration"
         dotnet test tests/Baketa.Infrastructure.Tests --configuration Release --verbosity minimal --filter "Category!=LocalOnly&Category!=Integration"
       continue-on-error: true
