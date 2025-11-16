@@ -132,7 +132,7 @@ jobs:
       run: dotnet build Baketa.sln --configuration Debug --verbosity diagnostic -p:EnforceCodeStyleInBuild=false -p:TreatWarningsAsErrors=false
     
     - name: Run Core Tests
-      run: dotnet test tests/Baketa.Core.Tests/Baketa.Core.Tests.csproj --configuration Debug --verbosity normal --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration" --results-directory TestResults/Core
+      run: dotnet test tests/Baketa.Core.Tests/Baketa.Core.Tests.csproj --configuration Debug --verbosity detailed --logger "console;verbosity=detailed" --logger "trx" --collect:"XPlat Code Coverage" --filter "Category!=LocalOnly&Category!=Integration" --results-directory TestResults/Core
       env:
         MODELS_BASE_PATH: ${{ github.workspace }}\Models
         DEBUG_LOG_PATH: ${{ github.workspace }}\debug_app_logs.txt
