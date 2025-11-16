@@ -123,6 +123,9 @@ public class InfrastructureModule : ServiceModuleBase
 
         // Phase2: ハイブリッドリソース管理システム - PlatformModuleに移動（循環依存解決）
 
+        // 初回起動判定サービス
+        RegisterFirstRunServices(services);
+
         // データ永続化
         RegisterPersistenceServices(services, environment);
     }
@@ -191,6 +194,9 @@ public class InfrastructureModule : ServiceModuleBase
         RegisterResourceMonitoringServices(services);
 
         // Phase2: ハイブリッドリソース管理システム - PlatformModuleに移動（循環依存解決）
+
+        // 初回起動判定サービス
+        RegisterFirstRunServices(services);
 
         // データ永続化
         RegisterPersistenceServices(services, environment);
@@ -701,6 +707,19 @@ public class InfrastructureModule : ServiceModuleBase
         // #endif
 
         Console.WriteLine("✅ 統合パフォーマンス管理システム登録完了（プール化×GPU最適化 + Phase 4.1 メトリクス収集含む）");
+    }
+
+    /// <summary>
+    /// 初回起動判定サービスを登録します。
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterFirstRunServices(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 初回起動判定サービス登録開始");
+
+        services.AddSingleton<Baketa.Infrastructure.Services.IFirstRunService, Baketa.Infrastructure.Services.FirstRunService>();
+
+        Console.WriteLine("✅ FirstRunService登録完了 - 初回起動フラグ管理");
     }
 
     /// <summary>

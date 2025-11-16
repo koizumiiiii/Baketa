@@ -63,7 +63,8 @@ public class MainOverlayViewModel : ViewModelBase
         IWindowManagementService windowManagementService,
         ITranslationControlService translationControlService,
         SimpleSettingsViewModel settingsViewModel,
-        IWarmupService warmupService) // 🔥 [PHASE5.2E] ウォームアップサービス依存追加
+        IWarmupService warmupService, // 🔥 [PHASE5.2E] ウォームアップサービス依存追加
+        Baketa.Infrastructure.Services.IFirstRunService firstRunService) // 初回起動判定サービス
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
@@ -79,6 +80,9 @@ public class MainOverlayViewModel : ViewModelBase
         _warmupService = warmupService ?? throw new ArgumentNullException(nameof(warmupService));
         _warmupService.WarmupProgressChanged += OnWarmupProgressChanged;
 
+        // 初回起動判定サービス設定
+        _firstRunService = firstRunService ?? throw new ArgumentNullException(nameof(firstRunService));
+
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
         _currentStatus = TranslationStatus.Idle; // アイドル状態から開始
@@ -86,10 +90,10 @@ public class MainOverlayViewModel : ViewModelBase
         // 🔥 [FIX] 翻訳エンジンは既に起動済み（ServerManagerHostedServiceで起動）
         // MainOverlayViewModel初期化時点でサーバーは準備完了しているため、falseで開始
         _isTranslationEngineInitializing = false;
-        
+
         Logger?.LogDebug("🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🎯 NEW UI FLOW VERSION - MainOverlayViewModel初期化完了");
-        
+
         // 直接ファイル書き込みでも記録
         try
         {
@@ -99,13 +103,16 @@ public class MainOverlayViewModel : ViewModelBase
         {
             System.Diagnostics.Debug.WriteLine($"MainOverlayViewModel初期化 ファイル書き込みエラー: {fileEx.Message}");
         }
-        
+
         // OCR初期化状態を監視するタスクを開始
         _ = Task.Run(MonitorOcrInitializationAsync);
-        
+
         InitializeCommands();
         InitializeEventHandlers();
         InitializePropertyChangeHandlers();
+
+        // 初回起動チェックと設定画面自動表示
+        _ = Task.Run(CheckAndHandleFirstRunAsync);
     }
 
     private readonly IWindowManagerAdapter _windowManager;
@@ -116,7 +123,8 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly IWindowManagementService _windowManagementService;
     private readonly ITranslationControlService _translationControlService;
     private readonly SimpleSettingsViewModel _settingsViewModel;
-    private readonly IWarmupService _warmupService; // 🔥 [PHASE5.2E] ウォームアップサービス
+    private readonly IWarmupService _warmupService;
+    private readonly Baketa.Infrastructure.Services.IFirstRunService _firstRunService;
 
     #region Properties
 
@@ -1449,6 +1457,45 @@ public class MainOverlayViewModel : ViewModelBase
             // ReactiveCommandのWhenAnyValueがウォームアップ完了状態を検出するために必須
             this.RaisePropertyChanged(nameof(IsWarmupCompleted));
         });
+    }
+
+    #endregion
+
+    #region FirstRun
+
+    /// <summary>
+    /// 初回起動チェックと設定画面自動表示
+    /// </summary>
+    private async Task CheckAndHandleFirstRunAsync()
+    {
+        try
+        {
+            Logger?.LogInformation("🔍 初回起動チェック開始");
+
+            if (_firstRunService.IsFirstRun())
+            {
+                Logger?.LogInformation("✅ 初回起動を検出 - 設定画面を自動表示します");
+
+                // UIスレッドで設定画面を開く
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    Logger?.LogInformation("🎯 設定画面を開きます");
+                    ExecuteSettings();
+                });
+
+                // 初回起動フラグをマーク
+                _firstRunService.MarkAsRun();
+                Logger?.LogInformation("✅ 初回起動フラグをマークしました");
+            }
+            else
+            {
+                Logger?.LogInformation("ℹ️ 2回目以降の起動です");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "❌ 初回起動チェック処理でエラーが発生しました: {Message}", ex.Message);
+        }
     }
 
     #endregion
