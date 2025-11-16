@@ -26,6 +26,12 @@ public interface IOverlayManager
     Task HideAllAsync();
 
     /// <summary>
+    /// 管理下の全オーバーレイの可視性を設定（破棄せずに表示/非表示を切り替え）
+    /// </summary>
+    /// <param name="isVisible">true: 表示, false: 非表示</param>
+    Task SetAllVisibilityAsync(bool isVisible);
+
+    /// <summary>
     /// 現在表示中のオーバーレイ数を取得
     /// </summary>
     int ActiveOverlayCount { get; }

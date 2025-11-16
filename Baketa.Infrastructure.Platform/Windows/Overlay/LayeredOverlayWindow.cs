@@ -304,6 +304,9 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                 _logger.LogDebug("🙈 [WIN32_OVERLAY] ウィンドウ非表示 - HWND: 0x{Hwnd:X}", _hwnd.ToInt64());
             }
         });
+
+        // 🔥 [MESSAGE_QUEUE_FIX] PostMessage()でメッセージキュー処理をトリガー
+        TriggerMessageQueueProcessing();
     }
 
     public void Close()

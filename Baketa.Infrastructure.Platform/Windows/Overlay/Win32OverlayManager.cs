@@ -151,5 +151,36 @@ public sealed class Win32OverlayManager : IOverlayManager
     }
 
     /// <inheritdoc/>
+    public async Task SetAllVisibilityAsync(bool isVisible)
+    {
+        try
+        {
+            var overlayCount = _activeOverlays.Count;
+            _logger.LogInformation("全Win32オーバーレイ可視性変更開始: IsVisible={IsVisible}, Count={Count}",
+                isVisible, overlayCount);
+
+            // 全てのアクティブオーバーレイに対して可視性を設定
+            var tasks = new List<Task>();
+            foreach (var overlay in _activeOverlays.Values)
+            {
+                var task = isVisible ? overlay.ShowAsync() : overlay.HideAsync();
+                tasks.Add(task);
+            }
+
+            // すべての可視性変更を並列実行
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            _logger.LogInformation("全Win32オーバーレイ可視性変更完了: IsVisible={IsVisible}, {Count}個のオーバーレイ",
+                isVisible, overlayCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "全Win32オーバーレイ可視性変更中にエラーが発生しました: IsVisible={IsVisible}",
+                isVisible);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
     public int ActiveOverlayCount => _windowsOverlayWindowManager.ActiveOverlayCount;
 }

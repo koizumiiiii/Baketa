@@ -500,7 +500,7 @@ public class TranslationFlowEventProcessor :
     }
 
     /// <summary>
-    /// 翻訳表示切り替え要求イベントの処理（高速化版）
+    /// 翻訳表示切り替え要求イベントの処理
     /// </summary>
     public async Task HandleAsync(ToggleTranslationDisplayRequestEvent eventData)
     {
@@ -508,16 +508,14 @@ public class TranslationFlowEventProcessor :
         {
             _logger.LogDebug("翻訳表示切り替え要求を処理中: IsVisible={IsVisible}", eventData.IsVisible);
 
-            // 🔧 [OVERLAY_UNIFICATION] TODO: IOverlayManagerにSetAllOverlaysVisibilityAsync()メソッドを追加
-            // 現時点では可視性切り替えは未実装
-            _logger.LogWarning("⚠️ 翻訳表示切り替え機能は現在実装中です (Phase 4で完成予定)");
-            await Task.CompletedTask.ConfigureAwait(false);
+            // 全オーバーレイの可視性を切り替え
+            await _overlayManager.SetAllVisibilityAsync(eventData.IsVisible).ConfigureAwait(false);
 
             // 表示状態変更イベントを発行
             var visibilityEvent = new TranslationDisplayVisibilityChangedEvent(eventData.IsVisible);
             await _eventAggregator.PublishAsync(visibilityEvent).ConfigureAwait(false);
 
-            _logger.LogDebug("翻訳表示切り替えが完了しました（高速化版）");
+            _logger.LogInformation("翻訳表示切り替えが完了しました: IsVisible={IsVisible}", eventData.IsVisible);
         }
         catch (Exception ex)
         {
