@@ -82,15 +82,11 @@ Baketa/
 ├── Baketa.Infrastructure/     # インフラストラクチャ層
 │   ├── OCR/                   # OCR機能実装
 │   ├── Translation/           # 翻訳機能実装
+│   │   ├── Clients/           # gRPCクライアント（NLLB-200 Python連携）
 │   │   ├── Cloud/             # クラウド翻訳（Gemini API）
-│   │   ├── Local/             # ローカル翻訳（OPUS-MT）
-│   │   │   └── Onnx/          # ONNX推論エンジン
-│   │   │       ├── SentencePiece/  # SentencePiece統合
-│   │   │       └── Chinese/   # 中国語翻訳特化
-│   │   ├── Hybrid/            # フォールバック翻訳エンジン
-│   │   ├── Complete/          # 統合翻訳システム
-│   │   ├── Extensions/        # DI拡張メソッド
-│   │   └── Services/          # 翻訳サポートサービス
+│   │   ├── Adapters/          # 翻訳エンジンアダプター
+│   │   ├── Services/          # PythonServerManager等
+│   │   └── Protos/            # gRPC Protocol Buffers定義
 │   └── Services/              # その他サービス実装
 │
 ├── Baketa.Infrastructure.Platform/  # プラットフォーム依存機能
@@ -127,13 +123,13 @@ Baketa/
 
 プラットフォーム非依存のインフラストラクチャサービスを提供します：
 
-- **OCRエンジン**: PaddleOCRとOpenCV最適化
+- **OCRエンジン**: PP-OCRv5（PaddleOCR）とOpenCV最適化
 - **翻訳システム**:
-  - **ローカル翻訳**: OPUS-MT ONNXモデル + SentencePieceトークナイザー
+  - **gRPC翻訳クライアント**: HTTP/2によるC# ↔ Python連携（NLLB-200）
   - **クラウド翻訳**: Google Gemini API 統合
-  - **フォールバック翻訳**: ローカル/クラウドのフォールバック対応
-  - **中国語特化**: 簡体字・繁体字・双方向翻訳完全対応
-- **永続化機能**: モデルキャッシュ、翻訳キャッシュ
+  - **PythonServerManager**: 自動サーバー起動・ヘルスチェック・Keep-Alive
+  - **ハイブリッドフォールバック**: ローカル（NLLB-200 gRPC）⇄クラウド（Gemini）自動切り替え
+- **永続化機能**: 翻訳キャッシュ、設定管理
 - **共通サービス実装**: レート制限、メトリクス管理
 
 ### 2.3 Baketa.Infrastructure.Platform
