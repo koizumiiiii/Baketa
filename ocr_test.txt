@@ -1,1 +1,0 @@
-これはOCRテスト用のテキストです。日本語の文字認識をテストしています。Hello World. This is a test for OCR recognition.
