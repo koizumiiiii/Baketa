@@ -62,8 +62,8 @@ public sealed class Win32OverlayManager : IOverlayManager
                 .CreateOverlayWindowAsync(targetWindowHandle, initialSize, initialPosition)
                 .ConfigureAwait(false);
 
-            // コンテンツを設定（現時点ではテキストのみ、将来的にスタイル情報も適用）
-            overlayWindow.UpdateContent(content.Text);
+            // コンテンツを設定（OverlayContent全体を渡してフォントサイズなどの設定を反映）
+            overlayWindow.UpdateContent(content);
 
             // Win32OverlayでラップしてIOverlayとして返す
             var win32Overlay = new Win32Overlay(overlayWindow);

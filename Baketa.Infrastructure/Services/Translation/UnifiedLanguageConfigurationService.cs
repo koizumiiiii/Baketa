@@ -150,4 +150,5 @@ internal sealed class TranslationSettingsImpl : ITranslationSettings
     public bool UseLocalEngine { get; set; }
     public double ConfidenceThreshold { get; set; }
     public int TimeoutMs { get; set; }
+    public int OverlayFontSize { get; set; }
 }

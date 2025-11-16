@@ -84,6 +84,16 @@ public interface ILayeredOverlayWindow : IDisposable
     void SetBackgroundColor(byte a, byte r, byte g, byte b);
 
     /// <summary>
+    /// フォントサイズを設定
+    /// </summary>
+    /// <param name="fontSize">フォントサイズ（ポイント単位）</param>
+    /// <remarks>
+    /// スレッドセーフ: メッセージキュー経由でSTAスレッドに転送
+    /// フォントサイズ変更後、コンテンツを再描画
+    /// </remarks>
+    void SetFontSize(float fontSize);
+
+    /// <summary>
     /// ウィンドウが表示中かどうか
     /// </summary>
     bool IsVisible { get; }

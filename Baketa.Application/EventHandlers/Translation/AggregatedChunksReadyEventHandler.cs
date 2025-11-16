@@ -40,6 +40,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AggregatedChunksReadyEventHandler> _logger;
     private readonly ICoordinateTransformationService _coordinateTransformationService; // 🔥 [COORDINATE_FIX]
+    private readonly Core.Abstractions.Settings.IUnifiedSettingsService _unifiedSettingsService;
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
@@ -49,6 +50,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         IEventAggregator eventAggregator,
         ILogger<AggregatedChunksReadyEventHandler> logger,
         ICoordinateTransformationService coordinateTransformationService, // 🔥 [COORDINATE_FIX]
+        Core.Abstractions.Settings.IUnifiedSettingsService unifiedSettingsService,
         IStreamingTranslationService? streamingTranslationService = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
@@ -57,6 +59,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService)); // 🔥 [COORDINATE_FIX]
+        _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _streamingTranslationService = streamingTranslationService;
     }
 
@@ -260,10 +263,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 };
 
                 // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()で直接オーバーレイ表示（スクリーン絶対座標使用）
+                var translationSettings = _unifiedSettingsService.GetTranslationSettings();
                 var content = new OverlayContent
                 {
                     Text = chunkWithScreenCoords.TranslatedText,
-                    OriginalText = chunkWithScreenCoords.CombinedText
+                    OriginalText = chunkWithScreenCoords.CombinedText,
+                    FontSize = translationSettings.OverlayFontSize
                 };
 
                 var position = new OverlayPosition
@@ -532,10 +537,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                         chunk.ChunkId);
 
                     // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()でオーバーレイ表示
+                    var translationSettings = _unifiedSettingsService.GetTranslationSettings();
                     var content = new OverlayContent
                     {
                         Text = chunk.TranslatedText,
-                        OriginalText = chunk.CombinedText
+                        OriginalText = chunk.CombinedText,
+                        FontSize = translationSettings.OverlayFontSize
                     };
 
                     var position = new OverlayPosition

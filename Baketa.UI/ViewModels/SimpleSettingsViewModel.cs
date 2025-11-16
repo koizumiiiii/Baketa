@@ -64,6 +64,7 @@ public class SimpleSettingsViewModel : ViewModelBase
         public bool UseLocalEngine { get; set; }
         public double ConfidenceThreshold { get; set; }
         public int TimeoutMs { get; set; }
+        public int OverlayFontSize { get; set; }
     }
 
     public SimpleSettingsViewModel(
@@ -689,14 +690,14 @@ public class SimpleSettingsViewModel : ViewModelBase
 
             if (_unifiedSettingsService != null)
             {
-                // 統一設定サービスから読み込み
+                // 統一設定サービスから翻訳設定を読み込み
                 var translationSettings = _unifiedSettingsService.GetTranslationSettings();
                 var unifiedResult = new SimpleSettingsData
                 {
                     UseLocalEngine = true, // SimpleSettingsでは常にローカルエンジン
                     SourceLanguage = LanguageCodeConverter.ToDisplayName(translationSettings.DefaultSourceLanguage),
                     TargetLanguage = LanguageCodeConverter.ToDisplayName(translationSettings.DefaultTargetLanguage),
-                    FontSize = 14 // デフォルトフォントサイズ（統一設定にフォント設定はないため）
+                    FontSize = translationSettings.OverlayFontSize
                 };
 
                 DebugHelper.Log($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービスから読み込み完了: UseLocalEngine={unifiedResult.UseLocalEngine}, SourceLanguage={unifiedResult.SourceLanguage}, TargetLanguage={unifiedResult.TargetLanguage}, FontSize={unifiedResult.FontSize}");
@@ -744,7 +745,7 @@ public class SimpleSettingsViewModel : ViewModelBase
 
             if (_unifiedSettingsService != null)
             {
-                // 統一設定サービス経由で保存
+                // 統一設定サービス経由で翻訳設定を保存
                 var translationSettings = new SimpleTranslationSettings
                 {
                     AutoDetectSourceLanguage = false,
@@ -753,11 +754,12 @@ public class SimpleSettingsViewModel : ViewModelBase
                     DefaultEngine = settings.UseLocalEngine ? "NLLB-200" : "Gemini",
                     UseLocalEngine = settings.UseLocalEngine,
                     ConfidenceThreshold = 0.7,
-                    TimeoutMs = 30000
+                    TimeoutMs = 30000,
+                    OverlayFontSize = settings.FontSize
                 };
 
                 await _unifiedSettingsService.UpdateTranslationSettingsAsync(translationSettings).ConfigureAwait(false);
-                Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービス経由での保存完了: {settings.SourceLanguage} → {settings.TargetLanguage}");
+                Console.WriteLine($"🔧 [SimpleSettingsViewModel#{vmHash}] 統一設定サービス経由での保存完了: {settings.SourceLanguage} → {settings.TargetLanguage}, FontSize={settings.FontSize}");
                 return;
             }
 

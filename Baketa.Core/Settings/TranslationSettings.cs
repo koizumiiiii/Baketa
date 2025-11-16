@@ -229,6 +229,15 @@ public sealed class TranslationSettings
     public bool RecordApiUsageStatistics { get; set; }
 
     /// <summary>
+    /// 翻訳結果のフォントサイズ
+    /// </summary>
+    [SettingMetadata(SettingLevel.Basic, "Translation", "フォントサイズ",
+        Description = "翻訳結果オーバーレイのフォントサイズ（ポイント）",
+        MinValue = 8,
+        MaxValue = 48)]
+    public int OverlayFontSize { get; set; } = 14;
+
+    /// <summary>
     /// テキストグループ化機能を有効にする
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "Translation", "文章グループ化",
@@ -431,6 +440,7 @@ public sealed class TranslationSettings
             EnableVerboseLogging = EnableVerboseLogging,
             SaveTranslationResults = SaveTranslationResults,
             RecordApiUsageStatistics = RecordApiUsageStatistics,
+            OverlayFontSize = OverlayFontSize,
             EnableTextGrouping = EnableTextGrouping,
             PreserveParagraphs = PreserveParagraphs,
             SameLineThreshold = SameLineThreshold,

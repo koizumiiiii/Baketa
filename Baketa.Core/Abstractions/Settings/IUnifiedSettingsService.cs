@@ -103,6 +103,7 @@ public interface ITranslationSettings
     bool UseLocalEngine { get; }
     double ConfidenceThreshold { get; }
     int TimeoutMs { get; }
+    int OverlayFontSize { get; }
 }
 
 /// <summary>

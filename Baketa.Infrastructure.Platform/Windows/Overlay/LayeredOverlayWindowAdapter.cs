@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Versioning;
+using Baketa.Core.Abstractions.UI.Overlays;
 using Baketa.Core.UI.Overlay;
 using CoreGeometry = Baketa.Core.UI.Geometry;
 
@@ -98,12 +99,24 @@ public sealed class LayeredOverlayWindowAdapter : IOverlayWindow
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // contentが文字列の場合はSetTextを使用
-        if (content is string text)
+        // contentがOverlayContentの場合
+        if (content is OverlayContent overlayContent)
+        {
+            // フォントサイズが指定されている場合は設定
+            if (overlayContent.FontSize.HasValue)
+            {
+                _layeredWindow.SetFontSize((float)overlayContent.FontSize.Value);
+            }
+
+            // テキストを設定
+            _layeredWindow.SetText(overlayContent.Text);
+        }
+        // contentが文字列の場合はSetTextを使用（後方互換性）
+        else if (content is string text)
         {
             _layeredWindow.SetText(text);
         }
-        // それ以外の場合は何もしない（LayeredOverlayWindowは文字列のみサポート）
+        // それ以外の場合は何もしない
     }
 
     public void AdjustToTargetWindow()

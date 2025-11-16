@@ -128,7 +128,8 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             ["autoDetectSourceLanguage"] = settings.AutoDetectSourceLanguage,
             ["defaultEngine"] = settings.DefaultEngine,
             ["confidenceThreshold"] = settings.ConfidenceThreshold,
-            ["timeoutMs"] = settings.TimeoutMs
+            ["timeoutMs"] = settings.TimeoutMs,
+            ["overlayFontSize"] = settings.OverlayFontSize
         };
 
         var json = JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true });
@@ -252,7 +253,8 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             appSettings.DefaultEngine.ToString(),
             true, // ユーザー設定がない場合はローカルエンジンを使用
             BaketaConstants.Ocr.DefaultConfidenceThreshold, // デフォルト信頼度しきい値
-            appSettings.TimeoutSeconds * 1000); // 秒をミリ秒に変換
+            appSettings.TimeoutSeconds * 1000, // 秒をミリ秒に変換
+            14); // デフォルトフォントサイズ
     }
 
     private UnifiedOcrSettings LoadOcrSettings()
@@ -302,7 +304,8 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             userSettings.GetValueOrDefault("defaultEngine")?.ToString() ?? appSettings.DefaultEngine.ToString(),
             GetBoolValue(userSettings, "useLocalEngine", true),
             GetDoubleValue(userSettings, "confidenceThreshold", 0.7),
-            GetIntValue(userSettings, "timeoutMs", appSettings.TimeoutSeconds * 1000));
+            GetIntValue(userSettings, "timeoutMs", appSettings.TimeoutSeconds * 1000),
+            GetIntValue(userSettings, "overlayFontSize", 14));
     }
 
     private static UnifiedOcrSettings CreateOcrSettingsFromUser(
@@ -417,7 +420,8 @@ internal sealed record UnifiedTranslationSettings(
     string DefaultEngine,
     bool UseLocalEngine,
     double ConfidenceThreshold,
-    int TimeoutMs) : ITranslationSettings;
+    int TimeoutMs,
+    int OverlayFontSize) : ITranslationSettings;
 
 /// <summary>
 /// 統一OCR設定実装
