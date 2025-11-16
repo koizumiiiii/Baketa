@@ -1426,14 +1426,16 @@ public class MainOverlayViewModel : ViewModelBase
                 // Startボタンは canStartCapture() で IsWarmupCompleted をチェックするため、
                 // 失敗状態では永遠に有効化されない（IsWarmupCompleted = false のまま）
             }
-            else if (!_warmupService.IsWarmupCompleted)
+            else if (e.Progress < 1.0)
             {
+                // 🔥 [ALPHA_0.1.2_FIX] 100%未満のみ進捗表示（100%時は完了扱い）
                 // ウォームアップ進行中: 進捗パーセンテージを表示
                 StartButtonTooltip = $"モデル読み込み中... {e.Progress:P0}";
                 Logger?.LogDebug($"🔥 [PHASE5.2E] ウォームアップ進捗: {e.Progress:P0} - {e.Status}");
             }
             else
             {
+                // 🔥 [ALPHA_0.1.2_FIX] 100%到達時にツールチップを即座に「翻訳を開始」に戻す
                 // ウォームアップ完了: デフォルトツールチップに戻す
                 StartButtonTooltip = "翻訳を開始";
                 Logger?.LogInformation("✅ [PHASE5.2E] ウォームアップ完了 - Startボタン有効化");
