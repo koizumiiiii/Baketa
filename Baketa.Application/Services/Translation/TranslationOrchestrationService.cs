@@ -319,6 +319,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 _logger?.LogDebug("🔧 [PHASE3.3_FIX] 新CTS生成完了 - Hash: {TokenHash}", _automaticTranslationCts.Token.GetHashCode());
             }
 
+            // 🔒 [NULL_REF_FIX] ラムダ実行中にフィールドがnullになる競合を防ぐため、トークンをローカル変数にキャプチャ
+            CancellationToken automaticToken = _automaticTranslationCts.Token;
+
             _isAutomaticTranslationActive = true;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
 
@@ -357,7 +360,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 try
                 {
-                    await ExecuteAutomaticTranslationLoopAsync(_automaticTranslationCts.Token).ConfigureAwait(false);
+                    await ExecuteAutomaticTranslationLoopAsync(automaticToken).ConfigureAwait(false);
 
                     try
                     {
@@ -385,7 +388,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 catch { }
 
                 _logger?.LogDebug($"🎬 Task.Run内部終了");
-            }, _automaticTranslationCts.Token);
+            }, automaticToken);
 
             try
             {
