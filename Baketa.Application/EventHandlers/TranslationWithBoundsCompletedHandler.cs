@@ -30,18 +30,20 @@ public class TranslationWithBoundsCompletedHandler(
     private readonly IOverlayManager? _overlayManager = overlayManager;
     private readonly ILogger<TranslationWithBoundsCompletedHandler> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    // 🔥🔥🔥 [ULTRATHINK] コンストラクタで型情報をログ出力
+#if DEBUG
+    // 🔥🔥🔥 [DEBUG] コンストラクタで型情報をログ出力
     static TranslationWithBoundsCompletedHandler()
     {
-        var logFilePath = @"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\debug_app_logs.txt";
+        var logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
         var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        var log = $"[{timestamp}] 🔥🔥🔥 [ULTRATHINK] TranslationWithBoundsCompletedHandler static constructor{Environment.NewLine}";
+        var log = $"[{timestamp}] 🔥🔥🔥 [DEBUG] TranslationWithBoundsCompletedHandler static constructor{Environment.NewLine}";
         try
         {
             File.AppendAllText(logFilePath, log);
         }
         catch { /* ignore */ }
     }
+#endif
 
     // インスタンス初期化時のログ
     private readonly string _instanceId = LogConstructorInfo(overlayManager);
@@ -276,22 +278,24 @@ public class TranslationWithBoundsCompletedHandler(
         await Task.CompletedTask;
     }
 
-    // 🔥🔥🔥 [ULTRATHINK] インスタンス初期化時の型情報ログ
+    // 🔥🔥🔥 [DEBUG] インスタンス初期化時の型情報ログ
     // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
     private static string LogConstructorInfo(IOverlayManager? overlayManager)
     {
         var instanceId = Guid.NewGuid().ToString("N")[..8];
+#if DEBUG
         var typeName = overlayManager?.GetType().FullName ?? "NULL";
-        var logFilePath = @"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\debug_app_logs.txt";
+        var logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
         var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        var log1 = $"[{timestamp}] 🔥🔥🔥 [ULTRATHINK] TranslationWithBoundsCompletedHandler インスタンス作成 - ID: {instanceId}{Environment.NewLine}";
-        var log2 = $"[{timestamp}] 🔥🔥🔥 [ULTRATHINK] _overlayManager実際の型: {typeName}{Environment.NewLine}";
+        var log1 = $"[{timestamp}] 🔥🔥🔥 [DEBUG] TranslationWithBoundsCompletedHandler インスタンス作成 - ID: {instanceId}{Environment.NewLine}";
+        var log2 = $"[{timestamp}] 🔥🔥🔥 [DEBUG] _overlayManager実際の型: {typeName}{Environment.NewLine}";
         try
         {
             File.AppendAllText(logFilePath, log1 + log2);
         }
         catch { /* ignore */ }
-        Console.WriteLine($"🔥🔥🔥 [ULTRATHINK] TranslationWithBoundsCompletedHandler - ID: {instanceId}, Type: {typeName}");
+        Console.WriteLine($"🔥🔥🔥 [DEBUG] TranslationWithBoundsCompletedHandler - ID: {instanceId}, Type: {typeName}");
+#endif
         return instanceId;
     }
 }

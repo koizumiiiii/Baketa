@@ -554,11 +554,13 @@ internal sealed class Program
         Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Environment config file: {environmentConfigFile}");
         Console.WriteLine($"🔍 [CONFIG_PATH_DEBUG] Environment config file exists: {File.Exists(Path.Combine(configBasePath, environmentConfigFile))}");
 
-        // 🔥 Phase 2.3診断: 設定ファイルパスをファイルに出力
+#if DEBUG
+        // 🔥 [DEBUG] 設定ファイルパス診断ログ
         var diagLog = Path.Combine(baseDirectory, "config_diagnostic.log");
         File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] Config Base Path: {configBasePath}\n");
         File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] Environment Config: {environmentConfigFile}\n");
         File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] Env Config Exists: {File.Exists(Path.Combine(configBasePath, environmentConfigFile))}\n");
+#endif
 
         var configuration = new ConfigurationBuilder()
             .SetBasePath(configBasePath)
@@ -566,12 +568,14 @@ internal sealed class Program
             .AddJsonFile(environmentConfigFile, optional: true, reloadOnChange: true)
             .Build();
 
-        // 🔥 Phase 2.3診断: Translation設定の内容を確認
+#if DEBUG
+        // 🔥 [DEBUG] Translation設定の内容確認
         var translationSection = configuration.GetSection("Translation");
         var translationKeys = string.Join(", ", translationSection.GetChildren().Select(c => c.Key));
         File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] Translation Keys: {translationKeys}\n");
         File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] UseGrpcClient: {configuration["Translation:UseGrpcClient"] ?? "NULL"}\n");
         File.AppendAllText(diagLog, $"[{DateTime.Now:HH:mm:ss.fff}] GrpcServerAddress: {configuration["Translation:GrpcServerAddress"] ?? "NULL"}\n");
+#endif
 
         // 設定内容の詳細デバッグ
         Console.WriteLine($"🔍 [CONFIG_DETAILED] All configuration keys:");

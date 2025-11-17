@@ -194,12 +194,14 @@ internal sealed partial class App : Avalonia.Application
             // ReactiveUIログ出力
             Console.WriteLine("🎆 ReactiveUIエラーハンドラー設定完了");
 
+#if DEBUG
             try
             {
                 var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "reactive_ui_startup.txt");
                 File.WriteAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎆 ReactiveUIエラーハンドラー設定完了");
             }
             catch { /* ファイル出力失敗は無視 */ }
+#endif
 
             try
             {

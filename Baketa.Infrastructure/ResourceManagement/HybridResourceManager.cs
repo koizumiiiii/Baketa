@@ -146,16 +146,19 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         IGpuEnvironmentDetector? gpuEnvironmentDetector = null,
         IPerformanceMetricsCollector? metricsCollector = null)
     {
-        // 🔥🔥🔥 ABSOLUTE FIRST LINE - ログファイルに直接書き込み
+#if DEBUG
+        // 🔥🔥🔥 [DEBUG] ログファイルに直接書き込み
         try
         {
-            System.IO.File.AppendAllText(@"E:\dev\Baketa\Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\CTOR_EXECUTED.txt",
+            var debugPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CTOR_EXECUTED.txt");
+            System.IO.File.AppendAllText(debugPath,
                 $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] HybridResourceManager CONSTRUCTOR CALLED\r\n");
         }
         catch { /* ignore */ }
 
         // 🔥🔥🔥 Gemini推奨: コンストラクタ先頭で確実に実行されることを確認
         Console.WriteLine("🔥🔥🔥 [CTOR_ENTRY_CHECK_20251001_0107] CONSTRUCTOR HAS BEEN ENTERED! 🔥🔥🔥");
+#endif
 
         ArgumentNullException.ThrowIfNull(resourceMonitor);
         ArgumentNullException.ThrowIfNull(optionsMonitor);

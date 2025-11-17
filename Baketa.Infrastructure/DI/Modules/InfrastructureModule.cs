@@ -528,10 +528,6 @@ public class InfrastructureModule : ServiceModuleBase
     /// <param name="services">サービスコレクション</param>
     private static void RegisterNllb200TranslationServices(IServiceCollection services)
     {
-        // 🔥 [PHASE12.5.2_DEBUG] メソッド実行確認用ログ（最優先出力）
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
-            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] RegisterNllb200TranslationServices 開始\r\n");
-
         // 既存のITranslationEngine登録を全て削除して、最適化されたエンジンを登録
         var existingTranslationEngines = services
             .Where(s => s.ServiceType == typeof(Baketa.Core.Abstractions.Translation.ITranslationEngine))
@@ -550,24 +546,16 @@ public class InfrastructureModule : ServiceModuleBase
         var pythonServerManagerRegistered = services.Any(sd =>
             sd.ServiceType == typeof(IPythonServerManager));
 
-        // 🔥 [PHASE12.5.2_DEBUG] 判定結果ログ
-        System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
-            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] IPythonServerManager登録済み: {pythonServerManagerRegistered}\r\n");
-
         if (!pythonServerManagerRegistered)
         {
             // ✅ FixedSizeConnectionPool登録（レガシーTCP接続モード専用）
             services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
             Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - レガシーTCP接続モード");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
-                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] FixedSizeConnectionPool登録完了 - レガシーTCP接続モード\r\n");
         }
         else
         {
             // ✅ ConnectionPool未登録（gRPC通信モード）
             Console.WriteLine("🔧 [PHASE3.3] ConnectionPool登録スキップ - gRPC通信モード（gRPCクライアント使用）");
-            System.IO.File.AppendAllText("E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\NLLB_REGISTRATION.txt",
-                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] 🔧 [PHASE3.3] ConnectionPool登録スキップ - gRPC通信モード\r\n");
         }
 
         // 🎯 [UltraThink Solution] appsettings.json固定ポート優先 + ServerManagerHostedService起動監視
