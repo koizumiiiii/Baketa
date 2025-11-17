@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Memory;
@@ -729,8 +730,9 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         // 距離ベースグルーピング（UltraThink修正: 文章統合に最適化）
         var groups = GroupChunksByProximity(validChunks, threshold: 10.0f); // 10ピクセル以内を近接とみなす（文章内の単語のみ統合）
 
+#if DEBUG
         // 🔍 [DEBUG] グルーピング結果デバッグ（ファイル出力）
-        var debugLogPath = "E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\grouping_debug.txt";
+        var debugLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "grouping_debug.txt");
         var debugText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [GROUPING_DEBUG] グルーピング結果: {validChunks.Count}個のチャンク → {groups.Count}個のグループ{Environment.NewLine}";
 
         for (int i = 0; i < groups.Count; i++)
@@ -751,6 +753,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         {
             // ログ出力エラーは無視
         }
+#endif
 
         // 各グループを処理
         foreach (var group in groups)
@@ -854,10 +857,11 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
         var isProximate = edgeDistance <= threshold;
 
+#if DEBUG
         // 🔍 [DEBUG] 近接判定の詳細（ファイル出力）
         if (edgeDistance <= threshold + 5) // 閾値付近をログ出力
         {
-            var debugLogPath = "E:\\dev\\Baketa\\Baketa.UI\\bin\\Debug\\net8.0-windows10.0.19041.0\\grouping_debug.txt";
+            var debugLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "grouping_debug.txt");
             var debugText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🔍 [PROXIMITY_DEBUG] 近接判定: エッジ距離={edgeDistance:F1}px, 閾値={threshold}px → {(isProximate ? "統合" : "分離")}{Environment.NewLine}";
             debugText += $"   Rect1: ({rect1.X},{rect1.Y},{rect1.Width}x{rect1.Height}){Environment.NewLine}";
             debugText += $"   Rect2: ({rect2.X},{rect2.Y},{rect2.Width}x{rect2.Height}){Environment.NewLine}";
@@ -871,6 +875,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                 // ログ出力エラーは無視
             }
         }
+#endif
 
         return isProximate;
     }
