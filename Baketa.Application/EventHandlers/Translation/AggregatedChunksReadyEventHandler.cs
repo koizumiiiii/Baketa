@@ -170,11 +170,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             _logger?.LogDebug($"✅✅✅ [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync完了 - 結果数: {translationResults.Count}");
             Console.WriteLine($"✅✅✅ [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync完了 - 結果数: {translationResults.Count}");
 
+#if DEBUG
             // 🚨 [ULTRATHINK_TRACE1] 翻訳完了直後トレースログ
             var timestamp1 = DateTime.Now.ToString("HH:mm:ss.fff");
             var threadId1 = Environment.CurrentManagedThreadId;
             System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                 $"[{timestamp1}][T{threadId1:D2}] 🚨 [ULTRATHINK_TRACE1] 翻訳完了直後 - 結果数: {translationResults.Count}\r\n");
+#endif
 
             // 翻訳結果を各チャンクに設定
             for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
@@ -183,11 +185,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 _logger?.LogDebug($"🔧 [PHASE12.2_HANDLER] チャンク{i}翻訳結果設定: '{nonEmptyChunks[i].CombinedText}' → '{translationResults[i]}'");
             }
 
+#if DEBUG
             // 🚨 [ULTRATHINK_TRACE2] 翻訳結果設定完了トレースログ
             var timestamp2 = DateTime.Now.ToString("HH:mm:ss.fff");
             var threadId2 = Environment.CurrentManagedThreadId;
             System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                 $"[{timestamp2}][T{threadId2:D2}] 🚨 [ULTRATHINK_TRACE2] 翻訳結果設定完了 - チャンク数: {nonEmptyChunks.Count}\r\n");
+#endif
 
             // 🧹 [OVERLAY_CLEANUP] 新しいオーバーレイ表示前に古いオーバーレイをクリア
             try
@@ -209,11 +213,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             _logger?.LogDebug($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
             Console.WriteLine($"🔥 [OVERLAY_FIX] 直接オーバーレイ表示開始 - チャンク数: {nonEmptyChunks.Count}");
 
+#if DEBUG
             // 🚨 [ULTRATHINK_TRACE3] オーバーレイ表示ループ開始直前トレースログ
             var timestamp3 = DateTime.Now.ToString("HH:mm:ss.fff");
             var threadId3 = Environment.CurrentManagedThreadId;
             System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                 $"[{timestamp3}][T{threadId3:D2}] 🚨 [ULTRATHINK_TRACE3] オーバーレイ表示ループ開始直前 - ループ回数: {Math.Min(nonEmptyChunks.Count, translationResults.Count)}\r\n");
+#endif
 
             for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
             {
@@ -279,30 +285,36 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     Height = chunkWithScreenCoords.CombinedBounds.Height
                 };
 
+#if DEBUG
                 // 🚨 [ULTRATHINK_TRACE4] ShowAsync呼び出し直前トレースログ
                 var timestamp4 = DateTime.Now.ToString("HH:mm:ss.fff");
                 var threadId4 = Environment.CurrentManagedThreadId;
                 var overlayManagerType = _overlayManager?.GetType().FullName ?? "NULL";
                 System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                     $"[{timestamp4}][T{threadId4:D2}] 🚨 [ULTRATHINK_TRACE4] ShowAsync呼び出し直前 - チャンク{i}, Text: '{content.Text}', Position: ({position.X},{position.Y},{position.Width}x{position.Height}), OverlayManagerType: {overlayManagerType}\r\n");
+#endif
 
                 try
                 {
                     await _overlayManager.ShowAsync(content, position).ConfigureAwait(false);
 
+#if DEBUG
                     // 🚨 [ULTRATHINK_TRACE5] ShowAsync呼び出し完了トレースログ
                     var timestamp5 = DateTime.Now.ToString("HH:mm:ss.fff");
                     var threadId5 = Environment.CurrentManagedThreadId;
                     System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                         $"[{timestamp5}][T{threadId5:D2}] 🚨 [ULTRATHINK_TRACE5] ShowAsync呼び出し完了 - チャンク{i}\r\n");
+#endif
                 }
                 catch (Exception showAsyncEx)
                 {
+#if DEBUG
                     // 🚨 [ULTRATHINK_TRACE5_ERROR] ShowAsync例外トレースログ
                     var timestampErr = DateTime.Now.ToString("HH:mm:ss.fff");
                     var threadIdErr = Environment.CurrentManagedThreadId;
                     System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                         $"[{timestampErr}][T{threadIdErr:D2}] 💥 [ULTRATHINK_TRACE5_ERROR] ShowAsync例外 - チャンク{i}, Exception: {showAsyncEx.GetType().Name}, Message: {showAsyncEx.Message}\r\n");
+#endif
                     throw;
                 }
 
@@ -310,11 +322,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 Console.WriteLine($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}'");
             }
 
+#if DEBUG
             // 🚨 [ULTRATHINK_TRACE6] オーバーレイ表示ループ完了トレースログ
             var timestamp6 = DateTime.Now.ToString("HH:mm:ss.fff");
             var threadId6 = Environment.CurrentManagedThreadId;
             System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                 $"[{timestamp6}][T{threadId6:D2}] 🚨 [ULTRATHINK_TRACE6] オーバーレイ表示ループ完了 - 表示数: {nonEmptyChunks.Count}\r\n");
+#endif
 
             Console.WriteLine($"✅✅✅ [OVERLAY_FIX] オーバーレイ表示完了 - {nonEmptyChunks.Count}個表示");
 
@@ -420,11 +434,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 _logger?.LogDebug($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
                 Console.WriteLine($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
 
+#if DEBUG
                 // 🚨🚨🚨 [ULTRA_CRITICAL] 呼び出し直前を確実に記録
                 var timestamp1 = DateTime.Now.ToString("HH:mm:ss.fff");
                 var threadId1 = Environment.CurrentManagedThreadId;
                 System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                     $"[{timestamp1}][T{threadId1:D2}] 🚨🚨🚨 [ULTRA_CRITICAL] TranslateBatchWithStreamingAsync呼び出し実行！\r\n");
+#endif
 
                 var results = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
                     batchTexts,
@@ -433,11 +449,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     null!, // OnChunkCompletedコールバックは不要（バッチ完了後にオーバーレイ表示）
                     cancellationToken).ConfigureAwait(false);
 
+#if DEBUG
                 // 🚨🚨🚨 [ULTRA_CRITICAL] 呼び出し完了を確実に記録
                 var timestamp2 = DateTime.Now.ToString("HH:mm:ss.fff");
                 var threadId2 = Environment.CurrentManagedThreadId;
                 System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                     $"[{timestamp2}][T{threadId2:D2}] 🚨🚨🚨 [ULTRA_CRITICAL] TranslateBatchWithStreamingAsync呼び出し完了！ - 結果数: {results.Count}\r\n");
+#endif
 
                 _logger?.LogDebug($"✅ [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync完了 - 結果数: {results.Count}");
                 return results;
