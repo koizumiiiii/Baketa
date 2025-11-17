@@ -424,6 +424,9 @@ temp_ocr/
 temp_images/
 temp_translations/
 
+# Packaged Python environment (for distribution)
+/vendor/python/
+
 # Configuration files with sensitive data
 appsettings.Production.json
 appsettings.Local.json

@@ -288,17 +288,30 @@ public class PythonServerManager(
             logger.LogInformation("✅ gRPC翻訳サーバー使用（CTranslate2統合版・80%メモリ削減）: {Script}", scriptPath);
         }
 
-        // Step 1統合: PythonEnvironmentResolver使用（py.exe優先戦略）
+        // DEPLOYMENT_STRATEGY: 同梱Python環境を優先使用
         string pythonExecutable;
-        try
+        var vendorPythonPath = Path.Combine(AppContext.BaseDirectory, "vendor", "python", "python.exe");
+
+        if (File.Exists(vendorPythonPath))
         {
-            pythonExecutable = await pythonResolver.ResolvePythonExecutableAsync();
-            logger.LogInformation("✅ Python実行環境解決: {PythonPath}", pythonExecutable);
+            // 同梱されたPython実行ファイルを使用（配布版）
+            pythonExecutable = vendorPythonPath;
+            logger.LogInformation("✅ 同梱Python環境使用: {PythonPath}", pythonExecutable);
         }
-        catch (InvalidOperationException ex)
+        else
         {
-            logger.LogError("❌ Python実行環境解決失敗: {Error}", ex.Message);
-            throw new InvalidOperationException($"Python実行環境が見つかりません。Python 3.10以上をインストールしてください。詳細: {ex.Message}", ex);
+            // 同梱Pythonが見つからない場合、システムPythonにフォールバック（開発環境用）
+            logger.LogWarning("⚠️ 同梱Python未検出（{Path}）。システムPythonにフォールバック", vendorPythonPath);
+            try
+            {
+                pythonExecutable = await pythonResolver.ResolvePythonExecutableAsync();
+                logger.LogInformation("✅ システムPython実行環境解決: {PythonPath}", pythonExecutable);
+            }
+            catch (InvalidOperationException ex)
+            {
+                logger.LogError("❌ Python実行環境解決失敗: {Error}", ex.Message);
+                throw new InvalidOperationException($"Python実行環境が見つかりません。Python 3.10以上をインストールするか、vendor/python/python.exeを配置してください。詳細: {ex.Message}", ex);
+            }
         }
 
         // 🔥 [TOKENIZER_HANG_FIX] HuggingFace Tokenizerロード時のstderrハング問題修正

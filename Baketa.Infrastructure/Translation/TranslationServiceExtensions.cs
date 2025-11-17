@@ -31,13 +31,14 @@ public static class TranslationServiceExtensions
         // ITranslationEngineFactoryを登録（TranslationOrchestrationServiceで必要）
         services.AddSingleton<ITranslationEngineFactory, DefaultTranslationEngineFactory>();
 
-        // ✨ 実際のAI翻訳エンジンを登録（優先順位順）
+        // ✨ 翻訳エンジン登録（単一エンジン使用）
+        // CORRECTION_PLAN: フォールバック機能は存在しない。設定に基づいて単一のエンジンを使用する。
 
-        // 1. NLLB-200エンジン（ローカル、最優先）
-        // NOTE: GrpcTranslationEngineAdapterはInfrastructureModuleで具象クラス登録済み
+        // NLLB-200エンジン（ローカル、現在唯一の本番エンジン）
+        // NOTE: GrpcTranslationEngineAdapterはInfrastructureModuleで ITranslationEngine として登録済み
 
-        // 2. Geminiエンジン（クラウド、第2優先）
-        services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine, GeminiTranslationEngine>();
+        // Google Geminiエンジン（未実装）
+        // 将来的な実装予定。現在は利用不可。
 
 #if DEBUG
         // 開発環境でのみMockエンジンを登録（デバッグ・テスト用）
