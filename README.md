@@ -27,8 +27,7 @@ OCR技術によりゲーム画面からテキストを検出し、翻訳結果�
 - **NLLB-200**: Meta製多言語翻訳モデル（600M distilled版、ローカル処理）
 - **gRPC通信**: HTTP/2ベースの高速C#↔Python間通信（Keep-Alive対応）
 - **CTranslate2**: メモリ使用量80%削減の最適化版エンジン（2.4GB → 500MB）
-- **Google Gemini**: クラウド翻訳エンジン（高精度翻訳・フォールバック）
-- **多言語対応**: 200言語対応（日英中韓など主要言語ペア最適化）
+- **日英翻訳対応**: NLLB-200モデル使用（モデル自体は200言語対応だが、現在は日英のみ動作確認済み）
 - **バッチ翻訳**: 最大32件同時翻訳対応で処理効率向上
 - **自動サーバー起動**: 初回翻訳時にPython gRPCサーバーを自動起動
 
@@ -55,7 +54,7 @@ Baketaは5層クリーンアーキテクチャとモジュラー設計を採用�
    - 抽象インターフェース (`Abstractions/` 名前空間)
 
 2. **Baketa.Infrastructure**: インフラストラクチャ層（OCR、翻訳、設定管理）
-   - PaddleOCR統合、翻訳エンジン (NLLB-200, Gemini, モックエンジン)
+   - PaddleOCR統合、翻訳エンジン (NLLB-200)
    - **gRPC翻訳クライアント**: Python翻訳サーバーとのHTTP/2通信 (`GrpcTranslationClient`)
    - **Pythonサーバー管理**: 自動起動・ヘルスチェック (`PythonServerManager`)
    - 画像処理パイプライン、設定永続化 (JSONベース)
@@ -285,7 +284,7 @@ dotnet publish Baketa.UI/Baketa.UI.csproj \
 - **フレームワーク**: .NET 8.0 Windows、FastAPI（翻訳サーバー）
 - **UI**: Avalonia 11.2.7 + ReactiveUI
 - **OCR**: PaddleOCR PP-OCRv5 + OpenCV最適化
-- **翻訳**: NLLB-200（Meta製、ローカル）、Google Gemini（クラウド）
+- **翻訳**: NLLB-200（Meta製、ローカル）
 - **パフォーマンス**: CTranslate2最適化（提案中）、GPU最適化（CUDA）
 - **監視**: Windows Performance Counter、動的リソース監視
 - **テスト**: xUnit + Moq + Avalonia.Headless
@@ -341,7 +340,6 @@ Baketa/
 - **OpenCV**: 画像処理ライブラリ
 - **Avalonia**: クロスプラットフォームUIフレームワーク
 - **Meta NLLB-200**: No Language Left Behind多言語翻訳モデル
-- **Google Gemini**: クラウドAI翻訳サービス
 
 ---
 
