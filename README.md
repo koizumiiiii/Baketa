@@ -94,44 +94,44 @@ BaketaはgRPC (HTTP/2) による高速C#↔Python間通信で翻訳処理を実�
 
 ```mermaid
 graph TB
-    subgraph "Baketa.UI<br/>(Avalonia UI Layer)"
-        UI[UI Components<br/>MainWindow]
+    subgraph ui["Baketa.UI (Avalonia UI Layer)"]
+        UI[UI Components / MainWindow]
     end
 
-    subgraph "Baketa.Application<br/>(Business Logic Layer)"
-        App[DefaultTranslationService<br/>翻訳サービス統括]
-        EventHandler[AggregatedChunksReadyEventHandler<br/>イベント処理]
+    subgraph app["Baketa.Application (Business Logic Layer)"]
+        App[DefaultTranslationService]
+        EventHandler[AggregatedChunksReadyEventHandler]
     end
 
-    subgraph "Baketa.Infrastructure<br/>(Infrastructure Layer)"
-        Adapter[GrpcTranslationEngineAdapter<br/>ITranslationEngine実装]
-        Client[GrpcTranslationClient<br/>HTTP/2通信]
-        ServerMgr[PythonServerManager<br/>サーバー自動起動]
+    subgraph infra["Baketa.Infrastructure (Infrastructure Layer)"]
+        Adapter[GrpcTranslationEngineAdapter]
+        Client[GrpcTranslationClient]
+        ServerMgr[PythonServerManager]
     end
 
-    subgraph "Python gRPC Server<br/>(Translation Engine)"
-        Server[TranslationServicer<br/>gRPC Service]
-        Engine[NLLB Engine<br/>facebook/nllb-200-distilled-600M]
-        CT2[CTranslate2 Engine<br/>メモリ80%削減版]
+    subgraph python["Python gRPC Server (Translation Engine)"]
+        Server[TranslationServicer]
+        Engine[NLLB Engine: nllb-200-distilled-600M]
+        CT2[CTranslate2 Engine]
     end
 
-    UI -->|翻訳リクエスト| App
+    UI -->|Translation Request| App
     App -->|ITranslationEngine.TranslateAsync| Adapter
-    EventHandler -->|バッチ翻訳| Adapter
+    EventHandler -->|Batch Translation| Adapter
 
-    Adapter -->|1. サーバー起動確認| ServerMgr
+    Adapter -->|1. Check Server| ServerMgr
     ServerMgr -.->|python start_server.py| Server
 
     Adapter -->|2. gRPC Call| Client
-    Client -->|HTTP/2 Keep-Alive<br/>port:50051| Server
+    Client -->|HTTP/2 Keep-Alive port:50051| Server
 
-    Server -->|translate()| Engine
-    Server -.->|オプション| CT2
+    Server -->|translate| Engine
+    Server -.->|optional| CT2
 
     Server -->|TranslateResponse| Client
     Client -->|TranslationResponse| Adapter
-    Adapter -->|結果| App
-    App -->|表示| UI
+    Adapter -->|Result| App
+    App -->|Display| UI
 
     style Server fill:#e1f5fe
     style Engine fill:#fff3e0
