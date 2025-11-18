@@ -43,6 +43,9 @@ public static class UIServiceCollectionExtensions
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
         services.AddSingleton<SettingsFileManager>();
 
+        // 📢 広告サービスの登録（Issue #174: WebView統合）
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IAdvertisementService, AdvertisementService>();
+
         // ファイルダイアログ・エクスポート/インポートサービスの登録
         services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
         services.AddSingleton<SettingsExportImportService>();
@@ -132,7 +135,8 @@ public static class UIServiceCollectionExtensions
             typeof(INotificationService),
             typeof(ITranslationEngineStatusService),
             typeof(IFileDialogService),
-            typeof(SettingsExportImportService)
+            typeof(SettingsExportImportService),
+            typeof(Baketa.Core.Abstractions.Services.IAdvertisementService)
         };
 
         foreach (var serviceType in requiredServices)
