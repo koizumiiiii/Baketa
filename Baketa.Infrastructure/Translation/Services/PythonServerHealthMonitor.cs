@@ -32,7 +32,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private bool _isRestartInProgress = false;
     private bool _disposed = false;
     private Process? _managedServerProcess;
-    private int _currentServerPort = 5556; // デフォルト動的ポート範囲に統一（NLLB-200動的ポート対応）
+    private int _currentServerPort = 50051; // gRPC標準ポート（PythonServerManagerと統一）
 
     // 🔧 [PROCESS_DUPLICATION_PREVENTION] プロセス重複防止システム
     private static readonly string PidFilePath = Path.Combine(Path.GetTempPath(), "baketa_translation_server.pid");
@@ -546,8 +546,8 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                     _logger.LogWarning("⚠️ CTranslate2版が見つからず、gRPCサーバーを使用: {Path}", serverScriptPath);
                 }
 
-                // NLLB-200用のポート設定（動的ポート範囲に統一）
-                _currentServerPort = 5556;
+                // NLLB-200用のポート設定（PythonServerManagerと統一）
+                _currentServerPort = 50051;
 
                 _logger.LogInformation("🎯 [NLLB-200] NLLB-200高品質翻訳サーバーを起動: {ScriptPath} Port:{Port}", serverScriptPath, _currentServerPort);
             }
