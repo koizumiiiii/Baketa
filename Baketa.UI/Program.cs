@@ -6,6 +6,8 @@ using System.Linq;
 using System.Reactive;
 using Avalonia;
 using Avalonia.ReactiveUI;
+// TODO: WebView統合完了後に有効化
+// using Avalonia.WebView.Desktop; // 📢 Issue #174: WebView統合
 using Baketa.Application.DI.Modules;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
@@ -319,6 +321,8 @@ internal sealed class Program
             .WithInterFont()
             .LogToTrace()
             .UseReactiveUI();
+            // TODO: WebView統合完了後に有効化
+            // .UseDesktopWebView(); // 📢 Issue #174: WebView統合
 
     /// <summary>
     /// EventHandlerInitializationServiceを即座に実行（競合状態根本解決）
@@ -604,6 +608,11 @@ internal sealed class Program
 
         // appsettings.jsonから設定を読み込み
         services.Configure<Baketa.Core.Settings.AppSettings>(configuration);
+
+        // 📢 認証設定の登録（Issue #174: WebView統合）
+        services.Configure<Baketa.Core.Settings.AuthSettings>(
+            configuration.GetSection("Authentication"));
+
         services.Configure<Baketa.UI.Services.TranslationEngineStatusOptions>(
             configuration.GetSection("TranslationEngineStatus"));
         services.Configure<Baketa.Core.Settings.RoiDiagnosticsSettings>(
