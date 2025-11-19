@@ -1,5 +1,5 @@
-using Baketa.Application.Models;
 using Baketa.Core.Events;
+using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 
 namespace Baketa.Application.Events;
 

@@ -2,8 +2,8 @@ using System;
 using System.Reactive;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Application.Models;
 using Baketa.Core.Abstractions.Imaging;
+using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 
 namespace Baketa.Application.Services.Translation;
 

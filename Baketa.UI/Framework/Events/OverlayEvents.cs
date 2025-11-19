@@ -191,3 +191,17 @@ public class LoadSettingsRequestEvent : IEvent
     public string Category { get; } = "Settings";
 }
 
+/// <summary>
+/// シングルショット翻訳実行要求イベント
+/// ユーザーがボタンを押したタイミングで1回だけキャプチャ→翻訳を実行
+/// </summary>
+public class ExecuteSingleshotRequestEvent(WindowInfo targetWindow) : IEvent
+{
+    public Guid Id { get; } = Guid.NewGuid();
+    public DateTime Timestamp { get; } = DateTime.UtcNow;
+    public string Name { get; } = nameof(ExecuteSingleshotRequestEvent);
+    public string Category { get; } = "Translation";
+
+    public WindowInfo TargetWindow { get; } = targetWindow ?? throw new ArgumentNullException(nameof(targetWindow));
+}
+

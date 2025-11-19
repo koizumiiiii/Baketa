@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Application.Models;
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
+using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 
 namespace Baketa.Application.Services.Translation;
 
@@ -133,7 +133,7 @@ public class TranslationErrorHandlerService(
         return new TranslationResult
         {
             Id = Guid.NewGuid().ToString(),
-            Mode = TranslationMode.Manual,
+            Mode = TranslationMode.Singleshot,
             OriginalText = sourceText,
             TranslatedText = coreResponse.TranslatedText ?? $"[翻訳エラー: 結果がnull]",
             TargetLanguage = targetLanguage,
@@ -163,7 +163,7 @@ public class TranslationErrorHandlerService(
         return new TranslationResult
         {
             Id = Guid.NewGuid().ToString(),
-            Mode = TranslationMode.Manual,
+            Mode = TranslationMode.Singleshot,
             OriginalText = originalText,
             TranslatedText = $"[翻訳エラー: {errorMessage}]",
             TargetLanguage = "ja",
