@@ -57,6 +57,13 @@ internal static class UIServiceCollectionExtensions
         // 設定関連サービスの登録
         services.AddSettingsServices();
 
+        // 📢 広告関連サービスの登録（Issue #174: WebView統合）
+        // AdvertisementServiceの依存関係を先に登録
+        services.AddSingleton<Baketa.UI.Services.IUserPlanService, Baketa.UI.Services.UserPlanService>();
+
+        // 広告サービス本体
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IAdvertisementService, Baketa.UI.Services.AdvertisementService>();
+
         // 翻訳エンジン状態監視サービス（モック実装）
         services.AddSingleton<ITranslationEngineStatusService, MockTranslationEngineStatusService>();
 
@@ -119,11 +126,11 @@ internal static class UIServiceCollectionExtensions
     /// <summary>
     /// ビューモデルの登録
     /// </summary>
-    /// <param name="_">サービスコレクション（将来の拡張のため保持）</param>
-    private static void RegisterViewModels(IServiceCollection _)
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterViewModels(IServiceCollection services)
     {
-        // ViewModelの登録はUIModuleで一元化するため、ここでは何も登録しない
-        // UIModuleとの重複を避ける
+        // 📢 広告ViewModel登録（Issue #174: WebView統合）
+        services.AddTransient<Baketa.UI.ViewModels.AdViewModel>();
 
         // その他のビューモデル
         // 例: services.AddTransient<MainWindowViewModel>();

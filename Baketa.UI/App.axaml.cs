@@ -466,6 +466,29 @@ internal sealed partial class App : Avalonia.Application
                     // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ MainOverlayView.Show()失敗: {showEx.Message}");
                 }
 
+                // 📢 [Issue #174] 広告ウィンドウの起動
+                _logger?.LogInformation("AdWindow起動開始（Issue #174: WebView統合）");
+                try
+                {
+                    var adViewModel = serviceProvider.GetRequiredService<AdViewModel>();
+                    var adWindow = new Views.AdWindow(adViewModel, serviceProvider.GetRequiredService<ILogger<Views.AdWindow>>());
+
+                    // 広告表示が有効な場合のみ表示
+                    if (adViewModel.ShouldShowAd)
+                    {
+                        adWindow.Show();
+                        _logger?.LogInformation("AdWindow表示完了: 画面右下に配置");
+                    }
+                    else
+                    {
+                        _logger?.LogInformation("AdWindow非表示: Premiumプランまたは広告非表示設定");
+                    }
+                }
+                catch (Exception adEx)
+                {
+                    _logger?.LogWarning(adEx, "AdWindow起動失敗: {Message}。アプリケーションは継続します", adEx.Message);
+                }
+
                 // 🔧 [OVERLAY_UNIFICATION] オーバーレイマネージャー統合確認
                 Console.WriteLine("🎯 IOverlayManager (Win32OverlayManager) 初期化確認");
                 try

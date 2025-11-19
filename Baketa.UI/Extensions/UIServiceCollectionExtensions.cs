@@ -71,6 +71,9 @@ public static class UIServiceCollectionExtensions
         services.AddTransient<Baketa.UI.ViewModels.Settings.TranslationStrategyViewModel>();
         services.AddTransient<Baketa.UI.ViewModels.Settings.EngineStatusViewModel>();
 
+        // 📢 広告ViewModel登録（Issue #174: WebView統合）
+        services.AddTransient<Baketa.UI.ViewModels.AdViewModel>();
+
         return services;
     }
 
