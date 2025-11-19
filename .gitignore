@@ -741,3 +741,7 @@ translation_ports_global.json
 post_gemini_*.json
 requirements.before_update.txt
 disable_file_appendalltext.py
+
+# Python virtual environment
+.venv/
+venv/
