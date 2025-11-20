@@ -43,17 +43,35 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         ILogger<EnhancedSettingsService> logger,
         ISettingMetadataService metadataService,
         ISettingsMigrationManager migrationManager)
+        : this(logger, metadataService, migrationManager, null)
+    {
+    }
+
+    /// <summary>
+    /// EnhancedSettingsServiceを初期化します（テスト用コンストラクタ）
+    /// </summary>
+    /// <param name="logger">ロガー</param>
+    /// <param name="metadataService">メタデータサービス</param>
+    /// <param name="migrationManager">マイグレーション管理サービス</param>
+    /// <param name="settingsFilePath">設定ファイルパス（nullでデフォルト）</param>
+    public EnhancedSettingsService(
+        ILogger<EnhancedSettingsService> logger,
+        ISettingMetadataService metadataService,
+        ISettingsMigrationManager migrationManager,
+        string? settingsFilePath)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _metadataService = metadataService ?? throw new ArgumentNullException(nameof(metadataService));
         _migrationManager = migrationManager ?? throw new ArgumentNullException(nameof(migrationManager));
 
-        // ベースとなるJsonSettingsServiceを初期化
+        // ベースとなるJsonSettingsServiceを初期化（テスト用ファイルパスを渡す）
         using var loggerFactory = LoggerFactory.Create(builder =>
         {
             builder.AddConsole().SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Debug);
         });
-        _baseSettingsService = new JsonSettingsService(loggerFactory.CreateLogger<JsonSettingsService>());
+        _baseSettingsService = new JsonSettingsService(
+            loggerFactory.CreateLogger<JsonSettingsService>(),
+            settingsFilePath);
 
         // 起動時に自動マイグレーションを実行
         _ = Task.Run(async () =>

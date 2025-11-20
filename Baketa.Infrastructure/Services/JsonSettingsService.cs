@@ -26,13 +26,31 @@ public sealed class JsonSettingsService : ISettingsService
     /// </summary>
     /// <param name="logger">ロガー</param>
     public JsonSettingsService(ILogger<JsonSettingsService> logger)
+        : this(logger, null)
+    {
+    }
+
+    /// <summary>
+    /// JsonSettingsService を初期化します（テスト用コンストラクタ）
+    /// </summary>
+    /// <param name="logger">ロガー</param>
+    /// <param name="settingsFilePath">設定ファイルパス（nullでデフォルト）</param>
+    public JsonSettingsService(ILogger<JsonSettingsService> logger, string? settingsFilePath)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // ユーザー設定ディレクトリを取得
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var settingsDirectory = Path.Combine(userProfile, ".baketa", "settings");
-        _settingsFilePath = Path.Combine(settingsDirectory, "user-settings.json");
+        // ファイルパスの決定
+        if (string.IsNullOrWhiteSpace(settingsFilePath))
+        {
+            // ユーザー設定ディレクトリを取得
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var settingsDirectory = Path.Combine(userProfile, ".baketa", "settings");
+            _settingsFilePath = Path.Combine(settingsDirectory, "user-settings.json");
+        }
+        else
+        {
+            _settingsFilePath = settingsFilePath;
+        }
 
         // JSON シリアライゼーションオプション
         _jsonOptions = new JsonSerializerOptions
