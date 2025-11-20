@@ -260,9 +260,14 @@ public class PythonServerManager(
     /// </summary>
     private async Task<Process> StartPythonProcessAsync(int port, string languagePair)
     {
-        // プロジェクトルート取得（Environment.CurrentDirectoryが既にBaketaルート）
+        // 🔥 [GEMINI_REVIEW_FIX] .slnファイルベースの堅牢なプロジェクトルート解決
         var currentDir = Environment.CurrentDirectory;
-        var projectRoot = currentDir; // 🔧 [PATH_FIX] CurrentDirectoryが既にプロジェクトルート
+        var projectRoot = FindProjectRoot(AppContext.BaseDirectory);
+        if (string.IsNullOrEmpty(projectRoot))
+        {
+            logger.LogWarning("⚠️ ソリューションルート(.sln)が見つかりません。CurrentDirectoryをプロジェクトルートとして使用します。");
+            projectRoot = currentDir;
+        }
 
         // CTranslate2版サーバーを優先使用（プロジェクトルートからの相対パス）
         var scriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server_ct2.py");
@@ -288,20 +293,32 @@ public class PythonServerManager(
             logger.LogInformation("✅ gRPC翻訳サーバー使用（CTranslate2統合版・80%メモリ削減）: {Script}", scriptPath);
         }
 
-        // DEPLOYMENT_STRATEGY: 同梱Python環境を優先使用
+        // DEPLOYMENT_STRATEGY: Python環境の優先順位
+        // 1. .venv (Baketa専用開発環境 - protobuf 6.x対応)
+        // 2. vendor/python (配布版同梱)
+        // 3. システムPython (pythonResolver)
         string pythonExecutable;
+
+        // projectRootは既にLine 265で.slnベースの堅牢な方法で解決済み
+        var venvPythonPath = Path.Combine(projectRoot, ".venv", "Scripts", "python.exe");
         var vendorPythonPath = Path.Combine(AppContext.BaseDirectory, "vendor", "python", "python.exe");
 
-        if (File.Exists(vendorPythonPath))
+        if (File.Exists(venvPythonPath))
+        {
+            // Baketa専用Python環境を使用（開発環境 - protobuf 6.x対応）
+            pythonExecutable = venvPythonPath;
+            logger.LogInformation("✅ Baketa専用Python環境使用 (.venv): {PythonPath}", pythonExecutable);
+        }
+        else if (File.Exists(vendorPythonPath))
         {
             // 同梱されたPython実行ファイルを使用（配布版）
             pythonExecutable = vendorPythonPath;
-            logger.LogInformation("✅ 同梱Python環境使用: {PythonPath}", pythonExecutable);
+            logger.LogInformation("✅ 同梱Python環境使用 (vendor): {PythonPath}", pythonExecutable);
         }
         else
         {
-            // 同梱Pythonが見つからない場合、システムPythonにフォールバック（開発環境用）
-            logger.LogWarning("⚠️ 同梱Python未検出（{Path}）。システムPythonにフォールバック", vendorPythonPath);
+            // システムPythonにフォールバック（最終手段）
+            logger.LogWarning("⚠️ .venv未検出（{VenvPath}）、同梱Python未検出（{VendorPath}）。システムPythonにフォールバック", venvPythonPath, vendorPythonPath);
             try
             {
                 pythonExecutable = await pythonResolver.ResolvePythonExecutableAsync();
@@ -310,7 +327,7 @@ public class PythonServerManager(
             catch (InvalidOperationException ex)
             {
                 logger.LogError("❌ Python実行環境解決失敗: {Error}", ex.Message);
-                throw new InvalidOperationException($"Python実行環境が見つかりません。Python 3.10以上をインストールするか、vendor/python/python.exeを配置してください。詳細: {ex.Message}", ex);
+                throw new InvalidOperationException($"Python実行環境が見つかりません。.venv環境を作成（python -m venv .venv）するか、Python 3.10以上をインストールしてください。詳細: {ex.Message}", ex);
             }
         }
 
@@ -867,6 +884,25 @@ public class PythonServerManager(
         }
 
         logger.LogInformation("✅ PythonServerManager破棄完了");
+    }
+
+    /// <summary>
+    /// プロジェクトルートディレクトリを.slnファイルを基点に探索
+    /// 🔥 [GEMINI_REVIEW_FIX] ハードコードされた"../../../../../"をより堅牢な方法に置き換え
+    /// </summary>
+    /// <param name="startPath">探索開始パス（通常はAppContext.BaseDirectory）</param>
+    /// <returns>プロジェクトルートディレクトリ、見つからない場合はnull</returns>
+    private static string? FindProjectRoot(string startPath)
+    {
+        var directory = new DirectoryInfo(startPath);
+
+        // .slnファイルが見つかるまで親ディレクトリを遡る
+        while (directory != null && !directory.GetFiles("*.sln").Any())
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName;
     }
 
     /// <summary>

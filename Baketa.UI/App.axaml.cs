@@ -19,6 +19,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using CoreEvents = Baketa.Core.Events;
+using Baketa.UI.Framework.Events;
 
 namespace Baketa.UI;
 
@@ -535,6 +536,20 @@ internal sealed partial class App : Avalonia.Application
                     Console.WriteLine("✅ TranslationFlowModule初期化完了");
                     // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationFlowModule初期化完了");
                     _logger?.LogInformation("✅ TranslationFlowModule初期化完了");
+
+                    // 🔥 [ISSUE#163] SingleshotEventProcessorの登録 - シングルショット翻訳機能
+                    try
+                    {
+                        var singleshotProcessor = serviceProvider.GetRequiredService<IEventProcessor<ExecuteSingleshotRequestEvent>>();
+                        _eventAggregator.Subscribe<ExecuteSingleshotRequestEvent>(singleshotProcessor);
+                        Console.WriteLine("✅ SingleshotEventProcessor登録完了");
+                        _logger?.LogInformation("✅ SingleshotEventProcessor登録完了 - シングルショット翻訳機能");
+                    }
+                    catch (Exception singleshotEx)
+                    {
+                        Console.WriteLine($"⚠️ SingleshotEventProcessor登録失敗: {singleshotEx.Message}");
+                        _logger?.LogError(singleshotEx, "SingleshotEventProcessor登録失敗");
+                    }
 
                 }
                 catch (Exception moduleEx)

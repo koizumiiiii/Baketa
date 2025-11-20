@@ -1,13 +1,13 @@
 #pragma warning disable CS0618 // Type or member is obsolete
 using System;
 using Baketa.Application.Events;
-using Baketa.Application.Models;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 // 名前空間競合を解決するためのエイリアス
 using ApplicationTranslationSettings = Baketa.Application.Services.Translation.TranslationSettings;
 using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
+using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 
 namespace Baketa.UI.Tests.TestUtilities;
 
@@ -21,7 +21,7 @@ internal static class TestDataFactory
     /// </summary>
     public static TranslationResult CreateSampleTranslationResult(
         string? id = null,
-        TranslationMode mode = TranslationMode.Manual,
+        TranslationMode mode = TranslationMode.Singleshot,
         string originalText = "Hello World",
         string translatedText = "こんにちは 世界")
     {
@@ -42,8 +42,8 @@ internal static class TestDataFactory
     /// 翻訳モード変更イベントを作成
     /// </summary>
     public static TranslationModeChangedEvent CreateModeChangedEvent(
-        TranslationMode newMode = TranslationMode.Automatic,
-        TranslationMode previousMode = TranslationMode.Manual)
+        TranslationMode newMode = TranslationMode.Live,
+        TranslationMode previousMode = TranslationMode.Singleshot)
     {
         return new TranslationModeChangedEvent(newMode, previousMode);
     }
@@ -52,7 +52,7 @@ internal static class TestDataFactory
     /// 翻訳実行イベントを作成
     /// </summary>
     public static TranslationTriggeredEvent CreateTranslationTriggeredEvent(
-        TranslationMode mode = TranslationMode.Manual)
+        TranslationMode mode = TranslationMode.Singleshot)
     {
         return new TranslationTriggeredEvent(mode, DateTime.UtcNow);
     }

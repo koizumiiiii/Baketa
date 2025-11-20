@@ -50,6 +50,9 @@ public class MainOverlayViewModel : ViewModelBase
     // 🔥 [PHASE5.2E] Startボタンツールチップ（ウォームアップ進捗表示用）
     private string _startButtonTooltip = "翻訳を開始";
 
+    // 🔥 [ISSUE#163_TOGGLE] シングルショットオーバーレイ表示状態（トグル動作用）
+    private bool _isSingleshotOverlayVisible;
+
     private WindowInfo? _selectedWindow;
 
     public MainOverlayViewModel(
@@ -64,7 +67,8 @@ public class MainOverlayViewModel : ViewModelBase
         ITranslationControlService translationControlService,
         SimpleSettingsViewModel settingsViewModel,
         IWarmupService warmupService, // 🔥 [PHASE5.2E] ウォームアップサービス依存追加
-        Baketa.Infrastructure.Services.IFirstRunService firstRunService) // 初回起動判定サービス
+        Baketa.Infrastructure.Services.IFirstRunService firstRunService, // 初回起動判定サービス
+        ITranslationModeService translationModeService) // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス依存追加
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
@@ -82,6 +86,9 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 初回起動判定サービス設定
         _firstRunService = firstRunService ?? throw new ArgumentNullException(nameof(firstRunService));
+
+        // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス設定
+        _translationModeService = translationModeService ?? throw new ArgumentNullException(nameof(translationModeService));
 
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
@@ -125,6 +132,7 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly SimpleSettingsViewModel _settingsViewModel;
     private readonly IWarmupService _warmupService;
     private readonly Baketa.Infrastructure.Services.IFirstRunService _firstRunService;
+    private readonly ITranslationModeService _translationModeService; // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス
 
     #region Properties
 
@@ -133,6 +141,23 @@ public class MainOverlayViewModel : ViewModelBase
     /// ReactiveCommandのWhenAnyValueでウォームアップ完了状態を監視するため必須
     /// </summary>
     public bool IsWarmupCompleted => _warmupService.IsWarmupCompleted;
+
+    /// <summary>
+    /// 🔥 [ISSUE#163_PHASE4] 現在の翻訳モード（None/Live/Singleshot）
+    /// TranslationModeServiceから取得
+    /// </summary>
+    public Baketa.Core.Abstractions.Services.TranslationMode CurrentTranslationMode => _translationModeService.CurrentMode;
+
+    /// <summary>
+    /// 🔥 [ISSUE#163_TOGGLE] シングルショットオーバーレイ表示状態
+    /// true: オーバーレイ表示中（次回のShot押下でオーバーレイ削除）
+    /// false: オーバーレイ非表示（次回のShot押下で翻訳実行）
+    /// </summary>
+    public bool IsSingleshotOverlayVisible
+    {
+        get => _isSingleshotOverlayVisible;
+        set => SetPropertySafe(ref _isSingleshotOverlayVisible, value);
+    }
 
     public bool IsCollapsed
     {
@@ -429,6 +454,8 @@ public class MainOverlayViewModel : ViewModelBase
     public ICommand SettingsCommand { get; private set; } = null!;
     public ICommand FoldCommand { get; private set; } = null!;
     public ICommand ExitCommand { get; private set; } = null!;
+    // 🔥 [ISSUE#163_PHASE4] シングルショット翻訳実行コマンド
+    public ICommand ExecuteSingleshotCommand { get; private set; } = null!;
 
     #endregion
 
@@ -544,6 +571,29 @@ public class MainOverlayViewModel : ViewModelBase
             FoldCommand = ReactiveCommand.Create(ExecuteFold,
                 outputScheduler: RxApp.MainThreadScheduler);
             ExitCommand = ReactiveCommand.CreateFromTask(ExecuteExitAsync,
+                outputScheduler: RxApp.MainThreadScheduler);
+
+            // 🔥 [ISSUE#163_PHASE4] シングルショット翻訳コマンド初期化
+            // 🔥 [ISSUE#163_FIX] Live翻訳と同様の条件を適用: イベントハンドラー初期化完了、翻訳エンジン初期化完了を追加
+            // 🔥 [ISSUE#163_TOGGLE] トグル動作対応: オーバーレイ表示中でもボタンを有効化（削除操作のため）
+            // 条件: ウィンドウ選択済み、OCR初期化完了、イベントハンドラー初期化完了、翻訳エンジン初期化中でない、ウォームアップ完了、
+            //       （Live翻訳中でない OR オーバーレイ表示中）、ローディング中でない
+            ExecuteSingleshotCommand = ReactiveCommand.CreateFromTask(ExecuteSingleshotAsync,
+                this.WhenAnyValue(
+                    x => x.IsLoading,
+                    x => x.IsWindowSelected,
+                    x => x.IsOcrInitialized,
+                    x => x.IsEventHandlerInitialized,        // 🔥 [FIX] Live翻訳と同じ条件追加
+                    x => x.IsTranslationEngineInitializing,  // 🔥 [FIX] Live翻訳と同じ条件追加
+                    x => x.IsWarmupCompleted,
+                    x => x.IsTranslationActive,
+                    x => x.IsSingleshotOverlayVisible,       // 🔥 [ISSUE#163_TOGGLE] オーバーレイ表示状態を監視
+                    (isLoading, isWindowSelected, isOcrInitialized, isEventHandlerInitialized,
+                     isTranslationEngineInitializing, isWarmupCompleted, isTranslationActive, isSingleshotOverlayVisible) =>
+                        !isLoading && isWindowSelected && isOcrInitialized && isEventHandlerInitialized &&
+                        !isTranslationEngineInitializing && isWarmupCompleted &&
+                        (!isTranslationActive || isSingleshotOverlayVisible)) // 🔥 [ISSUE#163_TOGGLE] Live翻訳中でもオーバーレイ表示中なら有効
+                .ObserveOn(RxApp.MainThreadScheduler),
                 outputScheduler: RxApp.MainThreadScheduler);
         }
         catch (Exception ex)
@@ -1314,7 +1364,7 @@ public class MainOverlayViewModel : ViewModelBase
                 "翻訳を停止してアプリを終了しますか？",
                 "終了確認");
             await PublishEventAsync(confirmationRequest).ConfigureAwait(false);
-            
+
             var confirmed = await confirmationRequest.GetResultAsync().ConfigureAwait(false);
             if (!confirmed)
             {
@@ -1325,8 +1375,83 @@ public class MainOverlayViewModel : ViewModelBase
 
         var exitEvent = new ExitApplicationRequestEvent();
         await PublishEventAsync(exitEvent).ConfigureAwait(false);
-        
+
         Logger?.LogInformation("Application exit requested");
+    }
+
+    /// <summary>
+    /// 🔥 [ISSUE#163_PHASE4] シングルショット翻訳実行ハンドラー
+    /// 🔥 [ISSUE#163_TOGGLE] トグル動作実装:
+    ///   - オーバーレイ非表示時: 翻訳実行→オーバーレイ表示
+    ///   - オーバーレイ表示時: オーバーレイ削除
+    /// </summary>
+    private async Task ExecuteSingleshotAsync()
+    {
+        Logger?.LogDebug("📸 ExecuteSingleshotAsync開始 (IsSingleshotOverlayVisible={IsVisible})", IsSingleshotOverlayVisible);
+
+        try
+        {
+            // 🔥 [ISSUE#163_TOGGLE] トグル動作: オーバーレイ表示中なら非表示
+            if (IsSingleshotOverlayVisible)
+            {
+                Logger?.LogInformation("🗑️ シングルショットオーバーレイを非表示にします");
+
+                try
+                {
+                    // 🔥 [ISSUE#163_CRASH_FIX] HideAllAsync()でクラッシュするため、
+                    // 暫定対策として可視性のみ変更（破棄はしない）
+                    // オーバーレイは次の翻訳実行時に自然にクリアされる
+                    await _overlayManager.SetAllVisibilityAsync(false).ConfigureAwait(false);
+
+                    // 状態をリセット
+                    IsSingleshotOverlayVisible = false;
+
+                    Logger?.LogInformation("✅ シングルショットオーバーレイ非表示完了");
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogError(ex, "オーバーレイ非表示中にエラーが発生: {ErrorMessage}", ex.Message);
+                    // エラーが発生しても状態はリセット
+                    IsSingleshotOverlayVisible = false;
+                }
+                return;
+            }
+
+            // 🔥 [ISSUE#163_TOGGLE] オーバーレイ非表示時: 翻訳実行
+            Logger?.LogInformation("シングルショット翻訳実行開始");
+
+            // ウィンドウが選択されているか確認
+            var selectedWindow = SelectedWindow;
+            if (selectedWindow == null)
+            {
+                Logger?.LogWarning("ウィンドウが選択されていない状態でシングルショット翻訳が要求されました");
+                return;
+            }
+
+            Logger?.LogDebug("✅ シングルショット翻訳対象ウィンドウ: '{Title}' (Handle={Handle})",
+                selectedWindow.Title, selectedWindow.Handle);
+
+            // ExecuteSingleshotRequestEventを発行
+            var singleshotEvent = new ExecuteSingleshotRequestEvent(selectedWindow);
+            Logger?.LogDebug("📤 ExecuteSingleshotRequestEvent発行: EventID={EventId}, TargetWindow={WindowTitle}",
+                singleshotEvent.Id, selectedWindow.Title);
+
+            await PublishEventAsync(singleshotEvent).ConfigureAwait(false);
+
+            // 🔥 [ISSUE#163_TOGGLE] オーバーレイ表示状態に変更
+            // （実際の表示は翻訳完了後のイベントハンドラで行われる）
+            IsSingleshotOverlayVisible = true;
+
+            Logger?.LogDebug("✅ ExecuteSingleshotRequestEvent発行完了（オーバーレイ表示予定）");
+            Logger?.LogInformation("シングルショット翻訳実行イベント発行完了: '{Title}'", selectedWindow.Title);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "シングルショット翻訳実行中にエラーが発生: {ErrorMessage}", ex.Message);
+
+            // エラー時は状態をリセット
+            IsSingleshotOverlayVisible = false;
+        }
     }
 
     #endregion

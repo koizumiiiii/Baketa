@@ -3,8 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Events;
 using Baketa.Application.Events.Processors;
-using Baketa.Application.Models;
 using Baketa.Core.Abstractions.Events;
+using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 using Baketa.Core.Events.Implementation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -55,8 +55,8 @@ public class EventIntegrationTests(ITestOutputHelper output)
 
         // テストイベントの作成
         var testEvent = new TranslationModeChangedEvent(
-            TranslationMode.Automatic,
-            TranslationMode.Manual);
+            TranslationMode.Live,
+            TranslationMode.Singleshot);
 
         // Act
         await eventAggregator.PublishAsync(testEvent);
@@ -108,8 +108,8 @@ public class EventIntegrationTests(ITestOutputHelper output)
         eventAggregator.Subscribe<TranslationModeChangedEvent>(processor2);
 
         var testEvent = new TranslationModeChangedEvent(
-            TranslationMode.Manual,
-            TranslationMode.Automatic);
+            TranslationMode.Singleshot,
+            TranslationMode.Live);
 
         // Act
         await eventAggregator.PublishAsync(testEvent);
@@ -151,8 +151,8 @@ public class EventIntegrationTests(ITestOutputHelper output)
         eventAggregator.Subscribe<TranslationModeChangedEvent>(processor);
 
         var testEvent1 = new TranslationModeChangedEvent(
-            TranslationMode.Automatic,
-            TranslationMode.Manual);
+            TranslationMode.Live,
+            TranslationMode.Singleshot);
 
         // 最初のイベント発行（登録済み）
         await eventAggregator.PublishAsync(testEvent1);
@@ -161,8 +161,8 @@ public class EventIntegrationTests(ITestOutputHelper output)
         eventAggregator.Unsubscribe<TranslationModeChangedEvent>(processor);
 
         var testEvent2 = new TranslationModeChangedEvent(
-            TranslationMode.Manual,
-            TranslationMode.Automatic);
+            TranslationMode.Singleshot,
+            TranslationMode.Live);
 
         // Act & Assert
         // 2回目のイベント発行（登録解除済み）

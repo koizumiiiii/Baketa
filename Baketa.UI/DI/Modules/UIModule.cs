@@ -196,6 +196,11 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<SecurityNotificationService>();
         services.AddSingleton<RecoveryWorkflowManager>();
 
+        // 🔥 [ISSUE#163_PHASE5] SingleshotEventProcessor登録 - シングルショット翻訳実行
+        services.AddSingleton<Baketa.UI.Services.SingleshotEventProcessor>();
+        services.AddSingleton<IEventProcessor<Baketa.UI.Framework.Events.ExecuteSingleshotRequestEvent>>(
+            provider => provider.GetRequiredService<Baketa.UI.Services.SingleshotEventProcessor>());
+
         // ウィンドウ管理
         // 例: services.AddSingleton<IWindowService, AvaloniaWindowService>();
 

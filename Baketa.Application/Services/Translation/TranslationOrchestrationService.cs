@@ -8,7 +8,6 @@ using System.Reactive.Subjects;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Application.Models;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
@@ -31,6 +30,7 @@ using Microsoft.Extensions.Options;
 using CoreOcrResult = Baketa.Core.Models.OCR.OcrResult;
 using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
 using TranslationService = Baketa.Core.Abstractions.Translation.ITranslationService;
+using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 
 namespace Baketa.Application.Services.Translation;
 
@@ -160,7 +160,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     public bool IsAnyTranslationActive => _isAutomaticTranslationActive || _isSingleTranslationActive;
 
     /// <inheritdoc />
-    public TranslationMode CurrentMode => _isAutomaticTranslationActive ? TranslationMode.Automatic : TranslationMode.Manual;
+    public TranslationMode CurrentMode => _isAutomaticTranslationActive ? TranslationMode.Live : TranslationMode.Singleshot;
 
     #endregion
 
@@ -327,7 +327,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             // TODO: モード変更イベントの発行はViewModelで実行
             // await _eventAggregator.PublishAsync(
-            //     new TranslationModeChangedEvent(TranslationMode.Automatic, TranslationMode.Manual))
+            //     new TranslationModeChangedEvent(TranslationMode.Live, TranslationMode.Singleshot))
             //     .ConfigureAwait(false);
 
             // バックグラウンドタスクで自動翻訳を実行
@@ -537,7 +537,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             // TODO: モード変更イベントの発行はViewModelで実行
             // await _eventAggregator.PublishAsync(
-            //     new TranslationModeChangedEvent(TranslationMode.Manual, TranslationMode.Automatic))
+            //     new TranslationModeChangedEvent(TranslationMode.Singleshot, TranslationMode.Live))
             //     .ConfigureAwait(false);
 
             _logger?.LogInformation("自動翻訳を停止しました");
@@ -572,7 +572,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             _logger?.LogInformation("単発翻訳を実行します");
 
             // TODO: 翻訳実行イベントの発行はViewModelで実行
-            // await _eventAggregator.PublishAsync(new TranslationTriggeredEvent(TranslationMode.Manual))
+            // await _eventAggregator.PublishAsync(new TranslationTriggeredEvent(TranslationMode.Singleshot))
             //     .ConfigureAwait(false);
 
             // 単発翻訳を実行
@@ -1094,89 +1094,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // キャンセルチェック
             cancellationToken.ThrowIfCancellationRequested();
 
-            // TODO: 翻訳実行イベントの発行はViewModelで実行
-            // await _eventAggregator.PublishAsync(new TranslationTriggeredEvent(TranslationMode.Automatic))
-            //     .ConfigureAwait(false);
+            // 🔥 [ISSUE#163_REFACTOR] 既にキャプチャされた画像を翻訳・発行
+            TranslationResult? publishedResult = null;
 
-            // null チェック
-            if (currentImage == null)
-            {
-                _logger?.LogDebug($"❌ 画面キャプチャが失敗しました: ID={translationId}");
-                return;
-            }
-
-            // 翻訳を実行
-            // 緊急デバッグ: ExecuteTranslationAsync呼び出し前
             try
             {
-                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            }
-            catch { }
+                publishedResult = await TranslateAndPublishAsync(
+                    translationId,
+                    currentImage!,
+                    cancellationToken).ConfigureAwait(false);
 
-            _logger?.LogDebug($"🌍 翻訳処理開始: ID={translationId}");
-            try
-            {
-                var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Automatic, cancellationToken)
-                    .ConfigureAwait(false);
-
-                // 緊急デバッグ: ExecuteTranslationAsync完了
-                try
-                {
-                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-                }
-                catch { }
-
-                _logger?.LogDebug($"🌍 翻訳処理完了: ID={translationId}");
-
-                // キャンセルチェック
-                cancellationToken.ThrowIfCancellationRequested();
-
-                // 翻訳結果の重複チェック
-                string lastTranslatedText;
-                lock (_lastTranslatedTextLock)
-                {
-                    lastTranslatedText = _lastTranslatedText;
-                }
-
-                if (!string.IsNullOrEmpty(lastTranslatedText) &&
-                    string.Equals(result?.TranslatedText, lastTranslatedText, StringComparison.Ordinal))
-                {
-                    _logger?.LogDebug($"🔄 前回と同じ翻訳結果のため発行をスキップ: '{result?.TranslatedText}'");
-                    return;
-                }
-
-                // 座標ベース翻訳モードの場合はObservable発行をスキップ
-                if (result?.IsCoordinateBasedMode == true)
-                {
-                    _logger?.LogDebug($"🎯 座標ベース翻訳モードのためObservable発行をスキップ");
-                    // 翻訳完了時刻を記録
-                    lock (_lastTranslationTimeLock)
-                    {
-                        _lastTranslationCompletedAt = DateTime.UtcNow;
-                    }
-                    return;
-                }
-
-                // 翻訳完了時刻と結果を記録（重複翻訳防止用）
+                // 翻訳完了時刻を記録（重複翻訳防止用）
                 lock (_lastTranslationTimeLock)
                 {
                     _lastTranslationCompletedAt = DateTime.UtcNow;
-                }
-                lock (_lastTranslatedTextLock)
-                {
-                    _lastTranslatedText = result?.TranslatedText ?? string.Empty;
-                }
-
-                // 結果を通知（UI層でスケジューラ制御）
-                if (result != null)
-                {
-                    _logger?.LogDebug($"📤 翻訳結果をObservableに発行: '{result.TranslatedText}'");
-                    _translationResultsSubject.OnNext(result);
-                    _logger?.LogDebug($"✅ 翻訳結果発行完了");
-                }
-                else
-                {
-                    _logger?.LogDebug($"⚠️ 翻訳結果がnullのためObservable発行をスキップ");
                 }
             }
             catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") ||
@@ -1205,25 +1136,31 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 return;
             }
 
-            // 前回のキャプチャ画像を安全に更新
-            lock (_previousImageLock)
+            // 🔥 [ISSUE#163_REFACTOR] 翻訳結果が発行された場合のみ前回画像を更新
+            // publishedResultがnullでない = 翻訳結果がObservableに発行された
+            // publishedResultがnull = 重複/座標ベースモードでスキップされた
+            if (publishedResult != null && currentImage != null)
             {
-                var oldImage = _previousCapturedImage;
-                _previousCapturedImage = null; // 一旦クリア
-
-                try
+                // 前回のキャプチャ画像を安全に更新
+                lock (_previousImageLock)
                 {
-                    // 現在の画像のコピーを作成して保持
-                    _previousCapturedImage = currentImage.Clone();
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogDebug($"⚠️ 前回画像の更新に失敗: {ex.Message}");
-                    _logger?.LogWarning(ex, "前回キャプチャ画像の更新に失敗しました");
-                }
+                    var oldImage = _previousCapturedImage;
+                    _previousCapturedImage = null; // 一旦クリア
 
-                // 古い画像を安全に破棄
-                oldImage?.Dispose();
+                    try
+                    {
+                        // 現在の画像のコピーを作成して保持
+                        _previousCapturedImage = currentImage.Clone();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogDebug($"⚠️ 前回画像の更新に失敗: {ex.Message}");
+                        _logger?.LogWarning(ex, "前回キャプチャ画像の更新に失敗しました");
+                    }
+
+                    // 古い画像を安全に破棄
+                    oldImage?.Dispose();
+                }
             }
 
             // 🚀 [FUNDAMENTAL_FIX] 現在の画像のDisposeは行わない - CaptureCompletedEventハンドラーが責任を持つ
@@ -1286,17 +1223,19 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 進行状況を通知
             PublishProgress(translationId, TranslationStatus.Capturing, 0.1f, "画面キャプチャ中...");
 
-            // 画面をキャプチャ
-            var currentImage = await _captureService.CaptureScreenAsync().ConfigureAwait(false);
+            // 🔥 [ISSUE#163_REFACTOR] Singleshotパイプライン処理を使用
+            var (currentImage, result) = await ExecuteTranslationPipelineAsync(
+                translationId,
+                cancellationToken).ConfigureAwait(false);
 
+            // 画像の破棄責任はSingleshotが持つ
             using (currentImage)
             {
-                // 翻訳を実行
-                var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Manual, cancellationToken)
-                    .ConfigureAwait(false);
-
-                // 単発翻訳の表示時間を設定
-                result = result with { DisplayDuration = GetSingleTranslationDisplayDuration() };
+                if (result == null)
+                {
+                    _logger?.LogWarning("⚠️ 翻訳結果がnullのため処理を中断");
+                    return;
+                }
 
                 // 翻訳完了時刻を記録（重複翻訳防止用）
                 lock (_lastTranslationTimeLock)
@@ -1328,9 +1267,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         // { "DisplayDuration", result.DisplayDuration?.TotalSeconds ?? 0 }
                     }
                 }).ConfigureAwait(false);
-
-                // 結果を通知（UI層でスケジューラ制御）
-                _translationResultsSubject.OnNext(result);
 
                 _logger?.LogInformation("単発翻訳が完了しました: ID={Id}, テキスト長={Length}",
                     translationId, result.TranslatedText.Length);
@@ -1377,6 +1313,105 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             throw;
         }
 #pragma warning restore CA1031
+    }
+
+    /// <summary>
+    /// 🔥 [ISSUE#163_REFACTOR] 既にキャプチャされた画像を翻訳して結果を発行（Live翻訳用）
+    /// </summary>
+    /// <param name="translationId">翻訳ID</param>
+    /// <param name="currentImage">既にキャプチャされた画像</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>翻訳結果（発行された場合）、nullの場合は重複/座標ベースでスキップ</returns>
+    private async Task<TranslationResult?> TranslateAndPublishAsync(
+        string translationId,
+        IImage currentImage,
+        CancellationToken cancellationToken)
+    {
+        // 翻訳実行
+        _logger?.LogDebug("🌍 翻訳処理開始: ID={Id}", translationId);
+        var result = await ExecuteTranslationAsync(translationId, currentImage, TranslationMode.Live, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Live翻訳: 重複チェック、座標ベースモード判定
+        string lastTranslatedText;
+        lock (_lastTranslatedTextLock)
+        {
+            lastTranslatedText = _lastTranslatedText;
+        }
+
+        if (!string.IsNullOrEmpty(lastTranslatedText) &&
+            string.Equals(result?.TranslatedText, lastTranslatedText, StringComparison.Ordinal))
+        {
+            _logger?.LogDebug("🔄 前回と同じ翻訳結果のため発行をスキップ: '{Text}'", result?.TranslatedText);
+            return null; // 結果発行なし
+        }
+
+        if (result?.IsCoordinateBasedMode == true)
+        {
+            _logger?.LogDebug("🎯 座標ベース翻訳モードのためObservable発行をスキップ");
+            return null; // 結果発行なし
+        }
+
+        // 翻訳結果を記録
+        lock (_lastTranslatedTextLock)
+        {
+            _lastTranslatedText = result?.TranslatedText ?? string.Empty;
+        }
+
+        // 結果を通知
+        if (result != null)
+        {
+            _logger?.LogDebug("📤 翻訳結果をObservableに発行: '{Text}'", result.TranslatedText);
+            _translationResultsSubject.OnNext(result);
+            return result; // 発行された結果を返す
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 🔥 [ISSUE#163_REFACTOR] Singleshot翻訳のパイプライン処理
+    /// キャプチャ→翻訳→結果発行の一連の処理を実行
+    /// </summary>
+    /// <param name="translationId">翻訳ID</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>キャプチャ画像と翻訳結果のタプル（呼び出し側が画像の破棄責任を持つ）</returns>
+    private async Task<(IImage? currentImage, TranslationResult? result)> ExecuteTranslationPipelineAsync(
+        string translationId,
+        CancellationToken cancellationToken)
+    {
+        // キャプチャ処理
+        IImage? currentImage;
+        if (_targetWindowHandle.HasValue && _targetWindowHandle.Value != IntPtr.Zero)
+        {
+            _logger?.LogDebug("🎯 ウィンドウキャプチャ実行: Handle={Handle:X}",
+                _targetWindowHandle.Value.ToInt64());
+            currentImage = await _captureService.CaptureWindowAsync(_targetWindowHandle.Value).ConfigureAwait(false);
+        }
+        else
+        {
+            _logger?.LogWarning("⚠️ ウィンドウハンドルが未指定のため画面全体をキャプチャ");
+            currentImage = await _captureService.CaptureScreenAsync().ConfigureAwait(false);
+        }
+
+        if (currentImage == null)
+        {
+            _logger?.LogDebug("❌ 画面キャプチャが失敗しました: ID={Id}", translationId);
+            return (null, null);
+        }
+
+        // 翻訳実行
+        _logger?.LogDebug("🌍 翻訳処理開始: ID={Id}", translationId);
+        var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Singleshot, cancellationToken)
+            .ConfigureAwait(false);
+
+        // 🔥 [ISSUE#163_REFACTOR] 画像の破棄は呼び出し側（usingステートメント）が責任を持つ
+        // currentImage.Dispose(); // 削除
+
+        // Singleshot: DisplayDuration設定
+        result = result with { DisplayDuration = GetSingleTranslationDisplayDuration() };
+        _translationResultsSubject.OnNext(result);
+
+        return (currentImage, result);
     }
 
     /// <summary>

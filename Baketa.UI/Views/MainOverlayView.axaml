@@ -177,7 +177,26 @@
                      Foreground="{StaticResource TextBrush}"/>
         </StackPanel>
       </Button>
-      
+
+      <!-- シングルショット翻訳ボタン -->
+      <!-- 🔥 [ISSUE#163_PHASE5] シングルショット翻訳機能追加 -->
+      <Button Classes="menu-item"
+              Command="{Binding ExecuteSingleshotCommand}"
+              ToolTip.Tip="シングルショット翻訳を実行"
+              Name="SingleshotButton">
+        <StackPanel Orientation="Vertical" Spacing="4">
+          <TextBlock Text="📸"
+                     FontSize="20"
+                     HorizontalAlignment="Center"
+                     Foreground="{StaticResource IconBrush}"/>
+          <TextBlock Text="Shot"
+                     FontSize="10"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Foreground="{StaticResource TextBrush}"/>
+        </StackPanel>
+      </Button>
+
       <!-- ローディングインジケーター -->
       <Border Classes="status-item" IsVisible="{Binding IsLoading}">
         <StackPanel Orientation="Vertical" Spacing="4">
