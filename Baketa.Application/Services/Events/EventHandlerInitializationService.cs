@@ -346,6 +346,9 @@ public sealed class EventHandlerInitializationService(
                 Console.WriteLine($"🔥 [ERROR] DiagnosticEventProcessorの登録失敗: {ex.Message}");
             }
 
+            // 🔥 [ISSUE#163] SingleshotEventProcessorの登録はUIModule/TranslationFlowModuleで実施
+            // (UI層イベントのためApplication層では登録できない)
+
             _logger.LogInformation("🔥 イベントハンドラー初期化が完了しました");
             Console.WriteLine("🔥 [DEBUG] イベントハンドラー初期化が完了しました");
             // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 

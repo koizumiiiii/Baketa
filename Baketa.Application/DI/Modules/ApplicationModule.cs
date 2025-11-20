@@ -208,6 +208,15 @@ public sealed class ApplicationModule : ServiceModuleBase
             }
         });
 
+        // 🔥 [ISSUE#163_PHASE5] 翻訳モードサービス登録（State Pattern実装）
+        Console.WriteLine("🔥 [ISSUE#163_PHASE5] TranslationModeService DI登録開始");
+        services.AddSingleton<Baketa.Application.Services.TranslationModes.LiveTranslationMode>();
+        services.AddSingleton<Baketa.Application.Services.TranslationModes.SingleshotTranslationMode>();
+        services.AddSingleton<Baketa.Application.Services.TranslationModes.TranslationModeService>();
+        services.AddSingleton<Baketa.Core.Abstractions.Services.ITranslationModeService>(
+            provider => provider.GetRequiredService<Baketa.Application.Services.TranslationModes.TranslationModeService>());
+        Console.WriteLine("✅ [ISSUE#163_PHASE5] TranslationModeService DI登録完了");
+
         // 翻訳統合サービス（IEventAggregatorの依存を削除）
         services.AddSingleton<Baketa.Application.Services.Translation.TranslationOrchestrationService>(provider =>
         {
@@ -435,6 +444,8 @@ public sealed class ApplicationModule : ServiceModuleBase
         services.AddSingleton<Baketa.Application.EventHandlers.Translation.StopTranslationRequestEventHandler>();
         services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.StopTranslationRequestEvent>>(
             provider => provider.GetRequiredService<Baketa.Application.EventHandlers.Translation.StopTranslationRequestEventHandler>());
+
+        // 🔥 [ISSUE#163_PHASE5] SingleshotEventProcessor登録はUIModuleに移動（Clean Architecture準拠）
 
         // ⚡ [ARCHITECTURAL_FIX] CaptureCompletedHandler登録 - Application層に適切配置
         Console.WriteLine("🔍 [DI_DEBUG] CaptureCompletedHandler登録開始 - Application層配置");

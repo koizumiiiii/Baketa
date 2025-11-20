@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Application.Models;
 using Baketa.Application.Services.Translation;
+using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 using Baketa.Application.Tests.TestUtilities;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Factories;
@@ -104,7 +104,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert
         _service.IsAutomaticTranslationActive.Should().BeTrue();
-        _service.CurrentMode.Should().Be(TranslationMode.Automatic);
+        _service.CurrentMode.Should().Be(TranslationMode.Live);
 
         // Cleanup
         await _service.StopAutomaticTranslationAsync();
@@ -147,7 +147,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert
         _service.IsAutomaticTranslationActive.Should().BeFalse();
-        _service.CurrentMode.Should().Be(TranslationMode.Manual);
+        _service.CurrentMode.Should().Be(TranslationMode.Singleshot);
     }
 
     /// <summary>
@@ -197,7 +197,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // 翻訳結果が発行されることを確認
         receivedResult.Should().NotBeNull();
-        receivedResult!.Mode.Should().Be(TranslationMode.Manual);
+        receivedResult!.Mode.Should().Be(TranslationMode.Singleshot);
         receivedResult.Id.Should().NotBeNullOrEmpty();
     }
 
@@ -324,7 +324,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert - 自動翻訳モードが継続していることを確認
         _service.IsAutomaticTranslationActive.Should().BeTrue();
-        _service.CurrentMode.Should().Be(TranslationMode.Automatic);
+        _service.CurrentMode.Should().Be(TranslationMode.Live);
 
         // Cleanup
         await _service.StopAutomaticTranslationAsync();
@@ -350,7 +350,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert
         receivedResult.Should().NotBeNull();
-        receivedResult!.Mode.Should().Be(TranslationMode.Manual);
+        receivedResult!.Mode.Should().Be(TranslationMode.Singleshot);
         receivedResult.Id.Should().NotBeNullOrEmpty();
     }
 

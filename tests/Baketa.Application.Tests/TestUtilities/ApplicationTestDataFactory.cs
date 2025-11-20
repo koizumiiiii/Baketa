@@ -1,5 +1,4 @@
 using System;
-using Baketa.Application.Models;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
@@ -8,6 +7,7 @@ using Moq;
 
 // 名前空間競合を解決するためのエイリアス
 using ApplicationTranslationSettings = Baketa.Application.Services.Translation.TranslationSettings;
+using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 using CoreTranslationSettings = Baketa.Core.Settings.TranslationSettings;
 
 namespace Baketa.Application.Tests.TestUtilities;
@@ -73,7 +73,7 @@ internal static class ApplicationTestDataFactory
     /// </summary>
     public static TranslationResult CreateTranslationResult(
         string? id = null,
-        TranslationMode mode = TranslationMode.Manual,
+        TranslationMode mode = TranslationMode.Singleshot,
         bool isSuccessful = true)
     {
         return new TranslationResult
@@ -86,7 +86,7 @@ internal static class ApplicationTestDataFactory
             TargetLanguage = "ja",
             Confidence = isSuccessful ? 0.95f : 0.0f,
             ProcessingTime = TimeSpan.FromMilliseconds(Random.Shared.Next(200, 2000)),
-            DisplayDuration = mode == TranslationMode.Manual
+            DisplayDuration = mode == TranslationMode.Singleshot
                 ? TimeSpan.FromSeconds(5)
                 : TimeSpan.Zero
         };
