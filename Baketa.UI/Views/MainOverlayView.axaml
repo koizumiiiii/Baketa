@@ -166,7 +166,7 @@
       <!-- 🔥 [ISSUE#164] UI/UX改善: translation-mode-button スタイル、ObservableAsPropertyHelperでアイコン切り替え -->
       <!-- 🔥 [ISSUE#164_FIX] menu-itemクラスを削除してスタイル競合を解消 -->
       <Button Classes="translation-mode-button"
-              Classes.active="{Binding IsLiveActive}"
+              Classes.pulsing="{Binding IsLiveActive}"
               IsEnabled="{Binding IsLiveEnabled}"
               Command="{Binding StartStopCommand}"
               ToolTip.Tip="{Binding StartButtonTooltip}"
@@ -190,7 +190,7 @@
       <!-- 🔥 [ISSUE#164_FIX] menu-itemクラスを削除してスタイル競合を解消 -->
       <!-- 🔥 [ISSUE#164_DEBUG] 一時的に静的パスでテスト -->
       <Button Classes="translation-mode-button"
-              Classes.active="{Binding IsSingleshotActive}"
+              Classes.pulsing="{Binding IsSingleshotActive}"
               IsEnabled="{Binding IsSingleshotEnabled}"
               Command="{Binding ExecuteSingleshotCommand}"
               ToolTip.Tip="シングルショット翻訳を実行"

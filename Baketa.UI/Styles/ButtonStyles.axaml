@@ -67,11 +67,29 @@
         <Setter Property="RenderTransform" Value="scale(0.95)" />
     </Style>
 
-    <!-- Active状態（モードがアクティブな時） -->
+    <!-- Pulsing状態（モードがアクティブな時のパルスアニメーション） -->
     <!-- 🔥 [ISSUE#164] アクティブ時は赤色アイコンのみ表示（背景・ボーダー変更なし） -->
-    <Style Selector="Button.translation-mode-button.active">
+    <!-- 🔥 [GEMINI_FIX] 'active'クラス名が:active疑似クラスと競合するため'pulsing'に変更 -->
+    <!-- 🔥 [GEMINI_FIX2] ボタン全体ではなくImage要素のみにアニメーションを適用 -->
+    <Style Selector="Button.translation-mode-button.pulsing Image">
         <!-- アクティブ時は背景やボーダーを変更せず、アイコンの色のみ変更 -->
         <!-- アイコン切り替えはViewModelのLiveIconSource/SingleshotIconSourceで実装済み -->
+
+        <!-- 🔥 [ISSUE#164] 実行中の点滅効果（パルスアニメーション） -->
+        <!-- 🔥 [ISSUE#164_TUNE] 速度を1.5秒→0.8秒、透過を0.6→0.2に変更（視認性向上） -->
+        <Style.Animations>
+            <Animation Duration="0:0:0.8" IterationCount="Infinite">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Opacity" Value="1.0" />
+                </KeyFrame>
+                <KeyFrame Cue="50%">
+                    <Setter Property="Opacity" Value="0.2" />
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Opacity" Value="1.0" />
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
     </Style>
 
     <!-- Disabled状態 -->
