@@ -104,9 +104,9 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     /// TextDisappearanceEventハンドラー（IEventProcessorとして実装）
     /// Circuit Breaker パターンによる安全な自動削除処理
     /// </summary>
-    public async Task HandleAsync(TextDisappearanceEvent textDisappearanceEvent)
+    public async Task HandleAsync(TextDisappearanceEvent eventData)
     {
-        if (_disposed || textDisappearanceEvent == null)
+        if (_disposed || eventData == null)
             return;
 
         var stopwatch = Stopwatch.StartNew();
@@ -117,16 +117,16 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             Interlocked.Increment(ref _totalEventsProcessed);
 
             _logger.LogDebug("🔍 テキスト消失イベント受信 - RegionId: {RegionId}, 信頼度: {Confidence:F3}, 領域数: {RegionCount}",
-                textDisappearanceEvent.RegionId ?? "未指定",
-                textDisappearanceEvent.ConfidenceScore,
-                textDisappearanceEvent.DisappearedRegions.Count);
+                eventData.RegionId ?? "未指定",
+                eventData.ConfidenceScore,
+                eventData.DisappearedRegions.Count);
 
             // Circuit Breaker: 信頼度チェック
-            if (textDisappearanceEvent.ConfidenceScore < MinConfidenceScore)
+            if (eventData.ConfidenceScore < MinConfidenceScore)
             {
                 Interlocked.Increment(ref _rejectedByConfidence);
                 _logger.LogDebug("⚠️ 信頼度不足により削除要求を却下 - 信頼度: {Confidence:F3} < 閾値: {Threshold:F3}",
-                    textDisappearanceEvent.ConfidenceScore, MinConfidenceScore);
+                    eventData.ConfidenceScore, MinConfidenceScore);
                 return;
             }
 
@@ -140,8 +140,8 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
 
             // 実際のオーバーレイ削除実行
             var cleanedCount = await CleanupOverlaysInRegionAsync(
-                textDisappearanceEvent.SourceWindowHandle,
-                textDisappearanceEvent.DisappearedRegions).ConfigureAwait(false);
+                eventData.SourceWindowHandle,
+                eventData.DisappearedRegions).ConfigureAwait(false);
 
             // 削除成功時の統計更新
             if (cleanedCount > 0)
@@ -150,14 +150,14 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
                 RecordCleanupTime();
 
                 _logger.LogInformation("✅ オーバーレイ自動削除完了 - RegionId: {RegionId}, 削除数: {CleanedCount}, 処理時間: {ProcessingTime}ms",
-                    textDisappearanceEvent.RegionId ?? "未指定", cleanedCount, stopwatch.ElapsedMilliseconds);
+                    eventData.RegionId ?? "未指定", cleanedCount, stopwatch.ElapsedMilliseconds);
             }
         }
         catch (Exception ex)
         {
             Interlocked.Increment(ref _errorCount);
             _logger.LogError(ex, "❌ テキスト消失イベント処理エラー - RegionId: {RegionId}",
-                textDisappearanceEvent.RegionId ?? "未指定");
+                eventData.RegionId ?? "未指定");
         }
         finally
         {

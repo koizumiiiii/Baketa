@@ -44,9 +44,9 @@ public sealed class PaddleOcrEnginePoolPolicy(
     /// <summary>
     /// エンジンインスタンスがプールに返却される際の処理
     /// </summary>
-    public bool Return(IOcrEngine engine)
+    public bool Return(IOcrEngine obj)
     {
-        if (engine == null)
+        if (obj == null)
         {
             _logger.LogWarning("⚠️ PaddleOcrEnginePoolPolicy: null エンジンの返却を拒否");
             return false;
@@ -55,34 +55,34 @@ public sealed class PaddleOcrEnginePoolPolicy(
         try
         {
             _logger.LogDebug("🔄 PaddleOcrEnginePoolPolicy: エンジン返却処理開始 - Hash: {EngineHash}",
-                engine.GetHashCode());
+                obj.GetHashCode());
 
             // エンジンの再利用可能性を確認
-            if (!_engineFactory.IsReusable(engine))
+            if (!_engineFactory.IsReusable(obj))
             {
                 _logger.LogWarning("⚠️ PaddleOcrEnginePoolPolicy: エンジンが再利用不可 - 破棄 Hash: {EngineHash}",
-                    engine.GetHashCode());
+                    obj.GetHashCode());
 
                 // エンジンを破棄
-                DisposeEngine(engine);
+                DisposeEngine(obj);
                 return false;
             }
 
             // クリーンアップを実行（非同期メソッドを同期実行）
-            _engineFactory.CleanupAsync(engine).GetAwaiter().GetResult();
+            _engineFactory.CleanupAsync(obj).GetAwaiter().GetResult();
 
             _logger.LogDebug("✅ PaddleOcrEnginePoolPolicy: エンジン返却処理完了 - プールに復帰 Hash: {EngineHash}",
-                engine.GetHashCode());
+                obj.GetHashCode());
 
             return true; // プールに返却
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "❌ PaddleOcrEnginePoolPolicy: エンジン返却処理でエラー - 破棄 Hash: {EngineHash}",
-                engine.GetHashCode());
+                obj.GetHashCode());
 
             // エラー時はエンジンを破棄
-            DisposeEngine(engine);
+            DisposeEngine(obj);
             return false;
         }
     }
