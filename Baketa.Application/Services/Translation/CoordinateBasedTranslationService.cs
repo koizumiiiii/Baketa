@@ -148,9 +148,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     /// 座標ベース翻訳処理を実行
     /// バッチOCR処理 → 複数ウィンドウオーバーレイ表示の統合フロー
     /// </summary>
+    /// <param name="options">パイプライン処理オプション（nullの場合はデフォルト設定を使用）</param>
     public async Task ProcessWithCoordinateBasedTranslationAsync(
         IAdvancedImage image,
         IntPtr windowHandle,
+        Baketa.Core.Models.Processing.ProcessingPipelineOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -200,7 +202,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             {
                 CapturedImage = image,
                 CaptureRegion = image.CaptureRegion ?? new System.Drawing.Rectangle(0, 0, image.Width, image.Height),
-                SourceWindowHandle = windowHandle
+                SourceWindowHandle = windowHandle,
+                Options = options ?? new Baketa.Core.Models.Processing.ProcessingPipelineOptions()
             };
 
             // パイプライン実行（ImageChangeDetection → OcrExecution）

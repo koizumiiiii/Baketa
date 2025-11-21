@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from . import translation_pb2 as translation__pb2
+from protos import translation_pb2 as protos_dot_translation__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = '1.69.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in translation_pb2_grpc.py depends on'
+        + f' but the generated code in protos/translation_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -44,23 +44,23 @@ class TranslationServiceStub(object):
         """
         self.Translate = channel.unary_unary(
                 '/baketa.translation.v1.TranslationService/Translate',
-                request_serializer=translation__pb2.TranslateRequest.SerializeToString,
-                response_deserializer=translation__pb2.TranslateResponse.FromString,
+                request_serializer=protos_dot_translation__pb2.TranslateRequest.SerializeToString,
+                response_deserializer=protos_dot_translation__pb2.TranslateResponse.FromString,
                 _registered_method=True)
         self.TranslateBatch = channel.unary_unary(
                 '/baketa.translation.v1.TranslationService/TranslateBatch',
-                request_serializer=translation__pb2.BatchTranslateRequest.SerializeToString,
-                response_deserializer=translation__pb2.BatchTranslateResponse.FromString,
+                request_serializer=protos_dot_translation__pb2.BatchTranslateRequest.SerializeToString,
+                response_deserializer=protos_dot_translation__pb2.BatchTranslateResponse.FromString,
                 _registered_method=True)
         self.HealthCheck = channel.unary_unary(
                 '/baketa.translation.v1.TranslationService/HealthCheck',
-                request_serializer=translation__pb2.HealthCheckRequest.SerializeToString,
-                response_deserializer=translation__pb2.HealthCheckResponse.FromString,
+                request_serializer=protos_dot_translation__pb2.HealthCheckRequest.SerializeToString,
+                response_deserializer=protos_dot_translation__pb2.HealthCheckResponse.FromString,
                 _registered_method=True)
         self.IsReady = channel.unary_unary(
                 '/baketa.translation.v1.TranslationService/IsReady',
-                request_serializer=translation__pb2.IsReadyRequest.SerializeToString,
-                response_deserializer=translation__pb2.IsReadyResponse.FromString,
+                request_serializer=protos_dot_translation__pb2.IsReadyRequest.SerializeToString,
+                response_deserializer=protos_dot_translation__pb2.IsReadyResponse.FromString,
                 _registered_method=True)
 
 
@@ -116,23 +116,23 @@ def add_TranslationServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Translate': grpc.unary_unary_rpc_method_handler(
                     servicer.Translate,
-                    request_deserializer=translation__pb2.TranslateRequest.FromString,
-                    response_serializer=translation__pb2.TranslateResponse.SerializeToString,
+                    request_deserializer=protos_dot_translation__pb2.TranslateRequest.FromString,
+                    response_serializer=protos_dot_translation__pb2.TranslateResponse.SerializeToString,
             ),
             'TranslateBatch': grpc.unary_unary_rpc_method_handler(
                     servicer.TranslateBatch,
-                    request_deserializer=translation__pb2.BatchTranslateRequest.FromString,
-                    response_serializer=translation__pb2.BatchTranslateResponse.SerializeToString,
+                    request_deserializer=protos_dot_translation__pb2.BatchTranslateRequest.FromString,
+                    response_serializer=protos_dot_translation__pb2.BatchTranslateResponse.SerializeToString,
             ),
             'HealthCheck': grpc.unary_unary_rpc_method_handler(
                     servicer.HealthCheck,
-                    request_deserializer=translation__pb2.HealthCheckRequest.FromString,
-                    response_serializer=translation__pb2.HealthCheckResponse.SerializeToString,
+                    request_deserializer=protos_dot_translation__pb2.HealthCheckRequest.FromString,
+                    response_serializer=protos_dot_translation__pb2.HealthCheckResponse.SerializeToString,
             ),
             'IsReady': grpc.unary_unary_rpc_method_handler(
                     servicer.IsReady,
-                    request_deserializer=translation__pb2.IsReadyRequest.FromString,
-                    response_serializer=translation__pb2.IsReadyResponse.SerializeToString,
+                    request_deserializer=protos_dot_translation__pb2.IsReadyRequest.FromString,
+                    response_serializer=protos_dot_translation__pb2.IsReadyResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -168,8 +168,8 @@ class TranslationService(object):
             request,
             target,
             '/baketa.translation.v1.TranslationService/Translate',
-            translation__pb2.TranslateRequest.SerializeToString,
-            translation__pb2.TranslateResponse.FromString,
+            protos_dot_translation__pb2.TranslateRequest.SerializeToString,
+            protos_dot_translation__pb2.TranslateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -195,8 +195,8 @@ class TranslationService(object):
             request,
             target,
             '/baketa.translation.v1.TranslationService/TranslateBatch',
-            translation__pb2.BatchTranslateRequest.SerializeToString,
-            translation__pb2.BatchTranslateResponse.FromString,
+            protos_dot_translation__pb2.BatchTranslateRequest.SerializeToString,
+            protos_dot_translation__pb2.BatchTranslateResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -222,8 +222,8 @@ class TranslationService(object):
             request,
             target,
             '/baketa.translation.v1.TranslationService/HealthCheck',
-            translation__pb2.HealthCheckRequest.SerializeToString,
-            translation__pb2.HealthCheckResponse.FromString,
+            protos_dot_translation__pb2.HealthCheckRequest.SerializeToString,
+            protos_dot_translation__pb2.HealthCheckResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -249,8 +249,8 @@ class TranslationService(object):
             request,
             target,
             '/baketa.translation.v1.TranslationService/IsReady',
-            translation__pb2.IsReadyRequest.SerializeToString,
-            translation__pb2.IsReadyResponse.FromString,
+            protos_dot_translation__pb2.IsReadyRequest.SerializeToString,
+            protos_dot_translation__pb2.IsReadyResponse.FromString,
             options,
             channel_credentials,
             insecure,

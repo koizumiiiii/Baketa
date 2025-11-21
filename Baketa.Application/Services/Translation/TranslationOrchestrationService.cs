@@ -1552,9 +1552,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     catch { }
 
                     _logger?.LogDebug($"🔄 ProcessWithCoordinateBasedTranslationAsync呼び出し開始");
+
+                    // 🔧 [SINGLESHOT_FIX] Singleshotモード時は画面変化検出をバイパス
+                    var pipelineOptions = mode == TranslationMode.Singleshot
+                        ? new Baketa.Core.Models.Processing.ProcessingPipelineOptions
+                        {
+                            ForceCompleteExecution = true,
+                            EnableEarlyTermination = false  // 早期終了も明示的に無効化
+                        }
+                        : null;
+
                     await _coordinateBasedTranslation!.ProcessWithCoordinateBasedTranslationAsync(
                         advancedImage,
                         _targetWindowHandle!.Value,
+                        pipelineOptions,
                         cancellationToken)
                         .ConfigureAwait(false);
 

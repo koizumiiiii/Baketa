@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Services;
 using Baketa.UI.Framework.Events;
 using Microsoft.Extensions.Logging;
 
@@ -17,15 +18,18 @@ public class SingleshotEventProcessor : IEventProcessor<ExecuteSingleshotRequest
     private readonly ILogger<SingleshotEventProcessor> _logger;
     private readonly IEventAggregator _eventAggregator;
     private readonly ITranslationOrchestrationService _translationService;
+    private readonly ITranslationModeService _translationModeService;
 
     public SingleshotEventProcessor(
         ILogger<SingleshotEventProcessor> logger,
         IEventAggregator eventAggregator,
-        ITranslationOrchestrationService translationService)
+        ITranslationOrchestrationService translationService,
+        ITranslationModeService translationModeService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
+        _translationModeService = translationModeService ?? throw new ArgumentNullException(nameof(translationModeService));
 
         _logger.LogDebug("SingleshotEventProcessor instance created: Hash={Hash}", GetHashCode());
     }
@@ -53,6 +57,11 @@ public class SingleshotEventProcessor : IEventProcessor<ExecuteSingleshotRequest
 
         try
         {
+            // 🔧 [SINGLESHOT_FIX] Singleshotモードに切り替え - CaptureCompletedHandlerで早期終了を無効化
+            _logger.LogInformation("🔄 Singleshotモードに切り替え開始");
+            await _translationModeService.SwitchToSingleshotModeAsync().ConfigureAwait(false);
+            _logger.LogInformation("✅ Singleshotモード切り替え完了");
+
             _logger.LogInformation("Processing singleshot translation request for window: {WindowTitle} (Handle={Handle})",
                 eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
 
@@ -75,6 +84,20 @@ public class SingleshotEventProcessor : IEventProcessor<ExecuteSingleshotRequest
             catch (Exception eventEx)
             {
                 _logger.LogError(eventEx, "エラー状態イベント発行失敗");
+            }
+        }
+        finally
+        {
+            // 🔧 [SINGLESHOT_FIX] 翻訳完了後、モードをリセット
+            try
+            {
+                _logger.LogInformation("🔄 翻訳モードリセット開始");
+                await _translationModeService.ResetModeAsync().ConfigureAwait(false);
+                _logger.LogInformation("✅ 翻訳モードリセット完了");
+            }
+            catch (Exception resetEx)
+            {
+                _logger.LogError(resetEx, "翻訳モードリセット失敗: {ErrorMessage}", resetEx.Message);
             }
         }
     }

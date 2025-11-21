@@ -1,12 +1,9 @@
-import datetime
-
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from collections.abc import Iterable as _Iterable, Mapping as _Mapping
-from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
+from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -159,7 +156,7 @@ class TranslateRequest(_message.Message):
     preferred_engine: str
     options: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, source_text: _Optional[str] = ..., source_language: _Optional[_Union[Language, _Mapping]] = ..., target_language: _Optional[_Union[Language, _Mapping]] = ..., request_id: _Optional[str] = ..., context: _Optional[_Union[TranslationContext, _Mapping]] = ..., preferred_engine: _Optional[str] = ..., options: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, source_text: _Optional[str] = ..., source_language: _Optional[_Union[Language, _Mapping]] = ..., target_language: _Optional[_Union[Language, _Mapping]] = ..., request_id: _Optional[str] = ..., context: _Optional[_Union[TranslationContext, _Mapping]] = ..., preferred_engine: _Optional[str] = ..., options: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class TranslateResponse(_message.Message):
     __slots__ = ("request_id", "source_text", "translated_text", "source_language", "target_language", "engine_name", "confidence_score", "processing_time_ms", "is_success", "error", "metadata", "timestamp")
@@ -194,7 +191,7 @@ class TranslateResponse(_message.Message):
     error: TranslationError
     metadata: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, request_id: _Optional[str] = ..., source_text: _Optional[str] = ..., translated_text: _Optional[str] = ..., source_language: _Optional[_Union[Language, _Mapping]] = ..., target_language: _Optional[_Union[Language, _Mapping]] = ..., engine_name: _Optional[str] = ..., confidence_score: _Optional[float] = ..., processing_time_ms: _Optional[int] = ..., is_success: bool = ..., error: _Optional[_Union[TranslationError, _Mapping]] = ..., metadata: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, request_id: _Optional[str] = ..., source_text: _Optional[str] = ..., translated_text: _Optional[str] = ..., source_language: _Optional[_Union[Language, _Mapping]] = ..., target_language: _Optional[_Union[Language, _Mapping]] = ..., engine_name: _Optional[str] = ..., confidence_score: _Optional[float] = ..., processing_time_ms: _Optional[int] = ..., is_success: bool = ..., error: _Optional[_Union[TranslationError, _Mapping]] = ..., metadata: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class BatchTranslateRequest(_message.Message):
     __slots__ = ("requests", "batch_id", "timestamp")
@@ -204,7 +201,7 @@ class BatchTranslateRequest(_message.Message):
     requests: _containers.RepeatedCompositeFieldContainer[TranslateRequest]
     batch_id: str
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, requests: _Optional[_Iterable[_Union[TranslateRequest, _Mapping]]] = ..., batch_id: _Optional[str] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, requests: _Optional[_Iterable[_Union[TranslateRequest, _Mapping]]] = ..., batch_id: _Optional[str] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class BatchTranslateResponse(_message.Message):
     __slots__ = ("responses", "batch_id", "success_count", "failure_count", "total_processing_time_ms", "timestamp")
@@ -220,7 +217,7 @@ class BatchTranslateResponse(_message.Message):
     failure_count: int
     total_processing_time_ms: int
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, responses: _Optional[_Iterable[_Union[TranslateResponse, _Mapping]]] = ..., batch_id: _Optional[str] = ..., success_count: _Optional[int] = ..., failure_count: _Optional[int] = ..., total_processing_time_ms: _Optional[int] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, responses: _Optional[_Iterable[_Union[TranslateResponse, _Mapping]]] = ..., batch_id: _Optional[str] = ..., success_count: _Optional[int] = ..., failure_count: _Optional[int] = ..., total_processing_time_ms: _Optional[int] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class HealthCheckRequest(_message.Message):
     __slots__ = ()
@@ -243,7 +240,7 @@ class HealthCheckResponse(_message.Message):
     status: str
     details: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, is_healthy: bool = ..., status: _Optional[str] = ..., details: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, is_healthy: bool = ..., status: _Optional[str] = ..., details: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class IsReadyRequest(_message.Message):
     __slots__ = ()
@@ -266,4 +263,4 @@ class IsReadyResponse(_message.Message):
     status: str
     details: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, is_ready: bool = ..., status: _Optional[str] = ..., details: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, is_ready: bool = ..., status: _Optional[str] = ..., details: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...

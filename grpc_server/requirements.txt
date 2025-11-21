@@ -2,9 +2,12 @@
 # Phase 2.2: Python gRPCサーバー実装
 
 # gRPC (最新版)
+# protobuf 5.x系に固定（Google AI, grpcio-status, open-clip-torchとの互換性のため）
 grpcio>=1.60.0
-grpcio-tools>=1.60.0
-protobuf>=4.25.0
+# 🔥 [ISSUE#164 PROTOBUF_FIX] grpcio-tools 1.69.xに制限 - Protobuf 5.x互換コード生成のため
+# 1.70以降はProtobuf 6.xでコード生成してランタイムエラーが発生
+grpcio-tools>=1.60.0,<1.70.0
+protobuf>=5.26.1,<6.0
 
 # NLLB-200 Translation Model (既存requirements.txtベース)
 transformers>=4.30.0

@@ -213,18 +213,25 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                         continue;
                     }
 
+                    // 🔧 [SINGLESHOT_FIX] ForceCompleteExecution時はShouldExecute判定を無視
                     // 段階実行の必要性判定
-                    if (!strategy.ShouldExecute(context))
+                    if (!input.Options.ForceCompleteExecution && !strategy.ShouldExecute(context))
                     {
                         _logger.LogDebug("段階スキップ: {StageType} - 実行条件未満", stageType);
 
                         // 早期終了判定（強制完全実行でない場合）
-                        if (settings.EnableEarlyTermination && !input.Options.ForceCompleteExecution)
+                        if (settings.EnableEarlyTermination)
                         {
                             earlyTerminated = true;
                             break;
                         }
                         continue;
+                    }
+
+                    // 🔧 [SINGLESHOT_FIX] ForceCompleteExecution時の強制実行ログ
+                    if (input.Options.ForceCompleteExecution && !strategy.ShouldExecute(context))
+                    {
+                        _logger.LogInformation("🔧 [SINGLESHOT_FIX] ForceCompleteExecution有効 - {StageType}段階を強制実行", stageType);
                     }
 
                     // 🎯 Strategy A: 段階開始時の一時参照取得 (PipelineScope使用)

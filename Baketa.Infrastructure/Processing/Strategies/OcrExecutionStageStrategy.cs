@@ -594,11 +594,17 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         var bitmap = await GetBitmapAsync(cancellationToken).ConfigureAwait(false);
-        var croppedBitmap = new Bitmap(rectangle.Width, rectangle.Height);
+        // 🔧 [MEMORY_LEAK_FIX] using文でBitmapを確実に破棄（2回目のOCR実行時のメモリ不足エラー対策）
+        using var croppedBitmap = new Bitmap(rectangle.Width, rectangle.Height);
 
         using (var graphics = Graphics.FromImage(croppedBitmap))
         {
-            graphics.DrawImage(bitmap, 0, 0, rectangle, GraphicsUnit.Pixel);
+            // 🔧 [CRITICAL_FIX] Graphics.DrawImage引数修正 - Segmentation Fault原因 (Line 601)
+            // 正しいシグネチャ: DrawImage(Image, Rectangle destRect, int srcX, srcY, srcWidth, srcHeight, GraphicsUnit)
+            graphics.DrawImage(bitmap,
+                new System.Drawing.Rectangle(0, 0, rectangle.Width, rectangle.Height),  // 描画先の矩形
+                rectangle.X, rectangle.Y, rectangle.Width, rectangle.Height,            // ソース領域
+                GraphicsUnit.Pixel);
         }
 
         using var memoryStream = new MemoryStream();

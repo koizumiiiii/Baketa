@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Baketa.Application.Services.Diagnostics;
 using Baketa.Application.Services.Translation;
 using Baketa.Application.Services.UI;
@@ -18,6 +20,7 @@ using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
+using Baketa.UI.Helpers;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
 using Baketa.UI.Views;
@@ -156,7 +159,39 @@ public class MainOverlayViewModel : ViewModelBase
     public bool IsSingleshotOverlayVisible
     {
         get => _isSingleshotOverlayVisible;
-        set => SetPropertySafe(ref _isSingleshotOverlayVisible, value);
+        set
+        {
+            var changed = SetPropertySafe(ref _isSingleshotOverlayVisible, value);
+            if (changed)
+            {
+                // 🔥 [ISSUE#164] 依存プロパティの変更通知
+                if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                {
+                    this.RaisePropertyChanged(nameof(IsSingleshotActive));
+                    this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
+                    // 🔥 [ISSUE#164_FIX] SingleshotIconSourceは計算プロパティなので手動通知が必要
+                    this.RaisePropertyChanged(nameof(SingleshotIconSource));
+                    // 🔥 [ISSUE#164] SingleshotButtonTooltipは計算プロパティなので手動通知が必要
+                    this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
+                    // 🔥 [ISSUE#164_FIX] IsLiveEnabledは!IsSingleshotOverlayVisibleに依存するため通知が必要
+                    this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        this.RaisePropertyChanged(nameof(IsSingleshotActive));
+                        this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
+                        // 🔥 [ISSUE#164_FIX] SingleshotIconSourceは計算プロパティなので手動通知が必要
+                        this.RaisePropertyChanged(nameof(SingleshotIconSource));
+                        // 🔥 [ISSUE#164] SingleshotButtonTooltipは計算プロパティなので手動通知が必要
+                        this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
+                        // 🔥 [ISSUE#164_FIX] IsLiveEnabledは!IsSingleshotOverlayVisibleに依存するため通知が必要
+                        this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                    });
+                }
+            }
+        }
     }
 
     public bool IsCollapsed
@@ -184,6 +219,12 @@ public class MainOverlayViewModel : ViewModelBase
                     this.RaisePropertyChanged(nameof(SettingsEnabled));
                     this.RaisePropertyChanged(nameof(ShowHideEnabled));
                     this.RaisePropertyChanged(nameof(IsStartStopEnabled)); // 🔧 CRITICAL FIX: StartStopCommandのCanExecute更新
+                    // 🔥 [ISSUE#164] UI/UX改善用プロパティの通知
+                    this.RaisePropertyChanged(nameof(IsLiveActive));
+                    this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                    this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
+                    // 🔥 [ISSUE#164_FIX] LiveIconSourceは計算プロパティなので手動通知が必要
+                    this.RaisePropertyChanged(nameof(LiveIconSource));
                 }
                 else
                 {
@@ -197,6 +238,12 @@ public class MainOverlayViewModel : ViewModelBase
                         this.RaisePropertyChanged(nameof(SettingsEnabled));
                         this.RaisePropertyChanged(nameof(ShowHideEnabled));
                         this.RaisePropertyChanged(nameof(IsStartStopEnabled)); // 🔧 CRITICAL FIX: StartStopCommandのCanExecute更新
+                        // 🔥 [ISSUE#164] UI/UX改善用プロパティの通知
+                        this.RaisePropertyChanged(nameof(IsLiveActive));
+                        this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                        this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
+                        // 🔥 [ISSUE#164_FIX] LiveIconSourceは計算プロパティなので手動通知が必要
+                        this.RaisePropertyChanged(nameof(LiveIconSource));
                     });
                 }
             }
@@ -267,6 +314,9 @@ public class MainOverlayViewModel : ViewModelBase
                 {
                     this.RaisePropertyChanged(nameof(IsStartStopEnabled));
                     this.RaisePropertyChanged(nameof(StartStopText));
+                    // 🔥 [ISSUE#164] UI/UX改善: IsWindowSelectedに依存するボタン状態プロパティの通知
+                    this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                    this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
                 }
                 else
                 {
@@ -274,6 +324,9 @@ public class MainOverlayViewModel : ViewModelBase
                     {
                         this.RaisePropertyChanged(nameof(IsStartStopEnabled));
                         this.RaisePropertyChanged(nameof(StartStopText));
+                        // 🔥 [ISSUE#164] UI/UX改善: IsWindowSelectedに依存するボタン状態プロパティの通知
+                        this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                        this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
                     });
                 }
             }
@@ -293,6 +346,9 @@ public class MainOverlayViewModel : ViewModelBase
                     this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
                     // 🔧 [ULTRATHINK_ROOT_CAUSE_FIX] Start/Stopボタン状態更新通知追加
                     this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                    // 🔥 [ISSUE#164] UI/UX改善: IsOcrInitializedに依存するボタン状態プロパティの通知
+                    this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                    this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
                 }
                 else
                 {
@@ -301,6 +357,9 @@ public class MainOverlayViewModel : ViewModelBase
                         this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
                         // 🔧 [ULTRATHINK_ROOT_CAUSE_FIX] Start/Stopボタン状態更新通知追加
                         this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                        // 🔥 [ISSUE#164] UI/UX改善: IsOcrInitializedに依存するボタン状態プロパティの通知
+                        this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                        this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
                     });
                 }
             }
@@ -393,8 +452,9 @@ public class MainOverlayViewModel : ViewModelBase
             // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ウォームアップ完了、ローディング中でない、翻訳中でない
             var canStart = !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized && !IsTranslationEngineInitializing && _warmupService.IsWarmupCompleted && !IsTranslationActive;
 
-            // Stop可能条件: 翻訳実行中、ローディング中でない
-            var canStop = IsTranslationActive && !IsLoading;
+            // Stop可能条件: 翻訳実行中（ローディング中でもStopは可能）
+            // 🔥 [ISSUE#164_FIX] ローディング中でも翻訳停止を可能にする
+            var canStop = IsTranslationActive;
 
             var enabled = canStart || canStop;
 
@@ -424,6 +484,107 @@ public class MainOverlayViewModel : ViewModelBase
     public string LoadingText => IsLoading ? "🔄 翻訳準備中..." : "";
     public string ShowHideText => IsTranslationResultVisible ? "Hide" : "Show"; // 非表示ボタンのテキスト
     public string ShowHideIcon => IsTranslationResultVisible ? "👁️" : "🙈"; // 非表示ボタンのアイコン（例）
+
+    // 🔥 [ISSUE#164] UI/UX改善用のボタン状態プロパティ（意味的に明確な命名）
+    /// <summary>
+    /// Liveモードがアクティブか（UIバインディング用）
+    /// IsTranslationActiveのエイリアス
+    /// </summary>
+    public bool IsLiveActive => IsTranslationActive;
+
+    /// <summary>
+    /// Singleshotモードがアクティブか（UIバインディング用）
+    /// IsSingleshotOverlayVisibleのエイリアス
+    /// </summary>
+    public bool IsSingleshotActive => IsSingleshotOverlayVisible;
+
+    /// <summary>
+    /// Liveボタンが有効か（UIバインディング用）
+    /// IsStartStopEnabledと同じ条件だが、Singleshot実行中は無効
+    /// </summary>
+    public bool IsLiveEnabled => IsStartStopEnabled && !IsSingleshotOverlayVisible;
+
+    /// <summary>
+    /// Singleshotボタンが有効か（UIバインディング用）
+    /// ExecuteSingleshotCommandのCanExecute条件と同等
+    /// </summary>
+    public bool IsSingleshotEnabled
+    {
+        get
+        {
+            // 条件: ウィンドウ選択済み、OCR初期化完了、イベントハンドラー初期化完了、
+            //       翻訳エンジン初期化中でない、ウォームアップ完了、
+            //       （Live翻訳中でない OR オーバーレイ表示中）、ローディング中でない
+            return !IsLoading && IsWindowSelected && IsOcrInitialized && IsEventHandlerInitialized
+                   && !IsTranslationEngineInitializing && _warmupService.IsWarmupCompleted
+                   && (!IsTranslationActive || IsSingleshotOverlayVisible);
+        }
+    }
+
+    /// <summary>
+    /// Liveボタンのアイコンソース（アクティブ状態で赤色アイコンに切り替え）
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [ISSUE#164] UI/UX改善: アクティブ状態に応じてアイコンを自動切り替え
+    /// IsLiveActive（IsTranslationActiveのエイリアス）の値に基づいてアイコンBitmapを返す
+    /// Avalonia型コンバーター問題を回避するため、Bitmap型で直接返す
+    /// </remarks>
+    public Bitmap? LiveIconSource
+    {
+        get
+        {
+            try
+            {
+                var uri = IsLiveActive
+                    ? new Uri("avares://Baketa.UI/Assets/Icons/live_active.png")
+                    : new Uri("avares://Baketa.UI/Assets/Icons/live.png");
+                return ImageHelper.LoadFromAvaloniaResource(uri);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "Failed to load Live icon bitmap");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Singleshotボタンのアイコンソース（アクティブ状態で赤色アイコンに切り替え）
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [ISSUE#164] UI/UX改善: アクティブ状態に応じてアイコンを自動切り替え
+    /// IsSingleshotActive（IsSingleshotOverlayVisibleのエイリアス）の値に基づいてアイコンBitmapを返す
+    /// Avalonia型コンバーター問題を回避するため、Bitmap型で直接返す
+    /// </remarks>
+    public Bitmap? SingleshotIconSource
+    {
+        get
+        {
+            try
+            {
+                var uri = IsSingleshotActive
+                    ? new Uri("avares://Baketa.UI/Assets/Icons/singleshot_active.png")
+                    : new Uri("avares://Baketa.UI/Assets/Icons/singleshot.png");
+                return ImageHelper.LoadFromAvaloniaResource(uri);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "Failed to load Singleshot icon bitmap");
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Singleshotボタンのツールチップ（オーバーレイ表示状態で切り替え）
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [ISSUE#164] UI/UX改善: オーバーレイ表示中は「結果をクリアする」、非表示時は「シングルショット翻訳を実行」
+    /// IsSingleshotOverlayVisibleの値に基づいてツールチップテキストを返す
+    /// </remarks>
+    public string SingleshotButtonTooltip =>
+        IsSingleshotOverlayVisible ? "結果をクリア" : "シングルショット翻訳を実行";
+
     public string InitializationText => CurrentStatus switch
     {
         TranslationStatus.Initializing => "初期化中...",
@@ -487,8 +648,9 @@ public class MainOverlayViewModel : ViewModelBase
                     // 🔥 [WARMUP_FIX] isWarmupCompletedチェック追加 - ウォームアップ完了前のStartボタン押下を防止
                     var canStart = !isLoading && isWindowSelected && isOcrInitialized && isEventHandlerInitialized && !isTranslationEngineInitializing && isWarmupCompleted && !isTranslationActive;
 
-                    // Stop可能条件: 翻訳実行中、ローディング中でない
-                    var canStop = isTranslationActive && !isLoading;
+                    // Stop可能条件: 翻訳実行中（ローディング中でもStopは可能）
+                    // 🔥 [ISSUE#164_FIX] ローディング中でも翻訳停止を可能にする
+                    var canStop = isTranslationActive;
 
                     var enabled = canStart || canStop;
 
@@ -1581,6 +1743,11 @@ public class MainOverlayViewModel : ViewModelBase
             // 🔥 [WARMUP_FIX] IsWarmupCompletedプロパティの変更通知
             // ReactiveCommandのWhenAnyValueがウォームアップ完了状態を検出するために必須
             this.RaisePropertyChanged(nameof(IsWarmupCompleted));
+
+            // 🔥 [ISSUE#164] UI/UX改善: Issue #164で追加されたプロパティの変更通知
+            // IsLiveEnabledとIsSingleshotEnabledはIsWarmupCompletedに依存しているため通知必須
+            this.RaisePropertyChanged(nameof(IsLiveEnabled));
+            this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
         });
     }
 

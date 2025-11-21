@@ -465,6 +465,9 @@ public sealed class ApplicationModule : ServiceModuleBase
             // 🎯 Phase 3.17.9: IImageToReferencedSafeImageConverter注入修正
             var imageToReferencedConverter = provider.GetService<IImageToReferencedSafeImageConverter>();
 
+            // 🔧 [SINGLESHOT_FIX] ITranslationModeService注入 - Singleshotモード検出のため
+            var translationModeService = provider.GetService<Baketa.Core.Abstractions.Services.ITranslationModeService>();
+
             return new Baketa.Application.Events.Handlers.CaptureCompletedHandler(
                 eventAggregator,
                 chunkAggregatorService,
@@ -474,7 +477,8 @@ public sealed class ApplicationModule : ServiceModuleBase
                 settings,
                 diagnosticsSaver,
                 roiSettings,
-                imageToReferencedConverter);
+                imageToReferencedConverter,
+                translationModeService);
         });
         services.AddSingleton<IEventProcessor<CaptureCompletedEvent>>(
             provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.CaptureCompletedHandler>());

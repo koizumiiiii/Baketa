@@ -40,8 +40,9 @@ public class PythonServerManager(
     {
         _healthCheckTimer ??= new System.Threading.Timer(HealthCheckTimerCallback, null,
             System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
-        _healthCheckTimer.Change(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-        logger.LogInformation("🩺 PythonServerManager初期化完了（ヘルスチェック30秒間隔）");
+        // 🔥 [PHASE1.3] ヘルスチェック間隔を10秒に短縮（Gemini推奨：早期クラッシュ検出）
+        _healthCheckTimer.Change(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        logger.LogInformation("🩺 PythonServerManager初期化完了（ヘルスチェック10秒間隔）");
     }
 
     /// <summary>
