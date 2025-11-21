@@ -171,6 +171,8 @@ public class MainOverlayViewModel : ViewModelBase
                     this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
                     // 🔥 [ISSUE#164_FIX] SingleshotIconSourceは計算プロパティなので手動通知が必要
                     this.RaisePropertyChanged(nameof(SingleshotIconSource));
+                    // 🔥 [ISSUE#164] SingleshotButtonTooltipは計算プロパティなので手動通知が必要
+                    this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
                     // 🔥 [ISSUE#164_FIX] IsLiveEnabledは!IsSingleshotOverlayVisibleに依存するため通知が必要
                     this.RaisePropertyChanged(nameof(IsLiveEnabled));
                 }
@@ -182,6 +184,8 @@ public class MainOverlayViewModel : ViewModelBase
                         this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
                         // 🔥 [ISSUE#164_FIX] SingleshotIconSourceは計算プロパティなので手動通知が必要
                         this.RaisePropertyChanged(nameof(SingleshotIconSource));
+                        // 🔥 [ISSUE#164] SingleshotButtonTooltipは計算プロパティなので手動通知が必要
+                        this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
                         // 🔥 [ISSUE#164_FIX] IsLiveEnabledは!IsSingleshotOverlayVisibleに依存するため通知が必要
                         this.RaisePropertyChanged(nameof(IsLiveEnabled));
                     });
@@ -570,6 +574,16 @@ public class MainOverlayViewModel : ViewModelBase
             }
         }
     }
+
+    /// <summary>
+    /// Singleshotボタンのツールチップ（オーバーレイ表示状態で切り替え）
+    /// </summary>
+    /// <remarks>
+    /// 🔥 [ISSUE#164] UI/UX改善: オーバーレイ表示中は「結果をクリアする」、非表示時は「シングルショット翻訳を実行」
+    /// IsSingleshotOverlayVisibleの値に基づいてツールチップテキストを返す
+    /// </remarks>
+    public string SingleshotButtonTooltip =>
+        IsSingleshotOverlayVisible ? "結果をクリア" : "シングルショット翻訳を実行";
 
     public string InitializationText => CurrentStatus switch
     {

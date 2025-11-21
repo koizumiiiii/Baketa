@@ -193,7 +193,7 @@
               Classes.pulsing="{Binding IsSingleshotActive}"
               IsEnabled="{Binding IsSingleshotEnabled}"
               Command="{Binding ExecuteSingleshotCommand}"
-              ToolTip.Tip="シングルショット翻訳を実行"
+              ToolTip.Tip="{Binding SingleshotButtonTooltip}"
               Name="SingleshotButton">
         <StackPanel Orientation="Vertical" Spacing="4">
           <!-- 🔥 [ISSUE#164] ObservableAsPropertyHelperでIImage型を直接バインディング（ReactiveUIベストプラクティス） -->
