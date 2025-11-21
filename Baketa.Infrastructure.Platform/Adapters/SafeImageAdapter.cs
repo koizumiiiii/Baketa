@@ -143,7 +143,13 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
         using var bitmap = CreateBitmapFromSafeImage();
         using var croppedBitmap = new Bitmap(rect.Width, rect.Height);
         using var graphics = Graphics.FromImage(croppedBitmap);
-        graphics.DrawImage(bitmap, 0, 0, rect, GraphicsUnit.Pixel);
+
+        // 🔧 [CRITICAL_FIX] Graphics.DrawImage引数修正 - Segmentation Fault原因 (Line 146)
+        // 正しいシグネチャ: DrawImage(Image, Rectangle destRect, int srcX, srcY, srcWidth, srcHeight, GraphicsUnit)
+        graphics.DrawImage(bitmap,
+            new System.Drawing.Rectangle(0, 0, rect.Width, rect.Height),  // 描画先の矩形
+            rect.X, rect.Y, rect.Width, rect.Height,                      // ソース領域
+            GraphicsUnit.Pixel);
 
         // 🎯 Strategy B実装: SafeImageFactoryでSafeImage生成 → SafeImageAdapterでラップ
         var safeImage = _safeImageFactory.CreateFromBitmap(croppedBitmap, rect.Width, rect.Height);
@@ -254,7 +260,8 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
         return await Task.Run(() =>
         {
             using var bitmap = CreateBitmapFromSafeImage();
-            var resizedBitmap = new Bitmap(width, height);
+            // 🔧 [MEMORY_LEAK_FIX] using文でBitmapを確実に破棄（2回目のOCR実行時のメモリ不足エラー対策）
+            using var resizedBitmap = new Bitmap(width, height);
             using (var graphics = Graphics.FromImage(resizedBitmap))
             {
                 graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
@@ -283,7 +290,13 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
             using var bitmap = CreateBitmapFromSafeImage();
             using var croppedBitmap = new Bitmap(rectangle.Width, rectangle.Height);
             using var graphics = Graphics.FromImage(croppedBitmap);
-            graphics.DrawImage(bitmap, 0, 0, rectangle, GraphicsUnit.Pixel);
+
+            // 🔧 [CRITICAL_FIX] Graphics.DrawImage引数修正 - Segmentation Fault原因 (Line 292)
+            // 正しいシグネチャ: DrawImage(Image, Rectangle destRect, int srcX, srcY, srcWidth, srcHeight, GraphicsUnit)
+            graphics.DrawImage(bitmap,
+                new System.Drawing.Rectangle(0, 0, rectangle.Width, rectangle.Height),  // 描画先の矩形
+                rectangle.X, rectangle.Y, rectangle.Width, rectangle.Height,            // ソース領域
+                GraphicsUnit.Pixel);
 
             // 🎯 Strategy B実装: SafeImageFactoryでSafeImage生成 → SafeImageAdapterでラップ
             var safeImage = _safeImageFactory.CreateFromBitmap(croppedBitmap, rectangle.Width, rectangle.Height);

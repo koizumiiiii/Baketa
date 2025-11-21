@@ -28,6 +28,8 @@
         <StyleInclude Source="/Styles/FontStyles.axaml"/>
         <StyleInclude Source="/Styles/OverlayStyles.axaml"/>
         <StyleInclude Source="/Styles/MainOverlayStyles.axaml"/>
-        
+        <!-- 🔥 [ISSUE#164] ボタンスタイル -->
+        <StyleInclude Source="/Styles/ButtonStyles.axaml"/>
+
     </Application.Styles>
 </Application>

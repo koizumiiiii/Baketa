@@ -164,7 +164,14 @@ public sealed class CachedOcrEngine : IOcrEngine
                     var roi = regionOfInterest.Value;
                     using var croppedBitmap = new Bitmap(roi.Width, roi.Height);
                     using var graphics = Graphics.FromImage(croppedBitmap);
-                    graphics.DrawImage(bitmap, 0, 0, roi, GraphicsUnit.Pixel);
+
+                    // 🔧 [CRITICAL_FIX] Graphics.DrawImage引数修正 - Segmentation Fault原因 (Line 167)
+                    // 正しいシグネチャ: DrawImage(Image, Rectangle destRect, int srcX, srcY, srcWidth, srcHeight, GraphicsUnit)
+                    graphics.DrawImage(bitmap,
+                        new System.Drawing.Rectangle(0, 0, roi.Width, roi.Height),  // 描画先の矩形
+                        roi.X, roi.Y, roi.Width, roi.Height,                        // ソース領域
+                        GraphicsUnit.Pixel);
+
                     croppedBitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
                 }
                 else
@@ -190,7 +197,13 @@ public sealed class CachedOcrEngine : IOcrEngine
                     var roi = regionOfInterest.Value;
                     using var croppedBitmap = new Bitmap(roi.Width, roi.Height);
                     using var graphics = Graphics.FromImage(croppedBitmap);
-                    graphics.DrawImage(bitmap, 0, 0, roi, GraphicsUnit.Pixel);
+
+                    // 🔧 [CRITICAL_FIX] Graphics.DrawImage引数修正 - Segmentation Fault原因
+                    // 正しいシグネチャ: DrawImage(Image, Rectangle destRect, int srcX, srcY, srcWidth, srcHeight, GraphicsUnit)
+                    graphics.DrawImage(bitmap,
+                        new System.Drawing.Rectangle(0, 0, roi.Width, roi.Height),  // 描画先の矩形
+                        roi.X, roi.Y, roi.Width, roi.Height,                        // ソース領域
+                        GraphicsUnit.Pixel);
 
                     using var outputStream = new MemoryStream();
                     croppedBitmap.Save(outputStream, System.Drawing.Imaging.ImageFormat.Png);

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
@@ -30,6 +31,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     private readonly IImageToReferencedSafeImageConverter? _imageToReferencedConverter;
     private readonly ITextChunkAggregatorService _chunkAggregatorService;
     private readonly ILanguageConfigurationService _languageConfig;
+    private readonly ITranslationModeService? _translationModeService;
 
     public CaptureCompletedHandler(
         IEventAggregator eventAggregator,
@@ -40,7 +42,8 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         IOptionsMonitor<ProcessingPipelineSettings>? settings = null,
         ImageDiagnosticsSaver? diagnosticsSaver = null,
         IOptionsMonitor<RoiDiagnosticsSettings>? roiSettings = null,
-        IImageToReferencedSafeImageConverter? imageToReferencedConverter = null)
+        IImageToReferencedSafeImageConverter? imageToReferencedConverter = null,
+        ITranslationModeService? translationModeService = null)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _chunkAggregatorService = chunkAggregatorService ?? throw new ArgumentNullException(nameof(chunkAggregatorService));
@@ -51,6 +54,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         _diagnosticsSaver = diagnosticsSaver;
         _roiSettings = roiSettings;
         _imageToReferencedConverter = imageToReferencedConverter;
+        _translationModeService = translationModeService;
     }
 
     /// <inheritdoc />
@@ -169,7 +173,12 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                     // Gemini フィードバック反映: 設定から取得（ハードコーディング回避）
                     EnableStaging = _settings?.CurrentValue?.EnableStaging ?? true,
                     EnablePerformanceMetrics = _settings?.CurrentValue?.EnablePerformanceMetrics ?? true,
-                    EnableEarlyTermination = _settings?.CurrentValue?.EnableEarlyTermination ?? true,
+
+                    // 🔧 [SINGLESHOT_FIX] 個別翻訳モード時は早期終了を無効化（Singleshotで毎回OCR実行を保証）
+                    EnableEarlyTermination = ShouldSkipIntegratedTranslation() ? false : (_settings?.CurrentValue?.EnableEarlyTermination ?? true),
+
+                    // 🔧 [SINGLESHOT_FIX] Singleshotモード時は強制完全実行を有効化（画面変化に関係なくOCRを実行）
+                    ForceCompleteExecution = ShouldSkipIntegratedTranslation(),
 
                     // UltraThink Phase 3: 個別翻訳実行時の統合翻訳スキップ制御
                     // グルーピング後のOCR結果が複数存在する場合は個別翻訳を実行するため統合翻訳をスキップ
@@ -178,6 +187,10 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
                     // 🔥 [PHASE5] ROI関連設定削除 - ROI廃止により不要
                 }
             };
+
+            // 🐛 [DEBUG] パイプラインオプション確認
+            _logger?.LogInformation("🔍 [PIPELINE_OPTIONS] ForceCompleteExecution={ForceCompleteExecution}, EnableEarlyTermination={EnableEarlyTermination}, SkipIntegratedTranslation={SkipIntegratedTranslation}",
+                input.Options.ForceCompleteExecution, input.Options.EnableEarlyTermination, input.Options.SkipIntegratedTranslation);
 
             // 段階的処理パイプライン実行
             // 🔧 [PHASE3.2_FIX] 非同期処理完了まで画像を保持、完了後に手動でDispose
@@ -883,6 +896,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     /// <summary>
     /// 統合翻訳をスキップすべきかどうかを判断
     /// UltraThink Phase 3: 個別翻訳実行時の重複防止制御
+    /// 🔧 [SINGLESHOT_FIX] Singleshotモードの判定を追加（早期終了を無効化）
     /// </summary>
     /// <returns>統合翻訳をスキップする場合はtrue</returns>
     private bool ShouldSkipIntegratedTranslation()
@@ -892,6 +906,21 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
         try
         {
+            // 🔧 [SINGLESHOT_FIX] Singleshotモード時は常に個別翻訳を優先（早期終了を無効化）
+            _logger?.LogDebug("🔍 [SINGLESHOT_DEBUG] _translationModeService is null: {IsNull}", _translationModeService == null);
+
+            if (_translationModeService != null)
+            {
+                var currentMode = _translationModeService.CurrentMode;
+                _logger?.LogDebug("🔍 [SINGLESHOT_DEBUG] CurrentMode: {CurrentMode}", currentMode);
+
+                if (currentMode == Core.Abstractions.Services.TranslationMode.Singleshot)
+                {
+                    _logger?.LogDebug("🎯 [SINGLESHOT_FIX] Singleshotモード検出 - 統合翻訳をスキップ、早期終了を無効化");
+                    return true;
+                }
+            }
+
             // PriorityAwareOcrCompletedHandlerの存在確認
             // EventAggregatorに登録されているハンドラーをチェックすることは困難なため、
             // 設定ベースでの判断を実装

@@ -269,7 +269,12 @@ public class WindowsImageFactory : IWindowsImageFactoryInterface
                 // 🔒 Thread-safe DrawImage呼び出し
                 lock (_gdiLock)
                 {
-                    graphics.DrawImage(sourceBitmapClone, 0, 0, cropArea, GraphicsUnit.Pixel);
+                    // 🔧 [CRITICAL_FIX] Graphics.DrawImage引数修正 - Segmentation Fault原因 (Line 272)
+                    // 正しいシグネチャ: DrawImage(Image, Rectangle destRect, int srcX, srcY, srcWidth, srcHeight, GraphicsUnit)
+                    graphics.DrawImage(sourceBitmapClone,
+                        new System.Drawing.Rectangle(0, 0, cropArea.Width, cropArea.Height),  // 描画先の矩形
+                        cropArea.X, cropArea.Y, cropArea.Width, cropArea.Height,             // ソース領域
+                        GraphicsUnit.Pixel);
                 }
             }
 
