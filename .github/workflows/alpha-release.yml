@@ -105,7 +105,16 @@ jobs:
     #     dotnet test tests/Baketa.Core.Tests --configuration Release --verbosity minimal --filter "Category!=LocalOnly&Category!=Integration"
     #     dotnet test tests/Baketa.Infrastructure.Tests --configuration Release --verbosity minimal --filter "Category!=LocalOnly&Category!=Integration"
     #   continue-on-error: true
-    
+
+    - name: Build projects individually
+      run: |
+        # Build each project individually to avoid NETSDK1134 error
+        dotnet build Baketa.Core/Baketa.Core.csproj --configuration Release --verbosity minimal
+        dotnet build Baketa.Infrastructure/Baketa.Infrastructure.csproj --configuration Release --verbosity minimal
+        dotnet build Baketa.Infrastructure.Platform/Baketa.Infrastructure.Platform.csproj --configuration Release --verbosity minimal
+        dotnet build Baketa.Application/Baketa.Application.csproj --configuration Release --verbosity minimal
+        dotnet build Baketa.UI/Baketa.UI.csproj --configuration Release --verbosity minimal
+
     - name: Publish application
       run: |
         $version = "${{ steps.version.outputs.version }}"
@@ -115,6 +124,7 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
+          --no-build `
           --output $outputDir `
           --verbosity minimal `
           /p:PublishSingleFile=true `
