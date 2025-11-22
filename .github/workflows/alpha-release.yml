@@ -147,19 +147,6 @@ jobs:
     # HuggingFace Hub統合により、モデルは初回起動時に自動ダウンロードされます
     # これにより配布パッケージが軽量化（~600MB削減）されます
 
-    - name: Create alpha package
-      run: |
-        $version = "${{ steps.version.outputs.version }}"
-        $publishDir = "./publish/Baketa-$version"
-        $packageName = "${{ steps.version.outputs.package-name }}"
-
-        # Copy additional files for alpha testing
-        Copy-Item "README.md" "$publishDir/"
-
-        # Copy Python gRPC server directory
-        Copy-Item "grpc_server" "$publishDir/" -Recurse -Force -Verbose
-        Write-Host "grpc_server directory copied to publish directory"
-
     - name: Download and setup Python Embeddable
       run: |
         $version = "${{ steps.version.outputs.version }}"
@@ -220,6 +207,19 @@ jobs:
         $version = "${{ steps.version.outputs.version }}"
         $publishDir = "./publish/Baketa-$version"
         $packageName = "${{ steps.version.outputs.package-name }}"
+
+        # 🔥 [HOTFIX alpha-0.1.11] Copy Python gRPC server directory FIRST
+        # Root cause: alpha-0.1.10 had duplicate "Create alpha package" steps
+        # First step copied grpc_server but second step created zip without it
+        # Fix: Consolidate into single step with grpc_server copy at beginning
+        Copy-Item "grpc_server" "$publishDir/" -Recurse -Force -Verbose
+        Write-Host "grpc_server directory copied to publish directory"
+
+        # Validate protos module exists (prevent alpha-0.1.10 regression)
+        if (-Not (Test-Path "$publishDir/grpc_server/protos/translation_pb2_grpc.py")) {
+            throw "CRITICAL: protos module not copied to package - grpc_server copy failed"
+        }
+        Write-Host "✅ Validation passed: protos module exists in package"
 
         # Copy additional files for alpha testing
         Copy-Item "README.md" "$publishDir/"
