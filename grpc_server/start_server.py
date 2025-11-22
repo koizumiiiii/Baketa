@@ -32,6 +32,13 @@ import faulthandler  # 🔥 [PHASE1.3] Windows固有クラッシュ検出用
 import traceback  # 🔥 [PHASE1.3] 例外スタックトレース出力用
 from pathlib import Path
 
+# 🔥 [HOTFIX alpha-0.1.12] Python Embeddable版でのprotosモジュールインポート修正
+# Root cause: python310._pthの"."はvendor/python/を基準とするため、
+#             WorkingDirectory=grpc_serverでもカレントディレクトリがsys.pathに含まれない
+# Fix: 明示的にカレントディレクトリをsys.pathに追加
+if os.getcwd() not in sys.path:
+    sys.path.insert(0, os.getcwd())
+
 import grpc
 from grpc import aio
 # 🔥 [PACKAGE_SIZE_FIX] torch削除（約200MB削減）
