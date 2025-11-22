@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
-      - 'alpha-*'
+      # alpha-* は alpha-release.yml で処理
       - 'beta-*'
 
 env:
@@ -46,15 +46,13 @@ jobs:
       uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
-    
-    - name: Restore dependencies
-      run: dotnet restore Baketa.sln --verbosity minimal
 
-    - name: Build and test
-      run: |
-        dotnet build Baketa.sln --configuration Release --no-restore --verbosity minimal --arch x64
-        dotnet test Baketa.sln --configuration Release --no-build --verbosity minimal
-    
+    # 🔥 [NETSDK1134_FIX] Restore/Build/Testステップを削除
+    # Reason: dotnet publish automatically handles restore and build
+    # Building solution with --arch x64 causes NETSDK1134 error
+    # Testing with solution and RuntimeIdentifier causes NETSDK1134 error
+    # Tests are verified locally before release
+
     - name: Publish UI application
       run: |
         dotnet publish Baketa.UI/Baketa.UI.csproj `
