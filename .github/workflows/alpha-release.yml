@@ -15,6 +15,9 @@ env:
   DOTNET_VERSION: '8.0.x'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Python Embeddable設定（Gemini提案: バージョン一元管理）
+  PYTHON_VERSION: '3.10.11'
+  PYTHON_ARCH: 'amd64'
 
 jobs:
   build-alpha:
@@ -140,6 +143,70 @@ jobs:
         # Copy Python gRPC server directory
         Copy-Item "grpc_server" "$publishDir/" -Recurse -Force -Verbose
         Write-Host "grpc_server directory copied to publish directory"
+
+    - name: Download and setup Python Embeddable
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $publishDir = "./publish/Baketa-$version"
+        $vendorPythonDir = "$publishDir/vendor/python"
+
+        # Python環境変数から設定を取得（Gemini提案: バージョン一元管理）
+        $pythonVersion = "${{ env.PYTHON_VERSION }}"
+        $pythonArch = "${{ env.PYTHON_ARCH }}"
+
+        # Python Embeddable版をダウンロード
+        Write-Host "📦 Downloading Python $pythonVersion Embeddable ($pythonArch)..."
+        $pythonUrl = "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-$pythonArch.zip"
+        $pythonZip = "./python-embed.zip"
+        Write-Host "Download URL: $pythonUrl"
+        Invoke-WebRequest -Uri $pythonUrl -OutFile $pythonZip -UseBasicParsing
+
+        # vendor/pythonに展開
+        Write-Host "📂 Extracting Python to vendor/python..."
+        New-Item -ItemType Directory -Path $vendorPythonDir -Force | Out-Null
+        Expand-Archive -Path $pythonZip -DestinationPath $vendorPythonDir -Force
+
+        # pythonXXX._pthを編集（import pathを有効化してpipを使えるようにする）
+        # バージョンから._pthファイル名を動的に構築（例: 3.10.11 → python310._pth）
+        Write-Host "⚙️ Configuring Python paths..."
+        $versionParts = $pythonVersion.Split('.')
+        $pthFileName = "python$($versionParts[0])$($versionParts[1])._pth"
+        $pthFile = "$vendorPythonDir/$pthFileName"
+        Write-Host "PTH file: $pthFileName"
+        $pthContent = Get-Content $pthFile -Raw
+        $pthContent = $pthContent -replace '(?m)^#import site', 'import site'
+        $pthContent | Set-Content $pthFile -NoNewline
+
+        # get-pip.pyをダウンロードしてpipをインストール
+        Write-Host "📦 Installing pip..."
+        $getPipUrl = "https://bootstrap.pypa.io/get-pip.py"
+        $getPipPath = "./get-pip.py"
+        Invoke-WebRequest -Uri $getPipUrl -OutFile $getPipPath -UseBasicParsing
+        & "$vendorPythonDir/python.exe" $getPipPath --no-warn-script-location
+
+        # requirements.txtからパッケージをインストール
+        Write-Host "📦 Installing required packages from requirements.txt..."
+        & "$vendorPythonDir/python.exe" -m pip install --no-warn-script-location --no-cache-dir -r requirements.txt
+
+        # インストール確認
+        Write-Host "✅ Verifying installed packages..."
+        & "$vendorPythonDir/python.exe" -m pip list
+
+        Write-Host "✅ Python Embeddable setup completed"
+
+        # サイズ確認
+        $pythonSize = [math]::Round((Get-ChildItem $vendorPythonDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
+        Write-Host "Python installation size: $pythonSize MB"
+      shell: powershell
+
+    - name: Create alpha package
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $publishDir = "./publish/Baketa-$version"
+        $packageName = "${{ steps.version.outputs.package-name }}"
+
+        # Copy additional files for alpha testing
+        Copy-Item "README.md" "$publishDir/"
 
         # Create alpha-specific readme
         @"
