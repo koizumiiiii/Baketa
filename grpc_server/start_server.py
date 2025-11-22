@@ -160,7 +160,16 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
             logger.info("Model found locally. Skipping download.")
 
         # 🔥 [PACKAGE_SIZE_FIX] GPU検出をctranslate2組み込み関数で実行（torch不要）
-        is_cuda_available = ctranslate2.get_device_count("cuda") > 0
+        # 🔥 [HOTFIX alpha-0.1.13] ctranslate2バージョン互換性対応
+        # Root cause: ctranslate2.get_device_count()はバージョン4.0以降で追加されたAPIで、
+        #             配布パッケージの3.x系では存在しない
+        # Fix: try-exceptでフォールバックし、GPU検出失敗時はCPUモードで動作
+        try:
+            is_cuda_available = ctranslate2.get_device_count("cuda") > 0
+        except (AttributeError, Exception) as e:
+            # Fallback: ctranslate2のバージョンが古いまたは環境によってGPU検出失敗
+            logger.warning(f"GPU detection failed ({e.__class__.__name__}), falling back to CPU mode")
+            is_cuda_available = False
 
         engine = CTranslate2Engine(
             model_path=str(model_path),  # %APPDATA%\Baketa\Models\nllb-200-ct2
