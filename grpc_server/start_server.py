@@ -34,7 +34,9 @@ from pathlib import Path
 
 import grpc
 from grpc import aio
-import torch
+# 🔥 [PACKAGE_SIZE_FIX] torch削除（約200MB削減）
+# GPU検出はctranslate2.get_device_count()を使用
+import ctranslate2
 
 # Proto生成ファイル（コンパイル後にインポート可能になります）
 from protos import translation_pb2_grpc
@@ -150,9 +152,12 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
         else:
             logger.info("Model found locally. Skipping download.")
 
+        # 🔥 [PACKAGE_SIZE_FIX] GPU検出をctranslate2組み込み関数で実行（torch不要）
+        is_cuda_available = ctranslate2.get_device_count("cuda") > 0
+
         engine = CTranslate2Engine(
             model_path=str(model_path),  # %APPDATA%\Baketa\Models\nllb-200-ct2
-            device="cuda" if torch.cuda.is_available() else "cpu",
+            device="cuda" if is_cuda_available else "cpu",
             compute_type="int8"
         )
     else:

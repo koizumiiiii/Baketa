@@ -364,7 +364,10 @@ public class PythonServerManager(
             StandardInputEncoding = new System.Text.UTF8Encoding(false), // UltraThink Phase 3.1: BOM無しUTF-8
             StandardOutputEncoding = new System.Text.UTF8Encoding(false), // UltraThink Phase 3.1: BOM無しUTF-8
             StandardErrorEncoding = new System.Text.UTF8Encoding(false),  // UltraThink Phase 3.1: BOM無しUTF-8
-            WorkingDirectory = Environment.CurrentDirectory
+            // 🔥 [PROTOS_IMPORT_FIX] WorkingDirectoryをgrpc_serverに設定
+            // 理由: Python側の `from protos import translation_pb2_grpc` が相対インポートであり、
+            //       grpc_serverディレクトリからの実行が必要
+            WorkingDirectory = Path.Combine(AppContext.BaseDirectory, "grpc_server")
         };
 
         // 🔥 [ULTRATHINK_FIX] Phase 2: 環境変数追加でTokenizerハング完全解消

@@ -11,7 +11,9 @@ protobuf>=5.26.1,<6.0
 
 # NLLB-200 Translation Model (既存requirements.txtベース)
 transformers>=4.30.0
-torch>=2.0.0
+# 🔥 [PACKAGE_SIZE_FIX] torch削除（約200MB削減）
+# GPU検出はctranslate2.get_device_count("cuda")を使用
+# torch>=2.0.0
 sentencepiece>=0.1.99
 
 # Data Processing
