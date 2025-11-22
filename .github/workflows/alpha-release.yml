@@ -184,8 +184,8 @@ jobs:
         & "$vendorPythonDir/python.exe" $getPipPath --no-warn-script-location
 
         # Install required packages from requirements.txt
-        Write-Host "Installing required packages from requirements.txt..."
-        & "$vendorPythonDir/python.exe" -m pip install --no-warn-script-location --no-cache-dir -r requirements.txt
+        Write-Host "Installing required packages from grpc_server/requirements.txt..."
+        & "$vendorPythonDir/python.exe" -m pip install --no-warn-script-location --no-cache-dir -r grpc_server/requirements.txt
 
         # Verify installation
         Write-Host "Verifying installed packages..."
