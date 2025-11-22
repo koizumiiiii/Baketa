@@ -106,14 +106,16 @@ jobs:
     #     dotnet test tests/Baketa.Infrastructure.Tests --configuration Release --verbosity minimal --filter "Category!=LocalOnly&Category!=Integration"
     #   continue-on-error: true
 
-    - name: Build projects individually
-      run: |
-        # Build each project individually to avoid NETSDK1134 error
-        dotnet build Baketa.Core/Baketa.Core.csproj --configuration Release --verbosity minimal
-        dotnet build Baketa.Infrastructure/Baketa.Infrastructure.csproj --configuration Release --verbosity minimal
-        dotnet build Baketa.Infrastructure.Platform/Baketa.Infrastructure.Platform.csproj --configuration Release --verbosity minimal
-        dotnet build Baketa.Application/Baketa.Application.csproj --configuration Release --verbosity minimal
-        dotnet build Baketa.UI/Baketa.UI.csproj --configuration Release --verbosity minimal
+    # 🔥 [HOTFIX] alpha-0.1.9: Individual build step removed
+    # Reason: dotnet publish automatically builds and restores
+    # Pre-building caused NETSDK1047 (missing project.assets.json)
+    # - name: Build projects individually
+    #   run: |
+    #     dotnet build Baketa.Core/Baketa.Core.csproj --configuration Release --verbosity minimal
+    #     dotnet build Baketa.Infrastructure/Baketa.Infrastructure.csproj --configuration Release --verbosity minimal
+    #     dotnet build Baketa.Infrastructure.Platform/Baketa.Infrastructure.Platform.csproj --configuration Release --verbosity minimal
+    #     dotnet build Baketa.Application/Baketa.Application.csproj --configuration Release --verbosity minimal
+    #     dotnet build Baketa.UI/Baketa.UI.csproj --configuration Release --verbosity minimal
 
     - name: Publish application
       run: |
@@ -124,7 +126,6 @@ jobs:
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --no-build `
           --output $outputDir `
           --verbosity minimal `
           /p:PublishSingleFile=true `
