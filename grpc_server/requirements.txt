@@ -11,9 +11,12 @@ protobuf>=5.26.1,<6.0
 
 # NLLB-200 Translation Model (既存requirements.txtベース)
 transformers>=4.30.0
-# 🔥 [PACKAGE_SIZE_FIX] torch削除（約200MB削減）
-# GPU検出はctranslate2.get_device_count("cuda")を使用
-# torch>=2.0.0
+# 🔥 [HOTFIX alpha-0.1.10] torch CPU版を追加（transformersがtorchを暗黙的に必要とするため）
+# 根本原因: transformersのAutoTokenizer.from_pretrained()は内部でtorchをインポートするため、
+#           torchなしではImportErrorで起動直後にExitCode 1で失敗する。
+# 対策: CPU専用版を使用してパッケージサイズを抑制（CUDA版との差分 約50-100MB削減）
+# 恒久対応: Issue #171でSentencePieceProcessorによるAutoTokenizer置き換えを実施予定
+torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu
 sentencepiece>=0.1.99
 
 # Data Processing
