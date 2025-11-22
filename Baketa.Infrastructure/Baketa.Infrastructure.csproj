@@ -13,6 +13,11 @@
 		<NoWarn>$(NoWarn);CA1848;CA1711</NoWarn>
 	</PropertyGroup>
 
+	<!-- 配布版判定用コンパイル時シンボル（Gemini提案: より堅牢な配布モード判定） -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DefineConstants>$(DefineConstants);IS_DISTRIBUTION</DefineConstants>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<ProjectReference Include="..\Baketa.Core\Baketa.Core.csproj" />
 	</ItemGroup>

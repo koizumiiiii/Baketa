@@ -294,36 +294,51 @@ public class PythonServerManager(
             logger.LogInformation("✅ gRPC翻訳サーバー使用（CTranslate2統合版・80%メモリ削減）: {Script}", scriptPath);
         }
 
-        // DEPLOYMENT_STRATEGY: Python環境の優先順位
-        // 1. .venv (Baketa専用開発環境 - protobuf 6.x対応)
-        // 2. vendor/python (配布版同梱)
-        // 3. システムPython (pythonResolver)
+        // DEPLOYMENT_STRATEGY: Python環境の優先順位（Gemini提案: コンパイル時判定）
+        // 配布版（Release build）: vendor/pythonのみ（厳密チェック）
+        // 開発版（Debug build）: .venv → vendor/python → システムPython
         string pythonExecutable;
 
-        // projectRootは既にLine 265で.slnベースの堅牢な方法で解決済み
-        var venvPythonPath = Path.Combine(projectRoot, ".venv", "Scripts", "python.exe");
         var vendorPythonPath = Path.Combine(AppContext.BaseDirectory, "vendor", "python", "python.exe");
 
-        if (File.Exists(venvPythonPath))
+#if IS_DISTRIBUTION
+        // 配布版: 同梱Pythonを最優先（コンパイル時判定）
+        if (File.Exists(vendorPythonPath))
         {
-            // Baketa専用Python環境を使用（開発環境 - protobuf 6.x対応）
-            pythonExecutable = venvPythonPath;
-            logger.LogInformation("✅ Baketa専用Python環境使用 (.venv): {PythonPath}", pythonExecutable);
-        }
-        else if (File.Exists(vendorPythonPath))
-        {
-            // 同梱されたPython実行ファイルを使用（配布版）
             pythonExecutable = vendorPythonPath;
-            logger.LogInformation("✅ 同梱Python環境使用 (vendor): {PythonPath}", pythonExecutable);
+            logger.LogInformation("✅ 同梱Python使用（配布版）: {PythonPath}", pythonExecutable);
         }
         else
         {
-            // システムPythonにフォールバック（最終手段）
+            // 配布版で同梱Pythonがない場合はエラー（ユーザーにPythonインストールさせない）
+            logger.LogError("❌ 同梱Python未検出（配布版）: {VendorPath}", vendorPythonPath);
+            throw new InvalidOperationException(
+                "同梱されたPython環境が見つかりません。アプリケーションパッケージが破損している可能性があります。\n" +
+                "再ダウンロードするか、GitHubのIssueで報告してください。\n" +
+                $"期待されるパス: {vendorPythonPath}");
+        }
+#else
+        // 開発版: .venv優先、vendor/pythonフォールバック（コンパイル時判定）
+        var venvPythonPath = Path.Combine(projectRoot, ".venv", "Scripts", "python.exe");
+
+        if (File.Exists(venvPythonPath))
+        {
+            pythonExecutable = venvPythonPath;
+            logger.LogInformation("✅ Baketa専用Python環境使用（開発版 - .venv）: {PythonPath}", pythonExecutable);
+        }
+        else if (File.Exists(vendorPythonPath))
+        {
+            pythonExecutable = vendorPythonPath;
+            logger.LogInformation("✅ 同梱Python環境使用（開発版 - vendor）: {PythonPath}", pythonExecutable);
+        }
+        else
+        {
+            // 開発版でのみシステムPythonにフォールバック
             logger.LogWarning("⚠️ .venv未検出（{VenvPath}）、同梱Python未検出（{VendorPath}）。システムPythonにフォールバック", venvPythonPath, vendorPythonPath);
             try
             {
                 pythonExecutable = await pythonResolver.ResolvePythonExecutableAsync();
-                logger.LogInformation("✅ システムPython実行環境解決: {PythonPath}", pythonExecutable);
+                logger.LogInformation("✅ システムPython実行環境解決（開発版フォールバック）: {PythonPath}", pythonExecutable);
             }
             catch (InvalidOperationException ex)
             {
@@ -331,6 +346,7 @@ public class PythonServerManager(
                 throw new InvalidOperationException($"Python実行環境が見つかりません。.venv環境を作成（python -m venv .venv）するか、Python 3.10以上をインストールしてください。詳細: {ex.Message}", ex);
             }
         }
+#endif
 
         // 🔥 [TOKENIZER_HANG_FIX] HuggingFace Tokenizerロード時のstderrハング問題修正
         // 問題: Transformers警告の長いメッセージでstderrバッファが満杯になり、Python側がブロック

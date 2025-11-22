@@ -185,10 +185,22 @@ public sealed class PythonEnvironmentResolver
                     var output = (await process.StandardOutput.ReadToEndAsync()).Trim();
                     if (!string.IsNullOrWhiteSpace(output))
                     {
-                        // Windowsでは複数行返る場合があるので最初の行を使用
-                        var firstLine = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
-                        _logger.LogDebug("🔍 {Command}で発見: {Candidate} -> {Path}", commandName, candidate, firstLine);
-                        return firstLine;
+                        // Windowsでは複数行返る場合があるので全行をチェック
+                        var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var line in lines)
+                        {
+                            var trimmedLine = line.Trim();
+
+                            // WindowsAppsのPythonストアアプリ版を除外（機能しないため）
+                            if (trimmedLine.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase))
+                            {
+                                _logger.LogDebug("⚠️ WindowsApps版Pythonをスキップ（ストアアプリ版は機能しません）: {Path}", trimmedLine);
+                                continue;
+                            }
+
+                            _logger.LogDebug("🔍 {Command}で発見: {Candidate} -> {Path}", commandName, candidate, trimmedLine);
+                            return trimmedLine;
+                        }
                     }
                 }
             }
