@@ -87,10 +87,13 @@ jobs:
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
-    
-    - name: Restore dependencies
-      run: |
-        dotnet restore Baketa.sln --verbosity minimal
+
+    # 🔥 [HOTFIX] alpha-0.1.9: Restore step removed
+    # Reason: dotnet publish automatically restores dependencies
+    # Explicit restore of solution causes NETSDK1134 error
+    # - name: Restore dependencies
+    #   run: |
+    #     dotnet restore Baketa.sln --verbosity minimal
 
     # 🔥 [HOTFIX] alpha-0.1.9: Test step skipped
     # Reason: dotnet test causes NETSDK1134 error when building solution with RuntimeIdentifier
