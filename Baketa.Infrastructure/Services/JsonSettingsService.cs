@@ -223,7 +223,32 @@ public sealed class JsonSettingsService : ISettingsService
 
             // JSON に変換して保存
             var json = JsonSerializer.Serialize(settingsToSave, _jsonOptions);
-            await File.WriteAllTextAsync(_settingsFilePath, json).ConfigureAwait(false);
+
+            // 🔥 [CI_FIX] ファイルアクセス競合を回避するため、排他的アクセス + リトライロジック
+            // Issue: CI/CD環境で複数スレッドが同時にファイルアクセスし IOException が発生
+            // Solution: FileStream with FileShare.None で排他制御、3回リトライで堅牢性向上
+            const int maxRetries = 3;
+            const int retryDelayMs = 50;
+
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    // FileShare.None で排他的アクセスを確保（他プロセス/スレッドからの読み書き禁止）
+                    using (var stream = new FileStream(_settingsFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    using (var writer = new StreamWriter(stream))
+                    {
+                        await writer.WriteAsync(json).ConfigureAwait(false);
+                    }
+                    break; // 成功したらループ脱出
+                }
+                catch (IOException ex) when (attempt < maxRetries - 1)
+                {
+                    // 最後の試行以外では、リトライ前に短時間待機
+                    _logger.LogWarning(ex, "ファイル保存リトライ {Attempt}/{MaxRetries}: {FilePath}", attempt + 1, maxRetries, _settingsFilePath);
+                    await Task.Delay(retryDelayMs).ConfigureAwait(false);
+                }
+            }
 
             _logger.LogInformation("設定を保存しました: {FilePath}", _settingsFilePath);
         }
