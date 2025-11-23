@@ -12,6 +12,7 @@ public interface IWindowSelectionDialogService
     /// <summary>
     /// ウィンドウ選択ダイアログを表示します
     /// </summary>
+    /// <param name="currentlySelectedWindowHandle">現在選択中のウィンドウハンドル（選択済みウィンドウに枠表示用）</param>
     /// <returns>選択されたウィンドウ情報（キャンセル時はnull）</returns>
-    Task<WindowInfo?> ShowWindowSelectionDialogAsync();
+    Task<WindowInfo?> ShowWindowSelectionDialogAsync(IntPtr currentlySelectedWindowHandle = default);
 }

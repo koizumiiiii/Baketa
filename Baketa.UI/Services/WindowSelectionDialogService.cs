@@ -16,19 +16,22 @@ public sealed class WindowSelectionDialogService : IWindowSelectionDialogService
     private readonly IEventAggregator _eventAggregator;
     private readonly IWindowManagerAdapter _windowManager;
     private readonly ILogger<WindowSelectionDialogService> _logger;
+    private readonly ILoggerFactory _loggerFactory;
 
     public WindowSelectionDialogService(
         IEventAggregator eventAggregator,
         IWindowManagerAdapter windowManager,
-        ILogger<WindowSelectionDialogService> logger)
+        ILogger<WindowSelectionDialogService> logger,
+        ILoggerFactory loggerFactory)
     {
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
     }
 
     /// <inheritdoc />
-    public async Task<WindowInfo?> ShowWindowSelectionDialogAsync()
+    public async Task<WindowInfo?> ShowWindowSelectionDialogAsync(IntPtr currentlySelectedWindowHandle = default)
     {
         try
         {
@@ -36,13 +39,20 @@ public sealed class WindowSelectionDialogService : IWindowSelectionDialogService
             Console.WriteLine("[DIALOG_START] Window selection dialog started");
 
             // Gemini推奨: HomeViewModelパターンによる簡素化実装
-            // Note: ViewModelには専用のLoggerが必要のため、NullLoggerを使用
-            var viewModelLogger = Microsoft.Extensions.Logging.Abstractions.NullLogger<WindowSelectionDialogViewModel>.Instance;
-            var dialogViewModel = new WindowSelectionDialogViewModel(_eventAggregator, viewModelLogger, _windowManager);
+            // 🔥 [ISSUE#171] 実際のLoggerを使用（NullLoggerではログが出力されない）
+            var viewModelLogger = _loggerFactory.CreateLogger<WindowSelectionDialogViewModel>();
+            _logger.LogDebug("[BORDER_DEBUG] Creating ViewModel with PreviouslySelectedWindowHandle: {Handle}", currentlySelectedWindowHandle);
+            var dialogViewModel = new WindowSelectionDialogViewModel(_eventAggregator, viewModelLogger, _windowManager)
+            {
+                // 🔥 [ISSUE#171] 前回選択したウィンドウハンドルを設定（選択済みウィンドウに枠表示用）
+                PreviouslySelectedWindowHandle = currentlySelectedWindowHandle
+            };
+            _logger.LogDebug("[BORDER_DEBUG] ViewModel created - PreviouslySelectedWindowHandle confirmed: {Handle}", dialogViewModel.PreviouslySelectedWindowHandle);
             var dialog = new WindowSelectionDialogView
             {
                 DataContext = dialogViewModel
             };
+            _logger.LogDebug("[BORDER_DEBUG] Dialog created with DataContext set");
 
             // メインウィンドウを取得
             var owner = Avalonia.Application.Current?.ApplicationLifetime

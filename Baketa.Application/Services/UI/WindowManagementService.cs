@@ -66,7 +66,10 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
             if (_dialogService != null)
             {
                 Console.WriteLine("🔧 _dialogService != null - ShowWindowSelectionDialogAsync呼び出し開始");
-                var result = await _dialogService.ShowWindowSelectionDialogAsync();
+                // 🔥 [ISSUE#171] 現在選択中のウィンドウハンドルを渡す（選択済みウィンドウに枠表示用）
+                var currentHandle = _selectedWindow?.Handle ?? IntPtr.Zero;
+                _logger.LogDebug("[BORDER_DEBUG] Passing currentHandle to dialog: {Handle} (from _selectedWindow: {Title})", currentHandle, _selectedWindow?.Title ?? "null");
+                var result = await _dialogService.ShowWindowSelectionDialogAsync(currentHandle);
                 Console.WriteLine($"🔧 _dialogService.ShowWindowSelectionDialogAsync完了: result={result != null}");
 
                 if (result != null)
@@ -74,6 +77,10 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
                     _logger.LogInformation("ウィンドウ選択完了: '{Title}' (Handle={Handle})",
                         result.Title, result.Handle);
                     Console.WriteLine($"✅ ウィンドウ選択完了: '{result.Title}' (Handle={result.Handle})");
+
+                    // 🔥 [ISSUE#171] 選択されたウィンドウを保存（次回のダイアログ表示時に枠表示するため）
+                    await SelectWindowAsync(result).ConfigureAwait(false);
+                    _logger.LogDebug("[BORDER_DEBUG] SelectWindowAsync called - _selectedWindow updated to: {Handle}", result.Handle);
                 }
                 else
                 {

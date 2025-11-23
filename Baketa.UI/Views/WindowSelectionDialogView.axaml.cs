@@ -85,12 +85,15 @@ public partial class WindowSelectionDialogView : Window
         Console.WriteLine("🎯 XAML WindowSelectionDialogView OnLoaded完了");
     }
 
+    // 🔥 [ISSUE#171] データバインディングによる実装に変更したため、イベントハンドラーは不要
+
     /// <summary>
     /// ウィンドウアイテムのクリックイベント処理
     /// </summary>
     private void OnWindowItemClick(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is Control control && control.DataContext is WindowInfo windowInfo)
+        // 🔥 [ISSUE#171] WindowInfoViewModel対応
+        if (sender is Control control && control.DataContext is WindowInfoViewModel windowInfoViewModel)
         {
             if (DataContext is WindowSelectionDialogViewModel viewModel)
             {
@@ -98,15 +101,15 @@ public partial class WindowSelectionDialogView : Window
                 if (e.ClickCount == 1)
                 {
                     // シングルクリック: 選択状態を設定
-                    viewModel.SelectedWindow = windowInfo;
+                    viewModel.SelectedWindow = windowInfoViewModel.WindowInfo;
                 }
                 else if (e.ClickCount >= 2)
                 {
                     // ダブルクリック: 選択して即座に決定
-                    viewModel.SelectedWindow = windowInfo;
+                    viewModel.SelectedWindow = windowInfoViewModel.WindowInfo;
 
                     // ダブルクリックで即座に選択を実行
-                    viewModel.SelectWindowCommand.Execute(windowInfo);
+                    viewModel.SelectWindowCommand.Execute(windowInfoViewModel);
                 }
             }
         }

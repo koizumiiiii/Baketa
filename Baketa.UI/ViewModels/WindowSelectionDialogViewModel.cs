@@ -24,6 +24,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     private readonly IWindowManagerAdapter _windowManager;
     private WindowInfo? _selectedWindow;
     private bool _isLoading;
+    private IntPtr _previouslySelectedWindowHandle; // 🔥 [ISSUE#171] 前回選択したウィンドウのハンドル
 
     public WindowSelectionDialogViewModel(
         IEventAggregator eventAggregator,
@@ -38,7 +39,8 @@ public class WindowSelectionDialogViewModel : ViewModelBase
         // コマンドの初期化（UI スレッドで安全に初期化）
         try
         {
-            SelectWindowCommand = ReactiveCommand.CreateFromTask<WindowInfo>(ExecuteSelectWindowAsync,
+            // 🔥 [ISSUE#171] WindowInfoViewModel対応
+            SelectWindowCommand = ReactiveCommand.CreateFromTask<WindowInfoViewModel>(ExecuteSelectWindowAsync,
                 outputScheduler: RxApp.MainThreadScheduler);
             CancelCommand = ReactiveCommand.Create(ExecuteCancel,
                 outputScheduler: RxApp.MainThreadScheduler);
@@ -58,9 +60,9 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 利用可能なウィンドウリスト
+    /// 利用可能なウィンドウリスト（🔥 [ISSUE#171] ViewModelでラップ）
     /// </summary>
-    public ObservableCollection<WindowInfo> AvailableWindows { get; }
+    public ObservableCollection<WindowInfoViewModel> AvailableWindows { get; }
 
     /// <summary>
     /// 選択中のウィンドウ
@@ -91,6 +93,15 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// 🔥 [ISSUE#171] 前回選択したウィンドウのハンドル（再選択時に枠表示用）
+    /// </summary>
+    public IntPtr PreviouslySelectedWindowHandle
+    {
+        get => _previouslySelectedWindowHandle;
+        set => this.RaiseAndSetIfChanged(ref _previouslySelectedWindowHandle, value);
+    }
+
+    /// <summary>
     /// ロード中状態
     /// </summary>
     public new bool IsLoading
@@ -116,9 +127,9 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     public bool CanSelect => SelectedWindow != null;
 
     /// <summary>
-    /// ウィンドウ選択コマンド
+    /// ウィンドウ選択コマンド（🔥 [ISSUE#171] WindowInfoViewModel対応）
     /// </summary>
-    public ReactiveCommand<WindowInfo, Unit> SelectWindowCommand { get; }
+    public ReactiveCommand<WindowInfoViewModel, Unit> SelectWindowCommand { get; }
 
     /// <summary>
     /// キャンセルコマンド
@@ -438,7 +449,9 @@ public class WindowSelectionDialogViewModel : ViewModelBase
                             if (i == 0) AvailableWindows.Clear(); // 初回のみクリア
                             foreach (var window in batchResults)
                             {
-                                AvailableWindows.Add(window);
+                                // 🔥 [ISSUE#171] WindowInfoViewModelでラップし、選択済みかどうかを設定
+                                var isCurrentlySelected = window.Handle == PreviouslySelectedWindowHandle;
+                                AvailableWindows.Add(new WindowInfoViewModel(window, isCurrentlySelected));
                             }
                         });
 
@@ -468,9 +481,18 @@ public class WindowSelectionDialogViewModel : ViewModelBase
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 AvailableWindows.Clear();
+                Logger?.LogInformation("🎯 [BORDER_DEBUG] LoadAvailableWindowsAsync: PreviouslySelectedWindowHandle = {Handle}", PreviouslySelectedWindowHandle);
+                Console.WriteLine($"🎯 [BORDER_DEBUG] LoadAvailableWindowsAsync: PreviouslySelectedWindowHandle = {PreviouslySelectedWindowHandle}");
                 foreach (var window in windows)
                 {
-                    AvailableWindows.Add(window);
+                    // 🔥 [ISSUE#171] WindowInfoViewModelでラップし、選択済みかどうかを設定
+                    var isCurrentlySelected = window.Handle == PreviouslySelectedWindowHandle;
+                    if (isCurrentlySelected)
+                    {
+                        Logger?.LogInformation("✅ [BORDER_DEBUG] Setting IsCurrentlySelected=true for window: '{Title}' (Handle={Handle})", window.Title, window.Handle);
+                        Console.WriteLine($"✅ [BORDER_DEBUG] Setting IsCurrentlySelected=true for window: '{window.Title}' (Handle={window.Handle})");
+                    }
+                    AvailableWindows.Add(new WindowInfoViewModel(window, isCurrentlySelected));
                 }
 
                 Logger?.LogDebug("🔄 AvailableWindows.Count最終更新: {Count}", AvailableWindows.Count);
@@ -521,16 +543,19 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     /// <summary>
     /// ウィンドウ選択実行
     /// </summary>
-    private async Task ExecuteSelectWindowAsync(WindowInfo selectedWindow)
+    private async Task ExecuteSelectWindowAsync(WindowInfoViewModel? selectedWindowViewModel)
     {
 
         try
         {
-            if (selectedWindow == null)
+            if (selectedWindowViewModel == null)
             {
                 Logger?.LogWarning("No window selected");
                 return;
             }
+
+            // 🔥 [ISSUE#171] WindowInfoViewModelから元のWindowInfoを取得
+            var selectedWindow = selectedWindowViewModel.WindowInfo;
 
             Logger?.LogInformation("Window selection executed: '{Title}' (Handle: {Handle})",
                 selectedWindow.Title, selectedWindow.Handle);
@@ -573,10 +598,39 @@ public class WindowSelectionDialogViewModel : ViewModelBase
     /// </summary>
     internal async Task ExecuteRefreshAsync()
     {
+        Logger?.LogInformation("🔴 [BORDER_DEBUG] ExecuteRefreshAsync開始 - PreviouslySelectedWindowHandle: {Handle}", PreviouslySelectedWindowHandle);
         Console.WriteLine("🔴 [DEBUG] ExecuteRefreshAsync開始 - Logger is: " + (Logger?.ToString() ?? "NULL"));
         Logger?.LogDebug("Refreshing window list");
+        Logger?.LogDebug("[BORDER_DEBUG] PreviouslySelectedWindowHandle before loading: {Handle}", PreviouslySelectedWindowHandle);
         Console.WriteLine("🔴 [DEBUG] ExecuteRefreshAsync - LoadAvailableWindowsAsync呼び出し前");
         await LoadAvailableWindowsAsync().ConfigureAwait(false);
+        Logger?.LogInformation("🔴 [BORDER_DEBUG] ExecuteRefreshAsync完了 - AvailableWindows.Count: {Count}", AvailableWindows.Count);
         Console.WriteLine("🔴 [DEBUG] ExecuteRefreshAsync完了");
+
+        // 🔥 [ISSUE#171] デバッグ: 読み込まれたウィンドウとPreviouslySelectedWindowHandleを比較
+        Logger?.LogInformation("🎯 [BORDER_DEBUG] ExecuteRefreshAsync: Windows loaded: {Count}, PreviouslySelectedWindowHandle: {Handle}", AvailableWindows.Count, PreviouslySelectedWindowHandle);
+        Console.WriteLine($"🎯 [BORDER_DEBUG] ExecuteRefreshAsync: Windows loaded: {AvailableWindows.Count}, PreviouslySelectedWindowHandle: {PreviouslySelectedWindowHandle}");
+
+        // 各ウィンドウのIsCurrentlySelectedをチェック
+        foreach (var windowVm in AvailableWindows)
+        {
+            if (windowVm.IsCurrentlySelected)
+            {
+                Logger?.LogInformation("✅ [BORDER_DEBUG] Found selected window: '{Title}' (Handle={Handle}), IsCurrentlySelected={IsSelected}", windowVm.Title, windowVm.Handle, windowVm.IsCurrentlySelected);
+                Console.WriteLine($"✅ [BORDER_DEBUG] Found selected window: '{windowVm.Title}' (Handle={windowVm.Handle}), IsCurrentlySelected={windowVm.IsCurrentlySelected}");
+            }
+        }
+
+        var matchingWindow = AvailableWindows.FirstOrDefault(w => w.Handle == PreviouslySelectedWindowHandle);
+        if (matchingWindow != null)
+        {
+            Logger?.LogInformation("🔥 [BORDER_DEBUG] MATCH FOUND! Window '{Title}' (Handle={Handle}), IsCurrentlySelected={IsSelected}", matchingWindow.Title, matchingWindow.Handle, matchingWindow.IsCurrentlySelected);
+            Console.WriteLine($"🔥 [BORDER_DEBUG] MATCH FOUND! Window '{matchingWindow.Title}' (Handle={matchingWindow.Handle}), IsCurrentlySelected={matchingWindow.IsCurrentlySelected}");
+        }
+        else if (PreviouslySelectedWindowHandle != IntPtr.Zero)
+        {
+            Logger?.LogInformation("❌ [BORDER_DEBUG] NO MATCH! PreviouslySelectedWindowHandle {Handle} not found in AvailableWindows", PreviouslySelectedWindowHandle);
+            Console.WriteLine($"❌ [BORDER_DEBUG] NO MATCH! PreviouslySelectedWindowHandle {PreviouslySelectedWindowHandle} not found in AvailableWindows");
+        }
     }
 }

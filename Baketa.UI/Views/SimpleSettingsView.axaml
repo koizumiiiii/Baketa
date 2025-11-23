@@ -158,16 +158,16 @@
                        FontSize="14"
                        Foreground="{StaticResource TextBrush}"/>
             
-            <!-- フォントサイズ -->
+            <!-- 翻訳文字サイズ -->
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              
+
               <TextBlock Grid.Column="0"
-                         Text="フォントサイズ:"
+                         Text="翻訳文字サイズ:"
                          FontSize="13"
                          VerticalAlignment="Center"
                          Foreground="{StaticResource TextBrush}"
