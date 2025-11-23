@@ -31,7 +31,7 @@
     </Styles.Resources>
 
     <!-- ベースボタンスタイル -->
-    <!-- 🔥 [ISSUE#164_FIX] menu-itemスタイルと統合、通常状態は完全透明背景 -->
+    <!-- 🔥 [ISSUE#171] 多言語対応: Width固定値 → MinWidth に変更（テキスト長に応じて自動調整） -->
     <Style Selector="Button.translation-mode-button">
         <Setter Property="Background" Value="{StaticResource ButtonDefaultBackground}" />
         <Setter Property="Foreground" Value="{StaticResource ButtonDefaultForeground}" />
@@ -39,12 +39,12 @@
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Padding" Value="8" />
         <Setter Property="Margin" Value="4,2" />
-        <Setter Property="Width" Value="50" />
+        <Setter Property="MinWidth" Value="50" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="Transitions">
             <Transitions>
                 <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" />

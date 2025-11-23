@@ -8,7 +8,7 @@
         x:DataType="vm:MainOverlayViewModel"
         Title="Baketa Overlay"
         SizeToContent="WidthAndHeight"
-        MaxWidth="120"
+        MaxWidth="200"
         MaxHeight="600"
         WindowStartupLocation="Manual"
         ShowInTaskbar="False"
@@ -41,16 +41,17 @@
 
   <Window.Styles>
     <!-- メニュー項目スタイル -->
+    <!-- 🔥 [ISSUE#171] 多言語対応: Width固定値 → MinWidth に変更（テキスト長に応じて自動調整） -->
     <Style Selector="Button.menu-item">
       <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Padding" Value="8"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
-      <Setter Property="HorizontalAlignment" Value="Center"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="CornerRadius" Value="6"/>
       <Setter Property="Margin" Value="4,2"/>
-      <Setter Property="Width" Value="50"/>
+      <Setter Property="MinWidth" Value="50"/>
     </Style>
     
     <Style Selector="Button.menu-item:hover">
@@ -61,18 +62,19 @@
       <Setter Property="Background" Value="{StaticResource ButtonPressedBrush}"/>
     </Style>
     
-    <!-- ステータス表示スタイル -->
+    <!-- ステータス表示スタイル（未使用 - Status削除済み） -->
     <Style Selector="Border.status-item">
       <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Padding" Value="8"/>
-      <Setter Property="HorizontalAlignment" Value="Center"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="CornerRadius" Value="6"/>
       <Setter Property="Margin" Value="4,2"/>
-      <Setter Property="Width" Value="50"/>
+      <Setter Property="MinWidth" Value="50"/>
     </Style>
     
     <!-- 最小化ボタンスタイル -->
+    <!-- 🔥 [ISSUE#171] 多言語対応: Width固定値 → MinWidth に変更 -->
     <Style Selector="Button.minimize-button">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
@@ -80,8 +82,8 @@
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="CornerRadius" Value="4"/>
-      <Setter Property="HorizontalAlignment" Value="Center"/>
-      <Setter Property="Width" Value="50"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="MinWidth" Value="50"/>
       <Setter Property="Margin" Value="4,8,4,4"/>
     </Style>
     
@@ -125,25 +127,20 @@
                   VerticalScrollBarVisibility="Auto">
       <StackPanel Orientation="Vertical" Spacing="2">
       
-      <!-- 最小化ボタン -->
-      <!-- 🔥 [ISSUE#164] UI/UX改善: SVGアイコン統合 + アクセシビリティ -->
+      <!-- 最小化ボタン - ウィンドウ選択後のみ表示 -->
+      <!-- 🔥 [ISSUE#171] UI改善: Minテキスト削除、アイコンサイズをexpandと統一（16px） -->
       <Button Classes="minimize-button"
               Command="{Binding FoldCommand}"
               ToolTip.Tip="最小化"
-              AutomationProperties.Name="最小化ボタン">
-        <StackPanel Orientation="Horizontal" Spacing="3" HorizontalAlignment="Center">
-          <Image Width="10" Height="10"
-                 Source="avares://Baketa.UI/Assets/Icons/minimize.png"
-                 VerticalAlignment="Center"/>
-          <TextBlock Text="Min"
-                     FontSize="7"
-                     VerticalAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"/>
-        </StackPanel>
+              AutomationProperties.Name="最小化ボタン"
+              IsVisible="{Binding IsWindowSelected}">
+        <Image Width="16" Height="16"
+               Source="avares://Baketa.UI/Assets/Icons/minimize.png"
+               VerticalAlignment="Center"/>
       </Button>
       
-      <!-- ウィンドウ選択ボタン -->
-      <!-- 🔥 [ISSUE#164] UI/UX改善: SVGアイコン統合 + アクセシビリティ -->
+      <!-- ウィンドウ選択ボタン - 常に表示 -->
+      <!-- 🔥 [ISSUE#171] UI改善: Select → Target に変更 -->
       <Button Classes="menu-item"
               Command="{Binding SelectWindowCommand}"
               ToolTip.Tip="翻訳対象ウィンドウを選択"
@@ -153,21 +150,21 @@
         <StackPanel Orientation="Vertical" Spacing="4">
           <Image Width="18" Height="18"
                  Source="avares://Baketa.UI/Assets/Icons/target.png"/>
-          <TextBlock Text="Select"
+          <TextBlock Text="Target"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"/>
+                     Foreground="{StaticResource TextBrush}"
+                     IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
       
-      <!-- ホーム/開始ボタン -->
-      <!-- 🔥 [PHASE5.2E] ToolTipを StartButtonTooltip にバインディング（ウォームアップ進捗表示） -->
-      <!-- 🔥 [ISSUE#164] UI/UX改善: translation-mode-button スタイル、ObservableAsPropertyHelperでアイコン切り替え -->
-      <!-- 🔥 [ISSUE#164_FIX] menu-itemクラスを削除してスタイル競合を解消 -->
+      <!-- Live翻訳ボタン - ウィンドウ選択後のみ表示 -->
+      <!-- 🔥 [ISSUE#171] UI改善: Start → Live翻訳 に変更、状態による表示制御 -->
       <Button Classes="translation-mode-button"
               Classes.pulsing="{Binding IsLiveActive}"
               IsEnabled="{Binding IsLiveEnabled}"
+              IsVisible="{Binding IsWindowSelected}"
               Command="{Binding StartStopCommand}"
               ToolTip.Tip="{Binding StartButtonTooltip}"
               Name="StartStopButton"
@@ -176,22 +173,21 @@
           <!-- 🔥 [ISSUE#164] ObservableAsPropertyHelperでIImage型を直接バインディング（ReactiveUIベストプラクティス） -->
           <Image Width="20" Height="20"
                  Source="{Binding LiveIconSource}" />
-          <TextBlock Text="{Binding StartStopText}"
+          <TextBlock Text="Live翻訳"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"/>
+                     Foreground="{StaticResource TextBrush}"
+                     IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
 
-      <!-- シングルショット翻訳ボタン -->
-      <!-- 🔥 [ISSUE#163_PHASE5] シングルショット翻訳機能追加 -->
-      <!-- 🔥 [ISSUE#164] UI/UX改善: translation-mode-button スタイル、SVGアイコン、Classes.active バインディング -->
-      <!-- 🔥 [ISSUE#164_FIX] menu-itemクラスを削除してスタイル競合を解消 -->
-      <!-- 🔥 [ISSUE#164_DEBUG] 一時的に静的パスでテスト -->
+      <!-- Shot翻訳ボタン - ウィンドウ選択後のみ表示 -->
+      <!-- 🔥 [ISSUE#171] UI改善: Shot → Shot翻訳 に変更、状態による表示制御 -->
       <Button Classes="translation-mode-button"
               Classes.pulsing="{Binding IsSingleshotActive}"
               IsEnabled="{Binding IsSingleshotEnabled}"
+              IsVisible="{Binding IsWindowSelected}"
               Command="{Binding ExecuteSingleshotCommand}"
               ToolTip.Tip="{Binding SingleshotButtonTooltip}"
               Name="SingleshotButton">
@@ -199,11 +195,12 @@
           <!-- 🔥 [ISSUE#164] ObservableAsPropertyHelperでIImage型を直接バインディング（ReactiveUIベストプラクティス） -->
           <Image Width="20" Height="20"
                  Source="{Binding SingleshotIconSource}" />
-          <TextBlock Text="Shot"
+          <TextBlock Text="Shot翻訳"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"/>
+                     Foreground="{StaticResource TextBrush}"
+                     IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
 
@@ -220,11 +217,12 @@
         </StackPanel>
       </Border>
       
-      <!-- ドライブ/表示切り替えボタン -->
-      <!-- 🔥 [ISSUE#164] UI/UX改善: SVGアイコン統合 -->
+      <!-- 翻訳表示切り替えボタン - ウィンドウ選択後のみ表示 -->
+      <!-- 🔥 [ISSUE#171] UI改善: Show → 翻訳表示 に変更、状態による表示制御 -->
       <Button Classes="menu-item"
               Command="{Binding ShowHideCommand}"
               IsEnabled="{Binding ShowHideEnabled}"
+              IsVisible="{Binding IsWindowSelected}"
               ToolTip.Tip="翻訳結果の表示/非表示">
         <StackPanel Orientation="Vertical" Spacing="4" HorizontalAlignment="Center">
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -235,15 +233,16 @@
                      Margin="2,0,0,0"
                      IsVisible="{Binding IsTranslationActive}"/>
           </StackPanel>
-          <TextBlock Text="{Binding ShowHideText}"
+          <TextBlock Text="翻訳表示"
                      FontSize="10"
                      HorizontalAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"/>
+                     Foreground="{StaticResource TextBrush}"
+                     IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
       
-      <!-- 設定ボタン -->
-      <!-- 🔥 [ISSUE#164] UI/UX改善: SVGアイコン統合 -->
+      <!-- 設定ボタン - 常に表示 -->
+      <!-- 🔥 [ISSUE#171] UI改善: Set → 設定 に変更 -->
       <Button Classes="menu-item"
               Command="{Binding SettingsCommand}"
               IsEnabled="{Binding SettingsEnabled}"
@@ -251,45 +250,22 @@
         <StackPanel Orientation="Vertical" Spacing="4">
           <Image Width="18" Height="18"
                  Source="avares://Baketa.UI/Assets/Icons/settings.png"/>
-          <TextBlock Text="Set"
+          <TextBlock Text="設定"
                      FontSize="10"
                      HorizontalAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"/>
+                     Foreground="{StaticResource TextBrush}"
+                     IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
       
       <!-- 区切り線 -->
-      <Rectangle Height="1" 
+      <Rectangle Height="1"
                  Fill="{StaticResource OverlayBorderBrush}"
-                 Margin="8,4" 
+                 Margin="8,4"
                  Opacity="0.5"/>
-      
-      <!-- システム情報 -->
-      <Border Classes="status-item">
-        <StackPanel Orientation="Vertical" Spacing="4">
-          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-            <PathIcon Width="16" Height="16"
-                      Data="{StaticResource SystemIcon}"
-                      Foreground="{StaticResource IconBrush}"/>
-            <Ellipse Width="8" Height="8"
-                     Fill="{Binding CurrentStatus, Converter={StaticResource StatusToColorConverter}}"
-                     Margin="2,0,0,0"/>
-          </StackPanel>
-          <TextBlock Text="Status"
-                     FontSize="10"
-                     HorizontalAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"/>
-        </StackPanel>
-      </Border>
-      
-      <!-- 区切り線 -->
-      <Rectangle Height="1" 
-                 Fill="{StaticResource OverlayBorderBrush}"
-                 Margin="8,4" 
-                 Opacity="0.5"/>
-      
-      <!-- 終了ボタン -->
-      <!-- 🔥 [ISSUE#164] UI/UX改善: SVGアイコン統合 -->
+
+      <!-- 終了ボタン - 常に表示 -->
+      <!-- 🔥 [ISSUE#171] UI改善: Exit テキストは展開時のみ表示 -->
       <Button Classes="menu-item"
               Command="{Binding ExitCommand}"
               ToolTip.Tip="アプリケーション終了"
@@ -300,7 +276,8 @@
           <TextBlock Text="Exit"
                      FontSize="10"
                      HorizontalAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"/>
+                     Foreground="{StaticResource TextBrush}"
+                     IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
 
@@ -309,7 +286,7 @@
   </Border>
 
   <!-- 最小化状態 -->
-  <!-- 🔥 [ISSUE#164] UI/UX改善: SVGアイコン統合 -->
+  <!-- 🔥 [ISSUE#171] UI改善: ステータスインジケーター削除、アイコンサイズ拡大 -->
   <Border Name="CollapsedOverlayBorder"
           Width="40"
           Height="40"
@@ -327,12 +304,8 @@
             BorderThickness="0"
             Width="36"
             Height="36">
-      <StackPanel Orientation="Vertical" Spacing="2">
-        <Image Width="12" Height="12"
-               Source="avares://Baketa.UI/Assets/Icons/expand.png"/>
-        <Ellipse Width="6" Height="6"
-                 Fill="{Binding CurrentStatus, Converter={StaticResource StatusToColorConverter}}"/>
-      </StackPanel>
+      <Image Width="16" Height="16"
+             Source="avares://Baketa.UI/Assets/Icons/expand.png"/>
     </Button>
   </Border>
 
