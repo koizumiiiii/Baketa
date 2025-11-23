@@ -66,6 +66,9 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<OverlayViewModel>();
         services.AddSingleton<HistoryViewModel>();
 
+        // 🔧 [Issue #170] ローディング画面ViewModel登録
+        services.AddSingleton<Baketa.UI.ViewModels.LoadingViewModel>();
+
         // 🗑️ [CLEANUP] OperationalControlViewModel削除 - 未使用コンポーネントのため除去
         // services.AddSingleton<Baketa.UI.ViewModels.Controls.OperationalControlViewModel>();
 
