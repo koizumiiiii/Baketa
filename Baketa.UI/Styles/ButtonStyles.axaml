@@ -55,10 +55,9 @@
     </Style>
 
     <!-- Hover状態 -->
+    <!-- 🔥 [ISSUE#171] ボーダーを削除、背景とスケールのみ -->
     <Style Selector="Button.translation-mode-button:pointerover">
         <Setter Property="Background" Value="{StaticResource ButtonHoverBackground}" />
-        <Setter Property="BorderBrush" Value="{StaticResource ButtonHoverBorder}" />
-        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="RenderTransform" Value="scale(1.05)" />
     </Style>
 
