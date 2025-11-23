@@ -533,7 +533,7 @@ public class PythonServerManager(
             }
 
             Console.WriteLine($"✅ [UltraPhase 14.13] SERVER_START信号検出完了: Port {port}, PID {process.Id}");
-            logger.LogInformation("✅ サーバー準備完了確認: Port {Port}, PID {PID} (stdin/stdout通信)", port, process.Id);
+            logger.LogInformation("✅ サーバー準備完了確認: Port {Port}, PID {PID} (gRPC通信、stderr監視)", port, process.Id);
 
             // 🔧 [ULTRA_FIX] イベント発行はLine 183 (StartServerAsync内部)で実施
             // WaitForServerReadyAsyncは準備確認のみに専念し、イベント発行責務を持たない
@@ -542,7 +542,7 @@ public class PythonServerManager(
         catch (Exception ex)
         {
             Console.WriteLine($"❌ [UltraPhase 14.13] サーバー準備確認失敗: Port {port}, Error: {ex.Message}");
-            logger.LogError(ex, "❌ サーバー準備確認失敗: Port {Port}, PID {PID} (stdin/stdout通信)", port, process.Id);
+            logger.LogError(ex, "❌ サーバー準備確認失敗: Port {Port}, PID {PID} (gRPC通信、stderr監視)", port, process.Id);
             throw;
         }
     }

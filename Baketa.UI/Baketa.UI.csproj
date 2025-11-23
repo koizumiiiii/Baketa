@@ -30,7 +30,7 @@
 		<AssemblyCopyright>Copyright © 2025 Baketa Project</AssemblyCopyright>
 		<AssemblyVersion>0.1.7.0</AssemblyVersion>
 		<FileVersion>0.1.7.0</FileVersion>
-		<ApplicationIcon>Assets\avalonia-logo.ico</ApplicationIcon>
+		<ApplicationIcon>Assets\Icons\baketa.ico</ApplicationIcon>
 	</PropertyGroup>
 
 	<!-- Release配布用設定 -->
@@ -118,6 +118,14 @@
 		<None Include="..\Baketa.Infrastructure.Platform\bin\x64\Debug\net8.0-windows10.0.19041.0\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Debug' and '$(Platform)' == 'x64' and Exists('..\Baketa.Infrastructure.Platform\bin\x64\Debug\net8.0-windows10.0.19041.0\BaketaCaptureNative.dll')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>BaketaCaptureNative.dll</Link>
+		</None>
+	</ItemGroup>
+
+	<!-- Python gRPCサーバーディレクトリの自動コピー -->
+	<ItemGroup>
+		<None Include="..\grpc_server\**\*" Exclude="..\grpc_server\**\__pycache__\**;..\grpc_server\**\*.pyc">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>grpc_server\%(RecursiveDir)%(FileName)%(Extension)</Link>
 		</None>
 	</ItemGroup>
 </Project>

@@ -159,17 +159,36 @@ async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctransl
         else:
             logger.info("Model found locally. Skipping download.")
 
-        # 🔥 [PACKAGE_SIZE_FIX] GPU検出をctranslate2組み込み関数で実行（torch不要）
-        # 🔥 [HOTFIX alpha-0.1.13] ctranslate2バージョン互換性対応
-        # Root cause: ctranslate2.get_device_count()はバージョン4.0以降で追加されたAPIで、
-        #             配布パッケージの3.x系では存在しない
-        # Fix: try-exceptでフォールバックし、GPU検出失敗時はCPUモードで動作
+        # 🔥 [PACKAGE_SIZE_FIX] GPU検出をpynvml（既存依存）で実行（torch不要）
+        # 🔥 [HOTFIX Issue #170] ctranslate2.get_device_count()は存在しないため、pynvmlを使用
+        # Root cause: ctranslate2 4.6.0にget_device_count()が存在しない
+        # Fix: pynvml（既にrequirements.txtに含まれている）でCUDA検出
+        # 🔥 [GEMINI_REVIEW] finally句でpynvml.nvmlShutdown()を確実に実行
+        is_cuda_available = False
+        nvml_initialized = False
         try:
-            is_cuda_available = ctranslate2.get_device_count("cuda") > 0
-        except (AttributeError, Exception) as e:
-            # Fallback: ctranslate2のバージョンが古いまたは環境によってGPU検出失敗
-            logger.warning(f"GPU detection failed ({e.__class__.__name__}), falling back to CPU mode")
+            import pynvml
+            pynvml.nvmlInit()
+            nvml_initialized = True
+            device_count = pynvml.nvmlDeviceGetCount()
+            is_cuda_available = device_count > 0
+            if is_cuda_available:
+                # GPU情報をログ出力
+                handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                gpu_name = pynvml.nvmlDeviceGetName(handle)
+                # bytes型の場合はUTF-8デコード（環境によってbytesを返す場合がある）
+                if isinstance(gpu_name, bytes):
+                    gpu_name = gpu_name.decode('utf-8')
+                logger.info(f"🎮 GPU detection successful: {device_count} CUDA device(s) found")
+                logger.info(f"   Primary GPU: {gpu_name}")
+        except Exception as e:
+            # Fallback: GPU検出失敗時はCPUモードで動作
+            logger.warning(f"⚠️ GPU detection failed ({e.__class__.__name__}), falling back to CPU mode")
             is_cuda_available = False
+        finally:
+            # 🔥 [GEMINI_REVIEW] nvmlInit()が成功した場合のみShutdown()を実行
+            if nvml_initialized:
+                pynvml.nvmlShutdown()
 
         engine = CTranslate2Engine(
             model_path=str(model_path),  # %APPDATA%\Baketa\Models\nllb-200-ct2

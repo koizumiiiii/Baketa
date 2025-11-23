@@ -28,6 +28,9 @@ internal sealed partial class App : Avalonia.Application
     private ILogger<App>? _logger;
     private IEventAggregator? _eventAggregator;
 
+    // アプリケーションアイコンのパス定数 (Issue #179)
+    private const string BAKETA_ICON_PATH = "avares://Baketa.UI/Assets/Icons/baketa.ico";
+
     // LoggerMessageデリゲートの定義
     private static readonly Action<ILogger, Exception?> _logInitializing =
         LoggerMessage.Define(LogLevel.Information, new EventId(1, nameof(Initialize)),
@@ -49,12 +52,47 @@ internal sealed partial class App : Avalonia.Application
         LoggerMessage.Define(LogLevel.Error, new EventId(5, "OnShutdownRequested"),
             "シャットダウン中にエラーが発生しました");
 
+    /// <summary>
+    /// [Issue #170] 早期ローディング画面表示用のウィンドウ参照
+    /// App.Initialize()で作成し、OnFrameworkInitializationCompleted()で閉じる
+    /// </summary>
+    private LoadingWindow? _earlyLoadingWindow;
+
     public override void Initialize()
     {
         Console.WriteLine("🔥🔥🔥 [INIT_DEBUG] App.Initialize() 開始 - ServiceProvider状態確認 🔥🔥🔥");
         Console.WriteLine($"[INIT_DEBUG] Program.ServiceProvider == null: {Program.ServiceProvider == null}");
 
         AvaloniaXamlLoader.Load(this);
+
+        // [Issue #170] 早期ローディング画面を即座に表示（ServiceProvider不要）
+        try
+        {
+            Console.WriteLine("🚀 [EARLY_LOADING] 早期ローディング画面表示開始");
+
+            _earlyLoadingWindow = new LoadingWindow();
+
+            // アプリケーションアイコンを設定
+            try
+            {
+                var iconUri = new Uri(BAKETA_ICON_PATH);
+                _earlyLoadingWindow.Icon = new Avalonia.Controls.WindowIcon(
+                    Avalonia.Platform.AssetLoader.Open(iconUri));
+            }
+            catch (Exception iconEx)
+            {
+                Console.WriteLine($"⚠️ 早期LoadingWindowアイコン設定失敗: {iconEx.Message}");
+            }
+
+            // ViewModelなしで表示（後でDataContextを設定）
+            _earlyLoadingWindow.Show();
+            Console.WriteLine("✅ [EARLY_LOADING] 早期ローディング画面表示完了");
+        }
+        catch (Exception earlyLoadingEx)
+        {
+            Console.WriteLine($"⚠️ [EARLY_LOADING] 早期ローディング画面表示失敗: {earlyLoadingEx.Message}");
+            _earlyLoadingWindow = null;
+        }
 
         // ServiceProviderが利用可能になってからサービスを取得
         if (Program.ServiceProvider != null)
@@ -159,7 +197,7 @@ internal sealed partial class App : Avalonia.Application
         }
     }
 
-    public override async void OnFrameworkInitializationCompleted()
+    public override void OnFrameworkInitializationCompleted()
     {
         Console.WriteLine("🚨🚨🚨 [FRAMEWORK] OnFrameworkInitializationCompleted開始！ 🚨🚨🚨");
         Console.WriteLine("🚀 OnFrameworkInitializationCompleted開始");
@@ -210,6 +248,8 @@ internal sealed partial class App : Avalonia.Application
                 System.Diagnostics.Debug.WriteLine("🖥️ IClassicDesktopStyleApplicationLifetime取得成功");
 
                 // サービスプロバイダーからサービスを取得
+                LoadingWindow? loadingWindow = null;
+                LoadingViewModel? loadingViewModel = null;
                 Console.WriteLine("🔍 Program.ServiceProvider確認開始");
 
                 // ログファイルにも確実に出力
@@ -257,222 +297,122 @@ internal sealed partial class App : Avalonia.Application
                 Console.WriteLine("✅ Program.ServiceProvider確認成功");
                 // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ Program.ServiceProvider確認成功");
 
-                // EventHandlerInitializationServiceを最優先で実行（Gemini分析に基づく修正）
-                Console.WriteLine("🔥 EventHandlerInitializationService実行開始（最優先実行）");
-
-                // デバッグログ追加
-                try
+                // [Issue #170] UIスレッドで単一の非同期フローを実行（ローディング→初期化→メインUI表示）
+                _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    var loggingSettings = LoggingSettings.CreateDevelopmentSettings();
-                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                    System.IO.File.AppendAllText(loggingSettings.GetFullDebugLogPath(), $"{timestamp}→🔥 EventHandlerInitializationService実行開始（最優先実行）{Environment.NewLine}");
-                }
-                catch { /* ログファイル書き込み失敗は無視 */ }
+                    LoadingWindow? loadingWindow = null;
+                    LoadingViewModel? loadingViewModel = null;
 
-                // EventHandlerInitializationService は Program.cs で既に完了済み
-                Console.WriteLine("✅ EventHandlerInitializationService は Program.cs で初期化済み - App.axaml.cs での重複実行をスキップ");
-
-                // 🔥 [PHASE0_FIX] IHostedService重複起動削除 - Program.cs:677-722で既に起動済み
-                // Event Storm問題（PythonServerStatusChangedEvent多重発行）の根本原因を解決
-                // ServerManagerHostedServiceを含むすべてのIHostedServiceはProgram.csで起動完了
-                Console.WriteLine("🔥 [PHASE0_FIX] IHostedService起動はProgram.csで完了済み - 重複実行を回避");
-
-                Console.WriteLine("🔍 IEventAggregator取得開始");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 IEventAggregator取得開始");
-                try
-                {
-                    _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-                    Console.WriteLine($"✅ IEventAggregator取得成功: {_eventAggregator.GetType().Name}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ IEventAggregator取得成功: {_eventAggregator.GetType().Name}");
-                    _logger?.LogInformation("✅ IEventAggregator取得成功: {AggregatorType}", _eventAggregator.GetType().Name);
-
-                    // EventHandlerInitializationServiceは最優先実行済み（上部で処理完了）
-
-                    // 🩺 診断システム開始 - 診断レポート機能を有効化
-                    Console.WriteLine("🚨🚨🚨 [CRITICAL] 診断システム開始処理 - 重要ポイント！ 🚨🚨🚨");
                     try
                     {
-                        Console.WriteLine("🔍🔍🔍 [CRITICAL_DEBUG] IDiagnosticCollectionService解決試行中... 🔍🔍🔍");
-                        var diagnosticCollectionService = serviceProvider.GetService<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService>();
-                        if (diagnosticCollectionService != null)
+                        // --- 1. ローディング画面の準備 ---
+                        _logger?.LogInformation("ローディング画面初期化開始");
+
+                        var loadingScreenInitializer = serviceProvider.GetRequiredService<Baketa.Core.Abstractions.Services.ILoadingScreenInitializer>();
+                        loadingViewModel = serviceProvider.GetRequiredService<LoadingViewModel>();
+
+                        if (_earlyLoadingWindow != null)
                         {
-                            Console.WriteLine($"✅✅✅ [CRITICAL_SUCCESS] IDiagnosticCollectionService解決成功: {diagnosticCollectionService.GetType().Name} ✅✅✅");
-                            _ = Task.Run(async () =>
-                            {
-                                try
-                                {
-                                    Console.WriteLine("🩺 [DEBUG] 診断データ収集開始中...");
-                                    await diagnosticCollectionService.StartCollectionAsync().ConfigureAwait(false);
-                                    Console.WriteLine("✅ 診断データ収集開始完了");
-                                }
-                                catch (Exception diagEx)
-                                {
-                                    Console.WriteLine($"⚠️ 診断システム開始エラー: {diagEx.Message}");
-                                    Console.WriteLine($"⚠️ エラーの詳細: {diagEx}");
-                                    _logger?.LogWarning(diagEx, "診断システム開始エラー");
-                                }
-                            });
-                            Console.WriteLine("🩺 診断システム非同期開始完了");
+                            loadingWindow = _earlyLoadingWindow;
+                            loadingWindow.DataContext = loadingViewModel;
+                            _logger?.LogInformation("早期ローディング画面にLoadingViewModel設定完了");
                         }
                         else
                         {
-                            Console.WriteLine("🚨❌❌❌ [CRITICAL_ERROR] IDiagnosticCollectionServiceが見つかりません！ ❌❌❌🚨");
-                            Console.WriteLine("🚨❌ [CRITICAL_DEBUG] DiagnosticModuleのDI登録に問題がある可能性があります ❌🚨");
+                            Console.WriteLine("⚠️ 早期ローディング画面なし - 新規作成");
+                            loadingWindow = new LoadingWindow { DataContext = loadingViewModel };
+                            var iconUri = new Uri(BAKETA_ICON_PATH);
+                            loadingWindow.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(iconUri));
+                            loadingWindow.Show();
+                            _logger?.LogInformation("LoadingViewModel設定完了（フォールバック）");
                         }
 
-                        // 🧪 診断システム動作テスト - テストイベント発行
-                        _ = Task.Run(async () =>
+                        // --- 2. アプリケーション初期化 ---
+                        var loadingStartTime = System.Diagnostics.Stopwatch.StartNew();
+                        await loadingScreenInitializer.InitializeAsync();
+                        _logger?.LogInformation("アプリケーション初期化完了");
+
+                        // 最小表示時間（2秒）を確保
+                        const int MinimumDisplayTimeMs = 2000;
+                        var elapsedMs = (int)loadingStartTime.ElapsedMilliseconds;
+                        if (elapsedMs < MinimumDisplayTimeMs)
                         {
-                            await Task.Delay(5000).ConfigureAwait(false); // 5秒待機してから発行
-                            try
-                            {
-                                var testEvent = new Baketa.Core.Events.Diagnostics.PipelineDiagnosticEvent
-                                {
-                                    Stage = "ApplicationStartup",
-                                    IsSuccess = true,
-                                    ProcessingTimeMs = 1000,
-                                    Metrics = new Dictionary<string, object>
-                                    {
-                                        ["TestEventType"] = "StartupTest",
-                                        ["Version"] = "1.0.0"
-                                    },
-                                    Severity = Baketa.Core.Events.Diagnostics.DiagnosticSeverity.Information
-                                };
+                            var remainingMs = MinimumDisplayTimeMs - elapsedMs;
+                            _logger?.LogInformation("ローディング画面最小表示時間確保: {RemainingMs}ms待機", remainingMs);
+                            await Task.Delay(remainingMs);
+                        }
 
-                                await _eventAggregator.PublishAsync(testEvent).ConfigureAwait(false);
-                                Console.WriteLine("🧪 診断テストイベント発行完了");
+                        // --- 3. ローディング画面を閉じる ---
+                        await loadingWindow.CloseWithFadeOutAsync();
+                        _logger?.LogInformation("ローディング画面クローズ完了");
 
-                                // 追加のテストレポート生成 - 詳細デバッグ付き
-                                Console.WriteLine("🔍 [診断レポート] 2秒待機開始");
-                                await Task.Delay(2000).ConfigureAwait(false);
-                                Console.WriteLine("🔍 [診断レポート] 2秒待機完了 - サービス取得開始");
+                        // --- 4. メインUIの準備と表示 ---
+                        var mainOverlayViewModel = serviceProvider.GetRequiredService<MainOverlayViewModel>();
+                        if (Program.IsEventHandlerInitialized)
+                        {
+                            mainOverlayViewModel.IsEventHandlerInitialized = true;
+                        }
 
-                                try
-                                {
-                                    Console.WriteLine("🔍 [診断レポート] IDiagnosticCollectionService取得試行中...");
-                                    var diagnosticCollectionService = serviceProvider.GetService<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService>();
+                        var mainOverlayView = new MainOverlayView { DataContext = mainOverlayViewModel };
+                        var mainIconUri = new Uri(BAKETA_ICON_PATH);
+                        mainOverlayView.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(mainIconUri));
 
-                                    if (diagnosticCollectionService != null)
-                                    {
-                                        Console.WriteLine($"✅ [診断レポート] IDiagnosticCollectionService取得成功: {diagnosticCollectionService.GetType().Name}");
-                                        Console.WriteLine("🧪 手動レポート生成テスト開始");
+                        desktop.MainWindow = mainOverlayView;
+                        mainOverlayView.Show();  // ローディング完了後に表示
+                        Console.WriteLine("✅ MainOverlayView.Show()実行完了");
 
-                                        var reportPath = await diagnosticCollectionService.GenerateReportAsync("manual_test").ConfigureAwait(false);
-                                        Console.WriteLine($"🧪 手動レポート生成完了: {reportPath}");
+                        // --- 5. その他の初期化とイベントハンドラ登録 ---
+                        _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
 
-                                        // Reports ディレクトリの内容確認
-                                        var reportsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Baketa", "Reports");
-                                        if (Directory.Exists(reportsDir))
-                                        {
-                                            var files = Directory.GetFiles(reportsDir, "*.json");
-                                            Console.WriteLine($"📁 [診断レポート] Reports ディレクトリ内ファイル数: {files.Length}");
-                                            foreach (var file in files.Take(3))
-                                            {
-                                                Console.WriteLine($"📄 [診断レポート] ファイル: {Path.GetFileName(file)}");
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine("❌ [診断レポート] IDiagnosticCollectionServiceがnull - サービス登録を確認してください");
-                                    }
-                                }
-                                catch (Exception manualEx)
-                                {
-                                    Console.WriteLine($"❌ [診断レポート] 手動レポート生成エラー: {manualEx.Message}");
-                                    Console.WriteLine($"❌ [診断レポート] スタックトレース: {manualEx.StackTrace}");
-                                }
-                            }
-                            catch (Exception testEx)
-                            {
-                                Console.WriteLine($"🧪 診断テストイベント発行エラー: {testEx.Message}");
-                            }
-                        });
+                        var translationFlowModule = new Baketa.UI.DI.Modules.TranslationFlowModule();
+                        translationFlowModule.ConfigureEventAggregator(_eventAggregator, serviceProvider);
+
+                        _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());
+                        _logStartupCompleted(_logger, null);
+
+                        desktop.ShutdownRequested += OnShutdownRequested;
+                        AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"❌ 診断システム初期化エラー: {ex.Message}");
-                        _logger?.LogError(ex, "診断システム初期化エラー");
+                        _logStartupError(_logger, ex);
+                        loadingWindow?.Close();
+                        desktop.Shutdown();
                     }
-                }
-                catch (Exception eventAggregatorEx)
-                {
-                    Console.WriteLine($"💥 IEventAggregator取得失敗: {eventAggregatorEx.GetType().Name}: {eventAggregatorEx.Message}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 IEventAggregator取得失敗: {eventAggregatorEx.GetType().Name}: {eventAggregatorEx.Message}");
-                    _logger?.LogError(eventAggregatorEx, "💥 IEventAggregator取得失敗: {ErrorMessage}", eventAggregatorEx.Message);
-                    throw; // 致命的なエラーなので再スロー
-                }
-
-                // MainOverlayViewModelを取得
-                Console.WriteLine("🔍 MainOverlayViewModel取得開始");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔍 MainOverlayViewModel取得開始");
-                MainOverlayViewModel mainOverlayViewModel;
-                try
-                {
-                    mainOverlayViewModel = serviceProvider.GetRequiredService<MainOverlayViewModel>();
-                    Console.WriteLine($"✅ MainOverlayViewModel取得成功: {mainOverlayViewModel.GetType().Name}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ MainOverlayViewModel取得成功: {mainOverlayViewModel.GetType().Name}");
-                    _logger?.LogInformation("✅ MainOverlayViewModel取得成功: {ViewModelType}", mainOverlayViewModel.GetType().Name);
-
-                    // 🚀 EventHandler初期化完了をUI側に安全に通知（Gemini分析に基づく修正）
-                    if (Program.IsEventHandlerInitialized)
+                    finally
                     {
-                        Console.WriteLine("🚀 [UI_SAFE] EventHandler初期化済み - MainOverlayViewModel通知実行");
-                        mainOverlayViewModel.IsEventHandlerInitialized = true;
-                        Console.WriteLine("✅ [UI_SAFE] MainOverlayViewModel.IsEventHandlerInitialized = true 設定完了");
+                        if (loadingViewModel is IDisposable disposable)
+                        {
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(500);
+                                disposable.Dispose();
+                            });
+                        }
                     }
-                    else
-                    {
-                        Console.WriteLine("⚠️ [UI_SAFE] EventHandler初期化未完了 - UI表示時に手動設定が必要");
-                    }
-                }
-                catch (Exception mainViewModelEx)
-                {
-                    Console.WriteLine($"💥 MainOverlayViewModel取得失敗: {mainViewModelEx.GetType().Name}: {mainViewModelEx.Message}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 MainOverlayViewModel取得失敗: {mainViewModelEx.GetType().Name}: {mainViewModelEx.Message}");
-                    _logger?.LogError(mainViewModelEx, "💥 MainOverlayViewModel取得失敗: {ErrorMessage}", mainViewModelEx.Message);
-                    Console.WriteLine($"💥 内部例外: {mainViewModelEx.InnerException?.GetType().Name}: {mainViewModelEx.InnerException?.Message}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 内部例外: {mainViewModelEx.InnerException?.GetType().Name}: {mainViewModelEx.InnerException?.Message}");
-                    Console.WriteLine($"💥 スタックトレース: {mainViewModelEx.StackTrace}");
-                    throw; // 致命的なエラーなので再スロー
-                }
+                }, Avalonia.Threading.DispatcherPriority.Normal);
 
-                // MainOverlayViewを設定（透明オーバーレイとして）
-                Console.WriteLine("🖥️ MainOverlayView作成開始");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ MainOverlayView作成開始");
+                // [Issue #170] UIスレッド非同期フロー内でメインUI表示が完了するため、
+                // この時点では追加の初期化は不要。AdWindowと診断システムは別途処理。
 
-                var mainOverlayView = new MainOverlayView
-                {
-                    DataContext = mainOverlayViewModel,
-                };
-
-                Console.WriteLine("🖥️ MainOverlayView作成完了 - DataContext設定済み");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ MainOverlayView作成完了 - DataContext設定済み");
-
-                desktop.MainWindow = mainOverlayView;
-
-                Console.WriteLine("🖥️ desktop.MainWindowに設定完了");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖥️ desktop.MainWindowに設定完了");
-
-                // 明示的にウィンドウを表示
-                try
-                {
-                    mainOverlayView.Show();
-                    Console.WriteLine("✅ MainOverlayView.Show()実行完了");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ MainOverlayView.Show()実行完了");
-                }
-                catch (Exception showEx)
-                {
-                    Console.WriteLine($"⚠️ MainOverlayView.Show()失敗: {showEx.Message}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ MainOverlayView.Show()失敗: {showEx.Message}");
-                }
-
-                // 📢 [Issue #174] 広告ウィンドウの起動
+                // 📢 [Issue #174] 広告ウィンドウの起動（メインUIとは独立）
                 _logger?.LogInformation("AdWindow起動開始（Issue #174: WebView統合）");
                 try
                 {
                     var adViewModel = serviceProvider.GetRequiredService<AdViewModel>();
                     var adWindow = new Views.AdWindow(adViewModel, serviceProvider.GetRequiredService<ILogger<Views.AdWindow>>());
+
+                    // アプリケーションアイコンを設定
+                    try
+                    {
+                        var iconUri = new Uri(BAKETA_ICON_PATH);
+                        adWindow.Icon = new Avalonia.Controls.WindowIcon(
+                            Avalonia.Platform.AssetLoader.Open(iconUri));
+                    }
+                    catch (Exception iconEx)
+                    {
+                        _logger?.LogWarning(iconEx, "AdWindowアイコン設定失敗");
+                    }
 
                     // 広告表示が有効な場合のみ表示
                     if (adViewModel.ShouldShowAd)
@@ -490,122 +430,43 @@ internal sealed partial class App : Avalonia.Application
                     _logger?.LogWarning(adEx, "AdWindow起動失敗: {Message}。アプリケーションは継続します", adEx.Message);
                 }
 
-                // 🔧 [OVERLAY_UNIFICATION] オーバーレイマネージャー統合確認
-                Console.WriteLine("🎯 IOverlayManager (Win32OverlayManager) 初期化確認");
+                // 🩺 診断システム開始（メインUIとは独立）
                 try
                 {
-                    var overlayManager = serviceProvider.GetService<Baketa.Core.Abstractions.UI.Overlays.IOverlayManager>();
-                    if (overlayManager != null)
+                    var diagnosticCollectionService = serviceProvider.GetService<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService>();
+                    if (diagnosticCollectionService != null)
                     {
-                        // 🔧 [OVERLAY_UNIFICATION] Win32OverlayManagerはDIコンテナで初期化済み
-                        // InitializeAsync()メソッドは存在しないため、初期化不要
-                        Console.WriteLine($"✅ IOverlayManager (Win32OverlayManager) DI解決成功: {overlayManager.GetType().Name}");
-                    }
-                    else
-                    {
-                        Console.WriteLine("⚠️ IOverlayManagerが見つかりません");
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await diagnosticCollectionService.StartCollectionAsync().ConfigureAwait(false);
+                                Console.WriteLine("✅ 診断データ収集開始完了");
+                            }
+                            catch (Exception diagEx)
+                            {
+                                _logger?.LogWarning(diagEx, "診断システム開始エラー");
+                            }
+                        });
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ IOverlayManager確認エラー: {ex.Message}");
+                    _logger?.LogWarning(ex, "診断システム初期化エラー");
                 }
 
-                // 旧TranslationResultOverlayManagerは削除済み - インプレースシステムが自動で管理
-                Console.WriteLine("🖥️ 旧オーバーレイシステムは削除済み - インプレースシステムが自動で管理");
-
-                // 🔥 [FIX] Pythonサーバー起動はPythonServerHostedServiceで自動実行される
-                // IHostedServiceパターン（コミット 1b5a5d9）により、アプリ起動時に自動的にサーバーが起動される
-                // 手動起動コードは重複のため削除（重複イベント発行によるStartボタン有効化問題を解決）
-                Console.WriteLine("✅ Pythonサーバーは PythonServerHostedService により自動起動されます");
-
-                // TranslationFlowModuleを使用してイベント購読を設定
-                Console.WriteLine("🔧 TranslationFlowModuleのイベント購読を初期化中");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 TranslationFlowModuleのイベント購読を初期化中");
-                _logger?.LogInformation("🔧 TranslationFlowModuleのイベント購読を初期化中");
-
+                // 🔥 [ISSUE#163] SingleshotEventProcessor登録（メインUIとは独立）
                 try
                 {
-                    var translationFlowModule = new Baketa.UI.DI.Modules.TranslationFlowModule();
-                    Console.WriteLine("📦 TranslationFlowModuleインスタンス作成完了");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📦 TranslationFlowModuleインスタンス作成完了");
-                    _logger?.LogInformation("📦 TranslationFlowModuleインスタンス作成完了");
-
-                    translationFlowModule.ConfigureEventAggregator(_eventAggregator, serviceProvider);
-
-                    Console.WriteLine("✅ TranslationFlowModule初期化完了");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ TranslationFlowModule初期化完了");
-                    _logger?.LogInformation("✅ TranslationFlowModule初期化完了");
-
-                    // 🔥 [ISSUE#163] SingleshotEventProcessorの登録 - シングルショット翻訳機能
-                    try
-                    {
-                        var singleshotProcessor = serviceProvider.GetRequiredService<IEventProcessor<ExecuteSingleshotRequestEvent>>();
-                        _eventAggregator.Subscribe<ExecuteSingleshotRequestEvent>(singleshotProcessor);
-                        Console.WriteLine("✅ SingleshotEventProcessor登録完了");
-                        _logger?.LogInformation("✅ SingleshotEventProcessor登録完了 - シングルショット翻訳機能");
-                    }
-                    catch (Exception singleshotEx)
-                    {
-                        Console.WriteLine($"⚠️ SingleshotEventProcessor登録失敗: {singleshotEx.Message}");
-                        _logger?.LogError(singleshotEx, "SingleshotEventProcessor登録失敗");
-                    }
-
+                    var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
+                    var singleshotProcessor = serviceProvider.GetRequiredService<IEventProcessor<ExecuteSingleshotRequestEvent>>();
+                    eventAggregator.Subscribe<ExecuteSingleshotRequestEvent>(singleshotProcessor);
+                    Console.WriteLine("✅ SingleshotEventProcessor登録完了");
                 }
-                catch (Exception moduleEx)
+                catch (Exception singleshotEx)
                 {
-                    Console.WriteLine($"💥 TranslationFlowModule初期化エラー: {moduleEx.GetType().Name}: {moduleEx.Message}");
-                    // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 TranslationFlowModule初期化エラー: {moduleEx.GetType().Name}: {moduleEx.Message}");
-                    _logger?.LogError(moduleEx, "💥 TranslationFlowModule初期化エラー: {ErrorMessage}", moduleEx.Message);
-                    Console.WriteLine($"💥 スタックトレース: {moduleEx.StackTrace}");
-                    _logger?.LogError("💥 スタックトレース: {StackTrace}", moduleEx.StackTrace);
-                    // エラーが発生してもアプリケーションの起動は継続
+                    _logger?.LogWarning(singleshotEx, "SingleshotEventProcessor登録失敗");
                 }
-
-                // OPUS-MT削除済み: NLLB-200統一により事前起動サービス不要
-
-                // 🚨 PythonServerHealthMonitor の直接開始
-                Console.WriteLine("🔧 PythonServerHealthMonitor直接開始開始");
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        using var scope = serviceProvider.CreateScope();
-
-                        // PythonServerHealthMonitor を直接取得
-                        var healthMonitor = scope.ServiceProvider.GetService<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>();
-                        if (healthMonitor != null)
-                        {
-                            Console.WriteLine($"✅ [HEALTH_MONITOR] PythonServerHealthMonitor取得成功");
-                            await healthMonitor.StartAsync(CancellationToken.None).ConfigureAwait(false);
-                            Console.WriteLine($"🎯 [HEALTH_MONITOR] PythonServerHealthMonitor開始完了");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"⚠️ [HEALTH_MONITOR] PythonServerHealthMonitor取得失敗");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"⚠️ [HEALTH_MONITOR] PythonServerHealthMonitor開始エラー: {ex.Message}");
-                        _logger?.LogWarning(ex, "⚠️ PythonServerHealthMonitor開始エラー: {Error}", ex.Message);
-                    }
-                });
-                Console.WriteLine("🚀 PythonServerHealthMonitor直接開始要求完了");
-
-                // アプリケーション起動完了イベントをパブリッシュ（非ブロッキング）
-                _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());
-
-                if (_logger != null)
-                {
-                    _logStartupCompleted(_logger, null);
-                }
-
-                // シャットダウンイベントハンドラーの登録
-                desktop.ShutdownRequested += OnShutdownRequested;
-
-                // アプリケーション終了イベントハンドラーを追加
-                AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             }
             catch (InvalidOperationException ex)
             {
