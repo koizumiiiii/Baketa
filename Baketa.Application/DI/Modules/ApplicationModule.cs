@@ -313,6 +313,9 @@ public sealed class ApplicationModule : ServiceModuleBase
         // 🎯 Phase 3.11: IReferencedSafeImageFactory登録 (SafeImage早期破棄問題解決)
         services.AddSingleton<Baketa.Core.Abstractions.Memory.IReferencedSafeImageFactory, Baketa.Application.Services.Memory.ReferencedSafeImageFactory>();
 
+        // 🔧 [Issue #170] ローディング画面初期化サービス登録
+        services.AddSingleton<Baketa.Core.Abstractions.Services.ILoadingScreenInitializer, Baketa.Application.Services.ApplicationInitializer>();
+
         // 🔧 診断レポートサービス（UI制御フロー責務分離 - Phase 6.2.1）
         // IHostedServiceとして登録しアプリケーションライフサイクルと連動
         services.AddSingleton<Services.Diagnostics.DiagnosticReportService>();

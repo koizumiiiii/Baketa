@@ -1,0 +1,120 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="400"
+        x:Class="Baketa.UI.Views.LoadingWindow"
+        x:DataType="vm:LoadingViewModel"
+        Title="Baketa - Loading..."
+        Width="600" Height="400"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+  <Window.Styles>
+    <Style Selector="Window">
+      <Setter Property="Opacity" Value="0"/>
+    </Style>
+    <Style Selector="Window.loaded">
+      <Style.Animations>
+        <Animation Duration="0:0:0.3" FillMode="Forward">
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="1"/>
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+  </Window.Styles>
+
+  <Border CornerRadius="12"
+          Background="#1E1E1E"
+          BorderBrush="#3F3F46"
+          BorderThickness="1">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="40">
+
+      <!-- Baketaアイコン (256px) -->
+      <Image Grid.Row="0"
+             Source="avares://Baketa.UI/Assets/Icons/baketa-256.png"
+             Width="128" Height="128"
+             HorizontalAlignment="Center"
+             Margin="0,0,0,32"/>
+
+      <!-- 初期化ステップリスト -->
+      <ItemsControl Grid.Row="1"
+                    ItemsSource="{Binding InitializationSteps}"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8">
+              <!-- ステータスアイコン -->
+              <Border Grid.Column="0"
+                      Width="24" Height="24"
+                      CornerRadius="12"
+                      Background="{Binding StatusColor}"
+                      Margin="0,0,16,0">
+                <TextBlock Text="{Binding StatusIcon}"
+                           Foreground="White"
+                           FontSize="12"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+              </Border>
+
+              <!-- メッセージ -->
+              <TextBlock Grid.Column="1"
+                         Text="{Binding Message}"
+                         Foreground="#E4E4E7"
+                         FontSize="14"
+                         VerticalAlignment="Center"/>
+
+              <!-- スピナー (実行中のみ表示) -->
+              <Border Grid.Column="2"
+                      Width="20" Height="20"
+                      IsVisible="{Binding IsInProgress}">
+                <Border.Styles>
+                  <Style Selector="Border">
+                    <Style.Animations>
+                      <Animation Duration="0:0:1" IterationCount="INFINITE">
+                        <KeyFrame Cue="0%">
+                          <Setter Property="RotateTransform.Angle" Value="0"/>
+                        </KeyFrame>
+                        <KeyFrame Cue="100%">
+                          <Setter Property="RotateTransform.Angle" Value="360"/>
+                        </KeyFrame>
+                      </Animation>
+                    </Style.Animations>
+                  </Style>
+                </Border.Styles>
+                <Border.RenderTransform>
+                  <RotateTransform Angle="0"/>
+                </Border.RenderTransform>
+                <Path Data="M 10,2 A 8,8 0 1,1 10,18 A 8,8 0 0,1 10,2 M 10,4 A 6,6 0 1,0 10,16 A 6,6 0 0,0 10,4"
+                      Fill="#3B82F6"
+                      Stretch="Uniform"/>
+              </Border>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- フッター -->
+      <StackPanel Grid.Row="2"
+                  Orientation="Vertical"
+                  HorizontalAlignment="Center"
+                  Margin="0,32,0,0">
+        <TextBlock Text="Baketa - Game Translation Overlay"
+                   Foreground="#71717A"
+                   FontSize="12"
+                   HorizontalAlignment="Center"/>
+        <TextBlock Text="{Binding VersionText}"
+                   Foreground="#52525B"
+                   FontSize="10"
+                   HorizontalAlignment="Center"
+                   Margin="0,4,0,0"/>
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>
