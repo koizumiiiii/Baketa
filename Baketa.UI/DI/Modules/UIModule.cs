@@ -160,6 +160,9 @@ internal sealed class UIModule : ServiceModuleBase
         // ウィンドウ選択ダイアログサービス（UIレイヤー）
         services.AddSingleton<Baketa.Application.Services.UI.IWindowSelectionDialogService, WindowSelectionDialogService>();
 
+        // 🔥 [ISSUE#171] エラー通知サービス（画面中央最下部にエラーメッセージを表示）
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IErrorNotificationService, ErrorNotificationService>();
+
         // OPUS-MT削除済み: NLLB-200統一により事前起動サービス不要
 
 

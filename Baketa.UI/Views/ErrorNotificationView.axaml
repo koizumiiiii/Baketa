@@ -1,0 +1,102 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="100"
+        x:Class="Baketa.UI.Views.ErrorNotificationView"
+        x:DataType="vm:ErrorNotificationViewModel"
+        Title="Baketa Error"
+        Width="600"
+        Height="100"
+        WindowStartupLocation="Manual"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        CanResize="False"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="0"
+        IsVisible="{Binding IsVisible}"
+        Opacity="0.95">
+
+  <Window.Resources>
+    <!-- カラーリソース -->
+    <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="#DC3545"/>
+    <SolidColorBrush x:Key="ErrorBorderBrush" Color="#C82333"/>
+    <SolidColorBrush x:Key="ErrorTextBrush" Color="#FFFFFF"/>
+
+    <!-- エラーアイコン（Material Design Icons） -->
+    <StreamGeometry x:Key="ErrorIcon">M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z</StreamGeometry>
+    <StreamGeometry x:Key="CloseIcon">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</StreamGeometry>
+  </Window.Resources>
+
+  <Window.Styles>
+    <!-- クローズボタンスタイル -->
+    <Style Selector="Button.close-button">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="8"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style Selector="Button.close-button:hover">
+      <Setter Property="Background" Value="#40FFFFFF"/>
+    </Style>
+
+    <Style Selector="Button.close-button:pressed">
+      <Setter Property="Background" Value="#60FFFFFF"/>
+    </Style>
+  </Window.Styles>
+
+  <!-- エラー通知コンテナ -->
+  <Border Background="{StaticResource ErrorBackgroundBrush}"
+          BorderBrush="{StaticResource ErrorBorderBrush}"
+          BorderThickness="2"
+          CornerRadius="8"
+          BoxShadow="0 4 16 0 #60000000"
+          Padding="16,12">
+
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+
+      <!-- エラーアイコン -->
+      <PathIcon Grid.Column="0"
+                Width="24"
+                Height="24"
+                Data="{StaticResource ErrorIcon}"
+                Foreground="{StaticResource ErrorTextBrush}"
+                VerticalAlignment="Top"
+                Margin="0,0,12,0"/>
+
+      <!-- エラーメッセージ -->
+      <TextBlock Grid.Column="1"
+                 Text="{Binding DisplayMessage}"
+                 FontSize="14"
+                 FontWeight="Medium"
+                 Foreground="{StaticResource ErrorTextBrush}"
+                 TextWrapping="Wrap"
+                 MaxLines="4"
+                 TextTrimming="CharacterEllipsis"
+                 VerticalAlignment="Center"/>
+
+      <!-- 閉じるボタン -->
+      <Button Grid.Column="2"
+              Classes="close-button"
+              Command="{Binding CloseCommand}"
+              ToolTip.Tip="閉じる (5秒後に自動で消えます)"
+              VerticalAlignment="Top"
+              Margin="12,0,0,0">
+        <PathIcon Width="16"
+                  Height="16"
+                  Data="{StaticResource CloseIcon}"
+                  Foreground="{StaticResource ErrorTextBrush}"/>
+      </Button>
+    </Grid>
+  </Border>
+</Window>
