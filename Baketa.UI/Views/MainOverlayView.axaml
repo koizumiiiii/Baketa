@@ -286,27 +286,84 @@
   </Border>
 
   <!-- 最小化状態 -->
-  <!-- 🔥 [ISSUE#171] UI改善: ステータスインジケーター削除、アイコンサイズ拡大 -->
+  <!-- 🔥 [ISSUE#171] UI改善: Live翻訳、Shot翻訳、翻訳表示ボタン追加（アイコンのみ） -->
+  <!-- Height削除: ウィンドウ選択状態に応じて自動調整 -->
   <Border Name="CollapsedOverlayBorder"
           Width="40"
-          Height="40"
           Background="{StaticResource OverlayBackgroundBrush}"
           BorderBrush="{StaticResource OverlayBorderBrush}"
           BorderThickness="1"
-          CornerRadius="20"
+          CornerRadius="8"
           BoxShadow="0 2 8 0 #40000000"
           IsVisible="{Binding IsCollapsed}">
 
-    <Button Classes="minimize-button"
-            Command="{Binding FoldCommand}"
-            ToolTip.Tip="展開"
-            Background="Transparent"
-            BorderThickness="0"
-            Width="36"
-            Height="36">
-      <Image Width="16" Height="16"
-             Source="avares://Baketa.UI/Assets/Icons/expand.png"/>
-    </Button>
+    <StackPanel Orientation="Vertical" Spacing="0">
+      <!-- 展開ボタン -->
+      <Button Classes="minimize-button"
+              Command="{Binding FoldCommand}"
+              ToolTip.Tip="展開"
+              Background="Transparent"
+              BorderThickness="0"
+              Width="36"
+              Height="36"
+              Margin="2">
+        <Image Width="16" Height="16"
+               Source="avares://Baketa.UI/Assets/Icons/expand.png"/>
+      </Button>
+
+      <!-- Live翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
+      <Button Classes="minimize-button"
+              Command="{Binding StartStopCommand}"
+              ToolTip.Tip="{Binding StartButtonTooltip}"
+              IsEnabled="{Binding IsLiveEnabled}"
+              IsVisible="{Binding IsWindowSelected}"
+              Background="Transparent"
+              BorderThickness="0"
+              Width="36"
+              Height="36"
+              Margin="2"
+              PointerPressed="StartStopButton_OnPointerPressed">
+        <Image Width="16" Height="16"
+               Source="{Binding LiveIconSource}"/>
+      </Button>
+
+      <!-- Shot翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
+      <Button Classes="minimize-button"
+              Command="{Binding ExecuteSingleshotCommand}"
+              ToolTip.Tip="{Binding SingleshotButtonTooltip}"
+              IsEnabled="{Binding IsSingleshotEnabled}"
+              IsVisible="{Binding IsWindowSelected}"
+              Background="Transparent"
+              BorderThickness="0"
+              Width="36"
+              Height="36"
+              Margin="2">
+        <Image Width="16" Height="16"
+               Source="{Binding SingleshotIconSource}"/>
+      </Button>
+
+      <!-- 翻訳表示ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
+      <Button Classes="minimize-button"
+              Command="{Binding ShowHideCommand}"
+              ToolTip.Tip="翻訳結果の表示/非表示"
+              IsEnabled="{Binding ShowHideEnabled}"
+              IsVisible="{Binding IsWindowSelected}"
+              Background="Transparent"
+              BorderThickness="0"
+              Width="36"
+              Height="36"
+              Margin="2">
+        <StackPanel>
+          <Image Width="16" Height="16"
+                 Source="avares://Baketa.UI/Assets/Icons/visible.png"/>
+          <Ellipse Width="6" Height="6"
+                   Fill="{StaticResource StatusActiveBrush}"
+                   Margin="0,-2,0,0"
+                   HorizontalAlignment="Center"
+                   IsVisible="{Binding IsTranslationActive}"/>
+        </StackPanel>
+      </Button>
+    </StackPanel>
   </Border>
 
   </Grid>
