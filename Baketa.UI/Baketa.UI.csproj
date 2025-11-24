@@ -52,7 +52,7 @@
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 	</PropertyGroup>
 
-	<!-- 🔥 [SIZE_OPTIMIZATION] Releaseビルド後に不要なファイルを削除（943MB削減） -->
+	<!-- 🔥 [SIZE_OPTIMIZATION] Releaseビルド後に不要なファイルを削除（961.5MB削減） -->
 	<Target Name="RemoveUnusedRuntimeFiles" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
 		<Message Text="🔥 [SIZE_OPTIMIZATION] 不要なランタイムファイルを削除中..." Importance="high" />
 
@@ -77,7 +77,11 @@
 		</ItemGroup>
 		<Delete Files="@(OldPaddleModels)" Condition="Exists('%(Identity)')" />
 
-		<Message Text="🔥 [SIZE_OPTIMIZATION] 不要なファイル削除完了 - 推定削減: 943MB" Importance="high" />
+		<!-- 🔥 LINESeedフォント除外 - NotoSansに統一 (18.5MB削減) -->
+		<RemoveDir Directories="$(OutDir)Assets\Fonts\LINESeedJP" Condition="Exists('$(OutDir)Assets\Fonts\LINESeedJP')" />
+		<RemoveDir Directories="$(OutDir)Assets\Fonts\LINESeedEN" Condition="Exists('$(OutDir)Assets\Fonts\LINESeedEN')" />
+
+		<Message Text="🔥 [SIZE_OPTIMIZATION] 不要なファイル削除完了 - 推定削減: 961.5MB (ランタイム: 943MB + フォント: 18.5MB)" Importance="high" />
 	</Target>
 
 	<!-- テストアセンブリからのアクセスを許可 -->
