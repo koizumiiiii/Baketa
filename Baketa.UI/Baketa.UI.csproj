@@ -21,7 +21,11 @@
 		<!-- Fody警告を抑制: ReactiveUIは意図的に無効化 (OutOfMemoryException回避) -->
 		<FodyVerifyIgnoreCodes>True</FodyVerifyIgnoreCodes>
 		<DisableFody>true</DisableFody>
-		
+
+		<!-- 🔥 [SIZE_OPTIMIZATION] Windows x64専用ビルド - CI/CD対応 -->
+		<!-- ⚠️ RuntimeIdentifierは常に設定（条件付きだとNuGet復元時に認識されない） -->
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+
 		<!-- リリース用設定 -->
 		<AssemblyTitle>Baketa - Game Translation Overlay</AssemblyTitle>
 		<AssemblyDescription>Real-time text translation overlay for games</AssemblyDescription>
@@ -38,8 +42,6 @@
 		<DebugType>none</DebugType>
 		<DebugSymbols>false</DebugSymbols>
 		<Optimize>true</Optimize>
-		<!-- 🔥 [SIZE_OPTIMIZATION] Windows x64専用ビルド - 他プラットフォームランタイム除外 -->
-		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 		<SelfContained>true</SelfContained>
 	</PropertyGroup>
 
