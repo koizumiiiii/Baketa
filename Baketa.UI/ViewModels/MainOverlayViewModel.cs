@@ -71,7 +71,8 @@ public class MainOverlayViewModel : ViewModelBase
         SimpleSettingsViewModel settingsViewModel,
         IWarmupService warmupService, // 🔥 [PHASE5.2E] ウォームアップサービス依存追加
         Baketa.Infrastructure.Services.IFirstRunService firstRunService, // 初回起動判定サービス
-        ITranslationModeService translationModeService) // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス依存追加
+        ITranslationModeService translationModeService, // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス依存追加
+        IErrorNotificationService errorNotificationService) // 🔥 [ISSUE#171_PHASE2] エラー通知サービス依存追加
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
@@ -92,6 +93,9 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス設定
         _translationModeService = translationModeService ?? throw new ArgumentNullException(nameof(translationModeService));
+
+        // 🔥 [ISSUE#171_PHASE2] エラー通知サービス設定
+        _errorNotificationService = errorNotificationService ?? throw new ArgumentNullException(nameof(errorNotificationService));
 
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
@@ -136,6 +140,7 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly IWarmupService _warmupService;
     private readonly Baketa.Infrastructure.Services.IFirstRunService _firstRunService;
     private readonly ITranslationModeService _translationModeService; // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス
+    private readonly IErrorNotificationService _errorNotificationService; // 🔥 [ISSUE#171_PHASE2] エラー通知サービス
 
     #region Properties
 
@@ -1077,6 +1082,11 @@ public class MainOverlayViewModel : ViewModelBase
                 IsTranslationActive = false;
                 IsLoading = false; // エラー時はローディング状態も終了
             });
+
+            // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
+            var operation = IsTranslationActive ? "停止" : "開始";
+            await _errorNotificationService.ShowErrorAsync(
+                $"翻訳の{operation}に失敗しました。\n原因: {ex.Message}\n対処: アプリを再起動してください。").ConfigureAwait(false);
         }
     }
 
@@ -1099,6 +1109,10 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 Logger?.LogDebug("❌ ウィンドウが選択されていません");
                 Logger?.LogError("ウィンドウが選択されていない状態で翻訳開始が要求されました");
+
+                // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
+                await _errorNotificationService.ShowErrorAsync(
+                    "翻訳を開始できません。\n原因: 翻訳対象のウィンドウが選択されていません。\n対処: 「ウィンドウ選択」ボタンから翻訳対象のウィンドウを選択してください。").ConfigureAwait(false);
                 return;
             }
 
@@ -1575,6 +1589,10 @@ public class MainOverlayViewModel : ViewModelBase
                     Logger?.LogError(ex, "オーバーレイ非表示中にエラーが発生: {ErrorMessage}", ex.Message);
                     // エラーが発生しても状態はリセット
                     IsSingleshotOverlayVisible = false;
+
+                    // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
+                    await _errorNotificationService.ShowErrorAsync(
+                        $"翻訳結果の非表示に失敗しました。\n原因: {ex.Message}\n対処: アプリを再起動してください。").ConfigureAwait(false);
                 }
                 return;
             }
@@ -1587,6 +1605,10 @@ public class MainOverlayViewModel : ViewModelBase
             if (selectedWindow == null)
             {
                 Logger?.LogWarning("ウィンドウが選択されていない状態でシングルショット翻訳が要求されました");
+
+                // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
+                await _errorNotificationService.ShowErrorAsync(
+                    "翻訳を実行できません。\n原因: 翻訳対象のウィンドウが選択されていません。\n対処: 「ウィンドウ選択」ボタンから翻訳対象のウィンドウを選択してください。").ConfigureAwait(false);
                 return;
             }
 

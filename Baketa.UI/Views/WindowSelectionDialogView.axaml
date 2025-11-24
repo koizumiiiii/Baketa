@@ -37,6 +37,42 @@
     <StreamGeometry x:Key="VisibleIcon">M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z</StreamGeometry>
   </Window.Resources>
 
+  <Window.Styles>
+    <!-- 🔥 [ISSUE#171] ウィンドウアイテムのスタイル（Gemini推奨: Local valuesを削除してStyleで管理） -->
+
+    <!-- デフォルト状態 -->
+    <Style Selector="Border.WindowItem">
+      <Setter Property="Background" Value="{StaticResource WindowItemBackgroundBrush}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource WindowItemBorderBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Margin" Value="8"/>
+      <Setter Property="Padding" Value="12"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- ホバー状態 -->
+    <Style Selector="Border.WindowItem:pointerover">
+      <Setter Property="Background" Value="{StaticResource WindowItemHoverBrush}"/>
+      <Setter Property="BorderBrush" Value="#0078D4"/>
+      <Setter Property="BorderThickness" Value="2"/>
+    </Style>
+
+    <!-- 押下状態 -->
+    <Style Selector="Border.WindowItem:pressed">
+      <Setter Property="Background" Value="{StaticResource WindowItemSelectedBrush}"/>
+      <Setter Property="BorderBrush" Value="#0078D4"/>
+      <Setter Property="BorderThickness" Value="2"/>
+    </Style>
+
+    <!-- 選択済み状態（最優先） -->
+    <Style Selector="Border.WindowItem.IsCurrentlySelected">
+      <Setter Property="BorderBrush" Value="#28A745"/>
+      <Setter Property="BorderThickness" Value="3"/>
+      <Setter Property="Background" Value="#E8F5E9"/>
+    </Style>
+  </Window.Styles>
+
   <Grid Background="{StaticResource DialogBackgroundBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
@@ -124,27 +160,11 @@
           
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Border Background="{StaticResource WindowItemBackgroundBrush}"
-                      BorderBrush="{StaticResource WindowItemBorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="8"
-                      Margin="8"
-                      Padding="12"
-                      Cursor="Hand"
+              <!-- 🔥 [ISSUE#171] 選択済みウィンドウに枠表示（Gemini推奨: Local values削除、Styleで管理） -->
+              <Border x:Name="WindowItemBorder"
+                      Classes="WindowItem"
+                      Classes.IsCurrentlySelected="{Binding IsCurrentlySelected}"
                       PointerPressed="OnWindowItemClick">
-                
-                <Border.Styles>
-                  <Style Selector="Border:pointerover">
-                    <Setter Property="Background" Value="{StaticResource WindowItemHoverBrush}"/>
-                    <Setter Property="BorderBrush" Value="#0078D4"/>
-                    <Setter Property="BorderThickness" Value="2"/>
-                  </Style>
-                  <Style Selector="Border:pressed">
-                    <Setter Property="Background" Value="{StaticResource WindowItemSelectedBrush}"/>
-                    <Setter Property="BorderBrush" Value="#0078D4"/>
-                    <Setter Property="BorderThickness" Value="2"/>
-                  </Style>
-                </Border.Styles>
                 
                 <Grid>
                   <Grid.RowDefinitions>

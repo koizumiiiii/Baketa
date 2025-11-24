@@ -53,8 +53,8 @@
                 </controls:SettingsItem>
 
                 <!-- AR風UIでは自動計算されるため非表示化 -->
-                <controls:SettingsItem Title="フォントサイズ"
-                                        Description="オーバーレイに表示されるテキストのフォントサイズ"
+                <controls:SettingsItem Title="翻訳文字サイズ"
+                                        Description="オーバーレイに表示される翻訳テキストの文字サイズ"
                                         IsVisible="False">
                     <controls:SettingsItem.SettingContent>
                         <ComboBox ItemsSource="{Binding FontSizeOptions}"

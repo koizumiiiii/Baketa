@@ -80,14 +80,14 @@
           </StackPanel>
         </Border>
 
-        <!-- 言語設定 -->
+        <!-- 翻訳言語設定 -->
         <Border Background="{StaticResource CardBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="16">
           <StackPanel Spacing="12">
-            <TextBlock Text="言語設定"
+            <TextBlock Text="翻訳言語設定"
                        FontWeight="SemiBold"
                        FontSize="14"
                        Foreground="{StaticResource TextBrush}"/>
@@ -158,16 +158,16 @@
                        FontSize="14"
                        Foreground="{StaticResource TextBrush}"/>
             
-            <!-- フォントサイズ -->
+            <!-- 翻訳文字サイズ -->
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              
+
               <TextBlock Grid.Column="0"
-                         Text="フォントサイズ:"
+                         Text="翻訳文字サイズ:"
                          FontSize="13"
                          VerticalAlignment="Center"
                          Foreground="{StaticResource TextBrush}"
