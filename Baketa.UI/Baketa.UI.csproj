@@ -158,7 +158,8 @@
 
 	<!-- Python gRPCサーバーディレクトリの自動コピー -->
 	<ItemGroup>
-		<None Include="..\grpc_server\**\*" Exclude="..\grpc_server\**\__pycache__\**;..\grpc_server\**\*.pyc">
+		<!-- ⚠️ MSB3061警告対策: *.logを除外（Pythonプロセスがロック中のため） -->
+		<None Include="..\grpc_server\**\*" Exclude="..\grpc_server\**\__pycache__\**;..\grpc_server\**\*.pyc;..\grpc_server\**\*.log">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>grpc_server\%(RecursiveDir)%(FileName)%(Extension)</Link>
 		</None>

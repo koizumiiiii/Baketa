@@ -235,11 +235,9 @@ public sealed class JsonSettingsService : ISettingsService
                 try
                 {
                     // FileShare.None で排他的アクセスを確保（他プロセス/スレッドからの読み書き禁止）
-                    using (var stream = new FileStream(_settingsFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                    using (var writer = new StreamWriter(stream))
-                    {
-                        await writer.WriteAsync(json).ConfigureAwait(false);
-                    }
+                    using var stream = new FileStream(_settingsFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                    using var writer = new StreamWriter(stream);
+                    await writer.WriteAsync(json).ConfigureAwait(false);
                     break; // 成功したらループ脱出
                 }
                 catch (IOException ex) when (attempt < maxRetries - 1)
