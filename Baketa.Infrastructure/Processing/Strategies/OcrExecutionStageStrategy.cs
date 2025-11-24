@@ -304,6 +304,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 _logger.LogWarning(logEx, "🎯 [OCR_DEBUG_LOG] デバッグログ出力でエラー");
             }
 
+            // 🔥 [PERFORMANCE_FIX] ROI画像保存をデバッグビルド専用に制限
+            //
+            // **修正理由:**
+            // ROI画像保存処理が3840x2160ピクセルのPNG保存に1.1-1.3秒かかり、
+            // OCR実行の度に2回実行されるため、合計2.4秒（処理時間の30%）を消費していた。
+            //
+            // **期待効果:**
+            // - 開発ビルド: ROI画像保存を維持（デバッグ用途）
+            // - 本番ビルド: ROI画像保存を無効化 → 2.4秒削減（30%改善）
+            //
+#if DEBUG
             // 🎯 [ROI_IMAGE_SAVE] ROI実行時にテキスト検出領域枠をつけた画像を保存
             try
             {
@@ -332,6 +343,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             {
                 _logger.LogWarning(imageEx, "🎯 [ROI_IMAGE_SAVE] ROI画像保存でエラー");
             }
+#else
+            // 本番ビルド: ROI画像保存をスキップ（パフォーマンス優先）
+            _logger?.LogDebug("🔥 [PERFORMANCE_FIX] 本番ビルド - ROI画像保存をスキップ（デバッグ専用機能）");
+#endif
 
             // ProcessingStageResult作成
             var ocrResult = new OcrExecutionResult
@@ -384,8 +399,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         return !hasImageChangeResult;
     }
 
+#if DEBUG
     /// <summary>
     /// 🎯 [ROI_IMAGE_SAVE] ROI実行時にテキスト検出領域枠をつけた画像を保存
+    /// ⚠️ デバッグビルド専用機能 - 本番ビルドでは無効化
     /// </summary>
     /// <param name="ocrImage">OCR処理に使用された画像</param>
     /// <param name="textChunks">検出されたテキストチャンク</param>
@@ -479,6 +496,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             _logger?.LogDebug($"❌ [ROI_IMAGE_SAVE] ROI画像保存エラー: {ex.Message}");
         }
     }
+#endif
 }
 
 /// <summary>

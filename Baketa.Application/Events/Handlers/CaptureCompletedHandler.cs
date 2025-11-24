@@ -79,17 +79,36 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
             // 🎯 キャプチャ画像保存（設定が有効な場合）
             await SaveCaptureImagesIfEnabledAsync(eventData).ConfigureAwait(false);
 
-            // 🔄 P1: 段階的フィルタリングシステム使用判定
-            if (_smartPipeline != null)
-            {
-                _logger?.LogDebug("段階的フィルタリングシステム使用開始");
-                await HandleWithStagedFilteringAsync(eventData).ConfigureAwait(false);
-            }
-            else
-            {
-                _logger?.LogDebug("従来処理モード使用（段階的フィルタリング無効）");
-                await HandleLegacyModeAsync(eventData).ConfigureAwait(false);
-            }
+            // 🔥 [PERFORMANCE_FIX] OCR重複実行削除 - TranslationOrchestrationServiceが独自にOCR実行
+            //
+            // **削除理由:**
+            // 旧アーキテクチャ（CaptureCompletedEvent → OCR → 翻訳）の名残として残っていたが、
+            // 現在のアーキテクチャではTranslationOrchestrationService → CoordinateBasedTranslationService →
+            // SmartProcessingPipelineServiceが正規ルートとしてOCR実行するため、この処理は完全に冗長。
+            //
+            // **影響範囲:**
+            // - Singleshotモード: TranslationOrchestrationServiceが直接OCR実行（影響なし）
+            // - Liveモード: 同様にTranslationOrchestrationServiceが実行（影響なし）
+            // - 画面変化検知: 同様にTranslationOrchestrationServiceが実行（影響なし）
+            //
+            // **期待効果:**
+            // - OCR処理時間50%削減: 4.0秒 → 2.0秒
+            // - ROI画像保存50%削減: 2.4秒 → 1.2秒（開発ビルド）
+            // - 合計削減: 3.2秒削減（40%改善）
+            //
+            // **削除されたコード:**
+            // if (_smartPipeline != null)
+            // {
+            //     _logger?.LogDebug("段階的フィルタリングシステム使用開始");
+            //     await HandleWithStagedFilteringAsync(eventData).ConfigureAwait(false);
+            // }
+            // else
+            // {
+            //     _logger?.LogDebug("従来処理モード使用（段階的フィルタリング無効）");
+            //     await HandleLegacyModeAsync(eventData).ConfigureAwait(false);
+            // }
+
+            _logger?.LogInformation("🔥 [PERFORMANCE_FIX] CaptureCompletedHandlerのOCR重複実行を削除 - TranslationOrchestrationServiceが正規ルートでOCR実行");
         }
         catch (Exception ex)
         {
