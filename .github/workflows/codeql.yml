@@ -47,7 +47,7 @@ jobs:
       shell: powershell
 
     - name: Restore dependencies
-      run: dotnet restore Baketa.sln
+      run: dotnet restore Baketa.sln --runtime win-x64
 
     - name: Build solution
       run: dotnet build Baketa.sln --configuration Release --no-restore

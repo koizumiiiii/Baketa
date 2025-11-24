@@ -16,18 +16,18 @@
     <FontFamily x:Key="EnglishFontFamily.Bold">Segoe UI Semibold, Tahoma, Arial, sans-serif</FontFamily>
     <FontFamily x:Key="EnglishFontFamily.ExtraBold">Segoe UI Bold, Tahoma, Arial, sans-serif</FontFamily>
     
-    <!-- カスタムフォント版 -->
-    <FontFamily x:Key="JapaneseFontFamily.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP, Yu Gothic UI, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
-    <FontFamily x:Key="JapaneseFontFamily.Thin.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Th.otf#LINE Seed JP, Yu Gothic UI Light, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
-    <FontFamily x:Key="JapaneseFontFamily.Regular.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP, Yu Gothic UI, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
-    <FontFamily x:Key="JapaneseFontFamily.Bold.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Bd.otf#LINE Seed JP, Yu Gothic UI Semibold, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
-    <FontFamily x:Key="JapaneseFontFamily.ExtraBold.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Eb.otf#LINE Seed JP, Yu Gothic UI Bold, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
-    
-    <FontFamily x:Key="EnglishFontFamily.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Rg.otf#LINE Seed Sans, Segoe UI, Tahoma, Arial, sans-serif</FontFamily>
-    <FontFamily x:Key="EnglishFontFamily.Thin.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Th.otf#LINE Seed Sans, Segoe UI Light, Tahoma, Arial, sans-serif</FontFamily>
-    <FontFamily x:Key="EnglishFontFamily.Regular.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Rg.otf#LINE Seed Sans, Segoe UI, Tahoma, Arial, sans-serif</FontFamily>
-    <FontFamily x:Key="EnglishFontFamily.Bold.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Bd.otf#LINE Seed Sans, Segoe UI Semibold, Tahoma, Arial, sans-serif</FontFamily>
-    <FontFamily x:Key="EnglishFontFamily.ExtraBold.Enhanced">avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_XBd.otf#LINE Seed Sans, Segoe UI Bold, Tahoma, Arial, sans-serif</FontFamily>
+    <!-- 🔥 [SIZE_OPTIMIZATION] NotoSans統一版（LINESeed削除） -->
+    <FontFamily x:Key="JapaneseFontFamily.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Yu Gothic UI, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
+    <FontFamily x:Key="JapaneseFontFamily.Thin.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Yu Gothic UI Light, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
+    <FontFamily x:Key="JapaneseFontFamily.Regular.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Yu Gothic UI, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
+    <FontFamily x:Key="JapaneseFontFamily.Bold.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Yu Gothic UI Semibold, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
+    <FontFamily x:Key="JapaneseFontFamily.ExtraBold.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Yu Gothic UI Bold, Meiryo UI, MS UI Gothic, sans-serif</FontFamily>
+
+    <FontFamily x:Key="EnglishFontFamily.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Segoe UI, Tahoma, Arial, sans-serif</FontFamily>
+    <FontFamily x:Key="EnglishFontFamily.Thin.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Segoe UI Light, Tahoma, Arial, sans-serif</FontFamily>
+    <FontFamily x:Key="EnglishFontFamily.Regular.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Segoe UI, Tahoma, Arial, sans-serif</FontFamily>
+    <FontFamily x:Key="EnglishFontFamily.Bold.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Segoe UI Semibold, Tahoma, Arial, sans-serif</FontFamily>
+    <FontFamily x:Key="EnglishFontFamily.ExtraBold.Enhanced">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Segoe UI Bold, Tahoma, Arial, sans-serif</FontFamily>
     
     <!-- その他言語フォント -->
     <FontFamily x:Key="ChineseFontFamily">Microsoft YaHei UI, SimHei, Yu Gothic UI, sans-serif</FontFamily>
@@ -42,10 +42,8 @@
         sans-serif
     </FontFamily>
     
-    <!-- カスタムフォントが利用可能な場合の定義 -->
+    <!-- 🔥 [SIZE_OPTIMIZATION] NotoSans統一版（LINESeed削除） -->
     <FontFamily x:Key="EnhancedFallbackFontFamily">
-        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
-        avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Rg.otf#LINE Seed Sans,
         avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC,
         Segoe UI,
         Yu Gothic UI,
@@ -77,10 +75,8 @@
         sans-serif
     </FontFamily>
     
-    <!-- カスタムフォント対応版 -->
+    <!-- 🔥 [SIZE_OPTIMIZATION] NotoSans統一版（LINESeed削除） -->
     <FontFamily x:Key="OptimizedFontFamily.Japanese.Enhanced">
-        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
-        avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Rg.otf#LINE Seed Sans,
         avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC,
         Yu Gothic UI,
         Meiryo UI,
@@ -88,20 +84,16 @@
         Segoe UI,
         sans-serif
     </FontFamily>
-    
+
     <FontFamily x:Key="OptimizedFontFamily.English.Enhanced">
-        avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Rg.otf#LINE Seed Sans,
-        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
         avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC,
         Segoe UI,
         Yu Gothic UI,
         sans-serif
     </FontFamily>
-    
+
     <FontFamily x:Key="OptimizedFontFamily.ChineseSimplified.Enhanced">
         avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC,
-        avares://Baketa.UI/Assets/Fonts/LINESeedJP/LINESeedJP_OTF_Rg.otf#LINE Seed JP,
-        avares://Baketa.UI/Assets/Fonts/LINESeedEN/LINESeedSans_Rg.otf#LINE Seed Sans,
         Microsoft YaHei UI,
         SimHei,
         Yu Gothic UI,

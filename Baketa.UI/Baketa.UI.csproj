@@ -21,7 +21,11 @@
 		<!-- Fody警告を抑制: ReactiveUIは意図的に無効化 (OutOfMemoryException回避) -->
 		<FodyVerifyIgnoreCodes>True</FodyVerifyIgnoreCodes>
 		<DisableFody>true</DisableFody>
-		
+
+		<!-- 🔥 [SIZE_OPTIMIZATION] Windows x64専用ビルド - CI/CD対応 -->
+		<!-- ⚠️ RuntimeIdentifierは常に設定（条件付きだとNuGet復元時に認識されない） -->
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+
 		<!-- リリース用設定 -->
 		<AssemblyTitle>Baketa - Game Translation Overlay</AssemblyTitle>
 		<AssemblyDescription>Real-time text translation overlay for games</AssemblyDescription>
@@ -38,8 +42,9 @@
 		<DebugType>none</DebugType>
 		<DebugSymbols>false</DebugSymbols>
 		<Optimize>true</Optimize>
+		<SelfContained>true</SelfContained>
 	</PropertyGroup>
-	
+
 	<!-- Publish設定（配布時のみ使用） -->
 	<PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(PublishDir)' != ''">
 		<PublishSingleFile>true</PublishSingleFile>
@@ -48,6 +53,38 @@
 		<PublishTrimmed>false</PublishTrimmed>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 	</PropertyGroup>
+
+	<!-- 🔥 [SIZE_OPTIMIZATION] Releaseビルド後に不要なファイルを削除（961.5MB削減） -->
+	<Target Name="RemoveUnusedRuntimeFiles" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+		<Message Text="🔥 [SIZE_OPTIMIZATION] 不要なランタイムファイルを削除中..." Importance="high" />
+
+		<!-- Linux ONNX Runtime除外 (459MB削減) -->
+		<RemoveDir Directories="$(OutDir)runtimes\linux-x64" Condition="Exists('$(OutDir)runtimes\linux-x64')" />
+
+		<!-- 他プラットフォームランタイム除外 (164MB削減) -->
+		<RemoveDir Directories="$(OutDir)runtimes\osx-x64" Condition="Exists('$(OutDir)runtimes\osx-x64')" />
+		<RemoveDir Directories="$(OutDir)runtimes\osx-arm64" Condition="Exists('$(OutDir)runtimes\osx-arm64')" />
+		<RemoveDir Directories="$(OutDir)runtimes\ios" Condition="Exists('$(OutDir)runtimes\ios')" />
+		<RemoveDir Directories="$(OutDir)runtimes\android" Condition="Exists('$(OutDir)runtimes\android')" />
+
+		<!-- win-x86ライブラリ除外 (65MB削減) -->
+		<RemoveDir Directories="$(OutDir)runtimes\win-x86" Condition="Exists('$(OutDir)runtimes\win-x86')" />
+
+		<!-- 旧PaddleOCRモデル除外 - V5のみ保持 (255MB削減) -->
+		<ItemGroup>
+			<OldPaddleModels Include="$(OutDir)**\Sdcb.PaddleOCR.Models.LocalV3.dll" />
+			<OldPaddleModels Include="$(OutDir)**\Sdcb.PaddleOCR.Models.LocalV4.dll" />
+			<OldPaddleModels Include="$(OutDir)win-x64\Sdcb.PaddleOCR.Models.LocalV3.dll" />
+			<OldPaddleModels Include="$(OutDir)win-x64\Sdcb.PaddleOCR.Models.LocalV4.dll" />
+		</ItemGroup>
+		<Delete Files="@(OldPaddleModels)" Condition="Exists('%(Identity)')" />
+
+		<!-- 🔥 LINESeedフォント除外 - NotoSansに統一 (18.5MB削減) -->
+		<RemoveDir Directories="$(OutDir)Assets\Fonts\LINESeedJP" Condition="Exists('$(OutDir)Assets\Fonts\LINESeedJP')" />
+		<RemoveDir Directories="$(OutDir)Assets\Fonts\LINESeedEN" Condition="Exists('$(OutDir)Assets\Fonts\LINESeedEN')" />
+
+		<Message Text="🔥 [SIZE_OPTIMIZATION] 不要なファイル削除完了 - 推定削減: 961.5MB (ランタイム: 943MB + フォント: 18.5MB)" Importance="high" />
+	</Target>
 
 	<!-- テストアセンブリからのアクセスを許可 -->
 	<ItemGroup>
@@ -123,7 +160,8 @@
 
 	<!-- Python gRPCサーバーディレクトリの自動コピー -->
 	<ItemGroup>
-		<None Include="..\grpc_server\**\*" Exclude="..\grpc_server\**\__pycache__\**;..\grpc_server\**\*.pyc">
+		<!-- ⚠️ MSB3061警告対策: *.logを除外（Pythonプロセスがロック中のため） -->
+		<None Include="..\grpc_server\**\*" Exclude="..\grpc_server\**\__pycache__\**;..\grpc_server\**\*.pyc;..\grpc_server\**\*.log">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>grpc_server\%(RecursiveDir)%(FileName)%(Extension)</Link>
 		</None>
