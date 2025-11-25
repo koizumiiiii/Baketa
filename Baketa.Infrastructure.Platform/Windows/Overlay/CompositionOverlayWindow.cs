@@ -324,14 +324,13 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
         {
             // AccentPolicyを作成
             // GradientColor: AABGR format (0xAABBGGRR)
-            // 🔥 [NATURAL_BLEND] 背景色をそのまま活かすため、ほぼ透明の黒を使用
-            // 黒ピクセルは透明として扱われるため、ブラーされた背景色がそのまま見える
-            // これにより、どんな背景色でも自然に馴染む
+            // 🔥 黒ベースのオーバーレイ（ライト/ダークモード共通）
+            // ACCENT_ENABLE_BLURBEHIND: ガウスぼかし風のブラー効果
             var accent = new AccentPolicy
             {
-                AccentState = AccentState.ACCENT_ENABLE_ACRYLICBLURBEHIND,  // Windows 10 1803+ Acrylic
+                AccentState = AccentState.ACCENT_ENABLE_BLURBEHIND,  // ガウスぼかし風ブラー
                 AccentFlags = 0,  // No additional flags
-                GradientColor = 0x01000000,  // ほぼ透明の黒（背景色をそのまま活かす）
+                GradientColor = 0x60000000,  // 約38%不透明の黒
                 AnimationId = 0
             };
 
@@ -452,41 +451,13 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
         graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
 
-        // 🔥 [NATURAL_BLEND] 背景色をそのまま活かすため、非常に薄いオーバーレイのみ
-        // フェードアウトエッジで自然に周囲と同化
-        const int fadeWidth = 40; // 周辺40pxをフェードアウト（より広く滑らかに）
-        var rect = new RectangleF(0, 0, _currentWidth, _currentHeight);
+        // 🔥 黒ベースのオーバーレイ（ライト/ダークモード共通）
+        // SetWindowCompositionAttributeのブラー効果のみ使用
 
-        using (var path = new System.Drawing.Drawing2D.GraphicsPath())
-        {
-            path.AddRectangle(rect);
-
-            using (var brush = new System.Drawing.Drawing2D.PathGradientBrush(path))
-            {
-                // 🔥 [NATURAL_BLEND] 中央は非常に薄い黒（背景を透かしつつ可読性向上）
-                // 黒ベースにすることで、どんな背景色でも馴染む
-                brush.CenterColor = Color.FromArgb(60, 0, 0, 0); // 約24%不透明の黒
-
-                // 周辺は完全に透明（周囲と自然に同化）
-                brush.SurroundColors = new[] {
-                    Color.FromArgb(0, 0, 0, 0),
-                    Color.FromArgb(0, 0, 0, 0),
-                    Color.FromArgb(0, 0, 0, 0),
-                    Color.FromArgb(0, 0, 0, 0)
-                };
-
-                // フェード範囲を設定（より広く滑らかなグラデーション）
-                var focusX = Math.Max(0.1f, 1.0f - (fadeWidth * 2.0f / _currentWidth));
-                var focusY = Math.Max(0.1f, 1.0f - (fadeWidth * 2.0f / _currentHeight));
-                brush.FocusScales = new PointF(focusX, focusY);
-
-                graphics.FillRectangle(brush, rect);
-            }
-        }
-
-        // テキスト描画（ドロップシャドウ付きで可読性確保）
+        // テキスト描画（白テキスト、左寄せ・垂直中央）
         if (!string.IsNullOrWhiteSpace(_currentText))
         {
+            // 🔥 白テキスト + 黒の影（可読性向上）
             using var shadowBrush = new SolidBrush(Color.FromArgb(180, 0, 0, 0)); // 影（黒）
             using var textBrush = new SolidBrush(Color.FromArgb(255, 255, 255, 255)); // テキスト（白）
             using var font = new Font("Segoe UI", _fontSize, FontStyle.Regular);
@@ -503,16 +474,20 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
                 Trimming = StringTrimming.None
             };
 
-            var y = padding;
-            const float shadowOffset = 1.5f; // ドロップシャドウのオフセット
+            // 🔥 テキスト全体の高さを計算して垂直中央に配置
+            var totalTextHeight = lines.Count * lineHeight;
+            var y = (_currentHeight - totalTextHeight) / 2f; // 垂直中央
+            y = Math.Max(padding, y); // 最低でもpaddingは確保
+
+            const float shadowOffset = 1.0f; // ドロップシャドウのオフセット（控えめ）
 
             foreach (var line in lines)
             {
                 if ((y + lineHeight) > _currentHeight) break;
 
-                // 🔥 [NATURAL_BLEND] ドロップシャドウを先に描画（可読性向上）
+                // 薄い白の影を先に描画（白背景上では控えめに）
                 graphics.DrawString(line, font, shadowBrush, new PointF(padding + shadowOffset, y + shadowOffset), format);
-                // テキスト本体（白）
+                // テキスト本体（黒）- 左寄せ
                 graphics.DrawString(line, font, textBrush, new PointF(padding, y), format);
                 y += lineHeight;
             }
