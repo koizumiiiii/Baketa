@@ -34,6 +34,9 @@ public static class OverlayModule
         // 🔥 [WIN32_OVERLAY_MIGRATION] Win32 Layered Window Factory登録
         services.AddSingleton<ILayeredOverlayWindowFactory, LayeredOverlayWindowFactory>();
 
+        // 🔥 [DWM_BLUR_IMPLEMENTATION] DWM Composition Window Factory登録
+        services.AddSingleton<ICompositionOverlayWindowFactory, CompositionOverlayWindowFactory>();
+
         // 🔧 [OVERLAY_UNIFICATION] Win32オーバーレイウィンドウマネージャー登録
         // Infrastructure.Platform層の具象実装
         services.AddSingleton<WindowsOverlayWindowManager>();
@@ -45,6 +48,8 @@ public static class OverlayModule
         services.AddSingleton<IOverlayManager, Win32OverlayManager>();
 
         logger.LogInformation("✅ [OVERLAY_UNIFICATION] Win32オーバーレイシステム登録完了");
+        logger.LogDebug("   - LayeredOverlayWindowFactory → ILayeredOverlayWindowFactory");
+        logger.LogDebug("   - CompositionOverlayWindowFactory → ICompositionOverlayWindowFactory [DWM_BLUR_IMPLEMENTATION]");
         logger.LogDebug("   - WindowsOverlayWindowManager → IOverlayWindowManager");
         logger.LogDebug("   - Win32OverlayManager → IOverlayManager (統一インターフェース)");
 
