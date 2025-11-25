@@ -12,14 +12,14 @@ public static class BaketaConstants
     public static class Ocr
     {
         /// <summary>
-        /// デフォルト信頼度しきい値
+        /// デフォルト信頼度しきい値（0.9以上のみ翻訳対象）
         /// </summary>
-        public const double DefaultConfidenceThreshold = 0.7;
+        public const double DefaultConfidenceThreshold = 0.9;
 
         /// <summary>
         /// 高信頼度しきい値（確実なテキストと判定）
         /// </summary>
-        public const float HighConfidenceThreshold = 0.7f;
+        public const float HighConfidenceThreshold = 0.9f;
 
         /// <summary>
         /// デフォルトタイムアウト（ミリ秒）
@@ -143,9 +143,9 @@ public static class BaketaConstants
     public static class Translation
     {
         /// <summary>
-        /// 信頼度しきい値
+        /// 信頼度しきい値（0.9以上のみ翻訳対象）
         /// </summary>
-        public const float ConfidenceThreshold = 0.7f;
+        public const float ConfidenceThreshold = 0.9f;
 
         /// <summary>
         /// 成功報酬倍率

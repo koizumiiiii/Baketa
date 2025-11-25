@@ -233,6 +233,49 @@ public sealed class OverlaySettings
     [SettingMetadata(SettingLevel.Debug, "Overlay", "デバッグ境界表示",
         Description = "オーバーレイの境界をデバッグ用に表示します（開発者向け）")]
     public bool ShowDebugBounds { get; set; } = false;
+
+    /// <summary>
+    /// 🔥 [DWM_BLUR_IMPLEMENTATION] DWM Composition モードを使用するか
+    /// </summary>
+    /// <remarks>
+    /// Windows Vista以降で利用可能なDesktop Window Manager (DWM) Compositionを使用します。
+    /// - true: DWM Compositionモード（ブラー効果が利用可能、Windows Vista+）
+    /// - false: Layeredウィンドウモード（従来方式、Windows XP+）
+    /// DWMがサポートされていない環境では自動的にLayeredモードにフォールバックします。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "Overlay", "DWM Compositionモード",
+        Description = "Windows Vista以降のブラー効果を使用します（非サポート環境では自動的に従来方式にフォールバック）")]
+    public bool UseComposition { get; set; } = true;
+
+    /// <summary>
+    /// 🔥 [DWM_BLUR_IMPLEMENTATION] ブラー効果を有効にするか
+    /// </summary>
+    /// <remarks>
+    /// UseComposition が true の場合のみ有効です。
+    /// Windows Vista/7: 標準的なブラー効果
+    /// Windows 10/11: より洗練されたブラー効果
+    /// パフォーマンスへの影響はわずかです（GPU側で処理）。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Basic, "Overlay", "ブラー効果",
+        Description = "オーバーレイの背景にブラー効果を適用します（DWM Compositionモード時のみ）")]
+    public bool EnableBlur { get; set; } = true;
+
+    /// <summary>
+    /// 🔥 [DWM_BLUR_IMPLEMENTATION] ブラー効果の不透明度 (0-255)
+    /// </summary>
+    /// <remarks>
+    /// ブラー効果の強度を調整します。
+    /// - 0: 完全透明（ブラーのみ）
+    /// - 128: 半透明（推奨）
+    /// - 200: やや不透明（デフォルト）
+    /// - 255: 完全不透明
+    /// 値が高いほど背景が見えにくくなりますが、テキストの可読性は向上します。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "Overlay", "ブラー不透明度",
+        Description = "ブラー効果の不透明度（0=完全透明、255=完全不透明）",
+        MinValue = 0,
+        MaxValue = 255)]
+    public byte BlurOpacity { get; set; } = 200;
 }
 
 /// <summary>

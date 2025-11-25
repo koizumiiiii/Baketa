@@ -240,3 +240,32 @@ internal struct WNDCLASS
     [MarshalAs(UnmanagedType.LPWStr)]
     public string lpszClassName;
 }
+
+/// <summary>
+/// 🔥 [DWM_BLUR_IMPLEMENTATION] PAINTSTRUCT構造体
+/// </summary>
+/// <remarks>
+/// WM_PAINT処理に使用される構造体。
+/// BeginPaint/EndPaint APIで使用されます。
+/// </remarks>
+[StructLayout(LayoutKind.Sequential)]
+internal struct PAINTSTRUCT
+{
+    public IntPtr hdc;
+    public bool fErase;
+    public RECT rcPaint;
+    public bool fRestore;
+    public bool fIncUpdate;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
+    public byte[] rgbReserved;
+
+    public PAINTSTRUCT()
+    {
+        hdc = IntPtr.Zero;
+        fErase = false;
+        rcPaint = new RECT();
+        fRestore = false;
+        fIncUpdate = false;
+        rgbReserved = new byte[32];
+    }
+}

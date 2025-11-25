@@ -4,8 +4,11 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
+using Baketa.Core.Settings;
 using Baketa.Core.UI.Overlay;
+using Baketa.Infrastructure.Platform.Windows.NativeMethods;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using CoreGeometry = Baketa.Core.UI.Geometry;
 
 namespace Baketa.Infrastructure.Platform.Windows.Overlay;
@@ -13,22 +16,37 @@ namespace Baketa.Infrastructure.Platform.Windows.Overlay;
 /// <summary>
 /// Windows用オーバーレイウィンドウ管理サービス
 /// </summary>
+/// <remarks>
+/// 🔥 [DWM_BLUR_IMPLEMENTATION] DWM Composition対応版
+/// - OverlaySettings.UseComposition に基づいてウィンドウタイプを選択
+/// - DWM非サポート環境では自動的にLayeredウィンドウにフォールバック
+/// - 既存のLayeredOverlayWindow実装と完全な互換性を維持
+///
+/// 🔥 [GEMINI_REVIEW] IDisposable実装
+/// - 正常なスレッド終了とリソース解放を保証
+/// </remarks>
 [SupportedOSPlatform("windows")]
-public sealed class WindowsOverlayWindowManager : IOverlayWindowManager
+public sealed class WindowsOverlayWindowManager : IOverlayWindowManager, IDisposable
 {
     private readonly ILogger<WindowsOverlayWindowManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILayeredOverlayWindowFactory _layeredWindowFactory;
+    private readonly ICompositionOverlayWindowFactory? _compositionWindowFactory;
+    private readonly OverlaySettings _overlaySettings;
     private readonly ConcurrentDictionary<nint, IOverlayWindow> _activeOverlays = new();
 
     public WindowsOverlayWindowManager(
         ILogger<WindowsOverlayWindowManager> logger,
         ILoggerFactory loggerFactory,
-        ILayeredOverlayWindowFactory layeredWindowFactory)
+        ILayeredOverlayWindowFactory layeredWindowFactory,
+        ICompositionOverlayWindowFactory? compositionWindowFactory,
+        IOptions<OverlaySettings> overlaySettings)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _layeredWindowFactory = layeredWindowFactory ?? throw new ArgumentNullException(nameof(layeredWindowFactory));
+        _compositionWindowFactory = compositionWindowFactory; // Optional: null for environments without DWM support
+        _overlaySettings = overlaySettings?.Value ?? throw new ArgumentNullException(nameof(overlaySettings));
     }
 
     /// <inheritdoc/>
@@ -41,14 +59,20 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager
         {
             try
             {
-                _logger.LogDebug("🔥 [LAYERED_FIX] Creating LayeredOverlayWindow. Target: {Target}, Size: {Size}, Position: {Position}",
-                    targetWindowHandle, initialSize, initialPosition);
+                // 🔥 [DWM_BLUR_IMPLEMENTATION] ウィンドウタイプの選択ロジック
+                var useComposition = ShouldUseCompositionMode();
+                var windowTypeName = useComposition ? "CompositionOverlayWindow" : "LayeredOverlayWindow";
 
-                // 🔥 [LAYERED_FIX] LayeredOverlayWindowFactoryを使用してSTAスレッド+メッセージループ対応ウィンドウを作成
-                var layeredWindow = _layeredWindowFactory.Create();
+                _logger.LogDebug("🔥 [DWM_BLUR_IMPLEMENTATION] Creating {WindowType}. Target: {Target}, Size: {Size}, Position: {Position}",
+                    windowTypeName, targetWindowHandle, initialSize, initialPosition);
+
+                // ファクトリーを使ってウィンドウを作成
+                ILayeredOverlayWindow underlyingWindow = useComposition
+                    ? _compositionWindowFactory!.Create()
+                    : _layeredWindowFactory.Create();
 
                 // 🔥 [ADAPTER_PATTERN] LayeredOverlayWindowAdapterでIOverlayWindowに適応
-                var adapter = new LayeredOverlayWindowAdapter(layeredWindow)
+                var adapter = new LayeredOverlayWindowAdapter(underlyingWindow)
                 {
                     Size = initialSize,
                     Position = initialPosition,
@@ -57,26 +81,66 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager
 
                 _activeOverlays.TryAdd(adapter.Handle, adapter);
 
-                _logger.LogInformation("✅ [LAYERED_FIX] LayeredOverlayWindow created successfully with adapter. Handle: {Handle}", adapter.Handle);
+                _logger.LogInformation("✅ [DWM_BLUR_IMPLEMENTATION] {WindowType} created successfully. Handle: {Handle}",
+                    windowTypeName, adapter.Handle);
 
                 return adapter;
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogError(ex, "❌ [LAYERED_FIX] Failed to create overlay window due to invalid operation");
+                _logger.LogError(ex, "❌ Failed to create overlay window due to invalid operation");
                 throw;
             }
             catch (ExternalException ex)
             {
-                _logger.LogError(ex, "❌ [LAYERED_FIX] Failed to create overlay window due to external error");
+                _logger.LogError(ex, "❌ Failed to create overlay window due to external error");
                 throw;
             }
             catch (OutOfMemoryException ex)
             {
-                _logger.LogError(ex, "❌ [LAYERED_FIX] Failed to create overlay window due to insufficient memory");
+                _logger.LogError(ex, "❌ Failed to create overlay window due to insufficient memory");
                 throw;
             }
         }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// DWM Compositionモードを使用すべきか判定
+    /// </summary>
+    /// <returns>Compositionモードを使用する場合 true</returns>
+    /// <remarks>
+    /// 🔥 [DWM_BLUR_IMPLEMENTATION] フォールバック戦略:
+    /// 1. OverlaySettings.UseComposition が false → Layeredモード
+    /// 2. CompositionWindowFactory が null → Layeredモード（DI未登録）
+    /// 3. DWM Compositionがサポートされていない → Layeredモード（Windows XP等）
+    /// 4. 上記すべてクリア → Compositionモード
+    /// </remarks>
+    private bool ShouldUseCompositionMode()
+    {
+        // 設定で無効化されている場合
+        if (!_overlaySettings.UseComposition)
+        {
+            _logger.LogDebug("🔥 [DWM_BLUR_IMPLEMENTATION] UseComposition=false: Layeredモードを使用");
+            return false;
+        }
+
+        // CompositionWindowFactoryが登録されていない場合
+        if (_compositionWindowFactory == null)
+        {
+            _logger.LogWarning("⚠️ [DWM_BLUR_IMPLEMENTATION] CompositionWindowFactory未登録: Layeredモードにフォールバック");
+            return false;
+        }
+
+        // DWM Compositionのサポート確認
+        if (!DwmApiMethods.IsCompositionSupported())
+        {
+            _logger.LogWarning("⚠️ [DWM_BLUR_IMPLEMENTATION] DWM Composition未サポート: Layeredモードにフォールバック");
+            return false;
+        }
+
+        // すべてクリア: Compositionモードを使用
+        _logger.LogDebug("🔥 [DWM_BLUR_IMPLEMENTATION] UseComposition=true & DWM supported: Compositionモードを使用");
+        return true;
     }
 
     /// <inheritdoc/>
@@ -121,4 +185,28 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager
 
     /// <inheritdoc/>
     public int ActiveOverlayCount => _activeOverlays.Count;
+
+    /// <summary>
+    /// 🔥 [GEMINI_REVIEW] リソースの解放とスレッドの正常終了
+    /// </summary>
+    /// <remarks>
+    /// すべてのオーバーレイウィンドウを破棄し、専用UIスレッドを正常終了させます。
+    /// アプリケーション終了時に呼び出してリソースリークを防ぎます。
+    /// </remarks>
+    public void Dispose()
+    {
+        _logger.LogInformation("🔥 [DWM_BLUR_IMPLEMENTATION] Disposing WindowsOverlayWindowManager...");
+
+        try
+        {
+            // すべてのオーバーレイを閉じる（既存のメソッドを使用）
+            CloseAllOverlaysAsync().GetAwaiter().GetResult();
+
+            _logger.LogInformation("✅ [DWM_BLUR_IMPLEMENTATION] All overlays disposed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ [DWM_BLUR_IMPLEMENTATION] Error during WindowsOverlayWindowManager disposal");
+        }
+    }
 }

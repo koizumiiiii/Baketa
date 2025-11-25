@@ -75,6 +75,14 @@ internal static class User32Methods
     [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
     internal static extern long GetWindowLong(IntPtr hWnd, GetWindowLongIndex nIndex);
 
+    // 🔥 [GEMINI_REVIEW] 64-bit完全対応のためのSetWindowLongPtr/GetWindowLongPtr
+    // SetWindowLong/GetWindowLongは32-bit値のみ対応。ポインタ値を扱う場合は*Ptr版を使用
+    [DllImport(USER32_DLL, SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    [DllImport(USER32_DLL, SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
     [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
     internal static extern IntPtr MonitorFromWindow(IntPtr hwnd, MonitorFlags dwFlags);
 
@@ -181,7 +189,27 @@ internal static class User32Methods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
+    // 🎯 [DWM_BLUR_IMPLEMENTATION] WM_PAINT処理用API
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    internal static extern IntPtr BeginPaint(IntPtr hwnd, ref PAINTSTRUCT lpPaint);
+
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EndPaint(IntPtr hWnd, ref PAINTSTRUCT lpPaint);
+
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
+
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool UpdateWindow(IntPtr hWnd);
+
     // GetWindowTextLength と IsIconic は既に定義済み（68行目、105行目）
+
+    // 🔥 [ACRYLIC_BLUR] SetWindowCompositionAttribute for Windows 10/11 Blur/Acrylic
+    [DllImport(USER32_DLL, SetLastError = false)]
+    internal static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
 }
 
 [Flags]
@@ -195,4 +223,37 @@ internal enum SystemMetric
 {
     SM_CXSCREEN = 0,
     SM_CYSCREEN = 1
+}
+
+// 🔥 [ACRYLIC_BLUR] Windows 10/11 Composition Attribute structures
+[StructLayout(LayoutKind.Sequential)]
+internal struct WindowCompositionAttributeData
+{
+    public WindowCompositionAttribute Attribute;
+    public IntPtr Data;
+    public int SizeOfData;
+}
+
+internal enum WindowCompositionAttribute
+{
+    WCA_ACCENT_POLICY = 19
+}
+
+internal enum AccentState
+{
+    ACCENT_DISABLED = 0,
+    ACCENT_ENABLE_GRADIENT = 1,
+    ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
+    ACCENT_ENABLE_BLURBEHIND = 3,           // Windows 10 Blur
+    ACCENT_ENABLE_ACRYLICBLURBEHIND = 4,    // Windows 10 1803+ Acrylic
+    ACCENT_INVALID_STATE = 5
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct AccentPolicy
+{
+    public AccentState AccentState;
+    public uint AccentFlags;
+    public uint GradientColor;  // ABGR format
+    public uint AnimationId;
 }
