@@ -794,3 +794,97 @@ public class LocalizationServiceTests
 - 数値フォーマット例: 日本語 "1,234", 英語 "1,234"
 - 将来的に言語ファイル (.json) による外部化も検討
 - 翻訳品質は #178 でネイティブスピーカーによるチェックを実施
+
+---
+
+## 🔐 Supabase Auth メールテンプレート多言語対応
+
+### 背景
+Issue #133 (Supabase Auth基盤構築) で設定したメールテンプレートを、アプリの言語設定と連動させる必要がある。
+
+### 実装方針: Goテンプレート条件分岐
+
+Supabaseのメールテンプレートは Go のテンプレート言語を使用しており、ユーザーメタデータに基づいて言語を切り替えられる。
+
+#### 1. サインアップ時に言語メタデータを渡す (C#側)
+```csharp
+// Baketa.Infrastructure/Authentication/SupabaseAuthService.cs
+public async Task<AuthResult> SignUpAsync(string email, string password, string language = "ja")
+{
+    var response = await _supabaseClient.Auth.SignUp(email, password, new SignUpOptions
+    {
+        Data = new Dictionary<string, object>
+        {
+            { "language", language },  // "ja" or "en"
+            { "display_name", email.Split('@')[0] }
+        }
+    });
+    // ...
+}
+```
+
+#### 2. Supabaseメールテンプレート (Goテンプレート)
+
+**確認メール (Confirm signup)**
+```html
+{{ if eq .Data.language "ja" }}
+<h2>メールアドレスの確認</h2>
+<p>Baketaへのご登録ありがとうございます。</p>
+<p>以下のリンクをクリックしてメールアドレスを確認してください：</p>
+<a href="{{ .ConfirmationURL }}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">確認する</a>
+<p>このリンクは24時間有効です。</p>
+{{ else }}
+<h2>Confirm your email</h2>
+<p>Thank you for signing up for Baketa.</p>
+<p>Click the link below to confirm your email address:</p>
+<a href="{{ .ConfirmationURL }}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Confirm</a>
+<p>This link is valid for 24 hours.</p>
+{{ end }}
+```
+
+**パスワードリセット (Reset password)**
+```html
+{{ if eq .Data.language "ja" }}
+<h2>パスワードリセット</h2>
+<p>パスワードリセットのリクエストを受け付けました。</p>
+<p>以下のリンクをクリックしてパスワードを再設定してください：</p>
+<a href="{{ .ConfirmationURL }}" style="background-color: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">パスワードを再設定</a>
+<p>このリンクは1時間有効です。心当たりがない場合は、このメールを無視してください。</p>
+{{ else }}
+<h2>Reset your password</h2>
+<p>We received a request to reset your password.</p>
+<p>Click the link below to set a new password:</p>
+<a href="{{ .ConfirmationURL }}" style="background-color: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+<p>This link is valid for 1 hour. If you didn't request this, please ignore this email.</p>
+{{ end }}
+```
+
+**マジックリンク (Magic Link)**
+```html
+{{ if eq .Data.language "ja" }}
+<h2>ログインリンク</h2>
+<p>Baketaへのログインリンクをお送りします。</p>
+<p>以下のリンクをクリックしてログインしてください：</p>
+<a href="{{ .ConfirmationURL }}" style="background-color: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ログイン</a>
+<p>このリンクは10分間有効です。</p>
+{{ else }}
+<h2>Login Link</h2>
+<p>Here's your login link for Baketa.</p>
+<p>Click the link below to log in:</p>
+<a href="{{ .ConfirmationURL }}" style="background-color: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Log In</a>
+<p>This link is valid for 10 minutes.</p>
+{{ end }}
+```
+
+### タスク
+- [ ] C#側でサインアップ時に言語メタデータを送信
+- [ ] Supabaseダッシュボードでメールテンプレートを更新
+- [ ] テスト: 日本語設定でサインアップ → 日本語メール受信
+- [ ] テスト: 英語設定でサインアップ → 英語メール受信
+- [ ] テスト: パスワードリセット (日本語/英語)
+- [ ] テスト: マジックリンク (日本語/英語)
+
+### 注意事項
+- OAuth認証 (Google/Discord/Twitch) ではメールテンプレートは使用されない
+- Email/Password認証時のみ有効
+- 言語設定はユーザーの `raw_user_meta_data` に保存される
