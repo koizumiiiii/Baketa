@@ -24,8 +24,9 @@
 - パスワードを忘れた場合、リセットメールを送信できる
 - いつでもログアウトして別アカウントでログインできる
 - メインウィンドウでログイン中のメールアドレス/アバターを確認できる
-- **ソーシャルログインのプロバイダー情報が表示される**（例: "Steamアカウントでログイン中"）
-- **プロフィール画像が同期される**（Google/Discord/Steamアバター）
+- **ソーシャルログインのプロバイダー情報が表示される**（例: "Twitchアカウントでログイン中"）
+- **プロフィール画像が同期される**（Google/Discord/Twitchアバター）
+- ※ Steam認証は Issue #173 で別途実装予定
 - **パスワードリセットが適切に制限される**（レート制限、監査ログ）
 
 ---
@@ -138,17 +139,19 @@
 
 #### 6. ソーシャルログイン統合（P1）
 - [ ] **プロバイダー情報表示**
-  - ログイン方法の表示（"Steamアカウント"、"メール/パスワード"等）
-  - プロバイダーアイコン表示
+  - ログイン方法の表示（"Twitchアカウント"、"メール/パスワード"等）
+  - プロバイダーアイコン表示（Google/Discord/Twitch）
+  - ※ Steamアイコンは Issue #173 実装後に追加
 
 - [ ] **プロフィール画像同期**
-  - Google/Discord/Steamアバターの取得と表示
+  - Google/Discord/Twitchアバターの取得と表示
   - デフォルトアバター（ソーシャルログインでない場合）
   - アバター画像のキャッシュ
+  - ※ Steamアバターは Issue #173 実装後に追加
 
 - [ ] **プロバイダー別UI調整**
   - ソーシャルログインの場合、「パスワードを忘れた」リンクを非表示
-  - 複数プロバイダー連携の表示（"Google + Steam"等）
+  - 複数プロバイダー連携の表示（"Google + Twitch"等）
 
 ---
 
@@ -405,7 +408,8 @@ public class MainWindowViewModel : ViewModelBase
             {
                 "google" => "Google",
                 "discord" => "Discord",
-                "steam" => "Steam",
+                "twitch" => "Twitch",
+                // "steam" => "Steam",  // Issue #173 で追加
                 "email" => "メール/パスワード",
                 _ => primaryIdentity.Provider
             };
@@ -415,7 +419,8 @@ public class MainWindowViewModel : ViewModelBase
             {
                 "google" => user.UserMetadata?.GetValue<string>("avatar_url"),
                 "discord" => user.UserMetadata?.GetValue<string>("avatar_url"),
-                "steam" => user.UserMetadata?.GetValue<string>("avatar"),
+                "twitch" => user.UserMetadata?.GetValue<string>("picture"),
+                // "steam" => user.UserMetadata?.GetValue<string>("avatar"),  // Issue #173 で追加
                 _ => null
             };
 
@@ -465,11 +470,6 @@ public class MainWindowViewModel : ViewModelBase
       <StackPanel Orientation="Horizontal" Spacing="5">
         <!-- プロバイダーアイコン -->
         <Image Width="16" Height="16"
-               IsVisible="{Binding LoginProvider, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Steam}">
-          <Image.Source>/Assets/Icons/steam-icon.png</Image.Source>
-        </Image>
-
-        <Image Width="16" Height="16"
                IsVisible="{Binding LoginProvider, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Google}">
           <Image.Source>/Assets/Icons/google-icon.png</Image.Source>
         </Image>
@@ -478,6 +478,18 @@ public class MainWindowViewModel : ViewModelBase
                IsVisible="{Binding LoginProvider, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Discord}">
           <Image.Source>/Assets/Icons/discord-icon.png</Image.Source>
         </Image>
+
+        <Image Width="16" Height="16"
+               IsVisible="{Binding LoginProvider, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Twitch}">
+          <Image.Source>/Assets/Icons/twitch-icon.png</Image.Source>
+        </Image>
+
+        <!-- Steam: Issue #173 実装後に追加
+        <Image Width="16" Height="16"
+               IsVisible="{Binding LoginProvider, Converter={StaticResource StringEqualsConverter}, ConverterParameter=Steam}">
+          <Image.Source>/Assets/Icons/steam-icon.png</Image.Source>
+        </Image>
+        -->
 
         <TextBlock Text="{Binding LoginProvider}"
                    FontSize="12"
@@ -573,12 +585,14 @@ public async Task LogLogoutAsync(string userId, string? reason = null, Cancellat
 - [ ] **表示名表示**: ユーザーの表示名が正しく表示される
 
 #### ソーシャルログイン統合
-- [ ] **プロバイダー表示**: ログイン方法（Steam/Google/Discord）が正しく表示される
+- [ ] **プロバイダー表示**: ログイン方法（Google/Discord/Twitch）が正しく表示される
 - [ ] **プロバイダーアイコン**: 各プロバイダーのアイコンが表示される
-- [ ] **プロフィール画像**: Google/Discord/Steamアバターが表示される
+- [ ] **プロフィール画像**: Google/Discord/Twitchアバターが表示される
 - [ ] **デフォルトアバター**: ソーシャルログインでない場合、デフォルトアバターが表示される
 - [ ] **パスワードリセット非表示**: ソーシャルログインの場合、「パスワードを忘れた」リンクが非表示になる
 - [ ] **複数プロバイダー**: 複数プロバイダー連携時、すべてのアイコンが表示される
+
+> **Note**: Steam認証関連テストは Issue #173 で追加
 
 ---
 
@@ -647,3 +661,12 @@ public async Task LogLogoutAsync(string userId, string? reason = null, Cancellat
 - **優先度変更**: Medium → High
 - **所要時間変更**: 1日 → 2日
 - **Issue #167, #168との統合**: 監査ログ、セキュリティパターン、ソーシャルログイン連携
+
+### 2025-11-26: Steam → Twitch変更、Issue分離
+- **変更理由**: Steam OpenIDはSupabaseでネイティブサポートされず、Issue #173へ分離
+- **変更内容**:
+  - Steam → Twitch に変更（Supabase標準サポート）
+  - プロバイダー情報表示をTwitchに更新
+  - プロフィール画像同期をTwitchに更新
+  - Steam関連は Issue #173 実装後に追加
+- **関連Issue**: #133 (Supabase Auth基盤構築), #173 (Steam OpenID認証)

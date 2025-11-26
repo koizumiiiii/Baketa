@@ -570,6 +570,7 @@ internal sealed class Program
             .SetBasePath(configBasePath)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .AddJsonFile(environmentConfigFile, optional: true, reloadOnChange: true)
+            .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true) // シークレット用（.gitignore対象）
             .Build();
 
 #if DEBUG

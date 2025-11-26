@@ -22,7 +22,8 @@ Supabase認証システム（#133で構築）を利用したログイン/登録U
 
 ### 目指す状態
 - メールアドレス・パスワードでユーザー登録ができる
-- **Steam、Discord、Googleアカウントでワンクリックログインができる**
+- **Twitch、Discord、Googleアカウントでワンクリックログインができる**
+- **Steam認証は Issue #173 で別途実装予定**
 - 登録済みユーザーがログインできる
 - ログイン状態を視覚的に確認できる
 - エラー時に適切なメッセージが表示される
@@ -157,25 +158,28 @@ Supabase認証システム（#133で構築）を利用したログイン/登録U
   - 「ネットワーク接続を確認してください」メッセージ
 
 #### 6. ソーシャルログイン対応（P1 → P0昇格）
-- [ ] **Supabase OAuth設定**
-  - Googleプロバイダー設定（Supabaseダッシュボード）
-  - Discordプロバイダー設定（Discord Developer Portal連携）
-  - Steam OpenID設定（カスタム実装）
+- [x] **Supabase OAuth設定** (Issue #133 で完了)
+  - Googleプロバイダー設定（Supabaseダッシュボード）✅
+  - Discordプロバイダー設定（Discord Developer Portal連携）✅
+  - Twitchプロバイダー設定（Twitch Developer Console連携）✅
+  - Steam OpenID設定 → Issue #173 へ分離
 
 - [ ] **UI実装**
   - Googleログインボタン（Google標準デザイン）
   - Discordログインボタン（Discord標準デザイン）
-  - Steamログインボタン（Steam標準デザイン）
+  - Twitchログインボタン（Twitch標準デザイン）
   - 区切り線とラベル（「または」）
+  - ※ Steamログインボタンは Issue #173 実装後に追加
 
 - [ ] **OAuth フロー実装**
   ```csharp
-  // Google/Discord: Supabase標準OAuth
+  // Google/Discord/Twitch: Supabase標準OAuth
   await _authService.SignInWithOAuthAsync(Provider.Google);
   await _authService.SignInWithOAuthAsync(Provider.Discord);
+  await _authService.SignInWithOAuthAsync(Provider.Twitch);
 
-  // Steam: カスタムOpenID実装
-  await _authService.SignInWithSteamAsync();
+  // Steam: カスタムOpenID実装 (Issue #173)
+  // await _authService.SignInWithSteamAsync();
   ```
 
 - [ ] **アカウント紐付け処理**
@@ -197,7 +201,8 @@ Supabase認証システム（#133で構築）を利用したログイン/登録U
   - **ソーシャルログインテスト (6ケース)**
     - Google OAuth成功/失敗
     - Discord OAuth成功/失敗
-    - Steam OpenID成功/失敗
+    - Twitch OAuth成功/失敗
+  - ※ Steam OpenIDテストは Issue #173 で追加
 
 ---
 
@@ -311,17 +316,19 @@ Supabase認証システム（#133で構築）を利用したログイン/登録U
       </StackPanel>
     </Button>
 
-    <Button Command="{Binding LoginWithSteamCommand}"
+    <Button Command="{Binding LoginWithTwitchCommand}"
             IsEnabled="{Binding !IsLoading}"
             Width="300"
             Height="40"
-            Background="#171A21"
+            Background="#9146FF"
             BorderThickness="0">
       <StackPanel Orientation="Horizontal" Spacing="10">
-        <Image Source="/Assets/Icons/steam-icon.png" Width="20" Height="20" />
-        <TextBlock Text="Steamでログイン" Foreground="White" VerticalAlignment="Center" />
+        <Image Source="/Assets/Icons/twitch-icon.png" Width="20" Height="20" />
+        <TextBlock Text="Twitchでログイン" Foreground="White" VerticalAlignment="Center" />
       </StackPanel>
     </Button>
+
+    <!-- Steam認証は Issue #173 実装後に追加 -->
   </StackPanel>
 
 </Window>
@@ -351,7 +358,9 @@ public class LoginViewModel : ViewModelBase
     // ソーシャルログインコマンド
     public ReactiveCommand<Unit, Unit> LoginWithGoogleCommand { get; }
     public ReactiveCommand<Unit, Unit> LoginWithDiscordCommand { get; }
-    public ReactiveCommand<Unit, Unit> LoginWithSteamCommand { get; }
+    public ReactiveCommand<Unit, Unit> LoginWithTwitchCommand { get; }
+    // Steam認証は Issue #173 で実装予定
+    // public ReactiveCommand<Unit, Unit> LoginWithSteamCommand { get; }
 
     public LoginViewModel(
         IAuthenticationService authService,
@@ -390,8 +399,10 @@ public class LoginViewModel : ViewModelBase
             async () => await ExecuteSocialLoginAsync(OAuthProvider.Google), canExecute);
         LoginWithDiscordCommand = ReactiveCommand.CreateFromTask(
             async () => await ExecuteSocialLoginAsync(OAuthProvider.Discord), canExecute);
-        LoginWithSteamCommand = ReactiveCommand.CreateFromTask(
-            ExecuteSteamLoginAsync, canExecute);
+        LoginWithTwitchCommand = ReactiveCommand.CreateFromTask(
+            async () => await ExecuteSocialLoginAsync(OAuthProvider.Twitch), canExecute);
+        // Steam認証は Issue #173 で実装予定
+        // LoginWithSteamCommand = ReactiveCommand.CreateFromTask(ExecuteSteamLoginAsync, canExecute);
     }
 
     private async Task ExecuteLoginAsync()
@@ -488,6 +499,7 @@ public class LoginViewModel : ViewModelBase
                 {
                     OAuthProvider.Google => "Googleログインに失敗しました。",
                     OAuthProvider.Discord => "Discordログインに失敗しました。",
+                    OAuthProvider.Twitch => "Twitchログインに失敗しました。",
                     _ => $"{provider}ログインに失敗しました。"
                 };
                 _logger.LogWarning("ソーシャルログイン失敗: {Provider}, Error: {Error}",
@@ -574,11 +586,13 @@ public class LoginViewModel : ViewModelBase
 - [ ] **Discordログイン成功**: Discordアカウントでログインし、MainWindowが表示される
 - [ ] **Discordログイン失敗**: Discord認証エラー時、適切なエラーメッセージが表示される
 - [ ] **Discordログインキャンセル**: ユーザーがDiscord認証をキャンセルすると、エラーメッセージが表示される
-- [ ] **Steamログイン成功**: Steamアカウントでログインし、MainWindowが表示される
-- [ ] **Steamログイン失敗**: Steam OpenIDエラー時、適切なエラーメッセージが表示される
-- [ ] **Steamログインキャンセル**: ユーザーがSteam認証をキャンセルすると、エラーメッセージが表示される
+- [ ] **Twitchログイン成功**: Twitchアカウントでログインし、MainWindowが表示される
+- [ ] **Twitchログイン失敗**: Twitch認証エラー時、適切なエラーメッセージが表示される
+- [ ] **Twitchログインキャンセル**: ユーザーがTwitch認証をキャンセルすると、エラーメッセージが表示される
 - [ ] **アカウント紐付け**: 既存のメールアドレスと一致するソーシャルログインの場合、自動紐付けされる
 - [ ] **プロフィール同期**: ソーシャルログイン後、アバターと表示名が同期される
+
+> **Note**: Steam認証テスト (成功/失敗/キャンセル) は Issue #173 で追加
 
 ### UIテスト実行基準
 
@@ -606,13 +620,16 @@ public class LoginViewModel : ViewModelBase
 - `Baketa.UI/Assets/baketa-logo.png`
 - `Baketa.UI/Assets/Icons/google-icon.png` (Googleロゴ: 20x20px)
 - `Baketa.UI/Assets/Icons/discord-icon.png` (Discordロゴ: 20x20px)
-- `Baketa.UI/Assets/Icons/steam-icon.png` (Steamロゴ: 20x20px)
+- `Baketa.UI/Assets/Icons/twitch-icon.png` (Twitchロゴ: 20x20px)
+- `Baketa.UI/Assets/Icons/steam-icon.png` (Steamロゴ: 20x20px) ※Issue #173 で使用
 - `Baketa.UI/Styles/LoginStyles.axaml`
 - `Baketa.Core.Abstractions/Services/IAuthenticationService.cs` (OAuth拡張)
-- `Baketa.Infrastructure/Authentication/OAuthProvider.cs` (列挙型)
-- `Baketa.Infrastructure/Authentication/SteamOpenIdAuthenticator.cs` (Steam専用実装)
+- `Baketa.Infrastructure/Authentication/OAuthProvider.cs` (列挙型: Google, Discord, Twitch)
 - `Baketa.Infrastructure/Authentication/Exceptions/OAuthCancelledException.cs`
 - `tests/Baketa.UI.Tests/ViewModels/LoginViewModelTests.cs`
+
+**Issue #173 で追加予定:**
+- `Baketa.Infrastructure/Authentication/SteamOpenIdAuthenticator.cs` (Steam専用実装)
 - `tests/Baketa.Infrastructure.Tests/Authentication/SteamOpenIdAuthenticatorTests.cs`
 
 ### 修正
@@ -729,8 +746,9 @@ public async Task<AuthResult> LinkSocialAccountAsync(OAuthProvider provider, str
 ## 備考
 
 ### 実装済み機能（β版）
-- ✅ **ソーシャルログイン**: Google、Discord、Steam対応
+- ✅ **ソーシャルログイン**: Google、Discord、Twitch対応
 - ✅ **パスワード強度チェック**: 大文字・小文字・数字・記号の組み合わせ
+- ⏳ **Steam認証**: Issue #173 で別途実装予定
 
 ### 将来的な拡張（v1.0.0以降）
 - GitHub OAuth対応（開発者向け）
@@ -754,7 +772,7 @@ public async Task<AuthResult> LinkSocialAccountAsync(OAuthProvider provider, str
 ## 更新履歴
 
 ### 2025-11-18: ソーシャルログイン対応追加
-- **変更理由**: ゲーム翻訳アプリとして、Steam/Discord/Googleアカウント連携は必須機能
+- **変更理由**: ゲーム翻訳アプリとして、Discord/Googleアカウント連携は必須機能
 - **追加内容**:
   - Google OAuth実装（Supabase標準）
   - Discord OAuth実装（Supabase標準）
@@ -766,3 +784,12 @@ public async Task<AuthResult> LinkSocialAccountAsync(OAuthProvider provider, str
 - **優先度変更**: Critical → Critical+ (P0+)
 - **所要時間変更**: 3-4日 → 4-5日
 - **テストケース変更**: 15件 → 21件
+
+### 2025-11-26: Steam → Twitch変更、Issue分離
+- **変更理由**: Steam OpenIDはSupabaseでネイティブサポートされず、カスタム実装が必要なためIssue #173へ分離
+- **変更内容**:
+  - Steam認証 → Issue #173 へ分離
+  - Twitch OAuth追加（Supabase標準サポート）
+  - Supabase OAuth設定完了マーク（Issue #133 で完了）
+  - テストケース更新（Steam → Twitch）
+- **関連Issue**: #133 (Supabase Auth基盤構築), #173 (Steam OpenID認証)
