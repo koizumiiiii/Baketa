@@ -454,6 +454,9 @@ internal sealed partial class App : Avalonia.Application
                         var translationFlowModule = new Baketa.UI.DI.Modules.TranslationFlowModule();
                         translationFlowModule.ConfigureEventAggregator(_eventAggregator, serviceProvider);
 
+                        // --- 5.1 トークン有効期限切れハンドラー登録 (Issue #168) ---
+                        SetupTokenExpirationHandler(serviceProvider, mainOverlayView);
+
                         _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());
                         _logStartupCompleted(_logger, null);
 
@@ -645,6 +648,67 @@ internal sealed partial class App : Avalonia.Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// トークン有効期限切れハンドラーの設定 (Issue #168)
+    /// TokenExpiredイベントをサブスクライブし、UI通知とナビゲーションを行う
+    /// </summary>
+    private void SetupTokenExpirationHandler(IServiceProvider serviceProvider, Avalonia.Controls.Window mainWindow)
+    {
+        try
+        {
+            var tokenExpirationHandler = serviceProvider.GetService<ITokenExpirationHandler>();
+            if (tokenExpirationHandler == null)
+            {
+                _logger?.LogWarning("ITokenExpirationHandler が見つかりません。トークン有効期限切れ処理は無効です。");
+                return;
+            }
+
+            var navigationService = serviceProvider.GetService<INavigationService>();
+            var notificationService = serviceProvider.GetService<INotificationService>();
+
+            tokenExpirationHandler.TokenExpired += async (sender, args) =>
+            {
+                _logger?.LogWarning("トークン有効期限切れイベント受信: {Reason} (ユーザー: {UserId})", args.Reason, args.UserId);
+
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    try
+                    {
+                        // 1. ユーザーに通知
+                        if (notificationService != null)
+                        {
+                            await notificationService.ShowWarningAsync(
+                                "セッション期限切れ",
+                                "セッションが期限切れになりました。再度ログインしてください。",
+                                duration: 5000);
+                        }
+
+                        // 2. ログイン画面へナビゲーション
+                        if (navigationService != null)
+                        {
+                            await navigationService.LogoutAndShowLoginAsync();
+                            _logger?.LogInformation("トークン有効期限切れによりログイン画面へリダイレクトしました");
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("INavigationService が見つかりません。ログイン画面へのリダイレクトをスキップします。");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "トークン有効期限切れイベント処理中にエラーが発生しました");
+                    }
+                });
+            };
+
+            _logger?.LogInformation("✅ TokenExpirationHandler イベントサブスクリプション完了");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "TokenExpirationHandler のセットアップに失敗しました");
+        }
     }
 
     /// <summary>

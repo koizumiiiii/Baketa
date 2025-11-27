@@ -72,6 +72,14 @@ public sealed class AuthModule : ServiceModuleBase
         services.AddSingleton<FileTokenAuditLogger>();
         services.AddSingleton<ITokenAuditLogger>(provider => provider.GetRequiredService<FileTokenAuditLogger>());
 
+        // Token expiration handler for HTTP 401 detection and auto-logout (Issue #168)
+        services.AddSingleton<TokenExpirationHandler>();
+        services.AddSingleton<ITokenExpirationHandler>(provider => provider.GetRequiredService<TokenExpirationHandler>());
+
+        // Password strength validator for enhanced security (Issue #167)
+        services.AddSingleton<PasswordStrengthValidator>();
+        services.AddSingleton<IPasswordStrengthValidator>(provider => provider.GetRequiredService<PasswordStrengthValidator>());
+
         // Authentication event handlers (future extension)
         // services.AddSingleton<IAuthEventHandler, DefaultAuthEventHandler>();
 

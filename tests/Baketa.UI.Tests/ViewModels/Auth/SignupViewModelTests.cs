@@ -25,6 +25,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     private readonly Mock<IAuthService> _mockAuthService;
     private readonly Mock<IOAuthCallbackHandler> _mockOAuthHandler;
     private readonly Mock<INavigationService> _mockNavigationService;
+    private readonly Mock<IPasswordStrengthValidator> _mockPasswordValidator;
     private readonly Mock<IEventAggregator> _mockEventAggregator;
     private readonly Mock<ILogger<SignupViewModel>> _mockLogger;
     private SignupViewModel? _currentViewModel;
@@ -34,6 +35,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         _mockAuthService = new Mock<IAuthService>();
         _mockOAuthHandler = new Mock<IOAuthCallbackHandler>();
         _mockNavigationService = new Mock<INavigationService>();
+        _mockPasswordValidator = new Mock<IPasswordStrengthValidator>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLogger = new Mock<ILogger<SignupViewModel>>();
 
@@ -48,11 +50,20 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         _mockAuthService.Reset();
         _mockOAuthHandler.Reset();
         _mockNavigationService.Reset();
+        _mockPasswordValidator.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
 
         // デフォルト設定
         _mockNavigationService.Setup(x => x.ShowLoginAsync()).ReturnsAsync(true);
+
+        // パスワードバリデーターのデフォルト設定（有効なパスワードとして扱う）
+        _mockPasswordValidator.Setup(x => x.ValidatePassword(It.IsAny<string>()))
+            .Returns(PasswordValidationResult.Success(PasswordStrength.Medium, 3));
+        _mockPasswordValidator.Setup(x => x.GetPasswordStrength(It.IsAny<string>()))
+            .Returns(PasswordStrength.Medium);
+        _mockPasswordValidator.Setup(x => x.GetStrengthMessage(It.IsAny<PasswordStrength>()))
+            .Returns("普通");
     }
 
     /// <summary>
@@ -66,6 +77,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
             _mockAuthService.Object,
             _mockOAuthHandler.Object,
             _mockNavigationService.Object,
+            _mockPasswordValidator.Object,
             _mockEventAggregator.Object,
             _mockLogger.Object));
         return _currentViewModel;
@@ -119,28 +131,49 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     [Fact]
     public void Constructor_WithNullAuthService_ThrowsArgumentNullException()
     {
+        // Arrange
+        ResetMocks();
+
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
     public void Constructor_WithNullOAuthHandler_ThrowsArgumentNullException()
     {
+        // Arrange
+        ResetMocks();
+
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
     public void Constructor_WithNullNavigationService_ThrowsArgumentNullException()
     {
+        // Arrange
+        ResetMocks();
+
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+    }
+
+    [Fact]
+    public void Constructor_WithNullPasswordValidator_ThrowsArgumentNullException()
+    {
+        // Arrange
+        ResetMocks();
+
+        // Act & Assert
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
+                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, null!, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     #endregion

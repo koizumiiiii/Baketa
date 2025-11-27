@@ -3,6 +3,7 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Framework;
@@ -24,6 +25,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     private readonly IAuthService _authService;
     private readonly IOAuthCallbackHandler _oauthHandler;
     private readonly INavigationService _navigationService;
+    private readonly IPasswordStrengthValidator _passwordValidator;
     private readonly ILogger<SignupViewModel>? _logger;
 
     // LoggerMessage delegates for structured logging
@@ -105,6 +107,33 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         set => this.RaiseAndSetIfChanged(ref _successMessage, value);
     }
 
+    // パスワード強度表示
+    private PasswordStrength _passwordStrength = PasswordStrength.Weak;
+    public PasswordStrength PasswordStrength
+    {
+        get => _passwordStrength;
+        set => this.RaiseAndSetIfChanged(ref _passwordStrength, value);
+    }
+
+    private string _passwordStrengthMessage = string.Empty;
+    public string PasswordStrengthMessage
+    {
+        get => _passwordStrengthMessage;
+        set => this.RaiseAndSetIfChanged(ref _passwordStrengthMessage, value);
+    }
+
+    private static readonly SolidColorBrush GrayBrush = new(Color.Parse("#808080"));
+    private static readonly SolidColorBrush RedBrush = new(Color.Parse("#FF4444"));
+    private static readonly SolidColorBrush OrangeBrush = new(Color.Parse("#FFA500"));
+    private static readonly SolidColorBrush GreenBrush = new(Color.Parse("#44BB44"));
+
+    private IBrush _passwordStrengthBrush = GrayBrush;
+    public IBrush PasswordStrengthBrush
+    {
+        get => _passwordStrengthBrush;
+        set => this.RaiseAndSetIfChanged(ref _passwordStrengthBrush, value);
+    }
+
     // IValidatableViewModel implementation
     public IValidationContext ValidationContext { get; } = new ValidationContext();
 
@@ -122,18 +151,21 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <param name="authService">認証サービス</param>
     /// <param name="oauthHandler">OAuthコールバックハンドラー</param>
     /// <param name="navigationService">ナビゲーションサービス</param>
+    /// <param name="passwordValidator">パスワード強度バリデーター</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="logger">ロガー</param>
     public SignupViewModel(
         IAuthService authService,
         IOAuthCallbackHandler oauthHandler,
         INavigationService navigationService,
+        IPasswordStrengthValidator passwordValidator,
         IEventAggregator eventAggregator,
         ILogger<SignupViewModel>? logger = null) : base(eventAggregator, logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _oauthHandler = oauthHandler ?? throw new ArgumentNullException(nameof(oauthHandler));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+        _passwordValidator = passwordValidator ?? throw new ArgumentNullException(nameof(passwordValidator));
         _logger = logger;
 
         // バリデーションルールの設定
@@ -144,6 +176,9 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
 
         // 認証状態変更イベントの購読
         SubscribeToAuthEvents();
+
+        // パスワード強度のリアクティブ更新を設定
+        SetupPasswordStrengthIndicator();
     }
 
     /// <summary>
@@ -158,11 +193,11 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             "有効なメールアドレスを入力してください");
         Disposables.Add(emailRule);
 
-        // Passwordバリデーション
+        // Passwordバリデーション（パスワード強度バリデーターを使用）
         var passwordRule = this.ValidationRule(
             vm => vm.Password,
-            password => !string.IsNullOrWhiteSpace(password) && IsValidPassword(password),
-            "パスワードは8文字以上で、大文字・小文字・数字を含む必要があります");
+            password => IsValidPassword(password),
+            "パスワードは8文字以上で、大文字・小文字・数字・記号のうち3種類以上を含む必要があります");
         Disposables.Add(passwordRule);
 
         // ConfirmPasswordバリデーション  
@@ -543,26 +578,44 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// </summary>
     /// <param name="password">パスワード</param>
     /// <returns>有効な場合true</returns>
-    private static bool IsValidPassword(string password)
+    private bool IsValidPassword(string password)
     {
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+        if (string.IsNullOrWhiteSpace(password))
             return false;
 
-        bool hasUpper = false;
-        bool hasLower = false;
-        bool hasDigit = false;
+        var result = _passwordValidator.ValidatePassword(password);
+        return result.IsValid;
+    }
 
-        foreach (char c in password)
-        {
-            if (char.IsUpper(c)) hasUpper = true;
-            else if (char.IsLower(c)) hasLower = true;
-            else if (char.IsDigit(c)) hasDigit = true;
+    /// <summary>
+    /// パスワード強度インジケーターのリアクティブ更新を設定します
+    /// </summary>
+    private void SetupPasswordStrengthIndicator()
+    {
+        // パスワード変更時に強度を更新
+        var passwordStrengthSubscription = this.WhenAnyValue(x => x.Password)
+            .Subscribe(password =>
+            {
+                if (string.IsNullOrWhiteSpace(password))
+                {
+                    PasswordStrength = PasswordStrength.Weak;
+                    PasswordStrengthMessage = string.Empty;
+                    PasswordStrengthBrush = GrayBrush;
+                    return;
+                }
 
-            if (hasUpper && hasLower && hasDigit)
-                return true;
-        }
-
-        return hasUpper && hasLower && hasDigit;
+                var strength = _passwordValidator.GetPasswordStrength(password);
+                PasswordStrength = strength;
+                PasswordStrengthMessage = _passwordValidator.GetStrengthMessage(strength);
+                PasswordStrengthBrush = strength switch
+                {
+                    PasswordStrength.Weak => RedBrush,
+                    PasswordStrength.Medium => OrangeBrush,
+                    PasswordStrength.Strong => GreenBrush,
+                    _ => GrayBrush
+                };
+            });
+        Disposables.Add(passwordStrengthSubscription);
     }
 
     /// <summary>

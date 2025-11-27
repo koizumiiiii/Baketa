@@ -183,8 +183,30 @@
                                      PasswordChar="•"
                                      Watermark="8文字以上"
                                      KeyboardNavigation.TabIndex="3"/>
+                            <!-- Password Strength Indicator -->
+                            <Grid ColumnDefinitions="*,Auto" Margin="2,6,0,0">
+                                <!-- Strength Bar -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
+                                    <Border Width="50" Height="4" CornerRadius="2"
+                                            Background="{Binding PasswordStrengthBrush}"/>
+                                    <Border Width="50" Height="4" CornerRadius="2"
+                                            Background="{Binding PasswordStrengthBrush}"
+                                            IsVisible="{Binding PasswordStrength, Converter={x:Static converters:PasswordStrengthConverters.IsMediumOrHigher}}"/>
+                                    <Border Width="50" Height="4" CornerRadius="2"
+                                            Background="{Binding PasswordStrengthBrush}"
+                                            IsVisible="{Binding PasswordStrength, Converter={x:Static converters:PasswordStrengthConverters.IsStrong}}"/>
+                                </StackPanel>
+                                <!-- Strength Text -->
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding PasswordStrengthMessage}"
+                                           FontSize="11"
+                                           FontWeight="Medium"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{Binding PasswordStrengthBrush}"/>
+                            </Grid>
                             <!-- Password Requirements (パスワード入力直下) -->
-                            <TextBlock Text="※ 8文字以上、大文字・小文字・数字を含む"
+                            <TextBlock Text="※ 8文字以上、大文字・小文字・数字・記号のうち3種類以上"
                                        FontSize="11"
                                        Margin="2,4,0,0"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
