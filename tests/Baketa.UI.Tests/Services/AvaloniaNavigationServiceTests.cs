@@ -69,7 +69,10 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     {
         return RunOnUIThread(() => new LoginViewModel(
             _mockAuthService.Object,
+            Mock.Of<IOAuthCallbackHandler>(),
             Mock.Of<INavigationService>(),
+            Mock.Of<ITokenStorage>(),
+            new SecureSessionManager(Mock.Of<ILogger<SecureSessionManager>>()),
             new LoginAttemptTracker(),
             new SecurityAuditLogger(Mock.Of<ILogger<SecurityAuditLogger>>()),
             Mock.Of<Core.Abstractions.Events.IEventAggregator>(),
@@ -80,6 +83,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     {
         return RunOnUIThread(() => new SignupViewModel(
             _mockAuthService.Object,
+            Mock.Of<IOAuthCallbackHandler>(),
             Mock.Of<INavigationService>(),
             Mock.Of<Core.Abstractions.Events.IEventAggregator>(),
             Mock.Of<ILogger<SignupViewModel>>()));

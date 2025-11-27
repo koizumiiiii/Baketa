@@ -39,4 +39,14 @@ public interface INavigationService
     /// ログアウトして認証画面に戻ります
     /// </summary>
     Task LogoutAndShowLoginAsync();
+
+    /// <summary>
+    /// ログイン画面に切り替えます（現在のウィンドウを置き換え）
+    /// </summary>
+    Task SwitchToLoginAsync();
+
+    /// <summary>
+    /// サインアップ画面に切り替えます（現在のウィンドウを置き換え）
+    /// </summary>
+    Task SwitchToSignupAsync();
 }

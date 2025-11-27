@@ -22,6 +22,7 @@ namespace Baketa.UI.ViewModels.Auth;
 public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstractions.IValidatableViewModel
 {
     private readonly IAuthService _authService;
+    private readonly IOAuthCallbackHandler _oauthHandler;
     private readonly INavigationService _navigationService;
     private readonly ILogger<SignupViewModel>? _logger;
 
@@ -66,23 +67,27 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     public ReactiveCommand<Unit, Unit> SignupWithEmailCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> SignupWithGoogleCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> SignupWithDiscordCommand { get; private set; } = null!;
-    public ReactiveCommand<Unit, Unit> SignupWithSteamCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> SignupWithTwitchCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> NavigateToLoginCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ExitCommand { get; private set; } = null!;
 
     /// <summary>
     /// SignupViewModelを初期化します
     /// </summary>
     /// <param name="authService">認証サービス</param>
+    /// <param name="oauthHandler">OAuthコールバックハンドラー</param>
     /// <param name="navigationService">ナビゲーションサービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="logger">ロガー</param>
     public SignupViewModel(
         IAuthService authService,
+        IOAuthCallbackHandler oauthHandler,
         INavigationService navigationService,
         IEventAggregator eventAggregator,
         ILogger<SignupViewModel>? logger = null) : base(eventAggregator, logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _oauthHandler = oauthHandler ?? throw new ArgumentNullException(nameof(oauthHandler));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _logger = logger;
 
@@ -173,12 +178,8 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             canExecuteEmailSignup);
         Disposables.Add(SignupWithEmailCommand);
 
-        // OAuthサインアップコマンド
-        var canExecuteOAuth = this.WhenAnyValue(
-            x => x.AcceptTerms,
-            x => x.AcceptPrivacyPolicy,
-            x => x.IsLoading,
-            (acceptTerms, acceptPrivacy, isLoading) => acceptTerms && acceptPrivacy && !isLoading);
+        // OAuthサインアップコマンド（OAuth認証では利用規約同意は不要 - 一般的なUXパターン）
+        var canExecuteOAuth = this.WhenAnyValue(x => x.IsLoading, isLoading => !isLoading);
 
         SignupWithGoogleCommand = ReactiveCommand.CreateFromTask(
             () => ExecuteOAuthSignupAsync(AuthProvider.Google),
@@ -190,17 +191,39 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             canExecuteOAuth);
         Disposables.Add(SignupWithDiscordCommand);
 
-        SignupWithSteamCommand = ReactiveCommand.CreateFromTask(
-            () => ExecuteOAuthSignupAsync(AuthProvider.Steam),
+        SignupWithTwitchCommand = ReactiveCommand.CreateFromTask(
+            () => ExecuteOAuthSignupAsync(AuthProvider.Twitch),
             canExecuteOAuth);
-        Disposables.Add(SignupWithSteamCommand);
+        Disposables.Add(SignupWithTwitchCommand);
 
-        // ログイン画面への遷移コマンド
-        NavigateToLoginCommand = ReactiveCommand.CreateFromTask(async () =>
+        // ログイン画面への遷移コマンド（ダイアログを閉じてから切り替え）
+        NavigateToLoginCommand = ReactiveCommand.Create(() =>
         {
-            await _navigationService.ShowLoginAsync().ConfigureAwait(false);
+            _logger?.LogInformation("[AUTH_DEBUG] NavigateToLoginCommand実行開始");
+
+            // 🔥 [ISSUE#167] ダイアログを閉じて、その後LoginViewを表示
+            _logger?.LogInformation("[AUTH_DEBUG] CloseDialogRequestedイベント発火");
+            CloseDialogRequested?.Invoke();
+
+            // UIスレッドで非同期にLoginViewを表示（ダイアログが閉じた後に実行される）
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(150).ConfigureAwait(false); // ダイアログが閉じるのを待つ
+                _logger?.LogInformation("[AUTH_DEBUG] SwitchToLoginAsync呼び出し");
+                await _navigationService.SwitchToLoginAsync().ConfigureAwait(false);
+            });
         });
         Disposables.Add(NavigateToLoginCommand);
+
+        // アプリケーション終了コマンド
+        ExitCommand = ReactiveCommand.Create(() =>
+        {
+            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
+            }
+        });
+        Disposables.Add(ExitCommand);
 
         // エラーハンドリング
         SetupCommandErrorHandling();
@@ -220,7 +243,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         });
 
         // OAuthエラーハンドリング
-        var oauthCommands = new[] { SignupWithGoogleCommand, SignupWithDiscordCommand, SignupWithSteamCommand };
+        var oauthCommands = new[] { SignupWithGoogleCommand, SignupWithDiscordCommand, SignupWithTwitchCommand };
         foreach (var command in oauthCommands)
         {
             command.ThrownExceptions.Subscribe(ex =>
@@ -245,12 +268,57 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <param name="e">イベント引数</param>
     private void OnAuthStatusChanged(object? sender, AuthStatusChangedEventArgs e)
     {
-        if (e.IsLoggedIn)
+        _logger?.LogDebug("[AUTH_DEBUG] SignupViewModel.OnAuthStatusChanged呼び出し開始 - IsLoggedIn={IsLoggedIn}, Thread={ThreadId}",
+            e.IsLoggedIn, Environment.CurrentManagedThreadId);
+
+        if (!e.IsLoggedIn)
         {
-            // TODO: Navigate to main screen or show welcome message
-            ErrorMessage = null;
+            _logger?.LogDebug("[AUTH_DEBUG] IsLoggedIn=falseのためスキップ");
+            return;
         }
+
+        // 🔥 [FIX] UIスレッド違反を回避するため、全ての[Reactive]プロパティ操作をUIスレッドで実行
+        // AuthStatusChangedイベントは非UIスレッドから発火される可能性がある
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            try
+            {
+                _logger?.LogDebug("[AUTH_DEBUG] UIThread内処理開始 - Thread={ThreadId}", Environment.CurrentManagedThreadId);
+                _logger?.LogInformation("認証成功: ダイアログを閉じます");
+
+                // 🔥 [FIX] Phase 2: ダイアログを閉じるだけ
+                // 状態変更（SetAuthenticationMode）はViewのOnClosedイベントで行う
+                // これにより、ウィンドウが完全に破棄された後に確実に状態変更される
+                _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火前");
+                CloseDialogRequested?.Invoke();
+                _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火後");
+
+                // 注意: ErrorMessageとSetAuthenticationModeはViewのOnClosedで処理される
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "[AUTH_DEBUG] UIThread内処理で例外: {Message}", ex.Message);
+            }
+        });
+
+        _logger?.LogDebug("[AUTH_DEBUG] SignupViewModel.OnAuthStatusChanged InvokeAsync発行完了");
     }
+
+    /// <summary>
+    /// 認証成功フラグ（ダイアログを閉じるために使用）
+    /// </summary>
+    [Reactive] public bool AuthenticationSucceeded { get; set; }
+
+    /// <summary>
+    /// ダイアログを閉じる要求イベント
+    /// </summary>
+    public event Action? CloseDialogRequested;
+
+    /// <summary>
+    /// デバッグログを出力します（Viewからの呼び出し用）
+    /// </summary>
+    /// <param name="message">ログメッセージ</param>
+    public void LogDebug(string message) => _logger?.LogDebug("{Message}", message);
 
     /// <summary>
     /// メール/パスワードサインアップを実行します
@@ -272,7 +340,15 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
                 if (_logger != null)
                     _logSignupSuccess(_logger, Email, null);
 
-                // TODO: Handle successful signup (show email verification message, etc.)
+                // メールアドレス確認のメッセージを表示
+                // SupabaseはデフォルトでEmail確認を要求するため、ログイン画面へ誘導
+                ErrorMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログイン画面でログインしてください。";
+
+                _logger?.LogInformation("サインアップ成功: 確認メールを送信しました（Email: {Email}）", Email);
+
+                // 少し待ってからログイン画面へ遷移
+                await Task.Delay(3000).ConfigureAwait(false);
+                await _navigationService.SwitchToLoginAsync().ConfigureAwait(false);
             }
             else if (result is AuthFailure failure)
             {
@@ -305,20 +381,45 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             if (_logger != null)
                 _logOAuthAttempt(_logger, provider.ToString(), null);
 
-            var result = await _authService.SignInWithOAuthAsync(provider).ConfigureAwait(false);
+            // OAuthCallbackHandlerを使用してブラウザベースのOAuth認証を開始
+            var result = await _oauthHandler.StartOAuthFlowAsync(provider).ConfigureAwait(false);
 
-            if (result is AuthFailure failure)
+            // 🔥 [FIX] ViewModelがDisposeされている場合は何もしない
+            // OAuth成功時、AuthStatusChangedイベントがダイアログを閉じてViewModelをDisposeする
+            // その後にこのコードが実行されるとAccessViolationが発生する
+            if (IsDisposed)
             {
-                ErrorMessage = GetAuthFailureMessage(failure.ErrorCode, failure.Message);
+                _logger?.LogDebug("OAuth完了後、ViewModelが既にDisposeされているためスキップ");
+                return;
+            }
+
+            if (result is AuthSuccess)
+            {
+                // 認証成功時はOnAuthStatusChangedイベントで処理されるため、ここでは何もしない
+                _logger?.LogInformation("OAuth認証成功: {Provider}", provider);
+            }
+            else if (result is AuthFailure failure)
+            {
+                if (!IsDisposed)
+                {
+                    ErrorMessage = GetAuthFailureMessage(failure.ErrorCode, failure.Message);
+                }
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = GetUserFriendlyErrorMessage(ex);
+            if (!IsDisposed)
+            {
+                ErrorMessage = GetUserFriendlyErrorMessage(ex);
+            }
         }
         finally
         {
-            IsLoading = false;
+            // 🔥 [FIX] Disposeされていない場合のみIsLoadingを変更
+            if (!IsDisposed)
+            {
+                IsLoading = false;
+            }
         }
     }
 

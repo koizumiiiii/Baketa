@@ -56,6 +56,9 @@ public class MainOverlayViewModel : ViewModelBase
     // 🔥 [ISSUE#163_TOGGLE] シングルショットオーバーレイ表示状態（トグル動作用）
     private bool _isSingleshotOverlayVisible;
 
+    // 🔥 [ISSUE#167] 認証モード（ログイン/サインアップ画面表示中はExitボタン以外無効化）
+    private bool _isAuthenticationMode;
+
     private WindowInfo? _selectedWindow;
 
     public MainOverlayViewModel(
@@ -444,14 +447,101 @@ public class MainOverlayViewModel : ViewModelBase
     }
 
 
+    // 🔥 [ISSUE#167] 認証モードプロパティ（ログイン/サインアップ画面表示中）
+    /// <summary>
+    /// 認証モードかどうか（ログイン/サインアップ画面表示中）
+    /// 認証モード中はExitボタン以外のすべてのボタンが無効化される
+    /// </summary>
+    public bool IsAuthenticationMode
+    {
+        get => _isAuthenticationMode;
+        private set
+        {
+            if (_isAuthenticationMode != value)
+            {
+                _isAuthenticationMode = value;
+                try
+                {
+                    if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                    {
+                        Logger?.LogDebug("[AUTH_DEBUG] RaisePropertyChanged開始 (UIThread)");
+                        this.RaisePropertyChanged(nameof(IsAuthenticationMode));
+                        Logger?.LogDebug("[AUTH_DEBUG] IsAuthenticationMode通知完了");
+                        // 全ボタン状態を更新
+                        this.RaisePropertyChanged(nameof(ShowHideEnabled));
+                        Logger?.LogDebug("[AUTH_DEBUG] ShowHideEnabled通知完了");
+                        this.RaisePropertyChanged(nameof(SettingsEnabled));
+                        Logger?.LogDebug("[AUTH_DEBUG] SettingsEnabled通知完了");
+                        this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+                        Logger?.LogDebug("[AUTH_DEBUG] IsSelectWindowEnabled通知完了");
+                        this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                        Logger?.LogDebug("[AUTH_DEBUG] IsStartStopEnabled通知完了");
+                        this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                        Logger?.LogDebug("[AUTH_DEBUG] IsLiveEnabled通知完了");
+                        this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
+                        Logger?.LogDebug("[AUTH_DEBUG] IsSingleshotEnabled通知完了");
+                    }
+                    else
+                    {
+                        Logger?.LogDebug("[AUTH_DEBUG] RaisePropertyChanged開始 (InvokeAsync)");
+                        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            try
+                            {
+                                this.RaisePropertyChanged(nameof(IsAuthenticationMode));
+                                this.RaisePropertyChanged(nameof(ShowHideEnabled));
+                                this.RaisePropertyChanged(nameof(SettingsEnabled));
+                                this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+                                this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+                                this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                                this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
+                                Logger?.LogDebug("[AUTH_DEBUG] 全RaisePropertyChanged完了 (InvokeAsync)");
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger?.LogError(ex, "[AUTH_DEBUG] InvokeAsync内でRaisePropertyChanged例外: {Message}", ex.Message);
+                            }
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogError(ex, "[AUTH_DEBUG] IsAuthenticationModeセッターで例外: {Message}", ex.Message);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 認証モードを設定
+    /// ログイン/サインアップ画面表示時にNavigationServiceから呼び出される
+    /// </summary>
+    public void SetAuthenticationMode(bool isAuthMode)
+    {
+        Logger?.LogDebug("認証モード変更: {IsAuthMode}", isAuthMode);
+        try
+        {
+            IsAuthenticationMode = isAuthMode;
+            Logger?.LogDebug("[AUTH_DEBUG] IsAuthenticationModeプロパティ設定完了");
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "[AUTH_DEBUG] SetAuthenticationModeで例外: {Message}", ex.Message);
+            throw;
+        }
+    }
+
     // UI状態の計算プロパティ
-    public bool ShowHideEnabled => IsTranslationActive; // 翻訳中のみ有効
-    public bool SettingsEnabled => !IsLoading && !IsTranslationActive; // ローディング中または翻訳実行中は無効
-    public bool IsSelectWindowEnabled => IsOcrInitialized && !IsLoading; // OCR初期化完了かつローディング中以外
+    public bool ShowHideEnabled => !_isAuthenticationMode && IsTranslationActive; // 認証モード中または翻訳中でない場合は無効
+    public bool SettingsEnabled => !_isAuthenticationMode && !IsLoading && !IsTranslationActive; // 認証モード中、ローディング中、翻訳実行中は無効
+    public bool IsSelectWindowEnabled => !_isAuthenticationMode && IsOcrInitialized && !IsLoading; // 認証モード中またはOCR未初期化またはローディング中は無効
     public bool IsStartStopEnabled
     {
         get
         {
+            // 🔥 [ISSUE#167] 認証モード中は無効
+            if (_isAuthenticationMode) return false;
+
             // 🔥 [PHASE6.1_ROOT_CAUSE_FIX] Start/Stop両方の条件を正しく実装
             // 🔥 [PHASE5.2E] ウォームアップ完了条件追加 - Startボタン押下前に全準備完了を保証
             // Start可能条件: ウィンドウ選択済み、OCR初期化完了、ウォームアップ完了、ローディング中でない、翻訳中でない
@@ -517,6 +607,9 @@ public class MainOverlayViewModel : ViewModelBase
     {
         get
         {
+            // 🔥 [ISSUE#167] 認証モード中は無効
+            if (_isAuthenticationMode) return false;
+
             // 条件: ウィンドウ選択済み、OCR初期化完了、イベントハンドラー初期化完了、
             //       翻訳エンジン初期化中でない、ウォームアップ完了、
             //       （Live翻訳中でない OR オーバーレイ表示中）、ローディング中でない
@@ -843,21 +936,28 @@ public class MainOverlayViewModel : ViewModelBase
         try
         {
             Logger?.LogDebug("🔄 OCR初期化監視開始");
-            
+            Logger?.LogDebug("[MONITOR_DEBUG] timeout変数設定前");
+
             var timeout = TimeSpan.FromSeconds(30); // 30秒でタイムアウト
+            Logger?.LogDebug("[MONITOR_DEBUG] timeout変数設定後");
+
             var startTime = DateTime.UtcNow;
-            
+            Logger?.LogDebug("[MONITOR_DEBUG] startTime設定後、whileループ開始");
+
             while (DateTime.UtcNow - startTime < timeout)
             {
+                Logger?.LogDebug("[MONITOR_DEBUG] whileループ内部開始");
                 try
                 {
                     // ServiceProviderからOCRサービスを取得して初期化状態をチェック
+                    Logger?.LogDebug("[MONITOR_DEBUG] ServiceProvider取得前");
                     var serviceProvider = Program.ServiceProvider;
-                    Logger?.LogDebug($"🔍 ServiceProvider: {serviceProvider != null}");
+                    Logger?.LogDebug("[MONITOR_DEBUG] ServiceProvider取得後: {HasProvider}", serviceProvider != null);
                     if (serviceProvider != null)
                     {
+                        Logger?.LogDebug("[STACK_DEBUG] GetService<IOcrEngine>呼び出し前");
                         var ocrService = serviceProvider.GetService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-                        Logger?.LogDebug($"🔍 IOcrEngine取得: {ocrService != null}");
+                        Logger?.LogDebug("[STACK_DEBUG] GetService<IOcrEngine>呼び出し後: {HasService}", ocrService != null);
                         if (ocrService != null)
                         {
                             // OCRサービスが初期化済みかチェック

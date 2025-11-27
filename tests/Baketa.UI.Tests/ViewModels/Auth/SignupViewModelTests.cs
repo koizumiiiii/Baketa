@@ -23,6 +23,7 @@ namespace Baketa.UI.Tests.ViewModels.Auth;
 public sealed class SignupViewModelTests : AvaloniaTestBase
 {
     private readonly Mock<IAuthService> _mockAuthService;
+    private readonly Mock<IOAuthCallbackHandler> _mockOAuthHandler;
     private readonly Mock<INavigationService> _mockNavigationService;
     private readonly Mock<IEventAggregator> _mockEventAggregator;
     private readonly Mock<ILogger<SignupViewModel>> _mockLogger;
@@ -31,6 +32,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     public SignupViewModelTests()
     {
         _mockAuthService = new Mock<IAuthService>();
+        _mockOAuthHandler = new Mock<IOAuthCallbackHandler>();
         _mockNavigationService = new Mock<INavigationService>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLogger = new Mock<ILogger<SignupViewModel>>();
@@ -44,6 +46,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     private void ResetMocks()
     {
         _mockAuthService.Reset();
+        _mockOAuthHandler.Reset();
         _mockNavigationService.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
@@ -61,6 +64,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         _currentViewModel?.Dispose(); // 前のViewModelがあれば破棄
         _currentViewModel = RunOnUIThread(() => new SignupViewModel(
             _mockAuthService.Object,
+            _mockOAuthHandler.Object,
             _mockNavigationService.Object,
             _mockEventAggregator.Object,
             _mockLogger.Object));
@@ -108,7 +112,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         viewModel.SignupWithEmailCommand.Should().NotBeNull();
         viewModel.SignupWithGoogleCommand.Should().NotBeNull();
         viewModel.SignupWithDiscordCommand.Should().NotBeNull();
-        viewModel.SignupWithSteamCommand.Should().NotBeNull();
+        viewModel.SignupWithTwitchCommand.Should().NotBeNull();
         viewModel.NavigateToLoginCommand.Should().NotBeNull();
     }
 
@@ -118,7 +122,16 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(null!, _mockNavigationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+    }
+
+    [Fact]
+    public void Constructor_WithNullOAuthHandler_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
+                new SignupViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -127,7 +140,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(_mockAuthService.Object, null!, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     #endregion

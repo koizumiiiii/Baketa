@@ -23,7 +23,10 @@ namespace Baketa.UI.ViewModels.Auth;
 public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstractions.IValidatableViewModel
 {
     private readonly IAuthService _authService;
+    private readonly IOAuthCallbackHandler _oauthHandler;
     private readonly INavigationService _navigationService;
+    private readonly ITokenStorage _tokenStorage;
+    private readonly SecureSessionManager _sessionManager;
     private readonly LoginAttemptTracker _attemptTracker;
     private readonly SecurityAuditLogger _auditLogger;
     private readonly ILogger<LoginViewModel>? _logger;
@@ -66,29 +69,39 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     public ReactiveCommand<Unit, Unit> LoginWithEmailCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> LoginWithGoogleCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> LoginWithDiscordCommand { get; private set; } = null!;
-    public ReactiveCommand<Unit, Unit> LoginWithSteamCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> LoginWithTwitchCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ForgotPasswordCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> NavigateToSignupCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> ExitCommand { get; private set; } = null!;
 
     /// <summary>
     /// LoginViewModelを初期化します
     /// </summary>
     /// <param name="authService">認証サービス</param>
+    /// <param name="oauthHandler">OAuthコールバックハンドラー</param>
     /// <param name="navigationService">ナビゲーションサービス</param>
+    /// <param name="tokenStorage">トークン永続化ストレージ</param>
+    /// <param name="sessionManager">セッション管理</param>
     /// <param name="attemptTracker">ログイン試行追跡器</param>
     /// <param name="auditLogger">セキュリティ監査ログ</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="logger">ロガー</param>
     public LoginViewModel(
         IAuthService authService,
+        IOAuthCallbackHandler oauthHandler,
         INavigationService navigationService,
+        ITokenStorage tokenStorage,
+        SecureSessionManager sessionManager,
         LoginAttemptTracker attemptTracker,
         SecurityAuditLogger auditLogger,
         IEventAggregator eventAggregator,
         ILogger<LoginViewModel>? logger = null) : base(eventAggregator, logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _oauthHandler = oauthHandler ?? throw new ArgumentNullException(nameof(oauthHandler));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+        _tokenStorage = tokenStorage ?? throw new ArgumentNullException(nameof(tokenStorage));
+        _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _attemptTracker = attemptTracker ?? throw new ArgumentNullException(nameof(attemptTracker));
         _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
         _logger = logger;
@@ -163,10 +176,10 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             canExecuteOAuth);
         Disposables.Add(LoginWithDiscordCommand);
 
-        LoginWithSteamCommand = ReactiveCommand.CreateFromTask(
-            () => ExecuteOAuthLoginAsync(AuthProvider.Steam),
+        LoginWithTwitchCommand = ReactiveCommand.CreateFromTask(
+            () => ExecuteOAuthLoginAsync(AuthProvider.Twitch),
             canExecuteOAuth);
-        Disposables.Add(LoginWithSteamCommand);
+        Disposables.Add(LoginWithTwitchCommand);
 
         // パスワードリセットコマンド
         var canExecuteForgotPassword = this.WhenAnyValue(
@@ -179,12 +192,34 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             canExecuteForgotPassword);
         Disposables.Add(ForgotPasswordCommand);
 
-        // サインアップ画面への遷移コマンド
-        NavigateToSignupCommand = ReactiveCommand.CreateFromTask(async () =>
+        // サインアップ画面への遷移コマンド（ダイアログを閉じてから切り替え）
+        NavigateToSignupCommand = ReactiveCommand.Create(() =>
         {
-            await _navigationService.ShowSignupAsync().ConfigureAwait(false);
+            _logger?.LogInformation("[AUTH_DEBUG] NavigateToSignupCommand実行開始");
+
+            // 🔥 [ISSUE#167] ダイアログを閉じて、その後SignupViewを表示
+            _logger?.LogInformation("[AUTH_DEBUG] CloseDialogRequestedイベント発火");
+            CloseDialogRequested?.Invoke();
+
+            // UIスレッドで非同期にSignupViewを表示（ダイアログが閉じた後に実行される）
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(150).ConfigureAwait(false); // ダイアログが閉じるのを待つ
+                _logger?.LogInformation("[AUTH_DEBUG] SwitchToSignupAsync呼び出し");
+                await _navigationService.SwitchToSignupAsync().ConfigureAwait(false);
+            });
         });
         Disposables.Add(NavigateToSignupCommand);
+
+        // アプリケーション終了コマンド
+        ExitCommand = ReactiveCommand.Create(() =>
+        {
+            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
+            }
+        });
+        Disposables.Add(ExitCommand);
 
         // エラーハンドリング
         SetupCommandErrorHandling();
@@ -204,7 +239,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         });
 
         // OAuthエラーハンドリング
-        var oauthCommands = new[] { LoginWithGoogleCommand, LoginWithDiscordCommand, LoginWithSteamCommand };
+        var oauthCommands = new[] { LoginWithGoogleCommand, LoginWithDiscordCommand, LoginWithTwitchCommand };
         foreach (var command in oauthCommands)
         {
             command.ThrownExceptions.Subscribe(ex =>
@@ -235,12 +270,53 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     /// <param name="e">イベント引数</param>
     private void OnAuthStatusChanged(object? sender, AuthStatusChangedEventArgs e)
     {
-        if (e.IsLoggedIn)
+        _logger?.LogDebug("[AUTH_DEBUG] LoginViewModel.OnAuthStatusChanged呼び出し開始 - IsLoggedIn={IsLoggedIn}, Thread={ThreadId}",
+            e.IsLoggedIn, Environment.CurrentManagedThreadId);
+
+        if (!e.IsLoggedIn)
         {
-            // TODO: Navigate to main screen or close login window
-            ErrorMessage = null;
+            _logger?.LogDebug("[AUTH_DEBUG] IsLoggedIn=falseのためスキップ");
+            return;
         }
+
+        // 🔥 [FIX] UIスレッド違反を回避するため、全ての[Reactive]プロパティ操作をUIスレッドで実行
+        // AuthStatusChangedイベントは非UIスレッドから発火される可能性がある
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            try
+            {
+                _logger?.LogDebug("[AUTH_DEBUG] UIThread内処理開始 - Thread={ThreadId}", Environment.CurrentManagedThreadId);
+                _logger?.LogInformation("認証成功: ダイアログを閉じます");
+
+                // 🔥 [FIX] Phase 2: ダイアログを閉じるだけ
+                // 状態変更（SetAuthenticationMode）はViewのOnClosedイベントで行う
+                // これにより、ウィンドウが完全に破棄された後に確実に状態変更される
+                _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火前");
+                CloseDialogRequested?.Invoke();
+                _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火後");
+
+                // 注意: ErrorMessageとSetAuthenticationModeはViewのOnClosedで処理される
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "[AUTH_DEBUG] UIThread内処理で例外: {Message}", ex.Message);
+            }
+        });
+
+        _logger?.LogDebug("[AUTH_DEBUG] LoginViewModel.OnAuthStatusChanged InvokeAsync発行完了");
     }
+
+    /// <summary>
+    /// ダイアログを閉じる要求イベント
+    /// 認証成功時と画面切り替え時の両方でこのイベントが発火される
+    /// </summary>
+    public event Action? CloseDialogRequested;
+
+    /// <summary>
+    /// デバッグログを出力します（Viewからの呼び出し用）
+    /// </summary>
+    /// <param name="message">ログメッセージ</param>
+    public void LogDebug(string message) => _logger?.LogDebug("{Message}", message);
 
     /// <summary>
     /// メール/パスワードログインを実行します
@@ -287,11 +363,20 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                 if (_logger != null)
                     _logLoginSuccess(_logger, sanitizedEmail, null);
 
-                // セッション情報を必要に応じて保存
+                // セッション管理の開始
+                _sessionManager.StartSession(success.Session, RememberMe);
+
+                // Remember Me: トークンを永続化
                 if (RememberMe)
                 {
-                    // TODO: Implement remember me functionality with SecureSessionManager
+                    await _tokenStorage.StoreTokensAsync(
+                        success.Session.AccessToken,
+                        success.Session.RefreshToken).ConfigureAwait(false);
+
+                    _logger?.LogInformation("Remember Me: トークンを永続化しました");
                 }
+
+                // 認証成功イベントによりOnAuthStatusChangedがナビゲーションを処理
             }
             else if (result is AuthFailure failure)
             {
@@ -344,20 +429,45 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             if (_logger != null)
                 _logOAuthAttempt(_logger, provider.ToString(), null);
 
-            var result = await _authService.SignInWithOAuthAsync(provider).ConfigureAwait(false);
+            // OAuthCallbackHandlerを使用してブラウザベースのOAuth認証を開始
+            var result = await _oauthHandler.StartOAuthFlowAsync(provider).ConfigureAwait(false);
 
-            if (result is AuthFailure failure)
+            // 🔥 [FIX] ViewModelがDisposeされている場合は何もしない
+            // OAuth成功時、AuthStatusChangedイベントがダイアログを閉じてViewModelをDisposeする
+            // その後にこのコードが実行されるとAccessViolationが発生する
+            if (IsDisposed)
             {
-                ErrorMessage = GetAuthFailureMessage(failure.ErrorCode, failure.Message);
+                _logger?.LogDebug("OAuth完了後、ViewModelが既にDisposeされているためスキップ");
+                return;
+            }
+
+            if (result is AuthSuccess)
+            {
+                // 認証成功時はOnAuthStatusChangedイベントで処理されるため、ここでは何もしない
+                _logger?.LogInformation("OAuth認証成功: {Provider}", provider);
+            }
+            else if (result is AuthFailure failure)
+            {
+                if (!IsDisposed)
+                {
+                    ErrorMessage = GetAuthFailureMessage(failure.ErrorCode, failure.Message);
+                }
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = GetUserFriendlyErrorMessage(ex);
+            if (!IsDisposed)
+            {
+                ErrorMessage = GetUserFriendlyErrorMessage(ex);
+            }
         }
         finally
         {
-            IsLoading = false;
+            // 🔥 [FIX] Disposeされていない場合のみIsLoadingを変更
+            if (!IsDisposed)
+            {
+                IsLoading = false;
+            }
         }
     }
 

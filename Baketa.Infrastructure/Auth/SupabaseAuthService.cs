@@ -1,8 +1,19 @@
+using System.Security.Cryptography;
 using Baketa.Core.Abstractions.Auth;
 using Microsoft.Extensions.Logging;
-using Supabase;
+using Supabase.Gotrue;
+using Supabase.Gotrue.Exceptions;
+using SupabaseClient = Supabase.Client;
 
 namespace Baketa.Infrastructure.Auth;
+
+/// <summary>
+/// OAuth flow state containing PKCE verifier and CSRF state parameter
+/// </summary>
+/// <param name="Uri">OAuth authorization URL</param>
+/// <param name="PkceVerifier">PKCE code verifier for token exchange</param>
+/// <param name="StateParameter">CSRF protection state parameter</param>
+public sealed record OAuthFlowState(Uri Uri, string PkceVerifier, string StateParameter);
 
 /// <summary>
 /// Supabase authentication service implementation using C# 12 features
@@ -12,7 +23,8 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 {
     private readonly ILogger<SupabaseAuthService> _logger;
     private readonly SemaphoreSlim _authSemaphore = new(1, 1);
-    private readonly Client _supabaseClient;
+    private readonly SupabaseClient _supabaseClient;
+    private readonly ITokenStorage _tokenStorage;
     private bool _disposed;
 
     /// <summary>
@@ -24,16 +36,18 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     /// Initialize Supabase authentication service with modern C# 12 primary constructor
     /// </summary>
     /// <param name="supabaseClient">Supabase client instance</param>
+    /// <param name="tokenStorage">Token storage for session persistence</param>
     /// <param name="logger">Logger instance</param>
-    public SupabaseAuthService(Client supabaseClient, ILogger<SupabaseAuthService> logger)
+    public SupabaseAuthService(SupabaseClient supabaseClient, ITokenStorage tokenStorage, ILogger<SupabaseAuthService> logger)
     {
         _supabaseClient = supabaseClient ?? throw new ArgumentNullException(nameof(supabaseClient));
+        _tokenStorage = tokenStorage ?? throw new ArgumentNullException(nameof(tokenStorage));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Subscribe to auth state changes
         _supabaseClient.Auth.AddStateChangedListener(OnAuthStateChanged);
 
-        _logger.LogInformation("SupabaseAuthService initialized with Supabase client");
+        _logger.LogInformation("SupabaseAuthService initialized with Supabase client and token storage");
     }
 
     /// <summary>
@@ -52,27 +66,45 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         await _authSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            _logger.LogInformation("Starting email signup for user: {Email}", email);
+            _logger.LogInformation("Starting email signup for user: {MaskedEmail}", MaskEmail(email));
 
-            // TODO: Implement Supabase signup when client is available
-            // var response = await _supabaseClient.Auth.SignUp(email, password);
+            // Call Supabase SignUp API
+            var session = await _supabaseClient.Auth.SignUp(email, password).ConfigureAwait(false);
 
-            // Mock implementation for now
-            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            if (session?.User != null)
+            {
+                // Check if email confirmation is required
+                if (session.User.ConfirmedAt == null)
+                {
+                    _logger.LogInformation("Signup confirmation email sent to: {MaskedEmail}", MaskEmail(email));
+                    return new AuthFailure(AuthErrorCodes.EmailNotConfirmed,
+                        "サインアップ確認メールを送信しました。メールを確認してください。");
+                }
 
-            // Simulate email confirmation required
-            _logger.LogInformation("Signup confirmation email sent to: {Email}", email);
-            return new AuthFailure(AuthErrorCodes.EmailNotConfirmed,
-                "サインアップ確認メールを送信しました。メールを確認してください。");
+                // User is confirmed (auto-confirm enabled in Supabase)
+                var authSession = ConvertToAuthSession(session);
+                _logger.LogInformation("Signup successful for user: {MaskedEmail}", MaskEmail(email));
+
+                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, authSession.User, false));
+                return new AuthSuccess(authSession);
+            }
+
+            _logger.LogWarning("Signup returned null session for user: {MaskedEmail}", MaskEmail(email));
+            return new AuthFailure(AuthErrorCodes.UnexpectedError, "サインアップに失敗しました。");
+        }
+        catch (GotrueException ex)
+        {
+            _logger.LogWarning(ex, "Supabase auth error during signup for user: {MaskedEmail}", MaskEmail(email));
+            return MapGotrueException(ex);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogInformation("Signup cancelled for user: {Email}", email);
+            _logger.LogInformation("Signup cancelled for user: {MaskedEmail}", MaskEmail(email));
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during signup for user: {Email}", email);
+            _logger.LogError(ex, "Unexpected error during signup for user: {MaskedEmail}", MaskEmail(email));
             return new AuthFailure(AuthErrorCodes.UnexpectedError, $"予期せぬエラーが発生しました: {ex.Message}");
         }
         finally
@@ -97,31 +129,36 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         await _authSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            _logger.LogInformation("Starting email signin for user: {Email}", email);
+            _logger.LogInformation("Starting email signin for user: {MaskedEmail}", MaskEmail(email));
 
-            // TODO: Implement Supabase signin when client is available
-            // var response = await _supabaseClient.Auth.SignIn(email, password);
+            // Call Supabase SignIn API
+            var session = await _supabaseClient.Auth.SignIn(email, password).ConfigureAwait(false);
 
-            // Mock implementation for now
-            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            if (session?.User != null)
+            {
+                var authSession = ConvertToAuthSession(session);
+                _logger.LogInformation("Signin successful for user: {MaskedEmail}", MaskEmail(email));
 
-            // Mock successful login
-            var mockSession = CreateMockSession(email);
-            _logger.LogInformation("Signin successful for user: {Email}", email);
+                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, authSession.User, false));
+                return new AuthSuccess(authSession);
+            }
 
-            // Fire auth status changed event
-            AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, mockSession.User, false));
-
-            return new AuthSuccess(mockSession);
+            _logger.LogWarning("Signin returned null session for user: {MaskedEmail}", MaskEmail(email));
+            return new AuthFailure(AuthErrorCodes.InvalidCredentials, "メールアドレスまたはパスワードが正しくありません。");
+        }
+        catch (GotrueException ex)
+        {
+            _logger.LogWarning(ex, "Supabase auth error during signin for user: {MaskedEmail}", MaskEmail(email));
+            return MapGotrueException(ex);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogInformation("Signin cancelled for user: {Email}", email);
+            _logger.LogInformation("Signin cancelled for user: {MaskedEmail}", MaskEmail(email));
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during signin for user: {Email}", email);
+            _logger.LogError(ex, "Unexpected error during signin for user: {MaskedEmail}", MaskEmail(email));
             return new AuthFailure(AuthErrorCodes.UnexpectedError, $"予期せぬエラーが発生しました: {ex.Message}");
         }
         finally
@@ -131,7 +168,81 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     }
 
     /// <summary>
-    /// Sign in with OAuth provider using modern switch expressions
+    /// Initiate OAuth flow and return flow state for callback handling
+    /// This method does NOT open the browser - caller is responsible for that
+    /// </summary>
+    /// <param name="provider">OAuth provider</param>
+    /// <param name="redirectPort">Local redirect port for callback</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>OAuth flow state containing URI, PKCE verifier, and CSRF state</returns>
+    public async Task<OAuthFlowState?> InitiateOAuthFlowAsync(AuthProvider provider, int redirectPort, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        await _authSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _logger.LogInformation("Initiating OAuth flow for provider: {Provider}", provider);
+
+            // Map Baketa AuthProvider to Supabase Constants.Provider
+            var supabaseProvider = MapToSupabaseProvider(provider);
+
+            // Steam uses OpenID 2.0, not OAuth - requires custom implementation (Issue #173)
+            if (provider == AuthProvider.Steam)
+            {
+                _logger.LogWarning("Steam OAuth not supported - requires custom OpenID 2.0 implementation");
+                return null;
+            }
+
+            // 🔥 [ISSUE#167] リダイレクトURLはクエリパラメータなしのクリーンなURLにする
+            // SupabaseのPKCEフローがCSRF保護を提供するため、カスタムstateパラメータは不要
+            var redirectUrl = $"http://localhost:{redirectPort}/oauth/callback";
+
+            _logger.LogDebug("OAuth redirect URL: {RedirectUrl}", redirectUrl);
+
+            // Initiate OAuth flow with PKCE
+            var providerAuthState = await _supabaseClient.Auth.SignIn(supabaseProvider, new SignInOptions
+            {
+                FlowType = Constants.OAuthFlowType.PKCE,
+                RedirectTo = redirectUrl
+            }).ConfigureAwait(false);
+
+            if (providerAuthState?.Uri != null && !string.IsNullOrEmpty(providerAuthState.PKCEVerifier))
+            {
+                _logger.LogDebug("OAuth flow initiated for provider: {Provider}, PKCE verifier length: {Length}",
+                    provider, providerAuthState.PKCEVerifier.Length);
+
+                // PKCEVerifierをstate代わりに使用（PKCEフローではPKCE自体がCSRF保護を提供）
+                return new OAuthFlowState(providerAuthState.Uri, providerAuthState.PKCEVerifier, providerAuthState.PKCEVerifier);
+            }
+
+            _logger.LogWarning("OAuth initiation returned invalid state for provider: {Provider}", provider);
+            return null;
+        }
+        catch (GotrueException ex)
+        {
+            _logger.LogWarning(ex, "Supabase auth error during OAuth initiation for provider: {Provider}", provider);
+            return null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("OAuth initiation cancelled for provider: {Provider}", provider);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during OAuth initiation for provider: {Provider}", provider);
+            return null;
+        }
+        finally
+        {
+            _authSemaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Sign in with OAuth provider using PKCE flow
+    /// Note: For full OAuth flow with callback handling, use OAuthCallbackHandler.StartOAuthFlowAsync instead
     /// </summary>
     /// <param name="provider">OAuth provider</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -140,44 +251,100 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     {
         ThrowIfDisposed();
 
+        // Steam uses OpenID 2.0, not OAuth - requires custom implementation (Issue #173)
+        if (provider == AuthProvider.Steam)
+        {
+            return new AuthFailure(AuthErrorCodes.OAuthError,
+                "Steam認証はカスタム実装が必要です。Issue #173で対応予定です。");
+        }
+
+        // For OAuth, we recommend using OAuthCallbackHandler.StartOAuthFlowAsync
+        // which properly handles PKCE verifier and CSRF protection
+        _logger.LogInformation("OAuth signin requested for provider: {Provider}. Use OAuthCallbackHandler for full flow.", provider);
+
+        return new AuthFailure(AuthErrorCodes.OAuthError,
+            "OAuth認証を開始するにはOAuthCallbackHandlerを使用してください。");
+    }
+
+    /// <summary>
+    /// Generate a cryptographically secure random string
+    /// </summary>
+    private static string GenerateSecureRandomString(int length)
+    {
+        var bytes = new byte[length];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(bytes);
+        return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=')[..length];
+    }
+
+    /// <summary>
+    /// Mask email address for logging (PII protection)
+    /// Example: "user@example.com" -> "u***@e***.com"
+    /// </summary>
+    private static string MaskEmail(string email)
+    {
+        if (string.IsNullOrEmpty(email))
+            return "[empty]";
+
+        var atIndex = email.IndexOf('@');
+        if (atIndex < 1)
+            return "[invalid]";
+
+        var localPart = email[..atIndex];
+        var domainPart = email[(atIndex + 1)..];
+        var dotIndex = domainPart.LastIndexOf('.');
+
+        var maskedLocal = localPart.Length > 1 ? $"{localPart[0]}***" : "*";
+        var maskedDomain = dotIndex > 1 ? $"{domainPart[0]}***{domainPart[dotIndex..]}" : "***";
+
+        return $"{maskedLocal}@{maskedDomain}";
+    }
+
+    /// <summary>
+    /// Exchange OAuth code for session (called by OAuthCallbackHandler)
+    /// </summary>
+    /// <param name="pkceVerifier">PKCE verifier from initial OAuth request</param>
+    /// <param name="code">Authorization code from callback</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Authentication result</returns>
+    public async Task<AuthResult> ExchangeCodeForSessionAsync(string pkceVerifier, string code, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(pkceVerifier);
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+
         await _authSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            _logger.LogInformation("Starting OAuth signin with provider: {Provider}", provider);
+            _logger.LogInformation("Exchanging OAuth code for session");
 
-            // Modern C# 12 switch expression for provider mapping
-            var providerName = provider switch
+            var session = await _supabaseClient.Auth.ExchangeCodeForSession(pkceVerifier, code).ConfigureAwait(false);
+
+            if (session?.User != null)
             {
-                AuthProvider.Google => "Google",
-                AuthProvider.X => "X (Twitter)",
-                AuthProvider.Discord => "Discord",
-                AuthProvider.Steam => "Steam",
-                _ => throw new ArgumentOutOfRangeException(nameof(provider), "サポートされていないプロバイダーです。")
-            };
+                var authSession = ConvertToAuthSession(session);
+                _logger.LogInformation("OAuth code exchange successful for user: {UserId}", session.User.Id);
 
-            // TODO: Implement OAuth flow when Supabase client is available
-            // This would involve:
-            // 1. Starting local HTTP listener
-            // 2. Opening browser with OAuth URL
-            // 3. Capturing callback
-            // 4. Extracting tokens from callback
-            // 5. Setting session with tokens
+                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, authSession.User, false));
+                return new AuthSuccess(authSession);
+            }
 
-            // Mock implementation for now
-            await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
-
-            _logger.LogInformation("OAuth signin successful with provider: {Provider}", provider);
-            return new AuthFailure(AuthErrorCodes.OAuthError,
-                $"{providerName}認証は現在実装中です。しばらくお待ちください。");
+            _logger.LogWarning("OAuth code exchange returned null session");
+            return new AuthFailure(AuthErrorCodes.OAuthError, "OAuth認証の完了に失敗しました。");
+        }
+        catch (GotrueException ex)
+        {
+            _logger.LogWarning(ex, "Supabase auth error during OAuth code exchange");
+            return MapGotrueException(ex);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogInformation("OAuth signin cancelled for provider: {Provider}", provider);
+            _logger.LogInformation("OAuth code exchange cancelled");
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during OAuth signin with provider: {Provider}", provider);
+            _logger.LogError(ex, "Unexpected error during OAuth code exchange");
             return new AuthFailure(AuthErrorCodes.UnexpectedError, $"予期せぬエラーが発生しました: {ex.Message}");
         }
         finally
@@ -197,13 +364,21 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
         try
         {
-            // TODO: Implement session retrieval when Supabase client is available
-            // var session = await _supabaseClient.Auth.RetrieveSessionAsync();
+            // Get current session from Supabase client
+            var session = _supabaseClient.Auth.CurrentSession;
 
-            // Mock implementation for now
-            await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+            if (session?.User != null && session.ExpiresAt() > DateTime.UtcNow)
+            {
+                return ConvertToAuthSession(session);
+            }
 
-            // Return null for no active session
+            // Try to retrieve session from persistence
+            var retrievedSession = await _supabaseClient.Auth.RetrieveSessionAsync().ConfigureAwait(false);
+            if (retrievedSession?.User != null && retrievedSession.ExpiresAt() > DateTime.UtcNow)
+            {
+                return ConvertToAuthSession(retrievedSession);
+            }
+
             return null;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -219,7 +394,7 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     }
 
     /// <summary>
-    /// Restore session on application startup
+    /// Restore session on application startup from persistent storage
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Task representing the restore operation</returns>
@@ -229,19 +404,52 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
         try
         {
-            _logger.LogInformation("Attempting to restore user session...");
+            _logger.LogInformation("Attempting to restore user session from persistent storage...");
 
-            var session = await GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
-            if (session?.IsValid == true)
+            // Check if tokens are stored
+            var hasStoredTokens = await _tokenStorage.HasStoredTokensAsync(cancellationToken).ConfigureAwait(false);
+            if (!hasStoredTokens)
             {
+                _logger.LogInformation("No stored tokens found");
+                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, false));
+                return;
+            }
+
+            // Retrieve stored tokens
+            var storedTokens = await _tokenStorage.RetrieveTokensAsync(cancellationToken).ConfigureAwait(false);
+            if (storedTokens == null)
+            {
+                _logger.LogWarning("Failed to retrieve stored tokens");
+                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, false));
+                return;
+            }
+
+            _logger.LogDebug("Retrieved stored tokens, attempting to restore session...");
+
+            // Use Supabase's SetSession to restore from tokens
+            var session = await _supabaseClient.Auth.SetSession(storedTokens.Value.AccessToken, storedTokens.Value.RefreshToken).ConfigureAwait(false);
+
+            if (session != null && session.User != null)
+            {
+                var authSession = ConvertToAuthSession(session);
                 _logger.LogInformation("Session restored successfully for user: {UserId}", session.User.Id);
-                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, session.User, false));
+                AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, authSession.User, false));
+
+                // Update stored tokens with potentially refreshed ones
+                await _tokenStorage.StoreTokensAsync(session.AccessToken, session.RefreshToken, cancellationToken).ConfigureAwait(false);
             }
             else
             {
-                _logger.LogInformation("No valid session found to restore");
+                _logger.LogWarning("Session restoration returned no valid session, clearing stored tokens");
+                await _tokenStorage.ClearTokensAsync(cancellationToken).ConfigureAwait(false);
                 AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, false));
             }
+        }
+        catch (GotrueException ex)
+        {
+            _logger.LogWarning(ex, "Session restoration failed (invalid/expired tokens), clearing stored tokens");
+            await _tokenStorage.ClearTokensAsync(cancellationToken).ConfigureAwait(false);
+            AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, false));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -269,11 +477,11 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         {
             _logger.LogInformation("Starting user signout");
 
-            // TODO: Implement signout when Supabase client is available
-            // await _supabaseClient.Auth.SignOut();
+            await _supabaseClient.Auth.SignOut().ConfigureAwait(false);
 
-            // Mock implementation for now
-            await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            // Clear stored tokens from persistent storage
+            await _tokenStorage.ClearTokensAsync(cancellationToken).ConfigureAwait(false);
+            _logger.LogDebug("Cleared stored tokens");
 
             _logger.LogInformation("User signout completed");
             AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, true));
@@ -286,6 +494,9 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during signout");
+            // Even if signout fails on server, clear local state and tokens
+            await _tokenStorage.ClearTokensAsync(CancellationToken.None).ConfigureAwait(false);
+            AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, true));
         }
         finally
         {
@@ -306,29 +517,29 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
         try
         {
-            _logger.LogInformation("Sending password reset email to: {Email}", email);
+            _logger.LogInformation("Sending password reset email to: {MaskedEmail}", MaskEmail(email));
 
             // Basic email validation
             if (!email.Contains('@') || email.Length < 5)
             {
-                _logger.LogWarning("Invalid email address format: {Email}", email);
+                _logger.LogWarning("Invalid email address format: {MaskedEmail}", MaskEmail(email));
                 return false;
             }
 
             // Supabase Auth password reset API call
             await _supabaseClient.Auth.ResetPasswordForEmail(email).ConfigureAwait(false);
 
-            _logger.LogInformation("Password reset email sent successfully to: {Email}", email);
+            _logger.LogInformation("Password reset email sent successfully to: {MaskedEmail}", MaskEmail(email));
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogInformation("Password reset email cancelled for: {Email}", email);
+            _logger.LogInformation("Password reset email cancelled for: {MaskedEmail}", MaskEmail(email));
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending password reset email to: {Email}", email);
+            _logger.LogError(ex, "Error sending password reset email to: {MaskedEmail}", MaskEmail(email));
             return false;
         }
     }
@@ -349,14 +560,30 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         {
             _logger.LogInformation("Updating user password");
 
-            // TODO: Implement password update when Supabase client is available
-            // var response = await _supabaseClient.Auth.UpdateUser(new UserAttributes { Password = newPassword });
+            var user = await _supabaseClient.Auth.Update(new UserAttributes { Password = newPassword }).ConfigureAwait(false);
 
-            // Mock implementation for now
-            await Task.Delay(200, cancellationToken).ConfigureAwait(false);
+            if (user != null)
+            {
+                _logger.LogInformation("Password updated successfully for user: {UserId}", user.Id);
 
-            _logger.LogInformation("Password updated successfully");
-            return new AuthFailure(AuthErrorCodes.UnexpectedError, "パスワード更新機能は現在実装中です。");
+                // Get current session after password update
+                var session = await GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+                if (session != null)
+                {
+                    return new AuthSuccess(session);
+                }
+
+                // If no session, return success without session
+                return new AuthFailure(AuthErrorCodes.UnexpectedError, "パスワードは更新されましたが、セッションの取得に失敗しました。再度ログインしてください。");
+            }
+
+            _logger.LogWarning("Password update returned null user");
+            return new AuthFailure(AuthErrorCodes.UnexpectedError, "パスワードの更新に失敗しました。");
+        }
+        catch (GotrueException ex)
+        {
+            _logger.LogWarning(ex, "Supabase auth error during password update");
+            return MapGotrueException(ex);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -375,21 +602,111 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     }
 
     /// <summary>
-    /// Create mock session for testing purposes
+    /// Convert Supabase Session to Baketa AuthSession
     /// </summary>
-    /// <param name="email">User email</param>
-    /// <returns>Mock authentication session</returns>
-    private static AuthSession CreateMockSession(string email)
+    /// <param name="session">Supabase session</param>
+    /// <returns>Baketa authentication session</returns>
+    private static AuthSession ConvertToAuthSession(Session session)
     {
-        var userId = Guid.NewGuid().ToString();
-        var user = new UserInfo(userId, email, email.Split('@')[0]);
-        var expiresAt = DateTime.UtcNow.AddHours(24);
+        var user = session.User!;
+        var userInfo = new UserInfo(
+            Id: user.Id ?? string.Empty,
+            Email: user.Email ?? string.Empty,
+            DisplayName: user.UserMetadata?.GetValueOrDefault("display_name")?.ToString()
+                ?? user.UserMetadata?.GetValueOrDefault("full_name")?.ToString()
+                ?? user.Email?.Split('@')[0],
+            AvatarUrl: user.UserMetadata?.GetValueOrDefault("avatar_url")?.ToString(),
+            Provider: MapFromIdentityProvider(user.AppMetadata?.GetValueOrDefault("provider")?.ToString())
+        );
 
         return new AuthSession(
-            AccessToken: "mock_access_token",
-            RefreshToken: "mock_refresh_token",
-            ExpiresAt: expiresAt,
-            User: user);
+            AccessToken: session.AccessToken ?? string.Empty,
+            RefreshToken: session.RefreshToken ?? string.Empty,
+            ExpiresAt: session.ExpiresAt(),
+            User: userInfo
+        );
+    }
+
+    /// <summary>
+    /// Map Baketa AuthProvider to Supabase Constants.Provider
+    /// </summary>
+    /// <param name="provider">Baketa auth provider</param>
+    /// <returns>Supabase provider constant</returns>
+    private static Constants.Provider MapToSupabaseProvider(AuthProvider provider) =>
+        provider switch
+        {
+            AuthProvider.Google => Constants.Provider.Google,
+            AuthProvider.X => Constants.Provider.Twitter,
+            AuthProvider.Discord => Constants.Provider.Discord,
+            AuthProvider.Twitch => Constants.Provider.Twitch,
+            AuthProvider.Steam => throw new NotSupportedException("Steam uses OpenID 2.0, not OAuth. Use custom implementation."),
+            _ => throw new ArgumentOutOfRangeException(nameof(provider), "サポートされていないプロバイダーです。")
+        };
+
+    /// <summary>
+    /// Map identity provider string to Baketa AuthProvider
+    /// </summary>
+    /// <param name="provider">Identity provider string</param>
+    /// <returns>Baketa auth provider or null</returns>
+    private static AuthProvider? MapFromIdentityProvider(string? provider) =>
+        provider?.ToLowerInvariant() switch
+        {
+            "google" => AuthProvider.Google,
+            "twitter" => AuthProvider.X,
+            "discord" => AuthProvider.Discord,
+            "twitch" => AuthProvider.Twitch,
+            "steam" => AuthProvider.Steam,
+            "email" => null,
+            _ => null
+        };
+
+    /// <summary>
+    /// Map GotrueException to AuthFailure with appropriate error code
+    /// </summary>
+    /// <param name="ex">Gotrue exception</param>
+    /// <returns>Authentication failure result</returns>
+    private static AuthFailure MapGotrueException(GotrueException ex)
+    {
+        var message = ex.Message?.ToLowerInvariant() ?? string.Empty;
+
+        return message switch
+        {
+            _ when message.Contains("invalid login credentials") ||
+                   message.Contains("invalid password") ||
+                   message.Contains("email not confirmed")
+                => new AuthFailure(AuthErrorCodes.InvalidCredentials, "メールアドレスまたはパスワードが正しくありません。"),
+
+            _ when message.Contains("user not found")
+                => new AuthFailure(AuthErrorCodes.UserNotFound, "ユーザーが見つかりません。"),
+
+            _ when message.Contains("user already registered") ||
+                   message.Contains("email already exists")
+                => new AuthFailure(AuthErrorCodes.UserAlreadyExists, "このメールアドレスは既に使用されています。"),
+
+            _ when message.Contains("email not confirmed")
+                => new AuthFailure(AuthErrorCodes.EmailNotConfirmed, "メールアドレスが確認されていません。確認メールをご確認ください。"),
+
+            _ when message.Contains("weak password") ||
+                   message.Contains("password should be")
+                => new AuthFailure(AuthErrorCodes.WeakPassword, "パスワードが弱すぎます。より強力なパスワードを設定してください。"),
+
+            _ when message.Contains("rate limit") ||
+                   message.Contains("too many requests")
+                => new AuthFailure(AuthErrorCodes.RateLimitExceeded, "リクエストが多すぎます。しばらくしてから再試行してください。"),
+
+            _ when message.Contains("network") ||
+                   message.Contains("connection")
+                => new AuthFailure(AuthErrorCodes.NetworkError, "ネットワークエラーが発生しました。インターネット接続をご確認ください。"),
+
+            _ when message.Contains("token") ||
+                   message.Contains("jwt")
+                => new AuthFailure(AuthErrorCodes.InvalidToken, "認証トークンが無効です。再度ログインしてください。"),
+
+            _ when message.Contains("expired")
+                => new AuthFailure(AuthErrorCodes.TokenExpired, "セッションの有効期限が切れました。再度ログインしてください。"),
+
+            _ => new AuthFailure(AuthErrorCodes.UnexpectedError, $"認証エラーが発生しました: {ex.Message}")
+        };
     }
 
     /// <summary>
@@ -397,10 +714,12 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     /// </summary>
     /// <param name="sender">Event sender</param>
     /// <param name="changedState">Changed auth state</param>
-    private void OnAuthStateChanged(object? sender, Supabase.Gotrue.Constants.AuthState changedState)
+    private void OnAuthStateChanged(object? sender, Constants.AuthState changedState)
     {
         try
         {
+            _logger.LogDebug("Auth state changed: {State}", changedState);
+
             var session = _supabaseClient.Auth.CurrentSession;
             var user = _supabaseClient.Auth.CurrentUser;
 
@@ -408,19 +727,30 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
 
             if (isLoggedIn && user != null)
             {
-                var userInfo = new UserInfo(user.Id ?? string.Empty, user.Email ?? string.Empty, user.Email?.Split('@')[0] ?? "User");
+                var userInfo = new UserInfo(
+                    user.Id ?? string.Empty,
+                    user.Email ?? string.Empty,
+                    user.UserMetadata?.GetValueOrDefault("display_name")?.ToString()
+                        ?? user.Email?.Split('@')[0] ?? "User"
+                );
+
+                _logger.LogDebug("[AUTH_DEBUG] AuthStatusChanged.Invoke呼び出し");
                 AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, userInfo, false));
-                _logger.LogInformation("Auth state changed: User logged in - {Email}", user.Email);
+                _logger.LogDebug("[AUTH_DEBUG] AuthStatusChanged.Invoke完了");
+                _logger.LogInformation("Auth state changed: User logged in - {MaskedEmail}", MaskEmail(user.Email ?? string.Empty));
             }
             else
             {
+                _logger.LogDebug("[AUTH_DEBUG] AuthStatusChanged.Invoke呼び出し前 (logged out)");
                 AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, true));
+                _logger.LogDebug("[AUTH_DEBUG] AuthStatusChanged.Invoke呼び出し後 (logged out)");
                 _logger.LogInformation("Auth state changed: User logged out");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling auth state change");
+            _logger.LogError(ex, "Error handling auth state change: {Message}", ex.Message);
+            Console.WriteLine($"[AUTH_DEBUG] OnAuthStateChanged全体で例外: {ex}");
         }
     }
 

@@ -25,7 +25,9 @@ namespace Baketa.UI.Tests.ViewModels.Auth;
 public sealed class LoginViewModelTests : AvaloniaTestBase
 {
     private readonly Mock<IAuthService> _mockAuthService;
+    private readonly Mock<IOAuthCallbackHandler> _mockOAuthHandler;
     private readonly Mock<INavigationService> _mockNavigationService;
+    private readonly Mock<ITokenStorage> _mockTokenStorage;
     private readonly Mock<IEventAggregator> _mockEventAggregator;
     private readonly Mock<ILogger<LoginViewModel>> _mockLogger;
     private LoginViewModel? _currentViewModel;
@@ -33,7 +35,9 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     public LoginViewModelTests()
     {
         _mockAuthService = new Mock<IAuthService>();
+        _mockOAuthHandler = new Mock<IOAuthCallbackHandler>();
         _mockNavigationService = new Mock<INavigationService>();
+        _mockTokenStorage = new Mock<ITokenStorage>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLogger = new Mock<ILogger<LoginViewModel>>();
 
@@ -46,12 +50,16 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     private void ResetMocks()
     {
         _mockAuthService.Reset();
+        _mockOAuthHandler.Reset();
         _mockNavigationService.Reset();
+        _mockTokenStorage.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
 
         // デフォルト設定
         _mockNavigationService.Setup(x => x.ShowSignupAsync()).ReturnsAsync(true);
+        _mockTokenStorage.Setup(x => x.StoreTokensAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
     }
 
     /// <summary>
@@ -64,10 +72,14 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
 
         // LoginAttemptTrackerはsealクラスなのMock不可、新しいインスタンスでブロック状態を回避
         var attemptTracker = new LoginAttemptTracker();
+        var sessionManager = new SecureSessionManager(NullLogger<SecureSessionManager>.Instance);
 
         _currentViewModel = RunOnUIThread(() => new LoginViewModel(
             _mockAuthService.Object,
+            _mockOAuthHandler.Object,
             _mockNavigationService.Object,
+            _mockTokenStorage.Object,
+            sessionManager,
             attemptTracker,
             new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance),
             _mockEventAggregator.Object,
@@ -113,7 +125,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         viewModel.LoginWithEmailCommand.Should().NotBeNull();
         viewModel.LoginWithGoogleCommand.Should().NotBeNull();
         viewModel.LoginWithDiscordCommand.Should().NotBeNull();
-        viewModel.LoginWithSteamCommand.Should().NotBeNull();
+        viewModel.LoginWithTwitchCommand.Should().NotBeNull();
         viewModel.ForgotPasswordCommand.Should().NotBeNull();
         viewModel.NavigateToSignupCommand.Should().NotBeNull();
     }
@@ -121,28 +133,70 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     [Fact]
     public void Constructor_WithNullAuthService_ThrowsArgumentNullException()
     {
+        // Arrange
+        var sessionManager = new SecureSessionManager(NullLogger<SecureSessionManager>.Instance);
+
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(null!, _mockNavigationService.Object, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+                new LoginViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+    }
+
+    [Fact]
+    public void Constructor_WithNullOAuthHandler_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var sessionManager = new SecureSessionManager(NullLogger<SecureSessionManager>.Instance);
+
+        // Act & Assert
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
+                new LoginViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
     public void Constructor_WithNullNavigationService_ThrowsArgumentNullException()
     {
+        // Arrange
+        var sessionManager = new SecureSessionManager(NullLogger<SecureSessionManager>.Instance);
+
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(_mockAuthService.Object, null!, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+    }
+
+    [Fact]
+    public void Constructor_WithNullTokenStorage_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var sessionManager = new SecureSessionManager(NullLogger<SecureSessionManager>.Instance);
+
+        // Act & Assert
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
+                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, null!, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+    }
+
+    [Fact]
+    public void Constructor_WithNullSessionManager_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
+                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, null!, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
     public void Constructor_WithNullEventAggregator_ThrowsArgumentNullException()
     {
+        // Arrange
+        var sessionManager = new SecureSessionManager(NullLogger<SecureSessionManager>.Instance);
+
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(_mockAuthService.Object, _mockNavigationService.Object, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), null!, _mockLogger.Object)));
+                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), null!, _mockLogger.Object)));
     }
 
     #endregion

@@ -27,6 +27,9 @@ internal sealed class AvaloniaNavigationService(
     private readonly ILogger<AvaloniaNavigationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private bool _disposed;
 
+    // 🔥 [ISSUE#167] 二重ナビゲーション防止フラグ
+    private volatile bool _isNavigatingToMainWindow;
+
     // LoggerMessage delegates for structured logging
     private static readonly Action<ILogger, string, Exception?> _logNavigating =
         LoggerMessage.Define<string>(
@@ -47,9 +50,22 @@ internal sealed class AvaloniaNavigationService(
     public async Task<bool> ShowLoginAsync()
     {
         ThrowIfDisposed();
+        MainOverlayViewModel? mainOverlayViewModel = null;
         try
         {
             _logNavigating(_logger, "Login", null);
+
+            // 🔥 [ISSUE#167] メインウィンドウを表示し、認証モードを有効化
+            // UIスレッドで実行する必要がある
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                mainOverlayViewModel = _serviceProvider.GetService<MainOverlayViewModel>();
+                if (mainOverlayViewModel != null)
+                {
+                    mainOverlayViewModel.SetAuthenticationMode(true);
+                }
+                await ShowMainWindowInternalAsync().ConfigureAwait(false);
+            }).ConfigureAwait(false);
 
             var loginViewModel = _serviceProvider.GetRequiredService<LoginViewModel>();
             var loginWindow = new LoginView(loginViewModel);
@@ -62,6 +78,11 @@ internal sealed class AvaloniaNavigationService(
             _logNavigationError(_logger, "Login", ex);
             return false;
         }
+        finally
+        {
+            // 🔥 [ISSUE#167] 認証モードを解除
+            mainOverlayViewModel?.SetAuthenticationMode(false);
+        }
     }
 
     /// <summary>
@@ -71,9 +92,22 @@ internal sealed class AvaloniaNavigationService(
     public async Task<bool> ShowSignupAsync()
     {
         ThrowIfDisposed();
+        MainOverlayViewModel? mainOverlayViewModel = null;
         try
         {
             _logNavigating(_logger, "Signup", null);
+
+            // 🔥 [ISSUE#167] メインウィンドウを表示し、認証モードを有効化
+            // UIスレッドで実行する必要がある
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                mainOverlayViewModel = _serviceProvider.GetService<MainOverlayViewModel>();
+                if (mainOverlayViewModel != null)
+                {
+                    mainOverlayViewModel.SetAuthenticationMode(true);
+                }
+                await ShowMainWindowInternalAsync().ConfigureAwait(false);
+            }).ConfigureAwait(false);
 
             var signupViewModel = _serviceProvider.GetRequiredService<SignupViewModel>();
             var signupWindow = new SignupView(signupViewModel);
@@ -86,6 +120,11 @@ internal sealed class AvaloniaNavigationService(
             _logNavigationError(_logger, "Signup", ex);
             return false;
         }
+        finally
+        {
+            // 🔥 [ISSUE#167] 認証モードを解除
+            mainOverlayViewModel?.SetAuthenticationMode(false);
+        }
     }
 
     /// <summary>
@@ -94,28 +133,90 @@ internal sealed class AvaloniaNavigationService(
     public async Task ShowMainWindowAsync()
     {
         ThrowIfDisposed();
+
+        // 🔥 [ISSUE#167] 二重ナビゲーション防止（LoginViewModelとSignupViewModelの両方が呼び出す可能性がある）
+        if (_isNavigatingToMainWindow)
+        {
+            _logger.LogDebug("[NAVIGATION] ShowMainWindowAsync: 既にナビゲーション中のためスキップ");
+            return;
+        }
+
+        _isNavigatingToMainWindow = true;
+        try
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                await ShowMainWindowInternalAsync().ConfigureAwait(false);
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            _isNavigatingToMainWindow = false;
+        }
+    }
+
+    /// <summary>
+    /// メイン画面を表示します（内部実装、UIスレッドで呼び出すこと）
+    /// </summary>
+    private Task ShowMainWindowInternalAsync()
+    {
         try
         {
             _logNavigating(_logger, "MainOverlayView", null);
 
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
+                // 🔥 [ISSUE#167] 既にMainOverlayViewが存在する場合は表示のみ
+                // LoginView/SignupViewが設定されている場合は新しいMainOverlayViewを作成
+                if (desktop.MainWindow is MainOverlayView existingOverlay)
+                {
+                    existingOverlay.Show();
+                    _logger.LogDebug("Showing existing MainOverlayView");
+                    return Task.CompletedTask;
+                }
+
+                // 🔥 [ISSUE#167] 古いウィンドウを記録
+                var oldWindow = desktop.MainWindow;
+                _logger.LogDebug("[NAVIGATION_DEBUG] 古いウィンドウ: {WindowType}", oldWindow?.GetType().Name ?? "null");
+
+                // MainOverlayViewを作成
+                _logger.LogDebug("[NAVIGATION_DEBUG] MainOverlayViewModel取得開始");
                 var mainOverlayViewModel = _serviceProvider.GetRequiredService<ViewModels.MainOverlayViewModel>();
+                _logger.LogDebug("[NAVIGATION_DEBUG] MainOverlayViewModel取得完了");
+
+                _logger.LogDebug("[NAVIGATION_DEBUG] MainOverlayView作成開始");
                 var mainOverlayView = new MainOverlayView
                 {
                     DataContext = mainOverlayViewModel
                 };
+                _logger.LogDebug("[NAVIGATION_DEBUG] MainOverlayView作成完了");
 
+                // 🔥 [ISSUE#167] MainOverlayViewを先にMainWindowに設定してから表示
+                // これによりアプリのShutdownを防ぐ
+                _logger.LogDebug("[NAVIGATION_DEBUG] MainWindow設定開始");
                 desktop.MainWindow = mainOverlayView;
+                _logger.LogDebug("[NAVIGATION_DEBUG] MainWindow設定完了、Show()呼び出し");
                 mainOverlayView.Show();
-            }
+                _logger.LogDebug("[NAVIGATION_DEBUG] Show()完了");
 
-            await Task.CompletedTask.ConfigureAwait(false);
+                // 🔥 [ISSUE#167] 古いウィンドウ（LoginView/SignupView）を閉じる
+                if (oldWindow != null && oldWindow != mainOverlayView)
+                {
+                    _logger.LogDebug("[NAVIGATION_DEBUG] 古いウィンドウClose開始: {WindowType}", oldWindow.GetType().Name);
+                    oldWindow.Close();
+                    _logger.LogDebug("[NAVIGATION_DEBUG] 古いウィンドウClose完了");
+                }
+
+                _logger.LogDebug("[NAVIGATION_DEBUG] ShowMainWindowInternalAsync完了");
+            }
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "[NAVIGATION_ERROR] ShowMainWindowInternalAsync例外: {Message}", ex.Message);
             _logNavigationError(_logger, "MainOverlayView", ex);
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -201,6 +302,82 @@ internal sealed class AvaloniaNavigationService(
         catch (Exception ex)
         {
             _logNavigationError(_logger, "LogoutAndShowLogin", ex);
+        }
+    }
+
+    /// <summary>
+    /// ログイン画面に切り替えます（ダイアログとして表示）
+    /// </summary>
+    public async Task SwitchToLoginAsync()
+    {
+        ThrowIfDisposed();
+        try
+        {
+            _logNavigating(_logger, "SwitchToLogin", null);
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
+                    desktop.MainWindow is MainOverlayView mainOverlay)
+                {
+                    // 🔥 [ISSUE#167] MainOverlayView上にダイアログとして表示
+                    var loginViewModel = _serviceProvider.GetRequiredService<LoginViewModel>();
+                    var loginWindow = new LoginView(loginViewModel);
+
+                    await loginWindow.ShowDialog<bool?>(mainOverlay).ConfigureAwait(false);
+                }
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logNavigationError(_logger, "SwitchToLogin", ex);
+        }
+    }
+
+    /// <summary>
+    /// サインアップ画面に切り替えます（ダイアログとして表示）
+    /// </summary>
+    public async Task SwitchToSignupAsync()
+    {
+        ThrowIfDisposed();
+        try
+        {
+            _logNavigating(_logger, "SwitchToSignup", null);
+            _logger.LogDebug("[AUTH_DEBUG] SwitchToSignupAsync開始");
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                _logger.LogDebug("[AUTH_DEBUG] UIThread.InvokeAsync内部開始");
+
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
+                    desktop.MainWindow is MainOverlayView mainOverlay)
+                {
+                    _logger.LogDebug("[AUTH_DEBUG] MainOverlayView検出、SignupView作成開始");
+
+                    // 🔥 [ISSUE#167] MainOverlayView上にダイアログとして表示
+                    var signupViewModel = _serviceProvider.GetRequiredService<SignupViewModel>();
+                    _logger.LogDebug("[AUTH_DEBUG] SignupViewModel取得完了");
+
+                    var signupWindow = new SignupView(signupViewModel);
+                    _logger.LogDebug("[AUTH_DEBUG] SignupView作成完了、ShowDialog呼び出し");
+
+                    await signupWindow.ShowDialog<bool?>(mainOverlay).ConfigureAwait(false);
+                    _logger.LogDebug("[AUTH_DEBUG] ShowDialog完了");
+                }
+                else
+                {
+                    var currentDesktop = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+                    _logger.LogWarning("[AUTH_DEBUG] MainOverlayViewが見つからない: MainWindow={WindowType}",
+                        currentDesktop?.MainWindow?.GetType().Name ?? "null");
+                }
+            }).ConfigureAwait(false);
+
+            _logger.LogDebug("[AUTH_DEBUG] SwitchToSignupAsync完了");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[AUTH_DEBUG] SwitchToSignupAsync例外: {Message}", ex.Message);
+            _logNavigationError(_logger, "SwitchToSignup", ex);
         }
     }
 
