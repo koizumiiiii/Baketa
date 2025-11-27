@@ -25,6 +25,7 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     private readonly SemaphoreSlim _authSemaphore = new(1, 1);
     private readonly SupabaseClient _supabaseClient;
     private readonly ITokenStorage _tokenStorage;
+    private readonly ITokenAuditLogger _auditLogger;
     private bool _disposed;
 
     /// <summary>
@@ -37,11 +38,17 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     /// </summary>
     /// <param name="supabaseClient">Supabase client instance</param>
     /// <param name="tokenStorage">Token storage for session persistence</param>
+    /// <param name="auditLogger">Token audit logger for security compliance</param>
     /// <param name="logger">Logger instance</param>
-    public SupabaseAuthService(SupabaseClient supabaseClient, ITokenStorage tokenStorage, ILogger<SupabaseAuthService> logger)
+    public SupabaseAuthService(
+        SupabaseClient supabaseClient,
+        ITokenStorage tokenStorage,
+        ITokenAuditLogger auditLogger,
+        ILogger<SupabaseAuthService> logger)
     {
         _supabaseClient = supabaseClient ?? throw new ArgumentNullException(nameof(supabaseClient));
         _tokenStorage = tokenStorage ?? throw new ArgumentNullException(nameof(tokenStorage));
+        _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Subscribe to auth state changes
@@ -84,6 +91,9 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
                 // User is confirmed (auto-confirm enabled in Supabase)
                 var authSession = ConvertToAuthSession(session);
                 _logger.LogInformation("Signup successful for user: {MaskedEmail}", MaskEmail(email));
+
+                // Record audit log for token issuance
+                await _auditLogger.LogTokenIssuedAsync(authSession.User.Id, authSession.ExpiresAt, cancellationToken).ConfigureAwait(false);
 
                 AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, authSession.User, false));
                 return new AuthSuccess(authSession);
@@ -138,6 +148,9 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
             {
                 var authSession = ConvertToAuthSession(session);
                 _logger.LogInformation("Signin successful for user: {MaskedEmail}", MaskEmail(email));
+
+                // Record audit log for token issuance
+                await _auditLogger.LogTokenIssuedAsync(authSession.User.Id, authSession.ExpiresAt, cancellationToken).ConfigureAwait(false);
 
                 AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, authSession.User, false));
                 return new AuthSuccess(authSession);
@@ -324,6 +337,9 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
             {
                 var authSession = ConvertToAuthSession(session);
                 _logger.LogInformation("OAuth code exchange successful for user: {UserId}", session.User.Id);
+
+                // Record audit log for token issuance
+                await _auditLogger.LogTokenIssuedAsync(authSession.User.Id, authSession.ExpiresAt, cancellationToken).ConfigureAwait(false);
 
                 AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, authSession.User, false));
                 return new AuthSuccess(authSession);

@@ -18,12 +18,14 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
 {
     private readonly Mock<ILogger<SupabaseAuthService>> _mockLogger;
     private readonly Mock<ITokenStorage> _mockTokenStorage;
+    private readonly Mock<ITokenAuditLogger> _mockAuditLogger;
     private readonly SupabaseAuthService _authService;
 
     public SupabaseAuthServiceIntegrationTests()
     {
         _mockLogger = new Mock<ILogger<SupabaseAuthService>>();
         _mockTokenStorage = new Mock<ITokenStorage>();
+        _mockAuditLogger = new Mock<ITokenAuditLogger>();
 
         // Setup default token storage behavior
         _mockTokenStorage.Setup(x => x.HasStoredTokensAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -37,7 +39,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
         };
         var supabaseClient = new Supabase.Client("https://mock.supabase.co", "mock-anon-key", options);
 
-        _authService = new SupabaseAuthService(supabaseClient, _mockTokenStorage.Object, _mockLogger.Object);
+        _authService = new SupabaseAuthService(supabaseClient, _mockTokenStorage.Object, _mockAuditLogger.Object, _mockLogger.Object);
     }
 
     public void Dispose()
@@ -52,7 +54,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     {
         // Arrange & Act
         var mockClient = new Mock<Supabase.Client>("mock-url", "mock-key", new Supabase.SupabaseOptions());
-        using var service = new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, _mockLogger.Object);
+        using var service = new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, _mockAuditLogger.Object, _mockLogger.Object);
 
         // Assert
         service.Should().NotBeNull();
@@ -66,7 +68,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
         var mockClient = new Mock<Supabase.Client>("mock-url", "mock-key", new Supabase.SupabaseOptions());
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, null!));
+        Assert.Throws<ArgumentNullException>(() => new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, _mockAuditLogger.Object, null!));
     }
 
     [Fact]
@@ -76,7 +78,17 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
         var mockClient = new Mock<Supabase.Client>("mock-url", "mock-key", new Supabase.SupabaseOptions());
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new SupabaseAuthService(mockClient.Object, null!, _mockLogger.Object));
+        Assert.Throws<ArgumentNullException>(() => new SupabaseAuthService(mockClient.Object, null!, _mockAuditLogger.Object, _mockLogger.Object));
+    }
+
+    [Fact]
+    public void Constructor_WithNullAuditLogger_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var mockClient = new Mock<Supabase.Client>("mock-url", "mock-key", new Supabase.SupabaseOptions());
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, null!, _mockLogger.Object));
     }
 
     #endregion
@@ -373,7 +385,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     {
         // Arrange
         var mockClient = new Mock<Supabase.Client>("mock-url", "mock-key", new Supabase.SupabaseOptions());
-        using var service = new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, _mockLogger.Object);
+        using var service = new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, _mockAuditLogger.Object, _mockLogger.Object);
 
         // Act & Assert
         service.Dispose(); // First call
@@ -385,7 +397,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
     {
         // Arrange
         var mockClient = new Mock<Supabase.Client>("mock-url", "mock-key", new Supabase.SupabaseOptions());
-        var service = new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, _mockLogger.Object);
+        var service = new SupabaseAuthService(mockClient.Object, _mockTokenStorage.Object, _mockAuditLogger.Object, _mockLogger.Object);
         service.Dispose();
 
         // Act & Assert

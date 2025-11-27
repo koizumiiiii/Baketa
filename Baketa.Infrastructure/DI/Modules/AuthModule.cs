@@ -68,6 +68,10 @@ public sealed class AuthModule : ServiceModuleBase
         services.AddSingleton<OAuthCallbackHandler>();
         services.AddSingleton<IOAuthCallbackHandler>(provider => provider.GetRequiredService<OAuthCallbackHandler>());
 
+        // Token audit logger for security compliance (Issue #168)
+        services.AddSingleton<FileTokenAuditLogger>();
+        services.AddSingleton<ITokenAuditLogger>(provider => provider.GetRequiredService<FileTokenAuditLogger>());
+
         // Authentication event handlers (future extension)
         // services.AddSingleton<IAuthEventHandler, DefaultAuthEventHandler>();
 

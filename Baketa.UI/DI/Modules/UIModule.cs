@@ -207,6 +207,9 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<IEventProcessor<Baketa.UI.Framework.Events.ExecuteSingleshotRequestEvent>>(
             provider => provider.GetRequiredService<Baketa.UI.Services.SingleshotEventProcessor>());
 
+        // 🔐 [Issue #168] TokenExpirationHandler - トークン失効時の処理ハンドラー
+        services.AddSingleton<TokenExpirationHandler>();
+
         // ウィンドウ管理
         // 例: services.AddSingleton<IWindowService, AvaloniaWindowService>();
 
