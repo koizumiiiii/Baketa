@@ -10,7 +10,7 @@ using Baketa.UI.Security;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+// ReactiveUI.Fody.Helpersは不要（FodyのReactiveUIウィービングが無効化されているため）
 using ReactiveUI.Validation.Abstractions;
 using ReactiveUI.Validation.Contexts;
 using ReactiveUI.Validation.Extensions;
@@ -56,10 +56,29 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             new EventId(4, "OAuthAttempt"),
             "OAuth認証試行: {Provider}");
 
-    // Reactive properties with Fody
-    [Reactive] public string Email { get; set; } = string.Empty;
-    [Reactive] public string Password { get; set; } = string.Empty;
-    [Reactive] public bool RememberMe { get; set; } = true;
+    // 🔥 [FIX] FodyのReactiveUIウィービングが無効化されているため、手動でPropertyChangedを実装
+    // ReactiveUIの標準的なRaiseAndSetIfChangedを直接使用
+    private string _email = string.Empty;
+    public string Email
+    {
+        get => _email;
+        set => this.RaiseAndSetIfChanged(ref _email, value);
+    }
+
+    private string _password = string.Empty;
+    public string Password
+    {
+        get => _password;
+        set => this.RaiseAndSetIfChanged(ref _password, value);
+    }
+
+    private bool _rememberMe = true;
+    public bool RememberMe
+    {
+        get => _rememberMe;
+        set => this.RaiseAndSetIfChanged(ref _rememberMe, value);
+    }
+
     // ErrorMessageとIsLoadingはViewModelBaseに既に定義済み
 
     // IValidatableViewModel implementation
@@ -198,8 +217,8 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             _logger?.LogInformation("[AUTH_DEBUG] NavigateToSignupCommand実行開始");
 
             // 🔥 [ISSUE#167] ダイアログを閉じて、その後SignupViewを表示
-            _logger?.LogInformation("[AUTH_DEBUG] CloseDialogRequestedイベント発火");
-            CloseDialogRequested?.Invoke();
+            _logger?.LogInformation("[AUTH_DEBUG] CloseDialogRequestedイベント発火 (画面切り替え)");
+            CloseDialogRequested?.Invoke(false); // false = 画面切り替え（認証成功ではない）
 
             // UIスレッドで非同期にSignupViewを表示（ダイアログが閉じた後に実行される）
             _ = Task.Run(async () =>
@@ -291,8 +310,8 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                 // 🔥 [FIX] Phase 2: ダイアログを閉じるだけ
                 // 状態変更（SetAuthenticationMode）はViewのOnClosedイベントで行う
                 // これにより、ウィンドウが完全に破棄された後に確実に状態変更される
-                _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火前");
-                CloseDialogRequested?.Invoke();
+                _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火前 (認証成功)");
+                CloseDialogRequested?.Invoke(true); // true = 認証成功
                 _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火後");
 
                 // 注意: ErrorMessageとSetAuthenticationModeはViewのOnClosedで処理される
@@ -309,8 +328,9 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     /// <summary>
     /// ダイアログを閉じる要求イベント
     /// 認証成功時と画面切り替え時の両方でこのイベントが発火される
+    /// パラメータ: 認証成功の場合はtrue、画面切り替えの場合はfalse
     /// </summary>
-    public event Action? CloseDialogRequested;
+    public event Action<bool>? CloseDialogRequested;
 
     /// <summary>
     /// デバッグログを出力します（Viewからの呼び出し用）
@@ -352,7 +372,9 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             if (_logger != null)
                 _logLoginAttempt(_logger, sanitizedEmail, null);
 
-            var result = await _authService.SignInWithEmailPasswordAsync(sanitizedEmail, Password).ConfigureAwait(false);
+            // 🔥 [FIX] ConfigureAwait(true)に変更してUIスレッドで継続処理を実行
+            // ConfigureAwait(false)だとバックグラウンドスレッドになり、プロパティ変更でAccessViolationが発生する
+            var result = await _authService.SignInWithEmailPasswordAsync(sanitizedEmail, Password);
 
             if (result is AuthSuccess success)
             {
@@ -371,7 +393,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                 {
                     await _tokenStorage.StoreTokensAsync(
                         success.Session.AccessToken,
-                        success.Session.RefreshToken).ConfigureAwait(false);
+                        success.Session.RefreshToken);
 
                     _logger?.LogInformation("Remember Me: トークンを永続化しました");
                 }
@@ -429,8 +451,9 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             if (_logger != null)
                 _logOAuthAttempt(_logger, provider.ToString(), null);
 
+            // 🔥 [FIX] ConfigureAwait(true)でUIスレッドを維持
             // OAuthCallbackHandlerを使用してブラウザベースのOAuth認証を開始
-            var result = await _oauthHandler.StartOAuthFlowAsync(provider).ConfigureAwait(false);
+            var result = await _oauthHandler.StartOAuthFlowAsync(provider);
 
             // 🔥 [FIX] ViewModelがDisposeされている場合は何もしない
             // OAuth成功時、AuthStatusChangedイベントがダイアログを閉じてViewModelをDisposeする
@@ -485,7 +508,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             var sanitizedEmail = InputValidator.SanitizeInput(Email);
 
             // パスワードリセットメール送信
-            var success = await _authService.SendPasswordResetEmailAsync(sanitizedEmail).ConfigureAwait(false);
+            var success = await _authService.SendPasswordResetEmailAsync(sanitizedEmail);
 
             if (success)
             {

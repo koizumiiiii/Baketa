@@ -45,8 +45,26 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Background" Value="#2563EB" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style Selector="Button.primary-button:pointerover">
+            <Setter Property="Background" Value="#1D4ED8" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.primary-button:pressed">
+            <Setter Property="Background" Value="#1E40AF" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.primary-button:disabled">
+            <Setter Property="Background" Value="#93C5FD" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
         
         <Style Selector="TextBox.input-field">
@@ -153,12 +171,12 @@
                         
                         <!-- Remember Me & Forgot Password -->
                         <Grid ColumnDefinitions="*,Auto">
-                            <CheckBox Grid.Column="0" 
+                            <CheckBox Grid.Column="0"
                                       IsChecked="{Binding RememberMe}"
                                       Content="ログイン状態を保持"
                                       FontSize="13"
                                       KeyboardNavigation.TabIndex="3"/>
-                            <Button Grid.Column="1" 
+                            <Button Grid.Column="1"
                                     Command="{Binding ForgotPasswordCommand}"
                                     Classes="link"
                                     Content="パスワードを忘れた方"
@@ -166,45 +184,50 @@
                                     Padding="4,0"
                                     KeyboardNavigation.TabIndex="4"/>
                         </Grid>
-                        
+
+                        <!-- Error Message (ボタンの上に配置) -->
+                        <Border IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                Background="{DynamicResource ErrorBackgroundBrush}"
+                                BorderBrush="{DynamicResource ErrorBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12,8"
+                                Margin="0,4,0,0">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <PathIcon Grid.Column="0"
+                                          Data="M12,2C17.53,2 22,6.47 22,12C22,17.53 17.53,22 12,22C6.47,22 2,17.53 2,12C2,6.47 6.47,2 12,2M13,17V15H11V17H13M13,13V7H11V13H13Z"
+                                          Width="16" Height="16"
+                                          Margin="0,2,8,0"
+                                          VerticalAlignment="Top"
+                                          Foreground="{DynamicResource ErrorForegroundBrush}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding ErrorMessage}"
+                                           TextWrapping="Wrap"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource ErrorForegroundBrush}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Loading Indicator (ボタンの上に配置) -->
+                        <StackPanel IsVisible="{Binding IsLoading}"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    Spacing="8"
+                                    Margin="0,8">
+                            <PathIcon Data="M12,1A11,11 0 1,0 23,12A11,11 0 0,0 12,1M12,19A7,7 0 1,1 19,12A7,7 0 0,1 12,19Z"
+                                      Width="16" Height="16"
+                                      Classes="spin"/>
+                            <TextBlock Text="認証中..."
+                                       FontSize="13"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+
                         <!-- Login Button -->
+                        <!-- 注意: IsEnabledはCommandのCanExecuteで自動制御されるため明示的なバインドは不要 -->
                         <Button Classes="primary-button"
                                 Command="{Binding LoginWithEmailCommand}"
                                 Content="ログイン"
-                                IsEnabled="{Binding !IsLoading}"
                                 KeyboardNavigation.TabIndex="5"/>
-                    </StackPanel>
-                    
-                    <!-- Error Message -->
-                    <Border IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                            Background="{DynamicResource ErrorBackgroundBrush}"
-                            BorderBrush="{DynamicResource ErrorBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="12,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <PathIcon Data="M12,2L13.09,8.26L22,9L13.09,9.74L12,16L10.91,9.74L2,9L10.91,8.26L12,2Z"
-                                      Width="16" Height="16"
-                                      Foreground="{DynamicResource ErrorForegroundBrush}"/>
-                            <TextBlock Text="{Binding ErrorMessage}"
-                                       TextWrapping="Wrap"
-                                       FontSize="13"
-                                       Foreground="{DynamicResource ErrorForegroundBrush}"/>
-                        </StackPanel>
-                    </Border>
-                    
-                    <!-- Loading Indicator -->
-                    <StackPanel IsVisible="{Binding IsLoading}" 
-                                Orientation="Horizontal" 
-                                HorizontalAlignment="Center"
-                                Spacing="8"
-                                Margin="0,12">
-                        <PathIcon Data="M12,1A11,11 0 1,0 23,12A11,11 0 0,0 12,1M12,19A7,7 0 1,1 19,12A7,7 0 0,1 12,19Z"
-                                  Width="16" Height="16"
-                                  Classes="spin"/>
-                        <TextBlock Text="認証中..." 
-                                   FontSize="13"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

@@ -45,8 +45,26 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Background" Value="#2563EB" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style Selector="Button.primary-button:pointerover">
+            <Setter Property="Background" Value="#1D4ED8" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.primary-button:pressed">
+            <Setter Property="Background" Value="#1E40AF" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+        </Style>
+
+        <Style Selector="Button.primary-button:disabled">
+            <Setter Property="Background" Value="#93C5FD" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
         </Style>
         
         <Style Selector="TextBox.input-field">
@@ -156,17 +174,22 @@
                         </StackPanel>
                         
                         <StackPanel>
-                            <TextBlock Text="パスワード" 
+                            <TextBlock Text="パスワード"
                                        FontSize="13" FontWeight="Medium"
                                        Margin="0,0,0,2"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
                             <TextBox Classes="input-field"
                                      Text="{Binding Password}"
                                      PasswordChar="•"
-                                     Watermark="8文字以上（大文字・小文字・数字を含む）"
+                                     Watermark="8文字以上"
                                      KeyboardNavigation.TabIndex="3"/>
+                            <!-- Password Requirements (パスワード入力直下) -->
+                            <TextBlock Text="※ 8文字以上、大文字・小文字・数字を含む"
+                                       FontSize="11"
+                                       Margin="2,4,0,0"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
-                        
+
                         <StackPanel>
                             <TextBlock Text="パスワード確認" 
                                        FontSize="13" FontWeight="Medium"
@@ -191,7 +214,7 @@
                                 <Run Text="に同意します"/>
                             </TextBlock>
                         </CheckBox>
-                        
+
                         <CheckBox Classes="agreement-checkbox"
                                   IsChecked="{Binding AcceptPrivacyPolicy}"
                                   KeyboardNavigation.TabIndex="6">
@@ -202,68 +225,73 @@
                             </TextBlock>
                         </CheckBox>
                     </StackPanel>
-                    
-                    <!-- Signup Button -->
-                    <Button Classes="primary-button"
-                            Command="{Binding SignupWithEmailCommand}"
-                            Content="アカウントを作成"
-                            IsEnabled="{Binding !IsLoading}"
-                            KeyboardNavigation.TabIndex="7"/>
-                    
-                    <!-- Error Message -->
+
+                    <!-- Success Message (緑色・ボタンの上に配置) -->
+                    <Border IsVisible="{Binding SuccessMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                            Background="#E8F5E9"
+                            BorderBrush="#4CAF50"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,8"
+                            Margin="0,8,0,0">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <PathIcon Grid.Column="0"
+                                      Data="M12,2C17.53,2 22,6.47 22,12C22,17.53 17.53,22 12,22C6.47,22 2,17.53 2,12C2,6.47 6.47,2 12,2M10,17L5,12L6.41,10.58L10,14.17L17.59,6.58L19,8L10,17Z"
+                                      Width="16" Height="16"
+                                      Margin="0,2,8,0"
+                                      VerticalAlignment="Top"
+                                      Foreground="#2E7D32"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding SuccessMessage}"
+                                       TextWrapping="Wrap"
+                                       FontSize="13"
+                                       Foreground="#2E7D32"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Error Message (赤色・ボタンの上に配置) -->
                     <Border IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                             Background="{DynamicResource ErrorBackgroundBrush}"
                             BorderBrush="{DynamicResource ErrorBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Padding="12,8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <PathIcon Data="M12,2L13.09,8.26L22,9L13.09,9.74L12,16L10.91,9.74L2,9L10.91,8.26L12,2Z"
+                            Padding="12,8"
+                            Margin="0,8,0,0">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <PathIcon Grid.Column="0"
+                                      Data="M12,2C17.53,2 22,6.47 22,12C22,17.53 17.53,22 12,22C6.47,22 2,17.53 2,12C2,6.47 6.47,2 12,2M13,17V15H11V17H13M13,13V7H11V13H13Z"
                                       Width="16" Height="16"
+                                      Margin="0,2,8,0"
+                                      VerticalAlignment="Top"
                                       Foreground="{DynamicResource ErrorForegroundBrush}"/>
-                            <TextBlock Text="{Binding ErrorMessage}"
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ErrorMessage}"
                                        TextWrapping="Wrap"
                                        FontSize="13"
                                        Foreground="{DynamicResource ErrorForegroundBrush}"/>
-                        </StackPanel>
+                        </Grid>
                     </Border>
-                    
-                    <!-- Loading Indicator -->
-                    <StackPanel IsVisible="{Binding IsLoading}" 
-                                Orientation="Horizontal" 
+
+                    <!-- Loading Indicator (ボタンの上に配置) -->
+                    <StackPanel IsVisible="{Binding IsLoading}"
+                                Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 Spacing="8"
                                 Margin="0,8">
                         <PathIcon Data="M12,1A11,11 0 1,0 23,12A11,11 0 0,0 12,1M12,19A7,7 0 1,1 19,12A7,7 0 0,1 12,19Z"
                                   Width="16" Height="16"
                                   Classes="spin"/>
-                        <TextBlock Text="アカウント作成中..." 
+                        <TextBlock Text="アカウント作成中..."
                                    FontSize="13"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                     </StackPanel>
-                    
-                    <!-- Password Requirements -->
-                    <Border Background="{DynamicResource CardBackgroundBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="12,8"
-                            Margin="0,4">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="パスワード要件:" 
-                                       FontSize="12" FontWeight="Medium"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="• 8文字以上" 
-                                       FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBlock Text="• 大文字と小文字を含む" 
-                                       FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBlock Text="• 数字を含む" 
-                                       FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                    </Border>
+
+                    <!-- Signup Button -->
+                    <!-- 注意: IsEnabledはCommandのCanExecuteで自動制御されるため明示的なバインドは不要 -->
+                    <Button Classes="primary-button"
+                            Command="{Binding SignupWithEmailCommand}"
+                            Content="アカウントを作成"
+                            KeyboardNavigation.TabIndex="7"/>
                 </StackPanel>
             </ScrollViewer>
             

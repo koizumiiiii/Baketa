@@ -36,16 +36,16 @@ public partial class LoginView : Window
         viewModel.CloseDialogRequested += OnCloseDialogRequested;
     }
 
-    private void OnCloseDialogRequested()
+    private void OnCloseDialogRequested(bool isAuthSuccess)
     {
-        _viewModel?.LogDebug("[AUTH_DEBUG] LoginView: CloseDialogRequestedイベント受信");
-        // 認証成功フラグを設定（OnClosedで使用）
-        _isAuthenticationSuccess = true;
+        _viewModel?.LogDebug($"[AUTH_DEBUG] LoginView: CloseDialogRequestedイベント受信 (認証成功={isAuthSuccess})");
+        // 🔥 [FIX] 認証成功の場合のみフラグを設定（画面切り替え時は設定しない）
+        _isAuthenticationSuccess = isAuthSuccess;
         // Post()を使用して確実にキューイングし、現在の処理が完了してからCloseを実行
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            _viewModel?.LogDebug("[AUTH_DEBUG] LoginView: Close(true)実行");
-            Close(true);
+            _viewModel?.LogDebug("[AUTH_DEBUG] LoginView: Close実行");
+            Close(isAuthSuccess);
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
@@ -70,6 +70,7 @@ public partial class LoginView : Window
 
         // 🔥 [FIX] Phase 2: ウィンドウが完全に閉じた後に認証モードを解除
         // これにより、ReactiveUI通知が破棄済みのウィンドウにアクセスするのを防ぐ
+        // 注意: 画面切り替え（Login→Signup）の場合は認証モードを解除しない
         if (_isAuthenticationSuccess)
         {
             _viewModel?.LogDebug("[AUTH_DEBUG] LoginView: 認証成功のため状態リセットをスケジュール");

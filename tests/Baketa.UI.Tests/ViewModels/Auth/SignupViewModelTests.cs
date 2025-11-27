@@ -284,16 +284,32 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     }
 
     [Fact]
-    public async Task NavigateToLoginCommand_WhenExecuted_CallsNavigationService()
+    public async Task NavigateToLoginCommand_WhenExecuted_FiresCloseDialogRequestedAndNavigates()
     {
         // Arrange
+        _mockNavigationService.Setup(x => x.SwitchToLoginAsync()).Returns(Task.CompletedTask);
         var viewModel = CreateViewModel();
+        bool closeDialogRequested = false;
+        bool wasAuthSuccess = true; // デフォルトはtrue、falseに設定されることを期待
+
+        // イベント購読
+        viewModel.CloseDialogRequested += (isAuthSuccess) =>
+        {
+            closeDialogRequested = true;
+            wasAuthSuccess = isAuthSuccess;
+        };
 
         // Act
         await viewModel.NavigateToLoginCommand.Execute().FirstAsync();
 
         // Assert
-        _mockNavigationService.Verify(x => x.ShowLoginAsync(), Times.Once);
+        // CloseDialogRequestedイベントが発火されることを確認（画面切り替えなのでfalse）
+        closeDialogRequested.Should().BeTrue("CloseDialogRequestedイベントが発火されるべき");
+        wasAuthSuccess.Should().BeFalse("画面切り替えの場合はfalseがパラメータとして渡されるべき");
+
+        // SwitchToLoginAsyncは非同期で遅延実行されるため、少し待ってから確認
+        await Task.Delay(300);
+        _mockNavigationService.Verify(x => x.SwitchToLoginAsync(), Times.Once);
     }
 
     #endregion

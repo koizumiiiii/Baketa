@@ -9,7 +9,7 @@ using Baketa.UI.Framework;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
+// ReactiveUI.Fody.Helpersは不要（FodyのReactiveUIウィービングが無効化されているため）
 using ReactiveUI.Validation.Abstractions;
 using ReactiveUI.Validation.Contexts;
 using ReactiveUI.Validation.Extensions;
@@ -51,14 +51,59 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             new EventId(4, "OAuthAttempt"),
             "OAuth認証試行: {Provider}");
 
-    // Reactive properties with Fody
-    [Reactive] public string Email { get; set; } = string.Empty;
-    [Reactive] public string Password { get; set; } = string.Empty;
-    [Reactive] public string ConfirmPassword { get; set; } = string.Empty;
-    [Reactive] public string DisplayName { get; set; } = string.Empty;
-    [Reactive] public bool AcceptTerms { get; set; }
-    [Reactive] public bool AcceptPrivacyPolicy { get; set; }
+    // 🔥 [FIX] FodyのReactiveUIウィービングが無効化されているため、手動でPropertyChangedを実装
+    // ReactiveUIの標準的なRaiseAndSetIfChangedを直接使用（SetPropertySafeはStackOverflowの原因になる可能性）
+    private string _email = string.Empty;
+    public string Email
+    {
+        get => _email;
+        set => this.RaiseAndSetIfChanged(ref _email, value);
+    }
+
+    private string _password = string.Empty;
+    public string Password
+    {
+        get => _password;
+        set => this.RaiseAndSetIfChanged(ref _password, value);
+    }
+
+    private string _confirmPassword = string.Empty;
+    public string ConfirmPassword
+    {
+        get => _confirmPassword;
+        set => this.RaiseAndSetIfChanged(ref _confirmPassword, value);
+    }
+
+    private string _displayName = string.Empty;
+    public string DisplayName
+    {
+        get => _displayName;
+        set => this.RaiseAndSetIfChanged(ref _displayName, value);
+    }
+
+    private bool _acceptTerms;
+    public bool AcceptTerms
+    {
+        get => _acceptTerms;
+        set => this.RaiseAndSetIfChanged(ref _acceptTerms, value);
+    }
+
+    private bool _acceptPrivacyPolicy;
+    public bool AcceptPrivacyPolicy
+    {
+        get => _acceptPrivacyPolicy;
+        set => this.RaiseAndSetIfChanged(ref _acceptPrivacyPolicy, value);
+    }
+
     // ErrorMessageとIsLoadingはViewModelBaseに既に定義済み
+
+    // 成功メッセージ（緑色で表示）
+    private string? _successMessage;
+    public string? SuccessMessage
+    {
+        get => _successMessage;
+        set => this.RaiseAndSetIfChanged(ref _successMessage, value);
+    }
 
     // IValidatableViewModel implementation
     public IValidationContext ValidationContext { get; } = new ValidationContext();
@@ -155,6 +200,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     private void SetupCommands()
     {
         // メール/パスワードサインアップコマンド
+        // 注意: このセレクタ内でログ出力やプロパティ変更を行わないこと（StackOverflowの原因になる）
         var canExecuteEmailSignup = this.WhenAnyValue(
             x => x.Email,
             x => x.Password,
@@ -202,8 +248,8 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             _logger?.LogInformation("[AUTH_DEBUG] NavigateToLoginCommand実行開始");
 
             // 🔥 [ISSUE#167] ダイアログを閉じて、その後LoginViewを表示
-            _logger?.LogInformation("[AUTH_DEBUG] CloseDialogRequestedイベント発火");
-            CloseDialogRequested?.Invoke();
+            _logger?.LogInformation("[AUTH_DEBUG] CloseDialogRequestedイベント発火 (画面切り替え)");
+            CloseDialogRequested?.Invoke(false); // false = 画面切り替え（認証成功ではない）
 
             // UIスレッドで非同期にLoginViewを表示（ダイアログが閉じた後に実行される）
             _ = Task.Run(async () =>
@@ -290,7 +336,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
                 // 状態変更（SetAuthenticationMode）はViewのOnClosedイベントで行う
                 // これにより、ウィンドウが完全に破棄された後に確実に状態変更される
                 _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火前");
-                CloseDialogRequested?.Invoke();
+                CloseDialogRequested?.Invoke(true); // true = 認証成功
                 _logger?.LogDebug("[AUTH_DEBUG] CloseDialogRequested発火後");
 
                 // 注意: ErrorMessageとSetAuthenticationModeはViewのOnClosedで処理される
@@ -307,12 +353,18 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <summary>
     /// 認証成功フラグ（ダイアログを閉じるために使用）
     /// </summary>
-    [Reactive] public bool AuthenticationSucceeded { get; set; }
+    private bool _authenticationSucceeded;
+    public bool AuthenticationSucceeded
+    {
+        get => _authenticationSucceeded;
+        set => this.RaiseAndSetIfChanged(ref _authenticationSucceeded, value);
+    }
 
     /// <summary>
     /// ダイアログを閉じる要求イベント
+    /// パラメータ: 認証成功の場合はtrue、画面切り替えの場合はfalse
     /// </summary>
-    public event Action? CloseDialogRequested;
+    public event Action<bool>? CloseDialogRequested;
 
     /// <summary>
     /// デバッグログを出力します（Viewからの呼び出し用）
@@ -333,26 +385,57 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             if (_logger != null)
                 _logSignupAttempt(_logger, Email, null);
 
-            var result = await _authService.SignUpWithEmailPasswordAsync(Email, Password).ConfigureAwait(false);
+            // 🔥 [FIX] ConfigureAwait(true)に変更してUIスレッドで継続処理を実行
+            // ConfigureAwait(false)だとバックグラウンドスレッドになり、プロパティ変更でAccessViolationが発生する
+            var result = await _authService.SignUpWithEmailPasswordAsync(Email, Password);
 
             if (result is AuthSuccess success)
             {
                 if (_logger != null)
                     _logSignupSuccess(_logger, Email, null);
 
-                // メールアドレス確認のメッセージを表示
-                // SupabaseはデフォルトでEmail確認を要求するため、ログイン画面へ誘導
-                ErrorMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログイン画面でログインしてください。";
+                // 🔥 [UX改善] 成功メッセージを緑色で表示し、数秒後にログイン画面へ自動遷移
+                SuccessMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...";
+                ErrorMessage = null; // エラーメッセージをクリア
 
                 _logger?.LogInformation("サインアップ成功: 確認メールを送信しました（Email: {Email}）", Email);
 
-                // 少し待ってからログイン画面へ遷移
-                await Task.Delay(3000).ConfigureAwait(false);
-                await _navigationService.SwitchToLoginAsync().ConfigureAwait(false);
+                // 3秒待ってからログイン画面へ遷移
+                await Task.Delay(3000);
+
+                // ダイアログを閉じてLoginViewを表示
+                CloseDialogRequested?.Invoke(false); // false = 画面切り替え（認証成功ではない）
+                await Task.Delay(150); // ダイアログが閉じるのを待つ
+                await _navigationService.SwitchToLoginAsync();
             }
             else if (result is AuthFailure failure)
             {
-                ErrorMessage = GetAuthFailureMessage(failure.ErrorCode, failure.Message);
+                // 🔥 [FIX] EmailNotConfirmedは成功として扱う（確認メール送信成功）
+                // SupabaseAuthServiceは確認メール送信時にAuthFailure(EmailNotConfirmed)を返す
+                if (failure.ErrorCode == AuthErrorCodes.EmailNotConfirmed)
+                {
+                    if (_logger != null)
+                        _logSignupSuccess(_logger, Email, null);
+
+                    // 緑色の成功メッセージを表示
+                    SuccessMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...";
+                    ErrorMessage = null;
+
+                    _logger?.LogInformation("サインアップ成功（メール確認待ち）: 確認メールを送信しました（Email: {Email}）", Email);
+
+                    // 3秒待ってからログイン画面へ遷移
+                    await Task.Delay(3000);
+
+                    // ダイアログを閉じてLoginViewを表示
+                    CloseDialogRequested?.Invoke(false);
+                    await Task.Delay(150);
+                    await _navigationService.SwitchToLoginAsync();
+                }
+                else
+                {
+                    // 通常のエラー
+                    ErrorMessage = GetAuthFailureMessage(failure.ErrorCode, failure.Message);
+                }
             }
         }
         catch (Exception ex)
@@ -381,8 +464,9 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             if (_logger != null)
                 _logOAuthAttempt(_logger, provider.ToString(), null);
 
+            // 🔥 [FIX] ConfigureAwait(true)でUIスレッドを維持
             // OAuthCallbackHandlerを使用してブラウザベースのOAuth認証を開始
-            var result = await _oauthHandler.StartOAuthFlowAsync(provider).ConfigureAwait(false);
+            var result = await _oauthHandler.StartOAuthFlowAsync(provider);
 
             // 🔥 [FIX] ViewModelがDisposeされている場合は何もしない
             // OAuth成功時、AuthStatusChangedイベントがダイアログを閉じてViewModelをDisposeする
@@ -489,13 +573,14 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <returns>ユーザーフレンドリーなエラーメッセージ</returns>
     private static string GetAuthFailureMessage(string errorCode, string message)
     {
+        // 🔥 [FIX] AuthErrorCodes定数を使用（大文字小文字の不一致を修正）
         return errorCode switch
         {
-            "email_already_exists" => "このメールアドレスは既に使用されています",
-            "weak_password" => "パスワードが弱すぎます。より強固なパスワードを設定してください",
-            "invalid_email" => "無効なメールアドレス形式です",
-            "email_not_confirmed" => "メールアドレスの確認が必要です。確認メールをご確認ください",
-            "too_many_requests" => "リクエストが多すぎます。しばらく時間をおいてから再試行してください",
+            AuthErrorCodes.UserAlreadyExists => "このメールアドレスは既に使用されています",
+            AuthErrorCodes.WeakPassword => "パスワードが弱すぎます。より強固なパスワードを設定してください",
+            AuthErrorCodes.InvalidCredentials => "無効なメールアドレス形式です",
+            AuthErrorCodes.EmailNotConfirmed => "確認メールを送信しました。メール内のリンクをクリックしてから、ログイン画面でログインしてください。",
+            AuthErrorCodes.RateLimitExceeded => "リクエストが多すぎます。しばらく時間をおいてから再試行してください",
             "signup_disabled" => "現在、新規アカウント作成を停止しています",
             _ => $"アカウント作成に失敗しました: {message}"
         };

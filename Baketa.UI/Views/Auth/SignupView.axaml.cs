@@ -37,16 +37,16 @@ public partial class SignupView : Window
         viewModel.CloseDialogRequested += OnCloseDialogRequested;
     }
 
-    private void OnCloseDialogRequested()
+    private void OnCloseDialogRequested(bool isAuthSuccess)
     {
-        _viewModel?.LogDebug("[AUTH_DEBUG] SignupView: CloseDialogRequestedイベント受信");
-        // 認証成功フラグを設定（OnClosedで使用）
-        _isAuthenticationSuccess = true;
+        _viewModel?.LogDebug($"[AUTH_DEBUG] SignupView: CloseDialogRequestedイベント受信 (認証成功={isAuthSuccess})");
+        // 🔥 [FIX] 認証成功の場合のみフラグを設定（画面切り替え時は設定しない）
+        _isAuthenticationSuccess = isAuthSuccess;
         // Post()を使用して確実にキューイングし、現在の処理が完了してからCloseを実行
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            _viewModel?.LogDebug("[AUTH_DEBUG] SignupView: Close(true)実行");
-            Close(true);
+            _viewModel?.LogDebug("[AUTH_DEBUG] SignupView: Close実行");
+            Close(isAuthSuccess);
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
