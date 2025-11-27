@@ -115,10 +115,14 @@
   - トークン本体はログに出力されない
 
 #### 7. テスト実装
-- [ ] **`WindowsCredentialStorageTests.cs` 作成**（xUnit）- 未実装
-  - 保存・読み込みテスト (5ケース)
-  - 削除テスト (2ケース)
+- [x] **`WindowsCredentialStorageTests.cs` 作成**（xUnit）✅ 完了
+  - 保存・読み込みテスト (7ケース)
+  - 削除テスト (3ケース)
   - 存在確認テスト (3ケース)
+  - 統合テスト (2ケース)
+  - 並行性テスト (2ケース)
+  - サイズ制限テスト (2ケース)
+  - 合計: 21ケース
 
 - [x] **`TokenRefreshServiceTests.cs` 作成**（xUnit + Moq）✅ 完了
   - トークン更新テスト
