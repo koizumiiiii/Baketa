@@ -137,6 +137,11 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     // IValidatableViewModel implementation
     public IValidationContext ValidationContext { get; } = new ValidationContext();
 
+    // Legal page URLs (GitHub Pages)
+    // TODO: Move to configuration/settings when custom domain is available
+    private const string TermsOfServiceUrl = "https://koizumiiiii.github.io/Baketa/pages/terms-of-service.html";
+    private const string PrivacyPolicyUrl = "https://koizumiiiii.github.io/Baketa/pages/privacy-policy.html";
+
     // Commands (initialized in SetupCommands method)
     public ReactiveCommand<Unit, Unit> SignupWithEmailCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> SignupWithGoogleCommand { get; private set; } = null!;
@@ -144,6 +149,8 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     public ReactiveCommand<Unit, Unit> SignupWithTwitchCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> NavigateToLoginCommand { get; private set; } = null!;
     public ReactiveCommand<Unit, Unit> ExitCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> OpenTermsCommand { get; private set; } = null!;
+    public ReactiveCommand<Unit, Unit> OpenPrivacyPolicyCommand { get; private set; } = null!;
 
     /// <summary>
     /// SignupViewModelを初期化します
@@ -305,6 +312,14 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             }
         });
         Disposables.Add(ExitCommand);
+
+        // 利用規約を開くコマンド
+        OpenTermsCommand = ReactiveCommand.Create(() => OpenUrlInBrowser(TermsOfServiceUrl));
+        Disposables.Add(OpenTermsCommand);
+
+        // プライバシーポリシーを開くコマンド
+        OpenPrivacyPolicyCommand = ReactiveCommand.Create(() => OpenUrlInBrowser(PrivacyPolicyUrl));
+        Disposables.Add(OpenPrivacyPolicyCommand);
 
         // エラーハンドリング
         SetupCommandErrorHandling();
@@ -654,5 +669,26 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             UnauthorizedAccessException => "認証に失敗しました",
             _ => $"予期しないエラーが発生しました: {ex.Message}"
         };
+    }
+
+    /// <summary>
+    /// 指定したURLをデフォルトブラウザで開きます
+    /// </summary>
+    /// <param name="url">開くURL</param>
+    private void OpenUrlInBrowser(string url)
+    {
+        try
+        {
+            _logger?.LogDebug("外部URLを開く: {Url}", url);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "URLを開けませんでした: {Url}", url);
+        }
     }
 }

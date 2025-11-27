@@ -232,7 +232,8 @@
                                   KeyboardNavigation.TabIndex="5">
                             <TextBlock TextWrapping="Wrap">
                                 <Run Text=""/>
-                                <Button Classes="link" Content="利用規約" Padding="0" FontSize="13"/>
+                                <Button Classes="link" Content="利用規約" Padding="0" FontSize="13"
+                                        Command="{Binding OpenTermsCommand}"/>
                                 <Run Text="に同意します"/>
                             </TextBlock>
                         </CheckBox>
@@ -242,7 +243,8 @@
                                   KeyboardNavigation.TabIndex="6">
                             <TextBlock TextWrapping="Wrap">
                                 <Run Text=""/>
-                                <Button Classes="link" Content="プライバシーポリシー" Padding="0" FontSize="13"/>
+                                <Button Classes="link" Content="プライバシーポリシー" Padding="0" FontSize="13"
+                                        Command="{Binding OpenPrivacyPolicyCommand}"/>
                                 <Run Text="に同意します"/>
                             </TextBlock>
                         </CheckBox>

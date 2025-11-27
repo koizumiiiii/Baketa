@@ -3,130 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baketa - ゲーム翻訳オーバーレイ</title>
-    <meta name="description" content="Baketaは、ゲーム画面のテキストをリアルタイムで翻訳するWindowsアプリケーションです。">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 48px;
-            max-width: 600px;
-            width: 100%;
-            text-align: center;
-        }
-        .logo {
-            font-size: 48px;
-            font-weight: 700;
-            color: #667eea;
-            margin-bottom: 16px;
-        }
-        h1 {
-            color: #333;
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
-        p {
-            color: #666;
-            font-size: 16px;
-            line-height: 1.6;
-            margin-bottom: 24px;
-        }
-        .features {
-            text-align: left;
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 24px;
-            margin: 24px 0;
-        }
-        .features h2 {
-            color: #333;
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
-        .features ul {
-            list-style: none;
-        }
-        .features li {
-            padding: 8px 0;
-            color: #555;
-            display: flex;
-            align-items: flex-start;
-        }
-        .features li::before {
-            content: "✓";
-            color: #4CAF50;
-            font-weight: bold;
-            margin-right: 12px;
-        }
-        .cta {
-            margin-top: 24px;
-        }
-        .cta a {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            padding: 14px 32px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .cta a:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-        }
-        .footer {
-            margin-top: 32px;
-            padding-top: 24px;
-            border-top: 1px solid #eee;
-        }
-        .footer p {
-            font-size: 13px;
-            color: #999;
-            margin-bottom: 0;
-        }
-    </style>
+    <title>Baketa - 言語の壁を超えて、世界中のゲームを楽しもう</title>
+    <meta name="description" content="Baketaは、ゲーム画面のテキストをリアルタイムで翻訳するWindowsアプリケーションです。日本語未対応のゲームも、あなたの言葉でプレイできます。">
+    <meta name="keywords" content="ゲーム翻訳,OCR,オーバーレイ,リアルタイム翻訳,Windows">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
-    <div class="container">
-        <div class="logo">Baketa</div>
-        <h1>ゲーム翻訳オーバーレイ</h1>
-        <p>ゲーム画面のテキストをリアルタイムでOCR検出し、翻訳結果をオーバーレイ表示するWindowsアプリケーションです。</p>
+<body class="page page--hero page--centered">
+    <div class="card card--elevated card--landing">
 
-        <div class="features">
-            <h2>主な機能</h2>
-            <ul>
-                <li>PaddleOCR PP-OCRv5による高精度テキスト検出</li>
-                <li>NLLB-200による多言語翻訳</li>
-                <li>透明オーバーレイによるシームレスな表示</li>
-                <li>Windows Graphics Capture APIによる安定したキャプチャ</li>
-            </ul>
+        <!-- Badge -->
+        <div class="badge badge--success">
+            <span>&#10003;</span>
+            <span>基本無料・オープンソース</span>
         </div>
 
-        <div class="cta">
-            <a href="https://github.com/koizumiiiii/Baketa">GitHub でダウンロード</a>
+        <!-- Hero Section -->
+        <p class="hero-tagline">ゲーム翻訳オーバーレイ</p>
+        <h1 class="hero-title">言語の壁を超えて、<br>世界中のゲームを楽しもう</h1>
+        <p class="hero-description">
+            ゲーム中にスマホで翻訳...その手間、もう不要です。<br>
+            Baketaが画面内のテキストを自動で検出・翻訳。<br>
+            ゲームの没入感を損なわずにプレイできます。
+        </p>
+
+        <!-- Primary CTA -->
+        <div class="cta-group">
+            <a href="https://github.com/koizumiiiii/Baketa/releases" class="btn btn--primary btn--lg">
+                無料でダウンロード
+            </a>
+            <span class="cta-hint">Windows 10/11対応 ・ インストール不要 ・ 英語⇔日本語</span>
         </div>
 
-        <div class="footer">
-            <p>&copy; 2024 Baketa. All rights reserved.</p>
+        <div class="divider"></div>
+
+        <!-- How it works -->
+        <h2 class="feature-box__title">使い方は簡単</h2>
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-card__number">1</div>
+                <div class="step-card__title">選ぶ</div>
+                <div class="step-card__description">翻訳したいゲームのウィンドウを選択</div>
+            </div>
+            <div class="step-card">
+                <div class="step-card__number">2</div>
+                <div class="step-card__title">開始</div>
+                <div class="step-card__description">スタートボタンを押すだけ</div>
+            </div>
+            <div class="step-card">
+                <div class="step-card__number">3</div>
+                <div class="step-card__title">プレイ</div>
+                <div class="step-card__description">あとは普通にゲームを楽しむ</div>
+            </div>
         </div>
+
+        <div class="divider"></div>
+
+        <!-- Benefits -->
+        <h2 class="feature-box__title">Baketaの特徴</h2>
+        <div class="benefit-grid">
+            <div class="benefit-item">
+                <div class="benefit-item__icon">&#10003;</div>
+                <div class="benefit-item__text">
+                    <div class="benefit-item__title">PC上で完結</div>
+                    <div>スマホでカメラを向ける必要なし</div>
+                </div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-item__icon">&#10003;</div>
+                <div class="benefit-item__text">
+                    <div class="benefit-item__title">ゲームを止めない</div>
+                    <div>プレイしながらリアルタイムで翻訳</div>
+                </div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-item__icon">&#10003;</div>
+                <div class="benefit-item__text">
+                    <div class="benefit-item__title">画面に溶け込む</div>
+                    <div>透明オーバーレイで没入感そのまま</div>
+                </div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-item__icon">&#10003;</div>
+                <div class="benefit-item__text">
+                    <div class="benefit-item__title">基本無料</div>
+                    <div>無料プランはローカル処理でデータ送信なし</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Final CTA -->
+        <p class="urgency-text">今すぐ始めて、新しいゲーム体験を</p>
+        <div class="cta-group mt-4">
+            <a href="https://github.com/koizumiiiii/Baketa/releases" class="btn btn--primary btn--lg">
+                無料でダウンロード
+            </a>
+            <a href="https://github.com/koizumiiiii/Baketa" class="btn btn--secondary">
+                GitHubでソースを見る
+            </a>
+        </div>
+
+        <footer class="footer footer--landing">
+            <p>
+                <a href="terms-of-service.html">利用規約</a> ・
+                <a href="privacy-policy.html">プライバシーポリシー</a>
+            </p>
+            <p>&copy; 2025 Baketa. All rights reserved.</p>
+        </footer>
     </div>
 </body>
 </html>
