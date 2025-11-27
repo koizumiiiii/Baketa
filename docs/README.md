@@ -5,8 +5,11 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 ## ドキュメント構成
 
 ### 静的ページ（GitHub Pages）
-- [ランディングページ](pages/index.html) - 製品紹介ページ
-- [メール確認完了ページ](pages/auth/confirm/index.html) - Supabase認証後のリダイレクト先
+- [ランディングページ](pages/index.html) - 製品紹介ページ（英語⇔日本語対応）
+- [利用規約](pages/terms-of-service.html) - サービス利用条件
+- [プライバシーポリシー](pages/privacy-policy.html) - 個人情報取り扱い方針
+- [パスワードリセット](pages/forgot-password.html) - パスワードリセット手順ガイド
+- [メール確認完了](pages/auth/confirm/index.html) - Supabase認証後のリダイレクト先
 
 ### 1. プロジェクト概要
 - [プロジェクト概要](1-project/overview.md)
@@ -108,6 +111,30 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [翻訳システム実装確認完了レポート](development-notes/baketa-translation-status.md) **最新** - Phase 5完了・実ファイル検証済み・プロダクション品質達成
 
 ## 最新の更新情報
+
+**2025年11月28日** - **Issue #167, #168 完了・静的ページ追加** 🔐
+
+### 📋 **認証システム完全完了**
+
+Issue #167（ログイン/登録UI）と#168（トークン管理）の全タスクが完了しました。
+
+#### **✅ Issue #167 完了項目**
+- **パスワード強度バリデーション**: 8文字以上、3種類以上の文字種、ブラックリストチェック
+- **強度インジケーター**: 弱い/普通/強いの3段階表示
+- **利用規約・プライバシーポリシーリンク**: 外部ブラウザでGitHub Pagesを開く
+
+#### **✅ Issue #168 完了項目**
+- **TokenExpirationHandler**: HTTP 401検出時の自動ログアウト
+- **WindowsCredentialStorageTests**: 21テストケース（保存/読込/削除/並行性/サイズ制限）
+
+#### **📄 GitHub Pages 静的ページ追加**
+- [ランディングページ](pages/index.html) - 製品紹介（対応言語: 英語⇔日本語）
+- [利用規約](pages/terms-of-service.html) - サービス利用条件
+- [プライバシーポリシー](pages/privacy-policy.html) - 個人情報取り扱い
+- [パスワードリセット手順](pages/forgot-password.html) - リセット方法ガイド
+- [共有CSS](pages/css/styles.css) - デザインシステム（ダークモード対応）
+
+---
 
 **2025年11月27日** - **Supabase Auth統合・認証UI実装** 🔐
 
