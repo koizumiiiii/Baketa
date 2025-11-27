@@ -1,8 +1,8 @@
 # Baketaプロジェクト概要
 
-*最終更新: 2025年11月27日*
+*最終更新: 2025年11月28日*
 
-> **プロダクション状態**: Baketa翻訳システムは**Phase 5.3完全実装達成**により、プロダクション環境での安定運用が可能な状態です。gRPC翻訳システム、PP-OCRv5統合、Windows Graphics Capture API、ArrayPoolメモリ最適化が完了し、1,518テストケース（100%成功率）で品質が実証されています。
+> **プロダクション状態**: Baketa翻訳システムは**Phase 5.3完全実装達成**および**認証システム完全実装（Issue #167, #168）**により、プロダクション環境での安定運用が可能な状態です。gRPC翻訳システム、PP-OCRv5統合、Windows Graphics Capture API、ArrayPoolメモリ最適化、Supabase Auth統合が完了し、1,500+テストケース（100%成功率）で品質が実証されています。
 
 ## 1. プロジェクト概要
 
@@ -39,12 +39,13 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - **通知システム**: WindowNotificationManager統合・確認ダイアログ実装
 - **ゲームプロファイル**: ゲーム別の最適設定
 
-#### **🔐 認証システム（実装中）**
+#### **🔐 認証システム（完全実装済み - Issue #167, #168）**
 - **Supabase Auth統合**: Email/Password認証、OAuth認証（Google/Discord/Twitch）
 - **ログイン/登録UI**: ReactiveUIベースのログイン・サインアップ画面
-- **OAuthコールバック**: ローカルHTTPサーバーによるデスクトップアプリ対応
-- **トークン管理**: Windows Credential Manager統合（予定）
-- **GitHub Pages**: メール確認完了ページ
+- **OAuthコールバック**: ローカルHTTPサーバーによるデスクトップアプリ対応（PKCEフロー）
+- **トークン管理**: Windows Credential Manager統合、TokenExpirationHandler
+- **パスワード強度検証**: 3種類以上文字種要件、ブラックリストチェック、強度インジケーター
+- **GitHub Pages**: ランディングページ、利用規約、プライバシーポリシー、パスワードリセット
 
 ### 1.2 差別化要素（プロダクション達成済み）
 
