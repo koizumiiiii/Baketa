@@ -430,6 +430,7 @@ temp_translations/
 # Configuration files with sensitive data
 appsettings.Production.json
 appsettings.Local.json
+appsettings.Development.json
 **/secrets.json
 **/*secrets*.json
 
