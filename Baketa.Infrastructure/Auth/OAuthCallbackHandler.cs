@@ -196,8 +196,7 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
 
                 _logger.LogDebug("[OAUTH_DEBUG] GetContextAsync()呼び出し開始");
                 var context = await _httpListener.GetContextAsync().ConfigureAwait(false);
-                // セキュリティ: クエリパラメータを除いたパスのみログ出力
-                _logger.LogInformation("[OAUTH_DEBUG] リクエスト受信: {Path}", context.Request.Url?.LocalPath ?? "(unknown)");
+                _logger.LogDebug("[OAUTH_DEBUG] HTTPリクエスト受信");
                 // Handle callback in a separate task to avoid blocking the listener
                 await HandleCallbackSafelyAsync(context).ConfigureAwait(false);
             }
@@ -247,8 +246,7 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
 
         try
         {
-            // セキュリティ: URLパスのみログ出力（クエリパラメータは除外）
-            _logger.LogDebug("Received callback request: {Path}", request.Url?.LocalPath ?? "(unknown)");
+            _logger.LogDebug("OAuthコールバックリクエスト処理開始");
 
             // Check if this is the OAuth callback path
             if (request.Url?.LocalPath != "/oauth/callback")
@@ -267,10 +265,9 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             // Handle OAuth provider errors
             if (!string.IsNullOrEmpty(error))
             {
-                // セキュリティ: エラーコードのみログ出力（詳細説明は省略）
-                _logger.LogWarning("OAuth error received: {Error}", error);
-                await SendResponseAsync(response, "認証エラー", $"エラー: {error}\n{errorDescription}", false).ConfigureAwait(false);
-                _callbackTcs?.TrySetResult(new AuthFailure(AuthErrorCodes.OAuthError, errorDescription ?? error));
+                _logger.LogWarning("OAuthプロバイダーからエラーが返されました");
+                await SendResponseAsync(response, "認証エラー", "認証プロバイダーでエラーが発生しました。再度お試しください。", false).ConfigureAwait(false);
+                _callbackTcs?.TrySetResult(new AuthFailure(AuthErrorCodes.OAuthError, "認証プロバイダーエラー"));
                 return;
             }
 

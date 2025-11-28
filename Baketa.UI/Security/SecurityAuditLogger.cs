@@ -112,7 +112,10 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     {
         var logLevel = EventLogLevels.GetValueOrDefault(eventType, LogLevel.Information);
         var timestamp = DateTime.UtcNow;
-        var normalizedUserInfo = userInfo ?? "Anonymous";
+        // セキュリティ: ユーザー情報がメールアドレスの場合はマスク
+        var normalizedUserInfo = userInfo != null && userInfo.Contains('@')
+            ? MaskEmail(userInfo)
+            : userInfo ?? "Anonymous";
         var normalizedIpAddress = ipAddress ?? GetLocalIPAddress();
 
         // 構造化データの準備
