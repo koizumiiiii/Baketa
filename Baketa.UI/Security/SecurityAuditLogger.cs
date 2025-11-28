@@ -25,6 +25,29 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    /// <summary>
+    /// メールアドレスをマスク（例: te***@example.com）
+    /// </summary>
+    private static string MaskEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return "[unknown]";
+
+        var atIndex = email.IndexOf('@');
+        if (atIndex <= 0)
+            return "[invalid-email]";
+
+        var localPart = email[..atIndex];
+        var domain = email[atIndex..];
+
+        // ローカル部分を最初の2文字 + *** に置換
+        var maskedLocal = localPart.Length <= 2
+            ? "***"
+            : localPart[..2] + "***";
+
+        return maskedLocal + domain;
+    }
+
     // セキュリティイベントタイプ
     public enum SecurityEventType
     {
@@ -134,12 +157,13 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     /// <param name="ipAddress">IPアドレス</param>
     public void LogLoginAttempt(string email, bool success, string? failureReason = null, string? ipAddress = null)
     {
+        var maskedEmail = MaskEmail(email);
         var eventType = success ? SecurityEventType.LoginSuccess : SecurityEventType.LoginFailure;
         var details = success
-            ? $"ログイン成功: {email}"
-            : $"ログイン失敗: {email} - {failureReason}";
+            ? $"ログイン成功: {maskedEmail}"
+            : $"ログイン失敗: {maskedEmail} - {failureReason}";
 
-        LogSecurityEvent(eventType, details, email, ipAddress);
+        LogSecurityEvent(eventType, details, maskedEmail, ipAddress);
     }
 
     /// <summary>
@@ -151,9 +175,10 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     /// <param name="ipAddress">IPアドレス</param>
     public void LogAccountLockout(string email, int attemptCount, TimeSpan lockoutDuration, string? ipAddress = null)
     {
-        var details = $"アカウントロックアウト: {email} - 試行回数: {attemptCount}, ロックアウト期間: {lockoutDuration.TotalMinutes}分";
+        var maskedEmail = MaskEmail(email);
+        var details = $"アカウントロックアウト: {maskedEmail} - 試行回数: {attemptCount}, ロックアウト期間: {lockoutDuration.TotalMinutes}分";
 
-        LogSecurityEvent(SecurityEventType.AccountLockout, details, email, ipAddress, new
+        LogSecurityEvent(SecurityEventType.AccountLockout, details, maskedEmail, ipAddress, new
         {
             AttemptCount = attemptCount,
             LockoutDuration = lockoutDuration,

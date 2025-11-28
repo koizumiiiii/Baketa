@@ -196,7 +196,8 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
 
                 _logger.LogDebug("[OAUTH_DEBUG] GetContextAsync()呼び出し開始");
                 var context = await _httpListener.GetContextAsync().ConfigureAwait(false);
-                _logger.LogInformation("[OAUTH_DEBUG] リクエスト受信: {Url}", context.Request.Url);
+                // セキュリティ: クエリパラメータを除いたパスのみログ出力
+                _logger.LogInformation("[OAUTH_DEBUG] リクエスト受信: {Path}", context.Request.Url?.LocalPath ?? "(unknown)");
                 // Handle callback in a separate task to avoid blocking the listener
                 await HandleCallbackSafelyAsync(context).ConfigureAwait(false);
             }
@@ -246,7 +247,8 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
 
         try
         {
-            _logger.LogDebug("Received callback request: {Path}", request.Url?.LocalPath);
+            // セキュリティ: URLパスのみログ出力（クエリパラメータは除外）
+            _logger.LogDebug("Received callback request: {Path}", request.Url?.LocalPath ?? "(unknown)");
 
             // Check if this is the OAuth callback path
             if (request.Url?.LocalPath != "/oauth/callback")
@@ -265,7 +267,8 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             // Handle OAuth provider errors
             if (!string.IsNullOrEmpty(error))
             {
-                _logger.LogWarning("OAuth error received: {Error} - {Description}", error, errorDescription);
+                // セキュリティ: エラーコードのみログ出力（詳細説明は省略）
+                _logger.LogWarning("OAuth error received: {Error}", error);
                 await SendResponseAsync(response, "認証エラー", $"エラー: {error}\n{errorDescription}", false).ConfigureAwait(false);
                 _callbackTcs?.TrySetResult(new AuthFailure(AuthErrorCodes.OAuthError, errorDescription ?? error));
                 return;
@@ -281,8 +284,8 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
                 return;
             }
 
-            // state パラメータのログ（デバッグ用）
-            _logger.LogDebug("OAuth callback state parameter: {State}", state ?? "(none)");
+            // state パラメータの存在確認のみログ（セキュリティ: 実際の値は出力しない）
+            _logger.LogDebug("OAuth callback state parameter present: {HasState}", !string.IsNullOrEmpty(state));
 
             // Validate authorization code
             if (string.IsNullOrEmpty(code))
