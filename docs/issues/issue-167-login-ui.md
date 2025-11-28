@@ -152,7 +152,7 @@ Supabase認証システム（#133で構築）を利用したログイン/登録U
   - ローカルHTTPサーバーでコールバック受信
   - 認証コード→セッショントークン交換
 
-- [ ] **アカウント紐付け処理** - Supabase側で自動処理
+- [x] **アカウント紐付け処理** - Supabase側で自動処理 ✅ 完了（Supabase標準機能）
   - 既存メールアドレスと一致する場合、自動紐付け
   - 初回ログイン時、Supabaseアカウント作成
   - プロフィール情報同期（アバター、表示名）
@@ -737,7 +737,7 @@ public async Task<AuthResult> LinkSocialAccountAsync(OAuthProvider provider, str
 ---
 
 **作成日**: 2025-11-18
-**最終更新**: 2025-11-18
+**最終更新**: 2025-11-28
 **作成者**: Claude Code
 **関連ドキュメント**: `docs/BETA_DEVELOPMENT_PLAN.md`, `docs/issues/issue-133-supabase-auth.md` (既存)
 

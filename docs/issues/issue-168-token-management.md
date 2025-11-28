@@ -634,7 +634,7 @@ public class TokenExpirationHandler
 - [x] **自動ログイン**: アプリ再起動時、保存済みトークンで自動ログインできる ✅ 実装済み
 - [x] **トークン更新**: 期限切れ前にトークンが自動更新される ✅ 実装済み
 - [x] **トークン削除**: ログアウト時にCredential Managerからトークンが削除される ✅ 実装済み
-- [ ] **有効期限チェック**: 期限切れトークンでログイン試行時、エラーが返される
+- [x] **有効期限チェック**: 期限切れトークンでログイン試行時、エラーが返される ✅ TokenExpirationHandler実装済み
 - [x] **セキュリティ**: 他のWindowsユーザーからトークンが読み込めないことを確認 ✅ DPAPI自動暗号化
 
 #### 並列制御
@@ -655,7 +655,7 @@ public class TokenExpirationHandler
 
 ### テスト実行基準
 
-- [ ] `WindowsCredentialStorageTests`: 未実装
+- [x] `WindowsCredentialStorageTests`: 21件成功 ✅ (2025-11-27)
 - [x] `TokenRefreshServiceTests`: 15件成功 ✅
 - [x] `FileTokenAuditLoggerTests`: 成功 ✅
 - [x] `SupabaseAuthServiceIntegrationTests`: 49件成功 ✅
@@ -696,8 +696,8 @@ public class TokenExpirationHandler
 - `Baketa.Infrastructure/Auth/TokenExpirationHandler.cs` - HTTP 401検出・自動ログアウト実装
 - `tests/Baketa.Infrastructure.Tests/Auth/TokenExpirationHandlerTests.cs` - テスト（30件）
 
-### 未実装
-- `tests/Baketa.Infrastructure.Platform.Tests/Windows/Credentials/WindowsCredentialStorageTests.cs` - 資格情報ストレージテスト
+### 追加実装（2025-11-27）✅
+- `tests/Baketa.Infrastructure.Platform.Tests/Windows/Credentials/WindowsCredentialStorageTests.cs` - 資格情報ストレージテスト（21件）
 
 ### 修正（実装済み）✅
 - `Baketa.Infrastructure/Auth/SupabaseAuthService.cs` - トークン保存・読み込み統合、ITokenAuditLogger統合
@@ -772,5 +772,6 @@ public class TokenExpirationHandler
 ---
 
 **作成日**: 2025-11-18
+**最終更新**: 2025-11-28
 **作成者**: Claude Code
 **関連ドキュメント**: `docs/BETA_DEVELOPMENT_PLAN.md`, `docs/issues/issue-167-login-ui.md`
