@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using Baketa.Core.Abstractions.Auth;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,8 @@ public sealed record OAuthFlowState(Uri Uri, string PkceVerifier, string StatePa
 /// Supabase authentication service implementation using C# 12 features
 /// Provides comprehensive authentication functionality with OAuth and email/password support
 /// </summary>
+[SuppressMessage("CodeQuality", "cs/exposure-of-private-information",
+    Justification = "All email addresses are masked using MaskEmail() before logging. MaskEmail converts 'user@example.com' to 'us***@example.com'")]
 public sealed class SupabaseAuthService : IAuthService, IDisposable
 {
     private readonly ILogger<SupabaseAuthService> _logger;

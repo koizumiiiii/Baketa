@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -102,6 +103,8 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     /// <param name="ipAddress">IPアドレス</param>
     /// <param name="additionalData">追加データ</param>
     /// <param name="source">呼び出し元メソッド名</param>
+    [SuppressMessage("CodeQuality", "cs/clear-text-storage-of-sensitive-information",
+        Justification = "Emails are masked before logging. Enum values like RecoveryType are not sensitive.")]
     public void LogSecurityEvent(
         SecurityEventType eventType,
         string details,

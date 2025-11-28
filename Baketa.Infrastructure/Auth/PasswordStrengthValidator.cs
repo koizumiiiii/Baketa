@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Baketa.Core.Abstractions.Auth;
 using Microsoft.Extensions.Logging;
@@ -92,6 +93,8 @@ public sealed class PasswordStrengthValidator : IPasswordStrengthValidator
     }
 
     /// <inheritdoc/>
+    [SuppressMessage("CodeQuality", "cs/clear-text-storage-of-sensitive-information",
+        Justification = "Only logging category count (1-4) and strength enum, not the actual password")]
     public PasswordValidationResult ValidatePassword(string password)
     {
         var errors = new List<string>();
