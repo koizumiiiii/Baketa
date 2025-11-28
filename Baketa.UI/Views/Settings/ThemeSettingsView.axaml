@@ -21,10 +21,10 @@
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
-            <!-- 基本設定 -->
+            <!-- テーマ設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="基本設定" FontSize="16" FontWeight="SemiBold"/>
-                
+                <TextBlock Text="テーマ設定" FontSize="16" FontWeight="SemiBold"/>
+
                 <controls:SettingsItem Title="アプリケーションテーマ"
                                         Description="ライト、ダーク、または自動（システム設定に従う）">
                     <controls:SettingsItem.SettingContent>
@@ -39,154 +39,6 @@
                         </ComboBox>
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
-
-                <controls:SettingsItem Title="アクセントカラー"
-                                        Description="アプリケーションのアクセントカラー">
-                    <controls:SettingsItem.SettingContent>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Border Width="30" Height="30" 
-                                    Background="{Binding AccentColorHex}"
-                                    CornerRadius="4" 
-                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" 
-                                    BorderThickness="1"/>
-                            <Button Content="色を選択" 
-                                    Command="{Binding ChooseAccentColorCommand}"/>
-                            <TextBlock Text="{Binding AccentColorHex}" 
-                                       VerticalAlignment="Center" 
-                                       FontFamily="Consolas"/>
-                        </StackPanel>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="フォントファミリー"
-                                        Description="アプリケーションで使用するフォント">
-                    <controls:SettingsItem.SettingContent>
-                        <ComboBox ItemsSource="{Binding FontFamilyOptions}"
-                                  SelectedItem="{Binding FontFamily}"
-                                  Width="180"/>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="ベースフォントサイズ"
-                                        Description="アプリケーションの基本フォントサイズ（9-24pt）">
-                    <controls:SettingsItem.SettingContent>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Slider Value="{Binding BaseFontSize}" 
-                                    Minimum="9" Maximum="24" 
-                                    TickFrequency="1" Width="150"/>
-                            <TextBlock Text="{Binding BaseFontSize, StringFormat={}{0}pt}" 
-                                       VerticalAlignment="Center" Width="40"/>
-                        </StackPanel>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="ハイコントラストモード"
-                                        Description="視認性向上のためのハイコントラスト表示">
-                    <controls:SettingsItem.SettingContent>
-                        <ToggleSwitch IsChecked="{Binding HighContrastMode}"/>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-            </StackPanel>
-
-            <!-- 詳細設定表示切り替え -->
-            <Button Command="{Binding ToggleAdvancedSettingsCommand}" 
-                    HorizontalAlignment="Left"
-                    Classes="hyperlink">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <PathIcon Data="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToExpandIconConverter.Instance}}" 
-                              Width="16" Height="16"/>
-                    <TextBlock Text="{Binding ShowAdvancedSettings, Converter={x:Static converters:BoolToAdvancedSettingsTextConverter.Instance}}"/>
-                </StackPanel>
-            </Button>
-
-            <!-- 詳細設定 -->
-            <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="詳細設定" FontSize="16" FontWeight="SemiBold"/>
-                
-                <controls:SettingsItem Title="DPIスケーリング対応"
-                                        Description="高DPI環境での自動スケーリングを有効にします">
-                    <controls:SettingsItem.SettingContent>
-                        <ToggleSwitch IsChecked="{Binding EnableDpiScaling}"/>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="カスタムスケールファクター"
-                                        Description="独自のスケールファクター（50%-300%）">
-                    <controls:SettingsItem.SettingContent>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Slider Value="{Binding CustomScaleFactor}" 
-                                    Minimum="0.5" Maximum="3.0" 
-                                    TickFrequency="0.1" Width="200"/>
-                            <TextBlock Text="{Binding ScaleFactorPercentage}" 
-                                       VerticalAlignment="Center" Width="60"/>
-                        </StackPanel>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="アニメーション効果"
-                                        Description="UI要素のアニメーション効果を有効にします">
-                    <controls:SettingsItem.SettingContent>
-                        <ToggleSwitch IsChecked="{Binding EnableAnimations}"/>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="アニメーション速度"
-                                        Description="アニメーション効果の速度調整">
-                    <controls:SettingsItem.SettingContent>
-                        <ComboBox ItemsSource="{Binding AnimationSpeedOptions}"
-                                  SelectedItem="{Binding AnimationSpeed}"
-                                  IsEnabled="{Binding EnableAnimations}"
-                                  Width="120"/>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="ウィンドウの角丸効果"
-                                        Description="ウィンドウの角を丸く表示します">
-                    <controls:SettingsItem.SettingContent>
-                        <ToggleSwitch IsChecked="{Binding RoundedWindowCorners}"/>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="半透明効果（ブラー）"
-                                        Description="ウィンドウ背景に半透明効果を適用します">
-                    <controls:SettingsItem.SettingContent>
-                        <ToggleSwitch IsChecked="{Binding EnableBlurEffect}"/>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-            </StackPanel>
-
-            <!-- デバッグ設定 -->
-            <StackPanel Spacing="12" IsVisible="{Binding EnableCustomCss}">
-                <TextBlock Text="デバッグ設定" FontSize="16" FontWeight="SemiBold"/>
-                
-                <controls:SettingsItem Title="カスタムCSS適用"
-                                        Description="カスタムCSSスタイルの適用を有効にします（開発者向け）"
-                                        WarningMessage="この設定は開発者向けです。不正なCSSファイルはアプリケーションの表示を破綻させる可能性があります。">
-                    <controls:SettingsItem.SettingContent>
-                        <ToggleSwitch IsChecked="{Binding EnableCustomCss}"/>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-
-                <controls:SettingsItem Title="CSSファイルパス"
-                                        Description="適用するカスタムCSSファイルのパス"
-                                        IsVisible="{Binding EnableCustomCss}">
-                    <controls:SettingsItem.SettingContent>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBox Text="{Binding CustomCssFilePath}" 
-                                     Width="300" 
-                                     Watermark="CSSファイルを選択してください"/>
-                            <Button Content="参照" 
-                                    Command="{Binding BrowseCssFileCommand}"/>
-                        </StackPanel>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
-            </StackPanel>
-
-            <!-- アクション -->
-            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,20,0,0">
-                <Button Content="デフォルトに戻す" 
-                        Command="{Binding ResetToDefaultsCommand}"
-                        Width="120"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

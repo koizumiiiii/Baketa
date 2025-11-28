@@ -46,22 +46,9 @@
                 <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="8"
                         Padding="16">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <!-- Avatar -->
-                        <Border Grid.Column="0"
-                                Width="56" Height="56"
-                                CornerRadius="28"
-                                Background="{DynamicResource AccentFillColorDefaultBrush}">
-                            <TextBlock Text="{Binding UserDisplayName, FallbackValue=U, TargetNullValue=U}"
-                                       FontSize="24"
-                                       FontWeight="SemiBold"
-                                       Foreground="White"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"/>
-                        </Border>
-
+                    <Grid ColumnDefinitions="*,Auto">
                         <!-- User Details -->
-                        <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center" Spacing="4">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
                             <TextBlock Text="{Binding UserDisplayName}"
                                        FontSize="16"
                                        FontWeight="SemiBold"/>
@@ -79,7 +66,7 @@
                         </StackPanel>
 
                         <!-- Status Badge -->
-                        <Border Grid.Column="2"
+                        <Border Grid.Column="1"
                                 Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
                                 CornerRadius="4"
                                 Padding="8,4"
@@ -94,15 +81,6 @@
                 <!-- Account Actions Section -->
                 <StackPanel Spacing="12">
                     <TextBlock Text="アカウント操作" FontSize="16" FontWeight="SemiBold"/>
-
-                    <controls:SettingsItem Title="パスワードリセット"
-                                           Description="パスワードを忘れた場合、リセットメールを送信できます">
-                        <controls:SettingsItem.SettingContent>
-                            <Button Content="リセット"
-                                    Command="{Binding ShowPasswordResetFormCommand}"
-                                    Width="100"/>
-                        </controls:SettingsItem.SettingContent>
-                    </controls:SettingsItem>
 
                     <controls:SettingsItem Title="ログアウト"
                                            Description="このデバイスからログアウトします">

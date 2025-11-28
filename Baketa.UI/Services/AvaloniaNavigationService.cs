@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -51,21 +52,35 @@ internal sealed class AvaloniaNavigationService(
     {
         ThrowIfDisposed();
         MainOverlayViewModel? mainOverlayViewModel = null;
+        bool isCalledFromSettingsDialog = false;
         try
         {
             _logNavigating(_logger, "Login", null);
 
-            // 🔥 [ISSUE#167] メインウィンドウを表示し、認証モードを有効化
-            // UIスレッドで実行する必要がある
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            // 設定画面から呼ばれているかチェック（設定画面が開いている場合はMainOverlayViewを操作しない）
+            if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                mainOverlayViewModel = _serviceProvider.GetService<MainOverlayViewModel>();
-                if (mainOverlayViewModel != null)
+                isCalledFromSettingsDialog = desktop.Windows.Any(w => w is Views.SettingsWindow && w.IsVisible);
+            }
+
+            if (!isCalledFromSettingsDialog)
+            {
+                // 🔥 [ISSUE#167] メインウィンドウを表示し、認証モードを有効化
+                // UIスレッドで実行する必要がある
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    mainOverlayViewModel.SetAuthenticationMode(true);
-                }
-                await ShowMainWindowInternalAsync().ConfigureAwait(false);
-            }).ConfigureAwait(false);
+                    mainOverlayViewModel = _serviceProvider.GetService<MainOverlayViewModel>();
+                    if (mainOverlayViewModel != null)
+                    {
+                        mainOverlayViewModel.SetAuthenticationMode(true);
+                    }
+                    await ShowMainWindowInternalAsync().ConfigureAwait(false);
+                }).ConfigureAwait(false);
+            }
+            else
+            {
+                _logger.LogDebug("設定画面からのログイン呼び出し - MainOverlayView操作をスキップ");
+            }
 
             var loginViewModel = _serviceProvider.GetRequiredService<LoginViewModel>();
             var loginWindow = new LoginView(loginViewModel);
@@ -80,8 +95,11 @@ internal sealed class AvaloniaNavigationService(
         }
         finally
         {
-            // 🔥 [ISSUE#167] 認証モードを解除
-            mainOverlayViewModel?.SetAuthenticationMode(false);
+            // 🔥 [ISSUE#167] 認証モードを解除（設定画面から呼ばれた場合はスキップ）
+            if (!isCalledFromSettingsDialog)
+            {
+                mainOverlayViewModel?.SetAuthenticationMode(false);
+            }
         }
     }
 
@@ -93,21 +111,35 @@ internal sealed class AvaloniaNavigationService(
     {
         ThrowIfDisposed();
         MainOverlayViewModel? mainOverlayViewModel = null;
+        bool isCalledFromSettingsDialog = false;
         try
         {
             _logNavigating(_logger, "Signup", null);
 
-            // 🔥 [ISSUE#167] メインウィンドウを表示し、認証モードを有効化
-            // UIスレッドで実行する必要がある
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            // 設定画面から呼ばれているかチェック（設定画面が開いている場合はMainOverlayViewを操作しない）
+            if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                mainOverlayViewModel = _serviceProvider.GetService<MainOverlayViewModel>();
-                if (mainOverlayViewModel != null)
+                isCalledFromSettingsDialog = desktop.Windows.Any(w => w is Views.SettingsWindow && w.IsVisible);
+            }
+
+            if (!isCalledFromSettingsDialog)
+            {
+                // 🔥 [ISSUE#167] メインウィンドウを表示し、認証モードを有効化
+                // UIスレッドで実行する必要がある
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    mainOverlayViewModel.SetAuthenticationMode(true);
-                }
-                await ShowMainWindowInternalAsync().ConfigureAwait(false);
-            }).ConfigureAwait(false);
+                    mainOverlayViewModel = _serviceProvider.GetService<MainOverlayViewModel>();
+                    if (mainOverlayViewModel != null)
+                    {
+                        mainOverlayViewModel.SetAuthenticationMode(true);
+                    }
+                    await ShowMainWindowInternalAsync().ConfigureAwait(false);
+                }).ConfigureAwait(false);
+            }
+            else
+            {
+                _logger.LogDebug("設定画面からのサインアップ呼び出し - MainOverlayView操作をスキップ");
+            }
 
             var signupViewModel = _serviceProvider.GetRequiredService<SignupViewModel>();
             var signupWindow = new SignupView(signupViewModel);
@@ -122,8 +154,11 @@ internal sealed class AvaloniaNavigationService(
         }
         finally
         {
-            // 🔥 [ISSUE#167] 認証モードを解除
-            mainOverlayViewModel?.SetAuthenticationMode(false);
+            // 🔥 [ISSUE#167] 認証モードを解除（設定画面から呼ばれた場合はスキップ）
+            if (!isCalledFromSettingsDialog)
+            {
+                mainOverlayViewModel?.SetAuthenticationMode(false);
+            }
         }
     }
 
@@ -229,23 +264,13 @@ internal sealed class AvaloniaNavigationService(
         {
             _logNavigating(_logger, "Settings", null);
 
-            // αテスト向けSimpleSettings画面を表示
-            Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得開始");
-            try
-            {
-                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            }
-            catch { }
+            Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SettingsWindowViewModel取得開始");
 
-            var settingsViewModel = _serviceProvider.GetRequiredService<SimpleSettingsViewModel>();
+            var settingsViewModel = _serviceProvider.GetRequiredService<SettingsWindowViewModel>();
 
-            Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SimpleSettingsViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}");
-            try
-            {
-                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化.Name ?? "null"}{Environment.NewLine}");
-            }
-            catch { }
-            var settingsWindow = new SimpleSettingsView
+            Console.WriteLine($"🔍 [NAVIGATION_DEBUG] SettingsWindowViewModel取得完了: {settingsViewModel?.GetType().Name ?? "null"}");
+
+            var settingsWindow = new SettingsWindow
             {
                 DataContext = settingsViewModel
             };
@@ -388,16 +413,28 @@ internal sealed class AvaloniaNavigationService(
     /// <returns>ダイアログの結果</returns>
     private static async Task<bool?> ShowDialogAsync(Window window)
     {
-        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
-            desktop.MainWindow != null)
+        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            return await window.ShowDialog<bool?>(desktop.MainWindow).ConfigureAwait(false);
+            // 優先順位:
+            // 1. アクティブなウィンドウ（IsActive=true）
+            // 2. フォーカスされているウィンドウ（IsFocused=true）
+            // 3. 最後に追加されたウィンドウ（設定画面などのモーダルダイアログ）
+            // 4. MainWindow
+            var ownerWindow = desktop.Windows.FirstOrDefault(w => w.IsActive)
+                           ?? desktop.Windows.FirstOrDefault(w => w.IsFocused)
+                           ?? desktop.Windows.LastOrDefault(w => w != window && w.IsVisible)
+                           ?? desktop.MainWindow;
+
+            if (ownerWindow != null)
+            {
+                Console.WriteLine($"📌 [ShowDialogAsync] owner={ownerWindow.GetType().Name}, dialog={window.GetType().Name}");
+                return await window.ShowDialog<bool?>(ownerWindow).ConfigureAwait(false);
+            }
         }
-        else
-        {
-            window.Show();
-            return null;
-        }
+
+        Console.WriteLine($"⚠️ [ShowDialogAsync] ownerWindow not found, showing as regular window");
+        window.Show();
+        return null;
     }
 
     /// <summary>

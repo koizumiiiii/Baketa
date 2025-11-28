@@ -31,7 +31,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     private readonly IAuthService _authService;
     private readonly INavigationService _navigationService;
     private readonly ILogger<SettingsWindowViewModel>? _logger;
-    private bool _showAdvancedSettings;
     private SettingCategory? _selectedCategory;
     private string _statusMessage = string.Empty;
 
@@ -67,13 +66,12 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         };
 
         // コマンドの初期化
-        ToggleAdvancedSettingsCommand = ReactiveCommand.Create(ToggleAdvancedSettings);
         SaveCommand = ReactiveCommand.CreateFromTask(SaveAsync, this.WhenAnyValue(x => x.HasChanges));
         CancelCommand = ReactiveCommand.CreateFromTask(CancelAsync);
         ResetCommand = ReactiveCommand.CreateFromTask(ResetAsync);
 
         // 初期カテゴリの選択
-        SelectedCategory = VisibleCategories.Count > 0 ? VisibleCategories[0] : null;
+        SelectedCategory = AllCategories.Count > 0 ? AllCategories[0] : null;
     }
 
     #region プロパティ
@@ -84,38 +82,24 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     public IReadOnlyList<SettingCategory> AllCategories { get; private set; } = [];
 
     /// <summary>
-    /// 現在表示されているカテゴリ（フィルタリング済み）
-    /// </summary>
-    public IReadOnlyList<SettingCategory> VisibleCategories => ShowAdvancedSettings
-        ? [.. AllCategories.Where(c => c.Level <= SettingLevel.Advanced).OrderBy(c => c.DisplayOrder)]
-        : AllCategories.Where(c => c.Level == SettingLevel.Basic).OrderBy(c => c.DisplayOrder).ToList();
-
-    /// <summary>
-    /// 詳細設定を表示するかどうか
-    /// </summary>
-    public bool ShowAdvancedSettings
-    {
-        get => _showAdvancedSettings;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _showAdvancedSettings, value);
-            this.RaisePropertyChanged(nameof(VisibleCategories));
-
-            // 現在選択されているカテゴリが表示されない場合は最初のカテゴリを選択
-            if (SelectedCategory != null && !VisibleCategories.Contains(SelectedCategory))
-            {
-                SelectedCategory = VisibleCategories.Count > 0 ? VisibleCategories[0] : null;
-            }
-        }
-    }
-
-    /// <summary>
     /// 現在選択されているカテゴリ
     /// </summary>
     public SettingCategory? SelectedCategory
     {
         get => _selectedCategory;
-        set => this.RaiseAndSetIfChanged(ref _selectedCategory, value);
+        set
+        {
+            if (_selectedCategory == value) return;
+
+            // Contentが未作成の場合は遅延作成（変更通知前に作成）
+            if (value != null)
+            {
+                EnsureCategoryContent(value);
+            }
+
+            // プロパティ変更を通知（Contentが既に作成済みの状態で）
+            this.RaiseAndSetIfChanged(ref _selectedCategory, value);
+        }
     }
 
     /// <summary>
@@ -135,11 +119,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     #endregion
 
     #region コマンド
-
-    /// <summary>
-    /// 詳細設定表示切り替えコマンド
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> ToggleAdvancedSettingsCommand { get; }
 
     /// <summary>
     /// 保存コマンド
@@ -187,84 +166,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Level = SettingLevel.Basic,
                 DisplayOrder = 2,
                 Description = "ユーザー認証とアカウント管理",
-                Content = null // 遅延作成
-            },
-
-            new()
-            {
-                Id = "settings_appearance",
-                Name = "外観設定",
-                IconData = "M12,18.5A6.5,6.5 0 0,1 5.5,12A6.5,6.5 0 0,1 12,5.5A6.5,6.5 0 0,1 18.5,12A6.5,6.5 0 0,1 12,18.5M12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16Z", // Theme icon
-                Level = SettingLevel.Basic,
-                DisplayOrder = 3,
-                Description = "テーマとUI外観の設定",
-                Content = null // 遅延作成
-            },
-
-            new()
-            {
-                Id = "settings_mainui",
-                Name = "操作パネル",
-                IconData = "M13,9H18.5L13,3.5V9M6,2H14L20,8V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V4C4,2.89 4.89,2 6,2M15,18V16H6V18H15M18,14V12H6V14H18Z", // UI Panel icon
-                Level = SettingLevel.Basic,
-                DisplayOrder = 4,
-                Description = "翻訳パネルの操作設定",
-                Content = null // 遅延作成
-            },
-
-            new()
-            {
-                Id = "settings_translation",
-                Name = "翻訳設定",
-                IconData = "M12.87,15.07L10.33,12.56L10.36,12.53C12.1,10.59 13.34,8.36 14.07,6H17V4H10V2H8V4H1V6H12.17C11.5,7.92 10.44,9.75 9,11.35C8.07,10.32 7.3,9.19 6.69,8H4.69C5.42,9.63 6.42,11.17 7.67,12.56L2.58,17.58L4,19L9,14L12.11,17.11L12.87,15.07M18.5,10H16.5L12,22H14L15.12,19H19.87L21,22H23L18.5,10M15.88,17L17.5,12.67L19.12,17H15.88Z", // Translate icon
-                Level = SettingLevel.Basic,
-                DisplayOrder = 5,
-                Description = "翻訳エンジンとオプション設定",
-                Content = null // 遅延作成
-            },
-
-            new()
-            {
-                Id = "settings_overlay",
-                Name = "オーバーレイ",
-                IconData = "M3,3V21H21V3H3M19,19H5V5H19V19M17,17H7V7H17V17M15,15H9V9H15V15Z", // Overlay icon
-                Level = SettingLevel.Basic,
-                DisplayOrder = 6,
-                Description = "オーバーレイ表示の設定",
-                Content = null // 遅延作成
-            },
-
-            // 詳細設定カテゴリ
-            new()
-            {
-                Id = "settings_capture",
-                Name = "キャプチャ設定",
-                IconData = "M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z", // Camera icon
-                Level = SettingLevel.Advanced,
-                DisplayOrder = 7,
-                Description = "画面キャプチャの詳細設定",
-                Content = null // 遅延作成
-            },
-
-            new()
-            {
-                Id = "settings_ocr",
-                Name = "OCR設定",
-                IconData = "M5,3C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H11V19H5V5H12V12H19V5C19,3.89 18.11,3 17,3H5M14,2L20,8H14V2M15.5,22L14,20.5L15.5,19L17,20.5L20.5,17L22,18.5L15.5,22Z", // OCR icon
-                Level = SettingLevel.Advanced,
-                DisplayOrder = 8,
-                Description = "OCR処理の詳細設定",
-                Content = null // 遅延作成
-            },
-
-            new()
-            {
-                Id = "settings_advanced",
-                Name = "拡張設定",
-                IconData = "M10,4A4,4 0 0,1 14,8A4,4 0 0,1 10,12A4,4 0 0,1 6,8A4,4 0 0,1 10,4M17,12C18.1,12 19,12.9 19,14V20C19,21.1 18.1,22 17,22H3C1.9,22 1,21.1 1,20V14C1,12.9 1.9,12 3,12H17Z", // Advanced icon
-                Level = SettingLevel.Advanced,
-                DisplayOrder = 9,
-                Description = "パフォーマンスと拡張機能の設定",
                 Content = null // 遅延作成
             }
         };
@@ -337,200 +238,36 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     }
 
     /// <summary>
-    /// 外観設定Viewを作成します
+    /// カテゴリのContentを遅延作成します
     /// </summary>
-    private ThemeSettingsView? CreateAppearanceSettingsView()
+    private void EnsureCategoryContent(SettingCategory category)
     {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
+        if (category.Content != null)
         {
-            return null; // テスト環境では null を返す
+            return; // 既に作成済み
         }
 
-        try
+        category.Content = category.Id switch
         {
-            ThemeSettings settings = new(); // TODO: 実際の設定データを注入
-            ThemeSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<ThemeSettingsViewModel>);
-            return new ThemeSettingsView(viewModel);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "外観設定Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のViewを返す
-            return new ThemeSettingsView();
-        }
+            "settings_general" => CreateGeneralSettingsView(),
+            "settings_account" => CreateAccountSettingsView(),
+            _ => null
+        };
+
+        _logger?.LogDebug("カテゴリ {CategoryId} のContentを作成しました", category.Id);
     }
 
     /// <summary>
-    /// メインUI設定Viewを作成します
+    /// 設定画面を閉じる際にカテゴリのContentをクリアします
+    /// Avaloniaのビジュアルツリー問題を回避するため、再表示時に新しいViewを作成できるようにします
     /// </summary>
-    private MainUiSettingsView? CreateMainUiSettingsView()
+    public void ClearCategoryContents()
     {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
+        foreach (var category in AllCategories)
         {
-            return null; // テスト環境では null を返す
+            category.Content = null;
         }
-
-        try
-        {
-            MainUiSettings settings = new(); // TODO: 実際の設定データを注入
-            MainUiSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<MainUiSettingsViewModel>);
-            return new MainUiSettingsView(viewModel);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "メインUI設定Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のViewを返す
-            return new MainUiSettingsView();
-        }
-    }
-
-    /// <summary>
-    /// 翻訳設定Viewを作成します
-    /// </summary>
-    private TranslationSettingsView? CreateTranslationSettingsView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        // 既存のTranslationSettingsViewを使用
-        return new();
-    }
-
-    /// <summary>
-    /// オーバーレイ設定Viewを作成します
-    /// </summary>
-    [SuppressMessage("IDisposableAnalyzers.Correctness", "CA2000:Dispose objects before losing scope",
-        Justification = "UserControlは呼び出し元のUIコンポーネントとして返され、適切に管理されます")]
-    private UserControl? CreateOverlaySettingsView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        try
-        {
-            // TODO: 実際の設定データを注入し、ViewModelと連携する
-            // 簡単なスタブ実装としてUserControlを返す
-            Avalonia.Controls.TextBlock textBlock = new() { Text = "オーバーレイ設定（開発中）" };
-            return new UserControl()
-            {
-                Content = textBlock
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "オーバーレイ設定Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のUserControlを返す
-            return new UserControl()
-            {
-                Content = new Avalonia.Controls.TextBlock { Text = "設定の読み込みに失敗しました" }
-            };
-        }
-    }
-
-    /// <summary>
-    /// キャプチャ設定Viewを作成します
-    /// </summary>
-    [SuppressMessage("IDisposableAnalyzers.Correctness", "CA2000:Dispose objects before losing scope",
-        Justification = "UserControlは呼び出し元のUIコンポーネントとして返され、適切に管理されます")]
-    private UserControl? CreateCaptureSettingsView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        try
-        {
-            // TODO: 実際の設定データを注入し、ViewModelと連携する
-            // 簡単なスタブ実装としてUserControlを返す
-            Avalonia.Controls.TextBlock textBlock = new() { Text = "キャプチャ設定（開発中）" };
-            return new UserControl()
-            {
-                Content = textBlock
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "キャプチャ設定Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のUserControlを返す
-            return new UserControl()
-            {
-                Content = new Avalonia.Controls.TextBlock { Text = "設定の読み込みに失敗しました" }
-            };
-        }
-    }
-
-    /// <summary>
-    /// OCR設定Viewを作成します
-    /// </summary>
-    private OcrSettingsView? CreateOcrSettingsView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        try
-        {
-            OcrSettings settings = new(); // TODO: 実際の設定データを注入
-            OcrSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<OcrSettingsViewModel>);
-            return new OcrSettingsView(viewModel);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "OCR設定Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のViewを返す
-            return new OcrSettingsView();
-        }
-    }
-
-    /// <summary>
-    /// 拡張設定Viewを作成します
-    /// </summary>
-    private UserControl? CreateAdvancedSettingsView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        try
-        {
-            // 簡単なスタブ実装としてUserControlを返す
-            Avalonia.Controls.TextBlock textBlock = new() { Text = "拡張設定（開発中）" };
-            return new UserControl()
-            {
-                Content = textBlock
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "拡張設定Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のUserControlを返す
-            return new UserControl()
-            {
-                Content = new Avalonia.Controls.TextBlock { Text = "設定の読み込みに失敗しました" }
-            };
-        }
-    }
-
-    /// <summary>
-    /// 詳細設定表示を切り替えます
-    /// </summary>
-    private void ToggleAdvancedSettings()
-    {
-        ShowAdvancedSettings = !ShowAdvancedSettings;
+        _logger?.LogDebug("すべてのカテゴリContentをクリアしました");
     }
 
     /// <summary>

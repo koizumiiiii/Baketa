@@ -100,8 +100,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
 
         // Assert
         viewModel.Should().NotBeNull();
-        viewModel.AllCategories.Should().HaveCount(9); // アカウントカテゴリ追加により9つに増加
-        viewModel.ShowAdvancedSettings.Should().BeFalse();
+        viewModel.AllCategories.Should().HaveCount(2); // 一般設定、アカウントの2つに簡素化
         viewModel.SelectedCategory.Should().NotBeNull();
         viewModel.StatusMessage.Should().Be(string.Empty);
     }
@@ -136,7 +135,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
             var categories = viewModel.AllCategories;
 
             // Assert
-            categories.Should().HaveCount(9); // アカウントカテゴリ追加により9つに増加
+            categories.Should().HaveCount(2); // 一般設定、アカウントの2つに簡素化
 
             // 基本設定カテゴリの確認（DisplayOrder順）
             categories[0].Id.Should().Be("settings_general");
@@ -146,109 +145,12 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
             categories[1].Id.Should().Be("settings_account");
             categories[1].Level.Should().Be(SettingLevel.Basic);
             categories[1].DisplayOrder.Should().Be(2);
-
-            categories[2].Id.Should().Be("settings_appearance");
-            categories[2].Level.Should().Be(SettingLevel.Basic);
-
-            categories[3].Id.Should().Be("settings_mainui");
-            categories[3].Level.Should().Be(SettingLevel.Basic);
-
-            categories[4].Id.Should().Be("settings_translation");
-            categories[4].Level.Should().Be(SettingLevel.Basic);
-
-            categories[5].Id.Should().Be("settings_overlay");
-            categories[5].Level.Should().Be(SettingLevel.Basic);
-
-            // 詳細設定カテゴリの確認
-            categories[6].Id.Should().Be("settings_capture");
-            categories[6].Level.Should().Be(SettingLevel.Advanced);
-
-            categories[7].Id.Should().Be("settings_ocr");
-            categories[7].Level.Should().Be(SettingLevel.Advanced);
-
-            categories[8].Id.Should().Be("settings_advanced");
-            categories[8].Level.Should().Be(SettingLevel.Advanced);
         }
         finally
         {
             // 確実なクリーンアップ
             viewModel?.Dispose();
         }
-    }
-
-    [Fact]
-    public void VisibleCategories_WhenShowAdvancedSettingsFalse_ReturnsOnlyBasicCategories()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        viewModel.ShowAdvancedSettings = false;
-
-        // Act
-        var visibleCategories = viewModel.VisibleCategories;
-
-        // Assert
-        visibleCategories.Should().HaveCount(6); // アカウントカテゴリ追加により6つに増加
-        visibleCategories.Should().OnlyContain(c => c.Level == SettingLevel.Basic);
-
-        var categoryIds = visibleCategories.Select(c => c.Id).ToArray();
-        categoryIds.Should().Equal("settings_general", "settings_account", "settings_appearance", "settings_mainui", "settings_translation", "settings_overlay");
-    }
-
-    [Fact]
-    public void VisibleCategories_WhenShowAdvancedSettingsTrue_ReturnsAllCategories()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        viewModel.ShowAdvancedSettings = true;
-
-        // Act
-        var visibleCategories = viewModel.VisibleCategories;
-
-        // Assert
-        visibleCategories.Should().HaveCount(9); // アカウントカテゴリ追加により9つに増加
-        visibleCategories.Should().Contain(c => c.Level == SettingLevel.Basic);
-        visibleCategories.Should().Contain(c => c.Level == SettingLevel.Advanced);
-    }
-
-    [Fact]
-    public void ShowAdvancedSettings_WhenToggledTrue_UpdatesVisibleCategoriesProperty()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        var propertyChanged = false;
-        viewModel.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(viewModel.VisibleCategories))
-                propertyChanged = true;
-        };
-
-        // Act
-        viewModel.ShowAdvancedSettings = true;
-
-        // Assert
-        viewModel.ShowAdvancedSettings.Should().BeTrue();
-        propertyChanged.Should().BeTrue();
-        viewModel.VisibleCategories.Should().HaveCount(9); // アカウントカテゴリ追加により9つに増加
-    }
-
-    [Fact]
-    public void ShowAdvancedSettings_WhenCurrentCategoryBecomesInvisible_SelectsFirstVisibleCategory()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        viewModel.ShowAdvancedSettings = true;
-
-        // 詳細設定カテゴリを選択
-        var advancedCategory = viewModel.VisibleCategories.First(c => c.Level == SettingLevel.Advanced);
-        viewModel.SelectedCategory = advancedCategory;
-
-        // Act - 基本設定のみに切り替え
-        viewModel.ShowAdvancedSettings = false;
-
-        // Assert
-        viewModel.SelectedCategory.Should().NotBe(advancedCategory);
-        viewModel.SelectedCategory?.Level.Should().Be(SettingLevel.Basic);
-        viewModel.SelectedCategory?.Id.Should().Be("settings_general"); // 最初のカテゴリ
     }
 
     [Fact(Skip = "PropertyChangedイベントハング問題のため一時的に無効化")]
@@ -310,20 +212,6 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Assert
         viewModel.StatusMessage.Should().Be("テストメッセージ");
         propertyChanged.Should().BeTrue();
-    }
-
-    [Fact]
-    public void ToggleAdvancedSettingsCommand_WhenExecuted_TogglesShowAdvancedSettings()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        var initialValue = viewModel.ShowAdvancedSettings;
-
-        // Act
-        viewModel.ToggleAdvancedSettingsCommand.Execute().Subscribe();
-
-        // Assert
-        viewModel.ShowAdvancedSettings.Should().Be(!initialValue);
     }
 
     [Fact]
@@ -471,18 +359,10 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     [Theory]
     [InlineData("settings_general")]
     [InlineData("settings_account")]
-    [InlineData("settings_appearance")]
-    [InlineData("settings_mainui")]
-    [InlineData("settings_translation")]
-    [InlineData("settings_overlay")]
-    [InlineData("settings_capture")]
-    [InlineData("settings_ocr")]
-    [InlineData("settings_advanced")]
     public void CategorySelection_SpecificCategory_WorksCorrectly(string categoryId)
     {
         // Arrange
         var viewModel = CreateViewModel();
-        viewModel.ShowAdvancedSettings = true; // すべてのカテゴリを表示
 
         // Act
         var targetCategory = viewModel.AllCategories.First(c => c.Id == categoryId);
@@ -501,7 +381,6 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     {
         // Arrange
         var viewModel = CreateViewModel();
-        viewModel.ShowAdvancedSettings = true;
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Act - 100回カテゴリを切り替え
@@ -518,20 +397,17 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     }
 
     /// <summary>
-    /// 境界値テスト：空のコレクション状態での動作確認
+    /// 境界値テスト：カテゴリが存在することの確認
     /// </summary>
     [Fact]
-    public void BoundaryConditions_EmptyVisibleCategories_HandledGracefully()
+    public void BoundaryConditions_AllCategories_HasExpectedCount()
     {
-        // NOTE: 現在の実装では空のカテゴリになることはないが、
-        // 将来的な拡張のために境界条件をテスト
-
         // Arrange
         var viewModel = CreateViewModel();
 
-        // Act & Assert - 通常の状態では9カテゴリ存在（アカウントカテゴリ追加により増加）
-        viewModel.AllCategories.Should().HaveCount(9);
-        viewModel.VisibleCategories.Should().NotBeEmpty();
+        // Act & Assert - 一般設定、アカウントの2カテゴリ存在
+        viewModel.AllCategories.Should().HaveCount(2);
+        viewModel.AllCategories.Should().NotBeEmpty();
     }
 }
 
