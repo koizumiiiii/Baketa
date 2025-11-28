@@ -1,5 +1,6 @@
 using Baketa.UI.Services;
 using Baketa.UI.ViewModels;
+using Baketa.UI.ViewModels.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.UI.DI.Modules;
@@ -21,6 +22,9 @@ public static class SettingsModule
 
         // 設定ウィンドウViewModel
         services.AddTransient<SettingsWindowViewModel>();
+
+        // アカウント設定ViewModel
+        services.AddTransient<AccountSettingsViewModel>();
 
         return services;
     }

@@ -6,6 +6,7 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Settings;
 using Baketa.UI.Framework;
@@ -27,6 +28,8 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
 {
     private readonly ISettingsChangeTracker _changeTracker;
     private readonly IEventAggregator _eventAggregator;
+    private readonly IAuthService _authService;
+    private readonly INavigationService _navigationService;
     private readonly ILogger<SettingsWindowViewModel>? _logger;
     private bool _showAdvancedSettings;
     private SettingCategory? _selectedCategory;
@@ -37,14 +40,20 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// </summary>
     /// <param name="changeTracker">設定変更追跡サービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
+    /// <param name="authService">認証サービス</param>
+    /// <param name="navigationService">ナビゲーションサービス</param>
     /// <param name="logger">ロガー（オプション）</param>
     public SettingsWindowViewModel(
         ISettingsChangeTracker changeTracker,
         IEventAggregator eventAggregator,
+        IAuthService authService,
+        INavigationService navigationService,
         ILogger<SettingsWindowViewModel>? logger = null) : base(eventAggregator)
     {
         _changeTracker = changeTracker ?? throw new ArgumentNullException(nameof(changeTracker));
         _eventAggregator = eventAggregator; // 既にbase()でnullチェック済み
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _logger = logger;
 
         // カテゴリの初期化（null引数チェック後に実行）
@@ -172,11 +181,22 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
 
             new()
             {
+                Id = "settings_account",
+                Name = "アカウント",
+                IconData = "M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z", // Account icon
+                Level = SettingLevel.Basic,
+                DisplayOrder = 2,
+                Description = "ユーザー認証とアカウント管理",
+                Content = null // 遅延作成
+            },
+
+            new()
+            {
                 Id = "settings_appearance",
                 Name = "外観設定",
                 IconData = "M12,18.5A6.5,6.5 0 0,1 5.5,12A6.5,6.5 0 0,1 12,5.5A6.5,6.5 0 0,1 18.5,12A6.5,6.5 0 0,1 12,18.5M12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16Z", // Theme icon
                 Level = SettingLevel.Basic,
-                DisplayOrder = 2,
+                DisplayOrder = 3,
                 Description = "テーマとUI外観の設定",
                 Content = null // 遅延作成
             },
@@ -187,7 +207,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Name = "操作パネル",
                 IconData = "M13,9H18.5L13,3.5V9M6,2H14L20,8V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V4C4,2.89 4.89,2 6,2M15,18V16H6V18H15M18,14V12H6V14H18Z", // UI Panel icon
                 Level = SettingLevel.Basic,
-                DisplayOrder = 3,
+                DisplayOrder = 4,
                 Description = "翻訳パネルの操作設定",
                 Content = null // 遅延作成
             },
@@ -198,7 +218,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Name = "翻訳設定",
                 IconData = "M12.87,15.07L10.33,12.56L10.36,12.53C12.1,10.59 13.34,8.36 14.07,6H17V4H10V2H8V4H1V6H12.17C11.5,7.92 10.44,9.75 9,11.35C8.07,10.32 7.3,9.19 6.69,8H4.69C5.42,9.63 6.42,11.17 7.67,12.56L2.58,17.58L4,19L9,14L12.11,17.11L12.87,15.07M18.5,10H16.5L12,22H14L15.12,19H19.87L21,22H23L18.5,10M15.88,17L17.5,12.67L19.12,17H15.88Z", // Translate icon
                 Level = SettingLevel.Basic,
-                DisplayOrder = 4,
+                DisplayOrder = 5,
                 Description = "翻訳エンジンとオプション設定",
                 Content = null // 遅延作成
             },
@@ -209,7 +229,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Name = "オーバーレイ",
                 IconData = "M3,3V21H21V3H3M19,19H5V5H19V19M17,17H7V7H17V17M15,15H9V9H15V15Z", // Overlay icon
                 Level = SettingLevel.Basic,
-                DisplayOrder = 5,
+                DisplayOrder = 6,
                 Description = "オーバーレイ表示の設定",
                 Content = null // 遅延作成
             },
@@ -221,7 +241,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Name = "キャプチャ設定",
                 IconData = "M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z", // Camera icon
                 Level = SettingLevel.Advanced,
-                DisplayOrder = 6,
+                DisplayOrder = 7,
                 Description = "画面キャプチャの詳細設定",
                 Content = null // 遅延作成
             },
@@ -232,7 +252,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Name = "OCR設定",
                 IconData = "M5,3C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H11V19H5V5H12V12H19V5C19,3.89 18.11,3 17,3H5M14,2L20,8H14V2M15.5,22L14,20.5L15.5,19L17,20.5L20.5,17L22,18.5L15.5,22Z", // OCR icon
                 Level = SettingLevel.Advanced,
-                DisplayOrder = 7,
+                DisplayOrder = 8,
                 Description = "OCR処理の詳細設定",
                 Content = null // 遅延作成
             },
@@ -243,7 +263,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Name = "拡張設定",
                 IconData = "M10,4A4,4 0 0,1 14,8A4,4 0 0,1 10,12A4,4 0 0,1 6,8A4,4 0 0,1 10,4M17,12C18.1,12 19,12.9 19,14V20C19,21.1 18.1,22 17,22H3C1.9,22 1,21.1 1,20V14C1,12.9 1.9,12 3,12H17Z", // Advanced icon
                 Level = SettingLevel.Advanced,
-                DisplayOrder = 8,
+                DisplayOrder = 9,
                 Description = "パフォーマンスと拡張機能の設定",
                 Content = null // 遅延作成
             }
@@ -285,6 +305,34 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
             _logger?.LogError(ex, "一般設定Viewの作成中にエラーが発生しました");
             // フォールバック: 空のViewを返す
             return new GeneralSettingsView();
+        }
+    }
+
+    /// <summary>
+    /// アカウント設定Viewを作成します
+    /// </summary>
+    private AccountSettingsView? CreateAccountSettingsView()
+    {
+        // テスト環境では View 作成を避ける
+        if (IsTestEnvironment())
+        {
+            return null; // テスト環境では null を返す
+        }
+
+        try
+        {
+            AccountSettingsViewModel viewModel = new(
+                _authService,
+                _navigationService,
+                _eventAggregator,
+                _logger as ILogger<AccountSettingsViewModel>);
+            return new AccountSettingsView { DataContext = viewModel };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "アカウント設定Viewの作成中にエラーが発生しました");
+            // フォールバック: 空のViewを返す
+            return new AccountSettingsView();
         }
     }
 
