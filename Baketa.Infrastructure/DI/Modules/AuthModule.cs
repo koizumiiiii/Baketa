@@ -64,6 +64,22 @@ public sealed class AuthModule : ServiceModuleBase
         services.AddSingleton<SupabaseAuthService>();
         services.AddSingleton<IAuthService>(provider => provider.GetRequiredService<SupabaseAuthService>());
 
+        // OAuth callback handler for desktop OAuth flows
+        services.AddSingleton<OAuthCallbackHandler>();
+        services.AddSingleton<IOAuthCallbackHandler>(provider => provider.GetRequiredService<OAuthCallbackHandler>());
+
+        // Token audit logger for security compliance (Issue #168)
+        services.AddSingleton<FileTokenAuditLogger>();
+        services.AddSingleton<ITokenAuditLogger>(provider => provider.GetRequiredService<FileTokenAuditLogger>());
+
+        // Token expiration handler for HTTP 401 detection and auto-logout (Issue #168)
+        services.AddSingleton<TokenExpirationHandler>();
+        services.AddSingleton<ITokenExpirationHandler>(provider => provider.GetRequiredService<TokenExpirationHandler>());
+
+        // Password strength validator for enhanced security (Issue #167)
+        services.AddSingleton<PasswordStrengthValidator>();
+        services.AddSingleton<IPasswordStrengthValidator>(provider => provider.GetRequiredService<PasswordStrengthValidator>());
+
         // Authentication event handlers (future extension)
         // services.AddSingleton<IAuthEventHandler, DefaultAuthEventHandler>();
 
@@ -110,12 +126,9 @@ public sealed class AuthModule : ServiceModuleBase
     /// <param name="services">Service collection</param>
     private static void RegisterBackgroundServices(IServiceCollection services)
     {
-        // Authentication initialization service
+        // Authentication initialization service (Phase 4: Enabled for session restoration)
         services.AddSingleton<AuthInitializationService>();
-        // TEMPORARY: Disable AuthInitializationService for Phase 1 testing
-        // Phase 1 Goal: Focus on translation pipeline functionality
-        // Will re-enable after Phase 4 completion for premium membership features
-        // services.AddHostedService<AuthInitializationService>();
+        services.AddHostedService(provider => provider.GetRequiredService<AuthInitializationService>());
 
         // Session refresh service (future extension)
         // services.AddSingleton<SessionRefreshService>();

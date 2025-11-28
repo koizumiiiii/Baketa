@@ -23,7 +23,9 @@ namespace Baketa.UI.Tests.ViewModels.Auth;
 public sealed class SignupViewModelTests : AvaloniaTestBase
 {
     private readonly Mock<IAuthService> _mockAuthService;
+    private readonly Mock<IOAuthCallbackHandler> _mockOAuthHandler;
     private readonly Mock<INavigationService> _mockNavigationService;
+    private readonly Mock<IPasswordStrengthValidator> _mockPasswordValidator;
     private readonly Mock<IEventAggregator> _mockEventAggregator;
     private readonly Mock<ILogger<SignupViewModel>> _mockLogger;
     private SignupViewModel? _currentViewModel;
@@ -31,7 +33,9 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     public SignupViewModelTests()
     {
         _mockAuthService = new Mock<IAuthService>();
+        _mockOAuthHandler = new Mock<IOAuthCallbackHandler>();
         _mockNavigationService = new Mock<INavigationService>();
+        _mockPasswordValidator = new Mock<IPasswordStrengthValidator>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLogger = new Mock<ILogger<SignupViewModel>>();
 
@@ -44,12 +48,22 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     private void ResetMocks()
     {
         _mockAuthService.Reset();
+        _mockOAuthHandler.Reset();
         _mockNavigationService.Reset();
+        _mockPasswordValidator.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
 
         // デフォルト設定
         _mockNavigationService.Setup(x => x.ShowLoginAsync()).ReturnsAsync(true);
+
+        // パスワードバリデーターのデフォルト設定（有効なパスワードとして扱う）
+        _mockPasswordValidator.Setup(x => x.ValidatePassword(It.IsAny<string>()))
+            .Returns(PasswordValidationResult.Success(PasswordStrength.Medium, 3));
+        _mockPasswordValidator.Setup(x => x.GetPasswordStrength(It.IsAny<string>()))
+            .Returns(PasswordStrength.Medium);
+        _mockPasswordValidator.Setup(x => x.GetStrengthMessage(It.IsAny<PasswordStrength>()))
+            .Returns("普通");
     }
 
     /// <summary>
@@ -61,7 +75,9 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         _currentViewModel?.Dispose(); // 前のViewModelがあれば破棄
         _currentViewModel = RunOnUIThread(() => new SignupViewModel(
             _mockAuthService.Object,
+            _mockOAuthHandler.Object,
             _mockNavigationService.Object,
+            _mockPasswordValidator.Object,
             _mockEventAggregator.Object,
             _mockLogger.Object));
         return _currentViewModel;
@@ -108,26 +124,56 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         viewModel.SignupWithEmailCommand.Should().NotBeNull();
         viewModel.SignupWithGoogleCommand.Should().NotBeNull();
         viewModel.SignupWithDiscordCommand.Should().NotBeNull();
-        viewModel.SignupWithSteamCommand.Should().NotBeNull();
+        viewModel.SignupWithTwitchCommand.Should().NotBeNull();
         viewModel.NavigateToLoginCommand.Should().NotBeNull();
     }
 
     [Fact]
     public void Constructor_WithNullAuthService_ThrowsArgumentNullException()
     {
+        // Arrange
+        ResetMocks();
+
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(null!, _mockNavigationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+    }
+
+    [Fact]
+    public void Constructor_WithNullOAuthHandler_ThrowsArgumentNullException()
+    {
+        // Arrange
+        ResetMocks();
+
+        // Act & Assert
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
+                new SignupViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
     public void Constructor_WithNullNavigationService_ThrowsArgumentNullException()
     {
+        // Arrange
+        ResetMocks();
+
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(_mockAuthService.Object, null!, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+    }
+
+    [Fact]
+    public void Constructor_WithNullPasswordValidator_ThrowsArgumentNullException()
+    {
+        // Arrange
+        ResetMocks();
+
+        // Act & Assert
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
+                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, null!, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     #endregion
@@ -271,16 +317,32 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     }
 
     [Fact]
-    public async Task NavigateToLoginCommand_WhenExecuted_CallsNavigationService()
+    public async Task NavigateToLoginCommand_WhenExecuted_FiresCloseDialogRequestedAndNavigates()
     {
         // Arrange
+        _mockNavigationService.Setup(x => x.SwitchToLoginAsync()).Returns(Task.CompletedTask);
         var viewModel = CreateViewModel();
+        bool closeDialogRequested = false;
+        bool wasAuthSuccess = true; // デフォルトはtrue、falseに設定されることを期待
+
+        // イベント購読
+        viewModel.CloseDialogRequested += (isAuthSuccess) =>
+        {
+            closeDialogRequested = true;
+            wasAuthSuccess = isAuthSuccess;
+        };
 
         // Act
         await viewModel.NavigateToLoginCommand.Execute().FirstAsync();
 
         // Assert
-        _mockNavigationService.Verify(x => x.ShowLoginAsync(), Times.Once);
+        // CloseDialogRequestedイベントが発火されることを確認（画面切り替えなのでfalse）
+        closeDialogRequested.Should().BeTrue("CloseDialogRequestedイベントが発火されるべき");
+        wasAuthSuccess.Should().BeFalse("画面切り替えの場合はfalseがパラメータとして渡されるべき");
+
+        // SwitchToLoginAsyncは非同期で遅延実行されるため、少し待ってから確認
+        await Task.Delay(300);
+        _mockNavigationService.Verify(x => x.SwitchToLoginAsync(), Times.Once);
     }
 
     #endregion

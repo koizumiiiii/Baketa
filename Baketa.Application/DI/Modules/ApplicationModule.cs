@@ -5,6 +5,7 @@ using Baketa.Application.Configuration;
 using Baketa.Application.DI.Modules;
 using Baketa.Application.Services.Capture;
 using Baketa.Application.Services.Events;
+using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.Abstractions.Events;
@@ -340,6 +341,11 @@ public sealed class ApplicationModule : ServiceModuleBase
 
         // 🔧 翻訳制御サービス（UI制御フロー責務分離 - Phase 6.2.3）
         services.AddSingleton<Services.Translation.ITranslationControlService, Services.Translation.TranslationControlService>();
+
+        // 🔐 [Issue #168] Token Refresh Service - バックグラウンドトークン自動更新
+        Console.WriteLine("🔐 [Issue #168] TokenRefreshService DI登録");
+        services.AddSingleton<Services.Auth.TokenRefreshService>();
+        services.AddSingleton<ITokenRefreshService>(provider => provider.GetRequiredService<Services.Auth.TokenRefreshService>());
 
         // 統合サービス
         // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();

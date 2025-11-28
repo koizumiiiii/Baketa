@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -24,6 +25,29 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
         WriteIndented = false,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
+
+    /// <summary>
+    /// メールアドレスをマスク（例: te***@example.com）
+    /// </summary>
+    private static string MaskEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return "[unknown]";
+
+        var atIndex = email.IndexOf('@');
+        if (atIndex <= 0)
+            return "[invalid-email]";
+
+        var localPart = email[..atIndex];
+        var domain = email[atIndex..];
+
+        // ローカル部分を最初の2文字 + *** に置換
+        var maskedLocal = localPart.Length <= 2
+            ? "***"
+            : localPart[..2] + "***";
+
+        return maskedLocal + domain;
+    }
 
     // セキュリティイベントタイプ
     public enum SecurityEventType
@@ -79,6 +103,8 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     /// <param name="ipAddress">IPアドレス</param>
     /// <param name="additionalData">追加データ</param>
     /// <param name="source">呼び出し元メソッド名</param>
+    [SuppressMessage("CodeQuality", "cs/clear-text-storage-of-sensitive-information",
+        Justification = "Emails are masked before logging. Enum values like RecoveryType are not sensitive.")]
     public void LogSecurityEvent(
         SecurityEventType eventType,
         string details,
@@ -89,7 +115,10 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     {
         var logLevel = EventLogLevels.GetValueOrDefault(eventType, LogLevel.Information);
         var timestamp = DateTime.UtcNow;
-        var normalizedUserInfo = userInfo ?? "Anonymous";
+        // セキュリティ: ユーザー情報がメールアドレスの場合はマスク
+        var normalizedUserInfo = userInfo != null && userInfo.Contains('@')
+            ? MaskEmail(userInfo)
+            : userInfo ?? "Anonymous";
         var normalizedIpAddress = ipAddress ?? GetLocalIPAddress();
 
         // 構造化データの準備
@@ -134,12 +163,13 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     /// <param name="ipAddress">IPアドレス</param>
     public void LogLoginAttempt(string email, bool success, string? failureReason = null, string? ipAddress = null)
     {
+        var maskedEmail = MaskEmail(email);
         var eventType = success ? SecurityEventType.LoginSuccess : SecurityEventType.LoginFailure;
         var details = success
-            ? $"ログイン成功: {email}"
-            : $"ログイン失敗: {email} - {failureReason}";
+            ? $"ログイン成功: {maskedEmail}"
+            : $"ログイン失敗: {maskedEmail} - {failureReason}";
 
-        LogSecurityEvent(eventType, details, email, ipAddress);
+        LogSecurityEvent(eventType, details, maskedEmail, ipAddress);
     }
 
     /// <summary>
@@ -151,9 +181,10 @@ public sealed class SecurityAuditLogger(ILogger<SecurityAuditLogger> logger)
     /// <param name="ipAddress">IPアドレス</param>
     public void LogAccountLockout(string email, int attemptCount, TimeSpan lockoutDuration, string? ipAddress = null)
     {
-        var details = $"アカウントロックアウト: {email} - 試行回数: {attemptCount}, ロックアウト期間: {lockoutDuration.TotalMinutes}分";
+        var maskedEmail = MaskEmail(email);
+        var details = $"アカウントロックアウト: {maskedEmail} - 試行回数: {attemptCount}, ロックアウト期間: {lockoutDuration.TotalMinutes}分";
 
-        LogSecurityEvent(SecurityEventType.AccountLockout, details, email, ipAddress, new
+        LogSecurityEvent(SecurityEventType.AccountLockout, details, maskedEmail, ipAddress, new
         {
             AttemptCount = attemptCount,
             LockoutDuration = lockoutDuration,

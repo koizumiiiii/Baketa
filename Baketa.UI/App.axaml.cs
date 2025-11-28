@@ -8,13 +8,16 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Baketa.Application.Services;
+using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
 using Baketa.UI.ViewModels;
+using Baketa.UI.ViewModels.Auth;
 using Baketa.UI.Views;
+using Baketa.UI.Views.Auth;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -305,8 +308,12 @@ internal sealed partial class App : Avalonia.Application
 
                     try
                     {
+                        // 🔥 [ISSUE#167] デバッグ出力
+                        Console.WriteLine("🔥🔥🔥 [AUTH_DEBUG] InvokeAsync開始 🔥🔥🔥");
+
                         // --- 1. ローディング画面の準備 ---
                         _logger?.LogInformation("ローディング画面初期化開始");
+                        Console.WriteLine("📌 [AUTH_DEBUG] Step 1: ローディング画面準備開始");
 
                         var loadingScreenInitializer = serviceProvider.GetRequiredService<Baketa.Core.Abstractions.Services.ILoadingScreenInitializer>();
                         loadingViewModel = serviceProvider.GetRequiredService<LoadingViewModel>();
@@ -328,8 +335,10 @@ internal sealed partial class App : Avalonia.Application
                         }
 
                         // --- 2. アプリケーション初期化 ---
+                        Console.WriteLine("📌 [AUTH_DEBUG] Step 2: アプリケーション初期化開始");
                         var loadingStartTime = System.Diagnostics.Stopwatch.StartNew();
                         await loadingScreenInitializer.InitializeAsync();
+                        Console.WriteLine("📌 [AUTH_DEBUG] Step 2: アプリケーション初期化完了");
                         _logger?.LogInformation("アプリケーション初期化完了");
 
                         // 最小表示時間（2秒）を確保
@@ -343,29 +352,110 @@ internal sealed partial class App : Avalonia.Application
                         }
 
                         // --- 3. ローディング画面を閉じる ---
+                        Console.WriteLine("📌 [AUTH_DEBUG] Step 3: ローディング画面クローズ開始");
                         await loadingWindow.CloseWithFadeOutAsync();
+                        Console.WriteLine("📌 [AUTH_DEBUG] Step 3: ローディング画面クローズ完了");
                         _logger?.LogInformation("ローディング画面クローズ完了");
 
-                        // --- 4. メインUIの準備と表示 ---
+                        // --- 4. 認証状態チェックとメインUI表示 ---
+                        Console.WriteLine("📌 [AUTH_DEBUG] Step 4: 認証状態チェック開始");
+                        _logger?.LogInformation("認証状態をチェック中...");
+
+                        var authService = serviceProvider.GetRequiredService<IAuthService>();
+                        var tokenStorage = serviceProvider.GetRequiredService<ITokenStorage>();
+
+                        // セッション復元を試みる
+                        bool isAuthenticated = false;
+                        try
+                        {
+                            // 保存されたトークンがあるか確認
+                            var hasTokens = await tokenStorage.HasStoredTokensAsync().ConfigureAwait(true);
+                            if (hasTokens)
+                            {
+                                _logger?.LogInformation("保存されたトークンを検出、セッション復元を試行中...");
+                                await authService.RestoreSessionAsync().ConfigureAwait(true);
+
+                                // セッション復元後に認証状態を確認
+                                var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
+                                isAuthenticated = session != null;
+                                _logger?.LogInformation("セッション復元結果: {IsAuthenticated}", isAuthenticated);
+                            }
+                            else
+                            {
+                                _logger?.LogInformation("保存されたトークンなし、未認証状態");
+                            }
+                        }
+                        catch (Exception authEx)
+                        {
+                            _logger?.LogWarning(authEx, "セッション復元中にエラー発生、ログイン画面を表示します");
+                            isAuthenticated = false;
+
+                            // セキュリティ強化: 不正なトークンを削除
+                            try
+                            {
+                                await tokenStorage.ClearTokensAsync().ConfigureAwait(true);
+                                _logger?.LogInformation("セッション復元失敗に伴い、保存されたトークンをクリアしました");
+                            }
+                            catch (Exception clearEx)
+                            {
+                                _logger?.LogError(clearEx, "トークンクリア中にエラー発生");
+                            }
+                        }
+
+                        Console.WriteLine($"📌 [AUTH_DEBUG] Step 4: 認証チェック完了 isAuthenticated={isAuthenticated}");
+
+                        // 🔥 [ISSUE#167] 常にMainOverlayViewを最初に表示
+                        // 認証前はExitボタンのみ有効、認証後は全ボタン有効
+                        Console.WriteLine("📌 [AUTH_DEBUG] Step 5: MainOverlayView表示開始");
+                        _logger?.LogInformation("MainOverlayViewを表示します（認証状態: {IsAuthenticated}）", isAuthenticated);
+
                         var mainOverlayViewModel = serviceProvider.GetRequiredService<MainOverlayViewModel>();
                         if (Program.IsEventHandlerInitialized)
                         {
                             mainOverlayViewModel.IsEventHandlerInitialized = true;
                         }
 
+                        // 認証状態に応じてモードを設定
+                        mainOverlayViewModel.SetAuthenticationMode(!isAuthenticated);
+
                         var mainOverlayView = new MainOverlayView { DataContext = mainOverlayViewModel };
                         var mainIconUri = new Uri(BAKETA_ICON_PATH);
                         mainOverlayView.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(mainIconUri));
 
                         desktop.MainWindow = mainOverlayView;
-                        mainOverlayView.Show();  // ローディング完了後に表示
+                        mainOverlayView.Show();
                         Console.WriteLine("✅ MainOverlayView.Show()実行完了");
+
+                        // 未認証の場合はLoginViewをダイアログとして表示
+                        if (!isAuthenticated)
+                        {
+                            Console.WriteLine("📌 [AUTH_DEBUG] Step 6: LoginViewダイアログ表示（未認証）");
+                            _logger?.LogInformation("未認証: LoginViewをダイアログとして表示します");
+
+                            // 認証完了後にダイアログが閉じるよう、非同期で表示
+                            _ = Task.Run(async () =>
+                            {
+                                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                                {
+                                    var loginViewModel = serviceProvider.GetRequiredService<LoginViewModel>();
+                                    var loginView = new LoginView(loginViewModel);
+                                    var loginIconUri = new Uri(BAKETA_ICON_PATH);
+                                    loginView.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(loginIconUri));
+
+                                    await loginView.ShowDialog<bool?>(mainOverlayView);
+                                    Console.WriteLine("✅ LoginViewダイアログ終了");
+                                });
+                            });
+                        }
 
                         // --- 5. その他の初期化とイベントハンドラ登録 ---
                         _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
 
                         var translationFlowModule = new Baketa.UI.DI.Modules.TranslationFlowModule();
                         translationFlowModule.ConfigureEventAggregator(_eventAggregator, serviceProvider);
+
+                        // --- 5.1 トークン有効期限切れハンドラー登録 (Issue #168) ---
+                        SetupTokenExpirationHandler(serviceProvider, mainOverlayView);
 
                         _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());
                         _logStartupCompleted(_logger, null);
@@ -375,6 +465,9 @@ internal sealed partial class App : Avalonia.Application
                     }
                     catch (Exception ex)
                     {
+                        // 🔥 [ISSUE#167] 起動時例外のデバッグ出力
+                        Console.WriteLine($"❌❌❌ [AUTH_DEBUG] 起動時例外: {ex.GetType().Name}: {ex.Message}");
+                        Console.WriteLine($"❌❌❌ [AUTH_DEBUG] スタックトレース: {ex.StackTrace}");
                         _logStartupError(_logger, ex);
                         loadingWindow?.Close();
                         desktop.Shutdown();
@@ -555,6 +648,67 @@ internal sealed partial class App : Avalonia.Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// トークン有効期限切れハンドラーの設定 (Issue #168)
+    /// TokenExpiredイベントをサブスクライブし、UI通知とナビゲーションを行う
+    /// </summary>
+    private void SetupTokenExpirationHandler(IServiceProvider serviceProvider, Avalonia.Controls.Window mainWindow)
+    {
+        try
+        {
+            var tokenExpirationHandler = serviceProvider.GetService<ITokenExpirationHandler>();
+            if (tokenExpirationHandler == null)
+            {
+                _logger?.LogWarning("ITokenExpirationHandler が見つかりません。トークン有効期限切れ処理は無効です。");
+                return;
+            }
+
+            var navigationService = serviceProvider.GetService<INavigationService>();
+            var notificationService = serviceProvider.GetService<INotificationService>();
+
+            tokenExpirationHandler.TokenExpired += async (sender, args) =>
+            {
+                _logger?.LogWarning("トークン有効期限切れイベント受信: {Reason} (ユーザー: {UserId})", args.Reason, args.UserId);
+
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    try
+                    {
+                        // 1. ユーザーに通知
+                        if (notificationService != null)
+                        {
+                            await notificationService.ShowWarningAsync(
+                                "セッション期限切れ",
+                                "セッションが期限切れになりました。再度ログインしてください。",
+                                duration: 5000);
+                        }
+
+                        // 2. ログイン画面へナビゲーション
+                        if (navigationService != null)
+                        {
+                            await navigationService.LogoutAndShowLoginAsync();
+                            _logger?.LogInformation("トークン有効期限切れによりログイン画面へリダイレクトしました");
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("INavigationService が見つかりません。ログイン画面へのリダイレクトをスキップします。");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "トークン有効期限切れイベント処理中にエラーが発生しました");
+                    }
+                });
+            };
+
+            _logger?.LogInformation("✅ TokenExpirationHandler イベントサブスクリプション完了");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "TokenExpirationHandler のセットアップに失敗しました");
+        }
     }
 
     /// <summary>

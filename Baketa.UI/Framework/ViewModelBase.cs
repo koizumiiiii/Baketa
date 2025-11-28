@@ -59,6 +59,11 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
     private bool _disposed;
 
     /// <summary>
+    /// ViewModelが破棄されたかどうかを取得します
+    /// </summary>
+    protected bool IsDisposed => _disposed;
+
+    /// <summary>
     /// UIスレッド安全なプロパティ設定メソッド
     /// </summary>
     /// <typeparam name="T">プロパティの型</typeparam>

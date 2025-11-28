@@ -167,6 +167,11 @@ public class PlatformModule : ServiceModuleBase
             Baketa.Infrastructure.Platform.Windows.Services.CoordinateTransformationService>();
         Console.WriteLine("✅ [PHASE2.1_CLEAN_ARCH] CoordinateTransformationService登録完了 - ROI→スクリーン座標変換（DWM Hybrid検出対応）");
 
+        // トークンストレージ（Windows Credential Manager）
+        services.AddSingleton<Baketa.Core.Abstractions.Auth.ITokenStorage,
+            Baketa.Infrastructure.Platform.Windows.Credentials.WindowsCredentialStorage>();
+        Console.WriteLine("✅ WindowsCredentialStorage登録完了 - 認証トークンの安全な永続化");
+
         // その他のWindows API関連サービス
         // 例: services.AddSingleton<IWindowsProcessService, WindowsProcessService>();
         // 例: services.AddSingleton<IHotkeyService, Win32HotkeyService>();

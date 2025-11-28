@@ -8,7 +8,8 @@ public enum AuthProvider
     Google,
     X,
     Discord,
-    Steam
+    Steam,
+    Twitch
 }
 
 /// <summary>

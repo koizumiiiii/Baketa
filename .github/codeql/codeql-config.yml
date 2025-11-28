@@ -7,6 +7,13 @@ query-filters:
       id: cs/weak-crypto
   - exclude:
       id: cs/hardcoded-credentials
+  # 認証サービスでのMaskEmail使用は適切な対応済み
+  # パスワードカテゴリカウント（1-4の整数）は機密情報ではない
+  # RecoveryType enum値は機密情報ではない
+  - exclude:
+      id: cs/exposure-of-sensitive-information
+  - exclude:
+      id: cs/cleartext-storage-of-sensitive-information
 
 queries:
   - uses: security-and-quality

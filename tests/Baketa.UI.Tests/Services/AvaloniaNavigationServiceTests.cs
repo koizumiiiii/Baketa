@@ -69,7 +69,10 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     {
         return RunOnUIThread(() => new LoginViewModel(
             _mockAuthService.Object,
+            Mock.Of<IOAuthCallbackHandler>(),
             Mock.Of<INavigationService>(),
+            Mock.Of<ITokenStorage>(),
+            new SecureSessionManager(Mock.Of<ILogger<SecureSessionManager>>()),
             new LoginAttemptTracker(),
             new SecurityAuditLogger(Mock.Of<ILogger<SecurityAuditLogger>>()),
             Mock.Of<Core.Abstractions.Events.IEventAggregator>(),
@@ -78,9 +81,20 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
 
     private SignupViewModel CreateStubSignupViewModel()
     {
+        // パスワードバリデーターのモックを設定
+        var mockPasswordValidator = new Mock<IPasswordStrengthValidator>();
+        mockPasswordValidator.Setup(x => x.ValidatePassword(It.IsAny<string>()))
+            .Returns(PasswordValidationResult.Success(PasswordStrength.Medium, 3));
+        mockPasswordValidator.Setup(x => x.GetPasswordStrength(It.IsAny<string>()))
+            .Returns(PasswordStrength.Medium);
+        mockPasswordValidator.Setup(x => x.GetStrengthMessage(It.IsAny<PasswordStrength>()))
+            .Returns("普通");
+
         return RunOnUIThread(() => new SignupViewModel(
             _mockAuthService.Object,
+            Mock.Of<IOAuthCallbackHandler>(),
             Mock.Of<INavigationService>(),
+            mockPasswordValidator.Object,
             Mock.Of<Core.Abstractions.Events.IEventAggregator>(),
             Mock.Of<ILogger<SignupViewModel>>()));
     }
