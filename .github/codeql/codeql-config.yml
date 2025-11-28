@@ -11,9 +11,9 @@ query-filters:
   # パスワードカテゴリカウント（1-4の整数）は機密情報ではない
   # RecoveryType enum値は機密情報ではない
   - exclude:
-      id: cs/exposure-of-private-information
+      id: cs/exposure-of-sensitive-information
   - exclude:
-      id: cs/clear-text-storage-of-sensitive-information
+      id: cs/cleartext-storage-of-sensitive-information
 
 queries:
   - uses: security-and-quality
