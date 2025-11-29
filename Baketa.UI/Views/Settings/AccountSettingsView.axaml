@@ -1,0 +1,198 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Controls"
+             x:Class="Baketa.UI.Views.Settings.AccountSettingsView"
+             x:DataType="vm:AccountSettingsViewModel">
+
+    <Design.PreviewWith>
+        <Border Padding="20" Width="600" Height="800">
+            <!-- Design time preview -->
+        </Border>
+    </Design.PreviewWith>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- Header -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="アカウント" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="ユーザー認証とアカウント管理"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- Loading Indicator -->
+            <Border IsVisible="{Binding IsLoading}"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" Width="200"/>
+                    <TextBlock Text="処理中..." HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Status Message -->
+            <Border IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                    Padding="12,8"
+                    CornerRadius="6"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                <TextBlock Text="{Binding StatusMessage}"
+                           TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Logged In State -->
+            <StackPanel IsVisible="{Binding IsLoggedIn}" Spacing="16">
+                <!-- User Info Card -->
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <!-- User Details -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                            <TextBlock Text="{Binding UserDisplayName}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding UserEmail}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding AuthProvider, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <PathIcon Data="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock Text="{Binding AuthProvider, StringFormat='{}{0}でログイン'}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Status Badge -->
+                        <Border Grid.Column="1"
+                                Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                                CornerRadius="4"
+                                Padding="8,4"
+                                VerticalAlignment="Top">
+                            <TextBlock Text="ログイン中"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Account Actions Section -->
+                <StackPanel Spacing="12">
+                    <TextBlock Text="アカウント操作" FontSize="16" FontWeight="SemiBold"/>
+
+                    <controls:SettingsItem Title="ログアウト"
+                                           Description="このデバイスからログアウトします">
+                        <controls:SettingsItem.SettingContent>
+                            <Button Content="ログアウト"
+                                    Command="{Binding LogoutCommand}"
+                                    Classes="danger"
+                                    Width="100"/>
+                        </controls:SettingsItem.SettingContent>
+                    </controls:SettingsItem>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Not Logged In State -->
+            <StackPanel IsVisible="{Binding !IsLoggedIn}" Spacing="16">
+                <!-- Info Card -->
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="20">
+                    <StackPanel Spacing="12" HorizontalAlignment="Center">
+                        <PathIcon Data="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"
+                                  Width="48" Height="48"
+                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="ログインしていません"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="ログインすると、設定の同期や追加機能が利用できます"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   MaxWidth="300"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Auth Buttons -->
+                <StackPanel Spacing="12">
+                    <Button Content="ログイン"
+                            Command="{Binding LoginCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Classes="accent"
+                            Padding="16,12"/>
+
+                    <Button Content="新規登録"
+                            Command="{Binding SignupCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Padding="16,12"/>
+                </StackPanel>
+
+                <!-- Password Reset Link -->
+                <Button Content="パスワードを忘れた場合"
+                        Command="{Binding ShowPasswordResetFormCommand}"
+                        Classes="hyperlink"
+                        HorizontalAlignment="Center"
+                        Margin="0,8,0,0"/>
+            </StackPanel>
+
+            <!-- Password Reset Form (shown when requested) -->
+            <Border IsVisible="{Binding ShowPasswordResetForm}"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="20">
+                <StackPanel Spacing="16">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="パスワードリセット"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="登録したメールアドレスにパスワードリセットリンクを送信します"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- Success Message -->
+                    <Border IsVisible="{Binding PasswordResetSent}"
+                            Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                            CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                      Width="16" Height="16"
+                                      Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                            <TextBlock Text="リセットメールを送信しました。メールを確認してください。"
+                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Email Input -->
+                    <StackPanel Spacing="8" IsVisible="{Binding !PasswordResetSent}">
+                        <TextBlock Text="メールアドレス" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding ResetEmail}"
+                                 Watermark="example@email.com"
+                                 Classes="clearButton"/>
+                    </StackPanel>
+
+                    <!-- Action Buttons -->
+                    <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                        <Button Content="キャンセル"
+                                Command="{Binding HidePasswordResetFormCommand}"
+                                Width="100"/>
+                        <Button Content="送信"
+                                Command="{Binding SendPasswordResetCommand}"
+                                Classes="accent"
+                                Width="100"
+                                IsVisible="{Binding !PasswordResetSent}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

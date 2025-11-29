@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using Avalonia.Styling;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Settings;
 using Baketa.UI.Framework;
@@ -36,6 +38,15 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     private bool _showAdvancedSettings;
     private bool _hasChanges;
 
+    // 翻訳設定用バッキングフィールド
+    private bool _useLocalEngine = true;
+    private string _sourceLanguage = "Japanese";
+    private string _targetLanguage = "English";
+    private int _fontSize = 14;
+
+    // テーマ設定用バッキングフィールド
+    private UiTheme _selectedTheme = UiTheme.Auto;
+
     /// <summary>
     /// GeneralSettingsViewModelを初期化します
     /// </summary>
@@ -58,6 +69,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
         // 選択肢の初期化
         LogLevelOptions = [.. Enum.GetValues<LogLevel>()];
+
+        // 翻訳先言語リストの初期化
+        UpdateAvailableTargetLanguages();
 
         // コマンドの初期化
         ResetToDefaultsCommand = ReactiveCommand.Create(ResetToDefaults);
@@ -164,6 +178,112 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         get => _enableDebugMode;
         set => this.RaiseAndSetIfChanged(ref _enableDebugMode, value);
     }
+
+    #endregion
+
+    #region 翻訳設定プロパティ
+
+    /// <summary>
+    /// ローカル翻訳エンジンを使用するかどうか
+    /// </summary>
+    public bool UseLocalEngine
+    {
+        get => _useLocalEngine;
+        set => this.RaiseAndSetIfChanged(ref _useLocalEngine, value);
+    }
+
+    /// <summary>
+    /// AI翻訳が有効かどうか（αテストでは無効）
+    /// </summary>
+    public bool IsCloudTranslationEnabled => false;
+
+    /// <summary>
+    /// 翻訳元言語
+    /// </summary>
+    public string SourceLanguage
+    {
+        get => _sourceLanguage;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _sourceLanguage, value);
+            UpdateAvailableTargetLanguages();
+        }
+    }
+
+    /// <summary>
+    /// 翻訳先言語
+    /// </summary>
+    public string TargetLanguage
+    {
+        get => _targetLanguage;
+        set => this.RaiseAndSetIfChanged(ref _targetLanguage, value);
+    }
+
+    /// <summary>
+    /// フォントサイズ
+    /// </summary>
+    public int FontSize
+    {
+        get => _fontSize;
+        set => this.RaiseAndSetIfChanged(ref _fontSize, value);
+    }
+
+    /// <summary>
+    /// 利用可能な言語リスト
+    /// </summary>
+    public ObservableCollection<string> AvailableLanguages { get; } = ["Japanese", "English"];
+
+    /// <summary>
+    /// 利用可能な翻訳先言語リスト
+    /// </summary>
+    public ObservableCollection<string> AvailableTargetLanguages { get; } = [];
+
+    /// <summary>
+    /// フォントサイズの選択肢
+    /// </summary>
+    public ObservableCollection<int> FontSizeOptions { get; } = [10, 12, 14, 16, 18, 20, 24, 28, 32];
+
+    /// <summary>
+    /// 言語ペアが有効かどうか
+    /// </summary>
+    public bool IsLanguagePairValid => !string.Equals(SourceLanguage, TargetLanguage, StringComparison.OrdinalIgnoreCase);
+
+    #endregion
+
+    #region テーマ設定プロパティ
+
+    /// <summary>
+    /// 選択されたテーマ
+    /// </summary>
+    public UiTheme SelectedTheme
+    {
+        get => _selectedTheme;
+        set
+        {
+            var oldValue = _selectedTheme;
+            this.RaiseAndSetIfChanged(ref _selectedTheme, value);
+            if (oldValue != value)
+            {
+                ApplyTheme(value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 利用可能なテーマリスト
+    /// </summary>
+    public IReadOnlyList<UiTheme> AvailableThemes { get; } = [UiTheme.Light, UiTheme.Dark, UiTheme.Auto];
+
+    /// <summary>
+    /// テーマ表示名を取得
+    /// </summary>
+    public static string GetThemeDisplayName(UiTheme theme) => theme switch
+    {
+        UiTheme.Light => "ライト",
+        UiTheme.Dark => "ダーク",
+        UiTheme.Auto => "システム設定に従う",
+        _ => theme.ToString()
+    };
 
     #endregion
 
@@ -278,6 +398,28 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         this.WhenAnyValue(x => x.EnableDebugMode)
             .Skip(1).DistinctUntilChanged()
             .Subscribe(_ => HasChanges = true);
+
+        // 翻訳設定の変更追跡
+        this.WhenAnyValue(x => x.UseLocalEngine)
+            .Skip(1).DistinctUntilChanged()
+            .Subscribe(_ => HasChanges = true);
+
+        this.WhenAnyValue(x => x.SourceLanguage)
+            .Skip(1).DistinctUntilChanged()
+            .Subscribe(_ => HasChanges = true);
+
+        this.WhenAnyValue(x => x.TargetLanguage)
+            .Skip(1).DistinctUntilChanged()
+            .Subscribe(_ => HasChanges = true);
+
+        this.WhenAnyValue(x => x.FontSize)
+            .Skip(1).DistinctUntilChanged()
+            .Subscribe(_ => HasChanges = true);
+
+        // テーマ設定の変更追跡
+        this.WhenAnyValue(x => x.SelectedTheme)
+            .Skip(1).DistinctUntilChanged()
+            .Subscribe(_ => HasChanges = true);
     }
 
     /// <summary>
@@ -335,6 +477,60 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         catch (ArgumentException ex)
         {
             _logger?.LogError(ex, "無効なパスが指定されました: {LogPath}", logPath);
+        }
+    }
+
+    /// <summary>
+    /// テーマを適用します
+    /// </summary>
+    private void ApplyTheme(UiTheme theme)
+    {
+        try
+        {
+            var app = Avalonia.Application.Current;
+            if (app == null)
+            {
+                _logger?.LogWarning("Application.Current が null のためテーマを適用できません");
+                return;
+            }
+
+            app.RequestedThemeVariant = theme switch
+            {
+                UiTheme.Light => ThemeVariant.Light,
+                UiTheme.Dark => ThemeVariant.Dark,
+                UiTheme.Auto => ThemeVariant.Default,
+                _ => ThemeVariant.Default
+            };
+
+            _logger?.LogInformation("テーマを変更しました: {Theme}", theme);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "テーマの適用に失敗しました: {Theme}", theme);
+        }
+    }
+
+    /// <summary>
+    /// 翻訳先言語リストを更新
+    /// </summary>
+    private void UpdateAvailableTargetLanguages()
+    {
+        AvailableTargetLanguages.Clear();
+
+        // 翻訳元言語に基づいて翻訳先言語を設定
+        if (SourceLanguage == "Japanese")
+        {
+            AvailableTargetLanguages.Add("English");
+        }
+        else if (SourceLanguage == "English")
+        {
+            AvailableTargetLanguages.Add("Japanese");
+        }
+
+        // 現在の翻訳先言語が選択肢にない場合は最初の選択肢を選択
+        if (!AvailableTargetLanguages.Contains(TargetLanguage) && AvailableTargetLanguages.Count > 0)
+        {
+            TargetLanguage = AvailableTargetLanguages.First();
         }
     }
 

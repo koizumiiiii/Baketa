@@ -99,14 +99,6 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
             Mock.Of<ILogger<SignupViewModel>>()));
     }
 
-    private SimpleSettingsViewModel CreateStubSimpleSettingsViewModel(Core.Abstractions.Events.IEventAggregator eventAggregator)
-    {
-        return RunOnUIThread(() => new SimpleSettingsViewModel(
-            eventAggregator,
-            Mock.Of<ILogger<SimpleSettingsViewModel>>(),
-            null)); // TranslationOrchestrationServiceは任意
-    }
-
     /// <summary>
     /// Mockオブジェクトの設定
     /// </summary>

@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Baketa.UI.ViewModels;
 
@@ -15,6 +16,10 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+
+        // ウィンドウが閉じられる際にカテゴリContentをクリア
+        // これによりAvaloniaのビジュアルツリー問題を回避
+        Closed += OnWindowClosed;
     }
 
     /// <summary>
@@ -24,5 +29,17 @@ public partial class SettingsWindow : Window
     public SettingsWindow(SettingsWindowViewModel viewModel) : this()
     {
         DataContext = viewModel;
+    }
+
+    /// <summary>
+    /// ウィンドウが閉じられた際のイベントハンドラ
+    /// </summary>
+    private void OnWindowClosed(object? sender, EventArgs e)
+    {
+        // ViewModelのカテゴリContentをクリアして、次回表示時に新しいViewを作成できるようにする
+        if (DataContext is SettingsWindowViewModel viewModel)
+        {
+            viewModel.ClearCategoryContents();
+        }
     }
 }

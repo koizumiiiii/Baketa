@@ -7,6 +7,22 @@ using Baketa.Core.Settings;
 namespace Baketa.UI.Converters;
 
 /// <summary>
+/// 設定画面用コンバーターの静的参照クラス
+/// </summary>
+public static class SettingsConverters
+{
+    /// <summary>
+    /// UiThemeを日本語表示名に変換するコンバーター
+    /// </summary>
+    public static readonly UiThemeToStringConverter ThemeToDisplayName = UiThemeToStringConverter.Instance;
+
+    /// <summary>
+    /// UiSizeを日本語表示名に変換するコンバーター
+    /// </summary>
+    public static readonly UiSizeToStringConverter SizeToDisplayName = UiSizeToStringConverter.Instance;
+}
+
+/// <summary>
 /// UiSizeを日本語文字列に変換するコンバーター
 /// </summary>
 public sealed class UiSizeToStringConverter : IValueConverter

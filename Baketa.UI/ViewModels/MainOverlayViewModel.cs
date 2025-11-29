@@ -10,6 +10,7 @@ using Avalonia.Media.Imaging;
 using Baketa.Application.Services.Diagnostics;
 using Baketa.Application.Services.Translation;
 using Baketa.Application.Services.UI;
+using Baketa.Core.Abstractions.Auth; // 🔥 [ISSUE#176] 認証状態監視用
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.GPU; // 🔥 [PHASE5.2E] IWarmupService用
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
@@ -59,6 +60,9 @@ public class MainOverlayViewModel : ViewModelBase
     // 🔥 [ISSUE#167] 認証モード（ログイン/サインアップ画面表示中はExitボタン以外無効化）
     private bool _isAuthenticationMode;
 
+    // 🔥 [ISSUE#176] ログイン状態（ログアウト時はTargetを非活性にする）
+    private bool _isLoggedIn;
+
     private WindowInfo? _selectedWindow;
 
     public MainOverlayViewModel(
@@ -71,11 +75,12 @@ public class MainOverlayViewModel : ViewModelBase
         IDiagnosticReportService diagnosticReportService,
         IWindowManagementService windowManagementService,
         ITranslationControlService translationControlService,
-        SimpleSettingsViewModel settingsViewModel,
+        SettingsWindowViewModel settingsViewModel,
         IWarmupService warmupService, // 🔥 [PHASE5.2E] ウォームアップサービス依存追加
         Baketa.Infrastructure.Services.IFirstRunService firstRunService, // 初回起動判定サービス
         ITranslationModeService translationModeService, // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス依存追加
-        IErrorNotificationService errorNotificationService) // 🔥 [ISSUE#171_PHASE2] エラー通知サービス依存追加
+        IErrorNotificationService errorNotificationService, // 🔥 [ISSUE#171_PHASE2] エラー通知サービス依存追加
+        IAuthService authService) // 🔥 [ISSUE#176] 認証状態監視用
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
@@ -99,6 +104,10 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 🔥 [ISSUE#171_PHASE2] エラー通知サービス設定
         _errorNotificationService = errorNotificationService ?? throw new ArgumentNullException(nameof(errorNotificationService));
+
+        // 🔥 [ISSUE#176] 認証サービス設定とイベント購読（ログアウト時のUI状態リセット用）
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _authService.AuthStatusChanged += OnAuthStatusChanged;
 
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
@@ -124,6 +133,9 @@ public class MainOverlayViewModel : ViewModelBase
         // OCR初期化状態を監視するタスクを開始
         _ = Task.Run(MonitorOcrInitializationAsync);
 
+        // 🔥 [ISSUE#176] 認証状態を初期化（起動時のログイン状態を取得）
+        _ = Task.Run(InitializeAuthStateAsync);
+
         InitializeCommands();
         InitializeEventHandlers();
         InitializePropertyChangeHandlers();
@@ -139,11 +151,12 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly IDiagnosticReportService _diagnosticReportService;
     private readonly IWindowManagementService _windowManagementService;
     private readonly ITranslationControlService _translationControlService;
-    private readonly SimpleSettingsViewModel _settingsViewModel;
+    private readonly SettingsWindowViewModel _settingsViewModel;
     private readonly IWarmupService _warmupService;
     private readonly Baketa.Infrastructure.Services.IFirstRunService _firstRunService;
     private readonly ITranslationModeService _translationModeService; // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス
     private readonly IErrorNotificationService _errorNotificationService; // 🔥 [ISSUE#171_PHASE2] エラー通知サービス
+    private readonly IAuthService _authService; // 🔥 [ISSUE#176] 認証状態監視用
 
     #region Properties
 
@@ -534,7 +547,7 @@ public class MainOverlayViewModel : ViewModelBase
     // UI状態の計算プロパティ
     public bool ShowHideEnabled => !_isAuthenticationMode && IsTranslationActive; // 認証モード中または翻訳中でない場合は無効
     public bool SettingsEnabled => !_isAuthenticationMode && !IsLoading && !IsTranslationActive; // 認証モード中、ローディング中、翻訳実行中は無効
-    public bool IsSelectWindowEnabled => !_isAuthenticationMode && IsOcrInitialized && !IsLoading; // 認証モード中またはOCR未初期化またはローディング中は無効
+    public bool IsSelectWindowEnabled => !_isAuthenticationMode && IsOcrInitialized && !IsLoading && _isLoggedIn; // 認証モード中またはOCR未初期化またはローディング中またはログアウト時は無効
     public bool IsStartStopEnabled
     {
         get
@@ -1492,7 +1505,7 @@ public class MainOverlayViewModel : ViewModelBase
         Logger?.LogDebug("Translation display visibility toggled: {IsVisible}", IsTranslationResultVisible);
     }
 
-    private static SimpleSettingsView? _currentSettingsDialog;
+    private static Views.SettingsWindow? _currentSettingsDialog;
 
     private async void ExecuteSettings()
     {
@@ -1519,39 +1532,22 @@ public class MainOverlayViewModel : ViewModelBase
             }
 
             DebugHelper.Log($"🔧 [MainOverlayViewModel] 新しい設定ダイアログを作成開始");
-            Logger?.LogDebug("Opening simple settings dialog");
-            
-            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel使用開始");
+            Logger?.LogDebug("Opening settings dialog");
 
-            // DI注入されたSimpleSettingsViewModelを使用
+            // DI注入されたSettingsWindowViewModelを使用
             var settingsViewModel = _settingsViewModel;
             var vmHash = settingsViewModel.GetHashCode();
-            DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsViewModel取得: {vmHash}");
-
-            // ViewModelの設定を読み込み
-            DebugHelper.Log($"🔧 [MainOverlayViewModel] LoadSettingsAsync呼び出し前");
-            try
-            {
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
-                {
-                    await settingsViewModel.LoadSettingsAsync().ConfigureAwait(false);
-                }).ConfigureAwait(false);
-                DebugHelper.Log($"🔧 [MainOverlayViewModel] LoadSettingsAsync呼び出し完了");
-            }
-            catch (Exception loadEx)
-            {
-                DebugHelper.Log($"💥 [MainOverlayViewModel] LoadSettingsAsync例外: {loadEx.Message}");
-            }
+            DebugHelper.Log($"🔧 [MainOverlayViewModel] SettingsWindowViewModel取得: {vmHash}");
 
             // 設定ダイアログをUIスレッドで作成
             var dialogHash = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                _currentSettingsDialog = new SimpleSettingsView
+                _currentSettingsDialog = new Views.SettingsWindow
                 {
                     DataContext = settingsViewModel
                 };
                 var hash = _currentSettingsDialog.GetHashCode();
-                DebugHelper.Log($"🔧 [MainOverlayViewModel] SimpleSettingsView作成: {hash}");
+                DebugHelper.Log($"🔧 [MainOverlayViewModel] SettingsWindow作成: {hash}");
                 return hash;
             });
 
@@ -1564,29 +1560,6 @@ public class MainOverlayViewModel : ViewModelBase
                 _currentSettingsDialog = null;
                 Logger?.LogDebug($"🔧 [MainOverlayViewModel] _currentSettingsDialogをnullに設定 - 前の値: {previousDialog?.GetHashCode()}");
             };
-
-            // ViewModelのCloseRequestedイベントハンドル - 直接Close()を呼び出し
-            if (settingsViewModel != null)
-            {
-                settingsViewModel.CloseRequested += () =>
-                {
-                    Logger?.LogDebug($"🔧 [MainOverlayViewModel] Settings dialog close requested by ViewModel - VM: {vmHash}");
-                    Logger?.LogDebug("Settings dialog close requested by ViewModel");
-                    var dialog = _currentSettingsDialog;
-                    var currentDialogHash2 = dialog?.GetHashCode();
-                    Logger?.LogDebug($"🔧 [MainOverlayViewModel] 現在のダイアログ状態: {currentDialogHash2}, 作成時: {dialogHash}");
-                    if (dialog != null)
-                    {
-                        Logger?.LogDebug($"🔧 [MainOverlayViewModel] 直接Close()を呼び出し - 対象: {currentDialogHash2}");
-                        dialog.Close();
-                        Logger?.LogDebug($"🔧 [MainOverlayViewModel] Close()完了 - 対象: {currentDialogHash2}");
-                    }
-                    else
-                    {
-                        Logger?.LogDebug($"⚠️ [MainOverlayViewModel] _currentSettingsDialogがnull");
-                    }
-                };
-            }
 
             // UIスレッドで安全にApplication.Currentにアクセス
             var owner = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
@@ -1930,10 +1903,98 @@ public class MainOverlayViewModel : ViewModelBase
                 _warmupService.WarmupProgressChanged -= OnWarmupProgressChanged;
             }
 
+            // 🔥 [ISSUE#176] 認証状態変更イベントの購読解除
+            if (_authService != null)
+            {
+                _authService.AuthStatusChanged -= OnAuthStatusChanged;
+            }
+
             Logger?.LogDebug("🔥 [PHASE5.2E] MainOverlayViewModel Dispose完了 - イベント購読解除");
         }
 
         base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// 🔥 [ISSUE#176] 起動時の認証状態を初期化
+    /// </summary>
+    private async Task InitializeAuthStateAsync()
+    {
+        try
+        {
+            var session = await _authService.GetCurrentSessionAsync().ConfigureAwait(false);
+            _isLoggedIn = session != null;
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+            });
+
+            Logger?.LogDebug("初期認証状態: IsLoggedIn={IsLoggedIn}", _isLoggedIn);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "認証状態の初期化に失敗しました");
+            _isLoggedIn = false;
+        }
+    }
+
+    /// <summary>
+    /// 🔥 [ISSUE#176] 認証状態変更イベントハンドラ
+    /// ログアウト時にUIを起動時状態にリセット
+    /// </summary>
+    private void OnAuthStatusChanged(object? sender, AuthStatusChangedEventArgs e)
+    {
+        Logger?.LogDebug("[AUTH_DEBUG] 認証状態変更: IsLoggedIn={IsLoggedIn}", e.IsLoggedIn);
+
+        // ログイン状態を更新
+        _isLoggedIn = e.IsLoggedIn;
+
+        // UIスレッドでボタン状態を更新
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            // ボタン状態のPropertyChanged通知
+            this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
+            this.RaisePropertyChanged(nameof(IsStartStopEnabled));
+            this.RaisePropertyChanged(nameof(IsLiveEnabled));
+            this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
+            this.RaisePropertyChanged(nameof(SettingsEnabled));
+
+            if (!e.IsLoggedIn)
+            {
+                // ログアウト時: UIを起動時状態にリセット
+                Logger?.LogDebug("[AUTH_DEBUG] ログアウト検出 - UIリセット開始");
+
+                // 1. 翻訳を停止（実行中の場合）
+                if (IsTranslationActive)
+                {
+                    Logger?.LogDebug("[AUTH_DEBUG] 翻訳停止");
+                    await StopTranslationAsync();
+                }
+
+                // 2. オーバーレイを非表示
+                if (_overlayManager != null)
+                {
+                    Logger?.LogDebug("[AUTH_DEBUG] オーバーレイ非表示");
+                    await _overlayManager.SetAllVisibilityAsync(false);
+                }
+
+                // 3. ターゲットウィンドウ選択をリセット
+                SelectedWindow = null;
+                IsWindowSelected = false;
+
+                // 4. 翻訳結果を非表示
+                IsTranslationResultVisible = false;
+
+                // 5. シングルショットオーバーレイ状態をリセット
+                _isSingleshotOverlayVisible = false;
+
+                // 6. ステータスをアイドルに戻す
+                CurrentStatus = TranslationStatus.Idle;
+
+                Logger?.LogDebug("[AUTH_DEBUG] ログアウト時UIリセット完了 - 起動時状態に戻りました");
+            }
+        });
     }
 
     #endregion

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baketa - パスワードリセット</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 48px;
+            max-width: 480px;
+            width: 100%;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        input[type="password"].error {
+            border-color: #e53935;
+        }
+        input[type="password"].valid {
+            border-color: #4CAF50;
+        }
+        .password-requirements {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        .password-requirements h3 {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .requirement {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 6px;
+        }
+        .requirement:last-child {
+            margin-bottom: 0;
+        }
+        .requirement-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+        .requirement.met .requirement-icon {
+            background: #4CAF50;
+            color: white;
+        }
+        .requirement.unmet .requirement-icon {
+            background: #e0e0e0;
+            color: #999;
+        }
+        .requirement.met {
+            color: #4CAF50;
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .message {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            display: none;
+        }
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            display: block;
+        }
+        .message.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            display: block;
+        }
+        .message.info {
+            background: #e3f2fd;
+            color: #1565c0;
+            display: block;
+        }
+        .success-container {
+            text-align: center;
+            display: none;
+        }
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+        .success-icon svg {
+            width: 48px;
+            height: 48px;
+            fill: white;
+        }
+        .success-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 16px;
+        }
+        .success-message {
+            color: #666;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+        .steps {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: left;
+        }
+        .steps h2 {
+            color: #333;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .step:last-child {
+            margin-bottom: 0;
+        }
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        .step-text {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.5;
+            padding-top: 2px;
+        }
+        .footer {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        .footer p {
+            font-size: 13px;
+            color: #999;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- フォーム表示 -->
+        <div id="form-container">
+            <div class="logo">Baketa</div>
+            <h1>新しいパスワードを設定</h1>
+            <p class="subtitle">安全なパスワードを入力してください</p>
+
+            <div id="message" class="message"></div>
+
+            <form id="reset-form">
+                <div class="form-group">
+                    <label for="password">新しいパスワード</label>
+                    <input type="password" id="password" name="password"
+                           placeholder="新しいパスワードを入力" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm-password">パスワード（確認）</label>
+                    <input type="password" id="confirm-password" name="confirm-password"
+                           placeholder="もう一度入力してください" required>
+                </div>
+
+                <div class="password-requirements">
+                    <h3>パスワード要件</h3>
+                    <div class="requirement unmet" id="req-length">
+                        <span class="requirement-icon">✓</span>
+                        <span>8文字以上</span>
+                    </div>
+                    <div class="requirement unmet" id="req-uppercase">
+                        <span class="requirement-icon">✓</span>
+                        <span>大文字を含む (A-Z)</span>
+                    </div>
+                    <div class="requirement unmet" id="req-lowercase">
+                        <span class="requirement-icon">✓</span>
+                        <span>小文字を含む (a-z)</span>
+                    </div>
+                    <div class="requirement unmet" id="req-number">
+                        <span class="requirement-icon">✓</span>
+                        <span>数字を含む (0-9)</span>
+                    </div>
+                    <div class="requirement unmet" id="req-match">
+                        <span class="requirement-icon">✓</span>
+                        <span>確認用パスワードが一致</span>
+                    </div>
+                </div>
+
+                <button type="submit" id="submit-btn" disabled>
+                    パスワードを変更
+                </button>
+            </form>
+        </div>
+
+        <!-- 成功表示 -->
+        <div id="success-container" class="success-container">
+            <div class="success-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                </svg>
+            </div>
+            <div class="logo">Baketa</div>
+            <h1 class="success-title">パスワードを変更しました</h1>
+            <p class="success-message">新しいパスワードが設定されました。<br>アプリからログインしてください。</p>
+
+            <div class="steps">
+                <h2>次のステップ</h2>
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-text">このページを閉じてください</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-text">Baketaアプリを開いてください</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-text">新しいパスワードでログインしてください</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2025 Baketa. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        // Supabase設定
+        const SUPABASE_URL = 'https://dshxqhdqxnbawxvyqqnj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzaHhxaGRxeG5iYXd4dnlxcW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0MDE1NTQsImV4cCI6MjA0Nzk3NzU1NH0.YDCAwm2G32x9Nd1S5o7cUq_o2xfPkE8fPoXdPLGshBM';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const passwordInput = document.getElementById('password');
+        const confirmInput = document.getElementById('confirm-password');
+        const submitBtn = document.getElementById('submit-btn');
+        const messageDiv = document.getElementById('message');
+        const formContainer = document.getElementById('form-container');
+        const successContainer = document.getElementById('success-container');
+
+        // パスワード要件チェック
+        function checkRequirements() {
+            const password = passwordInput.value;
+            const confirm = confirmInput.value;
+
+            const checks = {
+                length: password.length >= 8,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /[0-9]/.test(password),
+                match: password === confirm && password.length > 0
+            };
+
+            // UI更新
+            updateRequirement('req-length', checks.length);
+            updateRequirement('req-uppercase', checks.uppercase);
+            updateRequirement('req-lowercase', checks.lowercase);
+            updateRequirement('req-number', checks.number);
+            updateRequirement('req-match', checks.match);
+
+            // 入力フィールドのスタイル
+            const typesCount = [checks.uppercase, checks.lowercase, checks.number].filter(Boolean).length;
+            const isValidPassword = checks.length && typesCount >= 2;
+
+            passwordInput.classList.toggle('valid', isValidPassword);
+            passwordInput.classList.toggle('error', password.length > 0 && !isValidPassword);
+
+            confirmInput.classList.toggle('valid', checks.match);
+            confirmInput.classList.toggle('error', confirm.length > 0 && !checks.match);
+
+            // ボタン有効化
+            submitBtn.disabled = !(isValidPassword && checks.match);
+        }
+
+        function updateRequirement(id, met) {
+            const el = document.getElementById(id);
+            el.classList.toggle('met', met);
+            el.classList.toggle('unmet', !met);
+        }
+
+        passwordInput.addEventListener('input', checkRequirements);
+        confirmInput.addEventListener('input', checkRequirements);
+
+        // メッセージ表示
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+        }
+
+        function hideMessage() {
+            messageDiv.className = 'message';
+        }
+
+        // フォーム送信
+        document.getElementById('reset-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const password = passwordInput.value;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span>変更中...';
+            hideMessage();
+
+            try {
+                const { data, error } = await supabase.auth.updateUser({
+                    password: password
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                // 成功
+                formContainer.style.display = 'none';
+                successContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error('Password update error:', error);
+
+                let errorMessage = 'パスワードの変更に失敗しました。';
+
+                if (error.message.includes('expired')) {
+                    errorMessage = 'リンクの有効期限が切れています。もう一度パスワードリセットをリクエストしてください。';
+                } else if (error.message.includes('same')) {
+                    errorMessage = '現在のパスワードと同じパスワードは使用できません。';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                showMessage(errorMessage, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'パスワードを変更';
+            }
+        });
+
+        // ページ読み込み時にセッション確認
+        async function checkSession() {
+            const { data: { session }, error } = await supabase.auth.getSession();
+
+            if (error || !session) {
+                showMessage('このリンクは無効または期限切れです。アプリから再度パスワードリセットをリクエストしてください。', 'error');
+                submitBtn.style.display = 'none';
+                document.getElementById('reset-form').querySelectorAll('input').forEach(input => {
+                    input.disabled = true;
+                });
+            }
+        }
+
+        // URLハッシュからトークンを処理（Supabaseが自動的に処理）
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                showMessage('新しいパスワードを入力してください。', 'info');
+            }
+        });
+
+        // 初期化
+        checkSession();
+    </script>
+</body>
+</html>
