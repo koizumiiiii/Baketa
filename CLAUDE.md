@@ -61,6 +61,35 @@ dotnet run --project Baketa.UI
 dotnet run --project Baketa.UI --configuration Release
 ```
 
+### Creating Release Package
+To create a distribution package with bundled translation server:
+
+```cmd
+# Step 1: PyInstallerで翻訳サーバーをexe化（Pythonコード変更時のみ必要）
+cd grpc_server
+python -m venv venv_build
+venv_build\Scripts\activate
+pip install -r requirements.txt
+pip install pyinstaller
+pyinstaller BaketaTranslationServer.spec --clean
+deactivate
+
+# Step 2: .NET Releaseビルド
+cd E:\dev\Baketa
+dotnet build Baketa.sln --configuration Release
+
+# Step 3: リリースパッケージ作成
+# - Baketa.UI/bin/Release/net8.0-windows10.0.19041.0/win-x64/ をコピー
+# - grpc_server/dist/BaketaTranslationServer/ を上記の grpc_server/BaketaTranslationServer/ にコピー
+```
+
+**PyInstallerビルドが必要なケース:**
+| 変更内容 | PyInstallerビルド |
+|----------|------------------|
+| C#コードのみ変更 | ❌ 不要（既存exeを再利用） |
+| grpc_server/のPythonコード変更 | ✅ 必要 |
+| requirements.txt変更 | ✅ 必要 |
+
 ### NLLB-200 Model Setup
 Before running translation features, ensure Python environment and models are ready:
 ```cmd
