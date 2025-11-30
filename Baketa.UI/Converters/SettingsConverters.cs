@@ -3,6 +3,7 @@ using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Baketa.Core.Settings;
+using Baketa.UI.Resources;
 
 namespace Baketa.UI.Converters;
 
@@ -33,15 +34,15 @@ public sealed class UiSizeToStringConverter : IValueConverter
     public static readonly UiSizeToStringConverter Instance = new();
 
     /// <summary>
-    /// UiSizeを日本語文字列に変換します
+    /// UiSizeをローカライズされた文字列に変換します
     /// </summary>
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         return value switch
         {
-            UiSize.Small => "小（コンパクト）",
-            UiSize.Medium => "中（標準）",
-            UiSize.Large => "大（見やすさ重視）",
+            UiSize.Small => Strings.Size_Small,
+            UiSize.Medium => Strings.Size_Medium,
+            UiSize.Large => Strings.Size_Large,
             null => null,
             _ => value.ToString()
         };
@@ -100,15 +101,15 @@ public sealed class UiThemeToStringConverter : IValueConverter
     public static readonly UiThemeToStringConverter Instance = new();
 
     /// <summary>
-    /// UiThemeを日本語文字列に変換します
+    /// UiThemeをローカライズされた文字列に変換します
     /// </summary>
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         return value switch
         {
-            UiTheme.Light => "ライト",
-            UiTheme.Dark => "ダーク",
-            UiTheme.Auto => "自動（システム設定に従う）",
+            UiTheme.Light => Strings.Theme_Light,
+            UiTheme.Dark => Strings.Theme_Dark,
+            UiTheme.Auto => Strings.Theme_Auto,
             null => null,
             _ => value.ToString()
         };
@@ -138,7 +139,7 @@ public sealed class BoolToAdvancedSettingsTextConverter : IValueConverter
     /// </summary>
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        return value is true ? "基本設定に戻す" : "詳細設定を表示";
+        return value is true ? Strings.Settings_Advanced_Hide : Strings.Settings_Advanced_Show;
     }
 
     /// <summary>

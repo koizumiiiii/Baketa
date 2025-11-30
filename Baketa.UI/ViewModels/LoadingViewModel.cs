@@ -3,6 +3,7 @@ using System.Reflection;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
 using Baketa.UI.Framework;
+using Baketa.UI.Resources;
 using ReactiveUI;
 
 namespace Baketa.UI.ViewModels;
@@ -37,13 +38,13 @@ public class LoadingViewModel : ViewModelBase
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         VersionText = $"Version {version?.ToString(3) ?? "0.0.0"}";
 
-        // 初期化ステップを作成
+        // 初期化ステップを作成（ローカライズリソースを使用）
         InitializationSteps =
         [
-            new("resolve_dependencies", "依存関係を解決しています..."),
-            new("load_ocr", "OCRモデルを読み込んでいます..."),
-            new("init_translation", "翻訳エンジンを初期化しています..."),
-            new("prepare_ui", "UIコンポーネントを準備しています...")
+            new("resolve_dependencies", Strings.Loading_ResolvingDependencies),
+            new("load_ocr", Strings.Loading_LoadingOCR),
+            new("init_translation", Strings.Loading_InitializingTranslation),
+            new("prepare_ui", Strings.Loading_PreparingUI)
         ];
 
         // 進捗イベントを購読

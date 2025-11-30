@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Baketa.UI.ViewModels"
+        xmlns:local="using:Baketa.UI.Extensions"
         mc:Ignorable="d" d:DesignWidth="110" d:DesignHeight="600"
         x:Class="Baketa.UI.Views.MainOverlayView"
         x:DataType="vm:MainOverlayViewModel"
@@ -131,7 +132,7 @@
       <!-- 🔥 [ISSUE#171] UI改善: Minテキスト削除、アイコンサイズをexpandと統一（16px） -->
       <Button Classes="minimize-button"
               Command="{Binding FoldCommand}"
-              ToolTip.Tip="最小化"
+              ToolTip.Tip="{local:Localize MainOverlay_Minimize}"
               AutomationProperties.Name="最小化ボタン"
               IsVisible="{Binding IsWindowSelected}">
         <Image Width="16" Height="16"
@@ -143,14 +144,14 @@
       <!-- 🔥 [ISSUE#171] UI改善: Select → Target に変更 -->
       <Button Classes="menu-item"
               Command="{Binding SelectWindowCommand}"
-              ToolTip.Tip="翻訳対象ウィンドウを選択"
+              ToolTip.Tip="{local:Localize MainOverlay_SelectWindow}"
               Name="SelectWindowButton"
               IsEnabled="{Binding IsSelectWindowEnabled}"
               AutomationProperties.Name="翻訳対象ウィンドウを選択">
         <StackPanel Orientation="Vertical" Spacing="4">
           <Image Width="18" Height="18"
                  Source="avares://Baketa.UI/Assets/Icons/target.png"/>
-          <TextBlock Text="Target"
+          <TextBlock Text="{local:Localize MainOverlay_Target}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
@@ -173,7 +174,7 @@
           <!-- 🔥 [ISSUE#164] ObservableAsPropertyHelperでIImage型を直接バインディング（ReactiveUIベストプラクティス） -->
           <Image Width="20" Height="20"
                  Source="{Binding LiveIconSource}" />
-          <TextBlock Text="Live翻訳"
+          <TextBlock Text="{local:Localize MainOverlay_LiveTranslation}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
@@ -195,7 +196,7 @@
           <!-- 🔥 [ISSUE#164] ObservableAsPropertyHelperでIImage型を直接バインディング（ReactiveUIベストプラクティス） -->
           <Image Width="20" Height="20"
                  Source="{Binding SingleshotIconSource}" />
-          <TextBlock Text="Shot翻訳"
+          <TextBlock Text="{local:Localize MainOverlay_ShotTranslation}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
@@ -210,7 +211,7 @@
           <Ellipse Width="16" Height="16"
                    Fill="{StaticResource StatusProcessingBrush}"
                    Opacity="0.8"/>
-          <TextBlock Text="準備中"
+          <TextBlock Text="{local:Localize MainOverlay_Preparing}"
                      FontSize="9"
                      HorizontalAlignment="Center"
                      Foreground="{StaticResource StatusProcessingBrush}"/>
@@ -223,7 +224,7 @@
               Command="{Binding ShowHideCommand}"
               IsEnabled="{Binding ShowHideEnabled}"
               IsVisible="{Binding IsWindowSelected}"
-              ToolTip.Tip="翻訳結果の表示/非表示">
+              ToolTip.Tip="{local:Localize MainOverlay_ShowHideTranslation}">
         <StackPanel Orientation="Vertical" Spacing="4" HorizontalAlignment="Center">
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
             <Image Width="18" Height="18"
@@ -233,7 +234,7 @@
                      Margin="2,0,0,0"
                      IsVisible="{Binding IsTranslationActive}"/>
           </StackPanel>
-          <TextBlock Text="翻訳表示"
+          <TextBlock Text="{local:Localize MainOverlay_ShowTranslation}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      Foreground="{StaticResource TextBrush}"
@@ -246,11 +247,11 @@
       <Button Classes="menu-item"
               Command="{Binding SettingsCommand}"
               IsEnabled="{Binding SettingsEnabled}"
-              ToolTip.Tip="設定">
+              ToolTip.Tip="{local:Localize MainOverlay_Settings}">
         <StackPanel Orientation="Vertical" Spacing="4">
           <Image Width="18" Height="18"
                  Source="avares://Baketa.UI/Assets/Icons/settings.png"/>
-          <TextBlock Text="設定"
+          <TextBlock Text="{local:Localize MainOverlay_Settings}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      Foreground="{StaticResource TextBrush}"
@@ -268,12 +269,12 @@
       <!-- 🔥 [ISSUE#171] UI改善: Exit テキストは展開時のみ表示 -->
       <Button Classes="menu-item"
               Command="{Binding ExitCommand}"
-              ToolTip.Tip="アプリケーション終了"
+              ToolTip.Tip="{local:Localize MainOverlay_Exit}"
               Click="OnExitButtonClick">
         <StackPanel Orientation="Vertical" Spacing="4">
           <Image Width="18" Height="18"
                  Source="avares://Baketa.UI/Assets/Icons/exit.png"/>
-          <TextBlock Text="Exit"
+          <TextBlock Text="{local:Localize MainOverlay_Exit}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      Foreground="{StaticResource TextBrush}"
@@ -301,7 +302,7 @@
       <!-- 展開ボタン -->
       <Button Classes="minimize-button"
               Command="{Binding FoldCommand}"
-              ToolTip.Tip="展開"
+              ToolTip.Tip="{local:Localize MainOverlay_Expand}"
               Background="Transparent"
               BorderThickness="0"
               Width="36"
@@ -345,7 +346,7 @@
       <!-- 翻訳表示ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
       <Button Classes="minimize-button"
               Command="{Binding ShowHideCommand}"
-              ToolTip.Tip="翻訳結果の表示/非表示"
+              ToolTip.Tip="{local:Localize MainOverlay_ShowHideTranslation}"
               IsEnabled="{Binding ShowHideEnabled}"
               IsVisible="{Binding IsWindowSelected}"
               Background="Transparent"

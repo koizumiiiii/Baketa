@@ -14,6 +14,12 @@ query-filters:
       id: cs/exposure-of-sensitive-information
   - exclude:
       id: cs/cleartext-storage-of-sensitive-information
+  # ローカライズされたリソース文字列（Strings.resx）からのstring.Format呼び出し
+  # リソースファイルには正しく{0}プレースホルダーが含まれているが、
+  # CodeQLは.resxファイルを静的解析できないため誤検出となる
+  # https://codeql.github.com/codeql-query-help/csharp/cs-invalid-string-formatting/
+  - exclude:
+      id: cs/invalid-string-formatting
 
 queries:
   - uses: security-and-quality

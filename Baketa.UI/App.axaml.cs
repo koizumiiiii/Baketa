@@ -451,6 +451,9 @@ internal sealed partial class App : Avalonia.Application
                         // --- 5. その他の初期化とイベントハンドラ登録 ---
                         _eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
 
+                        // Note: LocalizationManager.Initialize()はLocalizationServiceのコンストラクタで呼ばれるため、
+                        // ここでの呼び出しは不要です (Issue #176, #177)
+
                         var translationFlowModule = new Baketa.UI.DI.Modules.TranslationFlowModule();
                         translationFlowModule.ConfigureEventAggregator(_eventAggregator, serviceProvider);
 

@@ -60,7 +60,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object));
+            logger: _mockLogger.Object));
         return _currentViewModel;
     }
 
@@ -123,7 +123,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
                 _mockSettingsService.Object,
                 _mockChangeTracker.Object,
                 _mockEventAggregator.Object,
-                _mockLogger.Object);
+                logger: _mockLogger.Object);
 
             // Assert
             viewModel.Should().NotBeNull();
@@ -146,7 +146,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
                     null!,
                     _mockChangeTracker.Object,
                     _mockEventAggregator.Object,
-                    _mockLogger.Object));
+                    logger: _mockLogger.Object));
         });
     }
 
@@ -161,7 +161,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
                     _mockSettingsService.Object,
                     null!,
                     _mockEventAggregator.Object,
-                    _mockLogger.Object));
+                    logger: _mockLogger.Object));
         });
     }
 
@@ -173,7 +173,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
+            logger: _mockLogger.Object);
 
         var initialBasicCount = viewModel.VisibleCategories.Count;
 
@@ -194,7 +194,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object)
+            logger: _mockLogger.Object)
         {
             // 詳細設定を表示してAdvancedカテゴリを選択
             ShowAdvancedSettings = true
@@ -218,7 +218,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
+            logger: _mockLogger.Object);
 
         var initialValue = viewModel.ShowAdvancedSettings;
 
@@ -237,7 +237,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
+            logger: _mockLogger.Object);
 
         // カテゴリを選択してViewModelを初期化
         var generalCategory = viewModel.AllCategories.First(c => c.Id == "general");
@@ -265,7 +265,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
+            logger: _mockLogger.Object);
 
         // Act
         viewModel.CancelCommand.Execute().Subscribe();
@@ -285,7 +285,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
+            logger: _mockLogger.Object);
 
         // Act
         viewModel.ResetCommand.Execute().Subscribe();
@@ -305,7 +305,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
+            logger: _mockLogger.Object);
 
         // OCRカテゴリを選択してViewModelを初期化（カテゴリIDの不一致を回避）
         var ocrCategory = viewModel.AllCategories.FirstOrDefault(c => c.Id == "settings_ocr") ??
@@ -384,7 +384,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
+            logger: _mockLogger.Object);
 
         // Act & Assert
         viewModel.HasChanges.Should().BeTrue();
@@ -407,7 +407,7 @@ public class EnhancedSettingsWindowViewModelIntegrationTests : AvaloniaTestBase
             _mockSettingsService.Object,
             _mockChangeTracker.Object,
             _mockEventAggregator.Object,
-            _mockLogger.Object);
+            logger: _mockLogger.Object);
 
         // カテゴリを選択してViewModelを初期化
         var generalCategory = viewModel.AllCategories.First(c => c.Id == "general");

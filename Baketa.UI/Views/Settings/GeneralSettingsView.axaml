@@ -3,6 +3,7 @@
              xmlns:vm="using:Baketa.UI.ViewModels.Settings"
              xmlns:controls="using:Baketa.UI.Controls"
              xmlns:converters="using:Baketa.UI.Converters"
+             xmlns:local="using:Baketa.UI.Extensions"
              x:Class="Baketa.UI.Views.Settings.GeneralSettingsView"
              x:DataType="vm:GeneralSettingsViewModel">
 
@@ -16,47 +17,27 @@
         <StackPanel Margin="20" Spacing="20">
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
-                <TextBlock Text="一般設定" FontSize="20" FontWeight="SemiBold"/>
-                <TextBlock Text="アプリケーションの基本的な動作設定"
+                <TextBlock Text="{local:Localize Settings_General_Title}" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_General_Subtitle}"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-            </StackPanel>
-
-            <!-- 外観設定 -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="外観" FontSize="16" FontWeight="SemiBold"/>
-
-                <controls:SettingsItem Title="テーマ"
-                                        Description="アプリケーションの配色テーマを選択します">
-                    <controls:SettingsItem.SettingContent>
-                        <ComboBox ItemsSource="{Binding AvailableThemes}"
-                                  SelectedItem="{Binding SelectedTheme}"
-                                  Width="200">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Converter={x:Static converters:SettingsConverters.ThemeToDisplayName}}"/>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </controls:SettingsItem.SettingContent>
-                </controls:SettingsItem>
             </StackPanel>
 
             <!-- 翻訳設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="翻訳設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_General_Translation}" FontSize="16" FontWeight="SemiBold"/>
 
-                <controls:SettingsItem Title="翻訳エンジン"
-                                        Description="使用する翻訳エンジンを選択します">
+                <controls:SettingsItem Title="{local:Localize Settings_General_TranslationEngine}"
+                                        Description="{local:Localize Settings_General_TranslationEngineDescription}">
                     <controls:SettingsItem.SettingContent>
                         <StackPanel Spacing="8">
-                            <RadioButton Content="オフライン翻訳"
+                            <RadioButton Content="{local:Localize Settings_General_OfflineTranslation}"
                                          IsChecked="{Binding UseLocalEngine}"
                                          GroupName="TranslationEngine"/>
-                            <RadioButton Content="AI翻訳"
+                            <RadioButton Content="{local:Localize Settings_General_AITranslation}"
                                          IsChecked="{Binding !UseLocalEngine}"
                                          IsEnabled="{Binding IsCloudTranslationEnabled}"
                                          GroupName="TranslationEngine"/>
-                            <TextBlock Text="※ αテストではオフライン翻訳のみ利用可能"
+                            <TextBlock Text="{local:Localize Settings_General_AlphaNote}"
                                        FontSize="11"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                        Margin="0,4,0,0"/>
@@ -64,8 +45,8 @@
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
-                <controls:SettingsItem Title="翻訳言語"
-                                        Description="翻訳元と翻訳先の言語を選択します">
+                <controls:SettingsItem Title="{local:Localize Settings_General_TranslationLanguage}"
+                                        Description="{local:Localize Settings_General_TranslationLanguageDescription}">
                     <controls:SettingsItem.SettingContent>
                         <StackPanel Orientation="Horizontal" Spacing="12">
                             <ComboBox ItemsSource="{Binding AvailableLanguages}"
@@ -82,22 +63,57 @@
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
-                <controls:SettingsItem Title="翻訳文字サイズ"
-                                        Description="オーバーレイに表示される翻訳テキストのサイズ">
+                <controls:SettingsItem Title="{local:Localize Settings_General_FontSize}"
+                                        Description="{local:Localize Settings_General_FontSizeDescription}">
                     <controls:SettingsItem.SettingContent>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ComboBox ItemsSource="{Binding FontSizeOptions}"
                                       SelectedItem="{Binding FontSize}"
                                       Width="80"/>
-                            <TextBlock Text="px" VerticalAlignment="Center"/>
+                            <TextBlock Text="{local:Localize Settings_General_FontSizeUnit}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>
 
-                <TextBlock Text="※ 翻訳元と翻訳先は異なる言語を選択してください"
+                <TextBlock Text="{local:Localize Settings_General_LanguagePairWarning}"
                            FontSize="11"
                            Foreground="#D83B01"
                            IsVisible="{Binding !IsLanguagePairValid}"/>
+            </StackPanel>
+
+            <!-- 外観設定 -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="{local:Localize Settings_General_Appearance}" FontSize="16" FontWeight="SemiBold"/>
+
+                <controls:SettingsItem Title="{local:Localize Settings_General_Theme}"
+                                        Description="{local:Localize Settings_General_ThemeDescription}">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding AvailableThemes}"
+                                  SelectedItem="{Binding SelectedTheme}"
+                                  Width="200">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={x:Static converters:SettingsConverters.ThemeToDisplayName}}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
+
+                <controls:SettingsItem Title="{local:Localize Settings_General_Language}"
+                                        Description="{local:Localize Settings_General_LanguageDescription}">
+                    <controls:SettingsItem.SettingContent>
+                        <ComboBox ItemsSource="{Binding AvailableUiLanguages}"
+                                  SelectedItem="{Binding SelectedUiLanguage}"
+                                  Width="200">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding NativeName}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </controls:SettingsItem.SettingContent>
+                </controls:SettingsItem>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

@@ -31,7 +31,7 @@ public class GeneralSettingsViewModelTests
     public void Constructor_WithValidParameters_InitializesCorrectly()
     {
         // Arrange & Act
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
 
         // Assert
         viewModel.AutoStartWithWindows.Should().Be(_testSettings.AutoStartWithWindows);
@@ -53,7 +53,7 @@ public class GeneralSettingsViewModelTests
     {
         // Arrange, Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new GeneralSettingsViewModel(null!, _mockEventAggregator.Object, _mockLogger.Object));
+            new GeneralSettingsViewModel(null!, _mockEventAggregator.Object, logger: _mockLogger.Object));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public class GeneralSettingsViewModelTests
     {
         // Arrange, Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new GeneralSettingsViewModel(_testSettings, null!, _mockLogger.Object));
+            new GeneralSettingsViewModel(_testSettings, null!, logger: _mockLogger.Object));
     }
 
     [Theory]
@@ -75,7 +75,7 @@ public class GeneralSettingsViewModelTests
     public void BooleanPropertyChange_SetsHasChangesToTrue(string propertyName)
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
         var property = typeof(GeneralSettingsViewModel).GetProperty(propertyName);
         var currentValue = (bool)property!.GetValue(viewModel)!;
 
@@ -92,7 +92,7 @@ public class GeneralSettingsViewModelTests
     public void IntegerPropertyChange_SetsHasChangesToTrue(string propertyName, int newValue)
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
         var property = typeof(GeneralSettingsViewModel).GetProperty(propertyName);
 
         // Act
@@ -111,7 +111,7 @@ public class GeneralSettingsViewModelTests
     public void LogLevel_PropertyChange_SetsHasChangesToTrue(LogLevel newLogLevel)
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
 
         // 現在の値と異なる値を設定する必要がある
         if (viewModel.LogLevel == newLogLevel)
@@ -137,7 +137,7 @@ public class GeneralSettingsViewModelTests
     public void LogLevelOptions_ContainsAllLogLevels()
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
         var expectedLogLevels = Enum.GetValues<LogLevel>();
 
         // Act & Assert
@@ -148,7 +148,7 @@ public class GeneralSettingsViewModelTests
     public void ResetToDefaultsCommand_ResetsToDefaultValues()
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
         var defaultSettings = new GeneralSettings();
 
         // 初期値を変更
@@ -168,7 +168,7 @@ public class GeneralSettingsViewModelTests
     public void ToggleAdvancedSettingsCommand_TogglesShowAdvancedSettings()
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
         var initialValue = viewModel.ShowAdvancedSettings;
 
         // Act
@@ -182,7 +182,7 @@ public class GeneralSettingsViewModelTests
     public void OpenLogFolderCommand_CanExecute()
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
 
         // Act
         bool canExecute = false;
@@ -198,7 +198,7 @@ public class GeneralSettingsViewModelTests
     public void CurrentSettings_ReturnsCurrentValues()
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object)
         {
             // 一部の値を変更
             AutoStartWithWindows = true,
@@ -221,7 +221,7 @@ public class GeneralSettingsViewModelTests
     public void UpdateSettings_UpdatesAllProperties()
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
         var newSettings = new GeneralSettings
         {
             AutoStartWithWindows = true,
@@ -249,7 +249,7 @@ public class GeneralSettingsViewModelTests
     public void UpdateSettings_WithNullSettings_ThrowsArgumentNullException()
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object);
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => viewModel.UpdateSettings(null!));
@@ -264,7 +264,7 @@ public class GeneralSettingsViewModelTests
     public void MaxMemoryUsageMb_ValidRanges_AcceptsValue(int memoryMb)
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object)
         {
             // Act
             MaxMemoryUsageMb = memoryMb
@@ -282,7 +282,7 @@ public class GeneralSettingsViewModelTests
     public void LogRetentionDays_ValidRanges_AcceptsValue(int days)
     {
         // Arrange
-        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object)
+        var viewModel = new GeneralSettingsViewModel(_testSettings, _mockEventAggregator.Object, logger: _mockLogger.Object)
         {
             // Act
             LogRetentionDays = days

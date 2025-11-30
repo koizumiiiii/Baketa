@@ -89,6 +89,14 @@ public sealed class GeneralSettings
     [SettingMetadata(SettingLevel.Advanced, "General", "アクティブプロファイル",
         Description = "現在アクティブなゲームプロファイルのID")]
     public string? ActiveGameProfile { get; set; }
+
+    /// <summary>
+    /// UI表示言語
+    /// nullの場合はシステム言語を使用
+    /// </summary>
+    [SettingMetadata(SettingLevel.Basic, "General", "表示言語",
+        Description = "アプリケーションの表示言語を設定します")]
+    public string? UiLanguage { get; set; }
 }
 
 

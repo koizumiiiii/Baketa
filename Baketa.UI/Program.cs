@@ -19,6 +19,8 @@ using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.Platform.DI;
 using Baketa.UI.DI.Modules;
 using Baketa.UI.DI.Services;
+using Baketa.UI.Extensions;
+using Baketa.UI.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -696,6 +698,11 @@ internal sealed class Program
         RegisterApplicationAndSpecializedModules(services);
         Console.WriteLine("✅ Phase 2-2: アプリケーション・特殊機能モジュール群登録完了");
 
+        // 🌐 [i18n] LocalizationService登録 - UI言語設定を保存/読み込みするサービス
+        Console.WriteLine("🌐 [i18n] LocalizationService登録開始");
+        services.AddTranslationSettingsUI(configuration);
+        Console.WriteLine("✅ [i18n] LocalizationService登録完了");
+
         // DI登録デバッグ
         DebugServiceRegistration(services);
 
@@ -708,6 +715,26 @@ internal sealed class Program
         ServiceProvider = services.BuildServiceProvider();
         Console.WriteLine("✅ ServiceProvider構築完了");
         System.Diagnostics.Debug.WriteLine("✅ ServiceProvider構築完了");
+
+        // 🌐 [i18n] ILocalizationService早期初期化 - 保存された言語設定をXAML読み込み前に適用
+        Console.WriteLine("🌐 [i18n] ILocalizationService早期初期化開始");
+        try
+        {
+            var localizationService = ServiceProvider.GetService<ILocalizationService>();
+            if (localizationService != null)
+            {
+                Console.WriteLine($"🌐 [i18n] ILocalizationService初期化完了: Culture={localizationService.CurrentCulture.Name}");
+            }
+            else
+            {
+                Console.WriteLine("⚠️ [i18n] ILocalizationServiceが登録されていません");
+            }
+        }
+        catch (Exception locEx)
+        {
+            Console.WriteLine($"❌ [i18n] ILocalizationService初期化エラー: {locEx.Message}");
+            // ローカライゼーション初期化失敗してもアプリケーション起動は継続
+        }
 
         // 🚨🚨🚨 [PHASE5.2G_VERIFY] 診断ログ - ビルド反映確認用
         var verifyMessage = "🚨🚨🚨 [PHASE5.2G_VERIFY] このログが出ればビルド反映成功！";
