@@ -756,7 +756,7 @@
     <value>8 or more characters</value>
   </data>
   <data name="Auth_Signup_PasswordRequirement" xml:space="preserve">
-    <value>* At least 8 characters, with 3 or more of: uppercase, lowercase, numbers, symbols</value>
+    <value>* 8+ characters, with at least 3 of: uppercase, lowercase, numbers, symbols</value>
   </data>
   <data name="Auth_Signup_ConfirmPassword" xml:space="preserve">
     <value>Confirm Password</value>
