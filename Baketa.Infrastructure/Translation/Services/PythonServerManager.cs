@@ -294,31 +294,33 @@ public class PythonServerManager(
             logger.LogInformation("✅ gRPC翻訳サーバー使用（CTranslate2統合版・80%メモリ削減）: {Script}", scriptPath);
         }
 
-        // DEPLOYMENT_STRATEGY: Python環境の優先順位（Gemini提案: コンパイル時判定）
-        // 配布版（Release build）: vendor/pythonのみ（厳密チェック）
-        // 開発版（Debug build）: .venv → vendor/python → システムPython
-        string pythonExecutable;
-
-        var vendorPythonPath = Path.Combine(AppContext.BaseDirectory, "vendor", "python", "python.exe");
+        // 🔥 [PYINSTALLER_INTEGRATION] 配布版実行戦略（PyInstaller exe vs Python script）
+        // 配布版（Release build）: PyInstaller exe（BaketaTranslationServer.exe）を直接実行
+        // 開発版（Debug build）: Python + scriptで実行
 
 #if IS_DISTRIBUTION
-        // 配布版: 同梱Pythonを最優先（コンパイル時判定）
-        if (File.Exists(vendorPythonPath))
+        // 🔥 [PYINSTALLER_INTEGRATION] 配布版: PyInstallerでビルドしたexeを直接実行
+        var translationServerExePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaTranslationServer", "BaketaTranslationServer.exe");
+
+        if (!File.Exists(translationServerExePath))
         {
-            pythonExecutable = vendorPythonPath;
-            logger.LogInformation("✅ 同梱Python使用（配布版）: {PythonPath}", pythonExecutable);
-        }
-        else
-        {
-            // 配布版で同梱Pythonがない場合はエラー（ユーザーにPythonインストールさせない）
-            logger.LogError("❌ 同梱Python未検出（配布版）: {VendorPath}", vendorPythonPath);
+            logger.LogError("❌ 翻訳サーバーexe未検出（配布版）: {ExePath}", translationServerExePath);
             throw new InvalidOperationException(
-                "同梱されたPython環境が見つかりません。アプリケーションパッケージが破損している可能性があります。\n" +
+                "翻訳サーバー(BaketaTranslationServer.exe)が見つかりません。アプリケーションパッケージが破損している可能性があります。\n" +
                 "再ダウンロードするか、GitHubのIssueで報告してください。\n" +
-                $"期待されるパス: {vendorPythonPath}");
+                $"期待されるパス: {translationServerExePath}");
         }
+
+        logger.LogInformation("✅ [PYINSTALLER] 翻訳サーバーexe使用（配布版）: {ExePath}", translationServerExePath);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = translationServerExePath,
+            Arguments = $"--port {port} --use-ctranslate2",
 #else
-        // 開発版: .venv優先、vendor/pythonフォールバック（コンパイル時判定）
+        // 開発版: Python + script実行（従来ロジック）
+        string pythonExecutable;
+        var vendorPythonPath = Path.Combine(AppContext.BaseDirectory, "vendor", "python", "python.exe");
         var venvPythonPath = Path.Combine(projectRoot, ".venv", "Scripts", "python.exe");
 
         if (File.Exists(venvPythonPath))
@@ -346,16 +348,12 @@ public class PythonServerManager(
                 throw new InvalidOperationException($"Python実行環境が見つかりません。.venv環境を作成（python -m venv .venv）するか、Python 3.10以上をインストールしてください。詳細: {ex.Message}", ex);
             }
         }
-#endif
 
-        // 🔥 [TOKENIZER_HANG_FIX] HuggingFace Tokenizerロード時のstderrハング問題修正
-        // 問題: Transformers警告の長いメッセージでstderrバッファが満杯になり、Python側がブロック
-        // 解決策: stderr監視を非同期タスクで実行し、バッファを即座に消費
         var startInfo = new ProcessStartInfo
         {
-            FileName = pythonExecutable, // Step 1: py.exe優先戦略適用
-            // 🔥 [CTRANSLATE2_FIX] CTranslate2エンジン使用（int8量子化、80%メモリ削減、安定動作確認済み）
+            FileName = pythonExecutable,
             Arguments = $"\"{scriptPath}\" --port {port} --use-ctranslate2",
+#endif
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -381,14 +379,23 @@ public class PythonServerManager(
         var process = Process.Start(startInfo) ??
             throw new InvalidOperationException($"Python翻訳サーバープロセス起動失敗: {languagePair}");
 
+#if IS_DISTRIBUTION
+        logger.LogDebug("🐍 翻訳サーバー起動: PID {PID}, Exe: {Exe}, Args: {Args}",
+            process.Id, translationServerExePath, startInfo.Arguments);
+#else
         logger.LogDebug("🐍 Pythonプロセス起動: PID {PID}, Python: {Python}, Args: {Args}",
             process.Id, pythonExecutable, startInfo.Arguments);
+#endif
 
         // 🔥 [PHASE7] StdErrファイル完全記録（ExitCode -1診断用）
         var stderrLogPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"python_stderr_port{port}.log");
-        System.IO.File.WriteAllText(stderrLogPath, $"=== Python Process Started: PID {process.Id}, Port {port}, Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ===\r\n");
+        System.IO.File.WriteAllText(stderrLogPath, $"=== Translation Server Started: PID {process.Id}, Port {port}, Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ===\r\n");
+#if IS_DISTRIBUTION
+        System.IO.File.AppendAllText(stderrLogPath, $"Exe: {translationServerExePath}\r\n");
+#else
         System.IO.File.AppendAllText(stderrLogPath, $"Python: {pythonExecutable}\r\n");
         System.IO.File.AppendAllText(stderrLogPath, $"Script: {scriptPath}\r\n");
+#endif
         System.IO.File.AppendAllText(stderrLogPath, $"Args: {startInfo.Arguments}\r\n");
         System.IO.File.AppendAllText(stderrLogPath, $"=== StdErr Output ===\r\n");
 
@@ -787,10 +794,12 @@ public class PythonServerManager(
                         {
                             var orphanProcess = Process.GetProcessById(pid);
 
-                            // 🔥 [GEMINI_SECURITY] プロセス名が "python" または "pythonw" であることを確認
+                            // 🔥 [GEMINI_SECURITY] プロセス名が翻訳サーバー関連であることを確認
                             // 予期しないプロセスを誤って終了するリスクを回避
+                            // [PYINSTALLER_INTEGRATION] BaketaTranslationServerも検出対象に追加
                             if (orphanProcess.ProcessName.Equals("python", StringComparison.OrdinalIgnoreCase) ||
-                                orphanProcess.ProcessName.Equals("pythonw", StringComparison.OrdinalIgnoreCase))
+                                orphanProcess.ProcessName.Equals("pythonw", StringComparison.OrdinalIgnoreCase) ||
+                                orphanProcess.ProcessName.Equals("BaketaTranslationServer", StringComparison.OrdinalIgnoreCase))
                             {
                                 logger.LogInformation("🔥 [ORPHAN_PROCESS_FIX] 孤立したPythonプロセスを強制終了: PID {Pid}, Name {Name}", pid, orphanProcess.ProcessName);
                                 Console.WriteLine($"🔥 [ORPHAN_PROCESS_FIX] 孤立したPythonプロセスを強制終了: PID {pid}, Name {orphanProcess.ProcessName}");

@@ -746,3 +746,8 @@ disable_file_appendalltext.py
 # Python virtual environment
 .venv/
 venv/
+
+# PyInstaller build artifacts (grpc_server)
+grpc_server/build/
+grpc_server/dist/
+grpc_server/venv_build/
