@@ -751,3 +751,6 @@ venv/
 grpc_server/build/
 grpc_server/dist/
 grpc_server/venv_build/
+
+# Release package output
+release_package/
