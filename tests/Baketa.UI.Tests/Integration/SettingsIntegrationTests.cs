@@ -171,7 +171,7 @@ public sealed class SettingsIntegrationTests : IDisposable
         var generalViewModel = new GeneralSettingsViewModel(
             settingsService.GetCategorySettings<GeneralSettings>(),
             _mockEventAggregator.Object,
-            Mock.Of<ILogger<GeneralSettingsViewModel>>());
+            logger: Mock.Of<ILogger<GeneralSettingsViewModel>>());
 
         var themeViewModel = new ThemeSettingsViewModel(
             settingsService.GetCategorySettings<ThemeSettings>(),

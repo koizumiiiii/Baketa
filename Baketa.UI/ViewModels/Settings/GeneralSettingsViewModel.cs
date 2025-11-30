@@ -5,10 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Threading.Tasks;
 using Avalonia.Styling;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Settings;
 using Baketa.UI.Framework;
+using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
@@ -22,6 +24,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 {
     private readonly GeneralSettings _originalSettings;
     private readonly ILogger<GeneralSettingsViewModel>? _logger;
+    private readonly ILocalizationService? _localizationService;
+    private readonly ISettingsChangeTracker? _changeTracker;
 
     // バッキングフィールド
     private bool _autoStartWithWindows;
@@ -47,19 +51,28 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     // テーマ設定用バッキングフィールド
     private UiTheme _selectedTheme = UiTheme.Auto;
 
+    // UI言語設定用バッキングフィールド
+    private SupportedLanguage? _selectedUiLanguage;
+
     /// <summary>
     /// GeneralSettingsViewModelを初期化します
     /// </summary>
     /// <param name="settings">一般設定データ</param>
     /// <param name="eventAggregator">イベント集約器</param>
+    /// <param name="localizationService">ローカライゼーションサービス（オプション）</param>
+    /// <param name="changeTracker">設定変更追跡サービス（オプション）</param>
     /// <param name="logger">ロガー（オプション）</param>
     public GeneralSettingsViewModel(
         GeneralSettings settings,
         IEventAggregator eventAggregator,
+        ILocalizationService? localizationService = null,
+        ISettingsChangeTracker? changeTracker = null,
         ILogger<GeneralSettingsViewModel>? logger = null) : base(eventAggregator)
     {
         _originalSettings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger;
+        _localizationService = localizationService;
+        _changeTracker = changeTracker;
 
         // 初期化
         InitializeFromSettings(settings);
@@ -72,6 +85,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
         // 翻訳先言語リストの初期化
         UpdateAvailableTargetLanguages();
+
+        // UI言語の初期化
+        InitializeUiLanguage();
 
         // コマンドの初期化
         ResetToDefaultsCommand = ReactiveCommand.Create(ResetToDefaults);
@@ -287,6 +303,36 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
     #endregion
 
+    #region UI言語設定プロパティ
+
+    /// <summary>
+    /// 選択されたUI言語
+    /// 実際の言語変更は保存時にのみ適用されます（ApplyUiLanguageAsync）
+    /// </summary>
+    public SupportedLanguage? SelectedUiLanguage
+    {
+        get => _selectedUiLanguage;
+        set
+        {
+            _logger?.LogDebug("SelectedUiLanguage変更: {OldCode} → {NewCode}",
+                _selectedUiLanguage?.Code ?? "(null)", value?.Code ?? "(null)");
+            this.RaiseAndSetIfChanged(ref _selectedUiLanguage, value);
+            // 注意: 即座に言語を変更しない（保存時にApplyUiLanguageAsyncで適用）
+        }
+    }
+
+    /// <summary>
+    /// 利用可能なUI言語リスト（日本語と英語のみ）
+    /// 翻訳言語を増やすタイミングでUI言語も増やす予定
+    /// </summary>
+    public IReadOnlyList<SupportedLanguage> AvailableUiLanguages { get; } = new List<SupportedLanguage>
+    {
+        new("ja", "日本語", "Japanese"),
+        new("en", "English", "English")
+    }.AsReadOnly();
+
+    #endregion
+
     #region UI制御プロパティ
 
     /// <summary>
@@ -351,6 +397,13 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _logRetentionDays = settings.LogRetentionDays;
         _enableDebugMode = settings.EnableDebugMode;
         _activeGameProfile = settings.ActiveGameProfile;
+
+        // UI言語設定の復元（AvailableUiLanguagesから検索）
+        if (!string.IsNullOrEmpty(settings.UiLanguage))
+        {
+            _selectedUiLanguage = AvailableUiLanguages
+                .FirstOrDefault(lang => lang.Code == settings.UiLanguage);
+        }
     }
 
     /// <summary>
@@ -358,68 +411,84 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// </summary>
     private void SetupChangeTracking()
     {
+        const string categoryId = "General";
+
         // 主要プロパティの変更追跡
         this.WhenAnyValue(x => x.AutoStartWithWindows)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(AutoStartWithWindows)));
 
         this.WhenAnyValue(x => x.MinimizeToTray)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(MinimizeToTray)));
 
         this.WhenAnyValue(x => x.ShowExitConfirmation)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(ShowExitConfirmation)));
 
         this.WhenAnyValue(x => x.AllowUsageStatistics)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(AllowUsageStatistics)));
 
         this.WhenAnyValue(x => x.CheckForUpdatesAutomatically)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(CheckForUpdatesAutomatically)));
 
         this.WhenAnyValue(x => x.PerformanceMode)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(PerformanceMode)));
 
         this.WhenAnyValue(x => x.MaxMemoryUsageMb)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(MaxMemoryUsageMb)));
 
         this.WhenAnyValue(x => x.LogLevel)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(LogLevel)));
 
         this.WhenAnyValue(x => x.LogRetentionDays)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(LogRetentionDays)));
 
         this.WhenAnyValue(x => x.EnableDebugMode)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(EnableDebugMode)));
 
         // 翻訳設定の変更追跡
         this.WhenAnyValue(x => x.UseLocalEngine)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(UseLocalEngine)));
 
         this.WhenAnyValue(x => x.SourceLanguage)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(SourceLanguage)));
 
         this.WhenAnyValue(x => x.TargetLanguage)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(TargetLanguage)));
 
         this.WhenAnyValue(x => x.FontSize)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(FontSize)));
 
         // テーマ設定の変更追跡
         this.WhenAnyValue(x => x.SelectedTheme)
             .Skip(1).DistinctUntilChanged()
-            .Subscribe(_ => HasChanges = true);
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(SelectedTheme)));
+
+        // UI言語設定の変更追跡
+        this.WhenAnyValue(x => x.SelectedUiLanguage)
+            .Skip(1).DistinctUntilChanged()
+            .Subscribe(_ => TrackPropertyChange(categoryId, nameof(SelectedUiLanguage)));
+    }
+
+    /// <summary>
+    /// プロパティ変更を追跡
+    /// </summary>
+    private void TrackPropertyChange(string categoryId, string propertyName)
+    {
+        HasChanges = true;
+        _changeTracker?.TrackChange(categoryId, propertyName, null, "changed");
     }
 
     /// <summary>
@@ -535,6 +604,67 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
+    /// UI言語の初期化
+    /// </summary>
+    private void InitializeUiLanguage()
+    {
+        // InitializeFromSettings で既に設定済みの場合はスキップ
+        if (_selectedUiLanguage != null)
+        {
+            return;
+        }
+
+        if (_localizationService == null)
+        {
+            // サービスがない場合はデフォルトで日本語
+            _selectedUiLanguage = AvailableUiLanguages.First();
+            return;
+        }
+
+        // 設定から復元できなかった場合は、現在のカルチャに基づいて初期化
+        var currentCultureCode = _localizationService.CurrentCulture.TwoLetterISOLanguageName;
+        _selectedUiLanguage = AvailableUiLanguages
+            .FirstOrDefault(l => l.Code == currentCultureCode || l.Code == _localizationService.CurrentCulture.Name)
+            ?? AvailableUiLanguages.First();
+    }
+
+    /// <summary>
+    /// UI言語を適用します（保存時に呼び出される）
+    /// </summary>
+    /// <returns>成功した場合はtrue</returns>
+    public async Task<bool> ApplyUiLanguageAsync()
+    {
+        var cultureCode = SelectedUiLanguage?.Code;
+        if (string.IsNullOrEmpty(cultureCode))
+        {
+            _logger?.LogDebug("ApplyUiLanguageAsync: UI言語が選択されていません");
+            return false;
+        }
+
+        if (_localizationService == null)
+        {
+            _logger?.LogWarning("LocalizationService is not available, cannot change UI language");
+            return false;
+        }
+
+        try
+        {
+            _logger?.LogDebug("UI言語を適用: {CultureCode}", cultureCode);
+            var success = await _localizationService.ChangeLanguageAsync(cultureCode);
+            if (success)
+            {
+                _logger?.LogInformation("UI language changed to: {CultureCode}", cultureCode);
+            }
+            return success;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error applying UI language: {CultureCode}", cultureCode);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 現在の設定データを取得
     /// </summary>
     public GeneralSettings CurrentSettings => new()
@@ -549,7 +679,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         LogLevel = LogLevel,
         LogRetentionDays = LogRetentionDays,
         EnableDebugMode = EnableDebugMode,
-        ActiveGameProfile = _activeGameProfile
+        ActiveGameProfile = _activeGameProfile,
+        UiLanguage = SelectedUiLanguage?.Code
     };
 
     /// <summary>

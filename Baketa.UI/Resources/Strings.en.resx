@@ -1,0 +1,989 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="0" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ========== App General ========== -->
+  <data name="App_Title" xml:space="preserve">
+    <value>Baketa</value>
+  </data>
+  <data name="App_LoadingMessage" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="App_ErrorTitle" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="App_Version" xml:space="preserve">
+    <value>Current Version: {0}</value>
+  </data>
+  <data name="App_Copyright" xml:space="preserve">
+    <value>© 2024 Baketa. All rights reserved.</value>
+  </data>
+
+  <!-- ========== Common Buttons ========== -->
+  <data name="Common_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Common_Apply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="Common_Reset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Common_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="Common_Help" xml:space="preserve">
+    <value>Help</value>
+  </data>
+  <data name="Common_Loading" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="Common_Or" xml:space="preserve">
+    <value>or</value>
+  </data>
+  <data name="Common_Submit" xml:space="preserve">
+    <value>Submit</value>
+  </data>
+
+  <!-- ========== Main Overlay ========== -->
+  <data name="MainOverlay_Minimize" xml:space="preserve">
+    <value>Minimize</value>
+  </data>
+  <data name="MainOverlay_SelectWindow" xml:space="preserve">
+    <value>Select Target Window</value>
+  </data>
+  <data name="MainOverlay_Target" xml:space="preserve">
+    <value>Target</value>
+  </data>
+  <data name="MainOverlay_ShowHideTranslation" xml:space="preserve">
+    <value>Show/Hide Translation</value>
+  </data>
+  <data name="MainOverlay_LiveTranslation" xml:space="preserve">
+    <value>Live Translation</value>
+  </data>
+  <data name="MainOverlay_ShotTranslation" xml:space="preserve">
+    <value>Shot Translation</value>
+  </data>
+  <data name="MainOverlay_Preparing" xml:space="preserve">
+    <value>Preparing</value>
+  </data>
+  <data name="MainOverlay_ShowTranslation" xml:space="preserve">
+    <value>Show Translation</value>
+  </data>
+  <data name="MainOverlay_Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="MainOverlay_Exit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="MainOverlay_Expand" xml:space="preserve">
+    <value>Expand</value>
+  </data>
+  <data name="MainOverlay_SelectedWindow" xml:space="preserve">
+    <value>[Selected: {0}]</value>
+  </data>
+  <data name="MainOverlay_TranslationCount" xml:space="preserve">
+    <value>Translated: {0}</value>
+  </data>
+
+  <!-- ========== Home View ========== -->
+  <data name="Home_QuickStart" xml:space="preserve">
+    <value>Quick Start</value>
+  </data>
+  <data name="Home_StartCapture" xml:space="preserve">
+    <value>Start Capture</value>
+  </data>
+  <data name="Home_CaptureSettings" xml:space="preserve">
+    <value>Capture Settings</value>
+  </data>
+  <data name="Home_TranslationSettings" xml:space="preserve">
+    <value>Translation Settings</value>
+  </data>
+  <data name="Home_RecentTranslations" xml:space="preserve">
+    <value>Recent Translations</value>
+  </data>
+  <data name="Home_ViewAll" xml:space="preserve">
+    <value>View All</value>
+  </data>
+  <data name="Home_NoHistory" xml:space="preserve">
+    <value>No translation history yet</value>
+  </data>
+  <data name="Home_UsageStatistics" xml:space="preserve">
+    <value>Usage Statistics</value>
+  </data>
+  <data name="Home_CaptureStatus" xml:space="preserve">
+    <value>Capture Status:</value>
+  </data>
+  <data name="Home_TranslationEngine" xml:space="preserve">
+    <value>Translation Engine:</value>
+  </data>
+  <data name="Home_TargetLanguage" xml:space="preserve">
+    <value>Target Language:</value>
+  </data>
+  <data name="Home_MemoryUsage" xml:space="preserve">
+    <value>Memory Usage:</value>
+  </data>
+  <data name="Home_RunningTime" xml:space="preserve">
+    <value>Running Time:</value>
+  </data>
+  <data name="Home_Tips" xml:space="preserve">
+    <value>Tips</value>
+  </data>
+  <data name="Home_Tip_OpenTabs" xml:space="preserve">
+    <value>Open each feature from the tabs on the left</value>
+  </data>
+  <data name="Home_Tip_SelectArea" xml:space="preserve">
+    <value>Select the area to translate on the game screen before starting capture</value>
+  </data>
+  <data name="Home_Tip_OverlaySettings" xml:space="preserve">
+    <value>Customize display position and font in Overlay Settings</value>
+  </data>
+  <data name="Home_Tip_TranslationHistory" xml:space="preserve">
+    <value>Check past translations in Translation History</value>
+  </data>
+
+  <!-- ========== Settings Window ========== -->
+  <data name="Settings_Title" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+
+  <!-- ========== General Settings ========== -->
+  <data name="Settings_General_Title" xml:space="preserve">
+    <value>General Settings</value>
+  </data>
+  <data name="Settings_General_Subtitle" xml:space="preserve">
+    <value>Basic application settings</value>
+  </data>
+  <data name="Settings_General_Appearance" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="Settings_General_Theme" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="Settings_General_ThemeDescription" xml:space="preserve">
+    <value>Select the application color theme</value>
+  </data>
+  <data name="Settings_General_ThemeLight" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Settings_General_ThemeDark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="Settings_General_ThemeAuto" xml:space="preserve">
+    <value>Auto (Follow system)</value>
+  </data>
+  <data name="Settings_General_Translation" xml:space="preserve">
+    <value>Translation Settings</value>
+  </data>
+  <data name="Settings_General_TranslationEngine" xml:space="preserve">
+    <value>Translation Engine</value>
+  </data>
+  <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
+    <value>Select the translation engine to use</value>
+  </data>
+  <data name="Settings_General_OfflineTranslation" xml:space="preserve">
+    <value>Offline Translation</value>
+  </data>
+  <data name="Settings_General_AITranslation" xml:space="preserve">
+    <value>AI Translation</value>
+  </data>
+  <data name="Settings_General_AlphaNote" xml:space="preserve">
+    <value>* Only offline translation is available in alpha test</value>
+  </data>
+  <data name="Settings_General_TranslationLanguage" xml:space="preserve">
+    <value>Translation Language</value>
+  </data>
+  <data name="Settings_General_TranslationLanguageDescription" xml:space="preserve">
+    <value>Select source and target languages</value>
+  </data>
+  <data name="Settings_General_FontSize" xml:space="preserve">
+    <value>Translation Font Size</value>
+  </data>
+  <data name="Settings_General_FontSizeDescription" xml:space="preserve">
+    <value>Size of translation text displayed on overlay</value>
+  </data>
+  <data name="Settings_General_FontSizeUnit" xml:space="preserve">
+    <value>px</value>
+  </data>
+  <data name="Settings_General_LanguagePairWarning" xml:space="preserve">
+    <value>* Please select different languages for source and target</value>
+  </data>
+  <data name="Settings_General_Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Settings_General_LanguageDescription" xml:space="preserve">
+    <value>Select application display language</value>
+  </data>
+  <data name="Settings_General_LanguageJapanese" xml:space="preserve">
+    <value>Japanese</value>
+  </data>
+  <data name="Settings_General_LanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+
+  <!-- ========== Translation Settings ========== -->
+  <data name="Settings_Translation_Title" xml:space="preserve">
+    <value>Translation Settings</value>
+  </data>
+  <data name="Settings_Translation_Subtitle" xml:space="preserve">
+    <value>Configure translation engine, language pairs, and translation strategy</value>
+  </data>
+  <data name="Settings_Translation_LastSaved" xml:space="preserve">
+    <value>Last saved: {0:MM/dd HH:mm}</value>
+  </data>
+  <data name="Settings_Translation_UnsavedChanges" xml:space="preserve">
+    <value>Settings have unsaved changes</value>
+  </data>
+  <data name="Settings_Translation_DiscardChanges" xml:space="preserve">
+    <value>Discard Changes</value>
+  </data>
+  <data name="Settings_Translation_Summary" xml:space="preserve">
+    <value>Current Settings Summary</value>
+  </data>
+  <data name="Settings_Translation_Engine" xml:space="preserve">
+    <value>Translation Engine</value>
+  </data>
+  <data name="Settings_Translation_LanguagePair" xml:space="preserve">
+    <value>Language Pair</value>
+  </data>
+  <data name="Settings_Translation_Strategy" xml:space="preserve">
+    <value>Translation Strategy</value>
+  </data>
+  <data name="Settings_Translation_ChineseVariant" xml:space="preserve">
+    <value>Chinese Variant</value>
+  </data>
+  <data name="Settings_Translation_Fallback" xml:space="preserve">
+    <value>Fallback</value>
+  </data>
+  <data name="Settings_Translation_ChangeStatus" xml:space="preserve">
+    <value>Change Status</value>
+  </data>
+  <data name="Settings_Translation_Import" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="Settings_Translation_ImportTip" xml:space="preserve">
+    <value>Import from settings file</value>
+  </data>
+  <data name="Settings_Translation_Export" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="Settings_Translation_ExportTip" xml:space="preserve">
+    <value>Export settings to file</value>
+  </data>
+  <data name="Settings_Translation_Load" xml:space="preserve">
+    <value>Load</value>
+  </data>
+  <data name="Settings_Translation_LoadTip" xml:space="preserve">
+    <value>Load saved settings</value>
+  </data>
+  <data name="Settings_Translation_SaveTip" xml:space="preserve">
+    <value>Save current settings</value>
+  </data>
+  <data name="Settings_Translation_ApplyTip" xml:space="preserve">
+    <value>Save and apply settings</value>
+  </data>
+  <data name="Settings_Translation_Saving" xml:space="preserve">
+    <value>Saving settings...</value>
+  </data>
+
+  <!-- ========== Capture Settings ========== -->
+  <data name="Settings_Capture_Title" xml:space="preserve">
+    <value>Capture Settings</value>
+  </data>
+  <data name="Settings_Capture_Subtitle" xml:space="preserve">
+    <value>Detailed settings for screen capture and screenshot features</value>
+  </data>
+  <data name="Settings_Capture_Basic" xml:space="preserve">
+    <value>Basic Settings</value>
+  </data>
+  <data name="Settings_Capture_Enabled" xml:space="preserve">
+    <value>Capture Feature</value>
+  </data>
+  <data name="Settings_Capture_EnabledDescription" xml:space="preserve">
+    <value>Enable screen capture feature</value>
+  </data>
+  <data name="Settings_Capture_Interval" xml:space="preserve">
+    <value>Capture Interval</value>
+  </data>
+  <data name="Settings_Capture_IntervalDescription" xml:space="preserve">
+    <value>Interval for screen capture (shorter = more accurate, longer = faster)</value>
+  </data>
+  <data name="Settings_Capture_Quality" xml:space="preserve">
+    <value>Capture Quality</value>
+  </data>
+  <data name="Settings_Capture_QualityDescription" xml:space="preserve">
+    <value>Quality of captured images (higher = more accurate, lower = faster)</value>
+  </data>
+  <data name="Settings_Capture_AreaMode" xml:space="preserve">
+    <value>Area Detection Mode</value>
+  </data>
+  <data name="Settings_Capture_AreaModeDescription" xml:space="preserve">
+    <value>Choose between automatic text area detection or fixed region</value>
+  </data>
+  <data name="Settings_Capture_AutoDetect" xml:space="preserve">
+    <value>Auto Detect</value>
+  </data>
+  <data name="Settings_Capture_FixedArea" xml:space="preserve">
+    <value>Fixed Area</value>
+  </data>
+  <data name="Settings_Capture_FixedAreaSection" xml:space="preserve">
+    <value>Fixed Capture Area</value>
+  </data>
+  <data name="Settings_Capture_Position" xml:space="preserve">
+    <value>Position and Size</value>
+  </data>
+  <data name="Settings_Capture_PositionDescription" xml:space="preserve">
+    <value>Specify position and size of fixed capture area</value>
+  </data>
+  <data name="Settings_Capture_Advanced" xml:space="preserve">
+    <value>Advanced Settings</value>
+  </data>
+  <data name="Settings_Capture_Monitor" xml:space="preserve">
+    <value>Target Monitor</value>
+  </data>
+  <data name="Settings_Capture_MonitorDescription" xml:space="preserve">
+    <value>Select monitor to capture in multi-monitor environment</value>
+  </data>
+  <data name="Settings_Capture_DpiScaling" xml:space="preserve">
+    <value>DPI Scaling Aware</value>
+  </data>
+  <data name="Settings_Capture_DpiScalingDescription" xml:space="preserve">
+    <value>Consider scaling in high DPI environments</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccel" xml:space="preserve">
+    <value>Hardware Acceleration</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccelDescription" xml:space="preserve">
+    <value>Hardware acceleration using GPU</value>
+  </data>
+  <data name="Settings_Capture_DiffDetection" xml:space="preserve">
+    <value>Difference Detection Settings</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionEnable" xml:space="preserve">
+    <value>Difference Detection Feature</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionDescription" xml:space="preserve">
+    <value>Enable screen change difference detection</value>
+  </data>
+
+  <!-- ========== OCR Settings ========== -->
+  <data name="Settings_OCR_Title" xml:space="preserve">
+    <value>OCR Settings</value>
+  </data>
+  <data name="Settings_OCR_Subtitle" xml:space="preserve">
+    <value>Detailed settings for optical character recognition</value>
+  </data>
+  <data name="Settings_OCR_Basic" xml:space="preserve">
+    <value>Basic Settings</value>
+  </data>
+  <data name="Settings_OCR_Enabled" xml:space="preserve">
+    <value>Enable OCR</value>
+  </data>
+  <data name="Settings_OCR_EnabledDescription" xml:space="preserve">
+    <value>Automatically recognize text on screen</value>
+  </data>
+  <data name="Settings_OCR_Language" xml:space="preserve">
+    <value>Recognition Language</value>
+  </data>
+  <data name="Settings_OCR_LanguageDescription" xml:space="preserve">
+    <value>Primary language for OCR recognition</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguage" xml:space="preserve">
+    <value>Target Language</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguageDescription" xml:space="preserve">
+    <value>Output language for translation results</value>
+  </data>
+  <data name="Settings_OCR_Confidence" xml:space="preserve">
+    <value>Confidence Threshold</value>
+  </data>
+  <data name="Settings_OCR_ConfidenceDescription" xml:space="preserve">
+    <value>Minimum confidence for text recognition (0.0-1.0)</value>
+  </data>
+  <data name="Settings_OCR_Filtering" xml:space="preserve">
+    <value>Text Filtering</value>
+  </data>
+  <data name="Settings_OCR_FilteringDescription" xml:space="preserve">
+    <value>Enable post-processing of recognized text</value>
+  </data>
+  <data name="Settings_OCR_Advanced" xml:space="preserve">
+    <value>Advanced Settings</value>
+  </data>
+  <data name="Settings_OCR_Preprocessing" xml:space="preserve">
+    <value>Image Preprocessing</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingEnable" xml:space="preserve">
+    <value>Enable Image Preprocessing</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingDescription" xml:space="preserve">
+    <value>Apply image preprocessing to improve OCR accuracy</value>
+  </data>
+  <data name="Settings_OCR_Grayscale" xml:space="preserve">
+    <value>Grayscale Conversion</value>
+  </data>
+
+  <!-- ========== Overlay Settings ========== -->
+  <data name="Settings_Overlay_Title" xml:space="preserve">
+    <value>Overlay Settings</value>
+  </data>
+  <data name="Settings_Overlay_Subtitle" xml:space="preserve">
+    <value>Settings for displaying translation results on game screen</value>
+  </data>
+  <data name="Settings_Overlay_ARNote" xml:space="preserve">
+    <value>AR-style display: Translation results are overlaid at the same position as original text, providing a Google Translate camera-like experience</value>
+  </data>
+  <data name="Settings_Overlay_Basic" xml:space="preserve">
+    <value>Basic Settings</value>
+  </data>
+  <data name="Settings_Overlay_Enabled" xml:space="preserve">
+    <value>Overlay Display</value>
+  </data>
+  <data name="Settings_Overlay_EnabledDescription" xml:space="preserve">
+    <value>Display translation results as overlay on game screen</value>
+  </data>
+  <data name="Settings_Overlay_Opacity" xml:space="preserve">
+    <value>Opacity</value>
+  </data>
+  <data name="Settings_Overlay_OpacityDescription" xml:space="preserve">
+    <value>Overlay opacity (higher = more opaque)</value>
+  </data>
+  <data name="Settings_Overlay_FontSize" xml:space="preserve">
+    <value>Translation Font Size</value>
+  </data>
+  <data name="Settings_Overlay_FontSizeDescription" xml:space="preserve">
+    <value>Font size of translation text displayed on overlay</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColor" xml:space="preserve">
+    <value>Background Color</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColorDescription" xml:space="preserve">
+    <value>Background color of overlay</value>
+  </data>
+  <data name="Settings_Overlay_ChooseColor" xml:space="preserve">
+    <value>Choose Color...</value>
+  </data>
+  <data name="Settings_Overlay_TextColor" xml:space="preserve">
+    <value>Text Color</value>
+  </data>
+  <data name="Settings_Overlay_TextColorDescription" xml:space="preserve">
+    <value>Text color of overlay</value>
+  </data>
+  <data name="Settings_Overlay_AutoHide" xml:space="preserve">
+    <value>Auto Hide Settings</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAuto" xml:space="preserve">
+    <value>Auto Hide for Live Translation</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDescription" xml:space="preserve">
+    <value>Automatically hide live translation results after specified time</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelay" xml:space="preserve">
+    <value>Live Translation Hide Delay</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelayDescription" xml:space="preserve">
+    <value>Time until live translation results automatically disappear</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelay" xml:space="preserve">
+    <value>Shot Translation Auto Hide Delay</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelayDescription" xml:space="preserve">
+    <value>Time until shot translation results automatically disappear</value>
+  </data>
+  <data name="Settings_Overlay_ManualClose" xml:space="preserve">
+    <value>Click to Close</value>
+  </data>
+  <data name="Settings_Overlay_ManualCloseDescription" xml:space="preserve">
+    <value>Click overlay to manually hide it</value>
+  </data>
+
+  <!-- ========== Account Settings ========== -->
+  <data name="Settings_Account_Title" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="Settings_Account_Subtitle" xml:space="preserve">
+    <value>User authentication and account management</value>
+  </data>
+  <data name="Settings_Account_Processing" xml:space="preserve">
+    <value>Processing...</value>
+  </data>
+  <data name="Settings_Account_LoggedInWith" xml:space="preserve">
+    <value>Logged in with {0}</value>
+  </data>
+  <data name="Settings_Account_LoggedInStatus" xml:space="preserve">
+    <value>Logged in</value>
+  </data>
+  <data name="Settings_Account_Actions" xml:space="preserve">
+    <value>Account Actions</value>
+  </data>
+  <data name="Settings_Account_LogoutDescription" xml:space="preserve">
+    <value>Log out from this device</value>
+  </data>
+  <data name="Settings_Account_NotLoggedIn" xml:space="preserve">
+    <value>Not logged in</value>
+  </data>
+  <data name="Settings_Account_LoginBenefits" xml:space="preserve">
+    <value>Sign in to sync settings and access additional features</value>
+  </data>
+  <data name="Settings_Account_ForgotPassword" xml:space="preserve">
+    <value>Forgot password?</value>
+  </data>
+  <data name="Settings_Account_PasswordReset" xml:space="preserve">
+    <value>Password Reset</value>
+  </data>
+  <data name="Settings_Account_PasswordResetDescription" xml:space="preserve">
+    <value>We'll send a password reset link to your registered email address</value>
+  </data>
+  <data name="Settings_Account_ResetEmailSent" xml:space="preserve">
+    <value>Reset email sent. Please check your inbox.</value>
+  </data>
+  <data name="Settings_Account_EmailAddress" xml:space="preserve">
+    <value>Email Address</value>
+  </data>
+  <data name="Settings_Account_Profile" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="Settings_Account_Email" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="Settings_Account_ChangePassword" xml:space="preserve">
+    <value>Change Password</value>
+  </data>
+  <data name="Settings_Account_Logout" xml:space="preserve">
+    <value>Logout</value>
+  </data>
+  <data name="Settings_Account_Login" xml:space="preserve">
+    <value>Login</value>
+  </data>
+  <data name="Settings_Account_Signup" xml:space="preserve">
+    <value>Sign Up</value>
+  </data>
+  <data name="Settings_Account_CurrentPlan" xml:space="preserve">
+    <value>Current Plan</value>
+  </data>
+  <data name="Settings_Account_UpgradeToPremium" xml:space="preserve">
+    <value>Upgrade to Premium</value>
+  </data>
+
+  <!-- ========== Advanced Settings ========== -->
+  <data name="Settings_Advanced_Title" xml:space="preserve">
+    <value>Advanced Settings</value>
+  </data>
+  <data name="Settings_Advanced_Subtitle" xml:space="preserve">
+    <value>Detailed settings for advanced features and system optimization</value>
+  </data>
+  <data name="Settings_Advanced_Warning" xml:space="preserve">
+    <value>Warning: These settings are for advanced users. Changes may cause unexpected behavior.</value>
+  </data>
+  <data name="Settings_Advanced_Basic" xml:space="preserve">
+    <value>Basic Optimization Settings</value>
+  </data>
+  <data name="Settings_Advanced_CPU" xml:space="preserve">
+    <value>CPU/Process Settings</value>
+  </data>
+  <data name="Settings_Advanced_Memory" xml:space="preserve">
+    <value>Memory/Buffering Settings</value>
+  </data>
+  <data name="Settings_Advanced_Network" xml:space="preserve">
+    <value>Network Settings</value>
+  </data>
+  <data name="Settings_Advanced_Seconds" xml:space="preserve">
+    <value>seconds</value>
+  </data>
+  <data name="Settings_Advanced_Connections" xml:space="preserve">
+    <value>connections</value>
+  </data>
+  <data name="Settings_Advanced_Retry" xml:space="preserve">
+    <value>Retry Settings</value>
+  </data>
+  <data name="Settings_Advanced_Times" xml:space="preserve">
+    <value>times</value>
+  </data>
+  <data name="Settings_Advanced_Statistics" xml:space="preserve">
+    <value>Statistics/Monitoring Settings</value>
+  </data>
+  <data name="Settings_Advanced_Days" xml:space="preserve">
+    <value>days</value>
+  </data>
+  <data name="Settings_Advanced_Experimental" xml:space="preserve">
+    <value>Experimental/Debug Settings</value>
+  </data>
+  <data name="Settings_Advanced_Danger" xml:space="preserve">
+    <value>Danger: These settings are for developers. Do not use in production.</value>
+  </data>
+
+  <!-- ========== Login View ========== -->
+  <data name="Auth_Login_Title" xml:space="preserve">
+    <value>Sign in to Baketa</value>
+  </data>
+  <data name="Auth_Login_Google" xml:space="preserve">
+    <value>Sign in with Google</value>
+  </data>
+  <data name="Auth_Login_Discord" xml:space="preserve">
+    <value>Sign in with Discord</value>
+  </data>
+  <data name="Auth_Login_Twitch" xml:space="preserve">
+    <value>Sign in with Twitch</value>
+  </data>
+  <data name="Auth_Login_Email" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="Auth_Login_EmailPlaceholder" xml:space="preserve">
+    <value>example@email.com</value>
+  </data>
+  <data name="Auth_Login_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Auth_Login_PasswordPlaceholder" xml:space="preserve">
+    <value>Enter password</value>
+  </data>
+  <data name="Auth_Login_RememberMe" xml:space="preserve">
+    <value>Remember me</value>
+  </data>
+  <data name="Auth_Login_ForgotPassword" xml:space="preserve">
+    <value>Forgot password?</value>
+  </data>
+  <data name="Auth_Login_Button" xml:space="preserve">
+    <value>Sign In</value>
+  </data>
+  <data name="Auth_Login_Loading" xml:space="preserve">
+    <value>Authenticating...</value>
+  </data>
+  <data name="Auth_Login_SignupPrompt" xml:space="preserve">
+    <value>New to Baketa? </value>
+  </data>
+  <data name="Auth_Login_SignupLink" xml:space="preserve">
+    <value>Create Account</value>
+  </data>
+
+  <!-- ========== Signup View ========== -->
+  <data name="Auth_Signup_Title" xml:space="preserve">
+    <value>Create Baketa Account</value>
+  </data>
+  <data name="Auth_Signup_Google" xml:space="preserve">
+    <value>Sign up with Google</value>
+  </data>
+  <data name="Auth_Signup_Discord" xml:space="preserve">
+    <value>Sign up with Discord</value>
+  </data>
+  <data name="Auth_Signup_Twitch" xml:space="preserve">
+    <value>Sign up with Twitch</value>
+  </data>
+  <data name="Auth_Signup_OrEmail" xml:space="preserve">
+    <value>or sign up with email</value>
+  </data>
+  <data name="Auth_Signup_DisplayName" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="Auth_Signup_DisplayNamePlaceholder" xml:space="preserve">
+    <value>Your display name</value>
+  </data>
+  <data name="Auth_Signup_Email" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="Auth_Signup_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Auth_Signup_PasswordPlaceholder" xml:space="preserve">
+    <value>8 or more characters</value>
+  </data>
+  <data name="Auth_Signup_PasswordRequirement" xml:space="preserve">
+    <value>* At least 8 characters, with 3 or more of: uppercase, lowercase, numbers, symbols</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPassword" xml:space="preserve">
+    <value>Confirm Password</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPasswordPlaceholder" xml:space="preserve">
+    <value>Enter password again</value>
+  </data>
+  <data name="Auth_Signup_Terms" xml:space="preserve">
+    <value>Terms of Service</value>
+  </data>
+  <data name="Auth_Signup_TermsAgree" xml:space="preserve">
+    <value>I agree to the</value>
+  </data>
+  <data name="Auth_Signup_Privacy" xml:space="preserve">
+    <value>Privacy Policy</value>
+  </data>
+  <data name="Auth_Signup_Button" xml:space="preserve">
+    <value>Create Account</value>
+  </data>
+  <data name="Auth_Signup_Loading" xml:space="preserve">
+    <value>Creating account...</value>
+  </data>
+  <data name="Auth_Signup_LoginPrompt" xml:space="preserve">
+    <value>Already have an account? </value>
+  </data>
+  <data name="Auth_Signup_LoginLink" xml:space="preserve">
+    <value>Sign In</value>
+  </data>
+
+  <!-- ========== Premium Plan ========== -->
+  <data name="Premium_Title" xml:space="preserve">
+    <value>Baketa Premium</value>
+  </data>
+  <data name="Premium_FeatureAdFree" xml:space="preserve">
+    <value>Ad-free</value>
+  </data>
+  <data name="Premium_FeatureCloudTranslation" xml:space="preserve">
+    <value>Cloud Translation (Google Gemini)</value>
+  </data>
+  <data name="Premium_FeaturePrioritySupport" xml:space="preserve">
+    <value>Priority Support</value>
+  </data>
+  <data name="Premium_FeatureEarlyAccess" xml:space="preserve">
+    <value>Early Access to New Features</value>
+  </data>
+  <data name="Premium_Monthly" xml:space="preserve">
+    <value>$5/month</value>
+  </data>
+  <data name="Premium_Yearly" xml:space="preserve">
+    <value>$50/year (17% OFF)</value>
+  </data>
+
+  <!-- ========== Error Messages ========== -->
+  <data name="Error_NetworkError" xml:space="preserve">
+    <value>A network error occurred</value>
+  </data>
+  <data name="Error_AuthenticationFailed" xml:space="preserve">
+    <value>Authentication failed</value>
+  </data>
+  <data name="Error_TranslationFailed" xml:space="preserve">
+    <value>Translation failed</value>
+  </data>
+  <data name="Error_OcrFailed" xml:space="preserve">
+    <value>OCR failed</value>
+  </data>
+  <data name="Error_WindowNotFound" xml:space="preserve">
+    <value>Target window not found</value>
+  </data>
+  <data name="Error_InvalidEmail" xml:space="preserve">
+    <value>Invalid email address</value>
+  </data>
+  <data name="Error_PasswordTooShort" xml:space="preserve">
+    <value>Password must be at least 8 characters</value>
+  </data>
+  <data name="Error_LoginFailed" xml:space="preserve">
+    <value>Login failed</value>
+  </data>
+  <data name="Error_PasswordMismatch" xml:space="preserve">
+    <value>Passwords do not match</value>
+  </data>
+  <data name="Error_SignupFailed" xml:space="preserve">
+    <value>Account creation failed</value>
+  </data>
+
+  <!-- ========== Confirmation Dialogs ========== -->
+  <data name="Dialog_LogoutConfirm" xml:space="preserve">
+    <value>Are you sure you want to logout?</value>
+  </data>
+  <data name="Dialog_DiscardChanges" xml:space="preserve">
+    <value>You have unsaved changes. Discard changes?</value>
+  </data>
+  <data name="Dialog_ResetSettings" xml:space="preserve">
+    <value>Reset settings to default?</value>
+  </data>
+  <data name="Dialog_ExitApp" xml:space="preserve">
+    <value>Exit application?</value>
+  </data>
+
+  <!-- MainOverlay Tooltips -->
+  <data name="MainOverlay_StartButton_Tooltip" xml:space="preserve">
+    <value>Start translation</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Execute" xml:space="preserve">
+    <value>Execute singleshot translation</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Clear" xml:space="preserve">
+    <value>Clear results</value>
+  </data>
+  <data name="MainOverlay_Status_Initializing" xml:space="preserve">
+    <value>Initializing...</value>
+  </data>
+  <data name="MainOverlay_Status_Idle" xml:space="preserve">
+    <value>Not selected</value>
+  </data>
+  <data name="MainOverlay_Status_Ready" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="MainOverlay_Status_Translating" xml:space="preserve">
+    <value>Translating</value>
+  </data>
+  <data name="MainOverlay_Status_Waiting" xml:space="preserve">
+    <value>Waiting</value>
+  </data>
+  <data name="MainOverlay_Warmup_Failed" xml:space="preserve">
+    <value>Model initialization failed. Please restart the app.</value>
+  </data>
+  <data name="MainOverlay_Warmup_Loading" xml:space="preserve">
+    <value>Loading model... {0}</value>
+  </data>
+  <data name="MainOverlay_Warmup_Complete" xml:space="preserve">
+    <value>Ready! You can start translating</value>
+  </data>
+
+  <!-- Theme Options -->
+  <data name="Theme_Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Theme_Dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="Theme_Auto" xml:space="preserve">
+    <value>Auto (follow system setting)</value>
+  </data>
+
+  <!-- Size Options -->
+  <data name="Size_Small" xml:space="preserve">
+    <value>Small (compact)</value>
+  </data>
+  <data name="Size_Medium" xml:space="preserve">
+    <value>Medium (standard)</value>
+  </data>
+  <data name="Size_Large" xml:space="preserve">
+    <value>Large (easy to read)</value>
+  </data>
+
+  <!-- Advanced Settings Toggle -->
+  <data name="Settings_Advanced_Show" xml:space="preserve">
+    <value>Show advanced settings</value>
+  </data>
+  <data name="Settings_Advanced_Hide" xml:space="preserve">
+    <value>Back to basic settings</value>
+  </data>
+
+  <!-- Settings Window Status Messages -->
+  <data name="Settings_Window_Title" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Settings_Status_HasChanges" xml:space="preserve">
+    <value>Settings have been modified</value>
+  </data>
+  <data name="Settings_Status_NoChanges" xml:space="preserve">
+    <value>No changes</value>
+  </data>
+  <data name="Settings_Status_Saving" xml:space="preserve">
+    <value>Saving settings...</value>
+  </data>
+  <data name="Settings_Status_Saved" xml:space="preserve">
+    <value>Settings saved</value>
+  </data>
+  <data name="Settings_Status_SaveFailed" xml:space="preserve">
+    <value>Failed to save: {0}</value>
+  </data>
+  <data name="Settings_Status_AccessDenied" xml:space="preserve">
+    <value>Failed to save: Access denied</value>
+  </data>
+  <data name="Settings_Status_IOError" xml:space="preserve">
+    <value>Failed to save: File I/O error</value>
+  </data>
+  <data name="Settings_Status_Cancelled" xml:space="preserve">
+    <value>Changes cancelled</value>
+  </data>
+  <data name="Settings_Status_Reset" xml:space="preserve">
+    <value>Settings reset</value>
+  </data>
+
+  <!-- Settings Window Buttons -->
+  <data name="Settings_Button_Reset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="Settings_Button_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Settings_Button_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Settings_Tooltip_Reset" xml:space="preserve">
+    <value>Reset all settings to default</value>
+  </data>
+  <data name="Settings_Tooltip_Cancel" xml:space="preserve">
+    <value>Discard changes and close</value>
+  </data>
+  <data name="Settings_Tooltip_Save" xml:space="preserve">
+    <value>Save changes</value>
+  </data>
+
+  <!-- ========== Loading Screen ========== -->
+  <data name="Loading_ResolvingDependencies" xml:space="preserve">
+    <value>Resolving dependencies...</value>
+  </data>
+  <data name="Loading_LoadingOCR" xml:space="preserve">
+    <value>Loading OCR model...</value>
+  </data>
+  <data name="Loading_InitializingTranslation" xml:space="preserve">
+    <value>Initializing translation engine...</value>
+  </data>
+  <data name="Loading_PreparingUI" xml:space="preserve">
+    <value>Preparing UI components...</value>
+  </data>
+
+</root>

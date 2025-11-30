@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.UI.Framework;
+using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -108,8 +109,19 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     public string? AuthProvider
     {
         get => _authProvider;
-        private set => this.RaiseAndSetIfChanged(ref _authProvider, value);
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _authProvider, value);
+            this.RaisePropertyChanged(nameof(AuthProviderDisplay));
+        }
     }
+
+    /// <summary>
+    /// ローカライズされた認証プロバイダー表示文字列
+    /// </summary>
+    public string AuthProviderDisplay => string.IsNullOrEmpty(AuthProvider)
+        ? string.Empty
+        : string.Format(Strings.Settings_Account_LoggedInWith, AuthProvider);
 
     /// <summary>
     /// ステータスメッセージ

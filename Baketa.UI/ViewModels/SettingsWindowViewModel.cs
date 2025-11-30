@@ -8,9 +8,11 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Baketa.UI.Models.Settings;
+using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Baketa.UI.ViewModels.Settings;
 using Baketa.UI.Views.Settings;
@@ -30,6 +32,8 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     private readonly IEventAggregator _eventAggregator;
     private readonly IAuthService _authService;
     private readonly INavigationService _navigationService;
+    private readonly ISettingsService _settingsService;
+    private readonly ILocalizationService? _localizationService;
     private readonly ILogger<SettingsWindowViewModel>? _logger;
     private SettingCategory? _selectedCategory;
     private string _statusMessage = string.Empty;
@@ -41,19 +45,29 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="authService">認証サービス</param>
     /// <param name="navigationService">ナビゲーションサービス</param>
+    /// <param name="settingsService">設定サービス</param>
+    /// <param name="localizationService">ローカライゼーションサービス（オプション）</param>
     /// <param name="logger">ロガー（オプション）</param>
     public SettingsWindowViewModel(
         ISettingsChangeTracker changeTracker,
         IEventAggregator eventAggregator,
         IAuthService authService,
         INavigationService navigationService,
+        ISettingsService settingsService,
+        ILocalizationService? localizationService = null,
         ILogger<SettingsWindowViewModel>? logger = null) : base(eventAggregator)
     {
         _changeTracker = changeTracker ?? throw new ArgumentNullException(nameof(changeTracker));
         _eventAggregator = eventAggregator; // 既にbase()でnullチェック済み
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _localizationService = localizationService;
         _logger = logger;
+
+        // [DEBUG] ILocalizationServiceのDI注入確認
+        Console.WriteLine($"[SettingsWindowViewModel] Constructor - ILocalizationService is null: {localizationService == null}");
+        System.Diagnostics.Debug.WriteLine($"[SettingsWindowViewModel] Constructor - ILocalizationService is null: {localizationService == null}");
 
         // カテゴリの初期化（null引数チェック後に実行）
         InitializeCategories();
@@ -62,7 +76,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         this._changeTracker.HasChangesChanged += (_, e) =>
         {
             this.RaisePropertyChanged(nameof(HasChanges));
-            StatusMessage = e.HasChanges ? "設定に変更があります" : "変更なし";
+            StatusMessage = e.HasChanges ? Strings.Settings_Status_HasChanges : Strings.Settings_Status_NoChanges;
         };
 
         // コマンドの初期化
@@ -118,6 +132,23 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
 
     #endregion
 
+    #region イベント
+
+    /// <summary>
+    /// ウィンドウを閉じることを要求するイベント
+    /// </summary>
+    public event EventHandler? CloseRequested;
+
+    /// <summary>
+    /// ウィンドウを閉じることを要求します
+    /// </summary>
+    private void RequestClose()
+    {
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    #endregion
+
     #region コマンド
 
     /// <summary>
@@ -150,27 +181,45 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
             new()
             {
                 Id = "settings_general",
-                Name = "一般設定",
+                NameResourceKey = "Settings_General_Title",
+                DescriptionResourceKey = "Settings_General_Subtitle",
                 IconData = "M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z", // Settings icon
                 Level = SettingLevel.Basic,
                 DisplayOrder = 1,
-                Description = "基本的なアプリケーション設定",
                 Content = null // 遅延作成
             },
 
             new()
             {
                 Id = "settings_account",
-                Name = "アカウント",
+                NameResourceKey = "Settings_Account_Title",
+                DescriptionResourceKey = "Settings_Account_Subtitle",
                 IconData = "M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z", // Account icon
                 Level = SettingLevel.Basic,
                 DisplayOrder = 2,
-                Description = "ユーザー認証とアカウント管理",
                 Content = null // 遅延作成
             }
         };
 
         AllCategories = categories;
+
+        // 言語変更イベントをサブスクライブしてカテゴリ名を更新
+        if (_localizationService != null)
+        {
+            _localizationService.LanguageChanged += OnLanguageChanged;
+        }
+    }
+
+    /// <summary>
+    /// 言語変更イベントハンドラ - カテゴリのローカライズ文字列を更新
+    /// </summary>
+    private void OnLanguageChanged(object? sender, LanguageChangedEventArgs e)
+    {
+        foreach (var category in AllCategories)
+        {
+            category.RefreshLocalizedStrings();
+        }
+        _logger?.LogDebug("設定カテゴリのローカライズ文字列を更新しました: {NewCulture}", e.NewCulture.Name);
     }
 
     /// <summary>
@@ -197,8 +246,16 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
 
         try
         {
-            GeneralSettings settings = new(); // TODO: 実際の設定データを注入
-            GeneralSettingsViewModel viewModel = new(settings, _eventAggregator, _logger as ILogger<GeneralSettingsViewModel>);
+            // 保存済みの設定を読み込む（なければデフォルト値を使用）
+            GeneralSettings settings = _settingsService.GetCategorySettings<GeneralSettings>() ?? new GeneralSettings();
+            _logger?.LogDebug("一般設定を読み込みました: UiLanguage={UiLanguage}", settings.UiLanguage);
+
+            GeneralSettingsViewModel viewModel = new(
+                settings,
+                _eventAggregator,
+                localizationService: _localizationService,
+                changeTracker: _changeTracker,
+                logger: _logger as ILogger<GeneralSettingsViewModel>);
             return new GeneralSettingsView(viewModel);
         }
         catch (Exception ex)
@@ -271,34 +328,125 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     }
 
     /// <summary>
+    /// 選択中のカテゴリのContentを確実に再作成します
+    /// ウィンドウを再表示する際に、ClearCategoryContentsでnullになったContentを再作成するために使用します
+    /// </summary>
+    public void EnsureSelectedCategoryContent()
+    {
+        if (_selectedCategory != null)
+        {
+            EnsureCategoryContent(_selectedCategory);
+            // ContentControlのバインディングを更新するためにPropertyChangedを発行
+            this.RaisePropertyChanged(nameof(SelectedCategory));
+            _logger?.LogDebug("選択中のカテゴリ {CategoryId} のContentを再作成しました", _selectedCategory.Id);
+        }
+    }
+
+    /// <summary>
     /// 設定を保存します
     /// </summary>
     private async Task SaveAsync()
     {
         try
         {
-            StatusMessage = "設定を保存中...";
+            StatusMessage = Strings.Settings_Status_Saving;
 
-            // TODO: 実際の設定保存処理を実装
-            await Task.Delay(500).ConfigureAwait(false); // シミュレーション
+            // 各カテゴリの設定を保存（UIスレッドコンテキストを維持）
+            await SaveCategorySettingsAsync();
 
             this._changeTracker.ClearChanges();
-            StatusMessage = "設定を保存しました";
+            StatusMessage = Strings.Settings_Status_Saved;
+            _logger?.LogInformation("設定の保存が完了しました");
+
+            // ウィンドウを閉じる
+            RequestClose();
         }
         catch (InvalidOperationException ex)
         {
-            StatusMessage = $"保存に失敗しました: {ex.Message}";
+            StatusMessage = string.Format(Strings.Settings_Status_SaveFailed, ex.Message);
             _logger?.LogError(ex, "設定の保存中にエラーが発生しました");
         }
         catch (UnauthorizedAccessException ex)
         {
-            StatusMessage = $"保存に失敗しました: アクセスが拒否されました";
+            StatusMessage = Strings.Settings_Status_AccessDenied;
             _logger?.LogError(ex, "設定ファイルへのアクセスが拒否されました");
         }
         catch (System.IO.IOException ex)
         {
-            StatusMessage = $"保存に失敗しました: ファイルI/Oエラー";
+            StatusMessage = Strings.Settings_Status_IOError;
             _logger?.LogError(ex, "設定ファイルのI/Oエラーが発生しました");
+        }
+    }
+
+    /// <summary>
+    /// 各カテゴリの設定を保存します
+    /// </summary>
+    private async Task SaveCategorySettingsAsync()
+    {
+        _logger?.LogInformation("設定カテゴリの保存処理を実行中 - カテゴリ数: {Count}", AllCategories.Count);
+
+        // UIスレッドで設定データを収集（ConfigureAwait(false)の前に完了）
+        GeneralSettings? generalSettingsToSave = null;
+        GeneralSettingsViewModel? generalViewModel = null;
+
+        foreach (var category in AllCategories)
+        {
+            // 保存前にContentを確実に作成
+            EnsureCategoryContent(category);
+
+            _logger?.LogInformation("カテゴリ処理: {CategoryId}, Content: {ContentType}, DataContext: {DataContextType}",
+                category.Id,
+                category.Content?.GetType().Name ?? "null",
+                (category.Content as UserControl)?.DataContext?.GetType().Name ?? "null");
+
+            if (category.Content is not UserControl { DataContext: { } dataContext })
+            {
+                _logger?.LogWarning("スキップ - Content is not UserControl with DataContext: {CategoryId}", category.Id);
+                continue;
+            }
+
+            switch (dataContext)
+            {
+                case GeneralSettingsViewModel generalVm:
+                    generalViewModel = generalVm;
+                    generalSettingsToSave = generalVm.CurrentSettings;
+                    _logger?.LogInformation("GeneralSettings収集: UiLanguage={UiLanguage}, AutoStart={AutoStart}, MinimizeToTray={MinimizeToTray}",
+                        generalSettingsToSave.UiLanguage ?? "(null)",
+                        generalSettingsToSave.AutoStartWithWindows,
+                        generalSettingsToSave.MinimizeToTray);
+                    break;
+                    // 他のViewModelも必要に応じて追加
+            }
+        }
+
+        // ファイルI/O操作を実行（ConfigureAwait(false)で非UIスレッドへ移行可能）
+        try
+        {
+            if (generalSettingsToSave != null)
+            {
+                _logger?.LogInformation("一般設定を保存中: UiLanguage={UiLanguage}", generalSettingsToSave.UiLanguage ?? "(null)");
+                await _settingsService.SaveAsync(generalSettingsToSave).ConfigureAwait(false);
+                _logger?.LogInformation("一般設定を保存しました");
+
+                // UI言語を適用（保存後に実際に言語を変更）
+                if (generalViewModel != null)
+                {
+                    await generalViewModel.ApplyUiLanguageAsync().ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                _logger?.LogWarning("保存する一般設定がありません（generalSettingsToSave is null）");
+            }
+
+            // 設定をファイルに永続化
+            await _settingsService.SaveAsync().ConfigureAwait(false);
+            _logger?.LogInformation("すべての設定をファイルに保存しました");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "設定の保存中にエラーが発生しました");
+            throw;
         }
     }
 
@@ -309,8 +457,11 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     {
         if (await this._changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
         {
-            // TODO: ウィンドウを閉じる処理
-            StatusMessage = "変更をキャンセルしました";
+            StatusMessage = Strings.Settings_Status_Cancelled;
+            _logger?.LogInformation("設定の変更がキャンセルされました");
+
+            // ウィンドウを閉じる
+            RequestClose();
         }
     }
 
@@ -322,7 +473,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         if (await this._changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
         {
             // TODO: 設定のリセット処理を実装
-            StatusMessage = "設定をリセットしました";
+            StatusMessage = Strings.Settings_Status_Reset;
         }
     }
 

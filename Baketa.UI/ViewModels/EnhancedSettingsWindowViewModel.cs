@@ -28,6 +28,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly ISettingsChangeTracker _changeTracker;
     private readonly IEventAggregator _eventAggregator;
+    private readonly ILocalizationService? _localizationService;
     private readonly ILogger<EnhancedSettingsWindowViewModel>? _logger;
     private bool _showAdvancedSettings;
     private SettingCategory? _selectedCategory;
@@ -42,16 +43,19 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     /// <param name="settingsService">設定サービス</param>
     /// <param name="changeTracker">設定変更追跡サービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
+    /// <param name="localizationService">ローカライゼーションサービス（オプション）</param>
     /// <param name="logger">ロガー（オプション）</param>
     public EnhancedSettingsWindowViewModel(
         ISettingsService settingsService,
         ISettingsChangeTracker changeTracker,
         IEventAggregator eventAggregator,
+        ILocalizationService? localizationService = null,
         ILogger<EnhancedSettingsWindowViewModel>? logger = null) : base(eventAggregator)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _changeTracker = changeTracker ?? throw new ArgumentNullException(nameof(changeTracker));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+        _localizationService = localizationService;
         _logger = logger;
 
         // カテゴリの初期化
@@ -316,7 +320,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 _logger?.LogWarning(settingsEx, "一般設定の読み込みに失敗しました。デフォルト設定を使用します");
                 settings = new GeneralSettings();
             }
-            var viewModel = new GeneralSettingsViewModel(settings, _eventAggregator, _logger as ILogger<GeneralSettingsViewModel>);
+            var viewModel = new GeneralSettingsViewModel(settings, _eventAggregator, localizationService: _localizationService, changeTracker: _changeTracker, logger: _logger as ILogger<GeneralSettingsViewModel>);
 
             _settingsViewModels["general"] = viewModel;
             return new GeneralSettingsView(viewModel);
@@ -623,8 +627,10 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
             // 全ての設定ViewModelから現在の設定を取得して保存
             var saveTasks = new List<Task>();
 
+            GeneralSettingsViewModel? generalSettingsViewModel = null;
             if (_settingsViewModels.TryGetValue("general", out var generalVm) && generalVm is GeneralSettingsViewModel general)
             {
+                generalSettingsViewModel = general;
                 saveTasks.Add(_settingsService.SaveAsync(general.CurrentSettings));
             }
 
@@ -660,6 +666,12 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
 
             // 並列で保存処理を実行
             await Task.WhenAll(saveTasks).ConfigureAwait(false);
+
+            // UI言語を適用（保存後に実際に言語を変更）
+            if (generalSettingsViewModel != null)
+            {
+                await generalSettingsViewModel.ApplyUiLanguageAsync().ConfigureAwait(false);
+            }
 
             _changeTracker.ClearChanges();
             StatusMessage = "設定を保存しました";
@@ -700,6 +712,7 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         if (await _changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
         {
+            // シンプルアプローチ: キャンセル時は何もしない（言語変更は保存時のみ適用されるため）
             // TODO: ウィンドウを閉じる処理
             StatusMessage = "変更をキャンセルしました";
             _logger?.LogInformation("設定の変更がキャンセルされました");
@@ -875,6 +888,8 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         if (disposing)
         {
+            // シンプルアプローチ: 言語変更は保存時のみ適用されるため、ロールバック不要
+
             // ViewModelキャッシュ内のDisposableオブジェクトを解放
             foreach (var kvp in _settingsViewModels)
             {

@@ -22,6 +22,7 @@ using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
 using Baketa.UI.Helpers;
+using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
 using Baketa.UI.Views;
@@ -52,7 +53,7 @@ public class MainOverlayViewModel : ViewModelBase
     private bool _isTranslationEngineInitializing;
 
     // 🔥 [PHASE5.2E] Startボタンツールチップ（ウォームアップ進捗表示用）
-    private string _startButtonTooltip = "翻訳を開始";
+    private string _startButtonTooltip = null!; // コンストラクタで初期化
 
     // 🔥 [ISSUE#163_TOGGLE] シングルショットオーバーレイ表示状態（トグル動作用）
     private bool _isSingleshotOverlayVisible;
@@ -112,6 +113,7 @@ public class MainOverlayViewModel : ViewModelBase
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
         _currentStatus = TranslationStatus.Idle; // アイドル状態から開始
+        _startButtonTooltip = Strings.MainOverlay_StartButton_Tooltip; // ローカライズ対応
 
         // 🔥 [FIX] 翻訳エンジンは既に起動済み（ServerManagerHostedServiceで起動）
         // MainOverlayViewModel初期化時点でサーバーは準備完了しているため、falseで開始
@@ -694,15 +696,15 @@ public class MainOverlayViewModel : ViewModelBase
     /// IsSingleshotOverlayVisibleの値に基づいてツールチップテキストを返す
     /// </remarks>
     public string SingleshotButtonTooltip =>
-        IsSingleshotOverlayVisible ? "結果をクリア" : "シングルショット翻訳を実行";
+        IsSingleshotOverlayVisible ? Strings.MainOverlay_Singleshot_Clear : Strings.MainOverlay_Singleshot_Execute;
 
     public string InitializationText => CurrentStatus switch
     {
-        TranslationStatus.Initializing => "初期化中...",
-        TranslationStatus.Idle => "未選択",
-        TranslationStatus.Ready => "準備完了",
-        TranslationStatus.Capturing or TranslationStatus.ProcessingOCR or TranslationStatus.Translating => "翻訳中",
-        _ => "待機中"
+        TranslationStatus.Initializing => Strings.MainOverlay_Status_Initializing,
+        TranslationStatus.Idle => Strings.MainOverlay_Status_Idle,
+        TranslationStatus.Ready => Strings.MainOverlay_Status_Ready,
+        TranslationStatus.Capturing or TranslationStatus.ProcessingOCR or TranslationStatus.Translating => Strings.MainOverlay_Status_Translating,
+        _ => Strings.MainOverlay_Status_Waiting
     };
     public string StatusIndicatorClass => CurrentStatus switch
     {
@@ -1811,7 +1813,7 @@ public class MainOverlayViewModel : ViewModelBase
             if (_warmupService.Status == Baketa.Core.Abstractions.GPU.WarmupStatus.Failed)
             {
                 // ウォームアップ失敗: ユーザーにアプリ再起動を促すエラーメッセージ
-                StartButtonTooltip = "モデルの初期化に失敗しました。アプリを再起動してください。";
+                StartButtonTooltip = Strings.MainOverlay_Warmup_Failed;
                 Logger?.LogError(_warmupService.LastError, "❌ [PHASE5.2E.1] ウォームアップ失敗 - Startボタン永続的に無効化");
                 // Startボタンは canStartCapture() で IsWarmupCompleted をチェックするため、
                 // 失敗状態では永遠に有効化されない（IsWarmupCompleted = false のまま）
@@ -1820,14 +1822,14 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 // 🔥 [ALPHA_0.1.2_FIX] 100%未満のみ進捗表示（100%時は完了扱い）
                 // ウォームアップ進行中: 進捗パーセンテージを表示
-                StartButtonTooltip = $"モデル読み込み中... {e.Progress:P0}";
+                StartButtonTooltip = string.Format(Strings.MainOverlay_Warmup_Loading, e.Progress.ToString("P0"));
                 Logger?.LogDebug($"🔥 [PHASE5.2E] ウォームアップ進捗: {e.Progress:P0} - {e.Status}");
             }
             else
             {
                 // 🔥 [ALPHA_0.1.2_FIX] 100%到達時にツールチップを即座に「翻訳を開始」に戻す
                 // ウォームアップ完了: デフォルトツールチップに戻す
-                StartButtonTooltip = "翻訳を開始";
+                StartButtonTooltip = Strings.MainOverlay_StartButton_Tooltip;
                 Logger?.LogInformation("✅ [PHASE5.2E] ウォームアップ完了 - Startボタン有効化");
             }
 
