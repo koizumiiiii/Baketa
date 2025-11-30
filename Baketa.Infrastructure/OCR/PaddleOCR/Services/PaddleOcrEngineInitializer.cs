@@ -119,6 +119,11 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
                         _queuedEngine = new QueuedPaddleOcrAll(
                             factory: () =>
                             {
+                                // 🔧 [MKL_FIX] CPU専用設定 - GPU初期化エラー回避
+                                // Sdcb.PaddleInference.runtime.win64.mkl パッケージはCPU専用のため
+                                // デフォルトコンストラクタを使用（暗黙的にCPUモード）
+                                // TODO: Issue #181 - GPU対応時にPaddleDevice.Gpu()を使用し、
+                                //       NuGetパッケージをSdcb.PaddleInference.runtime.win64.cuda.cudnnに変更
                                 var engine = new PaddleOcrAll(models)
                                 {
                                     AllowRotateDetection = true, // ✅ [PHASE10.26_REVERT] commit 09e1fc3の正常動作設定に戻す - false設定が原因で検出激減（8→1個）
@@ -146,13 +151,13 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
 
                                 return engine;
                             },
-                            consumerCount: settings.QueuedOcrConsumerCount,  // 🔥 [P4-B_FIX] 設定外部化（appsettings.json対応）
+                            consumerCount: 1,  // 🔧 [SEH_FIX] 暫定的に1ワーカーで初期化（複数インスタンスでSEHException発生）
                             boundedCapacity: settings.QueuedOcrBoundedCapacity // 🔥 [P4-B_FIX] 設定外部化（appsettings.json対応）
                         );
 
-                        _logger?.LogInformation("✅ [P4-B_FIX] QueuedPaddleOcrAll初期化完了 - consumerCount: {ConsumerCount}, boundedCapacity: {BoundedCapacity}",
-                            settings.QueuedOcrConsumerCount, settings.QueuedOcrBoundedCapacity);
-                        Console.WriteLine($"✅ [P4-B_FIX] QueuedPaddleOcrAll初期化完了 - consumerCount: {settings.QueuedOcrConsumerCount}, boundedCapacity: {settings.QueuedOcrBoundedCapacity}");
+                        _logger?.LogInformation("✅ [SEH_FIX] QueuedPaddleOcrAll初期化完了 - consumerCount: 1 (暫定), boundedCapacity: {BoundedCapacity}",
+                            settings.QueuedOcrBoundedCapacity);
+                        Console.WriteLine($"✅ [SEH_FIX] QueuedPaddleOcrAll初期化完了 - consumerCount: 1 (暫定), boundedCapacity: {settings.QueuedOcrBoundedCapacity}");
                     }
 
                     _logger?.LogDebug("✅ [P4-B_FIX] QueuedPaddleOcrAll作成完了 - ワーカー数: {ConsumerCount}（設定値）", settings.QueuedOcrConsumerCount);
