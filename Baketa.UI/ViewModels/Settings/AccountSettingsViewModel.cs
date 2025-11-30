@@ -119,9 +119,15 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     /// <summary>
     /// ローカライズされた認証プロバイダー表示文字列
     /// </summary>
+    /// <remarks>
+    /// CA1863: ローカライズされたリソース文字列は言語変更時に内容が変わるため、
+    /// CompositeFormatキャッシュは不適切。プロパティアクセスは低頻度。
+    /// </remarks>
+#pragma warning disable CA1863
     public string AuthProviderDisplay => string.IsNullOrEmpty(AuthProvider)
         ? string.Empty
         : string.Format(Strings.Settings_Account_LoggedInWith, AuthProvider);
+#pragma warning restore CA1863
 
     /// <summary>
     /// ステータスメッセージ

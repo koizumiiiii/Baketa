@@ -1822,7 +1822,11 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 // 🔥 [ALPHA_0.1.2_FIX] 100%未満のみ進捗表示（100%時は完了扱い）
                 // ウォームアップ進行中: 進捗パーセンテージを表示
+                // CA1863: ローカライズされたリソース文字列は言語変更時に内容が変わるため、
+                // CompositeFormatキャッシュは不適切。ウォームアップ中の数回のみ呼ばれる低頻度処理。
+#pragma warning disable CA1863
                 StartButtonTooltip = string.Format(Strings.MainOverlay_Warmup_Loading, e.Progress.ToString("P0"));
+#pragma warning restore CA1863
                 Logger?.LogDebug($"🔥 [PHASE5.2E] ウォームアップ進捗: {e.Progress:P0} - {e.Status}");
             }
             else

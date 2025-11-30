@@ -488,6 +488,7 @@ public sealed class WindowsCredentialStorageTests : IAsyncLifetime
 /// Sequential execution to avoid credential conflicts
 /// </summary>
 [CollectionDefinition("WindowsCredentialStorage", DisableParallelization = true)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "CA1711:識別子は、不適切なサフィックスを含むことはできません", Justification = "xUnitテストコレクション定義の命名規約")]
 public class WindowsCredentialStorageCollection : ICollectionFixture<WindowsCredentialStorageFixture>
 {
 }

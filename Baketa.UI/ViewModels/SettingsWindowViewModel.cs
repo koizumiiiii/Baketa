@@ -363,7 +363,11 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         }
         catch (InvalidOperationException ex)
         {
+            // CA1863: ローカライズされたリソース文字列は言語変更時に内容が変わるため、
+            // CompositeFormatキャッシュは不適切。低頻度のエラー処理なのでパフォーマンス影響も軽微。
+#pragma warning disable CA1863
             StatusMessage = string.Format(Strings.Settings_Status_SaveFailed, ex.Message);
+#pragma warning restore CA1863
             _logger?.LogError(ex, "設定の保存中にエラーが発生しました");
         }
         catch (UnauthorizedAccessException ex)
