@@ -248,14 +248,17 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         {
             // 保存済みの設定を読み込む（なければデフォルト値を使用）
             GeneralSettings settings = _settingsService.GetCategorySettings<GeneralSettings>() ?? new GeneralSettings();
-            _logger?.LogDebug("一般設定を読み込みました: UiLanguage={UiLanguage}", settings.UiLanguage);
+            TranslationSettings translationSettings = _settingsService.GetCategorySettings<TranslationSettings>() ?? new TranslationSettings();
+            _logger?.LogDebug("一般設定を読み込みました: UiLanguage={UiLanguage}, SourceLang={SourceLang}, TargetLang={TargetLang}, FontSize={FontSize}",
+                settings.UiLanguage, translationSettings.DefaultSourceLanguage, translationSettings.DefaultTargetLanguage, translationSettings.OverlayFontSize);
 
             GeneralSettingsViewModel viewModel = new(
                 settings,
                 _eventAggregator,
                 localizationService: _localizationService,
                 changeTracker: _changeTracker,
-                logger: _logger as ILogger<GeneralSettingsViewModel>);
+                logger: _logger as ILogger<GeneralSettingsViewModel>,
+                translationSettings: translationSettings);
             return new GeneralSettingsView(viewModel);
         }
         catch (Exception ex)
@@ -391,6 +394,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
 
         // UIスレッドで設定データを収集（ConfigureAwait(false)の前に完了）
         GeneralSettings? generalSettingsToSave = null;
+        TranslationSettings? translationSettingsToSave = null;
         GeneralSettingsViewModel? generalViewModel = null;
 
         foreach (var category in AllCategories)
@@ -414,10 +418,15 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 case GeneralSettingsViewModel generalVm:
                     generalViewModel = generalVm;
                     generalSettingsToSave = generalVm.CurrentSettings;
+                    translationSettingsToSave = generalVm.CurrentTranslationSettings;
                     _logger?.LogInformation("GeneralSettings収集: UiLanguage={UiLanguage}, AutoStart={AutoStart}, MinimizeToTray={MinimizeToTray}",
                         generalSettingsToSave.UiLanguage ?? "(null)",
                         generalSettingsToSave.AutoStartWithWindows,
                         generalSettingsToSave.MinimizeToTray);
+                    _logger?.LogInformation("TranslationSettings収集: SourceLang={SourceLang}, TargetLang={TargetLang}, FontSize={FontSize}",
+                        translationSettingsToSave.DefaultSourceLanguage,
+                        translationSettingsToSave.DefaultTargetLanguage,
+                        translationSettingsToSave.OverlayFontSize);
                     break;
                     // 他のViewModelも必要に応じて追加
             }
@@ -441,6 +450,21 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
             else
             {
                 _logger?.LogWarning("保存する一般設定がありません（generalSettingsToSave is null）");
+            }
+
+            // 翻訳設定を保存（翻訳言語・フォントサイズ）
+            if (translationSettingsToSave != null)
+            {
+                _logger?.LogInformation("翻訳設定を保存中: SourceLang={SourceLang}, TargetLang={TargetLang}, FontSize={FontSize}",
+                    translationSettingsToSave.DefaultSourceLanguage,
+                    translationSettingsToSave.DefaultTargetLanguage,
+                    translationSettingsToSave.OverlayFontSize);
+                await _settingsService.SaveAsync(translationSettingsToSave).ConfigureAwait(false);
+                _logger?.LogInformation("翻訳設定を保存しました");
+            }
+            else
+            {
+                _logger?.LogWarning("保存する翻訳設定がありません（translationSettingsToSave is null）");
             }
 
             // 設定をファイルに永続化
