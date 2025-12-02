@@ -7,6 +7,7 @@ namespace Baketa.Infrastructure.OCR.GPU.Providers;
 /// Execution Provider Factory 拡張メソッド
 /// Core層のインターフェースからInfrastructure層のSessionOptions作成
 /// Phase 4: Clean Architecture準拠の実装分離
+/// Issue #181: ONNX Runtime プロバイダー固有メソッド対応
 /// </summary>
 public static class ExecutionProviderExtensions
 {
@@ -26,17 +27,10 @@ public static class ExecutionProviderExtensions
             // プロバイダー設定を取得
             var providerOptions = factory.GetProviderOptions(environment);
 
-            // ONNX Runtime制限対応: 一部プロバイダーは直接追加できない
-            if (CanAppendDirectly(factory.Type))
-            {
-                var providerName = GetOnnxProviderName(factory.Type);
-                sessionOptions.AppendExecutionProvider(providerName, providerOptions);
-            }
-            else
-            {
-                // OpenVINO等の場合は基本設定のみ適用
-                ApplyProviderSpecificSettings(sessionOptions, factory.Type, providerOptions);
-            }
+            // Issue #181: ONNX Runtime プロバイダー固有メソッドを使用
+            // AppendExecutionProvider() は QNN, SNPE, XNNPACK, AZURE のみ対応
+            // DirectML, CUDA, CPU は専用メソッドを使用する必要がある
+            AppendExecutionProviderByType(sessionOptions, factory.Type, providerOptions, environment);
 
             // 共通最適化設定
             ApplyCommonOptimizations(sessionOptions, factory.Type, environment);
@@ -51,20 +45,69 @@ public static class ExecutionProviderExtensions
     }
 
     /// <summary>
-    /// ExecutionProviderタイプからONNX Runtime用プロバイダー名に変換
+    /// プロバイダータイプに応じた専用メソッドで実行プロバイダーを追加
+    /// Issue #181: ONNX Runtime 1.x 互換性対応
     /// </summary>
-    private static string GetOnnxProviderName(ExecutionProvider providerType)
+    private static void AppendExecutionProviderByType(
+        SessionOptions sessionOptions,
+        ExecutionProvider providerType,
+        Dictionary<string, string> providerOptions,
+        GpuEnvironmentInfo environment)
     {
-        return providerType switch
+        switch (providerType)
         {
-            ExecutionProvider.CPU => "CPUExecutionProvider",
-            ExecutionProvider.CUDA => "CUDAExecutionProvider",
-            ExecutionProvider.DirectML => "DmlExecutionProvider",
-            ExecutionProvider.TensorRT => "TensorrtExecutionProvider",
-            ExecutionProvider.OpenVINO => "OpenVINOExecutionProvider",
-            ExecutionProvider.OpenCL => "OpenCLExecutionProvider",
-            _ => throw new ArgumentException($"Unsupported provider type: {providerType}")
-        };
+            case ExecutionProvider.DirectML:
+                // DirectML専用メソッド（デバイスID指定）
+                var dmlDeviceId = 0;
+                if (providerOptions.TryGetValue("device_id", out var dmlDeviceIdStr) &&
+                    int.TryParse(dmlDeviceIdStr, out var parsedDmlDeviceId))
+                {
+                    dmlDeviceId = parsedDmlDeviceId;
+                }
+                sessionOptions.AppendExecutionProvider_DML(dmlDeviceId);
+                Console.WriteLine($"✅ [Issue #181] DirectML プロバイダー追加 (DeviceId: {dmlDeviceId})");
+                break;
+
+            case ExecutionProvider.CUDA:
+                // CUDA専用メソッド（デバイスID指定）
+                var cudaDeviceId = 0;
+                if (providerOptions.TryGetValue("device_id", out var cudaDeviceIdStr) &&
+                    int.TryParse(cudaDeviceIdStr, out var parsedCudaDeviceId))
+                {
+                    cudaDeviceId = parsedCudaDeviceId;
+                }
+                sessionOptions.AppendExecutionProvider_CUDA(cudaDeviceId);
+                Console.WriteLine($"✅ [Issue #181] CUDA プロバイダー追加 (DeviceId: {cudaDeviceId})");
+                break;
+
+            case ExecutionProvider.TensorRT:
+                // TensorRT専用メソッド（デバイスID指定）
+                var trtDeviceId = 0;
+                if (providerOptions.TryGetValue("device_id", out var trtDeviceIdStr) &&
+                    int.TryParse(trtDeviceIdStr, out var parsedTrtDeviceId))
+                {
+                    trtDeviceId = parsedTrtDeviceId;
+                }
+                sessionOptions.AppendExecutionProvider_Tensorrt(trtDeviceId);
+                Console.WriteLine($"✅ [Issue #181] TensorRT プロバイダー追加 (DeviceId: {trtDeviceId})");
+                break;
+
+            case ExecutionProvider.CPU:
+                // CPUはデフォルトで含まれるため追加不要
+                // ただしスレッド数等の設定は ApplyCommonOptimizations で適用
+                Console.WriteLine("✅ [Issue #181] CPU プロバイダー使用（デフォルト）");
+                break;
+
+            case ExecutionProvider.OpenVINO:
+            case ExecutionProvider.OpenCL:
+                // これらは実行環境依存のため基本設定のみ適用
+                ApplyProviderSpecificSettings(sessionOptions, providerType, providerOptions);
+                Console.WriteLine($"⚠️ [Issue #181] {providerType} プロバイダー: 基本設定のみ適用");
+                break;
+
+            default:
+                throw new NotSupportedException($"Unsupported execution provider: {providerType}");
+        }
     }
 
     /// <summary>
@@ -98,25 +141,7 @@ public static class ExecutionProviderExtensions
     }
 
     /// <summary>
-    /// ONNX Runtime AppendExecutionProviderで直接追加可能かどうか判定
-    /// 制限: OpenVINO等は実行時環境に依存するため直接追加できない場合がある
-    /// </summary>
-    private static bool CanAppendDirectly(ExecutionProvider providerType)
-    {
-        return providerType switch
-        {
-            ExecutionProvider.CPU => true,
-            ExecutionProvider.CUDA => true,
-            ExecutionProvider.DirectML => true,
-            ExecutionProvider.TensorRT => true,
-            ExecutionProvider.OpenVINO => false, // 実行環境依存
-            ExecutionProvider.OpenCL => false,   // 実行環境依存
-            _ => false
-        };
-    }
-
-    /// <summary>
-    /// プロバイダー固有設定を適用（直接追加できない場合）
+    /// プロバイダー固有設定を適用（OpenVINO/OpenCL用）
     /// </summary>
     private static void ApplyProviderSpecificSettings(SessionOptions sessionOptions, ExecutionProvider providerType, Dictionary<string, string> providerOptions)
     {

@@ -304,23 +304,27 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
 
             // 実際の設定データを読み込み（テスト環境では同期処理を回避）
             GeneralSettings settings;
+            TranslationSettings translationSettings;
             try
             {
                 if (IsTestEnvironment())
                 {
                     settings = new GeneralSettings(); // テスト環境ではデフォルト設定を使用
+                    translationSettings = new TranslationSettings();
                 }
                 else
                 {
                     settings = _settingsService.GetAsync<GeneralSettings>().GetAwaiter().GetResult() ?? new GeneralSettings();
+                    translationSettings = _settingsService.GetAsync<TranslationSettings>().GetAwaiter().GetResult() ?? new TranslationSettings();
                 }
             }
             catch (Exception settingsEx)
             {
                 _logger?.LogWarning(settingsEx, "一般設定の読み込みに失敗しました。デフォルト設定を使用します");
                 settings = new GeneralSettings();
+                translationSettings = new TranslationSettings();
             }
-            var viewModel = new GeneralSettingsViewModel(settings, _eventAggregator, localizationService: _localizationService, changeTracker: _changeTracker, logger: _logger as ILogger<GeneralSettingsViewModel>);
+            var viewModel = new GeneralSettingsViewModel(settings, _eventAggregator, localizationService: _localizationService, changeTracker: _changeTracker, logger: _logger as ILogger<GeneralSettingsViewModel>, translationSettings: translationSettings);
 
             _settingsViewModels["general"] = viewModel;
             return new GeneralSettingsView(viewModel);
@@ -632,6 +636,8 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
             {
                 generalSettingsViewModel = general;
                 saveTasks.Add(_settingsService.SaveAsync(general.CurrentSettings));
+                // 翻訳言語とフォントサイズも保存
+                saveTasks.Add(_settingsService.SaveAsync(general.CurrentTranslationSettings));
             }
 
             if (_settingsViewModels.TryGetValue("appearance", out var themeVm) && themeVm is ThemeSettingsViewModel theme)

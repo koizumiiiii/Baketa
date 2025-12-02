@@ -1415,5 +1415,11 @@ internal sealed class Program
         var unifiedGpuModule = new Baketa.Infrastructure.DI.UnifiedGpuModule();
         unifiedGpuModule.RegisterServices(services);
         Console.WriteLine("✅ Phase4: UnifiedGpuModule登録完了");
+
+        // Issue #181: ONNX OCRエンジンモジュールの登録
+        Console.WriteLine("🚀 OnnxOcrModule登録開始");
+        var onnxOcrModule = new Baketa.Infrastructure.DI.OnnxOcrModule();
+        onnxOcrModule.RegisterServices(services);
+        Console.WriteLine("✅ OnnxOcrModule登録完了");
     }
 }

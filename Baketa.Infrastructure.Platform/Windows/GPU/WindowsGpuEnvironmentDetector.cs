@@ -161,21 +161,27 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
         {
             // D3D11CreateDevice を使用してフィーチャーレベル検出
             var featureLevel = NativeMethods.GetDirectXFeatureLevel();
+            _logger.LogDebug("DirectX Feature Level raw value: 0x{FeatureLevel:X}", featureLevel);
+
+            // Issue #181: D3D_FEATURE_LEVEL 定数マッピング
+            // https://docs.microsoft.com/en-us/windows/win32/api/d3dcommon/ne-d3dcommon-d3d_feature_level
             return featureLevel switch
             {
-                0xc100 => DirectXFeatureLevel.D3D122,
-                0xc000 => DirectXFeatureLevel.D3D121,
-                0xb100 => DirectXFeatureLevel.D3D120,
-                0xb000 => DirectXFeatureLevel.D3D111,
-                0xa100 => DirectXFeatureLevel.D3D111,
-                0xa000 => DirectXFeatureLevel.D3D110,
+                0xc200 => DirectXFeatureLevel.D3D122, // D3D_FEATURE_LEVEL_12_2
+                0xc100 => DirectXFeatureLevel.D3D122, // D3D_FEATURE_LEVEL_12_1 (RTX 4070対応)
+                0xc000 => DirectXFeatureLevel.D3D121, // D3D_FEATURE_LEVEL_12_0
+                0xb100 => DirectXFeatureLevel.D3D120, // D3D_FEATURE_LEVEL_11_1
+                0xb000 => DirectXFeatureLevel.D3D111, // D3D_FEATURE_LEVEL_11_0
+                0xa100 => DirectXFeatureLevel.D3D111, // D3D_FEATURE_LEVEL_10_1
+                0xa000 => DirectXFeatureLevel.D3D110, // D3D_FEATURE_LEVEL_10_0
+                _ when featureLevel >= 0xb000 => DirectXFeatureLevel.D3D111, // 11.0以上ならOK
                 _ => DirectXFeatureLevel.Unknown
             };
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "DirectXフィーチャーレベル検出失敗");
-            return DirectXFeatureLevel.D3D110; // 安全なフォールバック
+            return DirectXFeatureLevel.D3D111; // Issue #181: DirectML最低要件を満たすフォールバック
         }
     }
 
@@ -368,10 +374,19 @@ internal static class NativeMethods
     {
         try
         {
+            // Issue #181 Fix: driverType=1 (D3D_DRIVER_TYPE_HARDWARE) を使用
+            // driverType=0 (UNKNOWN) だとpAdapter=null時に失敗する
             var hr = D3D11CreateDevice(
-                IntPtr.Zero, 0, IntPtr.Zero, 0,
-                IntPtr.Zero, 0, 7,
-                out var device, out var featureLevel, out var context);
+                IntPtr.Zero,
+                1,  // D3D_DRIVER_TYPE_HARDWARE
+                IntPtr.Zero,
+                0,
+                IntPtr.Zero,
+                0,
+                7,  // D3D11_SDK_VERSION
+                out var device,
+                out var featureLevel,
+                out var context);
 
             if (hr >= 0)
             {
@@ -387,6 +402,7 @@ internal static class NativeMethods
             // 失敗時は安全な値を返す
         }
 
-        return 0xa000; // D3D_FEATURE_LEVEL_10_0 フォールバック
+        // Issue #181: フォールバックをD3D11.1に変更（DirectML最低要件）
+        return 0xb000; // D3D_FEATURE_LEVEL_11_0
     }
 }

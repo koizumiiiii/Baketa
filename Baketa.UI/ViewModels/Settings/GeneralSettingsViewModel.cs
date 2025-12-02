@@ -23,6 +23,7 @@ namespace Baketa.UI.ViewModels.Settings;
 public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 {
     private readonly GeneralSettings _originalSettings;
+    private readonly TranslationSettings _originalTranslationSettings;
     private readonly ILogger<GeneralSettingsViewModel>? _logger;
     private readonly ILocalizationService? _localizationService;
     private readonly ISettingsChangeTracker? _changeTracker;
@@ -62,20 +63,24 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// <param name="localizationService">ローカライゼーションサービス（オプション）</param>
     /// <param name="changeTracker">設定変更追跡サービス（オプション）</param>
     /// <param name="logger">ロガー（オプション）</param>
+    /// <param name="translationSettings">翻訳設定データ（オプション）</param>
     public GeneralSettingsViewModel(
         GeneralSettings settings,
         IEventAggregator eventAggregator,
         ILocalizationService? localizationService = null,
         ISettingsChangeTracker? changeTracker = null,
-        ILogger<GeneralSettingsViewModel>? logger = null) : base(eventAggregator)
+        ILogger<GeneralSettingsViewModel>? logger = null,
+        TranslationSettings? translationSettings = null) : base(eventAggregator)
     {
         _originalSettings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _originalTranslationSettings = translationSettings ?? new TranslationSettings();
         _logger = logger;
         _localizationService = localizationService;
         _changeTracker = changeTracker;
 
         // 初期化
         InitializeFromSettings(settings);
+        InitializeFromTranslationSettings(_originalTranslationSettings);
 
         // 変更追跡の設定
         SetupChangeTracking();
@@ -407,6 +412,17 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
+    /// 翻訳設定データから初期化
+    /// </summary>
+    private void InitializeFromTranslationSettings(TranslationSettings settings)
+    {
+        // 翻訳言語の復元（NLLB形式 ja/en から表示名に変換）
+        _sourceLanguage = settings.DefaultSourceLanguage == "ja" ? "Japanese" : "English";
+        _targetLanguage = settings.DefaultTargetLanguage == "ja" ? "Japanese" : "English";
+        _fontSize = settings.OverlayFontSize;
+    }
+
+    /// <summary>
     /// 変更追跡を設定
     /// </summary>
     private void SetupChangeTracking()
@@ -682,6 +698,23 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         ActiveGameProfile = _activeGameProfile,
         UiLanguage = SelectedUiLanguage?.Code
     };
+
+    /// <summary>
+    /// 現在の翻訳設定データを取得
+    /// 元の設定をクローンして変更分を適用
+    /// </summary>
+    public TranslationSettings CurrentTranslationSettings
+    {
+        get
+        {
+            var settings = _originalTranslationSettings.Clone();
+            // 表示名からNLLB形式に変換
+            settings.DefaultSourceLanguage = SourceLanguage == "Japanese" ? "ja" : "en";
+            settings.DefaultTargetLanguage = TargetLanguage == "Japanese" ? "ja" : "en";
+            settings.OverlayFontSize = FontSize;
+            return settings;
+        }
+    }
 
     /// <summary>
     /// 設定データを更新

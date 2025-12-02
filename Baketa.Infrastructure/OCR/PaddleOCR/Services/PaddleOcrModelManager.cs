@@ -49,32 +49,21 @@ public sealed class PaddleOcrModelManager : IPaddleOcrModelManager
         {
             _logger?.LogInformation("🧠 UltraThink: PaddleOCRモデル段階的検証開始 - 言語: {Language}", language);
 
-            // Phase 1: 最も安全とされるEnglishV3で初期検証
-            _logger?.LogInformation("🔍 Phase 1: EnglishV3モデルでの安全性検証");
+            // PP-OCRv5 多言語統合モデルを使用（V3/V4は廃止）
+            _logger?.LogInformation("🔍 PP-OCRv5多言語モデルの取得");
             try
             {
-                var testModel = LocalFullModels.EnglishV3;
-                if (testModel != null)
+                // ChineseV5 は日本語・英語・中国語すべてに対応する多言語モデル
+                var v5Model = LocalFullModels.ChineseV5;
+                if (v5Model != null)
                 {
-                    _logger?.LogInformation("✅ EnglishV3モデル取得成功 - 基本的なPaddleOCR動作確認済み");
-
-                    // Phase 2: 言語別の最適化されたモデル選択
-                    _logger?.LogInformation("🔍 Phase 2: 言語別最適モデル選択");
-                    var selectedModel = language.ToLowerInvariant() switch
-                    {
-                        "jpn" or "ja" => LocalFullModels.JapanV4 ?? testModel,
-                        "eng" or "en" => LocalFullModels.EnglishV4 ?? testModel,
-                        "chs" or "zh" or "chi" => LocalFullModels.ChineseV4 ?? testModel,
-                        _ => testModel
-                    };
-
-                    _logger?.LogInformation("🎯 選択モデル確定: {Language} → {ModelType}", language, selectedModel?.GetType().Name ?? "null");
-                    return await Task.FromResult(selectedModel).ConfigureAwait(false);
+                    _logger?.LogInformation("✅ PP-OCRv5多言語モデル取得成功 - 言語: {Language}", language);
+                    return await Task.FromResult(v5Model).ConfigureAwait(false);
                 }
             }
             catch (Exception modelEx)
             {
-                _logger?.LogError(modelEx, "❌ Phase 1: EnglishV3モデル検証失敗 - より安全な手法に切り替え");
+                _logger?.LogError(modelEx, "❌ PP-OCRv5モデル取得失敗");
             }
 
             // Phase 3: 完全フォールバック - OCR無効化で安定性優先
@@ -136,38 +125,10 @@ public sealed class PaddleOcrModelManager : IPaddleOcrModelManager
     {
         try
         {
-            var model = language.ToLowerInvariant() switch
-            {
-                "jpn" or "ja" => LocalFullModels.JapanV4,
-                "eng" or "en" => LocalFullModels.EnglishV4,
-                "chs" or "zh" or "chi" => LocalFullModels.ChineseV4,
-                _ => LocalFullModels.EnglishV4
-            };
+            // PP-OCRv5 多言語統合モデルを使用（全言語で同じモデル）
+            var model = LocalFullModels.ChineseV5;
 
-            _logger?.LogDebug("🔍 デフォルトモデル取得: {Language} → {ModelType}", language, model?.GetType().Name ?? "null");
-
-            // モデルの詳細情報をログ出力
-            if (model != null)
-            {
-                try
-                {
-                    var modelType = model.GetType();
-                    _logger?.LogDebug("🔍 モデル詳細: {ModelType}", modelType.Name);
-                    foreach (var prop in modelType.GetProperties().Where(p => p.CanRead))
-                    {
-                        try
-                        {
-                            var value = prop.GetValue(model);
-                            _logger?.LogTrace("   {PropertyName}: {Value}", prop.Name, value);
-                        }
-                        catch { /* プロパティ取得エラーは無視 */ }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "モデル詳細取得エラー");
-                }
-            }
+            _logger?.LogDebug("🔍 PP-OCRv5モデル取得: {Language} → ChineseV5 (多言語対応)", language);
 
             return model;
         }

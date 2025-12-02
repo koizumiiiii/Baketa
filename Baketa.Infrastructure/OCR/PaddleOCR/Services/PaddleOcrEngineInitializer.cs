@@ -4,11 +4,13 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
+using Sdcb.PaddleInference;
 using Sdcb.PaddleOCR;
 using Sdcb.PaddleOCR.Models;
 
@@ -21,19 +23,33 @@ namespace Baketa.Infrastructure.OCR.PaddleOCR.Services;
 public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, IDisposable
 {
     private readonly IPaddleOcrUtilities _utilities;
+    private readonly IGpuEnvironmentDetector? _gpuDetector;
     private readonly ILogger<PaddleOcrEngineInitializer>? _logger;
 
     private PaddleOcrAll? _ocrEngine;
     private QueuedPaddleOcrAll? _queuedEngine;
     private readonly object _lockObject = new();
 
+    // Issue #181: GPU/CPU自動切り替え状態
+    private bool _isUsingGpu;
+#pragma warning disable IDE0044 // GPU検出後に設定されるため読み取り専用にできない
+    private GpuEnvironmentInfo? _cachedGpuInfo;
+#pragma warning restore IDE0044
+
+    /// <summary>
+    /// GPUモードで動作中かどうか
+    /// </summary>
+    public bool IsUsingGpu => _isUsingGpu;
+
     public PaddleOcrEngineInitializer(
         IPaddleOcrUtilities utilities,
+        IGpuEnvironmentDetector? gpuDetector = null,
         ILogger<PaddleOcrEngineInitializer>? logger = null)
     {
         _utilities = utilities ?? throw new ArgumentNullException(nameof(utilities));
+        _gpuDetector = gpuDetector;
         _logger = logger;
-        _logger?.LogInformation("🚀 PaddleOcrEngineInitializer初期化完了");
+        _logger?.LogInformation("🚀 PaddleOcrEngineInitializer初期化完了 (GPU検出: {GpuDetectorAvailable})", gpuDetector != null);
     }
 
     /// <summary>
@@ -111,53 +127,24 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
             {
                 try
                 {
+                    // 🔥 [Issue #181] GPU/CPU自動切り替え対応
+                    // GPU環境を事前検出（ファクトリー内では非同期不可のため）
+                    var useGpu = await DetectAndCacheGpuEnvironmentAsync(settings, combinedCts.Token).ConfigureAwait(false);
+
                     // 🔥 [P1-B-FIX_PHASE1] QueuedPaddleOcrAll作成（スレッドセーフ保証）
                     // Gemini推奨: 各ワーカーが独立したPaddleOcrAllインスタンスを持つ
-                    // 🚀 [P1-B-FIX_PHASE3] consumerCount=4: Phase2検証完了後の並列度最適化（2→4）
                     lock (_lockObject)
                     {
                         _queuedEngine = new QueuedPaddleOcrAll(
-                            factory: () =>
-                            {
-                                // 🔧 [MKL_FIX] CPU専用設定 - GPU初期化エラー回避
-                                // Sdcb.PaddleInference.runtime.win64.mkl パッケージはCPU専用のため
-                                // デフォルトコンストラクタを使用（暗黙的にCPUモード）
-                                // TODO: Issue #181 - GPU対応時にPaddleDevice.Gpu()を使用し、
-                                //       NuGetパッケージをSdcb.PaddleInference.runtime.win64.cuda.cudnnに変更
-                                var engine = new PaddleOcrAll(models)
-                                {
-                                    AllowRotateDetection = true, // ✅ [PHASE10.26_REVERT] commit 09e1fc3の正常動作設定に戻す - false設定が原因で検出激減（8→1個）
-                                    Enable180Classification = false // 🛡️ [CRASH_FIX] AccessViolationException回避
-                                };
-
-                                // 🔥 [PHASE10.26_DEBUG_A] 設定確認ログ
-                                Console.WriteLine($"🔥 [DEBUG_A] PaddleOcrAll作成直後: AllowRotateDetection={engine.AllowRotateDetection}");
-                                _logger?.LogDebug("🔥 [DEBUG_A] PaddleOcrAll作成直後: AllowRotateDetection={AllowRotateDetection}", engine.AllowRotateDetection);
-
-                                // 🔥 [PHASE13.2.2_FIX] 各ワーカーインスタンスに検出最適化適用
-                                try
-                                {
-                                    ApplyDetectionOptimization(engine);
-                                    _logger?.LogDebug("✅ [P1-B-FIX] ワーカーインスタンスに検出最適化適用完了");
-                                }
-                                catch (Exception optEx)
-                                {
-                                    _logger?.LogWarning(optEx, "⚠️ ワーカーインスタンス最適化で警告（処理継続）");
-                                }
-
-                                // 🔥 [PHASE10.26_DEBUG_A] 最終確認ログ
-                                Console.WriteLine($"🔥 [DEBUG_A] factory return直前: AllowRotateDetection={engine.AllowRotateDetection}");
-                                _logger?.LogDebug("🔥 [DEBUG_A] factory return直前: AllowRotateDetection={AllowRotateDetection}", engine.AllowRotateDetection);
-
-                                return engine;
-                            },
+                            factory: () => CreatePaddleOcrEngine(models, useGpu),
                             consumerCount: 1,  // 🔧 [SEH_FIX] 暫定的に1ワーカーで初期化（複数インスタンスでSEHException発生）
                             boundedCapacity: settings.QueuedOcrBoundedCapacity // 🔥 [P4-B_FIX] 設定外部化（appsettings.json対応）
                         );
 
-                        _logger?.LogInformation("✅ [SEH_FIX] QueuedPaddleOcrAll初期化完了 - consumerCount: 1 (暫定), boundedCapacity: {BoundedCapacity}",
-                            settings.QueuedOcrBoundedCapacity);
-                        Console.WriteLine($"✅ [SEH_FIX] QueuedPaddleOcrAll初期化完了 - consumerCount: 1 (暫定), boundedCapacity: {settings.QueuedOcrBoundedCapacity}");
+                        _isUsingGpu = useGpu;
+                        _logger?.LogInformation("✅ [Issue #181] QueuedPaddleOcrAll初期化完了 - GPU: {UseGpu}, consumerCount: 1, boundedCapacity: {BoundedCapacity}",
+                            useGpu, settings.QueuedOcrBoundedCapacity);
+                        Console.WriteLine($"✅ [Issue #181] QueuedPaddleOcrAll初期化完了 - GPU: {useGpu}, consumerCount: 1, boundedCapacity: {settings.QueuedOcrBoundedCapacity}");
                     }
 
                     _logger?.LogDebug("✅ [P4-B_FIX] QueuedPaddleOcrAll作成完了 - ワーカー数: {ConsumerCount}（設定値）", settings.QueuedOcrConsumerCount);
@@ -309,6 +296,164 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
             _logger?.LogError(ex, "❌ OCRエンジン再初期化中にエラーが発生");
         }
     }
+
+    #region Issue #181: GPU/CPU自動切り替え実装
+
+    /// <summary>
+    /// GPU環境を検出しキャッシュ
+    /// </summary>
+    private async Task<bool> DetectAndCacheGpuEnvironmentAsync(OcrEngineSettings settings, CancellationToken cancellationToken)
+    {
+        // 設定でGPU無効化されている場合はCPUを使用
+        if (!settings.UseGpu)
+        {
+            _logger?.LogInformation("🔧 [Issue #181] GPU無効化設定検出 - CPUモードを使用");
+            return false;
+        }
+
+#if !ENABLE_GPU_SUPPORT
+        // GPUランタイムパッケージが含まれていない場合はCPUを使用
+        _logger?.LogInformation("🔧 [Issue #181] GPUランタイム未インストール - CPUモードを使用（-p:EnableGpuSupport=true でビルドしてください）");
+        return false;
+#else
+        // GPU検出器がない場合はCPUを使用
+        if (_gpuDetector == null)
+        {
+            _logger?.LogInformation("🔧 [Issue #181] GPU検出器未登録 - CPUモードを使用");
+            return false;
+        }
+
+        try
+        {
+            // GPU環境を検出
+            _cachedGpuInfo = await _gpuDetector.DetectEnvironmentAsync(cancellationToken).ConfigureAwait(false);
+
+            // CUDA対応のNVIDIA GPUが必要
+            if (!_cachedGpuInfo.SupportsCuda)
+            {
+                _logger?.LogInformation("🔧 [Issue #181] CUDAサポートなし ({GpuName}) - CPUモードを使用", _cachedGpuInfo.GpuName);
+                return false;
+            }
+
+            // 最低VRAM要件チェック (2GB以上推奨)
+            const long MinimumVramMB = 2048;
+            if (_cachedGpuInfo.AvailableMemoryMB < MinimumVramMB)
+            {
+                _logger?.LogWarning("⚠️ [Issue #181] VRAM不足 ({AvailableVram}MB < {RequiredVram}MB) - CPUモードにフォールバック",
+                    _cachedGpuInfo.AvailableMemoryMB, MinimumVramMB);
+                return false;
+            }
+
+            _logger?.LogInformation("✅ [Issue #181] GPU検出成功 - {GpuName} (VRAM: {VramMB}MB, Compute: {Compute})",
+                _cachedGpuInfo.GpuName, _cachedGpuInfo.AvailableMemoryMB, _cachedGpuInfo.ComputeCapability);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "⚠️ [Issue #181] GPU検出エラー - CPUモードにフォールバック");
+            return false;
+        }
+#endif
+    }
+
+    /// <summary>
+    /// PaddleOcrAllエンジンを作成（GPU/CPUフォールバック付き）
+    /// </summary>
+    /// <remarks>
+    /// Geminiレビュー推奨: メソッド分割による可読性向上
+    /// </remarks>
+    private PaddleOcrAll CreatePaddleOcrEngine(FullOcrModel models, bool useGpu)
+    {
+        // Step 1: GPU/CPU エンジン作成
+        var engine = useGpu ? TryCreateGpuEngine(models) : null;
+        engine ??= CreateCpuEngine(models);
+
+        // Step 2: デバッグログ出力
+        LogEngineCreation(engine, useGpu);
+
+        // Step 3: 検出最適化適用
+        ApplyDetectionOptimizationSafe(engine);
+
+        return engine;
+    }
+
+#if ENABLE_GPU_SUPPORT
+    /// <summary>
+    /// GPUエンジン作成を試行（失敗時はnullを返す）
+    /// </summary>
+    private PaddleOcrAll? TryCreateGpuEngine(FullOcrModel models)
+    {
+        try
+        {
+            _logger?.LogInformation("🚀 [Issue #181] GPUモードでPaddleOcrAll初期化中...");
+
+            var engine = new PaddleOcrAll(models, PaddleDevice.Gpu())
+            {
+                AllowRotateDetection = true,
+                Enable180Classification = false
+            };
+
+            _logger?.LogInformation("✅ [Issue #181] GPUモード初期化成功");
+            return engine;
+        }
+        catch (Exception gpuEx)
+        {
+            _logger?.LogWarning(gpuEx, "⚠️ [Issue #181] GPU初期化失敗 - CPUモードにフォールバック");
+            _isUsingGpu = false;
+            return null;
+        }
+    }
+#else
+    /// <summary>
+    /// GPUエンジン作成（GPUサポート無効時はnullを返す）
+    /// </summary>
+    private PaddleOcrAll? TryCreateGpuEngine(FullOcrModel models) => null;
+#endif
+
+    /// <summary>
+    /// CPUエンジンを作成
+    /// </summary>
+    private PaddleOcrAll CreateCpuEngine(FullOcrModel models)
+    {
+        _logger?.LogInformation("🔧 [Issue #181] CPUモードでPaddleOcrAll初期化中...");
+
+        var engine = new PaddleOcrAll(models)
+        {
+            AllowRotateDetection = true,
+            Enable180Classification = false
+        };
+
+        _logger?.LogInformation("✅ [Issue #181] CPUモード初期化成功");
+        return engine;
+    }
+
+    /// <summary>
+    /// エンジン作成完了ログ出力
+    /// </summary>
+    private void LogEngineCreation(PaddleOcrAll engine, bool useGpu)
+    {
+        Console.WriteLine($"🔥 [DEBUG_A] PaddleOcrAll作成直後: AllowRotateDetection={engine.AllowRotateDetection}, GPU={useGpu}");
+        _logger?.LogDebug("🔥 [DEBUG_A] PaddleOcrAll作成直後: AllowRotateDetection={AllowRotateDetection}, GPU={UseGpu}",
+            engine.AllowRotateDetection, useGpu);
+    }
+
+    /// <summary>
+    /// 検出最適化を安全に適用（例外は警告ログのみ）
+    /// </summary>
+    private void ApplyDetectionOptimizationSafe(PaddleOcrAll engine)
+    {
+        try
+        {
+            ApplyDetectionOptimization(engine);
+            _logger?.LogDebug("✅ [P1-B-FIX] ワーカーインスタンスに検出最適化適用完了");
+        }
+        catch (Exception optEx)
+        {
+            _logger?.LogWarning(optEx, "⚠️ ワーカーインスタンス最適化で警告（処理継続）");
+        }
+    }
+
+    #endregion
 
     #region 内部実装メソッド
 

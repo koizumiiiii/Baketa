@@ -198,9 +198,9 @@ public sealed class PaddleOcrInitializer : IDisposable
         try
         {
             // PaddleOCRライブラリのロード確認 - 簡素化
-            // PaddleDeviceの代わりにモデルアクセスで確認
-            var testModel = Sdcb.PaddleOCR.Models.Local.LocalFullModels.EnglishV3;
-            _logger?.LogDebug("PaddleOCRライブラリの依存関係検証完了 - モデルアクセス成功");
+            // PP-OCRv5多言語モデル（日本語・英語・中国語対応）でアクセス確認
+            var testModel = Sdcb.PaddleOCR.Models.Local.LocalFullModels.ChineseV5;
+            _logger?.LogDebug("PaddleOCRライブラリの依存関係検証完了 - PP-OCRv5モデルアクセス成功");
         }
         catch (Exception ex)
         {
