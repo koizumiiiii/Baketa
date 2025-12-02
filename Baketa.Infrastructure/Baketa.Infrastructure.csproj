@@ -48,9 +48,9 @@
 		
 		<!-- OpenCV Sharp パッケージ - 重要: PaddleOCRで使用 -->
 		
-		<!-- ONNX Runtime パッケージ -->
-		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.1" />
-		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.17.1" />
+		<!-- Issue #181: ONNX Runtime DirectML版のみ使用（CPUフォールバック含む） -->
+		<!-- 注意: Microsoft.ML.OnnxRuntime, Microsoft.ML.OnnxRuntime.Gpu は削除済み -->
+		<!-- DirectML版には CPU, DirectML, (CUDA未含) のプロバイダが含まれる -->
 		<PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
 		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
 		<PackageReference Include="Sdcb.PaddleInference" Version="3.0.1" />
