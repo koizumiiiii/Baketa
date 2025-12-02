@@ -237,16 +237,18 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
 
         try
         {
-            _logger.LogDebug("[L3_STEP] Task.WhenAll実行直前. ThreadId: {ThreadId}", Environment.CurrentManagedThreadId);
-            // 🔧 [PHASE3.1] 各リクエストを並行実行（Task.WhenAll）
-            // Note: GrpcTranslationClientにTranslateBatchAsyncメソッドが実装されたら切り替え
-            var tasks = requests.Select(request => TranslateAsync(request, cancellationToken));
-            var responses = await Task.WhenAll(tasks).ConfigureAwait(false);
-            _logger.LogDebug("[L3_STEP] Task.WhenAll完了 - 結果数: {ResponseCount}. ThreadId: {ThreadId}", responses?.Length ?? 0, Environment.CurrentManagedThreadId);
+            // 🔧 [Issue #182] gRPCネイティブバッチ翻訳呼び出し
+            // Task.WhenAllによる個別リクエスト並行実行ではなく、TranslateBatch RPCを直接呼び出し
+            // これにより、リクエスト順序とレスポンス順序の対応が保証される
+            _logger.LogDebug("[L3_STEP] クライアントバッチ翻訳呼び出し直前. ThreadId: {ThreadId}", Environment.CurrentManagedThreadId);
 
-            // 🔥 [PHASE3.1_DEBUG] 翻訳結果ログ
-            Console.WriteLine($"🔥 [GrpcAdapter] TranslateBatchAsync完了 - 成功: {responses.Count(r => r.IsSuccess)}/{responses.Length}");
-            for (int i = 0; i < responses.Length; i++)
+            var responses = await _client.TranslateBatchAsync(requests, cancellationToken).ConfigureAwait(false);
+
+            _logger.LogDebug("[L3_STEP] クライアントバッチ翻訳完了 - 結果数: {ResponseCount}. ThreadId: {ThreadId}", responses?.Count ?? 0, Environment.CurrentManagedThreadId);
+
+            // 🔥 [Issue #182_DEBUG] 翻訳結果ログ
+            Console.WriteLine($"🔥 [GrpcAdapter] TranslateBatchAsync完了 - 成功: {responses.Count(r => r.IsSuccess)}/{responses.Count}");
+            for (int i = 0; i < responses.Count; i++)
             {
                 Console.WriteLine($"🔥 [GrpcAdapter] Response[{i}]: IsSuccess={responses[i].IsSuccess}, TranslatedText='{responses[i].TranslatedText}'");
             }
@@ -254,10 +256,10 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
             _logger.LogDebug(
                 "[GrpcAdapter] Batch translation completed: {SuccessCount}/{TotalCount} successful",
                 responses.Count(r => r.IsSuccess),
-                responses.Length
+                responses.Count
             );
 
-            _logger.LogDebug("[L3_RETURN] 正常リターン - 結果数: {ResponseCount}. ThreadId: {ThreadId}", responses.Length, Environment.CurrentManagedThreadId);
+            _logger.LogDebug("[L3_RETURN] 正常リターン - 結果数: {ResponseCount}. ThreadId: {ThreadId}", responses.Count, Environment.CurrentManagedThreadId);
             return responses;
         }
         catch (Exception ex)

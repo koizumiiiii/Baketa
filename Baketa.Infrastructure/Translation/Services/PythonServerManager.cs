@@ -336,11 +336,18 @@ public class PythonServerManager(
         else
         {
             // 開発版でのみシステムPythonにフォールバック
-            logger.LogWarning("⚠️ .venv未検出（{VenvPath}）、同梱Python未検出（{VendorPath}）。システムPythonにフォールバック", venvPythonPath, vendorPythonPath);
+            // 注意: これは開発環境での正常な動作パスであり、警告ではなく情報ログとして出力
+            // .venvを使用する場合: プロジェクトルートで `python -m venv .venv` を実行し、
+            // `pip install -r requirements.txt` で依存関係をインストール
+            logger.LogInformation(
+                "ℹ️ .venv環境未検出 → システムPythonを使用します（開発環境）。" +
+                "専用環境を使用する場合: `python -m venv .venv` で作成してください。");
+            logger.LogDebug("  検索パス: .venv={VenvPath}, vendor={VendorPath}", venvPythonPath, vendorPythonPath);
+
             try
             {
                 pythonExecutable = await pythonResolver.ResolvePythonExecutableAsync();
-                logger.LogInformation("✅ システムPython実行環境解決（開発版フォールバック）: {PythonPath}", pythonExecutable);
+                logger.LogInformation("✅ システムPython使用: {PythonPath}", pythonExecutable);
             }
             catch (InvalidOperationException ex)
             {

@@ -42,8 +42,8 @@ public sealed class OnnxOcrEngine : IOcrEngine
     private static readonly float[] ImageNetStd = [0.229f, 0.224f, 0.225f];
 
     // === 認識モデル前処理定数 ===
-    /// <summary>認識モデルの入力高さ（固定）</summary>
-    private const int RecognitionTargetHeight = 32;
+    /// <summary>認識モデルの入力高さ（固定） - PP-OCRv5は48を使用</summary>
+    private const int RecognitionTargetHeight = 48;
 
     /// <summary>認識モデルの最大入力幅</summary>
     private const int RecognitionMaxWidth = 320;
