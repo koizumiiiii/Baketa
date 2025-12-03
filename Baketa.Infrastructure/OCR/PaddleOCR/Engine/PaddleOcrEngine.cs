@@ -2834,6 +2834,33 @@ public class PaddleOcrEngine : Baketa.Core.Abstractions.OCR.IOcrEngine
                         throw new InvalidOperationException("PaddleOCR実行前のメモリ安全性チェックで例外", safetyEx);
                     }
 
+                    // 🎯 [JAPANESE_OPTIMIZATION] PP-OCRv5日本語最適化前処理
+                    __logger?.LogInformation("🇯🇵 [PREPROCESS] PP-OCRv5日本語最適化前処理を適用中...");
+                    Console.WriteLine($"🇯🇵 [PREPROCESS] PP-OCRv5日本語最適化前処理を適用中... {DateTime.Now:HH:mm:ss.fff}");
+                    try
+                    {
+                        var preprocessedMat = PPOCRv5Preprocessor.ProcessGameImageForV5(reconstructedMat, "jpn");
+                        if (preprocessedMat != null && !preprocessedMat.Empty())
+                        {
+                            // 元のMatを解放し、前処理済みMatを使用
+                            reconstructedMat.Dispose();
+                            reconstructedMat = preprocessedMat;
+                            __logger?.LogInformation("✅ [PREPROCESS] 日本語最適化前処理完了 - JapaneseEnhancedモード適用済み");
+                            Console.WriteLine($"✅ [PREPROCESS] 日本語最適化前処理完了 - JapaneseEnhancedモード適用済み {DateTime.Now:HH:mm:ss.fff}");
+                        }
+                        else
+                        {
+                            __logger?.LogWarning("⚠️ [PREPROCESS] 前処理がnullまたは空を返却 - 元画像を使用");
+                            Console.WriteLine($"⚠️ [PREPROCESS] 前処理がnullまたは空を返却 - 元画像を使用 {DateTime.Now:HH:mm:ss.fff}");
+                            preprocessedMat?.Dispose();
+                        }
+                    }
+                    catch (Exception preprocessEx)
+                    {
+                        __logger?.LogWarning(preprocessEx, "⚠️ [PREPROCESS] 前処理でエラー発生 - 元画像を使用");
+                        Console.WriteLine($"⚠️ [PREPROCESS] 前処理でエラー発生: {preprocessEx.Message} {DateTime.Now:HH:mm:ss.fff}");
+                    }
+
                     // 🎯 [PADDLE_PREDICTOR_CRITICAL_FIX] PaddlePredictor run failed エラー対策
                     __logger?.LogDebug("🏃 [OCR_ENGINE] PaddleOCR.Run実行開始 - メモリ分離済みMat使用");
 

@@ -111,7 +111,16 @@ public sealed class PpOcrv5ModelConfiguration : IPpOcrv5ModelConfiguration
 
     public string GetDictionaryPath(string language)
     {
-        // HuggingFace構造: languages/{language}/dict.txt
+        // PP-OCRv5は5言語統合辞書（日本語ひらがな・カタカナ含む）を使用
+        // 従来のlanguages/{language}/dict.txtは中国語漢字のみで日本語文字が含まれない
+        var unifiedDictPath = Path.Combine(ModelsRootDirectory, "ppocrv5_dict.txt");
+        if (File.Exists(unifiedDictPath))
+        {
+            _logger?.LogDebug("PP-OCRv5統合辞書を使用: {Path}", unifiedDictPath);
+            return unifiedDictPath;
+        }
+
+        // フォールバック: 従来のHuggingFace構造
         var languageDir = GetLanguageDirectory(language);
         return Path.Combine(ModelsRootDirectory, LanguagesDirectory, languageDir, DictionaryFileName);
     }

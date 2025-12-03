@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
+using Baketa.Infrastructure.OCR.ONNX;
 using Baketa.Infrastructure.OCR.PaddleOCR.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -45,23 +46,28 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
         });
         */
 
-        // 🚀 Gemini推奨: デコレーターパターンによる正しいキャッシング実装
-        // 1. ベースとなるプール化サービスを具体的な型で登録
-        services.AddSingleton<PooledOcrService>();
-        Console.WriteLine("✅ PooledOcrServiceを具体的な型で登録完了");
+        // 🚀 [Issue #181] OnnxOcrEngineをベースとしたデコレーターパターン実装
+        // PP-OCRv5 ONNXモデル + 日本語対応辞書(ppocrv5_dict.txt)を使用
+        //
+        // 旧: PooledOcrService → ObjectPool<IOcrEngine> → PaddleOcrEngine (Sdcb.PaddleOCR/ChineseV5)
+        //     問題: 辞書が中国語のみで日本語ひらがな・カタカナを認識不可
+        //
+        // 新: OnnxOcrEngine (ONNX Runtime + PP-OCRv5モデル + 日本語対応辞書)
+        //     解決: ppocrv5_dict.txtは9,912文字（日本語ひらがな・カタカナ含む）
 
         // 2. キャッシュエンジン（デコレーター）を具体的な型で登録
-        //    ベースとなるPooledOcrServiceをコンストラクタで受け取る
+        //    ベースとなるOnnxOcrEngineをコンストラクタで受け取る
         services.AddSingleton<CachedOcrEngine>(provider =>
         {
-            var pooledService = provider.GetRequiredService<PooledOcrService>();
+            var onnxEngine = provider.GetRequiredService<OnnxOcrEngine>();
             var cacheService = provider.GetRequiredService<IAdvancedOcrCacheService>();
             var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedOcrEngine>>();
 
-            Console.WriteLine($"✅ CachedOcrEngine（デコレーター）作成 - ベースサービス: {pooledService.GetType().Name}");
-            return new CachedOcrEngine(pooledService, cacheService, logger);
+            Console.WriteLine($"✅ [Issue #181] CachedOcrEngine（デコレーター）作成 - ベースサービス: {onnxEngine.GetType().Name}");
+            Console.WriteLine($"   → OnnxOcrEngine使用 (PP-OCRv5 ONNX + 日本語対応辞書)");
+            return new CachedOcrEngine(onnxEngine, cacheService, logger);
         });
-        Console.WriteLine("✅ CachedOcrEngineを具体的な型で登録完了");
+        Console.WriteLine("✅ CachedOcrEngineを具体的な型で登録完了 (OnnxOcrEngineベース)");
 
         // 3. IOcrEngineインターフェースへの要求を、最終的なキャッシュエンジン実装に解決
         //    これにより、IOcrEngineを要求する全てのサービスがキャッシュ機能の恩恵を受ける
@@ -78,13 +84,10 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
     /// <returns>依存モジュールの型のコレクション</returns>
     public override IEnumerable<Type> GetDependentModules()
     {
-        // ❌ 旧プール化システム依存を除去
-        // yield return typeof(StagedOcrStrategyModule);
-
-        // インフラストラクチャモジュールに依存（新ファクトリシステム）
+        // インフラストラクチャモジュールに依存
         yield return typeof(Baketa.Infrastructure.DI.Modules.InfrastructureModule);
 
-        // 🏭 新しいPaddleOcrModuleに依存（ファクトリシステム）
-        yield return typeof(Baketa.Infrastructure.DI.PaddleOcrModule);
+        // 🚀 [Issue #181] OnnxOcrModuleに依存（OnnxOcrEngineの登録）
+        yield return typeof(Baketa.Infrastructure.DI.OnnxOcrModule);
     }
 }

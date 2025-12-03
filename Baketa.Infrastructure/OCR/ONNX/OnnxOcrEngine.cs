@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using OpenCvSharp;
+using Baketa.Infrastructure.OCR.Preprocessing;
 
 // 型エイリアス: System.DrawingとOpenCvSharpの曖昧さ解消
 using DrawingPoint = System.Drawing.Point;
@@ -242,6 +243,10 @@ public sealed class OnnxOcrEngine : IOcrEngine
         OcrContext context,
         IProgress<OcrProgress>? progressCallback = null)
     {
+        // 🔍 [ONNX_DIAG] RecognizeAsync呼び出し確認
+        Console.WriteLine($"🔍 [ONNX_DIAG] OnnxOcrEngine.RecognizeAsync 開始 - IsInitialized: {_isInitialized}, Time: {DateTime.Now:HH:mm:ss.fff}");
+        _logger.LogInformation("🔍 [ONNX_DIAG] OnnxOcrEngine.RecognizeAsync 開始 - IsInitialized: {IsInit}", _isInitialized);
+
         if (!_isInitialized)
             throw new InvalidOperationException("OCR エンジンが初期化されていません");
 
@@ -263,72 +268,118 @@ public sealed class OnnxOcrEngine : IOcrEngine
                 return CreateEmptyResult(context.Image, context.CaptureRegion, stopwatch.Elapsed);
             }
 
+            // 🇯🇵 [PREPROCESS] PP-OCRv5日本語最適化前処理（現在無効化 - 精度検証中）
+            Mat? matForOcr = mat;  // 前処理なしで元画像を使用
+            var shouldDisposeMatForOcr = false;
+
+            _logger.LogInformation("🔍 [PREPROCESS_DISABLED] 前処理無効化中 - 素の画像でOCR実行 (ONNX)");
+            Console.WriteLine($"🔍 [PREPROCESS_DISABLED] 前処理無効化中 - 素の画像でOCR実行 (ONNX) {DateTime.Now:HH:mm:ss.fff}");
+
+            // TODO: 前処理の効果を検証後、以下を有効化または調整
+            /*
+            _logger.LogInformation("🇯🇵 [PREPROCESS] PP-OCRv5日本語最適化前処理を適用中 (ONNX)...");
+            Console.WriteLine($"🇯🇵 [PREPROCESS] PP-OCRv5日本語最適化前処理を適用中 (ONNX)... {DateTime.Now:HH:mm:ss.fff}");
+
+            try
+            {
+                var preprocessedMat = PPOCRv5Preprocessor.ProcessGameImageForV5(mat, "jpn");
+                if (preprocessedMat != null && !preprocessedMat.Empty())
+                {
+                    matForOcr = preprocessedMat;
+                    shouldDisposeMatForOcr = true;
+                    _logger.LogInformation("🇯🇵 [PREPROCESS] 前処理完了 (ONNX) - サイズ: {Width}x{Height}", preprocessedMat.Width, preprocessedMat.Height);
+                    Console.WriteLine($"🇯🇵 [PREPROCESS] 前処理完了 (ONNX) - サイズ: {preprocessedMat.Width}x{preprocessedMat.Height}");
+                }
+                else
+                {
+                    _logger.LogWarning("🇯🇵 [PREPROCESS] 前処理結果が無効、元画像でOCR実行 (ONNX)");
+                    matForOcr = mat;
+                }
+            }
+            catch (Exception preprocessEx)
+            {
+                _logger.LogWarning(preprocessEx, "🇯🇵 [PREPROCESS] 前処理でエラー、元画像でOCR実行 (ONNX)");
+                matForOcr = mat;
+            }
+            */
+
             progressCallback?.Report(new OcrProgress(0.3, "テキスト検出中") { Phase = OcrPhase.TextDetection });
 
-            // テキスト検出
-            var detectedBoxes = await DetectTextAsync(mat, context.CancellationToken).ConfigureAwait(false);
-
-            if (detectedBoxes.Count == 0)
+            try
             {
-                _logger.LogDebug("テキスト領域が検出されませんでした");
-                return CreateEmptyResult(context.Image, context.CaptureRegion, stopwatch.Elapsed);
-            }
+                // テキスト検出（前処理済み画像を使用）
+                var detectedBoxes = await DetectTextAsync(matForOcr!, context.CancellationToken).ConfigureAwait(false);
 
-            _logger.LogDebug("{Count} 個のテキスト領域を検出", detectedBoxes.Count);
-
-            progressCallback?.Report(new OcrProgress(0.5, "テキスト認識中") { Phase = OcrPhase.TextRecognition });
-
-            // テキスト認識
-            for (int i = 0; i < detectedBoxes.Count; i++)
-            {
-                context.CancellationToken.ThrowIfCancellationRequested();
-
-                var box = detectedBoxes[i];
-                var (text, confidence) = await RecognizeTextInRegionAsync(mat, box, context.CancellationToken).ConfigureAwait(false);
-
-                if (!string.IsNullOrWhiteSpace(text) && confidence >= _settings.RecognitionThreshold)
+                if (detectedBoxes.Count == 0)
                 {
-                    var bounds = GetBoundingRect(box);
-
-                    // ROI座標変換
-                    if (context.HasCaptureRegion)
-                    {
-                        bounds = new Rectangle(
-                            bounds.X + context.CaptureRegion!.Value.X,
-                            bounds.Y + context.CaptureRegion!.Value.Y,
-                            bounds.Width,
-                            bounds.Height);
-                    }
-
-                    textRegions.Add(new OcrTextRegion(
-                        text,
-                        bounds,
-                        confidence,
-                        box,
-                        DetectTextDirection(box)));
+                    _logger.LogDebug("テキスト領域が検出されませんでした");
+                    return CreateEmptyResult(context.Image, context.CaptureRegion, stopwatch.Elapsed);
                 }
 
-                progressCallback?.Report(new OcrProgress(
-                    0.5 + (0.4 * (i + 1) / detectedBoxes.Count),
-                    $"認識中 ({i + 1}/{detectedBoxes.Count})")
-                { Phase = OcrPhase.TextRecognition });
+                _logger.LogDebug("{Count} 個のテキスト領域を検出", detectedBoxes.Count);
+
+                progressCallback?.Report(new OcrProgress(0.5, "テキスト認識中") { Phase = OcrPhase.TextRecognition });
+
+                // テキスト認識（前処理済み画像を使用）
+                for (int i = 0; i < detectedBoxes.Count; i++)
+                {
+                    context.CancellationToken.ThrowIfCancellationRequested();
+
+                    var box = detectedBoxes[i];
+                    var (text, confidence) = await RecognizeTextInRegionAsync(matForOcr!, box, context.CancellationToken).ConfigureAwait(false);
+
+                    if (!string.IsNullOrWhiteSpace(text) && confidence >= _settings.RecognitionThreshold)
+                    {
+                        var bounds = GetBoundingRect(box);
+
+                        // ROI座標変換
+                        if (context.HasCaptureRegion)
+                        {
+                            bounds = new Rectangle(
+                                bounds.X + context.CaptureRegion!.Value.X,
+                                bounds.Y + context.CaptureRegion!.Value.Y,
+                                bounds.Width,
+                                bounds.Height);
+                        }
+
+                        textRegions.Add(new OcrTextRegion(
+                            text,
+                            bounds,
+                            confidence,
+                            box,
+                            DetectTextDirection(box)));
+                    }
+
+                    progressCallback?.Report(new OcrProgress(
+                        0.5 + (0.4 * (i + 1) / detectedBoxes.Count),
+                        $"認識中 ({i + 1}/{detectedBoxes.Count})")
+                    { Phase = OcrPhase.TextRecognition });
+                }
+
+                progressCallback?.Report(new OcrProgress(0.95, "後処理中") { Phase = OcrPhase.PostProcessing });
+
+                stopwatch.Stop();
+                UpdatePerformanceStats(stopwatch.Elapsed.TotalMilliseconds, true);
+
+                progressCallback?.Report(new OcrProgress(1.0, "完了") { Phase = OcrPhase.Completed });
+
+                _logger.LogInformation("OCR完了: {Count} 領域, {Time}ms", textRegions.Count, stopwatch.ElapsedMilliseconds);
+
+                return new OcrResults(
+                    textRegions,
+                    context.Image,
+                    stopwatch.Elapsed,
+                    _settings.Language,
+                    context.CaptureRegion);
             }
-
-            progressCallback?.Report(new OcrProgress(0.95, "後処理中") { Phase = OcrPhase.PostProcessing });
-
-            stopwatch.Stop();
-            UpdatePerformanceStats(stopwatch.Elapsed.TotalMilliseconds, true);
-
-            progressCallback?.Report(new OcrProgress(1.0, "完了") { Phase = OcrPhase.Completed });
-
-            _logger.LogInformation("OCR完了: {Count} 領域, {Time}ms", textRegions.Count, stopwatch.ElapsedMilliseconds);
-
-            return new OcrResults(
-                textRegions,
-                context.Image,
-                stopwatch.Elapsed,
-                _settings.Language,
-                context.CaptureRegion);
+            finally
+            {
+                // 前処理画像のリソース破棄
+                if (shouldDisposeMatForOcr && matForOcr != null)
+                {
+                    matForOcr.Dispose();
+                }
+            }
         }
         catch (OperationCanceledException)
         {

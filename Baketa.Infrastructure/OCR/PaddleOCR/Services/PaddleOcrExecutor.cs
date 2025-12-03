@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Infrastructure.OCR.PaddleOCR.Abstractions;
+using Baketa.Infrastructure.OCR.Preprocessing;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 using Sdcb.PaddleOCR;
@@ -348,6 +349,36 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
 
             // Mat.Clone()で独立したメモリを確保し、スレッドセーフティを向上
             using var matForOcr = processedMat.Clone();
+
+            // 🇯🇵 [PREPROCESS] PP-OCRv5日本語最適化前処理
+            _logger?.LogInformation("🇯🇵 [PREPROCESS] PP-OCRv5日本語最適化前処理を適用中...");
+            Console.WriteLine($"🇯🇵 [PREPROCESS] PP-OCRv5日本語最適化前処理を適用中... {DateTime.Now:HH:mm:ss.fff}");
+            try
+            {
+                var preprocessedMat = PPOCRv5Preprocessor.ProcessGameImageForV5(matForOcr, "jpn");
+                if (preprocessedMat != null && !preprocessedMat.Empty())
+                {
+                    // 前処理済み画像で置き換え
+                    matForOcr.Dispose();
+                    _logger?.LogInformation("🇯🇵 [PREPROCESS] 前処理完了 - サイズ: {Width}x{Height}", preprocessedMat.Width, preprocessedMat.Height);
+                    Console.WriteLine($"🇯🇵 [PREPROCESS] 前処理完了 - サイズ: {preprocessedMat.Width}x{preprocessedMat.Height}");
+
+                    var preprocessedResult = await queuedEngine.Run(preprocessedMat).ConfigureAwait(false);
+                    preprocessedMat.Dispose();
+                    return preprocessedResult;
+                }
+                else
+                {
+                    _logger?.LogWarning("🇯🇵 [PREPROCESS] 前処理結果が無効、元画像でOCR実行");
+                    Console.WriteLine("🇯🇵 [PREPROCESS] 前処理結果が無効、元画像でOCR実行");
+                }
+            }
+            catch (Exception preprocessEx)
+            {
+                _logger?.LogWarning(preprocessEx, "🇯🇵 [PREPROCESS] 前処理でエラー、元画像でOCR実行");
+                Console.WriteLine($"🇯🇵 [PREPROCESS] 前処理でエラー: {preprocessEx.Message}、元画像でOCR実行");
+            }
+
             var result = await queuedEngine.Run(matForOcr).ConfigureAwait(false);
 
             _logger?.LogDebug("✅ [P1-B-FIX] QueuedOCR完了: 検出領域数={Count}", result.Regions.Length);
@@ -401,6 +432,7 @@ public sealed class PaddleOcrExecutor : IPaddleOcrExecutor, IDisposable
 
             // Mat.Clone()で独立したメモリを確保し、スレッドセーフティを向上
             using var matForDetection = mat.Clone();
+
             var result = await queuedEngine.Run(matForDetection).ConfigureAwait(false);
 
             _logger?.LogDebug("✅ [P1-B-FIX] Queued検出完了: 検出領域数={Count}", result.Regions.Length);
