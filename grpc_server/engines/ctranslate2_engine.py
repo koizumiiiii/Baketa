@@ -9,6 +9,10 @@ Phase 2.2.1: CTranslate2最適化エンジン実装 (NLLB-200-distilled-1.3B)
 - 多言語翻訳対応（200言語以上）
 
 モデルソース: OpenNMT/nllb-200-distilled-1.3B-ct2-int8
+
+🔥 [Issue #185] torch/transformers依存を削除
+- tokenizersライブラリ（Rust製、軽量）を直接使用
+- パッケージサイズ ~450MB削減
 """
 
 import asyncio
@@ -21,7 +25,7 @@ from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
 
 import ctranslate2
-from transformers import AutoTokenizer
+from tokenizers import Tokenizer  # 🔥 [Issue #185] transformers → tokenizers (軽量)
 
 from .base import (
     TranslationEngine,
@@ -83,7 +87,7 @@ class CTranslate2Engine(TranslationEngine):
         self.model_name = f"CTranslate2 ({compute_type})"
 
         self.translator: Optional[ctranslate2.Translator] = None
-        self.tokenizer: Optional[AutoTokenizer] = None
+        self.tokenizer: Optional[Tokenizer] = None  # 🔥 [Issue #185] tokenizers.Tokenizer
 
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
 
@@ -132,11 +136,18 @@ class CTranslate2Engine(TranslationEngine):
             self.logger.info(f"  Device: {self.translator.device}")
             self.logger.info(f"  Compute Type: {self.translator.compute_type}")
 
-            # HuggingFace AutoTokenizer ロード（NLLB-200-1.3B公式トークナイザー）
-            self.logger.info("HuggingFace NllbTokenizer ロード中 (1.3B)...")
-            self.tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-1.3B")
-            self.logger.info("NllbTokenizer (1.3B) ロード成功")
-            self.logger.info(f"  Vocabulary size: {len(self.tokenizer)}")
+            # 🔥 [Issue #185] tokenizersライブラリでtokenizer.jsonを直接ロード
+            # transformers/torch不要で軽量化（~450MB削減）
+            tokenizer_path = self.model_path / "tokenizer.json"
+            self.logger.info(f"Tokenizer ロード中: {tokenizer_path}")
+            if not tokenizer_path.exists():
+                raise ModelNotLoadedError(
+                    f"tokenizer.json が見つかりません: {tokenizer_path}\n"
+                    f"モデルディレクトリに tokenizer.json が含まれていることを確認してください"
+                )
+            self.tokenizer = Tokenizer.from_file(str(tokenizer_path))
+            self.logger.info("Tokenizer ロード成功 (tokenizers library)")
+            self.logger.info(f"  Vocabulary size: {self.tokenizer.get_vocab_size()}")
 
             load_time = time.time() - start_time
             self.logger.info(f"CTranslate2モデルロード完了 - 所要時間: {load_time:.2f}秒")
@@ -203,7 +214,7 @@ class CTranslate2Engine(TranslationEngine):
         )
 
     def _encode_text(self, text: str, source_lang: str) -> List[str]:
-        """HuggingFace NllbTokenizer エンコード（スレッドセーフ）
+        """🔥 [Issue #185] tokenizersライブラリでエンコード（スレッドセーフ）
 
         Args:
             text: 入力テキスト
@@ -216,21 +227,22 @@ class CTranslate2Engine(TranslationEngine):
             ModelNotLoadedError: トークナイザー未初期化
         """
         if not self.tokenizer:
-            raise ModelNotLoadedError("NllbTokenizerが初期化されていません")
+            raise ModelNotLoadedError("Tokenizerが初期化されていません")
 
         try:
             # 言語コード取得（NLLB-200形式: eng_Latn, jpn_Jpan）
             nllb_lang_code = self.LANGUAGE_MAPPING.get(source_lang, source_lang)
 
-            # トークナイザー並列アクセス制御（tokenizer.src_langは共有状態）
+            # tokenizersライブラリでトークン化（スレッドセーフ）
             with self.tokenizer_lock:
-                # NllbTokenizerでトークン化
-                self.tokenizer.src_lang = nllb_lang_code
-                # 言語コードトークン（例: jpn_Jpan）が自動付与される
-                encoded = self.tokenizer(text, return_tensors=None, add_special_tokens=True)
+                encoding = self.tokenizer.encode(text)
 
-            # token IDsをテキストトークンに変換（ロック外で実行可能）
-            tokens = self.tokenizer.convert_ids_to_tokens(encoded["input_ids"])
+            # トークン文字列リストを取得
+            tokens = encoding.tokens
+
+            # NLLB形式: 言語コードを先頭に追加し、</s>を末尾に追加
+            # 例: [eng_Latn, ▁Hello, ▁world, </s>]
+            tokens = [nllb_lang_code] + tokens + ["</s>"]
 
             return tokens
 
@@ -239,7 +251,7 @@ class CTranslate2Engine(TranslationEngine):
             raise ModelNotLoadedError(f"Tokenization error: {e}")
 
     def _decode_tokens(self, tokens: List[str]) -> str:
-        """HuggingFace NllbTokenizer デコード
+        """🔥 [Issue #185] tokenizersライブラリでデコード
 
         Args:
             tokens: トークン文字列のリスト
@@ -251,27 +263,28 @@ class CTranslate2Engine(TranslationEngine):
             ModelNotLoadedError: トークナイザー未初期化
         """
         if not self.tokenizer:
-            raise ModelNotLoadedError("NllbTokenizerが初期化されていません")
+            raise ModelNotLoadedError("Tokenizerが初期化されていません")
 
         try:
-            # 言語コードプレフィックスと特殊トークンを除去
-            language_codes = {
-                "eng_Latn", "jpn_Jpan", "fra_Latn", "deu_Latn", "spa_Latn",
-                "ita_Latn", "por_Latn", "rus_Cyrl", "zho_Hans", "zho_Hant",
-                "kor_Hang", "ara_Arab", "hin_Deva", "tha_Thai", "vie_Latn"
-            }
-
+            # 🔥 [GEMINI_REVIEW] LANGUAGE_MAPPINGから動的生成（将来の言語追加時の修正漏れ防止）
+            nllb_language_codes = set(self.LANGUAGE_MAPPING.values())
             special_tokens = {"<s>", "</s>", "<pad>", "<unk>"}
 
             # フィルタリング
             filtered_tokens = [
                 token for token in tokens
-                if token not in special_tokens and token not in language_codes
+                if token not in special_tokens and token not in nllb_language_codes
             ]
 
-            # トークンリストを文字列に変換
-            # NllbTokenizer.convert_tokens_to_string()でSentencePiece処理が自動実行される
-            decoded_text = self.tokenizer.convert_tokens_to_string(filtered_tokens)
+            # トークンIDに変換してからデコード
+            # tokenizersライブラリのdecode()はIDリストを受け取る
+            with self.tokenizer_lock:
+                token_ids = [
+                    self.tokenizer.token_to_id(token)
+                    for token in filtered_tokens
+                    if self.tokenizer.token_to_id(token) is not None
+                ]
+                decoded_text = self.tokenizer.decode(token_ids)
 
             # 余分な空白を削除
             return decoded_text.strip()
