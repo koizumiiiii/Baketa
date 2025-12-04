@@ -569,7 +569,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             {
                 FileName = pythonPath,
                 // 🔥 [CTRANSLATE2_FIX] CTranslate2エンジン使用（int8量子化、80%メモリ削減、安定動作確認済み）
-                Arguments = $"\"{serverScriptPath}\" --port {_currentServerPort} --use-ctranslate2",
+                Arguments = $"\"{serverScriptPath}\" --port {_currentServerPort}",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,

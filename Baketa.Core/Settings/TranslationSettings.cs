@@ -487,6 +487,10 @@ public enum TranslationEngine
     /// </summary>
     NLLB200,
 
+    /// <summary>
+    /// LLamaSharp ローカルLLM翻訳（無料プラン用、Gemma 2B）
+    /// </summary>
+    LlamaLocal,
 }
 
 /// <summary>

@@ -49,7 +49,6 @@ import ctranslate2
 from protos import translation_pb2_grpc
 
 from translation_server import TranslationServicer
-from engines.nllb_engine import NllbEngine
 from engines.ctranslate2_engine import CTranslate2Engine
 from resource_monitor import ResourceMonitor  # Phase 1.1: GPU/VRAM監視
 
@@ -99,105 +98,104 @@ class GracefulShutdown:
         await self.shutdown_event.wait()
 
 
-async def serve(host: str, port: int, use_heavy_model: bool = False, use_ctranslate2: bool = False):
+async def serve(host: str, port: int):
     """gRPCサーバー起動
 
     Args:
         host: バインドホスト（例: "localhost", "0.0.0.0"）
         port: ポート番号（例: 50051）
-        use_heavy_model: Trueで1.3Bモデル、Falseで600Mモデル使用
-        use_ctranslate2: TrueでCTranslate2エンジン、Falseでtransformersエンジン使用
+
+    Note:
+        NLLB-200-distilled-1.3B (CTranslate2 int8) を使用。
+        600Mからの精度向上により、日本語翻訳品質が大幅に改善。
     """
     logger.info("=" * 80)
     logger.info("Baketa gRPC Translation Server Starting...")
     logger.info("=" * 80)
 
-    # エンジン選択
-    if use_ctranslate2:
-        logger.info("Initializing CTranslate2 translation engine...")
+    # CTranslate2エンジン（NLLB-200-distilled-1.3B）を使用
+    logger.info("Initializing CTranslate2 translation engine...")
 
-        # 🔥 [ALPHA_0.1.2] HuggingFace Hub統合: モデル保存先を%APPDATA%\Baketa\Modelsに変更
-        # Gemini推奨: インストール先への書き込みは管理者権限が必要なため、APPDATAを使用
-        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
-        model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-ct2"
-        logger.info(f"Model path resolved: {model_path}")
+    # 🔥 [ALPHA_0.1.2] HuggingFace Hub統合: モデル保存先を%APPDATA%\Baketa\Modelsに変更
+    # Gemini推奨: インストール先への書き込みは管理者権限が必要なため、APPDATAを使用
+    # 🚀 [Translation Quality] NLLB-200-distilled-1.3B に移行（600Mから精度向上）
+    appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+    model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-1.3B-ct2"
+    logger.info(f"Model path resolved: {model_path}")
 
-        # モデル存在チェック・自動ダウンロード
-        if not model_path.exists() or not (model_path / "model.bin").exists():
-            logger.info("=" * 80)
-            logger.info("Model not found. Downloading from HuggingFace Hub...")
-            logger.info("Repository: JustFrederik/nllb-200-distilled-600M-ct2-int8")
-            logger.info("Size: ~600MB | This may take several minutes...")
-            logger.info("=" * 80)
-            model_path.mkdir(parents=True, exist_ok=True)
+    # モデル存在チェック・自動ダウンロード
+    if not model_path.exists() or not (model_path / "model.bin").exists():
+        logger.info("=" * 80)
+        logger.info("Model not found. Downloading from HuggingFace Hub...")
+        logger.info("Repository: OpenNMT/nllb-200-distilled-1.3B-ct2-int8")
+        logger.info("Size: ~1.3GB | This may take several minutes...")
+        logger.info("=" * 80)
+        model_path.mkdir(parents=True, exist_ok=True)
 
-            try:
-                # 🔥 [GEMINI_RECOMMENDATION] 非同期ダウンロード（イベントループブロッキング回避）
-                from huggingface_hub import snapshot_download
-                from functools import partial
-
-                loop = asyncio.get_running_loop()
-                download_func = partial(
-                    snapshot_download,
-                    repo_id="JustFrederik/nllb-200-distilled-600M-ct2-int8",
-                    local_dir=str(model_path),
-                    revision="main"  # TODO: 特定のコミットハッシュに固定（セキュリティ向上）
-                )
-                await loop.run_in_executor(None, download_func)
-                logger.info("=" * 80)
-                logger.info("Model download completed successfully.")
-                logger.info("=" * 80)
-            except Exception as e:
-                logger.error("=" * 80)
-                logger.error(f"Model download failed: {e}")
-                logger.error("Please check:")
-                logger.error("  1. Internet connection is available")
-                logger.error("  2. Disk space is sufficient (~600MB)")
-                logger.error("  3. HuggingFace Hub is accessible")
-                logger.error("=" * 80)
-                raise RuntimeError(f"Failed to download model from HuggingFace Hub: {e}")
-        else:
-            logger.info("Model found locally. Skipping download.")
-
-        # 🔥 [PACKAGE_SIZE_FIX] GPU検出をpynvml（既存依存）で実行（torch不要）
-        # 🔥 [HOTFIX Issue #170] ctranslate2.get_device_count()は存在しないため、pynvmlを使用
-        # Root cause: ctranslate2 4.6.0にget_device_count()が存在しない
-        # Fix: pynvml（既にrequirements.txtに含まれている）でCUDA検出
-        # 🔥 [GEMINI_REVIEW] finally句でpynvml.nvmlShutdown()を確実に実行
-        is_cuda_available = False
-        nvml_initialized = False
         try:
-            import pynvml
-            pynvml.nvmlInit()
-            nvml_initialized = True
-            device_count = pynvml.nvmlDeviceGetCount()
-            is_cuda_available = device_count > 0
-            if is_cuda_available:
-                # GPU情報をログ出力
-                handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-                gpu_name = pynvml.nvmlDeviceGetName(handle)
-                # bytes型の場合はUTF-8デコード（環境によってbytesを返す場合がある）
-                if isinstance(gpu_name, bytes):
-                    gpu_name = gpu_name.decode('utf-8')
-                logger.info(f"🎮 GPU detection successful: {device_count} CUDA device(s) found")
-                logger.info(f"   Primary GPU: {gpu_name}")
-        except Exception as e:
-            # Fallback: GPU検出失敗時はCPUモードで動作
-            logger.warning(f"⚠️ GPU detection failed ({e.__class__.__name__}), falling back to CPU mode")
-            is_cuda_available = False
-        finally:
-            # 🔥 [GEMINI_REVIEW] nvmlInit()が成功した場合のみShutdown()を実行
-            if nvml_initialized:
-                pynvml.nvmlShutdown()
+            # 🔥 [GEMINI_RECOMMENDATION] 非同期ダウンロード（イベントループブロッキング回避）
+            from huggingface_hub import snapshot_download
+            from functools import partial
 
-        engine = CTranslate2Engine(
-            model_path=str(model_path),  # %APPDATA%\Baketa\Models\nllb-200-ct2
-            device="cuda" if is_cuda_available else "cpu",
-            compute_type="int8"
-        )
+            loop = asyncio.get_running_loop()
+            download_func = partial(
+                snapshot_download,
+                repo_id="OpenNMT/nllb-200-distilled-1.3B-ct2-int8",
+                local_dir=str(model_path),
+                revision="main"  # TODO: 特定のコミットハッシュに固定（セキュリティ向上）
+            )
+            await loop.run_in_executor(None, download_func)
+            logger.info("=" * 80)
+            logger.info("Model download completed successfully.")
+            logger.info("=" * 80)
+        except Exception as e:
+            logger.error("=" * 80)
+            logger.error(f"Model download failed: {e}")
+            logger.error("Please check:")
+            logger.error("  1. Internet connection is available")
+            logger.error("  2. Disk space is sufficient (~1.3GB)")
+            logger.error("  3. HuggingFace Hub is accessible")
+            logger.error("=" * 80)
+            raise RuntimeError(f"Failed to download model from HuggingFace Hub: {e}")
     else:
-        logger.info("Initializing NLLB translation engine...")
-        engine = NllbEngine(use_heavy_model=use_heavy_model)
+        logger.info("Model found locally. Skipping download.")
+
+    # 🔥 [PACKAGE_SIZE_FIX] GPU検出をpynvml（既存依存）で実行（torch不要）
+    # 🔥 [HOTFIX Issue #170] ctranslate2.get_device_count()は存在しないため、pynvmlを使用
+    # Root cause: ctranslate2 4.6.0にget_device_count()が存在しない
+    # Fix: pynvml（既にrequirements.txtに含まれている）でCUDA検出
+    # 🔥 [GEMINI_REVIEW] finally句でpynvml.nvmlShutdown()を確実に実行
+    is_cuda_available = False
+    nvml_initialized = False
+    try:
+        import pynvml
+        pynvml.nvmlInit()
+        nvml_initialized = True
+        device_count = pynvml.nvmlDeviceGetCount()
+        is_cuda_available = device_count > 0
+        if is_cuda_available:
+            # GPU情報をログ出力
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            gpu_name = pynvml.nvmlDeviceGetName(handle)
+            # bytes型の場合はUTF-8デコード（環境によってbytesを返す場合がある）
+            if isinstance(gpu_name, bytes):
+                gpu_name = gpu_name.decode('utf-8')
+            logger.info(f"🎮 GPU detection successful: {device_count} CUDA device(s) found")
+            logger.info(f"   Primary GPU: {gpu_name}")
+    except Exception as e:
+        # Fallback: GPU検出失敗時はCPUモードで動作
+        logger.warning(f"⚠️ GPU detection failed ({e.__class__.__name__}), falling back to CPU mode")
+        is_cuda_available = False
+    finally:
+        # 🔥 [GEMINI_REVIEW] nvmlInit()が成功した場合のみShutdown()を実行
+        if nvml_initialized:
+            pynvml.nvmlShutdown()
+
+    engine = CTranslate2Engine(
+        model_path=str(model_path),  # %APPDATA%\Baketa\Models\nllb-200-1.3B-ct2
+        device="cuda" if is_cuda_available else "cpu",
+        compute_type="int8"
+    )
 
     logger.info("Loading NLLB model (this may take a few minutes)...")
     await engine.load_model()
@@ -310,16 +308,6 @@ def main():
         help="gRPC server host (default: 0.0.0.0 for all interfaces)"
     )
     parser.add_argument(
-        "--heavy-model",
-        action="store_true",
-        help="Use 1.3B model instead of 600M model (requires more memory)"
-    )
-    parser.add_argument(
-        "--use-ctranslate2",
-        action="store_true",
-        help="Use CTranslate2 engine for 80%% memory reduction (2.4GB -> 500MB)"
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Enable debug logging"
@@ -335,8 +323,7 @@ def main():
     logger.info("Server configuration:")
     logger.info(f"  Host: {args.host}")
     logger.info(f"  Port: {args.port}")
-    logger.info(f"  Heavy model: {args.heavy_model}")
-    logger.info(f"  Use CTranslate2: {args.use_ctranslate2}")
+    logger.info(f"  Model: NLLB-200-distilled-1.3B (CTranslate2 int8)")
     logger.info(f"  Debug mode: {args.debug}")
 
     # asyncioイベントループでサーバー起動
@@ -344,9 +331,7 @@ def main():
         asyncio.run(
             serve(
                 host=args.host,
-                port=args.port,
-                use_heavy_model=args.heavy_model,
-                use_ctranslate2=args.use_ctranslate2
+                port=args.port
             )
         )
     except KeyboardInterrupt:

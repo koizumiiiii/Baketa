@@ -105,12 +105,24 @@ public abstract class TranslationEngineBase : ITranslationEngine, IAsyncDisposab
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        _logger.LogInformation("🔧🔧🔧 [ENGINE_BASE] TranslateAsync開始 - エンジン: {EngineName}, Text: '{Text}'",
+            Name, request.SourceText?.Length > 30 ? request.SourceText[..30] + "..." : request.SourceText);
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] TranslationEngineBase.TranslateAsync開始 - エンジン: {Name}");
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] - ソーステキスト: '{request.SourceText?.Substring(0, Math.Min(30, request.SourceText?.Length ?? 0))}...'");
+
         // エンジンの準備状態を確認
-        if (!await IsReadyAsync().ConfigureAwait(false))
+        var isReady = await IsReadyAsync().ConfigureAwait(false);
+        _logger.LogDebug("🔧 [ENGINE_BASE] IsReady: {IsReady}, IsInitialized: {IsInitialized}", isReady, IsInitialized);
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] - IsReady: {isReady}, IsInitialized: {IsInitialized}");
+
+        if (!isReady)
         {
+            Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] - 初期化が必要です。InitializeAsync呼び出し...");
             var initResult = await InitializeAsync().ConfigureAwait(false);
+            Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] - 初期化結果: {initResult}");
             if (!initResult)
             {
+                Console.WriteLine($"❌❌❌ [LLAMA_DEBUG] - 初期化失敗！ServiceUnavailableを返します");
                 return CreateErrorResponse(
                     request,
                     TranslationError.ServiceUnavailable,
@@ -149,6 +161,8 @@ public abstract class TranslationEngineBase : ITranslationEngine, IAsyncDisposab
 
         try
         {
+            _logger.LogDebug("🔧 [ENGINE_BASE] TranslateInternalAsync呼び出し開始...");
+
             // 翻訳の実行と時間測定
             var (result, elapsedMs) = await MeasureExecutionTimeAsync(() =>
                 TranslateInternalAsync(request, cancellationToken)).ConfigureAwait(false);
@@ -157,6 +171,9 @@ public abstract class TranslationEngineBase : ITranslationEngine, IAsyncDisposab
             result.EngineName = Name;
             result.ProcessingTimeMs = elapsedMs;
 
+            _logger.LogInformation("🔧✅ [ENGINE_BASE] 翻訳完了: エンジン={EngineName}, 処理時間={ElapsedMs}ms, 成功={IsSuccess}, 結果='{TranslatedText}'",
+                Name, elapsedMs, result.IsSuccess,
+                result.TranslatedText?.Length > 30 ? result.TranslatedText[..30] + "..." : result.TranslatedText);
             _logger.LogDebug(
                 "翻訳完了: リクエストID={RequestId}, 処理時間={ElapsedMs}ms, 成功={IsSuccess}",
                 request.RequestId, elapsedMs, result.IsSuccess);
@@ -275,16 +292,21 @@ public abstract class TranslationEngineBase : ITranslationEngine, IAsyncDisposab
             throw new ArgumentException("リクエストが空です。", nameof(requests));
         }
 
-        // 🚨 [BASE_CLASS_DEBUG] 基底クラスのTranslateBatchAsyncが実行されている
-        Console.WriteLine($"🚨 [BASE_CLASS_DEBUG] TranslationEngineBase.TranslateBatchAsync実行 - テキスト数: {requests.Count}");
-        System.IO.File.AppendAllText($"E:\\dev\\Baketa\\debug_app_logs_{Environment.ProcessId}_{Environment.CurrentManagedThreadId}.txt",
-            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 [BASE_CLASS_DEBUG] TranslationEngineBase.TranslateBatchAsync実行 - テキスト数: {requests.Count}{Environment.NewLine}");
+        // 🔥🔥🔥 [LLAMA_DEBUG] 基底クラスのTranslateBatchAsyncが実行されている
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] TranslationEngineBase.TranslateBatchAsync実行 - エンジン: {Name}, テキスト数: {requests.Count}");
+        foreach (var req in requests.Take(2))
+        {
+            Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] - リクエスト: '{req.SourceText?.Substring(0, Math.Min(50, req.SourceText?.Length ?? 0))}...'");
+        }
 
         // 各リクエストを並行して処理
         var tasks = requests.Select(request =>
             TranslateAsync(request, cancellationToken));
 
-        return await Task.WhenAll(tasks).ConfigureAwait(false);
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] Task.WhenAll開始...");
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] Task.WhenAll完了 - 結果数: {results.Length}");
+        return results;
     }
 
     /// <summary>

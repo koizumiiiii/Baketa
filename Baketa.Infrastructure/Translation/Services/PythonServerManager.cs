@@ -316,7 +316,7 @@ public class PythonServerManager(
         var startInfo = new ProcessStartInfo
         {
             FileName = translationServerExePath,
-            Arguments = $"--port {port} --use-ctranslate2",
+            Arguments = $"--port {port}",
 #else
         // 開発版: Python + script実行（従来ロジック）
         string pythonExecutable;
@@ -359,7 +359,7 @@ public class PythonServerManager(
         var startInfo = new ProcessStartInfo
         {
             FileName = pythonExecutable,
-            Arguments = $"\"{scriptPath}\" --port {port} --use-ctranslate2",
+            Arguments = $"\"{scriptPath}\" --port {port}",
 #endif
             UseShellExecute = false,
             CreateNoWindow = true,

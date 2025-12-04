@@ -633,12 +633,15 @@ public sealed class OnnxOcrEngine : IOcrEngine
         return tensor;
     }
 
+    /// <summary>認識モデルの最小入力幅（AveragePoolカーネルサイズ以上必要）</summary>
+    private const int RecognitionMinWidth = 48;
+
     private DenseTensor<float> PreprocessImageForRecognition(Mat image)
     {
         // 認識モデル用の前処理
         // 高さをRecognitionTargetHeightに正規化、幅はアスペクト比を維持
         var scale = (double)RecognitionTargetHeight / image.Height;
-        var newWidth = Math.Max(1, (int)(image.Width * scale));
+        var newWidth = Math.Max(RecognitionMinWidth, (int)(image.Width * scale));
 
         // 最大幅制限
         if (newWidth > RecognitionMaxWidth)

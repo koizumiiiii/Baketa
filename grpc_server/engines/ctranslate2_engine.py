@@ -1,11 +1,14 @@
 """
 CTranslate2 Translation Engine
-Phase 2.2.1: CTranslate2最適化エンジン実装
+Phase 2.2.1: CTranslate2最適化エンジン実装 (NLLB-200-distilled-1.3B)
 
 特徴:
-- int8量子化により80%メモリ削減（2.4GB → 0.5GB）
+- NLLB-200-distilled-1.3B モデル使用（600Mから精度向上）
+- int8量子化によりメモリ効率化（約5.5GB使用）
 - 20-30%推論高速化
-- 既存NLLB-200インターフェース完全互換
+- 多言語翻訳対応（200言語以上）
+
+モデルソース: OpenNMT/nllb-200-distilled-1.3B-ct2-int8
 """
 
 import asyncio
@@ -129,10 +132,10 @@ class CTranslate2Engine(TranslationEngine):
             self.logger.info(f"  Device: {self.translator.device}")
             self.logger.info(f"  Compute Type: {self.translator.compute_type}")
 
-            # HuggingFace AutoTokenizer ロード（NLLB-200公式トークナイザー）
-            self.logger.info("HuggingFace NllbTokenizer ロード中...")
-            self.tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M")
-            self.logger.info("NllbTokenizer ロード成功")
+            # HuggingFace AutoTokenizer ロード（NLLB-200-1.3B公式トークナイザー）
+            self.logger.info("HuggingFace NllbTokenizer ロード中 (1.3B)...")
+            self.tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-1.3B")
+            self.logger.info("NllbTokenizer (1.3B) ロード成功")
             self.logger.info(f"  Vocabulary size: {len(self.tokenizer)}")
 
             load_time = time.time() - start_time
@@ -144,7 +147,7 @@ class CTranslate2Engine(TranslationEngine):
             self.is_loaded = True
             total_time = time.time() - start_time
             self.logger.info(f"CTranslate2 engine ready - Total time: {total_time:.2f}秒")
-            self.logger.info("80% memory reduction achieved (2.4GB -> 500MB)")
+            self.logger.info("NLLB-200-distilled-1.3B (int8) loaded - ~5.5GB memory")
 
         except ImportError as e:
             self.logger.error(f"必要なライブラリが見つかりません: {e}")
@@ -317,14 +320,17 @@ class CTranslate2Engine(TranslationEngine):
                 )
 
             # 翻訳実行（asyncio.to_threadで非同期化）
+            # 🔥 [QUALITY_FIX] beam_size=1→4に変更（BLEU +1.0〜1.5向上）
+            # 参考: https://forum.opennmt.net/t/nllb-200-with-ctranslate2/5090
             def _generate():
                 return self.translator.translate_batch(
                     source=[source_tokens],
                     target_prefix=[[tgt_code]],
-                    beam_size=1,
+                    beam_size=4,  # 🔥 品質向上のため1→4に変更
                     max_decoding_length=256,  # 長めに設定
                     repetition_penalty=1.2,
                     no_repeat_ngram_size=3,
+                    length_penalty=1.0,  # 🔥 追加: 適切な出力長を促進
                     return_scores=True
                 )
 

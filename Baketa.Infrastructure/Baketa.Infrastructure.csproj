@@ -41,7 +41,7 @@
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.ObjectPool" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
@@ -64,7 +64,7 @@
 		<PackageReference Include="Sdcb.PaddleOCR" Version="3.0.1" />
 		<PackageReference Include="Sdcb.PaddleOCR.Models.Local" Version="3.0.1" />
 		<!-- GPU環境検出・テンソル処理用パッケージ（Issue #143対応） -->
-		<PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
+		<PackageReference Include="System.Numerics.Tensors" Version="9.0.8" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.17.1" />
 		<!-- Phase 3.3: WMI GPU利用率監視用 -->
 		<PackageReference Include="System.Management" Version="8.0.0" />

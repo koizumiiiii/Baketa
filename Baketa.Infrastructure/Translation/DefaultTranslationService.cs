@@ -255,6 +255,11 @@ public class DefaultTranslationService : ITranslationService
         string? context = null,
         CancellationToken cancellationToken = default)
     {
+        // 🔥 [LLAMA_DEBUG] DefaultTranslationService.TranslateBatchAsync到達確認
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] DefaultTranslationService.TranslateBatchAsync到達！");
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] テキスト数: {texts?.Count ?? 0}, エンジン: {ActiveEngine?.Name ?? "null"}");
+        Console.WriteLine($"🔥🔥🔥 [LLAMA_DEBUG] 言語: {sourceLang?.Code} → {targetLang?.Code}");
+
         ArgumentNullException.ThrowIfNull(texts, nameof(texts));
         ArgumentNullException.ThrowIfNull(sourceLang, nameof(sourceLang));
         ArgumentNullException.ThrowIfNull(targetLang, nameof(targetLang));
