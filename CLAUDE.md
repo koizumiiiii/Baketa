@@ -81,6 +81,23 @@ dotnet build Baketa.sln --configuration Release
 # Step 3: リリースパッケージ作成
 # - Baketa.UI/bin/Release/net8.0-windows10.0.19041.0/win-x64/ をコピー
 # - grpc_server/dist/BaketaTranslationServer/ を上記の grpc_server/BaketaTranslationServer/ にコピー
+# - Models/ppocrv5-onnx/ を上記の Models/ppocrv5-onnx/ にコピー（ONNX OCRモデル、約180MB）
+```
+
+**リリースパッケージ構成:**
+```
+release/
+├── Baketa.exe
+├── grpc_server/
+│   └── BaketaTranslationServer/  # PyInstallerでexe化した翻訳サーバー
+└── Models/
+    └── ppocrv5-onnx/             # ONNX OCRモデル（必須）
+        ├── detection/det.onnx    # 88MB
+        ├── ppocrv5_dict.txt
+        └── languages/
+            ├── japanese/
+            ├── latin/rec.onnx    # 7.8MB
+            └── chinese/rec.onnx  # 84MB
 ```
 
 **PyInstallerビルドが必要なケース:**
