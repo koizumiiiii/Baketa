@@ -418,6 +418,7 @@ Models/ONNX/
 Models/opus-mt-*/
 Models/ppocrv5/
 Models/pp-ocrv5/
+Models/ppocrv5-onnx/
 
 # OCR/Translation temporary files
 temp_ocr/

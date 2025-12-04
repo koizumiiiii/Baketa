@@ -434,28 +434,31 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 _logger?.LogDebug($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
                 Console.WriteLine($"🌍 [PHASE3.1_FIX] 言語ペア取得完了 - {languagePair.SourceCode} → {languagePair.TargetCode}");
 
-#if DEBUG
-                // 🚨🚨🚨 [ULTRA_CRITICAL] 呼び出し直前を確実に記録
-                var timestamp1 = DateTime.Now.ToString("HH:mm:ss.fff");
-                var threadId1 = Environment.CurrentManagedThreadId;
-                System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                    $"[{timestamp1}][T{threadId1:D2}] 🚨🚨🚨 [ULTRA_CRITICAL] TranslateBatchWithStreamingAsync呼び出し実行！\r\n");
-#endif
+                // 🔥🔥🔥 [CALL_DEBUG] 呼び出し直前の詳細デバッグ
+                Console.WriteLine($"🔥🔥🔥 [CALL_DEBUG] _streamingTranslationService型: {_streamingTranslationService?.GetType().FullName ?? "null"}");
+                Console.WriteLine($"🔥🔥🔥 [CALL_DEBUG] batchTexts数: {batchTexts?.Count ?? 0}");
+                Console.WriteLine($"🔥🔥🔥 [CALL_DEBUG] sourceLanguage: {sourceLanguage?.Code}, targetLanguage: {targetLanguage?.Code}");
+                Console.WriteLine($"🔥🔥🔥 [CALL_DEBUG] TranslateBatchWithStreamingAsync await 開始...");
 
-                var results = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
-                    batchTexts,
-                    sourceLanguage,
-                    targetLanguage,
-                    null!, // OnChunkCompletedコールバックは不要（バッチ完了後にオーバーレイ表示）
-                    cancellationToken).ConfigureAwait(false);
+                List<string> results;
+                try
+                {
+                    results = await _streamingTranslationService.TranslateBatchWithStreamingAsync(
+                        batchTexts,
+                        sourceLanguage,
+                        targetLanguage,
+                        null!, // OnChunkCompletedコールバックは不要（バッチ完了後にオーバーレイ表示）
+                        cancellationToken).ConfigureAwait(false);
 
-#if DEBUG
-                // 🚨🚨🚨 [ULTRA_CRITICAL] 呼び出し完了を確実に記録
-                var timestamp2 = DateTime.Now.ToString("HH:mm:ss.fff");
-                var threadId2 = Environment.CurrentManagedThreadId;
-                System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-                    $"[{timestamp2}][T{threadId2:D2}] 🚨🚨🚨 [ULTRA_CRITICAL] TranslateBatchWithStreamingAsync呼び出し完了！ - 結果数: {results.Count}\r\n");
-#endif
+                    Console.WriteLine($"🔥🔥🔥 [CALL_DEBUG] TranslateBatchWithStreamingAsync await 完了 - 結果数: {results?.Count ?? 0}");
+                }
+                catch (Exception callEx)
+                {
+                    Console.WriteLine($"💥💥💥 [CALL_ERROR] TranslateBatchWithStreamingAsync例外: {callEx.GetType().Name}");
+                    Console.WriteLine($"💥💥💥 [CALL_ERROR] Message: {callEx.Message}");
+                    Console.WriteLine($"💥💥💥 [CALL_ERROR] StackTrace: {callEx.StackTrace}");
+                    throw;
+                }
 
                 _logger?.LogDebug($"✅ [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync完了 - 結果数: {results.Count}");
                 return results;

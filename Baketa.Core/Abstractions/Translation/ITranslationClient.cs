@@ -33,6 +33,18 @@ public interface ITranslationClient
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 複数のテキストを一括翻訳します（バッチ翻訳）
+    /// Issue #182: gRPCネイティブバッチ翻訳対応
+    /// </summary>
+    /// <param name="requests">翻訳リクエストのリスト</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>翻訳レスポンスのリスト（入力と同じ順序を保証）</returns>
+    /// <exception cref="TranslationException">通信エラーまたは翻訳エラー</exception>
+    Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
+        IReadOnlyList<TranslationRequest> requests,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// クライアントの準備状態を確認します
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>

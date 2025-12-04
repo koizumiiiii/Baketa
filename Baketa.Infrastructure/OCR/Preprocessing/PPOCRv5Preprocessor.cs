@@ -21,7 +21,9 @@ public enum OptimizationMode
     /// <summary>100%精度特化（超高精度）</summary>
     UltraHighAccuracy,
     /// <summary>極限精度（全手法 + 超高精度）</summary>
-    PerfectAccuracy
+    PerfectAccuracy,
+    /// <summary>日本語特化（Bilateral + Otsu二値化）- PP-OCRv5日本語認識最適化</summary>
+    JapaneseEnhanced
 }
 
 /// <summary>
@@ -119,6 +121,9 @@ public static class PPOCRv5Preprocessor
 
                 case OptimizationMode.PerfectAccuracy:
                     return UltraHighAccuracyPreprocessor.ProcessForPerfectAccuracy(input);
+
+                case OptimizationMode.JapaneseEnhanced:
+                    return ProcessWithJapaneseOptimization(input);
 
                 default: // Standard
                     break;
@@ -377,25 +382,30 @@ public static class PPOCRv5Preprocessor
     /// ゲーム画面向けPP-OCRv5最適化処理
     /// ゲーム特化前処理とV5専用処理を組み合わせた最高品質処理
     /// </summary>
-    public static Mat ProcessGameImageForV5(Mat input)
+    /// <param name="input">入力画像</param>
+    /// <param name="language">OCR対象言語（"jpn", "ja", "japanese"で日本語最適化を適用）</param>
+    public static Mat ProcessGameImageForV5(Mat input, string? language = "jpn")
     {
-        Console.WriteLine($"🎮🚀 ゲーム画面PP-OCRv5専用処理開始");
+        // 言語に応じた最適化モードを決定
+        var mode = language?.ToLowerInvariant() switch
+        {
+            "jpn" or "ja" or "japanese" => OptimizationMode.JapaneseEnhanced,
+            "chi_sim" or "zh" or "chinese" => OptimizationMode.KanjiEnhanced,
+            _ => OptimizationMode.Standard
+        };
 
         try
         {
             // 1. ゲーム特化前処理を軽量化して適用
             using var gameProcessed = GameTextPreprocessor.ProcessGameImage(input);
 
-            // 2. PP-OCRv5専用最適化を追加適用
-            var v5Optimized = ProcessForPPOCRv5(gameProcessed);
+            // 2. 言語に応じたPP-OCRv5専用最適化を追加適用
+            var v5Optimized = ProcessForPPOCRv5(gameProcessed, mode);
 
-            Console.WriteLine($"✅ ゲーム画面PP-OCRv5専用処理完了");
             return v5Optimized;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine($"❌ ゲーム画面V5処理エラー: {ex.Message}");
-
             // エラー時は元画像を返す
             var fallback = new Mat();
             input.CopyTo(fallback);
@@ -623,6 +633,119 @@ public static class PPOCRv5Preprocessor
         catch (Exception ex)
         {
             Console.WriteLine($"❌ 全手法統合最適化エラー: {ex.Message}");
+            var fallback = new Mat();
+            input.CopyTo(fallback);
+            return fallback;
+        }
+    }
+
+    /// <summary>
+    /// 日本語特化最適化処理（PP-OCRv5日本語認識向け）
+    /// ScienceDirectベンチマーク結果に基づく: Bilateral Filter + Otsu二値化
+    /// 参照: https://www.sciencedirect.com/science/article/pii/S1877050925027383
+    ///
+    /// PP-OCRv5の「日本語が中国語になる」問題を軽減するための前処理最適化
+    /// LayerX技術ブログ確認済み: https://tech.layerx.co.jp/entry/2025/12/01/161913
+    /// </summary>
+    private static Mat ProcessWithJapaneseOptimization(Mat input)
+    {
+        var output = new Mat();
+        try
+        {
+            // 1. グレースケール変換
+            using var gray = new Mat();
+            if (input.Channels() == 3)
+            {
+                Cv2.CvtColor(input, gray, ColorConversionCodes.BGR2GRAY);
+            }
+            else
+            {
+                input.CopyTo(gray);
+            }
+
+            // 2. Bilateral Filter（エッジ保持ノイズ除去）
+            // ScienceDirectベンチマーク推奨パラメータ: d=9, sigmaColor=75, sigmaSpace=75
+            using var filtered = new Mat();
+            Cv2.BilateralFilter(gray, filtered, d: 9, sigmaColor: 75, sigmaSpace: 75);
+
+            // 3. Otsu二値化（自動閾値選択）
+            // Adaptive Thresholdより安定した結果を提供
+            using var binary = new Mat();
+            Cv2.Threshold(filtered, binary, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
+
+            // 4. 背景/文字の明暗判定と反転処理
+            // PP-OCRv5は黒背景白文字よりも白背景黒文字で精度が高い傾向
+            var meanValue = Cv2.Mean(binary).Val0;
+            using var normalized = new Mat();
+            if (meanValue > 127)
+            {
+                // 白背景黒文字の場合はそのまま使用
+                binary.CopyTo(normalized);
+            }
+            else
+            {
+                // 黒背景白文字の場合は反転して白背景黒文字に
+                Cv2.BitwiseNot(binary, normalized);
+            }
+
+            // 5. 微細ノイズ除去（モルフォロジー開放演算）
+            // 日本語の細かい画数を保持しながらノイズを除去
+            using var kernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(2, 2));
+            using var cleaned = new Mat();
+            Cv2.MorphologyEx(normalized, cleaned, MorphTypes.Open, kernel);
+
+            // 6. 文字の隙間補完（モルフォロジー閉鎖演算）
+            // ひらがな・カタカナの曲線を滑らかに
+            using var closeKernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(2, 2));
+            Cv2.MorphologyEx(cleaned, output, MorphTypes.Close, closeKernel);
+
+            return output;
+        }
+        catch (Exception)
+        {
+            output?.Dispose();
+            input.CopyTo(output = new Mat());
+            return output;
+        }
+    }
+
+    /// <summary>
+    /// 日本語ゲームテキスト向け高精度前処理
+    /// 小さいテキストや低コントラスト環境に対応
+    /// </summary>
+    public static Mat ProcessJapaneseGameText(Mat input, bool upscale = true)
+    {
+        try
+        {
+            Mat processInput = input;
+            Mat? upscaled = null;
+
+            // 1. 必要に応じて2倍アップスケール（小さいテキスト対策）
+            if (upscale && (input.Width < 640 || input.Height < 480))
+            {
+                upscaled = new Mat();
+                Cv2.Resize(input, upscaled, new OpenCvSharp.Size(input.Width * 2, input.Height * 2),
+                           interpolation: InterpolationFlags.Cubic);
+                processInput = upscaled;
+            }
+
+            // 2. 日本語特化前処理を適用
+            var result = ProcessWithJapaneseOptimization(processInput);
+
+            // 3. アップスケールした場合は元のサイズに戻す
+            if (upscaled != null)
+            {
+                using var temp = result;
+                result = new Mat();
+                Cv2.Resize(temp, result, new OpenCvSharp.Size(input.Width, input.Height),
+                           interpolation: InterpolationFlags.Area);
+                upscaled.Dispose();
+            }
+
+            return result;
+        }
+        catch (Exception)
+        {
             var fallback = new Mat();
             input.CopyTo(fallback);
             return fallback;

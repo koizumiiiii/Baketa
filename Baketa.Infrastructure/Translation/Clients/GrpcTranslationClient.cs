@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
@@ -260,6 +262,161 @@ public sealed class GrpcTranslationClient : ITranslationClient, IDisposable
             _logger.LogError(ex, "[gRPC] HealthCheck error");
             return false;
         }
+    }
+
+    /// <inheritdoc/>
+    /// <summary>
+    /// Issue #182: gRPCネイティブバッチ翻訳
+    /// Task.WhenAllによる個別リクエスト並行実行ではなく、TranslateBatch RPCを直接呼び出し
+    /// リクエスト順序とレスポンス順序の対応を保証
+    /// </summary>
+    public async Task<IReadOnlyList<TranslationResponse>> TranslateBatchAsync(
+        IReadOnlyList<TranslationRequest> requests,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(requests);
+
+        if (requests.Count == 0)
+        {
+            return Array.Empty<TranslationResponse>();
+        }
+
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            // BatchTranslateRequest構築
+            var batchRequest = new BatchTranslateRequest
+            {
+                BatchId = Guid.NewGuid().ToString()
+            };
+
+            Console.WriteLine($"🔥 [gRPC_CLIENT] TranslateBatchAsync開始 - BatchId: {batchRequest.BatchId}, Count: {requests.Count}");
+
+            // 各リクエストを変換
+            foreach (var request in requests)
+            {
+                var grpcRequest = new TranslateRequest
+                {
+                    RequestId = request.RequestId.ToString(),
+                    SourceText = request.SourceText,
+                    SourceLanguage = new ProtoLanguage { Code = request.SourceLanguage.Code },
+                    TargetLanguage = new ProtoLanguage { Code = request.TargetLanguage.Code }
+                };
+                batchRequest.Requests.Add(grpcRequest);
+            }
+
+            _logger.LogDebug(
+                "[gRPC] TranslateBatch: BatchId={BatchId}, Count={Count}",
+                batchRequest.BatchId,
+                requests.Count
+            );
+
+            // gRPC TranslateBatch RPC呼び出し
+            var callOptions = new CallOptions(cancellationToken: cancellationToken)
+                .WithWaitForReady(true);
+
+            Console.WriteLine($"🔥 [gRPC_CLIENT] gRPC TranslateBatch RPC呼び出し開始（WaitForReady=true）...");
+            var grpcBatchResponse = await _client.TranslateBatchAsync(batchRequest, callOptions)
+                .ConfigureAwait(false);
+
+            sw.Stop();
+
+            Console.WriteLine($"🔥 [gRPC_CLIENT] gRPCバッチ応答受信 - SuccessCount: {grpcBatchResponse.SuccessCount}/{grpcBatchResponse.Responses.Count}");
+
+            // レスポンス変換（順序維持）
+            var responses = new List<TranslationResponse>(grpcBatchResponse.Responses.Count);
+            for (var i = 0; i < grpcBatchResponse.Responses.Count; i++)
+            {
+                var grpcResponse = grpcBatchResponse.Responses[i];
+                var originalRequest = requests[i];
+
+                if (grpcResponse.IsSuccess)
+                {
+                    responses.Add(TranslationResponse.CreateSuccessWithConfidence(
+                        originalRequest,
+                        grpcResponse.TranslatedText,
+                        grpcResponse.EngineName,
+                        sw.ElapsedMilliseconds / requests.Count, // 平均時間
+                        grpcResponse.ConfidenceScore
+                    ));
+                }
+                else
+                {
+                    var error = new CoreTranslationError
+                    {
+                        ErrorCode = grpcResponse.Error?.ErrorCode ?? "UNKNOWN",
+                        Message = grpcResponse.Error?.Message ?? "Translation failed"
+                    };
+
+                    responses.Add(TranslationResponse.CreateError(originalRequest, error, grpcResponse.EngineName));
+                }
+            }
+
+            _logger.LogDebug(
+                "[gRPC] TranslateBatch completed: {SuccessCount}/{TotalCount} successful in {ElapsedMs}ms",
+                grpcBatchResponse.SuccessCount,
+                requests.Count,
+                sw.ElapsedMilliseconds
+            );
+
+            return responses;
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+        {
+            sw.Stop();
+            Console.WriteLine($"❌ [gRPC_CLIENT] BATCH TIMEOUT: {ex.Message}");
+            _logger.LogWarning("[gRPC] Batch translation timeout: {Message}", ex.Message);
+
+            return CreateBatchErrorResponses(requests, "TIMEOUT", "Batch translation request timed out", ex, sw.ElapsedMilliseconds);
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unavailable)
+        {
+            sw.Stop();
+            Console.WriteLine($"❌ [gRPC_CLIENT] BATCH UNAVAILABLE: {ex.Message}");
+            _logger.LogError("[gRPC] Server unavailable for batch: {Message}", ex.Message);
+
+            return CreateBatchErrorResponses(requests, "UNAVAILABLE", $"gRPC server unavailable: {_serverAddress}", ex, sw.ElapsedMilliseconds);
+        }
+        catch (RpcException ex)
+        {
+            sw.Stop();
+            Console.WriteLine($"❌ [gRPC_CLIENT] BATCH RPC ERROR: StatusCode={ex.StatusCode}, Message={ex.Message}");
+            _logger.LogError("[gRPC] Batch RPC error (Status: {StatusCode}): {Message}", ex.StatusCode, ex.Message);
+
+            return CreateBatchErrorResponses(requests, ex.StatusCode.ToString(), $"gRPC error: {ex.Message}", ex, sw.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            Console.WriteLine($"❌ [gRPC_CLIENT] BATCH UNEXPECTED ERROR: {ex.GetType().Name} - {ex.Message}");
+            _logger.LogError(ex, "[gRPC] Unexpected error during batch translation");
+
+            return CreateBatchErrorResponses(requests, "UNKNOWN", "Unexpected error occurred", ex, sw.ElapsedMilliseconds);
+        }
+    }
+
+    /// <summary>
+    /// バッチエラーレスポンスを作成するヘルパーメソッド
+    /// </summary>
+    private static List<TranslationResponse> CreateBatchErrorResponses(
+        IReadOnlyList<TranslationRequest> requests,
+        string errorCode,
+        string errorMessage,
+        Exception ex,
+        long elapsedMs)
+    {
+        return requests.Select(request =>
+            TranslationResponse.CreateErrorFromException(
+                request,
+                "gRPC",
+                errorCode,
+                errorMessage,
+                ex,
+                elapsedMs / requests.Count
+            )
+        ).ToList();
     }
 
     /// <summary>
