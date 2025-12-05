@@ -43,11 +43,18 @@
 	</ItemGroup>
 
 	<!-- ネイティブDLLの自動コピー -->
+	<!-- [Issue #185] Releaseビルドが存在しない場合、Debugビルドをフォールバックで使用 -->
 	<ItemGroup>
+		<!-- Debug設定: DebugビルドのDLLを使用 -->
 		<None Include="..\BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Debug' and Exists('..\BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+		<!-- Release設定: ReleaseビルドのDLLを優先使用 -->
 		<None Include="..\BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Release' and Exists('..\BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<!-- Release設定フォールバック: ReleaseビルドがなければDebugビルドを使用 -->
+		<None Include="..\BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll" Condition="'$(Configuration)' == 'Release' and !Exists('..\BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll') and Exists('..\BaketaCaptureNative\bin\Debug\BaketaCaptureNative.dll')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>

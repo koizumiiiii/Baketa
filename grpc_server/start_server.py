@@ -55,8 +55,15 @@ from resource_monitor import ResourceMonitor  # Phase 1.1: GPU/VRAM監視
 # 🔧 [UNICODE_FIX] Windows環境でのUnicodeEncodeError対策
 # sys.stdout/stderrをUTF-8に再設定（cp932 → utf-8）
 # これにより、ログ出力時のUnicodeエンコーディングエラーを防止
-sys.stdout.reconfigure(encoding='utf-8')
-sys.stderr.reconfigure(encoding='utf-8')
+# 🔥 [PYINSTALLER_FIX] コンソールなしモードではstdout/stderrがNoneの場合がある
+try:
+    if sys.stdout is not None and hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+    if sys.stderr is not None and hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8')
+except (AttributeError, OSError):
+    # PyInstaller --noconsole モードではstdout/stderrが無効
+    pass
 
 # ロギング設定
 logging.basicConfig(
@@ -235,9 +242,17 @@ async def serve(host: str, port: int):
 
     # 🔥 [PHASE8_FIX] PythonServerManager.WaitForServerReadyAsync()互換性のため[SERVER_START]出力
     # C#側がStdErrを監視しているため、sys.stderrに直接出力
-    sys.stderr.write("[SERVER_START]\n")
-    sys.stderr.flush()  # 即座に出力
-    logger.info("[SERVER_START] signal sent to stderr for C# detection")
+    # 🔥 [PYINSTALLER_FIX] コンソールなしモードではstderrがNoneまたは無効
+    try:
+        if sys.stderr is not None:
+            sys.stderr.write("[SERVER_START]\n")
+            sys.stderr.flush()  # 即座に出力
+            logger.info("[SERVER_START] signal sent to stderr for C# detection")
+        else:
+            logger.info("[SERVER_START] signal skipped (stderr unavailable)")
+    except (OSError, AttributeError):
+        # PyInstaller --noconsole モードでは書き込みがエラーになる
+        logger.info("[SERVER_START] signal skipped (stderr write failed)")
     logger.info(f"   Supported languages: {', '.join(engine.get_supported_languages())}")
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")

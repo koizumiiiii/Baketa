@@ -39,6 +39,7 @@ using Baketa.Infrastructure.Translation.Local;
 // 翻訳エンジンをNLLB-200に統一
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
+using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -1210,6 +1211,7 @@ public class InfrastructureModule : ServiceModuleBase
 
     /// <summary>
     /// [Issue #185] コンポーネントダウンロードサービスを登録します（appsettings.json対応版）
+    /// 🔥 [FIX] Singleton/Scoped競合問題修正 - HttpClientFactory + Singleton登録に変更
     /// </summary>
     /// <param name="services">サービスコレクション</param>
     /// <param name="configuration">設定オブジェクト</param>
@@ -1224,8 +1226,26 @@ public class InfrastructureModule : ServiceModuleBase
         // [Issue #185] 設定値バリデーション登録（IValidateOptionsパターン）
         services.AddSingleton<IValidateOptions<ComponentDownloadSettings>, ComponentDownloadSettingsValidator>();
 
-        // HttpClient登録（タイムアウト設定は ComponentDownloadService で行う）
-        services.AddHttpClient<Baketa.Core.Abstractions.Services.IComponentDownloader, ComponentDownloadService>();
+        // 🔥 [FIX] HttpClientFactory登録（名前付きクライアント）
+        services.AddHttpClient("ComponentDownload")
+            .ConfigureHttpClient(client =>
+            {
+                // デフォルトタイムアウトは ComponentDownloadService で上書きされる
+                client.DefaultRequestHeaders.Add("User-Agent", "Baketa-Downloader/1.0");
+            });
+
+        // 🔥 [FIX] Singleton登録でApplicationInitializer（Singleton）からの注入を可能に
+        // AddHttpClient<T>はScopedになるため、手動でSingleton登録
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IComponentDownloader>(provider =>
+        {
+            var logger = provider.GetRequiredService<ILogger<ComponentDownloadService>>();
+            var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient("ComponentDownload");
+            var settings = provider.GetRequiredService<IOptions<ComponentDownloadSettings>>();
+
+            Console.WriteLine("🔧 [ISSUE185] ComponentDownloadService インスタンス作成 - Singleton");
+            return new ComponentDownloadService(logger, httpClient, settings);
+        });
 
         // 設定値のログ出力（開発時のみ）
 #if DEBUG
@@ -1233,8 +1253,9 @@ public class InfrastructureModule : ServiceModuleBase
         var version = configuration[$"{ComponentDownloadSettings.SectionName}:ReleaseVersion"];
         Console.WriteLine($"✅ [ISSUE185] ComponentDownloadService登録完了 - BaseUrl: {baseUrl ?? "default"}, Version: {version ?? "default"}");
         Console.WriteLine("✅ [ISSUE185] ComponentDownloadSettingsValidator登録完了 - 起動時バリデーション有効");
+        Console.WriteLine("✅ [ISSUE185] Singleton登録 - ApplicationInitializerからの注入対応完了");
 #else
-        Console.WriteLine("✅ [ISSUE185] ComponentDownloadService登録完了");
+        Console.WriteLine("✅ [ISSUE185] ComponentDownloadService登録完了 (Singleton)");
 #endif
     }
 
