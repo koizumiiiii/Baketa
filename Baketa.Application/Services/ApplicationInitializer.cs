@@ -29,10 +29,23 @@ public class ApplicationInitializer : ILoadingScreenInitializer
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _componentDownloader = componentDownloader;
 
+        // [Issue #185] デバッグ: IComponentDownloader注入状況確認
+        _logger.LogDebug("[Issue185] ApplicationInitializer コンストラクタ実行");
+        _logger.LogDebug("[Issue185] IComponentDownloader is null: {IsNull}", _componentDownloader == null);
+        if (_componentDownloader != null)
+        {
+            _logger.LogDebug("[Issue185] IComponentDownloader Type: {Type}", _componentDownloader.GetType().FullName);
+        }
+
         // Subscribe to download progress events
         if (_componentDownloader != null)
         {
             _componentDownloader.DownloadProgressChanged += OnDownloadProgressChanged;
+            _logger.LogDebug("[Issue185] DownloadProgressChanged イベント購読完了");
+        }
+        else
+        {
+            _logger.LogWarning("[Issue185] IComponentDownloaderがnullのためイベント購読スキップ");
         }
     }
 
@@ -244,6 +257,25 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             else
             {
                 _logger.LogInformation("全てのコンポーネントは既にインストール済みです");
+            }
+
+            // [Issue #185] NLLB tokenizer.json 補完ダウンロード
+            // CTranslate2モデルパッケージにtokenizer.jsonが含まれていない場合、
+            // HuggingFaceから自動ダウンロードする
+            try
+            {
+                var tokenizerDownloaded = await _componentDownloader
+                    .EnsureNllbTokenizerAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (tokenizerDownloaded)
+                {
+                    _logger.LogInformation("[Issue #185] NLLB tokenizer.json をHuggingFaceからダウンロードしました");
+                }
+            }
+            catch (Exception tokenizerEx)
+            {
+                _logger.LogWarning(tokenizerEx, "[Issue #185] tokenizer.jsonダウンロードに失敗しましたが、続行します");
             }
         }
         catch (Exception ex)

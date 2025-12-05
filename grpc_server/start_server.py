@@ -55,8 +55,15 @@ from resource_monitor import ResourceMonitor  # Phase 1.1: GPU/VRAM監視
 # 🔧 [UNICODE_FIX] Windows環境でのUnicodeEncodeError対策
 # sys.stdout/stderrをUTF-8に再設定（cp932 → utf-8）
 # これにより、ログ出力時のUnicodeエンコーディングエラーを防止
-sys.stdout.reconfigure(encoding='utf-8')
-sys.stderr.reconfigure(encoding='utf-8')
+# 🔥 [PYINSTALLER_FIX] コンソールなしモードではstdout/stderrがNoneの場合がある
+try:
+    if sys.stdout is not None and hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+    if sys.stderr is not None and hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8')
+except (AttributeError, OSError):
+    # PyInstaller --noconsole モードではstdout/stderrが無効
+    pass
 
 # ロギング設定
 logging.basicConfig(
@@ -98,12 +105,13 @@ class GracefulShutdown:
         await self.shutdown_event.wait()
 
 
-async def serve(host: str, port: int):
+async def serve(host: str, port: int, model_path_arg: str | None = None):
     """gRPCサーバー起動
 
     Args:
         host: バインドホスト（例: "localhost", "0.0.0.0"）
         port: ポート番号（例: 50051）
+        model_path_arg: [Issue #185] C#から指定されたモデルパス（Noneの場合はデフォルト）
 
     Note:
         NLLB-200-distilled-1.3B (CTranslate2 int8) を使用。
@@ -116,12 +124,18 @@ async def serve(host: str, port: int):
     # CTranslate2エンジン（NLLB-200-distilled-1.3B）を使用
     logger.info("Initializing CTranslate2 translation engine...")
 
-    # 🔥 [ALPHA_0.1.2] HuggingFace Hub統合: モデル保存先を%APPDATA%\Baketa\Modelsに変更
-    # Gemini推奨: インストール先への書き込みは管理者権限が必要なため、APPDATAを使用
-    # 🚀 [Translation Quality] NLLB-200-distilled-1.3B に移行（600Mから精度向上）
-    appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
-    model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-1.3B-ct2"
-    logger.info(f"Model path resolved: {model_path}")
+    # [Issue #185] モデルパスの決定
+    # 優先順位: 1. コマンドライン引数 2. デフォルト（%APPDATA%\Baketa\Models\nllb-200-1.3B-ct2）
+    if model_path_arg:
+        model_path = Path(model_path_arg)
+        logger.info(f"[Issue #185] Using model path from command line: {model_path}")
+    else:
+        # 🔥 [ALPHA_0.1.2] HuggingFace Hub統合: モデル保存先を%APPDATA%\Baketa\Modelsに変更
+        # Gemini推奨: インストール先への書き込みは管理者権限が必要なため、APPDATAを使用
+        # 🚀 [Translation Quality] NLLB-200-distilled-1.3B に移行（600Mから精度向上）
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
+        model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-1.3B-ct2"
+        logger.info(f"[Issue #185] Using default model path: {model_path}")
 
     # モデル存在チェック・自動ダウンロード
     if not model_path.exists() or not (model_path / "model.bin").exists():
@@ -235,9 +249,17 @@ async def serve(host: str, port: int):
 
     # 🔥 [PHASE8_FIX] PythonServerManager.WaitForServerReadyAsync()互換性のため[SERVER_START]出力
     # C#側がStdErrを監視しているため、sys.stderrに直接出力
-    sys.stderr.write("[SERVER_START]\n")
-    sys.stderr.flush()  # 即座に出力
-    logger.info("[SERVER_START] signal sent to stderr for C# detection")
+    # 🔥 [PYINSTALLER_FIX] コンソールなしモードではstderrがNoneまたは無効
+    try:
+        if sys.stderr is not None:
+            sys.stderr.write("[SERVER_START]\n")
+            sys.stderr.flush()  # 即座に出力
+            logger.info("[SERVER_START] signal sent to stderr for C# detection")
+        else:
+            logger.info("[SERVER_START] signal skipped (stderr unavailable)")
+    except (OSError, AttributeError):
+        # PyInstaller --noconsole モードでは書き込みがエラーになる
+        logger.info("[SERVER_START] signal skipped (stderr write failed)")
     logger.info(f"   Supported languages: {', '.join(engine.get_supported_languages())}")
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")
@@ -312,6 +334,13 @@ def main():
         action="store_true",
         help="Enable debug logging"
     )
+    # [Issue #185] モデルパスをC#から指定可能に
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        default=None,
+        help="Path to CTranslate2 model directory (default: %APPDATA%/Baketa/Models/nllb-200-1.3B-ct2)"
+    )
 
     args = parser.parse_args()
 
@@ -324,6 +353,7 @@ def main():
     logger.info(f"  Host: {args.host}")
     logger.info(f"  Port: {args.port}")
     logger.info(f"  Model: NLLB-200-distilled-1.3B (CTranslate2 int8)")
+    logger.info(f"  Model path: {args.model_path or '(default)'}")
     logger.info(f"  Debug mode: {args.debug}")
 
     # asyncioイベントループでサーバー起動
@@ -331,7 +361,8 @@ def main():
         asyncio.run(
             serve(
                 host=args.host,
-                port=args.port
+                port=args.port,
+                model_path_arg=args.model_path  # [Issue #185] モデルパス引数を渡す
             )
         )
     except KeyboardInterrupt:

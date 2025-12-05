@@ -39,6 +39,7 @@ using Baketa.Infrastructure.Translation.Local;
 // 翻訳エンジンをNLLB-200に統一
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
+using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -1210,6 +1211,7 @@ public class InfrastructureModule : ServiceModuleBase
 
     /// <summary>
     /// [Issue #185] コンポーネントダウンロードサービスを登録します（appsettings.json対応版）
+    /// 🔥 [FIX] Singleton/Scoped競合問題修正 - HttpClientFactory + Singleton登録に変更
     /// </summary>
     /// <param name="services">サービスコレクション</param>
     /// <param name="configuration">設定オブジェクト</param>
@@ -1224,18 +1226,51 @@ public class InfrastructureModule : ServiceModuleBase
         // [Issue #185] 設定値バリデーション登録（IValidateOptionsパターン）
         services.AddSingleton<IValidateOptions<ComponentDownloadSettings>, ComponentDownloadSettingsValidator>();
 
-        // HttpClient登録（タイムアウト設定は ComponentDownloadService で行う）
-        services.AddHttpClient<Baketa.Core.Abstractions.Services.IComponentDownloader, ComponentDownloadService>();
+        // 🔥 [FIX] HttpClientFactory登録（名前付きクライアント）
+        services.AddHttpClient("ComponentDownload")
+            .ConfigureHttpClient(client =>
+            {
+                // デフォルトタイムアウトは ComponentDownloadService で上書きされる
+                client.DefaultRequestHeaders.Add("User-Agent", "Baketa-Downloader/1.0");
+            });
 
-        // 設定値のログ出力（開発時のみ）
-#if DEBUG
-        var baseUrl = configuration[$"{ComponentDownloadSettings.SectionName}:GitHubReleasesBaseUrl"];
-        var version = configuration[$"{ComponentDownloadSettings.SectionName}:ReleaseVersion"];
-        Console.WriteLine($"✅ [ISSUE185] ComponentDownloadService登録完了 - BaseUrl: {baseUrl ?? "default"}, Version: {version ?? "default"}");
-        Console.WriteLine("✅ [ISSUE185] ComponentDownloadSettingsValidator登録完了 - 起動時バリデーション有効");
-#else
-        Console.WriteLine("✅ [ISSUE185] ComponentDownloadService登録完了");
-#endif
+        // 🔥 [FIX] Singleton登録でApplicationInitializer（Singleton）からの注入を可能に
+        // AddHttpClient<T>はScopedになるため、手動でSingleton登録
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IComponentDownloader>(provider =>
+        {
+            var logger = provider.GetRequiredService<ILogger<ComponentDownloadService>>();
+            logger.LogDebug("[Issue185] IComponentDownloader Factory実行開始");
+
+            var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+            logger.LogDebug("[Issue185] HttpClientFactory取得成功");
+            var httpClient = httpClientFactory.CreateClient("ComponentDownload");
+            logger.LogDebug("[Issue185] HttpClient作成成功");
+            var settings = provider.GetRequiredService<IOptions<ComponentDownloadSettings>>();
+            logger.LogDebug("[Issue185] ComponentDownloadSettings取得成功");
+
+            // 設定内容をログ出力
+            var settingsValue = settings.Value;
+            logger.LogDebug("[Issue185] Settings - BaseUrl: {BaseUrl}", settingsValue.GitHubReleasesBaseUrl);
+            logger.LogDebug("[Issue185] Settings - Version: {Version}", settingsValue.ReleaseVersion);
+            logger.LogDebug("[Issue185] Settings - Components Count: {Count}", settingsValue.Components?.Count ?? 0);
+
+            if (settingsValue.Components != null && settingsValue.Components.Count > 0)
+            {
+                foreach (var component in settingsValue.Components)
+                {
+                    logger.LogDebug("[Issue185] Component: {Id} - {DisplayName}", component.Id, component.DisplayName);
+                }
+            }
+            else
+            {
+                logger.LogWarning("[Issue185] Components配列が空です！appsettings.jsonを確認してください");
+            }
+
+            logger.LogDebug("[Issue185] ComponentDownloadService インスタンス作成 - Singleton");
+            return new ComponentDownloadService(logger, httpClient, settings);
+        });
+
+        // 設定値のログ出力はファクトリー内のILoggerで実行されます
     }
 
     /// <summary>

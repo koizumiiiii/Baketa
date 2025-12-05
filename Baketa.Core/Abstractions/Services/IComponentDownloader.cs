@@ -39,6 +39,14 @@ public interface IComponentDownloader
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Number of components downloaded</returns>
     Task<int> DownloadMissingComponentsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// [Issue #185] Ensures NLLB tokenizer.json exists, downloading from HuggingFace if missing
+    /// This is needed because the CTranslate2 model package may not include the tokenizer file
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if tokenizer was downloaded, false if already exists</returns>
+    Task<bool> EnsureNllbTokenizerAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
