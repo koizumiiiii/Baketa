@@ -1,23 +1,17 @@
 # Baketa gRPC Translation Server Dependencies
-# Phase 2.2: Python gRPCサーバー実装
+# Phase 2.2: Python gRPC Server
 
-# gRPC (最新版)
-# protobuf 5.x系に固定（Google AI, grpcio-status, open-clip-torchとの互換性のため）
+# gRPC (latest version)
+# protobuf 5.x fixed for Google AI, grpcio-status compatibility
 grpcio>=1.60.0
-# 🔥 [ISSUE#164 PROTOBUF_FIX] grpcio-tools 1.69.xに制限 - Protobuf 5.x互換コード生成のため
-# 1.70以降はProtobuf 6.xでコード生成してランタイムエラーが発生
+# [ISSUE#164] grpcio-tools < 1.70.0 for Protobuf 5.x code generation
 grpcio-tools>=1.60.0,<1.70.0
 protobuf>=5.26.1,<6.0
 
-# NLLB-200 Translation Model (既存requirements.txtベース)
-transformers>=4.30.0
-# 🔥 [HOTFIX alpha-0.1.10] torch CPU版を追加（transformersがtorchを暗黙的に必要とするため）
-# 根本原因: transformersのAutoTokenizer.from_pretrained()は内部でtorchをインポートするため、
-#           torchなしではImportErrorで起動直後にExitCode 1で失敗する。
-# 対策: CPU専用版を使用してパッケージサイズを抑制（CUDA版との差分 約50-100MB削減）
-# 恒久対応: Issue #171でSentencePieceProcessorによるAutoTokenizer置き換えを実施予定
-torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu
-sentencepiece>=0.1.99
+# [Issue #185] tokenizers library (Rust-based, lightweight)
+# Removed transformers/torch, load tokenizer.json directly
+# Effect: Package size reduction ~450MB (torch ~300MB + transformers ~150MB)
+tokenizers>=0.15.0
 
 # Data Processing
 numpy>=1.24.0
@@ -25,7 +19,7 @@ numpy>=1.24.0
 # System Monitoring
 psutil>=5.9.0
 
-# 🔥 [PHASE1.1] GPU/VRAM監視用（NVIDIA GPU環境）
+# [PHASE1.1] GPU/VRAM monitoring (NVIDIA GPU)
 pynvml>=11.5.0
 
 # Optional: GPU support (uncomment if CUDA is available)
@@ -34,7 +28,7 @@ pynvml>=11.5.0
 # Phase 2.2.1: CTranslate2 for optimized inference (80% memory reduction: 2.4GB -> 500MB)
 ctranslate2>=3.20.0
 
-# 🔥 [ALPHA_0.1.2] HuggingFace Hub integration for automatic model download
+# [ALPHA_0.1.2] HuggingFace Hub integration for automatic model download
 huggingface_hub>=0.20.0
 
 # Development & Testing
