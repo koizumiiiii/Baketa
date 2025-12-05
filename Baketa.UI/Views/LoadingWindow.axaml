@@ -7,7 +7,8 @@
         x:Class="Baketa.UI.Views.LoadingWindow"
         x:DataType="vm:LoadingViewModel"
         Title="Baketa - Loading..."
-        Width="600" Height="400"
+        Width="600" MinHeight="400"
+        SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         SystemDecorations="None"
@@ -49,53 +50,73 @@
                     VerticalAlignment="Center">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8">
-              <!-- ステータスアイコン -->
-              <Border Grid.Column="0"
-                      Width="24" Height="24"
-                      CornerRadius="12"
-                      Background="{Binding StatusColor}"
-                      Margin="0,0,16,0">
-                <TextBlock Text="{Binding StatusIcon}"
-                           Foreground="White"
-                           FontSize="12"
-                           HorizontalAlignment="Center"
+            <StackPanel Margin="0,6">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- ステータスアイコン -->
+                <Border Grid.Column="0"
+                        Width="24" Height="24"
+                        CornerRadius="12"
+                        Background="{Binding StatusColor}"
+                        Margin="0,0,16,0">
+                  <TextBlock Text="{Binding StatusIcon}"
+                             Foreground="White"
+                             FontSize="12"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- メッセージ -->
+                <TextBlock Grid.Column="1"
+                           Text="{Binding Message}"
+                           Foreground="#E4E4E7"
+                           FontSize="14"
                            VerticalAlignment="Center"/>
-              </Border>
 
-              <!-- メッセージ -->
-              <TextBlock Grid.Column="1"
-                         Text="{Binding Message}"
-                         Foreground="#E4E4E7"
-                         FontSize="14"
-                         VerticalAlignment="Center"/>
+                <!-- スピナー (実行中のみ表示) -->
+                <Border Grid.Column="2"
+                        Width="20" Height="20"
+                        IsVisible="{Binding IsInProgress}">
+                  <Border.Styles>
+                    <Style Selector="Border">
+                      <Style.Animations>
+                        <Animation Duration="0:0:1" IterationCount="INFINITE">
+                          <KeyFrame Cue="0%">
+                            <Setter Property="RotateTransform.Angle" Value="0"/>
+                          </KeyFrame>
+                          <KeyFrame Cue="100%">
+                            <Setter Property="RotateTransform.Angle" Value="360"/>
+                          </KeyFrame>
+                        </Animation>
+                      </Style.Animations>
+                    </Style>
+                  </Border.Styles>
+                  <Border.RenderTransform>
+                    <RotateTransform Angle="0"/>
+                  </Border.RenderTransform>
+                  <Path Data="M 10,2 A 8,8 0 1,1 10,18 A 8,8 0 0,1 10,2 M 10,4 A 6,6 0 1,0 10,16 A 6,6 0 0,0 10,4"
+                        Fill="#3B82F6"
+                        Stretch="Uniform"/>
+                </Border>
+              </Grid>
 
-              <!-- スピナー (実行中のみ表示) -->
-              <Border Grid.Column="2"
-                      Width="20" Height="20"
-                      IsVisible="{Binding IsInProgress}">
-                <Border.Styles>
-                  <Style Selector="Border">
-                    <Style.Animations>
-                      <Animation Duration="0:0:1" IterationCount="INFINITE">
-                        <KeyFrame Cue="0%">
-                          <Setter Property="RotateTransform.Angle" Value="0"/>
-                        </KeyFrame>
-                        <KeyFrame Cue="100%">
-                          <Setter Property="RotateTransform.Angle" Value="360"/>
-                        </KeyFrame>
-                      </Animation>
-                    </Style.Animations>
-                  </Style>
-                </Border.Styles>
-                <Border.RenderTransform>
-                  <RotateTransform Angle="0"/>
-                </Border.RenderTransform>
-                <Path Data="M 10,2 A 8,8 0 1,1 10,18 A 8,8 0 0,1 10,2 M 10,4 A 6,6 0 1,0 10,16 A 6,6 0 0,0 10,4"
-                      Fill="#3B82F6"
-                      Stretch="Uniform"/>
-              </Border>
-            </Grid>
+              <!-- [Issue #185] 詳細メッセージ (ダウンロード進捗など) -->
+              <StackPanel IsVisible="{Binding HasDetailMessage}"
+                          Margin="40,4,0,0">
+                <TextBlock Text="{Binding DetailMessage}"
+                           Foreground="#A1A1AA"
+                           FontSize="12"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"/>
+                <!-- プログレスバー -->
+                <ProgressBar Value="{Binding Progress}"
+                             Minimum="0"
+                             Maximum="100"
+                             Height="4"
+                             Margin="0,4,0,0"
+                             Foreground="#3B82F6"
+                             Background="#27272A"/>
+              </StackPanel>
+            </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

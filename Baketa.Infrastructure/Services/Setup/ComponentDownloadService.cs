@@ -22,6 +22,11 @@ public class ComponentDownloadService : IComponentDownloader
     private readonly string _appDataPath;
     private readonly string _appBasePath;
 
+    // [Issue #185] HuggingFace NLLB tokenizer constants
+    private const string HuggingFaceTokenizerUrl = "https://huggingface.co/facebook/nllb-200-distilled-600M/resolve/main/tokenizer.json";
+    private const long TokenizerExpectedSizeBytes = 17_331_176; // ~17.3MB
+    private const string NllbModelComponentId = "nllb_model";
+
     /// <inheritdoc/>
     public event EventHandler<ComponentDownloadProgressEventArgs>? DownloadProgressChanged;
 
@@ -217,7 +222,124 @@ public class ComponentDownloadService : IComponentDownloader
         return downloadCount;
     }
 
+    /// <inheritdoc/>
+    public async Task<bool> EnsureNllbTokenizerAsync(CancellationToken cancellationToken = default)
+    {
+        // Find nllb_model component to get its local path
+        var nllbConfig = _settings.Components.FirstOrDefault(c => c.Id == NllbModelComponentId);
+        if (nllbConfig == null)
+        {
+            _logger.LogWarning("[Issue #185] nllb_model component not configured, skipping tokenizer check");
+            return false;
+        }
+
+        // Resolve the model path
+        var modelPath = nllbConfig.UseAppData
+            ? Path.Combine(_appDataPath, nllbConfig.LocalSubPath)
+            : Path.Combine(_appBasePath, nllbConfig.LocalSubPath);
+
+        var tokenizerPath = Path.Combine(modelPath, "tokenizer.json");
+
+        // Check if tokenizer already exists
+        if (File.Exists(tokenizerPath))
+        {
+            _logger.LogInformation("[Issue #185] tokenizer.json already exists: {Path}", tokenizerPath);
+            return false;
+        }
+
+        // Ensure model directory exists
+        if (!Directory.Exists(modelPath))
+        {
+            _logger.LogWarning("[Issue #185] NLLB model directory does not exist: {Path}", modelPath);
+            return false;
+        }
+
+        _logger.LogInformation("[Issue #185] Downloading tokenizer.json from HuggingFace...");
+
+        // Create a pseudo-component for progress reporting
+        var tokenizerComponent = new ComponentInfo(
+            Id: "nllb_tokenizer",
+            DisplayName: "NLLB Tokenizer",
+            DownloadUrl: HuggingFaceTokenizerUrl,
+            LocalPath: modelPath,
+            ExpectedSizeBytes: TokenizerExpectedSizeBytes,
+            IsRequired: true);
+
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            // Download with progress reporting
+            await DownloadTokenizerWithProgressAsync(tokenizerComponent, tempPath, cancellationToken).ConfigureAwait(false);
+
+            // Move to final destination
+            File.Move(tempPath, tokenizerPath, overwrite: true);
+
+            _logger.LogInformation("[Issue #185] tokenizer.json downloaded successfully: {Path}", tokenizerPath);
+            ReportProgress(tokenizerComponent, TokenizerExpectedSizeBytes, TokenizerExpectedSizeBytes, 0, isCompleted: true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #185] Failed to download tokenizer.json from HuggingFace");
+            ReportProgress(tokenizerComponent, 0, TokenizerExpectedSizeBytes, 0, isCompleted: false, errorMessage: ex.Message);
+
+            // Clean up temp file
+            if (File.Exists(tempPath))
+            {
+                try { File.Delete(tempPath); }
+                catch { /* ignore */ }
+            }
+
+            throw new ComponentDownloadException(
+                $"Failed to download NLLB tokenizer from HuggingFace: {ex.Message}",
+                "nllb_tokenizer",
+                ex);
+        }
+    }
+
     #region Private Methods
+
+    /// <summary>
+    /// [Issue #185] Downloads tokenizer.json from HuggingFace with progress reporting
+    /// </summary>
+    private async Task DownloadTokenizerWithProgressAsync(
+        ComponentInfo component,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        using var response = await _httpClient.GetAsync(
+            component.DownloadUrl,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken).ConfigureAwait(false);
+
+        response.EnsureSuccessStatusCode();
+
+        var totalBytes = response.Content.Headers.ContentLength ?? component.ExpectedSizeBytes;
+        var bytesReceived = 0L;
+        var lastReportTime = Stopwatch.StartNew();
+        var lastBytesReceived = 0L;
+
+        await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+
+        var buffer = new byte[81920]; // 80KB buffer
+        int bytesRead;
+
+        while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+            bytesReceived += bytesRead;
+
+            // Report progress every 500ms
+            if (lastReportTime.ElapsedMilliseconds >= 500)
+            {
+                var speed = (bytesReceived - lastBytesReceived) / (lastReportTime.ElapsedMilliseconds / 1000.0);
+                ReportProgress(component, bytesReceived, totalBytes, speed);
+                lastBytesReceived = bytesReceived;
+                lastReportTime.Restart();
+            }
+        }
+    }
 
     /// <summary>
     /// [Issue #185] Ensures sufficient disk space is available before downloading

@@ -258,6 +258,25 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             {
                 _logger.LogInformation("全てのコンポーネントは既にインストール済みです");
             }
+
+            // [Issue #185] NLLB tokenizer.json 補完ダウンロード
+            // CTranslate2モデルパッケージにtokenizer.jsonが含まれていない場合、
+            // HuggingFaceから自動ダウンロードする
+            try
+            {
+                var tokenizerDownloaded = await _componentDownloader
+                    .EnsureNllbTokenizerAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (tokenizerDownloaded)
+                {
+                    _logger.LogInformation("[Issue #185] NLLB tokenizer.json をHuggingFaceからダウンロードしました");
+                }
+            }
+            catch (Exception tokenizerEx)
+            {
+                _logger.LogWarning(tokenizerEx, "[Issue #185] tokenizer.jsonダウンロードに失敗しましたが、続行します");
+            }
         }
         catch (Exception ex)
         {

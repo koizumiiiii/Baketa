@@ -75,8 +75,9 @@ public class LoadingViewModel : ViewModelBase
             var step = InitializationSteps.FirstOrDefault(s => s.StepId == e.StepId);
             if (step != null)
             {
-                step.Update(e.IsCompleted, e.Progress);
-                _logger.LogDebug("[Issue185] ステップ更新完了: {StepId}", e.StepId);
+                // [Issue #185] 詳細メッセージ（ダウンロード進捗など）も渡す
+                step.Update(e.IsCompleted, e.Progress, e.Message);
+                _logger.LogDebug("[Issue185] ステップ更新完了: {StepId}, DetailMessage: {DetailMessage}", e.StepId, e.Message);
             }
             else
             {
@@ -111,6 +112,7 @@ public class InitializationStep : ReactiveObject
     private bool _isCompleted;
     private bool _isInProgress;
     private int _progress;
+    private string _detailMessage = string.Empty;
 
     /// <summary>
     /// ステップID
@@ -118,9 +120,24 @@ public class InitializationStep : ReactiveObject
     public string StepId { get; }
 
     /// <summary>
-    /// 表示メッセージ
+    /// 表示メッセージ（静的）
     /// </summary>
     public string Message { get; }
+
+    /// <summary>
+    /// [Issue #185] 詳細メッセージ（動的更新用）
+    /// ダウンロード進捗など、リアルタイムで更新される情報を表示
+    /// </summary>
+    public string DetailMessage
+    {
+        get => _detailMessage;
+        private set => this.RaiseAndSetIfChanged(ref _detailMessage, value);
+    }
+
+    /// <summary>
+    /// [Issue #185] 詳細メッセージが存在するか
+    /// </summary>
+    public bool HasDetailMessage => !string.IsNullOrEmpty(DetailMessage);
 
     /// <summary>
     /// 完了状態
@@ -173,12 +190,24 @@ public class InitializationStep : ReactiveObject
     /// </summary>
     public void Update(bool isCompleted, int progress)
     {
+        Update(isCompleted, progress, null);
+    }
+
+    /// <summary>
+    /// [Issue #185] ステップの状態を詳細メッセージ付きで更新
+    /// </summary>
+    public void Update(bool isCompleted, int progress, string? detailMessage)
+    {
         IsCompleted = isCompleted;
         IsInProgress = !isCompleted && progress > 0;
         Progress = progress;
 
+        // [Issue #185] 詳細メッセージを更新（完了時はクリア）
+        DetailMessage = isCompleted ? string.Empty : (detailMessage ?? string.Empty);
+
         // StatusIconとStatusColorの変更通知
         this.RaisePropertyChanged(nameof(StatusIcon));
         this.RaisePropertyChanged(nameof(StatusColor));
+        this.RaisePropertyChanged(nameof(HasDetailMessage));
     }
 }

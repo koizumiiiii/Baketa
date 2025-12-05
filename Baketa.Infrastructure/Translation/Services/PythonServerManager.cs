@@ -7,8 +7,10 @@ using System.Text.Json;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.Translation.Services;
 
@@ -23,8 +25,10 @@ public class PythonServerManager(
     IPortManagementService portManager,
     PythonEnvironmentResolver pythonResolver,
     IEventAggregator eventAggregator,
+    IOptions<ComponentDownloadSettings> componentDownloadSettings,
     ILogger<PythonServerManager> logger) : IPythonServerManager, IAsyncDisposable
 {
+    private readonly ComponentDownloadSettings _componentDownloadSettings = componentDownloadSettings.Value;
     private readonly ConcurrentDictionary<string, PythonServerInstance> _activeServers = [];
     private readonly ConcurrentDictionary<int, bool> _serverStartDetectionFlags = []; // 🔥 UltraPhase 14.17: [SERVER_START]検出フラグ
     // 🔥 [P1-C_FIX] _commandCommunicationActiveFlags削除 - gRPCモード移行によりstdin通信不要
@@ -298,6 +302,11 @@ public class PythonServerManager(
         // 配布版（Release build）: PyInstaller exe（BaketaTranslationServer.exe）を直接実行
         // 開発版（Debug build）: Python + scriptで実行
 
+        // [Issue #185] NLLBモデルパスを解決
+        var modelPath = ResolveNllbModelPath();
+        var modelPathArg = !string.IsNullOrEmpty(modelPath) ? $" --model-path \"{modelPath}\"" : "";
+        logger.LogDebug("[Issue #185] モデルパス引数: {ModelPathArg}", modelPathArg);
+
 #if IS_DISTRIBUTION
         // 🔥 [PYINSTALLER_INTEGRATION] 配布版: PyInstallerでビルドしたexeを直接実行
         var translationServerExePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaTranslationServer", "BaketaTranslationServer.exe");
@@ -316,7 +325,7 @@ public class PythonServerManager(
         var startInfo = new ProcessStartInfo
         {
             FileName = translationServerExePath,
-            Arguments = $"--port {port}",
+            Arguments = $"--port {port}{modelPathArg}",
 #else
         // 開発版: Python + script実行（従来ロジック）
         string pythonExecutable;
@@ -359,7 +368,7 @@ public class PythonServerManager(
         var startInfo = new ProcessStartInfo
         {
             FileName = pythonExecutable,
-            Arguments = $"\"{scriptPath}\" --port {port}",
+            Arguments = $"\"{scriptPath}\" --port {port}{modelPathArg}",
 #endif
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -939,6 +948,45 @@ public class PythonServerManager(
         }
 
         return directory?.FullName;
+    }
+
+    /// <summary>
+    /// [Issue #185] NLLBモデルのパスを解決する
+    /// ComponentDownloadSettingsから nllb_model コンポーネントの設定を取得し、
+    /// フルパスを構築して返す
+    /// </summary>
+    /// <returns>NLLBモデルのフルパス（設定が見つからない場合はnull）</returns>
+    private string? ResolveNllbModelPath()
+    {
+        // nllb_model コンポーネントを検索
+        var nllbComponent = _componentDownloadSettings.Components
+            .FirstOrDefault(c => c.Id == "nllb_model");
+
+        if (nllbComponent == null)
+        {
+            logger.LogWarning("[Issue #185] nllb_model コンポーネント設定が見つかりません。デフォルトパスを使用します。");
+            return null;
+        }
+
+        // パスを解決: UseAppData=true → %APPDATA%\Baketa\{LocalSubPath}
+        //            UseAppData=false → {AppBaseDirectory}\{LocalSubPath}
+        string basePath;
+        if (nllbComponent.UseAppData)
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            basePath = Path.Combine(appData, "Baketa");
+        }
+        else
+        {
+            basePath = AppContext.BaseDirectory;
+        }
+
+        var modelPath = Path.Combine(basePath, nllbComponent.LocalSubPath);
+
+        logger.LogInformation("[Issue #185] NLLBモデルパス解決: {ModelPath} (UseAppData={UseAppData})",
+            modelPath, nllbComponent.UseAppData);
+
+        return modelPath;
     }
 
     /// <summary>
