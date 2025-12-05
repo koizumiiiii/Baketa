@@ -32,6 +32,7 @@ using Baketa.Infrastructure.ResourceManagement;
 using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Services.Memory;
 using Baketa.Infrastructure.Services.Settings;
+using Baketa.Infrastructure.Services.Setup;
 using Baketa.Infrastructure.Services.Translation;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
@@ -126,6 +127,9 @@ public class InfrastructureModule : ServiceModuleBase
         // 初回起動判定サービス
         RegisterFirstRunServices(services);
 
+        // [Issue #185] コンポーネントダウンロードサービス
+        RegisterComponentDownloadServices(services);
+
         // データ永続化
         RegisterPersistenceServices(services, environment);
     }
@@ -197,6 +201,9 @@ public class InfrastructureModule : ServiceModuleBase
 
         // 初回起動判定サービス
         RegisterFirstRunServices(services);
+
+        // [Issue #185] コンポーネントダウンロードサービス（appsettings.json対応）
+        RegisterComponentDownloadServices(services, configuration);
 
         // データ永続化
         RegisterPersistenceServices(services, environment);
@@ -1176,6 +1183,59 @@ public class InfrastructureModule : ServiceModuleBase
                 options.RecoveryTimeoutMs = 60000;
             });
         }
+    }
+
+    /// <summary>
+    /// [Issue #185] コンポーネントダウンロードサービスを登録します（設定なし版）
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterComponentDownloadServices(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 [ISSUE185] コンポーネントダウンロードサービス登録開始（設定なし版）");
+
+        // デフォルト設定で登録
+        services.Configure<ComponentDownloadSettings>(options =>
+        {
+            // デフォルト値はクラス定義に含まれている
+        });
+
+        // [Issue #185] 設定値バリデーション登録（IValidateOptionsパターン）
+        services.AddSingleton<IValidateOptions<ComponentDownloadSettings>, ComponentDownloadSettingsValidator>();
+
+        // HttpClient登録（名前付きHttpClient推奨）
+        services.AddHttpClient<Baketa.Core.Abstractions.Services.IComponentDownloader, ComponentDownloadService>();
+
+        Console.WriteLine("✅ [ISSUE185] ComponentDownloadService登録完了 - デフォルト設定使用");
+    }
+
+    /// <summary>
+    /// [Issue #185] コンポーネントダウンロードサービスを登録します（appsettings.json対応版）
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    /// <param name="configuration">設定オブジェクト</param>
+    private static void RegisterComponentDownloadServices(IServiceCollection services, IConfiguration configuration)
+    {
+        Console.WriteLine("🚀 [ISSUE185] コンポーネントダウンロードサービス登録開始（appsettings.json対応版）");
+
+        // appsettings.jsonからComponentDownload設定をバインド
+        services.Configure<ComponentDownloadSettings>(
+            configuration.GetSection(ComponentDownloadSettings.SectionName));
+
+        // [Issue #185] 設定値バリデーション登録（IValidateOptionsパターン）
+        services.AddSingleton<IValidateOptions<ComponentDownloadSettings>, ComponentDownloadSettingsValidator>();
+
+        // HttpClient登録（タイムアウト設定は ComponentDownloadService で行う）
+        services.AddHttpClient<Baketa.Core.Abstractions.Services.IComponentDownloader, ComponentDownloadService>();
+
+        // 設定値のログ出力（開発時のみ）
+#if DEBUG
+        var baseUrl = configuration[$"{ComponentDownloadSettings.SectionName}:GitHubReleasesBaseUrl"];
+        var version = configuration[$"{ComponentDownloadSettings.SectionName}:ReleaseVersion"];
+        Console.WriteLine($"✅ [ISSUE185] ComponentDownloadService登録完了 - BaseUrl: {baseUrl ?? "default"}, Version: {version ?? "default"}");
+        Console.WriteLine("✅ [ISSUE185] ComponentDownloadSettingsValidator登録完了 - 起動時バリデーション有効");
+#else
+        Console.WriteLine("✅ [ISSUE185] ComponentDownloadService登録完了");
+#endif
     }
 
     /// <summary>

@@ -444,6 +444,8 @@ public static class Strings
 
     // ========== Loading Screen ==========
 
+    // [Issue #185] Component download step
+    public static string Loading_DownloadingComponents => GetString("Loading_DownloadingComponents");
     public static string Loading_ResolvingDependencies => GetString("Loading_ResolvingDependencies");
     public static string Loading_LoadingOCR => GetString("Loading_LoadingOCR");
     public static string Loading_InitializingTranslation => GetString("Loading_InitializingTranslation");

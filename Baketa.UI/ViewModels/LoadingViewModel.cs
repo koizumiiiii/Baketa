@@ -39,8 +39,10 @@ public class LoadingViewModel : ViewModelBase
         VersionText = $"Version {version?.ToString(3) ?? "0.0.0"}";
 
         // 初期化ステップを作成（ローカライズリソースを使用）
+        // [Issue #185] ダウンロードステップを先頭に追加
         InitializationSteps =
         [
+            new("download_components", Strings.Loading_DownloadingComponents),
             new("resolve_dependencies", Strings.Loading_ResolvingDependencies),
             new("load_ocr", Strings.Loading_LoadingOCR),
             new("init_translation", Strings.Loading_InitializingTranslation),

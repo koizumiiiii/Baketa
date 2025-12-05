@@ -973,6 +973,10 @@
   </data>
 
   <!-- ========== Loading Screen ========== -->
+  <!-- [Issue #185] Component download step -->
+  <data name="Loading_DownloadingComponents" xml:space="preserve">
+    <value>Downloading components...</value>
+  </data>
   <data name="Loading_ResolvingDependencies" xml:space="preserve">
     <value>Resolving dependencies...</value>
   </data>

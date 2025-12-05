@@ -7,12 +7,14 @@ namespace Baketa.Application.Services;
 
 /// <summary>
 /// ローディング画面初期化サービス
-/// ローディング画面で実行される4つの初期化ステップを管理します
+/// ローディング画面で実行される5つの初期化ステップを管理します
+/// [Issue #185] 初回起動時のコンポーネントダウンロードステップを追加
 /// </summary>
 public class ApplicationInitializer : ILoadingScreenInitializer
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ApplicationInitializer> _logger;
+    private readonly IComponentDownloader? _componentDownloader;
     private readonly Stopwatch _stopwatch = new();
 
     /// <inheritdoc/>
@@ -20,10 +22,18 @@ public class ApplicationInitializer : ILoadingScreenInitializer
 
     public ApplicationInitializer(
         IServiceProvider serviceProvider,
-        ILogger<ApplicationInitializer> logger)
+        ILogger<ApplicationInitializer> logger,
+        IComponentDownloader? componentDownloader = null)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _componentDownloader = componentDownloader;
+
+        // Subscribe to download progress events
+        if (_componentDownloader != null)
+        {
+            _componentDownloader.DownloadProgressChanged += OnDownloadProgressChanged;
+        }
     }
 
     /// <inheritdoc/>
@@ -34,6 +44,13 @@ public class ApplicationInitializer : ILoadingScreenInitializer
 
         try
         {
+            // [Issue #185] Step 0: コンポーネントダウンロード（初回起動時のみ）
+            await ExecuteStepAsync(
+                "download_components",
+                "コンポーネントをダウンロードしています...",
+                DownloadMissingComponentsAsync,
+                cancellationToken).ConfigureAwait(false);
+
             // Step 1: 依存関係解決
             await ExecuteStepAsync(
                 "resolve_dependencies",
@@ -198,5 +215,79 @@ public class ApplicationInitializer : ILoadingScreenInitializer
         await Task.Delay(300, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("UIコンポーネント準備完了");
+    }
+
+    /// <summary>
+    /// [Issue #185] Step 0: 不足コンポーネントをダウンロードします
+    /// 既にインストール済みの場合はスキップします
+    /// </summary>
+    private async Task DownloadMissingComponentsAsync(CancellationToken cancellationToken)
+    {
+        if (_componentDownloader == null)
+        {
+            _logger.LogInformation("コンポーネントダウンローダーが未設定のため、ダウンロードステップをスキップ");
+            return;
+        }
+
+        _logger.LogInformation("コンポーネントダウンロードチェック開始");
+
+        try
+        {
+            var downloadCount = await _componentDownloader
+                .DownloadMissingComponentsAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (downloadCount > 0)
+            {
+                _logger.LogInformation("{Count}個のコンポーネントをダウンロードしました", downloadCount);
+            }
+            else
+            {
+                _logger.LogInformation("全てのコンポーネントは既にインストール済みです");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "コンポーネントダウンロードに失敗しましたが、続行します");
+            // ダウンロード失敗は致命的エラーではないので続行
+        }
+    }
+
+    /// <summary>
+    /// [Issue #185] ダウンロード進捗イベントハンドラ
+    /// ダウンロード進捗をローディング画面に転送します
+    /// </summary>
+    private void OnDownloadProgressChanged(object? sender, ComponentDownloadProgressEventArgs e)
+    {
+        var progressPercent = (int)Math.Round(e.PercentComplete);
+        var message = FormatDownloadMessage(e);
+
+        ReportProgress("download_components", message, e.IsCompleted, progressPercent);
+    }
+
+    /// <summary>
+    /// ダウンロード進捗メッセージをフォーマットします
+    /// </summary>
+    private static string FormatDownloadMessage(ComponentDownloadProgressEventArgs e)
+    {
+        if (e.IsCompleted)
+        {
+            return $"{e.Component.DisplayName} のダウンロード完了";
+        }
+
+        if (!string.IsNullOrEmpty(e.ErrorMessage))
+        {
+            return $"{e.Component.DisplayName} のダウンロード失敗: {e.ErrorMessage}";
+        }
+
+        var receivedMB = e.BytesReceived / 1024.0 / 1024.0;
+        var totalMB = e.TotalBytes / 1024.0 / 1024.0;
+        var speedMBps = e.SpeedBytesPerSecond / 1024.0 / 1024.0;
+
+        var etaStr = e.EstimatedTimeRemaining.HasValue
+            ? $" (残り {e.EstimatedTimeRemaining.Value.TotalSeconds:F0}秒)"
+            : "";
+
+        return $"{e.Component.DisplayName}: {receivedMB:F1}MB / {totalMB:F1}MB ({speedMBps:F1}MB/s){etaStr}";
     }
 }
