@@ -1239,24 +1239,38 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddSingleton<Baketa.Core.Abstractions.Services.IComponentDownloader>(provider =>
         {
             var logger = provider.GetRequiredService<ILogger<ComponentDownloadService>>();
-            var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
-            var httpClient = httpClientFactory.CreateClient("ComponentDownload");
-            var settings = provider.GetRequiredService<IOptions<ComponentDownloadSettings>>();
+            logger.LogDebug("[Issue185] IComponentDownloader Factory実行開始");
 
-            Console.WriteLine("🔧 [ISSUE185] ComponentDownloadService インスタンス作成 - Singleton");
+            var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+            logger.LogDebug("[Issue185] HttpClientFactory取得成功");
+            var httpClient = httpClientFactory.CreateClient("ComponentDownload");
+            logger.LogDebug("[Issue185] HttpClient作成成功");
+            var settings = provider.GetRequiredService<IOptions<ComponentDownloadSettings>>();
+            logger.LogDebug("[Issue185] ComponentDownloadSettings取得成功");
+
+            // 設定内容をログ出力
+            var settingsValue = settings.Value;
+            logger.LogDebug("[Issue185] Settings - BaseUrl: {BaseUrl}", settingsValue.GitHubReleasesBaseUrl);
+            logger.LogDebug("[Issue185] Settings - Version: {Version}", settingsValue.ReleaseVersion);
+            logger.LogDebug("[Issue185] Settings - Components Count: {Count}", settingsValue.Components?.Count ?? 0);
+
+            if (settingsValue.Components != null && settingsValue.Components.Count > 0)
+            {
+                foreach (var component in settingsValue.Components)
+                {
+                    logger.LogDebug("[Issue185] Component: {Id} - {DisplayName}", component.Id, component.DisplayName);
+                }
+            }
+            else
+            {
+                logger.LogWarning("[Issue185] Components配列が空です！appsettings.jsonを確認してください");
+            }
+
+            logger.LogDebug("[Issue185] ComponentDownloadService インスタンス作成 - Singleton");
             return new ComponentDownloadService(logger, httpClient, settings);
         });
 
-        // 設定値のログ出力（開発時のみ）
-#if DEBUG
-        var baseUrl = configuration[$"{ComponentDownloadSettings.SectionName}:GitHubReleasesBaseUrl"];
-        var version = configuration[$"{ComponentDownloadSettings.SectionName}:ReleaseVersion"];
-        Console.WriteLine($"✅ [ISSUE185] ComponentDownloadService登録完了 - BaseUrl: {baseUrl ?? "default"}, Version: {version ?? "default"}");
-        Console.WriteLine("✅ [ISSUE185] ComponentDownloadSettingsValidator登録完了 - 起動時バリデーション有効");
-        Console.WriteLine("✅ [ISSUE185] Singleton登録 - ApplicationInitializerからの注入対応完了");
-#else
-        Console.WriteLine("✅ [ISSUE185] ComponentDownloadService登録完了 (Singleton)");
-#endif
+        // 設定値のログ出力はファクトリー内のILoggerで実行されます
     }
 
     /// <summary>

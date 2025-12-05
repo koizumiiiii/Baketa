@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
+using Avalonia.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
 using Baketa.UI.Framework;
 using Baketa.UI.Resources;
+using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
 namespace Baketa.UI.ViewModels;
@@ -15,6 +17,7 @@ namespace Baketa.UI.ViewModels;
 public class LoadingViewModel : ViewModelBase
 {
     private readonly ILoadingScreenInitializer _initializer;
+    private readonly ILogger<LoadingViewModel> _logger;
     private bool _disposed;
 
     /// <summary>
@@ -29,10 +32,12 @@ public class LoadingViewModel : ViewModelBase
 
     public LoadingViewModel(
         IEventAggregator eventAggregator,
-        ILoadingScreenInitializer initializer)
+        ILoadingScreenInitializer initializer,
+        ILogger<LoadingViewModel> logger)
         : base(eventAggregator)
     {
         _initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // バージョン情報を取得
         var version = Assembly.GetExecutingAssembly().GetName().Version;
@@ -58,11 +63,26 @@ public class LoadingViewModel : ViewModelBase
     /// </summary>
     private void OnProgressChanged(object? sender, LoadingProgressEventArgs e)
     {
-        var step = InitializationSteps.FirstOrDefault(s => s.StepId == e.StepId);
-        if (step != null)
+        // [Issue #185] デバッグログ: 進捗イベント受信確認
+        _logger.LogDebug("[Issue185] OnProgressChanged受信: StepId={StepId}, Progress={Progress}%, IsCompleted={IsCompleted}",
+            e.StepId, e.Progress, e.IsCompleted);
+        _logger.LogDebug("[Issue185] Message: {Message}", e.Message);
+
+        // [Issue #185] UIスレッドへディスパッチしてプロパティ更新
+        // バックグラウンドスレッドからの呼び出しでもUIが正しく更新されるようにする
+        Dispatcher.UIThread.Post(() =>
         {
-            step.Update(e.IsCompleted, e.Progress);
-        }
+            var step = InitializationSteps.FirstOrDefault(s => s.StepId == e.StepId);
+            if (step != null)
+            {
+                step.Update(e.IsCompleted, e.Progress);
+                _logger.LogDebug("[Issue185] ステップ更新完了: {StepId}", e.StepId);
+            }
+            else
+            {
+                _logger.LogWarning("[Issue185] 対応するステップが見つかりません: {StepId}", e.StepId);
+            }
+        });
     }
 
     /// <summary>

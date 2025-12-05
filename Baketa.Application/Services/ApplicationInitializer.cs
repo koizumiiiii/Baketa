@@ -29,10 +29,23 @@ public class ApplicationInitializer : ILoadingScreenInitializer
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _componentDownloader = componentDownloader;
 
+        // [Issue #185] デバッグ: IComponentDownloader注入状況確認
+        _logger.LogDebug("[Issue185] ApplicationInitializer コンストラクタ実行");
+        _logger.LogDebug("[Issue185] IComponentDownloader is null: {IsNull}", _componentDownloader == null);
+        if (_componentDownloader != null)
+        {
+            _logger.LogDebug("[Issue185] IComponentDownloader Type: {Type}", _componentDownloader.GetType().FullName);
+        }
+
         // Subscribe to download progress events
         if (_componentDownloader != null)
         {
             _componentDownloader.DownloadProgressChanged += OnDownloadProgressChanged;
+            _logger.LogDebug("[Issue185] DownloadProgressChanged イベント購読完了");
+        }
+        else
+        {
+            _logger.LogWarning("[Issue185] IComponentDownloaderがnullのためイベント購読スキップ");
         }
     }
 
