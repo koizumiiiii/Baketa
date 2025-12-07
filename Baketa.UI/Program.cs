@@ -1416,10 +1416,17 @@ internal sealed class Program
         unifiedGpuModule.RegisterServices(services);
         Console.WriteLine("✅ Phase4: UnifiedGpuModule登録完了");
 
-        // Issue #181: ONNX OCRエンジンモジュールの登録
+        // Issue #181: ONNX OCRエンジンモジュールの登録（Surya使用時は上書きされる）
         Console.WriteLine("🚀 OnnxOcrModule登録開始");
         var onnxOcrModule = new Baketa.Infrastructure.DI.OnnxOcrModule();
         onnxOcrModule.RegisterServices(services);
         Console.WriteLine("✅ OnnxOcrModule登録完了");
+
+        // Issue #189: Surya OCRエンジンモジュールの登録（IOcrEngineを上書き）
+        // PP-OCRv5で検出できなかったビジュアルノベルの日本語ダイアログを高精度検出
+        Console.WriteLine("🚀 SuryaOcrModule登録開始");
+        var suryaOcrModule = new Baketa.Infrastructure.DI.SuryaOcrModule();
+        suryaOcrModule.RegisterServices(services);
+        Console.WriteLine("✅ SuryaOcrModule登録完了");
     }
 }

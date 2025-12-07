@@ -103,6 +103,35 @@ class SuryaOcrEngine:
     # 画像サイズ上限（10MB）- Decompression Bomb攻撃対策
     MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
+    # リサイズ設定 - 処理速度と精度のバランス
+    MAX_IMAGE_DIMENSION = 2048  # 最長辺の最大ピクセル数
+
+    def _resize_image_if_needed(self, image: "Image.Image") -> tuple["Image.Image", float]:
+        """
+        画像が大きすぎる場合はリサイズ（アスペクト比維持）
+
+        Returns:
+            tuple: (リサイズ後の画像, スケール係数)
+            スケール係数は座標を元のサイズに戻すために使用
+        """
+        width, height = image.size
+        max_dim = max(width, height)
+
+        if max_dim <= self.MAX_IMAGE_DIMENSION:
+            return image, 1.0
+
+        scale = self.MAX_IMAGE_DIMENSION / max_dim
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+
+        logger.info(f"画像リサイズ: {width}x{height} → {new_width}x{new_height} (scale: {scale:.3f})")
+
+        # LANCZOS: 高品質リサイズ（テキスト保持に最適）
+        from PIL import Image
+        resized = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        return resized, scale
+
     def recognize(self, image_bytes: bytes, languages: Optional[List[str]] = None) -> dict:
         """画像からテキストを認識 (Surya v0.17.0+ API)"""
         if not self.is_loaded:
@@ -117,10 +146,14 @@ class SuryaOcrEngine:
 
             # バイトデータから画像を読み込み
             image = Image.open(io.BytesIO(image_bytes))
+            original_size = image.size
 
             # RGB変換（必要な場合）
             if image.mode != "RGB":
                 image = image.convert("RGB")
+
+            # 大きな画像はリサイズして処理速度を向上
+            image, scale = self._resize_image_if_needed(image)
 
             # 言語指定（v0.17.0では環境変数またはRecognitionPredictorの設定で制御）
             # Note: Surya v0.17.0では言語は自動検出またはデフォルト設定を使用
@@ -156,18 +189,21 @@ class SuryaOcrEngine:
                     confidence = getattr(line, 'confidence', 0.0)
                     text = getattr(line, 'text', '')
 
+                    # リサイズした場合は座標を元のスケールに戻す
+                    inv_scale = 1.0 / scale if scale != 1.0 else 1.0
+
                     region = {
                         "text": text,
                         "confidence": float(confidence) if confidence else 0.0,
                         "bbox": {
                             "points": [
-                                {"x": float(p[0]), "y": float(p[1])}
+                                {"x": float(p[0]) * inv_scale, "y": float(p[1]) * inv_scale}
                                 for p in polygon
                             ] if polygon else [],
-                            "x": int(bbox[0]) if bbox else 0,
-                            "y": int(bbox[1]) if bbox else 0,
-                            "width": int(bbox[2] - bbox[0]) if bbox and len(bbox) >= 4 else 0,
-                            "height": int(bbox[3] - bbox[1]) if bbox and len(bbox) >= 4 else 0,
+                            "x": int(bbox[0] * inv_scale) if bbox else 0,
+                            "y": int(bbox[1] * inv_scale) if bbox else 0,
+                            "width": int((bbox[2] - bbox[0]) * inv_scale) if bbox and len(bbox) >= 4 else 0,
+                            "height": int((bbox[3] - bbox[1]) * inv_scale) if bbox and len(bbox) >= 4 else 0,
                         },
                         "line_index": idx
                     }
@@ -287,7 +323,15 @@ def serve(port: int = 50052, device: str = "cuda"):
 
     # gRPCサーバー起動
     # max_workers=1: GPU処理の競合を避けるためシングルワーカーに制限
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
+    # max_message_length: 50MB - 高解像度ゲームスクリーンショット対応
+    MAX_MESSAGE_LENGTH = 50 * 1024 * 1024  # 50MB
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=1),
+        options=[
+            ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH),
+            ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
+        ]
+    )
 
     if ocr_pb2_grpc:
         ocr_pb2_grpc.add_OcrServiceServicer_to_server(

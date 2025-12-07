@@ -77,6 +77,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
             _mockNavigationService.Object,
             _mockSettingsService.Object,
             null, // ILocalizationService
+            null, // IUnifiedSettingsService
             _mockLogger.Object));
         return _currentViewModel;
     }
@@ -118,7 +119,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SettingsWindowViewModel(null!, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, _mockLogger.Object)));
+                new SettingsWindowViewModel(null!, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, null, _mockLogger.Object)));
     }
 
     [Fact]
@@ -127,14 +128,14 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SettingsWindowViewModel(_mockChangeTracker.Object, null!, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, _mockLogger.Object)));
+                new SettingsWindowViewModel(_mockChangeTracker.Object, null!, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, null, _mockLogger.Object)));
     }
 
     [Fact(Skip = "ハングアップ問題のため一時的に無効化")]
     public void AllCategories_ReturnsExpectedCategoriesInCorrectOrder()
     {
         // Arrange - Mock設定リセット問題を回避するため直接ViewModelを作成
-        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, _mockLogger.Object));
+        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, null, _mockLogger.Object));
 
         try
         {
@@ -186,7 +187,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     {
         // Arrange
         _mockChangeTracker.Setup(x => x.HasChanges).Returns(true);
-        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, _mockLogger.Object));
+        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, null, _mockLogger.Object));
 
         // Act & Assert
         viewModel.HasChanges.Should().BeTrue();
@@ -226,7 +227,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     {
         // Arrange - Mock設定が確実に反映されるよう直接ViewModelを作成
         _mockChangeTracker.Setup(x => x.HasChanges).Returns(false);
-        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, _mockLogger.Object));
+        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, null, _mockLogger.Object));
 
         try
         {
@@ -267,7 +268,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     {
         // Arrange
         _mockChangeTracker.Setup(x => x.ConfirmDiscardChangesAsync()).ReturnsAsync(true);
-        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, _mockLogger.Object));
+        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, null, _mockLogger.Object));
 
         // Act
         await viewModel.CancelCommand.Execute().FirstAsync();
@@ -300,7 +301,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     {
         // Arrange
         _mockChangeTracker.Setup(x => x.ConfirmDiscardChangesAsync()).ReturnsAsync(true);
-        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, _mockLogger.Object));
+        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockChangeTracker.Object, _mockEventAggregator.Object, _mockAuthService.Object, _mockNavigationService.Object, _mockSettingsService.Object, null, null, _mockLogger.Object));
 
         // Act
         await viewModel.ResetCommand.Execute().FirstAsync();

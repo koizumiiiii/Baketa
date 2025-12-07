@@ -136,7 +136,7 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
                     lock (_lockObject)
                     {
                         _queuedEngine = new QueuedPaddleOcrAll(
-                            factory: () => CreatePaddleOcrEngine(models, useGpu),
+                            factory: () => CreatePaddleOcrEngine(models, useGpu, settings),  // ✅ [DETECTION_THRESHOLD_FIX] settingsを渡す
                             consumerCount: 1,  // 🔧 [SEH_FIX] 暫定的に1ワーカーで初期化（複数インスタンスでSEHException発生）
                             boundedCapacity: settings.QueuedOcrBoundedCapacity // 🔥 [P4-B_FIX] 設定外部化（appsettings.json対応）
                         );
@@ -362,7 +362,7 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
     /// <remarks>
     /// Geminiレビュー推奨: メソッド分割による可読性向上
     /// </remarks>
-    private PaddleOcrAll CreatePaddleOcrEngine(FullOcrModel models, bool useGpu)
+    private PaddleOcrAll CreatePaddleOcrEngine(FullOcrModel models, bool useGpu, OcrEngineSettings settings)
     {
         // Step 1: GPU/CPU エンジン作成
         var engine = useGpu ? TryCreateGpuEngine(models) : null;
@@ -371,8 +371,8 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
         // Step 2: デバッグログ出力
         LogEngineCreation(engine, useGpu);
 
-        // Step 3: 検出最適化適用
-        ApplyDetectionOptimizationSafe(engine);
+        // Step 3: 検出最適化適用 ✅ [DETECTION_THRESHOLD_FIX] settingsを渡す
+        ApplyDetectionOptimizationSafe(engine, settings);
 
         return engine;
     }
@@ -440,11 +440,11 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
     /// <summary>
     /// 検出最適化を安全に適用（例外は警告ログのみ）
     /// </summary>
-    private void ApplyDetectionOptimizationSafe(PaddleOcrAll engine)
+    private void ApplyDetectionOptimizationSafe(PaddleOcrAll engine, OcrEngineSettings settings)
     {
         try
         {
-            ApplyDetectionOptimization(engine);
+            ApplyDetectionOptimization(engine, settings);  // ✅ [DETECTION_THRESHOLD_FIX] settingsを渡す
             _logger?.LogDebug("✅ [P1-B-FIX] ワーカーインスタンスに検出最適化適用完了");
         }
         catch (Exception optEx)
@@ -460,10 +460,11 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
     /// <summary>
     /// 検出精度最適化パラメーター適用（内部実装）
     /// </summary>
-    private void ApplyDetectionOptimization(PaddleOcrAll ocrEngine)
+    private void ApplyDetectionOptimization(PaddleOcrAll ocrEngine, OcrEngineSettings settings)
     {
         // ✅ [PPOCRV5_2025] パラメータ適用開始ログ
-        _logger?.LogInformation("🔥 [PPOCRV5_2025] ApplyDetectionOptimization メソッド開始");
+        // ✅ [DETECTION_THRESHOLD_FIX] settingsから検出閾値を適用
+        _logger?.LogInformation("🔥 [PPOCRV5_2025] ApplyDetectionOptimization メソッド開始 (DetectionThreshold={DetectionThreshold})", settings.DetectionThreshold);
 
         try
         {
@@ -516,10 +517,11 @@ public sealed class PaddleOcrEngineInitializer : IPaddleOcrEngineInitializer, ID
             // 🔥 実際のDetectorプロパティ名にマッピング: BoxScoreThreahold, BoxThreshold, UnclipRatio, MaxSize
             var detectionParams = new Dictionary<string, object>
             {
-                // 検出閾値: PP-OCRv5推奨値 0.3（ノイズ削減、精度向上）
-                // 旧値 0.1 は過度に緩く偽陽性増加の原因
+                // ✅ [DETECTION_THRESHOLD_FIX] OcrEngineSettings.DetectionThresholdから値を取得
+                // 検出閾値: デフォルト0.6、ユーザー設定で調整可能
+                // 低コントラストのダイアログテキスト検出には0.1-0.3推奨
                 // Note: プロパティ名にtypoあり（Threshold → Threahold）
-                { "BoxScoreThreahold", 0.3f },
+                { "BoxScoreThreahold", (float)settings.DetectionThreshold },
 
                 // ボックス閾値: PP-OCRv5推奨値 0.6（偽陽性削減 -40%）
                 // 旧値 0.3 は低信頼度ボックスを過剰検出

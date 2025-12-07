@@ -22,6 +22,11 @@ except ImportError:
 try:
     from . import ocr_pb2
     from . import ocr_pb2_grpc
-except ImportError:
+except ImportError as e:
+    print(f"OCR proto import error: {e}")
+    ocr_pb2 = None
+    ocr_pb2_grpc = None
+except Exception as e:
+    print(f"OCR proto unexpected error: {type(e).__name__}: {e}")
     ocr_pb2 = None
     ocr_pb2_grpc = None

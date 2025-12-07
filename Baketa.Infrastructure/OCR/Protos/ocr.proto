@@ -1,0 +1,144 @@
+// ocr.proto
+// Baketa OCR Service gRPC Interface Definition
+// Version: 1.0.0
+// Issue #189: 次世代OCRエンジン移行
+
+syntax = "proto3";
+
+package baketa.ocr.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+/// OCRエラーの種類
+enum OcrErrorType {
+  OCR_ERROR_TYPE_UNSPECIFIED = 0;
+  OCR_ERROR_TYPE_UNKNOWN = 1;
+  OCR_ERROR_TYPE_MODEL_LOAD_ERROR = 2;
+  OCR_ERROR_TYPE_INVALID_IMAGE = 3;
+  OCR_ERROR_TYPE_PROCESSING_ERROR = 4;
+  OCR_ERROR_TYPE_TIMEOUT = 5;
+  OCR_ERROR_TYPE_OUT_OF_MEMORY = 6;
+  OCR_ERROR_TYPE_UNSUPPORTED_LANGUAGE = 7;
+  OCR_ERROR_TYPE_SERVICE_UNAVAILABLE = 8;
+}
+
+/// OCRエンジンの種類
+enum OcrEngineType {
+  OCR_ENGINE_TYPE_UNSPECIFIED = 0;
+  OCR_ENGINE_TYPE_SURYA = 1;
+  OCR_ENGINE_TYPE_PADDLE_VL = 2;
+  OCR_ENGINE_TYPE_PP_OCRV5 = 3;  // 既存エンジン（参考用）
+}
+
+// ============================================================================
+// Basic Types
+// ============================================================================
+
+/// バウンディングボックス（4点ポリゴン）
+message BoundingBox {
+  // 4点の座標（左上から時計回り）
+  repeated Point points = 1;
+  // 簡易矩形（回転なしの場合）
+  int32 x = 2;
+  int32 y = 3;
+  int32 width = 4;
+  int32 height = 5;
+}
+
+/// 座標点
+message Point {
+  float x = 1;
+  float y = 2;
+}
+
+/// 検出されたテキスト領域
+message TextRegion {
+  string text = 1;                // 認識されたテキスト
+  BoundingBox bounding_box = 2;   // バウンディングボックス
+  float confidence = 3;           // 信頼度スコア (0.0-1.0)
+  string language = 4;            // 検出された言語（オプション）
+  int32 line_index = 5;           // 行番号（0-indexed）
+}
+
+/// OCRエラー情報
+message OcrError {
+  OcrErrorType error_type = 1;
+  string message = 2;
+  string details = 3;
+  bool is_retryable = 4;
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+/// OCRリクエスト
+message OcrRequest {
+  string request_id = 1;          // リクエストID (UUID)
+  bytes image_data = 2;           // 画像データ（PNG/JPEG）
+  string image_format = 3;        // 画像フォーマット ("png", "jpeg")
+  repeated string languages = 4;  // 認識対象言語（空の場合は自動検出）
+  OcrEngineType engine = 5;       // 使用するエンジン
+  map<string, string> options = 6; // エンジン固有オプション
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+/// OCRレスポンス
+message OcrResponse {
+  string request_id = 1;          // 対応するリクエストID
+  bool is_success = 2;            // 成功したかどうか
+  repeated TextRegion regions = 3; // 検出されたテキスト領域
+  int32 region_count = 4;         // 検出された領域数
+  int64 processing_time_ms = 5;   // 処理時間（ミリ秒）
+  OcrError error = 6;             // エラー情報（失敗時）
+  string engine_name = 7;         // 使用されたエンジン名
+  string engine_version = 8;      // エンジンバージョン
+  map<string, string> metadata = 9; // メタデータ
+  google.protobuf.Timestamp timestamp = 10;
+}
+
+/// ヘルスチェックリクエスト
+message OcrHealthCheckRequest {
+  // Empty
+}
+
+/// ヘルスチェックレスポンス
+message OcrHealthCheckResponse {
+  bool is_healthy = 1;
+  string status = 2;
+  map<string, string> details = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+/// 準備状態確認リクエスト
+message OcrIsReadyRequest {
+  // Empty
+}
+
+/// 準備状態確認レスポンス
+message OcrIsReadyResponse {
+  bool is_ready = 1;
+  string status = 2;
+  map<string, string> details = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// ============================================================================
+// Service Definition
+// ============================================================================
+
+/// Baketa OCRサービス
+service OcrService {
+  /// 画像からテキストを認識
+  rpc Recognize(OcrRequest) returns (OcrResponse);
+
+  /// ヘルスチェック
+  rpc HealthCheck(OcrHealthCheckRequest) returns (OcrHealthCheckResponse);
+
+  /// 準備状態確認
+  rpc IsReady(OcrIsReadyRequest) returns (OcrIsReadyResponse);
+}
