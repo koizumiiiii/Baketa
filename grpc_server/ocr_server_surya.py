@@ -100,10 +100,17 @@ class SuryaOcrEngine:
             logger.error(f"モデルロードエラー: {e}")
             return False
 
+    # 画像サイズ上限（10MB）- Decompression Bomb攻撃対策
+    MAX_IMAGE_SIZE = 10 * 1024 * 1024
+
     def recognize(self, image_bytes: bytes, languages: Optional[List[str]] = None) -> dict:
         """画像からテキストを認識"""
         if not self.is_loaded:
             raise RuntimeError("モデルが未ロードです")
+
+        # 入力画像サイズ検証（セキュリティ対策）
+        if len(image_bytes) > self.MAX_IMAGE_SIZE:
+            raise ValueError(f"画像サイズが上限を超えています: {len(image_bytes)} bytes (上限: {self.MAX_IMAGE_SIZE} bytes)")
 
         try:
             from PIL import Image
@@ -271,7 +278,8 @@ def serve(port: int = 50052, device: str = "cuda"):
         return
 
     # gRPCサーバー起動
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    # max_workers=1: GPU処理の競合を避けるためシングルワーカーに制限
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
 
     if ocr_pb2_grpc:
         ocr_pb2_grpc.add_OcrServiceServicer_to_server(
