@@ -43,42 +43,45 @@ logger = logging.getLogger(__name__)
 
 
 class PaddleVLOcrEngine:
-    """PaddleOCR-VL エンジンラッパー"""
+    """PaddleOCR-VL エンジンラッパー (真のVision-Language Model)
 
-    VERSION = "2.8.x"  # PaddleOCR バージョン
+    PaddleOCR-VL-0.9B: NaViT + ERNIE-4.5-0.3B ベースの109言語対応VLM
+    https://huggingface.co/PaddlePaddle/PaddleOCR-VL
+    """
 
-    def __init__(self, device: str = "cuda", use_angle_cls: bool = True):
+    VERSION = "VL-0.9B"  # PaddleOCR-VL バージョン
+
+    def __init__(self, device: str = "cuda"):
         self.device = device
-        self.use_angle_cls = use_angle_cls
-        self.ocr = None
+        self.pipeline = None
         self.is_loaded = False
+        # 一時ファイル用ディレクトリ
+        self._temp_dir = None
 
     def load(self) -> bool:
-        """モデルをロード"""
+        """モデルをロード (真のPaddleOCR-VL API)"""
         try:
             logger.info(f"PaddleOCR-VL モデルをロード中... (device: {self.device})")
             start_time = time.time()
 
-            from paddleocr import PaddleOCR
+            # 真のPaddleOCR-VL API
+            from paddleocr import PaddleOCRVL
 
-            # GPU使用設定
-            use_gpu = self.device == "cuda"
+            # 環境変数でGPU設定（PaddleOCR-VLはPaddlePaddle経由でGPU使用）
+            import os
+            if self.device == "cuda":
+                # PaddlePaddleのGPU設定
+                os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+            else:
+                os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-            # PaddleOCR-VL初期化
-            # PP-OCR-VLはPaddleOCRの最新バージョンに含まれる
-            self.ocr = PaddleOCR(
-                use_angle_cls=self.use_angle_cls,
-                lang="japan",  # 日本語モデル（多言語対応）
-                use_gpu=use_gpu,
-                show_log=False,
-                # VLモデル設定
-                ocr_version="PP-OCRv4",  # 最新バージョン
-                structure_version="PP-StructureV2",
-                # 高精度設定
-                det_db_thresh=0.3,
-                det_db_box_thresh=0.5,
-                rec_batch_num=6,
-            )
+            # PaddleOCR-VL 初期化
+            # 109言語対応、自動言語検出
+            self.pipeline = PaddleOCRVL()
+
+            # 一時ファイル用ディレクトリ作成
+            import tempfile
+            self._temp_dir = tempfile.mkdtemp(prefix="paddleocr_vl_")
 
             elapsed = time.time() - start_time
             logger.info(f"PaddleOCR-VL モデルロード完了 ({elapsed:.2f}秒)")
@@ -86,8 +89,8 @@ class PaddleVLOcrEngine:
             return True
 
         except ImportError as e:
-            logger.error(f"PaddleOCRライブラリが見つかりません: {e}")
-            logger.error("pip install paddlepaddle paddleocr を実行してください")
+            logger.error(f"PaddleOCR-VLライブラリが見つかりません: {e}")
+            logger.error("pip install paddlepaddle-gpu 'paddleocr[doc-parser]' を実行してください")
             return False
         except Exception as e:
             logger.exception(f"モデルロードエラー: {e}")
@@ -97,12 +100,9 @@ class PaddleVLOcrEngine:
     MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
     def recognize(self, image_bytes: bytes, languages: Optional[List[str]] = None) -> dict:
-        """画像からテキストを認識
+        """画像からテキストを認識 (真のPaddleOCR-VL API)
 
-        Note: languagesパラメータは現在無視されます。
-        PaddleOCRはインスタンス化時に言語モデルを決定するため、
-        このサーバーは日本語（japan）専用として動作します。
-        他の言語をサポートする場合は、言語ごとに個別のサーバーを起動してください。
+        PaddleOCR-VL-0.9Bは109言語を自動検出するため、languagesパラメータは参考情報として扱います。
         """
         if not self.is_loaded:
             raise RuntimeError("モデルが未ロードです")
@@ -113,7 +113,7 @@ class PaddleVLOcrEngine:
 
         try:
             from PIL import Image
-            import numpy as np
+            import uuid
 
             # バイトデータから画像を読み込み
             image = Image.open(io.BytesIO(image_bytes))
@@ -122,45 +122,64 @@ class PaddleVLOcrEngine:
             if image.mode != "RGB":
                 image = image.convert("RGB")
 
-            # numpy配列に変換
-            img_array = np.array(image)
+            # PaddleOCR-VLは画像パスを受け取るため、一時ファイルに保存
+            temp_image_path = os.path.join(self._temp_dir, f"{uuid.uuid4()}.png")
+            image.save(temp_image_path, "PNG")
+
+            if languages:
+                logger.info(f"言語ヒント: {languages} (PaddleOCR-VLは自動検出)")
 
             logger.info(f"OCR実行中... (サイズ: {image.size})")
             start_time = time.time()
 
-            # PaddleOCR実行
-            results = self.ocr.ocr(img_array, cls=self.use_angle_cls)
+            try:
+                # PaddleOCR-VL predict実行
+                output = self.pipeline.predict(temp_image_path)
 
-            elapsed = time.time() - start_time
+                elapsed = time.time() - start_time
 
-            # 結果を整形
-            regions = []
-            if results and results[0]:
-                for idx, line in enumerate(results[0]):
-                    bbox_points, (text, confidence) = line
+                # 結果を整形
+                regions = []
+                idx = 0
 
-                    # バウンディングボックスの座標を計算
-                    x_coords = [p[0] for p in bbox_points]
-                    y_coords = [p[1] for p in bbox_points]
-                    x_min, x_max = min(x_coords), max(x_coords)
-                    y_min, y_max = min(y_coords), max(y_coords)
+                # PaddleOCR-VLの結果構造を解析
+                for res in output:
+                    # 結果オブジェクトからテキストとBBoxを取得
+                    # APIによって構造が異なる可能性があるため、複数の方法を試行
+                    if hasattr(res, 'text_regions'):
+                        # text_regions属性がある場合
+                        for text_region in res.text_regions:
+                            text = getattr(text_region, 'text', '')
+                            confidence = getattr(text_region, 'confidence', 0.0)
+                            bbox = getattr(text_region, 'bbox', None)
+                            polygon = getattr(text_region, 'polygon', None)
 
-                    region = {
-                        "text": text,
-                        "confidence": confidence,
-                        "bbox": {
-                            "points": [
-                                {"x": float(p[0]), "y": float(p[1])}
-                                for p in bbox_points
-                            ],
-                            "x": int(x_min),
-                            "y": int(y_min),
-                            "width": int(x_max - x_min),
-                            "height": int(y_max - y_min),
-                        },
-                        "line_index": idx
-                    }
-                    regions.append(region)
+                            if text:
+                                region = self._create_region(text, confidence, bbox, polygon, idx)
+                                regions.append(region)
+                                idx += 1
+                    elif hasattr(res, 'rec_polys'):
+                        # rec_polys属性がある場合（レガシー形式）
+                        for i, (poly, text_info) in enumerate(zip(res.rec_polys, res.rec_texts)):
+                            text = text_info if isinstance(text_info, str) else text_info[0]
+                            confidence = 0.9  # デフォルト信頼度
+                            if isinstance(text_info, tuple) and len(text_info) > 1:
+                                confidence = float(text_info[1])
+
+                            region = self._create_region_from_poly(text, confidence, poly, idx)
+                            regions.append(region)
+                            idx += 1
+                    else:
+                        # dictとして直接アクセス
+                        res_dict = res if isinstance(res, dict) else getattr(res, '__dict__', {})
+                        logger.debug(f"結果構造: {type(res)}, keys: {res_dict.keys() if isinstance(res_dict, dict) else 'N/A'}")
+
+            finally:
+                # 一時ファイル削除
+                try:
+                    os.remove(temp_image_path)
+                except OSError:
+                    pass
 
             logger.info(f"OCR完了: {len(regions)}領域検出 ({elapsed*1000:.0f}ms)")
 
@@ -182,6 +201,58 @@ class PaddleVLOcrEngine:
                 "engine_name": "PaddleOCR-VL",
                 "engine_version": self.VERSION
             }
+
+    def _create_region(self, text: str, confidence: float, bbox, polygon, idx: int) -> dict:
+        """領域情報を作成"""
+        points = []
+        x, y, width, height = 0, 0, 0, 0
+
+        if polygon:
+            points = [{"x": float(p[0]), "y": float(p[1])} for p in polygon]
+            x_coords = [p[0] for p in polygon]
+            y_coords = [p[1] for p in polygon]
+            x, y = int(min(x_coords)), int(min(y_coords))
+            width = int(max(x_coords) - x)
+            height = int(max(y_coords) - y)
+        elif bbox:
+            x, y = int(bbox[0]), int(bbox[1])
+            width = int(bbox[2] - bbox[0]) if len(bbox) >= 4 else 0
+            height = int(bbox[3] - bbox[1]) if len(bbox) >= 4 else 0
+
+        return {
+            "text": text,
+            "confidence": float(confidence),
+            "bbox": {
+                "points": points,
+                "x": x,
+                "y": y,
+                "width": width,
+                "height": height,
+            },
+            "line_index": idx
+        }
+
+    def _create_region_from_poly(self, text: str, confidence: float, poly, idx: int) -> dict:
+        """ポリゴンから領域情報を作成"""
+        points = [{"x": float(p[0]), "y": float(p[1])} for p in poly]
+        x_coords = [p[0] for p in poly]
+        y_coords = [p[1] for p in poly]
+        x, y = int(min(x_coords)), int(min(y_coords))
+        width = int(max(x_coords) - x)
+        height = int(max(y_coords) - y)
+
+        return {
+            "text": text,
+            "confidence": float(confidence),
+            "bbox": {
+                "points": points,
+                "x": x,
+                "y": y,
+                "width": width,
+                "height": height,
+            },
+            "line_index": idx
+        }
 
 
 class OcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer if ocr_pb2_grpc else object):

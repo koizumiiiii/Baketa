@@ -10,15 +10,18 @@ protobuf>=4.25.0
 Pillow>=10.0.0
 numpy>=1.24.0
 
-# === Surya OCR ===
+# === Surya OCR v0.17.0+ ===
 # Note: surya-ocr requires PyTorch
-surya-ocr>=0.6.0
+# New API: FoundationPredictor, RecognitionPredictor, DetectionPredictor
+surya-ocr>=0.17.0
 
-# === PaddleOCR-VL ===
+# === PaddleOCR-VL (Vision-Language Model) ===
+# PaddleOCR-VL-0.9B: NaViT + ERNIE-4.5-0.3B based 109-language VLM
 # Note: PaddlePaddle requires separate installation
 # CPU: pip install paddlepaddle
 # GPU: pip install paddlepaddle-gpu
-paddleocr>=2.8.0
+# doc-parser extra includes PaddleOCRVL class
+paddleocr[doc-parser]>=3.0.0
 
 # PyTorch (Surya依存)
 # CPU: pip install torch torchvision

@@ -44,48 +44,48 @@ logger = logging.getLogger(__name__)
 
 
 class SuryaOcrEngine:
-    """Surya OCRエンジンラッパー"""
+    """Surya OCRエンジンラッパー (v0.17.0+ API対応)"""
 
-    VERSION = "0.6.x"  # Surya OCRバージョン
+    VERSION = "0.17.x"  # Surya OCRバージョン
 
     def __init__(self, device: str = "cuda"):
         self.device = device
-        self.det_model = None
-        self.det_processor = None
-        self.rec_model = None
-        self.rec_processor = None
+        self.foundation_predictor = None
+        self.recognition_predictor = None
+        self.detection_predictor = None
         self.is_loaded = False
 
     def load(self) -> bool:
-        """モデルをロード"""
+        """モデルをロード (Surya v0.17.0+ API)"""
         try:
             logger.info(f"Surya OCRモデルをロード中... (device: {self.device})")
             start_time = time.time()
 
-            # Surya OCRのインポート
-            from surya.model.detection.model import load_model as load_det_model
-            from surya.model.detection.model import load_processor as load_det_processor
-            from surya.model.recognition.model import load_model as load_rec_model
-            from surya.model.recognition.processor import load_processor as load_rec_processor
+            # Surya OCR v0.17.0+ APIのインポート
+            from surya.foundation import FoundationPredictor
+            from surya.recognition import RecognitionPredictor
+            from surya.detection import DetectionPredictor
 
-            # 検出モデル
-            self.det_model = load_det_model()
-            self.det_processor = load_det_processor()
-
-            # 認識モデル
-            self.rec_model = load_rec_model()
-            self.rec_processor = load_rec_processor()
-
-            # デバイス移動
+            # 環境変数でデバイス設定（Surya v0.17.0+）
+            import os
             if self.device == "cuda":
                 import torch
                 if torch.cuda.is_available():
-                    self.det_model = self.det_model.to("cuda")
-                    self.rec_model = self.rec_model.to("cuda")
+                    os.environ["TORCH_DEVICE"] = "cuda"
                     logger.info("CUDA利用可能: GPUモードで実行")
                 else:
+                    os.environ["TORCH_DEVICE"] = "cpu"
                     logger.warning("CUDA利用不可: CPUモードにフォールバック")
                     self.device = "cpu"
+            else:
+                os.environ["TORCH_DEVICE"] = "cpu"
+
+            # 検出モデル
+            self.detection_predictor = DetectionPredictor()
+
+            # 認識モデル (FoundationPredictor経由)
+            self.foundation_predictor = FoundationPredictor()
+            self.recognition_predictor = RecognitionPredictor(self.foundation_predictor)
 
             elapsed = time.time() - start_time
             logger.info(f"Surya OCRモデルロード完了 ({elapsed:.2f}秒)")
@@ -97,14 +97,14 @@ class SuryaOcrEngine:
             logger.error("pip install surya-ocr を実行してください")
             return False
         except Exception as e:
-            logger.error(f"モデルロードエラー: {e}")
+            logger.exception(f"モデルロードエラー: {e}")
             return False
 
     # 画像サイズ上限（10MB）- Decompression Bomb攻撃対策
     MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
     def recognize(self, image_bytes: bytes, languages: Optional[List[str]] = None) -> dict:
-        """画像からテキストを認識"""
+        """画像からテキストを認識 (Surya v0.17.0+ API)"""
         if not self.is_loaded:
             raise RuntimeError("モデルが未ロードです")
 
@@ -114,7 +114,6 @@ class SuryaOcrEngine:
 
         try:
             from PIL import Image
-            from surya.ocr import run_ocr
 
             # バイトデータから画像を読み込み
             image = Image.open(io.BytesIO(image_bytes))
@@ -123,43 +122,52 @@ class SuryaOcrEngine:
             if image.mode != "RGB":
                 image = image.convert("RGB")
 
-            # 言語指定（デフォルトは日本語+英語）
-            if not languages:
-                languages = ["ja", "en"]
+            # 言語指定（v0.17.0では環境変数またはRecognitionPredictorの設定で制御）
+            # Note: Surya v0.17.0では言語は自動検出またはデフォルト設定を使用
+            if languages:
+                logger.info(f"言語指定: {languages} (Surya v0.17.0では自動検出を使用)")
 
-            logger.info(f"OCR実行中... (言語: {languages}, サイズ: {image.size})")
+            logger.info(f"OCR実行中... (サイズ: {image.size})")
             start_time = time.time()
 
-            # Surya OCR実行
-            results = run_ocr(
+            # Surya OCR v0.17.0+ API: RecognitionPredictor + DetectionPredictor
+            predictions = self.recognition_predictor(
                 [image],
-                [languages],
-                self.det_model,
-                self.det_processor,
-                self.rec_model,
-                self.rec_processor
+                det_predictor=self.detection_predictor
             )
 
             elapsed = time.time() - start_time
 
             # 結果を整形
             regions = []
-            if results and len(results) > 0:
-                ocr_result = results[0]  # 最初の画像の結果
+            if predictions and len(predictions) > 0:
+                ocr_result = predictions[0]  # 最初の画像の結果
 
-                for idx, line in enumerate(ocr_result.text_lines):
+                # v0.17.0 API: text_linesプロパティを使用
+                text_lines = getattr(ocr_result, 'text_lines', [])
+                if not text_lines:
+                    # 代替アクセス方法
+                    text_lines = getattr(ocr_result, 'lines', [])
+
+                for idx, line in enumerate(text_lines):
+                    # BoundingBox取得（v0.17.0 API対応）
+                    bbox = getattr(line, 'bbox', None)
+                    polygon = getattr(line, 'polygon', None)
+                    confidence = getattr(line, 'confidence', 0.0)
+                    text = getattr(line, 'text', '')
+
                     region = {
-                        "text": line.text,
-                        "confidence": line.confidence,
+                        "text": text,
+                        "confidence": float(confidence) if confidence else 0.0,
                         "bbox": {
                             "points": [
-                                {"x": p[0], "y": p[1]}
-                                for p in line.polygon
-                            ] if hasattr(line, 'polygon') else [],
-                            "x": int(line.bbox[0]) if hasattr(line, 'bbox') else 0,
-                            "y": int(line.bbox[1]) if hasattr(line, 'bbox') else 0,
-                            "width": int(line.bbox[2] - line.bbox[0]) if hasattr(line, 'bbox') else 0,
-                            "height": int(line.bbox[3] - line.bbox[1]) if hasattr(line, 'bbox') else 0,
+                                {"x": float(p[0]), "y": float(p[1])}
+                                for p in polygon
+                            ] if polygon else [],
+                            "x": int(bbox[0]) if bbox else 0,
+                            "y": int(bbox[1]) if bbox else 0,
+                            "width": int(bbox[2] - bbox[0]) if bbox and len(bbox) >= 4 else 0,
+                            "height": int(bbox[3] - bbox[1]) if bbox and len(bbox) >= 4 else 0,
                         },
                         "line_index": idx
                     }
@@ -176,7 +184,7 @@ class SuryaOcrEngine:
             }
 
         except Exception as e:
-            logger.error(f"OCRエラー: {e}")
+            logger.exception(f"OCRエラー: {e}")
             return {
                 "success": False,
                 "error": str(e),
