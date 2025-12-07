@@ -1,0 +1,27 @@
+# OCR Engine Requirements for Issue #189
+# 次世代OCRエンジン移行
+
+# gRPC
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=4.25.0
+
+# 共通
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# === Surya OCR ===
+# Note: surya-ocr requires PyTorch
+surya-ocr>=0.6.0
+
+# === PaddleOCR-VL ===
+# Note: PaddlePaddle requires separate installation
+# CPU: pip install paddlepaddle
+# GPU: pip install paddlepaddle-gpu
+paddleocr>=2.8.0
+
+# PyTorch (Surya依存)
+# CPU: pip install torch torchvision
+# GPU: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+torch>=2.0.0
+torchvision>=0.15.0

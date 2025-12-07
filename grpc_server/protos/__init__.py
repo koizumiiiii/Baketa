@@ -1,16 +1,27 @@
 """
 Generated Protocol Buffer files
-Run the following command to compile translation.proto:
 
-python -m grpc_tools.protoc \
-  -I. \
-  --python_out=. \
-  --grpc_python_out=. \
-  --pyi_out=. \
-  translation.proto
+Compile proto files:
+  python -m grpc_tools.protoc -I./protos --python_out=./protos --grpc_python_out=./protos ./protos/translation.proto
+  python -m grpc_tools.protoc -I./protos --python_out=./protos --grpc_python_out=./protos ./protos/ocr.proto
 
-This will generate:
-- translation_pb2.py (message classes)
-- translation_pb2_grpc.py (service stubs)
-- translation_pb2.pyi (type hints)
+Generated files:
+- translation_pb2.py, translation_pb2_grpc.py (Translation Service)
+- ocr_pb2.py, ocr_pb2_grpc.py (OCR Service)
 """
+
+# Translation Service
+try:
+    from . import translation_pb2
+    from . import translation_pb2_grpc
+except ImportError:
+    translation_pb2 = None
+    translation_pb2_grpc = None
+
+# OCR Service
+try:
+    from . import ocr_pb2
+    from . import ocr_pb2_grpc
+except ImportError:
+    ocr_pb2 = None
+    ocr_pb2_grpc = None
