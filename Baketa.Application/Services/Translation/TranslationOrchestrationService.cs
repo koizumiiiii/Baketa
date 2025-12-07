@@ -715,9 +715,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// </summary>
     private CoreTranslationSettings GetTranslationSettings()
     {
-        // 🚨 CRITICAL FIX: translation-settings.jsonから直接読み取り
-        var sourceLanguageFromFile = "English"; // デフォルト値
-        var targetLanguageFromFile = "Japanese"; // デフォルト値
+        // 🔥 [Issue #189] translation-settings.jsonから直接読み取り
+        // UIはselectedLanguagePairとして保存（例: "en-ja"）
+        var sourceLanguageCode = "en"; // デフォルト値（TranslationSettingsと一致）
+        var targetLanguageCode = "ja"; // デフォルト値（TranslationSettingsと一致）
 
         try
         {
@@ -731,15 +732,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 var json = File.ReadAllText(translationSettingsPath);
                 using var doc = JsonDocument.Parse(json);
 
-                if (doc.RootElement.TryGetProperty("sourceLanguage", out var sourceLangElement))
+                // 🔥 [Issue #189] UIが保存する"selectedLanguagePair"プロパティを読み取る
+                // 形式: "en-ja", "ja-en" など
+                if (doc.RootElement.TryGetProperty("selectedLanguagePair", out var languagePairElement))
                 {
-                    sourceLanguageFromFile = sourceLangElement.GetString() ?? "English";
-                }
-
-                // 🔧 FIX: targetLanguageも読み取るように修正
-                if (doc.RootElement.TryGetProperty("targetLanguage", out var targetLangElement))
-                {
-                    targetLanguageFromFile = targetLangElement.GetString() ?? "Japanese";
+                    var languagePair = languagePairElement.GetString();
+                    if (!string.IsNullOrEmpty(languagePair) && languagePair.Contains('-'))
+                    {
+                        var parts = languagePair.Split('-', 2);
+                        if (parts.Length == 2)
+                        {
+                            sourceLanguageCode = parts[0].Trim().ToLowerInvariant();
+                            targetLanguageCode = parts[1].Trim().ToLowerInvariant();
+                        }
+                    }
                 }
             }
         }
@@ -748,32 +754,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             Console.WriteLine($"⚠️ [TRANSLATION_SETTINGS_DEBUG] JSON読み取り失敗: {ex.Message}");
         }
 
-        // 言語コード変換
-        var sourceLanguageCode = GetLanguageCode(sourceLanguageFromFile);
-        var targetLanguageCode = GetLanguageCode(targetLanguageFromFile);
-
-        // 緊急デバッグ: 設定取得状況を詳細ログ
-        Console.WriteLine($"🔍 [TRANSLATION_SETTINGS_DEBUG] 取得した設定:");
-        Console.WriteLine($"   - sourceLanguageFromFile: '{sourceLanguageFromFile}' → '{sourceLanguageCode}'");
-        Console.WriteLine($"   - targetLanguageFromFile: '{targetLanguageFromFile}' → '{targetLanguageCode}'");
-        Console.WriteLine($"   - _settingsService type: {_settingsService?.GetType()?.Name ?? "null"}");
-
-        // ファイルログに記録
-        try
-        {
-            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        }
-        catch { }
-
-        Console.WriteLine($"🌍 [LANGUAGE_SETTING] 設定ファイル連携: {sourceLanguageFromFile}→{targetLanguageFromFile} ({sourceLanguageCode}→{targetLanguageCode})");
-        try
-        {
-            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化{Environment.NewLine}");
-        }
-        catch { }
-
-        _logger?.LogDebug("🌍 翻訳言語設定取得: {SourceDisplay}→{TargetDisplay} ({SourceCode}→{TargetCode})",
-            sourceLanguageFromFile, targetLanguageFromFile, sourceLanguageCode, targetLanguageCode);
+        // 🔥 [Issue #189] デバッグ出力（言語コードのみ表示）
+        Console.WriteLine($"🌍 [LANGUAGE_SETTING] 設定ファイルから読み取り: {sourceLanguageCode} → {targetLanguageCode}");
+        _logger?.LogDebug("🌍 翻訳言語設定取得: {SourceCode} → {TargetCode}", sourceLanguageCode, targetLanguageCode);
 
         return new CoreTranslationSettings
         {
@@ -1932,8 +1915,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 try
                 {
                     // 設定から言語ペアを取得
-                    var sourceCode = settings.DefaultSourceLanguage ?? "ja";
-                    var targetCode = settings.DefaultTargetLanguage ?? "en";
+                    // 🔥 [Issue #189] nullフォールバックをTranslationSettingsのデフォルト値(en→ja)に合わせて修正
+                    var sourceCode = settings.DefaultSourceLanguage ?? "en";
+                    var targetCode = settings.DefaultTargetLanguage ?? "ja";
 
                     // 🚨 [CRITICAL_DEBUG] 言語設定の実際の値をデバッグ出力
                     _logger?.LogDebug($"🚨 [LANGUAGE_SETTINGS_DEBUG] settings.DefaultSourceLanguage='{settings.DefaultSourceLanguage}'");

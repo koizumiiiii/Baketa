@@ -29,6 +29,7 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
     private readonly INotificationService _notificationService;
     private readonly ILogger<LanguagePairSelectionViewModel> _logger;
     private readonly TranslationUIOptions _options;
+    private readonly SettingsFileManager _settingsFileManager;
     private readonly CompositeDisposable _disposables = [];
 
     private readonly SourceList<LanguagePairConfiguration> _languagePairsSource = new();
@@ -141,19 +142,22 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
         INotificationService notificationService,
         IOptions<TranslationUIOptions> options,
         ILogger<LanguagePairSelectionViewModel> logger,
-        IEventAggregator eventAggregator) : base(eventAggregator)
+        IEventAggregator eventAggregator,
+        SettingsFileManager settingsFileManager) : base(eventAggregator)
     {
         ArgumentNullException.ThrowIfNull(statusService);
         ArgumentNullException.ThrowIfNull(localizationService);
         ArgumentNullException.ThrowIfNull(notificationService);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(settingsFileManager);
 
         _statusService = statusService;
         _localizationService = localizationService;
         _notificationService = notificationService;
         _logger = logger;
         _options = options.Value;
+        _settingsFileManager = settingsFileManager;
 
         // 中国語変種一覧の作成
         AvailableChineseVariants = CreateChineseVariantsList();
@@ -247,8 +251,15 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
     /// </summary>
     private async Task SelectLanguagePairAsync(LanguagePairConfiguration languagePair)
     {
-        if (SelectedLanguagePair == languagePair)
-            return;
+        // 🔥 [DEBUG] メソッドが呼ばれたことを確認
+        Console.WriteLine($"[DEBUG] SelectLanguagePairAsync called: {languagePair?.LanguagePairKey}");
+        Console.WriteLine($"[DEBUG] Current SelectedLanguagePair: {SelectedLanguagePair?.LanguagePairKey}");
+
+        // 🔥 [Issue #189] ObjectEqualsConverterのConvertBackによりSelectedLanguagePairが
+        // 先に更新されるため、参照比較ではなくLanguagePairKeyで比較する
+        // また、同じペアでも設定保存は常に実行する（UIの同期を確実にするため）
+        var isSamePair = SelectedLanguagePair?.LanguagePairKey == languagePair?.LanguagePairKey;
+        Console.WriteLine($"[DEBUG] Is same pair (by key): {isSamePair}");
 
         _logger.LogInformation("Selecting language pair: {Pair}", languagePair.LanguagePairKey);
 
@@ -275,6 +286,9 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
             }
 
             SelectedLanguagePair = languagePair;
+
+            // 🔥 [Issue #189] 言語ペア変更時に即座に設定ファイルに保存
+            await SaveLanguagePairAsync(languagePair).ConfigureAwait(false);
 
             // 成功通知
             if (_options.EnableNotifications)
@@ -421,13 +435,30 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
             _languagePairsSource.Clear();
             _languagePairsSource.AddRange(languagePairsArray);
 
-            // デフォルト言語ペアの選択
+            // 🔥 [Issue #189] 保存された言語ペア設定を読み込む（フォールバックはappsettings.jsonのデフォルト値）
+            var (savedLanguagePair, savedChineseVariant) = await _settingsFileManager.LoadLanguagePairSettingsAsync().ConfigureAwait(false);
+            var targetLanguagePair = string.IsNullOrEmpty(savedLanguagePair) ? _options.DefaultLanguagePair : savedLanguagePair;
+
             var defaultPair = languagePairsArray.FirstOrDefault(p =>
-            string.Equals(p.LanguagePairKey, _options.DefaultLanguagePair, StringComparison.Ordinal));
+                string.Equals(p.LanguagePairKey, targetLanguagePair, StringComparison.OrdinalIgnoreCase));
 
             if (defaultPair != null)
             {
                 SelectedLanguagePair = defaultPair;
+                SelectedChineseVariant = savedChineseVariant;
+                _logger.LogInformation("保存された言語ペア設定を読み込みました: {LanguagePair}", targetLanguagePair);
+            }
+            else
+            {
+                // 保存された設定が見つからない場合はデフォルトを使用
+                var fallbackPair = languagePairsArray.FirstOrDefault(p =>
+                    string.Equals(p.LanguagePairKey, _options.DefaultLanguagePair, StringComparison.OrdinalIgnoreCase));
+                if (fallbackPair != null)
+                {
+                    SelectedLanguagePair = fallbackPair;
+                }
+                _logger.LogWarning("保存された言語ペア '{SavedPair}' が見つかりません。デフォルト '{Default}' を使用します",
+                    targetLanguagePair, _options.DefaultLanguagePair);
             }
 
             _logger.LogInformation("Language pairs refreshed. Count: {Count}", languagePairsArray.Length);
@@ -473,6 +504,26 @@ public sealed class LanguagePairSelectionViewModel : Framework.ViewModelBase, IA
 
         _logger.LogDebug("Language pair selected: {Pair}, IsChineseRelated: {IsChineseRelated}",
             languagePair.LanguagePairKey, IsChineseRelatedPair);
+
+        // 🔥 [Issue #189] 保存はSelectLanguagePairAsync内で行う（IsLoading状態に依存しない）
+    }
+
+    /// <summary>
+    /// 言語ペア設定を非同期で保存
+    /// </summary>
+    private async Task SaveLanguagePairAsync(LanguagePairConfiguration languagePair)
+    {
+        try
+        {
+            await _settingsFileManager.SaveLanguagePairSettingsAsync(
+                languagePair.LanguagePairKey,
+                SelectedChineseVariant).ConfigureAwait(false);
+            _logger.LogInformation("言語ペア設定を保存しました: {LanguagePair}", languagePair.LanguagePairKey);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "言語ペア設定の保存に失敗しました: {LanguagePair}", languagePair.LanguagePairKey);
+        }
     }
 
     /// <summary>

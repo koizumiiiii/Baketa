@@ -28,6 +28,7 @@ public class LanguagePairSelectionViewModelTests
     private readonly Mock<IOptions<TranslationUIOptions>> _mockOptions;
     private readonly Mock<ILogger<LanguagePairSelectionViewModel>> _mockLogger;
     private readonly Mock<IEventAggregator> _mockEventAggregator;
+    private readonly Mock<SettingsFileManager> _mockSettingsFileManager;
     private readonly TranslationUIOptions _testOptions;
 
     public LanguagePairSelectionViewModelTests()
@@ -38,6 +39,8 @@ public class LanguagePairSelectionViewModelTests
         _mockOptions = new Mock<IOptions<TranslationUIOptions>>();
         _mockLogger = new Mock<ILogger<LanguagePairSelectionViewModel>>();
         _mockEventAggregator = new Mock<IEventAggregator>();
+        _mockSettingsFileManager = new Mock<SettingsFileManager>(
+            new Mock<ILogger<SettingsFileManager>>().Object);
 
         _testOptions = new TranslationUIOptions
         {
@@ -57,6 +60,11 @@ public class LanguagePairSelectionViewModelTests
 
         // LocalizationServiceのObservableをモック設定
         _mockLocalizationService.Setup(x => x.CurrentLanguageChanged).Returns(Observable.Never<System.Globalization.CultureInfo>());
+
+        // SettingsFileManagerのモック設定（デフォルト言語ペアを返す）
+        _mockSettingsFileManager
+            .Setup(x => x.LoadLanguagePairSettingsAsync())
+            .ReturnsAsync(("en-ja", ChineseVariant.Simplified));
     }
 
     [Fact]
@@ -83,7 +91,8 @@ public class LanguagePairSelectionViewModelTests
                 _mockNotificationService.Object,
                 _mockOptions.Object,
                 _mockLogger.Object,
-                _mockEventAggregator.Object));
+                _mockEventAggregator.Object,
+                _mockSettingsFileManager.Object));
     }
 
     [Fact]
@@ -97,7 +106,8 @@ public class LanguagePairSelectionViewModelTests
                 _mockNotificationService.Object,
                 _mockOptions.Object,
                 _mockLogger.Object,
-                _mockEventAggregator.Object));
+                _mockEventAggregator.Object,
+                _mockSettingsFileManager.Object));
     }
 
     [Fact]
@@ -111,7 +121,8 @@ public class LanguagePairSelectionViewModelTests
                 null!,
                 _mockOptions.Object,
                 _mockLogger.Object,
-                _mockEventAggregator.Object));
+                _mockEventAggregator.Object,
+                _mockSettingsFileManager.Object));
     }
 
     [Fact]
@@ -125,7 +136,8 @@ public class LanguagePairSelectionViewModelTests
                 _mockNotificationService.Object,
                 null!,
                 _mockLogger.Object,
-                _mockEventAggregator.Object));
+                _mockEventAggregator.Object,
+                _mockSettingsFileManager.Object));
     }
 
     [Fact]
@@ -139,7 +151,8 @@ public class LanguagePairSelectionViewModelTests
                 _mockNotificationService.Object,
                 _mockOptions.Object,
                 null!,
-                _mockEventAggregator.Object));
+                _mockEventAggregator.Object,
+                _mockSettingsFileManager.Object));
     }
 
 
@@ -221,7 +234,8 @@ public class LanguagePairSelectionViewModelTests
             _mockNotificationService.Object,
             _mockOptions.Object,
             _mockLogger.Object,
-            _mockEventAggregator.Object);
+            _mockEventAggregator.Object,
+            _mockSettingsFileManager.Object);
     }
 
 }

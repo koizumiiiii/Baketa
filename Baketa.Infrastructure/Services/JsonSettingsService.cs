@@ -467,10 +467,60 @@ public sealed class JsonSettingsService : ISettingsService
     }
 
     /// <inheritdoc />
-    public Task SetCategorySettingsAsync<T>(T settings) where T : class, new()
+    public async Task SetCategorySettingsAsync<T>(T settings) where T : class, new()
     {
-        // TODO: 実際の実装
-        return Task.CompletedTask;
+        ArgumentNullException.ThrowIfNull(settings);
+
+        // 🔥 [Issue #189] TranslationSettingsの場合はtranslation-settings.jsonに保存
+        // UnifiedSettingsServiceが読み取れる形式（selectedLanguagePair）で保存する
+        if (settings is TranslationSettings translationSettings)
+        {
+            await SaveTranslationSettingsToFileAsync(translationSettings).ConfigureAwait(false);
+            return;
+        }
+
+        // その他の設定タイプは汎用ストレージに保存
+        var typeName = typeof(T).Name;
+        lock (_lockObject)
+        {
+            _settings[typeName] = settings;
+        }
+        _logger.LogDebug("カテゴリ設定を保存しました: {Type}", typeName);
+    }
+
+    /// <summary>
+    /// TranslationSettingsをtranslation-settings.jsonに保存
+    /// UnifiedSettingsServiceが読み取れる形式で保存
+    /// </summary>
+    private async Task SaveTranslationSettingsToFileAsync(TranslationSettings settings)
+    {
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var settingsDirectory = Path.Combine(userProfile, ".baketa", "settings");
+        var translationSettingsPath = Path.Combine(settingsDirectory, "translation-settings.json");
+
+        // 設定ディレクトリを作成
+        if (!Directory.Exists(settingsDirectory))
+        {
+            Directory.CreateDirectory(settingsDirectory);
+        }
+
+        // 🔥 selectedLanguagePair形式で保存（UnifiedSettingsServiceが期待する形式）
+        var settingsData = new Dictionary<string, object>
+        {
+            ["selectedLanguagePair"] = $"{settings.DefaultSourceLanguage}-{settings.DefaultTargetLanguage}",
+            ["overlayFontSize"] = settings.OverlayFontSize,
+            ["autoDetectSourceLanguage"] = settings.AutoDetectSourceLanguage,
+            ["defaultEngine"] = settings.DefaultEngine.ToString(),
+            ["useLocalEngine"] = settings.DefaultEngine == TranslationEngine.NLLB200,
+            ["timeoutMs"] = settings.TimeoutSeconds * 1000
+        };
+
+        var json = JsonSerializer.Serialize(settingsData, _jsonOptions);
+        await File.WriteAllTextAsync(translationSettingsPath, json).ConfigureAwait(false);
+
+        _logger.LogInformation("翻訳設定をファイルに保存しました: {Path}, LanguagePair={LanguagePair}",
+            translationSettingsPath,
+            settingsData["selectedLanguagePair"]);
     }
 
     /// <inheritdoc />

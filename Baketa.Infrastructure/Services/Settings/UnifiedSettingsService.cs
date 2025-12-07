@@ -61,14 +61,15 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     /// <inheritdoc />
     public ITranslationSettings GetTranslationSettings()
     {
-        if (_cachedTranslationSettings is not null)
-            return _cachedTranslationSettings;
-
+        // 🔥 [Issue #189] キャッシュを無効化し、毎回ファイルから読み取る
+        // JsonSettingsServiceがtranslation-settings.jsonに書き込んでも
+        // このキャッシュがクリアされない問題を回避
+        // 翻訳設定は頻繁にアクセスされないのでパフォーマンス影響は最小
         _settingsLock.Wait();
         try
         {
-            _cachedTranslationSettings ??= LoadTranslationSettings();
-            return _cachedTranslationSettings;
+            // 🔥 常に最新の設定をファイルから読み取る
+            return LoadTranslationSettings();
         }
         finally
         {
@@ -120,11 +121,16 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     /// <inheritdoc />
     public async Task UpdateTranslationSettingsAsync(ITranslationSettings settings, CancellationToken cancellationToken = default)
     {
+        // 🔥 [Issue #189] selectedLanguagePair形式で保存（CreateTranslationSettingsFromUserと統一）
+        // 言語コードを小文字で保存（例: "en-ja"）
+        var sourceLang = settings.DefaultSourceLanguage?.ToLowerInvariant() ?? "en";
+        var targetLang = settings.DefaultTargetLanguage?.ToLowerInvariant() ?? "ja";
+        var selectedLanguagePair = $"{sourceLang}-{targetLang}";
+
         var userSettings = new Dictionary<string, object>
         {
             ["useLocalEngine"] = settings.UseLocalEngine,
-            ["sourceLanguage"] = LanguageCodeConverter.ToDisplayName(settings.DefaultSourceLanguage),
-            ["targetLanguage"] = LanguageCodeConverter.ToDisplayName(settings.DefaultTargetLanguage),
+            ["selectedLanguagePair"] = selectedLanguagePair,  // 🔥 新形式
             ["autoDetectSourceLanguage"] = settings.AutoDetectSourceLanguage,
             ["defaultEngine"] = settings.DefaultEngine,
             ["confidenceThreshold"] = settings.ConfidenceThreshold,
@@ -147,8 +153,8 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             _settingsLock.Release();
         }
 
-        _logger?.LogInformation("翻訳設定を更新しました: {SourceLang} -> {TargetLang}, Engine: {Engine}",
-            settings.DefaultSourceLanguage, settings.DefaultTargetLanguage, settings.DefaultEngine);
+        _logger?.LogInformation("翻訳設定を更新しました: {SelectedLanguagePair}, Engine: {Engine}",
+            selectedLanguagePair, settings.DefaultEngine);
     }
 
     /// <inheritdoc />
@@ -292,10 +298,37 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         Dictionary<string, object> userSettings,
         TranslationSettings appSettings)
     {
-        var sourceLanguage = LanguageCodeConverter.ToLanguageCode(
-            userSettings.GetValueOrDefault("sourceLanguage")?.ToString() ?? "English");
-        var targetLanguage = LanguageCodeConverter.ToLanguageCode(
-            userSettings.GetValueOrDefault("targetLanguage")?.ToString() ?? "Japanese");
+        // 🔥 [Issue #189] UIが保存する"selectedLanguagePair"プロパティを優先的に読み取る
+        string sourceLanguage;
+        string targetLanguage;
+
+        var languagePairValue = userSettings.GetValueOrDefault("selectedLanguagePair");
+        var languagePairString = GetStringFromValue(languagePairValue);
+
+        if (!string.IsNullOrEmpty(languagePairString) && languagePairString.Contains('-'))
+        {
+            // 🔥 "ja-en" 形式をパース（source-target）
+            var parts = languagePairString.Split('-', 2);
+            if (parts.Length == 2)
+            {
+                sourceLanguage = parts[0].Trim().ToLowerInvariant();
+                targetLanguage = parts[1].Trim().ToLowerInvariant();
+            }
+            else
+            {
+                // パース失敗時はデフォルト
+                sourceLanguage = "en";
+                targetLanguage = "ja";
+            }
+        }
+        else
+        {
+            // レガシー形式にフォールバック（存在しない可能性が高い）
+            sourceLanguage = LanguageCodeConverter.ToLanguageCode(
+                userSettings.GetValueOrDefault("sourceLanguage")?.ToString() ?? "English");
+            targetLanguage = LanguageCodeConverter.ToLanguageCode(
+                userSettings.GetValueOrDefault("targetLanguage")?.ToString() ?? "Japanese");
+        }
 
         return new UnifiedTranslationSettings(
             GetBoolValue(userSettings, "autoDetectSourceLanguage", appSettings.AutoDetectSourceLanguage),
@@ -359,6 +392,20 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             JsonElement element when element.ValueKind == JsonValueKind.Number => element.GetInt32(),
             string stringValue when int.TryParse(stringValue, out var parsed) => parsed,
             _ => defaultValue
+        };
+    }
+
+    /// <summary>
+    /// オブジェクトから文字列を取得（JsonElement対応）
+    /// </summary>
+    private static string? GetStringFromValue(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            string stringValue => stringValue,
+            JsonElement element when element.ValueKind == JsonValueKind.String => element.GetString(),
+            _ => value.ToString()
         };
     }
 

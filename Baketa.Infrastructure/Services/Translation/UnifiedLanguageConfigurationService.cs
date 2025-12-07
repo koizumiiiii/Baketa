@@ -28,21 +28,42 @@ public sealed class UnifiedLanguageConfigurationService : ILanguageConfiguration
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        // 🔥 [Issue #189] 設定変更時にキャッシュをクリアして最新の言語ペアを反映
+        _settingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    /// <summary>
+    /// 設定変更時のハンドラ
+    /// </summary>
+    private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
+    {
+        // 翻訳設定が変更された場合のみキャッシュをクリア
+        if (e.SettingsType == SettingsType.Translation)
+        {
+            lock (_cacheLock)
+            {
+                _cachedLanguagePair = null;
+            }
+            _logger.LogDebug("言語ペアキャッシュをクリアしました（設定変更検出）");
+        }
     }
 
     /// <inheritdoc />
     public LanguagePair GetCurrentLanguagePair()
     {
+        // 🔥 [Issue #189] キャッシュを無効化し、毎回ファイルから読み取る
+        // JsonSettingsServiceがtranslation-settings.jsonに書き込んでも
+        // UnifiedSettingsServiceのキャッシュがクリアされない問題を回避
+        // 翻訳は頻繁に呼ばれないのでパフォーマンス影響は最小
         lock (_cacheLock)
         {
-            if (_cachedLanguagePair is not null)
-                return _cachedLanguagePair;
-
+            // 🔥 キャッシュは使用せず、常に最新の設定を読み取る
             var settings = _settingsService.GetTranslationSettings();
-            _cachedLanguagePair = CreateLanguagePairFromSettings(settings);
+            var languagePair = CreateLanguagePairFromSettings(settings);
 
-            _logger.LogDebug("言語ペア初期化: {LanguagePair}", _cachedLanguagePair.ToDisplayString());
-            return _cachedLanguagePair;
+            _logger.LogDebug("言語ペア取得（毎回読み取り）: {LanguagePair}", languagePair.ToDisplayString());
+            return languagePair;
         }
     }
 

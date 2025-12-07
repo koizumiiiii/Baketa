@@ -10,7 +10,7 @@ namespace Baketa.UI.Configuration;
 /// <summary>
 /// 翻訳設定ファイルの管理クラス
 /// </summary>
-public sealed class SettingsFileManager
+public class SettingsFileManager
 {
     private readonly ILogger<SettingsFileManager> _logger;
     private readonly string _settingsDirectory;
@@ -92,19 +92,53 @@ public sealed class SettingsFileManager
     /// <param name="chineseVariant">中国語変種</param>
     public async Task SaveLanguagePairSettingsAsync(string languagePair, ChineseVariant chineseVariant)
     {
+        // 🔥 [DEBUG] 保存メソッドが呼ばれたことを確認
+        Console.WriteLine($"[DEBUG] SaveLanguagePairSettingsAsync called: {languagePair}");
+        _logger.LogInformation("[DEBUG] SaveLanguagePairSettingsAsync called: {LanguagePair}, Path: {Path}", languagePair, _settingsFilePath);
+
         try
         {
-            var settings = await LoadAllSettingsAsync().ConfigureAwait(false);
-            settings.SelectedLanguagePair = languagePair;
-            settings.SelectedChineseVariant = chineseVariant;
-            settings.LastModified = DateTime.UtcNow;
+            EnsureSettingsDirectoryExists();
+            Console.WriteLine($"[DEBUG] Directory ensured: {_settingsDirectory}");
 
-            await SaveAllSettingsAsync(settings).ConfigureAwait(false);
+            // 🔥 [Issue #189] 既存のJSONファイルを読み込み、selectedLanguagePairのみを更新
+            // TranslationSettingsDataのスキーマではなく、UnifiedSettingsServiceが期待する形式を維持
+            Dictionary<string, object>? existingSettings = null;
+
+            if (File.Exists(_settingsFilePath))
+            {
+                Console.WriteLine($"[DEBUG] File exists, reading: {_settingsFilePath}");
+                var jsonContent = await File.ReadAllTextAsync(_settingsFilePath).ConfigureAwait(false);
+                existingSettings = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonContent, _jsonOptions);
+            }
+            else
+            {
+                Console.WriteLine($"[DEBUG] File does not exist: {_settingsFilePath}");
+            }
+
+            existingSettings ??= new Dictionary<string, object>();
+
+            // selectedLanguagePairのみを更新（他のプロパティは維持）
+            existingSettings["selectedLanguagePair"] = languagePair;
+            Console.WriteLine($"[DEBUG] Updated selectedLanguagePair to: {languagePair}");
+
+            // 中国語関連の場合はchineseVariantも保存
+            if (languagePair.Contains("zh"))
+            {
+                existingSettings["selectedChineseVariant"] = chineseVariant.ToString();
+            }
+
+            var json = JsonSerializer.Serialize(existingSettings, _jsonOptions);
+            Console.WriteLine($"[DEBUG] Serialized JSON: {json.Substring(0, Math.Min(100, json.Length))}...");
+
+            await File.WriteAllTextAsync(_settingsFilePath, json).ConfigureAwait(false);
+            Console.WriteLine($"[DEBUG] File written successfully: {_settingsFilePath}");
 
             _logger.LogInformation("言語ペア設定を保存しました: {LanguagePair}, {ChineseVariant}", languagePair, chineseVariant);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DEBUG] ERROR in SaveLanguagePairSettingsAsync: {ex.Message}");
             _logger.LogError(ex, "言語ペア設定の保存に失敗しました");
             throw;
         }
@@ -114,7 +148,7 @@ public sealed class SettingsFileManager
     /// 言語ペア設定を読み込みます
     /// </summary>
     /// <returns>言語ペア設定</returns>
-    public async Task<(string LanguagePair, ChineseVariant ChineseVariant)> LoadLanguagePairSettingsAsync()
+    public virtual async Task<(string LanguagePair, ChineseVariant ChineseVariant)> LoadLanguagePairSettingsAsync()
     {
         try
         {

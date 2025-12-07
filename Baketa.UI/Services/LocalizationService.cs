@@ -144,6 +144,13 @@ public class LocalizationService : ILocalizationService, IDisposable
             var newCulture = new CultureInfo(cultureCode);
             var oldCulture = CurrentCulture;
 
+            // 🔥 同じ言語への変更は無視（冗長なログ "ja to ja" を防止）
+            if (oldCulture.Name == newCulture.Name)
+            {
+                _logger.LogDebug("言語変更スキップ（同一言語）: {CultureCode}", cultureCode);
+                return true;
+            }
+
             System.Diagnostics.Debug.WriteLine($"[LocalizationService] Old culture: {oldCulture?.Name ?? "(null)"}, New culture: {newCulture.Name}");
             Console.WriteLine($"[LocalizationService] Old culture: {oldCulture?.Name ?? "(null)"}, New culture: {newCulture.Name}");
 
