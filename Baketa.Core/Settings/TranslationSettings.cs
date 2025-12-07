@@ -1,10 +1,12 @@
+using Baketa.Core.Abstractions.Settings;
+
 namespace Baketa.Core.Settings;
 
 /// <summary>
 /// 翻訳設定クラス（UX改善対応版）
 /// 自動翻訳と単発翻訳のエンジン設定を管理
 /// </summary>
-public sealed class TranslationSettings
+public sealed class TranslationSettings : ITranslationSettings
 {
     /// <summary>
     /// 翻訳機能の有効化
@@ -465,6 +467,32 @@ public sealed class TranslationSettings
             ServerStartupTimeoutMs = ServerStartupTimeoutMs
         };
     }
+
+    #region ITranslationSettings 明示的インターフェース実装
+
+    /// <summary>
+    /// ITranslationSettings.DefaultEngine - エンジン名を文字列で返す
+    /// </summary>
+    string ITranslationSettings.DefaultEngine => DefaultEngine.ToString();
+
+    /// <summary>
+    /// ITranslationSettings.UseLocalEngine - ローカルエンジン使用フラグ
+    /// NLLB200またはLlamaLocalの場合はローカルエンジンとみなす
+    /// </summary>
+    bool ITranslationSettings.UseLocalEngine => DefaultEngine is TranslationEngine.NLLB200 or TranslationEngine.LlamaLocal;
+
+    /// <summary>
+    /// ITranslationSettings.ConfidenceThreshold - 翻訳信頼度閾値（デフォルト: 0.0）
+    /// </summary>
+    double ITranslationSettings.ConfidenceThreshold => 0.0;
+
+    /// <summary>
+    /// ITranslationSettings.TimeoutMs - タイムアウト（ミリ秒）
+    /// TimeoutSecondsを変換
+    /// </summary>
+    int ITranslationSettings.TimeoutMs => TimeoutSeconds * 1000;
+
+    #endregion
 }
 
 /// <summary>

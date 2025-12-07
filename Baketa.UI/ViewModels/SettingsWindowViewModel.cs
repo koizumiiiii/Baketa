@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.UI.Framework;
@@ -34,6 +35,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly ISettingsService _settingsService;
     private readonly ILocalizationService? _localizationService;
+    private readonly IUnifiedSettingsService? _unifiedSettingsService;
     private readonly ILogger<SettingsWindowViewModel>? _logger;
     private SettingCategory? _selectedCategory;
     private string _statusMessage = string.Empty;
@@ -47,6 +49,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// <param name="navigationService">ナビゲーションサービス</param>
     /// <param name="settingsService">設定サービス</param>
     /// <param name="localizationService">ローカライゼーションサービス（オプション）</param>
+    /// <param name="unifiedSettingsService">統合設定サービス（オプション）</param>
     /// <param name="logger">ロガー（オプション）</param>
     public SettingsWindowViewModel(
         ISettingsChangeTracker changeTracker,
@@ -55,6 +58,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         INavigationService navigationService,
         ISettingsService settingsService,
         ILocalizationService? localizationService = null,
+        IUnifiedSettingsService? unifiedSettingsService = null,
         ILogger<SettingsWindowViewModel>? logger = null) : base(eventAggregator)
     {
         _changeTracker = changeTracker ?? throw new ArgumentNullException(nameof(changeTracker));
@@ -63,6 +67,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _localizationService = localizationService;
+        _unifiedSettingsService = unifiedSettingsService;
         _logger = logger;
 
         // [DEBUG] ILocalizationServiceのDI注入確認
@@ -461,6 +466,14 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                     translationSettingsToSave.OverlayFontSize);
                 await _settingsService.SaveAsync(translationSettingsToSave).ConfigureAwait(false);
                 _logger?.LogInformation("翻訳設定を保存しました");
+
+                // translation-settings.jsonにも保存（翻訳エンジンが読み込むファイル）
+                if (_unifiedSettingsService != null)
+                {
+                    _logger?.LogInformation("translation-settings.jsonに翻訳設定を保存中...");
+                    await _unifiedSettingsService.UpdateTranslationSettingsAsync(translationSettingsToSave).ConfigureAwait(false);
+                    _logger?.LogInformation("translation-settings.jsonに翻訳設定を保存しました");
+                }
             }
             else
             {
