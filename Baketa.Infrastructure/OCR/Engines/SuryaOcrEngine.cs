@@ -5,6 +5,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.Clients;
+using Baketa.Infrastructure.OCR.Services;
 using Baketa.Ocr.V1;
 using Microsoft.Extensions.Logging;
 
@@ -22,10 +23,11 @@ namespace Baketa.Infrastructure.OCR.Engines;
 public sealed class SuryaOcrEngine : IOcrEngine
 {
     private readonly GrpcOcrClient _client;
+    private readonly SuryaServerManager? _serverManager;
     private readonly ILogger<SuryaOcrEngine> _logger;
     private readonly OcrEngineSettings _settings;
     private readonly ConcurrentDictionary<string, long> _performanceStats = new();
-    private readonly object _initLock = new();
+    private readonly SemaphoreSlim _initLock = new(1, 1);
     private readonly DateTime _startTime = DateTime.UtcNow;
 
     private bool _isInitialized;
@@ -44,14 +46,15 @@ public sealed class SuryaOcrEngine : IOcrEngine
     ];
 
     /// <summary>
-    /// コンストラクタ
+    /// コンストラクタ（サーバー自動起動対応）
     /// </summary>
-    public SuryaOcrEngine(GrpcOcrClient client, ILogger<SuryaOcrEngine> logger)
+    public SuryaOcrEngine(GrpcOcrClient client, SuryaServerManager serverManager, ILogger<SuryaOcrEngine> logger)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(logger);
 
         _client = client;
+        _serverManager = serverManager;
         _logger = logger;
         _settings = new OcrEngineSettings
         {
@@ -60,7 +63,15 @@ public sealed class SuryaOcrEngine : IOcrEngine
             DetectionThreshold = 0.5
         };
 
-        _logger.LogInformation("SuryaOcrEngine created");
+        _logger.LogInformation("SuryaOcrEngine created (with auto-start support)");
+    }
+
+    /// <summary>
+    /// コンストラクタ（後方互換性用）
+    /// </summary>
+    public SuryaOcrEngine(GrpcOcrClient client, ILogger<SuryaOcrEngine> logger)
+        : this(client, null!, logger)
+    {
     }
 
     /// <inheritdoc/>
@@ -82,7 +93,8 @@ public sealed class SuryaOcrEngine : IOcrEngine
     {
         if (_isInitialized) return true;
 
-        lock (_initLock)
+        await _initLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
             if (_isInitialized) return true;
 
@@ -92,17 +104,34 @@ public sealed class SuryaOcrEngine : IOcrEngine
                 _settings.EnablePreprocessing = settings.EnablePreprocessing;
                 _settings.DetectionThreshold = settings.DetectionThreshold;
             }
-        }
 
-        try
-        {
+            // サーバー自動起動（SuryaServerManagerが設定されている場合）
+            if (_serverManager != null)
+            {
+                _logger.LogInformation("🚀 [Surya] サーバー自動起動開始...");
+                Console.WriteLine("🚀 [Surya] サーバー自動起動開始...");
+
+                var serverStarted = await _serverManager.StartServerAsync(cancellationToken).ConfigureAwait(false);
+
+                if (!serverStarted)
+                {
+                    _logger.LogError("❌ [Surya] サーバー自動起動失敗");
+                    Console.WriteLine("❌ [Surya] サーバー自動起動失敗");
+                    return false;
+                }
+
+                _logger.LogInformation("✅ [Surya] サーバー起動完了");
+                Console.WriteLine("✅ [Surya] サーバー起動完了");
+            }
+
             // サーバー接続確認
             var readyResponse = await _client.IsReadyAsync(cancellationToken).ConfigureAwait(false);
 
             if (readyResponse.IsReady)
             {
                 _isInitialized = true;
-                _logger.LogInformation("SuryaOcrEngine initialized successfully");
+                _logger.LogInformation("✅ SuryaOcrEngine initialized successfully");
+                Console.WriteLine("✅ SuryaOcrEngine initialized successfully");
                 return true;
             }
 
@@ -113,6 +142,10 @@ public sealed class SuryaOcrEngine : IOcrEngine
         {
             _logger.LogError(ex, "Failed to initialize SuryaOcrEngine");
             return false;
+        }
+        finally
+        {
+            _initLock.Release();
         }
     }
 
@@ -150,6 +183,11 @@ public sealed class SuryaOcrEngine : IOcrEngine
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(image);
 
+        // 診断ログ
+        Console.WriteLine($"🔍 [SuryaOCR] RecognizeAsync呼び出し - IsInitialized: {_isInitialized}, ImageSize: {image.Width}x{image.Height}");
+        _logger.LogInformation("🔍 [SuryaOCR] RecognizeAsync呼び出し - IsInitialized: {IsInit}, ImageSize: {W}x{H}",
+            _isInitialized, image.Width, image.Height);
+
         var sw = Stopwatch.StartNew();
         progressCallback?.Report(new OcrProgress(0, "Starting OCR...") { Phase = OcrPhase.TextDetection });
 
@@ -157,15 +195,18 @@ public sealed class SuryaOcrEngine : IOcrEngine
         {
             // 画像データ取得（PNGエンコード済み）- メモリ効率最適化
             var imageMemory = image.GetImageMemory();
+            Console.WriteLine($"🔍 [SuryaOCR] 画像データ取得完了: {imageMemory.Length} bytes");
 
             progressCallback?.Report(new OcrProgress(0.2, "Sending to Surya OCR...") { Phase = OcrPhase.TextDetection });
 
             // gRPC呼び出し（Span経由で中間配列を回避）
+            Console.WriteLine($"🔍 [SuryaOCR] gRPC呼び出し開始...");
             var response = await _client.RecognizeAsync(
                 imageMemory.ToArray(), // Note: GrpcOcrClient内でByteString.CopyFromを使用
                 "png",
                 [_settings.Language ?? "ja"],
                 cancellationToken).ConfigureAwait(false);
+            Console.WriteLine($"🔍 [SuryaOCR] gRPC呼び出し完了: IsSuccess={response.IsSuccess}, RegionCount={response.Regions?.Count ?? 0}");
 
             progressCallback?.Report(new OcrProgress(0.8, "Processing results...") { Phase = OcrPhase.TextRecognition });
 
@@ -346,6 +387,7 @@ public sealed class SuryaOcrEngine : IOcrEngine
         _disposed = true;
 
         _currentTimeoutCts?.Dispose();
+        _initLock.Dispose();
         _client.Dispose();
 
         _logger.LogDebug("SuryaOcrEngine disposed");

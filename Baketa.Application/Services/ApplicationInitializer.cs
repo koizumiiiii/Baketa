@@ -179,22 +179,39 @@ public class ApplicationInitializer : ILoadingScreenInitializer
 
     /// <summary>
     /// Step 2: OCRエンジンを初期化します
+    /// Issue #189: Surya OCRサーバー自動起動対応
     /// </summary>
     private async Task InitializeOcrAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("OCRエンジン初期化開始");
 
-        // TODO: Issue #170完了後、実際のOCRエンジン初期化を実装
-        // var ocrEngine = _serviceProvider.GetService<IOcrEngine>();
-        // if (ocrEngine != null)
-        // {
-        //     await ocrEngine.InitializeAsync(cancellationToken).ConfigureAwait(false);
-        // }
+        var ocrEngine = _serviceProvider.GetService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
+        if (ocrEngine != null)
+        {
+            _logger.LogInformation("OCRエンジン検出: {EngineName}", ocrEngine.EngineName);
+            Console.WriteLine($"🔧 [OCR] OCRエンジン検出: {ocrEngine.EngineName}");
 
-        // 暫定的にダミー処理
-        await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+            var initialized = await ocrEngine.InitializeAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        _logger.LogInformation("OCRエンジン初期化完了");
+            if (initialized)
+            {
+                _logger.LogInformation("✅ OCRエンジン初期化成功: {EngineName}", ocrEngine.EngineName);
+                Console.WriteLine($"✅ [OCR] OCRエンジン初期化成功: {ocrEngine.EngineName}");
+            }
+            else
+            {
+                _logger.LogWarning("⚠️ OCRエンジン初期化失敗: {EngineName} - アプリケーションは継続します", ocrEngine.EngineName);
+                Console.WriteLine($"⚠️ [OCR] OCRエンジン初期化失敗: {ocrEngine.EngineName}");
+                // 初期化失敗は致命的エラーではない（後で再試行可能）
+            }
+        }
+        else
+        {
+            _logger.LogWarning("IOcrEngineが登録されていません - OCR機能は使用できません");
+            Console.WriteLine("⚠️ [OCR] IOcrEngineが登録されていません");
+        }
+
+        _logger.LogInformation("OCRエンジン初期化処理完了");
     }
 
     /// <summary>

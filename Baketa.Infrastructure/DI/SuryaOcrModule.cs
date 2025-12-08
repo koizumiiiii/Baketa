@@ -2,6 +2,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.DI;
 using Baketa.Infrastructure.OCR.Clients;
 using Baketa.Infrastructure.OCR.Engines;
+using Baketa.Infrastructure.OCR.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -25,11 +26,34 @@ public sealed class SuryaOcrModule : ServiceModuleBase
         // Surya OCR設定登録
         RegisterSettings(services);
 
+        // Suryaサーバーマネージャー登録（自動起動対応）
+        RegisterServerManager(services);
+
         // gRPCクライアント登録
         RegisterGrpcClient(services);
 
         // Surya OCRエンジン登録
         RegisterSuryaOcrEngine(services);
+    }
+
+    private static void RegisterServerManager(IServiceCollection services)
+    {
+        services.AddSingleton<SuryaServerManager>(serviceProvider =>
+        {
+            var settings = serviceProvider.GetRequiredService<SuryaOcrSettings>();
+            var logger = serviceProvider.GetRequiredService<ILogger<SuryaServerManager>>();
+
+            // ポート番号をアドレスから抽出
+            var port = 50052; // デフォルト
+            if (!string.IsNullOrEmpty(settings.ServerAddress))
+            {
+                var uri = new Uri(settings.ServerAddress);
+                port = uri.Port;
+            }
+
+            Console.WriteLine($"🔧 [Issue #189] SuryaServerManager初期化: Port {port}");
+            return new SuryaServerManager(port, logger);
+        });
     }
 
     private static void RegisterSettings(IServiceCollection services)
@@ -71,13 +95,14 @@ public sealed class SuryaOcrModule : ServiceModuleBase
 
     private static void RegisterSuryaOcrEngine(IServiceCollection services)
     {
-        // SuryaOcrEngineをSingletonとして登録
+        // SuryaOcrEngineをSingletonとして登録（サーバー自動起動対応）
         services.AddSingleton<SuryaOcrEngine>(serviceProvider =>
         {
             var client = serviceProvider.GetRequiredService<GrpcOcrClient>();
+            var serverManager = serviceProvider.GetRequiredService<SuryaServerManager>();
             var logger = serviceProvider.GetRequiredService<ILogger<SuryaOcrEngine>>();
 
-            return new SuryaOcrEngine(client, logger);
+            return new SuryaOcrEngine(client, serverManager, logger);
         });
 
         // SuryaOcrEngineをKeyed Serviceとしても登録
