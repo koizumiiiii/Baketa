@@ -59,12 +59,14 @@ class SuryaOcrEngine:
         """モデルをロード (Surya v0.17.0+ API)"""
         try:
             logger.info(f"Surya OCRモデルをロード中... (device: {self.device})")
-            start_time = time.time()
+            total_start = time.time()
 
             # Surya OCR v0.17.0+ APIのインポート
+            import_start = time.time()
             from surya.foundation import FoundationPredictor
             from surya.recognition import RecognitionPredictor
             from surya.detection import DetectionPredictor
+            logger.info(f"[Timing] Import完了: {time.time() - import_start:.2f}秒")
 
             # 環境変数でデバイス設定（Surya v0.17.0+）
             import os
@@ -72,7 +74,8 @@ class SuryaOcrEngine:
                 import torch
                 if torch.cuda.is_available():
                     os.environ["TORCH_DEVICE"] = "cuda"
-                    logger.info("CUDA利用可能: GPUモードで実行")
+                    gpu_name = torch.cuda.get_device_name(0)
+                    logger.info(f"CUDA利用可能: GPUモードで実行 ({gpu_name})")
                 else:
                     os.environ["TORCH_DEVICE"] = "cpu"
                     logger.warning("CUDA利用不可: CPUモードにフォールバック")
@@ -81,14 +84,21 @@ class SuryaOcrEngine:
                 os.environ["TORCH_DEVICE"] = "cpu"
 
             # 検出モデル
+            det_start = time.time()
             self.detection_predictor = DetectionPredictor()
+            logger.info(f"[Timing] DetectionPredictor: {time.time() - det_start:.2f}秒")
 
             # 認識モデル (FoundationPredictor経由)
+            found_start = time.time()
             self.foundation_predictor = FoundationPredictor()
-            self.recognition_predictor = RecognitionPredictor(self.foundation_predictor)
+            logger.info(f"[Timing] FoundationPredictor: {time.time() - found_start:.2f}秒")
 
-            elapsed = time.time() - start_time
-            logger.info(f"Surya OCRモデルロード完了 ({elapsed:.2f}秒)")
+            rec_start = time.time()
+            self.recognition_predictor = RecognitionPredictor(self.foundation_predictor)
+            logger.info(f"[Timing] RecognitionPredictor: {time.time() - rec_start:.2f}秒")
+
+            elapsed = time.time() - total_start
+            logger.info(f"Surya OCRモデルロード完了 (合計: {elapsed:.2f}秒)")
             self.is_loaded = True
             return True
 

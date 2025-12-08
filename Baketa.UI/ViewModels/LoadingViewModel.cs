@@ -195,11 +195,13 @@ public class InitializationStep : ReactiveObject
 
     /// <summary>
     /// [Issue #185] ステップの状態を詳細メッセージ付きで更新
+    /// [Issue #189] IsInProgress条件を修正: progress > 0 の条件を削除
     /// </summary>
     public void Update(bool isCompleted, int progress, string? detailMessage)
     {
         IsCompleted = isCompleted;
-        IsInProgress = !isCompleted && progress > 0;
+        // Issue #189: ステップ開始時（progress=0）でもスピナーを表示するように修正
+        IsInProgress = !isCompleted;
         Progress = progress;
 
         // [Issue #185] 詳細メッセージを更新（完了時はクリア）

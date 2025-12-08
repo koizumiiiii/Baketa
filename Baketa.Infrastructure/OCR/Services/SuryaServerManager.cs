@@ -147,9 +147,10 @@ public sealed class SuryaServerManager : IAsyncDisposable
 
             _logger.LogInformation("✅ [Surya] プロセス起動完了 (PID: {PID})", _serverProcess.Id);
 
-            // 準備完了を待機（タイムアウト: 120秒 - モデルロードに時間がかかる）
+            // 準備完了を待機（タイムアウト: 300秒 - 初回モデルダウンロード＋ロードに時間がかかる）
+            // Issue #189: 120秒 → 300秒に延長（ユーザー報告: 4-5分かかるケースあり）
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(120));
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(300));
 
             try
             {
@@ -167,7 +168,8 @@ public sealed class SuryaServerManager : IAsyncDisposable
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                _logger.LogError("❌ [Surya] サーバー起動タイムアウト（120秒）");
+                _logger.LogError("❌ [Surya] サーバー起動タイムアウト（300秒）");
+                Console.WriteLine("❌ [Surya] サーバー起動タイムアウト（300秒）");
             }
 
             // タイムアウトまたは失敗
