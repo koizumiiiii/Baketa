@@ -61,6 +61,19 @@ class SuryaOcrEngine:
             logger.info(f"Surya OCRモデルをロード中... (device: {self.device})")
             total_start = time.time()
 
+            # カスタムモデルパス設定（GitHub Release配布モデル対応）
+            # 環境変数 BAKETA_SURYA_MODEL_DIR が設定されていれば使用
+            custom_model_dir = os.environ.get("BAKETA_SURYA_MODEL_DIR")
+            if custom_model_dir:
+                from pathlib import Path
+                model_path = Path(custom_model_dir)
+                if model_path.exists():
+                    # Surya/datalabのキャッシュディレクトリを上書き
+                    os.environ["XDG_DATA_HOME"] = str(model_path.parent.parent)
+                    logger.info(f"カスタムモデルパス使用: {custom_model_dir}")
+                else:
+                    logger.warning(f"カスタムモデルパスが存在しません: {custom_model_dir}")
+
             # Surya OCR v0.17.0+ APIのインポート
             import_start = time.time()
             from surya.foundation import FoundationPredictor
@@ -69,7 +82,6 @@ class SuryaOcrEngine:
             logger.info(f"[Timing] Import完了: {time.time() - import_start:.2f}秒")
 
             # 環境変数でデバイス設定（Surya v0.17.0+）
-            import os
             if self.device == "cuda":
                 import torch
                 if torch.cuda.is_available():

@@ -182,11 +182,35 @@ jobs:
         echo "- Package: ppocrv5-onnx.zip" >> $GITHUB_STEP_SUMMARY
         ls -lh ppocrv5-onnx.zip >> $GITHUB_STEP_SUMMARY || true
 
+    - name: Download and package Surya OCR models
+      run: |
+        # Download Surya models from models-v1 release (pre-uploaded)
+        echo "Downloading Surya OCR models..."
+
+        # Detection Model (ONNX INT8 quantized) - ~31MB
+        curl -L -o surya-detection-onnx.zip \
+          "https://github.com/koizumiiiii/Baketa/releases/download/models-v1/surya-detection-onnx.zip" || \
+          echo "::warning::Surya detection model download failed, may need manual upload"
+
+        # Recognition Model (PyTorch) - ~1.1GB
+        curl -L -o surya-recognition-pytorch.zip \
+          "https://github.com/koizumiiiii/Baketa/releases/download/models-v1/surya-recognition-pytorch.zip" || \
+          echo "::warning::Surya recognition model download failed, may need manual upload"
+
+        echo "## Surya OCR Models Package" >> $GITHUB_STEP_SUMMARY
+        echo "- Detection (ONNX INT8): surya-detection-onnx.zip" >> $GITHUB_STEP_SUMMARY
+        ls -lh surya-detection-onnx.zip >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "  (not available)" >> $GITHUB_STEP_SUMMARY
+        echo "- Recognition (PyTorch): surya-recognition-pytorch.zip" >> $GITHUB_STEP_SUMMARY
+        ls -lh surya-recognition-pytorch.zip >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "  (not available)" >> $GITHUB_STEP_SUMMARY
+
     - name: Upload OCR models artifact
       uses: actions/upload-artifact@v4
       with:
         name: ocr-models-package
-        path: ppocrv5-onnx.zip
+        path: |
+          ppocrv5-onnx.zip
+          surya-detection-onnx.zip
+          surya-recognition-pytorch.zip
         retention-days: 7
         if-no-files-found: warn
 
@@ -232,11 +256,13 @@ jobs:
 
         ### Downloads
 
-        | File | Description |
-        |------|-------------|
-        | `Baketa-$VERSION-win-x64.zip` | Main application (Windows x64) |
-        | `BaketaTranslationServer.zip` | Translation server (auto-downloaded on first run) |
-        | `ppocrv5-onnx.zip` | OCR models (auto-downloaded on first run) |
+        | File | Description | Size |
+        |------|-------------|------|
+        | `Baketa-$VERSION-win-x64.zip` | Main application (Windows x64) | ~50MB |
+        | `BaketaTranslationServer.zip` | Translation server (auto-downloaded) | ~200MB |
+        | `ppocrv5-onnx.zip` | PP-OCRv5 models (auto-downloaded) | ~180MB |
+        | `surya-detection-onnx.zip` | Surya Detection ONNX INT8 (auto-downloaded) | ~31MB |
+        | `surya-recognition-pytorch.zip` | Surya Recognition PyTorch (auto-downloaded) | ~1.1GB |
 
         ### Installation
 
@@ -244,6 +270,12 @@ jobs:
         2. Extract to desired location
         3. Run `Baketa.UI.exe`
         4. On first run, required components will be downloaded automatically
+
+        ### OCR Engine Selection
+
+        Baketa supports two OCR engines:
+        - **PP-OCRv5** (default): Lightweight, fast (~180MB models)
+        - **Surya OCR**: High accuracy, Japanese optimized (~1.1GB models)
 
         ### NLLB Translation Model
 
@@ -254,7 +286,7 @@ jobs:
 
         - Windows 10/11 (x64)
         - Internet connection (for first-time setup)
-        - ~2GB disk space
+        - ~3GB disk space (with all OCR engines)
 
         EOF
 
