@@ -468,7 +468,6 @@ public sealed class ApplicationModule : ServiceModuleBase
             var smartPipeline = provider.GetService<ISmartProcessingPipelineService>();
             var logger = provider.GetService<ILogger<Baketa.Application.Events.Handlers.CaptureCompletedHandler>>();
             var settings = provider.GetService<IOptionsMonitor<ProcessingPipelineSettings>>();
-            var diagnosticsSaver = provider.GetService<Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics.ImageDiagnosticsSaver>();
             var roiSettings = provider.GetService<IOptionsMonitor<RoiDiagnosticsSettings>>();
 
             // 🎯 Phase 3.17.9: IImageToReferencedSafeImageConverter注入修正
@@ -484,7 +483,6 @@ public sealed class ApplicationModule : ServiceModuleBase
                 smartPipeline,
                 logger,
                 settings,
-                diagnosticsSaver,
                 roiSettings,
                 imageToReferencedConverter,
                 translationModeService);
@@ -545,7 +543,7 @@ public sealed class ApplicationModule : ServiceModuleBase
         yield return typeof(PlatformModule); // PlatformModule → InfrastructureModule間接依存で十分
                                              // 🔧 UltraThink Phase 4-6 修正: 直接InfrastructureModule依存を除去し重複登録解決
                                              // yield return typeof(InfrastructureModule); // PlatformModule経由で間接取得
-        yield return typeof(BatchOcrModule); // バッチOCR処理モジュール
+        // NOTE: [PP-OCRv5削除] BatchOcrModule削除 - SuryaOcrModuleに移行
         yield return typeof(CaptureModule); // キャプチャサービス統合
         yield return typeof(OverlayOrchestrationModule); // オーバーレイ調整・管理システム（旧Phase15OverlayModule）
     }

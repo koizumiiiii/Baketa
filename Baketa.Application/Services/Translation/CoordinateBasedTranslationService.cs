@@ -20,7 +20,7 @@ using Baketa.Core.Performance;
 using Baketa.Core.Settings;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
-using Baketa.Infrastructure.OCR.BatchProcessing;
+// NOTE: [PP-OCRv5削除] BatchProcessing参照削除
 using Baketa.Infrastructure.Translation.Local;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -176,21 +176,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 $"バッチOCR処理 - 画像:{image.Width}x{image.Height}")
                 .WithAdditionalInfo($"WindowHandle:0x{windowHandle.ToInt64():X}");
 
-            // 🔄 [PADDLE_OCR_RESET] OCR処理前にPaddleOCR失敗カウンターをリセット（緊急修正）
-            try
-            {
-                if (_processingFacade.OcrProcessor is BatchOcrProcessor batchProcessor)
-                {
-                    Console.WriteLine("🔄 [PADDLE_OCR_RESET] PaddleOCR失敗カウンターをリセット実行");
-                    _logger?.LogInformation("🔄 [PADDLE_OCR_RESET] OCR連続失敗による無効化状態を解除");
-                    batchProcessor.ResetOcrFailureCounter();
-                }
-            }
-            catch (Exception resetEx)
-            {
-                _logger?.LogWarning(resetEx, "🔄 [PADDLE_OCR_RESET] PaddleOCRリセット中にエラー - 処理継続");
-                Console.WriteLine($"⚠️ [PADDLE_OCR_RESET] リセットエラー: {resetEx.Message}");
-            }
+            // NOTE: [PP-OCRv5削除] BatchOcrProcessor参照削除
+            // Surya OCRではgRPCベースのため、PaddleOCR失敗カウンターリセットは不要
 
             // 🎯 [OPTION_A] SmartProcessingPipelineServiceで段階的フィルタリング実行
             _logger?.LogDebug($"🎯 [OPTION_A] 段階的フィルタリングパイプライン開始 - ImageChangeDetection → OCR");

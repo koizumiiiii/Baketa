@@ -27,12 +27,12 @@ public static class ModuleRegistration
         BaketaEnvironment environment = BaketaEnvironment.Production)
     {
         // 標準モジュールのインスタンスを作成
+        // NOTE: [PP-OCRv5削除] StagedOcrStrategyModule削除 - SuryaOcrModuleに移行
         IServiceModule[] standardModules = [
             new CoreModule(),              // コアレイヤー
                 new InfrastructureModule(),    // インフラストラクチャレイヤー
                 new PlatformModule(),          // プラットフォーム依存レイヤー
                 new ApplicationModule(),       // アプリケーションレイヤー
-                new StagedOcrStrategyModule(), // Gemini推奨Step2: 段階的OCR戦略
                 // UIModuleは別途登録する
                 // new UIModule()                 // UIレイヤー
             ];
@@ -83,14 +83,14 @@ public static class ModuleRegistration
         this IServiceCollection services,
         BaketaEnvironment environment = BaketaEnvironment.Production)
     {
+        // NOTE: [PP-OCRv5削除] StagedOcrStrategyModule削除 - SuryaOcrModuleに移行
         return services.AddBaketaServices(
             false,
             environment,
             new CoreModule(),
             new InfrastructureModule(),
             new PlatformModule(),
-            new ApplicationModule(),
-            new StagedOcrStrategyModule()); // Gemini推奨Step2: 段階的OCR戦略
+            new ApplicationModule());
     }
 
     /// <summary>

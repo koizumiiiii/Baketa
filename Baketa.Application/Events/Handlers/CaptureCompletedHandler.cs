@@ -9,7 +9,6 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.Processing;
 using Baketa.Core.Settings;
-using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -26,7 +25,6 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     private readonly ISmartProcessingPipelineService? _smartPipeline;
     private readonly ILogger<CaptureCompletedHandler>? _logger;
     private readonly IOptionsMonitor<ProcessingPipelineSettings>? _settings;
-    private readonly ImageDiagnosticsSaver? _diagnosticsSaver;
     private readonly IOptionsMonitor<RoiDiagnosticsSettings>? _roiSettings;
     private readonly IImageToReferencedSafeImageConverter? _imageToReferencedConverter;
     private readonly ITextChunkAggregatorService _chunkAggregatorService;
@@ -40,7 +38,6 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         ISmartProcessingPipelineService? smartPipeline = null,
         ILogger<CaptureCompletedHandler>? logger = null,
         IOptionsMonitor<ProcessingPipelineSettings>? settings = null,
-        ImageDiagnosticsSaver? diagnosticsSaver = null,
         IOptionsMonitor<RoiDiagnosticsSettings>? roiSettings = null,
         IImageToReferencedSafeImageConverter? imageToReferencedConverter = null,
         ITranslationModeService? translationModeService = null)
@@ -51,7 +48,6 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
         _smartPipeline = smartPipeline;
         _logger = logger;
         _settings = settings;
-        _diagnosticsSaver = diagnosticsSaver;
         _roiSettings = roiSettings;
         _imageToReferencedConverter = imageToReferencedConverter;
         _translationModeService = translationModeService;
@@ -588,61 +584,13 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
 
     /// <summary>
     /// キャプチャ画像保存（設定が有効な場合）
+    /// NOTE: [PP-OCRv5削除] ImageDiagnosticsSaver削除に伴い無効化
     /// </summary>
-    private async Task SaveCaptureImagesIfEnabledAsync(CaptureCompletedEvent eventData)
+    private Task SaveCaptureImagesIfEnabledAsync(CaptureCompletedEvent eventData)
     {
-        try
-        {
-            // 設定チェック
-            var roiSettings = _roiSettings?.CurrentValue;
-            if (roiSettings == null || !roiSettings.EnableCaptureImageSaving || _diagnosticsSaver == null)
-            {
-                _logger?.LogTrace("キャプチャ画像保存が無効またはサービスが利用不可");
-                return;
-            }
-
-            // セッションID生成
-            var sessionId = Guid.NewGuid().ToString("N")[..8];
-
-            // 元画像のバイト配列取得
-            var originalImageBytes = await eventData.CapturedImage.ToByteArrayAsync().ConfigureAwait(false);
-            var originalWidth = eventData.CapturedImage.Width;
-            var originalHeight = eventData.CapturedImage.Height;
-
-            _logger?.LogDebug("キャプチャ画像保存開始 - セッションID: {SessionId}, サイズ: {Width}x{Height}, バイト数: {Bytes}",
-                sessionId, originalWidth, originalHeight, originalImageBytes.Length);
-
-            byte[]? scaledImageBytes = null;
-            int? scaledWidth = null;
-            int? scaledHeight = null;
-
-            // 縮小画像保存が有効な場合の処理
-            if (roiSettings.EnableScaledImageSaving)
-            {
-                // TODO: 縮小画像の取得方法を実装する必要がある
-                // 現在はOCR処理時に縮小されるが、キャプチャ時点では元サイズのみ利用可能
-                _logger?.LogTrace("縮小画像保存が有効ですが、キャプチャ時点では元画像のみ保存します");
-            }
-
-            // 画像保存実行
-            await _diagnosticsSaver.SaveCaptureImagesAsync(
-                originalImageBytes,
-                scaledImageBytes,
-                sessionId,
-                originalWidth,
-                originalHeight,
-                scaledWidth,
-                scaledHeight).ConfigureAwait(false);
-
-            _logger?.LogInformation("キャプチャ画像保存完了 - セッションID: {SessionId}", sessionId);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "キャプチャ画像保存中にエラーが発生しました: {ErrorType} - {ErrorMessage}",
-                ex.GetType().Name, ex.Message);
-
-            // 画像保存エラーはメインの処理を妨げない（ログ出力のみ）
-        }
+        // NOTE: [PP-OCRv5削除] ImageDiagnosticsSaver削除に伴い画像保存機能は無効化
+        _logger?.LogTrace("キャプチャ画像保存は無効化されています（PP-OCRv5削除）");
+        return Task.CompletedTask;
     }
 
     /// <summary>

@@ -11,7 +11,7 @@ using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Services;
-using Baketa.Infrastructure.OCR.BatchProcessing;
+// NOTE: [PP-OCRv5削除] BatchProcessing参照削除
 using Baketa.UI.DI.Modules;
 using Baketa.UI.Framework.Events; // 🔥 [DI_FIX] StartTranslationRequestEvent用
 using Baketa.UI.Services;
@@ -72,7 +72,11 @@ internal static class UIServiceCollectionExtensions
         // ローディングオーバーレイマネージャー
         services.AddSingleton<LoadingOverlayManager>();
 
-        // IOcrFailureManagerインターフェース登録（IBatchOcrProcessorと同じインスタンス）
+        // NOTE: [PP-OCRv5削除] NoOpBatchOcrProcessorを登録
+        // Surya OCRに移行したため、バッチ処理インターフェースはNo-Op実装を使用
+        services.AddSingleton<IBatchOcrProcessor, Baketa.Infrastructure.OCR.Services.NoOpBatchOcrProcessor>();
+
+        // IOcrFailureManagerインターフェース登録（NoOpBatchOcrProcessorと同じインスタンス）
         services.AddSingleton<IOcrFailureManager>(provider =>
             provider.GetRequiredService<IBatchOcrProcessor>() as IOcrFailureManager
             ?? throw new InvalidOperationException("IBatchOcrProcessor must implement IOcrFailureManager"));

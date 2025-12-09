@@ -25,7 +25,6 @@ using Baketa.Infrastructure.Imaging.ChangeDetection;
 using Baketa.Infrastructure.Logging;
 using Baketa.Infrastructure.OCR;
 using Baketa.Infrastructure.OCR.Measurement;
-using Baketa.Infrastructure.OCR.PaddleOCR.Diagnostics;
 using Baketa.Infrastructure.Patterns;
 using Baketa.Infrastructure.Performance;
 using Baketa.Infrastructure.ResourceManagement;
@@ -219,68 +218,11 @@ public class InfrastructureModule : ServiceModuleBase
         // Sprint 2 Fix: IImageFactory登録はPlatformModuleで実施
         // （アーキテクチャ原則に従い、Platform固有実装はPlatformModuleに配置）
 
-        // Sprint 1: PaddleOCR診断システム（Gemini推奨）
-        services.AddSingleton<Baketa.Core.Abstractions.Diagnostics.IPaddleOcrDiagnostics, Baketa.Infrastructure.Diagnostics.PaddleOcrDiagnosticsService>();
-        Console.WriteLine("✅ Sprint 1: PaddleOCR診断システム登録完了 - CPU First戦略対応");
+        // NOTE: PP-OCRv5は削除済み、Surya OCRがメインOCRエンジンとして使用される
+        // Surya OCRサービスはSuryaOcrModuleで登録
 
-        // Phase 2.2: PaddleOCR専門サービス（リファクタリング）
-        services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrUtilities, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrUtilities>();
-        services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrPerformanceTracker, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrPerformanceTracker>();
-        Console.WriteLine("✅ Phase 2.2: PaddleOCRユーティリティ・パフォーマンストラッカー登録完了");
-
-        // Phase 2.3: PaddleOCRエラーハンドラー（リファクタリング）
-        services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrErrorHandler, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrErrorHandler>();
-        Console.WriteLine("✅ Phase 2.3: PaddleOCRエラーハンドラー登録完了");
-
-        // Phase 2.4: PaddleOCRモデルマネージャー（リファクタリング）
-        services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrModelManager, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrModelManager>();
-        Console.WriteLine("✅ Phase 2.4: PaddleOCRモデルマネージャー登録完了");
-
-        // Phase 2.5: PaddleOCR画像プロセッサー（リファクタリング）
-        services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrImageProcessor, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrImageProcessor>();
-        Console.WriteLine("✅ Phase 2.5: PaddleOCR画像プロセッサー登録完了");
-
-        // Phase 2.6: PaddleOCRエンジン初期化（リファクタリング）
-        services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrEngineInitializer, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrEngineInitializer>();
-        Console.WriteLine("✅ Phase 2.6: PaddleOCRエンジン初期化登録完了");
-
-        // Phase 2.7: PaddleOCR実行エグゼキューター（リファクタリング）
-        services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrExecutor, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrExecutor>();
-        Console.WriteLine("✅ Phase 2.7: PaddleOCR実行エグゼキューター登録完了");
-
-        // Phase 2.8: PaddleOCR結果コンバーター（リファクタリング）
-        services.AddSingleton<Baketa.Infrastructure.OCR.PaddleOCR.Abstractions.IPaddleOcrResultConverter, Baketa.Infrastructure.OCR.PaddleOCR.Services.PaddleOcrResultConverter>();
-        Console.WriteLine("✅ Phase 2.8: PaddleOCR結果コンバーター登録完了");
-
-        // OCRエンジンやプロセッサーの登録
-        // 例: services.AddSingleton<IOcrEngine, PaddleOcrEngine>();
-        // 例: services.AddSingleton<IOcrModelProvider, LocalOcrModelProvider>();
-
-        // OCR最適化
-        // 例: services.AddSingleton<IOcrPreprocessor, OpenCvOcrPreprocessor>();
-        // 例: services.AddSingleton<IOcrPostProcessor, OcrTextNormalizer>();
-
-        // OCR検出用
-        // 例: services.AddSingleton<ITextBoxDetector, PaddleTextBoxDetector>();
-        // 例: services.AddSingleton<ITextRecognizer, PaddleTextRecognizer>();
-
-        // 🚀 [ROI_OPTIMIZATION] AdaptiveTileStrategyに切り替え（テキスト検出ベース→1枚全体ROI画像生成対応）
-        services.AddSingleton<Baketa.Infrastructure.OCR.Strategies.ITileStrategy>(provider =>
-        {
-            var ocrEngine = provider.GetRequiredService<IOcrEngine>();
-            var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy>>();
-            var advancedOptions = provider.GetService<Microsoft.Extensions.Options.IOptions<Baketa.Core.Settings.AdvancedSettings>>();
-            var diagnosticsSaver = provider.GetRequiredService<ImageDiagnosticsSaver>();
-            var adaptiveStrategy = new Baketa.Infrastructure.OCR.Strategies.AdaptiveTileStrategy(ocrEngine, logger, advancedOptions, diagnosticsSaver);
-
-            var moduleLogger = provider.GetService<ILogger<InfrastructureModule>>();
-            moduleLogger?.LogInformation("🎯 AdaptiveTileStrategy登録完了 - 高速テキスト検出→ROIベース認識（ROI画像保存機能付き）");
-
-            return adaptiveStrategy;
-        });
-
-        // OcrRegionGenerator（ITileStrategy使用）
-        services.AddSingleton<Baketa.Infrastructure.OCR.Strategies.OcrRegionGenerator>();
+        // NOTE: [PP-OCRv5削除] AdaptiveTileStrategy, ITileStrategy, OcrRegionGenerator削除
+        // Surya OCRでは異なるアプローチを使用（SuryaOcrModuleで登録）
 
         // OCR精度測定システム
         services.AddSingleton<IOcrAccuracyMeasurement, OcrAccuracyMeasurement>();
@@ -488,21 +430,8 @@ public class InfrastructureModule : ServiceModuleBase
     {
         Console.WriteLine("🎮 GPU統合サービス登録開始 - Issue #143 Week 2");
 
-        // ONNX Runtime セッション管理（DI Container完全統合）
-        services.AddSingleton<Baketa.Infrastructure.OCR.GPU.IOnnxSessionProvider, Baketa.Infrastructure.OCR.GPU.DefaultOnnxSessionProvider>();
-        services.AddSingleton<Baketa.Core.Abstractions.GPU.IOnnxSessionFactory, Baketa.Infrastructure.OCR.GPU.DefaultOnnxSessionFactory>();
-        Console.WriteLine("✅ IOnnxSessionFactory登録完了 - DI統合");
-
-        // ONNX モデル設定管理（Phase 2: テンソル名外部化）
-        services.AddSingleton<Baketa.Core.Abstractions.GPU.IOnnxModelConfiguration, Baketa.Infrastructure.OCR.GPU.DefaultOnnxModelConfiguration>();
-        Console.WriteLine("✅ IOnnxModelConfiguration登録完了 - モデル外部化");
-
-        // TDR対策・永続キャッシュシステム（Phase 3: 高可用性・高速起動）
-        services.AddSingleton<Baketa.Core.Abstractions.GPU.IPersistentSessionCache, Baketa.Infrastructure.OCR.GPU.FileBasedSessionCache>();
-        Console.WriteLine("✅ IPersistentSessionCache登録完了 - 永続キャッシュ");
-
-        // Sprint 2: Mock完全除去 + IntelligentOcrEngine統合
-        Console.WriteLine("🚀 Sprint 2: Mock完全除去開始 - 実際のPaddleOCR統合");
+        // NOTE: [PP-OCRv5削除] ONNX Runtime セッション管理は削除
+        // Surya OCRではPython側でモデル管理を行うため不要
 
         // OCR Circuit Breaker設定
         services.Configure<Baketa.Infrastructure.Patterns.OcrCircuitBreakerOptions>(options =>
@@ -686,11 +615,7 @@ public class InfrastructureModule : ServiceModuleBase
         // services.AddSingleton<Baketa.Core.Abstractions.Performance.IPerformanceOrchestrator, Baketa.Infrastructure.Performance.IntegratedPerformanceOrchestrator>();
         // Console.WriteLine("✅ IPerformanceOrchestrator登録完了 - 統合最適化システム");
 
-        // 🚀 プール化×GPU最適化統合オーケストレーター（最終フェーズ）
-        // [DI_FIX] AddSingleton削除 - AddHostedServiceが内部的にシングルトン登録するため重複登録不要
-        // 重複登録によりコンストラクタ解析が2回実行され、IPerformanceOrchestrator依存エラーが発生していた
-        services.AddHostedService<PooledGpuOptimizationOrchestrator>();
-        Console.WriteLine("🚀 PooledGpuOptimizationOrchestrator登録完了 - プール化×GPU最適化統合システム");
+        // NOTE: PooledGpuOptimizationOrchestratorは削除済み（PP-OCRv5依存）
 
         // 📊 Phase 3.2: VRAM監視5-tier圧迫度レベル判定システム
         services.AddHostedService<Baketa.Infrastructure.Services.ResourceMonitoringHostedService>();
@@ -913,7 +838,6 @@ public class InfrastructureModule : ServiceModuleBase
     {
         yield return typeof(CoreModule);
         yield return typeof(ObjectPoolModule);
-        yield return typeof(DiagnosticModule);
         // 🔧 UltraThink Phase 29: TimedAggregatorModule依存追加 - ITextChunkAggregatorService登録確保
         yield return typeof(TimedAggregatorModule);
     }

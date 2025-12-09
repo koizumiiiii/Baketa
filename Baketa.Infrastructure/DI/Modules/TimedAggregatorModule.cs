@@ -2,7 +2,6 @@ using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.DI;
 using Baketa.Core.Settings;
-using Baketa.Infrastructure.OCR.BatchProcessing;
 using Baketa.Infrastructure.OCR.PostProcessing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -45,16 +44,11 @@ public class TimedAggregatorModule : ConfigurableServiceModuleBase
             services.AddSingleton<TimedChunkAggregator>();
             Console.WriteLine("✅ [NEW_CONFIG] TimedChunkAggregator登録完了 - Singleton（バッファ状態維持）");
 
-            // EnhancedBatchOcrIntegrationServiceの登録（Singleton - TimedChunkAggregator連携のため）
-            Console.WriteLine("🔧 [PHASE12.2_DIAG] EnhancedBatchOcrIntegrationService登録直前");
-            services.AddSingleton<EnhancedBatchOcrIntegrationService>();
-            Console.WriteLine("✅ [NEW_CONFIG] EnhancedBatchOcrIntegrationService登録完了");
-
-            // Phase 26-4: ITextChunkAggregatorServiceインターフェース登録 - Clean Architecture対応
+            // ITextChunkAggregatorServiceインターフェース登録 - TimedChunkAggregatorをマッピング
             Console.WriteLine("🔧 [PHASE12.2_DIAG] ITextChunkAggregatorService登録直前");
             services.AddSingleton<ITextChunkAggregatorService>(provider =>
-                provider.GetRequiredService<EnhancedBatchOcrIntegrationService>());
-            Console.WriteLine("✅ [PHASE26] ITextChunkAggregatorService → EnhancedBatchOcrIntegrationService マッピング完了");
+                provider.GetRequiredService<TimedChunkAggregator>());
+            Console.WriteLine("✅ [PHASE26] ITextChunkAggregatorService → TimedChunkAggregator マッピング完了");
 
             Console.WriteLine("🎯 [NEW_CONFIG] TimedAggregatorModule - 新設定システム統合完了");
             Console.WriteLine("✅ [PHASE12.2_DIAG] TimedAggregatorModule.RegisterConfigurableServices() 完全完了");

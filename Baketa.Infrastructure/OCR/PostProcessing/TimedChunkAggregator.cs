@@ -15,8 +15,9 @@ namespace Baketa.Infrastructure.OCR.PostProcessing;
 /// 時間軸ベースのTextChunk集約処理クラス
 /// OCR結果を一定時間バッファリングし、統合してから翻訳パイプラインに送信
 /// 戦略書設計: translation-quality-improvement-strategy.md 完全準拠実装
+/// PP-OCRv5削除後: ITextChunkAggregatorService実装を追加
 /// </summary>
-public sealed class TimedChunkAggregator : IDisposable
+public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposable
 {
     private readonly System.Threading.Timer _aggregationTimer;
     private readonly ConcurrentDictionary<IntPtr, List<TextChunk>> _pendingChunksByWindow;
@@ -113,6 +114,19 @@ public sealed class TimedChunkAggregator : IDisposable
     /// Gemini専門家レビュー承認済みの実装
     /// </remarks>
     public bool IsFeatureEnabled => _settings.CurrentValue.IsFeatureEnabled;
+
+    /// <summary>
+    /// 現在の集約待機チャンク数を取得します
+    /// ITextChunkAggregatorService実装
+    /// </summary>
+    public int PendingChunksCount => _pendingChunksByWindow.Values.Sum(list => list.Count);
+
+    /// <summary>
+    /// ITextChunkAggregatorService.TryAddTextChunkAsync実装
+    /// 内部のTryAddChunkAsyncに委譲
+    /// </summary>
+    public Task<bool> TryAddTextChunkAsync(TextChunk chunk, CancellationToken cancellationToken = default)
+        => TryAddChunkAsync(chunk, cancellationToken);
 
     /// <summary>
     /// 新しいチャンクを追加し、タイマーをリセット
