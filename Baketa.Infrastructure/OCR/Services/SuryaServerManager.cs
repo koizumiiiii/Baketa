@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.Services;
@@ -8,12 +9,14 @@ namespace Baketa.Infrastructure.OCR.Services;
 /// <summary>
 /// Surya OCR gRPCサーバー管理
 /// Issue #189: PythonServerManagerパターンを参考に実装
+/// Issue #189: ゾンビプロセス対策 - Job Object統合
 /// </summary>
 public sealed class SuryaServerManager : IAsyncDisposable
 {
     private readonly ILogger<SuryaServerManager> _logger;
     private readonly int _port;
     private Process? _serverProcess;
+    private ProcessJobObject? _jobObject;
     private bool _isReady;
     private bool _disposed;
     private readonly SemaphoreSlim _startLock = new(1, 1);
@@ -32,6 +35,10 @@ public sealed class SuryaServerManager : IAsyncDisposable
     {
         _port = port;
         _logger = logger;
+
+        // Issue #189: Job Object初期化 - ゾンビプロセス対策
+        _jobObject = new ProcessJobObject(logger);
+        _logger.LogDebug("[Surya] Job Object初期化: IsValid={IsValid}", _jobObject.IsValid);
     }
 
     /// <summary>
@@ -156,6 +163,12 @@ public sealed class SuryaServerManager : IAsyncDisposable
             _serverProcess.BeginErrorReadLine();
 
             _logger.LogInformation("✅ [Surya] プロセス起動完了 (PID: {PID})", _serverProcess.Id);
+
+            // Issue #189: プロセスをJob Objectに関連付け（ゾンビプロセス対策）
+            if (_jobObject?.AssignProcess(_serverProcess) == true)
+            {
+                _logger.LogInformation("✅ [Surya] Job Object関連付け成功: PID={PID}", _serverProcess.Id);
+            }
 
             // 準備完了を待機（タイムアウト: 300秒 - 初回モデルダウンロード＋ロードに時間がかかる）
             // Issue #189: 120秒 → 300秒に延長（ユーザー報告: 4-5分かかるケースあり）
@@ -449,6 +462,11 @@ public sealed class SuryaServerManager : IAsyncDisposable
         _disposed = true;
 
         await StopServerAsync().ConfigureAwait(false);
+
+        // Issue #189: Job Object破棄（ゾンビプロセス対策）
+        _jobObject?.Dispose();
+        _jobObject = null;
+
         _startLock.Dispose();
     }
 }
