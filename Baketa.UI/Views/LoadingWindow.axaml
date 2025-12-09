@@ -51,7 +51,7 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate>
             <StackPanel Margin="0,6">
-              <Grid ColumnDefinitions="Auto,*,Auto">
+              <Grid ColumnDefinitions="Auto,*">
                 <!-- ステータスアイコン -->
                 <Border Grid.Column="0"
                         Width="24" Height="24"
@@ -71,44 +71,21 @@
                            Foreground="#E4E4E7"
                            FontSize="14"
                            VerticalAlignment="Center"/>
-
-                <!-- スピナー (実行中のみ表示) -->
-                <Border Grid.Column="2"
-                        Width="20" Height="20"
-                        IsVisible="{Binding IsInProgress}">
-                  <Border.Styles>
-                    <Style Selector="Border">
-                      <Style.Animations>
-                        <Animation Duration="0:0:1" IterationCount="INFINITE">
-                          <KeyFrame Cue="0%">
-                            <Setter Property="RotateTransform.Angle" Value="0"/>
-                          </KeyFrame>
-                          <KeyFrame Cue="100%">
-                            <Setter Property="RotateTransform.Angle" Value="360"/>
-                          </KeyFrame>
-                        </Animation>
-                      </Style.Animations>
-                    </Style>
-                  </Border.Styles>
-                  <Border.RenderTransform>
-                    <RotateTransform Angle="0"/>
-                  </Border.RenderTransform>
-                  <Path Data="M 10,2 A 8,8 0 1,1 10,18 A 8,8 0 0,1 10,2 M 10,4 A 6,6 0 1,0 10,16 A 6,6 0 0,0 10,4"
-                        Fill="#3B82F6"
-                        Stretch="Uniform"/>
-                </Border>
               </Grid>
 
-              <!-- [Issue #185] 詳細メッセージ (ダウンロード進捗など) -->
-              <StackPanel IsVisible="{Binding HasDetailMessage}"
+              <!-- プログレスバー（実行中のステップで表示） -->
+              <StackPanel IsVisible="{Binding IsInProgress}"
                           Margin="40,4,0,0">
+                <!-- [Issue #185] 詳細メッセージ (ダウンロード進捗など) -->
                 <TextBlock Text="{Binding DetailMessage}"
                            Foreground="#A1A1AA"
                            FontSize="12"
                            TextWrapping="NoWrap"
-                           TextTrimming="CharacterEllipsis"/>
-                <!-- プログレスバー -->
+                           TextTrimming="CharacterEllipsis"
+                           IsVisible="{Binding HasDetailMessage}"/>
+                <!-- プログレスバー（不確定アニメーション対応） -->
                 <ProgressBar Value="{Binding Progress}"
+                             IsIndeterminate="{Binding IsIndeterminate}"
                              Minimum="0"
                              Maximum="100"
                              Height="4"

@@ -167,6 +167,11 @@ public class InitializationStep : ReactiveObject
     }
 
     /// <summary>
+    /// 不確定進捗モード（進捗が0で実行中の場合）
+    /// </summary>
+    public bool IsIndeterminate => IsInProgress && Progress == 0;
+
+    /// <summary>
     /// ステータスアイコン
     /// </summary>
     public string StatusIcon => IsCompleted ? "✓" : (IsInProgress ? "●" : "○");
@@ -211,5 +216,6 @@ public class InitializationStep : ReactiveObject
         this.RaisePropertyChanged(nameof(StatusIcon));
         this.RaisePropertyChanged(nameof(StatusColor));
         this.RaisePropertyChanged(nameof(HasDetailMessage));
+        this.RaisePropertyChanged(nameof(IsIndeterminate));
     }
 }
