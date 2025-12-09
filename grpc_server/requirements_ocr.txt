@@ -1,0 +1,30 @@
+# OCR Engine Requirements for Issue #189
+# 次世代OCRエンジン移行
+
+# gRPC
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=4.25.0
+
+# 共通
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# === Surya OCR v0.17.0+ ===
+# Note: surya-ocr requires PyTorch
+# New API: FoundationPredictor, RecognitionPredictor, DetectionPredictor
+surya-ocr>=0.17.0
+
+# === PaddleOCR-VL (Vision-Language Model) ===
+# PaddleOCR-VL-0.9B: NaViT + ERNIE-4.5-0.3B based 109-language VLM
+# Note: PaddlePaddle requires separate installation
+# CPU: pip install paddlepaddle
+# GPU: pip install paddlepaddle-gpu
+# doc-parser extra includes PaddleOCRVL class
+paddleocr[doc-parser]>=3.0.0
+
+# PyTorch (Surya依存)
+# CPU: pip install torch torchvision
+# GPU: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+torch>=2.0.0
+torchvision>=0.15.0

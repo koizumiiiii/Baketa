@@ -345,6 +345,17 @@ public sealed class TranslationSettings : ITranslationSettings
     public int HealthCheckIntervalMs { get; set; } = 30000;
 
     /// <summary>
+    /// ヘルスチェックタイムアウト（ミリ秒）
+    /// Issue #189: 高負荷時の誤検出防止のため緩和（デフォルト15秒）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "ヘルスチェックタイムアウト",
+        Description = "ヘルスチェック1回あたりのタイムアウト時間",
+        Unit = "ms",
+        MinValue = 5000,
+        MaxValue = 60000)]
+    public int HealthCheckTimeoutMs { get; set; } = 15000;
+
+    /// <summary>
     /// 外部サーバー使用フラグ（trueの場合、独自プロセス起動を回避）
     /// Issue #147: 既存サーバー利用のための設定
     /// </summary>
@@ -384,7 +395,7 @@ public sealed class TranslationSettings : ITranslationSettings
         Description = "サーバー再起動を実行する連続失敗回数",
         MinValue = 1,
         MaxValue = 10)]
-    public int MaxConsecutiveFailures { get; set; } = 3;
+    public int MaxConsecutiveFailures { get; set; } = 5;
 
     /// <summary>
     /// 再起動バックオフ時間（ミリ秒）

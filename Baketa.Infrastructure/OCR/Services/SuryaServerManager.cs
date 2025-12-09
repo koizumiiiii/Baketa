@@ -1,0 +1,472 @@
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using Baketa.Infrastructure.Services;
+using Microsoft.Extensions.Logging;
+
+namespace Baketa.Infrastructure.OCR.Services;
+
+/// <summary>
+/// Surya OCR gRPCサーバー管理
+/// Issue #189: PythonServerManagerパターンを参考に実装
+/// Issue #189: ゾンビプロセス対策 - Job Object統合
+/// </summary>
+public sealed class SuryaServerManager : IAsyncDisposable
+{
+    private readonly ILogger<SuryaServerManager> _logger;
+    private readonly int _port;
+    private Process? _serverProcess;
+    private ProcessJobObject? _jobObject;
+    private bool _isReady;
+    private bool _disposed;
+    private readonly SemaphoreSlim _startLock = new(1, 1);
+
+    /// <summary>
+    /// サーバーが準備完了かどうか
+    /// </summary>
+    public bool IsReady => _isReady;
+
+    /// <summary>
+    /// サーバーポート
+    /// </summary>
+    public int Port => _port;
+
+    public SuryaServerManager(int port, ILogger<SuryaServerManager> logger)
+    {
+        _port = port;
+        _logger = logger;
+
+        // Issue #189: Job Object初期化 - ゾンビプロセス対策
+        _jobObject = new ProcessJobObject(logger);
+        _logger.LogDebug("[Surya] Job Object初期化: IsValid={IsValid}", _jobObject.IsValid);
+    }
+
+    /// <summary>
+    /// Suryaサーバーを起動し、準備完了まで待機
+    /// </summary>
+    public async Task<bool> StartServerAsync(CancellationToken cancellationToken = default)
+    {
+        await _startLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_isReady && _serverProcess is { HasExited: false })
+            {
+                _logger.LogInformation("♻️ [Surya] 既存サーバー再利用: Port {Port}", _port);
+                return true;
+            }
+
+            // 孤立プロセスの強制終了
+            await KillOrphanedProcessAsync().ConfigureAwait(false);
+
+            // スクリプトパス解決
+            var scriptPath = ResolveScriptPath();
+            if (string.IsNullOrEmpty(scriptPath))
+            {
+                _logger.LogError("❌ [Surya] サーバースクリプトが見つかりません");
+                return false;
+            }
+
+            // Python実行ファイル解決
+            var pythonPath = ResolvePythonPath();
+            if (string.IsNullOrEmpty(pythonPath))
+            {
+                _logger.LogError("❌ [Surya] Python実行ファイルが見つかりません");
+                return false;
+            }
+
+            _logger.LogInformation("🚀 [Surya] サーバー起動開始: {Script} --port {Port}", scriptPath, _port);
+
+            var workingDir = Path.GetDirectoryName(scriptPath) ?? Environment.CurrentDirectory;
+
+            // 引数構築（-u: unbuffered output）
+            var arguments = $"-u \"{scriptPath}\" --port {_port}";
+
+            _logger.LogInformation("🔧 [Surya] Python: {Python}", pythonPath);
+            _logger.LogInformation("🔧 [Surya] Arguments: {Args}", arguments);
+            _logger.LogInformation("🔧 [Surya] WorkingDir: {Dir}", workingDir);
+            Console.WriteLine($"🔧 [Surya] Python: {pythonPath}");
+            Console.WriteLine($"🔧 [Surya] Arguments: {arguments}");
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = pythonPath,
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = workingDir,
+                // UTF-8エンコーディング明示設定（日本語Windows対応）
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            // 環境変数設定（UTF-8強制）
+            startInfo.Environment["PYTHONIOENCODING"] = "utf-8";
+            startInfo.Environment["PYTHONUNBUFFERED"] = "1";
+
+            // Issue #189: Suryaモデルパス設定（GitHub Release配布モデル対応）
+            // ComponentDownloaderでダウンロードしたモデルを使用
+            var projectRootForModels = FindProjectRoot(AppContext.BaseDirectory) ?? workingDir;
+            var suryaModelDir = ResolveSuryaModelDir(projectRootForModels);
+            if (!string.IsNullOrEmpty(suryaModelDir))
+            {
+                startInfo.Environment["BAKETA_SURYA_MODEL_DIR"] = suryaModelDir;
+                _logger.LogInformation("🔧 [Surya] モデルパス設定: {Path}", suryaModelDir);
+            }
+
+            _serverProcess = new Process { StartInfo = startInfo };
+
+            var readyTcs = new TaskCompletionSource<bool>();
+            var errorOutput = new List<string>();
+
+            _serverProcess.OutputDataReceived += (_, e) =>
+            {
+                if (e.Data == null) return;
+
+                _logger.LogInformation("[Surya-stdout] {Data}", e.Data);
+                Console.WriteLine($"[Surya-stdout] {e.Data}");
+
+                // gRPCサーバー起動完了を検出
+                CheckForReadyMessage(e.Data, readyTcs);
+            };
+
+            _serverProcess.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data == null) return;
+
+                // PyTorch/CUDA警告はDEBUGレベル
+                if (e.Data.Contains("UserWarning") || e.Data.Contains("FutureWarning"))
+                {
+                    _logger.LogDebug("[Surya-stderr] {Data}", e.Data);
+                }
+                else
+                {
+                    _logger.LogInformation("[Surya-stderr] {Data}", e.Data);
+                    Console.WriteLine($"[Surya-stderr] {e.Data}");
+
+                    // stderr からも準備完了を検出（Pythonのloggingはstderrに出力）
+                    CheckForReadyMessage(e.Data, readyTcs);
+
+                    // 致命的エラーのみ記録（一般的な出力は除外）
+                    if ((e.Data.Contains("Error:") || e.Data.Contains("Exception:") ||
+                         e.Data.Contains("Traceback") || e.Data.Contains("ModuleNotFoundError")) &&
+                        !e.Data.Contains("WARNING") && !e.Data.Contains("INFO"))
+                    {
+                        errorOutput.Add(e.Data);
+                    }
+                }
+            };
+
+            _serverProcess.Start();
+            _serverProcess.BeginOutputReadLine();
+            _serverProcess.BeginErrorReadLine();
+
+            _logger.LogInformation("✅ [Surya] プロセス起動完了 (PID: {PID})", _serverProcess.Id);
+
+            // Issue #189: プロセスをJob Objectに関連付け（ゾンビプロセス対策）
+            if (_jobObject?.AssignProcess(_serverProcess) == true)
+            {
+                _logger.LogInformation("✅ [Surya] Job Object関連付け成功: PID={PID}", _serverProcess.Id);
+            }
+
+            // 準備完了を待機（タイムアウト: 300秒 - 初回モデルダウンロード＋ロードに時間がかかる）
+            // Issue #189: 120秒 → 300秒に延長（ユーザー報告: 4-5分かかるケースあり）
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(300));
+
+            try
+            {
+                var readyTask = readyTcs.Task;
+                var completedTask = await Task.WhenAny(
+                    readyTask,
+                    Task.Delay(Timeout.Infinite, timeoutCts.Token)
+                ).ConfigureAwait(false);
+
+                if (completedTask == readyTask && await readyTask.ConfigureAwait(false))
+                {
+                    _logger.LogInformation("✅ [Surya] サーバー準備完了: Port {Port}", _port);
+                    return true;
+                }
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError("❌ [Surya] サーバー起動タイムアウト（300秒）");
+                Console.WriteLine("❌ [Surya] サーバー起動タイムアウト（300秒）");
+            }
+
+            // タイムアウトまたは失敗
+            if (errorOutput.Count > 0)
+            {
+                _logger.LogError("❌ [Surya] サーバー起動エラー: {Errors}", string.Join("; ", errorOutput.Take(5)));
+            }
+
+            await StopServerAsync().ConfigureAwait(false);
+            return false;
+        }
+        finally
+        {
+            _startLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// サーバー停止
+    /// </summary>
+    public async Task StopServerAsync()
+    {
+        if (_serverProcess == null) return;
+
+        try
+        {
+            if (!_serverProcess.HasExited)
+            {
+                _logger.LogInformation("🛑 [Surya] サーバー停止中 (PID: {PID})", _serverProcess.Id);
+                _serverProcess.Kill(entireProcessTree: true);
+                await _serverProcess.WaitForExitAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ [Surya] サーバー停止時のエラー");
+        }
+        finally
+        {
+            _serverProcess.Dispose();
+            _serverProcess = null;
+            _isReady = false;
+        }
+    }
+
+    /// <summary>
+    /// サーバー準備完了メッセージを検出
+    /// </summary>
+    private void CheckForReadyMessage(string data, TaskCompletionSource<bool> readyTcs)
+    {
+        // 既に検出済みの場合はスキップ
+        if (_isReady) return;
+
+        // gRPCサーバー起動完了を検出（複数パターン対応）
+        // 日本語パターンとASCIIパターンの両方をサポート
+        var isReady =
+            data.Contains("gRPCサーバー起動") ||        // 日本語ログ
+            data.Contains("gRPC server started") ||     // 英語ログ
+            data.Contains("Server started") ||          // 汎用
+            data.Contains($"listening on [::]:{_port}") || // gRPC標準形式
+            data.Contains($"listening on 0.0.0.0:{_port}") ||
+            data.Contains($"(port: {_port})") ||        // Suryaサーバー形式
+            data.Contains($"port={_port}");             // 代替形式
+
+        if (isReady)
+        {
+            _logger.LogInformation("🎉 [Surya] サーバー準備完了検出: {Message}", data);
+            Console.WriteLine($"🎉 [Surya] サーバー準備完了検出: {data}");
+            _isReady = true;
+            readyTcs.TrySetResult(true);
+        }
+    }
+
+    /// <summary>
+    /// スクリプトパス解決
+    /// </summary>
+    private string? ResolveScriptPath()
+    {
+        // プロジェクトルート検索
+        var projectRoot = FindProjectRoot(AppContext.BaseDirectory);
+        if (string.IsNullOrEmpty(projectRoot))
+        {
+            projectRoot = Environment.CurrentDirectory;
+        }
+
+        var scriptPath = Path.Combine(projectRoot, "grpc_server", "ocr_server_surya.py");
+
+        if (File.Exists(scriptPath))
+        {
+            _logger.LogDebug("[Surya] スクリプトパス: {Path}", scriptPath);
+            return scriptPath;
+        }
+
+        // AppContext.BaseDirectoryからの相対パスも試行
+        scriptPath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "ocr_server_surya.py");
+        if (File.Exists(scriptPath))
+        {
+            return scriptPath;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Python実行ファイルパス解決
+    /// </summary>
+    private string? ResolvePythonPath()
+    {
+        var projectRoot = FindProjectRoot(AppContext.BaseDirectory) ?? Environment.CurrentDirectory;
+
+        // 1. .venv環境（最優先）
+        var venvPython = Path.Combine(projectRoot, ".venv", "Scripts", "python.exe");
+        if (File.Exists(venvPython))
+        {
+            _logger.LogInformation("[Surya] Python(.venv): {Path}", venvPython);
+            return venvPython;
+        }
+
+        // 2. vendor環境
+        var vendorPython = Path.Combine(AppContext.BaseDirectory, "vendor", "python", "python.exe");
+        if (File.Exists(vendorPython))
+        {
+            _logger.LogInformation("[Surya] Python(vendor): {Path}", vendorPython);
+            return vendorPython;
+        }
+
+        // 3. pyenv-win環境（Windowsでよく使われる）
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var pyenvPython = Path.Combine(userProfile, ".pyenv", "pyenv-win", "shims", "python.bat");
+        if (File.Exists(pyenvPython))
+        {
+            // pyenv shimsはバッチファイルなので、直接pythonを見つける
+            var pyenvVersionsDir = Path.Combine(userProfile, ".pyenv", "pyenv-win", "versions");
+            if (Directory.Exists(pyenvVersionsDir))
+            {
+                var versions = Directory.GetDirectories(pyenvVersionsDir);
+                foreach (var ver in versions.OrderByDescending(v => v))
+                {
+                    var pythonExe = Path.Combine(ver, "python.exe");
+                    if (File.Exists(pythonExe))
+                    {
+                        _logger.LogInformation("[Surya] Python(pyenv): {Path}", pythonExe);
+                        return pythonExe;
+                    }
+                }
+            }
+        }
+
+        // 4. miniconda/anaconda環境
+        var minicondaPython = Path.Combine(userProfile, "miniconda3", "python.exe");
+        if (File.Exists(minicondaPython))
+        {
+            _logger.LogInformation("[Surya] Python(miniconda): {Path}", minicondaPython);
+            return minicondaPython;
+        }
+
+        var anacondaPython = Path.Combine(userProfile, "anaconda3", "python.exe");
+        if (File.Exists(anacondaPython))
+        {
+            _logger.LogInformation("[Surya] Python(anaconda): {Path}", anacondaPython);
+            return anacondaPython;
+        }
+
+        // 5. PATHからpython.exeを検索
+        var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+        foreach (var pathDir in pathEnv.Split(Path.PathSeparator))
+        {
+            var pythonInPath = Path.Combine(pathDir, "python.exe");
+            if (File.Exists(pythonInPath))
+            {
+                _logger.LogInformation("[Surya] Python(PATH): {Path}", pythonInPath);
+                return pythonInPath;
+            }
+        }
+
+        _logger.LogWarning("[Surya] Python not found in any standard location");
+        return null;
+    }
+
+    /// <summary>
+    /// Suryaモデルディレクトリ解決
+    /// ComponentDownloaderでダウンロードしたモデルパスを検索
+    /// </summary>
+    private string? ResolveSuryaModelDir(string projectRoot)
+    {
+        // Recognition PyTorchモデルのパス（ComponentDownloader設定と一致）
+        // appsettings.json: LocalSubPath = "Models/surya-models/recognition"
+        var recognitionModelPath = Path.Combine(projectRoot, "Models", "surya-models", "recognition");
+        var modelFile = Path.Combine(recognitionModelPath, "model.safetensors");
+
+        if (File.Exists(modelFile))
+        {
+            _logger.LogDebug("[Surya] Recognition PyTorchモデル検出: {Path}", recognitionModelPath);
+            return recognitionModelPath;
+        }
+
+        // AppContext.BaseDirectoryも検索
+        var altPath = Path.Combine(AppContext.BaseDirectory, "Models", "surya-models", "recognition");
+        var altModelFile = Path.Combine(altPath, "model.safetensors");
+
+        if (File.Exists(altModelFile))
+        {
+            _logger.LogDebug("[Surya] Recognition PyTorchモデル検出(BaseDirectory): {Path}", altPath);
+            return altPath;
+        }
+
+        // モデルが見つからない場合はSuryaの標準ダウンロードを使用
+        _logger.LogDebug("[Surya] カスタムモデルなし - Surya標準ダウンロードを使用");
+        return null;
+    }
+
+    /// <summary>
+    /// プロジェクトルート検索（.slnファイルベース）
+    /// </summary>
+    private static string? FindProjectRoot(string startPath)
+    {
+        var current = new DirectoryInfo(startPath);
+        while (current != null)
+        {
+            if (current.GetFiles("*.sln").Length > 0)
+            {
+                return current.FullName;
+            }
+            current = current.Parent;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 孤立プロセス強制終了
+    /// </summary>
+    private async Task KillOrphanedProcessAsync()
+    {
+        try
+        {
+            var processes = Process.GetProcessesByName("python")
+                .Where(p =>
+                {
+                    try
+                    {
+                        return p.MainModule?.FileName?.Contains("ocr_server_surya") == true ||
+                               p.StartInfo.Arguments?.Contains("ocr_server_surya") == true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                })
+                .ToList();
+
+            foreach (var proc in processes)
+            {
+                _logger.LogWarning("🔥 [Surya] 孤立プロセス強制終了: PID {PID}", proc.Id);
+                proc.Kill(entireProcessTree: true);
+                await proc.WaitForExitAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[Surya] 孤立プロセス検索中のエラー（無視）");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await StopServerAsync().ConfigureAwait(false);
+
+        // Issue #189: Job Object破棄（ゾンビプロセス対策）
+        _jobObject?.Dispose();
+        _jobObject = null;
+
+        _startLock.Dispose();
+    }
+}

@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Services;
 using Baketa.Infrastructure.Translation.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,7 @@ namespace Baketa.Infrastructure.Translation.Services;
 /// Step 1統合: PythonEnvironmentResolver活用
 /// 🔧 [GEMINI_FIX] IAsyncDisposable実装追加 - アプリケーション終了時の確実なクリーンアップ
 /// </summary>
+/// Issue #189: ゾンビプロセス対策 - Job Object統合追加
 public class PythonServerManager(
     IPortManagementService portManager,
     PythonEnvironmentResolver pythonResolver,
@@ -35,6 +37,7 @@ public class PythonServerManager(
     private readonly SemaphoreSlim _startServerSemaphore = new(1, 1); // 🔥 [PORT_CONFLICT_FIX] 並行起動防止
     private System.Threading.Timer? _healthCheckTimer;
     private readonly object _healthCheckLock = new();
+    private ProcessJobObject? _jobObject; // Issue #189: ゾンビプロセス対策
     private bool _disposed;
 
     /// <summary>
@@ -46,7 +49,12 @@ public class PythonServerManager(
             System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
         // 🔥 [PHASE1.3] ヘルスチェック間隔を10秒に短縮（Gemini推奨：早期クラッシュ検出）
         _healthCheckTimer.Change(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
-        logger.LogInformation("🩺 PythonServerManager初期化完了（ヘルスチェック10秒間隔）");
+
+        // Issue #189: Job Object初期化 - ゾンビプロセス対策
+        _jobObject ??= new ProcessJobObject(logger);
+        logger.LogDebug("[Translation] Job Object初期化: IsValid={IsValid}", _jobObject.IsValid);
+
+        logger.LogInformation("🩺 PythonServerManager初期化完了（ヘルスチェック10秒間隔, Job Object: {IsValid}）", _jobObject.IsValid);
     }
 
     /// <summary>
@@ -486,6 +494,12 @@ public class PythonServerManager(
 
         // 🔥 [CRITICAL] BeginErrorReadLine()を即座に開始してstderrバッファを非同期消費
         process.BeginErrorReadLine();
+
+        // Issue #189: プロセスをJob Objectに関連付け（ゾンビプロセス対策）
+        if (_jobObject?.AssignProcess(process) == true)
+        {
+            logger.LogInformation("✅ [Translation] Job Object関連付け成功: PID={PID}", process.Id);
+        }
 
         return process;
     }
@@ -1035,6 +1049,18 @@ public class PythonServerManager(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "⚠️ [ASYNC_DISPOSE] SemaphoreSlim破棄エラー");
+        }
+
+        // Issue #189: Job Object破棄（ゾンビプロセス対策）
+        try
+        {
+            _jobObject?.Dispose();
+            _jobObject = null;
+            logger.LogDebug("✅ [ASYNC_DISPOSE] Job Object破棄完了");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "⚠️ [ASYNC_DISPOSE] Job Object破棄エラー");
         }
 
         logger.LogInformation("✅ [ASYNC_DISPOSE] PythonServerManager非同期破棄完了");

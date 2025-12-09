@@ -83,6 +83,8 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
         Console.WriteLine($"🔍 [HEALTH_MONITOR] 取得した設定: EnableServerAutoRestart={settings.EnableServerAutoRestart}");
         Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckIntervalMs: {settings.HealthCheckIntervalMs}ms");
+        Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckTimeoutMs: {settings.HealthCheckTimeoutMs}ms");
+        Console.WriteLine($"🔍 [HEALTH_MONITOR] MaxConsecutiveFailures: {settings.MaxConsecutiveFailures}");
 
         if (settings.EnableServerAutoRestart)
         {
@@ -195,13 +197,18 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     /// </summary>
     private async Task<bool> PerformHealthCheckAsync()
     {
+        // Issue #189: 設定可能なタイムアウト（デフォルト15秒、接続5秒+応答10秒に分割）
+        var totalTimeout = _cachedSettings?.HealthCheckTimeoutMs ?? 15000;
+        var connectionTimeout = Math.Max(totalTimeout / 3, 5000);  // 最低5秒
+        var responseTimeout = totalTimeout - connectionTimeout;     // 残りを応答用に
+
         try
         {
             using var client = new TcpClient();
             var connectTask = client.ConnectAsync("127.0.0.1", _currentServerPort);
 
-            // 短時間での接続テスト
-            if (await Task.WhenAny(connectTask, Task.Delay(2000)) == connectTask)
+            // 接続タイムアウト（設定の1/3、最低5秒）
+            if (await Task.WhenAny(connectTask, Task.Delay(connectionTimeout)) == connectTask)
             {
                 if (client.Connected)
                 {
@@ -214,11 +221,11 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                     await stream.WriteAsync(requestBytes);
                     await stream.FlushAsync();
 
-                    // レスポンス読み取り（タイムアウト付き）
+                    // レスポンス読み取り（タイムアウト付き - 設定の残り時間を使用）
                     var buffer = new byte[1024];
                     var readTask = stream.ReadAsync(buffer, 0, buffer.Length);
 
-                    if (await Task.WhenAny(readTask, Task.Delay(3000)) == readTask)
+                    if (await Task.WhenAny(readTask, Task.Delay(responseTimeout)) == readTask)
                     {
                         var bytesRead = await readTask;
                         if (bytesRead > 0)
