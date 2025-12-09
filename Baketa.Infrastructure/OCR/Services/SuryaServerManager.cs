@@ -84,8 +84,6 @@ public sealed class SuryaServerManager : IAsyncDisposable
             _logger.LogInformation("🔧 [Surya] Python: {Python}", pythonPath);
             _logger.LogInformation("🔧 [Surya] Arguments: {Args}", arguments);
             _logger.LogInformation("🔧 [Surya] WorkingDir: {Dir}", workingDir);
-            Console.WriteLine($"🔧 [Surya] Python: {pythonPath}");
-            Console.WriteLine($"🔧 [Surya] Arguments: {arguments}");
 
             var startInfo = new ProcessStartInfo
             {
@@ -124,8 +122,7 @@ public sealed class SuryaServerManager : IAsyncDisposable
             {
                 if (e.Data == null) return;
 
-                _logger.LogInformation("[Surya-stdout] {Data}", e.Data);
-                Console.WriteLine($"[Surya-stdout] {e.Data}");
+                _logger.LogDebug("[Surya-stdout] {Data}", e.Data);
 
                 // gRPCサーバー起動完了を検出
                 CheckForReadyMessage(e.Data, readyTcs);
@@ -142,8 +139,7 @@ public sealed class SuryaServerManager : IAsyncDisposable
                 }
                 else
                 {
-                    _logger.LogInformation("[Surya-stderr] {Data}", e.Data);
-                    Console.WriteLine($"[Surya-stderr] {e.Data}");
+                    _logger.LogDebug("[Surya-stderr] {Data}", e.Data);
 
                     // stderr からも準備完了を検出（Pythonのloggingはstderrに出力）
                     CheckForReadyMessage(e.Data, readyTcs);
@@ -192,7 +188,6 @@ public sealed class SuryaServerManager : IAsyncDisposable
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
                 _logger.LogError("❌ [Surya] サーバー起動タイムアウト（300秒）");
-                Console.WriteLine("❌ [Surya] サーバー起動タイムアウト（300秒）");
             }
 
             // タイムアウトまたは失敗
@@ -260,7 +255,6 @@ public sealed class SuryaServerManager : IAsyncDisposable
         if (isReady)
         {
             _logger.LogInformation("🎉 [Surya] サーバー準備完了検出: {Message}", data);
-            Console.WriteLine($"🎉 [Surya] サーバー準備完了検出: {data}");
             _isReady = true;
             readyTcs.TrySetResult(true);
         }

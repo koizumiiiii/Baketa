@@ -287,9 +287,7 @@ internal sealed class Program
             System.Diagnostics.Debug.WriteLine("🚀 OCRエンジン事前初期化開始（バックグラウンド）");
             _ = Task.Run(PreInitializeOcrEngineAsync);
 
-            // Phase4: 統合GPU最適化システム初期化
-            Console.WriteLine("🎯 Phase4: 統合GPU最適化システム初期化開始");
-            _ = Task.Run(InitializeUnifiedGpuSystemAsync);
+            // NOTE: [PP-OCRv5削除] UnifiedGpuSystemAsync削除 - PP-OCRv5 GPU最適化は不要
 
             // OPUS-MT削除済み: NLLB-200統一により事前ウォームアップサービス不要
 
@@ -682,11 +680,7 @@ internal sealed class Program
             }
         });
 
-        // 🩺 DiagnosticModuleの最優先登録 - 診断レポートシステム即座有効化
-        Console.WriteLine("🩺 [FIRST] DiagnosticModule最優先登録開始");
-        var diagnosticModule = new Baketa.Infrastructure.DI.Modules.DiagnosticModule();
-        diagnosticModule.RegisterServices(services);
-        Console.WriteLine("✅ [FIRST] DiagnosticModule最優先登録完了");
+        // NOTE: [PP-OCRv5削除] DiagnosticModule削除 - PP-OCRv5診断機能は不要
 
         // 🚀 Phase 2-1: 段階的DI簡素化 - ステップ1: 基盤モジュール群の統合
         Console.WriteLine("🔧 Phase 2-1: 基盤モジュール群登録開始");
@@ -995,61 +989,7 @@ internal sealed class Program
         }
     }
 
-    /// <summary>
-    /// Phase4: 統合GPU最適化システムを初期化
-    /// </summary>
-    private static async Task InitializeUnifiedGpuSystemAsync()
-    {
-        try
-        {
-            Console.WriteLine("🎯 統合GPU最適化システム初期化開始");
-            var timer = System.Diagnostics.Stopwatch.StartNew();
-
-            // ServiceProviderが利用可能になるまで待機
-            while (ServiceProvider == null)
-            {
-                await Task.Delay(100).ConfigureAwait(false);
-                if (timer.ElapsedMilliseconds > 30000) // 30秒でタイムアウト
-                {
-                    Console.WriteLine("⚠️ ServiceProvider初期化タイムアウト - 統合GPU初期化を中止");
-                    return;
-                }
-            }
-
-            // UnifiedGpuInitializerサービスを取得して初期化
-            var gpuInitializer = ServiceProvider.GetService<Baketa.Infrastructure.DI.UnifiedGpuInitializer>();
-            if (gpuInitializer != null)
-            {
-                Console.WriteLine("🔧 UnifiedGpuInitializer取得成功 - 初期化開始");
-
-                try
-                {
-                    await gpuInitializer.InitializeAsync().ConfigureAwait(false);
-                    timer.Stop();
-
-                    Console.WriteLine($"✅ 統合GPU最適化システム初期化完了 - 初期化時間: {timer.ElapsedMilliseconds}ms");
-                    System.Diagnostics.Debug.WriteLine($"✅ 統合GPU最適化システム初期化完了 - 初期化時間: {timer.ElapsedMilliseconds}ms");
-                }
-                catch (Exception gpuEx)
-                {
-                    timer.Stop();
-                    Console.WriteLine($"⚠️ 統合GPU最適化システム初期化部分的失敗（続行）: {gpuEx.Message} - 経過時間: {timer.ElapsedMilliseconds}ms");
-                    System.Diagnostics.Debug.WriteLine($"⚠️ 統合GPU最適化システム初期化部分的失敗（続行）: {gpuEx.Message} - 経過時間: {timer.ElapsedMilliseconds}ms");
-                }
-            }
-            else
-            {
-                timer.Stop();
-                Console.WriteLine($"⚠️ UnifiedGpuInitializerサービスが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
-                System.Diagnostics.Debug.WriteLine($"⚠️ UnifiedGpuInitializerサービスが見つかりません - 経過時間: {timer.ElapsedMilliseconds}ms");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"💥 統合GPU最適化システム初期化エラー: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"💥 統合GPU最適化システム初期化エラー: {ex.Message}");
-        }
-    }
+    // NOTE: [PP-OCRv5削除] InitializeUnifiedGpuSystemAsync削除 - PP-OCRv5 GPU最適化は不要
 
     /// <summary>
     /// OCRエンジンを事前初期化してメイン処理を高速化
@@ -1344,11 +1284,7 @@ internal sealed class Program
     /// <param name="moduleStack">モジュールスタック</param>
     private static void RegisterGeminiRecommendedModules(IServiceCollection services, HashSet<Type> registeredModules, Stack<Type> moduleStack)
     {
-        // 🚀 Gemini推奨Step2: 段階的OCR戦略モジュール登録
-        Console.WriteLine("🔍 [GEMINI] StagedOcrStrategyModule登録開始...");
-        var stagedOcrModule = new Baketa.Application.DI.Modules.StagedOcrStrategyModule();
-        stagedOcrModule.RegisterWithDependencies(services, registeredModules, moduleStack);
-        Console.WriteLine("✅ [GEMINI] StagedOcrStrategyModule登録完了！");
+        // NOTE: [PP-OCRv5削除] StagedOcrStrategyModule削除 - SuryaOcrModuleに移行
 
         // 🎯 Gemini推奨Step3: 高度キャッシング戦略モジュール登録
         Console.WriteLine("🔍 [GEMINI] AdvancedCachingModule登録開始...");
@@ -1386,44 +1322,19 @@ internal sealed class Program
     /// <param name="services">サービスコレクション</param>
     private static void RegisterOcrOptimizationModules(IServiceCollection services)
     {
-        // バッチOCRモジュールの登録
-        Console.WriteLine("📦 BatchOcrModule登録開始");
-        var batchOcrModule = new Baketa.Infrastructure.DI.BatchOcrModule();
-        batchOcrModule.RegisterServices(services);
-        Console.WriteLine("✅ BatchOcrModule登録完了");
+        // NOTE: [PP-OCRv5削除] BatchOcrModule, OcrProcessingModule, PaddleOcrModule, OnnxOcrModule削除
+        // Surya OCRに移行したため、PP-OCRv5関連モジュールは不要
 
-        // OCRモジュールの登録（IOcrPreprocessingService提供）
-        Console.WriteLine("🔍 OcrProcessingModule登録開始");
-        var ocrProcessingModule = new Baketa.Infrastructure.DI.OcrProcessingModule();
-        ocrProcessingModule.RegisterServices(services);
-        Console.WriteLine("✅ OcrProcessingModule登録完了");
-
-        // OpenCvProcessingModuleの登録（IOcrPreprocessingService上書き）
+        // OpenCvProcessingModuleの登録（IOcrPreprocessingService - 画像前処理は引き続き使用）
         Console.WriteLine("🎯 OpenCvProcessingModule登録開始");
         var openCvProcessingModule = new Baketa.Infrastructure.DI.Modules.OpenCvProcessingModule();
         openCvProcessingModule.RegisterServices(services);
         Console.WriteLine("✅ OpenCvProcessingModule登録完了");
 
-        // PaddleOCRモジュールの登録
-        Console.WriteLine("🚀 PaddleOcrModule登録開始");
-        var paddleOcrModule = new Baketa.Infrastructure.DI.PaddleOcrModule();
-        paddleOcrModule.RegisterServices(services);
-        Console.WriteLine("✅ PaddleOcrModule登録完了");
+        // NOTE: [PP-OCRv5削除] UnifiedGpuModule削除 - PP-OCRv5 GPU最適化は不要
 
-        // Phase 4: 統合GPU最適化モジュールの登録
-        Console.WriteLine("🎯 Phase4: UnifiedGpuModule登録開始");
-        var unifiedGpuModule = new Baketa.Infrastructure.DI.UnifiedGpuModule();
-        unifiedGpuModule.RegisterServices(services);
-        Console.WriteLine("✅ Phase4: UnifiedGpuModule登録完了");
-
-        // Issue #181: ONNX OCRエンジンモジュールの登録（Surya使用時は上書きされる）
-        Console.WriteLine("🚀 OnnxOcrModule登録開始");
-        var onnxOcrModule = new Baketa.Infrastructure.DI.OnnxOcrModule();
-        onnxOcrModule.RegisterServices(services);
-        Console.WriteLine("✅ OnnxOcrModule登録完了");
-
-        // Issue #189: Surya OCRエンジンモジュールの登録（IOcrEngineを上書き）
-        // PP-OCRv5で検出できなかったビジュアルノベルの日本語ダイアログを高精度検出
+        // Issue #189: Surya OCRエンジンモジュールの登録（IOcrEngineを提供）
+        // ビジュアルノベルの日本語ダイアログを高精度検出
         Console.WriteLine("🚀 SuryaOcrModule登録開始");
         var suryaOcrModule = new Baketa.Infrastructure.DI.SuryaOcrModule();
         suryaOcrModule.RegisterServices(services);

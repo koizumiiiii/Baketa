@@ -38,11 +38,8 @@ internal static class ModuleRegistrar
         var infrastructureModule = new InfrastructureModule();
         infrastructureModule.RegisterServices(services);
 
-        // 🚀 Gemini推奨Step2: 段階的OCR戦略モジュール直接登録
-        Console.WriteLine("🔍 [DEBUG] StagedOcrStrategyModule登録開始...");
-        var stagedOcrModule = new StagedOcrStrategyModule();
-        stagedOcrModule.RegisterServices(services);
-        Console.WriteLine("✅ [DEBUG] StagedOcrStrategyModule登録完了！");
+        // NOTE: [PP-OCRv5削除] StagedOcrStrategyModule削除 - SuryaOcrModuleに移行
+        // Surya OCRはSuryaOcrModuleで登録済み
 
         // Baketaのその他のサービスモジュールを追加
         services.AddBaketaServices(environment: environment);

@@ -134,30 +134,19 @@ public sealed class ModuleRegistrationService(IServiceCollection services)
 
     private void RegisterOcrOptimizationModules()
     {
-        // バッチOCR
-        var batchOcrModule = new BatchOcrModule();
-        batchOcrModule.RegisterServices(_services);
+        // NOTE: [PP-OCRv5削除] BatchOcrModule, OcrProcessingModule, PaddleOcrModule削除
+        // Surya OCRに移行したため、これらのモジュールは不要
 
-        // OCR前処理
-        var ocrProcessingModule = new OcrProcessingModule();
-        ocrProcessingModule.RegisterServices(_services);
-
-        // OpenCV処理（IOcrPreprocessingService上書き）
+        // OpenCV処理（IOcrPreprocessingService - 画像前処理は引き続き使用）
         var openCvProcessingModule = new Baketa.Infrastructure.DI.Modules.OpenCvProcessingModule();
         openCvProcessingModule.RegisterServices(_services);
 
-        // PaddleOCR統合
-        var paddleOcrModule = new PaddleOcrModule();
-        paddleOcrModule.RegisterServices(_services);
+        // Surya OCRはSuryaOcrModuleで登録（ApplicationModule経由）
     }
 
     private void RegisterGeminiRecommendedModules()
     {
-        // Gemini推奨Step2: 段階的OCR戦略
-        Console.WriteLine("🔍 [GEMINI] StagedOcrStrategyModule登録開始...");
-        var stagedOcrModule = new StagedOcrStrategyModule();
-        stagedOcrModule.RegisterWithDependencies(_services, _registeredModules, _moduleStack);
-        Console.WriteLine("✅ [GEMINI] StagedOcrStrategyModule登録完了！");
+        // NOTE: [PP-OCRv5削除] StagedOcrStrategyModule削除 - SuryaOcrModuleに移行
 
         // Gemini推奨Step3: 高度キャッシング戦略
         Console.WriteLine("🔍 [GEMINI] AdvancedCachingModule登録開始...");

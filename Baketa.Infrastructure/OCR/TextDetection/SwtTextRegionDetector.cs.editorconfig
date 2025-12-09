@@ -1,3 +1,0 @@
-# editorconfig for SwtTextRegionDetector.cs
-[*.cs]
-dotnet_diagnostic.CA1822.severity = none

@@ -17,7 +17,9 @@ OCR技術によりゲーム画面からテキストを検出し、翻訳結果�
 ## ✨ 主要機能
 
 ### 🔍 OCR・画像処理
-- **PaddleOCR**: 高精度なテキスト検出エンジン（PP-OCRv5対応）
+- **Surya OCR**: 高精度なテキスト検出・認識エンジン（v0.17+対応）
+  - **ハイブリッドモード**: ONNX Detection (軽量31MB) + PyTorch Recognition (高精度)
+  - **gRPCサーバー**: Python gRPCサーバー経由でC#から利用
 - **Windows Graphics Capture API**: ネイティブC++/WinRT実装によるDirectX/OpenGLコンテンツキャプチャ
 - **OpenCV画像フィルタ**: モルフォロジー、ガウシアンフィルタによる前処理最適化
 - **差分検出**: 画面変更の高速検出によるパフォーマンス向上
@@ -62,7 +64,7 @@ Baketaは5層クリーンアーキテクチャとモジュラー設計を採用�
    - 抽象インターフェース (`Abstractions/` 名前空間)
 
 2. **Baketa.Infrastructure**: インフラストラクチャ層（OCR、翻訳、設定管理）
-   - PaddleOCR統合、翻訳エンジン (NLLB-200)
+   - Surya OCR統合、翻訳エンジン (NLLB-200)
    - **gRPC翻訳クライアント**: Python翻訳サーバーとのHTTP/2通信 (`GrpcTranslationClient`)
    - **Pythonサーバー管理**: 自動起動・ヘルスチェック (`PythonServerManager`)
    - 画像処理パイプライン、設定永続化 (JSONベース)
@@ -291,7 +293,7 @@ dotnet publish Baketa.UI/Baketa.UI.csproj \
 - **言語**: C# 12.0（最新機能活用）、Python 3.10+（翻訳エンジン）
 - **フレームワーク**: .NET 8.0 Windows、FastAPI（翻訳サーバー）
 - **UI**: Avalonia 11.2.7 + ReactiveUI
-- **OCR**: PaddleOCR PP-OCRv5 + OpenCV最適化
+- **OCR**: Surya OCR (ONNX Detection + PyTorch Recognition) + OpenCV最適化
 - **翻訳**: NLLB-200（Meta製、ローカル）
 - **パフォーマンス**: CTranslate2最適化（提案中）、GPU最適化（CUDA）
 - **監視**: Windows Performance Counter、動的リソース監視
@@ -344,7 +346,7 @@ Baketa/
 
 ## 🙏 謝辞
 
-- **PaddleOCR**: 高精度OCRエンジン
+- **Surya OCR**: 高精度テキスト検出・認識エンジン
 - **OpenCV**: 画像処理ライブラリ
 - **Avalonia**: クロスプラットフォームUIフレームワーク
 - **Meta NLLB-200**: No Language Left Behind多言語翻訳モデル
