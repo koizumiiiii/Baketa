@@ -48,6 +48,12 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
+    - name: Install Windows SDK 10.0.19041.0
+      run: |
+        # Install Windows SDK with UWP components for CsWinRT
+        choco install windows-sdk-10-version-2004-windbg --yes --no-progress
+      shell: pwsh
+
     - name: Publish UI application
       run: |
         dotnet publish Baketa.UI/Baketa.UI.csproj `
@@ -115,6 +121,9 @@ jobs:
       run: |
         $distPath = "grpc_server/dist/BaketaTranslationServer"
         $zipName = "BaketaTranslationServer.zip"
+
+        # Ensure publish directory exists
+        New-Item -ItemType Directory -Path "./publish" -Force | Out-Null
 
         if (Test-Path $distPath) {
           Compress-Archive -Path "$distPath/*" -DestinationPath "./publish/$zipName" -Force
