@@ -383,6 +383,14 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         _logger.LogDebug("🎯 [OCR_SKIP_DEBUG] ShouldExecute呼び出し - PreviousStageResult: {HasPrevious}, Success: {Success}",
             context.PreviousStageResult != null, context.PreviousStageResult?.Success);
 
+        // 🔧 [Issue #193] キャプチャ段階でOCRが実行済みの場合はスキップ（二重OCR防止）
+        if (context.Input?.PreExecutedOcrResult != null)
+        {
+            _logger.LogInformation("🎯 [OCR_SKIP] キャプチャ段階でOCR実行済み ({RegionCount} regions) - 二重OCR防止のためスキップ",
+                context.Input.PreExecutedOcrResult.TextRegions.Count);
+            return false;
+        }
+
         // Stage 1で画像変化が検知された場合のみ実行
         if (context.PreviousStageResult?.Success == true &&
             context.PreviousStageResult.Data is ImageChangeDetectionResult imageChange)
