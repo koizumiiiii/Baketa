@@ -16,10 +16,12 @@ extern "C" {
 // フレームデータ構造体
 typedef struct {
     unsigned char* bgraData;    // BGRA ピクセルデータ
-    int width;                  // 幅
-    int height;                 // 高さ
+    int width;                  // 幅 (リサイズ後)
+    int height;                 // 高さ (リサイズ後)
     int stride;                 // 行バイト数
     long long timestamp;        // キャプチャ時刻 (100ns 単位)
+    int originalWidth;          // 🚀 [Issue #193] 元のキャプチャ幅 (リサイズ前)
+    int originalHeight;         // 🚀 [Issue #193] 元のキャプチャ高さ (リサイズ前)
 } BaketaCaptureFrame;
 
 /// <summary>

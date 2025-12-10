@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Events;
@@ -145,6 +146,13 @@ public class FullScreenOcrCaptureStrategy : ICaptureStrategy
                 return result;
             }
 
+            // 🚀 [Issue #193] ネイティブAPIから取得した実際のキャプチャサイズを使用
+            // DWMWA_EXTENDED_FRAME_BOUNDSではなく、WGCが実際にキャプチャした元サイズを使用
+            var originalWindowSize = new Size(fullImage.OriginalWidth, fullImage.OriginalHeight);
+            _logger.LogInformation("🚀 [Issue #193] 元キャプチャサイズ取得: {OriginalWidth}x{OriginalHeight} (リサイズ後: {Width}x{Height})",
+                originalWindowSize.Width, originalWindowSize.Height, fullImage.Width, fullImage.Height);
+            Console.WriteLine($"🚀 [Issue #193 DEBUG] 元キャプチャサイズ: {originalWindowSize.Width}x{originalWindowSize.Height} (リサイズ後: {fullImage.Width}x{fullImage.Height})");
+
             _logger.LogInformation("🔥 [PHASE2_STEP1] Full-screen capture completed - Size: {Width}x{Height}, Time: {ElapsedMs}ms",
                 fullImage.Width, fullImage.Height, phase1Stopwatch.ElapsedMilliseconds);
 
@@ -201,7 +209,43 @@ public class FullScreenOcrCaptureStrategy : ICaptureStrategy
             // 🔥 [PHASE2_STEP3] OcrResults → CaptureStrategyResult 変換
             result.Success = ocrResult.HasText;
             result.Images = [fullImage]; // 全画面画像1つのみ
-            result.TextRegions = [.. ocrResult.TextRegions.Select(r => r.Bounds)]; // 絶対座標（そのまま）
+
+            // 🚀 [Issue #193] OCR座標を元ウィンドウサイズにスケーリング
+            var capturedSize = new Size(fullImage.Width, fullImage.Height);
+
+            // スケーリング済みOcrTextRegionリストを作成
+            var scaledTextRegions = ocrResult.TextRegions.Select(r => new OcrTextRegion(
+                text: r.Text,
+                bounds: ScaleCoordinates(r.Bounds, originalWindowSize, capturedSize),
+                confidence: r.Confidence,
+                contour: r.Contour?.Select(p => new Point(
+                    (int)(p.X * (double)originalWindowSize.Width / capturedSize.Width),
+                    (int)(p.Y * (double)originalWindowSize.Height / capturedSize.Height))).ToArray(),
+                direction: r.Direction
+            )).ToList().AsReadOnly();
+
+            // スケーリング済みOcrResultsを作成して設定
+            result.PreExecutedOcrResult = new OcrResults(
+                textRegions: scaledTextRegions,
+                sourceImage: ocrResult.SourceImage,
+                processingTime: ocrResult.ProcessingTime,
+                languageCode: ocrResult.LanguageCode,
+                regionOfInterest: ocrResult.RegionOfInterest);
+
+            // 互換性のため、TextRegions（IList<Rectangle>）も設定
+            result.TextRegions = [.. scaledTextRegions.Select(r => r.Bounds)];
+
+            _logger.LogInformation("🚀 [Issue #193] 座標スケーリング完了: Captured={CapturedWidth}x{CapturedHeight} → Original={OriginalWidth}x{OriginalHeight}, Regions={RegionCount}",
+                capturedSize.Width, capturedSize.Height, originalWindowSize.Width, originalWindowSize.Height, scaledTextRegions.Count);
+            Console.WriteLine($"🚀 [Issue #193 DEBUG] 座標スケーリング完了: キャプチャ={capturedSize.Width}x{capturedSize.Height} → 元={originalWindowSize.Width}x{originalWindowSize.Height}, 領域数={scaledTextRegions.Count}");
+
+            // スケーリングの詳細をログ出力
+            if (scaledTextRegions.Count > 0)
+            {
+                var firstRegion = scaledTextRegions[0];
+                Console.WriteLine($"🚀 [Issue #193 DEBUG] 最初の領域スケーリング例: ({firstRegion.Bounds.X},{firstRegion.Bounds.Y},{firstRegion.Bounds.Width}x{firstRegion.Bounds.Height})");
+            }
+
             result.Metrics.ActualCaptureTime = totalStopwatch.Elapsed;
             result.Metrics.FrameCount = 1;
             result.Metrics.PerformanceCategory = "Fast";
@@ -269,31 +313,140 @@ public class FullScreenOcrCaptureStrategy : ICaptureStrategy
         return result;
     }
 
+    // 🚀 [Issue #193] OCR処理に適したGPUリサイズターゲットサイズ
+    // GPU→CPU転送量を削減するため、OCR処理に十分な解像度にリサイズ
+    private const int OcrTargetWidth = 1280;
+    private const int OcrTargetHeight = 720;
+
     private async Task<IWindowsImage?> CaptureFullScreenAsync(IntPtr hwnd)
     {
         try
         {
-            // 🔥 [PHASE2] IWindowsCapturer経由でウィンドウ全体をキャプチャ
-            // NativeWindowsCaptureWrapperの初期化・セッション管理は不要
-            // IWindowsCapturerが内部で適切に処理する
-            var fullImage = await _windowsCapturer.CaptureWindowAsync(hwnd).ConfigureAwait(false);
+            // 🚀 [Issue #193] GPUリサイズキャプチャを優先使用
+            // GPU上でリサイズしてからCPUに転送することで、転送量を削減
+            _logger.LogDebug("🚀 [Issue #193] GPUリサイズキャプチャ試行: Target={Width}x{Height}",
+                OcrTargetWidth, OcrTargetHeight);
+
+            var fullImage = await _windowsCapturer.CaptureWindowResizedAsync(
+                hwnd, OcrTargetWidth, OcrTargetHeight).ConfigureAwait(false);
 
             if (fullImage == null)
             {
-                _logger.LogWarning("Full-screen capture returned null");
+                _logger.LogWarning("🚀 [Issue #193] GPUリサイズキャプチャ失敗 - null返却");
                 return null;
             }
 
-            _logger.LogDebug("Full-screen capture successful - Size: {Width}x{Height}",
-                fullImage.Width, fullImage.Height);
+            _logger.LogInformation("🚀 [Issue #193] GPUリサイズキャプチャ成功 - Size: {Width}x{Height} (Target: {TargetWidth}x{TargetHeight})",
+                fullImage.Width, fullImage.Height, OcrTargetWidth, OcrTargetHeight);
 
             return fullImage;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Full-screen capture error");
+            _logger.LogError(ex, "🚀 [Issue #193] GPUリサイズキャプチャエラー");
             throw new InvalidOperationException("Full-screen capture failed", ex);
         }
+    }
+
+    #region P/Invoke Win32 API - DPI Awareness対応
+
+    // 🚀 [Issue #193] DWM API - 物理ピクセルサイズ取得用（DPI対応）
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT lpRect, int cbAttribute);
+
+    // DWMWA_EXTENDED_FRAME_BOUNDS はウィンドウの物理的な境界を取得
+    private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+    // 🚀 [Issue #193] GetWindowRect - フォールバック用（SetLastError追加）
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    // 🚀 [Issue #193] DPI取得用API (Windows 10 1607+)
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hWnd);
+
+    private const uint USER_DEFAULT_SCREEN_DPI = 96;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    #endregion
+
+    /// <summary>
+    /// 🚀 [Issue #193] ウィンドウの物理ピクセルサイズを取得（DPI Awareness対応）
+    /// DwmGetWindowAttributeを優先使用し、失敗時はGetWindowRect+DPIスケール補正
+    /// </summary>
+    private Size GetOriginalWindowSize(IntPtr hwnd)
+    {
+        // 方法1: DwmGetWindowAttribute を使用して物理サイズを取得 (推奨)
+        if (DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT rect, Marshal.SizeOf(typeof(RECT))) == 0) // S_OK
+        {
+            var size = new Size(rect.Right - rect.Left, rect.Bottom - rect.Top);
+            _logger.LogDebug("🚀 [Issue #193] DwmGetWindowAttribute成功: {Width}x{Height}", size.Width, size.Height);
+            return size;
+        }
+
+        _logger.LogDebug("🚀 [Issue #193] DwmGetWindowAttribute失敗、GetWindowRect+DPIスケールにフォールバック");
+
+        // 方法2: フォールバックとして GetWindowRect と DPI スケールで計算
+        if (GetWindowRect(hwnd, out rect))
+        {
+            try
+            {
+                uint dpi = GetDpiForWindow(hwnd);
+                double scaleFactor = dpi / (double)USER_DEFAULT_SCREEN_DPI;
+                int width = rect.Right - rect.Left;
+                int height = rect.Bottom - rect.Top;
+                var scaledSize = new Size((int)(width * scaleFactor), (int)(height * scaleFactor));
+                _logger.LogDebug("🚀 [Issue #193] GetWindowRect+DPIスケール: {Width}x{Height} (DPI={Dpi}, Scale={Scale:F2})",
+                    scaledSize.Width, scaledSize.Height, dpi, scaleFactor);
+                return scaledSize;
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // GetDpiForWindow が存在しない古いOSの場合
+                var size = new Size(rect.Right - rect.Left, rect.Bottom - rect.Top);
+                _logger.LogWarning("🚀 [Issue #193] GetDpiForWindow未サポート、DPIスケールなしで使用: {Width}x{Height}",
+                    size.Width, size.Height);
+                return size;
+            }
+        }
+
+        // 最終的なフォールバック
+        _logger.LogWarning("🚀 [Issue #193] ウィンドウサイズ取得失敗 (hwnd=0x{Hwnd:X})、OCRターゲットサイズを使用",
+            hwnd.ToInt64());
+        return new Size(OcrTargetWidth, OcrTargetHeight);
+    }
+
+    /// <summary>
+    /// 🚀 [Issue #193] OCR座標を元ウィンドウサイズにスケーリング
+    /// リサイズ画像での座標 → 元ウィンドウ座標に変換
+    /// </summary>
+    private Rectangle ScaleCoordinates(Rectangle bounds, Size originalSize, Size capturedSize)
+    {
+        // サイズが同じ場合は計算をスキップ（パフォーマンス最適化）
+        if (originalSize == capturedSize)
+            return bounds;
+
+        if (capturedSize.Width <= 0 || capturedSize.Height <= 0)
+            return bounds;
+
+        double scaleX = (double)originalSize.Width / capturedSize.Width;
+        double scaleY = (double)originalSize.Height / capturedSize.Height;
+
+        return new Rectangle(
+            (int)(bounds.X * scaleX),
+            (int)(bounds.Y * scaleY),
+            (int)(bounds.Width * scaleX),
+            (int)(bounds.Height * scaleY)
+        );
     }
 }
 

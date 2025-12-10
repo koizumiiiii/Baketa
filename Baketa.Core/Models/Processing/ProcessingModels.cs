@@ -88,6 +88,17 @@ public sealed record ProcessingPipelineInput : IDisposable
     public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; init; } = null;
 
     /// <summary>
+    /// 🚀 [Issue #193] 元ウィンドウサイズ（座標スケーリング用）
+    /// GPU Shaderリサイズ後のOCR座標を元のウィンドウサイズにスケーリングするために使用
+    /// </summary>
+    /// <remarks>
+    /// キャプチャ時に取得された元ウィンドウの物理サイズ。
+    /// OCR処理後の座標スケーリングで使用し、オーバーレイが正確な位置に表示されるようにする。
+    /// Size.Empty の場合はスケーリングをスキップする。
+    /// </remarks>
+    public Size OriginalWindowSize { get; init; } = Size.Empty;
+
+    /// <summary>
     /// 🎯 UltraThink: 所有権管理フラグ
     /// </summary>
     public bool OwnsImage { get; init; } = true;

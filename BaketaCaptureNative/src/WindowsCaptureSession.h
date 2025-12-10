@@ -47,11 +47,13 @@ public:
     /// <param name="height">高さ（出力）- リサイズ後のサイズ</param>
     /// <param name="stride">行バイト数（出力）</param>
     /// <param name="timestamp">タイムスタンプ（出力）</param>
+    /// <param name="originalWidth">🚀 [Issue #193] 元のキャプチャ幅（出力）- リサイズ前</param>
+    /// <param name="originalHeight">🚀 [Issue #193] 元のキャプチャ高さ（出力）- リサイズ前</param>
     /// <param name="targetWidth">ターゲット幅</param>
     /// <param name="targetHeight">ターゲット高さ</param>
     /// <param name="timeoutMs">タイムアウト時間</param>
     /// <returns>成功時は true</returns>
-    bool CaptureFrameResized(unsigned char** bgraData, int* width, int* height, int* stride, long long* timestamp, int targetWidth, int targetHeight, int timeoutMs);
+    bool CaptureFrameResized(unsigned char** bgraData, int* width, int* height, int* stride, long long* timestamp, int* originalWidth, int* originalHeight, int targetWidth, int targetHeight, int timeoutMs);
 
     /// <summary>
     /// セッションIDを取得
@@ -133,6 +135,22 @@ private:
     bool ResizeAndConvertTextureToBGRA(ID3D11Texture2D* texture, unsigned char** bgraData, int* outputWidth, int* outputHeight, int* stride, int targetWidth, int targetHeight);
 
     /// <summary>
+    /// 🚀 [Issue #193] GPUシェーダーリサイズリソースを初期化
+    /// </summary>
+    /// <returns>成功時は true</returns>
+    bool InitializeGpuResizeResources();
+
+    /// <summary>
+    /// 🚀 [Issue #193] GPU上でテクスチャをリサイズ（シェーダー使用）
+    /// </summary>
+    /// <param name="sourceTexture">ソーステクスチャ</param>
+    /// <param name="targetWidth">ターゲット幅</param>
+    /// <param name="targetHeight">ターゲット高さ</param>
+    /// <param name="resizedTexture">リサイズ後のテクスチャ（出力）</param>
+    /// <returns>成功時は true</returns>
+    bool GpuResizeTexture(ID3D11Texture2D* sourceTexture, int targetWidth, int targetHeight, ComPtr<ID3D11Texture2D>& resizedTexture);
+
+    /// <summary>
     /// エラーメッセージを設定
     /// </summary>
     /// <param name="message">エラーメッセージ</param>
@@ -174,4 +192,12 @@ private:
     // エラー情報
     std::string m_lastError;
     HRESULT m_lastHResult;
+
+    // 🚀 [Issue #193] GPU Shader Resize リソース
+    bool m_gpuResizeInitialized;
+    ComPtr<ID3D11VertexShader> m_vertexShader;
+    ComPtr<ID3D11PixelShader> m_pixelShader;
+    ComPtr<ID3D11InputLayout> m_inputLayout;
+    ComPtr<ID3D11Buffer> m_vertexBuffer;
+    ComPtr<ID3D11SamplerState> m_bilinearSampler;
 };

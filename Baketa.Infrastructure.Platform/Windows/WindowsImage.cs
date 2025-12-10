@@ -95,6 +95,18 @@ public sealed class WindowsImage : IWindowsImage
     }
 
     /// <summary>
+    /// 🚀 [Issue #193] 元のキャプチャ幅（リサイズ前）
+    /// WindowsImageはGPUリサイズを行わないため、常にWidthと同じ値
+    /// </summary>
+    public int OriginalWidth => Width;
+
+    /// <summary>
+    /// 🚀 [Issue #193] 元のキャプチャ高さ（リサイズ前）
+    /// WindowsImageはGPUリサイズを行わないため、常にHeightと同じ値
+    /// </summary>
+    public int OriginalHeight => Height;
+
+    /// <summary>
     /// ネイティブImageオブジェクトを取得
     /// </summary>
     /// <returns>System.Drawing.Image インスタンス</returns>

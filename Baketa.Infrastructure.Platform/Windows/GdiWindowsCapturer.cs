@@ -100,6 +100,25 @@ public class GdiWindowsCapturer : IWindowsCapturer, IDisposable
     }
 
     /// <summary>
+    /// 🚀 [Issue #193] 指定したウィンドウをGPU上でリサイズしてキャプチャ
+    /// GDI実装ではGPUリサイズ非対応のため、通常キャプチャにフォールバック
+    /// </summary>
+    /// <param name="windowHandle">ウィンドウハンドル</param>
+    /// <param name="targetWidth">ターゲット幅（無視）</param>
+    /// <param name="targetHeight">ターゲット高さ（無視）</param>
+    /// <returns>キャプチャした画像</returns>
+    public async Task<IWindowsImage> CaptureWindowResizedAsync(IntPtr windowHandle, int targetWidth, int targetHeight)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        _logger?.LogDebug("🚀 [Issue #193] GdiWindowsCapturer: GPUリサイズ非対応のため通常キャプチャにフォールバック: HWND=0x{WindowHandle:X8}",
+            windowHandle.ToInt64());
+
+        // GDI実装ではGPUリサイズ非対応のため、通常キャプチャを実行
+        return await CaptureWindowAsync(windowHandle).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// 指定したウィンドウのクライアント領域をキャプチャ
     /// </summary>
     /// <param name="windowHandle">ウィンドウハンドル</param>

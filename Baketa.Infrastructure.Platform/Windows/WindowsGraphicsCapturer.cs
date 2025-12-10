@@ -357,6 +357,62 @@ public class WindowsGraphicsCapturer : IWindowsCapturer, IDisposable
     }
 
     /// <summary>
+    /// 🚀 [Issue #193] 指定したウィンドウをGPU上でリサイズしてキャプチャ
+    /// GPU→CPU転送量を削減し、パフォーマンスを向上（4K→HD: 75%削減）
+    /// </summary>
+    /// <param name="windowHandle">ウィンドウハンドル</param>
+    /// <param name="targetWidth">ターゲット幅</param>
+    /// <param name="targetHeight">ターゲット高さ</param>
+    /// <returns>リサイズされたキャプチャ画像</returns>
+    public async Task<IWindowsImage> CaptureWindowResizedAsync(IntPtr windowHandle, int targetWidth, int targetHeight)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        _logger?.LogDebug("🚀 [Issue #193] GPUリサイズキャプチャ開始: HWND=0x{WindowHandle:X8}, Target={Width}x{Height}",
+            windowHandle.ToInt64(), targetWidth, targetHeight);
+
+        if (!_isInitialized)
+        {
+            var initSuccess = await InitializeAsync().ConfigureAwait(false);
+            if (!initSuccess)
+            {
+                throw new InvalidOperationException("Windows Graphics Captureの初期化に失敗しました");
+            }
+        }
+
+        try
+        {
+            // キャプチャセッションを作成
+            var sessionCreated = _nativeCapture.CreateCaptureSession(windowHandle);
+            if (!sessionCreated)
+            {
+                _logger?.LogWarning("🚀 [Issue #193] セッション作成失敗、通常キャプチャにフォールバック");
+                return await CaptureWindowAsync(windowHandle).ConfigureAwait(false);
+            }
+
+            // 🚀 GPUシェーダーリサイズを使用したフレームキャプチャ
+            var timeoutMs = 5000;
+            var capturedImage = await _nativeCapture.CaptureFrameResizedAsync(targetWidth, targetHeight, timeoutMs).ConfigureAwait(false);
+
+            if (capturedImage != null && capturedImage.Width > 0 && capturedImage.Height > 0)
+            {
+                _logger?.LogInformation("✅ [Issue #193] GPUリサイズキャプチャ成功: {Width}x{Height} (Target: {TargetWidth}x{TargetHeight})",
+                    capturedImage.Width, capturedImage.Height, targetWidth, targetHeight);
+                return capturedImage;
+            }
+
+            // リサイズ失敗時は通常キャプチャにフォールバック
+            _logger?.LogWarning("🚀 [Issue #193] GPUリサイズ失敗、通常キャプチャにフォールバック");
+            return await CaptureWindowAsync(windowHandle).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "🚀 [Issue #193] GPUリサイズキャプチャ例外、通常キャプチャにフォールバック");
+            return await CaptureWindowAsync(windowHandle).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
     /// 指定したウィンドウのクライアント領域をキャプチャ
     /// </summary>
     /// <param name="windowHandle">ウィンドウハンドル</param>

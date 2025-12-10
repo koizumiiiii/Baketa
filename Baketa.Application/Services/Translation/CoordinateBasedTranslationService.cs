@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -190,7 +191,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 CapturedImage = image,
                 CaptureRegion = image.CaptureRegion ?? new System.Drawing.Rectangle(0, 0, image.Width, image.Height),
                 SourceWindowHandle = windowHandle,
-                Options = options ?? new Baketa.Core.Models.Processing.ProcessingPipelineOptions()
+                Options = options ?? new Baketa.Core.Models.Processing.ProcessingPipelineOptions(),
+                // 🚀 [Issue #193] GPU Shaderリサイズ後のOCR座標スケーリング用に元ウィンドウサイズを設定
+                OriginalWindowSize = GetOriginalWindowSize(windowHandle)
             };
 
             // パイプライン実行（ImageChangeDetection → OcrExecution）
@@ -1603,4 +1606,35 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogError(ex, "❌ CoordinateBasedTranslationService dispose error");
         }
     }
+
+    #region 🚀 [Issue #193] Win32 API for coordinate scaling
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    /// <summary>
+    /// 🚀 [Issue #193] ウィンドウハンドルから元のウィンドウサイズを取得
+    /// GPU Shaderリサイズ後のOCR座標をスケーリングするために使用
+    /// </summary>
+    private static Size GetOriginalWindowSize(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero)
+            return Size.Empty;
+
+        if (GetWindowRect(hwnd, out RECT rect))
+        {
+            return new Size(rect.Right - rect.Left, rect.Bottom - rect.Top);
+        }
+
+        return Size.Empty;
+    }
+
+    #endregion
 }

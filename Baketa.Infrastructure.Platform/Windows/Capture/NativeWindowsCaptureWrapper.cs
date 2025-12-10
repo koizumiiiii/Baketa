@@ -458,11 +458,16 @@ public class NativeWindowsCaptureWrapper : IDisposable
                     // 🔧 [SAFEIMAGE_FIX] SafeImageを作成してメモリ安全性を確保
                     var safeImage = _safeImageFactory.CreateFromBitmap(bitmap, frame.width, frame.height);
 
-                    // 🔧 [SAFEIMAGE_FIX] SafeImageAdapterでラップしてIWindowsImageとして返す
-                    var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory);
+                    // 🚀 [Issue #193] SafeImageAdapterでラップしてIWindowsImageとして返す
+                    // 元のキャプチャサイズを保持して、座標スケーリングに使用
+                    var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory)
+                    {
+                        OriginalWidth = frame.originalWidth,
+                        OriginalHeight = frame.originalHeight
+                    };
 
-                    _logger?.LogDebug("✅ [Issue #193] リサイズフレームキャプチャ成功: {Width}x{Height} (target: {TargetWidth}x{TargetHeight}), Timestamp={Timestamp}",
-                        frame.width, frame.height, targetWidth, targetHeight, frame.timestamp);
+                    _logger?.LogDebug("✅ [Issue #193] リサイズフレームキャプチャ成功: {Width}x{Height} (original: {OriginalWidth}x{OriginalHeight}, target: {TargetWidth}x{TargetHeight}), Timestamp={Timestamp}",
+                        frame.width, frame.height, frame.originalWidth, frame.originalHeight, targetWidth, targetHeight, frame.timestamp);
 
                     return safeImageAdapter;
                 }

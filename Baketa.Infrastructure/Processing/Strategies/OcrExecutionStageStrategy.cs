@@ -232,9 +232,66 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                 ocrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
 
-                // OCR結果から文字列とチャンクを取得
+                // OCR結果から文字列を取得
                 detectedText = string.Join(" ", ocrResults.TextRegions.Select(r => r.Text));
-                textChunks = [.. ocrResults.TextRegions.Cast<object>()];
+
+                // 🚀 [Issue #193 FIX] GPU Shaderリサイズ後の座標スケーリング
+                // OCRは1280x720等にリサイズされた画像で実行されるため、
+                // 元のウィンドウサイズに座標を戻す必要がある
+                //
+                // 🔥 [CRITICAL FIX] OcrTextRegion.Boundsは読み取り専用のため、
+                // 新しいOcrTextRegionインスタンスを作成してスケーリング済み座標を設定
+                var originalSize = context.Input.OriginalWindowSize;
+                var capturedSize = new Size(ocrImage.Width, ocrImage.Height);
+
+                // 🔍 [Issue #193 DEBUG] スケーリング条件の診断ログ
+                _logger.LogInformation("🔍 [Issue #193 DEBUG] OriginalWindowSize: {OriginalWidth}x{OriginalHeight}, CapturedSize: {CapturedWidth}x{CapturedHeight}, SourceWindowHandle: {Handle}",
+                    originalSize.Width, originalSize.Height, capturedSize.Width, capturedSize.Height, context.Input.SourceWindowHandle.ToInt64());
+
+                if (originalSize != Size.Empty &&
+                    capturedSize.Width > 0 && capturedSize.Height > 0 &&
+                    (originalSize.Width != capturedSize.Width || originalSize.Height != capturedSize.Height))
+                {
+                    double scaleX = (double)originalSize.Width / capturedSize.Width;
+                    double scaleY = (double)originalSize.Height / capturedSize.Height;
+
+                    _logger.LogInformation("🚀 [Issue #193] 座標スケーリング適用 - 元サイズ: {OriginalWidth}x{OriginalHeight}, キャプチャサイズ: {CapturedWidth}x{CapturedHeight}, スケール: ({ScaleX:F3}, {ScaleY:F3})",
+                        originalSize.Width, originalSize.Height, capturedSize.Width, capturedSize.Height, scaleX, scaleY);
+
+                    // スケーリング済みの新しいOcrTextRegionリストを作成
+                    var scaledRegions = ocrResults.TextRegions.Select(r =>
+                    {
+                        var scaledBounds = new Rectangle(
+                            (int)(r.Bounds.X * scaleX),
+                            (int)(r.Bounds.Y * scaleY),
+                            (int)(r.Bounds.Width * scaleX),
+                            (int)(r.Bounds.Height * scaleY));
+
+                        // 🔥 [Issue #193 FIX] 新しいOcrTextRegionインスタンスを作成（Boundsは読み取り専用）
+                        return new Baketa.Core.Abstractions.OCR.OcrTextRegion(
+                            text: r.Text,
+                            bounds: scaledBounds,
+                            confidence: r.Confidence,
+                            contour: r.Contour?.Select(p => new Point(
+                                (int)(p.X * scaleX),
+                                (int)(p.Y * scaleY))).ToArray(),
+                            direction: r.Direction);
+                    }).ToList();
+
+                    textChunks = [.. scaledRegions.Cast<object>()];
+
+                    // 🔍 [Issue #193 DEBUG] スケーリング結果確認
+                    if (scaledRegions.Count > 0)
+                    {
+                        var first = scaledRegions[0];
+                        Console.WriteLine($"🚀 [Issue #193] スケーリング完了: 最初の領域 ({first.Bounds.X},{first.Bounds.Y},{first.Bounds.Width}x{first.Bounds.Height})");
+                    }
+                }
+                else
+                {
+                    // スケーリング不要の場合はそのまま使用
+                    textChunks = [.. ocrResults.TextRegions.Cast<object>()];
+                }
 
                 _logger.LogInformation("✅ [PHASE5_COMPLETE] 全画面OCR完了 - テキスト長: {TextLength}文字, 領域数: {RegionCount}個",
                     detectedText.Length, textChunks.Count);
@@ -520,6 +577,10 @@ internal sealed class InlineImageToWindowsImageAdapter : IWindowsImage, IDisposa
 
     public int Width => _underlyingImage.Width;
     public int Height => _underlyingImage.Height;
+
+    // 🚀 [Issue #193] InlineAdapterはリサイズを行わないため、常にWidth/Heightと同じ
+    public int OriginalWidth => Width;
+    public int OriginalHeight => Height;
 
     public InlineImageToWindowsImageAdapter(IImage underlyingImage, ILogger logger)
     {

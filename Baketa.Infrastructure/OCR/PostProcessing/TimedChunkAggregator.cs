@@ -778,7 +778,8 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
 
     /// <summary>
     /// 統合されたバウンディングボックスを計算
-    /// UltraThink P0: ROI座標からスクリーン座標への適切な変換を実装
+    /// 🚀 [Issue #193] 座標変換はAggregatedChunksReadyEventHandlerで行うため、ここでは単純な座標統合のみ
+    /// GPUリサイズ後の座標は既にFullScreenOcrCaptureStrategy.ScaleCoordinates()でスケーリング済み
     /// </summary>
     private System.Drawing.Rectangle CalculateCombinedBounds(List<TextChunk> chunks)
     {
@@ -786,27 +787,22 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
 
         if (chunks.Count == 1)
         {
-            var singleChunk = chunks[0];
-            // 🎯 [P0_COORDINATE_TRANSFORM] 単一チャンクのROI→スクリーン座標変換
-            return _coordinateTransformationService.ConvertRoiToScreenCoordinates(
-                singleChunk.CombinedBounds, singleChunk.SourceWindowHandle);
+            // 🚀 [Issue #193] 座標変換を削除 - 座標は既にスケーリング済み
+            return chunks[0].CombinedBounds;
         }
 
-        // 🎯 [P0_COORDINATE_TRANSFORM] 複数チャンクの一括座標変換
-        var windowHandle = chunks[0].SourceWindowHandle;
-        var roiBounds = chunks.Select(c => c.CombinedBounds).ToArray();
-        var screenBounds = _coordinateTransformationService.ConvertRoiToScreenCoordinatesBatch(
-            roiBounds, windowHandle);
+        // 🚀 [Issue #193] 複数チャンクの座標統合（座標変換なし）
+        var bounds = chunks.Select(c => c.CombinedBounds).ToArray();
 
-        // 変換された座標から統合バウンディングボックスを計算
-        var minX = screenBounds.Min(r => r.X);
-        var minY = screenBounds.Min(r => r.Y);
-        var maxRight = screenBounds.Max(r => r.Right);
-        var maxBottom = screenBounds.Max(r => r.Bottom);
+        // 入力座標から統合バウンディングボックスを計算（変換なし）
+        var minX = bounds.Min(r => r.X);
+        var minY = bounds.Min(r => r.Y);
+        var maxRight = bounds.Max(r => r.Right);
+        var maxBottom = bounds.Max(r => r.Bottom);
 
         var combinedBounds = new System.Drawing.Rectangle(minX, minY, maxRight - minX, maxBottom - minY);
 
-        _logger.LogDebug("🎯 [P0_COORDINATE_TRANSFORM] 統合バウンディングボックス計算完了: ChunkCount={Count}, ROI→Screen変換済み, Result=({X},{Y},{W},{H})",
+        _logger.LogDebug("🚀 [Issue #193] 統合バウンディングボックス計算完了（座標変換なし）: ChunkCount={Count}, Result=({X},{Y},{W},{H})",
             chunks.Count, combinedBounds.X, combinedBounds.Y, combinedBounds.Width, combinedBounds.Height);
 
         return combinedBounds;

@@ -221,6 +221,8 @@ int BaketaCapture_CaptureFrameResized(int sessionId, BaketaCaptureFrame* frame, 
     frame->height = 0;
     frame->stride = 0;
     frame->timestamp = 0;
+    frame->originalWidth = 0;      // 🚀 [Issue #193]
+    frame->originalHeight = 0;     // 🚀 [Issue #193]
 
     WindowsCaptureSession* session = nullptr;
     {
@@ -236,7 +238,8 @@ int BaketaCapture_CaptureFrameResized(int sessionId, BaketaCaptureFrame* frame, 
 
     try
     {
-        if (!session->CaptureFrameResized(&frame->bgraData, &frame->width, &frame->height, &frame->stride, &frame->timestamp, targetWidth, targetHeight, timeoutMs))
+        // 🚀 [Issue #193] 元のキャプチャサイズも取得
+        if (!session->CaptureFrameResized(&frame->bgraData, &frame->width, &frame->height, &frame->stride, &frame->timestamp, &frame->originalWidth, &frame->originalHeight, targetWidth, targetHeight, timeoutMs))
         {
             SetLastError("Failed to capture resized frame");
             return BAKETA_CAPTURE_ERROR_DEVICE;
@@ -271,6 +274,8 @@ void BaketaCapture_ReleaseFrame(BaketaCaptureFrame* frame)
         frame->height = 0;
         frame->stride = 0;
         frame->timestamp = 0;
+        frame->originalWidth = 0;    // 🚀 [Issue #193]
+        frame->originalHeight = 0;   // 🚀 [Issue #193]
     }
 }
 

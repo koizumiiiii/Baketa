@@ -30,6 +30,16 @@ public interface IWindowsCapturer
     Task<IWindowsImage> CaptureWindowAsync(IntPtr windowHandle);
 
     /// <summary>
+    /// 🚀 [Issue #193] 指定したウィンドウをGPU上でリサイズしてキャプチャ
+    /// GPU→CPU転送量を削減し、パフォーマンスを向上
+    /// </summary>
+    /// <param name="windowHandle">ウィンドウハンドル</param>
+    /// <param name="targetWidth">ターゲット幅</param>
+    /// <param name="targetHeight">ターゲット高さ</param>
+    /// <returns>リサイズされたキャプチャ画像</returns>
+    Task<IWindowsImage> CaptureWindowResizedAsync(IntPtr windowHandle, int targetWidth, int targetHeight);
+
+    /// <summary>
     /// 指定したウィンドウのクライアント領域をキャプチャ
     /// </summary>
     /// <param name="windowHandle">ウィンドウハンドル</param>

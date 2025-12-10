@@ -192,6 +192,12 @@ internal sealed class FallbackWindowsCapturer : IWindowsCapturer
         throw new NotSupportedException("画面キャプチャが利用できません。Windows Graphics Capture APIが必要です。");
     }
 
+    public Task<IWindowsImage> CaptureWindowResizedAsync(IntPtr windowHandle, int targetWidth, int targetHeight)
+    {
+        _logger?.LogError("❌ FallbackWindowsCapturer: GPUリサイズキャプチャは利用できません（ネイティブDLL不在）");
+        throw new NotSupportedException("画面キャプチャが利用できません。Windows Graphics Capture APIが必要です。");
+    }
+
     public void SetCaptureOptions(WindowsCaptureOptions options)
     {
         _options = options ?? new WindowsCaptureOptions();

@@ -246,11 +246,16 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 //       ROI_COORD_FIX未実行: 画像相対座標 → スクリーン絶対座標変換
                 var isBorderlessOrFullscreen = _coordinateTransformationService.DetectBorderlessOrFullscreen(chunk.SourceWindowHandle);
 
+                // 🚀 [Issue #193] GPUリサイズ後の座標は既にFullScreenOcrCaptureStrategyで
+                // 元ウィンドウサイズにスケーリング済みのため、DPI補正をスキップする
+                Console.WriteLine($"🚀🚀🚀 [Issue #193 DEBUG] ConvertRoiToScreenCoordinates呼び出し前 - Bounds: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height}), alreadyScaledToOriginalSize=true");
                 var screenBounds = _coordinateTransformationService.ConvertRoiToScreenCoordinates(
                     chunk.CombinedBounds,  // 画像絶対座標またはROI相対座標
                     chunk.SourceWindowHandle,
                     roiScaleFactor: 1.0f,
-                    isBorderlessOrFullscreen: isBorderlessOrFullscreen);
+                    isBorderlessOrFullscreen: isBorderlessOrFullscreen,
+                    alreadyScaledToOriginalSize: true);  // 🚀 [Issue #193] 座標は既にスケーリング済み
+                Console.WriteLine($"🚀🚀🚀 [Issue #193 DEBUG] ConvertRoiToScreenCoordinates呼び出し後 - Result: ({screenBounds.X},{screenBounds.Y},{screenBounds.Width}x{screenBounds.Height})");
 
                 _logger.LogDebug("🔥 [FIX4_FULLSCREEN_COORD] 座標変換実行 - 画像座標:({X},{Y}) → スクリーン座標:({SX},{SY})",
                     chunk.CombinedBounds.X, chunk.CombinedBounds.Y, screenBounds.X, screenBounds.Y);
