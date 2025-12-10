@@ -697,6 +697,24 @@ public class InfrastructureModule : ServiceModuleBase
     {
         // 統一ログサービス（Singleton: アプリケーション全体で共有）
         services.AddSingleton<IBaketaLogger, BaketaLogger>();
+
+        // 🔧 [Issue #193/#194] バックグラウンドタスクキュー（DiagnosticCollectionServiceの依存）
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IBackgroundTaskQueue, BackgroundTaskQueue>();
+        Console.WriteLine("✅ IBackgroundTaskQueue登録完了 - バックグラウンドタスク処理");
+
+        // 🔧 [Issue #193/#194] Gemini調査指摘: QueuedHostedService登録漏れ修正
+        // キューに追加されたタスクを処理するHostedServiceを登録
+        services.AddHostedService<QueuedHostedService>();
+        Console.WriteLine("✅ QueuedHostedService登録完了 - バックグラウンドタスクワーカー");
+
+        // 🔧 [Issue #193/#194] Gemini調査指摘: IDiagnosticReportGenerator登録漏れ修正
+        // DiagnosticCollectionServiceの依存関係
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IDiagnosticReportGenerator, DiagnosticReportGenerator>();
+        Console.WriteLine("✅ IDiagnosticReportGenerator登録完了 - 診断レポート生成");
+
+        // 診断データ収集サービス（Singleton: パイプライン診断イベント収集）
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService, DiagnosticCollectionService>();
+        Console.WriteLine("✅ IDiagnosticCollectionService登録完了 - 診断データ収集");
     }
 
     /// <summary>

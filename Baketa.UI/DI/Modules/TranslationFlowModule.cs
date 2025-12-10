@@ -52,8 +52,7 @@ public class TranslationFlowModule : ServiceModuleBase
         {
             if (_isEventAggregatorConfigured)
             {
-                Console.WriteLine("ℹ️ TranslationFlowModule: EventAggregator設定は既に完了済み - スキップ");
-                logger.LogDebug("ℹ️ TranslationFlowModule: EventAggregator設定は既に完了済み - スキップ");
+                logger.LogDebug("TranslationFlowModule: EventAggregator設定は既に完了済み - スキップ");
                 return;
             }
             _isEventAggregatorConfigured = true;
