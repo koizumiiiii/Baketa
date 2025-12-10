@@ -347,11 +347,24 @@ def serve(port: int = 50052, device: str = "cuda"):
     # max_workers=1: GPU処理の競合を避けるためシングルワーカーに制限
     # max_message_length: 50MB - 高解像度ゲームスクリーンショット対応
     MAX_MESSAGE_LENGTH = 50 * 1024 * 1024  # 50MB
+
+    # 🔧 [Issue #189] KeepAlive設定 - 長時間OCR処理中の接続切断を防止
+    # 根本原因: C#クライアントが10秒ごとにPINGを送信するが、サーバー側デフォルトの
+    # max_pings_without_data=2制限に引っかかり「Too many pings」エラーで接続切断
+    # 解決策: Translation Server (start_server.py) と同一のKeepAlive設定を適用
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=1),
         options=[
+            # メッセージサイズ制限
             ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH),
             ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
+            # KeepAlive設定（Translation Serverと同一）
+            ('grpc.keepalive_time_ms', 30000),  # 30秒ごとにクライアント生存確認PING
+            ('grpc.keepalive_timeout_ms', 10000),  # PING応答待ち時間
+            ('grpc.keepalive_permit_without_calls', True),  # アイドル中もPING許可
+            ('grpc.http2.min_time_between_pings_ms', 10000),  # PING最低間隔（クライアントの10秒対応）
+            ('grpc.http2.max_pings_without_data', 0),  # ★重要: データなしPING回数制限を無効化
+            ('grpc.http2.min_ping_interval_without_data_ms', 10000),  # クライアントからのPING最低間隔
         ]
     )
 
