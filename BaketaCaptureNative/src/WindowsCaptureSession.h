@@ -40,6 +40,20 @@ public:
     bool CaptureFrame(unsigned char** bgraData, int* width, int* height, int* stride, long long* timestamp, int timeoutMs);
 
     /// <summary>
+    /// フレームをキャプチャしてGPU側でリサイズ (Issue #193 パフォーマンス最適化)
+    /// </summary>
+    /// <param name="bgraData">BGRAピクセルデータ（出力）</param>
+    /// <param name="width">幅（出力）- リサイズ後のサイズ</param>
+    /// <param name="height">高さ（出力）- リサイズ後のサイズ</param>
+    /// <param name="stride">行バイト数（出力）</param>
+    /// <param name="timestamp">タイムスタンプ（出力）</param>
+    /// <param name="targetWidth">ターゲット幅</param>
+    /// <param name="targetHeight">ターゲット高さ</param>
+    /// <param name="timeoutMs">タイムアウト時間</param>
+    /// <returns>成功時は true</returns>
+    bool CaptureFrameResized(unsigned char** bgraData, int* width, int* height, int* stride, long long* timestamp, int targetWidth, int targetHeight, int timeoutMs);
+
+    /// <summary>
     /// セッションIDを取得
     /// </summary>
     /// <returns>セッションID</returns>
@@ -104,6 +118,19 @@ private:
     /// <param name="stride">行バイト数（出力）</param>
     /// <returns>成功時は true</returns>
     bool ConvertTextureToBGRA(ID3D11Texture2D* texture, unsigned char** bgraData, int* stride);
+
+    /// <summary>
+    /// テクスチャをGPU上でリサイズしてBGRAデータに変換 (Issue #193)
+    /// </summary>
+    /// <param name="texture">ソーステクスチャ</param>
+    /// <param name="bgraData">BGRAデータ（出力）</param>
+    /// <param name="outputWidth">出力幅（出力）</param>
+    /// <param name="outputHeight">出力高さ（出力）</param>
+    /// <param name="stride">行バイト数（出力）</param>
+    /// <param name="targetWidth">ターゲット幅</param>
+    /// <param name="targetHeight">ターゲット高さ</param>
+    /// <returns>成功時は true</returns>
+    bool ResizeAndConvertTextureToBGRA(ID3D11Texture2D* texture, unsigned char** bgraData, int* outputWidth, int* outputHeight, int* stride, int targetWidth, int targetHeight);
 
     /// <summary>
     /// エラーメッセージを設定

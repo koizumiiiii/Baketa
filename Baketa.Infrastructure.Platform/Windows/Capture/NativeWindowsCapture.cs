@@ -80,6 +80,20 @@ public static partial class NativeWindowsCapture
     public static extern int BaketaCapture_CaptureFrame(int sessionId, [Out] out BaketaCaptureFrame frame, int timeoutMs);
 
     /// <summary>
+    /// 🚀 [Issue #193] フレームをキャプチャしてGPU側でリサイズ
+    /// </summary>
+    /// <param name="sessionId">セッションID</param>
+    /// <param name="frame">キャプチャフレーム（出力）</param>
+    /// <param name="targetWidth">ターゲット幅（0の場合はリサイズなし）</param>
+    /// <param name="targetHeight">ターゲット高さ（0の場合はリサイズなし）</param>
+    /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
+    /// <returns>成功時は ErrorCodes.Success</returns>
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1707:Identifiers should not contain underscores", Justification = "Native API naming convention")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "CA1401:P/Invokes should not be visible", Justification = "Public API for platform integration")]
+    public static extern int BaketaCapture_CaptureFrameResized(int sessionId, [Out] out BaketaCaptureFrame frame, int targetWidth, int targetHeight, int timeoutMs);
+
+    /// <summary>
     /// フレームデータを解放
     /// </summary>
     /// <param name="frame">解放するフレーム</param>

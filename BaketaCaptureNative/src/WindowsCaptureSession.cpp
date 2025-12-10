@@ -788,3 +788,245 @@ bool WindowsCaptureSession::GetWindowDebugInfo(std::string& windowInfo, std::str
         return false;
     }
 }
+
+/// <summary>
+/// 🚀 [Issue #193] フレームをキャプチャしてGPU側でリサイズ
+/// </summary>
+bool WindowsCaptureSession::CaptureFrameResized(unsigned char** bgraData, int* width, int* height, int* stride, long long* timestamp, int targetWidth, int targetHeight, int timeoutMs)
+{
+    if (!m_initialized)
+    {
+        SetLastError("Session not initialized");
+        return false;
+    }
+
+    if (!m_captureSession)
+    {
+        SetLastError("Capture session not created");
+        return false;
+    }
+
+    // ターゲットサイズが0の場合は通常キャプチャにフォールバック
+    if (targetWidth <= 0 || targetHeight <= 0)
+    {
+        return CaptureFrame(bgraData, width, height, stride, timestamp, timeoutMs);
+    }
+
+    try
+    {
+        // キャプチャを開始
+        m_captureSession.StartCapture();
+
+        // フレーム待機
+        std::unique_lock<std::mutex> lock(m_frameMutex);
+        bool frameReceived = m_frameCondition.wait_for(
+            lock,
+            std::chrono::milliseconds(timeoutMs),
+            [this] { return m_frameReady; }
+        );
+
+        if (!frameReceived)
+        {
+            SetLastError("Frame capture timeout");
+            return false;
+        }
+
+        // タイムスタンプを設定
+        *timestamp = m_frameTimestamp;
+
+        // テクスチャをGPU上でリサイズしてBGRAデータに変換
+        if (!ResizeAndConvertTextureToBGRA(m_latestFrame.Get(), bgraData, width, height, stride, targetWidth, targetHeight))
+        {
+            SetLastError("Failed to resize and convert texture to BGRA");
+            return false;
+        }
+
+        // フレーム状態をリセット
+        m_frameReady = false;
+
+        return true;
+    }
+    catch (const winrt::hresult_error& ex)
+    {
+        SetLastError("CaptureFrameResized winrt error: 0x" + std::to_string(ex.code()));
+        return false;
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("CaptureFrameResized exception: ") + ex.what());
+        return false;
+    }
+    catch (...)
+    {
+        SetLastError("CaptureFrameResized unknown exception");
+        return false;
+    }
+}
+
+/// <summary>
+/// 🚀 [Issue #193] テクスチャをGPU上でリサイズしてBGRAデータに変換
+/// Direct3D 11 Copy + CPU側バイリニアリサイズ (シンプル実装)
+/// </summary>
+bool WindowsCaptureSession::ResizeAndConvertTextureToBGRA(ID3D11Texture2D* texture, unsigned char** bgraData, int* outputWidth, int* outputHeight, int* stride, int targetWidth, int targetHeight)
+{
+    try
+    {
+        if (!texture || !bgraData || !stride || !outputWidth || !outputHeight)
+        {
+            SetLastError("Invalid parameters for resize texture conversion");
+            return false;
+        }
+
+        // ソーステクスチャの詳細を取得
+        D3D11_TEXTURE2D_DESC srcDesc;
+        texture->GetDesc(&srcDesc);
+
+        int srcWidth = static_cast<int>(srcDesc.Width);
+        int srcHeight = static_cast<int>(srcDesc.Height);
+
+        // アスペクト比を維持してターゲットサイズを計算
+        float srcAspect = static_cast<float>(srcWidth) / static_cast<float>(srcHeight);
+        float targetAspect = static_cast<float>(targetWidth) / static_cast<float>(targetHeight);
+
+        int finalWidth, finalHeight;
+        if (srcAspect > targetAspect)
+        {
+            // ソースが横長
+            finalWidth = targetWidth;
+            finalHeight = static_cast<int>(targetWidth / srcAspect);
+        }
+        else
+        {
+            // ソースが縦長
+            finalHeight = targetHeight;
+            finalWidth = static_cast<int>(targetHeight * srcAspect);
+        }
+
+        // 最小サイズを保証
+        finalWidth = (std::max)(1, finalWidth);
+        finalHeight = (std::max)(1, finalHeight);
+
+        // リサイズが不要な場合（ソースがターゲットより小さいか同じ）
+        if (srcWidth <= targetWidth && srcHeight <= targetHeight)
+        {
+            // 通常の変換を使用
+            *outputWidth = srcWidth;
+            *outputHeight = srcHeight;
+            return ConvertTextureToBGRA(texture, bgraData, stride);
+        }
+
+        // 🔍 デバッグログ
+        char debugBuffer[512];
+        sprintf_s(debugBuffer, sizeof(debugBuffer),
+            "GPU_RESIZE: Source=%dx%d -> Target=%dx%d -> Final=%dx%d",
+            srcWidth, srcHeight, targetWidth, targetHeight, finalWidth, finalHeight);
+        SetLastError(std::string(debugBuffer));
+
+        // ステージングテクスチャを作成（ソースサイズ）
+        D3D11_TEXTURE2D_DESC stagingDesc = {};
+        stagingDesc.Width = srcDesc.Width;
+        stagingDesc.Height = srcDesc.Height;
+        stagingDesc.MipLevels = 1;
+        stagingDesc.ArraySize = 1;
+        stagingDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        stagingDesc.Usage = D3D11_USAGE_STAGING;
+        stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        stagingDesc.SampleDesc.Count = 1;
+        stagingDesc.SampleDesc.Quality = 0;
+
+        ComPtr<ID3D11Texture2D> stagingTexture;
+        HRESULT hr = m_d3dDevice->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create staging texture for resize");
+            return false;
+        }
+
+        // GPU テクスチャをステージングテクスチャにコピー
+        m_d3dContext->CopyResource(stagingTexture.Get(), texture);
+
+        // ステージングテクスチャをマップ
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        hr = m_d3dContext->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mappedResource);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to map staging texture for resize");
+            return false;
+        }
+
+        // 出力バッファのストライドとサイズを計算
+        UINT outputPixelRowBytes = finalWidth * 4;
+        UINT outputAlignedStride = ((outputPixelRowBytes + 15) / 16) * 16;
+        size_t outputDataSize = finalHeight * outputAlignedStride;
+
+        // 出力バッファを確保
+        *bgraData = static_cast<unsigned char*>(_aligned_malloc(outputDataSize, 16));
+        if (!(*bgraData))
+        {
+            m_d3dContext->Unmap(stagingTexture.Get(), 0);
+            SetLastError("Failed to allocate output buffer for resize");
+            return false;
+        }
+
+        // バイリニア補間でリサイズ（CPU側）
+        const unsigned char* srcData = static_cast<const unsigned char*>(mappedResource.pData);
+        unsigned char* dstData = *bgraData;
+        UINT srcRowPitch = static_cast<UINT>(mappedResource.RowPitch);
+
+        float xRatio = static_cast<float>(srcWidth) / finalWidth;
+        float yRatio = static_cast<float>(srcHeight) / finalHeight;
+
+        for (int y = 0; y < finalHeight; ++y)
+        {
+            float srcY = y * yRatio;
+            int y0 = static_cast<int>(srcY);
+            int y1 = (std::min)(y0 + 1, srcHeight - 1);
+            float yFrac = srcY - y0;
+
+            unsigned char* dstRow = dstData + y * outputAlignedStride;
+
+            for (int x = 0; x < finalWidth; ++x)
+            {
+                float srcX = x * xRatio;
+                int x0 = static_cast<int>(srcX);
+                int x1 = (std::min)(x0 + 1, srcWidth - 1);
+                float xFrac = srcX - x0;
+
+                // 4つの隣接ピクセルを取得
+                const unsigned char* p00 = srcData + y0 * srcRowPitch + x0 * 4;
+                const unsigned char* p10 = srcData + y0 * srcRowPitch + x1 * 4;
+                const unsigned char* p01 = srcData + y1 * srcRowPitch + x0 * 4;
+                const unsigned char* p11 = srcData + y1 * srcRowPitch + x1 * 4;
+
+                // バイリニア補間（BGRA各チャンネル）
+                for (int c = 0; c < 4; ++c)
+                {
+                    float top = p00[c] * (1 - xFrac) + p10[c] * xFrac;
+                    float bottom = p01[c] * (1 - xFrac) + p11[c] * xFrac;
+                    float value = top * (1 - yFrac) + bottom * yFrac;
+                    dstRow[x * 4 + c] = static_cast<unsigned char>((std::min)(255.0f, (std::max)(0.0f, value)));
+                }
+            }
+        }
+
+        // ステージングテクスチャをアンマップ
+        m_d3dContext->Unmap(stagingTexture.Get(), 0);
+
+        // 出力パラメータを設定
+        *outputWidth = finalWidth;
+        *outputHeight = finalHeight;
+        *stride = static_cast<int>(outputAlignedStride);
+
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("ResizeAndConvertTextureToBGRA exception: ") + ex.what());
+        return false;
+    }
+    catch (...)
+    {
+        SetLastError("ResizeAndConvertTextureToBGRA unknown exception");
+        return false;
+    }
+}

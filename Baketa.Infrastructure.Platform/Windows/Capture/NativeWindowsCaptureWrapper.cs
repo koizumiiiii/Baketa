@@ -407,6 +407,96 @@ public class NativeWindowsCaptureWrapper : IDisposable
     }
 
     /// <summary>
+    /// 🚀 [Issue #193] フレームをキャプチャしてGPU側でリサイズし、WindowsImageを作成
+    /// </summary>
+    /// <param name="targetWidth">ターゲット幅（0の場合はリサイズなし）</param>
+    /// <param name="targetHeight">ターゲット高さ（0の場合はリサイズなし）</param>
+    /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
+    /// <returns>キャプチャしたWindowsImage、失敗時はnull</returns>
+    public async Task<IWindowsImage?> CaptureFrameResizedAsync(int targetWidth, int targetHeight, int timeoutMs = 5000)
+    {
+        if (_sessionId < 0)
+        {
+            _logger?.LogError("キャプチャセッションが作成されていません");
+            return null;
+        }
+
+        return await Task.Run(() =>
+        {
+            // 🔒 安全化: ウィンドウ選択中は一時停止
+            lock (_pauseLock)
+            {
+                if (_isPausedForWindowSelection)
+                {
+                    _logger?.LogDebug("キャプチャは一時停止中のため、nullを返します");
+                    return null;
+                }
+            }
+
+            // 🚀 安全化: フレーム構造体を初期化
+            var frame = new NativeWindowsCapture.BaketaCaptureFrame();
+            bool frameValid = false;
+
+            try
+            {
+                int result = NativeWindowsCapture.BaketaCapture_CaptureFrameResized(_sessionId, out frame, targetWidth, targetHeight, timeoutMs);
+                if (result != NativeWindowsCapture.ErrorCodes.Success)
+                {
+                    string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
+                    _logger?.LogError("リサイズフレームキャプチャに失敗: {ErrorCode}, {ErrorMessage}", result, errorMsg);
+                    return null; // フレーム無効なので解放不要
+                }
+
+                // フレームが有効であることをマーク
+                frameValid = true;
+
+                try
+                {
+                    // BGRAデータからBitmapを作成
+                    var bitmap = CreateBitmapFromBGRA(frame);
+
+                    // 🔧 [SAFEIMAGE_FIX] SafeImageを作成してメモリ安全性を確保
+                    var safeImage = _safeImageFactory.CreateFromBitmap(bitmap, frame.width, frame.height);
+
+                    // 🔧 [SAFEIMAGE_FIX] SafeImageAdapterでラップしてIWindowsImageとして返す
+                    var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory);
+
+                    _logger?.LogDebug("✅ [Issue #193] リサイズフレームキャプチャ成功: {Width}x{Height} (target: {TargetWidth}x{TargetHeight}), Timestamp={Timestamp}",
+                        frame.width, frame.height, targetWidth, targetHeight, frame.timestamp);
+
+                    return safeImageAdapter;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "リサイズフレームからビットマップ作成中に例外が発生");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "リサイズフレームキャプチャ中に例外が発生");
+                return null;
+            }
+            finally
+            {
+                // 🚀 安全化: フレームが有効な場合のみ解放
+                if (frameValid && frame.bgraData != IntPtr.Zero)
+                {
+                    try
+                    {
+                        NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref frame);
+                    }
+                    catch (Exception ex)
+                    {
+                        // メモリ解放時の例外をログに記録（クラッシュを防ぐ）
+                        _logger?.LogError(ex, "リサイズフレーム解放中に例外が発生");
+                    }
+                }
+            }
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// 現在のキャプチャセッションを停止
     /// </summary>
     public void StopCurrentSession()
