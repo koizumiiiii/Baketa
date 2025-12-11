@@ -48,8 +48,12 @@ class SuryaOcrEngine:
 
     VERSION = "0.17.x"  # Surya OCRバージョン
 
-    def __init__(self, device: str = "cuda"):
+    # 量子化モデルのデフォルトパス
+    QUANTIZED_MODEL_PATH = "Models/surya-quantized/surya_rec_quantized.pth"
+
+    def __init__(self, device: str = "cuda", use_quantized: bool = False):
         self.device = device
+        self.use_quantized = use_quantized
         self.foundation_predictor = None
         self.recognition_predictor = None
         self.detection_predictor = None
@@ -58,7 +62,7 @@ class SuryaOcrEngine:
     def load(self) -> bool:
         """モデルをロード (Surya v0.17.0+ API)"""
         try:
-            logger.info(f"Surya OCRモデルをロード中... (device: {self.device})")
+            logger.info(f"Surya OCRモデルをロード中... (device: {self.device}, quantized: {self.use_quantized})")
             total_start = time.time()
 
             # カスタムモデルパス設定（GitHub Release配布モデル対応）
@@ -76,14 +80,19 @@ class SuryaOcrEngine:
 
             # Surya OCR v0.17.0+ APIのインポート
             import_start = time.time()
+            import torch
             from surya.foundation import FoundationPredictor
             from surya.recognition import RecognitionPredictor
             from surya.detection import DetectionPredictor
             logger.info(f"[Timing] Import完了: {time.time() - import_start:.2f}秒")
 
             # 環境変数でデバイス設定（Surya v0.17.0+）
-            if self.device == "cuda":
-                import torch
+            # 量子化モデルはCPUのみ対応
+            if self.use_quantized:
+                os.environ["TORCH_DEVICE"] = "cpu"
+                self.device = "cpu"
+                logger.info("量子化モデル使用: CPUモードで実行")
+            elif self.device == "cuda":
                 if torch.cuda.is_available():
                     os.environ["TORCH_DEVICE"] = "cuda"
                     gpu_name = torch.cuda.get_device_name(0)
@@ -104,6 +113,36 @@ class SuryaOcrEngine:
             found_start = time.time()
             self.foundation_predictor = FoundationPredictor()
             logger.info(f"[Timing] FoundationPredictor: {time.time() - found_start:.2f}秒")
+
+            # 量子化モデルのロード（オプション）
+            if self.use_quantized:
+                quantized_path = os.environ.get("BAKETA_SURYA_QUANTIZED_MODEL", self.QUANTIZED_MODEL_PATH)
+                if os.path.exists(quantized_path):
+                    logger.info(f"量子化モデルをロード中: {quantized_path}")
+                    quant_start = time.time()
+
+                    # モデルを動的量子化構造に変換
+                    model = self.foundation_predictor.model
+                    model = model.cpu()
+                    model.eval()
+
+                    quantized_model = torch.quantization.quantize_dynamic(
+                        model,
+                        {torch.nn.Linear},
+                        dtype=torch.qint8
+                    )
+
+                    # 量子化済みstate_dictをロード
+                    state_dict = torch.load(quantized_path, map_location="cpu", weights_only=False)
+                    quantized_model.load_state_dict(state_dict)
+
+                    # FoundationPredictorのモデルを置き換え
+                    self.foundation_predictor.model = quantized_model
+
+                    logger.info(f"[Timing] 量子化モデルロード: {time.time() - quant_start:.2f}秒")
+                else:
+                    logger.warning(f"量子化モデルが見つかりません: {quantized_path}")
+                    logger.warning("オリジナルモデルで続行します")
 
             rec_start = time.time()
             self.recognition_predictor = RecognitionPredictor(self.foundation_predictor)
@@ -334,11 +373,11 @@ class OcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer if ocr_pb2_grpc else ob
         return response
 
 
-def serve(port: int = 50052, device: str = "cuda"):
+def serve(port: int = 50052, device: str = "cuda", use_quantized: bool = False):
     """gRPCサーバーを起動"""
 
     # エンジン初期化
-    engine = SuryaOcrEngine(device=device)
+    engine = SuryaOcrEngine(device=device, use_quantized=use_quantized)
     if not engine.load():
         logger.error("エンジンロード失敗")
         return
@@ -391,13 +430,15 @@ def main():
     parser.add_argument("--port", type=int, default=50052, help="gRPCポート番号")
     parser.add_argument("--device", type=str, default="cuda",
                         choices=["cuda", "cpu"], help="実行デバイス")
+    parser.add_argument("--quantized", action="store_true",
+                        help="量子化モデルを使用 (サイズ削減、CPUのみ)")
     parser.add_argument("--test", action="store_true", help="テストモード")
 
     args = parser.parse_args()
 
     if args.test:
         # テストモード: モデルロードのみ
-        engine = SuryaOcrEngine(device=args.device)
+        engine = SuryaOcrEngine(device=args.device, use_quantized=args.quantized)
         if engine.load():
             logger.info("テスト成功: モデルロード完了")
 
@@ -412,7 +453,7 @@ def main():
             logger.error("テスト失敗: モデルロードエラー")
             sys.exit(1)
     else:
-        serve(port=args.port, device=args.device)
+        serve(port=args.port, device=args.device, use_quantized=args.quantized)
 
 
 if __name__ == "__main__":

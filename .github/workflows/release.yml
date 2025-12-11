@@ -240,16 +240,16 @@ jobs:
           "https://github.com/koizumiiiii/Baketa/releases/download/models-v1/surya-detection-onnx.zip" || \
           echo "::warning::Surya detection model download failed, may need manual upload"
 
-        # Recognition Model (PyTorch) - ~1.1GB
-        curl -L -o surya-recognition-pytorch.zip \
-          "https://github.com/koizumiiiii/Baketa/releases/download/models-v1/surya-recognition-pytorch.zip" || \
+        # Recognition Model (Quantized PyTorch) - ~665MB (Issue #197: サイズ削減)
+        curl -L -o surya-recognition-quantized.zip \
+          "https://github.com/koizumiiiii/Baketa/releases/download/models-v1/surya-recognition-quantized.zip" || \
           echo "::warning::Surya recognition model download failed, may need manual upload"
 
         echo "## Surya OCR Models Package" >> $GITHUB_STEP_SUMMARY
         echo "- Detection (ONNX INT8): surya-detection-onnx.zip" >> $GITHUB_STEP_SUMMARY
         ls -lh surya-detection-onnx.zip >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "  (not available)" >> $GITHUB_STEP_SUMMARY
-        echo "- Recognition (PyTorch): surya-recognition-pytorch.zip" >> $GITHUB_STEP_SUMMARY
-        ls -lh surya-recognition-pytorch.zip >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "  (not available)" >> $GITHUB_STEP_SUMMARY
+        echo "- Recognition (Quantized PyTorch): surya-recognition-quantized.zip" >> $GITHUB_STEP_SUMMARY
+        ls -lh surya-recognition-quantized.zip >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "  (not available)" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload OCR models artifact
       uses: actions/upload-artifact@v4
@@ -257,7 +257,7 @@ jobs:
         name: ocr-models-package
         path: |
           surya-detection-onnx.zip
-          surya-recognition-pytorch.zip
+          surya-recognition-quantized.zip
         retention-days: 7
         if-no-files-found: warn
 
@@ -309,7 +309,7 @@ jobs:
         | `BaketaTranslationServer.zip` | Translation server (auto-downloaded) | ~200MB |
         | `BaketaSuryaOcrServer.zip` | Surya OCR server (auto-downloaded) | ~2GB |
         | `surya-detection-onnx.zip` | Surya Detection ONNX INT8 (auto-downloaded) | ~31MB |
-        | `surya-recognition-pytorch.zip` | Surya Recognition PyTorch (auto-downloaded) | ~1.1GB |
+        | `surya-recognition-quantized.zip` | Surya Recognition Quantized (auto-downloaded) | ~665MB |
 
         ### Installation
 
@@ -320,7 +320,7 @@ jobs:
 
         ### OCR Engine
 
-        Baketa uses **Surya OCR** for high accuracy Japanese text recognition (~1.1GB models)
+        Baketa uses **Surya OCR** for high accuracy Japanese text recognition (~700MB quantized model)
 
         ### NLLB Translation Model
 
