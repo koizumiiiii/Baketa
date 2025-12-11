@@ -61,27 +61,35 @@ dotnet run --project Baketa.UI
 dotnet run --project Baketa.UI --configuration Release
 ```
 
-### Creating Release Package
-To create a distribution package with bundled translation server:
+### Creating Release Package (Automated)
+Use the automated build script for reliable release package creation:
 
+```powershell
+# Full build (with PyInstaller - when Python code changed)
+.\scripts\build-release.ps1
+
+# Fast build (skip PyInstaller - C# changes only)
+.\scripts\build-release.ps1 -SkipPyInstaller
+
+# Development build (skip tests for speed)
+.\scripts\build-release.ps1 -SkipPyInstaller -SkipTests
+
+# Keep local changes (skip Git sync)
+.\scripts\build-release.ps1 -SkipGitSync -SkipPyInstaller -SkipTests
+```
+
+**Script performs these steps automatically:**
+1. Git sync with origin/main (optional)
+2. .NET Release build
+3. PyInstaller build for BaketaTranslationServer.exe (optional)
+4. Run tests (optional)
+5. Package assembly to `release/` directory
+
+**First-time venv_build setup (required for PyInstaller):**
 ```cmd
-# Step 1: PyInstallerで翻訳サーバーをexe化（Pythonコード変更時のみ必要）
 cd grpc_server
-python -m venv venv_build
-venv_build\Scripts\activate
-pip install -r requirements.txt
-pip install pyinstaller
-pyinstaller BaketaTranslationServer.spec --clean
-deactivate
-
-# Step 2: .NET Releaseビルド
-cd E:\dev\Baketa
-dotnet build Baketa.sln --configuration Release
-
-# Step 3: リリースパッケージ作成
-# - Baketa.UI/bin/Release/net8.0-windows10.0.19041.0/win-x64/ をコピー
-# - grpc_server/dist/BaketaTranslationServer/ を上記の grpc_server/BaketaTranslationServer/ にコピー
-# - Models/ppocrv5-onnx/ を上記の Models/ppocrv5-onnx/ にコピー（ONNX OCRモデル、約180MB）
+py -3.10 -m venv venv_build
+.\venv_build\Scripts\pip install -r requirements.txt pyinstaller
 ```
 
 **リリースパッケージ構成:**
