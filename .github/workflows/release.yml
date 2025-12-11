@@ -163,51 +163,72 @@ jobs:
         path: ./publish/BaketaTranslationServer.zip
         retention-days: 7
 
-  # Job 3: Package OCR Models
-  package-ocr-models:
-    name: Package OCR Models
-    runs-on: ubuntu-latest
+  # Job 3: Build Surya OCR Server with PyInstaller
+  build-surya-ocr-server:
+    name: Build Surya OCR Server
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
 
-    - name: Download and package PP-OCRv5 models
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        cache-dependency-path: 'grpc_server/requirements.txt'
+
+    - name: Install dependencies
       run: |
-        mkdir -p models/ppocrv5-onnx/detection
-        mkdir -p models/ppocrv5-onnx/languages/japanese
-        mkdir -p models/ppocrv5-onnx/languages/latin
-        mkdir -p models/ppocrv5-onnx/languages/chinese
+        cd grpc_server
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        # Surya OCR dependencies
+        pip install surya-ocr torch torchvision
 
-        # Download detection model
-        echo "Downloading PP-OCRv5 detection model..."
-        curl -L -o models/ppocrv5-onnx/detection/det.onnx \
-          "https://github.com/koizumiiiii/Baketa/releases/download/models-v1/det.onnx" || \
-          echo "::warning::Detection model download failed, may need manual upload"
+    - name: Build with PyInstaller
+      run: |
+        cd grpc_server
+        pyinstaller BaketaSuryaOcrServer.spec --clean --noconfirm
 
-        # Download recognition models
-        echo "Downloading PP-OCRv5 recognition models..."
-        curl -L -o models/ppocrv5-onnx/languages/latin/rec.onnx \
-          "https://github.com/koizumiiiii/Baketa/releases/download/models-v1/latin_rec.onnx" || \
-          echo "::warning::Latin rec model download failed"
+    - name: Create Surya OCR Server package
+      run: |
+        $distPath = "grpc_server/dist/BaketaSuryaOcrServer"
+        $zipName = "BaketaSuryaOcrServer.zip"
 
-        curl -L -o models/ppocrv5-onnx/languages/chinese/rec.onnx \
-          "https://github.com/koizumiiiii/Baketa/releases/download/models-v1/chinese_rec.onnx" || \
-          echo "::warning::Chinese rec model download failed"
+        # Ensure publish directory exists
+        New-Item -ItemType Directory -Path "./publish" -Force | Out-Null
 
-        # Copy dictionary files from repo
-        cp Models/ppocrv5-onnx/ppocrv5_dict.txt models/ppocrv5-onnx/ 2>/dev/null || true
-        cp Models/ppocrv5-onnx/languages/latin/dict.txt models/ppocrv5-onnx/languages/latin/ 2>/dev/null || true
-        cp Models/ppocrv5-onnx/languages/chinese/dict.txt models/ppocrv5-onnx/languages/chinese/ 2>/dev/null || true
+        if (Test-Path $distPath) {
+          Compress-Archive -Path "$distPath/*" -DestinationPath "./publish/$zipName" -Force
 
-        # Create zip
-        cd models
-        zip -r ../ppocrv5-onnx.zip ppocrv5-onnx/
-        cd ..
+          $size = [math]::Round((Get-Item "./publish/$zipName").Length / 1MB, 2)
+          echo "## Surya OCR Server Package" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Package: $zipName" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Size: $size MB" >> $env:GITHUB_STEP_SUMMARY
+        } else {
+          echo "::error::PyInstaller build failed - dist directory not found"
+          exit 1
+        }
+      shell: pwsh
 
-        echo "## OCR Models Package" >> $GITHUB_STEP_SUMMARY
-        echo "- Package: ppocrv5-onnx.zip" >> $GITHUB_STEP_SUMMARY
-        ls -lh ppocrv5-onnx.zip >> $GITHUB_STEP_SUMMARY || true
+    - name: Upload Surya OCR Server artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: surya-ocr-server-package
+        path: ./publish/BaketaSuryaOcrServer.zip
+        retention-days: 7
+
+  # Job 4: Package Surya OCR Models
+  package-ocr-models:
+    name: Package Surya OCR Models
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
 
     - name: Download and package Surya OCR models
       run: |
@@ -235,17 +256,16 @@ jobs:
       with:
         name: ocr-models-package
         path: |
-          ppocrv5-onnx.zip
           surya-detection-onnx.zip
           surya-recognition-pytorch.zip
         retention-days: 7
         if-no-files-found: warn
 
-  # Job 4: Create GitHub Release
+  # Job 5: Create GitHub Release
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-dotnet, build-translation-server, package-ocr-models]
+    needs: [build-dotnet, build-translation-server, build-surya-ocr-server, package-ocr-models]
 
     permissions:
       contents: write
@@ -287,7 +307,7 @@ jobs:
         |------|-------------|------|
         | `Baketa-$VERSION-win-x64.zip` | Main application (Windows x64) | ~50MB |
         | `BaketaTranslationServer.zip` | Translation server (auto-downloaded) | ~200MB |
-        | `ppocrv5-onnx.zip` | PP-OCRv5 models (auto-downloaded) | ~180MB |
+        | `BaketaSuryaOcrServer.zip` | Surya OCR server (auto-downloaded) | ~2GB |
         | `surya-detection-onnx.zip` | Surya Detection ONNX INT8 (auto-downloaded) | ~31MB |
         | `surya-recognition-pytorch.zip` | Surya Recognition PyTorch (auto-downloaded) | ~1.1GB |
 
@@ -298,11 +318,9 @@ jobs:
         3. Run `Baketa.UI.exe`
         4. On first run, required components will be downloaded automatically
 
-        ### OCR Engine Selection
+        ### OCR Engine
 
-        Baketa supports two OCR engines:
-        - **PP-OCRv5** (default): Lightweight, fast (~180MB models)
-        - **Surya OCR**: High accuracy, Japanese optimized (~1.1GB models)
+        Baketa uses **Surya OCR** for high accuracy Japanese text recognition (~1.1GB models)
 
         ### NLLB Translation Model
 
@@ -313,7 +331,7 @@ jobs:
 
         - Windows 10/11 (x64)
         - Internet connection (for first-time setup)
-        - ~3GB disk space (with all OCR engines)
+        - ~4GB disk space (including OCR models and translation server)
 
         EOF
 
