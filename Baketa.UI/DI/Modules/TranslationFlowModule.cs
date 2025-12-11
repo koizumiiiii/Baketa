@@ -21,6 +21,10 @@ namespace Baketa.UI.DI.Modules;
 /// </summary>
 public class TranslationFlowModule : ServiceModuleBase
 {
+    // 🔧 [Issue #194] 重複登録防止フラグ
+    private static bool _isEventAggregatorConfigured;
+    private static readonly object _configLock = new();
+
     public override void RegisterServices(IServiceCollection services)
     {
         // TranslationFlowEventProcessorは既にUIServiceCollectionExtensionsで登録済み
@@ -42,6 +46,17 @@ public class TranslationFlowModule : ServiceModuleBase
     public void ConfigureEventAggregator(IEventAggregator eventAggregator, IServiceProvider serviceProvider)
     {
         var logger = serviceProvider.GetRequiredService<ILogger<TranslationFlowModule>>();
+
+        // 🔧 [Issue #194] 重複登録防止 - べき等性の保証
+        lock (_configLock)
+        {
+            if (_isEventAggregatorConfigured)
+            {
+                logger.LogDebug("TranslationFlowModule: EventAggregator設定は既に完了済み - スキップ");
+                return;
+            }
+            _isEventAggregatorConfigured = true;
+        }
 
         try
         {

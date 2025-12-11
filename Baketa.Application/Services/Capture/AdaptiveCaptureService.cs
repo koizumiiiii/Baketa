@@ -108,6 +108,8 @@ public class AdaptiveCaptureService(
             result.Metrics = captureResult.Metrics;
             result.ErrorDetails = captureResult.ErrorMessage;
             result.ImageChangeSkipped = imageChangeSkipped; // 新機能: 変化検知結果
+            // 🚀 [Issue #193] スケーリング済みOCR結果をコピー（座標修正対応）
+            result.PreExecutedOcrResult = captureResult.PreExecutedOcrResult;
 
             // 🔥 [PHASE5] ROI廃止により、常に後続処理を継続
             // FullScreenOcr方式では、全画面キャプチャ後にSmartProcessingPipelineで処理

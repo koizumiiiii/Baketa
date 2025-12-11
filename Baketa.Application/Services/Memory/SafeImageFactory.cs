@@ -115,6 +115,69 @@ public sealed class SafeImageFactory : ISafeImageFactory
     }
 
     /// <summary>
+    /// ネイティブメモリポインタから直接SafeImageインスタンスを生成
+    /// Issue #193: Clone()を廃止し、中間Bitmap作成を排除してLOH圧迫を防止
+    /// </summary>
+    /// <param name="bgraData">BGRAピクセルデータへのポインタ</param>
+    /// <param name="width">画像幅</param>
+    /// <param name="height">画像高さ</param>
+    /// <param name="stride">1行あたりのバイト数</param>
+    /// <returns>生成されたSafeImageインスタンス</returns>
+    public SafeImage CreateFromNativePointer(IntPtr bgraData, int width, int height, int stride)
+    {
+        if (bgraData == IntPtr.Zero)
+            throw new ArgumentException("bgraDataがnullです", nameof(bgraData));
+        if (width <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width), "幅は正の値である必要があります");
+        if (height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(height), "高さは正の値である必要があります");
+        if (stride <= 0)
+            throw new ArgumentOutOfRangeException(nameof(stride), "strideは正の値である必要があります");
+
+        // BGRA32 = 4バイト/ピクセル
+        const int bytesPerPixel = 4;
+        var pixelFormat = ImagePixelFormat.Bgra32;
+
+        // 実際のデータ長（パディングなし）
+        var dataLength = width * height * bytesPerPixel;
+        var rowBytes = width * bytesPerPixel;
+
+        // ArrayPoolからバッファを借用
+        var arrayPool = ArrayPool<byte>.Shared;
+        var rentedBuffer = arrayPool.Rent(dataLength);
+
+        try
+        {
+            unsafe
+            {
+                var sourcePtr = (byte*)bgraData;
+
+                // ネイティブメモリから直接ArrayPoolバッファにコピー（stride考慮）
+                for (int y = 0; y < height; y++)
+                {
+                    var sourceOffset = y * stride;
+                    var destOffset = y * rowBytes;
+
+                    var sourceSpan = new Span<byte>(sourcePtr + sourceOffset, rowBytes);
+                    var destSpan = new Span<byte>(rentedBuffer, destOffset, rowBytes);
+                    sourceSpan.CopyTo(destSpan);
+                }
+            }
+
+            // SafeImageインスタンスを生成
+            var id = Guid.NewGuid();
+            var actualStride = rowBytes; // パディングなし
+            return new SafeImage(rentedBuffer, arrayPool, dataLength, width, height, pixelFormat, id, actualStride);
+        }
+        catch
+        {
+            // エラー発生時はバッファを返却
+            arrayPool.Return(rentedBuffer);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// System.Drawing.Imaging.PixelFormatをImagePixelFormatに変換
     /// </summary>
     /// <param name="format">System.Drawing.Imaging.PixelFormat</param>

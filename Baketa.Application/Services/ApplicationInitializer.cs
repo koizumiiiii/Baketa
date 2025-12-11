@@ -9,12 +9,14 @@ namespace Baketa.Application.Services;
 /// ローディング画面初期化サービス
 /// ローディング画面で実行される5つの初期化ステップを管理します
 /// [Issue #185] 初回起動時のコンポーネントダウンロードステップを追加
+/// [Issue #193] GPU環境自動セットアップステップを追加
 /// </summary>
 public class ApplicationInitializer : ILoadingScreenInitializer
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ApplicationInitializer> _logger;
     private readonly IComponentDownloader? _componentDownloader;
+    private readonly IGpuEnvironmentService? _gpuEnvironmentService;
     private readonly Stopwatch _stopwatch = new();
 
     /// <inheritdoc/>
@@ -23,11 +25,13 @@ public class ApplicationInitializer : ILoadingScreenInitializer
     public ApplicationInitializer(
         IServiceProvider serviceProvider,
         ILogger<ApplicationInitializer> logger,
-        IComponentDownloader? componentDownloader = null)
+        IComponentDownloader? componentDownloader = null,
+        IGpuEnvironmentService? gpuEnvironmentService = null)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _componentDownloader = componentDownloader;
+        _gpuEnvironmentService = gpuEnvironmentService;
 
         // [Issue #185] デバッグ: IComponentDownloader注入状況確認
         _logger.LogDebug("[Issue185] ApplicationInitializer コンストラクタ実行");
@@ -47,6 +51,13 @@ public class ApplicationInitializer : ILoadingScreenInitializer
         {
             _logger.LogWarning("[Issue185] IComponentDownloaderがnullのためイベント購読スキップ");
         }
+
+        // [Issue #193] GPU環境サービスのイベント購読
+        if (_gpuEnvironmentService != null)
+        {
+            _gpuEnvironmentService.ProgressChanged += OnGpuSetupProgressChanged;
+            _logger.LogDebug("[Issue193] GpuEnvironmentService.ProgressChanged イベント購読完了");
+        }
     }
 
     /// <inheritdoc/>
@@ -62,6 +73,13 @@ public class ApplicationInitializer : ILoadingScreenInitializer
                 "download_components",
                 "コンポーネントをダウンロードしています...",
                 DownloadMissingComponentsAsync,
+                cancellationToken).ConfigureAwait(false);
+
+            // [Issue #193] Step 0.5: GPU環境セットアップ（開発版のみ）
+            await ExecuteStepAsync(
+                "setup_gpu",
+                "GPU環境をチェックしています...",
+                SetupGpuEnvironmentAsync,
                 cancellationToken).ConfigureAwait(false);
 
             // Step 1: 依存関係解決
@@ -300,6 +318,67 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             _logger.LogWarning(ex, "コンポーネントダウンロードに失敗しましたが、続行します");
             // ダウンロード失敗は致命的エラーではないので続行
         }
+    }
+
+    /// <summary>
+    /// [Issue #193] GPU環境をセットアップします
+    /// 開発版でのみ実行され、NVIDIA GPU検出時にユーザー確認後GPU版パッケージをインストール
+    /// </summary>
+    private async Task SetupGpuEnvironmentAsync(CancellationToken cancellationToken)
+    {
+        if (_gpuEnvironmentService == null)
+        {
+            _logger.LogInformation("[Issue #193] GPU環境サービスが未設定のため、GPUセットアップをスキップ");
+            return;
+        }
+
+        _logger.LogInformation("[Issue #193] GPU環境セットアップ開始");
+
+        try
+        {
+            var result = await _gpuEnvironmentService
+                .EnsureGpuEnvironmentAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            switch (result)
+            {
+                case GpuSetupResult.Success:
+                    _logger.LogInformation("[Issue #193] GPU環境セットアップ成功");
+                    break;
+                case GpuSetupResult.AlreadySetup:
+                    _logger.LogInformation("[Issue #193] GPU環境は既にセットアップ済み");
+                    break;
+                case GpuSetupResult.NoNvidiaGpu:
+                    _logger.LogInformation("[Issue #193] NVIDIA GPU未検出 - CPUモードで続行");
+                    break;
+                case GpuSetupResult.Skipped:
+                    _logger.LogInformation("[Issue #193] GPUセットアップをスキップ - CPUモードで続行");
+                    break;
+                case GpuSetupResult.InstallationFailed:
+                    _logger.LogWarning("[Issue #193] GPUパッケージインストール失敗 - CPUモードで続行");
+                    break;
+                case GpuSetupResult.SkippedDistribution:
+                    _logger.LogInformation("[Issue #193] 配布版のためGPUセットアップスキップ");
+                    break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("[Issue #193] GPU環境セットアップがキャンセルされました");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #193] GPU環境セットアップでエラー発生 - CPUモードで続行");
+            // GPU環境セットアップ失敗は致命的エラーではないので続行
+        }
+    }
+
+    /// <summary>
+    /// [Issue #193] GPU環境セットアップ進捗イベントハンドラ
+    /// </summary>
+    private void OnGpuSetupProgressChanged(object? sender, GpuSetupProgressEventArgs e)
+    {
+        ReportProgress("setup_gpu", e.Message, e.IsCompleted, e.Progress);
     }
 
     /// <summary>

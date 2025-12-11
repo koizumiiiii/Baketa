@@ -112,75 +112,117 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
     /// ROI座標をスクリーン座標に変換
     /// coordinate_test/Program.csのConvertRoiToScreenCoordinatesと同じロジック
     /// Phase 2.1: ボーダーレス/フルスクリーンパラメータ追加
+    /// 🚀 [Issue #193] alreadyScaledToOriginalSize: GPU Shaderリサイズ後の座標が既に元ウィンドウサイズにスケーリング済みの場合true
     /// </summary>
     public Rectangle ConvertRoiToScreenCoordinates(
         Rectangle roiBounds,
         IntPtr windowHandle,
         float roiScaleFactor = 1.0f,
-        bool isBorderlessOrFullscreen = false)
+        bool isBorderlessOrFullscreen = false,
+        bool alreadyScaledToOriginalSize = false)
     {
         try
         {
-            _logger.LogDebug("🎯 [P0_COORDINATE_TRANSFORM] ROI→スクリーン座標変換開始: ROI=({X},{Y},{W},{H}), Handle={Handle}, ScaleFactor={ScaleFactor}",
-                roiBounds.X, roiBounds.Y, roiBounds.Width, roiBounds.Height, windowHandle, roiScaleFactor);
+            _logger.LogDebug("🎯 [P0_COORDINATE_TRANSFORM] ROI→スクリーン座標変換開始: ROI=({X},{Y},{W},{H}), Handle={Handle}, ScaleFactor={ScaleFactor}, AlreadyScaled={AlreadyScaled}",
+                roiBounds.X, roiBounds.Y, roiBounds.Width, roiBounds.Height, windowHandle, roiScaleFactor, alreadyScaledToOriginalSize);
 
-            // ROIスケールファクタの逆数でスケーリング
-            var inverseScale = 1.0f / roiScaleFactor;
+            int scaledX, scaledY, scaledWidth, scaledHeight;
 
-            // 1. ROI座標を実際の画面座標にスケーリング（クライアント座標系）
-            var scaledX = (int)(roiBounds.X * inverseScale);
-            var scaledY = (int)(roiBounds.Y * inverseScale);
-            // 🔥 [GEMINI_P2_FIX] scaledWidth/Heightが負の値にならないようにガード処理
-            var scaledWidth = Math.Max(0, (int)(roiBounds.Width * inverseScale));
-            var scaledHeight = Math.Max(0, (int)(roiBounds.Height * inverseScale));
-
-            _logger.LogInformation("📐 [PHASE2_SCALED] スケーリング後 - Scaled=({ScaledX},{ScaledY})", scaledX, scaledY);
-
-            // 🔥 [PHASE3_DPI_AWARENESS] DPI補正 - 高DPI環境（125%, 150%, 200%）対応
-            //    Per-Monitor DPI V2により、各モニターごとの異なるDPI設定に対応
-            //    物理ピクセル = 論理ピクセル * (DPI / 96.0)
-            // 🔥 [OVERLAY_FIX] ボーダーレス/フルスクリーンの場合、キャプチャは既に物理ピクセルなのでDPI補正不要
-            if (isBorderlessOrFullscreen)
+            // 🚀 [Issue #193] 座標が既にスケーリング済みの場合（FullScreenOcrCaptureStrategyでGPUリサイズ後にスケーリング済み）
+            // inverseScaleによるスケーリングとDPI補正の両方をスキップ
+            // さらに、ClientToScreenではなくGetWindowRectを使用（座標はウィンドウ全体に対する相対座標のため）
+            if (alreadyScaledToOriginalSize)
             {
-                _logger.LogInformation("🔍 [PHASE3_DPI] ボーダーレス/フルスクリーン検出 - DPI補正をスキップ（キャプチャは既に物理ピクセル）");
-            }
-            else if (windowHandle != IntPtr.Zero && IsWindow(windowHandle))
-            {
-                try
+                // 座標はそのまま使用（既に元ウィンドウサイズにスケーリング済み）
+                scaledX = roiBounds.X;
+                scaledY = roiBounds.Y;
+                scaledWidth = Math.Max(0, roiBounds.Width);
+                scaledHeight = Math.Max(0, roiBounds.Height);
+                Console.WriteLine($"🚀🚀🚀 [Issue #193 PHASE4] alreadyScaledToOriginalSize=TRUE → ROIスケーリングとDPI補正をスキップ: ({scaledX},{scaledY},{scaledWidth}x{scaledHeight})");
+                _logger.LogInformation("🚀 [Issue #193] 座標は既に元ウィンドウサイズにスケーリング済み - ROIスケーリングとDPI補正をスキップ: ({X},{Y},{W},{H})",
+                    scaledX, scaledY, scaledWidth, scaledHeight);
+
+                // 🚀 [Issue #193 PHASE4] Windows Graphics Capture APIはウィンドウ全体（タイトルバー含む）をキャプチャするため
+                // OCR座標はウィンドウ全体に対する相対座標（0,0 = タイトルバーの左上）
+                // ClientToScreenはクライアント領域（タイトルバーの下）からの変換なので、GetWindowRectを使用
+                if (GetWindowRect(windowHandle, out var windowRect))
                 {
-                    uint dpi = LayeredWindowMethods.GetDpiForWindow(windowHandle);
+                    var screenX = windowRect.Left + scaledX;
+                    var screenY = windowRect.Top + scaledY;
+                    Console.WriteLine($"🚀🚀🚀 [Issue #193 PHASE4] GetWindowRect使用 - WindowPos=({windowRect.Left},{windowRect.Top}) + ROI=({scaledX},{scaledY}) = Screen=({screenX},{screenY})");
+                    _logger.LogInformation("🚀 [Issue #193 PHASE4] GetWindowRect使用 - WindowPos=({WinX},{WinY}) + ROI=({RoiX},{RoiY}) = Screen=({ScreenX},{ScreenY})",
+                        windowRect.Left, windowRect.Top, scaledX, scaledY, screenX, screenY);
 
-                    // 🔥 [GEMINI_P0_FIX] DPI取得失敗時のフォールバック
-                    // GetDpiForWindowが0を返す場合: Windows 10 1607以前、無効なハンドル、API失敗
-                    if (dpi == 0)
-                    {
-                        _logger.LogWarning("⚠️ [PHASE3_DPI] GetDpiForWindow返り値が0 - DPI補正をスキップします（スケール1.0として継続）");
-                        // DPI補正なしで継続（スケーリング後の座標をそのまま使用）
-                    }
-                    else
-                    {
-                        float dpiScale = dpi / 96.0f; // 96 = 100% DPI（基準値）
-
-                        // DPI補正を適用
-                        scaledX = (int)(scaledX * dpiScale);
-                        scaledY = (int)(scaledY * dpiScale);
-                        scaledWidth = (int)(scaledWidth * dpiScale);
-                        scaledHeight = (int)(scaledHeight * dpiScale);
-
-                        _logger.LogInformation("📐 [PHASE3_DPI] DPI補正後 - DPI={Dpi}, Scale={DpiScale:F2}, Corrected=({CorrectedX},{CorrectedY})",
-                            dpi, dpiScale, scaledX, scaledY);
-                    }
+                    var resultBounds = new Rectangle(screenX, screenY, scaledWidth, scaledHeight);
+                    return resultBounds;
                 }
-                catch (Exception dpiEx)
+                else
                 {
-                    _logger.LogWarning(dpiEx, "⚠️ [PHASE3_DPI] GetDpiForWindow例外発生 - DPI補正をスキップします");
-                    // DPI取得失敗時はスケーリング後の座標をそのまま使用（フォールバック）
+                    _logger.LogWarning("⚠️ [Issue #193 PHASE4] GetWindowRect失敗 - スケーリング後の座標をそのまま返します");
+                    Console.WriteLine($"⚠️ [Issue #193 PHASE4] GetWindowRect失敗");
+                    return new Rectangle(scaledX, scaledY, scaledWidth, scaledHeight);
                 }
             }
             else
             {
-                _logger.LogDebug("🔍 [PHASE3_DPI] 無効なウィンドウハンドル - DPI補正をスキップします");
-            }
+                // ROIスケールファクタの逆数でスケーリング
+                var inverseScale = 1.0f / roiScaleFactor;
+
+                // 1. ROI座標を実際の画面座標にスケーリング（クライアント座標系）
+                scaledX = (int)(roiBounds.X * inverseScale);
+                scaledY = (int)(roiBounds.Y * inverseScale);
+                // 🔥 [GEMINI_P2_FIX] scaledWidth/Heightが負の値にならないようにガード処理
+                scaledWidth = Math.Max(0, (int)(roiBounds.Width * inverseScale));
+                scaledHeight = Math.Max(0, (int)(roiBounds.Height * inverseScale));
+
+                _logger.LogInformation("📐 [PHASE2_SCALED] スケーリング後 - Scaled=({ScaledX},{ScaledY})", scaledX, scaledY);
+
+                // 🔥 [PHASE3_DPI_AWARENESS] DPI補正 - 高DPI環境（125%, 150%, 200%）対応
+                //    Per-Monitor DPI V2により、各モニターごとの異なるDPI設定に対応
+                //    物理ピクセル = 論理ピクセル * (DPI / 96.0)
+                // 🔥 [OVERLAY_FIX] ボーダーレス/フルスクリーンの場合、キャプチャは既に物理ピクセルなのでDPI補正不要
+                if (isBorderlessOrFullscreen)
+                {
+                    _logger.LogInformation("🔍 [PHASE3_DPI] ボーダーレス/フルスクリーン検出 - DPI補正をスキップ（キャプチャは既に物理ピクセル）");
+                }
+                else if (windowHandle != IntPtr.Zero && IsWindow(windowHandle))
+                {
+                    try
+                    {
+                        uint dpi = LayeredWindowMethods.GetDpiForWindow(windowHandle);
+
+                        // 🔥 [GEMINI_P0_FIX] DPI取得失敗時のフォールバック
+                        // GetDpiForWindowが0を返す場合: Windows 10 1607以前、無効なハンドル、API失敗
+                        if (dpi == 0)
+                        {
+                            _logger.LogWarning("⚠️ [PHASE3_DPI] GetDpiForWindow返り値が0 - DPI補正をスキップします（スケール1.0として継続）");
+                            // DPI補正なしで継続（スケーリング後の座標をそのまま使用）
+                        }
+                        else
+                        {
+                            float dpiScale = dpi / 96.0f; // 96 = 100% DPI（基準値）
+
+                            // DPI補正を適用
+                            scaledX = (int)(scaledX * dpiScale);
+                            scaledY = (int)(scaledY * dpiScale);
+                            scaledWidth = (int)(scaledWidth * dpiScale);
+                            scaledHeight = (int)(scaledHeight * dpiScale);
+
+                            _logger.LogInformation("📐 [PHASE3_DPI] DPI補正後 - DPI={Dpi}, Scale={DpiScale:F2}, Corrected=({CorrectedX},{CorrectedY})",
+                                dpi, dpiScale, scaledX, scaledY);
+                        }
+                    }
+                    catch (Exception dpiEx)
+                    {
+                        _logger.LogWarning(dpiEx, "⚠️ [PHASE3_DPI] GetDpiForWindow例外発生 - DPI補正をスキップします");
+                        // DPI取得失敗時はスケーリング後の座標をそのまま使用（フォールバック）
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("🔍 [PHASE3_DPI] 無効なウィンドウハンドル - DPI補正をスキップします");
+                }
+            } // end of else (not alreadyScaledToOriginalSize)
 
             // 2. 🔥 [PHASE1_CLIENT_TO_SCREEN] クライアント座標→スクリーン絶対座標変換
             //    ROI座標はクライアント領域内の相対座標（0,0起点）

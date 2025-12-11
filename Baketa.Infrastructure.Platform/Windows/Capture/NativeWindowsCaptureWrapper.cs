@@ -1,7 +1,4 @@
 using System;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Memory;
@@ -267,23 +264,23 @@ public class NativeWindowsCaptureWrapper : IDisposable
 
                 try
                 {
-                    // BGRAデータからBitmapを作成
-                    var bitmap = CreateBitmapFromBGRA(frame);
+                    // 🚀 [Issue #193] Clone()廃止: ネイティブメモリから直接SafeImageを作成
+                    // 従来: tempBitmap → Clone() → SafeImage (32MB Bitmap×2 = LOH圧迫)
+                    // 新規: ネイティブポインタ → ArrayPool直接コピー → SafeImage (中間Bitmap排除)
+                    var safeImage = _safeImageFactory.CreateFromNativePointer(
+                        frame.bgraData, frame.width, frame.height, frame.stride);
 
-                    // 🔧 [SAFEIMAGE_FIX] SafeImageを作成してメモリ安全性を確保
-                    var safeImage = _safeImageFactory.CreateFromBitmap(bitmap, frame.width, frame.height);
-
-                    // 🔧 [SAFEIMAGE_FIX] SafeImageAdapterでラップしてIWindowsImageとして返す
+                    // SafeImageAdapterでラップしてIWindowsImageとして返す
                     var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory);
 
-                    _logger?.LogDebug("✅ [SAFEIMAGE_FIX] フレームキャプチャ成功（SafeImage統合）: {Width}x{Height}, Timestamp={Timestamp}",
+                    _logger?.LogDebug("✅ [Issue #193] フレームキャプチャ成功（Clone廃止・直接コピー）: {Width}x{Height}, Timestamp={Timestamp}",
                         frame.width, frame.height, frame.timestamp);
 
                     return safeImageAdapter;
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "フレームからビットマップ作成中に例外が発生");
+                    _logger?.LogError(ex, "フレームからSafeImage作成中に例外が発生");
                     return null;
                 }
             }
@@ -312,98 +309,96 @@ public class NativeWindowsCaptureWrapper : IDisposable
     }
 
     /// <summary>
-    /// BGRAデータからBitmapを作成 - Gemini推奨ゼロコピー・ラッパー方式
+    /// 🚀 [Issue #193] フレームをキャプチャしてGPU側でリサイズし、WindowsImageを作成
     /// </summary>
-    /// <param name="frame">キャプチャフレーム</param>
-    /// <returns>作成されたBitmap</returns>
-    private Bitmap CreateBitmapFromBGRA(NativeWindowsCapture.BaketaCaptureFrame frame)
+    /// <param name="targetWidth">ターゲット幅（0の場合はリサイズなし）</param>
+    /// <param name="targetHeight">ターゲット高さ（0の場合はリサイズなし）</param>
+    /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
+    /// <returns>キャプチャしたWindowsImage、失敗時はnull</returns>
+    public async Task<IWindowsImage?> CaptureFrameResizedAsync(int targetWidth, int targetHeight, int timeoutMs = 5000)
     {
-        if (frame.bgraData == IntPtr.Zero || frame.width <= 0 || frame.height <= 0)
+        if (_sessionId < 0)
         {
-            throw new InvalidOperationException("無効なフレームデータです");
+            _logger?.LogError("キャプチャセッションが作成されていません");
+            return null;
         }
 
-        // 🚀 Gemini推奨: 安全化Bitmap方式でStride問題とメモリ安全性を両立解決
-        _logger?.LogDebug("🚀 安全化Bitmap方式: サイズ={Width}x{Height}, stride={Stride}, timestamp={Timestamp}",
-            frame.width, frame.height, frame.stride, frame.timestamp);
-        _logger?.LogDebug("✅ Stride問題+メモリ安全性解決: Clone()によるネイティブ→管理メモリ転送");
-
-
-        // 🎯 Gemini推奨: ネイティブメモリを一時的にラップし、安全な管理コピーを作成
-        // 🔍 [PHASE4_DEBUG] tempBitmap作成前のフレーム情報ログ
-        _logger?.LogDebug("🔍 [PHASE4] tempBitmap作成開始: bgraData={BgraData}, width={Width}, height={Height}, stride={Stride}",
-            frame.bgraData, frame.width, frame.height, frame.stride);
-
-        using var tempBitmap = new Bitmap(
-            width: frame.width,
-            height: frame.height,
-            stride: frame.stride,
-            format: System.Drawing.Imaging.PixelFormat.Format32bppArgb,
-            scan0: frame.bgraData);
-
-        _logger?.LogDebug("✅ [PHASE4] tempBitmap作成成功: {Width}x{Height}", tempBitmap.Width, tempBitmap.Height);
-
-        // 🛡️ メモリ安全性: Clone()で管理メモリにコピーしてAccessViolationException防止
-        _logger?.LogDebug("🔍 [PHASE4] Clone()実行開始");
-
-        var bitmap = tempBitmap.Clone(
-            new System.Drawing.Rectangle(0, 0, tempBitmap.Width, tempBitmap.Height),
-            tempBitmap.PixelFormat);
-
-        _logger?.LogDebug("✅ [PHASE4] Clone()実行成功: {Width}x{Height}", bitmap.Width, bitmap.Height);
-
-        _logger?.LogDebug("安全化Bitmap作成成功: {Width}x{Height}, Stride={Stride}",
-            frame.width, frame.height, frame.stride);
-
-        // 🔍 デバッグ: メモリ安全なピクセルデータ品質検証
-        try
+        return await Task.Run(() =>
         {
-            var bitmapData = bitmap.LockBits(
-                new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
-                ImageLockMode.ReadOnly,
-                bitmap.PixelFormat);
+            // 🔒 安全化: ウィンドウ選択中は一時停止
+            lock (_pauseLock)
+            {
+                if (_isPausedForWindowSelection)
+                {
+                    _logger?.LogDebug("キャプチャは一時停止中のため、nullを返します");
+                    return null;
+                }
+            }
+
+            // 🚀 安全化: フレーム構造体を初期化
+            var frame = new NativeWindowsCapture.BaketaCaptureFrame();
+            bool frameValid = false;
 
             try
             {
-                unsafe
+                int result = NativeWindowsCapture.BaketaCapture_CaptureFrameResized(_sessionId, out frame, targetWidth, targetHeight, timeoutMs);
+                if (result != NativeWindowsCapture.ErrorCodes.Success)
                 {
-                    byte* data = (byte*)bitmapData.Scan0;
-                    int blackPixels = 0;
-
-                    // 中央部分の品質サンプリング（10x10領域）
-                    int centerStartX = bitmap.Width / 2 - 5;
-                    int centerStartY = bitmap.Height / 2 - 5;
-
-                    for (int y = centerStartY; y < centerStartY + 10 && y < bitmap.Height; y++)
-                    {
-                        for (int x = centerStartX; x < centerStartX + 10 && x < bitmap.Width; x++)
-                        {
-                            int pixelOffset = (y * bitmapData.Stride) + (x * 4);
-                            byte b = data[pixelOffset + 0];
-                            byte g = data[pixelOffset + 1];
-                            byte r = data[pixelOffset + 2];
-
-                            if (b == 0 && g == 0 && r == 0) blackPixels++;
-                        }
-                    }
-
-                    _logger?.LogDebug("🎨 安全化品質検証: 黒ピクセル={BlackPixels}/100 ({Percentage:F1}%)",
-                        blackPixels, blackPixels / 100.0 * 100);
+                    string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
+                    _logger?.LogError("リサイズフレームキャプチャに失敗: {ErrorCode}, {ErrorMessage}", result, errorMsg);
+                    return null; // フレーム無効なので解放不要
                 }
+
+                // フレームが有効であることをマーク
+                frameValid = true;
+
+                try
+                {
+                    // 🚀 [Issue #193] Clone()廃止: ネイティブメモリから直接SafeImageを作成
+                    var safeImage = _safeImageFactory.CreateFromNativePointer(
+                        frame.bgraData, frame.width, frame.height, frame.stride);
+
+                    // SafeImageAdapterでラップしてIWindowsImageとして返す
+                    // 元のキャプチャサイズを保持して、座標スケーリングに使用
+                    var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory)
+                    {
+                        OriginalWidth = frame.originalWidth,
+                        OriginalHeight = frame.originalHeight
+                    };
+
+                    _logger?.LogDebug("✅ [Issue #193] リサイズフレームキャプチャ成功（Clone廃止）: {Width}x{Height} (original: {OriginalWidth}x{OriginalHeight}, target: {TargetWidth}x{TargetHeight}), Timestamp={Timestamp}",
+                        frame.width, frame.height, frame.originalWidth, frame.originalHeight, targetWidth, targetHeight, frame.timestamp);
+
+                    return safeImageAdapter;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "リサイズフレームからSafeImage作成中に例外が発生");
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "リサイズフレームキャプチャ中に例外が発生");
+                return null;
             }
             finally
             {
-                bitmap.UnlockBits(bitmapData);
+                // 🚀 安全化: フレームが有効な場合のみ解放
+                if (frameValid && frame.bgraData != IntPtr.Zero)
+                {
+                    try
+                    {
+                        NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref frame);
+                    }
+                    catch (Exception ex)
+                    {
+                        // メモリ解放時の例外をログに記録（クラッシュを防ぐ）
+                        _logger?.LogError(ex, "リサイズフレーム解放中に例外が発生");
+                    }
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            // 🚨 [PHASE3_CRITICAL] 例外情報を完全にログ出力して根本原因特定
-            _logger?.LogError(ex, "🚨 [CRITICAL] 安全化品質検証失敗: Type={ExceptionType}, Message={Message}, StackTrace={StackTrace}",
-                ex.GetType().Name, ex.Message, ex.StackTrace);
-        }
-
-        return bitmap;
+        }).ConfigureAwait(false);
     }
 
     /// <summary>

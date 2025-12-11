@@ -222,6 +222,12 @@ python convert_nllb_to_ctranslate2.py
 pip install ctranslate2>=3.20.0
 ```
 
+### GPU環境セットアップ（CUDA利用不可の場合）
+
+**原因**: CPU版のPyTorch/ONNXRuntimeがインストールされています。
+
+**解決**: [GPU_SETUP.md](./GPU_SETUP.md) を参照してGPU版パッケージをインストールしてください。
+
 ---
 
 ## 📚 サポート言語

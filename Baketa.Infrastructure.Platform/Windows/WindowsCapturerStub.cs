@@ -70,6 +70,22 @@ public class WindowsCapturerStub : IWindowsCapturer
     }
 
     /// <summary>
+    /// 🚀 [Issue #193] 指定したウィンドウをGPU上でリサイズしてキャプチャします
+    /// スタブ実装では指定サイズの空のビットマップを返す
+    /// </summary>
+    /// <param name="windowHandle">ウィンドウハンドル</param>
+    /// <param name="targetWidth">ターゲット幅</param>
+    /// <param name="targetHeight">ターゲット高さ</param>
+    /// <returns>キャプチャした画像</returns>
+    public async Task<IWindowsImage> CaptureWindowResizedAsync(IntPtr windowHandle, int targetWidth, int targetHeight)
+    {
+        // スタブ実装では指定サイズの空のビットマップを返す
+        return await _imageFactory.CreateEmptyAsync(
+            Math.Max(1, targetWidth),
+            Math.Max(1, targetHeight)).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// キャプチャオプションを設定します
     /// </summary>
     /// <param name="options">キャプチャオプション</param>

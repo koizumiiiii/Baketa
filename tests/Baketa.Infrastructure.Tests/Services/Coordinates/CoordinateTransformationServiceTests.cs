@@ -214,40 +214,40 @@ public class CoordinateTransformationServiceTests : IDisposable
     }
 
     [Fact]
-    public void ConvertRoiToScreenCoordinates_DefaultScaleFactor_UsesQuarterScale()
+    public void ConvertRoiToScreenCoordinates_DefaultScaleFactor_UsesUnityScale()
     {
         // Arrange
         var roiBounds = new Rectangle(100, 100, 200, 200);
         var windowHandle = IntPtr.Zero;
-        // scaleFactor パラメータを省略（デフォルト値 0.25f を使用）
+        // scaleFactor パラメータを省略（デフォルト値 1.0f を使用）
 
         // Act
         var result = _service.ConvertRoiToScreenCoordinates(roiBounds, windowHandle);
 
-        // Assert - 0.25f (1/4) スケールが適用されることを確認
-        Assert.Equal(400, result.X);      // 100 * 4 = 400
-        Assert.Equal(400, result.Y);      // 100 * 4 = 400
-        Assert.Equal(800, result.Width);  // 200 * 4 = 800
-        Assert.Equal(800, result.Height); // 200 * 4 = 800
+        // Assert - 1.0f (1/1) スケールが適用されることを確認（スケーリングなし）
+        Assert.Equal(100, result.X);      // 100 * 1 = 100
+        Assert.Equal(100, result.Y);      // 100 * 1 = 100
+        Assert.Equal(200, result.Width);  // 200 * 1 = 200
+        Assert.Equal(200, result.Height); // 200 * 1 = 200
     }
 
     [Fact]
-    public void ConvertRoiToScreenCoordinatesBatch_DefaultScaleFactor_UsesQuarterScale()
+    public void ConvertRoiToScreenCoordinatesBatch_DefaultScaleFactor_UsesUnityScale()
     {
         // Arrange
         var rectangles = new[] { new Rectangle(50, 50, 100, 100) };
         var windowHandle = IntPtr.Zero;
-        // scaleFactor パラメータを省略
+        // scaleFactor パラメータを省略（デフォルト値 1.0f を使用）
 
         // Act
         var result = _service.ConvertRoiToScreenCoordinatesBatch(rectangles, windowHandle);
 
-        // Assert
+        // Assert - 1.0f スケールが適用されることを確認（スケーリングなし）
         Assert.Single(result);
-        Assert.Equal(200, result[0].X);      // 50 * 4 = 200
-        Assert.Equal(200, result[0].Y);      // 50 * 4 = 200
-        Assert.Equal(400, result[0].Width);  // 100 * 4 = 400
-        Assert.Equal(400, result[0].Height); // 100 * 4 = 400
+        Assert.Equal(50, result[0].X);      // 50 * 1 = 50
+        Assert.Equal(50, result[0].Y);      // 50 * 1 = 50
+        Assert.Equal(100, result[0].Width);  // 100 * 1 = 100
+        Assert.Equal(100, result[0].Height); // 100 * 1 = 100
     }
 
     // 🔥 [PHASE2.1_TEST] ボーダーレス/フルスクリーン検出機能のテスト

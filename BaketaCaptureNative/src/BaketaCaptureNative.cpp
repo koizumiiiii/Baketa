@@ -199,6 +199,68 @@ int BaketaCapture_CaptureFrame(int sessionId, BaketaCaptureFrame* frame, int tim
 }
 
 /// <summary>
+/// 🚀 [Issue #193] フレームをキャプチャしてGPU側でリサイズ
+/// </summary>
+int BaketaCapture_CaptureFrameResized(int sessionId, BaketaCaptureFrame* frame, int targetWidth, int targetHeight, int timeoutMs)
+{
+    if (!g_initialized)
+    {
+        SetLastError("Library not initialized");
+        return BAKETA_CAPTURE_ERROR_DEVICE;
+    }
+
+    if (!frame)
+    {
+        SetLastError("Invalid frame parameter");
+        return BAKETA_CAPTURE_ERROR_INVALID_WINDOW;
+    }
+
+    // フレーム構造体を初期化
+    frame->bgraData = nullptr;
+    frame->width = 0;
+    frame->height = 0;
+    frame->stride = 0;
+    frame->timestamp = 0;
+    frame->originalWidth = 0;      // 🚀 [Issue #193]
+    frame->originalHeight = 0;     // 🚀 [Issue #193]
+
+    WindowsCaptureSession* session = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_sessionMutex);
+        auto it = g_sessions.find(sessionId);
+        if (it == g_sessions.end())
+        {
+            SetLastError("Session not found");
+            return BAKETA_CAPTURE_ERROR_NOT_FOUND;
+        }
+        session = it->second.get();
+    }
+
+    try
+    {
+        // 🚀 [Issue #193] 元のキャプチャサイズも取得
+        if (!session->CaptureFrameResized(&frame->bgraData, &frame->width, &frame->height, &frame->stride, &frame->timestamp, &frame->originalWidth, &frame->originalHeight, targetWidth, targetHeight, timeoutMs))
+        {
+            SetLastError("Failed to capture resized frame");
+            return BAKETA_CAPTURE_ERROR_DEVICE;
+        }
+
+        SetLastError("");
+        return BAKETA_CAPTURE_SUCCESS;
+    }
+    catch (const std::exception& e)
+    {
+        SetLastError(std::string("Resized frame capture failed: ") + e.what());
+        return BAKETA_CAPTURE_ERROR_DEVICE;
+    }
+    catch (...)
+    {
+        SetLastError("Resized frame capture failed: Unknown error");
+        return BAKETA_CAPTURE_ERROR_DEVICE;
+    }
+}
+
+/// <summary>
 /// フレームデータを解放 - 🚀 P2最適化: アライメント済みメモリ対応
 /// </summary>
 void BaketaCapture_ReleaseFrame(BaketaCaptureFrame* frame)
@@ -212,6 +274,8 @@ void BaketaCapture_ReleaseFrame(BaketaCaptureFrame* frame)
         frame->height = 0;
         frame->stride = 0;
         frame->timestamp = 0;
+        frame->originalWidth = 0;    // 🚀 [Issue #193]
+        frame->originalHeight = 0;   // 🚀 [Issue #193]
     }
 }
 

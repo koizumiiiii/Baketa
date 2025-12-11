@@ -36,6 +36,7 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include <d3d11_4.h>
+#include <d3dcompiler.h>  // 🚀 [Issue #193] GPU Shader Resize
 
 // COM スマートポインタ
 #include <wrl/client.h>

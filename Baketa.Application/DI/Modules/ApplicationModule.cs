@@ -315,6 +315,8 @@ public sealed class ApplicationModule : ServiceModuleBase
         services.AddSingleton<Baketa.Core.Abstractions.Memory.IReferencedSafeImageFactory, Baketa.Application.Services.Memory.ReferencedSafeImageFactory>();
 
         // 🔧 [Issue #170] ローディング画面初期化サービス登録
+        // 🚀 [Issue #193] GPU環境サービスを先に登録
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IGpuEnvironmentService, Baketa.Application.Services.GpuEnvironmentService>();
         services.AddSingleton<Baketa.Core.Abstractions.Services.ILoadingScreenInitializer, Baketa.Application.Services.ApplicationInitializer>();
 
         // 🔧 診断レポートサービス（UI制御フロー責務分離 - Phase 6.2.1）

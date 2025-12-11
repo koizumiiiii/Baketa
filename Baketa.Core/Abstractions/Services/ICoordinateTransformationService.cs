@@ -19,12 +19,14 @@ public interface ICoordinateTransformationService
     /// <param name="windowHandle">対象ウィンドウハンドル</param>
     /// <param name="roiScaleFactor">ROIスケールファクタ（デフォルト: 1.0f）</param>
     /// <param name="isBorderlessOrFullscreen">ボーダーレス/フルスクリーンウィンドウかどうか（デフォルト: false）</param>
+    /// <param name="alreadyScaledToOriginalSize">🚀 [Issue #193] 座標が既に元ウィンドウサイズにスケーリング済みかどうか（デフォルト: false）</param>
     /// <returns>スクリーン座標系での境界</returns>
     Rectangle ConvertRoiToScreenCoordinates(
         Rectangle roiBounds,
         IntPtr windowHandle,
         float roiScaleFactor = 1.0f,
-        bool isBorderlessOrFullscreen = false);
+        bool isBorderlessOrFullscreen = false,
+        bool alreadyScaledToOriginalSize = false);
 
     /// <summary>
     /// 複数のROI座標を一括変換

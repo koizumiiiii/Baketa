@@ -73,6 +73,31 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
     /// </summary>
     public int Height => _safeImage.Height;
 
+    private int _originalWidth;
+    private int _originalHeight;
+
+    /// <summary>
+    /// 🚀 [Issue #193] 元のキャプチャ幅（リサイズ前）
+    /// GPUリサイズキャプチャの場合、リサイズ前の元サイズを保持
+    /// 未設定（0）の場合はWidthにフォールバック
+    /// </summary>
+    public int OriginalWidth
+    {
+        get => _originalWidth > 0 ? _originalWidth : Width;
+        init => _originalWidth = value;
+    }
+
+    /// <summary>
+    /// 🚀 [Issue #193] 元のキャプチャ高さ（リサイズ前）
+    /// GPUリサイズキャプチャの場合、リサイズ前の元サイズを保持
+    /// 未設定（0）の場合はHeightにフォールバック
+    /// </summary>
+    public int OriginalHeight
+    {
+        get => _originalHeight > 0 ? _originalHeight : Height;
+        init => _originalHeight = value;
+    }
+
     /// <summary>
     /// ピクセルフォーマット（Phase 3.1統合: SafeImageから取得）
     /// </summary>

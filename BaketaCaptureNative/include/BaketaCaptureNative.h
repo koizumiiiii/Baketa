@@ -16,10 +16,12 @@ extern "C" {
 // フレームデータ構造体
 typedef struct {
     unsigned char* bgraData;    // BGRA ピクセルデータ
-    int width;                  // 幅
-    int height;                 // 高さ
+    int width;                  // 幅 (リサイズ後)
+    int height;                 // 高さ (リサイズ後)
     int stride;                 // 行バイト数
     long long timestamp;        // キャプチャ時刻 (100ns 単位)
+    int originalWidth;          // 🚀 [Issue #193] 元のキャプチャ幅 (リサイズ前)
+    int originalHeight;         // 🚀 [Issue #193] 元のキャプチャ高さ (リサイズ前)
 } BaketaCaptureFrame;
 
 /// <summary>
@@ -49,6 +51,17 @@ __declspec(dllexport) int BaketaCapture_CreateSession(void* hwnd, int* sessionId
 /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
 /// <returns>成功時は BAKETA_CAPTURE_SUCCESS</returns>
 __declspec(dllexport) int BaketaCapture_CaptureFrame(int sessionId, BaketaCaptureFrame* frame, int timeoutMs);
+
+/// <summary>
+/// フレームをキャプチャしてGPU側でリサイズ (Issue #193 パフォーマンス最適化)
+/// </summary>
+/// <param name="sessionId">セッションID</param>
+/// <param name="frame">キャプチャフレーム（出力）</param>
+/// <param name="targetWidth">ターゲット幅（0の場合はリサイズなし）</param>
+/// <param name="targetHeight">ターゲット高さ（0の場合はリサイズなし）</param>
+/// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
+/// <returns>成功時は BAKETA_CAPTURE_SUCCESS</returns>
+__declspec(dllexport) int BaketaCapture_CaptureFrameResized(int sessionId, BaketaCaptureFrame* frame, int targetWidth, int targetHeight, int timeoutMs);
 
 /// <summary>
 /// フレームデータを解放

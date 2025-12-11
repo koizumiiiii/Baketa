@@ -49,6 +49,12 @@ public class CaptureStrategyResult
     public string ErrorMessage { get; set; } = string.Empty;
     public CaptureMetrics Metrics { get; set; } = new CaptureMetrics();
     public DateTime CompletionTime { get; set; } = DateTime.Now;
+
+    /// <summary>
+    /// 🚀 [Issue #193] キャプチャ段階で実行されたOCR結果（座標スケーリング済み）
+    /// FullScreenOcrCaptureStrategyで設定され、下流のパイプラインで使用される
+    /// </summary>
+    public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
 }
 
 /// <summary>

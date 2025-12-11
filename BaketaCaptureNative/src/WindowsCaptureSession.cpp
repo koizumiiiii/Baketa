@@ -23,6 +23,7 @@ WindowsCaptureSession::WindowsCaptureSession(int sessionId, HWND hwnd)
     , m_frameHeight(0)
     , m_frameTimestamp(0)
     , m_lastHResult(S_OK)
+    , m_gpuResizeInitialized(false)  // 🚀 [Issue #193] GPU Shader Resize
 {
 }
 
@@ -785,6 +786,580 @@ bool WindowsCaptureSession::GetWindowDebugInfo(std::string& windowInfo, std::str
     {
         windowInfo = "Exception during debug info retrieval";
         screenRect = "N/A";
+        return false;
+    }
+}
+
+/// <summary>
+/// 🚀 [Issue #193] フレームをキャプチャしてGPU側でリサイズ
+/// </summary>
+bool WindowsCaptureSession::CaptureFrameResized(unsigned char** bgraData, int* width, int* height, int* stride, long long* timestamp, int* originalWidth, int* originalHeight, int targetWidth, int targetHeight, int timeoutMs)
+{
+    if (!m_initialized)
+    {
+        SetLastError("Session not initialized");
+        return false;
+    }
+
+    if (!m_captureSession)
+    {
+        SetLastError("Capture session not created");
+        return false;
+    }
+
+    // ターゲットサイズが0の場合は通常キャプチャにフォールバック
+    if (targetWidth <= 0 || targetHeight <= 0)
+    {
+        bool result = CaptureFrame(bgraData, width, height, stride, timestamp, timeoutMs);
+        if (result && originalWidth && originalHeight)
+        {
+            // 🚀 [Issue #193] リサイズなしの場合、元のサイズ = キャプチャサイズ
+            *originalWidth = *width;
+            *originalHeight = *height;
+        }
+        return result;
+    }
+
+    try
+    {
+        // キャプチャを開始
+        m_captureSession.StartCapture();
+
+        // フレーム待機
+        std::unique_lock<std::mutex> lock(m_frameMutex);
+        bool frameReceived = m_frameCondition.wait_for(
+            lock,
+            std::chrono::milliseconds(timeoutMs),
+            [this] { return m_frameReady; }
+        );
+
+        if (!frameReceived)
+        {
+            SetLastError("Frame capture timeout");
+            return false;
+        }
+
+        // タイムスタンプを設定
+        *timestamp = m_frameTimestamp;
+
+        // 🚀 [Issue #193] 元のキャプチャサイズを保存（リサイズ前）
+        if (originalWidth && originalHeight)
+        {
+            *originalWidth = m_frameWidth;
+            *originalHeight = m_frameHeight;
+        }
+
+        // テクスチャをGPU上でリサイズしてBGRAデータに変換
+        if (!ResizeAndConvertTextureToBGRA(m_latestFrame.Get(), bgraData, width, height, stride, targetWidth, targetHeight))
+        {
+            SetLastError("Failed to resize and convert texture to BGRA");
+            return false;
+        }
+
+        // フレーム状態をリセット
+        m_frameReady = false;
+
+        return true;
+    }
+    catch (const winrt::hresult_error& ex)
+    {
+        SetLastError("CaptureFrameResized winrt error: 0x" + std::to_string(ex.code()));
+        return false;
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("CaptureFrameResized exception: ") + ex.what());
+        return false;
+    }
+    catch (...)
+    {
+        SetLastError("CaptureFrameResized unknown exception");
+        return false;
+    }
+}
+
+// ========================================
+// 🚀 [Issue #193] GPU Shader Resize 実装
+// ========================================
+
+// HLSLシェーダーコード（インライン埋め込み）
+static const char* g_ResizeShaderCode = R"(
+// Vertex Shader + Pixel Shader for GPU Bilinear Resize
+Texture2D<float4> sourceTexture : register(t0);
+SamplerState bilinearSampler : register(s0);
+
+struct VSInput
+{
+    float2 Position : POSITION;
+    float2 TexCoord : TEXCOORD0;
+};
+
+struct PSInput
+{
+    float4 Position : SV_POSITION;
+    float2 TexCoord : TEXCOORD0;
+};
+
+PSInput VSMain(VSInput input)
+{
+    PSInput output;
+    output.Position = float4(input.Position, 0.0f, 1.0f);
+    output.TexCoord = input.TexCoord;
+    return output;
+}
+
+float4 PSMain(PSInput input) : SV_TARGET
+{
+    return sourceTexture.Sample(bilinearSampler, input.TexCoord);
+}
+)";
+
+/// <summary>
+/// 🚀 [Issue #193] GPUシェーダーリサイズリソースを初期化
+/// </summary>
+bool WindowsCaptureSession::InitializeGpuResizeResources()
+{
+    if (m_gpuResizeInitialized)
+        return true;
+
+    try
+    {
+        HRESULT hr;
+
+        // 1. Vertex Shaderをコンパイル
+        ComPtr<ID3DBlob> vsBlob;
+        ComPtr<ID3DBlob> errorBlob;
+        hr = D3DCompile(g_ResizeShaderCode, strlen(g_ResizeShaderCode), "ResizeShader",
+            nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &vsBlob, &errorBlob);
+        if (FAILED(hr))
+        {
+            std::string errorMsg = "VS compile failed";
+            if (errorBlob)
+                errorMsg += ": " + std::string(static_cast<char*>(errorBlob->GetBufferPointer()));
+            SetLastError(errorMsg);
+            return false;
+        }
+
+        hr = m_d3dDevice->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(),
+            nullptr, &m_vertexShader);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create vertex shader");
+            return false;
+        }
+
+        // 2. Pixel Shaderをコンパイル
+        ComPtr<ID3DBlob> psBlob;
+        hr = D3DCompile(g_ResizeShaderCode, strlen(g_ResizeShaderCode), "ResizeShader",
+            nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, &psBlob, &errorBlob);
+        if (FAILED(hr))
+        {
+            std::string errorMsg = "PS compile failed";
+            if (errorBlob)
+                errorMsg += ": " + std::string(static_cast<char*>(errorBlob->GetBufferPointer()));
+            SetLastError(errorMsg);
+            return false;
+        }
+
+        hr = m_d3dDevice->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(),
+            nullptr, &m_pixelShader);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create pixel shader");
+            return false;
+        }
+
+        // 3. Input Layoutを作成
+        D3D11_INPUT_ELEMENT_DESC inputLayout[] = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+        };
+
+        hr = m_d3dDevice->CreateInputLayout(inputLayout, 2, vsBlob->GetBufferPointer(),
+            vsBlob->GetBufferSize(), &m_inputLayout);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create input layout");
+            return false;
+        }
+
+        // 4. フルスクリーンクワッド用頂点バッファを作成
+        struct Vertex { float x, y, u, v; };
+        Vertex vertices[] = {
+            { -1.0f,  1.0f, 0.0f, 0.0f },  // 左上
+            {  1.0f,  1.0f, 1.0f, 0.0f },  // 右上
+            { -1.0f, -1.0f, 0.0f, 1.0f },  // 左下
+            {  1.0f, -1.0f, 1.0f, 1.0f }   // 右下
+        };
+
+        D3D11_BUFFER_DESC bufferDesc = {};
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        bufferDesc.ByteWidth = sizeof(vertices);
+        bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+        D3D11_SUBRESOURCE_DATA initData = {};
+        initData.pSysMem = vertices;
+
+        hr = m_d3dDevice->CreateBuffer(&bufferDesc, &initData, &m_vertexBuffer);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create vertex buffer");
+            return false;
+        }
+
+        // 5. バイリニアサンプラーを作成
+        D3D11_SAMPLER_DESC samplerDesc = {};
+        samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;  // バイリニアフィルタリング
+        samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+        samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+        samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        samplerDesc.MinLOD = 0;
+        samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+        hr = m_d3dDevice->CreateSamplerState(&samplerDesc, &m_bilinearSampler);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create sampler state");
+            return false;
+        }
+
+        m_gpuResizeInitialized = true;
+        SetLastError("GPU resize resources initialized successfully");
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("InitializeGpuResizeResources exception: ") + ex.what());
+        return false;
+    }
+    catch (...)
+    {
+        SetLastError("InitializeGpuResizeResources unknown exception");
+        return false;
+    }
+}
+
+/// <summary>
+/// 🚀 [Issue #193] GPU上でテクスチャをリサイズ（シェーダー使用）
+/// </summary>
+bool WindowsCaptureSession::GpuResizeTexture(ID3D11Texture2D* sourceTexture, int targetWidth, int targetHeight, ComPtr<ID3D11Texture2D>& resizedTexture)
+{
+    try
+    {
+        if (!InitializeGpuResizeResources())
+            return false;
+
+        HRESULT hr;
+
+        // 1. ソースSRV（Shader Resource View）を作成
+        D3D11_TEXTURE2D_DESC srcDesc;
+        sourceTexture->GetDesc(&srcDesc);
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = srcDesc.Format;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+        srvDesc.Texture2D.MipLevels = 1;
+
+        ComPtr<ID3D11ShaderResourceView> sourceSRV;
+        hr = m_d3dDevice->CreateShaderResourceView(sourceTexture, &srvDesc, &sourceSRV);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create source SRV");
+            return false;
+        }
+
+        // 2. リサイズ先のRender Targetテクスチャを作成
+        D3D11_TEXTURE2D_DESC rtDesc = {};
+        rtDesc.Width = targetWidth;
+        rtDesc.Height = targetHeight;
+        rtDesc.MipLevels = 1;
+        rtDesc.ArraySize = 1;
+        rtDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        rtDesc.SampleDesc.Count = 1;
+        rtDesc.SampleDesc.Quality = 0;
+        rtDesc.Usage = D3D11_USAGE_DEFAULT;
+        rtDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+        ComPtr<ID3D11Texture2D> renderTargetTexture;
+        hr = m_d3dDevice->CreateTexture2D(&rtDesc, nullptr, &renderTargetTexture);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create render target texture");
+            return false;
+        }
+
+        // 3. Render Target Viewを作成
+        ComPtr<ID3D11RenderTargetView> rtv;
+        hr = m_d3dDevice->CreateRenderTargetView(renderTargetTexture.Get(), nullptr, &rtv);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create render target view");
+            return false;
+        }
+
+        // 4. レンダリングパイプラインを設定
+        // 現在の状態を保存
+        // Note: このDLLは専用D3Dパイプラインを使用しているため、
+        // IA/VS/PSステージの完全な状態保存は省略しています。
+        // 他のD3Dアプリケーションと共有する場合は、これらの状態も保存・復元が必要です。
+        ComPtr<ID3D11RenderTargetView> oldRTV;
+        ComPtr<ID3D11DepthStencilView> oldDSV;
+        D3D11_VIEWPORT oldViewport;
+        UINT numViewports = 1;
+        m_d3dContext->RSGetViewports(&numViewports, &oldViewport);
+        m_d3dContext->OMGetRenderTargets(1, &oldRTV, &oldDSV);
+
+        // ビューポートを設定
+        D3D11_VIEWPORT viewport = {};
+        viewport.Width = static_cast<float>(targetWidth);
+        viewport.Height = static_cast<float>(targetHeight);
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+        m_d3dContext->RSSetViewports(1, &viewport);
+
+        // レンダーターゲットを設定
+        ID3D11RenderTargetView* rtvArray[] = { rtv.Get() };
+        m_d3dContext->OMSetRenderTargets(1, rtvArray, nullptr);
+
+        // シェーダーを設定
+        m_d3dContext->IASetInputLayout(m_inputLayout.Get());
+        m_d3dContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        UINT stride = sizeof(float) * 4;
+        UINT offset = 0;
+        ID3D11Buffer* vbArray[] = { m_vertexBuffer.Get() };
+        m_d3dContext->IASetVertexBuffers(0, 1, vbArray, &stride, &offset);
+        m_d3dContext->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+        m_d3dContext->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+        ID3D11ShaderResourceView* srvArray[] = { sourceSRV.Get() };
+        m_d3dContext->PSSetShaderResources(0, 1, srvArray);
+        ID3D11SamplerState* samplerArray[] = { m_bilinearSampler.Get() };
+        m_d3dContext->PSSetSamplers(0, 1, samplerArray);
+
+        // 5. 描画（フルスクリーンクワッド）
+        m_d3dContext->Draw(4, 0);
+
+        // 6. 状態を復元
+        m_d3dContext->RSSetViewports(1, &oldViewport);
+        m_d3dContext->OMSetRenderTargets(1, oldRTV.GetAddressOf(), oldDSV.Get());
+
+        // SRVをアンバインド
+        ID3D11ShaderResourceView* nullSRV[] = { nullptr };
+        m_d3dContext->PSSetShaderResources(0, 1, nullSRV);
+
+        resizedTexture = renderTargetTexture;
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("GpuResizeTexture exception: ") + ex.what());
+        return false;
+    }
+    catch (...)
+    {
+        SetLastError("GpuResizeTexture unknown exception");
+        return false;
+    }
+}
+
+/// <summary>
+/// 🚀 [Issue #193] テクスチャをGPU上でリサイズしてBGRAデータに変換
+/// GPU Shader Resize（真のGPUリサイズ）実装
+/// </summary>
+bool WindowsCaptureSession::ResizeAndConvertTextureToBGRA(ID3D11Texture2D* texture, unsigned char** bgraData, int* outputWidth, int* outputHeight, int* stride, int targetWidth, int targetHeight)
+{
+    try
+    {
+        if (!texture || !bgraData || !stride || !outputWidth || !outputHeight)
+        {
+            SetLastError("Invalid parameters for resize texture conversion");
+            return false;
+        }
+
+        // ソーステクスチャの詳細を取得
+        D3D11_TEXTURE2D_DESC srcDesc;
+        texture->GetDesc(&srcDesc);
+
+        int srcWidth = static_cast<int>(srcDesc.Width);
+        int srcHeight = static_cast<int>(srcDesc.Height);
+
+        // アスペクト比を維持してターゲットサイズを計算
+        float srcAspect = static_cast<float>(srcWidth) / static_cast<float>(srcHeight);
+        float targetAspect = static_cast<float>(targetWidth) / static_cast<float>(targetHeight);
+
+        int finalWidth, finalHeight;
+        if (srcAspect > targetAspect)
+        {
+            finalWidth = targetWidth;
+            finalHeight = static_cast<int>(targetWidth / srcAspect);
+        }
+        else
+        {
+            finalHeight = targetHeight;
+            finalWidth = static_cast<int>(targetHeight * srcAspect);
+        }
+
+        finalWidth = (std::max)(1, finalWidth);
+        finalHeight = (std::max)(1, finalHeight);
+
+        // リサイズが不要な場合
+        if (srcWidth <= targetWidth && srcHeight <= targetHeight)
+        {
+            *outputWidth = srcWidth;
+            *outputHeight = srcHeight;
+            return ConvertTextureToBGRA(texture, bgraData, stride);
+        }
+
+        // 🔍 デバッグログ
+        char debugBuffer[512];
+        sprintf_s(debugBuffer, sizeof(debugBuffer),
+            "GPU_SHADER_RESIZE: Source=%dx%d -> Target=%dx%d -> Final=%dx%d (Transfer: %zu KB -> %zu KB)",
+            srcWidth, srcHeight, targetWidth, targetHeight, finalWidth, finalHeight,
+            (srcWidth * srcHeight * 4) / 1024, (finalWidth * finalHeight * 4) / 1024);
+        SetLastError(std::string(debugBuffer));
+
+        // 🚀 GPU上でリサイズ
+        ComPtr<ID3D11Texture2D> resizedTexture;
+        if (!GpuResizeTexture(texture, finalWidth, finalHeight, resizedTexture))
+        {
+            // シェーダーが失敗した場合はCPUフォールバック（フェイルセーフ）
+            SetLastError("GPU shader resize failed, using CPU fallback");
+            // 以下はCPUリサイズのフォールバックコード
+            D3D11_TEXTURE2D_DESC stagingDesc = {};
+            stagingDesc.Width = srcDesc.Width;
+            stagingDesc.Height = srcDesc.Height;
+            stagingDesc.MipLevels = 1;
+            stagingDesc.ArraySize = 1;
+            stagingDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+            stagingDesc.Usage = D3D11_USAGE_STAGING;
+            stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+            stagingDesc.SampleDesc.Count = 1;
+
+            ComPtr<ID3D11Texture2D> stagingTexture;
+            if (FAILED(m_d3dDevice->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture)))
+                return false;
+
+            m_d3dContext->CopyResource(stagingTexture.Get(), texture);
+            D3D11_MAPPED_SUBRESOURCE mappedResource;
+            if (FAILED(m_d3dContext->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mappedResource)))
+                return false;
+
+            UINT outputPixelRowBytes = finalWidth * 4;
+            UINT outputAlignedStride = ((outputPixelRowBytes + 15) / 16) * 16;
+            *bgraData = static_cast<unsigned char*>(_aligned_malloc(finalHeight * outputAlignedStride, 16));
+            if (!(*bgraData)) {
+                m_d3dContext->Unmap(stagingTexture.Get(), 0);
+                return false;
+            }
+
+            const unsigned char* srcData = static_cast<const unsigned char*>(mappedResource.pData);
+            unsigned char* dstData = *bgraData;
+            UINT srcRowPitch = static_cast<UINT>(mappedResource.RowPitch);
+            float xRatio = static_cast<float>(srcWidth) / finalWidth;
+            float yRatio = static_cast<float>(srcHeight) / finalHeight;
+
+            for (int y = 0; y < finalHeight; ++y) {
+                float srcY = y * yRatio;
+                int y0 = static_cast<int>(srcY);
+                int y1 = (std::min)(y0 + 1, srcHeight - 1);
+                float yFrac = srcY - y0;
+                unsigned char* dstRow = dstData + y * outputAlignedStride;
+                for (int x = 0; x < finalWidth; ++x) {
+                    float srcX = x * xRatio;
+                    int x0 = static_cast<int>(srcX);
+                    int x1 = (std::min)(x0 + 1, srcWidth - 1);
+                    float xFrac = srcX - x0;
+                    const unsigned char* p00 = srcData + y0 * srcRowPitch + x0 * 4;
+                    const unsigned char* p10 = srcData + y0 * srcRowPitch + x1 * 4;
+                    const unsigned char* p01 = srcData + y1 * srcRowPitch + x0 * 4;
+                    const unsigned char* p11 = srcData + y1 * srcRowPitch + x1 * 4;
+                    for (int c = 0; c < 4; ++c) {
+                        float top = p00[c] * (1 - xFrac) + p10[c] * xFrac;
+                        float bottom = p01[c] * (1 - xFrac) + p11[c] * xFrac;
+                        dstRow[x * 4 + c] = static_cast<unsigned char>((std::min)(255.0f, (std::max)(0.0f, top * (1 - yFrac) + bottom * yFrac)));
+                    }
+                }
+            }
+            m_d3dContext->Unmap(stagingTexture.Get(), 0);
+            *outputWidth = finalWidth;
+            *outputHeight = finalHeight;
+            *stride = static_cast<int>(outputAlignedStride);
+            return true;
+        }
+
+        // 🚀 リサイズ後のテクスチャをステージングテクスチャにコピーしてCPUに読み取り
+        D3D11_TEXTURE2D_DESC stagingDesc = {};
+        stagingDesc.Width = finalWidth;
+        stagingDesc.Height = finalHeight;
+        stagingDesc.MipLevels = 1;
+        stagingDesc.ArraySize = 1;
+        stagingDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        stagingDesc.Usage = D3D11_USAGE_STAGING;
+        stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        stagingDesc.SampleDesc.Count = 1;
+
+        ComPtr<ID3D11Texture2D> stagingTexture;
+        HRESULT hr = m_d3dDevice->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to create staging texture after GPU resize");
+            return false;
+        }
+
+        // リサイズ済みテクスチャをステージングテクスチャにコピー
+        m_d3dContext->CopyResource(stagingTexture.Get(), resizedTexture.Get());
+
+        // ステージングテクスチャをマップしてCPUに読み取り
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        hr = m_d3dContext->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mappedResource);
+        if (FAILED(hr))
+        {
+            SetLastError("Failed to map staging texture after GPU resize");
+            return false;
+        }
+
+        // 出力バッファを確保
+        UINT outputPixelRowBytes = finalWidth * 4;
+        UINT outputAlignedStride = ((outputPixelRowBytes + 15) / 16) * 16;
+        size_t outputDataSize = finalHeight * outputAlignedStride;
+
+        *bgraData = static_cast<unsigned char*>(_aligned_malloc(outputDataSize, 16));
+        if (!(*bgraData))
+        {
+            m_d3dContext->Unmap(stagingTexture.Get(), 0);
+            SetLastError("Failed to allocate output buffer after GPU resize");
+            return false;
+        }
+
+        // ピクセルデータをコピー
+        const unsigned char* srcData = static_cast<const unsigned char*>(mappedResource.pData);
+        unsigned char* dstData = *bgraData;
+        UINT srcRowPitch = static_cast<UINT>(mappedResource.RowPitch);
+
+        for (int y = 0; y < finalHeight; ++y)
+        {
+            unsigned char* dstRow = dstData + y * outputAlignedStride;
+            const unsigned char* srcRow = srcData + y * srcRowPitch;
+            memcpy(dstRow, srcRow, outputPixelRowBytes);
+        }
+
+        m_d3dContext->Unmap(stagingTexture.Get(), 0);
+
+        *outputWidth = finalWidth;
+        *outputHeight = finalHeight;
+        *stride = static_cast<int>(outputAlignedStride);
+
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        SetLastError(std::string("ResizeAndConvertTextureToBGRA exception: ") + ex.what());
+        return false;
+    }
+    catch (...)
+    {
+        SetLastError("ResizeAndConvertTextureToBGRA unknown exception");
         return false;
     }
 }

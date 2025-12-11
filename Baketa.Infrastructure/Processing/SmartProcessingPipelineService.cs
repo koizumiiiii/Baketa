@@ -202,11 +202,25 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                         _logger.LogInformation("🔥 [PHASE2.2.1] OCR段階スキップ - キャプチャ時にOCR実行済み (FullScreenOcrCaptureStrategy), Regions: {RegionCount}",
                             input.PreExecutedOcrResult.TextRegions.Count);
 
+                        // 🚀 [Issue #193] OcrResults → OcrExecutionResult変換（座標スケーリング済み結果を下流に伝達）
+                        // PreExecutedOcrResultはOcrResults型だが、下流のBuildSuccessResultはOcrExecutionResult型を期待する
+                        var preOcrResult = input.PreExecutedOcrResult;
+                        var detectedText = string.Join(" ", preOcrResult.TextRegions.Select(r => r.Text));
+                        var textChunks = preOcrResult.TextRegions.Cast<object>().ToList();
+
+                        var convertedOcrResult = new OcrExecutionResult
+                        {
+                            DetectedText = detectedText,
+                            TextChunks = textChunks,
+                            ProcessingTime = preOcrResult.ProcessingTime,
+                            Success = true
+                        };
+
                         // OCR結果をcontextに格納（後続の翻訳段階で使用）
                         var skippedResult = ProcessingStageResult.CreateSkipped(
                             ProcessingStageType.OcrExecution,
                             $"FullScreenOcrCaptureStrategyでOCR実行済み ({input.PreExecutedOcrResult.TextRegions.Count} regions)");
-                        skippedResult = skippedResult with { Data = input.PreExecutedOcrResult };
+                        skippedResult = skippedResult with { Data = convertedOcrResult };
                         context.AddStageResult(ProcessingStageType.OcrExecution, skippedResult);
 
                         executedStages.Add(stageType);

@@ -42,4 +42,15 @@ public interface ISafeImageFactory
     /// <param name="height">画像高さ</param>
     /// <returns>生成されたSafeImageインスタンス</returns>
     SafeImage CreateFromBitmap(Bitmap bitmap, int width, int height);
+
+    /// <summary>
+    /// ネイティブメモリポインタから直接SafeImageインスタンスを生成
+    /// Issue #193: Clone()を廃止し、中間Bitmap作成を排除してLOH圧迫を防止
+    /// </summary>
+    /// <param name="bgraData">BGRAピクセルデータへのポインタ</param>
+    /// <param name="width">画像幅</param>
+    /// <param name="height">画像高さ</param>
+    /// <param name="stride">1行あたりのバイト数</param>
+    /// <returns>生成されたSafeImageインスタンス</returns>
+    SafeImage CreateFromNativePointer(IntPtr bgraData, int width, int height, int stride);
 }
