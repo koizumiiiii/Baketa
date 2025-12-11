@@ -43,6 +43,7 @@ public sealed class SuryaServerManager : IAsyncDisposable
 
     /// <summary>
     /// Suryaサーバーを起動し、準備完了まで待機
+    /// Issue #197: モデルダウンロード完了待機ロジック追加
     /// </summary>
     public async Task<bool> StartServerAsync(CancellationToken cancellationToken = default)
     {
@@ -53,6 +54,15 @@ public sealed class SuryaServerManager : IAsyncDisposable
             {
                 _logger.LogInformation("♻️ [Surya] 既存サーバー再利用: Port {Port}", _port);
                 return true;
+            }
+
+            // Issue #197: モデルダウンロード完了を待機
+            // ComponentDownloaderがモデルをダウンロード中の場合、完了まで待つ
+            var modelReady = await WaitForSuryaModelAsync(cancellationToken).ConfigureAwait(false);
+            if (!modelReady)
+            {
+                _logger.LogError("❌ [Surya] モデルファイルが見つかりません。ComponentDownloaderでのダウンロードをお待ちください。");
+                return false;
             }
 
             // 孤立プロセスの強制終了
@@ -451,6 +461,69 @@ public sealed class SuryaServerManager : IAsyncDisposable
         // モデルが見つからない場合はSuryaの標準ダウンロードを使用
         _logger.LogDebug("[Surya] カスタムモデルなし - Surya標準ダウンロードを使用");
         return null;
+    }
+
+    /// <summary>
+    /// Issue #197: Suryaモデルダウンロード完了を待機
+    /// ComponentDownloaderがモデルをダウンロード中の場合、最大5分間待機
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>モデルが利用可能になったらtrue</returns>
+    private async Task<bool> WaitForSuryaModelAsync(CancellationToken cancellationToken)
+    {
+        var projectRoot = FindProjectRoot(AppContext.BaseDirectory) ?? Environment.CurrentDirectory;
+
+        // モデルファイルの候補パス
+        var modelPaths = new[]
+        {
+            Path.Combine(projectRoot, "Models", "surya-models", "recognition", "model.safetensors"),
+            Path.Combine(AppContext.BaseDirectory, "Models", "surya-models", "recognition", "model.safetensors"),
+        };
+
+        // 即座にモデルが存在するか確認
+        foreach (var modelPath in modelPaths)
+        {
+            if (File.Exists(modelPath))
+            {
+                _logger.LogInformation("✅ [Surya] モデルファイル検出（即座）: {Path}", modelPath);
+                return true;
+            }
+        }
+
+        // モデルが見つからない場合、ComponentDownloaderの完了を待機
+        _logger.LogInformation("⏳ [Surya] モデルダウンロード完了を待機中...");
+
+        const int maxWaitSeconds = 300; // 最大5分
+        const int checkIntervalMs = 3000; // 3秒ごとにチェック
+        var elapsed = 0;
+
+        while (elapsed < maxWaitSeconds * 1000)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await Task.Delay(checkIntervalMs, cancellationToken).ConfigureAwait(false);
+            elapsed += checkIntervalMs;
+
+            foreach (var modelPath in modelPaths)
+            {
+                if (File.Exists(modelPath))
+                {
+                    _logger.LogInformation("✅ [Surya] モデルダウンロード完了検出: {Path} (待機時間: {Elapsed}秒)",
+                        modelPath, elapsed / 1000);
+                    return true;
+                }
+            }
+
+            // 進捗ログ（30秒ごと）
+            if (elapsed % 30000 == 0)
+            {
+                _logger.LogInformation("⏳ [Surya] モデル待機中... {Elapsed}/{Max}秒",
+                    elapsed / 1000, maxWaitSeconds);
+            }
+        }
+
+        _logger.LogError("❌ [Surya] モデルダウンロード待機タイムアウト ({MaxWait}秒)", maxWaitSeconds);
+        return false;
     }
 
     /// <summary>
