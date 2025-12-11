@@ -1,11 +1,11 @@
-# Baketa リリースビルド自動化スクリプト
-# Issue #197: 最新の状態から確実にリリースビルドを作成する
+# Baketa Release Build Automation Script
+# Issue #197: Create release build from latest state reliably
 
 param(
-    [switch]$SkipGitSync,     # Git同期をスキップ（ローカル変更を保持したい場合）
-    [switch]$SkipPyInstaller, # PyInstallerビルドをスキップ（Pythonコード未変更時）
-    [switch]$SkipTests,       # テストをスキップ（高速ビルド用）
-    [string]$OutputDir = "$PSScriptRoot\..\release"  # 出力ディレクトリ
+    [switch]$SkipGitSync,     # Skip Git sync (keep local changes)
+    [switch]$SkipPyInstaller, # Skip PyInstaller build (when Python unchanged)
+    [switch]$SkipTests,       # Skip tests (fast build)
+    [string]$OutputDir = "$PSScriptRoot\..\release"  # Output directory
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,83 +17,83 @@ Write-Host " Project Root: $ProjectRoot" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Step 0: 前提条件チェック
-Write-Host "[Step 0] 前提条件チェック..." -ForegroundColor Yellow
+# Step 0: Prerequisites check
+Write-Host "[Step 0] Checking prerequisites..." -ForegroundColor Yellow
 $dotnetVersion = dotnet --version
 Write-Host "  .NET SDK: $dotnetVersion" -ForegroundColor Gray
 
 if (-not (Test-Path "$ProjectRoot\grpc_server\venv_build")) {
-    Write-Host "  WARNING: venv_buildが存在しません。PyInstallerビルドには事前セットアップが必要です。" -ForegroundColor Red
-    Write-Host "  セットアップコマンド:" -ForegroundColor Gray
+    Write-Host "  WARNING: venv_build does not exist. PyInstaller build requires setup." -ForegroundColor Red
+    Write-Host "  Setup commands:" -ForegroundColor Gray
     Write-Host "    cd $ProjectRoot\grpc_server" -ForegroundColor Gray
     Write-Host "    py -3.10 -m venv venv_build" -ForegroundColor Gray
     Write-Host "    .\venv_build\Scripts\pip install -r requirements.txt pyinstaller" -ForegroundColor Gray
     if (-not $SkipPyInstaller) {
-        throw "venv_build環境がありません"
+        throw "venv_build environment not found"
     }
 }
 
-# Step 1: Git最新同期（オプション）
+# Step 1: Git sync (optional)
 if (-not $SkipGitSync) {
     Write-Host ""
-    Write-Host "[Step 1] Git最新同期..." -ForegroundColor Yellow
+    Write-Host "[Step 1] Git sync with latest..." -ForegroundColor Yellow
 
     Push-Location $ProjectRoot
     try {
-        # 現在のブランチを取得
+        # Get current branch
         $currentBranch = git rev-parse --abbrev-ref HEAD
         Write-Host "  Current branch: $currentBranch" -ForegroundColor Gray
 
-        # mainブランチの最新を取得
+        # Fetch latest main
         Write-Host "  Fetching origin/main..." -ForegroundColor Gray
         git fetch origin main
 
-        # mainとの差分を確認
+        # Check diff from main
         $behindCount = git rev-list --count "HEAD..origin/main" 2>$null
         if ($behindCount -gt 0) {
-            Write-Host "  mainから$behindCountコミット遅れています。マージ中..." -ForegroundColor Gray
+            Write-Host "  Behind main by $behindCount commits. Merging..." -ForegroundColor Gray
             git merge origin/main --no-edit
-            Write-Host "  マージ完了" -ForegroundColor Green
+            Write-Host "  Merge complete" -ForegroundColor Green
         } else {
-            Write-Host "  既にmainと同期済み" -ForegroundColor Green
+            Write-Host "  Already synced with main" -ForegroundColor Green
         }
     } finally {
         Pop-Location
     }
 } else {
     Write-Host ""
-    Write-Host "[Step 1] Git同期スキップ" -ForegroundColor Gray
+    Write-Host "[Step 1] Git sync skipped" -ForegroundColor Gray
 }
 
-# Step 2: .NET Releaseビルド
+# Step 2: .NET Release build
 Write-Host ""
-Write-Host "[Step 2] .NET Releaseビルド..." -ForegroundColor Yellow
+Write-Host "[Step 2] .NET Release build..." -ForegroundColor Yellow
 Push-Location $ProjectRoot
 try {
     dotnet build Baketa.sln --configuration Release
     if ($LASTEXITCODE -ne 0) {
-        throw ".NET Releaseビルド失敗"
+        throw ".NET Release build failed"
     }
-    Write-Host "  .NET Releaseビルド完了" -ForegroundColor Green
+    Write-Host "  .NET Release build complete" -ForegroundColor Green
 } finally {
     Pop-Location
 }
 
-# Step 3: PyInstallerビルド（オプション）
+# Step 3: PyInstaller build (optional)
 if (-not $SkipPyInstaller) {
     Write-Host ""
-    Write-Host "[Step 3] PyInstallerビルド..." -ForegroundColor Yellow
+    Write-Host "[Step 3] PyInstaller build..." -ForegroundColor Yellow
 
     $venvPython = "$ProjectRoot\grpc_server\venv_build\Scripts\python.exe"
     $venvPyInstaller = "$ProjectRoot\grpc_server\venv_build\Scripts\pyinstaller.exe"
 
     Push-Location "$ProjectRoot\grpc_server"
     try {
-        # Proto再生成（念のため）
+        # Regenerate proto files
         Write-Host "  Proto files regenerating..." -ForegroundColor Gray
         & $venvPython -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. protos/translation.proto protos/ocr.proto
 
-        # BaketaTranslationServer.exe ビルド
+        # Build BaketaTranslationServer.exe
         Write-Host "  Building BaketaTranslationServer.exe..." -ForegroundColor Gray
         if (Test-Path "dist\BaketaTranslationServer") {
             Remove-Item -Recurse -Force "dist\BaketaTranslationServer"
@@ -104,57 +104,57 @@ if (-not $SkipPyInstaller) {
 
         & $venvPyInstaller BaketaTranslationServer.spec --clean --noconfirm
         if ($LASTEXITCODE -ne 0) {
-            throw "PyInstallerビルド失敗"
+            throw "PyInstaller build failed"
         }
-        Write-Host "  BaketaTranslationServer.exe ビルド完了" -ForegroundColor Green
+        Write-Host "  BaketaTranslationServer.exe build complete" -ForegroundColor Green
     } finally {
         Pop-Location
     }
 } else {
     Write-Host ""
-    Write-Host "[Step 3] PyInstallerビルドスキップ" -ForegroundColor Gray
+    Write-Host "[Step 3] PyInstaller build skipped" -ForegroundColor Gray
 }
 
-# Step 4: テスト実行（オプション）
+# Step 4: Run tests (optional)
 if (-not $SkipTests) {
     Write-Host ""
-    Write-Host "[Step 4] テスト実行..." -ForegroundColor Yellow
+    Write-Host "[Step 4] Running tests..." -ForegroundColor Yellow
     Push-Location $ProjectRoot
     try {
         dotnet test Baketa.sln --configuration Release --no-build --verbosity minimal
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  WARNING: 一部テストが失敗しました" -ForegroundColor Red
+            Write-Host "  WARNING: Some tests failed" -ForegroundColor Red
         } else {
-            Write-Host "  全テスト成功" -ForegroundColor Green
+            Write-Host "  All tests passed" -ForegroundColor Green
         }
     } finally {
         Pop-Location
     }
 } else {
     Write-Host ""
-    Write-Host "[Step 4] テストスキップ" -ForegroundColor Gray
+    Write-Host "[Step 4] Tests skipped" -ForegroundColor Gray
 }
 
-# Step 5: リリースパッケージ構築
+# Step 5: Build release package
 Write-Host ""
-Write-Host "[Step 5] リリースパッケージ構築..." -ForegroundColor Yellow
+Write-Host "[Step 5] Building release package..." -ForegroundColor Yellow
 
 $OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 if (Test-Path $OutputDir) {
-    Write-Host "  既存リリースディレクトリを削除中..." -ForegroundColor Gray
+    Write-Host "  Removing existing release directory..." -ForegroundColor Gray
     Remove-Item -Recurse -Force $OutputDir
 }
 New-Item -ItemType Directory -Path $OutputDir | Out-Null
 
-# 5.1 .NET Releaseビルド成果物をコピー
+# 5.1 Copy .NET Release build artifacts
 $sourceDir = "$ProjectRoot\Baketa.UI\bin\Release\net8.0-windows10.0.19041.0\win-x64"
 if (-not (Test-Path $sourceDir)) {
-    throw "Releaseビルド成果物が見つかりません: $sourceDir"
+    throw "Release build artifacts not found: $sourceDir"
 }
 Write-Host "  Copying .NET Release build..." -ForegroundColor Gray
 Copy-Item -Path "$sourceDir\*" -Destination $OutputDir -Recurse
 
-# 5.2 BaketaTranslationServer.exeをコピー
+# 5.2 Copy BaketaTranslationServer.exe
 $translationServerDir = "$ProjectRoot\grpc_server\dist\BaketaTranslationServer"
 if (Test-Path $translationServerDir) {
     $targetDir = "$OutputDir\grpc_server\BaketaTranslationServer"
@@ -162,10 +162,10 @@ if (Test-Path $translationServerDir) {
     Write-Host "  Copying BaketaTranslationServer..." -ForegroundColor Gray
     Copy-Item -Path "$translationServerDir\*" -Destination $targetDir -Recurse
 } else {
-    Write-Host "  WARNING: BaketaTranslationServerが見つかりません" -ForegroundColor Red
+    Write-Host "  WARNING: BaketaTranslationServer not found" -ForegroundColor Red
 }
 
-# 5.3 OCRモデル（ppocrv5-onnx）をコピー
+# 5.3 Copy OCR models (ppocrv5-onnx)
 $ocrModelDir = "$ProjectRoot\Models\ppocrv5-onnx"
 if (Test-Path $ocrModelDir) {
     $targetDir = "$OutputDir\Models\ppocrv5-onnx"
@@ -173,16 +173,16 @@ if (Test-Path $ocrModelDir) {
     Write-Host "  Copying OCR models..." -ForegroundColor Gray
     Copy-Item -Path "$ocrModelDir\*" -Destination $targetDir -Recurse
 } else {
-    Write-Host "  WARNING: OCRモデルが見つかりません: $ocrModelDir" -ForegroundColor Red
+    Write-Host "  WARNING: OCR models not found: $ocrModelDir" -ForegroundColor Red
 }
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host " リリースビルド完了!" -ForegroundColor Green
+Write-Host " Release build complete!" -ForegroundColor Green
 Write-Host " Output: $OutputDir" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
-# パッケージサイズを表示
+# Display package size
 $size = (Get-ChildItem $OutputDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
 Write-Host ""
 Write-Host "Total size: $([math]::Round($size, 2)) MB" -ForegroundColor Gray
