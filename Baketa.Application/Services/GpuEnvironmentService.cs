@@ -361,15 +361,47 @@ public class GpuEnvironmentService : IGpuEnvironmentService
 
             await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
 
-            if (process.ExitCode == 0)
+            var output = outputBuilder.ToString();
+            var error = errorBuilder.ToString();
+
+            // stderrに"ERROR"が含まれている場合は、明確な失敗と判断する
+            if (error.Contains("ERROR", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("[GPU] pip {Args} 失敗。stderrにERRORが含まれています (ExitCode: {ExitCode})", pipArgs, process.ExitCode);
+                _logger.LogWarning("[GPU] Standard output: {Output}", output);
+                _logger.LogWarning("[GPU] Error output: {Error}", error);
+                return false;
+            }
+
+            // pipの成功判定: ExitCode 0 または "Successfully installed" が出力に含まれる
+            // （pipはWARNINGをstderrに出力するが、インストール自体は成功している場合がある）
+            var isSuccess = process.ExitCode == 0 ||
+                            output.Contains("Successfully installed", StringComparison.OrdinalIgnoreCase) ||
+                            output.Contains("Requirement already satisfied", StringComparison.OrdinalIgnoreCase);
+
+            if (isSuccess)
             {
                 _logger.LogInformation("[GPU] pip {Args} 成功", pipArgs);
+                if (process.ExitCode != 0)
+                {
+                    _logger.LogDebug("[GPU] ExitCode={ExitCode}だが出力から成功と判定", process.ExitCode);
+                }
+                // stderrに何か出力されていても（"ERROR"は無い）、警告としてログに出力する
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    _logger.LogWarning("[GPU] pip {Args} 完了。ただし警告が出力されています: {Warning}", pipArgs, error);
+                }
                 return true;
             }
             else
             {
+                // その他の理由による失敗（例：ExitCodeが0でなく、stdoutにも成功メッセージがない）
                 _logger.LogWarning("[GPU] pip {Args} 失敗 (ExitCode: {ExitCode})", pipArgs, process.ExitCode);
-                _logger.LogWarning("[GPU] Error output: {Error}", errorBuilder.ToString());
+                _logger.LogWarning("[GPU] Standard output: {Output}", output);
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    _logger.LogWarning("[GPU] Error output: {Error}", error);
+                }
                 return false;
             }
         }
