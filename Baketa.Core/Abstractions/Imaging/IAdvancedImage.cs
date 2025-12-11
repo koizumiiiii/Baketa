@@ -148,6 +148,14 @@ public interface IAdvancedImage : IImage
     ///      → 絶対座標=(279,753) = (267+12, 743+10)
     /// </remarks>
     System.Drawing.Rectangle? CaptureRegion { get; }
+
+    /// <summary>
+    /// キャプチャ時に事前実行されたOCR結果
+    /// FullScreenOcrCaptureStrategy等で既にOCRが実行された場合、その結果を保持します。
+    /// 翻訳パイプラインでのOCR二重実行を防止するために使用されます。
+    /// Issue #193/#194: 二重OCR防止対応
+    /// </summary>
+    Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
 }
 
 /// <summary>

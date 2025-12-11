@@ -58,36 +58,23 @@ public sealed class SuryaServerManager : IAsyncDisposable
             // 孤立プロセスの強制終了
             await KillOrphanedProcessAsync().ConfigureAwait(false);
 
-            // スクリプトパス解決
-            var scriptPath = ResolveScriptPath();
-            if (string.IsNullOrEmpty(scriptPath))
+            // Issue #197: exe版とPython版の両対応
+            // 優先順位: 1. exe版（配布用） 2. Pythonスクリプト（開発用）
+            var (executablePath, arguments, workingDir, isExeMode) = ResolveServerExecutable();
+
+            if (string.IsNullOrEmpty(executablePath))
             {
-                _logger.LogError("❌ [Surya] サーバースクリプトが見つかりません");
+                _logger.LogError("❌ [Surya] サーバー実行ファイルが見つかりません（exe/Pythonいずれも）");
                 return false;
             }
 
-            // Python実行ファイル解決
-            var pythonPath = ResolvePythonPath();
-            if (string.IsNullOrEmpty(pythonPath))
-            {
-                _logger.LogError("❌ [Surya] Python実行ファイルが見つかりません");
-                return false;
-            }
-
-            _logger.LogInformation("🚀 [Surya] サーバー起動開始: {Script} --port {Port}", scriptPath, _port);
-
-            var workingDir = Path.GetDirectoryName(scriptPath) ?? Environment.CurrentDirectory;
-
-            // 引数構築（-u: unbuffered output）
-            var arguments = $"-u \"{scriptPath}\" --port {_port}";
-
-            _logger.LogInformation("🔧 [Surya] Python: {Python}", pythonPath);
-            _logger.LogInformation("🔧 [Surya] Arguments: {Args}", arguments);
+            _logger.LogInformation("🚀 [Surya] サーバー起動開始: {Executable} {Args}", executablePath, arguments);
+            _logger.LogInformation("🔧 [Surya] 実行モード: {Mode}", isExeMode ? "exe（配布版）" : "Python（開発版）");
             _logger.LogInformation("🔧 [Surya] WorkingDir: {Dir}", workingDir);
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = pythonPath,
+                FileName = executablePath,
                 Arguments = arguments,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -99,9 +86,12 @@ public sealed class SuryaServerManager : IAsyncDisposable
                 StandardErrorEncoding = Encoding.UTF8
             };
 
-            // 環境変数設定（UTF-8強制）
-            startInfo.Environment["PYTHONIOENCODING"] = "utf-8";
-            startInfo.Environment["PYTHONUNBUFFERED"] = "1";
+            // Python版の場合のみ環境変数設定
+            if (!isExeMode)
+            {
+                startInfo.Environment["PYTHONIOENCODING"] = "utf-8";
+                startInfo.Environment["PYTHONUNBUFFERED"] = "1";
+            }
 
             // Issue #189: Suryaモデルパス設定（GitHub Release配布モデル対応）
             // ComponentDownloaderでダウンロードしたモデルを使用
@@ -261,6 +251,71 @@ public sealed class SuryaServerManager : IAsyncDisposable
     }
 
     /// <summary>
+    /// Issue #197: サーバー実行ファイル解決（exe優先、Pythonフォールバック）
+    /// </summary>
+    /// <returns>(実行ファイルパス, 引数, 作業ディレクトリ, exeモードか)</returns>
+    private (string? executablePath, string arguments, string workingDir, bool isExeMode) ResolveServerExecutable()
+    {
+        var projectRoot = FindProjectRoot(AppContext.BaseDirectory) ?? Environment.CurrentDirectory;
+
+        // 1. exe版を優先検索（配布用）
+        var exePath = ResolveExePath(projectRoot);
+        if (!string.IsNullOrEmpty(exePath))
+        {
+            var exeDir = Path.GetDirectoryName(exePath) ?? projectRoot;
+            var arguments = $"--port {_port}";
+            _logger.LogInformation("[Surya] exe版検出: {Path}", exePath);
+            return (exePath, arguments, exeDir, true);
+        }
+
+        // 2. Pythonスクリプト版（開発用）
+        var scriptPath = ResolveScriptPath();
+        if (!string.IsNullOrEmpty(scriptPath))
+        {
+            var pythonPath = ResolvePythonPath();
+            if (!string.IsNullOrEmpty(pythonPath))
+            {
+                var workingDir = Path.GetDirectoryName(scriptPath) ?? projectRoot;
+                var arguments = $"-u \"{scriptPath}\" --port {_port}";
+                _logger.LogInformation("[Surya] Python版使用: {Script}", scriptPath);
+                return (pythonPath, arguments, workingDir, false);
+            }
+        }
+
+        return (null, "", "", false);
+    }
+
+    /// <summary>
+    /// Issue #197: exe版パス解決
+    /// PyInstallerでビルドしたBaketaSuryaOcrServer.exeを検索
+    /// </summary>
+    private string? ResolveExePath(string projectRoot)
+    {
+        // 検索候補パス（優先順）
+        var searchPaths = new[]
+        {
+            // 1. アプリ配布時: grpc_server/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe
+            Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"),
+            // 2. 開発時ビルド: grpc_server/dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe
+            Path.Combine(projectRoot, "grpc_server", "dist", "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"),
+            // 3. AppContext.BaseDirectory直下
+            Path.Combine(AppContext.BaseDirectory, "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"),
+        };
+
+        foreach (var path in searchPaths)
+        {
+            if (File.Exists(path))
+            {
+                _logger.LogDebug("[Surya] exe検出: {Path}", path);
+                return path;
+            }
+        }
+
+        _logger.LogDebug("[Surya] exe版なし - Python版にフォールバック");
+        return null;
+    }
+
+    /// <summary>
     /// スクリプトパス解決
     /// </summary>
     private string? ResolveScriptPath()
@@ -417,12 +472,14 @@ public sealed class SuryaServerManager : IAsyncDisposable
 
     /// <summary>
     /// 孤立プロセス強制終了
+    /// Issue #197: exe版とPython版の両方を検索
     /// </summary>
     private async Task KillOrphanedProcessAsync()
     {
         try
         {
-            var processes = Process.GetProcessesByName("python")
+            // Python版の孤立プロセス検索
+            var pythonProcesses = Process.GetProcessesByName("python")
                 .Where(p =>
                 {
                     try
@@ -437,9 +494,14 @@ public sealed class SuryaServerManager : IAsyncDisposable
                 })
                 .ToList();
 
-            foreach (var proc in processes)
+            // exe版の孤立プロセス検索
+            var exeProcesses = Process.GetProcessesByName("BaketaSuryaOcrServer").ToList();
+
+            var allProcesses = pythonProcesses.Concat(exeProcesses).ToList();
+
+            foreach (var proc in allProcesses)
             {
-                _logger.LogWarning("🔥 [Surya] 孤立プロセス強制終了: PID {PID}", proc.Id);
+                _logger.LogWarning("🔥 [Surya] 孤立プロセス強制終了: PID {PID} ({Name})", proc.Id, proc.ProcessName);
                 proc.Kill(entireProcessTree: true);
                 await proc.WaitForExitAsync().ConfigureAwait(false);
             }

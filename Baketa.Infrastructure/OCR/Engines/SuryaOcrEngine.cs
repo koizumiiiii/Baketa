@@ -239,10 +239,26 @@ public sealed class SuryaOcrEngine : IOcrEngine
 
             progressCallback?.Report(new OcrProgress(1.0, $"Detected {regions.Count} regions") { Phase = OcrPhase.Completed });
 
+            // 各テキスト領域の信頼度をログ出力
+            foreach (var region in regions)
+            {
+                _logger.LogInformation(
+                    "📝 [SuryaOCR] Text='{Text}' Confidence={Confidence:F3} Bounds=({X},{Y},{W}x{H})",
+                    region.Text.Length > 50 ? region.Text[..50] + "..." : region.Text,
+                    region.Confidence,
+                    region.Bounds.X,
+                    region.Bounds.Y,
+                    region.Bounds.Width,
+                    region.Bounds.Height);
+            }
+
+            // 平均信頼度を計算してサマリーログ
+            var avgConfidence = regions.Count > 0 ? regions.Average(r => r.Confidence) : 0.0f;
             _logger.LogInformation(
-                "Surya OCR completed: {RegionCount} regions in {ElapsedMs}ms",
+                "Surya OCR completed: {RegionCount} regions in {ElapsedMs}ms (AvgConfidence={AvgConfidence:F3})",
                 regions.Count,
-                sw.ElapsedMilliseconds);
+                sw.ElapsedMilliseconds,
+                avgConfidence);
 
             return new OcrResults(
                 regions,

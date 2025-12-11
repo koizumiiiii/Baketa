@@ -182,6 +182,11 @@ public class AdvancedImageTests
         public System.Drawing.Rectangle? CaptureRegion => null;
 
         /// <summary>
+        /// Issue #193/#194: 二重OCR防止対応 - モック画像なのでnull
+        /// </summary>
+        public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
+
+        /// <summary>
         /// 🔥 [PHASE5.2G-A] LockPixelData (MockAdvancedImage is test-only, not supported)
         /// </summary>
         public PixelDataLock LockPixelData() => throw new NotSupportedException("MockAdvancedImage does not support LockPixelData");

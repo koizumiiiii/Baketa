@@ -502,6 +502,11 @@ public sealed class ApplicationModule : ServiceModuleBase
             provider => provider.GetRequiredService<Baketa.Application.Events.Handlers.OcrRequestHandler>());
         Console.WriteLine("✅ [DI_DEBUG] OcrRequestHandler登録完了 - Phase 2翻訳チェーン修復");
 
+        // 🔧 [Issue #195] ResourceMonitoringEventHandler登録 - 未処理イベント警告を解消
+        services.AddSingleton<Baketa.Application.EventHandlers.ResourceMonitoringEventHandler>();
+        services.AddSingleton<IEventProcessor<ResourceMonitoringEvent>>(
+            provider => provider.GetRequiredService<Baketa.Application.EventHandlers.ResourceMonitoringEventHandler>());
+
         // 自動登録が必要な場合は必要に応じて実装
         // RegisterEventHandlersAutomatically(services);
     }

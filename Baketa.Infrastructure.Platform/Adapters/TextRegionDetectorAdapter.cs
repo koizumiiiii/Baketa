@@ -236,6 +236,11 @@ internal sealed class SimpleAdvancedImageAdapter : IAdvancedImage, IDisposable
     /// </summary>
     public System.Drawing.Rectangle? CaptureRegion => null;
 
+    /// <summary>
+    /// Issue #193/#194: 二重OCR防止対応 - 簡易実装アダプターなのでnull
+    /// </summary>
+    public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
+
     public ImagePixelFormat PixelFormat => ImagePixelFormat.Rgba32; // IImage要求
 
     public SimpleAdvancedImageAdapter(Bitmap bitmap, ILogger logger)

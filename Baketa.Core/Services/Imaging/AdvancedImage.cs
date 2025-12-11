@@ -27,6 +27,13 @@ public sealed class AdvancedImage : CoreImage, IAdvancedImage
     public System.Drawing.Rectangle? CaptureRegion { get; }
 
     /// <inheritdoc/>
+    /// <summary>
+    /// キャプチャ時に事前実行されたOCR結果
+    /// Issue #193/#194: 二重OCR防止対応
+    /// </summary>
+    public Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
+
+    /// <inheritdoc/>
     public bool IsGrayscale => Format == ImageFormat.Grayscale8;
 
     /// <inheritdoc/>

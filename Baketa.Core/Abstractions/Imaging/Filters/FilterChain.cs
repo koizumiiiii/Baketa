@@ -270,6 +270,11 @@ public class FilterChain : IImageFilter
         public System.Drawing.Rectangle? CaptureRegion => null;
 
         /// <summary>
+        /// Issue #193/#194: 二重OCR防止対応 - VirtualImageはメタデータ専用なので常にnull
+        /// </summary>
+        public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
+
+        /// <summary>
         /// 画像データの読み取り専用メモリを取得（IImage拡張対応）
         /// </summary>
         /// <returns>画像データの読み取り専用メモリ</returns>
