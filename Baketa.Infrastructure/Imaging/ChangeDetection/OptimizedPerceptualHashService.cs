@@ -481,13 +481,24 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     /// <summary>
     /// グレースケール変換（unsafeポインタ最適化）
     /// Issue #195: GetPixel()のフォールバック変換を廃止、直接ポインタアクセス
+    /// Note: LockBitsはFormat24bppRgbへの自動変換を行う（元フォーマットが異なる場合は変換コストが発生）
     /// </summary>
     private float[] ConvertToGrayscale(Bitmap bitmap)
     {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
         var width = bitmap.Width;
         var height = bitmap.Height;
+
+        if (width <= 0 || height <= 0)
+        {
+            return [];
+        }
+
         var grayData = new float[width * height];
 
+        // LockBitsはFormat24bppRgbを指定すると、元のフォーマットから自動変換する
+        // 32bppArgb等からの変換時は内部でコピーが発生するが、GetPixel()よりは高速
         var lockData = bitmap.LockBits(
             new Rectangle(0, 0, width, height),
             ImageLockMode.ReadOnly,
@@ -501,16 +512,20 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
             {
                 byte* ptr = (byte*)lockData.Scan0;
 
+                // 行ポインタを先に計算することで内部ループの乗算を削減
                 for (int y = 0; y < height; y++)
                 {
+                    byte* row = ptr + (y * stride);
+                    var rowOffset = y * width;
+
                     for (int x = 0; x < width; x++)
                     {
-                        var offset = y * stride + x * 3;
+                        var pixelOffset = x * 3;
                         // BGR順序 (PixelFormat.Format24bppRgb)
-                        var b = ptr[offset];
-                        var g = ptr[offset + 1];
-                        var r = ptr[offset + 2];
-                        grayData[y * width + x] = r * 0.299f + g * 0.587f + b * 0.114f;
+                        var b = row[pixelOffset];
+                        var g = row[pixelOffset + 1];
+                        var r = row[pixelOffset + 2];
+                        grayData[rowOffset + x] = r * 0.299f + g * 0.587f + b * 0.114f;
                     }
                 }
             }
@@ -629,13 +644,22 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     /// <summary>
     /// ウィンドウ抽出（unsafeポインタ最適化）
     /// Issue #195: GetPixel()を廃止、直接ポインタアクセス
+    /// Note: LockBitsはFormat24bppRgbへの自動変換を行う（元フォーマットが異なる場合は変換コストが発生）
     /// </summary>
     private float[] ExtractWindow(Bitmap bitmap, int x, int y, int size)
     {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
         var window = new float[size * size];
         var width = bitmap.Width;
         var height = bitmap.Height;
 
+        if (width <= 0 || height <= 0 || size <= 0)
+        {
+            return window;
+        }
+
+        // LockBitsはFormat24bppRgbを指定すると、元のフォーマットから自動変換する
         var lockData = bitmap.LockBits(
             new Rectangle(0, 0, width, height),
             ImageLockMode.ReadOnly,
@@ -652,16 +676,18 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
 
                 for (int wy = 0; wy < size; wy++)
                 {
+                    var py = Math.Min(y + wy, height - 1);
+                    byte* row = ptr + (py * stride);
+
                     for (int wx = 0; wx < size; wx++)
                     {
                         var px = Math.Min(x + wx, width - 1);
-                        var py = Math.Min(y + wy, height - 1);
-                        var offset = py * stride + px * 3;
+                        var pixelOffset = px * 3;
 
                         // BGR順序 (PixelFormat.Format24bppRgb)
-                        var b = ptr[offset];
-                        var g = ptr[offset + 1];
-                        var r = ptr[offset + 2];
+                        var b = row[pixelOffset];
+                        var g = row[pixelOffset + 1];
+                        var r = row[pixelOffset + 2];
                         window[index++] = r * 0.299f + g * 0.587f + b * 0.114f;
                     }
                 }
