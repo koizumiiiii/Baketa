@@ -479,7 +479,8 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     }
 
     /// <summary>
-    /// グレースケール変換
+    /// グレースケール変換（unsafeポインタ最適化）
+    /// Issue #195: GetPixel()のフォールバック変換を廃止、直接ポインタアクセス
     /// </summary>
     private float[] ConvertToGrayscale(Bitmap bitmap)
     {
@@ -487,13 +488,36 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         var height = bitmap.Height;
         var grayData = new float[width * height];
 
-        for (int y = 0; y < height; y++)
+        var lockData = bitmap.LockBits(
+            new Rectangle(0, 0, width, height),
+            ImageLockMode.ReadOnly,
+            PixelFormat.Format24bppRgb);
+
+        try
         {
-            for (int x = 0; x < width; x++)
+            var stride = lockData.Stride;
+
+            unsafe
             {
-                var pixel = bitmap.GetPixel(x, y);
-                grayData[y * width + x] = (pixel.R * 0.299f + pixel.G * 0.587f + pixel.B * 0.114f);
+                byte* ptr = (byte*)lockData.Scan0;
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        var offset = y * stride + x * 3;
+                        // BGR順序 (PixelFormat.Format24bppRgb)
+                        var b = ptr[offset];
+                        var g = ptr[offset + 1];
+                        var r = ptr[offset + 2];
+                        grayData[y * width + x] = r * 0.299f + g * 0.587f + b * 0.114f;
+                    }
+                }
             }
+        }
+        finally
+        {
+            bitmap.UnlockBits(lockData);
         }
 
         return grayData;
@@ -603,23 +627,49 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     }
 
     /// <summary>
-    /// ウィンドウ抽出
+    /// ウィンドウ抽出（unsafeポインタ最適化）
+    /// Issue #195: GetPixel()を廃止、直接ポインタアクセス
     /// </summary>
     private float[] ExtractWindow(Bitmap bitmap, int x, int y, int size)
     {
         var window = new float[size * size];
-        var index = 0;
+        var width = bitmap.Width;
+        var height = bitmap.Height;
 
-        for (int wy = 0; wy < size; wy++)
+        var lockData = bitmap.LockBits(
+            new Rectangle(0, 0, width, height),
+            ImageLockMode.ReadOnly,
+            PixelFormat.Format24bppRgb);
+
+        try
         {
-            for (int wx = 0; wx < size; wx++)
-            {
-                var px = Math.Min(x + wx, bitmap.Width - 1);
-                var py = Math.Min(y + wy, bitmap.Height - 1);
-                var pixel = bitmap.GetPixel(px, py);
+            var stride = lockData.Stride;
+            var index = 0;
 
-                window[index++] = (pixel.R * 0.299f + pixel.G * 0.587f + pixel.B * 0.114f);
+            unsafe
+            {
+                byte* ptr = (byte*)lockData.Scan0;
+
+                for (int wy = 0; wy < size; wy++)
+                {
+                    for (int wx = 0; wx < size; wx++)
+                    {
+                        var px = Math.Min(x + wx, width - 1);
+                        var py = Math.Min(y + wy, height - 1);
+                        var offset = py * stride + px * 3;
+
+                        // BGR順序 (PixelFormat.Format24bppRgb)
+                        var b = ptr[offset];
+                        var g = ptr[offset + 1];
+                        var r = ptr[offset + 2];
+                        window[index++] = r * 0.299f + g * 0.587f + b * 0.114f;
+                    }
+                }
             }
+        }
+        finally
+        {
+            bitmap.UnlockBits(lockData);
         }
 
         return window;
