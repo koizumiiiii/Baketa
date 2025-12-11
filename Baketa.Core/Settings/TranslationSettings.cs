@@ -415,7 +415,7 @@ public sealed class TranslationSettings : ITranslationSettings
         Unit = "ms",
         MinValue = 5000,
         MaxValue = 120000)]
-    public int ServerStartupTimeoutMs { get; set; } = 30000;
+    public int ServerStartupTimeoutMs { get; set; } = 120000;
 
     /// <summary>
     /// 設定のクローンを作成します
