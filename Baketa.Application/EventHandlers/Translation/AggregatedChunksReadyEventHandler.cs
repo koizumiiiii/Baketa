@@ -142,8 +142,25 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             // 集約されたチャンクをリストに変換
             var aggregatedChunks = eventData.AggregatedChunks.ToList();
 
-            // 空でないチャンクのみフィルタリング
-            var nonEmptyChunks = aggregatedChunks
+            // 🔥 [CONFIDENCE_FILTER] 信頼度フィルタリング - 低信頼度結果を翻訳から除外
+            var ocrSettings = _unifiedSettingsService.GetOcrSettings();
+            var confidenceThreshold = ocrSettings?.ConfidenceThreshold ?? 0.9;
+
+            var highConfidenceChunks = aggregatedChunks
+                .Where(chunk => chunk.AverageConfidence >= confidenceThreshold)
+                .ToList();
+
+            var filteredByConfidenceCount = aggregatedChunks.Count - highConfidenceChunks.Count;
+            if (filteredByConfidenceCount > 0)
+            {
+                Console.WriteLine($"🔍 [CONFIDENCE_FILTER] 信頼度フィルタリング: {filteredByConfidenceCount}件除外（閾値={confidenceThreshold:F2}）");
+                _logger.LogInformation(
+                    "🔍 [CONFIDENCE_FILTER] 信頼度{Threshold:F2}未満の{FilteredCount}件をフィルタリング（残り{RemainingCount}件）",
+                    confidenceThreshold, filteredByConfidenceCount, highConfidenceChunks.Count);
+            }
+
+            // 空でないチャンクのみフィルタリング（信頼度フィルタリング後）
+            var nonEmptyChunks = highConfidenceChunks
                 .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
                 .ToList();
 
