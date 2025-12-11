@@ -66,9 +66,12 @@ public sealed class AuthSettings
     /// <summary>
     /// OAuth callback port for desktop app
     /// </summary>
+    /// <remarks>
+    /// 38438 は衝突しにくいポート番号として選択（3000はNode.js等でよく使われる）
+    /// </remarks>
     [SettingMetadata(SettingLevel.Debug, "Authentication", "OAuth Callback Port",
         Description = "Local port for OAuth callback handling in desktop app")]
-    public int OAuthCallbackPort { get; set; } = 3000;
+    public int OAuthCallbackPort { get; set; } = 38438;
 
     /// <summary>
     /// OAuth callback timeout in seconds

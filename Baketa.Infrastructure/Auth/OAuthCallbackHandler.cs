@@ -126,9 +126,9 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
         {
             _logger.LogDebug("[OAUTH_DEBUG] StartListenerAsync: HttpListener作成開始");
             _httpListener = new HttpListener();
-            // 🔥 [ISSUE#167] localhostと127.0.0.1の両方でリッスン
+            // 🔥 [ISSUE#196] localhostのみでリッスン
+            // 127.0.0.1も同時登録するとHTTP.sys競合でエラー183が発生する環境がある
             _httpListener.Prefixes.Add($"http://localhost:{_authSettings.OAuthCallbackPort}/");
-            _httpListener.Prefixes.Add($"http://127.0.0.1:{_authSettings.OAuthCallbackPort}/");
             _logger.LogDebug("[OAUTH_DEBUG] StartListenerAsync: Prefixes追加完了, Port={Port}", _authSettings.OAuthCallbackPort);
             _httpListener.Start();
             _logger.LogDebug("[OAUTH_DEBUG] StartListenerAsync: HttpListener.Start()完了, IsListening={IsListening}", _httpListener.IsListening);
@@ -137,7 +137,7 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             // 🔥 [ISSUE#167] リスナー準備完了シグナルを初期化
             _listenerReadyTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            _logger.LogInformation("[OAUTH_DEBUG] OAuth callback listener started on port {Port} (localhost and 127.0.0.1)", _authSettings.OAuthCallbackPort);
+            _logger.LogInformation("[OAUTH_DEBUG] OAuth callback listener started on port {Port} (localhost)", _authSettings.OAuthCallbackPort);
 
             // Start listening for requests in the background with proper task tracking
             _logger.LogDebug("[OAUTH_DEBUG] StartListenerAsync: ListenForCallbackAsync開始");

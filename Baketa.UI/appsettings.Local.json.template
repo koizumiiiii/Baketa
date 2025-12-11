@@ -3,7 +3,7 @@
     "SupabaseUrl": "https://YOUR-PROJECT-ID.supabase.co",
     "SupabaseAnonKey": "YOUR-SUPABASE-ANON-KEY",
     "IsFreePlan": true,
-    "OAuthCallbackPort": 3000
+    "OAuthCallbackPort": 38438
   },
   "OAuth": {
     "Google": {
