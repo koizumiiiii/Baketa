@@ -35,6 +35,13 @@ public class WindowsImageAdapter : DisposableBase, IAdvancedImage
     /// </summary>
     public System.Drawing.Rectangle? CaptureRegion { get; }
 
+    /// <inheritdoc/>
+    /// <summary>
+    /// キャプチャ時に事前実行されたOCR結果
+    /// Issue #193/#194: 二重OCR防止対応
+    /// </summary>
+    public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
+
     /// <summary>
     /// WindowsImageAdapterのコンストラクタ
     /// </summary>

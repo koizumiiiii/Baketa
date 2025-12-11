@@ -137,18 +137,31 @@ public partial class AdaptiveCaptureServiceAdapter(
 
             // 🎯 CRITICAL FIX: SafeImageAdapterの場合はWindowsImageAdapterでラップ（型互換性確保）
             var capturedImage = result.CapturedImages[0];
+            WindowsImageAdapter adapter;
             if (capturedImage is SafeImageAdapter safeImageAdapter)
             {
                 _logger.LogInformation("🎯 [PHASE3.18.4] SafeImageAdapter検出 - WindowsImageAdapterでラップしてIImage互換性確保");
                 Console.WriteLine("🎯 [PHASE3.18.4] SafeImageAdapter → WindowsImageAdapter変換（型安全）");
                 // 🔥 [PHASE2.5_ROI_FIX] result.DetectedTextRegions[0]から取得したCaptureRegionを設定
-                return new WindowsImageAdapter(safeImageAdapter, captureRegion);
+                adapter = new WindowsImageAdapter(safeImageAdapter, captureRegion);
+            }
+            else
+            {
+                // レガシー対応: SafeImageAdapter以外の場合はWindowsImageAdapterでラップ
+                _logger.LogWarning("⚠️ [PHASE3.18.4] 非SafeImageAdapter検出 - WindowsImageAdapterでラップ: Type={Type}", capturedImage.GetType().Name);
+                // 🔥 [PHASE2.5_ROI_FIX] result.DetectedTextRegions[0]から取得したCaptureRegionを設定
+                adapter = new WindowsImageAdapter(capturedImage, captureRegion);
             }
 
-            // レガシー対応: SafeImageAdapter以外の場合はWindowsImageAdapterでラップ
-            _logger.LogWarning("⚠️ [PHASE3.18.4] 非SafeImageAdapter検出 - WindowsImageAdapterでラップ: Type={Type}", capturedImage.GetType().Name);
-            // 🔥 [PHASE2.5_ROI_FIX] result.DetectedTextRegions[0]から取得したCaptureRegionを設定
-            return new WindowsImageAdapter(capturedImage, captureRegion);
+            // 🔥 [Issue #193/#194] キャプチャ時に実行されたOCR結果を画像に付与（二重OCR防止）
+            if (result.PreExecutedOcrResult != null)
+            {
+                adapter.PreExecutedOcrResult = result.PreExecutedOcrResult;
+                _logger.LogInformation("🔥 [DUAL_OCR_FIX] PreExecutedOcrResult設定: {RegionCount}個のテキスト領域",
+                    result.PreExecutedOcrResult.TextRegions.Count);
+            }
+
+            return adapter;
         }
         catch (Exception ex)
         {

@@ -1545,10 +1545,19 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         }
                         : null;
 
+                    // 🔥 [Issue #193/#194] キャプチャ時のOCR結果を渡して二重OCR防止
+                    var preExecutedOcrResult = advancedImage.PreExecutedOcrResult;
+                    if (preExecutedOcrResult != null)
+                    {
+                        _logger?.LogInformation("🔥 [DUAL_OCR_FIX] PreExecutedOcrResult検出: {RegionCount}個のテキスト領域をパイプラインに渡す",
+                            preExecutedOcrResult.TextRegions.Count);
+                    }
+
                     await _coordinateBasedTranslation!.ProcessWithCoordinateBasedTranslationAsync(
                         advancedImage,
                         _targetWindowHandle!.Value,
                         pipelineOptions,
+                        preExecutedOcrResult,
                         cancellationToken)
                         .ConfigureAwait(false);
 

@@ -151,6 +151,11 @@ public class ImageFilterTests
         /// </summary>
         public System.Drawing.Rectangle? CaptureRegion => null;
 
+        /// <summary>
+        /// Issue #193/#194: 二重OCR防止対応 - モック画像なのでnull
+        /// </summary>
+        public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
+
         public IAdvancedImage ToGrayscale() => new MockAdvancedImage(_data, Width, Height);
 
         public Task<byte[]> ToByteArrayAsync() => Task.FromResult(_data);

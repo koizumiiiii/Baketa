@@ -64,6 +64,12 @@ public sealed class SafeImageAdapter : IWindowsImage, IAdvancedImage
     public GdiRectangle? CaptureRegion { get; init; }
 
     /// <summary>
+    /// Issue #193/#194: 二重OCR防止対応
+    /// キャプチャ時に事前実行されたOCR結果
+    /// </summary>
+    public Baketa.Core.Abstractions.OCR.OcrResults? PreExecutedOcrResult { get; set; }
+
+    /// <summary>
     /// 画像の幅（Phase 3.1統合: SafeImageから取得）
     /// </summary>
     public int Width => _safeImage.Width;

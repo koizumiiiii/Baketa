@@ -150,10 +150,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     /// バッチOCR処理 → 複数ウィンドウオーバーレイ表示の統合フロー
     /// </summary>
     /// <param name="options">パイプライン処理オプション（nullの場合はデフォルト設定を使用）</param>
+    /// <param name="preExecutedOcrResult">🔥 [Issue #193/#194] キャプチャ時に実行済みのOCR結果（二重OCR防止）</param>
     public async Task ProcessWithCoordinateBasedTranslationAsync(
         IAdvancedImage image,
         IntPtr windowHandle,
         Baketa.Core.Models.Processing.ProcessingPipelineOptions? options = null,
+        Baketa.Core.Abstractions.OCR.OcrResults? preExecutedOcrResult = null,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -193,7 +195,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 SourceWindowHandle = windowHandle,
                 Options = options ?? new Baketa.Core.Models.Processing.ProcessingPipelineOptions(),
                 // 🚀 [Issue #193] GPU Shaderリサイズ後のOCR座標スケーリング用に元ウィンドウサイズを設定
-                OriginalWindowSize = GetOriginalWindowSize(windowHandle)
+                OriginalWindowSize = GetOriginalWindowSize(windowHandle),
+                // 🔥 [Issue #193/#194] キャプチャ時に実行済みのOCR結果を伝達（二重OCR防止）
+                PreExecutedOcrResult = preExecutedOcrResult
             };
 
             // パイプライン実行（ImageChangeDetection → OcrExecution）
