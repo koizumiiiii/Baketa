@@ -282,30 +282,6 @@ public class PythonServerManager(
             projectRoot = currentDir;
         }
 
-        // CTranslate2版サーバーを優先使用（プロジェクトルートからの相対パス）
-        var scriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server_ct2.py");
-
-        // 🔧 デバッグ: パス構築情報を詳細ログ出力
-        logger.LogInformation("🔧 [PATH_FIX] CurrentDirectory: '{CurrentDir}'", currentDir);
-        logger.LogInformation("🔧 [PATH_FIX] ProjectRoot: '{ProjectRoot}'", projectRoot);
-        logger.LogInformation("🔧 [PATH_FIX] Constructed scriptPath: '{ScriptPath}'", scriptPath);
-        logger.LogInformation("🔧 [PATH_FIX] Script file exists: {Exists}", File.Exists(scriptPath));
-
-        // スクリプトファイル存在確認
-        if (!File.Exists(scriptPath))
-        {
-            // フォールバック: gRPCサーバーを使用（Phase 2.2統合版、プロジェクトルートから）
-            scriptPath = Path.Combine(projectRoot, "grpc_server", "start_server.py");
-
-            if (!File.Exists(scriptPath))
-            {
-                throw new FileNotFoundException($"Python翻訳サーバースクリプトが見つかりません: {scriptPath}");
-            }
-
-            // [CTRANSLATE2_INFO] grpc_server/start_server.pyは既にCTranslate2統合済み（Phase 2.2.1完了）
-            logger.LogInformation("✅ gRPC翻訳サーバー使用（CTranslate2統合版・80%メモリ削減）: {Script}", scriptPath);
-        }
-
         // 🔥 [PYINSTALLER_INTEGRATION] 配布版実行戦略（PyInstaller exe vs Python script）
         // 配布版（Release build）: PyInstaller exe（BaketaTranslationServer.exe）を直接実行
         // 開発版（Debug build）: Python + scriptで実行
@@ -336,6 +312,22 @@ public class PythonServerManager(
             Arguments = $"--port {port}{modelPathArg}",
 #else
         // 開発版: Python + script実行（従来ロジック）
+        // CTranslate2版サーバーを優先使用（プロジェクトルートからの相対パス）
+        var scriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server_ct2.py");
+        logger.LogDebug("[開発版] 翻訳サーバースクリプト探索開始: {ScriptPath}", scriptPath);
+
+        // スクリプトファイル存在確認（開発版のみ）
+        if (!File.Exists(scriptPath))
+        {
+            scriptPath = Path.Combine(projectRoot, "grpc_server", "start_server.py");
+            logger.LogDebug("[開発版] CTranslate2スクリプト未検出、フォールバック: {ScriptPath}", scriptPath);
+            if (!File.Exists(scriptPath))
+            {
+                throw new FileNotFoundException($"Python翻訳サーバースクリプトが見つかりません: {scriptPath}");
+            }
+        }
+        logger.LogInformation("✅ [開発版] 翻訳サーバースクリプト使用: {ScriptPath}", scriptPath);
+
         string pythonExecutable;
         var vendorPythonPath = Path.Combine(AppContext.BaseDirectory, "vendor", "python", "python.exe");
         var venvPythonPath = Path.Combine(projectRoot, ".venv", "Scripts", "python.exe");

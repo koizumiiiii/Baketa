@@ -142,9 +142,18 @@ Write-Host "[Step 5] Building release package..." -ForegroundColor Yellow
 $OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 if (Test-Path $OutputDir) {
     Write-Host "  Removing existing release directory..." -ForegroundColor Gray
-    Remove-Item -Recurse -Force $OutputDir
+    # Use -LiteralPath to avoid issues with special Windows device names like 'nul'
+    Get-ChildItem -LiteralPath $OutputDir -Force | ForEach-Object {
+        if ($_.Name -eq 'nul') {
+            # Skip Windows reserved device name
+            Write-Host "  Skipping reserved device name: $($_.FullName)" -ForegroundColor Yellow
+        } else {
+            Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Remove-Item -LiteralPath $OutputDir -Force -ErrorAction SilentlyContinue
 }
-New-Item -ItemType Directory -Path $OutputDir | Out-Null
+$null = New-Item -ItemType Directory -Path $OutputDir -Force
 
 # 5.1 Copy .NET Release build artifacts
 $sourceDir = "$ProjectRoot\Baketa.UI\bin\Release\net8.0-windows10.0.19041.0\win-x64"
@@ -158,7 +167,7 @@ Copy-Item -Path "$sourceDir\*" -Destination $OutputDir -Recurse
 $translationServerDir = "$ProjectRoot\grpc_server\dist\BaketaTranslationServer"
 if (Test-Path $translationServerDir) {
     $targetDir = "$OutputDir\grpc_server\BaketaTranslationServer"
-    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+    $null = New-Item -ItemType Directory -Path $targetDir -Force
     Write-Host "  Copying BaketaTranslationServer..." -ForegroundColor Gray
     Copy-Item -Path "$translationServerDir\*" -Destination $targetDir -Recurse
 } else {
@@ -169,7 +178,7 @@ if (Test-Path $translationServerDir) {
 $ocrModelDir = "$ProjectRoot\Models\ppocrv5-onnx"
 if (Test-Path $ocrModelDir) {
     $targetDir = "$OutputDir\Models\ppocrv5-onnx"
-    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+    $null = New-Item -ItemType Directory -Path $targetDir -Force
     Write-Host "  Copying OCR models..." -ForegroundColor Gray
     Copy-Item -Path "$ocrModelDir\*" -Destination $targetDir -Recurse
 } else {
