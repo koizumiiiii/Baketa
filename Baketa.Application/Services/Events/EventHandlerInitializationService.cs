@@ -346,6 +346,20 @@ public sealed class EventHandlerInitializationService(
                 Console.WriteLine($"🔥 [ERROR] DiagnosticEventProcessorの登録失敗: {ex.Message}");
             }
 
+            // 🔧 [Issue #195] ResourceMonitoringEventHandlerの登録 - 未処理イベント警告を解消
+            try
+            {
+                var resourceMonitoringHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Abstractions.Events.ResourceMonitoringEvent>>();
+                eventAggregator.Subscribe<Baketa.Core.Abstractions.Events.ResourceMonitoringEvent>(resourceMonitoringHandler);
+                _logger.LogInformation("ResourceMonitoringEventHandlerを登録しました");
+                Console.WriteLine("🔧 [Issue #195] ResourceMonitoringEventHandlerを登録しました");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ResourceMonitoringEventHandlerの登録に失敗しました");
+                Console.WriteLine($"🔥 [ERROR] ResourceMonitoringEventHandler登録失敗: {ex.Message}");
+            }
+
             // 🔥 [ISSUE#163] SingleshotEventProcessorの登録はUIModule/TranslationFlowModuleで実施
             // (UI層イベントのためApplication層では登録できない)
 

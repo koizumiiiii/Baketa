@@ -465,8 +465,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     throw;
                 }
 
-                _logger?.LogDebug($"✅ [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync完了 - 結果数: {results.Count}");
-                return results;
+                _logger?.LogDebug($"✅ [PHASE12.2_BATCH] TranslateBatchWithStreamingAsync完了 - 結果数: {results?.Count ?? 0}");
+                return results ?? [];
             }
             else
             {
