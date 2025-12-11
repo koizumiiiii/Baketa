@@ -13,6 +13,7 @@ namespace Baketa.UI.ViewModels;
 /// <summary>
 /// ローディング画面用ViewModel
 /// 初期化ステップの進捗を管理します
+/// [Issue #193] GPU環境自動セットアップステップ追加
 /// </summary>
 public class LoadingViewModel : ViewModelBase
 {
@@ -45,9 +46,11 @@ public class LoadingViewModel : ViewModelBase
 
         // 初期化ステップを作成（ローカライズリソースを使用）
         // [Issue #185] ダウンロードステップを先頭に追加
+        // [Issue #193] GPU環境セットアップステップを追加
         InitializationSteps =
         [
             new("download_components", Strings.Loading_DownloadingComponents),
+            new("setup_gpu", "GPU環境をセットアップしています..."),
             new("resolve_dependencies", Strings.Loading_ResolvingDependencies),
             new("load_ocr", Strings.Loading_LoadingOCR),
             new("init_translation", Strings.Loading_InitializingTranslation),
