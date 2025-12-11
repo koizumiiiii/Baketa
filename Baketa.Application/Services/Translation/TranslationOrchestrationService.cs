@@ -1766,8 +1766,23 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             {
                 Console.WriteLine($"🔥 [BRIDGE_FIX] OCR完了イベント発行開始: TextRegions数={ocrResults.TextRegions.Count}");
 
-                // OCR結果をOcrResultsコレクションに変換
-                var ocrResultsList = ocrResults.TextRegions.Select(region => new CoreOcrResult(
+                // 🔥 [CONFIDENCE_FILTER] 信頼度フィルタリング - 低信頼度結果を翻訳から除外
+                var confidenceThreshold = _ocrSettings?.CurrentValue?.ConfidenceThreshold ?? 0.9;
+                var filteredRegions = ocrResults.TextRegions
+                    .Where(region => region.Confidence >= confidenceThreshold)
+                    .ToList();
+
+                var filteredCount = ocrResults.TextRegions.Count - filteredRegions.Count;
+                if (filteredCount > 0)
+                {
+                    Console.WriteLine($"🔍 [CONFIDENCE_FILTER] 信頼度フィルタリング: {filteredCount}件除外（閾値={confidenceThreshold:F2}）");
+                    _logger?.LogInformation(
+                        "🔍 [CONFIDENCE_FILTER] 信頼度{Threshold:F2}未満の{FilteredCount}件をフィルタリング（残り{RemainingCount}件）",
+                        confidenceThreshold, filteredCount, filteredRegions.Count);
+                }
+
+                // OCR結果をOcrResultsコレクションに変換（フィルタリング済み）
+                var ocrResultsList = filteredRegions.Select(region => new CoreOcrResult(
                     text: region.Text,
                     bounds: region.Bounds,
                     confidence: (float)region.Confidence)).ToList().AsReadOnly();
