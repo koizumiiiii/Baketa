@@ -3,12 +3,30 @@ NLLB-200 Translation Engine
 Phase 2.2: NLLB-200モデルベース翻訳エンジン実装
 """
 
+import os
+import sys
 import time
 import logging
 from typing import List, Tuple, Optional
 import asyncio
 
-import torch
+# Issue #198: CUDA DLLロードエラー対策
+# グローバルimport前にCUDA利用可否を安全にチェック
+def _safe_import_torch():
+    """CUDA DLLエラーを回避してtorchをインポート"""
+    try:
+        import torch
+        return torch
+    except OSError as e:
+        # CUDA DLLロードエラー（cublas64_12.dll等）
+        logger = logging.getLogger(__name__)
+        logger.warning(f"CUDA DLLロードエラー: {e}")
+        logger.info("CUDA無効化してtorchを再インポートします")
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        import torch
+        return torch
+
+torch = _safe_import_torch()
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 from .base import (

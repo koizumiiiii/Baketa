@@ -80,29 +80,58 @@ class SuryaOcrEngine:
 
             # Surya OCR v0.17.0+ APIのインポート
             import_start = time.time()
-            import torch
+
+            # Issue #198: CUDA DLLロードエラー対策
+            # PyTorchインポート前にCUDA利用可否を判定し、DLLエラーを防止
+            # ユーザー環境: GPU有り＋PyTorch CPU版 → miniconda CUDA DLLエラー回避
+            use_cuda = False
+            if self.device == "cuda" and not self.use_quantized:
+                try:
+                    # 安全なCUDA利用可否チェック
+                    # OSError: CUDA DLLロードエラー（Windows + miniconda環境）
+                    import torch
+                    if torch.cuda.is_available():
+                        use_cuda = True
+                        gpu_name = torch.cuda.get_device_name(0)
+                        logger.info(f"CUDA利用可能: GPUモードで実行 ({gpu_name})")
+                    else:
+                        logger.info("CUDA利用不可（torch.cuda.is_available()=False）: CPUモードで実行")
+                except OSError as e:
+                    # CUDA DLLロードエラー（cublas64_12.dll等）
+                    logger.warning(f"CUDA DLLロードエラー: {e}")
+                    logger.info("CPUモードにフォールバックします")
+                    # CUDA無効化してPyTorchを再インポート
+                    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                    import importlib
+                    if 'torch' in sys.modules:
+                        # 既にインポート済みの場合は警告のみ（再インポートは危険）
+                        pass
+                    else:
+                        import torch
+                except Exception as e:
+                    logger.warning(f"CUDA初期化エラー: {e}")
+                    logger.info("CPUモードにフォールバックします")
+                    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                    if 'torch' not in sys.modules:
+                        import torch
+            else:
+                # CPUモード指定または量子化モデル使用
+                os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                import torch
+
+            # デバイス設定の確定
+            if use_cuda:
+                os.environ["TORCH_DEVICE"] = "cuda"
+            else:
+                os.environ["TORCH_DEVICE"] = "cpu"
+                self.device = "cpu"
+                if self.use_quantized:
+                    logger.info("量子化モデル使用: CPUモードで実行")
+
             from surya.foundation import FoundationPredictor
             from surya.recognition import RecognitionPredictor
             from surya.detection import DetectionPredictor
             logger.info(f"[Timing] Import完了: {time.time() - import_start:.2f}秒")
-
-            # 環境変数でデバイス設定（Surya v0.17.0+）
-            # 量子化モデルはCPUのみ対応
-            if self.use_quantized:
-                os.environ["TORCH_DEVICE"] = "cpu"
-                self.device = "cpu"
-                logger.info("量子化モデル使用: CPUモードで実行")
-            elif self.device == "cuda":
-                if torch.cuda.is_available():
-                    os.environ["TORCH_DEVICE"] = "cuda"
-                    gpu_name = torch.cuda.get_device_name(0)
-                    logger.info(f"CUDA利用可能: GPUモードで実行 ({gpu_name})")
-                else:
-                    os.environ["TORCH_DEVICE"] = "cpu"
-                    logger.warning("CUDA利用不可: CPUモードにフォールバック")
-                    self.device = "cpu"
-            else:
-                os.environ["TORCH_DEVICE"] = "cpu"
 
             # 検出モデル
             det_start = time.time()

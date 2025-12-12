@@ -464,66 +464,43 @@ public sealed class SuryaServerManager : IAsyncDisposable
     }
 
     /// <summary>
-    /// Issue #197: Suryaモデルダウンロード完了を待機
-    /// ComponentDownloaderがモデルをダウンロード中の場合、最大5分間待機
+    /// Issue #197: Suryaモデル準備確認
+    /// Issue #198: Suryaは初回起動時にHuggingFaceからモデルを自動ダウンロードする設計
+    /// ComponentDownloaderによる事前ダウンロードは任意（オフライン環境向け）
     /// </summary>
     /// <param name="cancellationToken">キャンセルトークン</param>
-    /// <returns>モデルが利用可能になったらtrue</returns>
-    private async Task<bool> WaitForSuryaModelAsync(CancellationToken cancellationToken)
+    /// <returns>常にtrue（Suryaが自動ダウンロードするため）</returns>
+    private Task<bool> WaitForSuryaModelAsync(CancellationToken cancellationToken)
     {
         var projectRoot = FindProjectRoot(AppContext.BaseDirectory) ?? Environment.CurrentDirectory;
 
-        // モデルファイルの候補パス
-        var modelPaths = new[]
+        // 事前配布モデルのパス候補（ComponentDownloaderでダウンロードされた場合）
+        var preloadedPaths = new[]
         {
-            Path.Combine(projectRoot, "Models", "surya-models", "recognition", "model.safetensors"),
-            Path.Combine(AppContext.BaseDirectory, "Models", "surya-models", "recognition", "model.safetensors"),
+            // appsettings.jsonの設定パス: Models/surya-quantized/surya_rec_quantized.pth
+            Path.Combine(projectRoot, "Models", "surya-quantized", "surya_rec_quantized.pth"),
+            Path.Combine(AppContext.BaseDirectory, "Models", "surya-quantized", "surya_rec_quantized.pth"),
+            // Detection ONNX: Models/surya-onnx/detection/model_int8.onnx
+            Path.Combine(projectRoot, "Models", "surya-onnx", "detection", "model_int8.onnx"),
+            Path.Combine(AppContext.BaseDirectory, "Models", "surya-onnx", "detection", "model_int8.onnx"),
         };
 
-        // 即座にモデルが存在するか確認
-        foreach (var modelPath in modelPaths)
+        // 事前配布モデルが存在するか確認
+        foreach (var modelPath in preloadedPaths)
         {
             if (File.Exists(modelPath))
             {
-                _logger.LogInformation("✅ [Surya] モデルファイル検出（即座）: {Path}", modelPath);
-                return true;
+                _logger.LogInformation("✅ [Surya] 事前配布モデル検出: {Path}", modelPath);
+                return Task.FromResult(true);
             }
         }
 
-        // モデルが見つからない場合、ComponentDownloaderの完了を待機
-        _logger.LogInformation("⏳ [Surya] モデルダウンロード完了を待機中...");
+        // Issue #198: Suryaは初回起動時にHuggingFaceからモデルを自動ダウンロードする
+        // 事前配布モデルがなくても、Pythonサーバー起動を許可（Suryaが自動取得）
+        _logger.LogInformation("ℹ️ [Surya] 事前配布モデルなし - Suryaが初回起動時にHuggingFaceからダウンロードします");
+        _logger.LogInformation("ℹ️ [Surya] 初回起動は数分かかる場合があります（モデルサイズ: 約1GB）");
 
-        const int maxWaitSeconds = 300; // 最大5分
-        const int checkIntervalMs = 3000; // 3秒ごとにチェック
-        var elapsed = 0;
-
-        while (elapsed < maxWaitSeconds * 1000)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            await Task.Delay(checkIntervalMs, cancellationToken).ConfigureAwait(false);
-            elapsed += checkIntervalMs;
-
-            foreach (var modelPath in modelPaths)
-            {
-                if (File.Exists(modelPath))
-                {
-                    _logger.LogInformation("✅ [Surya] モデルダウンロード完了検出: {Path} (待機時間: {Elapsed}秒)",
-                        modelPath, elapsed / 1000);
-                    return true;
-                }
-            }
-
-            // 進捗ログ（30秒ごと）
-            if (elapsed % 30000 == 0)
-            {
-                _logger.LogInformation("⏳ [Surya] モデル待機中... {Elapsed}/{Max}秒",
-                    elapsed / 1000, maxWaitSeconds);
-            }
-        }
-
-        _logger.LogError("❌ [Surya] モデルダウンロード待機タイムアウト ({MaxWait}秒)", maxWaitSeconds);
-        return false;
+        return Task.FromResult(true);
     }
 
     /// <summary>
