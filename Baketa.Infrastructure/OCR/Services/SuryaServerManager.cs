@@ -103,15 +103,10 @@ public sealed class SuryaServerManager : IAsyncDisposable
                 startInfo.Environment["PYTHONUNBUFFERED"] = "1";
             }
 
-            // Issue #189: Suryaモデルパス設定（GitHub Release配布モデル対応）
-            // ComponentDownloaderでダウンロードしたモデルを使用
-            var projectRootForModels = FindProjectRoot(AppContext.BaseDirectory) ?? workingDir;
-            var suryaModelDir = ResolveSuryaModelDir(projectRootForModels);
-            if (!string.IsNullOrEmpty(suryaModelDir))
-            {
-                startInfo.Environment["BAKETA_SURYA_MODEL_DIR"] = suryaModelDir;
-                _logger.LogInformation("🔧 [Surya] モデルパス設定: {Path}", suryaModelDir);
-            }
+            // Issue #198: Surya 0.17.0はHuggingFaceから自動ダウンロードするため
+            // BAKETA_SURYA_MODEL_DIR環境変数は設定しない
+            // 以前のコードでは XDG_DATA_HOME上書きによりDetectionモデルのパスが壊れていた
+            _logger.LogInformation("ℹ️ [Surya] Surya 0.17.0はHuggingFaceからモデルを自動ダウンロードします");
 
             _serverProcess = new Process { StartInfo = startInfo };
 
@@ -431,37 +426,6 @@ public sealed class SuryaServerManager : IAsyncDisposable
         return null;
     }
 
-    /// <summary>
-    /// Suryaモデルディレクトリ解決
-    /// ComponentDownloaderでダウンロードしたモデルパスを検索
-    /// </summary>
-    private string? ResolveSuryaModelDir(string projectRoot)
-    {
-        // Recognition PyTorchモデルのパス（ComponentDownloader設定と一致）
-        // appsettings.json: LocalSubPath = "Models/surya-models/recognition"
-        var recognitionModelPath = Path.Combine(projectRoot, "Models", "surya-models", "recognition");
-        var modelFile = Path.Combine(recognitionModelPath, "model.safetensors");
-
-        if (File.Exists(modelFile))
-        {
-            _logger.LogDebug("[Surya] Recognition PyTorchモデル検出: {Path}", recognitionModelPath);
-            return recognitionModelPath;
-        }
-
-        // AppContext.BaseDirectoryも検索
-        var altPath = Path.Combine(AppContext.BaseDirectory, "Models", "surya-models", "recognition");
-        var altModelFile = Path.Combine(altPath, "model.safetensors");
-
-        if (File.Exists(altModelFile))
-        {
-            _logger.LogDebug("[Surya] Recognition PyTorchモデル検出(BaseDirectory): {Path}", altPath);
-            return altPath;
-        }
-
-        // モデルが見つからない場合はSuryaの標準ダウンロードを使用
-        _logger.LogDebug("[Surya] カスタムモデルなし - Surya標準ダウンロードを使用");
-        return null;
-    }
 
     /// <summary>
     /// Issue #197: Suryaモデル準備確認

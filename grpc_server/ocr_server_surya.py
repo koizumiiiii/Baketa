@@ -66,17 +66,14 @@ class SuryaOcrEngine:
             total_start = time.time()
 
             # カスタムモデルパス設定（GitHub Release配布モデル対応）
-            # 環境変数 BAKETA_SURYA_MODEL_DIR が設定されていれば使用
+            # 注意: XDG_DATA_HOMEの上書きは全モデル（Detection含む）に影響するため削除
+            # Surya 0.17.0はHuggingFaceから自動ダウンロードするため、カスタムパスは不要
             custom_model_dir = os.environ.get("BAKETA_SURYA_MODEL_DIR")
             if custom_model_dir:
-                from pathlib import Path
-                model_path = Path(custom_model_dir)
-                if model_path.exists():
-                    # Surya/datalabのキャッシュディレクトリを上書き
-                    os.environ["XDG_DATA_HOME"] = str(model_path.parent.parent)
-                    logger.info(f"カスタムモデルパス使用: {custom_model_dir}")
-                else:
-                    logger.warning(f"カスタムモデルパスが存在しません: {custom_model_dir}")
+                # Issue #198: XDG_DATA_HOME上書きは削除
+                # 以前のコードでは Detection モデルのパスが壊れていた
+                logger.info(f"[INFO] BAKETA_SURYA_MODEL_DIR設定検出: {custom_model_dir}")
+                logger.info("[INFO] Surya 0.17.0はHuggingFaceから自動ダウンロードします")
 
             # Surya OCR v0.17.0+ APIのインポート
             import_start = time.time()
