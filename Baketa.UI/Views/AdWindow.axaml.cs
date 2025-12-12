@@ -61,12 +61,17 @@ public partial class AdWindow : Window
             var scaling = this.VisualRoot?.RenderScaling ?? 1.0;
             var workingArea = screen.WorkingArea;
 
-            // 定数クラスから取得（Boundsはスケーリング済みの場合があるため定義値を使用）
-            var physicalWidth = AdConstants.Width * scaling;
-            var physicalHeight = AdConstants.Height * scaling;
+            // 🔧 Issue #199: Boundsが論理値か物理値かを判定
+            // Debug: Bounds=300x250（論理値）, Release: Bounds=450x375（物理値=300×1.5）
+            // Boundsが定義値（300x250）と異なる場合、既にスケーリング済みと判断
+            var boundsIsPhysical = Math.Abs(Bounds.Width - AdConstants.Width) > 1.0;
 
-            _logger?.LogInformation("ウィンドウサイズ分析: Defined=({DefinedW}x{DefinedH}), Physical=({PhysicalW}x{PhysicalH}), Scaling={Scaling}, Bounds=({BoundsW}x{BoundsH})",
-                AdConstants.Width, AdConstants.Height, physicalWidth, physicalHeight, scaling, Bounds.Width, Bounds.Height);
+            // 物理サイズの計算: Boundsがスケーリング済みならそのまま使用、そうでなければスケーリング
+            var physicalWidth = boundsIsPhysical ? Bounds.Width : AdConstants.Width * scaling;
+            var physicalHeight = boundsIsPhysical ? Bounds.Height : AdConstants.Height * scaling;
+
+            _logger?.LogInformation("ウィンドウサイズ分析: Defined=({DefinedW}x{DefinedH}), Physical=({PhysicalW}x{PhysicalH}), Scaling={Scaling}, Bounds=({BoundsW}x{BoundsH}), BoundsIsPhysical={BoundsIsPhysical}",
+                AdConstants.Width, AdConstants.Height, physicalWidth, physicalHeight, scaling, Bounds.Width, Bounds.Height, boundsIsPhysical);
             _logger?.LogInformation("作業領域: {WorkingArea}, 現在位置: {Position}",
                 workingArea, Position);
 
@@ -169,18 +174,19 @@ public partial class AdWindow : Window
             // DPIスケーリングを取得（この時点ではVisualRootが未設定の可能性があるためscreen.Scalingを使用）
             var scaling = screen.Scaling;
 
-            // 画面右下に配置（タスクバーの上）- 物理ピクセルで計算
+            // 🔧 Issue #199: この時点ではBoundsが未設定なのでscalingで計算
+            // Loaded後に再調整されるため、ここでは概算値を使用
             var physicalWidth = (int)(AdConstants.Width * scaling);
             var physicalHeight = (int)(AdConstants.Height * scaling);
-            var physicalMargin = (int)(AdConstants.ScreenMargin * scaling);
+            var physicalMargin = AdConstants.ScreenMargin;
 
             var x = workingArea.Right - physicalWidth - physicalMargin;
             var y = workingArea.Bottom - physicalHeight - physicalMargin;
 
             Position = new PixelPoint(x, y);
 
-            _logger?.LogInformation("AdWindow位置設定: Screen={ScreenName}, Bounds={Bounds}, WorkingArea={WorkingArea}, Position=({X}, {Y})",
-                screen.DisplayName ?? "Unknown", screen.Bounds, workingArea, x, y);
+            _logger?.LogInformation("AdWindow位置設定: Screen={ScreenName}, Bounds={Bounds}, WorkingArea={WorkingArea}, Position=({X}, {Y}), Scaling={Scaling}",
+                screen.DisplayName ?? "Unknown", screen.Bounds, workingArea, x, y, scaling);
         }
         catch (Exception ex)
         {
@@ -255,9 +261,10 @@ public partial class AdWindow : Window
                 workingArea = screen.WorkingArea;
             }
 
-            // 物理サイズで計算（定数クラス使用、Boundsはスケーリング済みの場合があるため）
-            var physicalWidth = (int)(AdConstants.Width * scaling);
-            var physicalHeight = (int)(AdConstants.Height * scaling);
+            // 🔧 Issue #199: Boundsが論理値か物理値かを判定して物理サイズを取得
+            var boundsIsPhysical = Math.Abs(Bounds.Width - AdConstants.Width) > 1.0;
+            var physicalWidth = (int)(boundsIsPhysical ? Bounds.Width : AdConstants.Width * scaling);
+            var physicalHeight = (int)(boundsIsPhysical ? Bounds.Height : AdConstants.Height * scaling);
 
             // 画面左端制約
             var constrainedX = Math.Max(workingArea.X, position.X);
