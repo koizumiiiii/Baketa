@@ -46,11 +46,25 @@ public sealed class ServerManagerHostedService : IHostedService
             {
                 // [Issue #198] 初期化完了を待機（コンポーネントダウンロード・解凍完了まで待つ）
                 // これにより、ディスクI/O高負荷時のサーバー起動を防止
+                // [Issue #198 Phase 2] 5分タイムアウト追加 - 大容量モデル解凍対応（低速HDD環境考慮）
                 if (_initializationSignal != null)
                 {
                     _logger.LogInformation("⏳ [HOSTED_SERVICE] 初期化完了シグナルを待機中...");
-                    await _initializationSignal.WaitForCompletionAsync(cancellationToken).ConfigureAwait(false);
-                    _logger.LogInformation("✅ [HOSTED_SERVICE] 初期化完了シグナル受信 - サーバー起動を開始");
+
+                    // 5分タイムアウト付き待機（1GB解凍 + モデルロードに十分な時間）
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+                    try
+                    {
+                        await _initializationSignal.WaitForCompletionAsync(linkedCts.Token).ConfigureAwait(false);
+                        _logger.LogInformation("✅ [HOSTED_SERVICE] 初期化完了シグナル受信 - サーバー起動を開始");
+                    }
+                    catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                    {
+                        // タイムアウト時は警告ログを出力して続行
+                        _logger.LogWarning("⚠️ [HOSTED_SERVICE] 初期化完了待機がタイムアウト（5分）しました - サーバー起動を続行します");
+                    }
                 }
 
                 _logger.LogInformation("🔄 [HOSTED_SERVICE] Python翻訳サーバー起動開始");
