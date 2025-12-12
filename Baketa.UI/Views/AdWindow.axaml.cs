@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform;
 using Avalonia.WebView.Desktop;
+using Baketa.UI.Constants;
 using Baketa.UI.ViewModels;
 using Microsoft.Extensions.Logging;
 
@@ -60,20 +61,18 @@ public partial class AdWindow : Window
             var scaling = this.VisualRoot?.RenderScaling ?? 1.0;
             var workingArea = screen.WorkingArea;
 
-            // ウィンドウの実際のサイズを取得
-            var logicalWidth = Bounds.Width;
-            var logicalHeight = Bounds.Height;
-            var physicalWidth = logicalWidth * scaling;
-            var physicalHeight = logicalHeight * scaling;
+            // 定数クラスから取得（Boundsはスケーリング済みの場合があるため定義値を使用）
+            var physicalWidth = AdConstants.Width * scaling;
+            var physicalHeight = AdConstants.Height * scaling;
 
-            _logger?.LogInformation("ウィンドウサイズ分析: Logical=({LogicalW}x{LogicalH}), Physical=({PhysicalW}x{PhysicalH}), Scaling={Scaling}",
-                logicalWidth, logicalHeight, physicalWidth, physicalHeight, scaling);
+            _logger?.LogInformation("ウィンドウサイズ分析: Defined=({DefinedW}x{DefinedH}), Physical=({PhysicalW}x{PhysicalH}), Scaling={Scaling}, Bounds=({BoundsW}x{BoundsH})",
+                AdConstants.Width, AdConstants.Height, physicalWidth, physicalHeight, scaling, Bounds.Width, Bounds.Height);
             _logger?.LogInformation("作業領域: {WorkingArea}, 現在位置: {Position}",
                 workingArea, Position);
 
             // 物理サイズで右下端に配置
-            var x = workingArea.Right - (int)physicalWidth - 10;
-            var y = workingArea.Bottom - (int)physicalHeight - 10;
+            var x = workingArea.Right - (int)physicalWidth - AdConstants.ScreenMargin;
+            var y = workingArea.Bottom - (int)physicalHeight - AdConstants.ScreenMargin;
 
             // 画面左上端制約
             x = Math.Max(x, workingArea.X);
@@ -168,8 +167,8 @@ public partial class AdWindow : Window
             var workingArea = screen.WorkingArea;
 
             // 画面右下に配置（タスクバーの上）
-            var x = workingArea.Right - (int)Width - 10; // 右端から10pxのマージン
-            var y = workingArea.Bottom - (int)Height - 10; // 下端から10pxのマージン
+            var x = workingArea.Right - (int)AdConstants.Width - AdConstants.ScreenMargin;
+            var y = workingArea.Bottom - (int)AdConstants.Height - AdConstants.ScreenMargin;
 
             Position = new PixelPoint(x, y);
 
@@ -249,11 +248,9 @@ public partial class AdWindow : Window
                 workingArea = screen.WorkingArea;
             }
 
-            // 物理サイズで計算（DPIスケーリング考慮）
-            var logicalWidth = Bounds.Width > 0 ? Bounds.Width : Width;
-            var logicalHeight = Bounds.Height > 0 ? Bounds.Height : Height;
-            var physicalWidth = (int)(logicalWidth * scaling);
-            var physicalHeight = (int)(logicalHeight * scaling);
+            // 物理サイズで計算（定数クラス使用、Boundsはスケーリング済みの場合があるため）
+            var physicalWidth = (int)(AdConstants.Width * scaling);
+            var physicalHeight = (int)(AdConstants.Height * scaling);
 
             // 画面左端制約
             var constrainedX = Math.Max(workingArea.X, position.X);
