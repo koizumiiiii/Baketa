@@ -493,7 +493,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 try
                 {
                     // 簡易判定: Pythonプロセス全体から翻訳サーバーを推定
-                    _logger.LogWarning("🔄 [FALLBACK] Python프로세ス終了 (推定翻訳サーバー): PID {ProcessId}", process.Id);
+                    _logger.LogWarning("🔄 [FALLBACK] Pythonプロセス終了 (推定翻訳サーバー): PID {ProcessId}", process.Id);
                     process.Kill();
                     process.WaitForExit(2000);
                     terminatedCount++;
@@ -510,7 +510,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
             if (terminatedCount > 0)
             {
-                _logger.LogInformation("✅ [FALLBACK] Python프로세ス終了完了: {Count}個", terminatedCount);
+                _logger.LogInformation("✅ [FALLBACK] Pythonプロセス終了完了: {Count}個", terminatedCount);
                 await Task.Delay(2000);
             }
         }
