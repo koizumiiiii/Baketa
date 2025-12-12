@@ -97,15 +97,11 @@ py -3.10 -m venv venv_build
 release/
 ├── Baketa.exe
 ├── grpc_server/
-│   └── BaketaTranslationServer/  # PyInstallerでexe化した翻訳サーバー
+│   └── BaketaTranslationServer/  # PyInstallerでexe化した翻訳・OCRサーバー
 └── Models/
-    └── ppocrv5-onnx/             # ONNX OCRモデル（必須）
-        ├── detection/det.onnx    # 88MB
-        ├── ppocrv5_dict.txt
-        └── languages/
-            ├── japanese/
-            ├── latin/rec.onnx    # 7.8MB
-            └── chinese/rec.onnx  # 84MB
+    └── surya/                    # Surya OCRモデル（GitHub Releasesから自動ダウンロード）
+        ├── detection/            # ONNX INT8量子化済み
+        └── recognition/          # PyTorch量子化済み (Issue #197)
 ```
 
 **PyInstallerビルドが必要なケース:**
@@ -183,7 +179,7 @@ where python
    - Settings management and validation
 
 2. **Baketa.Infrastructure**: Infrastructure layer (OCR, translation)
-   - PaddleOCR integration
+   - Surya OCR integration (Detection + Recognition)
    - Translation engines (NLLB-200, Gemini, mock engines)
    - Image processing pipelines
    - Settings persistence (JSON-based)
@@ -253,7 +249,10 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 ### OCR and Translation Pipeline
 1. **Screen Capture**: Windows Graphics Capture API (native DLL) with PrintWindow fallback
 2. **Image Processing**: OpenCV filters and preprocessing
-3. **OCR**: PaddleOCR PP-OCRv5 for text detection
+3. **OCR**: Surya OCR (gRPC-based Python server)
+   - **Detection**: ONNX INT8 quantized model
+   - **Recognition**: PyTorch quantized model (Issue #197)
+   - **Protocol**: gRPC with Keep-Alive
 4. **Translation**: gRPC-based Python translation server
    - **C# Client**: `GrpcTranslationClient` (HTTP/2 communication)
    - **Python Server**: NLLB-200 engine with CTranslate2 optimization
@@ -377,7 +376,7 @@ _logger.LogInformation("Event {EventType} processing started (Count: {Count})", 
 
 ### Core Technologies
 - **UI Framework**: Avalonia 11.2.7 with ReactiveUI
-- **OCR Engine**: PaddleOCR PP-OCRv5 (native integration)
+- **OCR Engine**: Surya OCR (gRPC-based Python server with ONNX/PyTorch models)
 - **Image Processing**: OpenCV (Windows wrapper)
 - **Screen Capture**: Windows Graphics Capture API (C++/WinRT native DLL)
 - **Translation**: NLLB-200 (Meta's multilingual model, local), Google Gemini (cloud)
@@ -673,7 +672,8 @@ gemini -p "実装完了しました。以下のコードについてレビュー
 ## Known Issues and Considerations
 
 - NLLB-200 models are downloaded automatically on first run (~2.4GB)
-- Python 3.10+ environment required for NLLB-200 translation server
+- Surya OCR models are downloaded automatically from GitHub Releases on first run
+- Python 3.10+ environment required for translation/OCR servers
 - OpenCV native dependencies are Windows-specific
 - Platform adapters use P/Invoke for Windows APIs
 - Game detection requires specific DPI awareness settings
