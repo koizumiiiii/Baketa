@@ -65,6 +65,10 @@ public sealed class SuryaServerManager : IAsyncDisposable
                 return false;
             }
 
+            // Issue #199: exe版のダウンロード完了を待機（配布版で必須）
+            // ComponentDownloadServiceがSurya OCRサーバーexeをダウンロード中の場合、完了まで待つ
+            await WaitForExeDownloadAsync(cancellationToken).ConfigureAwait(false);
+
             // 孤立プロセスの強制終了
             await KillOrphanedProcessAsync().ConfigureAwait(false);
 
@@ -465,6 +469,55 @@ public sealed class SuryaServerManager : IAsyncDisposable
         _logger.LogInformation("ℹ️ [Surya] 初回起動は数分かかる場合があります（モデルサイズ: 約1GB）");
 
         return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// Issue #199: exe版のダウンロード完了を待機
+    /// ComponentDownloadServiceがBaketaSuryaOcrServer.exeをダウンロード中の場合、完了まで待つ
+    /// 開発環境（.slnが見つかる場合）ではスキップしてPython版を使用
+    /// </summary>
+    private async Task WaitForExeDownloadAsync(CancellationToken cancellationToken)
+    {
+        // 開発環境の場合はスキップ（Python版を使用するため）
+        var projectRoot = FindProjectRoot(AppContext.BaseDirectory);
+        if (!string.IsNullOrEmpty(projectRoot))
+        {
+            _logger.LogDebug("[Surya] 開発環境検出 - exe待機スキップ");
+            return;
+        }
+
+        // exe版の期待パス
+        var exePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe");
+
+        // 既に存在する場合は即座に戻る
+        if (File.Exists(exePath))
+        {
+            _logger.LogInformation("✅ [Surya] exe版検出済み: {Path}", exePath);
+            return;
+        }
+
+        // 最大120秒待機（ComponentDownloadは約60秒かかる可能性がある）
+        var maxWaitTime = TimeSpan.FromSeconds(120);
+        var pollInterval = TimeSpan.FromSeconds(2);
+        var startTime = DateTime.UtcNow;
+
+        _logger.LogInformation("⏳ [Surya] exe版ダウンロード待機開始（最大{MaxWait}秒）...", maxWaitTime.TotalSeconds);
+
+        while (DateTime.UtcNow - startTime < maxWaitTime)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (File.Exists(exePath))
+            {
+                _logger.LogInformation("✅ [Surya] exe版ダウンロード完了検出: {Path}", exePath);
+                return;
+            }
+
+            await Task.Delay(pollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        // タイムアウトしてもエラーにしない（Python版にフォールバック可能な場合があるため）
+        _logger.LogWarning("⚠️ [Surya] exe版ダウンロード待機タイムアウト（{MaxWait}秒） - 続行します", maxWaitTime.TotalSeconds);
     }
 
     /// <summary>
