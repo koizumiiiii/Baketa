@@ -10,6 +10,7 @@ namespace Baketa.Application.Services;
 /// ローディング画面で実行される5つの初期化ステップを管理します
 /// [Issue #185] 初回起動時のコンポーネントダウンロードステップを追加
 /// [Issue #193] GPU環境自動セットアップステップを追加
+/// [Issue #198] 初期化完了シグナルを追加（翻訳サーバー起動の遅延制御）
 /// </summary>
 public class ApplicationInitializer : ILoadingScreenInitializer
 {
@@ -17,6 +18,7 @@ public class ApplicationInitializer : ILoadingScreenInitializer
     private readonly ILogger<ApplicationInitializer> _logger;
     private readonly IComponentDownloader? _componentDownloader;
     private readonly IGpuEnvironmentService? _gpuEnvironmentService;
+    private readonly IInitializationCompletionSignal? _completionSignal;
     private readonly Stopwatch _stopwatch = new();
 
     /// <inheritdoc/>
@@ -26,12 +28,14 @@ public class ApplicationInitializer : ILoadingScreenInitializer
         IServiceProvider serviceProvider,
         ILogger<ApplicationInitializer> logger,
         IComponentDownloader? componentDownloader = null,
-        IGpuEnvironmentService? gpuEnvironmentService = null)
+        IGpuEnvironmentService? gpuEnvironmentService = null,
+        IInitializationCompletionSignal? completionSignal = null)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _componentDownloader = componentDownloader;
         _gpuEnvironmentService = gpuEnvironmentService;
+        _completionSignal = completionSignal;
 
         // [Issue #185] デバッグ: IComponentDownloader注入状況確認
         _logger.LogDebug("[Issue185] ApplicationInitializer コンストラクタ実行");
@@ -114,6 +118,11 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             _logger.LogInformation(
                 "アプリケーション初期化完了: {ElapsedMs}ms",
                 _stopwatch.ElapsedMilliseconds);
+
+            // [Issue #198] 初期化完了を通知
+            // ServerManagerHostedServiceがこのシグナルを待ってから翻訳サーバーを起動する
+            _completionSignal?.SignalCompletion();
+            _logger.LogInformation("[Issue #198] 初期化完了シグナルを発行しました");
         }
         catch (Exception ex)
         {
@@ -395,17 +404,26 @@ public class ApplicationInitializer : ILoadingScreenInitializer
 
     /// <summary>
     /// ダウンロード進捗メッセージをフォーマットします
+    /// [Issue #198] StatusMessageが設定されている場合はそれを優先表示
     /// </summary>
     private static string FormatDownloadMessage(ComponentDownloadProgressEventArgs e)
     {
+        // [Issue #198] StatusMessageがあれば優先表示（展開中などの状態表示）
+        if (!string.IsNullOrEmpty(e.StatusMessage))
+        {
+            return e.StatusMessage;
+        }
+
         if (e.IsCompleted)
         {
-            return $"{e.Component.DisplayName} のダウンロード完了";
+            // [Issue #198] 「ダウンロード完了」→「インストール完了」に変更
+            // 解凍まで完了してから呼ばれるため、より正確な表現に
+            return $"{e.Component.DisplayName} のインストール完了";
         }
 
         if (!string.IsNullOrEmpty(e.ErrorMessage))
         {
-            return $"{e.Component.DisplayName} のダウンロード失敗: {e.ErrorMessage}";
+            return $"{e.Component.DisplayName}: {e.ErrorMessage}";
         }
 
         var receivedMB = e.BytesReceived / 1024.0 / 1024.0;

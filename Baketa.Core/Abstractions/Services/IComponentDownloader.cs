@@ -125,6 +125,12 @@ public class ComponentDownloadProgressEventArgs : EventArgs
     /// Error message if download failed
     /// </summary>
     public string? ErrorMessage { get; init; }
+
+    /// <summary>
+    /// [Issue #198] Status message for current operation (e.g., "Extracting files...")
+    /// Takes precedence over default progress message when set
+    /// </summary>
+    public string? StatusMessage { get; init; }
 }
 
 /// <summary>
