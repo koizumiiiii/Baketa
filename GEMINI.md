@@ -10,8 +10,8 @@
 - **言語**: C# 12 / .NET 8 Windows
 - **アーキテクチャ**: クリーンアーキテクチャ（5層構造）
 - **UI**: Avalonia 11.2.7 + ReactiveUI
-- **OCR**: PaddleOCR PP-OCRv5
-- **翻訳**: OPUS-MT（ローカル）、Google Gemini（クラウド）
+- **OCR**: Surya OCR（gRPC経由、GPU/CUDA対応）
+- **翻訳**: NLLB-200（ローカル、gRPC経由）、Google Gemini（クラウド）
 - **キャプチャ**: Windows Graphics Capture API（C++/WinRT ネイティブDLL）
 - **画像処理**: OpenCV
 
@@ -104,10 +104,10 @@
 - **ビルド順序**: ネイティブDLL → .NETソリューション
 - **配置**: DLLの適切な出力ディレクトリ配置
 
-### OPUS-MT モデル
-- **依存関係**: SentencePiece tokenizer、ONNXモデル
-- **初期化**: アプリ起動時の事前読み込み
-- **パフォーマンス**: CPU/GPU実行の最適化
+### NLLB-200 翻訳モデル
+- **依存関係**: gRPC Python サーバー、CTranslate2
+- **初期化**: アプリ起動時の自動サーバー起動
+- **パフォーマンス**: GPU/CUDA対応、80%メモリ削減（CTranslate2）
 
 ### ReactiveUI パターン
 - **ViewModelBase**: すべてのViewModelの基底クラス

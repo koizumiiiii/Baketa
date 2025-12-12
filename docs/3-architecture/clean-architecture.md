@@ -108,10 +108,10 @@ Baketa.Core (基底層 - 依存なし)
 #### 主要コンポーネント
 
 **OCR実装** (Baketa.Infrastructure/OCR/)
-- **PaddleOcrEngine.cs** (5,741行) - PP-OCRv5統合
-  - 検出: PP-OCRv5 Detection Model
-  - 認識: PP-OCRv5 Recognition Model
-  - ArrayPool<byte>によるメモリ最適化
+- **GrpcOcrClient.cs** - Surya OCR gRPCクライアント
+  - 検出・認識: Surya OCR（gRPC経由、port 50052）
+  - GPU/CUDA対応
+  - 90+言語サポート
 - **OcrServiceProxy.cs** - OCRサービスプロキシ
 
 **翻訳実装** (Baketa.Infrastructure/Translation/)
@@ -142,15 +142,10 @@ Baketa.Core (基底層 - 依存なし)
 
 #### Phase 0分析結果
 
-**重大問題 (P0)**:
-- ❌ **PaddleOcrEngine.cs**: 5,741行 - 責任過多
-  - 対応: Phase 3-4で分割（継続中）
-  - 検出/認識/前処理を分離
-
 **最適化済み**:
 - ✅ Phase 5.2C: ArrayPool導入（86%メモリ削減）
 - ✅ Phase 5.2D: gRPC Keep-Alive実装
-- ✅ Phase 37: PP-OCRv5統合完了
+- ✅ Issue #189: Surya OCR統合完了（PP-OCRv5から移行）
 
 ---
 
@@ -395,7 +390,7 @@ sequenceDiagram
 1. **Stage 1**: 画像変化検知（未実装、P0タスク）
 2. **Stage 2**: 段階的フィルタリング（Phase 1で90.5%削減実現）
 3. **Stage 3**: ProximityGrouping（実装済み）
-4. **Stage 4**: OCR実行（PaddleOCR PP-OCRv5）
+4. **Stage 4**: OCR実行（Surya OCR gRPC）
 
 ### 4.3 gRPC翻訳システム
 
@@ -451,7 +446,7 @@ sequenceDiagram
 | Phase 5.2C | ArrayPool導入 | メモリリーク86%削減 |
 | Phase 5.2D | gRPC Keep-Alive | 初回翻訳成功率100% |
 | Phase 5.2E | モデルプリウォーミング | 起動時初期化最適化 |
-| Phase 37 | PP-OCRv5統合 | OCR精度向上 |
+| Issue #189 | Surya OCR統合 | OCR精度向上・日本語認識改善 |
 
 ---
 

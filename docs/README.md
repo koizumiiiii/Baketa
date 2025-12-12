@@ -72,7 +72,7 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [Issue56実装ノート](3-architecture/ui-system/issue56-implementation-notes.md)
 
 #### OCR システム
-- [PP-OCRv5統合設計](3-architecture/ocr-system/pp-ocrv5-integration.md) *NEW* - PP-OCRv5検出・認識モデル、ArrayPool最適化
+- [Surya OCR統合設計](3-architecture/ocr-system/surya-ocr-integration.md) - Surya OCR gRPCサーバー、GPU/CUDA対応（Issue #189）
 - [OCRアプローチ](3-architecture/ocr-system/ocr-opencv-approach.md)
 - [OCR設定UI設計](3-architecture/ocr-system/ocr-settings-ui.md)
 - [OCR実装ガイド](3-architecture/ocr-system/ocr-implementation.md)
@@ -183,13 +183,13 @@ Supabase認証基盤とログイン/登録UIを実装しました。
 - **ディレクトリ再編成**: 4-testing/, 4-implementation/, 4-ui/ → 2-development/, 3-architecture/に統合
 - **refactoring/削除**: 情報をclean-architecture.mdに統合
 - **古い情報削除**: OPUS-MT、SentencePiece、2段階翻訳、240テストの記述を削除
-- **最新情報反映**: gRPC/NLLB-200、PP-OCRv5、Windows Graphics Capture、ArrayPool、1,518テスト
+- **最新情報反映**: gRPC/NLLB-200、Surya OCR、Windows Graphics Capture、ArrayPool、1,518テスト
 
 #### **📄 新規作成ドキュメント**
 - [Clean Architecture概要](3-architecture/clean-architecture.md) - 5層構造、依存関係分析
 - [gRPC翻訳システム設計](3-architecture/translation/grpc-system.md) - NLLB-200、HTTP/2通信
 - [Windows Graphics Capture API](3-architecture/capture-system/windows-graphics-capture.md) - C++/WinRT実装
-- [PP-OCRv5統合設計](3-architecture/ocr-system/pp-ocrv5-integration.md) - PaddleOCR最新モデル
+- [Surya OCR統合設計](3-architecture/ocr-system/surya-ocr-integration.md) - GPU/CUDA対応OCR（Issue #189）
 - [テスト標準](2-development/coding-standards/testing-standards.md) - 1,518テストケースのベストプラクティス
 
 #### **📊 更新されたドキュメント**

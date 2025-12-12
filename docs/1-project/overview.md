@@ -2,7 +2,7 @@
 
 *最終更新: 2025年11月29日*
 
-> **プロダクション状態**: Baketa翻訳システムは**Phase 5.3完全実装達成**および**認証システム完全実装（Issue #167, #168, #176）**により、プロダクション環境での安定運用が可能な状態です。gRPC翻訳システム、PP-OCRv5統合、Windows Graphics Capture API、ArrayPoolメモリ最適化、Supabase Auth統合、設定画面からの認証アクセスが完了し、1,500+テストケース（100%成功率）で品質が実証されています。
+> **プロダクション状態**: Baketa翻訳システムは**Phase 5.3完全実装達成**および**認証システム完全実装（Issue #167, #168, #176）**により、プロダクション環境での安定運用が可能な状態です。gRPC翻訳システム、Surya OCR統合（Issue #189）、Windows Graphics Capture API、ArrayPoolメモリ最適化、Supabase Auth統合、設定画面からの認証アクセスが完了し、1,500+テストケース（100%成功率）で品質が実証されています。
 
 ## 1. プロジェクト概要
 
@@ -13,7 +13,7 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 ### 1.1 主要機能
 
 #### **🔍 OCR・画像処理システム**
-- **PP-OCRv5統合**: PaddleOCR PP-OCRv5検出・認識モデル（Phase 37完了）
+- **Surya OCR統合**: GPU対応の高精度OCRエンジン（Issue #189完了）
 - **Windows Graphics Capture API**: C++/WinRT native DLL（DirectX/OpenGL対応）
 - **OpenCVベース最適化**: 画像前処理とArrayPoolメモリ管理（86%リーク削減）
 - **差分検出**: 画面変更の高精度検出によるパフォーマンス最適化
@@ -69,7 +69,7 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 
 #### **⚡ パフォーマンスと品質**
 - **Windows Graphics Capture API**: C++/WinRT native DLL、DirectX/OpenGL完全対応
-- **PP-OCRv5統合**: 最新PaddleOCR検出・認識モデル（Phase 37完了）
+- **Surya OCR統合**: GPU対応の高精度OCRエンジン、90+言語対応（Issue #189完了）
 - **ArrayPoolメモリ最適化**: 86%メモリリーク削減（Phase 5.2C）
 - **高度な差分検出**: 画面変更を高精度で検出し、不要な処理をスキップ
 - **低リソース消費**: ゲームパフォーマンスへの影響を最小限に抑えた設計
@@ -134,7 +134,7 @@ Baketa/
 
 プラットフォーム非依存のインフラストラクチャサービスを提供します：
 
-- **OCRエンジン**: PP-OCRv5（PaddleOCR）とOpenCV最適化
+- **OCRエンジン**: Surya OCR（gRPC経由）とOpenCV最適化
 - **翻訳システム**:
   - **gRPC翻訳クライアント**: HTTP/2によるC# ↔ Python連携（NLLB-200）
   - **クラウド翻訳**: Google Gemini API 統合
@@ -180,7 +180,7 @@ Windows固有の実装を担当します：
 - **フレームワーク**: .NET 8 (LTS)
 - **UI技術**: Avalonia UI（ReactiveUI）
 - **アーキテクチャ**: MVVMパターン、Clean Architecture 5層構造
-- **OCRエンジン**: PaddleOCR PP-OCRv5 + OpenCV最適化
+- **OCRエンジン**: Surya OCR（gRPC経由、GPU/CUDA対応）
 - **翻訳システム**:
   - **ローカル**: NLLB-200（facebook/nllb-200-distilled-600M、gRPC経由）
   - **クラウド**: Google Gemini API
@@ -359,19 +359,20 @@ NLLB-200 Pythonサーバーとの高性能gRPC通信を実現：
 - Model: facebook/nllb-200-distilled-600M（200+言語）
 - RPC Methods: Translate, TranslateBatch, HealthCheck, IsReady
 
-### 8.3 PP-OCRv5統合完了（Phase 37 - 2025年11月完了）
+### 8.3 Surya OCR統合完了（Issue #189 - 2025年12月完了）
 
-最新PaddleOCR PP-OCRv5検出・認識モデルを統合：
+Surya OCRエンジンを統合（PP-OCRv5から移行）：
 
 **主な実装成果**：
-- **PP-OCRv5 Detection Model**: 最新テキスト検出エンジン
-- **PP-OCRv5 Recognition Model**: 高精度文字認識エンジン
-- **PaddleOcrEngine.cs**: 5,741行の統合実装
+- **Surya OCR gRPCサーバー**: Python製OCRサーバー（port 50052）
+- **GPU/CUDA対応**: 高速テキスト検出・認識
+- **90+言語対応**: 多言語テキスト検出の大幅改善
+- **PyInstallerパッケージ**: スタンドアロン配布用exe化
 
 **効果**：
-- OCR精度の向上
-- 多言語テキスト検出の改善
-- ゲーム画面特化最適化
+- ビジュアルノベル等の日本語ダイアログ認識率100%達成
+- PP-OCRv5で検出できなかったテキストを確実に検出
+- CUDA対応による高速処理（2秒/画像）
 
 ### 8.4 モデルプリウォーミング最適化（Phase 5.2E - 2025年11月完了）
 
@@ -409,7 +410,7 @@ NLLB-200 Pythonサーバーとの高性能gRPC通信を実現：
 
 **品質保証**：
 - すべての主要機能を網羅
-- gRPC、ArrayPool、PP-OCRv5の安定性実証
+- gRPC、ArrayPool、Surya OCRの安定性実証
 - CI/CD自動実行対応
 
 ### 8.6 翻訳エンジン状態監視・UI統合（Phase 5 - 2025年6月完了）

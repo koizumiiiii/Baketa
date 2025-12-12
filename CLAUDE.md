@@ -551,7 +551,7 @@ dotnet run --project Baketa.UI
 
 ### Technical Benefits Achieved
 - **DirectX/OpenGL Capture**: Full game content capture capability
-- **PP-OCRv5 Performance**: Optimized text detection without timeout issues
+- **Surya OCR Performance**: GPU-accelerated text detection with CUDA support
 - **Fallback Compatibility**: PrintWindow backup for older applications
 - **Memory Efficiency**: Direct BGRA texture processing
 

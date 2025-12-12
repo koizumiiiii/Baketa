@@ -2,7 +2,7 @@
 
 *最終更新: 2025年11月28日*
 
-> **プロダクション状態**: **Phase 5.3完全実装達成** - Baketa翻訳システムはプロダクション環境での安定運用が可能です。gRPC翻訳システム、PP-OCRv5統合、Windows Graphics Capture API、ArrayPoolメモリ最適化が完了し、1,518テストケース（100%成功率）で品質が実証されています。
+> **プロダクション状態**: **Phase 5.3完全実装達成** - Baketa翻訳システムはプロダクション環境での安定運用が可能です。gRPC翻訳システム、Surya OCR統合（Issue #189）、Windows Graphics Capture API、ArrayPoolメモリ最適化が完了し、1,518テストケース（100%成功率）で品質が実証されています。
 
 ## 🎉 **最新の実装完了状況**
 
@@ -14,7 +14,7 @@
 - **✅ ArrayPoolメモリ最適化（Phase 5.2C）**: 86%メモリリーク削減（577MB→138MB）
 - **✅ gRPC翻訳システム（Phase 5.2D）**: NLLB-200 Python gRPCサーバー統合完了
 - **✅ モデルプリウォーミング（Phase 5.2E）**: 起動時初期化最適化完了
-- **✅ PP-OCRv5統合（Phase 37）**: 最新PaddleOCR検出・認識モデル統合
+- **✅ Surya OCR統合（Issue #189）**: GPU対応高精度OCRエンジン
 - **✅ Windows Graphics Capture API**: C++/WinRT native DLL完成
 - **✅ 包括的テスト（Phase 5.3）**: 1,518テストケース100%成功率達成
 
@@ -22,7 +22,7 @@
 - **翻訳システム**: gRPC HTTP/2通信、NLLB-200（200+言語対応）
 - **テスト品質**: 1,518テスト実装済み（100%成功率、実行時間1.4分）
 - **メモリ最適化**: ArrayPool導入で86%リーク削減
-- **OCRエンジン**: PP-OCRv5（PaddleOcrEngine.cs 5,741行）
+- **OCRエンジン**: Surya OCR（gRPC経由、GPU/CUDA対応）
 - **ネイティブDLL**: BaketaCaptureNative.dll（DirectX/OpenGL対応）
 
 #### **プロダクション準備完了**
@@ -92,7 +92,7 @@ Baketaプロジェクトは以下のフェーズで開発を進め、**Phase 5�
 - ✅ **ArrayPoolメモリ最適化（Phase 5.2C）** - 86%メモリリーク削減（577MB→138MB）
 - ✅ **gRPC翻訳システム（Phase 5.2D）** - Keep-Alive、WithWaitForReady実装
 - ✅ **モデルプリウォーミング（Phase 5.2E）** - 起動時初期化最適化
-- ✅ **PP-OCRv5統合（Phase 37）** - 最新PaddleOCR検出・認識モデル
+- ✅ **Surya OCR統合（Issue #189）** - GPU対応高精度OCRエンジン
 - ✅ **包括的テスト（Phase 5.3）** - 1,518テストケース100%成功率達成
 - ✅ **TranslationEngineStatusService** - リアルタイム状態監視システム
 - ✅ **UI統合システム** - 725行統合ViewModel、527行設定管理
@@ -234,7 +234,7 @@ Baketaプロジェクトは以下のフェーズで開発を進め、**Phase 5�
   - ✅ **ArrayPoolメモリ最適化（Phase 5.2C）**: 86%メモリリーク削減
   - ✅ **gRPC翻訳システム（Phase 5.2D）**: NLLB-200 HTTP/2通信
   - ✅ **モデルプリウォーミング（Phase 5.2E）**: 起動時初期化最適化
-  - ✅ **PP-OCRv5統合（Phase 37）**: 最新PaddleOCR検出・認識モデル
+  - ✅ **Surya OCR統合（Issue #189）**: GPU対応高精度OCRエンジン
   - ✅ **包括的テスト（Phase 5.3）**: 1,518テストケース100%成功率
   - ✅ **Windows Graphics Capture API**: C++/WinRT native DLL完成
 - **✅ 成果物**:
