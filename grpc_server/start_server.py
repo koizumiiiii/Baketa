@@ -10,6 +10,65 @@ os.environ["PYTHONWARNINGS"] = "ignore"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # TensorFlow警告抑制
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # HuggingFace並列化無効
 
+# 🔥 [Issue #198] CUDA DLLロードエラー対策（Phase 3: miniconda PATH除外）
+# 問題: minicondaのCUDA DLL (cublas64_12.dll) がPATHにあるとtorchインポート時にOSErrorが発生
+# CUDA_VISIBLE_DEVICES="" だけでは不十分 - torchはPATH上のDLLをロードしようとする
+# 解決策: minicondaのパスをPATH環境変数から除外してからインポート
+import sys
+
+def _sanitize_path_for_cuda():
+    """minicondaのCUDA DLLパスをPATHから除外"""
+    path = os.environ.get("PATH", "")
+    path_parts = path.split(os.pathsep)
+
+    # miniconda/anacondaのパスを除外（CUDA DLL競合を防止）
+    sanitized_parts = []
+    excluded_parts = []
+    for part in path_parts:
+        part_lower = part.lower()
+        if "miniconda" in part_lower or "anaconda" in part_lower:
+            excluded_parts.append(part)
+        else:
+            sanitized_parts.append(part)
+
+    if excluded_parts:
+        print(f"[INFO] CUDA DLL競合防止: PATH から以下を除外しました:", file=sys.stderr)
+        for p in excluded_parts:
+            print(f"  - {p}", file=sys.stderr)
+        os.environ["PATH"] = os.pathsep.join(sanitized_parts)
+        return True
+    return False
+
+def _check_cuda_availability():
+    """CUDA DLLがロード可能かを事前チェック（torchインポート前）"""
+    import ctypes
+
+    # CUDA DLLのロードを試行
+    cuda_dlls = ["cublas64_12.dll", "cudart64_12.dll", "cublasLt64_12.dll"]
+
+    for dll_name in cuda_dlls:
+        try:
+            ctypes.CDLL(dll_name)
+        except OSError as e:
+            # CUDA DLLロードエラー - GPUは使用不可
+            print(f"[INFO] CUDA DLL '{dll_name}' ロード不可: CPUモードで起動します", file=sys.stderr)
+            return False
+
+    return True
+
+# Phase 3: minicondaパスを除外してCUDA DLL競合を防止
+_path_sanitized = _sanitize_path_for_cuda()
+
+# CUDA利用可否を事前チェック（PATH修正後）
+_cuda_dlls_available = _check_cuda_availability()
+if not _cuda_dlls_available:
+    # CUDA DLLがロードできない場合、環境変数でCUDAを完全無効化
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    os.environ["CUDA_HOME"] = ""
+
+# ctranslate2を安全にインポート（CUDA環境は既に設定済み）
+import ctranslate2
+
 """
 gRPC Translation Server Startup Script
 Phase 2.2: サーバー起動エントリーポイント
