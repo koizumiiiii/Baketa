@@ -144,17 +144,42 @@ public class ComponentDownloadService : IComponentDownloader
                     _logger.LogInformation("Checksum verified for {ComponentId}", component.Id);
                 }
 
-                // Extract to destination
-                await ExtractZipAsync(tempZipPath, component.LocalPath, cancellationToken).ConfigureAwait(false);
+                // [Issue #198] Report extraction start - notify UI that extraction is in progress
+                ReportProgress(
+                    component,
+                    component.ExpectedSizeBytes,
+                    component.ExpectedSizeBytes,
+                    0,
+                    isCompleted: false,
+                    statusMessage: $"{component.DisplayName} を展開しています... (数分かかる場合があります)");
+
+                // Extract to destination with error handling
+                try
+                {
+                    await ExtractZipAsync(tempZipPath, component.LocalPath, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // [Issue #198] Report extraction failure to UI
+                    ReportProgress(
+                        component,
+                        component.ExpectedSizeBytes,
+                        component.ExpectedSizeBytes,
+                        0,
+                        isCompleted: false,
+                        errorMessage: $"展開に失敗しました: {ex.Message}",
+                        statusMessage: "エラー: 展開に失敗しました");
+                    throw;
+                }
 
                 stopwatch.Stop();
                 _logger.LogInformation(
-                    "Download complete: {ComponentId} in {ElapsedMs}ms (attempt {Attempt})",
+                    "Download and extraction complete: {ComponentId} in {ElapsedMs}ms (attempt {Attempt})",
                     component.Id,
                     stopwatch.ElapsedMilliseconds,
                     attempt);
 
-                // Report completion
+                // [Issue #198] Report completion - installation is now complete
                 ReportProgress(component, component.ExpectedSizeBytes, component.ExpectedSizeBytes, 0, isCompleted: true);
                 return; // Success - exit retry loop
             }
@@ -487,7 +512,8 @@ public class ComponentDownloadService : IComponentDownloader
         long totalBytes,
         double speedBytesPerSecond,
         bool isCompleted = false,
-        string? errorMessage = null)
+        string? errorMessage = null,
+        string? statusMessage = null)
     {
         DownloadProgressChanged?.Invoke(this, new ComponentDownloadProgressEventArgs
         {
@@ -496,7 +522,8 @@ public class ComponentDownloadService : IComponentDownloader
             TotalBytes = totalBytes,
             SpeedBytesPerSecond = speedBytesPerSecond,
             IsCompleted = isCompleted,
-            ErrorMessage = errorMessage
+            ErrorMessage = errorMessage,
+            StatusMessage = statusMessage
         });
     }
 

@@ -353,15 +353,44 @@ public class PythonServerManager(
                 "専用環境を使用する場合: `python -m venv .venv` で作成してください。");
             logger.LogDebug("  検索パス: .venv={VenvPath}, vendor={VendorPath}", venvPythonPath, vendorPythonPath);
 
-            try
+            // 🔥 [Issue #198] pyenvのPythonを優先的に検索（miniconda競合回避）
+            // 開発者向け: pyenv-winでPython 3.10をインストールしている場合、minicondaより優先して使用
+            // リリース版ではvendor/python/を使用するため、この分岐は開発環境でのみ有効
+            // pyenvのPythonはCUDA DLL問題がない（正常なCUDAインストールを使用）
+            var pyenvPythonPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".pyenv", "pyenv-win", "versions", "3.10.9", "python.exe");
+
+            if (File.Exists(pyenvPythonPath))
             {
-                pythonExecutable = await pythonResolver.ResolvePythonExecutableAsync();
-                logger.LogInformation("✅ システムPython使用: {PythonPath}", pythonExecutable);
+                pythonExecutable = pyenvPythonPath;
+                logger.LogInformation("✅ pyenv Python使用（miniconda競合回避）: {PythonPath}", pythonExecutable);
             }
-            catch (InvalidOperationException ex)
+            else
             {
-                logger.LogError("❌ Python実行環境解決失敗: {Error}", ex.Message);
-                throw new InvalidOperationException($"Python実行環境が見つかりません。.venv環境を作成（python -m venv .venv）するか、Python 3.10以上をインストールしてください。詳細: {ex.Message}", ex);
+                try
+                {
+                    pythonExecutable = await pythonResolver.ResolvePythonExecutableAsync();
+
+                    // minicondaのPythonを検出した場合は警告
+                    if (pythonExecutable.Contains("miniconda", StringComparison.OrdinalIgnoreCase) ||
+                        pythonExecutable.Contains("anaconda", StringComparison.OrdinalIgnoreCase))
+                    {
+                        logger.LogWarning(
+                            "⚠️ miniconda/anacondaのPythonが検出されました。CUDA DLLエラーが発生する可能性があります。" +
+                            "推奨: pyenvでPython 3.10をインストールしてください。検出パス: {PythonPath}",
+                            pythonExecutable);
+                    }
+                    else
+                    {
+                        logger.LogInformation("✅ システムPython使用: {PythonPath}", pythonExecutable);
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogError("❌ Python実行環境解決失敗: {Error}", ex.Message);
+                    throw new InvalidOperationException($"Python実行環境が見つかりません。.venv環境を作成（python -m venv .venv）するか、Python 3.10以上をインストールしてください。詳細: {ex.Message}", ex);
+                }
             }
         }
 
@@ -390,7 +419,19 @@ public class PythonServerManager(
         // 解決策: 両方の環境変数を明示設定
         startInfo.EnvironmentVariables["PYTHONUNBUFFERED"] = "1"; // バッファリング完全無効化
         startInfo.EnvironmentVariables["TOKENIZERS_PARALLELISM"] = "false"; // Tokenizer並列化無効化
-        logger.LogInformation("🔥 [ULTRATHINK_FIX] 環境変数設定: PYTHONUNBUFFERED=1, TOKENIZERS_PARALLELISM=false");
+
+        // 🔥 [Issue #198] CUDA DLLエラー対策: miniconda/anacondaのPATHを除外
+        // 問題: minicondaのCUDA DLL (cublas64_12.dll) が破損/不完全な場合、
+        //       torch/ctranslate2のインポート時にOSErrorが発生してサーバー起動失敗
+        // 解決策: プロセス起動時にminiconda/anacondaのパスをPATHから除外
+        var currentPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+        var sanitizedPath = string.Join(Path.PathSeparator.ToString(),
+            currentPath.Split(Path.PathSeparator)
+                .Where(p => !p.Contains("miniconda", StringComparison.OrdinalIgnoreCase) &&
+                            !p.Contains("anaconda", StringComparison.OrdinalIgnoreCase)));
+        startInfo.EnvironmentVariables["PATH"] = sanitizedPath;
+
+        logger.LogInformation("🔥 [ULTRATHINK_FIX] 環境変数設定: PYTHONUNBUFFERED=1, TOKENIZERS_PARALLELISM=false, PATH sanitized");
 
         var process = Process.Start(startInfo) ??
             throw new InvalidOperationException($"Python翻訳サーバープロセス起動失敗: {languagePair}");

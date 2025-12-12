@@ -317,6 +317,11 @@ public sealed class ApplicationModule : ServiceModuleBase
         // 🔧 [Issue #170] ローディング画面初期化サービス登録
         // 🚀 [Issue #193] GPU環境サービスを先に登録
         services.AddSingleton<Baketa.Core.Abstractions.Services.IGpuEnvironmentService, Baketa.Application.Services.GpuEnvironmentService>();
+
+        // 🎯 [Issue #198] 初期化完了シグナル登録 - 翻訳サーバー起動の遅延制御
+        // コンポーネントダウンロード・解凍完了まで翻訳サーバー起動を待機させる
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IInitializationCompletionSignal, Baketa.Application.Services.InitializationCompletionSignal>();
+
         services.AddSingleton<Baketa.Core.Abstractions.Services.ILoadingScreenInitializer, Baketa.Application.Services.ApplicationInitializer>();
 
         // 🔧 診断レポートサービス（UI制御フロー責務分離 - Phase 6.2.1）
