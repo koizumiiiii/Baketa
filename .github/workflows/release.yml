@@ -71,6 +71,26 @@ jobs:
         }
       shell: pwsh
 
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build Native DLL (BaketaCaptureNative)
+      run: |
+        Write-Host "🔨 Building BaketaCaptureNative.dll (C++/WinRT)..."
+        msbuild BaketaCaptureNative\BaketaCaptureNative.vcxproj /p:Configuration=Release /p:Platform=x64 /verbosity:minimal
+
+        # Verify DLL was built
+        $dllPath = "BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll"
+        if (Test-Path $dllPath) {
+          Write-Host "✅ BaketaCaptureNative.dll built successfully"
+          $size = [math]::Round((Get-Item $dllPath).Length / 1KB, 2)
+          Write-Host "   Size: $size KB"
+        } else {
+          Write-Host "❌ BaketaCaptureNative.dll not found!"
+          exit 1
+        }
+      shell: pwsh
+
     - name: Publish UI application
       run: |
         dotnet publish Baketa.UI/Baketa.UI.csproj `
@@ -80,6 +100,23 @@ jobs:
           -p:IS_DISTRIBUTION=true `
           --output ./publish/Baketa-${{ steps.version.outputs.version }} `
           --verbosity minimal
+
+    - name: Copy Native DLL to publish directory
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $publishDir = "./publish/Baketa-$version"
+        $dllSource = "BaketaCaptureNative\bin\Release\BaketaCaptureNative.dll"
+
+        Write-Host "📦 Copying BaketaCaptureNative.dll to publish directory..."
+        Copy-Item $dllSource $publishDir -Force
+
+        if (Test-Path "$publishDir\BaketaCaptureNative.dll") {
+          Write-Host "✅ Native DLL copied successfully"
+        } else {
+          Write-Host "❌ Failed to copy native DLL!"
+          exit 1
+        }
+      shell: pwsh
 
     - name: Create .NET package
       run: |
