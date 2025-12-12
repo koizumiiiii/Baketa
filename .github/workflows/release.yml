@@ -71,6 +71,39 @@ jobs:
         }
       shell: pwsh
 
+    - name: Setup Python for PyInstaller
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Build Translation Server with PyInstaller
+      run: |
+        Write-Host "📦 Building BaketaTranslationServer with PyInstaller..."
+
+        cd grpc_server
+
+        # Install dependencies
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+        # Build with PyInstaller
+        pyinstaller BaketaTranslationServer.spec --clean
+
+        # Verify build
+        $exePath = "dist\BaketaTranslationServer\BaketaTranslationServer.exe"
+        if (Test-Path $exePath) {
+          Write-Host "✅ BaketaTranslationServer.exe built successfully"
+          $size = [math]::Round((Get-Item $exePath).Length / 1MB, 2)
+          Write-Host "   Size: $size MB"
+        } else {
+          Write-Host "❌ BaketaTranslationServer.exe not found!"
+          exit 1
+        }
+
+        cd ..
+      shell: pwsh
+
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
@@ -114,6 +147,31 @@ jobs:
           Write-Host "✅ Native DLL copied successfully"
         } else {
           Write-Host "❌ Failed to copy native DLL!"
+          exit 1
+        }
+      shell: pwsh
+
+    - name: Copy Translation Server to publish directory
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $publishDir = "./publish/Baketa-$version"
+        $serverSource = "grpc_server\dist\BaketaTranslationServer"
+        $serverDest = "$publishDir\grpc_server\BaketaTranslationServer"
+
+        Write-Host "📦 Copying BaketaTranslationServer to publish directory..."
+
+        # Create destination directory
+        New-Item -ItemType Directory -Path $serverDest -Force | Out-Null
+
+        # Copy entire PyInstaller output
+        Copy-Item "$serverSource\*" $serverDest -Recurse -Force
+
+        if (Test-Path "$serverDest\BaketaTranslationServer.exe") {
+          Write-Host "✅ Translation Server copied successfully"
+          $totalSize = (Get-ChildItem $serverDest -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+          Write-Host "   Total size: $([math]::Round($totalSize, 2)) MB"
+        } else {
+          Write-Host "❌ Failed to copy Translation Server!"
           exit 1
         }
       shell: pwsh
