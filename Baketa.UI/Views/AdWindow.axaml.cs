@@ -166,9 +166,16 @@ public partial class AdWindow : Window
 
             var workingArea = screen.WorkingArea;
 
-            // 画面右下に配置（タスクバーの上）
-            var x = workingArea.Right - (int)AdConstants.Width - AdConstants.ScreenMargin;
-            var y = workingArea.Bottom - (int)AdConstants.Height - AdConstants.ScreenMargin;
+            // DPIスケーリングを取得（この時点ではVisualRootが未設定の可能性があるためscreen.Scalingを使用）
+            var scaling = screen.Scaling;
+
+            // 画面右下に配置（タスクバーの上）- 物理ピクセルで計算
+            var physicalWidth = (int)(AdConstants.Width * scaling);
+            var physicalHeight = (int)(AdConstants.Height * scaling);
+            var physicalMargin = (int)(AdConstants.ScreenMargin * scaling);
+
+            var x = workingArea.Right - physicalWidth - physicalMargin;
+            var y = workingArea.Bottom - physicalHeight - physicalMargin;
 
             Position = new PixelPoint(x, y);
 
