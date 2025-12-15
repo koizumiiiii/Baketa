@@ -715,6 +715,12 @@ public class InfrastructureModule : ServiceModuleBase
         // 診断データ収集サービス（Singleton: パイプライン診断イベント収集）
         services.AddSingleton<Baketa.Core.Abstractions.Services.IDiagnosticCollectionService, DiagnosticCollectionService>();
         Console.WriteLine("✅ IDiagnosticCollectionService登録完了 - 診断データ収集");
+
+        // 🔧 [Issue #199] DiagnosticEventProcessor登録 - PipelineDiagnosticEventハンドラ
+        services.AddSingleton<Baketa.Infrastructure.Events.Processors.DiagnosticEventProcessor>();
+        services.AddSingleton<IEventProcessor<Baketa.Core.Events.Diagnostics.PipelineDiagnosticEvent>>(
+            provider => provider.GetRequiredService<Baketa.Infrastructure.Events.Processors.DiagnosticEventProcessor>());
+        Console.WriteLine("✅ DiagnosticEventProcessor登録完了 - PipelineDiagnosticEventハンドラ");
     }
 
     /// <summary>

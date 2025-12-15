@@ -110,6 +110,25 @@ release/
 | C#コードのみ変更 | ❌ 不要（既存exeを再利用） |
 | grpc_server/のPythonコード変更 | ✅ 必要 |
 | requirements.txt変更 | ✅ 必要 |
+| venv_buildの依存関係更新（pip upgrade等） | ✅ 必要 |
+
+**開発時にexeが古くてエラーが出る場合:**
+
+開発中に`dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe`が古い依存関係でビルドされていると、以下のようなエラーが発生することがあります：
+- `No module named 'cv2'`
+- `Protobuf Gencode/Runtime major versions mismatch`
+
+**対処法:**
+1. exeをリネームまたは削除してPython版にフォールバック：
+   ```cmd
+   mv grpc_server/dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe grpc_server/dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe.bak
+   ```
+2. venv_buildの依存関係を更新：
+   ```cmd
+   cd grpc_server
+   .\venv_build\Scripts\pip install --upgrade protobuf opencv-python-headless grpcio-tools
+   ```
+3. リリース時にPyInstallerで再ビルド（`build-release.ps1`実行）
 
 ### NLLB-200 Model Setup
 Before running translation features, ensure Python environment and models are ready:
