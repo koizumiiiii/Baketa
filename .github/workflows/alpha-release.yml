@@ -285,7 +285,7 @@ jobs:
     
     steps:
     - name: Download package
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: alpha-package
         path: ./package
