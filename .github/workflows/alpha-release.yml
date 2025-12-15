@@ -269,7 +269,7 @@ jobs:
         echo "Package size: $size MB" >> $env:GITHUB_STEP_SUMMARY
     
     - name: Upload alpha package
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: alpha-package
         path: ./publish/*.zip
