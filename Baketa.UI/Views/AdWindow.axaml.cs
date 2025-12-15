@@ -61,17 +61,14 @@ public partial class AdWindow : Window
             var scaling = this.VisualRoot?.RenderScaling ?? 1.0;
             var workingArea = screen.WorkingArea;
 
-            // 🔧 Issue #199: Boundsが論理値か物理値かを判定
-            // Debug: Bounds=300x250（論理値）, Release: Bounds=450x375（物理値=300×1.5）
-            // Boundsが定義値（300x250）と異なる場合、既にスケーリング済みと判断
-            var boundsIsPhysical = Math.Abs(Bounds.Width - AdConstants.Width) > 1.0;
+            // 🔧 Issue #199 再修正: Boundsに依存せず、常に論理サイズ×RenderScalingで計算
+            // Avalonia 11.2.xではBoundsの返す値がDebug/Releaseで異なるバグがある
+            // https://github.com/AvaloniaUI/Avalonia/issues/17834
+            var physicalWidth = AdConstants.Width * scaling;
+            var physicalHeight = AdConstants.Height * scaling;
 
-            // 物理サイズの計算: Boundsがスケーリング済みならそのまま使用、そうでなければスケーリング
-            var physicalWidth = boundsIsPhysical ? Bounds.Width : AdConstants.Width * scaling;
-            var physicalHeight = boundsIsPhysical ? Bounds.Height : AdConstants.Height * scaling;
-
-            _logger?.LogInformation("ウィンドウサイズ分析: Defined=({DefinedW}x{DefinedH}), Physical=({PhysicalW}x{PhysicalH}), Scaling={Scaling}, Bounds=({BoundsW}x{BoundsH}), BoundsIsPhysical={BoundsIsPhysical}",
-                AdConstants.Width, AdConstants.Height, physicalWidth, physicalHeight, scaling, Bounds.Width, Bounds.Height, boundsIsPhysical);
+            _logger?.LogInformation("ウィンドウサイズ計算: Logical=({LogicalW}x{LogicalH}), Physical=({PhysicalW}x{PhysicalH}), Scaling={Scaling}",
+                AdConstants.Width, AdConstants.Height, physicalWidth, physicalHeight, scaling);
             _logger?.LogInformation("作業領域: {WorkingArea}, 現在位置: {Position}",
                 workingArea, Position);
 
@@ -261,10 +258,9 @@ public partial class AdWindow : Window
                 workingArea = screen.WorkingArea;
             }
 
-            // 🔧 Issue #199: Boundsが論理値か物理値かを判定して物理サイズを取得
-            var boundsIsPhysical = Math.Abs(Bounds.Width - AdConstants.Width) > 1.0;
-            var physicalWidth = (int)(boundsIsPhysical ? Bounds.Width : AdConstants.Width * scaling);
-            var physicalHeight = (int)(boundsIsPhysical ? Bounds.Height : AdConstants.Height * scaling);
+            // 🔧 Issue #199 再修正: Boundsに依存せず、常に論理サイズ×RenderScalingで計算
+            var physicalWidth = (int)(AdConstants.Width * scaling);
+            var physicalHeight = (int)(AdConstants.Height * scaling);
 
             // 画面左端制約
             var constrainedX = Math.Max(workingArea.X, position.X);

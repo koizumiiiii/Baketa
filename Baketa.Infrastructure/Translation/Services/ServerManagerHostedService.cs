@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Hosting;
@@ -46,13 +48,18 @@ public sealed class ServerManagerHostedService : IHostedService
             {
                 // [Issue #198] 初期化完了を待機（コンポーネントダウンロード・解凍完了まで待つ）
                 // これにより、ディスクI/O高負荷時のサーバー起動を防止
-                // [Issue #198 Phase 2] 5分タイムアウト追加 - 大容量モデル解凍対応（低速HDD環境考慮）
+                // [Gemini Review] 初回インストール時は長いタイムアウトを使用
                 if (_initializationSignal != null)
                 {
-                    _logger.LogInformation("⏳ [HOSTED_SERVICE] 初期化完了シグナルを待機中...");
+                    var isFirstTimeSetup = IsFirstTimeSetup();
+                    var timeout = isFirstTimeSetup
+                        ? TimeSpan.FromMinutes(10)  // 初回: 10分（~2.4GBダウンロード対応）
+                        : TimeSpan.FromMinutes(5);   // 通常: 5分
 
-                    // 5分タイムアウト付き待機（1GB解凍 + モデルロードに十分な時間）
-                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                    _logger.LogInformation("⏳ [HOSTED_SERVICE] 初期化完了シグナルを待機中... (Mode: {Mode}, Timeout: {Timeout}分)",
+                        isFirstTimeSetup ? "初回セットアップ" : "通常起動", timeout.TotalMinutes);
+
+                    using var timeoutCts = new CancellationTokenSource(timeout);
                     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
                     try
@@ -63,7 +70,8 @@ public sealed class ServerManagerHostedService : IHostedService
                     catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                     {
                         // タイムアウト時は警告ログを出力して続行
-                        _logger.LogWarning("⚠️ [HOSTED_SERVICE] 初期化完了待機がタイムアウト（5分）しました - サーバー起動を続行します");
+                        _logger.LogWarning("⚠️ [HOSTED_SERVICE] 初期化完了待機がタイムアウト（{Timeout}分）しました - サーバー起動を続行します",
+                            timeout.TotalMinutes);
                     }
                 }
 
@@ -104,6 +112,30 @@ public sealed class ServerManagerHostedService : IHostedService
         // UIスレッドをブロックしないため、即座に完了を返す
         _logger.LogInformation("✅ [HOSTED_SERVICE] StartAsync完了 - バックグラウンド起動中");
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// [Gemini Review] 初回インストールかどうかを判定
+    /// NLLBモデルが存在しない場合は初回インストールとみなす
+    /// </summary>
+    private bool IsFirstTimeSetup()
+    {
+        try
+        {
+            // %AppData%\Baketa\Models\nllb-200-distilled-600M-ct2\model.bin をチェック
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var modelPath = Path.Combine(appDataPath, "Baketa", "Models", "nllb-200-distilled-600M-ct2", "model.bin");
+
+            var exists = File.Exists(modelPath);
+            _logger.LogDebug("[HOSTED_SERVICE] モデル存在チェック: {Path} = {Exists}", modelPath, exists);
+
+            return !exists;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[HOSTED_SERVICE] 初回インストール判定中にエラー - 初回と仮定して続行");
+            return true; // エラー時は安全側（初回）と仮定
+        }
     }
 
     /// <summary>

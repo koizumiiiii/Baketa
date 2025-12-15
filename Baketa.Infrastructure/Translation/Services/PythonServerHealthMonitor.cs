@@ -7,9 +7,11 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Patterns;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Services;
-using Baketa.Core.Settings;
 using Baketa.Core.Translation.Models;
+using TranslationSettings = Baketa.Core.Settings.TranslationSettings;
+using TranslationEngine = Baketa.Core.Settings.TranslationEngine;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -25,6 +27,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private readonly ILogger<PythonServerHealthMonitor> _logger;
     private readonly ISettingsService _settingsService;
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase2: サーキットブレーカー連携
+    private readonly IInitializationCompletionSignal? _initializationSignal; // 初期化完了待機用
     private System.Threading.Timer? _healthCheckTimer;
     private readonly SemaphoreSlim _restartLock = new(1, 1);
 
@@ -50,24 +53,83 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     public PythonServerHealthMonitor(
         ILogger<PythonServerHealthMonitor> logger,
         ISettingsService settingsService,
-        ICircuitBreaker<TranslationResponse>? circuitBreaker = null)
+        ICircuitBreaker<TranslationResponse>? circuitBreaker = null,
+        IInitializationCompletionSignal? initializationSignal = null)
     {
         Console.WriteLine("🔍 [HEALTH_MONITOR] コンストラクタ開始");
 
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _circuitBreaker = circuitBreaker; // Phase2: サーキットブレーカー連携（オプション）
+        _initializationSignal = initializationSignal; // 初期化完了待機用
 
         Console.WriteLine($"🔍 [HEALTH_MONITOR] settingsService パラメータ: {settingsService?.GetType().Name ?? "null"}");
         Console.WriteLine($"🔧 [PHASE2] サーキットブレーカー連携: {(_circuitBreaker != null ? "有効" : "無効")}");
+        Console.WriteLine($"🔧 [Issue198] 初期化シグナル連携: {(_initializationSignal != null ? "有効" : "無効")}");
 
         // 設定の遅延取得（StartAsync時に実際に取得）
         Console.WriteLine("✅ [HEALTH_MONITOR] コンストラクタ完了 - 設定は StartAsync で取得");
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("✅ PythonServerHealthMonitor開始");
+
+        // バックグラウンドで初期化待機とヘルスチェック開始を実行
+        // StartAsyncはすぐに返してアプリ起動をブロックしない
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await InitializeHealthMonitorAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ [HEALTH_MONITOR] 初期化中にエラーが発生しました");
+            }
+        }, cancellationToken);
+
+        _logger.LogInformation("✅ [HEALTH_MONITOR] StartAsync完了 - バックグラウンドで初期化中");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// バックグラウンドでヘルスモニターを初期化
+    /// </summary>
+    private async Task InitializeHealthMonitorAsync(CancellationToken cancellationToken)
+    {
+        // [Issue #198] 初期化完了を待機（コンポーネントダウンロード・解凍完了まで待つ）
+        // これにより、初回起動時のサーバー未起動状態での無駄なヘルスチェックを防止
+        if (_initializationSignal != null)
+        {
+            // [Gemini Review] 初回インストール検出 - モデルダウンロード時は長いタイムアウト
+            var isFirstTimeSetup = IsFirstTimeSetup();
+            var timeout = isFirstTimeSetup
+                ? TimeSpan.FromMinutes(10)  // 初回: 10分（~2.4GBダウンロード対応）
+                : TimeSpan.FromMinutes(5);   // 通常: 5分
+
+            _logger.LogInformation("⏳ [HEALTH_MONITOR] 初期化完了シグナルを待機中... (Mode: {Mode}, Timeout: {Timeout}分)",
+                isFirstTimeSetup ? "初回セットアップ" : "通常起動", timeout.TotalMinutes);
+            Console.WriteLine($"⏳ [HEALTH_MONITOR] 初期化完了シグナルを待機中... (Mode: {(isFirstTimeSetup ? "初回" : "通常")}, Timeout: {timeout.TotalMinutes}分)");
+
+            try
+            {
+                using var timeoutCts = new CancellationTokenSource(timeout);
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+                await _initializationSignal.WaitForCompletionAsync(linkedCts.Token).ConfigureAwait(false);
+
+                _logger.LogInformation("✅ [HEALTH_MONITOR] 初期化完了シグナル受信 - ヘルスチェック開始");
+                Console.WriteLine("✅ [HEALTH_MONITOR] 初期化完了シグナル受信");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // タイムアウト時は警告ログを出力して続行
+                _logger.LogWarning("⚠️ [HEALTH_MONITOR] 初期化完了待機がタイムアウト（{Timeout}分）- ヘルスチェックを開始します",
+                    timeout.TotalMinutes);
+                Console.WriteLine($"⚠️ [HEALTH_MONITOR] 初期化完了待機タイムアウト（{timeout.TotalMinutes}分）- 続行");
+            }
+        }
 
         // 設定を動的に取得
         var settings = await _settingsService.GetAsync<TranslationSettings>().ConfigureAwait(false);
@@ -85,6 +147,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckIntervalMs: {settings.HealthCheckIntervalMs}ms");
         Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckTimeoutMs: {settings.HealthCheckTimeoutMs}ms");
         Console.WriteLine($"🔍 [HEALTH_MONITOR] MaxConsecutiveFailures: {settings.MaxConsecutiveFailures}");
+        Console.WriteLine($"🔍 [HEALTH_MONITOR] ServerStartupTimeoutMs: {settings.ServerStartupTimeoutMs}ms");
 
         if (settings.EnableServerAutoRestart)
         {
@@ -595,7 +658,8 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
             // 起動完了待機（タイムアウト付き）
             var startupTask = WaitForServerStartupAsync();
-            var timeoutTask = Task.Delay(_cachedSettings?.ServerStartupTimeoutMs ?? 30000);
+            // デフォルト120秒（TranslationSettings.ServerStartupTimeoutMsと同じ）
+            var timeoutTask = Task.Delay(_cachedSettings?.ServerStartupTimeoutMs ?? 120000);
 
             var completedTask = await Task.WhenAny(startupTask, timeoutTask);
 
@@ -610,7 +674,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             }
             else
             {
-                _logger.LogError("❌ サーバー起動タイムアウト ({TimeoutMs}ms)", _cachedSettings?.ServerStartupTimeoutMs ?? 30000);
+                _logger.LogError("❌ サーバー起動タイムアウト ({TimeoutMs}ms)", _cachedSettings?.ServerStartupTimeoutMs ?? 120000);
                 await CleanupPidFileAsync(); // タイムアウト時のクリーンアップ
                 return false;
             }
@@ -756,6 +820,30 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// [Gemini Review] 初回インストールかどうかを判定
+    /// NLLBモデルが存在しない場合は初回インストールとみなす
+    /// </summary>
+    private bool IsFirstTimeSetup()
+    {
+        try
+        {
+            // %AppData%\Baketa\Models\nllb-200-distilled-600M-ct2\model.bin をチェック
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var modelPath = Path.Combine(appDataPath, "Baketa", "Models", "nllb-200-distilled-600M-ct2", "model.bin");
+
+            var exists = File.Exists(modelPath);
+            _logger.LogDebug("[HEALTH_MONITOR] モデル存在チェック: {Path} = {Exists}", modelPath, exists);
+
+            return !exists;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[HEALTH_MONITOR] 初回インストール判定中にエラー - 初回と仮定して続行");
+            return true; // エラー時は安全側（初回）と仮定
+        }
     }
 
     /// <summary>
