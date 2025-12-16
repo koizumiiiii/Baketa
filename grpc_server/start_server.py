@@ -40,34 +40,30 @@ def _sanitize_path_for_cuda():
     return False
 
 def _check_cuda_availability():
-    """CUDA DLLがロード可能かを事前チェック（torchインポート前）"""
-    import ctypes
-
-    # CUDA DLLのロードを試行
-    cuda_dlls = ["cublas64_12.dll", "cudart64_12.dll", "cublasLt64_12.dll"]
-
-    for dll_name in cuda_dlls:
-        try:
-            ctypes.CDLL(dll_name)
-        except OSError as e:
-            # CUDA DLLロードエラー - GPUは使用不可
-            print(f"[INFO] CUDA DLL '{dll_name}' ロード不可: CPUモードで起動します", file=sys.stderr)
-            return False
-
-    return True
+    """CTranslate2のCUDAサポートを直接チェック（DLLロードより信頼性が高い）"""
+    try:
+        import ctranslate2
+        cuda_types = ctranslate2.get_supported_compute_types("cuda")
+        if cuda_types:
+            print(f"[INFO] CTranslate2 CUDA対応: {cuda_types}", file=sys.stderr)
+            return True
+    except Exception as e:
+        print(f"[INFO] CTranslate2 CUDAチェックエラー: {e}", file=sys.stderr)
+    return False
 
 # Phase 3: minicondaパスを除外してCUDA DLL競合を防止
 _path_sanitized = _sanitize_path_for_cuda()
 
-# CUDA利用可否を事前チェック（PATH修正後）
-_cuda_dlls_available = _check_cuda_availability()
-if not _cuda_dlls_available:
-    # CUDA DLLがロードできない場合、環境変数でCUDAを完全無効化
+# ctranslate2を先にインポート
+import ctranslate2
+
+# CTranslate2のCUDAサポートを直接チェック
+_cuda_available = _check_cuda_availability()
+if not _cuda_available:
+    # CUDAが利用不可の場合のみ環境変数で無効化
+    print("[INFO] CUDA利用不可: CPUモードで起動します", file=sys.stderr)
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
     os.environ["CUDA_HOME"] = ""
-
-# ctranslate2を安全にインポート（CUDA環境は既に設定済み）
-import ctranslate2
 
 """
 gRPC Translation Server Startup Script
