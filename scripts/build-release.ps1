@@ -104,9 +104,24 @@ if (-not $SkipPyInstaller) {
 
         & $venvPyInstaller BaketaTranslationServer.spec --clean --noconfirm
         if ($LASTEXITCODE -ne 0) {
-            throw "PyInstaller build failed"
+            throw "PyInstaller build failed for BaketaTranslationServer"
         }
         Write-Host "  BaketaTranslationServer.exe build complete" -ForegroundColor Green
+
+        # Build BaketaSuryaOcrServer.exe
+        Write-Host "  Building BaketaSuryaOcrServer.exe..." -ForegroundColor Gray
+        if (Test-Path "dist\BaketaSuryaOcrServer") {
+            Remove-Item -Recurse -Force "dist\BaketaSuryaOcrServer"
+        }
+        if (Test-Path "build") {
+            Remove-Item -Recurse -Force "build"
+        }
+
+        & $venvPyInstaller BaketaSuryaOcrServer.spec --clean --noconfirm
+        if ($LASTEXITCODE -ne 0) {
+            throw "PyInstaller build failed for BaketaSuryaOcrServer"
+        }
+        Write-Host "  BaketaSuryaOcrServer.exe build complete" -ForegroundColor Green
     } finally {
         Pop-Location
     }
@@ -172,6 +187,17 @@ if (Test-Path $translationServerDir) {
     Copy-Item -Path "$translationServerDir\*" -Destination $targetDir -Recurse
 } else {
     Write-Host "  WARNING: BaketaTranslationServer not found" -ForegroundColor Red
+}
+
+# 5.2.1 Copy BaketaSuryaOcrServer.exe
+$suryaServerDir = "$ProjectRoot\grpc_server\dist\BaketaSuryaOcrServer"
+if (Test-Path $suryaServerDir) {
+    $targetDir = "$OutputDir\grpc_server\BaketaSuryaOcrServer"
+    $null = New-Item -ItemType Directory -Path $targetDir -Force
+    Write-Host "  Copying BaketaSuryaOcrServer..." -ForegroundColor Gray
+    Copy-Item -Path "$suryaServerDir\*" -Destination $targetDir -Recurse
+} else {
+    Write-Host "  WARNING: BaketaSuryaOcrServer not found" -ForegroundColor Red
 }
 
 # 5.3 Copy OCR models (ppocrv5-onnx)

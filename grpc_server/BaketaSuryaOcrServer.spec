@@ -53,6 +53,7 @@ a = Analysis(
         'PIL',
         'PIL.Image',
         'numpy',
+        'cv2',  # opencv-python-headless
 
         # その他依存
         'huggingface_hub',
@@ -75,8 +76,7 @@ a = Analysis(
         'IPython',
         'notebook',
         'jupyter',
-        'cv2',
-        'opencv-python',
+        # cv2はSurya OCRの依存関係として必要（除外しない）
     ],
     noarchive=False,
     optimize=0,
