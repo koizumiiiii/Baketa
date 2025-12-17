@@ -57,19 +57,14 @@ public partial class AdWindow : Window
             var screen = Screens.ScreenFromPoint(Position) ?? Screens.Primary;
             if (screen == null) return;
 
-            // DPIスケーリング率を取得（Screen.Scalingを優先使用）
-            // VisualRoot?.RenderScalingは実際のレンダリングスケールだが、
-            // WorkingAreaはScreen.Scalingベースなので一致させる
             var scaling = screen.Scaling;
             var workingArea = screen.WorkingArea;
 
-            // 🔧 Issue #199 修正: 常に論理サイズ×スケーリングで計算
-            // FrameSizeの値が環境によって不安定なため、一貫した計算を使用
-            var physicalWidth = (int)(AdConstants.Width * scaling);
-            var physicalHeight = (int)(AdConstants.Height * scaling);
-
-            // マージンもスケーリングを適用（論理ピクセル→物理ピクセル）
-            var physicalMargin = (int)(AdConstants.ScreenMargin * scaling);
+            // 🔧 Issue #199 修正: WorkingAreaは物理ピクセルなので、物理サイズで計算
+            // 論理サイズ × スケーリング = 物理サイズ
+            var physicalWidth = (int)(AdConstants.Width * scaling);   // 300 * 1.5 = 450
+            var physicalHeight = (int)(AdConstants.Height * scaling); // 250 * 1.5 = 375
+            var physicalMargin = (int)(AdConstants.ScreenMargin * scaling); // 10 * 1.5 = 15
 
             _logger?.LogInformation("ウィンドウサイズ: Physical=({PhysicalW}x{PhysicalH}), Margin={Margin}, Scaling={Scaling}, FrameSize={FrameSize}",
                 physicalWidth, physicalHeight, physicalMargin, scaling, FrameSize);
@@ -86,7 +81,7 @@ public partial class AdWindow : Window
 
             var newPosition = new PixelPoint(x, y);
             Position = newPosition;
-            _logger?.LogInformation("物理サイズで位置補正: ({X}, {Y})", x, y);
+            _logger?.LogInformation("位置補正: ({X}, {Y})", x, y);
 
         }, Avalonia.Threading.DispatcherPriority.Loaded);
 
@@ -158,11 +153,9 @@ public partial class AdWindow : Window
                     s.DisplayName ?? "Unknown", s.Bounds, s.WorkingArea, s == Screens.Primary);
             }
 
-            // マルチモニター環境対応: 最も左上のスクリーンを使用（最小のBounds.Xとyを持つ）
-            var screen = Screens.All
-                .OrderBy(s => s.Bounds.X)
-                .ThenBy(s => s.Bounds.Y)
-                .FirstOrDefault() ?? Screens.Primary;
+            // マルチモニター環境対応: プライマリスクリーンを使用
+            // 初回起動時は他のウィンドウの位置が不明なため、プライマリスクリーンが最も安定
+            var screen = Screens.Primary;
 
             if (screen == null)
             {
@@ -171,15 +164,11 @@ public partial class AdWindow : Window
             }
 
             var workingArea = screen.WorkingArea;
-
-            // DPIスケーリングを取得（この時点ではVisualRootが未設定の可能性があるためscreen.Scalingを使用）
             var scaling = screen.Scaling;
 
-            // 🔧 Issue #199: この時点ではBoundsが未設定なのでscalingで計算
-            // Loaded後に再調整されるため、ここでは概算値を使用
+            // 🔧 Issue #199 修正: WorkingAreaは物理ピクセルなので、物理サイズで計算
             var physicalWidth = (int)(AdConstants.Width * scaling);
             var physicalHeight = (int)(AdConstants.Height * scaling);
-            // マージンもスケーリングを適用（論理ピクセル→物理ピクセル）
             var physicalMargin = (int)(AdConstants.ScreenMargin * scaling);
 
             var x = workingArea.Right - physicalWidth - physicalMargin;
@@ -265,7 +254,7 @@ public partial class AdWindow : Window
                 workingArea = screen.WorkingArea;
             }
 
-            // 🔧 Issue #199 修正: 常に論理サイズ×Screen.Scalingで計算
+            // 🔧 Issue #199 修正: WorkingAreaは物理ピクセルなので、物理サイズで計算
             var physicalWidth = (int)(AdConstants.Width * scaling);
             var physicalHeight = (int)(AdConstants.Height * scaling);
 
