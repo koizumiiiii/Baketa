@@ -496,8 +496,8 @@ public sealed class SuryaServerManager : IAsyncDisposable
             return;
         }
 
-        // 最大120秒待機（ComponentDownloadは約60秒かかる可能性がある）
-        var maxWaitTime = TimeSpan.FromSeconds(120);
+        // [Issue #199] 最大10分待機（CUDA版は約2.4GB、ネットワーク状況により7分以上かかる場合がある）
+        var maxWaitTime = TimeSpan.FromMinutes(10);
         var pollInterval = TimeSpan.FromSeconds(2);
         var startTime = DateTime.UtcNow;
 
