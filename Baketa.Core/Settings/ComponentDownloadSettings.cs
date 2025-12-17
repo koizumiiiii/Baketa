@@ -39,6 +39,12 @@ public class ComponentDownloadSettings
     public int DownloadTimeoutSeconds { get; set; } = 300;
 
     /// <summary>
+    /// [Gemini Review] Maximum concurrent downloads (default: 2)
+    /// Higher values may improve speed but consume more bandwidth
+    /// </summary>
+    public int MaxConcurrentDownloads { get; set; } = 2;
+
+    /// <summary>
     /// List of components to download
     /// </summary>
     public List<ComponentConfig> Components { get; set; } = [];
@@ -172,6 +178,12 @@ public class ComponentDownloadSettingsValidator : IValidateOptions<ComponentDown
         if (options.DownloadTimeoutSeconds < 30 || options.DownloadTimeoutSeconds > 3600)
         {
             failures.Add($"DownloadTimeoutSeconds must be between 30 and 3600, but was {options.DownloadTimeoutSeconds}");
+        }
+
+        // [Gemini Review] Validate MaxConcurrentDownloads (1-10)
+        if (options.MaxConcurrentDownloads < 1 || options.MaxConcurrentDownloads > 10)
+        {
+            failures.Add($"MaxConcurrentDownloads must be between 1 and 10, but was {options.MaxConcurrentDownloads}");
         }
 
         // Validate Components

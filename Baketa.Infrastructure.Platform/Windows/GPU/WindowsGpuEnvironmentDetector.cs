@@ -12,13 +12,15 @@ namespace Baketa.Infrastructure.Platform.Windows.GPU;
 /// Windows環境でのGPU検出実装
 /// WMI + DirectX APIを使用したハードウェア情報取得
 /// [Issue #213] ディスクキャッシュ対応（次回起動時5秒短縮）
+/// [Gemini Review] 非同期I/O化、競合制御、キャッシュ無効化API追加
 /// </summary>
 public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDisposable
 {
     private readonly ILogger<WindowsGpuEnvironmentDetector> _logger;
     private readonly string _cacheFilePath;
-    private readonly object _lockObject = new();
+    private readonly SemaphoreSlim _detectionSemaphore = new(1, 1);
     private GpuEnvironmentInfo? _cachedEnvironment;
+    private bool _cacheLoaded;
     private bool _disposed;
 
     // [Issue #213] キャッシュ有効期限（7日）
@@ -35,39 +37,63 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
         Directory.CreateDirectory(appDataPath);
         _cacheFilePath = Path.Combine(appDataPath, "gpu_cache.json");
 
-        // 起動時にディスクキャッシュを読み込み
-        TryLoadCacheFromDisk();
+        // 注: 非同期キャッシュ読み込みはDetectEnvironmentAsync内で遅延実行
     }
 
     public async Task<GpuEnvironmentInfo> DetectEnvironmentAsync(CancellationToken cancellationToken = default)
     {
-        lock (_lockObject)
+        // [Gemini Review] 高速パス: キャッシュ済みの場合は即座に返却（ロック不要）
+        var cached = Volatile.Read(ref _cachedEnvironment);
+        if (cached != null)
         {
-            if (_cachedEnvironment != null)
-            {
-                _logger.LogDebug("キャッシュ済みGPU環境情報を返却: {GpuName}", _cachedEnvironment.GpuName);
-                return _cachedEnvironment;
-            }
+            _logger.LogDebug("キャッシュ済みGPU環境情報を返却: {GpuName}", cached.GpuName);
+            return cached;
         }
 
-        _logger.LogInformation("GPU環境検出開始");
-
+        // [Gemini Review] SemaphoreSlimで競合制御（async対応）
+        await _detectionSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var environment = await Task.Run(() => DetectGpuEnvironmentInternal(), cancellationToken).ConfigureAwait(false);
-
-            lock (_lockObject)
+            // ダブルチェックロッキング: セマフォ取得後に再確認
+            cached = Volatile.Read(ref _cachedEnvironment);
+            if (cached != null)
             {
-                _cachedEnvironment = environment;
+                _logger.LogDebug("キャッシュ済みGPU環境情報を返却（競合解決後）: {GpuName}", cached.GpuName);
+                return cached;
             }
 
+            // [Gemini Review] 非同期でディスクキャッシュを読み込み（初回のみ）
+            if (!_cacheLoaded)
+            {
+                await TryLoadCacheFromDiskAsync(cancellationToken).ConfigureAwait(false);
+                _cacheLoaded = true;
+
+                // ディスクキャッシュ読み込み成功時
+                cached = Volatile.Read(ref _cachedEnvironment);
+                if (cached != null)
+                {
+                    _logger.LogDebug("ディスクキャッシュからGPU環境情報を復元: {GpuName}", cached.GpuName);
+                    return cached;
+                }
+            }
+
+            _logger.LogInformation("GPU環境検出開始");
+
+            var environment = await Task.Run(() => DetectGpuEnvironmentInternal(), cancellationToken).ConfigureAwait(false);
+
+            Volatile.Write(ref _cachedEnvironment, environment);
+
             // [Issue #213] ディスクにキャッシュを保存（次回起動時の高速化）
-            SaveCacheToDisk(environment);
+            await SaveCacheToDiskAsync(environment, cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("GPU環境検出完了: {GpuName}, CUDA:{SupportsCuda}, DirectML:{SupportsDirectML}, VRAM:{AvailableMemoryMB}MB",
                 environment.GpuName, environment.SupportsCuda, environment.SupportsDirectML, environment.AvailableMemoryMB);
 
             return environment;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -75,34 +101,73 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
 
             // フォールバック環境（CPU専用）を返却
             var fallbackEnvironment = CreateFallbackEnvironment();
-
-            lock (_lockObject)
-            {
-                _cachedEnvironment = fallbackEnvironment;
-            }
+            Volatile.Write(ref _cachedEnvironment, fallbackEnvironment);
 
             return fallbackEnvironment;
+        }
+        finally
+        {
+            _detectionSemaphore.Release();
         }
     }
 
     public GpuEnvironmentInfo? GetCachedEnvironment()
     {
-        lock (_lockObject)
-        {
-            return _cachedEnvironment;
-        }
+        return Volatile.Read(ref _cachedEnvironment);
     }
 
     public async Task<GpuEnvironmentInfo> RefreshEnvironmentAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GPU環境情報強制更新");
 
-        lock (_lockObject)
+        // [Gemini Review] SemaphoreSlimで競合制御
+        await _detectionSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            _cachedEnvironment = null;
+            Volatile.Write(ref _cachedEnvironment, null);
+            _cacheLoaded = false; // 強制再読み込みのためフラグリセット
+        }
+        finally
+        {
+            _detectionSemaphore.Release();
         }
 
         return await DetectEnvironmentAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// [Gemini Review] キャッシュを無効化する
+    /// </summary>
+    /// <param name="reason">無効化の理由（ログ出力用）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    public async Task InvalidateCacheAsync(string reason, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("[Gemini Review] キャッシュ無効化: {Reason}", reason);
+
+        await _detectionSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            Volatile.Write(ref _cachedEnvironment, null);
+            _cacheLoaded = false;
+
+            // ディスクキャッシュも削除
+            if (File.Exists(_cacheFilePath))
+            {
+                try
+                {
+                    File.Delete(_cacheFilePath);
+                    _logger.LogDebug("[Gemini Review] ディスクキャッシュを削除: {Path}", _cacheFilePath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[Gemini Review] ディスクキャッシュ削除失敗: {Path}", _cacheFilePath);
+                }
+            }
+        }
+        finally
+        {
+            _detectionSemaphore.Release();
+        }
     }
 
     private GpuEnvironmentInfo DetectGpuEnvironmentInternal()
@@ -364,9 +429,10 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
     }
 
     /// <summary>
-    /// [Issue #213] ディスクからキャッシュを読み込む
+    /// [Issue #213] ディスクからキャッシュを読み込む（非同期I/O）
+    /// [Gemini Review] FileStreamを使用した非同期読み込みに変更
     /// </summary>
-    private void TryLoadCacheFromDisk()
+    private async Task TryLoadCacheFromDiskAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -376,8 +442,17 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
                 return;
             }
 
-            var json = File.ReadAllText(_cacheFilePath);
-            var cacheData = JsonSerializer.Deserialize<GpuCacheData>(json);
+            await using var fileStream = new FileStream(
+                _cacheFilePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 4096,
+                useAsync: true);
+
+            var cacheData = await JsonSerializer.DeserializeAsync<GpuCacheData>(
+                fileStream,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (cacheData == null)
             {
@@ -394,15 +469,16 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
                 return;
             }
 
-            lock (_lockObject)
-            {
-                _cachedEnvironment = cacheData.Environment;
-            }
+            Volatile.Write(ref _cachedEnvironment, cacheData.Environment);
 
             _logger.LogInformation("[Issue #213] GPU キャッシュをディスクから読み込み: {GpuName}, CUDA:{SupportsCuda} (キャッシュ日時: {CachedAt})",
                 cacheData.Environment?.GpuName,
                 cacheData.Environment?.SupportsCuda,
                 cacheData.CachedAt.ToLocalTime());
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -411,9 +487,10 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
     }
 
     /// <summary>
-    /// [Issue #213] キャッシュをディスクに保存する
+    /// [Issue #213] キャッシュをディスクに保存する（非同期I/O）
+    /// [Gemini Review] FileStreamを使用した非同期書き込みに変更
     /// </summary>
-    private void SaveCacheToDisk(GpuEnvironmentInfo environment)
+    private async Task SaveCacheToDiskAsync(GpuEnvironmentInfo environment, CancellationToken cancellationToken)
     {
         try
         {
@@ -423,13 +500,25 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
                 CachedAt = DateTime.UtcNow
             };
 
-            var json = JsonSerializer.Serialize(cacheData, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            await using var fileStream = new FileStream(
+                _cacheFilePath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 4096,
+                useAsync: true);
 
-            File.WriteAllText(_cacheFilePath, json);
+            await JsonSerializer.SerializeAsync(
+                fileStream,
+                cacheData,
+                new JsonSerializerOptions { WriteIndented = true },
+                cancellationToken).ConfigureAwait(false);
+
             _logger.LogDebug("[Issue #213] GPU キャッシュをディスクに保存: {Path}", _cacheFilePath);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -450,6 +539,7 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
     {
         if (!_disposed)
         {
+            _detectionSemaphore.Dispose();
             _disposed = true;
         }
     }
