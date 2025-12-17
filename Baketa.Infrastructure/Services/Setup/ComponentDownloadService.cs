@@ -330,22 +330,57 @@ public class ComponentDownloadService : IComponentDownloader
     public async Task<int> DownloadMissingComponentsAsync(CancellationToken cancellationToken = default)
     {
         var components = await GetRequiredComponentsAsync(cancellationToken).ConfigureAwait(false);
-        var downloadCount = 0;
 
-        foreach (var component in components)
+        // [Issue #213] 並列ダウンロードの最適化
+        // まず各コンポーネントのインストール状態を並列にチェック
+        var installCheckTasks = components.Select(async component =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             var isInstalled = await IsComponentInstalledAsync(component, cancellationToken).ConfigureAwait(false);
-            if (!isInstalled)
-            {
-                _logger.LogInformation("Downloading missing component: {ComponentId}", component.Id);
-                await DownloadComponentAsync(component, cancellationToken).ConfigureAwait(false);
-                downloadCount++;
-            }
+            return (component, isInstalled);
+        });
+        var checkResults = await Task.WhenAll(installCheckTasks).ConfigureAwait(false);
+
+        // 未インストールのコンポーネントを抽出
+        var missingComponents = checkResults
+            .Where(r => !r.isInstalled)
+            .Select(r => r.component)
+            .ToList();
+
+        if (missingComponents.Count == 0)
+        {
+            _logger.LogInformation("All components are already installed");
+            return 0;
         }
 
-        _logger.LogInformation("Downloaded {Count} missing components", downloadCount);
+        _logger.LogInformation("Found {Count} missing components to download: {Components}",
+            missingComponents.Count,
+            string.Join(", ", missingComponents.Select(c => c.Id)));
+
+        // [Issue #213] 並列ダウンロード（最大2同時、ネットワーク帯域を考慮）
+        const int maxConcurrentDownloads = 2;
+        using var semaphore = new SemaphoreSlim(maxConcurrentDownloads);
+        var downloadCount = 0;
+
+        var downloadTasks = missingComponents.Select(async component =>
+        {
+            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                _logger.LogInformation("Downloading component: {ComponentId}", component.Id);
+                await DownloadComponentAsync(component, cancellationToken).ConfigureAwait(false);
+                Interlocked.Increment(ref downloadCount);
+                _logger.LogInformation("Completed download: {ComponentId}", component.Id);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(downloadTasks).ConfigureAwait(false);
+
+        _logger.LogInformation("Downloaded {Count} components in parallel", downloadCount);
         return downloadCount;
     }
 

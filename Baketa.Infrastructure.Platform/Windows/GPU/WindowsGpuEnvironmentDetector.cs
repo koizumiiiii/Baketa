@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.IO;
 using System.Management;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using Baketa.Core.Abstractions.GPU;
 using Microsoft.Extensions.Logging;
 
@@ -9,17 +11,32 @@ namespace Baketa.Infrastructure.Platform.Windows.GPU;
 /// <summary>
 /// Windows環境でのGPU検出実装
 /// WMI + DirectX APIを使用したハードウェア情報取得
+/// [Issue #213] ディスクキャッシュ対応（次回起動時5秒短縮）
 /// </summary>
 public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDisposable
 {
     private readonly ILogger<WindowsGpuEnvironmentDetector> _logger;
+    private readonly string _cacheFilePath;
     private readonly object _lockObject = new();
     private GpuEnvironmentInfo? _cachedEnvironment;
     private bool _disposed;
 
+    // [Issue #213] キャッシュ有効期限（7日）
+    private static readonly TimeSpan CacheExpiration = TimeSpan.FromDays(7);
+
     public WindowsGpuEnvironmentDetector(ILogger<WindowsGpuEnvironmentDetector> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        // [Issue #213] キャッシュファイルパスを設定（AppData/Local/Baketa/gpu_cache.json）
+        var appDataPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Baketa");
+        Directory.CreateDirectory(appDataPath);
+        _cacheFilePath = Path.Combine(appDataPath, "gpu_cache.json");
+
+        // 起動時にディスクキャッシュを読み込み
+        TryLoadCacheFromDisk();
     }
 
     public async Task<GpuEnvironmentInfo> DetectEnvironmentAsync(CancellationToken cancellationToken = default)
@@ -43,6 +60,9 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             {
                 _cachedEnvironment = environment;
             }
+
+            // [Issue #213] ディスクにキャッシュを保存（次回起動時の高速化）
+            SaveCacheToDisk(environment);
 
             _logger.LogInformation("GPU環境検出完了: {GpuName}, CUDA:{SupportsCuda}, DirectML:{SupportsDirectML}, VRAM:{AvailableMemoryMB}MB",
                 environment.GpuName, environment.SupportsCuda, environment.SupportsDirectML, environment.AvailableMemoryMB);
@@ -341,6 +361,89 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             ComputeCapability = ComputeCapability.Unknown,
             RecommendedProviders = [ExecutionProvider.CPU]
         };
+    }
+
+    /// <summary>
+    /// [Issue #213] ディスクからキャッシュを読み込む
+    /// </summary>
+    private void TryLoadCacheFromDisk()
+    {
+        try
+        {
+            if (!File.Exists(_cacheFilePath))
+            {
+                _logger.LogDebug("[Issue #213] GPU キャッシュファイルが存在しません: {Path}", _cacheFilePath);
+                return;
+            }
+
+            var json = File.ReadAllText(_cacheFilePath);
+            var cacheData = JsonSerializer.Deserialize<GpuCacheData>(json);
+
+            if (cacheData == null)
+            {
+                _logger.LogDebug("[Issue #213] GPU キャッシュデータのデシリアライズに失敗");
+                return;
+            }
+
+            // キャッシュの有効期限をチェック
+            if (DateTime.UtcNow - cacheData.CachedAt > CacheExpiration)
+            {
+                _logger.LogInformation("[Issue #213] GPU キャッシュが期限切れ（{Days}日経過）、再検出します",
+                    (DateTime.UtcNow - cacheData.CachedAt).Days);
+                File.Delete(_cacheFilePath);
+                return;
+            }
+
+            lock (_lockObject)
+            {
+                _cachedEnvironment = cacheData.Environment;
+            }
+
+            _logger.LogInformation("[Issue #213] GPU キャッシュをディスクから読み込み: {GpuName}, CUDA:{SupportsCuda} (キャッシュ日時: {CachedAt})",
+                cacheData.Environment?.GpuName,
+                cacheData.Environment?.SupportsCuda,
+                cacheData.CachedAt.ToLocalTime());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #213] GPU キャッシュ読み込み失敗");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #213] キャッシュをディスクに保存する
+    /// </summary>
+    private void SaveCacheToDisk(GpuEnvironmentInfo environment)
+    {
+        try
+        {
+            var cacheData = new GpuCacheData
+            {
+                Environment = environment,
+                CachedAt = DateTime.UtcNow
+            };
+
+            var json = JsonSerializer.Serialize(cacheData, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            File.WriteAllText(_cacheFilePath, json);
+            _logger.LogDebug("[Issue #213] GPU キャッシュをディスクに保存: {Path}", _cacheFilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #213] GPU キャッシュ保存失敗");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #213] GPU キャッシュデータ（ディスク永続化用）
+    /// </summary>
+    private sealed class GpuCacheData
+    {
+        public GpuEnvironmentInfo? Environment { get; set; }
+        public DateTime CachedAt { get; set; }
     }
 
     public void Dispose()

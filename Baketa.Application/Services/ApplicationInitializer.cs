@@ -72,42 +72,54 @@ public class ApplicationInitializer : ILoadingScreenInitializer
 
         try
         {
-            // [Issue #185] Step 0: コンポーネントダウンロード（初回起動時のみ）
-            await ExecuteStepAsync(
+            // [Issue #213] Phase 1: ダウンロードとGPUセットアップを並列実行
+            // これらは独立した処理のため、並列化することで起動時間を短縮
+            _logger.LogInformation("[Issue #213] Phase 1: コンポーネントダウンロードとGPUセットアップを並列実行");
+            ReportProgress("parallel_init", "初期化中（ダウンロード + GPU環境セットアップ）...", isCompleted: false, progress: 0);
+
+            var downloadTask = ExecuteStepAsync(
                 "download_components",
                 "コンポーネントをダウンロードしています...",
                 DownloadMissingComponentsAsync,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
-            // [Issue #193] Step 0.5: GPU環境セットアップ（開発版のみ）
-            await ExecuteStepAsync(
+            var gpuSetupTask = ExecuteStepAsync(
                 "setup_gpu",
                 "GPU環境をチェックしています...",
                 SetupGpuEnvironmentAsync,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
-            // Step 1: 依存関係解決
+            await Task.WhenAll(downloadTask, gpuSetupTask).ConfigureAwait(false);
+            _logger.LogInformation("[Issue #213] Phase 1 完了");
+
+            // [Issue #213] Phase 2: 依存関係解決（シーケンシャル - サービス登録に依存）
             await ExecuteStepAsync(
                 "resolve_dependencies",
                 "依存関係を解決しています...",
                 ResolveDependenciesAsync,
                 cancellationToken).ConfigureAwait(false);
 
-            // Step 2: OCRモデル読み込み
-            await ExecuteStepAsync(
+            // [Issue #213] Phase 3: OCRと翻訳エンジンを並列初期化
+            // これらは独立しており、並列化することで初期化時間を短縮
+            _logger.LogInformation("[Issue #213] Phase 3: OCRと翻訳エンジンを並列初期化");
+            ReportProgress("parallel_engines", "OCR・翻訳エンジンを初期化中...", isCompleted: false, progress: 50);
+
+            var ocrTask = ExecuteStepAsync(
                 "load_ocr",
                 "OCRモデルを読み込んでいます...",
                 InitializeOcrAsync,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
-            // Step 3: 翻訳エンジン初期化
-            await ExecuteStepAsync(
+            var translationTask = ExecuteStepAsync(
                 "init_translation",
                 "翻訳エンジンを初期化しています...",
                 InitializeTranslationAsync,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
-            // Step 4: UIコンポーネント準備
+            await Task.WhenAll(ocrTask, translationTask).ConfigureAwait(false);
+            _logger.LogInformation("[Issue #213] Phase 3 完了");
+
+            // Step 4: UIコンポーネント準備（最後に実行）
             await ExecuteStepAsync(
                 "prepare_ui",
                 "UIコンポーネントを準備しています...",
@@ -116,7 +128,7 @@ public class ApplicationInitializer : ILoadingScreenInitializer
 
             _stopwatch.Stop();
             _logger.LogInformation(
-                "アプリケーション初期化完了: {ElapsedMs}ms",
+                "アプリケーション初期化完了: {ElapsedMs}ms（並列化により最適化済み）",
                 _stopwatch.ElapsedMilliseconds);
 
             // [Issue #198] 初期化完了を通知
