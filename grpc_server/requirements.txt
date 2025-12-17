@@ -1,12 +1,13 @@
 # Baketa gRPC Translation Server Dependencies
 # Phase 2.2: Python gRPC Server
 
-# gRPC (latest version)
-# protobuf 5.x fixed for Google AI, grpcio-status compatibility
+# gRPC (pinned versions for stability)
+# [Issue #212] protobuf 5.x fixed for PyInstaller compatibility
+# - grpcio-tools < 1.70.0 required for Protobuf 5.x code generation
+# - Exact version pinning prevents gencode/runtime version mismatch
 grpcio>=1.60.0
-# [ISSUE#164] grpcio-tools < 1.70.0 for Protobuf 5.x code generation
-grpcio-tools>=1.60.0,<1.70.0
-protobuf>=5.26.1,<6.0
+grpcio-tools==1.68.1
+protobuf==5.29.3
 
 # [Issue #185] tokenizers library (Rust-based, lightweight)
 # Removed transformers/torch, load tokenizer.json directly
