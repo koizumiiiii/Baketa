@@ -57,42 +57,28 @@ public partial class AdWindow : Window
             var screen = Screens.ScreenFromPoint(Position) ?? Screens.Primary;
             if (screen == null) return;
 
-            // DPIスケーリング率を取得
-            var scaling = this.VisualRoot?.RenderScaling ?? 1.0;
+            // DPIスケーリング率を取得（Screen.Scalingを優先使用）
+            // VisualRoot?.RenderScalingは実際のレンダリングスケールだが、
+            // WorkingAreaはScreen.Scalingベースなので一致させる
+            var scaling = screen.Scaling;
             var workingArea = screen.WorkingArea;
 
-            // 🔧 Issue #199 再修正: 実際のFrameSizeを優先使用
-            // Loaded後はFrameSizeが確定しているため、計算値より正確
-            var frameSize = FrameSize;
-            double physicalWidth;
-            double physicalHeight;
-
-            if (frameSize is { Width: > 0, Height: > 0 })
-            {
-                // 実際のフレームサイズを使用（最も正確）
-                physicalWidth = frameSize.Value.Width;
-                physicalHeight = frameSize.Value.Height;
-                _logger?.LogInformation("FrameSize使用: {FrameSize}", frameSize);
-            }
-            else
-            {
-                // フォールバック: 論理サイズ×スケーリングで計算
-                physicalWidth = AdConstants.Width * scaling;
-                physicalHeight = AdConstants.Height * scaling;
-                _logger?.LogInformation("計算サイズ使用（FrameSize未取得）");
-            }
+            // 🔧 Issue #199 修正: 常に論理サイズ×スケーリングで計算
+            // FrameSizeの値が環境によって不安定なため、一貫した計算を使用
+            var physicalWidth = (int)(AdConstants.Width * scaling);
+            var physicalHeight = (int)(AdConstants.Height * scaling);
 
             // マージンもスケーリングを適用（論理ピクセル→物理ピクセル）
             var physicalMargin = (int)(AdConstants.ScreenMargin * scaling);
 
-            _logger?.LogInformation("ウィンドウサイズ: Physical=({PhysicalW}x{PhysicalH}), Margin={Margin}, Scaling={Scaling}",
-                physicalWidth, physicalHeight, physicalMargin, scaling);
+            _logger?.LogInformation("ウィンドウサイズ: Physical=({PhysicalW}x{PhysicalH}), Margin={Margin}, Scaling={Scaling}, FrameSize={FrameSize}",
+                physicalWidth, physicalHeight, physicalMargin, scaling, FrameSize);
             _logger?.LogInformation("作業領域: {WorkingArea}, 現在位置: {Position}",
                 workingArea, Position);
 
             // 物理サイズで右下端に配置
-            var x = workingArea.Right - (int)physicalWidth - physicalMargin;
-            var y = workingArea.Bottom - (int)physicalHeight - physicalMargin;
+            var x = workingArea.Right - physicalWidth - physicalMargin;
+            var y = workingArea.Bottom - physicalHeight - physicalMargin;
 
             // 画面左上端制約
             x = Math.Max(x, workingArea.X);
@@ -218,8 +204,9 @@ public partial class AdWindow : Window
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             // パフォーマンス最適化: ドラッグ開始時にスクリーン情報とDPIをキャッシュ
-            _cachedScaling = this.VisualRoot?.RenderScaling ?? 1.0;
             _cachedScreen = Screens.ScreenFromPoint(Position) ?? Screens.Primary;
+            // Screen.Scalingを使用（WorkingAreaと一致させる）
+            _cachedScaling = _cachedScreen?.Scaling ?? 1.0;
             _cachedWorkingArea = _cachedScreen?.WorkingArea ?? new PixelRect(0, 0, 1920, 1080);
 
             _logger?.LogDebug("ネイティブドラッグ開始: Position={Position}, Scaling={Scaling}", Position, _cachedScaling);
@@ -273,11 +260,12 @@ public partial class AdWindow : Window
 
                 if (screen == null) return position;
 
-                scaling = this.VisualRoot?.RenderScaling ?? 1.0;
+                // Screen.Scalingを使用（WorkingAreaと一致させる）
+                scaling = screen.Scaling;
                 workingArea = screen.WorkingArea;
             }
 
-            // 🔧 Issue #199 再修正: Boundsに依存せず、常に論理サイズ×RenderScalingで計算
+            // 🔧 Issue #199 修正: 常に論理サイズ×Screen.Scalingで計算
             var physicalWidth = (int)(AdConstants.Width * scaling);
             var physicalHeight = (int)(AdConstants.Height * scaling);
 

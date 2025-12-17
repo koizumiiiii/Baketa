@@ -499,9 +499,11 @@ public sealed class SuryaServerManager : IAsyncDisposable
         // [Issue #199] 最大10分待機（CUDA版は約2.4GB、ネットワーク状況により7分以上かかる場合がある）
         var maxWaitTime = TimeSpan.FromMinutes(10);
         var pollInterval = TimeSpan.FromSeconds(2);
+        var progressLogInterval = TimeSpan.FromSeconds(30); // 30秒ごとに進捗ログ
         var startTime = DateTime.UtcNow;
+        var lastProgressLog = DateTime.UtcNow;
 
-        _logger.LogInformation("⏳ [Surya] exe版ダウンロード待機開始（最大{MaxWait}秒）...", maxWaitTime.TotalSeconds);
+        _logger.LogInformation("⏳ [Surya] exe版ダウンロード待機開始（最大{MaxWait:F0}分）...", maxWaitTime.TotalMinutes);
 
         while (DateTime.UtcNow - startTime < maxWaitTime)
         {
@@ -509,15 +511,27 @@ public sealed class SuryaServerManager : IAsyncDisposable
 
             if (File.Exists(exePath))
             {
-                _logger.LogInformation("✅ [Surya] exe版ダウンロード完了検出: {Path}", exePath);
+                var elapsed = DateTime.UtcNow - startTime;
+                _logger.LogInformation("✅ [Surya] exe版ダウンロード完了検出: {Path} (待機時間: {Elapsed:mm\\:ss})", exePath, elapsed);
                 return;
+            }
+
+            // 30秒ごとに進捗ログを出力
+            if (DateTime.UtcNow - lastProgressLog >= progressLogInterval)
+            {
+                var elapsed = DateTime.UtcNow - startTime;
+                var remaining = maxWaitTime - elapsed;
+                _logger.LogInformation("⏳ [Surya] exe版ダウンロード待機中... (経過: {Elapsed:mm\\:ss} / 残り: {Remaining:mm\\:ss})",
+                    elapsed, remaining);
+                lastProgressLog = DateTime.UtcNow;
             }
 
             await Task.Delay(pollInterval, cancellationToken).ConfigureAwait(false);
         }
 
         // タイムアウトしてもエラーにしない（Python版にフォールバック可能な場合があるため）
-        _logger.LogWarning("⚠️ [Surya] exe版ダウンロード待機タイムアウト（{MaxWait}秒） - 続行します", maxWaitTime.TotalSeconds);
+        // ただしRelease版ではPython版がないため、実質的にはOCRが使用不可となる
+        _logger.LogWarning("⚠️ [Surya] exe版ダウンロード待機タイムアウト（{MaxWait:F0}分） - 続行します", maxWaitTime.TotalMinutes);
     }
 
     /// <summary>
