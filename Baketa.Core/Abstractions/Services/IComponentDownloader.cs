@@ -59,6 +59,9 @@ public interface IComponentDownloader
 /// <param name="ExpectedSizeBytes">Expected file size in bytes (for progress display)</param>
 /// <param name="Checksum">Optional SHA256 checksum for verification</param>
 /// <param name="IsRequired">Whether this component is required for app to function</param>
+/// <param name="SplitParts">[Issue #210] Number of split parts (> 1 for files exceeding GitHub's 2GB limit)</param>
+/// <param name="PartChecksums">[Issue #210] SHA256 checksums for each split part (for early failure detection)</param>
+/// <param name="SplitPartSuffixFormat">[Issue #210] Format string for split part suffix</param>
 public record ComponentInfo(
     string Id,
     string DisplayName,
@@ -66,7 +69,10 @@ public record ComponentInfo(
     string LocalPath,
     long ExpectedSizeBytes,
     string? Checksum = null,
-    bool IsRequired = true);
+    bool IsRequired = true,
+    int SplitParts = 1,
+    IReadOnlyList<string>? PartChecksums = null,
+    string SplitPartSuffixFormat = ".{0:D3}");
 
 /// <summary>
 /// Download progress event arguments

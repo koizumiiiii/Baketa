@@ -93,6 +93,40 @@ public class ComponentConfig
     /// File to check for determining if component is installed
     /// </summary>
     public string? VerificationFile { get; set; }
+
+    /// <summary>
+    /// [Issue #210] CUDA version filename in GitHub Releases (for GPU-aware components)
+    /// When SupportsCuda is detected, this filename is used instead of FileName
+    /// </summary>
+    public string? CudaFileName { get; set; }
+
+    /// <summary>
+    /// [Issue #210] Expected file size for CUDA version in bytes
+    /// </summary>
+    public long? CudaExpectedSizeBytes { get; set; }
+
+    /// <summary>
+    /// [Issue #210] SHA256 checksum for CUDA version verification
+    /// </summary>
+    public string? CudaChecksum { get; set; }
+
+    /// <summary>
+    /// [Issue #210] Number of split parts for CUDA version (for files exceeding GitHub's 2GB limit)
+    /// When set to a value > 1, files are named: {CudaFileName}.001, {CudaFileName}.002, etc.
+    /// </summary>
+    public int? CudaSplitParts { get; set; }
+
+    /// <summary>
+    /// [Issue #210] SHA256 checksums for each split part (optional, for early failure detection)
+    /// Array index 0 = part 001, index 1 = part 002, etc.
+    /// </summary>
+    public List<string>? CudaPartChecksums { get; set; }
+
+    /// <summary>
+    /// [Issue #210] Format string for split part suffix (default: ".{0:D3}")
+    /// {0} is replaced with the part number (1-based)
+    /// </summary>
+    public string SplitPartSuffixFormat { get; set; } = ".{0:D3}";
 }
 
 /// <summary>
@@ -185,6 +219,35 @@ public class ComponentDownloadSettingsValidator : IValidateOptions<ComponentDown
             if (!string.IsNullOrEmpty(component.Checksum) && component.Checksum.Length != 64)
             {
                 failures.Add($"{prefix}.Checksum must be a 64-character SHA256 hash, but was {component.Checksum.Length} characters");
+            }
+
+            // [Issue #210] Validate split file settings
+            if (component.CudaSplitParts.HasValue && component.CudaSplitParts > 1)
+            {
+                // CudaPartChecksums count must match CudaSplitParts
+                if (component.CudaPartChecksums != null && component.CudaPartChecksums.Count != component.CudaSplitParts)
+                {
+                    failures.Add($"{prefix}.CudaPartChecksums count ({component.CudaPartChecksums.Count}) must match CudaSplitParts ({component.CudaSplitParts})");
+                }
+
+                // Validate each part checksum format (SHA256 = 64 hex characters)
+                if (component.CudaPartChecksums != null)
+                {
+                    for (var j = 0; j < component.CudaPartChecksums.Count; j++)
+                    {
+                        var partChecksum = component.CudaPartChecksums[j];
+                        if (!string.IsNullOrEmpty(partChecksum) && partChecksum.Length != 64)
+                        {
+                            failures.Add($"{prefix}.CudaPartChecksums[{j}] must be a 64-character SHA256 hash, but was {partChecksum.Length} characters");
+                        }
+                    }
+                }
+
+                // SplitPartSuffixFormat is required when CudaSplitParts > 1
+                if (string.IsNullOrWhiteSpace(component.SplitPartSuffixFormat))
+                {
+                    failures.Add($"{prefix}.SplitPartSuffixFormat is required when CudaSplitParts > 1");
+                }
             }
         }
 

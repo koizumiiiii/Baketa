@@ -1214,8 +1214,12 @@ public class InfrastructureModule : ServiceModuleBase
                 logger.LogWarning("[Issue185] Components配列が空です！appsettings.jsonを確認してください");
             }
 
+            // [Issue #210] GPU検出器を取得（オプショナル - 登録されていない場合はnull）
+            var gpuDetector = provider.GetService<Baketa.Core.Abstractions.GPU.IGpuEnvironmentDetector>();
+            logger.LogDebug("[Issue #210] GPU detector: {Status}", gpuDetector != null ? "Available" : "Not available");
+
             logger.LogDebug("[Issue185] ComponentDownloadService インスタンス作成 - Singleton");
-            return new ComponentDownloadService(logger, httpClient, settings);
+            return new ComponentDownloadService(logger, httpClient, settings, gpuDetector);
         });
 
         // 設定値のログ出力はファクトリー内のILoggerで実行されます
