@@ -46,8 +46,10 @@ public sealed class WarmupHostedService(
                 // ウォームアップ開始（非同期実行）
                 await warmupService.StartWarmupAsync(stoppingToken).ConfigureAwait(false);
 
-                // ウォームアップ完了を待機（最大5分）
-                var waitTimeout = TimeSpan.FromMinutes(5);
+                // ウォームアップ完了を待機（最大30分）
+                // [Issue #199] SuryaServerManagerのexeダウンロード（最大10分）+ PyTorchインストール（最大30分）を考慮
+                // ネットワーク状況によって大幅に変動するため、余裕を持って30分に設定
+                var waitTimeout = TimeSpan.FromMinutes(30);
                 var success = await warmupService.WaitForWarmupAsync(waitTimeout, stoppingToken).ConfigureAwait(false);
 
                 if (success)
