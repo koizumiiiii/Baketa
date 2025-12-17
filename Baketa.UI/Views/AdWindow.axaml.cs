@@ -61,20 +61,38 @@ public partial class AdWindow : Window
             var scaling = this.VisualRoot?.RenderScaling ?? 1.0;
             var workingArea = screen.WorkingArea;
 
-            // 🔧 Issue #199 再修正: Boundsに依存せず、常に論理サイズ×RenderScalingで計算
-            // Avalonia 11.2.xではBoundsの返す値がDebug/Releaseで異なるバグがある
-            // https://github.com/AvaloniaUI/Avalonia/issues/17834
-            var physicalWidth = AdConstants.Width * scaling;
-            var physicalHeight = AdConstants.Height * scaling;
+            // 🔧 Issue #199 再修正: 実際のFrameSizeを優先使用
+            // Loaded後はFrameSizeが確定しているため、計算値より正確
+            var frameSize = FrameSize;
+            double physicalWidth;
+            double physicalHeight;
 
-            _logger?.LogInformation("ウィンドウサイズ計算: Logical=({LogicalW}x{LogicalH}), Physical=({PhysicalW}x{PhysicalH}), Scaling={Scaling}",
-                AdConstants.Width, AdConstants.Height, physicalWidth, physicalHeight, scaling);
+            if (frameSize is { Width: > 0, Height: > 0 })
+            {
+                // 実際のフレームサイズを使用（最も正確）
+                physicalWidth = frameSize.Value.Width;
+                physicalHeight = frameSize.Value.Height;
+                _logger?.LogInformation("FrameSize使用: {FrameSize}", frameSize);
+            }
+            else
+            {
+                // フォールバック: 論理サイズ×スケーリングで計算
+                physicalWidth = AdConstants.Width * scaling;
+                physicalHeight = AdConstants.Height * scaling;
+                _logger?.LogInformation("計算サイズ使用（FrameSize未取得）");
+            }
+
+            // マージンもスケーリングを適用（論理ピクセル→物理ピクセル）
+            var physicalMargin = (int)(AdConstants.ScreenMargin * scaling);
+
+            _logger?.LogInformation("ウィンドウサイズ: Physical=({PhysicalW}x{PhysicalH}), Margin={Margin}, Scaling={Scaling}",
+                physicalWidth, physicalHeight, physicalMargin, scaling);
             _logger?.LogInformation("作業領域: {WorkingArea}, 現在位置: {Position}",
                 workingArea, Position);
 
             // 物理サイズで右下端に配置
-            var x = workingArea.Right - (int)physicalWidth - AdConstants.ScreenMargin;
-            var y = workingArea.Bottom - (int)physicalHeight - AdConstants.ScreenMargin;
+            var x = workingArea.Right - (int)physicalWidth - physicalMargin;
+            var y = workingArea.Bottom - (int)physicalHeight - physicalMargin;
 
             // 画面左上端制約
             x = Math.Max(x, workingArea.X);
@@ -175,7 +193,8 @@ public partial class AdWindow : Window
             // Loaded後に再調整されるため、ここでは概算値を使用
             var physicalWidth = (int)(AdConstants.Width * scaling);
             var physicalHeight = (int)(AdConstants.Height * scaling);
-            var physicalMargin = AdConstants.ScreenMargin;
+            // マージンもスケーリングを適用（論理ピクセル→物理ピクセル）
+            var physicalMargin = (int)(AdConstants.ScreenMargin * scaling);
 
             var x = workingArea.Right - physicalWidth - physicalMargin;
             var y = workingArea.Bottom - physicalHeight - physicalMargin;

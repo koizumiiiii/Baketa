@@ -192,12 +192,13 @@ public class GpuEnvironmentService : IGpuEnvironmentService
             }
 
             // Step 3: CUDA版PyTorchのインストール
-            ReportProgress("install_torch", "CUDA版PyTorchをインストール中（約2GB）...", 50);
+            // [Issue #213] タイムアウトを30分に延長（2.4GBダウンロード対応）
+            ReportProgress("install_torch", "CUDA版PyTorchをインストール中（約2.4GB、最大30分）...", 50);
             var torchResult = await RunPipCommandAsync(
                 pythonPath,
                 "install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121",
                 cancellationToken,
-                timeoutMinutes: 10).ConfigureAwait(false);
+                timeoutMinutes: 30).ConfigureAwait(false);
 
             if (!torchResult)
             {
