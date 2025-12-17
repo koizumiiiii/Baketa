@@ -193,16 +193,21 @@ if (Test-Path $translationServerDir) {
 # CPU版/CUDA版はGitHub Releasesから自動ダウンロードされるため、リリースパッケージには含めない
 Write-Host "  BaketaSuryaOcrServer: Skipped (downloaded on first run based on GPU detection)" -ForegroundColor Gray
 
-# 5.3 Copy OCR models (ppocrv5-onnx)
-$ocrModelDir = "$ProjectRoot\Models\ppocrv5-onnx"
-if (Test-Path $ocrModelDir) {
-    $targetDir = "$OutputDir\Models\ppocrv5-onnx"
-    $null = New-Item -ItemType Directory -Path $targetDir -Force
-    Write-Host "  Copying OCR models..." -ForegroundColor Gray
-    Copy-Item -Path "$ocrModelDir\*" -Destination $targetDir -Recurse
-} else {
-    Write-Host "  WARNING: OCR models not found: $ocrModelDir" -ForegroundColor Red
+# 5.3 OCR models - [SIZE_OPTIMIZATION] ppocrv5-onnxはNuGetパッケージに含まれるため不要
+Write-Host "  OCR models: Skipped (included in NuGet package Sdcb.PaddleOCR.Models.Local)" -ForegroundColor Gray
+
+# 5.4 [SIZE_OPTIMIZATION] 不要な言語フォルダを削除（ja, en以外）
+Write-Host "  Removing unnecessary language folders..." -ForegroundColor Gray
+$unnecessaryLangs = @('cs', 'de', 'es', 'fr', 'it', 'ko', 'pl', 'pt-BR', 'ru', 'tr', 'zh-Hans', 'zh-Hant')
+$removedCount = 0
+foreach ($lang in $unnecessaryLangs) {
+    $langPath = Join-Path $OutputDir $lang
+    if (Test-Path $langPath) {
+        Remove-Item -Recurse -Force $langPath
+        $removedCount++
+    }
 }
+Write-Host "  Removed $removedCount language folders (keeping ja, en only)" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
