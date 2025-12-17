@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Security.Cryptography;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
@@ -19,13 +20,20 @@ public class ComponentDownloadService : IComponentDownloader
     private readonly ILogger<ComponentDownloadService> _logger;
     private readonly HttpClient _httpClient;
     private readonly ComponentDownloadSettings _settings;
+    private readonly IGpuEnvironmentDetector? _gpuDetector;
     private readonly string _appDataPath;
     private readonly string _appBasePath;
+
+    // [Issue #210] Surya OCR Server component ID for GPU-aware download
+    private const string SuryaOcrServerComponentId = "surya_ocr_server";
 
     // [Issue #185] HuggingFace NLLB tokenizer constants
     private const string HuggingFaceTokenizerUrl = "https://huggingface.co/facebook/nllb-200-distilled-600M/resolve/main/tokenizer.json";
     private const long TokenizerExpectedSizeBytes = 17_331_176; // ~17.3MB
     private const string NllbModelComponentId = "nllb_model";
+
+    // [Issue #210] Cached GPU detection result
+    private bool? _cachedSupportsCuda;
 
     /// <inheritdoc/>
     public event EventHandler<ComponentDownloadProgressEventArgs>? DownloadProgressChanged;
@@ -33,11 +41,13 @@ public class ComponentDownloadService : IComponentDownloader
     public ComponentDownloadService(
         ILogger<ComponentDownloadService> logger,
         HttpClient httpClient,
-        IOptions<ComponentDownloadSettings> settings)
+        IOptions<ComponentDownloadSettings> settings,
+        IGpuEnvironmentDetector? gpuDetector = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
+        _gpuDetector = gpuDetector;
 
         // Configure HttpClient timeout from settings
         _httpClient.Timeout = TimeSpan.FromSeconds(_settings.DownloadTimeoutSeconds);
@@ -49,25 +59,109 @@ public class ComponentDownloadService : IComponentDownloader
 
         // Application base path for bundled components
         _appBasePath = AppContext.BaseDirectory;
+
+        _logger.LogInformation("[Issue #210] ComponentDownloadService initialized (GPU detector: {HasGpuDetector})",
+            _gpuDetector != null ? "Available" : "Not available");
     }
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<ComponentInfo>> GetRequiredComponentsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ComponentInfo>> GetRequiredComponentsAsync(CancellationToken cancellationToken = default)
     {
+        // [Issue #210] Detect GPU capabilities for Surya OCR Server selection
+        var supportsCuda = await DetectCudaSupportAsync(cancellationToken).ConfigureAwait(false);
+
         var components = _settings.Components
-            .Select(config => new ComponentInfo(
-                Id: config.Id,
-                DisplayName: config.DisplayName,
-                DownloadUrl: $"{_settings.GitHubReleasesBaseUrl}/{_settings.ReleaseVersion}/{config.FileName}",
-                LocalPath: config.UseAppData
-                    ? Path.Combine(_appDataPath, config.LocalSubPath)
-                    : Path.Combine(_appBasePath, config.LocalSubPath),
-                ExpectedSizeBytes: config.ExpectedSizeBytes,
-                Checksum: config.Checksum,
-                IsRequired: config.IsRequired))
+            .Select(config => CreateComponentInfo(config, supportsCuda))
             .ToList();
 
-        return Task.FromResult<IReadOnlyList<ComponentInfo>>(components);
+        return components;
+    }
+
+    /// <summary>
+    /// [Issue #210] Creates ComponentInfo with GPU-aware filename selection
+    /// </summary>
+    private ComponentInfo CreateComponentInfo(ComponentConfig config, bool supportsCuda)
+    {
+        var fileName = config.FileName;
+        var expectedSize = config.ExpectedSizeBytes;
+        var checksum = config.Checksum;
+        var splitParts = 1;
+        IReadOnlyList<string>? partChecksums = null;
+        var splitPartSuffixFormat = config.SplitPartSuffixFormat;
+
+        // [Issue #210] For Surya OCR Server, select CUDA or CPU version based on GPU detection
+        if (config.Id == SuryaOcrServerComponentId && supportsCuda && !string.IsNullOrEmpty(config.CudaFileName))
+        {
+            fileName = config.CudaFileName;
+            expectedSize = config.CudaExpectedSizeBytes ?? config.ExpectedSizeBytes;
+            checksum = config.CudaChecksum ?? config.Checksum;
+            splitParts = config.CudaSplitParts ?? 1;
+            partChecksums = config.CudaPartChecksums;
+
+            _logger.LogInformation(
+                "[Issue #210] GPU detected with CUDA support - selecting CUDA version: {FileName} ({SizeMB:N0} MB, {SplitParts} parts)",
+                fileName, expectedSize / (1024 * 1024), splitParts);
+        }
+        else if (config.Id == SuryaOcrServerComponentId)
+        {
+            _logger.LogInformation(
+                "[Issue #210] No CUDA support detected - selecting CPU version: {FileName} ({SizeMB:N0} MB)",
+                fileName, expectedSize / (1024 * 1024));
+        }
+
+        return new ComponentInfo(
+            Id: config.Id,
+            DisplayName: config.DisplayName,
+            DownloadUrl: $"{_settings.GitHubReleasesBaseUrl}/{_settings.ReleaseVersion}/{fileName}",
+            LocalPath: config.UseAppData
+                ? Path.Combine(_appDataPath, config.LocalSubPath)
+                : Path.Combine(_appBasePath, config.LocalSubPath),
+            ExpectedSizeBytes: expectedSize,
+            Checksum: checksum,
+            IsRequired: config.IsRequired,
+            SplitParts: splitParts,
+            PartChecksums: partChecksums,
+            SplitPartSuffixFormat: splitPartSuffixFormat);
+    }
+
+    /// <summary>
+    /// [Issue #210] Detects CUDA support using IGpuEnvironmentDetector
+    /// Falls back to false if detector is not available or detection fails
+    /// </summary>
+    private async Task<bool> DetectCudaSupportAsync(CancellationToken cancellationToken)
+    {
+        // Return cached result if available
+        if (_cachedSupportsCuda.HasValue)
+        {
+            return _cachedSupportsCuda.Value;
+        }
+
+        if (_gpuDetector == null)
+        {
+            _logger.LogWarning("[Issue #210] GPU detector not available - defaulting to CPU version");
+            _cachedSupportsCuda = false;
+            return false;
+        }
+
+        try
+        {
+            var gpuInfo = await _gpuDetector.DetectEnvironmentAsync(cancellationToken).ConfigureAwait(false);
+            _cachedSupportsCuda = gpuInfo.SupportsCuda;
+
+            _logger.LogInformation(
+                "[Issue #210] GPU detection complete - GPU: {GpuName}, CUDA: {SupportsCuda}, VRAM: {VramMB} MB",
+                gpuInfo.GpuName,
+                gpuInfo.SupportsCuda,
+                gpuInfo.AvailableMemoryMB);
+
+            return gpuInfo.SupportsCuda;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #210] GPU detection failed - defaulting to CPU version");
+            _cachedSupportsCuda = false;
+            return false;
+        }
     }
 
     /// <inheritdoc/>
@@ -130,8 +224,16 @@ public class ComponentDownloadService : IComponentDownloader
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
 
-                // Download with progress reporting
-                await DownloadFileWithProgressAsync(component, tempZipPath, cancellationToken).ConfigureAwait(false);
+                // [Issue #210] Handle split files for large CUDA downloads
+                if (component.SplitParts > 1)
+                {
+                    await DownloadAndConcatenateSplitFilesAsync(component, tempZipPath, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    // Download with progress reporting
+                    await DownloadFileWithProgressAsync(component, tempZipPath, cancellationToken).ConfigureAwait(false);
+                }
 
                 // Verify checksum if provided
                 if (!string.IsNullOrEmpty(component.Checksum))
@@ -293,8 +395,8 @@ public class ComponentDownloadService : IComponentDownloader
         var tempPath = Path.GetTempFileName();
         try
         {
-            // Download with progress reporting
-            await DownloadTokenizerWithProgressAsync(tokenizerComponent, tempPath, cancellationToken).ConfigureAwait(false);
+            // Download with progress reporting (using shared download method)
+            await DownloadFileWithProgressAsync(tokenizerComponent, tempPath, cancellationToken).ConfigureAwait(false);
 
             // Move to final destination
             File.Move(tempPath, tokenizerPath, overwrite: true);
@@ -325,43 +427,184 @@ public class ComponentDownloadService : IComponentDownloader
     #region Private Methods
 
     /// <summary>
-    /// [Issue #185] Downloads tokenizer.json from HuggingFace with progress reporting
+    /// [Issue #210] Downloads and concatenates split files for large CUDA downloads
+    /// Files are named using SplitPartSuffixFormat (default: {DownloadUrl}.001, .002, etc.)
+    /// Includes part-level checksum verification for early failure detection
     /// </summary>
-    private async Task DownloadTokenizerWithProgressAsync(
+    private async Task DownloadAndConcatenateSplitFilesAsync(
         ComponentInfo component,
         string destinationPath,
         CancellationToken cancellationToken)
     {
-        using var response = await _httpClient.GetAsync(
-            component.DownloadUrl,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation(
+            "[Issue #210] Downloading split files: {ComponentId} ({Parts} parts, suffix format: {Format})",
+            component.Id, component.SplitParts, component.SplitPartSuffixFormat);
 
-        response.EnsureSuccessStatusCode();
+        var tempParts = new List<string>();
+        var totalDownloaded = 0L;
+        var downloadStartTime = Stopwatch.StartNew();
 
-        var totalBytes = response.Content.Headers.ContentLength ?? component.ExpectedSizeBytes;
-        var bytesReceived = 0L;
-        var lastReportTime = Stopwatch.StartNew();
-        var lastBytesReceived = 0L;
-
-        await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-
-        var buffer = new byte[81920]; // 80KB buffer
-        int bytesRead;
-
-        while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        try
         {
-            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-            bytesReceived += bytesRead;
-
-            // Report progress every 500ms
-            if (lastReportTime.ElapsedMilliseconds >= 500)
+            // Download each part
+            for (var i = 1; i <= component.SplitParts; i++)
             {
-                var speed = (bytesReceived - lastBytesReceived) / (lastReportTime.ElapsedMilliseconds / 1000.0);
-                ReportProgress(component, bytesReceived, totalBytes, speed);
-                lastBytesReceived = bytesReceived;
-                lastReportTime.Restart();
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // [Issue #210] Use configurable suffix format
+                var partSuffix = string.Format(component.SplitPartSuffixFormat, i);
+                var partUrl = $"{component.DownloadUrl}{partSuffix}";
+                var partPath = Path.GetTempFileName();
+                tempParts.Add(partPath);
+
+                _logger.LogInformation(
+                    "[Issue #210] Downloading part {Part}/{Total}: {Url}",
+                    i, component.SplitParts, partUrl);
+
+                ReportProgress(
+                    component,
+                    totalDownloaded,
+                    component.ExpectedSizeBytes,
+                    0,
+                    isCompleted: false,
+                    statusMessage: $"{component.DisplayName} をダウンロード中... (パート {i}/{component.SplitParts})");
+
+                // Download this part
+                using var response = await _httpClient.GetAsync(
+                    partUrl,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken).ConfigureAwait(false);
+
+                response.EnsureSuccessStatusCode();
+
+                var partSize = response.Content.Headers.ContentLength ?? 0;
+                var partBytesReceived = 0L;
+                var lastReportTime = Stopwatch.StartNew();
+                var lastBytesForSpeed = 0L;
+
+                await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                await using var fileStream = new FileStream(partPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+
+                var buffer = new byte[81920];
+                int bytesRead;
+
+                while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                    partBytesReceived += bytesRead;
+
+                    // [Issue #210] Real-time progress reporting every 500ms
+                    if (lastReportTime.ElapsedMilliseconds >= 500)
+                    {
+                        var elapsedSeconds = lastReportTime.ElapsedMilliseconds / 1000.0;
+                        var speed = (partBytesReceived - lastBytesForSpeed) / elapsedSeconds;
+                        var progressPercent = component.ExpectedSizeBytes > 0
+                            ? (totalDownloaded + partBytesReceived) * 100.0 / component.ExpectedSizeBytes
+                            : 0;
+
+                        ReportProgress(
+                            component,
+                            totalDownloaded + partBytesReceived,
+                            component.ExpectedSizeBytes,
+                            speed,
+                            isCompleted: false,
+                            statusMessage: $"{component.DisplayName} をダウンロード中... (パート {i}/{component.SplitParts}, {progressPercent:F1}%)");
+
+                        lastBytesForSpeed = partBytesReceived;
+                        lastReportTime.Restart();
+                    }
+                }
+
+                totalDownloaded += partBytesReceived;
+                _logger.LogInformation(
+                    "[Issue #210] Part {Part}/{Total} downloaded: {SizeMB:N0} MB",
+                    i, component.SplitParts, partBytesReceived / (1024 * 1024));
+
+                // [Issue #210] Verify part checksum for early failure detection
+                if (component.PartChecksums != null && component.PartChecksums.Count >= i)
+                {
+                    var expectedChecksum = component.PartChecksums[i - 1];
+                    if (!string.IsNullOrEmpty(expectedChecksum))
+                    {
+                        ReportProgress(
+                            component,
+                            totalDownloaded,
+                            component.ExpectedSizeBytes,
+                            0,
+                            isCompleted: false,
+                            statusMessage: $"{component.DisplayName} パート {i} を検証中...");
+
+                        // Need to close fileStream before computing checksum
+                        await fileStream.DisposeAsync().ConfigureAwait(false);
+
+                        var actualChecksum = await ComputeChecksumAsync(partPath, cancellationToken).ConfigureAwait(false);
+                        if (!string.Equals(actualChecksum, expectedChecksum, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logger.LogError(
+                                "[Issue #210] Part {Part} checksum mismatch. Expected: {Expected}, Actual: {Actual}",
+                                i, expectedChecksum, actualChecksum);
+                            throw new InvalidOperationException(
+                                $"Checksum mismatch for part {i} of {component.Id}. Expected: {expectedChecksum}, Actual: {actualChecksum}");
+                        }
+                        _logger.LogInformation("[Issue #210] Part {Part} checksum verified", i);
+                    }
+                }
+            }
+
+            // Concatenate all parts with progress reporting
+            _logger.LogInformation("[Issue #210] Concatenating {Parts} parts...", component.SplitParts);
+
+            await using var outputStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+
+            var concatenatedBytes = 0L;
+            var concatStartTime = Stopwatch.StartNew();
+
+            for (var partIndex = 0; partIndex < tempParts.Count; partIndex++)
+            {
+                var partPath = tempParts[partIndex];
+                await using var partStream = File.OpenRead(partPath);
+
+                var buffer = new byte[81920];
+                int bytesRead;
+                var lastConcatReportTime = Stopwatch.StartNew();
+
+                while ((bytesRead = await partStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    await outputStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                    concatenatedBytes += bytesRead;
+
+                    // [Issue #210] Progress reporting during concatenation
+                    if (lastConcatReportTime.ElapsedMilliseconds >= 500)
+                    {
+                        var concatPercent = totalDownloaded > 0 ? concatenatedBytes * 100.0 / totalDownloaded : 0;
+                        ReportProgress(
+                            component,
+                            component.ExpectedSizeBytes,
+                            component.ExpectedSizeBytes,
+                            0,
+                            isCompleted: false,
+                            statusMessage: $"{component.DisplayName} を結合しています... ({concatPercent:F1}%)");
+                        lastConcatReportTime.Restart();
+                    }
+                }
+            }
+
+            var totalElapsedSeconds = downloadStartTime.Elapsed.TotalSeconds;
+            var averageSpeed = totalDownloaded / totalElapsedSeconds;
+
+            _logger.LogInformation(
+                "[Issue #210] Split file concatenation complete: {TotalMB:N0} MB in {Seconds:F1}s ({SpeedMBps:F1} MB/s)",
+                totalDownloaded / (1024 * 1024),
+                totalElapsedSeconds,
+                averageSpeed / (1024 * 1024));
+        }
+        finally
+        {
+            // Clean up temp parts
+            foreach (var partPath in tempParts)
+            {
+                try { File.Delete(partPath); }
+                catch { /* ignore cleanup errors */ }
             }
         }
     }
@@ -370,6 +613,7 @@ public class ComponentDownloadService : IComponentDownloader
     /// [Issue #185] Ensures sufficient disk space is available before downloading
     /// Checks both temp directory (for download) and destination directory (for extraction)
     /// Handles same-drive scenario to avoid double-counting space requirements
+    /// [Issue #210] For split files, accounts for 2x temp space (parts + concatenated file)
     /// </summary>
     /// <param name="component">Component to download</param>
     /// <exception cref="IOException">Thrown when insufficient disk space is available</exception>
@@ -385,33 +629,42 @@ public class ComponentDownloadService : IComponentDownloader
         var destinationRoot = Path.GetPathRoot(component.LocalPath);
         var isSameDrive = string.Equals(tempRoot, destinationRoot, StringComparison.OrdinalIgnoreCase);
 
+        // [Issue #210] For split files, temp needs 2x space (all parts + concatenated file exist simultaneously during concatenation)
+        var tempMultiplier = component.SplitParts > 1 ? 2 : 1;
+
         if (isSameDrive)
         {
             // Same drive: need space for both zip download AND extraction
-            var requiredBytes = (component.ExpectedSizeBytes * 2) + safetyMarginBytes;
+            // For split files: (parts + concatenated) + extraction = 3x
+            // For single files: download + extraction = 2x
+            var requiredBytes = (component.ExpectedSizeBytes * (tempMultiplier + 1)) + safetyMarginBytes;
             if (tempDrive.AvailableFreeSpace < requiredBytes)
             {
                 var requiredMB = requiredBytes / (1024 * 1024);
                 var availableMB = tempDrive.AvailableFreeSpace / (1024 * 1024);
-                var message = $"Insufficient disk space on drive ({tempDrive.Name}). " +
+                var splitInfo = component.SplitParts > 1 ? $" ({component.SplitParts}パート分割)" : "";
+                var message = $"Insufficient disk space on drive ({tempDrive.Name}){splitInfo}. " +
                              $"Required: {requiredMB:N0} MB (download + extraction), Available: {availableMB:N0} MB";
                 _logger.LogError(message);
                 throw new IOException(message);
             }
             _logger.LogDebug(
-                "Disk space check passed for {ComponentId} (same drive). Required: {RequiredMB:N0} MB",
+                "Disk space check passed for {ComponentId} (same drive, split={SplitParts}). Required: {RequiredMB:N0} MB",
                 component.Id,
+                component.SplitParts,
                 requiredBytes / (1024 * 1024));
         }
         else
         {
             // Different drives: check each separately
-            var tempRequiredBytes = component.ExpectedSizeBytes + safetyMarginBytes;
+            // For split files: temp needs 2x space (parts + concatenated file)
+            var tempRequiredBytes = (component.ExpectedSizeBytes * tempMultiplier) + safetyMarginBytes;
             if (tempDrive.AvailableFreeSpace < tempRequiredBytes)
             {
                 var requiredMB = tempRequiredBytes / (1024 * 1024);
                 var availableMB = tempDrive.AvailableFreeSpace / (1024 * 1024);
-                var message = $"Insufficient disk space on temp drive ({tempDrive.Name}). " +
+                var splitInfo = component.SplitParts > 1 ? $" ({component.SplitParts}パート分割)" : "";
+                var message = $"Insufficient disk space on temp drive ({tempDrive.Name}){splitInfo}. " +
                              $"Required: {requiredMB:N0} MB, Available: {availableMB:N0} MB";
                 _logger.LogError(message);
                 throw new IOException(message);
@@ -433,13 +686,21 @@ public class ComponentDownloadService : IComponentDownloader
             }
 
             _logger.LogDebug(
-                "Disk space check passed for {ComponentId} (different drives). Temp: {TempDrive}, Dest: {DestDrive}",
+                "Disk space check passed for {ComponentId} (different drives, split={SplitParts}). Temp: {TempDrive}, Dest: {DestDrive}",
                 component.Id,
+                component.SplitParts,
                 tempRoot,
                 destinationRoot ?? "N/A");
         }
     }
 
+    /// <summary>
+    /// [Issue #185] Downloads a file with progress reporting
+    /// Used for both component downloads and tokenizer downloads
+    /// </summary>
+    /// <param name="component">Component info containing download URL and expected size</param>
+    /// <param name="destinationPath">Local path to save the downloaded file</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     private async Task DownloadFileWithProgressAsync(
         ComponentInfo component,
         string destinationPath,

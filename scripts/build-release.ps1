@@ -189,16 +189,9 @@ if (Test-Path $translationServerDir) {
     Write-Host "  WARNING: BaketaTranslationServer not found" -ForegroundColor Red
 }
 
-# 5.2.1 Copy BaketaSuryaOcrServer.exe
-$suryaServerDir = "$ProjectRoot\grpc_server\dist\BaketaSuryaOcrServer"
-if (Test-Path $suryaServerDir) {
-    $targetDir = "$OutputDir\grpc_server\BaketaSuryaOcrServer"
-    $null = New-Item -ItemType Directory -Path $targetDir -Force
-    Write-Host "  Copying BaketaSuryaOcrServer..." -ForegroundColor Gray
-    Copy-Item -Path "$suryaServerDir\*" -Destination $targetDir -Recurse
-} else {
-    Write-Host "  WARNING: BaketaSuryaOcrServer not found" -ForegroundColor Red
-}
+# 5.2.1 BaketaSuryaOcrServer - [Issue #210] 初回起動時にGPU検出結果に基づきダウンロード
+# CPU版/CUDA版はGitHub Releasesから自動ダウンロードされるため、リリースパッケージには含めない
+Write-Host "  BaketaSuryaOcrServer: Skipped (downloaded on first run based on GPU detection)" -ForegroundColor Gray
 
 # 5.3 Copy OCR models (ppocrv5-onnx)
 $ocrModelDir = "$ProjectRoot\Models\ppocrv5-onnx"
