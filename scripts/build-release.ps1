@@ -5,7 +5,9 @@ param(
     [switch]$SkipGitSync,     # Skip Git sync (keep local changes)
     [switch]$SkipPyInstaller, # Skip PyInstaller build (when Python unchanged)
     [switch]$SkipTests,       # Skip tests (fast build)
-    [string]$OutputDir = "$PSScriptRoot\..\release"  # Output directory
+    [switch]$SkipZip,         # Skip zip file creation
+    [string]$OutputDir = "$PSScriptRoot\..\release",  # Output directory
+    [string]$ZipName = ""     # Zip file name (auto-generated if empty)
 )
 
 $ErrorActionPreference = "Stop"
@@ -316,3 +318,73 @@ Get-ChildItem $OutputDir -Recurse -File |
         $relativePath = $_.FullName.Replace($OutputDir, "").TrimStart("\")
         Write-Host "  $sizeInMB MB`t$relativePath" -ForegroundColor Gray
     }
+
+# ========================================
+# Step 6: Create zip file (optional)
+# ========================================
+if (-not $SkipZip) {
+    Write-Host ""
+    Write-Host "[Step 6] Creating zip file..." -ForegroundColor Yellow
+
+    # Auto-generate zip name if not provided
+    if ([string]::IsNullOrEmpty($ZipName)) {
+        # Try to get version from git tag
+        $gitTag = git describe --tags --abbrev=0 2>$null
+        if ($gitTag) {
+            $ZipName = "Baketa-$gitTag.zip"
+        } else {
+            $ZipName = "Baketa-release.zip"
+        }
+    }
+
+    $ZipPath = Join-Path $ProjectRoot $ZipName
+
+    # Remove existing zip if exists
+    if (Test-Path $ZipPath) {
+        Remove-Item $ZipPath -Force
+        Write-Host "  Removed existing: $ZipName" -ForegroundColor DarkGray
+    }
+
+    # Get all files excluding Windows reserved names
+    $filesToZip = Get-ChildItem -Path $OutputDir -Recurse -File |
+        Where-Object { $_.Name -notmatch '^(nul|con|prn|aux|com[1-9]|lpt[1-9])$' }
+
+    # Create zip using .NET (more reliable than Compress-Archive for large files)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+    try {
+        $zip = [System.IO.Compression.ZipFile]::Open($ZipPath, 'Create')
+
+        $totalFiles = $filesToZip.Count
+        $processedFiles = 0
+
+        foreach ($file in $filesToZip) {
+            $relativePath = $file.FullName.Substring($OutputDir.Length + 1)
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $zip,
+                $file.FullName,
+                $relativePath,
+                [System.IO.Compression.CompressionLevel]::Optimal
+            ) | Out-Null
+
+            $processedFiles++
+            if ($processedFiles % 100 -eq 0) {
+                Write-Host "  Progress: $processedFiles / $totalFiles files" -ForegroundColor DarkGray
+            }
+        }
+
+        $zip.Dispose()
+
+        $zipSize = (Get-Item $ZipPath).Length / 1MB
+        Write-Host "  Created: $ZipName ($([math]::Round($zipSize, 2)) MB)" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Zip file: $ZipPath" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Host "  ERROR: Failed to create zip - $($_.Exception.Message)" -ForegroundColor Red
+        if ($zip) { $zip.Dispose() }
+    }
+} else {
+    Write-Host ""
+    Write-Host "[Step 6] Zip creation skipped" -ForegroundColor Gray
+}

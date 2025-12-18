@@ -758,3 +758,15 @@ release_package/
 
 # Release build temporary directory
 release_build/
+
+# Additional release directories (duplicate/old naming)
+publish/
+release_assets/
+release_packages/
+release-assets/
+
+# Temp review files (code review artifacts)
+temp_review_*.txt
+
+# Translation server logs
+translation_server.log
