@@ -60,14 +60,20 @@ public partial class AdWindow : Window
             var scaling = screen.Scaling;
             var workingArea = screen.WorkingArea;
 
+            // 🔧 Issue #212 修正: Release/Debug間のサイズ差異を解消
+            // Releaseビルドでウィンドウサイズが物理ピクセルで解釈される問題を修正
+            // 論理サイズを明示的に再設定
+            Width = AdConstants.Width;
+            Height = AdConstants.Height;
+
             // 🔧 Issue #199 修正: WorkingAreaは物理ピクセルなので、物理サイズで計算
             // 論理サイズ × スケーリング = 物理サイズ
             var physicalWidth = (int)(AdConstants.Width * scaling);   // 300 * 1.5 = 450
             var physicalHeight = (int)(AdConstants.Height * scaling); // 250 * 1.5 = 375
             var physicalMargin = (int)(AdConstants.ScreenMargin * scaling); // 10 * 1.5 = 15
 
-            _logger?.LogInformation("ウィンドウサイズ: Physical=({PhysicalW}x{PhysicalH}), Margin={Margin}, Scaling={Scaling}, FrameSize={FrameSize}",
-                physicalWidth, physicalHeight, physicalMargin, scaling, FrameSize);
+            _logger?.LogInformation("ウィンドウサイズ: Logical=({LogicalW}x{LogicalH}), Physical=({PhysicalW}x{PhysicalH}), Margin={Margin}, Scaling={Scaling}",
+                Width, Height, physicalWidth, physicalHeight, physicalMargin, scaling);
             _logger?.LogInformation("作業領域: {WorkingArea}, 現在位置: {Position}",
                 workingArea, Position);
 
