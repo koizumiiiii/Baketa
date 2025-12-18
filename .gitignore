@@ -755,3 +755,6 @@ grpc_server/venv_build/
 
 # Release package output
 release_package/
+
+# Release build temporary directory
+release_build/

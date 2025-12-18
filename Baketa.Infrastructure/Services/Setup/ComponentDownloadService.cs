@@ -330,22 +330,103 @@ public class ComponentDownloadService : IComponentDownloader
     public async Task<int> DownloadMissingComponentsAsync(CancellationToken cancellationToken = default)
     {
         var components = await GetRequiredComponentsAsync(cancellationToken).ConfigureAwait(false);
-        var downloadCount = 0;
 
-        foreach (var component in components)
+        // [Issue #213] 並列ダウンロードの最適化
+        // まず各コンポーネントのインストール状態を並列にチェック
+        var installCheckTasks = components.Select(async component =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             var isInstalled = await IsComponentInstalledAsync(component, cancellationToken).ConfigureAwait(false);
-            if (!isInstalled)
+            return (component, isInstalled);
+        });
+        var checkResults = await Task.WhenAll(installCheckTasks).ConfigureAwait(false);
+
+        // 未インストールのコンポーネントを抽出
+        var missingComponents = checkResults
+            .Where(r => !r.isInstalled)
+            .Select(r => r.component)
+            .ToList();
+
+        if (missingComponents.Count == 0)
+        {
+            _logger.LogInformation("All components are already installed");
+            return 0;
+        }
+
+        _logger.LogInformation("Found {Count} missing components to download: {Components}",
+            missingComponents.Count,
+            string.Join(", ", missingComponents.Select(c => c.Id)));
+
+        // [Issue #213] 並列ダウンロード（設定ファイルから読み込み、デフォルト2）
+        // [Gemini Review] maxConcurrentDownloadsを設定可能に
+        var maxConcurrentDownloads = _settings.MaxConcurrentDownloads > 0 ? _settings.MaxConcurrentDownloads : 2;
+        using var semaphore = new SemaphoreSlim(maxConcurrentDownloads);
+        var downloadCount = 0;
+        var failedComponents = new List<(ComponentInfo Component, Exception Exception)>();
+        var failedComponentsLock = new object();
+
+        // [Gemini Review] 経過時間ログ出力
+        var totalStopwatch = Stopwatch.StartNew();
+
+        var downloadTasks = missingComponents.Select(async component =>
+        {
+            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var componentStopwatch = Stopwatch.StartNew();
+            try
             {
-                _logger.LogInformation("Downloading missing component: {ComponentId}", component.Id);
+                cancellationToken.ThrowIfCancellationRequested();
+                _logger.LogInformation("Downloading component: {ComponentId}", component.Id);
                 await DownloadComponentAsync(component, cancellationToken).ConfigureAwait(false);
-                downloadCount++;
+                Interlocked.Increment(ref downloadCount);
+                componentStopwatch.Stop();
+                _logger.LogInformation("Completed download: {ComponentId} in {ElapsedMs}ms", component.Id, componentStopwatch.ElapsedMilliseconds);
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // キャンセルは再スロー
+            }
+            catch (Exception ex)
+            {
+                // [Gemini Review] 部分的成功許容: 失敗したコンポーネントを記録して続行
+                componentStopwatch.Stop();
+                _logger.LogWarning(ex, "Failed to download component: {ComponentId} after {ElapsedMs}ms", component.Id, componentStopwatch.ElapsedMilliseconds);
+                lock (failedComponentsLock)
+                {
+                    failedComponents.Add((component, ex));
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(downloadTasks).ConfigureAwait(false);
+
+        totalStopwatch.Stop();
+        _logger.LogInformation("[Gemini Review] Downloaded {SuccessCount}/{TotalCount} components in {ElapsedMs}ms (並列数: {Concurrency})",
+            downloadCount, missingComponents.Count, totalStopwatch.ElapsedMilliseconds, maxConcurrentDownloads);
+
+        // [Gemini Review] 部分的失敗の場合、エラーをログに出力
+        if (failedComponents.Count > 0)
+        {
+            var requiredFailures = failedComponents.Where(f => f.Component.IsRequired).ToList();
+            if (requiredFailures.Count > 0)
+            {
+                // 必須コンポーネントが失敗した場合は例外をスロー
+                var failedIds = string.Join(", ", requiredFailures.Select(f => f.Component.Id));
+                _logger.LogError("Required components failed to download: {FailedIds}", failedIds);
+                throw new AggregateException(
+                    $"Failed to download required components: {failedIds}",
+                    requiredFailures.Select(f => f.Exception));
+            }
+            else
+            {
+                // オプションのコンポーネントのみ失敗した場合は警告のみ
+                var failedIds = string.Join(", ", failedComponents.Select(f => f.Component.Id));
+                _logger.LogWarning("Optional components failed to download: {FailedIds}. Continuing with partial success.", failedIds);
             }
         }
 
-        _logger.LogInformation("Downloaded {Count} missing components", downloadCount);
         return downloadCount;
     }
 
