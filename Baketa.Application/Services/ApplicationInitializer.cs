@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Events.Setup;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +21,7 @@ public class ApplicationInitializer : ILoadingScreenInitializer
     private readonly IComponentDownloader? _componentDownloader;
     private readonly IGpuEnvironmentService? _gpuEnvironmentService;
     private readonly IInitializationCompletionSignal? _completionSignal;
+    private readonly IEventAggregator? _eventAggregator;
     private readonly Stopwatch _stopwatch = new();
 
     /// <inheritdoc/>
@@ -29,13 +32,15 @@ public class ApplicationInitializer : ILoadingScreenInitializer
         ILogger<ApplicationInitializer> logger,
         IComponentDownloader? componentDownloader = null,
         IGpuEnvironmentService? gpuEnvironmentService = null,
-        IInitializationCompletionSignal? completionSignal = null)
+        IInitializationCompletionSignal? completionSignal = null,
+        IEventAggregator? eventAggregator = null)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _componentDownloader = componentDownloader;
         _gpuEnvironmentService = gpuEnvironmentService;
         _completionSignal = completionSignal;
+        _eventAggregator = eventAggregator;
 
         // [Issue #185] デバッグ: IComponentDownloader注入状況確認
         _logger.LogDebug("[Issue185] ApplicationInitializer コンストラクタ実行");
@@ -334,10 +339,67 @@ public class ApplicationInitializer : ILoadingScreenInitializer
                 _logger.LogWarning(tokenizerEx, "[Issue #185] tokenizer.jsonダウンロードに失敗しましたが、続行します");
             }
         }
+        catch (AggregateException aggEx)
+        {
+            // [Gemini Review] 必須コンポーネントの失敗 - ユーザーに再起動を促す
+            _logger.LogWarning(aggEx, "必須コンポーネントのダウンロードに失敗しました");
+            await PublishDownloadFailedEventAsync(aggEx, hasRequiredFailures: true).ConfigureAwait(false);
+            // 続行するが、ユーザーには再起動を促す通知が表示される
+        }
         catch (Exception ex)
         {
+            // [Gemini Review] オプションコンポーネントの失敗 - ユーザーに通知
             _logger.LogWarning(ex, "コンポーネントダウンロードに失敗しましたが、続行します");
-            // ダウンロード失敗は致命的エラーではないので続行
+            await PublishDownloadFailedEventAsync(ex, hasRequiredFailures: false).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// [Gemini Review] ダウンロード失敗イベントを発行
+    /// UIでユーザーに再起動を促す通知を表示
+    /// </summary>
+    private async Task PublishDownloadFailedEventAsync(Exception exception, bool hasRequiredFailures)
+    {
+        if (_eventAggregator == null)
+        {
+            _logger.LogDebug("EventAggregatorが未設定のため、ダウンロード失敗イベントをスキップ");
+            return;
+        }
+
+        var failedIds = new List<string>();
+        var errorMessage = exception.Message;
+
+        // AggregateExceptionから失敗したコンポーネントIDを抽出
+        if (exception is AggregateException aggEx)
+        {
+            foreach (var innerEx in aggEx.InnerExceptions)
+            {
+                if (innerEx is ComponentDownloadException downloadEx)
+                {
+                    failedIds.Add(downloadEx.ComponentId);
+                }
+            }
+            errorMessage = string.Join(", ", aggEx.InnerExceptions.Select(e => e.Message));
+        }
+        else if (exception is ComponentDownloadException downloadEx)
+        {
+            failedIds.Add(downloadEx.ComponentId);
+        }
+
+        var downloadFailedEvent = new ComponentDownloadFailedEvent(
+            failedIds.AsReadOnly(),
+            hasRequiredFailures,
+            errorMessage);
+
+        try
+        {
+            await _eventAggregator.PublishAsync(downloadFailedEvent).ConfigureAwait(false);
+            _logger.LogInformation("[Gemini Review] ComponentDownloadFailedEvent発行完了 (Required: {HasRequired}, Failed: {FailedCount})",
+                hasRequiredFailures, failedIds.Count);
+        }
+        catch (Exception pubEx)
+        {
+            _logger.LogWarning(pubEx, "ダウンロード失敗イベントの発行に失敗");
         }
     }
 

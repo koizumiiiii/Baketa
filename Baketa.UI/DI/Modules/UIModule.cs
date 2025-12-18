@@ -154,6 +154,11 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<IEventProcessor<Baketa.UI.Framework.Events.ExecuteSingleshotRequestEvent>>(
             provider => provider.GetRequiredService<Baketa.UI.Services.SingleshotEventProcessor>());
 
+        // [Gemini Review] ComponentDownloadFailedEventProcessor登録 - ダウンロード失敗時の再起動通知
+        services.AddSingleton<Baketa.UI.Services.ComponentDownloadFailedEventProcessor>();
+        services.AddSingleton<IEventProcessor<Baketa.Core.Events.Setup.ComponentDownloadFailedEvent>>(
+            provider => provider.GetRequiredService<Baketa.UI.Services.ComponentDownloadFailedEventProcessor>());
+
         // 🔐 [Issue #168] TokenExpirationHandler - トークン失効時の処理ハンドラー
         services.AddSingleton<TokenExpirationHandler>();
 
