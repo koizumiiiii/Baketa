@@ -3,6 +3,8 @@
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+		<!-- 🎯 exe名をBaketa.exeに変更（ユーザーフレンドリー） -->
+		<AssemblyName>Baketa</AssemblyName>
 		<Nullable>enable</Nullable>
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>

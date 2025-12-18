@@ -157,16 +157,35 @@ Write-Host "[Step 5] Building release package..." -ForegroundColor Yellow
 $OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 if (Test-Path $OutputDir) {
     Write-Host "  Removing existing release directory..." -ForegroundColor Gray
-    # Use -LiteralPath to avoid issues with special Windows device names like 'nul'
-    Get-ChildItem -LiteralPath $OutputDir -Force | ForEach-Object {
-        if ($_.Name -eq 'nul') {
-            # Skip Windows reserved device name
-            Write-Host "  Skipping reserved device name: $($_.FullName)" -ForegroundColor Yellow
-        } else {
-            Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+
+    # Check for reserved device names first
+    $hasReservedNames = $false
+    Get-ChildItem -LiteralPath $OutputDir -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($_.Name -match '^(nul|con|prn|aux|com[1-9]|lpt[1-9])$') {
+            $hasReservedNames = $true
+            Write-Host "  Skipping reserved device name: $($_.Name)" -ForegroundColor Yellow
         }
     }
-    Remove-Item -LiteralPath $OutputDir -Force -ErrorAction SilentlyContinue
+
+    # Remove all deletable items
+    Get-ChildItem -LiteralPath $OutputDir -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        if (-not ($_.Name -match '^(nul|con|prn|aux|com[1-9]|lpt[1-9])$')) {
+            try {
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+            } catch {
+                Write-Host "  Warning: Could not delete $($_.Name)" -ForegroundColor Yellow
+            }
+        }
+    }
+
+    # Only try to remove directory if no reserved names exist
+    if (-not $hasReservedNames) {
+        try {
+            Remove-Item -LiteralPath $OutputDir -Force -ErrorAction Stop
+        } catch {
+            # Directory may not be empty due to reserved names
+        }
+    }
 }
 $null = New-Item -ItemType Directory -Path $OutputDir -Force
 
@@ -196,18 +215,69 @@ Write-Host "  BaketaSuryaOcrServer: Skipped (downloaded on first run based on GP
 # 5.3 OCR models - [SIZE_OPTIMIZATION] ppocrv5-onnxはNuGetパッケージに含まれるため不要
 Write-Host "  OCR models: Skipped (included in NuGet package Sdcb.PaddleOCR.Models.Local)" -ForegroundColor Gray
 
+# ========================================
 # 5.4 [SIZE_OPTIMIZATION] 不要な言語フォルダを削除（ja, en以外）
+# ========================================
 Write-Host "  Removing unnecessary language folders..." -ForegroundColor Gray
 $unnecessaryLangs = @('cs', 'de', 'es', 'fr', 'it', 'ko', 'pl', 'pt-BR', 'ru', 'tr', 'zh-Hans', 'zh-Hant')
 $removedCount = 0
+$removedSize = 0
 foreach ($lang in $unnecessaryLangs) {
     $langPath = Join-Path $OutputDir $lang
     if (Test-Path $langPath) {
-        Remove-Item -Recurse -Force $langPath
+        $folderSize = (Get-ChildItem -LiteralPath $langPath -Recurse -File | Measure-Object -Property Length -Sum).Sum
+        $removedSize += $folderSize
+        Remove-Item -LiteralPath $langPath -Recurse -Force
         $removedCount++
+        Write-Host "    Removed: $lang ($([math]::Round($folderSize/1KB, 1)) KB)" -ForegroundColor DarkGray
     }
 }
-Write-Host "  Removed $removedCount language folders (keeping ja, en only)" -ForegroundColor Gray
+Write-Host "  Removed $removedCount language folders ($([math]::Round($removedSize/1MB, 2)) MB freed)" -ForegroundColor Green
+
+# ========================================
+# 5.5 [USER_FRIENDLY] 不要なファイルを削除
+# ========================================
+Write-Host "  Removing unnecessary files..." -ForegroundColor Gray
+
+# 開発用設定ファイル削除
+$devConfigFiles = @(
+    'appsettings.Development.json',
+    'appsettings.AlphaTest.json',
+    'appsettings.Local.json'
+)
+foreach ($file in $devConfigFiles) {
+    $filePath = Join-Path $OutputDir $file
+    if (Test-Path $filePath) {
+        Remove-Item -LiteralPath $filePath -Force
+        Write-Host "    Removed: $file" -ForegroundColor DarkGray
+    }
+}
+
+# PDB（デバッグシンボル）ファイル削除（Releaseには不要）
+$pdbFiles = Get-ChildItem -Path $OutputDir -Filter "*.pdb" -Recurse
+$pdbCount = 0
+$pdbSize = 0
+foreach ($pdb in $pdbFiles) {
+    $pdbSize += $pdb.Length
+    Remove-Item -LiteralPath $pdb.FullName -Force
+    $pdbCount++
+}
+if ($pdbCount -gt 0) {
+    Write-Host "    Removed: $pdbCount PDB files ($([math]::Round($pdbSize/1MB, 2)) MB freed)" -ForegroundColor DarkGray
+}
+
+# XML（XMLドキュメント）ファイル削除
+$xmlDocFiles = Get-ChildItem -Path $OutputDir -Filter "*.xml" -Recurse | Where-Object { $_.Name -match '\.xml$' -and $_.Name -notmatch 'appsettings|config' }
+$xmlCount = 0
+$xmlSize = 0
+foreach ($xml in $xmlDocFiles) {
+    $xmlSize += $xml.Length
+    Remove-Item -LiteralPath $xml.FullName -Force
+    $xmlCount++
+}
+if ($xmlCount -gt 0) {
+    Write-Host "    Removed: $xmlCount XML doc files ($([math]::Round($xmlSize/1MB, 2)) MB freed)" -ForegroundColor DarkGray
+}
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -215,7 +285,34 @@ Write-Host " Release build complete!" -ForegroundColor Green
 Write-Host " Output: $OutputDir" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
-# Display package size
-$size = (Get-ChildItem $OutputDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+# Display package contents summary
 Write-Host ""
-Write-Host "Total size: $([math]::Round($size, 2)) MB" -ForegroundColor Gray
+Write-Host "Package Contents:" -ForegroundColor Yellow
+
+# Count files by category
+$exeFile = Get-ChildItem -Path $OutputDir -Filter "Baketa.exe" -ErrorAction SilentlyContinue
+$dllFiles = Get-ChildItem -Path $OutputDir -Filter "*.dll" -File -ErrorAction SilentlyContinue
+$configFiles = Get-ChildItem -Path $OutputDir -Filter "*.json" -File -ErrorAction SilentlyContinue
+$grpcServerExists = Test-Path (Join-Path $OutputDir "grpc_server")
+
+Write-Host "  Main executable: Baketa.exe" -ForegroundColor Gray
+Write-Host "  DLL files: $($dllFiles.Count) files" -ForegroundColor Gray
+Write-Host "  Config files: $($configFiles.Count) files" -ForegroundColor Gray
+Write-Host "  Translation server: $(if ($grpcServerExists) { 'Included' } else { 'Not found' })" -ForegroundColor Gray
+
+# Display package size
+$size = (Get-ChildItem $OutputDir -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB
+Write-Host ""
+Write-Host "Total size: $([math]::Round($size, 2)) MB" -ForegroundColor Cyan
+
+# Display top 10 largest files for reference
+Write-Host ""
+Write-Host "Top 10 largest files:" -ForegroundColor Yellow
+Get-ChildItem $OutputDir -Recurse -File |
+    Sort-Object Length -Descending |
+    Select-Object -First 10 |
+    ForEach-Object {
+        $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+        $relativePath = $_.FullName.Replace($OutputDir, "").TrimStart("\")
+        Write-Host "  $sizeInMB MB`t$relativePath" -ForegroundColor Gray
+    }
