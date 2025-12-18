@@ -307,23 +307,11 @@ public sealed class EventHandlerInitializationService(
                 catch { /* ファイル出力失敗は無視 */ }
             }
 
-            // 🛑 [PHASE6.1] StopTranslationRequestEventHandler登録 - Stop処理問題修正
-            try
-            {
-                // 🔥 [PHASE6.1_EVENTAG_INSTANCE_CHECK] EventAggregatorインスタンス確認
-                var eventAggregatorHash = eventAggregator?.GetHashCode() ?? -1;
-                Console.WriteLine($"🔍 [INSTANCE_CHECK] EventHandlerInitializationService - EventAggregator HashCode: {eventAggregatorHash}");
-
-                var stopTranslationHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.EventTypes.StopTranslationRequestEvent>>();
-                eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.StopTranslationRequestEvent>(stopTranslationHandler);
-                _logger.LogInformation("🛑 StopTranslationRequestHandlerを登録しました - Stop押下後も処理継続問題の修正");
-                Console.WriteLine("🛑 [PHASE6.1] StopTranslationRequestHandlerを登録しました");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ StopTranslationRequestHandlerの登録に失敗しました");
-                Console.WriteLine($"❌ [ERROR] StopTranslationRequestHandler登録失敗: {ex.Message}");
-            }
+            // 🛑 [PHASE6.1] StopTranslationRequestEventHandler登録
+            // ⚠️ 削除: TranslationFlowModuleで既に登録済み（重複登録警告の原因）
+            // TranslationFlowEventProcessorがIEventProcessor<StopTranslationRequestEvent>として
+            // UIServiceCollectionExtensionsで登録されており、TranslationFlowModule.ConfigureEventAggregator()で
+            // 同じプロセッサがSubscribeされるため、ここでの登録は不要
 
             // 🔥 [CRITICAL_FIX] PriorityAwareOcrCompletedHandlerの登録 - 統合翻訳処理実現
             try
