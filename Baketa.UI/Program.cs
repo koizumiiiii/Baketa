@@ -1191,6 +1191,13 @@ internal sealed class Program
         registeredModules.Add(typeof(InfrastructureModule));
         Console.WriteLine("✅ Infrastructure基盤モジュール登録完了 - appsettings.json設定読み込み済み");
 
+        // Issue #77: LicenseModuleの登録（4プランライセンス管理システム）
+        Console.WriteLine("🔐 LicenseModule登録開始");
+        var licenseModule = new LicenseModule();
+        licenseModule.RegisterServices(services);
+        registeredModules.Add(typeof(LicenseModule));
+        Console.WriteLine("✅ LicenseModule登録完了 - 4プランライセンス管理システム統合済み");
+
         // 🎯 UltraThink Phase 21 修正: OCR処理パイプライン復旧のためのSmartProcessingPipelineService登録
         Console.WriteLine("🔧 ProcessingServices登録開始 - OCR処理パイプライン修復");
         services.AddProcessingServices();
