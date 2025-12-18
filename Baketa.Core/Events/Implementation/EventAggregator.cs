@@ -24,6 +24,17 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
     private readonly Dictionary<Type, List<object>> _processors = [];
     private readonly object _syncRoot = new();
 
+    // [Issue #218] プロセッサがなくても警告を出さないイベント型名のリスト
+    // これらは通知目的のイベントであり、購読者がいなくても正常動作
+    private static readonly HashSet<string> _silentEventTypes =
+    [
+        "ApplicationStartupEvent",        // アプリ起動完了通知
+        "ExitApplicationRequestEvent",    // アプリ終了要求通知
+        "DiagnosticReportGeneratedEvent", // 診断レポート生成通知
+        "ComponentDownloadProgressEvent", // コンポーネントダウンロード進捗通知
+        "ComponentDownloadFailedEvent"    // コンポーネントダウンロード失敗通知
+    ];
+
     /// <inheritdoc />
     public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
     {
@@ -57,35 +68,44 @@ public sealed class EventAggregator(ILogger<EventAggregator>? logger = null) : B
 
         if (eventProcessors == null || eventProcessors.Count == 0)
         {
-            Console.WriteLine($"⚠️ イベント {eventType.Name} のプロセッサが登録されていません");
-            _logger?.LogWarning("⚠️ イベント {EventType} のプロセッサが登録されていません", eventType.Name);
-
-            // TranslationWithBoundsCompletedEvent特化デバッグ
-            if (eventType.Name == "TranslationWithBoundsCompletedEvent")
+            // [Issue #218] サイレントイベントは警告を出さない
+            if (!_silentEventTypes.Contains(eventType.Name))
             {
-                Console.WriteLine($"🎯 [特化デバッグ] TranslationWithBoundsCompletedEventのプロセッサが見つからない！");
-                Console.WriteLine($"🎯 [特化デバッグ] 登録済みイベント型一覧:");
-                lock (_syncRoot)
+                Console.WriteLine($"⚠️ イベント {eventType.Name} のプロセッサが登録されていません");
+                _logger?.LogWarning("⚠️ イベント {EventType} のプロセッサが登録されていません", eventType.Name);
+
+                // TranslationWithBoundsCompletedEvent特化デバッグ
+                if (eventType.Name == "TranslationWithBoundsCompletedEvent")
                 {
-                    foreach (var kvp in _processors)
+                    Console.WriteLine($"🎯 [特化デバッグ] TranslationWithBoundsCompletedEventのプロセッサが見つからない！");
+                    Console.WriteLine($"🎯 [特化デバッグ] 登録済みイベント型一覧:");
+                    lock (_syncRoot)
                     {
-                        Console.WriteLine($"🎯 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
+                        foreach (var kvp in _processors)
+                        {
+                            Console.WriteLine($"🎯 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
+                        }
+                    }
+                }
+
+                // TranslationRequestEvent特化デバッグ
+                if (eventType.Name == "TranslationRequestEvent")
+                {
+                    Console.WriteLine($"🔥 [特化デバッグ] TranslationRequestEventのプロセッサが見つからない！");
+                    Console.WriteLine($"🔥 [特化デバッグ] 登録済みイベント型一覧:");
+                    lock (_syncRoot)
+                    {
+                        foreach (var kvp in _processors)
+                        {
+                            Console.WriteLine($"🔥 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
+                        }
                     }
                 }
             }
-
-            // TranslationRequestEvent特化デバッグ
-            if (eventType.Name == "TranslationRequestEvent")
+            else
             {
-                Console.WriteLine($"🔥 [特化デバッグ] TranslationRequestEventのプロセッサが見つからない！");
-                Console.WriteLine($"🔥 [特化デバッグ] 登録済みイベント型一覧:");
-                lock (_syncRoot)
-                {
-                    foreach (var kvp in _processors)
-                    {
-                        Console.WriteLine($"🔥 [特化デバッグ]   - {kvp.Key.Name}: {kvp.Value.Count}個のプロセッサ");
-                    }
-                }
+                // サイレントイベントはDebugレベルでログ
+                _logger?.LogDebug("ℹ️ イベント {EventType} のプロセッサが登録されていません（通知専用イベント）", eventType.Name);
             }
 
             return;

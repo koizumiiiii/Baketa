@@ -273,15 +273,6 @@ public class PythonServerManager(
     /// </summary>
     private async Task<Process> StartPythonProcessAsync(int port, string languagePair)
     {
-        // 🔥 [GEMINI_REVIEW_FIX] .slnファイルベースの堅牢なプロジェクトルート解決
-        var currentDir = Environment.CurrentDirectory;
-        var projectRoot = FindProjectRoot(AppContext.BaseDirectory);
-        if (string.IsNullOrEmpty(projectRoot))
-        {
-            logger.LogWarning("⚠️ ソリューションルート(.sln)が見つかりません。CurrentDirectoryをプロジェクトルートとして使用します。");
-            projectRoot = currentDir;
-        }
-
         // 🔥 [PYINSTALLER_INTEGRATION] 配布版実行戦略（PyInstaller exe vs Python script）
         // 配布版（Release build）: PyInstaller exe（BaketaTranslationServer.exe）を直接実行
         // 開発版（Debug build）: Python + scriptで実行
@@ -312,6 +303,16 @@ public class PythonServerManager(
             Arguments = $"--port {port}{modelPathArg}",
 #else
         // 開発版: Python + script実行（従来ロジック）
+        // 🔧 [Issue #218 FIX] .slnファイル探索を開発版のみに限定（配布版では不要）
+        // Gemini分析: 配布版で5秒の不要な遅延が発生していた原因
+        var currentDir = Environment.CurrentDirectory;
+        var projectRoot = FindProjectRoot(AppContext.BaseDirectory);
+        if (string.IsNullOrEmpty(projectRoot))
+        {
+            logger.LogWarning("⚠️ ソリューションルート(.sln)が見つかりません。CurrentDirectoryをプロジェクトルートとして使用します。");
+            projectRoot = currentDir;
+        }
+
         // CTranslate2版サーバーを優先使用（プロジェクトルートからの相対パス）
         var scriptPath = Path.Combine(projectRoot, "scripts", "nllb_translation_server_ct2.py");
         logger.LogDebug("[開発版] 翻訳サーバースクリプト探索開始: {ScriptPath}", scriptPath);

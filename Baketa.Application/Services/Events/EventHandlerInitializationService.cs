@@ -30,6 +30,10 @@ public sealed class EventHandlerInitializationService(
     private readonly ILogger<EventHandlerInitializationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly LoggingSettings _loggingSettings = InitializeLoggingSettings(serviceProvider);
 
+    // [Issue #218] 重複登録防止フラグ - べき等性の保証
+    private static bool _isInitialized;
+    private static readonly object _initLock = new();
+
     private static LoggingSettings InitializeLoggingSettings(IServiceProvider serviceProvider)
     {
         try
@@ -60,6 +64,25 @@ public sealed class EventHandlerInitializationService(
     /// <returns>初期化タスク</returns>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        // [Issue #218] 重複登録防止 - べき等性の保証
+        bool alreadyInitialized;
+        lock (_initLock)
+        {
+            alreadyInitialized = _isInitialized;
+            if (!alreadyInitialized)
+            {
+                _isInitialized = true;
+            }
+        }
+
+        if (alreadyInitialized)
+        {
+            Console.WriteLine("ℹ️ [INIT_SKIP] EventHandlerInitializationService.InitializeAsync() 既に初期化済み - スキップ");
+            _logger.LogDebug("EventHandlerInitializationService: 既に初期化済み - スキップ");
+            await Task.CompletedTask.ConfigureAwait(false);
+            return;
+        }
+
         // 🚨 最重要: メソッド開始の即座ログ出力（確実な記録）
         var startTimestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
         Console.WriteLine("🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！");
