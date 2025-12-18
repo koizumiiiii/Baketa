@@ -32,7 +32,7 @@ internal sealed partial class App : Avalonia.Application
     private IEventAggregator? _eventAggregator;
 
     // アプリケーションアイコンのパス定数 (Issue #179)
-    private const string BAKETA_ICON_PATH = "avares://Baketa.UI/Assets/Icons/baketa.ico";
+    private const string BAKETA_ICON_PATH = "avares://Baketa/Assets/Icons/baketa.ico";
 
     // LoggerMessageデリゲートの定義
     private static readonly Action<ILogger, Exception?> _logInitializing =

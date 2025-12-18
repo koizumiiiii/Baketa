@@ -38,7 +38,7 @@
 
       <!-- Baketaアイコン (256px) -->
       <Image Grid.Row="0"
-             Source="avares://Baketa.UI/Assets/Icons/baketa-256.png"
+             Source="avares://Baketa/Assets/Icons/baketa-256.png"
              Width="128" Height="128"
              HorizontalAlignment="Center"
              Margin="0,0,0,32"/>

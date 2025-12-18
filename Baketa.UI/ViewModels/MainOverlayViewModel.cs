@@ -649,8 +649,8 @@ public class MainOverlayViewModel : ViewModelBase
             try
             {
                 var uri = IsLiveActive
-                    ? new Uri("avares://Baketa.UI/Assets/Icons/live_active.png")
-                    : new Uri("avares://Baketa.UI/Assets/Icons/live.png");
+                    ? new Uri("avares://Baketa/Assets/Icons/live_active.png")
+                    : new Uri("avares://Baketa/Assets/Icons/live.png");
                 return ImageHelper.LoadFromAvaloniaResource(uri);
             }
             catch (Exception ex)
@@ -676,8 +676,8 @@ public class MainOverlayViewModel : ViewModelBase
             try
             {
                 var uri = IsSingleshotActive
-                    ? new Uri("avares://Baketa.UI/Assets/Icons/singleshot_active.png")
-                    : new Uri("avares://Baketa.UI/Assets/Icons/singleshot.png");
+                    ? new Uri("avares://Baketa/Assets/Icons/singleshot_active.png")
+                    : new Uri("avares://Baketa/Assets/Icons/singleshot.png");
                 return ImageHelper.LoadFromAvaloniaResource(uri);
             }
             catch (Exception ex)

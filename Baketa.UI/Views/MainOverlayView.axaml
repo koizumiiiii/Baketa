@@ -136,7 +136,7 @@
               AutomationProperties.Name="最小化ボタン"
               IsVisible="{Binding IsWindowSelected}">
         <Image Width="16" Height="16"
-               Source="avares://Baketa.UI/Assets/Icons/minimize.png"
+               Source="avares://Baketa/Assets/Icons/minimize.png"
                VerticalAlignment="Center"/>
       </Button>
       
@@ -150,7 +150,7 @@
               AutomationProperties.Name="翻訳対象ウィンドウを選択">
         <StackPanel Orientation="Vertical" Spacing="4">
           <Image Width="18" Height="18"
-                 Source="avares://Baketa.UI/Assets/Icons/target.png"/>
+                 Source="avares://Baketa/Assets/Icons/target.png"/>
           <TextBlock Text="{local:Localize MainOverlay_Target}"
                      FontSize="10"
                      HorizontalAlignment="Center"
@@ -228,7 +228,7 @@
         <StackPanel Orientation="Vertical" Spacing="4" HorizontalAlignment="Center">
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
             <Image Width="18" Height="18"
-                   Source="avares://Baketa.UI/Assets/Icons/visible.png"/>
+                   Source="avares://Baketa/Assets/Icons/visible.png"/>
             <Ellipse Width="8" Height="8"
                      Fill="{StaticResource StatusActiveBrush}"
                      Margin="2,0,0,0"
@@ -250,7 +250,7 @@
               ToolTip.Tip="{local:Localize MainOverlay_Settings}">
         <StackPanel Orientation="Vertical" Spacing="4">
           <Image Width="18" Height="18"
-                 Source="avares://Baketa.UI/Assets/Icons/settings.png"/>
+                 Source="avares://Baketa/Assets/Icons/settings.png"/>
           <TextBlock Text="{local:Localize MainOverlay_Settings}"
                      FontSize="10"
                      HorizontalAlignment="Center"
@@ -273,7 +273,7 @@
               Click="OnExitButtonClick">
         <StackPanel Orientation="Vertical" Spacing="4">
           <Image Width="18" Height="18"
-                 Source="avares://Baketa.UI/Assets/Icons/exit.png"/>
+                 Source="avares://Baketa/Assets/Icons/exit.png"/>
           <TextBlock Text="{local:Localize MainOverlay_Exit}"
                      FontSize="10"
                      HorizontalAlignment="Center"
@@ -309,7 +309,7 @@
               Height="36"
               Margin="2">
         <Image Width="16" Height="16"
-               Source="avares://Baketa.UI/Assets/Icons/expand.png"/>
+               Source="avares://Baketa/Assets/Icons/expand.png"/>
       </Button>
 
       <!-- Live翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
@@ -356,7 +356,7 @@
               Margin="2">
         <StackPanel>
           <Image Width="16" Height="16"
-                 Source="avares://Baketa.UI/Assets/Icons/visible.png"/>
+                 Source="avares://Baketa/Assets/Icons/visible.png"/>
           <Ellipse Width="6" Height="6"
                    Fill="{StaticResource StatusActiveBrush}"
                    Margin="0,-2,0,0"
