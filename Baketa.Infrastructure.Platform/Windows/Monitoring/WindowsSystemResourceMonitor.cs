@@ -172,7 +172,8 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
         {
             if (IsMonitoring)
             {
-                _logger.LogWarning("リソース監視は既に開始されています");
+                // [Issue #218] 既に監視中の場合はDebugレベルでログ出力（ノイズ削減）
+                _logger.LogDebug("リソース監視は既に開始されています - スキップ");
                 return;
             }
 

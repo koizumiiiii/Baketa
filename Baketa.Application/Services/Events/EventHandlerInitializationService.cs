@@ -30,6 +30,10 @@ public sealed class EventHandlerInitializationService(
     private readonly ILogger<EventHandlerInitializationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly LoggingSettings _loggingSettings = InitializeLoggingSettings(serviceProvider);
 
+    // [Issue #218] 重複登録防止フラグ - べき等性の保証
+    private static bool _isInitialized;
+    private static readonly object _initLock = new();
+
     private static LoggingSettings InitializeLoggingSettings(IServiceProvider serviceProvider)
     {
         try
@@ -60,6 +64,25 @@ public sealed class EventHandlerInitializationService(
     /// <returns>初期化タスク</returns>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        // [Issue #218] 重複登録防止 - べき等性の保証
+        bool alreadyInitialized;
+        lock (_initLock)
+        {
+            alreadyInitialized = _isInitialized;
+            if (!alreadyInitialized)
+            {
+                _isInitialized = true;
+            }
+        }
+
+        if (alreadyInitialized)
+        {
+            Console.WriteLine("ℹ️ [INIT_SKIP] EventHandlerInitializationService.InitializeAsync() 既に初期化済み - スキップ");
+            _logger.LogDebug("EventHandlerInitializationService: 既に初期化済み - スキップ");
+            await Task.CompletedTask.ConfigureAwait(false);
+            return;
+        }
+
         // 🚨 最重要: メソッド開始の即座ログ出力（確実な記録）
         var startTimestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
         Console.WriteLine("🚨🚨🚨 [INIT_START] EventHandlerInitializationService.InitializeAsync() 実行開始！");
@@ -284,23 +307,11 @@ public sealed class EventHandlerInitializationService(
                 catch { /* ファイル出力失敗は無視 */ }
             }
 
-            // 🛑 [PHASE6.1] StopTranslationRequestEventHandler登録 - Stop処理問題修正
-            try
-            {
-                // 🔥 [PHASE6.1_EVENTAG_INSTANCE_CHECK] EventAggregatorインスタンス確認
-                var eventAggregatorHash = eventAggregator?.GetHashCode() ?? -1;
-                Console.WriteLine($"🔍 [INSTANCE_CHECK] EventHandlerInitializationService - EventAggregator HashCode: {eventAggregatorHash}");
-
-                var stopTranslationHandler = _serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.EventTypes.StopTranslationRequestEvent>>();
-                eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.StopTranslationRequestEvent>(stopTranslationHandler);
-                _logger.LogInformation("🛑 StopTranslationRequestHandlerを登録しました - Stop押下後も処理継続問題の修正");
-                Console.WriteLine("🛑 [PHASE6.1] StopTranslationRequestHandlerを登録しました");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ StopTranslationRequestHandlerの登録に失敗しました");
-                Console.WriteLine($"❌ [ERROR] StopTranslationRequestHandler登録失敗: {ex.Message}");
-            }
+            // 🛑 [PHASE6.1] StopTranslationRequestEventHandler登録
+            // ⚠️ 削除: TranslationFlowModuleで既に登録済み（重複登録警告の原因）
+            // TranslationFlowEventProcessorがIEventProcessor<StopTranslationRequestEvent>として
+            // UIServiceCollectionExtensionsで登録されており、TranslationFlowModule.ConfigureEventAggregator()で
+            // 同じプロセッサがSubscribeされるため、ここでの登録は不要
 
             // 🔥 [CRITICAL_FIX] PriorityAwareOcrCompletedHandlerの登録 - 統合翻訳処理実現
             try

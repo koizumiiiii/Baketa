@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Management;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using Baketa.Core.Abstractions.GPU;
 using Microsoft.Extensions.Logging;
@@ -283,7 +284,20 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             }
             else
             {
-                // 専用GPU: WMIからVRAM容量取得
+                // [Issue #218] 専用GPU: NVML優先、WMIフォールバック
+                // WMIのAdapterRAMは32-bit制限（最大4095MB）があるため、
+                // NVIDIA GPUはNVMLで正確なVRAM容量を取得
+
+                // 1. NVML経由でVRAM取得を試行（NVIDIA GPU専用、64-bit正確値）
+                var nvmlVramMB = TryGetNvmlVramMB();
+                if (nvmlVramMB > 0)
+                {
+                    _logger.LogInformation("[NVML] VRAM容量取得成功: {VramMB}MB", nvmlVramMB);
+                    var maxTexture = nvmlVramMB >= 8192 ? 16384 : 8192;
+                    return (nvmlVramMB, maxTexture);
+                }
+
+                // 2. WMIフォールバック（32-bit制限あり、非NVIDIA GPUまたはNVML失敗時）
                 using var searcher = new ManagementObjectSearcher("SELECT AdapterRAM FROM Win32_VideoController WHERE Availability = 3");
                 using var results = searcher.Get();
 
@@ -292,15 +306,162 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
                     .Max();
 
                 var availableMemoryMB = maxVram > 0 ? (long)(maxVram / (1024 * 1024)) : 4096; // フォールバック4GB
-                var maxTexture = availableMemoryMB >= 8192 ? 16384 : 8192; // 8GB以上なら16Kテクスチャ
 
-                return (availableMemoryMB, maxTexture);
+                // 32-bit制限警告（4095MBでカンストしている場合）
+                if (availableMemoryMB == 4095)
+                {
+                    _logger.LogWarning("[WMI] VRAM容量が4095MBで上限に達しています。実際のVRAM容量はこれより大きい可能性があります（WMI 32-bit制限）");
+                }
+
+                var maxTextureDim = availableMemoryMB >= 8192 ? 16384 : 8192;
+                return (availableMemoryMB, maxTextureDim);
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "GPU メモリ情報取得失敗");
             return (4096, 8192); // 安全なフォールバック
+        }
+    }
+
+    /// <summary>
+    /// [Issue #218] NVML経由でNVIDIA GPUのVRAM容量を取得（64-bit正確値）
+    /// WMIのAdapterRAMは32-bit制限があるため、4GB超のVRAMを持つGPUでは不正確
+    /// </summary>
+    /// <returns>VRAM容量（MB）、失敗時は0</returns>
+    private long TryGetNvmlVramMB()
+    {
+        IntPtr nvmlLib = IntPtr.Zero;
+        try
+        {
+            _logger.LogInformation("[NVML] VRAM検出を開始");
+
+            // NVML DLL検索パス（NVIDIA GPUドライバに付属）
+            var nvmlPaths = new[]
+            {
+                "nvml.dll",
+                @"C:\Windows\System32\nvml.dll",
+                @"C:\Program Files\NVIDIA Corporation\NVSMI\nvml.dll",
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "nvml.dll")
+            };
+
+            foreach (var path in nvmlPaths)
+            {
+                _logger.LogDebug("[NVML] DLL検索: {Path}", path);
+                nvmlLib = NvmlNativeMethods.LoadLibrary(path);
+                if (nvmlLib != IntPtr.Zero)
+                {
+                    _logger.LogInformation("[NVML] ライブラリロード成功: {Path}", path);
+                    break;
+                }
+            }
+
+            if (nvmlLib == IntPtr.Zero)
+            {
+                _logger.LogWarning("[NVML] ライブラリが見つかりません - WMIフォールバックを使用（4GB制限あり）");
+                return 0;
+            }
+
+            // 必要な関数のアドレスを取得（_v2サフィックスも試行）
+            var initAddr = NvmlNativeMethods.GetProcAddress(nvmlLib, "nvmlInit_v2");
+            if (initAddr == IntPtr.Zero)
+                initAddr = NvmlNativeMethods.GetProcAddress(nvmlLib, "nvmlInit");
+
+            var shutdownAddr = NvmlNativeMethods.GetProcAddress(nvmlLib, "nvmlShutdown");
+
+            var getCountAddr = NvmlNativeMethods.GetProcAddress(nvmlLib, "nvmlDeviceGetCount_v2");
+            if (getCountAddr == IntPtr.Zero)
+                getCountAddr = NvmlNativeMethods.GetProcAddress(nvmlLib, "nvmlDeviceGetCount");
+
+            var getHandleAddr = NvmlNativeMethods.GetProcAddress(nvmlLib, "nvmlDeviceGetHandleByIndex_v2");
+            if (getHandleAddr == IntPtr.Zero)
+                getHandleAddr = NvmlNativeMethods.GetProcAddress(nvmlLib, "nvmlDeviceGetHandleByIndex");
+
+            var getMemoryAddr = NvmlNativeMethods.GetProcAddress(nvmlLib, "nvmlDeviceGetMemoryInfo");
+
+            _logger.LogDebug("[NVML] 関数アドレス: init={Init}, shutdown={Shutdown}, count={Count}, handle={Handle}, memory={Memory}",
+                initAddr != IntPtr.Zero, shutdownAddr != IntPtr.Zero, getCountAddr != IntPtr.Zero,
+                getHandleAddr != IntPtr.Zero, getMemoryAddr != IntPtr.Zero);
+
+            if (initAddr == IntPtr.Zero || shutdownAddr == IntPtr.Zero ||
+                getCountAddr == IntPtr.Zero || getHandleAddr == IntPtr.Zero || getMemoryAddr == IntPtr.Zero)
+            {
+                _logger.LogWarning("[NVML] 関数アドレス取得失敗 - WMIフォールバックを使用");
+                return 0;
+            }
+
+            // デリゲート作成
+            var nvmlInit = Marshal.GetDelegateForFunctionPointer<NvmlNativeMethods.NvmlInitDelegate>(initAddr);
+            var nvmlShutdown = Marshal.GetDelegateForFunctionPointer<NvmlNativeMethods.NvmlShutdownDelegate>(shutdownAddr);
+            var nvmlDeviceGetCount = Marshal.GetDelegateForFunctionPointer<NvmlNativeMethods.NvmlDeviceGetCountDelegate>(getCountAddr);
+            var nvmlDeviceGetHandleByIndex = Marshal.GetDelegateForFunctionPointer<NvmlNativeMethods.NvmlDeviceGetHandleByIndexDelegate>(getHandleAddr);
+            var nvmlDeviceGetMemoryInfo = Marshal.GetDelegateForFunctionPointer<NvmlNativeMethods.NvmlDeviceGetMemoryInfoDelegate>(getMemoryAddr);
+
+            // NVML初期化
+            var initResult = nvmlInit();
+            if (initResult != 0)
+            {
+                _logger.LogWarning("[NVML] 初期化失敗 (エラーコード: {ErrorCode}) - WMIフォールバックを使用", initResult);
+                return 0;
+            }
+            _logger.LogInformation("[NVML] 初期化成功");
+
+            try
+            {
+                // デバイス数取得
+                var countResult = nvmlDeviceGetCount(out var deviceCount);
+                if (countResult != 0 || deviceCount == 0)
+                {
+                    _logger.LogWarning("[NVML] デバイス数取得失敗 (結果: {Result}, 数: {Count})", countResult, deviceCount);
+                    return 0;
+                }
+                _logger.LogInformation("[NVML] デバイス数: {DeviceCount}", deviceCount);
+
+                // 最大VRAM容量を持つデバイスを検索
+                long maxVramMB = 0;
+                for (uint i = 0; i < deviceCount; i++)
+                {
+                    var handleResult = nvmlDeviceGetHandleByIndex(i, out var deviceHandle);
+                    if (handleResult != 0)
+                    {
+                        _logger.LogDebug("[NVML] デバイス{Index}のハンドル取得失敗: {Result}", i, handleResult);
+                        continue;
+                    }
+
+                    var memResult = nvmlDeviceGetMemoryInfo(deviceHandle, out var memoryInfo);
+                    if (memResult != 0)
+                    {
+                        _logger.LogDebug("[NVML] デバイス{Index}のメモリ情報取得失敗: {Result}", i, memResult);
+                        continue;
+                    }
+
+                    var vramMB = (long)(memoryInfo.Total / (1024 * 1024));
+                    _logger.LogInformation("[NVML] デバイス{Index}: VRAM={VramMB}MB (Total={TotalBytes}bytes)", i, vramMB, memoryInfo.Total);
+                    if (vramMB > maxVramMB)
+                        maxVramMB = vramMB;
+                }
+
+                if (maxVramMB > 0)
+                {
+                    _logger.LogInformation("[NVML] 最大VRAM容量: {MaxVramMB}MB", maxVramMB);
+                }
+                return maxVramMB;
+            }
+            finally
+            {
+                nvmlShutdown();
+                _logger.LogDebug("[NVML] シャットダウン完了");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[NVML] VRAM取得中にエラー発生 - WMIフォールバックを使用");
+            return 0;
+        }
+        finally
+        {
+            if (nvmlLib != IntPtr.Zero)
+                NvmlNativeMethods.FreeLibrary(nvmlLib);
         }
     }
 
@@ -597,5 +758,40 @@ internal static class NativeMethods
 
         // Issue #181: フォールバックをD3D11.1に変更（DirectML最低要件）
         return 0xb000; // D3D_FEATURE_LEVEL_11_0
+    }
+}
+
+/// <summary>
+/// [Issue #218] NVML Native API呼び出し
+/// NVIDIA GPUのVRAM容量を正確に取得するために使用
+/// </summary>
+internal static class NvmlNativeMethods
+{
+    // Windows DLL読み込み関数
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern IntPtr LoadLibrary(string lpFileName);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern bool FreeLibrary(IntPtr hModule);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
+    internal static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
+
+    // NVML関数デリゲート
+    internal delegate int NvmlInitDelegate();
+    internal delegate int NvmlShutdownDelegate();
+    internal delegate int NvmlDeviceGetCountDelegate(out uint deviceCount);
+    internal delegate int NvmlDeviceGetHandleByIndexDelegate(uint index, out IntPtr device);
+    internal delegate int NvmlDeviceGetMemoryInfoDelegate(IntPtr device, out NvmlMemory memory);
+
+    /// <summary>
+    /// NVML メモリ情報構造体（64-bit対応）
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NvmlMemory
+    {
+        public ulong Total;   // 総VRAM容量 (bytes)
+        public ulong Free;    // 空きVRAM容量 (bytes)
+        public ulong Used;    // 使用中VRAM容量 (bytes)
     }
 }
