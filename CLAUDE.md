@@ -187,6 +187,50 @@ where python
 - Avoid `python` commands in Git Bash environment
 - Use `py` launcher for maximum compatibility
 
+## Scripts Usage Guide
+
+### ⚠️ IMPORTANT: Script Creation Rules
+
+**Always check existing scripts before creating new ones.**
+Follow these rules strictly to prevent duplicate scripts.
+
+### Available Scripts
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| `build-release.ps1` | Create release package | Release builds only |
+| `run_app.ps1` | Run application | Development testing |
+| `run_tests.ps1` | Run tests | After code changes |
+| `check-environment.ps1` | Environment check | New environment setup |
+| `code-review-simple.ps1` | Static code review | When Gemini API unavailable |
+| `gemini.ps1` | Gemini CLI wrapper | Code review requests |
+| `diagnose_capture_issues.ps1` | Capture diagnostics | Screen capture issues |
+| `diagnose_gpu_env.py` | GPU environment check | CUDA-related issues |
+| `monitor_memory.ps1` | Memory monitoring | Performance investigation |
+| `download-ppocrv5-models.ps1` | Download OCR models | Model re-download |
+| `convert_nllb_to_ctranslate2.py` | NLLB conversion | Translation model conversion |
+
+### Prohibited Script Patterns
+
+**DO NOT create new scripts for these patterns:**
+
+1. **Build scripts**: Use/modify `build-release.ps1`
+2. **Code review scripts**: Use/modify `code-review-simple.ps1`
+3. **Download scripts**: Use/modify `download-ppocrv5-models.ps1`
+4. **One-time fix scripts**: Apply fixes directly to code instead
+5. **Issue/Phase-specific scripts**: Generalize and integrate into existing scripts
+
+### When New Scripts Are Allowed
+
+1. **Completely new functionality** that no existing script covers
+2. **Requirements impossible** to meet with existing scripts
+3. **Explicit user request** for a new script
+
+When creating new scripts:
+- Verify no overlap with existing scripts
+- Use generic naming (no Issue/Phase numbers)
+- Add entry to this table
+
 ## Architecture Overview
 
 ### 5-Layer Clean Architecture
