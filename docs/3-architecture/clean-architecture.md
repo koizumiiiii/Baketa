@@ -75,11 +75,18 @@ Baketa.Core (基底層 - 依存なし)
   - `IImageProxy`, `IAdvancedImage` - 画像処理抽象化
   - `IOcrEngine`, `ITranslationEngine` - OCR/翻訳エンジン抽象化
   - `ICaptureService`, `IWindowManager` - キャプチャシステム抽象化
+  - `ILicenseManager`, `ILicenseApiClient`, `ILicenseCacheService` - ライセンス管理抽象化
+- **License/** - ライセンス管理コンポーネント（Issue #77）
+  - `Models/PlanType.cs` - 4プランEnum（Free/Standard/Pro/Premia）
+  - `Models/FeatureType.cs` - 機能ゲートEnum
+  - `Models/LicenseState.cs` - ライセンス状態モデル
+  - `Extensions/PlanTypeExtensions.cs` - プラン判定拡張メソッド
+  - `Events/` - ライセンス関連イベント（StateChanged、TokenUsageWarning等）
 - **Events/** - ドメインイベント定義
   - `OcrCompletedEvent`, `TranslationCompletedEvent`
   - `CaptureRequestedEvent`, `OverlayUpdateEvent`
 - **Settings/** - 設定モデルとバリデーション
-  - `TranslationSettings`, `OcrSettings`, `CaptureSettings`
+  - `TranslationSettings`, `OcrSettings`, `CaptureSettings`, `LicenseSettings`
 - **DI/ServiceModuleBase.cs** - DIモジュールベースクラス
 
 #### 主要パッケージ
@@ -129,6 +136,16 @@ Baketa.Core (基底層 - 依存なし)
   - MorphologicalOperationsFilter, ContrastEnhancementFilter
 - **ArrayPool統合** - Phase 5.2Cで86%メモリリーク削減
 
+**ライセンス管理** (Baketa.Infrastructure/License/) - Issue #77
+- **Services/LicenseManager.cs** - ILicenseManager実装
+  - キャッシュ優先ライセンス状態管理
+  - トークン消費追跡・警告イベント発行
+  - オフライン対応（保留中消費の同期）
+- **Services/LicenseCacheService.cs** - ローカルキャッシュ実装
+- **Clients/MockLicenseApiClient.cs** - 開発・テスト用APIクライアント
+- **Adapters/UserPlanServiceAdapter.cs** - 既存IUserPlanService後方互換アダプタ
+- **DI/Modules/LicenseModule.cs** - DIコンテナ登録
+
 #### 主要パッケージ
 
 ```xml
@@ -146,6 +163,7 @@ Baketa.Core (基底層 - 依存なし)
 - ✅ Phase 5.2C: ArrayPool導入（86%メモリ削減）
 - ✅ Phase 5.2D: gRPC Keep-Alive実装
 - ✅ Issue #189: Surya OCR統合完了（PP-OCRv5から移行）
+- ✅ Issue #77: ライセンス管理システム基盤（4プラン対応、テスト173件）
 
 ---
 
