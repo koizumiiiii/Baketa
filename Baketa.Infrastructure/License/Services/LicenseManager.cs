@@ -689,6 +689,61 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
     #endregion
 
+    #region Test Support
+
+    /// <summary>
+    /// テストモード有効化に必要な環境変数名
+    /// </summary>
+    private const string TestModeEnvVar = "BAKETA_ALLOW_TEST_MODE";
+
+    /// <inheritdoc/>
+    public Task<bool> SetTestPlanAsync(PlanType plan, CancellationToken cancellationToken = default)
+    {
+        // モックモードでない場合は何もしない
+        if (!_settings.EnableMockMode)
+        {
+            _logger.LogWarning(
+                "SetTestPlanAsync呼び出しを無視: EnableMockMode=false（本番環境では使用できません）");
+            return Task.FromResult(false);
+        }
+
+        // 環境変数チェック（本番誤用防止の追加安全策）
+        var envValue = Environment.GetEnvironmentVariable(TestModeEnvVar);
+        if (!string.Equals(envValue, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "SetTestPlanAsync呼び出しを無視: 環境変数 {EnvVar}=true が設定されていません",
+                TestModeEnvVar);
+            return Task.FromResult(false);
+        }
+
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // テスト用に新しいLicenseStateを作成
+        var newState = new LicenseState
+        {
+            CurrentPlan = plan,
+            UserId = _userId ?? "test_user",
+            ContractStartDate = DateTime.UtcNow,
+            ExpirationDate = DateTime.UtcNow.AddMonths(plan == PlanType.Free ? 0 : 1),
+            CloudAiTokensUsed = 0,
+            IsCached = false,
+            SessionId = _sessionToken ?? $"test_session_{Guid.NewGuid():N}",
+            LastServerSync = DateTime.UtcNow
+        };
+
+        // 状態を更新（イベントも発火）
+        UpdateCurrentState(newState, LicenseChangeReason.ServerRefresh);
+
+        _logger.LogInformation(
+            "🧪 テストモード: プランを {Plan} に設定しました",
+            plan);
+
+        return Task.FromResult(true);
+    }
+
+    #endregion
+
     /// <inheritdoc/>
     public void Dispose()
     {

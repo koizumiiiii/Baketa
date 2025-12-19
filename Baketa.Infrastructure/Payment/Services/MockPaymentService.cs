@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.Payment;
 using Baketa.Core.License.Models;
 using Baketa.Core.Payment.Models;
@@ -8,23 +9,30 @@ namespace Baketa.Infrastructure.Payment.Services;
 /// <summary>
 /// 決済サービスのモック実装
 /// 開発・テスト環境で使用
+/// テストモード時は実際の決済処理なしにプラン変更を即座に反映
 /// </summary>
 public sealed class MockPaymentService : IPaymentService
 {
     private readonly ILogger<MockPaymentService> _logger;
+    private readonly ILicenseManager? _licenseManager;
     private readonly Dictionary<string, SubscriptionInfo> _subscriptions = new();
 
-    public MockPaymentService(ILogger<MockPaymentService> logger)
+    public MockPaymentService(
+        ILogger<MockPaymentService> logger,
+        ILicenseManager? licenseManager = null)
     {
         _logger = logger;
-        _logger.LogInformation("MockPaymentService initialized (mock mode)");
+        _licenseManager = licenseManager;
+        _logger.LogInformation(
+            "MockPaymentService initialized (mock mode, LicenseManager={HasLicenseManager})",
+            licenseManager is not null);
     }
 
     /// <inheritdoc/>
     public bool IsAvailable => true;
 
     /// <inheritdoc/>
-    public Task<PaymentResult<CheckoutSession>> CreateCheckoutSessionAsync(
+    public async Task<PaymentResult<CheckoutSession>> CreateCheckoutSessionAsync(
         string userId,
         PlanType targetPlan,
         BillingCycle billingCycle,
@@ -50,6 +58,31 @@ public sealed class MockPaymentService : IPaymentService
 
         _subscriptions[userId] = subscription;
 
+        // テストモード: LicenseManagerに即座にプラン変更を反映
+        if (_licenseManager is not null)
+        {
+            var success = await _licenseManager.SetTestPlanAsync(targetPlan, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (success)
+            {
+                _logger.LogInformation(
+                    "🧪 [Mock] テストモード: プラン {Plan} を即座に反映しました（決済処理スキップ）",
+                    targetPlan);
+
+                // テストモードでは決済URLなしで成功を返す
+                var testSession = new CheckoutSession
+                {
+                    SessionId = $"test_session_{Guid.NewGuid():N}",
+                    CheckoutUrl = string.Empty, // URLなし = 決済画面遷移なし
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+                };
+
+                return PaymentResult<CheckoutSession>.CreateSuccess(testSession);
+            }
+        }
+
+        // 通常のモック動作（URLを返す）
         var session = new CheckoutSession
         {
             SessionId = $"mock_session_{Guid.NewGuid():N}",
@@ -61,7 +94,7 @@ public sealed class MockPaymentService : IPaymentService
             "[Mock] Checkout session created: {SessionId}, subscription auto-activated",
             session.SessionId);
 
-        return Task.FromResult(PaymentResult<CheckoutSession>.CreateSuccess(session));
+        return PaymentResult<CheckoutSession>.CreateSuccess(session);
     }
 
     /// <inheritdoc/>

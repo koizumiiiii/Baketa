@@ -118,13 +118,21 @@ public sealed class LicenseModule : ServiceModuleBase
         // 決済サービス登録（設定に基づく）
         services.AddSingleton<IPaymentService>(provider =>
         {
-            var settings = provider.GetRequiredService<IOptions<PaymentSettings>>().Value;
+            var paymentSettings = provider.GetRequiredService<IOptions<PaymentSettings>>().Value;
+            var licenseSettings = provider.GetRequiredService<IOptions<LicenseSettings>>().Value;
 
-            if (settings.EnableMockMode)
+            if (paymentSettings.EnableMockMode)
             {
                 // モックモードの場合はモック実装を返す
+                // LicenseSettings.EnableMockModeも有効な場合はILicenseManagerを渡して
+                // テストモード（決済スキップ＆プラン即時変更）を有効化
+                var licenseManager = licenseSettings.EnableMockMode
+                    ? provider.GetRequiredService<ILicenseManager>()
+                    : null;
+
                 return new MockPaymentService(
-                    provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MockPaymentService>>());
+                    provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MockPaymentService>>(),
+                    licenseManager);
             }
 
             // HttpClientをファクトリから取得
