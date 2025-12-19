@@ -386,8 +386,15 @@ public sealed class OverlayPositionManager : IOverlayPositionManager
                 _currentPosition = positionInfo.Position;
                 _currentSize = positionInfo.Size;
 
-                // 変更があった場合のみイベントを発火
-                if (previousPosition != _currentPosition || previousSize != _currentSize)
+                var hasPositionOrSizeChanged = previousPosition != _currentPosition || previousSize != _currentSize;
+
+                // 重要な状態変更（翻訳完了、OCR検出）は位置/サイズが変わらなくてもイベントを発火
+                // これにより、UIや他のコンポーネントが状態変更を正しく認識できる
+                var isSignificantStateChange = reason is PositionUpdateReason.TranslationCompleted
+                    or PositionUpdateReason.OcrDetection
+                    or PositionUpdateReason.GameWindowChanged;
+
+                if (hasPositionOrSizeChanged || isSignificantStateChange)
                 {
                     var eventArgs = new OverlayPositionUpdatedEventArgs(
                         previousPosition,

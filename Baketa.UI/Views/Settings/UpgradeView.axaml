@@ -1,0 +1,273 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:local="using:Baketa.UI.Extensions"
+             x:Class="Baketa.UI.Views.Settings.UpgradeView"
+             x:DataType="vm:UpgradeViewModel">
+
+    <Design.PreviewWith>
+        <Border Padding="20" Width="600" Height="800">
+            <!-- Design time preview -->
+        </Border>
+    </Design.PreviewWith>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- Header -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="プランアップグレード" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="お客様に最適なプランをお選びください"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- Loading Indicator -->
+            <Border IsVisible="{Binding IsProcessing}"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" Width="200"/>
+                    <TextBlock Text="処理中..." HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Status Message -->
+            <Border IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                    Padding="12,8"
+                    CornerRadius="6">
+                <Border.Background>
+                    <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                        <Binding Path="IsStatusError"/>
+                    </MultiBinding>
+                </Border.Background>
+                <TextBlock Text="{Binding StatusMessage}"
+                           TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Current Plan Card -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                        <TextBlock Text="現在のプラン"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="{Binding CurrentPlanDisplayName}"
+                                   FontSize="24"
+                                   FontWeight="Bold"/>
+                    </StackPanel>
+                    <!-- Refresh Button -->
+                    <Button Grid.Column="1"
+                            Content="ライセンス情報を更新"
+                            Command="{Binding RefreshLicenseCommand}"
+                            VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- Billing Cycle Selection -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="課金サイクル" FontSize="14" FontWeight="SemiBold"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+                        <RadioButton Content="月額"
+                                     IsChecked="{Binding IsMonthlySelected}"
+                                     GroupName="BillingCycle"/>
+                        <RadioButton Content="年額（20%OFF）"
+                                     IsChecked="{Binding IsYearlySelected}"
+                                     GroupName="BillingCycle"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Plan Cards -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="プランを選択" FontSize="16" FontWeight="SemiBold"/>
+
+                <!-- Standard Plan -->
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16"
+                        Cursor="Hand">
+                    <Border.Styles>
+                        <Style Selector="Border:pointerover">
+                            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}"/>
+                        </Style>
+                    </Border.Styles>
+                    <RadioButton GroupName="PlanSelection"
+                                 IsChecked="{Binding SelectedPlan, Converter={StaticResource EnumBoolConverter}, ConverterParameter=Standard}">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="スタンダード"
+                                       FontSize="18" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="¥100/月"
+                                       FontSize="16" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Text="広告なし、ローカル翻訳"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                        Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                                <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="広告非表示" FontSize="11"/>
+                                <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="ローカル翻訳無制限" FontSize="11"/>
+                            </StackPanel>
+                        </Grid>
+                    </RadioButton>
+                </Border>
+
+                <!-- Pro Plan -->
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16"
+                        BorderBrush="{DynamicResource AccentFillColorDefaultBrush}"
+                        BorderThickness="2"
+                        Cursor="Hand">
+                    <Border.Styles>
+                        <Style Selector="Border:pointerover">
+                            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}"/>
+                        </Style>
+                    </Border.Styles>
+                    <RadioButton GroupName="PlanSelection"
+                                 IsChecked="{Binding SelectedPlan, Converter={StaticResource EnumBoolConverter}, ConverterParameter=Pro}">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+                            <!-- Recommended Badge -->
+                            <Border Grid.Row="0" Grid.Column="1"
+                                    Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                    CornerRadius="4"
+                                    Padding="8,2"
+                                    Margin="0,0,0,4">
+                                <TextBlock Text="おすすめ" FontSize="10" Foreground="White"/>
+                            </Border>
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                       Text="プロ"
+                                       FontSize="18" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="¥300/月"
+                                       FontSize="16" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Text="クラウドAI翻訳 400万トークン/月"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                            <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                                        Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                                <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="広告非表示" FontSize="11"/>
+                                <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="クラウドAI翻訳" FontSize="11"/>
+                                <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="高度なOCR設定" FontSize="11"/>
+                            </StackPanel>
+                        </Grid>
+                    </RadioButton>
+                </Border>
+
+                <!-- Premia Plan -->
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16"
+                        Cursor="Hand">
+                    <Border.Styles>
+                        <Style Selector="Border:pointerover">
+                            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}"/>
+                        </Style>
+                    </Border.Styles>
+                    <RadioButton GroupName="PlanSelection"
+                                 IsChecked="{Binding SelectedPlan, Converter={StaticResource EnumBoolConverter}, ConverterParameter=Premia}">
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                       Text="プレミア"
+                                       FontSize="18" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="¥500/月"
+                                       FontSize="16" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Text="クラウドAI翻訳 800万トークン/月、優先サポート"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                        Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                                <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="全ての機能" FontSize="11"/>
+                                <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="800万トークン" FontSize="11"/>
+                                <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                          Width="12" Height="12"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="優先サポート" FontSize="11"/>
+                            </StackPanel>
+                        </Grid>
+                    </RadioButton>
+                </Border>
+            </StackPanel>
+
+            <!-- Purchase Button -->
+            <Button Content="購入手続きへ"
+                    Command="{Binding PurchaseCommand}"
+                    HorizontalAlignment="Center"
+                    Padding="48,16"
+                    FontSize="16"
+                    Classes="accent"/>
+
+            <!-- Subscription Management -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16"
+                    IsVisible="{Binding HasActiveSubscription}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="サブスクリプション管理" FontSize="14" FontWeight="SemiBold"/>
+
+                    <!-- Cancellation Pending Notice -->
+                    <Border IsVisible="{Binding IsCancellationPending}"
+                            Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                            CornerRadius="6"
+                            Padding="12">
+                        <TextBlock Text="このサブスクリプションはキャンセル予約されています。現在の期間終了後に無料プランに移行します。"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource SystemFillColorCautionBrush}"/>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                        <Button Content="サブスクリプションを管理"
+                                Command="{Binding ManageSubscriptionCommand}"/>
+                        <Button Content="解約する"
+                                Command="{Binding CancelSubscriptionCommand}"
+                                IsVisible="{Binding !IsCancellationPending}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Footer Note -->
+            <TextBlock Text="決済はFastSpringを通じて安全に処理されます。購入後のプラン反映には数分かかる場合があります。"
+                       FontSize="11"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Margin="0,10,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

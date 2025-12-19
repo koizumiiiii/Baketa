@@ -73,6 +73,19 @@ public interface ILicenseManager
     /// プラン期限切れ警告イベント（7日前等）
     /// </summary>
     event EventHandler<PlanExpirationWarningEventArgs>? PlanExpirationWarning;
+
+    /// <summary>
+    /// テストモード用：プランを直接設定（モックモード有効時のみ動作）
+    /// QA検証でサーバー連携なしにプラン変更をテストするために使用
+    /// </summary>
+    /// <param name="plan">設定するプラン</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>設定成功時true</returns>
+    /// <remarks>
+    /// このメソッドはLicenseSettings.EnableMockModeがtrueの場合のみ動作します。
+    /// 本番環境では何も行わずfalseを返します。
+    /// </remarks>
+    Task<bool> SetTestPlanAsync(PlanType plan, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

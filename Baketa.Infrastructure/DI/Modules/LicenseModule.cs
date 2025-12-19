@@ -1,10 +1,13 @@
+using System.Net.Http;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Payment;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.License.Clients;
 using Baketa.Infrastructure.License.Services;
+using Baketa.Infrastructure.Payment.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -32,6 +35,9 @@ public sealed class LicenseModule : ServiceModuleBase
         // APIクライアントの登録（モックモード対応）
         RegisterApiClient(services);
 
+        // 決済サービスの登録
+        RegisterPaymentService(services);
+
         // NOTE: IUserPlanService後方互換アダプタはUI層で登録（Clean Architecture準拠）
         // NOTE: ログ出力はLicenseManagerのコンストラクタで行う
     }
@@ -45,8 +51,13 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddOptions<LicenseSettings>()
             .BindConfiguration(LicenseSettings.SectionName);
 
+        // PaymentSettings をオプションとして登録
+        services.AddOptions<PaymentSettings>()
+            .BindConfiguration(PaymentSettings.SectionName);
+
         // 設定バリデータの登録
         services.AddSingleton<IValidateOptions<LicenseSettings>, LicenseSettingsValidator>();
+        services.AddSingleton<IValidateOptions<PaymentSettings>, PaymentSettingsValidator>();
     }
 
     /// <summary>
@@ -77,9 +88,11 @@ public sealed class LicenseModule : ServiceModuleBase
     /// </summary>
     private static void RegisterApiClient(IServiceCollection services)
     {
-        // モッククライアントを登録（現時点では常にモック）
-        // TODO: 本番環境ではSupabaseLicenseClientに切り替え
+        // 両方のクライアントを登録
         services.AddSingleton<MockLicenseApiClient>();
+        services.AddSingleton<SupabaseLicenseApiClient>();
+
+        // 設定に基づいて適切なクライアントを選択
         services.AddSingleton<ILicenseApiClient>(provider =>
         {
             var settings = provider.GetRequiredService<IOptions<LicenseSettings>>().Value;
@@ -89,9 +102,48 @@ public sealed class LicenseModule : ServiceModuleBase
                 return provider.GetRequiredService<MockLicenseApiClient>();
             }
 
-            // TODO: 本番クライアント実装後に切り替え
-            // return provider.GetRequiredService<SupabaseLicenseClient>();
-            return provider.GetRequiredService<MockLicenseApiClient>();
+            // 本番環境ではSupabaseLicenseApiClientを使用
+            return provider.GetRequiredService<SupabaseLicenseApiClient>();
+        });
+    }
+
+    /// <summary>
+    /// 決済サービスを登録
+    /// </summary>
+    private static void RegisterPaymentService(IServiceCollection services)
+    {
+        // HttpClientファクトリ登録
+        services.AddHttpClient<SupabasePaymentService>();
+
+        // 決済サービス登録（設定に基づく）
+        services.AddSingleton<IPaymentService>(provider =>
+        {
+            var paymentSettings = provider.GetRequiredService<IOptions<PaymentSettings>>().Value;
+            var licenseSettings = provider.GetRequiredService<IOptions<LicenseSettings>>().Value;
+
+            if (paymentSettings.EnableMockMode)
+            {
+                // モックモードの場合はモック実装を返す
+                // LicenseSettings.EnableMockModeも有効な場合はILicenseManagerを渡して
+                // テストモード（決済スキップ＆プラン即時変更）を有効化
+                var licenseManager = licenseSettings.EnableMockMode
+                    ? provider.GetRequiredService<ILicenseManager>()
+                    : null;
+
+                return new MockPaymentService(
+                    provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MockPaymentService>>(),
+                    licenseManager);
+            }
+
+            // HttpClientをファクトリから取得
+            var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient(nameof(SupabasePaymentService));
+
+            return new SupabasePaymentService(
+                provider.GetRequiredService<Supabase.Client>(),
+                httpClient,
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<SupabasePaymentService>>(),
+                provider.GetRequiredService<IOptions<PaymentSettings>>());
         });
     }
 
@@ -120,6 +172,28 @@ public sealed class LicenseSettingsValidator : IValidateOptions<LicenseSettings>
         {
             var errors = validationResult.GetErrorMessages();
             return ValidateOptionsResult.Fail($"ライセンス設定の検証に失敗しました: {errors}");
+        }
+
+        return ValidateOptionsResult.Success;
+    }
+}
+
+/// <summary>
+/// 決済設定バリデータ
+/// </summary>
+public sealed class PaymentSettingsValidator : IValidateOptions<PaymentSettings>
+{
+    /// <summary>
+    /// 決済設定を検証
+    /// </summary>
+    public ValidateOptionsResult Validate(string? name, PaymentSettings options)
+    {
+        var validationResult = options.ValidateSettings();
+
+        if (!validationResult.IsValid)
+        {
+            var errors = validationResult.GetErrorMessages();
+            return ValidateOptionsResult.Fail($"決済設定の検証に失敗しました: {errors}");
         }
 
         return ValidateOptionsResult.Success;

@@ -20,6 +20,7 @@ using Baketa.UI.Views;
 using Baketa.UI.Views.Auth;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ReactiveUI;
 using CoreEvents = Baketa.Core.Events;
 using Baketa.UI.Framework.Events;
@@ -426,6 +427,9 @@ internal sealed partial class App : Avalonia.Application
                         mainOverlayView.Show();
                         Console.WriteLine("✅ MainOverlayView.Show()実行完了");
 
+                        // --- 4.5 テストモード警告表示（Issue #110: 決済統合） ---
+                        await ShowTestModeWarningIfNeededAsync(serviceProvider, mainOverlayView);
+
                         // 未認証の場合はLoginViewをダイアログとして表示
                         if (!isAuthenticated)
                         {
@@ -711,6 +715,90 @@ internal sealed partial class App : Avalonia.Application
         catch (Exception ex)
         {
             _logger?.LogError(ex, "TokenExpirationHandler のセットアップに失敗しました");
+        }
+    }
+
+    /// <summary>
+    /// テストモード有効化に必要な環境変数名
+    /// </summary>
+    private const string TestModeEnvVar = "BAKETA_ALLOW_TEST_MODE";
+
+    /// <summary>
+    /// テストモード警告表示 (Issue #110: 決済統合)
+    /// License.EnableMockMode と Payment.EnableMockMode が両方有効な場合に警告を表示
+    /// </summary>
+    private async Task ShowTestModeWarningIfNeededAsync(IServiceProvider serviceProvider, Avalonia.Controls.Window parentWindow)
+    {
+        try
+        {
+            var licenseSettings = serviceProvider.GetService<IOptions<LicenseSettings>>()?.Value;
+            var paymentSettings = serviceProvider.GetService<IOptions<PaymentSettings>>()?.Value;
+
+            // 両方のモックモードが有効かチェック
+            bool isLicenseMockEnabled = licenseSettings?.EnableMockMode ?? false;
+            bool isPaymentMockEnabled = paymentSettings?.EnableMockMode ?? false;
+
+            if (!isLicenseMockEnabled || !isPaymentMockEnabled)
+            {
+                // テストモードではない
+                return;
+            }
+
+            // 環境変数チェック
+            var envValue = Environment.GetEnvironmentVariable(TestModeEnvVar);
+            bool isEnvVarSet = string.Equals(envValue, "true", StringComparison.OrdinalIgnoreCase);
+
+            _logger?.LogWarning(
+                "🧪 テストモード設定検出: License.EnableMockMode={LicenseMock}, Payment.EnableMockMode={PaymentMock}, EnvVar={EnvVar}={EnvValue}",
+                isLicenseMockEnabled, isPaymentMockEnabled, TestModeEnvVar, envValue ?? "(未設定)");
+
+            // コンソールに警告出力（開発者向け）
+            Console.WriteLine("⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️");
+            Console.WriteLine("🧪 [TEST_MODE] 決済テストモード設定が検出されました");
+            Console.WriteLine($"   License.EnableMockMode = {isLicenseMockEnabled}");
+            Console.WriteLine($"   Payment.EnableMockMode = {isPaymentMockEnabled}");
+            Console.WriteLine($"   {TestModeEnvVar} = {envValue ?? "(未設定)"}");
+
+            // 警告メッセージを構築
+            string warningTitle;
+            string warningMessage;
+
+            if (isEnvVarSet)
+            {
+                // 環境変数が設定されている場合：テストモードが完全に有効
+                warningTitle = "🧪 テストモード有効";
+                warningMessage = "決済処理をスキップし、プラン変更を即座に反映するテストモードが有効です。" +
+                                "本番環境ではappsettings.jsonのEnableMockModeをfalseに設定してください。";
+
+                Console.WriteLine("   ✅ テストモード完全有効（プラン即時変更可能）");
+            }
+            else
+            {
+                // 環境変数が設定されていない場合：設定は有効だがテストモードは無効
+                warningTitle = "⚠️ テストモード設定警告";
+                warningMessage = $"決済モック設定が有効ですが、環境変数 {TestModeEnvVar}=true が未設定のため、" +
+                                "プラン即時変更は無効です。テストモードを有効にするには環境変数を設定してください。";
+
+                Console.WriteLine("   ⚠️ テストモード部分有効（プラン即時変更は無効）");
+                Console.WriteLine($"   → 有効化するには: set {TestModeEnvVar}=true");
+            }
+
+            Console.WriteLine("⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️");
+
+            // INotificationServiceを使用して警告を表示
+            var notificationService = serviceProvider.GetService<INotificationService>();
+            if (notificationService != null)
+            {
+                // 10秒間表示（重要な警告なので長めに）
+                await notificationService.ShowWarningAsync(warningTitle, warningMessage, duration: 10000);
+            }
+
+            _logger?.LogInformation("テストモード警告表示完了");
+        }
+        catch (Exception ex)
+        {
+            // 警告表示の失敗はアプリケーション起動をブロックしない
+            _logger?.LogWarning(ex, "テストモード警告表示中にエラー（継続）");
         }
     }
 

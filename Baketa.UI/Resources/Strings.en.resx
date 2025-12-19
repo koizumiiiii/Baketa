@@ -640,6 +640,12 @@
   <data name="Settings_License_Subtitle" xml:space="preserve">
     <value>View plan information and token usage</value>
   </data>
+  <data name="Settings_Upgrade_Title" xml:space="preserve">
+    <value>Plan Upgrade</value>
+  </data>
+  <data name="Settings_Upgrade_Subtitle" xml:space="preserve">
+    <value>Purchase or change your plan</value>
+  </data>
   <data name="Settings_License_Loading" xml:space="preserve">
     <value>Loading license information...</value>
   </data>
