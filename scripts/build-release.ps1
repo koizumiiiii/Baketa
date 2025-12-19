@@ -67,16 +67,30 @@ if (-not $SkipGitSync) {
     Write-Host "[Step 1] Git sync skipped" -ForegroundColor Gray
 }
 
-# Step 2: .NET Release build
+# Step 2: .NET Release publish (self-contained)
 Write-Host ""
-Write-Host "[Step 2] .NET Release build..." -ForegroundColor Yellow
+Write-Host "[Step 2] .NET Release publish (self-contained)..." -ForegroundColor Yellow
 Push-Location $ProjectRoot
 try {
-    dotnet build Baketa.sln --configuration Release
-    if ($LASTEXITCODE -ne 0) {
-        throw ".NET Release build failed"
+    # Use dotnet publish with self-contained to bundle .NET runtime
+    # This matches release.yml behavior for consistent builds
+    $publishOutput = "$ProjectRoot\publish-temp"
+    if (Test-Path $publishOutput) {
+        Remove-Item -LiteralPath $publishOutput -Recurse -Force
     }
-    Write-Host "  .NET Release build complete" -ForegroundColor Green
+
+    dotnet publish Baketa.UI/Baketa.UI.csproj `
+        --configuration Release `
+        --runtime win-x64 `
+        --self-contained true `
+        -p:IS_DISTRIBUTION=true `
+        --output $publishOutput `
+        --verbosity minimal
+
+    if ($LASTEXITCODE -ne 0) {
+        throw ".NET Release publish failed"
+    }
+    Write-Host "  .NET Release publish complete" -ForegroundColor Green
 } finally {
     Pop-Location
 }
@@ -191,13 +205,16 @@ if (Test-Path $OutputDir) {
 }
 $null = New-Item -ItemType Directory -Path $OutputDir -Force
 
-# 5.1 Copy .NET Release build artifacts
-$sourceDir = "$ProjectRoot\Baketa.UI\bin\Release\net8.0-windows10.0.19041.0\win-x64"
+# 5.1 Copy .NET Release publish artifacts
+$sourceDir = "$ProjectRoot\publish-temp"
 if (-not (Test-Path $sourceDir)) {
-    throw "Release build artifacts not found: $sourceDir"
+    throw "Release publish artifacts not found: $sourceDir"
 }
-Write-Host "  Copying .NET Release build..." -ForegroundColor Gray
+Write-Host "  Copying .NET Release publish output..." -ForegroundColor Gray
 Copy-Item -Path "$sourceDir\*" -Destination $OutputDir -Recurse
+
+# Clean up temp publish directory
+Remove-Item -LiteralPath $sourceDir -Recurse -Force -ErrorAction SilentlyContinue
 
 # 5.2 Copy BaketaTranslationServer.exe
 $translationServerDir = "$ProjectRoot\grpc_server\dist\BaketaTranslationServer"
