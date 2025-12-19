@@ -11,6 +11,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
+using Baketa.Core.Abstractions.License;
 using Baketa.UI.Framework;
 using Baketa.UI.Models.Settings;
 using Baketa.UI.Resources;
@@ -36,6 +37,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly ILocalizationService? _localizationService;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
+    private readonly ILicenseManager? _licenseManager;
     private readonly ILogger<SettingsWindowViewModel>? _logger;
     private SettingCategory? _selectedCategory;
     private string _statusMessage = string.Empty;
@@ -59,6 +61,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         ISettingsService settingsService,
         ILocalizationService? localizationService = null,
         IUnifiedSettingsService? unifiedSettingsService = null,
+        ILicenseManager? licenseManager = null,
         ILogger<SettingsWindowViewModel>? logger = null) : base(eventAggregator)
     {
         _changeTracker = changeTracker ?? throw new ArgumentNullException(nameof(changeTracker));
@@ -68,6 +71,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _localizationService = localizationService;
         _unifiedSettingsService = unifiedSettingsService;
+        _licenseManager = licenseManager;
         _logger = logger;
 
         // [DEBUG] ILocalizationServiceのDI注入確認
@@ -203,6 +207,17 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Level = SettingLevel.Basic,
                 DisplayOrder = 2,
                 Content = null // 遅延作成
+            },
+
+            new()
+            {
+                Id = "settings_license",
+                NameResourceKey = "Settings_License_Title",
+                DescriptionResourceKey = "Settings_License_Subtitle",
+                IconData = "M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,5A3,3 0 0,1 15,8A3,3 0 0,1 12,11A3,3 0 0,1 9,8A3,3 0 0,1 12,5M17.13,17C15.92,18.85 14.11,20.24 12,20.92C9.89,20.24 8.08,18.85 6.87,17C6.53,16.5 6.24,16 6,15.47C6,13.82 8.71,12.47 12,12.47C15.29,12.47 18,13.79 18,15.47C17.76,16 17.47,16.5 17.13,17Z", // Shield account icon
+                Level = SettingLevel.Basic,
+                DisplayOrder = 3,
+                Content = null // 遅延作成
             }
         };
 
@@ -303,6 +318,39 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     }
 
     /// <summary>
+    /// ライセンス情報Viewを作成します
+    /// </summary>
+    private LicenseInfoView? CreateLicenseInfoView()
+    {
+        // テスト環境では View 作成を避ける
+        if (IsTestEnvironment())
+        {
+            return null; // テスト環境では null を返す
+        }
+
+        try
+        {
+            if (_licenseManager == null)
+            {
+                _logger?.LogWarning("ILicenseManagerがDI登録されていないため、ライセンス情報Viewを作成できません");
+                return new LicenseInfoView();
+            }
+
+            LicenseInfoViewModel viewModel = new(
+                _licenseManager,
+                _eventAggregator,
+                _logger as ILogger<LicenseInfoViewModel>);
+            return new LicenseInfoView { DataContext = viewModel };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "ライセンス情報Viewの作成中にエラーが発生しました");
+            // フォールバック: 空のViewを返す
+            return new LicenseInfoView();
+        }
+    }
+
+    /// <summary>
     /// カテゴリのContentを遅延作成します
     /// </summary>
     private void EnsureCategoryContent(SettingCategory category)
@@ -316,6 +364,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         {
             "settings_general" => CreateGeneralSettingsView(),
             "settings_account" => CreateAccountSettingsView(),
+            "settings_license" => CreateLicenseInfoView(),
             _ => null
         };
 

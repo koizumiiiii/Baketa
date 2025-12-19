@@ -26,6 +26,9 @@ public static class SettingsModule
         // アカウント設定ViewModel
         services.AddTransient<AccountSettingsViewModel>();
 
+        // ライセンス情報ViewModel
+        services.AddTransient<LicenseInfoViewModel>();
+
         return services;
     }
 }

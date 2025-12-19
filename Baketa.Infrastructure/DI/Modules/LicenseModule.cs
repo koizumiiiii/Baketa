@@ -33,6 +33,7 @@ public sealed class LicenseModule : ServiceModuleBase
         RegisterApiClient(services);
 
         // NOTE: IUserPlanService後方互換アダプタはUI層で登録（Clean Architecture準拠）
+        // NOTE: ログ出力はLicenseManagerのコンストラクタで行う
     }
 
     /// <summary>
@@ -124,3 +125,4 @@ public sealed class LicenseSettingsValidator : IValidateOptions<LicenseSettings>
         return ValidateOptionsResult.Success;
     }
 }
+

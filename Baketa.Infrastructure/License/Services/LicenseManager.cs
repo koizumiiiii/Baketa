@@ -103,8 +103,10 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         }
 
         _logger.LogInformation(
-            "LicenseManager初期化: MockMode={MockMode}, BackgroundRefreshInterval={Interval}min",
+            "🔐 LicenseManager初期化完了 - Plan={Plan}, MockMode={MockMode}, TokenLimit={TokenLimit}, BackgroundRefresh={Interval}min",
+            _currentState.CurrentPlan,
             _settings.EnableMockMode,
+            _currentState.MonthlyTokenLimit,
             _settings.BackgroundRefreshIntervalMinutes);
     }
 

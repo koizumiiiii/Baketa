@@ -633,6 +633,83 @@
     <value>Premiumにアップグレード</value>
   </data>
 
+  <!-- ========== License Settings ========== -->
+  <data name="Settings_License_Title" xml:space="preserve">
+    <value>ライセンス</value>
+  </data>
+  <data name="Settings_License_Subtitle" xml:space="preserve">
+    <value>プラン情報とトークン使用状況を確認</value>
+  </data>
+  <data name="Settings_License_Loading" xml:space="preserve">
+    <value>ライセンス情報を読み込み中...</value>
+  </data>
+  <data name="Settings_License_TokenUsage" xml:space="preserve">
+    <value>トークン使用量</value>
+  </data>
+  <data name="Settings_License_MonthlyUsage" xml:space="preserve">
+    <value>月間使用量</value>
+  </data>
+  <data name="Settings_License_QuotaExceeded" xml:space="preserve">
+    <value>月間クォータを超過しました。クラウドAI翻訳は来月まで利用できません。</value>
+  </data>
+  <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
+    <value>このプランではローカル翻訳のみ利用可能です。クラウドAI翻訳を使用するには、Pro以上のプランへアップグレードしてください。</value>
+  </data>
+  <data name="Settings_License_PlanDetails" xml:space="preserve">
+    <value>プラン詳細</value>
+  </data>
+  <data name="Settings_License_ExpirationDate" xml:space="preserve">
+    <value>有効期限</value>
+  </data>
+  <data name="Settings_License_CloudAccess" xml:space="preserve">
+    <value>クラウドAIアクセス</value>
+  </data>
+  <data name="Settings_License_MonthlyLimit" xml:space="preserve">
+    <value>月間トークン上限</value>
+  </data>
+  <data name="Settings_License_Refresh" xml:space="preserve">
+    <value>ライセンス情報を更新</value>
+  </data>
+  <data name="License_Plan_Free" xml:space="preserve">
+    <value>Free</value>
+  </data>
+  <data name="License_Plan_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="License_Plan_Pro" xml:space="preserve">
+    <value>Pro</value>
+  </data>
+  <data name="License_Plan_Premia" xml:space="preserve">
+    <value>Premia</value>
+  </data>
+  <data name="License_Plan_Unknown" xml:space="preserve">
+    <value>不明</value>
+  </data>
+  <data name="License_Desc_Free" xml:space="preserve">
+    <value>無料プラン - 広告表示あり、ローカル翻訳のみ</value>
+  </data>
+  <data name="License_Desc_Standard" xml:space="preserve">
+    <value>スタンダードプラン - 広告なし、ローカル翻訳のみ</value>
+  </data>
+  <data name="License_Desc_Pro" xml:space="preserve">
+    <value>Proプラン - クラウドAI翻訳 月間400万トークン</value>
+  </data>
+  <data name="License_Desc_Premia" xml:space="preserve">
+    <value>Premiaプラン - クラウドAI翻訳 月間800万トークン</value>
+  </data>
+  <data name="License_NoExpiration" xml:space="preserve">
+    <value>無期限</value>
+  </data>
+  <data name="License_LocalOnly" xml:space="preserve">
+    <value>ローカルのみ</value>
+  </data>
+  <data name="License_RefreshSuccess" xml:space="preserve">
+    <value>ライセンス情報を更新しました</value>
+  </data>
+  <data name="License_RefreshFailed" xml:space="preserve">
+    <value>ライセンス情報の更新に失敗しました</value>
+  </data>
+
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">
     <value>拡張設定</value>
