@@ -70,4 +70,12 @@ public interface IPythonServerManager : IDisposable, IAsyncDisposable
     /// ヘルスチェックタイマーを初期化します
     /// </summary>
     void InitializeHealthCheckTimer();
+
+    /// <summary>
+    /// サーバーを再起動します（停止→起動）
+    /// HealthMonitorからの委譲用
+    /// </summary>
+    /// <param name="languagePair">言語ペア（例: "ja-en"）</param>
+    /// <returns>再起動成功時はサーバー情報、失敗時はnull</returns>
+    Task<IPythonServerInfo?> RestartServerAsync(string languagePair);
 }

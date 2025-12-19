@@ -268,6 +268,34 @@ public class PythonServerManager(
         await PerformHealthCheckInternalAsync().ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public async Task<IPythonServerInfo?> RestartServerAsync(string languagePair)
+    {
+        logger.LogInformation("🔄 [RESTART] サーバー再起動開始: {LanguagePair}", languagePair);
+
+        try
+        {
+            // 1. 既存サーバーを停止
+            await StopServerAsync(languagePair).ConfigureAwait(false);
+
+            // プロセス終了待機（安全マージン）
+            await Task.Delay(2000).ConfigureAwait(false);
+
+            // 2. 新しいサーバーを起動
+            var serverInfo = await StartServerAsync(languagePair).ConfigureAwait(false);
+
+            logger.LogInformation("✅ [RESTART] サーバー再起動成功: {LanguagePair} → Port {Port}",
+                languagePair, serverInfo.Port);
+
+            return serverInfo;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "❌ [RESTART] サーバー再起動失敗: {LanguagePair}", languagePair);
+            return null;
+        }
+    }
+
     /// <summary>
     /// Pythonプロセス起動
     /// </summary>
