@@ -47,14 +47,33 @@
 		<SelfContained>true</SelfContained>
 	</PropertyGroup>
 
-	<!-- Publish設定（配布時のみ使用） -->
-	<PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(PublishDir)' != ''">
+	<!-- 🚀 [Issue #219] 配布用最適化設定 (IS_DISTRIBUTION=true で有効化) -->
+	<!-- 使用例: dotnet publish -c Release -p:IS_DISTRIBUTION=true -->
+	<PropertyGroup Condition="'$(IS_DISTRIBUTION)' == 'true'">
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<!-- 🔥 [SIZE_OPTIMIZATION] IL Linkingによるサイズ削減 -->
+		<PublishTrimmed>true</PublishTrimmed>
+		<TrimMode>partial</TrimMode>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<!-- リフレクション使用コードの保護 -->
+		<TrimmerDefaultAction>link</TrimmerDefaultAction>
+	</PropertyGroup>
+
+	<!-- 通常Publish設定（配布時以外 - トリミング無効） -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(PublishDir)' != '' AND '$(IS_DISTRIBUTION)' != 'true'">
 		<PublishSingleFile>true</PublishSingleFile>
 		<SelfContained>true</SelfContained>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 		<PublishTrimmed>false</PublishTrimmed>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 	</PropertyGroup>
+
+	<!-- 🔥 [Issue #219] IL Linker設定ファイル（リフレクション使用コードの保護） -->
+	<ItemGroup Condition="'$(IS_DISTRIBUTION)' == 'true'">
+		<TrimmerRootDescriptor Include="TrimmerRoots.xml" />
+	</ItemGroup>
 
 	<!-- 🔥 [SIZE_OPTIMIZATION] Releaseビルド後に不要なファイルを削除（961.5MB削減） -->
 	<Target Name="RemoveUnusedRuntimeFiles" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
