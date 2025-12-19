@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Patterns;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Services;
 using Baketa.Core.Translation.Models;
 using TranslationSettings = Baketa.Core.Settings.TranslationSettings;
@@ -26,6 +27,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 {
     private readonly ILogger<PythonServerHealthMonitor> _logger;
     private readonly ISettingsService _settingsService;
+    private readonly IPythonServerManager? _pythonServerManager; // 🔧 [DELEGATE_RESTART] サーバー再起動委譲用
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase2: サーキットブレーカー連携
     private readonly IInitializationCompletionSignal? _initializationSignal; // 初期化完了待機用
     private System.Threading.Timer? _healthCheckTimer;
@@ -53,6 +55,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     public PythonServerHealthMonitor(
         ILogger<PythonServerHealthMonitor> logger,
         ISettingsService settingsService,
+        IPythonServerManager? pythonServerManager = null,
         ICircuitBreaker<TranslationResponse>? circuitBreaker = null,
         IInitializationCompletionSignal? initializationSignal = null)
     {
@@ -60,10 +63,12 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _pythonServerManager = pythonServerManager; // 🔧 [DELEGATE_RESTART] サーバー再起動委譲用
         _circuitBreaker = circuitBreaker; // Phase2: サーキットブレーカー連携（オプション）
         _initializationSignal = initializationSignal; // 初期化完了待機用
 
         Console.WriteLine($"🔍 [HEALTH_MONITOR] settingsService パラメータ: {settingsService?.GetType().Name ?? "null"}");
+        Console.WriteLine($"🔧 [DELEGATE_RESTART] PythonServerManager連携: {(_pythonServerManager != null ? "有効" : "無効")}");
         Console.WriteLine($"🔧 [PHASE2] サーキットブレーカー連携: {(_circuitBreaker != null ? "有効" : "無効")}");
         Console.WriteLine($"🔧 [Issue198] 初期化シグナル連携: {(_initializationSignal != null ? "有効" : "無効")}");
 
@@ -585,8 +590,50 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
     /// <summary>
     /// 新しいサーバーの起動
+    /// 🔧 [DELEGATE_RESTART] PythonServerManagerへの委譲を優先
     /// </summary>
     private async Task<bool> StartNewServerAsync()
+    {
+        // 🔧 [DELEGATE_RESTART] PythonServerManagerが利用可能な場合は委譲
+        // これにより開発版/配布版の差異が1箇所（PythonServerManager）で管理される
+        if (_pythonServerManager != null)
+        {
+            _logger.LogInformation("🔄 [DELEGATE_RESTART] PythonServerManagerに再起動を委譲");
+
+            try
+            {
+                // 言語ペアはデフォルト値を使用（NLLB-200は言語ペアに依存しない）
+                var languagePair = "ja-en";
+                var serverInfo = await _pythonServerManager.RestartServerAsync(languagePair).ConfigureAwait(false);
+
+                if (serverInfo != null)
+                {
+                    _currentServerPort = serverInfo.Port;
+                    _logger.LogInformation("✅ [DELEGATE_RESTART] サーバー再起動成功 - Port: {Port}", serverInfo.Port);
+                    return true;
+                }
+                else
+                {
+                    _logger.LogError("❌ [DELEGATE_RESTART] PythonServerManagerからの再起動失敗");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ [DELEGATE_RESTART] PythonServerManager委譲中にエラー");
+                return false;
+            }
+        }
+
+        // フォールバック: PythonServerManagerが利用不可の場合は従来ロジック
+        _logger.LogWarning("⚠️ [DELEGATE_RESTART] PythonServerManager未設定、フォールバックロジックを使用");
+        return await StartNewServerFallbackAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// フォールバック: 従来のサーバー起動ロジック（PythonServerManager未設定時のみ）
+    /// </summary>
+    private async Task<bool> StartNewServerFallbackAsync()
     {
         try
         {
