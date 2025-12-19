@@ -176,11 +176,74 @@ jobs:
         }
       shell: pwsh
 
+    - name: Optimize package size
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $publishDir = "./publish/Baketa-$version"
+
+        Write-Host "🔧 Optimizing package size..."
+
+        # Remove unnecessary language folders (keep ja, en only)
+        $unnecessaryLangs = @('cs', 'de', 'es', 'fr', 'it', 'ko', 'pl', 'pt-BR', 'ru', 'tr', 'zh-Hans', 'zh-Hant')
+        $removedCount = 0
+        $removedSize = 0
+        foreach ($lang in $unnecessaryLangs) {
+          $langPath = Join-Path $publishDir $lang
+          if (Test-Path $langPath) {
+            $folderSize = (Get-ChildItem -LiteralPath $langPath -Recurse -File | Measure-Object -Property Length -Sum).Sum
+            $removedSize += $folderSize
+            Remove-Item -LiteralPath $langPath -Recurse -Force
+            $removedCount++
+          }
+        }
+        Write-Host "  Removed $removedCount language folders ($([math]::Round($removedSize/1MB, 2)) MB freed)"
+
+        # Remove dev config files
+        $devConfigFiles = @('appsettings.Development.json', 'appsettings.AlphaTest.json', 'appsettings.Local.json')
+        foreach ($file in $devConfigFiles) {
+          $filePath = Join-Path $publishDir $file
+          if (Test-Path $filePath) {
+            Remove-Item -LiteralPath $filePath -Force
+            Write-Host "  Removed: $file"
+          }
+        }
+
+        # Remove PDB files
+        $pdbFiles = Get-ChildItem -Path $publishDir -Filter "*.pdb" -Recurse
+        $pdbCount = 0
+        $pdbSize = 0
+        foreach ($pdb in $pdbFiles) {
+          $pdbSize += $pdb.Length
+          Remove-Item -LiteralPath $pdb.FullName -Force
+          $pdbCount++
+        }
+        if ($pdbCount -gt 0) {
+          Write-Host "  Removed: $pdbCount PDB files ($([math]::Round($pdbSize/1MB, 2)) MB freed)"
+        }
+
+        # Remove XML doc files (except config files)
+        $xmlDocFiles = Get-ChildItem -Path $publishDir -Filter "*.xml" -Recurse | Where-Object { $_.Name -notmatch 'appsettings|config' }
+        $xmlCount = 0
+        $xmlSize = 0
+        foreach ($xml in $xmlDocFiles) {
+          $xmlSize += $xml.Length
+          Remove-Item -LiteralPath $xml.FullName -Force
+          $xmlCount++
+        }
+        if ($xmlCount -gt 0) {
+          Write-Host "  Removed: $xmlCount XML doc files ($([math]::Round($xmlSize/1MB, 2)) MB freed)"
+        }
+
+        # Display final size
+        $finalSize = (Get-ChildItem $publishDir -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB
+        Write-Host "✅ Optimization complete. Final size: $([math]::Round($finalSize, 2)) MB"
+      shell: pwsh
+
     - name: Create .NET package
       run: |
         $version = "${{ steps.version.outputs.version }}"
         $publishDir = "./publish/Baketa-$version"
-        $zipName = "Baketa-$version-win-x64.zip"
+        $zipName = "Baketa-$version.zip"
 
         # Copy additional files
         Copy-Item "README.md" "$publishDir/" -ErrorAction SilentlyContinue
@@ -205,11 +268,11 @@ jobs:
 
         | File | Description |
         |------|-------------|
-        | ``Baketa-$version-win-x64.zip`` | Main application (Windows x64) |
+        | ``Baketa-$version.zip`` | Main application (Windows x64, self-contained) |
 
         ### Installation
 
-        1. Download ``Baketa-$version-win-x64.zip``
+        1. Download ``Baketa-$version.zip``
         2. Extract to desired location
         3. Run ``Baketa.UI.exe``
         4. On first run, required components will be downloaded automatically from [Model Assets v1](https://github.com/koizumiiiii/Baketa/releases/tag/models-v1)
@@ -235,7 +298,7 @@ jobs:
       with:
         name: "Baketa ${{ steps.version.outputs.version }}"
         body_path: release_notes.md
-        files: ./publish/Baketa-${{ steps.version.outputs.version }}-win-x64.zip
+        files: ./publish/Baketa-${{ steps.version.outputs.version }}.zip
         prerelease: ${{ steps.version.outputs.is-prerelease == 'true' }}
         make_latest: ${{ steps.version.outputs.is-prerelease == 'false' }}
         fail_on_unmatched_files: false

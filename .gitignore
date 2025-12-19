@@ -770,3 +770,4 @@ temp_review_*.txt
 
 # Translation server logs
 translation_server.log
+publish-temp/
