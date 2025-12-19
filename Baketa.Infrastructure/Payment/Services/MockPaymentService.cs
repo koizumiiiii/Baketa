@@ -200,8 +200,8 @@ public sealed class MockPaymentService : IPaymentService
 
         if (cycle == BillingCycle.Yearly)
         {
-            // 年額は20%OFF
-            return (int)(monthlyPrice * 12 * 0.8);
+            // 年額は20%OFF（オーバーフロー防止のため先にdoubleに変換）
+            return (int)((double)monthlyPrice * 12 * 0.8);
         }
 
         return monthlyPrice;

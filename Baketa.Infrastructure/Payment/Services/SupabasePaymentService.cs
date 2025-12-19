@@ -72,13 +72,6 @@ public sealed class SupabasePaymentService : IPaymentService
                 "チェックアウトセッション作成開始: UserId={UserId}, Plan={Plan}, Cycle={Cycle}",
                 userId, targetPlan, billingCycle);
 
-            var request = new CreateCheckoutRequest
-            {
-                UserId = userId,
-                TargetPlan = targetPlan,
-                BillingCycle = billingCycle
-            };
-
             var response = await CallEdgeFunctionAsync<CheckoutSessionResponse>(
                 "create-checkout-session",
                 new
