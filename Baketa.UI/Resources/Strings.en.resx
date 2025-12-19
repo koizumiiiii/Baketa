@@ -709,6 +709,12 @@
   <data name="License_RefreshFailed" xml:space="preserve">
     <value>Failed to update license information</value>
   </data>
+  <data name="Settings_License_Upgrade" xml:space="preserve">
+    <value>Upgrade</value>
+  </data>
+  <data name="License_UpgradeComingSoon" xml:space="preserve">
+    <value>Upgrade feature coming soon</value>
+  </data>
 
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">

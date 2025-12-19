@@ -328,6 +328,8 @@ public static class Strings
     public static string License_LocalOnly => GetString("License_LocalOnly");
     public static string License_RefreshSuccess => GetString("License_RefreshSuccess");
     public static string License_RefreshFailed => GetString("License_RefreshFailed");
+    public static string Settings_License_Upgrade => GetString("Settings_License_Upgrade");
+    public static string License_UpgradeComingSoon => GetString("License_UpgradeComingSoon");
 
     // ========== Advanced Settings ==========
 

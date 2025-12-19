@@ -51,6 +51,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
         // コマンドの初期化
         RefreshCommand = ReactiveCommand.CreateFromTask(RefreshLicenseStateAsync);
+        UpgradeCommand = ReactiveCommand.Create(ShowUpgradeComingSoon);
 
         // 初期状態の読み込み
         LoadCurrentState();
@@ -189,6 +190,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// </summary>
     public ReactiveCommand<Unit, Unit> RefreshCommand { get; }
 
+    /// <summary>
+    /// アップグレードコマンド（プレースホルダー）
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> UpgradeCommand { get; }
+
     #endregion
 
     #region メソッド
@@ -257,6 +263,16 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         {
             await Dispatcher.UIThread.InvokeAsync(() => IsLoading = false);
         }
+    }
+
+    /// <summary>
+    /// アップグレード準備中メッセージを表示（プレースホルダー）
+    /// </summary>
+    private void ShowUpgradeComingSoon()
+    {
+        StatusMessage = Strings.License_UpgradeComingSoon;
+        IsStatusError = false;
+        _logger?.LogInformation("アップグレードボタンがクリックされました（準備中）");
     }
 
     /// <summary>
