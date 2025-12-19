@@ -12,6 +12,7 @@ using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Payment;
 using Baketa.UI.Framework;
 using Baketa.UI.Models.Settings;
 using Baketa.UI.Resources;
@@ -38,6 +39,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     private readonly ILocalizationService? _localizationService;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
     private readonly ILicenseManager? _licenseManager;
+    private readonly IPaymentService? _paymentService;
     private readonly ILogger<SettingsWindowViewModel>? _logger;
     private SettingCategory? _selectedCategory;
     private string _statusMessage = string.Empty;
@@ -62,6 +64,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         ILocalizationService? localizationService = null,
         IUnifiedSettingsService? unifiedSettingsService = null,
         ILicenseManager? licenseManager = null,
+        IPaymentService? paymentService = null,
         ILogger<SettingsWindowViewModel>? logger = null) : base(eventAggregator)
     {
         _changeTracker = changeTracker ?? throw new ArgumentNullException(nameof(changeTracker));
@@ -72,6 +75,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         _localizationService = localizationService;
         _unifiedSettingsService = unifiedSettingsService;
         _licenseManager = licenseManager;
+        _paymentService = paymentService;
         _logger = logger;
 
         // [DEBUG] ILocalizationServiceのDI注入確認
@@ -218,6 +222,18 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Level = SettingLevel.Basic,
                 DisplayOrder = 3,
                 Content = null // 遅延作成
+            },
+
+            // Issue #110: プランアップグレードカテゴリ
+            new()
+            {
+                Id = "settings_upgrade",
+                NameResourceKey = "Settings_Upgrade_Title",
+                DescriptionResourceKey = "Settings_Upgrade_Subtitle",
+                IconData = "M16,6L18.29,8.29L13.41,13.17L9.41,9.17L2,16.59L3.41,18L9.41,12L13.41,16L19.71,9.71L22,12V6H16Z", // Trending up icon
+                Level = SettingLevel.Basic,
+                DisplayOrder = 4,
+                Content = null // 遅延作成
             }
         };
 
@@ -351,6 +367,40 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     }
 
     /// <summary>
+    /// アップグレードViewを作成します（Issue #110: 決済統合）
+    /// </summary>
+    private UpgradeView? CreateUpgradeView()
+    {
+        // テスト環境では View 作成を避ける
+        if (IsTestEnvironment())
+        {
+            return null; // テスト環境では null を返す
+        }
+
+        try
+        {
+            if (_licenseManager == null || _paymentService == null)
+            {
+                _logger?.LogWarning("ILicenseManagerまたはIPaymentServiceがDI登録されていないため、アップグレードViewを作成できません");
+                return new UpgradeView();
+            }
+
+            UpgradeViewModel viewModel = new(
+                _licenseManager,
+                _paymentService,
+                _eventAggregator,
+                _logger as ILogger<UpgradeViewModel>);
+            return new UpgradeView { DataContext = viewModel };
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "アップグレードViewの作成中にエラーが発生しました");
+            // フォールバック: 空のViewを返す
+            return new UpgradeView();
+        }
+    }
+
+    /// <summary>
     /// カテゴリのContentを遅延作成します
     /// </summary>
     private void EnsureCategoryContent(SettingCategory category)
@@ -365,6 +415,7 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
             "settings_general" => CreateGeneralSettingsView(),
             "settings_account" => CreateAccountSettingsView(),
             "settings_license" => CreateLicenseInfoView(),
+            "settings_upgrade" => CreateUpgradeView(),
             _ => null
         };
 

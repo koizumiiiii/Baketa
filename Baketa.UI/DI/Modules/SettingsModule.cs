@@ -29,6 +29,9 @@ public static class SettingsModule
         // ライセンス情報ViewModel
         services.AddTransient<LicenseInfoViewModel>();
 
+        // アップグレードViewModel（Issue #110: 決済統合）
+        services.AddTransient<UpgradeViewModel>();
+
         return services;
     }
 }

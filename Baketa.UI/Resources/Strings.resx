@@ -640,6 +640,12 @@
   <data name="Settings_License_Subtitle" xml:space="preserve">
     <value>プラン情報とトークン使用状況を確認</value>
   </data>
+  <data name="Settings_Upgrade_Title" xml:space="preserve">
+    <value>プランアップグレード</value>
+  </data>
+  <data name="Settings_Upgrade_Subtitle" xml:space="preserve">
+    <value>プランの購入・変更</value>
+  </data>
   <data name="Settings_License_Loading" xml:space="preserve">
     <value>ライセンス情報を読み込み中...</value>
   </data>
