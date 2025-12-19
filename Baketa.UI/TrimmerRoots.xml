@@ -30,6 +30,9 @@
   <assembly fullname="Microsoft.Extensions.Hosting" preserve="all" />
   <assembly fullname="Microsoft.Extensions.Options" preserve="all" />
 
+  <!-- System.Text.Json: リフレクションベースのシリアライゼーション -->
+  <assembly fullname="System.Text.Json" preserve="all" />
+
   <!-- プロジェクトアセンブリ: ViewModelとView -->
   <assembly fullname="Baketa">
     <!-- ViewModel（リフレクションでインスタンス化される） -->
