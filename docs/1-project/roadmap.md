@@ -105,7 +105,18 @@ Baketaプロジェクトは以下のフェーズで開発を進め、**Phase 5�
 - ✅ **パスワード強度検証**: ブラックリストチェック、強度インジケーター
 - ✅ **GitHub Pages**: ランディングページ、利用規約、プライバシーポリシー
 
-### 🔄 フェーズ6-B: 配布と運用（準備中）
+### 🔄 フェーズ6-B: ライセンス管理システム（Issue #77）（進行中）
+- ✅ **Core層基盤**: PlanType/FeatureType Enum、LicenseState、PlanTypeExtensions
+- ✅ **イベントシステム**: LicenseStateChanged、TokenUsageWarning、SessionInvalidated、PlanExpirationWarning
+- ✅ **インターフェース定義**: ILicenseManager、ILicenseApiClient、ILicenseCacheService
+- ✅ **Infrastructure実装**: LicenseManager、LicenseCacheService、MockLicenseApiClient
+- ✅ **後方互換アダプタ**: UserPlanServiceAdapter（既存IUserPlanService互換）
+- ✅ **UI統合**: LicenseInfoViewModel、LicenseInfoView、設定画面統合
+- ✅ **単体テスト**: PlanTypeExtensionsTests（145件）、LicenseStateTests、LicenseManagerTests（28件）
+- 🔄 Supabaseテーブル作成・Edge Function実装（将来対応）
+- 🔄 決済連携（将来対応）
+
+### 🔄 フェーズ6-C: 配布と運用（準備中）
 - 🔄 インストーラー作成
 - 🔄 更新システム
 - 🔄 エラー報告システム

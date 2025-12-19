@@ -633,6 +633,89 @@
     <value>Upgrade to Premium</value>
   </data>
 
+  <!-- ========== License Settings ========== -->
+  <data name="Settings_License_Title" xml:space="preserve">
+    <value>License</value>
+  </data>
+  <data name="Settings_License_Subtitle" xml:space="preserve">
+    <value>View plan information and token usage</value>
+  </data>
+  <data name="Settings_License_Loading" xml:space="preserve">
+    <value>Loading license information...</value>
+  </data>
+  <data name="Settings_License_TokenUsage" xml:space="preserve">
+    <value>Token Usage</value>
+  </data>
+  <data name="Settings_License_MonthlyUsage" xml:space="preserve">
+    <value>Monthly Usage</value>
+  </data>
+  <data name="Settings_License_QuotaExceeded" xml:space="preserve">
+    <value>Monthly quota exceeded. Cloud AI translation is unavailable until next month.</value>
+  </data>
+  <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
+    <value>This plan only supports local translation. Upgrade to Pro or higher to use Cloud AI translation.</value>
+  </data>
+  <data name="Settings_License_PlanDetails" xml:space="preserve">
+    <value>Plan Details</value>
+  </data>
+  <data name="Settings_License_ExpirationDate" xml:space="preserve">
+    <value>Expiration Date</value>
+  </data>
+  <data name="Settings_License_CloudAccess" xml:space="preserve">
+    <value>Cloud AI Access</value>
+  </data>
+  <data name="Settings_License_MonthlyLimit" xml:space="preserve">
+    <value>Monthly Token Limit</value>
+  </data>
+  <data name="Settings_License_Refresh" xml:space="preserve">
+    <value>Refresh License Info</value>
+  </data>
+  <data name="License_Plan_Free" xml:space="preserve">
+    <value>Free</value>
+  </data>
+  <data name="License_Plan_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="License_Plan_Pro" xml:space="preserve">
+    <value>Pro</value>
+  </data>
+  <data name="License_Plan_Premia" xml:space="preserve">
+    <value>Premia</value>
+  </data>
+  <data name="License_Plan_Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="License_Desc_Free" xml:space="preserve">
+    <value>Free Plan - With ads, local translation only</value>
+  </data>
+  <data name="License_Desc_Standard" xml:space="preserve">
+    <value>Standard Plan - No ads, local translation only</value>
+  </data>
+  <data name="License_Desc_Pro" xml:space="preserve">
+    <value>Pro Plan - Cloud AI translation, 4M tokens/month</value>
+  </data>
+  <data name="License_Desc_Premia" xml:space="preserve">
+    <value>Premia Plan - Cloud AI translation, 8M tokens/month</value>
+  </data>
+  <data name="License_NoExpiration" xml:space="preserve">
+    <value>No Expiration</value>
+  </data>
+  <data name="License_LocalOnly" xml:space="preserve">
+    <value>Local Only</value>
+  </data>
+  <data name="License_RefreshSuccess" xml:space="preserve">
+    <value>License information updated</value>
+  </data>
+  <data name="License_RefreshFailed" xml:space="preserve">
+    <value>Failed to update license information</value>
+  </data>
+  <data name="Settings_License_Upgrade" xml:space="preserve">
+    <value>Upgrade</value>
+  </data>
+  <data name="License_UpgradeComingSoon" xml:space="preserve">
+    <value>Upgrade feature coming soon</value>
+  </data>
+
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">
     <value>Advanced Settings</value>

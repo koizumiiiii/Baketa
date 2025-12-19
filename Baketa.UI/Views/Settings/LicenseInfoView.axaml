@@ -1,0 +1,191 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Baketa.UI.ViewModels.Settings"
+             xmlns:controls="using:Baketa.UI.Controls"
+             xmlns:local="using:Baketa.UI.Extensions"
+             x:Class="Baketa.UI.Views.Settings.LicenseInfoView"
+             x:DataType="vm:LicenseInfoViewModel">
+
+    <Design.PreviewWith>
+        <Border Padding="20" Width="600" Height="800">
+            <!-- Design time preview -->
+        </Border>
+    </Design.PreviewWith>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- Header -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="{local:Localize Settings_License_Title}" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_License_Subtitle}"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- Loading Indicator -->
+            <Border IsVisible="{Binding IsLoading}"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" Width="200"/>
+                    <TextBlock Text="{local:Localize Settings_License_Loading}" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Status Message -->
+            <Border IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                    Padding="12,8"
+                    CornerRadius="6"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                <TextBlock Text="{Binding StatusMessage}"
+                           TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Current Plan Card -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16">
+                <Grid ColumnDefinitions="*,Auto">
+                    <!-- Plan Details -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
+                        <TextBlock Text="{Binding PlanDisplayName}"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding PlanDescription}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <!-- Plan Badge -->
+                    <Border Grid.Column="1"
+                            Background="{DynamicResource AccentFillColorDefaultBrush}"
+                            CornerRadius="4"
+                            Padding="12,6"
+                            VerticalAlignment="Top">
+                        <TextBlock Text="{Binding PlanDisplayName}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="White"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Token Usage Section (Only for Pro/Premia) -->
+            <StackPanel IsVisible="{Binding HasCloudAccess}" Spacing="12">
+                <TextBlock Text="{local:Localize Settings_License_TokenUsage}" FontSize="16" FontWeight="SemiBold"/>
+
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <StackPanel Spacing="12">
+                        <!-- Usage Bar -->
+                        <StackPanel Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0"
+                                           Text="{local:Localize Settings_License_MonthlyUsage}"
+                                           FontSize="12"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding TokenUsageDisplay}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"/>
+                            </Grid>
+                            <ProgressBar Value="{Binding UsagePercentage}"
+                                         Maximum="100"
+                                         Height="8"
+                                         CornerRadius="4"/>
+                        </StackPanel>
+
+                        <!-- Quota Warning -->
+                        <Border IsVisible="{Binding IsQuotaExceeded}"
+                                Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}"
+                                CornerRadius="6"
+                                Padding="12">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"
+                                          Width="16" Height="16"
+                                          Foreground="{DynamicResource SystemFillColorCriticalBrush}"/>
+                                <TextBlock Text="{local:Localize Settings_License_QuotaExceeded}"
+                                           Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Local Only Message (For Free/Standard) -->
+            <Border IsVisible="{Binding !HasCloudAccess}"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="12" HorizontalAlignment="Center">
+                    <PathIcon Data="M12,3A9,9 0 0,0 3,12H0L4,16L8,12H5A7,7 0 0,1 12,5A7,7 0 0,1 19,12A7,7 0 0,1 12,19C10.5,19 9.09,18.5 7.94,17.7L6.5,19.14C8.04,20.3 9.94,21 12,21A9,9 0 0,0 21,12A9,9 0 0,0 12,3M14,12A2,2 0 0,0 12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12Z"
+                              Width="32" Height="32"
+                              Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                    <TextBlock Text="{local:Localize Settings_License_LocalOnlyMessage}"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               MaxWidth="400"/>
+                    <Button Content="{local:Localize Settings_License_Upgrade}"
+                            Command="{Binding UpgradeCommand}"
+                            HorizontalAlignment="Center"
+                            Padding="24,10"
+                            Classes="accent"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Plan Details Section -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="{local:Localize Settings_License_PlanDetails}" FontSize="16" FontWeight="SemiBold"/>
+
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <StackPanel Spacing="12">
+                        <!-- Expiration Date -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="{local:Localize Settings_License_ExpirationDate}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ExpirationDateDisplay}"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Cloud Access -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="{local:Localize Settings_License_CloudAccess}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding CloudAccessDisplay}"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- Token Limit (for Pro/Premia) -->
+                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasCloudAccess}">
+                            <TextBlock Grid.Column="0"
+                                       Text="{local:Localize Settings_License_MonthlyLimit}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding TokenLimit, StringFormat='{}{0:N0}'}"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Refresh Button -->
+            <Button Content="{local:Localize Settings_License_Refresh}"
+                    Command="{Binding RefreshCommand}"
+                    HorizontalAlignment="Center"
+                    Padding="24,12"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

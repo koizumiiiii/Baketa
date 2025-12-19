@@ -301,6 +301,36 @@ public static class Strings
     public static string Settings_Account_CurrentPlan => GetString("Settings_Account_CurrentPlan");
     public static string Settings_Account_UpgradeToPremium => GetString("Settings_Account_UpgradeToPremium");
 
+    // ========== License Settings ==========
+
+    public static string Settings_License_Title => GetString("Settings_License_Title");
+    public static string Settings_License_Subtitle => GetString("Settings_License_Subtitle");
+    public static string Settings_License_Loading => GetString("Settings_License_Loading");
+    public static string Settings_License_TokenUsage => GetString("Settings_License_TokenUsage");
+    public static string Settings_License_MonthlyUsage => GetString("Settings_License_MonthlyUsage");
+    public static string Settings_License_QuotaExceeded => GetString("Settings_License_QuotaExceeded");
+    public static string Settings_License_LocalOnlyMessage => GetString("Settings_License_LocalOnlyMessage");
+    public static string Settings_License_PlanDetails => GetString("Settings_License_PlanDetails");
+    public static string Settings_License_ExpirationDate => GetString("Settings_License_ExpirationDate");
+    public static string Settings_License_CloudAccess => GetString("Settings_License_CloudAccess");
+    public static string Settings_License_MonthlyLimit => GetString("Settings_License_MonthlyLimit");
+    public static string Settings_License_Refresh => GetString("Settings_License_Refresh");
+    public static string License_Plan_Free => GetString("License_Plan_Free");
+    public static string License_Plan_Standard => GetString("License_Plan_Standard");
+    public static string License_Plan_Pro => GetString("License_Plan_Pro");
+    public static string License_Plan_Premia => GetString("License_Plan_Premia");
+    public static string License_Plan_Unknown => GetString("License_Plan_Unknown");
+    public static string License_Desc_Free => GetString("License_Desc_Free");
+    public static string License_Desc_Standard => GetString("License_Desc_Standard");
+    public static string License_Desc_Pro => GetString("License_Desc_Pro");
+    public static string License_Desc_Premia => GetString("License_Desc_Premia");
+    public static string License_NoExpiration => GetString("License_NoExpiration");
+    public static string License_LocalOnly => GetString("License_LocalOnly");
+    public static string License_RefreshSuccess => GetString("License_RefreshSuccess");
+    public static string License_RefreshFailed => GetString("License_RefreshFailed");
+    public static string Settings_License_Upgrade => GetString("Settings_License_Upgrade");
+    public static string License_UpgradeComingSoon => GetString("License_UpgradeComingSoon");
+
     // ========== Advanced Settings ==========
 
     public static string Settings_Advanced_Title => GetString("Settings_Advanced_Title");

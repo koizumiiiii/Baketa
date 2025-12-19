@@ -8,6 +8,7 @@ using Baketa.Core.DI.Attributes;
 using Baketa.UI.DI.Extensions;
 using Baketa.UI.DI.Modules;
 using Baketa.UI.Security;
+using Baketa.UI.License.Adapters;
 using Baketa.UI.Services;
 using Baketa.UI.Services.Monitor;
 using Baketa.UI.ViewModels;
@@ -103,6 +104,14 @@ internal sealed class UIModule : ServiceModuleBase
         // 翻訳エンジン状態監視サービス
         // IConfigurationは既にProgram.csで登録済みなので、ここではサービスのみ登録
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
+
+        // Issue #77: 後方互換性のためのIUserPlanServiceアダプタ登録
+        // 新しいILicenseManagerをラップして既存のIUserPlanServiceインターフェースを提供
+        services.AddSingleton<UserPlanServiceAdapter>();
+        services.AddSingleton<IUserPlanService>(provider =>
+            provider.GetRequiredService<UserPlanServiceAdapter>());
+        services.AddSingleton<IDisposable>(provider =>
+            provider.GetRequiredService<UserPlanServiceAdapter>());
 
         // ウィンドウ選択ダイアログサービス（UIレイヤー）
         services.AddSingleton<Baketa.Application.Services.UI.IWindowSelectionDialogService, WindowSelectionDialogService>();
