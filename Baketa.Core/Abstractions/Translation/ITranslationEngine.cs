@@ -18,6 +18,12 @@ public interface ITranslationEngine : IDisposable
     string Name { get; }
 
     /// <summary>
+    /// エンジンの別名（設定ファイルでの互換性用）
+    /// デフォルト実装: 空配列
+    /// </summary>
+    IReadOnlyList<string> Aliases => [];
+
+    /// <summary>
     /// エンジンの説明を取得します
     /// </summary>
     string Description { get; }

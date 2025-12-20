@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Monitoring;
 using Microsoft.Extensions.Logging;
@@ -15,6 +16,30 @@ namespace Baketa.Infrastructure.Platform.Windows.Monitoring;
 /// </summary>
 public sealed class WindowsSystemResourceMonitor : IResourceMonitor
 {
+    #region P/Invoke for GlobalMemoryStatusEx (IL Trimming互換)
+
+    private const long BytesPerMegabyte = 1024 * 1024;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MEMORYSTATUSEX
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+    #endregion
+
     private readonly ILogger<WindowsSystemResourceMonitor> _logger;
     private readonly IEventAggregator _eventAggregator;
     private readonly ResourceMonitoringSettings _settings;
@@ -589,21 +614,21 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
     }
 
     /// <summary>
-    /// システム総メモリ容量取得
+    /// システム総メモリ容量取得（P/Invoke版 - IL Trimming互換）
     /// </summary>
     private long GetTotalSystemMemoryMB()
     {
         try
         {
-            using var searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
-            using var collection = searcher.Get();
-
-            foreach (ManagementObject obj in collection.Cast<ManagementObject>())
+            // P/Invoke: GlobalMemoryStatusEx（WMIより高速・IL Trimming互換）
+            var memStatus = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
+            if (GlobalMemoryStatusEx(ref memStatus))
             {
-                if (obj["TotalPhysicalMemory"] is ulong totalBytes)
-                {
-                    return (long)(totalBytes / (1024 * 1024)); // バイトからMBに変換
-                }
+                return (long)(memStatus.ullTotalPhys / BytesPerMegabyte);
+            }
+            else
+            {
+                _logger.LogWarning("GlobalMemoryStatusEx失敗 - エラーコード: {ErrorCode}", Marshal.GetLastWin32Error());
             }
         }
         catch (Exception ex)
@@ -611,8 +636,8 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
             _logger.LogError(ex, "システム総メモリ容量取得エラー");
         }
 
-        // フォールバック: 環境変数やGCから推定
-        return Environment.WorkingSet / (1024 * 1024) * 4; // 概算値
+        // フォールバック: 取得失敗を示す0を返す（呼び出し元でエラーハンドリング）
+        return 0;
     }
 
     /// <summary>

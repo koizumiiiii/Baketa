@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
-using Avalonia.Controls;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
@@ -18,7 +17,7 @@ using Baketa.UI.Models.Settings;
 using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Baketa.UI.ViewModels.Settings;
-using Baketa.UI.Views.Settings;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using UiFramework = Baketa.UI.Framework;
@@ -31,15 +30,12 @@ namespace Baketa.UI.ViewModels;
 /// </summary>
 public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
 {
+    private readonly IServiceProvider _serviceProvider;
     private readonly ISettingsChangeTracker _changeTracker;
     private readonly IEventAggregator _eventAggregator;
-    private readonly IAuthService _authService;
-    private readonly INavigationService _navigationService;
     private readonly ISettingsService _settingsService;
     private readonly ILocalizationService? _localizationService;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
-    private readonly ILicenseManager? _licenseManager;
-    private readonly IPaymentService? _paymentService;
     private readonly ILogger<SettingsWindowViewModel>? _logger;
     private SettingCategory? _selectedCategory;
     private string _statusMessage = string.Empty;
@@ -47,40 +43,29 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// <summary>
     /// SettingsWindowViewModelを初期化します
     /// </summary>
+    /// <param name="serviceProvider">DIコンテナのサービスプロバイダー</param>
     /// <param name="changeTracker">設定変更追跡サービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
-    /// <param name="authService">認証サービス</param>
-    /// <param name="navigationService">ナビゲーションサービス</param>
     /// <param name="settingsService">設定サービス</param>
     /// <param name="localizationService">ローカライゼーションサービス（オプション）</param>
     /// <param name="unifiedSettingsService">統合設定サービス（オプション）</param>
     /// <param name="logger">ロガー（オプション）</param>
     public SettingsWindowViewModel(
+        IServiceProvider serviceProvider,
         ISettingsChangeTracker changeTracker,
         IEventAggregator eventAggregator,
-        IAuthService authService,
-        INavigationService navigationService,
         ISettingsService settingsService,
         ILocalizationService? localizationService = null,
         IUnifiedSettingsService? unifiedSettingsService = null,
-        ILicenseManager? licenseManager = null,
-        IPaymentService? paymentService = null,
         ILogger<SettingsWindowViewModel>? logger = null) : base(eventAggregator)
     {
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _changeTracker = changeTracker ?? throw new ArgumentNullException(nameof(changeTracker));
         _eventAggregator = eventAggregator; // 既にbase()でnullチェック済み
-        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
-        _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _localizationService = localizationService;
         _unifiedSettingsService = unifiedSettingsService;
-        _licenseManager = licenseManager;
-        _paymentService = paymentService;
         _logger = logger;
-
-        // [DEBUG] ILocalizationServiceのDI注入確認
-        Console.WriteLine($"[SettingsWindowViewModel] Constructor - ILocalizationService is null: {localizationService == null}");
-        System.Diagnostics.Debug.WriteLine($"[SettingsWindowViewModel] Constructor - ILocalizationService is null: {localizationService == null}");
 
         // カテゴリの初期化（null引数チェック後に実行）
         InitializeCategories();
@@ -222,18 +207,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Level = SettingLevel.Basic,
                 DisplayOrder = 3,
                 Content = null // 遅延作成
-            },
-
-            // Issue #110: プランアップグレードカテゴリ
-            new()
-            {
-                Id = "settings_upgrade",
-                NameResourceKey = "Settings_Upgrade_Title",
-                DescriptionResourceKey = "Settings_Upgrade_Subtitle",
-                IconData = "M16,6L18.29,8.29L13.41,13.17L9.41,9.17L2,16.59L3.41,18L9.41,12L13.41,16L19.71,9.71L22,12V6H16Z", // Trending up icon
-                Level = SettingLevel.Basic,
-                DisplayOrder = 4,
-                Content = null // 遅延作成
             }
         };
 
@@ -259,149 +232,8 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     }
 
     /// <summary>
-    /// テスト環境かどうかを判定します
-    /// </summary>
-    private static bool IsTestEnvironment()
-    {
-        return AppDomain.CurrentDomain.GetAssemblies()
-            .Any(a => a.FullName?.Contains("xunit") == true ||
-                     a.FullName?.Contains("Microsoft.TestPlatform") == true ||
-                     a.FullName?.Contains("testhost") == true);
-    }
-
-    /// <summary>
-    /// 一般設定Viewを作成します
-    /// </summary>
-    private GeneralSettingsView? CreateGeneralSettingsView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        try
-        {
-            // 保存済みの設定を読み込む（なければデフォルト値を使用）
-            GeneralSettings settings = _settingsService.GetCategorySettings<GeneralSettings>() ?? new GeneralSettings();
-            TranslationSettings translationSettings = _settingsService.GetCategorySettings<TranslationSettings>() ?? new TranslationSettings();
-            _logger?.LogDebug("一般設定を読み込みました: UiLanguage={UiLanguage}, SourceLang={SourceLang}, TargetLang={TargetLang}, FontSize={FontSize}",
-                settings.UiLanguage, translationSettings.DefaultSourceLanguage, translationSettings.DefaultTargetLanguage, translationSettings.OverlayFontSize);
-
-            GeneralSettingsViewModel viewModel = new(
-                settings,
-                _eventAggregator,
-                localizationService: _localizationService,
-                changeTracker: _changeTracker,
-                logger: _logger as ILogger<GeneralSettingsViewModel>,
-                translationSettings: translationSettings);
-            return new GeneralSettingsView(viewModel);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "一般設定Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のViewを返す
-            return new GeneralSettingsView();
-        }
-    }
-
-    /// <summary>
-    /// アカウント設定Viewを作成します
-    /// </summary>
-    private AccountSettingsView? CreateAccountSettingsView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        try
-        {
-            AccountSettingsViewModel viewModel = new(
-                _authService,
-                _navigationService,
-                _eventAggregator,
-                _logger as ILogger<AccountSettingsViewModel>);
-            return new AccountSettingsView { DataContext = viewModel };
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "アカウント設定Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のViewを返す
-            return new AccountSettingsView();
-        }
-    }
-
-    /// <summary>
-    /// ライセンス情報Viewを作成します
-    /// </summary>
-    private LicenseInfoView? CreateLicenseInfoView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        try
-        {
-            if (_licenseManager == null)
-            {
-                _logger?.LogWarning("ILicenseManagerがDI登録されていないため、ライセンス情報Viewを作成できません");
-                return new LicenseInfoView();
-            }
-
-            LicenseInfoViewModel viewModel = new(
-                _licenseManager,
-                _eventAggregator,
-                _logger as ILogger<LicenseInfoViewModel>);
-            return new LicenseInfoView { DataContext = viewModel };
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "ライセンス情報Viewの作成中にエラーが発生しました");
-            // フォールバック: 空のViewを返す
-            return new LicenseInfoView();
-        }
-    }
-
-    /// <summary>
-    /// アップグレードViewを作成します（Issue #110: 決済統合）
-    /// </summary>
-    private UpgradeView? CreateUpgradeView()
-    {
-        // テスト環境では View 作成を避ける
-        if (IsTestEnvironment())
-        {
-            return null; // テスト環境では null を返す
-        }
-
-        try
-        {
-            if (_licenseManager == null || _paymentService == null)
-            {
-                _logger?.LogWarning("ILicenseManagerまたはIPaymentServiceがDI登録されていないため、アップグレードViewを作成できません");
-                return new UpgradeView();
-            }
-
-            UpgradeViewModel viewModel = new(
-                _licenseManager,
-                _paymentService,
-                _eventAggregator,
-                _logger as ILogger<UpgradeViewModel>);
-            return new UpgradeView { DataContext = viewModel };
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "アップグレードViewの作成中にエラーが発生しました");
-            // フォールバック: 空のViewを返す
-            return new UpgradeView();
-        }
-    }
-
-    /// <summary>
-    /// カテゴリのContentを遅延作成します
+    /// カテゴリのContentを遅延作成します（DIからViewModelを取得）
+    /// ViewLocatorがViewModelからViewへの変換を自動的に行います
     /// </summary>
     private void EnsureCategoryContent(SettingCategory category)
     {
@@ -410,16 +242,18 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
             return; // 既に作成済み
         }
 
+        // DIコンテナからViewModelを取得し、category.Contentに設定
+        // ViewLocatorがViewModelからViewへの自動変換を行う
         category.Content = category.Id switch
         {
-            "settings_general" => CreateGeneralSettingsView(),
-            "settings_account" => CreateAccountSettingsView(),
-            "settings_license" => CreateLicenseInfoView(),
-            "settings_upgrade" => CreateUpgradeView(),
+            "settings_general" => _serviceProvider.GetRequiredService<GeneralSettingsViewModel>(),
+            "settings_account" => _serviceProvider.GetRequiredService<AccountSettingsViewModel>(),
+            "settings_license" => _serviceProvider.GetService<LicenseInfoViewModel>(), // オプショナル
             _ => null
         };
 
-        _logger?.LogDebug("カテゴリ {CategoryId} のContentを作成しました", category.Id);
+        _logger?.LogDebug("カテゴリ {CategoryId} のViewModelを作成しました: {ContentType}",
+            category.Id, category.Content?.GetType().Name ?? "null");
     }
 
     /// <summary>
@@ -507,18 +341,12 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
             // 保存前にContentを確実に作成
             EnsureCategoryContent(category);
 
-            _logger?.LogInformation("カテゴリ処理: {CategoryId}, Content: {ContentType}, DataContext: {DataContextType}",
+            _logger?.LogInformation("カテゴリ処理: {CategoryId}, Content: {ContentType}",
                 category.Id,
-                category.Content?.GetType().Name ?? "null",
-                (category.Content as UserControl)?.DataContext?.GetType().Name ?? "null");
+                category.Content?.GetType().Name ?? "null");
 
-            if (category.Content is not UserControl { DataContext: { } dataContext })
-            {
-                _logger?.LogWarning("スキップ - Content is not UserControl with DataContext: {CategoryId}", category.Id);
-                continue;
-            }
-
-            switch (dataContext)
+            // ContentはViewModel（DIから取得済み）
+            switch (category.Content)
             {
                 case GeneralSettingsViewModel generalVm:
                     generalViewModel = generalVm;

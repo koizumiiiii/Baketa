@@ -129,11 +129,6 @@
                                TextWrapping="Wrap"
                                TextAlignment="Center"
                                MaxWidth="400"/>
-                    <Button Content="{local:Localize Settings_License_Upgrade}"
-                            Command="{Binding UpgradeCommand}"
-                            HorizontalAlignment="Center"
-                            Padding="24,10"
-                            Classes="accent"/>
                 </StackPanel>
             </Border>
 
@@ -181,11 +176,16 @@
                 </Border>
             </StackPanel>
 
-            <!-- Refresh Button -->
-            <Button Content="{local:Localize Settings_License_Refresh}"
-                    Command="{Binding RefreshCommand}"
-                    HorizontalAlignment="Center"
-                    Padding="24,12"/>
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                <Button Content="{local:Localize Settings_License_Refresh}"
+                        Command="{Binding RefreshCommand}"
+                        Padding="24,12"/>
+                <Button Content="{local:Localize Settings_License_Upgrade}"
+                        Command="{Binding ChangePlanCommand}"
+                        Padding="24,12"
+                        Classes="accent"/>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

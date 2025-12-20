@@ -1,0 +1,70 @@
+<linker>
+  <!--
+    Issue #219: IL Linkerの設定ファイル
+    TrimMode=partial 使用時にリフレクションを使うアセンブリを保護
+  -->
+
+  <!-- Avalonia UI: XAMLパーサー、バインディング、スタイルシステム -->
+  <assembly fullname="Avalonia" preserve="all" />
+  <assembly fullname="Avalonia.Base" preserve="all" />
+  <assembly fullname="Avalonia.Controls" preserve="all" />
+  <assembly fullname="Avalonia.Desktop" preserve="all" />
+  <assembly fullname="Avalonia.Themes.Fluent" preserve="all" />
+  <assembly fullname="Avalonia.Fonts.Inter" preserve="all" />
+  <assembly fullname="Avalonia.Markup.Xaml" preserve="all" />
+  <assembly fullname="Avalonia.ReactiveUI" preserve="all" />
+
+  <!-- ReactiveUI: バインディング、コマンド、ルーティング -->
+  <assembly fullname="ReactiveUI" preserve="all" />
+  <assembly fullname="ReactiveUI.Validation" preserve="all" />
+  <assembly fullname="Splat" preserve="all" />
+  <assembly fullname="Splat.Microsoft.Extensions.DependencyInjection" preserve="all" />
+
+  <!-- Microsoft.Extensions: DI、ロギング、構成 -->
+  <assembly fullname="Microsoft.Extensions.DependencyInjection" preserve="all" />
+  <assembly fullname="Microsoft.Extensions.DependencyInjection.Abstractions" preserve="all" />
+  <assembly fullname="Microsoft.Extensions.Configuration" preserve="all" />
+  <assembly fullname="Microsoft.Extensions.Configuration.Json" preserve="all" />
+  <assembly fullname="Microsoft.Extensions.Configuration.Binder" preserve="all" />
+  <assembly fullname="Microsoft.Extensions.Logging" preserve="all" />
+  <assembly fullname="Microsoft.Extensions.Hosting" preserve="all" />
+  <assembly fullname="Microsoft.Extensions.Options" preserve="all" />
+
+  <!-- System.Text.Json: リフレクションベースのシリアライゼーション -->
+  <assembly fullname="System.Text.Json" preserve="all" />
+
+  <!-- プロジェクトアセンブリ: ViewModelとView -->
+  <assembly fullname="Baketa">
+    <!-- ViewModel（リフレクションでインスタンス化される） -->
+    <type fullname="Baketa.UI.ViewModels.*" preserve="all" />
+    <type fullname="Baketa.UI.ViewModels.Settings.*" preserve="all" />
+    <!-- View（ViewLocatorで動的に解決される） -->
+    <type fullname="Baketa.UI.Views.*" preserve="all" />
+    <type fullname="Baketa.UI.Views.Settings.*" preserve="all" />
+    <!-- モデル（設定バインディング） -->
+    <type fullname="Baketa.UI.Models.*" preserve="all" />
+    <type fullname="Baketa.UI.Models.Settings.*" preserve="all" />
+  </assembly>
+
+  <assembly fullname="Baketa.Core">
+    <!-- 設定クラス（JSON逆シリアライズ） -->
+    <type fullname="Baketa.Core.Settings.*" preserve="all" />
+    <!-- イベント（EventAggregatorによるリフレクション） -->
+    <type fullname="Baketa.Core.Events.*" preserve="all" />
+  </assembly>
+
+  <assembly fullname="Baketa.Application">
+    <!-- イベントプロセッサー -->
+    <type fullname="Baketa.Application.Events.*" preserve="all" />
+  </assembly>
+
+  <assembly fullname="Baketa.Infrastructure">
+    <!-- 設定サービス -->
+    <type fullname="Baketa.Infrastructure.Settings.*" preserve="all" />
+  </assembly>
+
+  <assembly fullname="Baketa.Infrastructure.Platform">
+    <!-- プラットフォーム固有サービス -->
+    <type fullname="Baketa.Infrastructure.Platform.*" preserve="all" />
+  </assembly>
+</linker>

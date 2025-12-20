@@ -330,6 +330,8 @@ public static class Strings
     public static string License_RefreshFailed => GetString("License_RefreshFailed");
     public static string Settings_License_Upgrade => GetString("Settings_License_Upgrade");
     public static string License_UpgradeComingSoon => GetString("License_UpgradeComingSoon");
+    public static string License_OpeningPlanPage => GetString("License_OpeningPlanPage");
+    public static string License_PlanPageOpenFailed => GetString("License_PlanPageOpenFailed");
 
     // ========== Advanced Settings ==========
 

@@ -77,6 +77,9 @@ public sealed class GrpcTranslationEngineAdapter : ITranslationEngine
     public string Name => "gRPC Translation Engine";
 
     /// <inheritdoc/>
+    public IReadOnlyList<string> Aliases { get; } = ["NLLB200", "NLLB-200", "nllb"];
+
+    /// <inheritdoc/>
     public string Description => "gRPC-based Python translation server (NLLB-200)";
 
     /// <inheritdoc/>

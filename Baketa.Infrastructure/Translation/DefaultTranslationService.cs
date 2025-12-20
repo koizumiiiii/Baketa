@@ -121,7 +121,16 @@ public class DefaultTranslationService : ITranslationService
             return exactMatch;
         }
 
-        // 2. 部分一致検索（NLLB-200 → 'NLLB' 含むエンジン）
+        // 2. エイリアス検索（NLLB200 → gRPC Translation Engine）
+        var aliasMatch = _availableEngines.FirstOrDefault(e =>
+            e.Aliases.Any(alias => string.Equals(alias, engineName, StringComparison.OrdinalIgnoreCase)));
+        if (aliasMatch != null)
+        {
+            Console.WriteLine($"📍 [MATCH] エイリアス一致: {aliasMatch.Name} (alias: {engineName})");
+            return aliasMatch;
+        }
+
+        // 3. 部分一致検索（NLLB-200 → 'NLLB' 含むエンジン）
         var partialMatch = _availableEngines.FirstOrDefault(e =>
             e.Name.Contains(engineName, StringComparison.OrdinalIgnoreCase) ||
             engineName.Contains(e.Name, StringComparison.OrdinalIgnoreCase));
@@ -131,7 +140,7 @@ public class DefaultTranslationService : ITranslationService
             return partialMatch;
         }
 
-        // 3. エンジンタイプ名による検索
+        // 4. エンジンタイプ名による検索
         var typeMatch = _availableEngines.FirstOrDefault(e =>
             e.GetType().Name.Contains(engineName, StringComparison.OrdinalIgnoreCase));
         if (typeMatch != null)

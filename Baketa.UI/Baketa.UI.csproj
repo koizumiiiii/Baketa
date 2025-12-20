@@ -47,14 +47,35 @@
 		<SelfContained>true</SelfContained>
 	</PropertyGroup>
 
-	<!-- Publish設定（配布時のみ使用） -->
-	<PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(PublishDir)' != ''">
+	<!-- 🚀 [Issue #219] 配布用最適化設定 (IS_DISTRIBUTION=true で有効化) -->
+	<!-- 使用例: dotnet publish -c Release -p:IS_DISTRIBUTION=true -->
+	<PropertyGroup Condition="'$(IS_DISTRIBUTION)' == 'true'">
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<!-- 🔥 [SIZE_OPTIMIZATION] IL Linkingによるサイズ削減 -->
+		<PublishTrimmed>true</PublishTrimmed>
+		<TrimMode>partial</TrimMode>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<!-- リフレクション使用コードの保護 -->
+		<TrimmerDefaultAction>link</TrimmerDefaultAction>
+		<!-- 🔧 System.Text.Json リフレクションベースシリアライゼーション有効化 -->
+		<JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+	</PropertyGroup>
+
+	<!-- 通常Publish設定（配布時以外 - トリミング無効） -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Release' AND '$(PublishDir)' != '' AND '$(IS_DISTRIBUTION)' != 'true'">
 		<PublishSingleFile>true</PublishSingleFile>
 		<SelfContained>true</SelfContained>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 		<PublishTrimmed>false</PublishTrimmed>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 	</PropertyGroup>
+
+	<!-- 🔥 [Issue #219] IL Linker設定ファイル（リフレクション使用コードの保護） -->
+	<ItemGroup Condition="'$(IS_DISTRIBUTION)' == 'true'">
+		<TrimmerRootDescriptor Include="TrimmerRoots.xml" />
+	</ItemGroup>
 
 	<!-- 🔥 [SIZE_OPTIMIZATION] Releaseビルド後に不要なファイルを削除（961.5MB削減） -->
 	<Target Name="RemoveUnusedRuntimeFiles" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
@@ -182,50 +203,7 @@
 		</None>
 	</ItemGroup>
 
-	<!-- Python gRPCサーバーディレクトリの自動コピー -->
-	<ItemGroup>
-		<!--
-			本番に必要なファイルのみコピー:
-			- start_server.py, ocr_server_surya.py, translation_server.py
-			- *_pb2.py, *_pb2_grpc.py (gRPC生成コード)
-			- engines/, protos/ (サブディレクトリ)
-			- requirements.txt, __init__.py, *.spec
-
-			除外するファイル:
-			- test_*.py, export_*.py, quantize_*.py, check_*.py, fix_*.py, package_*.py (開発用スクリプト)
-			- ocr_server_hybrid.py, ocr_server_paddlevl.py, ocr_server_surya_onnx.py (未使用サーバー)
-			- stress_test.py, resource_monitor.py (デバッグ用)
-			- *.md, *.bat, *_output.txt, *.zip, *.log (ドキュメント・ログ・アーカイブ)
-			- requirements_ocr.txt (開発用依存関係)
-			- __pycache__/, venv_build/, dist/, build/ (キャッシュ・ビルド成果物)
-		-->
-		<None Include="..\grpc_server\**\*"
-			Exclude="..\grpc_server\**\__pycache__\**;
-				..\grpc_server\**\*.pyc;
-				..\grpc_server\**\*.log;
-				..\grpc_server\**\*.md;
-				..\grpc_server\**\*.bat;
-				..\grpc_server\**\*_output.txt;
-				..\grpc_server\**\*.zip;
-				..\grpc_server\nul;
-				..\grpc_server\**\nul;
-				..\grpc_server\venv_build\**;
-				..\grpc_server\dist\**;
-				..\grpc_server\build\**;
-				..\grpc_server\test_*.py;
-				..\grpc_server\export_*.py;
-				..\grpc_server\quantize_*.py;
-				..\grpc_server\check_*.py;
-				..\grpc_server\fix_*.py;
-				..\grpc_server\package_*.py;
-				..\grpc_server\ocr_server_hybrid.py;
-				..\grpc_server\ocr_server_paddlevl.py;
-				..\grpc_server\ocr_server_surya_onnx.py;
-				..\grpc_server\stress_test.py;
-				..\grpc_server\resource_monitor.py;
-				..\grpc_server\requirements_ocr.txt">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Link>grpc_server\%(RecursiveDir)%(FileName)%(Extension)</Link>
-		</None>
-	</ItemGroup>
+	<!-- 🔥 [SIZE_OPTIMIZATION] Python gRPCサーバーはPyInstallerビルド済みexeを使用
+	     build-release.ps1がdist/BaketaTranslationServer/をコピーするため、
+	     Pythonソースのコピーは不要 -->
 </Project>
