@@ -207,18 +207,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 Level = SettingLevel.Basic,
                 DisplayOrder = 3,
                 Content = null // 遅延作成
-            },
-
-            // Issue #110: プランアップグレードカテゴリ
-            new()
-            {
-                Id = "settings_upgrade",
-                NameResourceKey = "Settings_Upgrade_Title",
-                DescriptionResourceKey = "Settings_Upgrade_Subtitle",
-                IconData = "M16,6L18.29,8.29L13.41,13.17L9.41,9.17L2,16.59L3.41,18L9.41,12L13.41,16L19.71,9.71L22,12V6H16Z", // Trending up icon
-                Level = SettingLevel.Basic,
-                DisplayOrder = 4,
-                Content = null // 遅延作成
             }
         };
 
@@ -261,7 +249,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
             "settings_general" => _serviceProvider.GetRequiredService<GeneralSettingsViewModel>(),
             "settings_account" => _serviceProvider.GetRequiredService<AccountSettingsViewModel>(),
             "settings_license" => _serviceProvider.GetService<LicenseInfoViewModel>(), // オプショナル
-            "settings_upgrade" => _serviceProvider.GetService<UpgradeViewModel>(), // オプショナル
             _ => null
         };
 

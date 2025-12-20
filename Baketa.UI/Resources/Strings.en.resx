@@ -716,10 +716,16 @@
     <value>Failed to update license information</value>
   </data>
   <data name="Settings_License_Upgrade" xml:space="preserve">
-    <value>Upgrade</value>
+    <value>Change Plan</value>
   </data>
   <data name="License_UpgradeComingSoon" xml:space="preserve">
     <value>Upgrade feature coming soon</value>
+  </data>
+  <data name="License_OpeningPlanPage" xml:space="preserve">
+    <value>Opening plan change page...</value>
+  </data>
+  <data name="License_PlanPageOpenFailed" xml:space="preserve">
+    <value>Failed to open plan change page</value>
   </data>
 
   <!-- ========== Advanced Settings ========== -->

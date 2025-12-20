@@ -220,9 +220,13 @@ Remove-Item -LiteralPath $sourceDir -Recurse -Force -ErrorAction SilentlyContinu
 $translationServerDir = "$ProjectRoot\grpc_server\dist\BaketaTranslationServer"
 if (Test-Path $translationServerDir) {
     $targetDir = "$OutputDir\grpc_server\BaketaTranslationServer"
+    # 既存ディレクトリを削除してからコピー（_internalディレクトリの競合回避）
+    if (Test-Path $targetDir) {
+        Remove-Item -LiteralPath $targetDir -Recurse -Force
+    }
     $null = New-Item -ItemType Directory -Path $targetDir -Force
     Write-Host "  Copying BaketaTranslationServer..." -ForegroundColor Gray
-    Copy-Item -Path "$translationServerDir\*" -Destination $targetDir -Recurse
+    Copy-Item -Path "$translationServerDir\*" -Destination $targetDir -Recurse -Force
 } else {
     Write-Host "  WARNING: BaketaTranslationServer not found" -ForegroundColor Red
 }

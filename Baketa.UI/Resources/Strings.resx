@@ -716,10 +716,16 @@
     <value>ライセンス情報の更新に失敗しました</value>
   </data>
   <data name="Settings_License_Upgrade" xml:space="preserve">
-    <value>アップグレード</value>
+    <value>プラン変更</value>
   </data>
   <data name="License_UpgradeComingSoon" xml:space="preserve">
     <value>アップグレード機能は準備中です</value>
+  </data>
+  <data name="License_OpeningPlanPage" xml:space="preserve">
+    <value>プラン変更ページを開いています...</value>
+  </data>
+  <data name="License_PlanPageOpenFailed" xml:space="preserve">
+    <value>プラン変更ページを開けませんでした</value>
   </data>
 
   <!-- ========== Advanced Settings ========== -->

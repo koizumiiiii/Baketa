@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Reactive;
 using System.Reactive.Linq;
 using Avalonia.Threading;
@@ -51,7 +52,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
         // コマンドの初期化
         RefreshCommand = ReactiveCommand.CreateFromTask(RefreshLicenseStateAsync);
-        UpgradeCommand = ReactiveCommand.Create(ShowUpgradeComingSoon);
+        ChangePlanCommand = ReactiveCommand.Create(OpenPlanChangePage);
 
         // 初期状態の読み込み
         LoadCurrentState();
@@ -191,9 +192,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> RefreshCommand { get; }
 
     /// <summary>
-    /// アップグレードコマンド（プレースホルダー）
+    /// プラン変更コマンド（外部Webページを開く）
     /// </summary>
-    public ReactiveCommand<Unit, Unit> UpgradeCommand { get; }
+    public ReactiveCommand<Unit, Unit> ChangePlanCommand { get; }
 
     #endregion
 
@@ -266,13 +267,29 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// アップグレード準備中メッセージを表示（プレースホルダー）
+    /// プラン変更ページを外部ブラウザで開きます
     /// </summary>
-    private void ShowUpgradeComingSoon()
+    private void OpenPlanChangePage()
     {
-        StatusMessage = Strings.License_UpgradeComingSoon;
-        IsStatusError = false;
-        _logger?.LogInformation("アップグレードボタンがクリックされました（準備中）");
+        const string planChangeUrl = "https://baketa.app/pricing";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = planChangeUrl,
+                UseShellExecute = true
+            });
+            StatusMessage = Strings.License_OpeningPlanPage;
+            IsStatusError = false;
+            _logger?.LogInformation("プラン変更ページを開きました: {Url}", planChangeUrl);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = Strings.License_PlanPageOpenFailed;
+            IsStatusError = true;
+            _logger?.LogError(ex, "プラン変更ページを開けませんでした: {Url}", planChangeUrl);
+        }
     }
 
     /// <summary>
