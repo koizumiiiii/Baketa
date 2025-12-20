@@ -305,13 +305,9 @@ public class PythonServerManager(
         // 配布版（Release build）: PyInstaller exe（BaketaTranslationServer.exe）を直接実行
         // 開発版（Debug build）: Python + scriptで実行
 
-        // [Issue #185] NLLBモデルパスを解決
-        var modelPath = ResolveNllbModelPath();
-        var modelPathArg = !string.IsNullOrEmpty(modelPath) ? $" --model-path \"{modelPath}\"" : "";
-        logger.LogDebug("[Issue #185] モデルパス引数: {ModelPathArg}", modelPathArg);
-
 #if IS_DISTRIBUTION
         // 🔥 [PYINSTALLER_INTEGRATION] 配布版: PyInstallerでビルドしたexeを直接実行
+        // 注意: exeは--model-path引数をサポートしていない（内部でモデルパスを解決）
         var translationServerExePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaTranslationServer", "BaketaTranslationServer.exe");
 
         if (!File.Exists(translationServerExePath))
@@ -328,11 +324,17 @@ public class PythonServerManager(
         var startInfo = new ProcessStartInfo
         {
             FileName = translationServerExePath,
-            Arguments = $"--port {port}{modelPathArg}",
+            Arguments = $"--port {port}",
 #else
         // 開発版: Python + script実行（従来ロジック）
         // 🔧 [Issue #218 FIX] .slnファイル探索を開発版のみに限定（配布版では不要）
         // Gemini分析: 配布版で5秒の不要な遅延が発生していた原因
+
+        // [Issue #185] NLLBモデルパスを解決（開発版のみ）
+        var modelPath = ResolveNllbModelPath();
+        var modelPathArg = !string.IsNullOrEmpty(modelPath) ? $" --model-path \"{modelPath}\"" : "";
+        logger.LogDebug("[Issue #185] モデルパス引数: {ModelPathArg}", modelPathArg);
+
         var currentDir = Environment.CurrentDirectory;
         var projectRoot = FindProjectRoot(AppContext.BaseDirectory);
         if (string.IsNullOrEmpty(projectRoot))

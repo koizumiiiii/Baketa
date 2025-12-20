@@ -174,33 +174,27 @@ $OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 if (Test-Path $OutputDir) {
     Write-Host "  Removing existing release directory..." -ForegroundColor Gray
 
-    # Check for reserved device names first
-    $hasReservedNames = $false
+    # Remove all items including reserved device names (nul, con, etc.)
     Get-ChildItem -LiteralPath $OutputDir -Force -ErrorAction SilentlyContinue | ForEach-Object {
-        if ($_.Name -match '^(nul|con|prn|aux|com[1-9]|lpt[1-9])$') {
-            $hasReservedNames = $true
-            Write-Host "  Skipping reserved device name: $($_.Name)" -ForegroundColor Yellow
-        }
-    }
-
-    # Remove all deletable items
-    Get-ChildItem -LiteralPath $OutputDir -Force -ErrorAction SilentlyContinue | ForEach-Object {
-        if (-not ($_.Name -match '^(nul|con|prn|aux|com[1-9]|lpt[1-9])$')) {
-            try {
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-            } catch {
-                Write-Host "  Warning: Could not delete $($_.Name)" -ForegroundColor Yellow
-            }
-        }
-    }
-
-    # Only try to remove directory if no reserved names exist
-    if (-not $hasReservedNames) {
         try {
-            Remove-Item -LiteralPath $OutputDir -Force -ErrorAction Stop
+            if ($_.Name -match '^(nul|con|prn|aux|com[1-9]|lpt[1-9])$') {
+                # Use \\?\ prefix to delete Windows reserved device names
+                $extendedPath = "\\?\$($_.FullName)"
+                [System.IO.File]::Delete($extendedPath)
+                Write-Host "  Deleted reserved name: $($_.Name)" -ForegroundColor DarkGray
+            } else {
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+            }
         } catch {
-            # Directory may not be empty due to reserved names
+            Write-Host "  Warning: Could not delete $($_.Name): $($_.Exception.Message)" -ForegroundColor Yellow
         }
+    }
+
+    # Remove the directory itself
+    try {
+        Remove-Item -LiteralPath $OutputDir -Force -ErrorAction Stop
+    } catch {
+        Write-Host "  Warning: Could not remove output directory, will overwrite" -ForegroundColor Yellow
     }
 }
 $null = New-Item -ItemType Directory -Path $OutputDir -Force
@@ -216,24 +210,10 @@ Copy-Item -Path "$sourceDir\*" -Destination $OutputDir -Recurse
 # Clean up temp publish directory
 Remove-Item -LiteralPath $sourceDir -Recurse -Force -ErrorAction SilentlyContinue
 
-# 5.2 Copy BaketaTranslationServer.exe
-$translationServerDir = "$ProjectRoot\grpc_server\dist\BaketaTranslationServer"
-if (Test-Path $translationServerDir) {
-    $targetDir = "$OutputDir\grpc_server\BaketaTranslationServer"
-    # 既存ディレクトリを削除してからコピー（_internalディレクトリの競合回避）
-    if (Test-Path $targetDir) {
-        Remove-Item -LiteralPath $targetDir -Recurse -Force
-    }
-    $null = New-Item -ItemType Directory -Path $targetDir -Force
-    Write-Host "  Copying BaketaTranslationServer..." -ForegroundColor Gray
-    Copy-Item -Path "$translationServerDir\*" -Destination $targetDir -Recurse -Force
-} else {
-    Write-Host "  WARNING: BaketaTranslationServer not found" -ForegroundColor Red
-}
-
-# 5.2.1 BaketaSuryaOcrServer - [Issue #210] 初回起動時にGPU検出結果に基づきダウンロード
-# CPU版/CUDA版はGitHub Releasesから自動ダウンロードされるため、リリースパッケージには含めない
-Write-Host "  BaketaSuryaOcrServer: Skipped (downloaded on first run based on GPU detection)" -ForegroundColor Gray
+# 5.2 Python gRPC Servers - 初回起動時にmodels-v1からダウンロード
+# ComponentDownload設定でBaketaTranslationServer、BaketaSuryaOcrServerをダウンロード
+Write-Host "  BaketaTranslationServer: Skipped (downloaded from models-v1 on first run)" -ForegroundColor Gray
+Write-Host "  BaketaSuryaOcrServer: Skipped (downloaded from models-v1 based on GPU detection)" -ForegroundColor Gray
 
 # 5.3 OCR models - [SIZE_OPTIMIZATION] ppocrv5-onnxはNuGetパッケージに含まれるため不要
 Write-Host "  OCR models: Skipped (included in NuGet package Sdcb.PaddleOCR.Models.Local)" -ForegroundColor Gray
