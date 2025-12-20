@@ -271,7 +271,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// </summary>
     private void OpenPlanChangePage()
     {
-        const string planChangeUrl = "https://baketa.app/pricing";
+        const string planChangeUrl = "https://koizumiiiii.github.io/Baketa/pages/pricing.html";
 
         try
         {
