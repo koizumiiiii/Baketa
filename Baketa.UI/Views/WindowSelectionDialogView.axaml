@@ -275,13 +275,14 @@
                 Background="{StaticResource ButtonSecondaryBrush}"
                 Foreground="#1F1F1F"
                 Command="{Binding CancelCommand}"/>
+        <!-- 🔥 [ISSUE#225] CommandParameterをSelectedWindowViewModel（WindowInfoViewModel型）に修正 -->
         <Button Content="選択"
                 Width="100" Height="32"
                 Background="{StaticResource ButtonPrimaryBrush}"
                 Foreground="White"
                 IsEnabled="{Binding CanSelect}"
                 Command="{Binding SelectWindowCommand}"
-                CommandParameter="{Binding SelectedWindow}"/>
+                CommandParameter="{Binding SelectedWindowViewModel}"/>
       </StackPanel>
     </Border>
   </Grid>

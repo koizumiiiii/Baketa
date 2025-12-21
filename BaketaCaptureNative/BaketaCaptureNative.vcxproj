@@ -113,8 +113,9 @@
     <ClInclude Include="include\BaketaCaptureNative.h" />
     <ClInclude Include="src\pch.h" />
     <ClInclude Include="src\WindowsCaptureSession.h" />
+    <ClInclude Include="src\DxgiGpuDetector.h" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <ClCompile Include="src\BaketaCaptureNative.cpp" />
     <ClCompile Include="src\pch.cpp">
@@ -122,6 +123,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\WindowsCaptureSession.cpp" />
+    <ClCompile Include="src\DxgiGpuDetector.cpp" />
   </ItemGroup>
   
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

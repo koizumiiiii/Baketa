@@ -265,7 +265,9 @@ public sealed record PaymentResult
 
 /// <summary>
 /// 決済操作結果（データ付き）
+/// CA1000抑制: 内部ファクトリメソッドとして使用、型パラメータ指定は許容
 /// </summary>
+#pragma warning disable CA1000
 public sealed record PaymentResult<T>
 {
     /// <summary>
@@ -307,3 +309,4 @@ public sealed record PaymentResult<T>
         ErrorMessage = errorMessage
     };
 }
+#pragma warning restore CA1000

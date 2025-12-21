@@ -23,6 +23,7 @@ public class WindowSelectionDialogViewModel : ViewModelBase
 {
     private readonly IWindowManagerAdapter _windowManager;
     private WindowInfo? _selectedWindow;
+    private WindowInfoViewModel? _selectedWindowViewModel; // 🔥 [ISSUE#225] 選択中のウィンドウViewModel
     private bool _isLoading;
     private IntPtr _previouslySelectedWindowHandle; // 🔥 [ISSUE#171] 前回選択したウィンドウのハンドル
 
@@ -90,6 +91,15 @@ public class WindowSelectionDialogViewModel : ViewModelBase
                 catch { /* セカンダリ例外は無視 */ }
             }
         }
+    }
+
+    /// <summary>
+    /// 🔥 [ISSUE#225] 選択中のウィンドウViewModel（SelectWindowCommandのパラメータ用）
+    /// </summary>
+    public WindowInfoViewModel? SelectedWindowViewModel
+    {
+        get => _selectedWindowViewModel;
+        set => this.RaiseAndSetIfChanged(ref _selectedWindowViewModel, value);
     }
 
     /// <summary>
