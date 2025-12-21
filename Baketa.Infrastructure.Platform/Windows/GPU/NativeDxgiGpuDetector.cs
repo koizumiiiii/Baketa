@@ -39,6 +39,8 @@ public static class NativeDxgiGpuDetector
         /// <summary>D3D Feature Level (0xc000=12.0, 0xc100=12.1, etc.)</summary>
         public uint FeatureLevel;
 
+        // P/Invoke構造体フィールドはマーシャラーが設定するためreadonly不可
+#pragma warning disable IDE0044
         /// <summary>統合GPU判定 (0=false, 1=true)</summary>
         private byte _isIntegrated;
 
@@ -48,6 +50,7 @@ public static class NativeDxgiGpuDetector
         /// <summary>明示的パディング（C++側と一致）</summary>
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
         private byte[] _padding;
+#pragma warning restore IDE0044
 
         /// <summary>統合GPUかどうか</summary>
         public bool IsIntegrated => _isIntegrated != 0;
