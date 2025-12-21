@@ -20,6 +20,11 @@ public sealed class ServerManagerHostedService : IHostedService
     private readonly ILogger<ServerManagerHostedService> _logger;
     private readonly IInitializationCompletionSignal? _initializationSignal;
 
+    /// <summary>
+    /// [Gemini Review] 翻訳サーバーexeのパス - 複数箇所で使用するため定数化
+    /// </summary>
+    private readonly string _translationServerExePath;
+
     public ServerManagerHostedService(
         IPythonServerManager serverManager,
         GrpcPortProvider portProvider,
@@ -30,6 +35,9 @@ public sealed class ServerManagerHostedService : IHostedService
         _portProvider = portProvider;
         _logger = logger;
         _initializationSignal = initializationSignal;
+
+        // [Gemini Review] パスをコンストラクタで一度だけ生成（DRY原則）
+        _translationServerExePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaTranslationServer", "BaketaTranslationServer.exe");
     }
 
     /// <summary>
@@ -69,10 +77,32 @@ public sealed class ServerManagerHostedService : IHostedService
                     }
                     catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                     {
-                        // タイムアウト時は警告ログを出力して続行
-                        _logger.LogWarning("⚠️ [HOSTED_SERVICE] 初期化完了待機がタイムアウト（{Timeout}分）しました - サーバー起動を続行します",
+                        // 🔧 [Issue #228] タイムアウト時はサーバーexe存在確認を行う
+                        // 低速回線でダウンロードが完了していない場合、サーバー起動を試みずにスキップ
+                        _logger.LogWarning("⚠️ [HOSTED_SERVICE] 初期化完了待機がタイムアウト（{Timeout}分）しました",
                             timeout.TotalMinutes);
+
+                        if (!File.Exists(_translationServerExePath))
+                        {
+                            _logger.LogWarning("⚠️ [HOSTED_SERVICE] 翻訳サーバーexeが見つかりません - ダウンロード未完了の可能性があります: {Path}", _translationServerExePath);
+                            _logger.LogInformation("ℹ️ [HOSTED_SERVICE] サーバー起動をスキップします。ダウンロード完了後にアプリを再起動してください。");
+                            return; // サーバー起動をスキップ
+                        }
+
+                        _logger.LogInformation("✅ [HOSTED_SERVICE] 翻訳サーバーexe確認済み - サーバー起動を続行します");
                     }
+                }
+
+                // 🔧 [Issue #228] サーバー起動前に必須コンポーネントの存在確認
+                // ダウンロード失敗や中断後もアプリが続行した場合の早期検出
+                if (!File.Exists(_translationServerExePath))
+                {
+                    _logger.LogWarning("⚠️ [HOSTED_SERVICE] 翻訳サーバーexeが見つかりません: {Path}", _translationServerExePath);
+                    _logger.LogWarning("⚠️ [HOSTED_SERVICE] コンポーネントのダウンロードが完了していない可能性があります");
+                    _logger.LogInformation("ℹ️ [HOSTED_SERVICE] 翻訳機能は使用できません。アプリを再起動してダウンロードを再試行してください。");
+                    _portProvider.SetException(new InvalidOperationException(
+                        "翻訳サーバーが見つかりません。コンポーネントのダウンロードが完了していない可能性があります。アプリを再起動してください。"));
+                    return;
                 }
 
                 _logger.LogInformation("🔄 [HOSTED_SERVICE] Python翻訳サーバー起動開始");
