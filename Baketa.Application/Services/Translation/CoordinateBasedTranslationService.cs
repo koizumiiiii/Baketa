@@ -289,110 +289,22 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms",
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
 
-            // 🔍 [PHASE12.2_TRACE] トレースログ2: OCR処理完了直後
-            _logger?.LogDebug($"🔍 [PHASE12.2_TRACE] TRACE-2: OCR完了 - チャンク数: {textChunks.Count}");
-            _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-2: OCR完了 - チャンク数: {Count}", textChunks.Count);
-
-            // 🚀 [PHASE10_FIX] 個別イベント発行を完全無効化 - バッチ翻訳処理のみ実行
-            // 理由: PublishOcrCompletedEventAsync()により個別翻訳が実行されるが、結果がtextChunksに反映されない
-            //       二重処理（個別翻訳 + バッチ翻訳）を防止し、バッチ翻訳結果のみを使用
-            _logger?.LogInformation("🚀 [PHASE10_FIX] 個別イベント発行をスキップ - バッチ翻訳処理のみ実行");
-            Console.WriteLine("🚀 [PHASE10_FIX] 個別翻訳スキップ → バッチ翻訳処理のみ実行");
-
-            // 🚨 [PHASE10_FIX] 従来のTimedAggregator判定は無効化
-            // if (!_textChunkAggregatorService.IsFeatureEnabled)
-            // {
-            //     // TimedAggregator無効時：従来通り即座にイベント発行
-            //     _logger?.LogInformation("🔥 [DUPLICATE_FIX] TimedAggregator無効のため、OCR完了イベントを即座発行 - 個別処理モード");
-            //     await PublishOcrCompletedEventAsync(image, textChunks, ocrProcessingTime).ConfigureAwait(false);
-            //     _logger?.LogInformation("🔥 [DUPLICATE_FIX] OCR完了イベント発行完了 - 個別処理による翻訳開始");
-            // }
-            // else
-            // {
-            //     // TimedAggregator有効時：集約処理に委ね、重複イベント発行を防止
-            //     _logger?.LogInformation("🚀 [DUPLICATE_FIX] TimedAggregator有効のため、OCR完了イベント即座発行をスキップ - 集約後の統一イベント発行に委ねる");
-            //     Console.WriteLine("🚀 [DUPLICATE_FIX] 重複解消: 個別イベント発行をスキップ、統合処理のみ実行");
-            // }
-
-            // 🔍 [PHASE12.2_TRACE] トレースログ3: TIMED_AGGREGATOR処理直前
-            _logger?.LogDebug("🔍 [PHASE12.2_TRACE] TRACE-3: TIMED_AGGREGATOR処理開始直前");
-            _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-3: TIMED_AGGREGATOR処理開始直前");
-
-            // 🚨 [ULTRA_DEBUG] Line 238-239が実行されるか確認
-            _logger?.LogDebug("🚨🚨🚨 [ULTRA_DEBUG] Line 238直前に到達！");
-
-            // 🎯 [TIMED_AGGREGATOR] TimedChunkAggregator統合 - 時間軸集約による翻訳品質向上
-            _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - 時間軸集約システム");
-            _logger?.LogInformation("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理開始 - OCRチャンク数: {Count}", textChunks.Count);
-
+            // [Issue #227] TimedChunkAggregatorにバッチ追加
             try
             {
-                // 🚨 [ULTRA_DEBUG] tryブロック到達確認
-                _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] tryブロック開始 - チャンク数: {textChunks.Count}");
-                _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] _textChunkAggregatorService is null: {_textChunkAggregatorService == null}");
-                _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] IsFeatureEnabled: {_textChunkAggregatorService?.IsFeatureEnabled}");
+                var addedCount = await _textChunkAggregatorService.TryAddTextChunksBatchAsync(
+                    textChunks, cancellationToken).ConfigureAwait(false);
 
-                // 🔥 [DI_RESOLUTION_CHECK] DI解決されたインスタンス型を完全診断
-                var aggregatorServiceType = _textChunkAggregatorService?.GetType().FullName ?? "NULL";
-                var aggregatorBaseType = _textChunkAggregatorService?.GetType().BaseType?.FullName ?? "NULL";
-                var aggregatorInterfaces = _textChunkAggregatorService?.GetType().GetInterfaces()
-                    .Select(i => i.Name).ToList() ?? new List<string>();
-
-                _logger?.LogDebug(
-                    $"🔥🔥🔥 [DI_RESOLUTION_CHECK] " +
-                    $"Service Type: {aggregatorServiceType}, " +
-                    $"Base Type: {aggregatorBaseType}, " +
-                    $"Interfaces: [{string.Join(", ", aggregatorInterfaces)}]"
-                );
-
-                _logger?.LogCritical(
-                    "🔥🔥🔥 [DI_RESOLUTION_CHECK] " +
-                    "Service Type: {ServiceType}, " +
-                    "Base Type: {BaseType}, " +
-                    "Interfaces: [{Interfaces}]",
-                    aggregatorServiceType,
-                    aggregatorBaseType,
-                    string.Join(", ", aggregatorInterfaces)
-                );
-
-                // 各チャンクをTimedChunkAggregatorに追加
-                foreach (var chunk in textChunks)
-                {
-                    _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] TryAddTextChunkAsync呼び出し直前 - ChunkId: {chunk.ChunkId}");
-                    // チャンクには既にSourceWindowHandleが設定済み（initプロパティのため後から変更不可）
-                    var added = await _textChunkAggregatorService.TryAddTextChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
-                    _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] TryAddTextChunkAsync結果: {added}, ChunkId: {chunk.ChunkId}");
-                    _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] チャンク追加 - ChunkId: {ChunkId}, Text: '{Text}'",
-                        chunk.ChunkId, chunk.CombinedText);
-                }
-
-                // 注意: TimedChunkAggregatorはイベント駆動型設計
-                // 集約完了時にOnChunksAggregatedコールバックが自動的に呼ばれる
-                // 現在の同期的翻訳フローでは、チャンク追加のみ実行し、従来通り処理継続
-                Console.WriteLine($"🎯 [TIMED_AGGREGATOR] チャンク追加完了 - {textChunks.Count}個のチャンクを時間軸集約キューに追加");
-                _logger?.LogInformation("🎯 [TIMED_AGGREGATOR] チャンク追加完了 - {Count}個のチャンクがバッファリング開始", textChunks.Count);
-                _logger?.LogDebug("🎯 [TIMED_AGGREGATOR] 元のチャンクで翻訳続行 - 集約は非同期で並列実行");
+                _logger?.LogDebug("TimedChunkAggregator: {AddedCount}/{TotalCount}個のチャンクを追加",
+                    addedCount, textChunks.Count);
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "🚨 [TIMED_AGGREGATOR] TimedChunkAggregator処理でエラー - 元のチャンクを使用");
-                Console.WriteLine($"🚨 [TIMED_AGGREGATOR] エラーのため元のチャンクを使用: {ex.Message}");
+                _logger?.LogError(ex, "TimedChunkAggregator処理でエラー");
             }
 
-            // 🚨 [ULTRA_DEBUG] tryブロック完了確認
-            _logger?.LogDebug("🚨🚨🚨 [ULTRA_DEBUG] tryブロック完了 - Line 268到達");
-
-            Console.WriteLine($"🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理完了 - 最終チャンク数: {textChunks.Count}");
-            _logger?.LogInformation("🎯 [TIMED_AGGREGATOR] TimedChunkAggregator処理完了 - 最終チャンク数: {Count}", textChunks.Count);
-
-            // 🔍 [PHASE12.2_TRACE] トレースログ4: Phase 12.2早期リターン直前
-            _logger?.LogDebug("🔍 [PHASE12.2_TRACE] TRACE-4: Phase 12.2早期リターン実行直前");
-            _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-4: Phase 12.2早期リターン実行直前");
-
-            // 🎉 [PHASE12.2] 2重翻訳アーキテクチャ排除 - AggregatedChunksReadyEventHandler経由で処理
-            _logger?.LogInformation("🎉 [PHASE12.2] 2重翻訳排除により従来の翻訳処理をスキップ - AggregatedChunksReadyEventHandler経由で処理");
-            Console.WriteLine("🎉 [PHASE12.2] 2重翻訳排除: TimedChunkAggregator → AggregatedChunksReadyEvent → AggregatedChunksReadyEventHandler");
-            Console.WriteLine($"🎉 [PHASE12.2] オーバーレイ表示はイベントハンドラーで実行 - チャンク数: {textChunks.Count}");
+            // TimedChunkAggregatorが集約完了時にAggregatedChunksReadyEventを発行
+            // AggregatedChunksReadyEventHandlerで翻訳・オーバーレイ表示を実行
 
             // Phase 12.2完全移行により、この先の処理（2回目翻訳 + オーバーレイ表示）は不要
             // TimedChunkAggregatorがAggregatedChunksReadyEventを発行 → AggregatedChunksReadyEventHandlerで翻訳 + オーバーレイ表示
