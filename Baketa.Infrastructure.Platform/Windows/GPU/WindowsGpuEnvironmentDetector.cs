@@ -1,8 +1,5 @@
-using System.Globalization;
 using System.IO;
-using System.Management;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.Json;
 using Baketa.Core.Abstractions.GPU;
 using Microsoft.Extensions.Logging;
@@ -11,7 +8,10 @@ namespace Baketa.Infrastructure.Platform.Windows.GPU;
 
 /// <summary>
 /// Windows環境でのGPU検出実装
-/// WMI + DirectX APIを使用したハードウェア情報取得
+/// [Issue #222] DXGI APIを使用したハードウェア情報取得（WMIからの移行）
+/// - IL Trimming対応（System.Managementへの依存を削除）
+/// - 高速（ネイティブDLL経由で直接DXGI呼び出し）
+/// - 正確なVRAM（64-bit対応、4GB制限なし）
 /// [Issue #213] ディスクキャッシュ対応（次回起動時5秒短縮）
 /// [Gemini Review] 非同期I/O化、競合制御、キャッシュ無効化API追加
 /// </summary>
@@ -173,10 +173,18 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
 
     private GpuEnvironmentInfo DetectGpuEnvironmentInternal()
     {
+        // [Issue #222] DXGI APIでGPU情報を取得（VRAM容量も含む）
         var gpuInfo = DetectPrimaryGpu();
         var directXLevel = DetectDirectXFeatureLevel();
-        var (AvailableMemoryMB, MaxTexture2DDimension) = DetectGpuMemory(gpuInfo.IsIntegratedGpu);
-        var capabilities = DetectGpuCapabilities(gpuInfo);
+
+        // [Issue #222] DXGIで取得したVRAM容量を優先使用
+        var (AvailableMemoryMB, MaxTexture2DDimension) = DetectGpuMemory(
+            gpuInfo.IsIntegratedGpu,
+            gpuInfo.DedicatedVideoMemoryBytes);
+
+        // 旧形式の gpuInfo tuple を作成（既存の DetectGpuCapabilities との互換性）
+        var gpuInfoLegacy = (gpuInfo.GpuName, gpuInfo.IsIntegratedGpu, gpuInfo.IsDedicatedGpu);
+        var capabilities = DetectGpuCapabilities(gpuInfoLegacy);
 
         return new GpuEnvironmentInfo
         {
@@ -192,62 +200,66 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
             DirectXFeatureLevel = directXLevel,
             GpuName = gpuInfo.GpuName,
             ComputeCapability = capabilities.ComputeCapability,
-            RecommendedProviders = DetermineRecommendedProviders(capabilities, gpuInfo)
+            RecommendedProviders = DetermineRecommendedProviders(capabilities, gpuInfoLegacy)
         };
     }
 
-    private (string GpuName, bool IsIntegratedGpu, bool IsDedicatedGpu) DetectPrimaryGpu()
+    /// <summary>
+    /// [Issue #222] DXGI APIを使用してプライマリGPUを検出
+    /// WMIからの移行 - IL Trimming対応、高速、正確
+    /// </summary>
+    private (string GpuName, bool IsIntegratedGpu, bool IsDedicatedGpu, ulong DedicatedVideoMemoryBytes) DetectPrimaryGpu()
     {
         try
         {
-            using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController WHERE Availability = 3");
-            using var results = searcher.Get();
-
-            var gpus = new List<(string Name, uint AdapterRAM, string PNPDeviceID)>();
-
-            foreach (ManagementObject gpu in results.Cast<ManagementObject>())
+            if (NativeDxgiGpuDetector.GetPrimaryGpuInfo(out var gpuInfo) && gpuInfo.IsValid)
             {
-                var name = gpu["Name"]?.ToString() ?? "Unknown GPU";
-                var adapterRAM = Convert.ToUInt32(gpu["AdapterRAM"] ?? 0, CultureInfo.InvariantCulture);
-                var pnpDeviceID = gpu["PNPDeviceID"]?.ToString() ?? "";
+                _logger.LogInformation("[DXGI] GPU検出成功: {GpuName}, VendorId=0x{VendorId:X4}, VRAM={VramMB}MB, Integrated={IsIntegrated}",
+                    gpuInfo.Description,
+                    gpuInfo.VendorId,
+                    gpuInfo.DedicatedVideoMemory / (1024 * 1024),
+                    gpuInfo.IsIntegrated);
 
-                gpus.Add((name, adapterRAM, pnpDeviceID));
+                return (gpuInfo.Description, gpuInfo.IsIntegrated, !gpuInfo.IsIntegrated, gpuInfo.DedicatedVideoMemory);
             }
 
-            // 専用GPU優先（VRAM容量で判定）
-            var (Name, AdapterRAM, PNPDeviceID) = gpus.OrderByDescending(g => g.AdapterRAM).First();
-            var isIntegrated = IsIntegratedGpu(Name, PNPDeviceID);
-
-            return (Name, isIntegrated, !isIntegrated);
+            _logger.LogWarning("[DXGI] GPU検出失敗 - フォールバック値を使用");
+            return ("Unknown GPU", false, false, 0);
+        }
+        catch (DllNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "[DXGI] BaketaCaptureNative.dllが見つかりません - フォールバック値を使用");
+            return ("Unknown GPU (DLL not found)", false, false, 0);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "WMI GPU検出失敗");
-            return ("Unknown GPU", false, false);
+            _logger.LogWarning(ex, "[DXGI] GPU検出中にエラー発生 - フォールバック値を使用");
+            return ("Unknown GPU", false, false, 0);
         }
     }
 
-    private static bool IsIntegratedGpu(string gpuName, string pnpDeviceID)
-    {
-        string[] integratedIndicators =
-        [
-            "Intel", "UHD", "Iris", "HD Graphics",
-            "AMD Radeon Graphics", "Vega",
-            "Microsoft Basic"
-        ];
-
-        return integratedIndicators.Any(indicator =>
-            gpuName.Contains(indicator, StringComparison.OrdinalIgnoreCase)) ||
-               pnpDeviceID.Contains("VEN_8086", StringComparison.OrdinalIgnoreCase); // Intel Vendor ID
-    }
-
+    /// <summary>
+    /// [Issue #222] DirectX Feature Levelを検出
+    /// DXGIネイティブAPI（D3D12優先）を使用、失敗時はD3D11 P/Invokeフォールバック
+    /// </summary>
     private DirectXFeatureLevel DetectDirectXFeatureLevel()
     {
         try
         {
-            // D3D11CreateDevice を使用してフィーチャーレベル検出
-            var featureLevel = NativeMethods.GetDirectXFeatureLevel();
-            _logger.LogDebug("DirectX Feature Level raw value: 0x{FeatureLevel:X}", featureLevel);
+            // [Issue #222] DXGI ネイティブAPI経由で検出（D3D12優先）
+            uint featureLevel;
+            try
+            {
+                featureLevel = NativeDxgiGpuDetector.GetDirectXFeatureLevelDxgi();
+                _logger.LogDebug("[DXGI] DirectX Feature Level raw value: 0x{FeatureLevel:X}", featureLevel);
+            }
+            catch (DllNotFoundException)
+            {
+                // BaketaCaptureNative.dllが見つからない場合はD3D11 P/Invokeにフォールバック
+                _logger.LogDebug("[DXGI] BaketaCaptureNative.dll not found, falling back to D3D11");
+                featureLevel = NativeMethods.GetDirectXFeatureLevel();
+                _logger.LogDebug("[D3D11] DirectX Feature Level raw value: 0x{FeatureLevel:X}", featureLevel);
+            }
 
             // Issue #181: D3D_FEATURE_LEVEL 定数マッピング
             // https://docs.microsoft.com/en-us/windows/win32/api/d3dcommon/ne-d3dcommon-d3d_feature_level
@@ -271,7 +283,13 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
         }
     }
 
-    private (long AvailableMemoryMB, int MaxTexture2DDimension) DetectGpuMemory(bool isIntegratedGpu)
+    /// <summary>
+    /// [Issue #222] GPUメモリ情報を取得
+    /// DXGIで取得したVRAM容量を優先使用（64-bit対応、WMI 4GB制限を回避）
+    /// </summary>
+    /// <param name="isIntegratedGpu">統合GPUかどうか</param>
+    /// <param name="dxgiDedicatedVideoMemoryBytes">DXGI経由で取得した専用VRAM（bytes）</param>
+    private (long AvailableMemoryMB, int MaxTexture2DDimension) DetectGpuMemory(bool isIntegratedGpu, ulong dxgiDedicatedVideoMemoryBytes)
     {
         try
         {
@@ -282,40 +300,28 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
                 var availableMemoryMB = Math.Max(1024, totalRamMB / 4); // 最低1GB
                 return (availableMemoryMB, 8192); // 統合GPUは通常8Kテクスチャまで
             }
-            else
+
+            // [Issue #222] DXGI経由で取得したVRAM容量を優先使用
+            if (dxgiDedicatedVideoMemoryBytes > 0)
             {
-                // [Issue #218] 専用GPU: NVML優先、WMIフォールバック
-                // WMIのAdapterRAMは32-bit制限（最大4095MB）があるため、
-                // NVIDIA GPUはNVMLで正確なVRAM容量を取得
-
-                // 1. NVML経由でVRAM取得を試行（NVIDIA GPU専用、64-bit正確値）
-                var nvmlVramMB = TryGetNvmlVramMB();
-                if (nvmlVramMB > 0)
-                {
-                    _logger.LogInformation("[NVML] VRAM容量取得成功: {VramMB}MB", nvmlVramMB);
-                    var maxTexture = nvmlVramMB >= 8192 ? 16384 : 8192;
-                    return (nvmlVramMB, maxTexture);
-                }
-
-                // 2. WMIフォールバック（32-bit制限あり、非NVIDIA GPUまたはNVML失敗時）
-                using var searcher = new ManagementObjectSearcher("SELECT AdapterRAM FROM Win32_VideoController WHERE Availability = 3");
-                using var results = searcher.Get();
-
-                var maxVram = results.Cast<ManagementObject>()
-                    .Select(gpu => Convert.ToUInt64(gpu["AdapterRAM"] ?? 0, CultureInfo.InvariantCulture))
-                    .Max();
-
-                var availableMemoryMB = maxVram > 0 ? (long)(maxVram / (1024 * 1024)) : 4096; // フォールバック4GB
-
-                // 32-bit制限警告（4095MBでカンストしている場合）
-                if (availableMemoryMB == 4095)
-                {
-                    _logger.LogWarning("[WMI] VRAM容量が4095MBで上限に達しています。実際のVRAM容量はこれより大きい可能性があります（WMI 32-bit制限）");
-                }
-
-                var maxTextureDim = availableMemoryMB >= 8192 ? 16384 : 8192;
-                return (availableMemoryMB, maxTextureDim);
+                var vramMB = (long)(dxgiDedicatedVideoMemoryBytes / (1024 * 1024));
+                _logger.LogInformation("[DXGI] VRAM容量: {VramMB}MB (正確な64-bit値)", vramMB);
+                var maxTexture = vramMB >= 8192 ? 16384 : 8192;
+                return (vramMB, maxTexture);
             }
+
+            // DXGIが失敗した場合のフォールバック: NVML（NVIDIA GPU専用）
+            var nvmlVramMB = TryGetNvmlVramMB();
+            if (nvmlVramMB > 0)
+            {
+                _logger.LogInformation("[NVML] VRAM容量取得成功（DXGIフォールバック）: {VramMB}MB", nvmlVramMB);
+                var maxTexture = nvmlVramMB >= 8192 ? 16384 : 8192;
+                return (nvmlVramMB, maxTexture);
+            }
+
+            // 最終フォールバック
+            _logger.LogWarning("[Issue #222] VRAM容量を取得できません - フォールバック値を使用（4GB）");
+            return (4096, 8192);
         }
         catch (Exception ex)
         {
