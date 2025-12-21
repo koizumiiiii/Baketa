@@ -101,12 +101,16 @@ public partial class WindowSelectionDialogView : Window
                 if (e.ClickCount == 1)
                 {
                     // シングルクリック: 選択状態を設定
+                    // 🔥 [ISSUE#225] SelectedWindowとSelectedWindowViewModelの両方を設定
                     viewModel.SelectedWindow = windowInfoViewModel.WindowInfo;
+                    viewModel.SelectedWindowViewModel = windowInfoViewModel;
                 }
                 else if (e.ClickCount >= 2)
                 {
                     // ダブルクリック: 選択して即座に決定
+                    // 🔥 [ISSUE#225] SelectedWindowとSelectedWindowViewModelの両方を設定
                     viewModel.SelectedWindow = windowInfoViewModel.WindowInfo;
+                    viewModel.SelectedWindowViewModel = windowInfoViewModel;
 
                     // ダブルクリックで即座に選択を実行
                     viewModel.SelectWindowCommand.Execute(windowInfoViewModel);

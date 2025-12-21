@@ -115,12 +115,15 @@ public record PythonServerInstance(
                 }
 
                 // 🔧 [GEMINI_RECOMMENDED] Phase 2: Process.Kill()で終了シグナル送信
+                // 🔥 [Issue #224] entireProcessTree: true で子プロセス含めて強制終了
                 if (!Process.HasExited)
                 {
-                    Console.WriteLine($"🔥 [GRACEFUL_SHUTDOWN] Phase 2: Process.Kill()実行");
+                    Console.WriteLine($"🔥 [GRACEFUL_SHUTDOWN] Phase 2: Process.Kill(entireProcessTree: true)実行");
                     try
                     {
-                        Process.Kill();
+                        // 🔥 [Issue #224] 子プロセスツリー全体を終了させる
+                        // BaketaTranslationServer.exe が起動する Python子プロセスも含めて終了
+                        Process.Kill(entireProcessTree: true);
                     }
                     catch (InvalidOperationException)
                     {
