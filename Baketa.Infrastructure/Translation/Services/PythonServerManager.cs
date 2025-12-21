@@ -72,6 +72,14 @@ public class PythonServerManager(
         await _startServerSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
+            // 🔧 [Issue #227] JobObject早期初期化 - プロセス起動前にJobObjectを確実に初期化
+            // InitializeHealthCheckTimer()の呼び出し順序に依存せず、常にJobObjectが有効な状態でプロセスを起動
+            if (_jobObject == null)
+            {
+                _jobObject = new ProcessJobObject(logger);
+                logger.LogInformation("✅ [Translation] JobObject早期初期化完了: IsValid={IsValid}", _jobObject.IsValid);
+            }
+
             // 🔥 ULTRA_DEBUG: サーバー登録時の言語ペアキーを確実に記録
             Console.WriteLine($"🔥 [ULTRA_DEBUG] PythonServerManager.StartServerAsync() 言語ペアキー: '{languagePair}'");
             logger.LogInformation("🔥 [ULTRA_DEBUG] PythonServerManager.StartServerAsync() 言語ペアキー: '{LanguagePair}'", languagePair);
