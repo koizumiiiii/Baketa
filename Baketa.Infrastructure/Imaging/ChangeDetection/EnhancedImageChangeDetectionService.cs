@@ -804,7 +804,14 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             if (IsEdgeBlock(block.Row, block.Col, rows, cols) && block.Similarity > 0.90f)
             {
                 isNoise = true;
-                filterReason = $"Single edge block with minor change (similarity: {block.Similarity:F4})";
+                var position = IsCornerBlock(block.Row, block.Col, rows, cols) ? "Corner" : "Edge";
+                filterReason = $"Single edge block with minor change (similarity: {block.Similarity:F4}, position: {position})";
+
+                // [Issue #229] テレメトリ: 潜在的false negative のデータ収集
+                // 将来のオプションE/F判断のためのログ
+                _logger.LogWarning(
+                    "📊 [Stage2_Telemetry] Potential false negative - Position={Position}, Row={Row}, Col={Col}, Similarity={Similarity:F4}, GridSize={Rows}x{Cols}",
+                    position, block.Row, block.Col, block.Similarity, rows, cols);
             }
         }
 
@@ -904,6 +911,15 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     private static bool IsEdgeBlock(int row, int col, int rows, int cols)
     {
         return row == 0 || row == rows - 1 || col == 0 || col == cols - 1;
+    }
+
+    /// <summary>
+    /// [Issue #229] 角ブロック（グリッド四隅）かどうか判定
+    /// テレメトリおよび将来のオプションE実装用
+    /// </summary>
+    private static bool IsCornerBlock(int row, int col, int rows, int cols)
+    {
+        return (row == 0 || row == rows - 1) && (col == 0 || col == cols - 1);
     }
 
     #endregion
