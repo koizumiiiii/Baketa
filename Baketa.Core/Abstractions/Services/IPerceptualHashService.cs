@@ -1,3 +1,4 @@
+using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Models.ImageProcessing;
 
@@ -17,6 +18,15 @@ public interface IPerceptualHashService
     /// <param name="algorithm">ハッシュアルゴリズム</param>
     /// <returns>64bitハッシュ文字列</returns>
     string ComputeHash(IImage image, HashAlgorithmType algorithm);
+
+    /// <summary>
+    /// [Issue #229] 画像の指定領域に対してハッシュを計算（グリッド分割用）
+    /// </summary>
+    /// <param name="image">対象画像</param>
+    /// <param name="region">ハッシュ計算対象の矩形領域</param>
+    /// <param name="algorithm">ハッシュアルゴリズム</param>
+    /// <returns>領域のハッシュ文字列（64bit）</returns>
+    string ComputeHashForRegion(IImage image, Rectangle region, HashAlgorithmType algorithm);
 
     /// <summary>
     /// 2つのハッシュを比較して類似度を取得

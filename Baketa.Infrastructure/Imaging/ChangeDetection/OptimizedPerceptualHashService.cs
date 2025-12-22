@@ -1,10 +1,17 @@
+using System.Buffers;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Models.ImageProcessing;
 using Microsoft.Extensions.Logging;
+
+// GDI+とCore.Memoryの名前空間競合を解決
+using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
+using GdiRectangle = System.Drawing.Rectangle;
 
 namespace Baketa.Infrastructure.Imaging.ChangeDetection;
 
@@ -59,6 +66,180 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         {
             _logger.LogError(ex, "💥 ハッシュ計算エラー - Algorithm: {Algorithm}", algorithm);
             return "0000000000000000"; // エラー時の安全なフォールバック
+        }
+    }
+
+    /// <inheritdoc />
+    /// <summary>
+    /// [Issue #229] 画像の指定領域に対してハッシュを計算（グリッド分割用）
+    /// 8x8ハッシュを使用して高速計算（64ビット）
+    /// </summary>
+    public string ComputeHashForRegion(IImage image, GdiRectangle region, HashAlgorithmType algorithm)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+
+        try
+        {
+            using var fullBitmap = ConvertToBitmap(image);
+
+            // 領域の境界チェック
+            var clampedRegion = ClampRegion(region, fullBitmap.Width, fullBitmap.Height);
+            if (clampedRegion.Width <= 0 || clampedRegion.Height <= 0)
+            {
+                return "0000000000000000";
+            }
+
+            // 領域を切り出し
+            using var regionBitmap = fullBitmap.Clone(clampedRegion, fullBitmap.PixelFormat);
+
+            // 8x8ハッシュを計算（グリッド分割では軽量ハッシュが有効）
+            return algorithm switch
+            {
+                HashAlgorithmType.DifferenceHash => ComputeDifferenceHash8x8(regionBitmap),
+                HashAlgorithmType.AverageHash => ComputeAverageHash8x8(regionBitmap),
+                _ => ComputeDifferenceHash8x8(regionBitmap) // デフォルトはDifferenceHash
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "💥 領域ハッシュ計算エラー - Region: {Region}, Algorithm: {Algorithm}", region, algorithm);
+            return "0000000000000000";
+        }
+    }
+
+    /// <summary>
+    /// [Issue #229] 領域を画像境界内に収める
+    /// </summary>
+    private static GdiRectangle ClampRegion(GdiRectangle region, int imageWidth, int imageHeight)
+    {
+        var x = Math.Max(0, Math.Min(region.X, imageWidth - 1));
+        var y = Math.Max(0, Math.Min(region.Y, imageHeight - 1));
+        var width = Math.Min(region.Width, imageWidth - x);
+        var height = Math.Min(region.Height, imageHeight - y);
+
+        return new GdiRectangle(x, y, width, height);
+    }
+
+    /// <summary>
+    /// [Issue #229] 軽量8x8 DifferenceHash（グリッド分割用）
+    /// 64ビットハッシュで高速計算
+    /// </summary>
+    private string ComputeDifferenceHash8x8(Bitmap bitmap)
+    {
+        const int size = 8;
+
+        using var resized = new Bitmap(size + 1, size, GdiPixelFormat.Format24bppRgb);
+        using var graphics = Graphics.FromImage(resized);
+
+        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
+        graphics.DrawImage(bitmap, 0, 0, size + 1, size);
+
+        var lockData = resized.LockBits(new GdiRectangle(0, 0, size + 1, size),
+            ImageLockMode.ReadOnly, GdiPixelFormat.Format24bppRgb);
+
+        try
+        {
+            ulong hash = 0;
+            var bitIndex = 0;
+            var stride = lockData.Stride;
+
+            unsafe
+            {
+                byte* ptr = (byte*)lockData.Scan0;
+
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        var leftOffset = y * stride + x * 3;
+                        var rightOffset = y * stride + (x + 1) * 3;
+
+                        var leftGray = (ptr[leftOffset] + ptr[leftOffset + 1] + ptr[leftOffset + 2]) / 3;
+                        var rightGray = (ptr[rightOffset] + ptr[rightOffset + 1] + ptr[rightOffset + 2]) / 3;
+
+                        if (leftGray > rightGray)
+                        {
+                            hash |= 1UL << bitIndex;
+                        }
+                        bitIndex++;
+                    }
+                }
+            }
+
+            return hash.ToString("X16"); // 64ビット → 16文字の16進数
+        }
+        finally
+        {
+            resized.UnlockBits(lockData);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #229] 軽量8x8 AverageHash（グリッド分割用）
+    /// 64ビットハッシュで高速計算
+    /// </summary>
+    private string ComputeAverageHash8x8(Bitmap bitmap)
+    {
+        const int size = 8;
+
+        using var resized = new Bitmap(size, size, GdiPixelFormat.Format24bppRgb);
+        using var graphics = Graphics.FromImage(resized);
+
+        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+        graphics.DrawImage(bitmap, 0, 0, size, size);
+
+        var lockData = resized.LockBits(new GdiRectangle(0, 0, size, size),
+            ImageLockMode.ReadOnly, GdiPixelFormat.Format24bppRgb);
+
+        try
+        {
+            var stride = lockData.Stride;
+            var totalBrightness = 0;
+            var pixels = size * size;
+
+            unsafe
+            {
+                byte* ptr = (byte*)lockData.Scan0;
+
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        var offset = y * stride + x * 3;
+                        totalBrightness += (ptr[offset] + ptr[offset + 1] + ptr[offset + 2]) / 3;
+                    }
+                }
+            }
+
+            var averageBrightness = totalBrightness / pixels;
+            ulong hash = 0;
+            var bitIndex = 0;
+
+            unsafe
+            {
+                byte* ptr = (byte*)lockData.Scan0;
+
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        var offset = y * stride + x * 3;
+                        var brightness = (ptr[offset] + ptr[offset + 1] + ptr[offset + 2]) / 3;
+
+                        if (brightness >= averageBrightness)
+                        {
+                            hash |= 1UL << bitIndex;
+                        }
+                        bitIndex++;
+                    }
+                }
+            }
+
+            return hash.ToString("X16"); // 64ビット → 16文字の16進数
+        }
+        finally
+        {
+            resized.UnlockBits(lockData);
         }
     }
 
@@ -173,14 +354,18 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     #region Optimized Hash Implementations
 
     /// <summary>
-    /// 最適化Average Hash計算（Stage 1専用・超高速）
-    /// 目標: <1ms処理
+    /// 最適化Average Hash計算（Stage 1専用）
+    /// [Issue #230] 32x32ハッシュ対応 - テキスト変更検出精度向上
+    /// [Gemini Review] ArrayPool導入でGC圧力軽減
+    /// 目標: <3ms処理
     /// </summary>
     private string ComputeAverageHashOptimized(Bitmap bitmap)
     {
-        const int size = 8;
+        // [Issue #230] 8x8 → 32x32に拡大（1024ビットハッシュ）
+        const int size = 32;
+        const int hashSize = 128; // 32x32 = 1024ビット = 128バイト
 
-        using var resized = new Bitmap(size, size, PixelFormat.Format24bppRgb);
+        using var resized = new Bitmap(size, size, GdiPixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
 
         // 高速リサイズ設定
@@ -188,15 +373,20 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         graphics.DrawImage(bitmap, 0, 0, size, size);
 
         // 平均輝度の高速計算
-        var lockData = resized.LockBits(new Rectangle(0, 0, size, size),
-            ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+        var lockData = resized.LockBits(new GdiRectangle(0, 0, size, size),
+            ImageLockMode.ReadOnly, GdiPixelFormat.Format24bppRgb);
 
+        // [Gemini Review] ArrayPoolでGC圧力軽減
+        var hashBytes = ArrayPool<byte>.Shared.Rent(hashSize);
         try
         {
+            // 配列をクリア（前回の値が残っている可能性）
+            Array.Clear(hashBytes, 0, hashSize);
+
             var stride = lockData.Stride;
             var scan0 = lockData.Scan0;
 
-            var totalBrightness = 0;
+            var totalBrightness = 0L; // 32x32では合計値が大きくなるためlong使用
             var pixels = size * size;
 
             unsafe
@@ -214,10 +404,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                 }
             }
 
-            var averageBrightness = totalBrightness / pixels;
-
-            // ハッシュ生成
-            var hash = 0UL;
+            var averageBrightness = (int)(totalBrightness / pixels);
             var bitIndex = 0;
 
             unsafe
@@ -233,41 +420,54 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
 
                         if (brightness >= averageBrightness)
                         {
-                            hash |= 1UL << bitIndex;
+                            var byteIndex = bitIndex / 8;
+                            var bitPosition = bitIndex % 8;
+                            hashBytes[byteIndex] |= (byte)(1 << bitPosition);
                         }
                         bitIndex++;
                     }
                 }
             }
 
-            return hash.ToString("X16");
+            // 128バイト → 256文字の16進数文字列
+            return Convert.ToHexString(hashBytes.AsSpan(0, hashSize));
         }
         finally
         {
             resized.UnlockBits(lockData);
+            ArrayPool<byte>.Shared.Return(hashBytes);
         }
     }
 
     /// <summary>
     /// 最適化Difference Hash計算（Stage 1-2対応）
-    /// 目標: <2ms処理、エッジ検出最適化
+    /// [Issue #230] 32x32ハッシュ対応 - テキスト変更検出精度向上
+    /// [Gemini Review] ArrayPool導入でGC圧力軽減
+    /// 720p画面で1ブロック約40x22ピクセル、テキストボックス単位の変化を検出可能
+    /// 目標: <5ms処理、エッジ検出最適化
     /// </summary>
     private string ComputeDifferenceHashOptimized(Bitmap bitmap)
     {
-        const int size = 8;
+        // [Issue #230] 8x8 → 32x32に拡大（1024ビットハッシュ）
+        const int size = 32;
+        const int hashSize = 128; // 32x32 = 1024ビット = 128バイト
 
-        using var resized = new Bitmap(size + 1, size, PixelFormat.Format24bppRgb);
+        using var resized = new Bitmap(size + 1, size, GdiPixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
 
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
         graphics.DrawImage(bitmap, 0, 0, size + 1, size);
 
-        var lockData = resized.LockBits(new Rectangle(0, 0, size + 1, size),
-            ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+        var lockData = resized.LockBits(new GdiRectangle(0, 0, size + 1, size),
+            ImageLockMode.ReadOnly, GdiPixelFormat.Format24bppRgb);
 
+        // [Gemini Review] ArrayPoolでGC圧力軽減
+        var hashBytes = ArrayPool<byte>.Shared.Rent(hashSize);
         try
         {
-            var hash = 0UL;
+            // 配列をクリア（前回の値が残っている可能性）
+            Array.Clear(hashBytes, 0, hashSize);
+
             var bitIndex = 0;
             var stride = lockData.Stride;
 
@@ -288,18 +488,22 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
 
                         if (leftGray > rightGray)
                         {
-                            hash |= 1UL << bitIndex;
+                            var byteIndex = bitIndex / 8;
+                            var bitPosition = bitIndex % 8;
+                            hashBytes[byteIndex] |= (byte)(1 << bitPosition);
                         }
                         bitIndex++;
                     }
                 }
             }
 
-            return hash.ToString("X16");
+            // 128バイト → 256文字の16進数文字列
+            return Convert.ToHexString(hashBytes.AsSpan(0, hashSize));
         }
         finally
         {
             resized.UnlockBits(lockData);
+            ArrayPool<byte>.Shared.Return(hashBytes);
         }
     }
 
@@ -311,8 +515,8 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     {
         const int size = 32; // pHashは通常32x32
 
-        using var resized = new Bitmap(size, size, PixelFormat.Format8bppIndexed);
-        using var temp = new Bitmap(size, size, PixelFormat.Format24bppRgb);
+        using var resized = new Bitmap(size, size, GdiPixelFormat.Format8bppIndexed);
+        using var temp = new Bitmap(size, size, GdiPixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(temp);
 
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
@@ -347,7 +551,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     {
         const int size = 16; // Waveletは16x16が適切
 
-        using var resized = new Bitmap(size, size, PixelFormat.Format24bppRgb);
+        using var resized = new Bitmap(size, size, GdiPixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(resized);
 
         graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
@@ -441,42 +645,148 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     /// <summary>
     /// IImage -> Bitmap変換（リソース管理に注意）
     /// 戻り値のBitmapは呼び出し側でusingブロックでの適切な破棄が必要
+    /// 🔥 [Issue #230] LockPixelData()を使用してピクセルデータを正しくコピー
+    /// 🔧 [Gemini Review] リソースリーク対策、Gray8パレット設定、RGBA→BGRAチャンネルスワップ追加
     /// </summary>
     private Bitmap ConvertToBitmap(IImage image)
     {
+        Bitmap? bitmap = null;
         try
         {
-            // 🔥 Critical Fix: IImageからBitmapへの適切な変換実装
-            // IImageがToBitmap()メソッドを持つ場合はそれを使用
-            if (image is IImageConvertible convertible)
+            // 🔥 [Issue #230] LockPixelData()で生ピクセルデータを取得
+            using var pixelLock = image.LockPixelData();
+            var pixelData = pixelLock.Data;
+            var stride = pixelLock.Stride;
+            var pixelFormat = image.PixelFormat;
+
+            // GDI+のPixelFormatに変換
+            // 注: GDI+ Format32bppArgbはメモリ上でBGRA順序（Windows標準）
+            var gdiPixelFormat = pixelFormat switch
             {
-                return convertible.ToBitmap();
+                ImagePixelFormat.Bgra32 => GdiPixelFormat.Format32bppArgb,
+                ImagePixelFormat.Rgba32 => GdiPixelFormat.Format32bppArgb,
+                ImagePixelFormat.Rgb24 => GdiPixelFormat.Format24bppRgb,
+                ImagePixelFormat.Bgr24 => GdiPixelFormat.Format24bppRgb,
+                ImagePixelFormat.Gray8 => GdiPixelFormat.Format8bppIndexed,
+                _ => GdiPixelFormat.Format32bppArgb
+            };
+
+            bitmap = new Bitmap(image.Width, image.Height, gdiPixelFormat);
+
+            // 🔧 [Gemini Review] Gray8の場合は明示的にグレースケールパレットを設定
+            if (gdiPixelFormat == GdiPixelFormat.Format8bppIndexed)
+            {
+                var palette = bitmap.Palette;
+                for (int i = 0; i < 256; i++)
+                {
+                    palette.Entries[i] = Color.FromArgb(i, i, i);
+                }
+                bitmap.Palette = palette;
             }
 
-            // フォールバック: 基本実装（ピクセルデータのコピーが必要）
-            var bitmap = new Bitmap(image.Width, image.Height, PixelFormat.Format24bppRgb);
+            var bitmapData = bitmap.LockBits(
+                new GdiRectangle(0, 0, image.Width, image.Height),
+                ImageLockMode.WriteOnly,
+                gdiPixelFormat);
 
-            // IImageからピクセルデータを取得してBitmapにコピー
-            // 注意: この実装は不完全 - 実際のIImage実装に依存
-            _logger.LogWarning("⚠️ ConvertToBitmapフォールバック実装使用 - ピクセルデータコピー未実装");
+            try
+            {
+                unsafe
+                {
+                    var destPtr = (byte*)bitmapData.Scan0;
+                    var destStride = bitmapData.Stride;
+                    var bytesPerPixel = GetBytesPerPixel(pixelFormat);
+
+                    fixed (byte* srcPtr = pixelData)
+                    {
+                        // 🔧 [Gemini Review] RGBA/RGB形式はR-Bチャンネルスワップが必要
+                        // GDI+はBGRA/BGR順序を期待するため
+                        var needsChannelSwap = pixelFormat == ImagePixelFormat.Rgba32 ||
+                                               pixelFormat == ImagePixelFormat.Rgb24;
+
+                        if (needsChannelSwap)
+                        {
+                            CopyWithChannelSwap(srcPtr, destPtr, image.Width, image.Height,
+                                stride, destStride, bytesPerPixel);
+                        }
+                        else
+                        {
+                            // BGRA32, BGR24, Gray8は直接コピー
+                            for (int y = 0; y < image.Height; y++)
+                            {
+                                var srcOffset = y * stride;
+                                var destOffset = y * destStride;
+                                var rowBytes = image.Width * bytesPerPixel;
+
+                                Buffer.MemoryCopy(
+                                    srcPtr + srcOffset,
+                                    destPtr + destOffset,
+                                    rowBytes,
+                                    rowBytes);
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                bitmap.UnlockBits(bitmapData);
+            }
 
             return bitmap;
         }
         catch (Exception ex)
         {
+            // 🔧 [Gemini Review] 例外時のリソースリーク対策
+            bitmap?.Dispose();
             _logger.LogError(ex, "💥 IImage->Bitmap変換エラー");
             // 最小サイズのダミーBitmapを返す（呼び出し側でDispose必要）
-            return new Bitmap(1, 1, PixelFormat.Format24bppRgb);
+            return new Bitmap(1, 1, GdiPixelFormat.Format24bppRgb);
         }
     }
 
     /// <summary>
-    /// IImage変換インターフェース（将来実装予定）
+    /// 🔧 [Gemini Review] RGBA→BGRA / RGB→BGR チャンネルスワップ付きコピー
+    /// GDI+はBGR(A)順序を期待するため、RGBA/RGB形式の場合はR-Bをスワップ
     /// </summary>
-    private interface IImageConvertible
+    private static unsafe void CopyWithChannelSwap(
+        byte* src, byte* dest,
+        int width, int height,
+        int srcStride, int destStride,
+        int bytesPerPixel)
     {
-        Bitmap ToBitmap();
+        for (int y = 0; y < height; y++)
+        {
+            var srcRow = src + y * srcStride;
+            var destRow = dest + y * destStride;
+
+            for (int x = 0; x < width; x++)
+            {
+                var i = x * bytesPerPixel;
+                // R-B スワップ: RGBA → BGRA, RGB → BGR
+                destRow[i] = srcRow[i + 2];     // Dest[B] = Src[R]
+                destRow[i + 1] = srcRow[i + 1]; // Dest[G] = Src[G]
+                destRow[i + 2] = srcRow[i];     // Dest[R] = Src[B]
+                if (bytesPerPixel == 4)
+                {
+                    destRow[i + 3] = srcRow[i + 3]; // Dest[A] = Src[A]
+                }
+            }
+        }
     }
+
+    /// <summary>
+    /// ImagePixelFormatからバイト/ピクセルを計算
+    /// </summary>
+    private static int GetBytesPerPixel(ImagePixelFormat pixelFormat) => pixelFormat switch
+    {
+        ImagePixelFormat.Bgra32 => 4,
+        ImagePixelFormat.Rgba32 => 4,
+        ImagePixelFormat.Rgb24 => 3,
+        ImagePixelFormat.Bgr24 => 3,
+        ImagePixelFormat.Gray8 => 1,
+        _ => 4
+    };
 
     /// <summary>
     /// グレースケール変換（unsafeポインタ最適化）
@@ -500,9 +810,9 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         // LockBitsはFormat24bppRgbを指定すると、元のフォーマットから自動変換する
         // 32bppArgb等からの変換時は内部でコピーが発生するが、GetPixel()よりは高速
         var lockData = bitmap.LockBits(
-            new Rectangle(0, 0, width, height),
+            new GdiRectangle(0, 0, width, height),
             ImageLockMode.ReadOnly,
-            PixelFormat.Format24bppRgb);
+            GdiPixelFormat.Format24bppRgb);
 
         try
         {
@@ -521,7 +831,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                     for (int x = 0; x < width; x++)
                     {
                         var pixelOffset = x * 3;
-                        // BGR順序 (PixelFormat.Format24bppRgb)
+                        // BGR順序 (GdiPixelFormat.Format24bppRgb)
                         var b = row[pixelOffset];
                         var g = row[pixelOffset + 1];
                         var r = row[pixelOffset + 2];
@@ -661,9 +971,9 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
 
         // LockBitsはFormat24bppRgbを指定すると、元のフォーマットから自動変換する
         var lockData = bitmap.LockBits(
-            new Rectangle(0, 0, width, height),
+            new GdiRectangle(0, 0, width, height),
             ImageLockMode.ReadOnly,
-            PixelFormat.Format24bppRgb);
+            GdiPixelFormat.Format24bppRgb);
 
         try
         {
@@ -684,7 +994,7 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
                         var px = Math.Min(x + wx, width - 1);
                         var pixelOffset = px * 3;
 
-                        // BGR順序 (PixelFormat.Format24bppRgb)
+                        // BGR順序 (GdiPixelFormat.Format24bppRgb)
                         var b = row[pixelOffset];
                         var g = row[pixelOffset + 1];
                         var r = row[pixelOffset + 2];
@@ -735,16 +1045,11 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
 
     /// <summary>
     /// セットビット数カウント
+    /// [Gemini Review] BitOperations.PopCount()でHARDWARE命令（POPCNT）を活用
     /// </summary>
     private static int CountSetBits(byte value)
     {
-        var count = 0;
-        while (value != 0)
-        {
-            count++;
-            value &= (byte)(value - 1);
-        }
-        return count;
+        return BitOperations.PopCount(value);
     }
 
     #endregion

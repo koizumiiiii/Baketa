@@ -67,6 +67,50 @@ public sealed record ImageChangeDetectionSettings
     /// </summary>
     public bool EnablePerformanceLogging { get; init; } = true;
 
+    // ========================================
+    // [Issue #229] グリッド分割ハッシュ設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #229] グリッド分割ハッシュを有効化
+    /// </summary>
+    /// <remarks>
+    /// 有効にすると、画面全体のハッシュ比較から
+    /// グリッド分割による局所変化検知に切り替わります。
+    /// テキスト変更のような小さな変化の検出精度が向上します。
+    /// </remarks>
+    public bool EnableGridPartitioning { get; init; } = true;
+
+    /// <summary>
+    /// [Issue #229] グリッドの行数
+    /// </summary>
+    /// <remarks>
+    /// デフォルト: 4（4x4=16ブロック）
+    /// 推奨範囲: 3-6
+    /// </remarks>
+    public int GridRows { get; init; } = 4;
+
+    /// <summary>
+    /// [Issue #229] グリッドの列数
+    /// </summary>
+    /// <remarks>
+    /// デフォルト: 4（4x4=16ブロック）
+    /// 推奨範囲: 3-6
+    /// </remarks>
+    public int GridColumns { get; init; } = 4;
+
+    /// <summary>
+    /// [Issue #229] グリッドブロック単位の類似度閾値
+    /// </summary>
+    /// <remarks>
+    /// いずれか1ブロックでもこの閾値を下回れば「変化あり」と判定。
+    /// デフォルト: 0.98（テキスト変更検知に最適化）
+    /// 推奨範囲: 0.92-0.99
+    /// Stage 1は高速フィルタ、Stage 2でノイズ除外するため、高感度設定が可能。
+    /// テキスト変更は約1-5%の変化（類似度0.95-0.99程度）を生じる。
+    /// </remarks>
+    public float GridBlockSimilarityThreshold { get; init; } = 0.98f;
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -77,7 +121,11 @@ public sealed record ImageChangeDetectionSettings
             && Stage3SSIMThreshold is >= 0.0f and <= 1.0f
             && RegionSSIMThreshold is >= 0.0f and <= 1.0f
             && MaxCacheSize > 0
-            && CacheExpirationMinutes > 0;
+            && CacheExpirationMinutes > 0
+            // [Issue #229] グリッド分割設定の検証
+            && GridRows > 0
+            && GridColumns > 0
+            && GridBlockSimilarityThreshold is > 0.0f and <= 1.0f;
     }
 
     /// <summary>
