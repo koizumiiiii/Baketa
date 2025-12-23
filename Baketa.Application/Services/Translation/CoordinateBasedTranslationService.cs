@@ -169,6 +169,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // 🔥 [FILE_CONFLICT_FIX_3] ファイルアクセス競合回避のためILogger使用
             _logger?.LogDebug("🎯 [DEBUG] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {Width}x{Height}", image.Width, image.Height);
 
+            // 🔥🔥🔥 [ULTRA_DEBUG] ProcessWithCoordinateBasedTranslationAsync開始
+            try
+            {
+                System.IO.File.AppendAllText(
+                    System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [COORD_TRANSLATE] ProcessWithCoordinateBasedTranslationAsync開始 - 画像: {image.Width}x{image.Height}{Environment.NewLine}");
+            }
+            catch { /* ログ失敗は無視 */ }
+
             // 🔍 [PHASE12.2_TRACE] トレースログ1: メソッド開始直後
             _logger?.LogDebug("🔍 [PHASE12.2_TRACE] TRACE-1: メソッド開始 - OCR処理前");
             _logger?.LogInformation("🔍 [PHASE12.2_TRACE] TRACE-1: メソッド開始 - OCR処理前");
