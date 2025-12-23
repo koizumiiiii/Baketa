@@ -58,11 +58,17 @@ public sealed class OcrSettings
     /// 認識信頼度の閾値（0.0-1.0）
     /// この値以上の信頼度を持つ結果のみ翻訳にまわされます
     /// </summary>
+    /// <remarks>
+    /// デフォルト: 0.70（特殊記号を含む日本語テキストも翻訳対象とする）
+    /// - 0.90以上: 高品質結果のみ（誤認識を厳しく除外）
+    /// - 0.70-0.90: バランス重視（推奨）
+    /// - 0.70未満: 低品質結果も含む（誤訳リスク増加）
+    /// </remarks>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "認識信頼度閾値",
-        Description = "この値未満の信頼度の結果は破棄されます（0.96以上推奨）",
+        Description = "この値未満の信頼度の結果は破棄されます（0.70-0.90推奨）",
         MinValue = 0.0,
         MaxValue = 1.0)]
-    public double ConfidenceThreshold { get; set; } = 0.9;
+    public double ConfidenceThreshold { get; set; } = 0.70;
 
     /// <summary>
     /// テキスト検出の閾値（0.0-1.0）
