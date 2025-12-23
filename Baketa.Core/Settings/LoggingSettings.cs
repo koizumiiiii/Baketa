@@ -39,6 +39,23 @@ public sealed record LoggingSettings
     [Range(1, 30, ErrorMessage = "ログ保持日数は1日から30日の間で設定してください")]
     public int DebugLogRetentionDays { get; init; } = 7;
 
+    // ========================================
+    // [Issue #229] テレメトリログ設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #229] テレメトリログファイルのパス
+    /// Stage 2 ノイズフィルタの判定データを収集
+    /// </summary>
+    [Display(Name = "テレメトリログパス", Description = "テレメトリデータ収集用ログファイルの出力パス")]
+    public string TelemetryLogPath { get; init; } = "telemetry_stage2.csv";
+
+    /// <summary>
+    /// [Issue #229] テレメトリログの有効性
+    /// </summary>
+    [Display(Name = "テレメトリログ", Description = "テレメトリデータのファイル出力有効性")]
+    public bool EnableTelemetryLogging { get; init; } = true;
+
     /// <summary>
     /// 設定の妥当性を検証
     /// </summary>
@@ -63,6 +80,17 @@ public sealed record LoggingSettings
         return Path.IsPathRooted(DebugLogPath)
             ? DebugLogPath
             : Path.Combine(AppContext.BaseDirectory, DebugLogPath);
+    }
+
+    /// <summary>
+    /// [Issue #229] フルパスでテレメトリログパスを取得
+    /// </summary>
+    /// <returns>フルパス</returns>
+    public string GetFullTelemetryLogPath()
+    {
+        return Path.IsPathRooted(TelemetryLogPath)
+            ? TelemetryLogPath
+            : Path.Combine(AppContext.BaseDirectory, TelemetryLogPath);
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Models.ImageProcessing;
@@ -45,6 +46,10 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     private long _stage1Filtered = 0;
     private long _stage2Filtered = 0;
     private long _stage3Processed = 0;
+
+    // [Issue #229] テレメトリログ
+    private readonly object _telemetryLock = new();
+    private bool _telemetryInitialized = false;
 
     public EnhancedImageChangeDetectionService(
         ILogger<EnhancedImageChangeDetectionService> logger,
@@ -808,10 +813,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 filterReason = $"Single edge block with minor change (similarity: {block.Similarity:F4}, position: {position})";
 
                 // [Issue #229] テレメトリ: 潜在的false negative のデータ収集
-                // 将来のオプションE/F判断のためのログ
-                _logger.LogWarning(
-                    "📊 [Stage2_Telemetry] Potential false negative - Position={Position}, Row={Row}, Col={Col}, Similarity={Similarity:F4}, GridSize={Rows}x{Cols}",
-                    position, block.Row, block.Col, block.Similarity, rows, cols);
+                // 将来のオプションE/F判断のための専用CSVログ
+                WriteTelemetryLog(position, block.Row, block.Col, block.Similarity, rows, cols);
             }
         }
 
@@ -920,6 +923,43 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     private static bool IsCornerBlock(int row, int col, int rows, int cols)
     {
         return (row == 0 || row == rows - 1) && (col == 0 || col == cols - 1);
+    }
+
+    /// <summary>
+    /// [Issue #229] テレメトリログをCSVファイルに出力
+    /// Stage 2でノイズ判定された潜在的false negativeのデータを収集
+    /// </summary>
+    private void WriteTelemetryLog(string position, int row, int col, float similarity, int rows, int cols)
+    {
+        if (!_loggingSettings.EnableTelemetryLogging)
+            return;
+
+        try
+        {
+            var telemetryPath = _loggingSettings.GetFullTelemetryLogPath();
+
+            lock (_telemetryLock)
+            {
+                // CSVヘッダー初期化（ファイルが存在しない場合）
+                if (!_telemetryInitialized)
+                {
+                    if (!File.Exists(telemetryPath))
+                    {
+                        File.WriteAllText(telemetryPath, "Timestamp,Position,Row,Col,Similarity,GridRows,GridCols\n");
+                    }
+                    _telemetryInitialized = true;
+                }
+
+                // CSVデータ追記
+                var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff},{position},{row},{col},{similarity:F4},{rows},{cols}\n";
+                File.AppendAllText(telemetryPath, line);
+            }
+        }
+        catch (Exception ex)
+        {
+            // テレメトリ書き込み失敗は警告のみ（メイン処理に影響させない）
+            _logger.LogWarning(ex, "📊 [Stage2_Telemetry] テレメトリログ書き込み失敗");
+        }
     }
 
     #endregion
