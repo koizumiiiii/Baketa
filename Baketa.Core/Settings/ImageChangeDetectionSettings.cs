@@ -111,6 +111,39 @@ public sealed record ImageChangeDetectionSettings
     /// </remarks>
     public float GridBlockSimilarityThreshold { get; init; } = 0.98f;
 
+    // ========================================
+    // [Issue #229] テキスト安定化待機設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #229] テキスト安定化待機を有効化
+    /// </summary>
+    /// <remarks>
+    /// 有効にすると、テキストが一文字ずつ表示されるアニメーション
+    /// （タイプライター効果）に対応し、テキストが安定するまで
+    /// OCR実行を遅延させます。
+    /// </remarks>
+    public bool EnableTextStabilization { get; init; } = true;
+
+    /// <summary>
+    /// [Issue #229] テキスト安定化待機時間（ミリ秒）
+    /// </summary>
+    /// <remarks>
+    /// 最初の変化検知から、この時間変化がなければ「安定」と判定。
+    /// デフォルト: 500ms（一般的なテキストアニメーション完了時間）
+    /// 推奨範囲: 300-1000ms
+    /// </remarks>
+    public int TextStabilizationDelayMs { get; init; } = 500;
+
+    /// <summary>
+    /// [Issue #229] 安定化待機中の最大待機時間（ミリ秒）
+    /// </summary>
+    /// <remarks>
+    /// 安定化待機が無限に続かないよう上限を設定。
+    /// デフォルト: 3000ms（3秒でタイムアウト）
+    /// </remarks>
+    public int MaxStabilizationWaitMs { get; init; } = 3000;
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -125,7 +158,10 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #229] グリッド分割設定の検証
             && GridRows > 0
             && GridColumns > 0
-            && GridBlockSimilarityThreshold is > 0.0f and <= 1.0f;
+            && GridBlockSimilarityThreshold is > 0.0f and <= 1.0f
+            // [Issue #229] テキスト安定化設定の検証
+            && TextStabilizationDelayMs >= 0
+            && MaxStabilizationWaitMs >= TextStabilizationDelayMs;
     }
 
     /// <summary>
@@ -142,7 +178,11 @@ public sealed record ImageChangeDetectionSettings
             EnableCaching = true,
             MaxCacheSize = 500,
             CacheExpirationMinutes = 15,
-            EnablePerformanceLogging = true
+            EnablePerformanceLogging = true,
+            // [Issue #229] テキスト安定化設定
+            EnableTextStabilization = true,
+            TextStabilizationDelayMs = 500,
+            MaxStabilizationWaitMs = 3000
         };
     }
 
@@ -160,7 +200,11 @@ public sealed record ImageChangeDetectionSettings
             EnableCaching = true,
             MaxCacheSize = 1000,
             CacheExpirationMinutes = 30,
-            EnablePerformanceLogging = true
+            EnablePerformanceLogging = true,
+            // [Issue #229] テキスト安定化設定（高感度: 短め待機）
+            EnableTextStabilization = true,
+            TextStabilizationDelayMs = 300,
+            MaxStabilizationWaitMs = 2000
         };
     }
 
@@ -178,7 +222,11 @@ public sealed record ImageChangeDetectionSettings
             EnableCaching = true,
             MaxCacheSize = 1500,
             CacheExpirationMinutes = 60,
-            EnablePerformanceLogging = true
+            EnablePerformanceLogging = true,
+            // [Issue #229] テキスト安定化設定（低感度: 長め待機）
+            EnableTextStabilization = true,
+            TextStabilizationDelayMs = 800,
+            MaxStabilizationWaitMs = 5000
         };
     }
 
@@ -196,7 +244,11 @@ public sealed record ImageChangeDetectionSettings
             EnableCaching = true,
             MaxCacheSize = 2000,
             CacheExpirationMinutes = 60,
-            EnablePerformanceLogging = false // 本番ではパフォーマンスログを無効化
+            EnablePerformanceLogging = false, // 本番ではパフォーマンスログを無効化
+            // [Issue #229] テキスト安定化設定
+            EnableTextStabilization = true,
+            TextStabilizationDelayMs = 500,
+            MaxStabilizationWaitMs = 3000
         };
     }
 }

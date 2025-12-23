@@ -34,6 +34,9 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     // [Issue #229] グリッド分割ハッシュキャッシュ
     private readonly ConcurrentDictionary<string, GridHashCache> _gridHashCache = new();
 
+    // [Issue #229] テキスト安定化待機状態
+    private readonly ConcurrentDictionary<string, StabilizationState> _stabilizationStates = new();
+
     // パフォーマンス統計
     private readonly ConcurrentDictionary<int, List<TimeSpan>> _stageTimings = new()
     {
@@ -75,6 +78,13 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             _logger.LogInformation("🔧 [Issue #229] グリッド分割ハッシュ有効: {Rows}x{Cols}={TotalBlocks}ブロック, 閾値={Threshold:F4}",
                 _settings.GridRows, _settings.GridColumns, _settings.GridRows * _settings.GridColumns, _settings.GridBlockSimilarityThreshold);
         }
+
+        // [Issue #229] テキスト安定化設定ログ
+        if (_settings.EnableTextStabilization)
+        {
+            _logger.LogInformation("🔧 [Issue #229] テキスト安定化待機有効: DelayMs={DelayMs}, MaxWaitMs={MaxWaitMs}",
+                _settings.TextStabilizationDelayMs, _settings.MaxStabilizationWaitMs);
+        }
     }
 
     private static ImageChangeDetectionSettings InitializeImageChangeDetectionSettings(IConfiguration configuration)
@@ -97,7 +107,11 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     EnableGridPartitioning = configuration.GetValue<bool>("ImageChangeDetection:EnableGridPartitioning", true),
                     GridRows = configuration.GetValue<int>("ImageChangeDetection:GridRows", 4),
                     GridColumns = configuration.GetValue<int>("ImageChangeDetection:GridColumns", 4),
-                    GridBlockSimilarityThreshold = configuration.GetValue<float>("ImageChangeDetection:GridBlockSimilarityThreshold", 0.98f)
+                    GridBlockSimilarityThreshold = configuration.GetValue<float>("ImageChangeDetection:GridBlockSimilarityThreshold", 0.98f),
+                    // [Issue #229] テキスト安定化待機設定
+                    EnableTextStabilization = configuration.GetValue<bool>("ImageChangeDetection:EnableTextStabilization", true),
+                    TextStabilizationDelayMs = configuration.GetValue<int>("ImageChangeDetection:TextStabilizationDelayMs", 500),
+                    MaxStabilizationWaitMs = configuration.GetValue<int>("ImageChangeDetection:MaxStabilizationWaitMs", 3000)
                 };
             }
         }
@@ -176,6 +190,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     /// Stage 1: Grid Quick Filter
     /// Stage 2: Change Validation (ノイズフィルタリング)
     /// Stage 3: Region Analysis
+    /// + テキスト安定化待機（タイプライターエフェクト対応）
     /// </summary>
     private async Task<ImageChangeResult> ExecuteNewArchitectureAsync(
         IImage currentImage,
@@ -191,6 +206,17 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             Interlocked.Increment(ref _stage1Filtered);
             _logger.LogDebug("📊 [NewArch] Stage 1で除外 - Context: {ContextId}, MinSimilarity: {MinSim:F4}",
                 contextId, stage1Result.MinSimilarity);
+
+            // [Issue #229] テキスト安定化: 変化なし検出時の処理
+            if (_settings.EnableTextStabilization)
+            {
+                var stabilizationResult = HandleStabilizationOnNoChange(contextId, overallStopwatch.Elapsed);
+                if (stabilizationResult != null)
+                {
+                    return stabilizationResult;
+                }
+            }
+
             return ImageChangeResult.CreateNoChange(stage1Result.ProcessingTime, detectionStage: 1);
         }
 
@@ -206,6 +232,17 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             Interlocked.Increment(ref _stage2Filtered);
             _logger.LogDebug("📊 [NewArch] Stage 2で除外（ノイズ）- Context: {ContextId}, Reason: {Reason}",
                 contextId, stage2Result.FilterReason ?? "Not significant");
+
+            // [Issue #229] テキスト安定化: 変化なし検出時の処理
+            if (_settings.EnableTextStabilization)
+            {
+                var stabilizationResult = HandleStabilizationOnNoChange(contextId, overallStopwatch.Elapsed);
+                if (stabilizationResult != null)
+                {
+                    return stabilizationResult;
+                }
+            }
+
             return ImageChangeResult.CreateNoChange(overallStopwatch.Elapsed, detectionStage: 2);
         }
 
@@ -219,6 +256,16 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
 
         _logger.LogDebug("✅ [NewArch] Stage 3完了 - Regions: {Count}, ChangePercentage: {Pct:F4}",
             stage3Result.ChangedRegions.Length, stage3Result.ChangePercentage);
+
+        // [Issue #229] テキスト安定化: 変化検出時の処理
+        if (_settings.EnableTextStabilization)
+        {
+            var suppressResult = HandleStabilizationOnChange(contextId, overallStopwatch.Elapsed);
+            if (suppressResult != null)
+            {
+                return suppressResult; // OCR抑制（安定化待機中）
+            }
+        }
 
         // 最終結果を生成
         return ImageChangeResult.CreateChanged(
@@ -373,6 +420,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             _quickHashCache.TryRemove(contextId, out _);
             _imageHashCache.TryRemove(contextId, out _);
             _gridHashCache.TryRemove(contextId, out _);
+            _stabilizationStates.TryRemove(contextId, out _); // [Issue #229] 安定化状態もクリア
             _logger.LogDebug("🗑️ キャッシュクリア - Context: {ContextId}", contextId);
         }
         else
@@ -380,13 +428,15 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             var quickCount = _quickHashCache.Count;
             var imageCount = _imageHashCache.Count;
             var gridCount = _gridHashCache.Count;
+            var stabilizationCount = _stabilizationStates.Count; // [Issue #229]
 
             _quickHashCache.Clear();
             _imageHashCache.Clear();
             _gridHashCache.Clear();
+            _stabilizationStates.Clear(); // [Issue #229] 安定化状態もクリア
 
-            _logger.LogInformation("🗑️ 全キャッシュクリア - Quick: {QuickCount}, Image: {ImageCount}, Grid: {GridCount}",
-                quickCount, imageCount, gridCount);
+            _logger.LogInformation("🗑️ 全キャッシュクリア - Quick: {QuickCount}, Image: {ImageCount}, Grid: {GridCount}, Stabilization: {StabilizationCount}",
+                quickCount, imageCount, gridCount, stabilizationCount);
         }
     }
 
@@ -655,6 +705,121 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     }
 
     #region [Issue #229] 新3段階アーキテクチャ
+
+    #region [Issue #229] テキスト安定化待機ロジック
+
+    /// <summary>
+    /// [Issue #229] 変化検出時の安定化処理
+    /// 変化を検出したが、テキストアニメーション中の可能性があるためOCRを抑制
+    /// </summary>
+    /// <param name="contextId">コンテキストID</param>
+    /// <param name="elapsed">処理時間</param>
+    /// <returns>OCR抑制する場合は"NoChange"結果、そうでなければnull（OCR実行許可）</returns>
+    /// <remarks>
+    /// [Gemini Review] スレッドセーフティのため、stateオブジェクトをロックして
+    /// 読み取り→更新をアトミックに実行。
+    /// </remarks>
+    private ImageChangeResult? HandleStabilizationOnChange(string contextId, TimeSpan elapsed)
+    {
+        // GetOrAddで一度だけインスタンスを生成（スレッドセーフ）
+        var state = _stabilizationStates.GetOrAdd(contextId, _ => StabilizationState.CreateIdle());
+        var now = DateTime.UtcNow; // 判定基準時刻を統一
+
+        lock (state) // stateオブジェクトをロックしてアトミック操作を保証
+        {
+            if (!state.IsInStabilization)
+            {
+                // 安定化モード開始
+                state.EnterStabilization();
+
+                _logger.LogDebug("🕐 [TextStabilization] 安定化モード開始 - Context: {ContextId}, WaitMs: {WaitMs}",
+                    contextId, _settings.TextStabilizationDelayMs);
+
+                // OCRを抑制（変化なしとして返す）
+                return ImageChangeResult.CreateNoChange(elapsed, detectionStage: 1);
+            }
+
+            // 既に安定化モード中：タイムアウトチェック
+            if (state.HasTimedOut(now, _settings.MaxStabilizationWaitMs))
+            {
+                // タイムアウト：強制的にOCR実行許可
+                var waitedMs = (now - state.FirstChangeTime).TotalMilliseconds;
+                state.Reset();
+
+                _logger.LogWarning("⏰ [TextStabilization] タイムアウト - Context: {ContextId}, WaitedMs: {WaitedMs:F0}ms",
+                    contextId, waitedMs);
+
+                return null; // OCR実行許可
+            }
+
+            // 変化継続：最終変化時刻を更新してOCR抑制継続
+            state.UpdateLastChange();
+
+            _logger.LogDebug("🔄 [TextStabilization] 変化継続（待機中）- Context: {ContextId}, SinceFirstChange: {Ms:F0}ms",
+                contextId, (now - state.FirstChangeTime).TotalMilliseconds);
+
+            return ImageChangeResult.CreateNoChange(elapsed, detectionStage: 1);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #229] 変化なし検出時の安定化処理
+    /// 安定化モード中に変化なしを検出した場合、安定化完了を判定
+    /// </summary>
+    /// <param name="contextId">コンテキストID</param>
+    /// <param name="elapsed">処理時間</param>
+    /// <returns>安定化完了時は"Changed"結果（OCR実行トリガー）、そうでなければnull</returns>
+    /// <remarks>
+    /// [Gemini Review] スレッドセーフティのため、stateオブジェクトをロックして
+    /// 読み取り→更新をアトミックに実行。
+    /// </remarks>
+    private ImageChangeResult? HandleStabilizationOnNoChange(string contextId, TimeSpan elapsed)
+    {
+        if (!_stabilizationStates.TryGetValue(contextId, out var state))
+        {
+            // 状態がない場合は通常処理
+            return null;
+        }
+
+        var now = DateTime.UtcNow; // 判定基準時刻を統一
+
+        lock (state) // stateオブジェクトをロックしてアトミック操作を保証
+        {
+            if (!state.IsInStabilization)
+            {
+                // 安定化モードでない場合は通常処理
+                return null;
+            }
+
+            // 安定化モード中に変化なしを検出
+            if (state.HasStabilized(now, _settings.TextStabilizationDelayMs) || state.HasTimedOut(now, _settings.MaxStabilizationWaitMs))
+            {
+                // 安定化完了またはタイムアウト：OCR実行許可
+                var waitedMs = (now - state.FirstChangeTime).TotalMilliseconds;
+                state.Reset();
+
+                _logger.LogInformation("✅ [TextStabilization] 安定化完了 - Context: {ContextId}, WaitedMs: {WaitedMs:F0}ms",
+                    contextId, waitedMs);
+
+                // 「変化あり」として返すことでOCRをトリガー
+                return ImageChangeResult.CreateChanged(
+                    "STABILIZED",
+                    "STABILIZED",
+                    0.01f, // 軽微な変化として報告
+                    HashAlgorithmType.DifferenceHash,
+                    elapsed,
+                    detectionStage: 3);
+            }
+
+            // まだ安定化待機時間が経過していない
+            _logger.LogDebug("⏳ [TextStabilization] 安定化待機中（変化なし）- Context: {ContextId}, SinceLastChange: {Ms:F0}ms",
+                contextId, (now - state.LastChangeTime).TotalMilliseconds);
+
+            return null; // 通常の「変化なし」処理を続行
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// [Issue #229] 新 Stage 1: Grid Quick Filter
@@ -1194,4 +1359,93 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     }
 
     #endregion
+}
+
+/// <summary>
+/// [Issue #229] テキスト安定化待機状態
+/// </summary>
+/// <remarks>
+/// テキストアニメーション（タイプライター効果）検知後の安定化待機を管理。
+/// - FirstChangeTime: 安定化モード開始時刻
+/// - LastChangeTime: 最後の変化検知時刻
+/// - IsInStabilization: 安定化待機モード中かどうか
+///
+/// [Gemini Review] スレッドセーフティのため record から class に変更。
+/// 各インスタンスをロック対象として使用可能に。
+/// </remarks>
+internal sealed class StabilizationState
+{
+    /// <summary>
+    /// 安定化モード開始時刻
+    /// </summary>
+    public DateTime FirstChangeTime { get; private set; }
+
+    /// <summary>
+    /// 最後の変化検知時刻
+    /// </summary>
+    public DateTime LastChangeTime { get; private set; }
+
+    /// <summary>
+    /// 安定化待機モード中かどうか
+    /// </summary>
+    public bool IsInStabilization { get; private set; }
+
+    private StabilizationState()
+    {
+        FirstChangeTime = DateTime.MinValue;
+        LastChangeTime = DateTime.MinValue;
+        IsInStabilization = false;
+    }
+
+    /// <summary>
+    /// アイドル状態のインスタンスを作成
+    /// </summary>
+    public static StabilizationState CreateIdle() => new();
+
+    /// <summary>
+    /// 安定化モード開始
+    /// </summary>
+    public void EnterStabilization()
+    {
+        var now = DateTime.UtcNow;
+        FirstChangeTime = now;
+        LastChangeTime = now;
+        IsInStabilization = true;
+    }
+
+    /// <summary>
+    /// 変化検知時刻を更新
+    /// </summary>
+    public void UpdateLastChange()
+    {
+        LastChangeTime = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// 安定化モード終了（アイドル状態へリセット）
+    /// </summary>
+    public void Reset()
+    {
+        IsInStabilization = false;
+        FirstChangeTime = DateTime.MinValue;
+        LastChangeTime = DateTime.MinValue;
+    }
+
+    /// <summary>
+    /// 安定化待機時間が経過したか確認
+    /// </summary>
+    /// <param name="now">判定基準時刻</param>
+    /// <param name="delayMs">安定化待機時間（ミリ秒）</param>
+    /// <returns>安定化完了の場合true</returns>
+    public bool HasStabilized(DateTime now, int delayMs) =>
+        (now - LastChangeTime).TotalMilliseconds >= delayMs;
+
+    /// <summary>
+    /// 最大待機時間を超過したか確認
+    /// </summary>
+    /// <param name="now">判定基準時刻</param>
+    /// <param name="maxWaitMs">最大待機時間（ミリ秒）</param>
+    /// <returns>タイムアウトの場合true</returns>
+    public bool HasTimedOut(DateTime now, int maxWaitMs) =>
+        (now - FirstChangeTime).TotalMilliseconds >= maxWaitMs;
 }
