@@ -284,8 +284,11 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 ? ((double)(totalMemoryMB - availableMemoryMB) / totalMemoryMB) * 100.0
                 : 0.0;
 
-            // GPU使用率取得（利用可能な場合）
-            var gpuUsage = _settings.EnableGpuMonitoring ? await GetGpuUsageAsync(cancellationToken).ConfigureAwait(false) : null;
+            // GPU使用率・VRAM使用量取得（利用可能な場合）
+            // Issue #229: GpuMemoryUsageMBが未設定だったためVRAM=0%問題を修正
+            var (gpuUsage, gpuMemoryUsageMB, gpuTemperature) = _settings.EnableGpuMonitoring
+                ? await GetGpuMetricsAsync(cancellationToken).ConfigureAwait(false)
+                : (null, null, null);
 
             // プロセス・スレッド数取得
             var processCount = GetProcessCount();
@@ -298,6 +301,8 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 availableMemoryMB,
                 totalMemoryMB,
                 gpuUsage.HasValue ? Math.Max(0, Math.Min(100, gpuUsage.Value)) : null,
+                GpuMemoryUsageMB: gpuMemoryUsageMB,
+                GpuTemperature: gpuTemperature,
                 ProcessCount: processCount,
                 ThreadCount: threadCount);
 
@@ -535,9 +540,10 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
     }
 
     /// <summary>
-    /// GPU使用率取得（WMI経由）
+    /// GPU使用率・VRAM使用量・温度を取得
+    /// Issue #229: GpuMemoryUsageMBが未設定だった問題を修正
     /// </summary>
-    private async Task<double?> GetGpuUsageAsync(CancellationToken cancellationToken)
+    private async Task<(double? gpuUsage, long? gpuMemoryUsageMB, double? temperature)> GetGpuMetricsAsync(CancellationToken cancellationToken)
     {
         // Phase 3: 高度なNVML GPU監視を優先使用
         if (_nvmlGpuMonitor?.IsNvmlAvailable == true)
@@ -547,36 +553,44 @@ public sealed class WindowsSystemResourceMonitor : IResourceMonitor
                 var detailedMetrics = await _nvmlGpuMonitor.GetDetailedGpuMetricsAsync(cancellationToken).ConfigureAwait(false);
                 if (detailedMetrics != null)
                 {
-                    _logger.LogTrace("[NVML] GPU使用率取得成功: {Usage:F1}%, VRAM: {VramUsage:F1}%, 温度: {Temp}℃",
-                        detailedMetrics.GpuUtilizationPercent, detailedMetrics.VramUsagePercent, detailedMetrics.TemperatureCelsius);
-                    return detailedMetrics.GpuUtilizationPercent;
+                    _logger.LogTrace("[NVML] GPUメトリクス取得成功: Usage={Usage:F1}%, VRAM={VramUsed}MB/{VramTotal}MB, Temp={Temp}℃",
+                        detailedMetrics.GpuUtilizationPercent,
+                        detailedMetrics.UsedMemoryMB,
+                        detailedMetrics.TotalMemoryMB,
+                        detailedMetrics.TemperatureCelsius);
+
+                    return (
+                        detailedMetrics.GpuUtilizationPercent,
+                        (long)detailedMetrics.UsedMemoryMB,
+                        detailedMetrics.TemperatureCelsius
+                    );
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "⚠️ [NVML] GPU使用率取得エラー - フォールバックに切り替え");
+                _logger.LogWarning(ex, "⚠️ [NVML] GPUメトリクス取得エラー - フォールバックに切り替え");
             }
         }
 
         // フォールバック: 従来のWMI GPU監視（基本的な可用性確認）
         if (_gpuSearcher == null || string.IsNullOrEmpty(_gpuInstanceName))
         {
-            return null;
+            return (null, null, null);
         }
 
-        return await Task.Run<double?>(() =>
+        return await Task.Run<(double?, long?, double?)>(() =>
         {
             try
             {
                 _logger.LogTrace("[FALLBACK] WMI GPU監視 - 基本的な可用性確認のみ実行");
-                // Note: Windows標準のWMIではGPU使用率の直接取得は制限があります
+                // Note: Windows標準のWMIではGPU使用率・VRAM使用量の直接取得は制限があります
                 // フォールバック時は基本的な状態のみ返却
-                return 0.0; // プレースホルダー実装（GPU検出済みを示す）
+                return (0.0, null, null); // プレースホルダー実装（GPU検出済みを示す）
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "[FALLBACK] GPU使用率取得エラー");
-                return null;
+                _logger.LogWarning(ex, "[FALLBACK] GPUメトリクス取得エラー");
+                return (null, null, null);
             }
         }, cancellationToken).ConfigureAwait(false);
     }
