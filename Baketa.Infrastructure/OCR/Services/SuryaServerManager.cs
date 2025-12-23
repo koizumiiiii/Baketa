@@ -297,25 +297,33 @@ public sealed class SuryaServerManager : IAsyncDisposable
     /// <summary>
     /// Issue #197: exe版パス解決
     /// PyInstallerでビルドしたBaketaSuryaOcrServer.exeを検索
+    /// Issue #229: 配布版パスを確実に優先するよう修正
     /// </summary>
     private string? ResolveExePath(string projectRoot)
     {
+        // Issue #229: 配布版判定 - AppContext.BaseDirectory直下に.slnがなければ配布版
+        var isDistribution = Directory.GetFiles(AppContext.BaseDirectory, "*.sln").Length == 0;
+
         // 検索候補パス（優先順）
-        var searchPaths = new[]
+        var searchPaths = new List<string>();
+
+        // 1. アプリ配布時: grpc_server/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe（常に最優先）
+        searchPaths.Add(Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"));
+
+        // 2. 開発環境でのみ: grpc_server/dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe
+        if (!isDistribution)
         {
-            // 1. アプリ配布時: grpc_server/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe
-            Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"),
-            // 2. 開発時ビルド: grpc_server/dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe
-            Path.Combine(projectRoot, "grpc_server", "dist", "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"),
-            // 3. AppContext.BaseDirectory直下
-            Path.Combine(AppContext.BaseDirectory, "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"),
-        };
+            searchPaths.Add(Path.Combine(projectRoot, "grpc_server", "dist", "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"));
+        }
+
+        // 3. AppContext.BaseDirectory直下
+        searchPaths.Add(Path.Combine(AppContext.BaseDirectory, "BaketaSuryaOcrServer", "BaketaSuryaOcrServer.exe"));
 
         foreach (var path in searchPaths)
         {
             if (File.Exists(path))
             {
-                _logger.LogDebug("[Surya] exe検出: {Path}", path);
+                _logger.LogDebug("[Surya] exe検出: {Path} (配布版={IsDistribution})", path, isDistribution);
                 return path;
             }
         }
@@ -474,15 +482,17 @@ public sealed class SuryaServerManager : IAsyncDisposable
     /// <summary>
     /// Issue #199: exe版のダウンロード完了を待機
     /// ComponentDownloadServiceがBaketaSuryaOcrServer.exeをダウンロード中の場合、完了まで待つ
-    /// 開発環境（.slnが見つかる場合）ではスキップしてPython版を使用
+    /// Issue #229: 開発環境判定を修正 - AppContext.BaseDirectory直下に.slnがある場合のみ開発環境
     /// </summary>
     private async Task WaitForExeDownloadAsync(CancellationToken cancellationToken)
     {
-        // 開発環境の場合はスキップ（Python版を使用するため）
-        var projectRoot = FindProjectRoot(AppContext.BaseDirectory);
-        if (!string.IsNullOrEmpty(projectRoot))
+        // Issue #229: 開発環境判定を修正
+        // AppContext.BaseDirectory直下に.slnがある場合のみ開発環境とみなす
+        // 配布版フォルダ（Baketa-beta-x.x.x）からの実行時は親ディレクトリの.slnを無視
+        var isDevEnvironment = Directory.GetFiles(AppContext.BaseDirectory, "*.sln").Length > 0;
+        if (isDevEnvironment)
         {
-            _logger.LogDebug("[Surya] 開発環境検出 - exe待機スキップ");
+            _logger.LogDebug("[Surya] 開発環境検出（直下に.sln） - exe待機スキップ");
             return;
         }
 
