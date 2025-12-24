@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.IO.Hashing;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Models.ImageProcessing;
@@ -824,6 +825,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     /// <summary>
     /// [Issue #229] 新 Stage 1: Grid Quick Filter
     /// グリッド分割による高速フィルタリング（詳細結果を返す）
+    /// [Gemini Review] チェックサムフォールバック追加 - ハッシュ衝突時の検出漏れを防止
     /// </summary>
     private async Task<GridChangeDetectionResult> ExecuteNewStage1_GridQuickFilterAsync(
         IImage currentImage,
@@ -839,6 +841,9 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             var blockWidth = currentImage.Width / cols;
             var blockHeight = currentImage.Height / rows;
             var algorithm = HashAlgorithmType.DifferenceHash;
+
+            // [Issue #229] 画像チェックサム計算（フォールバック用）
+            var currentChecksum = CalculateImageChecksum(currentImage);
 
             // 並列ハッシュ計算（ブロック情報も保持）
             var hashTasks = Enumerable.Range(0, totalBlocks).Select(i => Task.Run(() =>
@@ -858,10 +863,10 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 // 初回またはサイズ変更
                 var newCache = new GridHashCache(
                     blockResults.OrderBy(b => b.Index).Select(b => b.Hash).ToArray(),
-                    rows, cols, DateTime.UtcNow);
+                    rows, cols, DateTime.UtcNow, currentChecksum);
                 _gridHashCache.AddOrUpdate(contextId, newCache, (_, _) => newCache);
 
-                _logger.LogDebug("🔲 [NewStage1] 初回キャッシュ作成 - Context: {ContextId}, Blocks: {Blocks}", contextId, totalBlocks);
+                _logger.LogDebug("🔲 [NewStage1] 初回キャッシュ作成 - Context: {ContextId}, Blocks: {Blocks}, Checksum: {Checksum}", contextId, totalBlocks, currentChecksum);
 
                 // 初回は全ブロック変化として扱う
                 return new GridChangeDetectionResult
@@ -900,11 +905,75 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 }
             }
 
-            // キャッシュ更新
+            // [Issue #229][Gemini Review] チェックサムフォールバック検出
+            // ハッシュが同一でもチェックサムが異なれば変化ありと判定
+            var checksumChanged = currentChecksum != cachedGrid.ImageChecksum;
+            if (changedBlocks.Count == 0 && checksumChanged)
+            {
+                _logger.LogInformation("🔄 [NewStage1_FALLBACK] チェックサムフォールバック発動 - ハッシュ同一だが画像変化検出 (Cached: {Cached:X16}, Current: {Current:X16})",
+                    cachedGrid.ImageChecksum, currentChecksum);
+
+                // テキスト領域（下部）を優先的に変化ブロックとして追加
+                var textRow = rows - 1; // 最下行（Row=3 for 4x4 grid）
+                for (int col = 0; col < cols; col++)
+                {
+                    var blockIndex = textRow * cols + col;
+                    var block = blockResults.First(b => b.Index == blockIndex);
+                    changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                }
+                minSimilarity = FallbackSimilarityThreshold; // フォールバック検出時の仮の類似度
+                mostChangedIndex = textRow * cols;
+            }
+
+            // キャッシュ更新（チェックサム含む）
             var updatedCache = new GridHashCache(
                 blockResults.OrderBy(b => b.Index).Select(b => b.Hash).ToArray(),
-                rows, cols, DateTime.UtcNow);
+                rows, cols, DateTime.UtcNow, currentChecksum);
             _gridHashCache.AddOrUpdate(contextId, updatedCache, (_, _) => updatedCache);
+
+            // 🔍 [DIAGNOSTIC] MinSimilarity=1.0000の場合、詳細ログ出力
+            if (minSimilarity >= 0.9999f)
+            {
+                // テキスト領域が含まれる下部ブロック（Row=3）のハッシュ値を確認
+                var row3Block0 = blockResults.FirstOrDefault(b => b.Row == 3 && b.Col == 0);
+                if (row3Block0.Hash != null)
+                {
+                    var cachedHash = cachedGrid.BlockHashes[row3Block0.Index];
+                    var currentHash = row3Block0.Hash;
+                    // ハッシュの先頭8文字を比較用に出力
+                    var cachedShort = cachedHash.Length > 8 ? cachedHash[..8] : cachedHash;
+                    var currentShort = currentHash.Length > 8 ? currentHash[..8] : currentHash;
+                    _logger.LogDebug("🔍 [NewStage1_DIAG] MinSim=1.0 - Block[3,0] CachedHash={Cached}..., CurrentHash={Current}..., CacheAge={Age:F1}s",
+                        cachedShort, currentShort, (DateTime.UtcNow - cachedGrid.Timestamp).TotalSeconds);
+                }
+
+                // 🔍 [DIAGNOSTIC] 画像バイト単位のチェックサム比較
+                // キャプチャ層で同一画像が返されていないか確認
+                try
+                {
+                    var imageMemory = currentImage.GetImageMemory();
+                    var imageArray = imageMemory.ToArray();
+                    var headChecksum = 0;
+                    // 先頭2000バイトと末尾2000バイトのチェックサム
+                    var headLimit = Math.Min(imageArray.Length, 2000);
+                    var tailStart = Math.Max(0, imageArray.Length - 2000);
+                    for (int i = 0; i < headLimit; i++)
+                    {
+                        headChecksum += imageArray[i];
+                    }
+                    var tailChecksum = 0;
+                    for (int i = tailStart; i < imageArray.Length; i++)
+                    {
+                        tailChecksum += imageArray[i];
+                    }
+                    _logger.LogDebug("🔍 [NewStage1_DIAG] HeadChecksum={HeadSum}, TailChecksum={TailSum}, ImageSize={Width}x{Height}, TotalBytes={Total}",
+                        headChecksum, tailChecksum, currentImage.Width, currentImage.Height, imageArray.Length);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug("🔍 [NewStage1_DIAG] ImageChecksum計算失敗: {Error}", ex.Message);
+                }
+            }
 
             _logger.LogDebug("🔲 [NewStage1] 完了 - Context: {ContextId}, ChangedBlocks: {Count}, MinSimilarity: {MinSim:F4}",
                 contextId, changedBlocks.Count, minSimilarity);
@@ -1356,6 +1425,57 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         var cacheSize = _quickHashCache.Count + _imageHashCache.Count;
 
         return totalProcessed > 0 ? Math.Min(1.0f, (float)cacheSize / totalProcessed) : 0f;
+    }
+
+    // [Issue #229][Gemini Review] チェックサム計算用定数
+    private const int ChecksumSampleSize = 2000;
+    private const float FallbackSimilarityThreshold = 0.95f;
+
+    /// <summary>
+    /// [Issue #229][Gemini Review] 画像のチェックサムを計算
+    /// ハッシュが衝突した場合のフォールバック検出用
+    /// XxHash64を使用して衝突耐性を向上（単純加算より堅牢）
+    /// 高速計算のため、画像全体ではなくサンプリングポイントを使用
+    /// </summary>
+    /// <param name="image">対象画像</param>
+    /// <returns>チェックサム値（XxHash64）</returns>
+    private long CalculateImageChecksum(IImage image)
+    {
+        try
+        {
+            var imageMemory = image.GetImageMemory();
+            var imageSpan = imageMemory.Span;
+
+            if (imageSpan.IsEmpty) return 0;
+
+            var xxHash = new XxHash64();
+
+            // 先頭サンプル
+            var headLength = Math.Min(imageSpan.Length, ChecksumSampleSize);
+            xxHash.Append(imageSpan[..headLength]);
+
+            // 中央サンプル（重複を避けるため、十分な長さがある場合のみ）
+            if (imageSpan.Length > ChecksumSampleSize * 3)
+            {
+                var midStart = imageSpan.Length / 2 - ChecksumSampleSize / 2;
+                var midLength = Math.Min(ChecksumSampleSize, imageSpan.Length - midStart);
+                xxHash.Append(imageSpan.Slice(midStart, midLength));
+            }
+
+            // 末尾サンプル（テキスト領域を含む可能性が高い）
+            var tailStart = Math.Max(headLength, imageSpan.Length - ChecksumSampleSize);
+            if (tailStart < imageSpan.Length)
+            {
+                xxHash.Append(imageSpan[tailStart..]);
+            }
+
+            return (long)xxHash.GetCurrentHashAsUInt64();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "チェックサム計算エラー - デフォルト値を返却");
+            return 0;
+        }
     }
 
     #endregion

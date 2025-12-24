@@ -70,6 +70,92 @@ public sealed class OcrSettings
         MaxValue = 1.0)]
     public double ConfidenceThreshold { get; set; } = 0.70;
 
+    // ========================================
+    // [Issue #229] ボーダーライン信頼度緩和設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #229] ボーダーライン信頼度緩和を有効化
+    /// </summary>
+    /// <remarks>
+    /// 信頼度が閾値をわずかに下回る場合、追加条件を満たせば
+    /// 緩和された閾値で採用することを許可します。
+    /// Geminiフィードバック: 正確に認識されたテキストが閾値未満で
+    /// 却下される問題（false negative）の解決策。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ボーダーライン緩和",
+        Description = "閾値に近い信頼度の結果を条件付きで採用します")]
+    public bool EnableBorderlineConfidenceRelaxation { get; set; } = true;
+
+    /// <summary>
+    /// [Issue #229] ボーダーライン判定の最小信頼度
+    /// </summary>
+    /// <remarks>
+    /// この値以上かつConfidenceThreshold未満の場合、
+    /// ボーダーラインとして追加条件をチェックします。
+    /// デフォルト: 0.60
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ボーダーライン最小信頼度",
+        Description = "ボーダーライン判定の下限（0.60推奨）",
+        MinValue = 0.0,
+        MaxValue = 1.0)]
+    public double BorderlineMinConfidence { get; set; } = 0.60;
+
+    /// <summary>
+    /// [Issue #229] ボーダーライン採用時の緩和閾値
+    /// </summary>
+    /// <remarks>
+    /// ボーダーライン条件を満たす場合、この閾値で採用判定します。
+    /// デフォルト: 0.65（通常閾値0.70より5%低い）
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ボーダーライン採用閾値",
+        Description = "条件を満たす場合の緩和閾値（0.65推奨）",
+        MinValue = 0.0,
+        MaxValue = 1.0)]
+    public double BorderlineRelaxedThreshold { get; set; } = 0.65;
+
+    /// <summary>
+    /// [Issue #229] ボーダーライン判定の最小テキスト長
+    /// </summary>
+    /// <remarks>
+    /// ボーダーライン緩和を適用するための最小文字数。
+    /// 短いテキストはノイズの可能性が高いため除外。
+    /// デフォルト: 5文字
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ボーダーライン最小文字数",
+        Description = "緩和適用の最小文字数（5文字推奨）",
+        MinValue = 1,
+        MaxValue = 50)]
+    public int BorderlineMinTextLength { get; set; } = 5;
+
+    /// <summary>
+    /// [Issue #229] ボーダーライン判定の最小バウンディングボックス高さ
+    /// </summary>
+    /// <remarks>
+    /// ボーダーライン緩和を適用するための最小高さ（ピクセル）。
+    /// 小さすぎるボックスはUIノイズの可能性が高いため除外。
+    /// デフォルト: 25px
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ボーダーライン最小高さ",
+        Description = "緩和適用の最小高さ（25px推奨）",
+        MinValue = 1,
+        MaxValue = 200)]
+    public int BorderlineMinBoundsHeight { get; set; } = 25;
+
+    /// <summary>
+    /// [Issue #229] ボーダーライン判定の最小アスペクト比
+    /// </summary>
+    /// <remarks>
+    /// ボーダーライン緩和を適用するための最小アスペクト比（幅/高さ）。
+    /// テキストは通常横長なので、正方形に近いものは除外。
+    /// デフォルト: 2.0（幅が高さの2倍以上）
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ボーダーライン最小アスペクト比",
+        Description = "緩和適用の最小アスペクト比（2.0推奨）",
+        MinValue = 0.5,
+        MaxValue = 20.0)]
+    public double BorderlineMinAspectRatio { get; set; } = 2.0;
+
     /// <summary>
     /// テキスト検出の閾値（0.0-1.0）
     /// </summary>
@@ -331,6 +417,13 @@ public sealed class OcrSettings
             Engine = Engine,
             RecognitionLanguage = RecognitionLanguage,
             ConfidenceThreshold = ConfidenceThreshold,
+            // [Issue #229] ボーダーライン信頼度緩和設定
+            EnableBorderlineConfidenceRelaxation = EnableBorderlineConfidenceRelaxation,
+            BorderlineMinConfidence = BorderlineMinConfidence,
+            BorderlineRelaxedThreshold = BorderlineRelaxedThreshold,
+            BorderlineMinTextLength = BorderlineMinTextLength,
+            BorderlineMinBoundsHeight = BorderlineMinBoundsHeight,
+            BorderlineMinAspectRatio = BorderlineMinAspectRatio,
             DetectionThreshold = DetectionThreshold,
             EnableImagePreprocessing = EnableImagePreprocessing,
             ConvertToGrayscale = ConvertToGrayscale,

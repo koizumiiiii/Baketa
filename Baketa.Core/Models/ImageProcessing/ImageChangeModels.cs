@@ -275,12 +275,19 @@ public record GridHashCache
     /// <summary>タイムスタンプ</summary>
     public DateTime Timestamp { get; init; }
 
-    public GridHashCache(string[] blockHashes, int rows, int columns, DateTime timestamp)
+    /// <summary>
+    /// [Issue #229] 画像全体のチェックサム
+    /// ハッシュが衝突した場合のフォールバック検出用
+    /// </summary>
+    public long ImageChecksum { get; init; }
+
+    public GridHashCache(string[] blockHashes, int rows, int columns, DateTime timestamp, long imageChecksum = 0)
     {
         BlockHashes = blockHashes;
         Rows = rows;
         Columns = columns;
         Timestamp = timestamp;
+        ImageChecksum = imageChecksum;
     }
 }
 

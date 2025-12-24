@@ -72,7 +72,8 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
     /// <inheritdoc />
     /// <summary>
     /// [Issue #229] 画像の指定領域に対してハッシュを計算（グリッド分割用）
-    /// 8x8ハッシュを使用して高速計算（64ビット）
+    /// [Issue #229 Fix] 16x16ハッシュを使用（256ビット）- テキスト変化検出精度向上
+    /// 8x8（64ビット）では320x180→9x8への縮小で微細な変化が失われる問題を解決
     /// </summary>
     public string ComputeHashForRegion(IImage image, GdiRectangle region, HashAlgorithmType algorithm)
     {
@@ -86,24 +87,24 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
             var clampedRegion = ClampRegion(region, fullBitmap.Width, fullBitmap.Height);
             if (clampedRegion.Width <= 0 || clampedRegion.Height <= 0)
             {
-                return "0000000000000000";
+                return "00000000000000000000000000000000"; // 16x16 = 256bit = 32文字
             }
 
             // 領域を切り出し
             using var regionBitmap = fullBitmap.Clone(clampedRegion, fullBitmap.PixelFormat);
 
-            // 8x8ハッシュを計算（グリッド分割では軽量ハッシュが有効）
+            // [Issue #229 Fix] 16x16ハッシュを使用（テキスト変化検出に適した解像度）
             return algorithm switch
             {
-                HashAlgorithmType.DifferenceHash => ComputeDifferenceHash8x8(regionBitmap),
-                HashAlgorithmType.AverageHash => ComputeAverageHash8x8(regionBitmap),
-                _ => ComputeDifferenceHash8x8(regionBitmap) // デフォルトはDifferenceHash
+                HashAlgorithmType.DifferenceHash => ComputeDifferenceHash16x16(regionBitmap),
+                HashAlgorithmType.AverageHash => ComputeAverageHash16x16(regionBitmap),
+                _ => ComputeDifferenceHash16x16(regionBitmap) // デフォルトはDifferenceHash
             };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "💥 領域ハッシュ計算エラー - Region: {Region}, Algorithm: {Algorithm}", region, algorithm);
-            return "0000000000000000";
+            return "00000000000000000000000000000000";
         }
     }
 
@@ -240,6 +241,140 @@ public sealed class OptimizedPerceptualHashService : IPerceptualHashService
         finally
         {
             resized.UnlockBits(lockData);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #229 Fix] 16x16 DifferenceHash（グリッド分割用 - 高精度版）
+    /// 256ビットハッシュでテキスト変化を検出可能
+    /// 320x180ピクセル → 17x16ピクセル（8x8の4倍解像度）
+    /// </summary>
+    private string ComputeDifferenceHash16x16(Bitmap bitmap)
+    {
+        const int size = 16;
+        const int hashSize = 32; // 16x16 = 256ビット = 32バイト
+
+        using var resized = new Bitmap(size + 1, size, GdiPixelFormat.Format24bppRgb);
+        using var graphics = Graphics.FromImage(resized);
+
+        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
+        graphics.DrawImage(bitmap, 0, 0, size + 1, size);
+
+        var lockData = resized.LockBits(new GdiRectangle(0, 0, size + 1, size),
+            ImageLockMode.ReadOnly, GdiPixelFormat.Format24bppRgb);
+
+        var hashBytes = ArrayPool<byte>.Shared.Rent(hashSize);
+        try
+        {
+            Array.Clear(hashBytes, 0, hashSize);
+            var bitIndex = 0;
+            var stride = lockData.Stride;
+
+            unsafe
+            {
+                byte* ptr = (byte*)lockData.Scan0;
+
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        var leftOffset = y * stride + x * 3;
+                        var rightOffset = y * stride + (x + 1) * 3;
+
+                        var leftGray = (ptr[leftOffset] + ptr[leftOffset + 1] + ptr[leftOffset + 2]) / 3;
+                        var rightGray = (ptr[rightOffset] + ptr[rightOffset + 1] + ptr[rightOffset + 2]) / 3;
+
+                        if (leftGray > rightGray)
+                        {
+                            var byteIndex = bitIndex / 8;
+                            var bitPosition = bitIndex % 8;
+                            hashBytes[byteIndex] |= (byte)(1 << bitPosition);
+                        }
+                        bitIndex++;
+                    }
+                }
+            }
+
+            return Convert.ToHexString(hashBytes.AsSpan(0, hashSize)); // 256ビット → 64文字の16進数
+        }
+        finally
+        {
+            resized.UnlockBits(lockData);
+            ArrayPool<byte>.Shared.Return(hashBytes);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #229 Fix] 16x16 AverageHash（グリッド分割用 - 高精度版）
+    /// 256ビットハッシュでテキスト変化を検出可能
+    /// </summary>
+    private string ComputeAverageHash16x16(Bitmap bitmap)
+    {
+        const int size = 16;
+        const int hashSize = 32; // 16x16 = 256ビット = 32バイト
+
+        using var resized = new Bitmap(size, size, GdiPixelFormat.Format24bppRgb);
+        using var graphics = Graphics.FromImage(resized);
+
+        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
+        graphics.DrawImage(bitmap, 0, 0, size, size);
+
+        var lockData = resized.LockBits(new GdiRectangle(0, 0, size, size),
+            ImageLockMode.ReadOnly, GdiPixelFormat.Format24bppRgb);
+
+        var hashBytes = ArrayPool<byte>.Shared.Rent(hashSize);
+        try
+        {
+            Array.Clear(hashBytes, 0, hashSize);
+            var stride = lockData.Stride;
+            var totalBrightness = 0;
+            var pixels = size * size;
+
+            unsafe
+            {
+                byte* ptr = (byte*)lockData.Scan0;
+
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        var offset = y * stride + x * 3;
+                        totalBrightness += (ptr[offset] + ptr[offset + 1] + ptr[offset + 2]) / 3;
+                    }
+                }
+            }
+
+            var averageBrightness = totalBrightness / pixels;
+            var bitIndex = 0;
+
+            unsafe
+            {
+                byte* ptr = (byte*)lockData.Scan0;
+
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        var offset = y * stride + x * 3;
+                        var brightness = (ptr[offset] + ptr[offset + 1] + ptr[offset + 2]) / 3;
+
+                        if (brightness >= averageBrightness)
+                        {
+                            var byteIndex = bitIndex / 8;
+                            var bitPosition = bitIndex % 8;
+                            hashBytes[byteIndex] |= (byte)(1 << bitPosition);
+                        }
+                        bitIndex++;
+                    }
+                }
+            }
+
+            return Convert.ToHexString(hashBytes.AsSpan(0, hashSize)); // 256ビット → 64文字の16進数
+        }
+        finally
+        {
+            resized.UnlockBits(lockData);
+            ArrayPool<byte>.Shared.Return(hashBytes);
         }
     }
 
