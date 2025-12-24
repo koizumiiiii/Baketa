@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Baketa.UI.Views.ToastNotificationWindow"
+        Title="Toast"
+        Width="320"
+        SizeToContent="Height"
+        WindowStartupLocation="Manual"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        CanResize="False"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome">
+
+  <Border Background="#F5FFFFFF"
+          BorderBrush="#A0A0A0A0"
+          BorderThickness="1"
+          CornerRadius="8"
+          BoxShadow="0 4 12 0 #40000000"
+          Padding="12"
+          Margin="8">
+
+    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+      <!-- アイコン -->
+      <Border Grid.Column="0" Grid.RowSpan="2"
+              Width="32" Height="32"
+              CornerRadius="16"
+              Margin="0,0,12,0"
+              VerticalAlignment="Center"
+              Name="IconBorder">
+        <TextBlock Name="IconText"
+                   FontSize="16"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
+      </Border>
+
+      <!-- タイトル -->
+      <TextBlock Grid.Column="1" Grid.Row="0"
+                 Name="TitleText"
+                 FontWeight="SemiBold"
+                 FontSize="13"
+                 TextWrapping="Wrap"
+                 Foreground="#202020"/>
+
+      <!-- メッセージ -->
+      <TextBlock Grid.Column="1" Grid.Row="1"
+                 Name="MessageText"
+                 FontSize="12"
+                 TextWrapping="Wrap"
+                 Foreground="#606060"
+                 Margin="0,4,0,0"/>
+
+      <!-- 閉じるボタン -->
+      <Button Grid.Column="2" Grid.RowSpan="2"
+              Background="Transparent"
+              BorderThickness="0"
+              Padding="4"
+              VerticalAlignment="Top"
+              Click="OnCloseClick"
+              Cursor="Hand">
+        <TextBlock Text="✕" FontSize="12" Foreground="#808080"/>
+      </Button>
+    </Grid>
+  </Border>
+</Window>

@@ -12,9 +12,10 @@ public static class BaketaConstants
     public static class Ocr
     {
         /// <summary>
-        /// デフォルト信頼度しきい値（0.9以上のみ翻訳対象）
+        /// デフォルト信頼度しきい値（0.7以上のみ翻訳対象）
+        /// 特殊記号を含む日本語テキストも翻訳対象とするためのバランス設定
         /// </summary>
-        public const double DefaultConfidenceThreshold = 0.9;
+        public const double DefaultConfidenceThreshold = 0.70;
 
         /// <summary>
         /// 高信頼度しきい値（確実なテキストと判定）

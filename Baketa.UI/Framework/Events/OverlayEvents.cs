@@ -151,6 +151,7 @@ public class TranslationDisplayVisibilityChangedEvent(bool isVisible) : IEvent
 }
 
 // TranslationResultDisplayEvent は削除 - マルチウィンドウオーバーレイシステムに移行
+// FirstTranslationResultReceivedEvent は Baketa.Core.Events.EventTypes に移動
 
 /// <summary>
 /// 設定変更イベント

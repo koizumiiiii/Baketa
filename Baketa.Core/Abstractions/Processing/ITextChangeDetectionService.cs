@@ -44,6 +44,22 @@ public interface ITextChangeDetectionService
     /// 全コンテキストの前回テキストをクリア
     /// </summary>
     void ClearAllPreviousTexts();
+
+    /// <summary>
+    /// キャッシュから前回テキストを取得
+    /// [Issue #230] OCR完了後のテキスト変化検知に使用
+    /// </summary>
+    /// <param name="contextId">処理コンテキストID（ウィンドウハンドル等）</param>
+    /// <returns>前回のテキスト（初回の場合はnull）</returns>
+    string? GetPreviousText(string contextId);
+
+    /// <summary>
+    /// 前回テキストをキャッシュに保存
+    /// [Issue #230] OCR完了後のテキスト変化検知に使用
+    /// </summary>
+    /// <param name="contextId">処理コンテキストID（ウィンドウハンドル等）</param>
+    /// <param name="text">保存するテキスト</param>
+    void SetPreviousText(string contextId, string text);
 }
 
 /// <summary>

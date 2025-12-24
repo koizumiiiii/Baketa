@@ -256,3 +256,124 @@ public record QuickHashCache
         Timestamp = timestamp;
     }
 }
+
+/// <summary>
+/// [Issue #229] グリッド分割ハッシュキャッシュ
+/// 画面を分割した各ブロックのハッシュを保持
+/// </summary>
+public record GridHashCache
+{
+    /// <summary>ブロック別ハッシュ配列（行優先順）</summary>
+    public string[] BlockHashes { get; init; } = [];
+
+    /// <summary>グリッド行数</summary>
+    public int Rows { get; init; }
+
+    /// <summary>グリッド列数</summary>
+    public int Columns { get; init; }
+
+    /// <summary>タイムスタンプ</summary>
+    public DateTime Timestamp { get; init; }
+
+    /// <summary>
+    /// [Issue #229] 画像全体のチェックサム
+    /// ハッシュが衝突した場合のフォールバック検出用
+    /// </summary>
+    public long ImageChecksum { get; init; }
+
+    public GridHashCache(string[] blockHashes, int rows, int columns, DateTime timestamp, long imageChecksum = 0)
+    {
+        BlockHashes = blockHashes;
+        Rows = rows;
+        Columns = columns;
+        Timestamp = timestamp;
+        ImageChecksum = imageChecksum;
+    }
+}
+
+/// <summary>
+/// [Issue #229] 単一ブロックの変化情報
+/// </summary>
+public readonly record struct BlockChangeInfo(
+    int Index,
+    int Row,
+    int Col,
+    float Similarity,
+    Rectangle Region
+);
+
+/// <summary>
+/// [Issue #229] グリッド変化検知の詳細結果
+/// Stage 1 の出力として Stage 2 に渡される
+/// </summary>
+public sealed class GridChangeDetectionResult
+{
+    /// <summary>処理時間</summary>
+    public TimeSpan ProcessingTime { get; init; }
+
+    /// <summary>変化したブロックのリスト</summary>
+    public IReadOnlyList<BlockChangeInfo> ChangedBlocks { get; init; } = [];
+
+    /// <summary>グリッド総ブロック数</summary>
+    public int TotalBlocks { get; init; }
+
+    /// <summary>グリッド行数</summary>
+    public int GridRows { get; init; }
+
+    /// <summary>グリッド列数</summary>
+    public int GridColumns { get; init; }
+
+    /// <summary>変化の可能性があるか（1つ以上のブロックが変化）</summary>
+    public bool HasPotentialChange => ChangedBlocks.Count > 0;
+
+    /// <summary>最小類似度（最も変化が大きいブロック）</summary>
+    public float MinSimilarity { get; init; } = 1.0f;
+
+    /// <summary>最も変化が大きいブロックのインデックス</summary>
+    public int MostChangedBlockIndex { get; init; } = -1;
+}
+
+/// <summary>
+/// [Issue #229] Stage 2 変化検証の結果
+/// </summary>
+public sealed class ChangeValidationResult
+{
+    /// <summary>処理時間</summary>
+    public TimeSpan ProcessingTime { get; init; }
+
+    /// <summary>有意な変化かどうか（ノイズではない）</summary>
+    public bool IsSignificantChange { get; init; }
+
+    /// <summary>フィルタリング理由</summary>
+    public string? FilterReason { get; init; }
+
+    /// <summary>変化ブロック数</summary>
+    public int ChangedBlockCount { get; init; }
+
+    /// <summary>隣接ブロックが存在するか</summary>
+    public bool HasAdjacentBlocks { get; init; }
+
+    /// <summary>端ブロックのみの変化か</summary>
+    public bool IsEdgeOnlyChange { get; init; }
+
+    /// <summary>Stage 1 の結果（参照用）</summary>
+    public GridChangeDetectionResult? Stage1Result { get; init; }
+}
+
+/// <summary>
+/// [Issue #229] Stage 3 領域分析の結果
+/// </summary>
+public sealed class RegionAnalysisResult
+{
+    /// <summary>処理時間</summary>
+    public TimeSpan ProcessingTime { get; init; }
+
+    /// <summary>変化領域の配列</summary>
+    public Rectangle[] ChangedRegions { get; init; } = [];
+
+    /// <summary>変化領域の総面積（ピクセル）</summary>
+    public int TotalChangedArea { get; init; }
+
+    /// <summary>画面全体に対する変化割合</summary>
+    public float ChangePercentage { get; init; }
+}

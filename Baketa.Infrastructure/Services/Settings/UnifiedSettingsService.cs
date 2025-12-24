@@ -477,7 +477,14 @@ internal sealed record UnifiedOcrSettings(
     string DefaultLanguage,
     double ConfidenceThreshold,
     int TimeoutMs,
-    bool EnablePreprocessing) : IOcrSettings;
+    bool EnablePreprocessing,
+    // [Issue #229] ボーダーライン信頼度緩和設定
+    bool EnableBorderlineConfidenceRelaxation = true,
+    double BorderlineMinConfidence = 0.60,
+    double BorderlineRelaxedThreshold = 0.65,
+    int BorderlineMinTextLength = 5,
+    int BorderlineMinBoundsHeight = 25,
+    double BorderlineMinAspectRatio = 2.0) : IOcrSettings;
 
 /// <summary>
 /// 統一アプリケーション設定実装

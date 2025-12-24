@@ -144,23 +144,94 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
             // 🔥 [CONFIDENCE_FILTER] 信頼度フィルタリング - 低信頼度結果を翻訳から除外
             var ocrSettings = _unifiedSettingsService.GetOcrSettings();
-            var confidenceThreshold = ocrSettings?.ConfidenceThreshold ?? 0.9;
+            var confidenceThreshold = ocrSettings?.ConfidenceThreshold ?? 0.70;
 
-            var highConfidenceChunks = aggregatedChunks
-                .Where(chunk => chunk.AverageConfidence >= confidenceThreshold)
-                .ToList();
+            // [Issue #229] ボーダーライン緩和設定の取得
+            var enableBorderlineRelaxation = ocrSettings?.EnableBorderlineConfidenceRelaxation ?? true;
+            var borderlineMinConfidence = ocrSettings?.BorderlineMinConfidence ?? 0.60;
+            var borderlineRelaxedThreshold = ocrSettings?.BorderlineRelaxedThreshold ?? 0.65;
+            var borderlineMinTextLength = ocrSettings?.BorderlineMinTextLength ?? 5;
+            var borderlineMinBoundsHeight = ocrSettings?.BorderlineMinBoundsHeight ?? 25;
+            var borderlineMinAspectRatio = ocrSettings?.BorderlineMinAspectRatio ?? 2.0;
 
-            var filteredByConfidenceCount = aggregatedChunks.Count - highConfidenceChunks.Count;
-            if (filteredByConfidenceCount > 0)
+            // 🔍 [DIAGNOSTIC] 各チャンクの信頼度をログ出力
+            var passedChunks = new List<TextChunk>();
+            var borderlineAcceptedCount = 0;
+
+            foreach (var chunk in aggregatedChunks)
             {
-                Console.WriteLine($"🔍 [CONFIDENCE_FILTER] 信頼度フィルタリング: {filteredByConfidenceCount}件除外（閾値={confidenceThreshold:F2}）");
-                _logger.LogInformation(
-                    "🔍 [CONFIDENCE_FILTER] 信頼度{Threshold:F2}未満の{FilteredCount}件をフィルタリング（残り{RemainingCount}件）",
-                    confidenceThreshold, filteredByConfidenceCount, highConfidenceChunks.Count);
+                var confidence = chunk.AverageConfidence;
+                var textLength = chunk.CombinedText?.Length ?? 0;
+                var boundsHeight = chunk.CombinedBounds.Height;
+                var boundsWidth = chunk.CombinedBounds.Width;
+                var aspectRatio = boundsHeight > 0 ? (double)boundsWidth / boundsHeight : 0;
+
+                // ケース1: 通常閾値を超える → 通過
+                if (confidence >= confidenceThreshold)
+                {
+                    passedChunks.Add(chunk);
+                    _logger.LogInformation("🔍 [OCR_CHUNK] ✅PASS Conf={Confidence:F3} Threshold={Threshold:F2} Text='{Text}'",
+                        confidence, confidenceThreshold,
+                        chunk.CombinedText?.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
+                    continue;
+                }
+
+                // ケース2: ボーダーライン緩和を試行
+                if (enableBorderlineRelaxation &&
+                    confidence >= borderlineMinConfidence &&
+                    confidence < confidenceThreshold &&
+                    confidence >= borderlineRelaxedThreshold &&
+                    textLength >= borderlineMinTextLength &&
+                    boundsHeight >= borderlineMinBoundsHeight &&
+                    aspectRatio >= borderlineMinAspectRatio &&
+                    !IsNoisePattern(chunk.CombinedText))
+                {
+                    // ボーダーライン条件を満たす → 緩和閾値で採用
+                    passedChunks.Add(chunk);
+                    borderlineAcceptedCount++;
+                    // IsNoisePattern が false を返した時点で chunk.CombinedText は null でないことが保証される
+                    _logger.LogInformation(
+                        "🔍 [OCR_CHUNK] ✅BORDERLINE Conf={Confidence:F3} RelaxedThreshold={RelaxedThreshold:F2} " +
+                        "TextLen={TextLen} Height={Height} AspectRatio={AspectRatio:F1} Text='{Text}'",
+                        confidence, borderlineRelaxedThreshold, textLength, boundsHeight, aspectRatio,
+                        chunk.CombinedText.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
+                    Console.WriteLine($"🎯 [BORDERLINE_ACCEPTED] Conf={confidence:F3} Text='{chunk.CombinedText}'");
+                    continue;
+                }
+
+                // ケース3: 閾値未満 → 却下
+                _logger.LogInformation("🔍 [OCR_CHUNK] ❌FAIL Conf={Confidence:F3} Threshold={Threshold:F2} Text='{Text}'",
+                    confidence, confidenceThreshold,
+                    chunk.CombinedText?.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
             }
 
-            // 空でないチャンクのみフィルタリング（信頼度フィルタリング後）
-            var nonEmptyChunks = highConfidenceChunks
+            var highConfidenceChunks = passedChunks;
+            var filteredByConfidenceCount = aggregatedChunks.Count - highConfidenceChunks.Count;
+
+            if (filteredByConfidenceCount > 0 || borderlineAcceptedCount > 0)
+            {
+                Console.WriteLine($"🔍 [CONFIDENCE_FILTER] 信頼度フィルタリング: {filteredByConfidenceCount}件除外, {borderlineAcceptedCount}件ボーダーライン採用（閾値={confidenceThreshold:F2}）");
+                _logger.LogInformation(
+                    "🔍 [CONFIDENCE_FILTER] 信頼度{Threshold:F2}未満の{FilteredCount}件をフィルタリング, {BorderlineCount}件ボーダーライン採用（残り{RemainingCount}件）",
+                    confidenceThreshold, filteredByConfidenceCount, borderlineAcceptedCount, highConfidenceChunks.Count);
+            }
+
+            // 🔥 [HALLUCINATION_FILTER] 繰り返しフレーズ検出 - OCRハルシネーション除外
+            var validChunks = highConfidenceChunks
+                .Where(chunk => !IsRepetitiveHallucination(chunk.CombinedText))
+                .ToList();
+
+            var filteredByHallucinationCount = highConfidenceChunks.Count - validChunks.Count;
+            if (filteredByHallucinationCount > 0)
+            {
+                Console.WriteLine($"🚫 [HALLUCINATION_FILTER] 繰り返しフレーズ検出: {filteredByHallucinationCount}件除外（OCRハルシネーション）");
+                _logger.LogWarning(
+                    "🚫 [HALLUCINATION_FILTER] 繰り返しフレーズ{FilteredCount}件をフィルタリング（残り{RemainingCount}件）",
+                    filteredByHallucinationCount, validChunks.Count);
+            }
+
+            // 空でないチャンクのみフィルタリング（ハルシネーションフィルタリング後）
+            var nonEmptyChunks = validChunks
                 .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
                 .ToList();
 
@@ -199,7 +270,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
             {
                 nonEmptyChunks[i].TranslatedText = translationResults[i];
-                _logger?.LogDebug($"🔧 [PHASE12.2_HANDLER] チャンク{i}翻訳結果設定: '{nonEmptyChunks[i].CombinedText}' → '{translationResults[i]}'");
+                _logger.LogInformation("🔧 [TRANSLATION_RESULT] チャンク{Index}: '{Original}' → '{Translated}'",
+                    i, nonEmptyChunks[i].CombinedText, translationResults[i]);
             }
 
 #if DEBUG
@@ -621,5 +693,132 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             _logger.LogError(ex, "❌ [PHASE12.2] オーバーレイ表示エラー");
             throw;
         }
+    }
+
+    /// <summary>
+    /// [Issue #229] ノイズパターンを検出（ボーダーライン緩和の除外条件）
+    /// </summary>
+    /// <remarks>
+    /// Geminiフィードバック反映:
+    /// - 同じ文字の繰り返し（例: "111111", "●●●"）
+    /// - 記号のみのテキスト
+    /// - その他のUIノイズパターン
+    /// </remarks>
+    private static bool IsNoisePattern(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return true;
+
+        // 同じ文字の繰り返し（5回以上）を検出
+        // 例: "111111", "●●●●●", "........."
+        if (text.Length >= 5)
+        {
+            var firstChar = text[0];
+            var allSame = true;
+            for (int i = 1; i < text.Length; i++)
+            {
+                if (text[i] != firstChar)
+                {
+                    allSame = false;
+                    break;
+                }
+            }
+            if (allSame)
+                return true;
+        }
+
+        // 文字・数字が全く含まれない（記号のみ）
+        var alphaNumCount = 0;
+        foreach (var c in text)
+        {
+            if (char.IsLetterOrDigit(c))
+                alphaNumCount++;
+        }
+        if (alphaNumCount == 0)
+            return true;
+
+        // 括弧に囲まれた数字のみ（例: "(111111111)"）
+        if (text.StartsWith('(') && text.EndsWith(')'))
+        {
+            var inner = text[1..^1];
+            if (inner.All(c => char.IsDigit(c)))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 🔥 [HALLUCINATION_FILTER] 繰り返しフレーズ検出
+    /// OCRエンジンがループに陥り、同じフレーズを繰り返すハルシネーションを検出
+    /// 例: "THE STATE OF THE STATE OF THE STATE OF..."
+    /// </summary>
+    /// <param name="text">検査対象テキスト</param>
+    /// <returns>繰り返しハルシネーションの場合true</returns>
+    /// <remarks>
+    /// Geminiレビュー反映:
+    /// - 短いテキスト（20文字未満）はスキップ（ゲームUIの正当な繰り返し許容）
+    /// - 空白区切り単語の繰り返しは正当性が高いためスキップ
+    /// </remarks>
+    private static bool IsRepetitiveHallucination(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        // 短いテキストはスキップ（日本語の場合、20文字未満は正当な繰り返しの可能性）
+        // 例: "クリア クリア クリア", "はい はい はい"
+        const int minTextLength = 20;
+        if (text.Length < minTextLength)
+            return false;
+
+        // 空白区切りの「同一単語」繰り返しのみ許容（ゲームUI等）
+        // 例: "クリア クリア クリア" → 許容（1種類の単語）
+        // 例: "THE PARTY OF THE PARTY OF" → ハルシネーション（複数種類の単語でフレーズ繰り返し）
+        var words = text.Split([' ', '　'], StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length >= 3 && words.Distinct().Count() == 1)
+        {
+            // 同一単語の繰り返しは正当なUIテキスト
+            return false;
+        }
+
+        // 最小繰り返し検出長（これより短いフレーズは無視）
+        const int minPhraseLength = 4;
+        // 最小繰り返し回数（この回数以上繰り返されたらハルシネーション）
+        const int minRepetitionCount = 3;
+
+        // 様々なフレーズ長で繰り返しをチェック
+        for (int phraseLen = minPhraseLength; phraseLen <= text.Length / minRepetitionCount; phraseLen++)
+        {
+            var phrase = text[..phraseLen];
+
+            // 空白のみのフレーズは無視
+            if (string.IsNullOrWhiteSpace(phrase))
+                continue;
+
+            // このフレーズが何回繰り返されているかカウント
+            int count = 0;
+            int index = 0;
+            while ((index = text.IndexOf(phrase, index, StringComparison.OrdinalIgnoreCase)) >= 0)
+            {
+                count++;
+                index += phrase.Length;
+            }
+
+            // 繰り返し回数が閾値以上、かつテキストの大部分を占める場合
+            if (count >= minRepetitionCount)
+            {
+                // テキストの50%以上が同じフレーズの繰り返しで構成されている
+                var repetitionRatio = (double)phrase.Length * count / text.Length;
+                if (repetitionRatio >= 0.5)
+                {
+                    // Geminiレビュー反映: Console.WriteLineは開発時の確認用として残す
+                    // 本番ではこのログはフィルタリングログで代替される
+                    Console.WriteLine($"🚫 [HALLUCINATION_DETECT] 繰り返し検出: '{phrase}' が {count}回繰り返し（占有率: {repetitionRatio:P0}）");
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

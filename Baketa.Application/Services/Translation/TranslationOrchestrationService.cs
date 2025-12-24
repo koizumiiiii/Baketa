@@ -180,6 +180,15 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <inheritdoc />
     public async Task StartAutomaticTranslationAsync(IntPtr? targetWindowHandle = null, CancellationToken cancellationToken = default)
     {
+        // 🔥🔥🔥 [ULTRA_DEBUG] メソッド呼び出しの絶対最初にファイル直接書き込み
+        try
+        {
+            System.IO.File.AppendAllText(
+                System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [AUTO_TRANSLATE_START] StartAutomaticTranslationAsync開始{Environment.NewLine}");
+        }
+        catch { /* ログ失敗は無視 */ }
+
         // メソッド呼び出しの絶対最初にファイル直接書き込み（最高優先度）
         try
         {
@@ -1253,6 +1262,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 _logger?.LogInformation("単発翻訳が完了しました: ID={Id}, テキスト長={Length}",
                     translationId, result.TranslatedText.Length);
+
+                // 🔔 [LOADING_END] シングルショット翻訳完了イベントを発行してローディング終了を通知
+                await _eventAggregator.PublishAsync(new FirstTranslationResultReceivedEvent()).ConfigureAwait(false);
+                _logger?.LogWarning("✅ [LOADING_END] FirstTranslationResultReceivedEvent発行完了 (Singleshot)");
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1515,10 +1528,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // CoordinateBasedTranslationService.cs Line 315でreturnして2重翻訳を防止済み
             if (overallCondition && image is IAdvancedImage advancedImage)
             {
-                // 緊急デバッグ: 座標ベース翻訳実行開始
+                // 🔥🔥🔥 [ULTRA_DEBUG] 座標ベース翻訳実行開始
                 try
                 {
-                    // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
+                    System.IO.File.AppendAllText(
+                        System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [ORCH_FLOW] 座標ベース翻訳開始 - ID={translationId}{Environment.NewLine}");
                 }
                 catch { }
 

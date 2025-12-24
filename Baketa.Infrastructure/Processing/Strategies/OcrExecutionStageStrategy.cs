@@ -436,7 +436,6 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
     public bool ShouldExecute(ProcessingContext context)
     {
-        // 🎯 UltraThink Phase 61.25: OCR段階スキップ原因調査のためのデバッグログ追加
         _logger.LogDebug("🎯 [OCR_SKIP_DEBUG] ShouldExecute呼び出し - PreviousStageResult: {HasPrevious}, Success: {Success}",
             context.PreviousStageResult != null, context.PreviousStageResult?.Success);
 
@@ -461,6 +460,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         var hasImageChangeResult = context.HasStageResult(ProcessingStageType.ImageChangeDetection);
         _logger.LogDebug("🎯 [OCR_SKIP_DEBUG] ImageChangeDetectionStage存在: {HasResult}, 実行判定: {WillExecute}",
             hasImageChangeResult, !hasImageChangeResult);
+
         return !hasImageChangeResult;
     }
 

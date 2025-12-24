@@ -18,6 +18,14 @@ public interface ITextChunkAggregatorService
     Task<bool> TryAddTextChunkAsync(TextChunk chunk, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// [Issue #227] 複数のテキストチャンクをバッチで追加します（N+1ロック問題解消）
+    /// </summary>
+    /// <param name="chunks">送信するTextChunkのコレクション</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>追加に成功したチャンク数</returns>
+    Task<int> TryAddTextChunksBatchAsync(IReadOnlyList<TextChunk> chunks, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// TimedAggregator機能が有効かどうかを示します
     /// </summary>
     bool IsFeatureEnabled { get; }

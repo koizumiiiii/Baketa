@@ -1,24 +1,26 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
 using Baketa.UI.Configuration;
+using Baketa.UI.Views;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Baketa.UI.Services;
 
 /// <summary>
-/// Avalonia用通知サービスの実装
+/// Avalonia用通知サービスの実装（カスタムトースト使用）
 /// </summary>
 public sealed class AvaloniaNotificationService : INotificationService, IDisposable
 {
     private readonly ILogger<AvaloniaNotificationService> _logger;
     private readonly TranslationUIOptions _options;
-    private WindowNotificationManager? _notificationManager;
+    private readonly List<ToastNotificationWindow> _activeToasts = [];
+    private readonly object _toastLock = new();
     private bool _disposed;
 
     /// <summary>
@@ -35,82 +37,6 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
 
         _logger = logger;
         _options = options.Value;
-
-        // UIスレッドで通知マネージャーを初期化
-        InitializeNotificationManager();
-    }
-
-    /// <summary>
-    /// 通知マネージャーを初期化
-    /// </summary>
-    private void InitializeNotificationManager()
-    {
-        try
-        {
-            // UIスレッドで実行する必要がある
-            if (Dispatcher.UIThread.CheckAccess())
-            {
-                SetupNotificationManager();
-            }
-            else
-            {
-                Dispatcher.UIThread.Post(SetupNotificationManager);
-            }
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogError(ex, "通知マネージャーの初期化でInvalidOperationExceptionが発生しました");
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogError(ex, "通知マネージャーの初期化でArgumentExceptionが発生しました");
-        }
-        catch (NotSupportedException ex)
-        {
-            _logger.LogError(ex, "通知マネージャーの初期化でNotSupportedExceptionが発生しました");
-        }
-    }
-
-    /// <summary>
-    /// 通知マネージャーのセットアップ
-    /// </summary>
-    private void SetupNotificationManager()
-    {
-        try
-        {
-            // メインウィンドウを取得
-            var mainWindow = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                ? desktop.MainWindow
-                : null;
-
-            if (mainWindow != null)
-            {
-                _notificationManager = new WindowNotificationManager(mainWindow)
-                {
-                    Position = NotificationPosition.BottomRight,
-                    MaxItems = 5,
-                    Margin = new Thickness(0, 0, 15, 40)
-                };
-
-                _logger.LogDebug("WindowNotificationManager が正常に初期化されました");
-            }
-            else
-            {
-                _logger.LogWarning("メインウィンドウが見つからないため、通知マネージャーを初期化できませんでした");
-            }
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogError(ex, "WindowNotificationManager のセットアップでInvalidOperationExceptionが発生しました");
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogError(ex, "WindowNotificationManager のセットアップでArgumentExceptionが発生しました");
-        }
-        catch (NotSupportedException ex)
-        {
-            _logger.LogError(ex, "WindowNotificationManager のセットアップでNotSupportedExceptionが発生しました");
-        }
     }
 
     /// <inheritdoc />
@@ -242,7 +168,7 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
     public event EventHandler<NotificationEventArgs>? NotificationShown;
 
     /// <summary>
-    /// 実際の通知を表示
+    /// 実際の通知を表示（カスタムトースト使用）
     /// </summary>
     /// <param name="type">通知タイプ</param>
     /// <param name="title">タイトル</param>
@@ -252,56 +178,67 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
     {
         try
         {
-            if (_notificationManager == null)
-            {
-                // 通知マネージャーが初期化されていない場合は初期化を試行
-                InitializeNotificationManager();
-                await Task.Delay(100).ConfigureAwait(false); // 初期化待ち
-            }
-
-            if (_notificationManager == null)
-            {
-                _logger.LogWarning("通知マネージャーが利用できないため、通知をログに出力します");
-                LogNotificationAsFallback(type, title, message);
-                return;
-            }
-
-            var avaloniaNotificationType = ConvertToAvaloniaNotificationType(type);
-            var timeSpan = duration > 0 ? TimeSpan.FromMilliseconds(duration) : TimeSpan.Zero;
-
-            var notification = new Notification(title, message, avaloniaNotificationType, timeSpan);
-
-            // UIスレッドで通知を表示
+            // UIスレッドでトーストウィンドウを表示
             if (Dispatcher.UIThread.CheckAccess())
             {
-                _notificationManager.Show(notification);
+                ShowToastWindow(type, title, message, duration);
             }
             else
             {
-                await Dispatcher.UIThread.InvokeAsync(() => _notificationManager.Show(notification));
+                await Dispatcher.UIThread.InvokeAsync(() => ShowToastWindow(type, title, message, duration));
             }
 
             if (_options.EnableVerboseLogging)
             {
-                _logger.LogDebug("通知が正常に表示されました: Type={Type}, Title={Title}, Message={Message}, Duration={Duration}ms",
-                    type, title, message, duration);
+                _logger.LogDebug("トースト通知を表示: Type={Type}, Title={Title}, Duration={Duration}ms",
+                    type, title, duration);
             }
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogError(ex, "通知の表示でInvalidOperationExceptionが発生しました: {Type} - {Title}", type, title);
-            // フォールバックとしてログに出力
+            _logger.LogError(ex, "トースト通知の表示でInvalidOperationExceptionが発生しました: {Type} - {Title}", type, title);
             LogNotificationAsFallback(type, title, message);
         }
         catch (ArgumentException ex)
         {
-            _logger.LogError(ex, "通知の表示でArgumentExceptionが発生しました: {Type} - {Title}", type, title);
+            _logger.LogError(ex, "トースト通知の表示でArgumentExceptionが発生しました: {Type} - {Title}", type, title);
             LogNotificationAsFallback(type, title, message);
         }
         catch (NotSupportedException ex)
         {
-            _logger.LogError(ex, "通知の表示でNotSupportedExceptionが発生しました: {Type} - {Title}", type, title);
+            _logger.LogError(ex, "トースト通知の表示でNotSupportedExceptionが発生しました: {Type} - {Title}", type, title);
             LogNotificationAsFallback(type, title, message);
+        }
+    }
+
+    /// <summary>
+    /// トーストウィンドウを表示
+    /// </summary>
+    private void ShowToastWindow(NotificationType type, string title, string message, int duration)
+    {
+        try
+        {
+            var toast = new ToastNotificationWindow(type, title, message, duration);
+
+            // クローズ時にリストから削除
+            toast.Closed += (_, _) =>
+            {
+                lock (_toastLock)
+                {
+                    _activeToasts.Remove(toast);
+                }
+            };
+
+            lock (_toastLock)
+            {
+                _activeToasts.Add(toast);
+            }
+
+            toast.Show();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "トーストウィンドウの作成に失敗");
         }
     }
 
@@ -434,25 +371,6 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
     }
 
     /// <summary>
-    /// 通知タイプをAvalonia通知タイプに変換
-    /// </summary>
-    /// <param name="type">通知タイプ</param>
-    /// <returns>Avalonia通知タイプ</returns>
-    private static Avalonia.Controls.Notifications.NotificationType ConvertToAvaloniaNotificationType(NotificationType type)
-    {
-        return type switch
-        {
-            NotificationType.Success => Avalonia.Controls.Notifications.NotificationType.Success,
-            NotificationType.Information => Avalonia.Controls.Notifications.NotificationType.Information,
-            NotificationType.Warning => Avalonia.Controls.Notifications.NotificationType.Warning,
-            NotificationType.Error => Avalonia.Controls.Notifications.NotificationType.Error,
-            NotificationType.FallbackNotification => Avalonia.Controls.Notifications.NotificationType.Information,
-            NotificationType.EngineStatusChange => Avalonia.Controls.Notifications.NotificationType.Information,
-            _ => Avalonia.Controls.Notifications.NotificationType.Information
-        };
-    }
-
-    /// <summary>
     /// フォールバックとして通知をログに出力
     /// </summary>
     /// <param name="type">通知タイプ</param>
@@ -479,10 +397,24 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
         {
             try
             {
-                // NotificationManagerは特別な解放処理は不要
-                _notificationManager = null;
-                _disposed = true;
+                // アクティブなトーストをすべて閉じる
+                lock (_toastLock)
+                {
+                    foreach (var toast in _activeToasts.ToArray())
+                    {
+                        try
+                        {
+                            Dispatcher.UIThread.Post(() => toast.Close());
+                        }
+                        catch
+                        {
+                            // 閉じ済みの場合は無視
+                        }
+                    }
+                    _activeToasts.Clear();
+                }
 
+                _disposed = true;
                 _logger.LogDebug("AvaloniaNotificationService が正常に解放されました");
             }
             catch (ObjectDisposedException ex)

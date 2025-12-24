@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Capture;
@@ -19,16 +18,18 @@ using CaptureOptions = Baketa.Core.Abstractions.Services.CaptureOptions;
 namespace Baketa.Infrastructure.Platform.Windows.Capture.Strategies;
 
 /// <summary>
-/// 🔥 [PHASE2] 全画面OCR直接翻訳方式キャプチャ戦略
+/// 🔥 [PHASE2] 全画面キャプチャ戦略
 ///
-/// ROI二重OCR廃止により処理時間を60-80%削減
-/// - ROI方式: 30-60秒
-/// - 全画面OCR方式: 10-15秒（目標）
+/// 🔧 [Issue #230] OCR実行はSmartProcessingPipelineServiceに移譲
+/// 画面変化検知の後にOCRを実行することで、変化がない場合のOCR処理（7-8秒）を省略
 ///
 /// 処理フロー:
 /// 1. 全画面キャプチャ (1回のみ) - NativeWindowsCaptureWrapper使用
-/// 2. PaddleOCR統合実行 (検出+認識) - IOcrEngine.RecognizeAsync()
-/// 3. 結果を直接返す（ROI座標変換不要 - 絶対座標）
+/// 2. 画像を返す（OCRはパイプラインで実行）
+///
+/// ⚡ 期待される効果:
+/// - 画面変化なし時: OCRスキップで7-8秒の処理時間を節約
+/// - 画面変化あり時: パイプラインでOCRを実行（従来通り）
 /// </summary>
 public class FullScreenOcrCaptureStrategy : ICaptureStrategy
 {
@@ -54,8 +55,7 @@ public class FullScreenOcrCaptureStrategy : ICaptureStrategy
         _windowsCapturer = windowsCapturer ?? throw new ArgumentNullException(nameof(windowsCapturer));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
 
-        _logger.LogInformation("🔥 [PHASE2] FullScreenOcrCaptureStrategy initialized - OCR Engine: {EngineType}",
-            _ocrEngine.GetType().Name);
+        _logger.LogInformation("🔧 [Issue #230] FullScreenCaptureStrategy initialized - OCR deferred to pipeline");
     }
 
     public bool CanApply(GpuEnvironmentInfo environment, IntPtr hwnd)
@@ -172,79 +172,22 @@ public class FullScreenOcrCaptureStrategy : ICaptureStrategy
                 }
             }).ConfigureAwait(false);
 
-            // 🔥 [PHASE2_STEP2] PaddleOCR統合実行 (検出+認識)
-            var phase2Stopwatch = Stopwatch.StartNew();
-            _logger.LogInformation("🔥 [PHASE2_STEP2] OCR unified execution started - Image: {Width}x{Height}",
-                fullImage.Width, fullImage.Height);
+            // 🔧 [Issue #230] OCR実行を削除 - 画面変化検知後に実行するように変更
+            // OCRはSmartProcessingPipelineServiceのOcrExecutionStageStrategyで実行される
+            // これにより、画面変化がない場合はOCRをスキップして7-8秒の処理時間を節約できる
+            //
+            // 変更前のフロー: Capture+OCR → ImageChangeDetection → 早期リターン（OCR無駄）
+            // 変更後のフロー: Capture → ImageChangeDetection → 変化あり時のみOCR → Translation
 
-            // 🔥 [PHASE2] IWindowsImage → IImage 変換アダプター作成
-            // PaddleOCR はIImageを期待するため、IWindowsImageをラップするアダプターを使用
-            using var imageAdapter = new WindowsImageToIImageAdapter(fullImage);
-            var ocrResult = await _ocrEngine.RecognizeAsync(imageAdapter).ConfigureAwait(false);
-            phase2Stopwatch.Stop();
-
-            _logger.LogInformation("🔥 [PHASE2_STEP2] OCR unified execution completed - Regions: {RegionCount}, Time: {ElapsedMs}ms",
-                ocrResult.TextRegions.Count, phase2Stopwatch.ElapsedMilliseconds);
-
-            // 📊 [DIAGNOSTIC] OCR完了イベント
-            await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
-            {
-                Stage = "FullScreenOcr_OCR",
-                IsSuccess = ocrResult.HasText,
-                ProcessingTimeMs = phase2Stopwatch.ElapsedMilliseconds,
-                SessionId = sessionId,
-                Severity = ocrResult.HasText ? DiagnosticSeverity.Information : DiagnosticSeverity.Warning,
-                Message = ocrResult.HasText
-                    ? $"OCR completed - {ocrResult.TextRegions.Count} regions detected"
-                    : "OCR completed but no text detected",
-                Metrics = new Dictionary<string, object>
-                {
-                    { "RegionCount", ocrResult.TextRegions.Count },
-                    { "OcrTimeMs", phase2Stopwatch.ElapsedMilliseconds },
-                    { "AverageConfidence", ocrResult.TextRegions.Any() ? ocrResult.TextRegions.Average(r => r.Confidence) : 0.0 },
-                    { "HighConfidenceRegions", ocrResult.TextRegions.Count(r => r.Confidence > 0.8) }
-                }
-            }).ConfigureAwait(false);
-
-            // 🔥 [PHASE2_STEP3] OcrResults → CaptureStrategyResult 変換
-            result.Success = ocrResult.HasText;
+            result.Success = true;
             result.Images = [fullImage]; // 全画面画像1つのみ
 
-            // 🚀 [Issue #193] OCR座標を元ウィンドウサイズにスケーリング
-            var capturedSize = new Size(fullImage.Width, fullImage.Height);
+            // PreExecutedOcrResultは設定しない（パイプラインでOCRを実行させる）
+            result.PreExecutedOcrResult = null;
+            result.TextRegions = [];
 
-            // スケーリング済みOcrTextRegionリストを作成
-            var scaledTextRegions = ocrResult.TextRegions.Select(r => new OcrTextRegion(
-                text: r.Text,
-                bounds: ScaleCoordinates(r.Bounds, originalWindowSize, capturedSize),
-                confidence: r.Confidence,
-                contour: r.Contour?.Select(p => new Point(
-                    (int)(p.X * (double)originalWindowSize.Width / capturedSize.Width),
-                    (int)(p.Y * (double)originalWindowSize.Height / capturedSize.Height))).ToArray(),
-                direction: r.Direction
-            )).ToList().AsReadOnly();
-
-            // スケーリング済みOcrResultsを作成して設定
-            result.PreExecutedOcrResult = new OcrResults(
-                textRegions: scaledTextRegions,
-                sourceImage: ocrResult.SourceImage,
-                processingTime: ocrResult.ProcessingTime,
-                languageCode: ocrResult.LanguageCode,
-                regionOfInterest: ocrResult.RegionOfInterest);
-
-            // 互換性のため、TextRegions（IList<Rectangle>）も設定
-            result.TextRegions = [.. scaledTextRegions.Select(r => r.Bounds)];
-
-            _logger.LogInformation("🚀 [Issue #193] 座標スケーリング完了: Captured={CapturedWidth}x{CapturedHeight} → Original={OriginalWidth}x{OriginalHeight}, Regions={RegionCount}",
-                capturedSize.Width, capturedSize.Height, originalWindowSize.Width, originalWindowSize.Height, scaledTextRegions.Count);
-            Console.WriteLine($"🚀 [Issue #193 DEBUG] 座標スケーリング完了: キャプチャ={capturedSize.Width}x{capturedSize.Height} → 元={originalWindowSize.Width}x{originalWindowSize.Height}, 領域数={scaledTextRegions.Count}");
-
-            // スケーリングの詳細をログ出力
-            if (scaledTextRegions.Count > 0)
-            {
-                var firstRegion = scaledTextRegions[0];
-                Console.WriteLine($"🚀 [Issue #193 DEBUG] 最初の領域スケーリング例: ({firstRegion.Bounds.X},{firstRegion.Bounds.Y},{firstRegion.Bounds.Width}x{firstRegion.Bounds.Height})");
-            }
+            _logger.LogInformation("🔧 [Issue #230] キャプチャ完了 - OCRはパイプラインで実行 (Size: {Width}x{Height})",
+                fullImage.Width, fullImage.Height);
 
             result.Metrics.ActualCaptureTime = totalStopwatch.Elapsed;
             result.Metrics.FrameCount = 1;
@@ -252,30 +195,27 @@ public class FullScreenOcrCaptureStrategy : ICaptureStrategy
 
             totalStopwatch.Stop();
 
-            _logger.LogInformation("🔥 [PHASE2] FullScreenOcr capture completed - Regions: {RegionCount}, Total time: {TotalMs}ms (Capture: {CaptureMs}ms, OCR: {OcrMs}ms)",
-                ocrResult.TextRegions.Count,
+            _logger.LogInformation("🔧 [Issue #230] FullScreenCapture完了 - Size: {Width}x{Height}, Total time: {TotalMs}ms (Capture: {CaptureMs}ms)",
+                fullImage.Width, fullImage.Height,
                 totalStopwatch.ElapsedMilliseconds,
-                phase1Stopwatch.ElapsedMilliseconds,
-                phase2Stopwatch.ElapsedMilliseconds);
+                phase1Stopwatch.ElapsedMilliseconds);
 
             // 📊 [DIAGNOSTIC] 完了イベント
             await _eventAggregator.PublishAsync(new PipelineDiagnosticEvent
             {
-                Stage = "FullScreenOcr_Complete",
+                Stage = "FullScreenCapture_Complete",
                 IsSuccess = result.Success,
                 ProcessingTimeMs = totalStopwatch.ElapsedMilliseconds,
                 SessionId = sessionId,
-                Severity = result.Success ? DiagnosticSeverity.Information : DiagnosticSeverity.Warning,
-                Message = result.Success
-                    ? $"FullScreenOcr completed successfully - {ocrResult.TextRegions.Count} regions"
-                    : "FullScreenOcr completed but no text detected",
+                Severity = DiagnosticSeverity.Information,
+                Message = $"FullScreenCapture completed - {fullImage.Width}x{fullImage.Height}, OCR deferred to pipeline",
                 Metrics = new Dictionary<string, object>
                 {
-                    { "TotalRegions", ocrResult.TextRegions.Count },
+                    { "ImageWidth", fullImage.Width },
+                    { "ImageHeight", fullImage.Height },
                     { "Phase1_CaptureMs", phase1Stopwatch.ElapsedMilliseconds },
-                    { "Phase2_OcrMs", phase2Stopwatch.ElapsedMilliseconds },
                     { "TotalTimeMs", totalStopwatch.ElapsedMilliseconds },
-                    { "PerformanceImprovement", "60-80% faster than ROI-based approach" }
+                    { "OcrDeferred", true }
                 }
             }).ConfigureAwait(false);
         }

@@ -115,6 +115,14 @@ public interface IOcrSettings
     double ConfidenceThreshold { get; }
     int TimeoutMs { get; }
     bool EnablePreprocessing { get; }
+
+    // [Issue #229] ボーダーライン信頼度緩和設定
+    bool EnableBorderlineConfidenceRelaxation { get; }
+    double BorderlineMinConfidence { get; }
+    double BorderlineRelaxedThreshold { get; }
+    int BorderlineMinTextLength { get; }
+    int BorderlineMinBoundsHeight { get; }
+    double BorderlineMinAspectRatio { get; }
 }
 
 /// <summary>

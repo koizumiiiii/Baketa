@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
@@ -53,38 +52,14 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
         _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService));
         _proximityGroupingService = proximityGroupingService ?? throw new ArgumentNullException(nameof(proximityGroupingService));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-
-        // 🔍 設定デバッグ情報出力
-        _logger.LogDebug("🔍 [CONFIG_DEBUG] TimedChunkAggregator設定デバッグ開始");
-        _logger.LogDebug("🔍 [CONFIG_DEBUG] settings parameter: {IsNull}", settings == null ? "NULL" : "NOT NULL");
-
-        if (settings != null)
-        {
-            _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue: {IsNull}", settings.CurrentValue == null ? "NULL" : "NOT NULL");
-            if (settings.CurrentValue != null)
-            {
-                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue.IsFeatureEnabled: {Enabled}", settings.CurrentValue.IsFeatureEnabled);
-                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue.BufferDelayMs: {DelayMs}", settings.CurrentValue.BufferDelayMs);
-                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue.ProximityGrouping.Enabled: {ProximityEnabled}", settings.CurrentValue.ProximityGrouping.Enabled);
-                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue.ProximityGrouping.VerticalDistanceFactor: {VFactor}", settings.CurrentValue.ProximityGrouping.VerticalDistanceFactor);
-                _logger.LogDebug("🔍 [CONFIG_DEBUG] settings.CurrentValue.ProximityGrouping.HorizontalDistanceFactor: {HFactor}", settings.CurrentValue.ProximityGrouping.HorizontalDistanceFactor);
-            }
-        }
-
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
         // 設定変更の動的反映を購読
         _settingsChangeSubscription = _settings.OnChange((newSettings, _) =>
         {
-            _logger.LogInformation("⚙️ 設定変更を検出 - 動的反映開始");
-            _logger.LogDebug("⚙️ 新しい設定 - IsFeatureEnabled: {Enabled}, BufferDelayMs: {DelayMs}, ProximityGrouping.Enabled: {ProximityEnabled}",
-                newSettings.IsFeatureEnabled, newSettings.BufferDelayMs, newSettings.ProximityGrouping.Enabled);
+            _logger.LogInformation("設定変更を検出: IsFeatureEnabled={Enabled}, BufferDelayMs={DelayMs}",
+                newSettings.IsFeatureEnabled, newSettings.BufferDelayMs);
         });
-
-        // フォールバック後の設定値も確認
-        _logger.LogDebug("🔍 [CONFIG_DEBUG] Final _settings.CurrentValue.IsFeatureEnabled: {Enabled}", _settings.CurrentValue.IsFeatureEnabled);
-        _logger.LogDebug("🔍 [CONFIG_DEBUG] Final _settings.CurrentValue.BufferDelayMs: {DelayMs}", _settings.CurrentValue.BufferDelayMs);
-        _logger.LogDebug("🔍 [CONFIG_DEBUG] TimedAggregatorSettings.Development.IsFeatureEnabled: {DevEnabled}", TimedAggregatorSettings.Development.IsFeatureEnabled);
 
         _pendingChunksByWindow = new ConcurrentDictionary<IntPtr, List<TextChunk>>();
         _processingLock = new SemaphoreSlim(1, 1);
@@ -129,54 +104,108 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
         => TryAddChunkAsync(chunk, cancellationToken);
 
     /// <summary>
+    /// [Issue #227] ITextChunkAggregatorService.TryAddTextChunksBatchAsync実装
+    /// 複数チャンクを1回のロックで追加（N+1ロック問題解消）
+    /// </summary>
+    private const int MaxBatchSize = 500;
+
+    public async Task<int> TryAddTextChunksBatchAsync(IReadOnlyList<TextChunk> chunks, CancellationToken cancellationToken = default)
+    {
+        if (chunks == null || chunks.Count == 0)
+            return 0;
+
+        // Feature Flag チェック
+        if (!_settings.CurrentValue.IsFeatureEnabled)
+        {
+            _logger.LogDebug("TimedChunkAggregator機能が無効化されています");
+            return 0;
+        }
+
+        // [Gemini Review] バッチサイズ制限 - メモリ枯渇防止
+        if (chunks.Count > MaxBatchSize)
+        {
+            _logger.LogWarning("バッチサイズ{Count}が上限{Max}を超えています - 分割処理",
+                chunks.Count, MaxBatchSize);
+
+            var totalAdded = 0;
+            for (var i = 0; i < chunks.Count; i += MaxBatchSize)
+            {
+                var batch = chunks.Skip(i).Take(MaxBatchSize).ToList();
+                totalAdded += await TryAddTextChunksBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+            }
+            return totalAdded;
+        }
+
+        await _processingLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var addedCount = 0;
+
+            foreach (var chunk in chunks)
+            {
+                var windowHandle = chunk.SourceWindowHandle;
+                if (!_pendingChunksByWindow.TryGetValue(windowHandle, out var existingChunks))
+                {
+                    existingChunks = [];
+                    _pendingChunksByWindow[windowHandle] = existingChunks;
+                }
+
+                // 最初のチャンク追加時にタイマーリセット時刻を更新
+                if (existingChunks.Count == 0)
+                {
+                    _lastTimerReset = DateTime.UtcNow;
+                }
+
+                existingChunks.Add(chunk);
+                addedCount++;
+                Interlocked.Increment(ref _totalChunksProcessed);
+            }
+
+            var totalChunks = _pendingChunksByWindow.Values.Sum(list => list.Count);
+
+            // メモリ保護：最大チャンク数を超えたら強制処理
+            if (totalChunks >= _settings.CurrentValue.MaxChunkCount)
+            {
+                _logger.LogWarning("最大チャンク数到達 - 強制処理: {Count}個", totalChunks);
+                await ProcessPendingChunksInternal().ConfigureAwait(false);
+                return addedCount;
+            }
+
+            // タイマーリセット（1回のみ）
+            _aggregationTimer.Change(_settings.CurrentValue.BufferDelayMs, Timeout.Infinite);
+            _lastTimerReset = DateTime.UtcNow;
+
+            _logger.LogDebug("バッチ追加完了: {AddedCount}個追加, 合計{TotalCount}個待機中",
+                addedCount, totalChunks);
+
+            return addedCount;
+        }
+        finally
+        {
+            _processingLock.Release();
+        }
+    }
+
+    /// <summary>
     /// 新しいチャンクを追加し、タイマーをリセット
     /// 戦略書フィードバック反映: SourceWindowHandle別管理、ForceFlushMs制御
     /// </summary>
     public async Task<bool> TryAddChunkAsync(TextChunk chunk, CancellationToken cancellationToken = default)
     {
-        // 🔥 [TIMED_AGG_ENTRY] メソッド最上部診断
-        Console.WriteLine($"🔥🔥🔥 [TIMED_AGG_ENTRY] TryAddChunkAsync実行開始 - ChunkId: {chunk.ChunkId}");
-        _logger?.LogDebug(
-            $"🔥🔥🔥 [TIMED_AGG_ENTRY] TryAddChunkAsync実行開始 - " +
-            $"ChunkId: {chunk.ChunkId}, Feature Enabled: {_settings.CurrentValue.IsFeatureEnabled}"
-        );
-        _logger.LogCritical(
-            "🔥🔥🔥 [TIMED_AGG_ENTRY] TryAddChunkAsync実行開始 - " +
-            "ChunkId: {ChunkId}, Feature Enabled: {Enabled}",
-            chunk.ChunkId,
-            _settings.CurrentValue.IsFeatureEnabled
-        );
+        // [Issue #227] デバッグログ削除 - パフォーマンス改善
 
         // Feature Flag チェック - 機能が無効の場合は即座にfalseを返す
         if (!_settings.CurrentValue.IsFeatureEnabled)
         {
-            Console.WriteLine("🔥 [TIMED_AGG_DISABLED] Feature無効により早期リターン");
-            _logger?.LogDebug("🔥 [TIMED_AGG_DISABLED] Feature無効により早期リターン");
-            _logger.LogCritical("🔥 [TIMED_AGG_DISABLED] Feature無効により早期リターン");
             _logger.LogDebug("TimedChunkAggregator機能が無効化されています");
             return false;
         }
 
-        Console.WriteLine("🔥 [TIMED_AGG_LOCK_BEFORE] ロック取得試行前");
-        _logger?.LogDebug("🔥 [TIMED_AGG_LOCK_BEFORE] ロック取得試行前");
-        _logger.LogCritical("🔥 [TIMED_AGG_LOCK_BEFORE] ロック取得試行前");
-
-        _logger.LogDebug("🔐 [PHASE_C_DEBUG] TryAddChunkAsync開始 - ロック取得試行中");
         await _processingLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        Console.WriteLine("🔥 [TIMED_AGG_LOCK_AFTER] ロック取得成功");
-        _logger?.LogDebug("🔥 [TIMED_AGG_LOCK_AFTER] ロック取得成功");
-        _logger.LogCritical("🔥 [TIMED_AGG_LOCK_AFTER] ロック取得成功");
-        _logger.LogDebug("✅ [PHASE_C_DEBUG] ロック取得成功 - 処理開始");
         try
         {
             // パフォーマンス計測開始
             _performanceStopwatch.Start();
-
-            // 🔍 Phase 20: 追加されるチャンクの内容をログ出力
-            var chunkText = chunk.CombinedText ?? chunk.TextResults?.FirstOrDefault()?.Text ?? "";
-            _logger.LogInformation("📥 [Phase20] チャンク追加: ID:{ChunkId}, Text:「{Text}」",
-                chunk.ChunkId, chunkText.Length > 100 ? chunkText[..100] + "..." : chunkText);
 
             // SourceWindowHandle別にバッファを分離（コンテキスト混在防止）
             var windowHandle = chunk.SourceWindowHandle;
@@ -201,15 +230,10 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             // 全ウィンドウのチャンク数を計算
             var totalChunks = _pendingChunksByWindow.Values.Sum(list => list.Count);
 
-            // 🔥 [PHASE12.2_TIMER_DEBUG] タイマー制御分岐診断
-            Console.WriteLine($"🔥 [PHASE12.2_TIMER_DEBUG] totalChunks: {totalChunks}, MaxChunkCount: {_settings.CurrentValue.MaxChunkCount}");
-            _logger?.LogDebug($"🔥 [PHASE12.2_TIMER_DEBUG] totalChunks: {totalChunks}, MaxChunkCount: {_settings.CurrentValue.MaxChunkCount}");
-
             // メモリ保護：最大チャンク数を超えたら強制処理
             if (totalChunks >= _settings.CurrentValue.MaxChunkCount)
             {
-                _logger.LogWarning("⚠️ [Phase20] 最大チャンク数到達 - 強制処理開始: {Count}個 (設定値: {MaxCount})",
-                    totalChunks, _settings.CurrentValue.MaxChunkCount);
+                _logger.LogWarning("最大チャンク数到達 - 強制処理: {Count}個", totalChunks);
                 await ProcessPendingChunksInternal().ConfigureAwait(false);
                 return true;
             }
@@ -217,59 +241,31 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             // ForceFlushMs制御: 無限タイマーリセットを防ぐ
             var timeSinceLastReset = DateTime.UtcNow - _lastTimerReset;
 
-            // 🔥 [PHASE12.2_TIMER_DEBUG] ForceFlushMs判定前の診断
-            Console.WriteLine($"🔥 [PHASE12.2_TIMER_DEBUG] timeSinceLastReset: {timeSinceLastReset.TotalMilliseconds}ms, ForceFlushMs: {_settings.CurrentValue.ForceFlushMs}ms");
-            _logger?.LogDebug($"🔥 [PHASE12.2_TIMER_DEBUG] timeSinceLastReset: {timeSinceLastReset.TotalMilliseconds}ms, ForceFlushMs: {_settings.CurrentValue.ForceFlushMs}ms");
-
             if (timeSinceLastReset.TotalMilliseconds >= _settings.CurrentValue.ForceFlushMs)
             {
-                _logger.LogWarning("🚨 [PHASE_20_EMERGENCY] ForceFlushMs到達 - タイマー長期停止検出: {ElapsedMs}ms経過 (設定値: {ForceFlushMs}ms)",
-                    timeSinceLastReset.TotalMilliseconds, _settings.CurrentValue.ForceFlushMs);
+                _logger.LogWarning("ForceFlushMs到達 - 強制処理: {ElapsedMs}ms経過", timeSinceLastReset.TotalMilliseconds);
 
-                // 🚀 Phase 20緊急修正: ForceFlushMs後にタイマーを強制リセット
                 try
                 {
                     await ProcessPendingChunksInternal().ConfigureAwait(false);
-
-                    // タイマーを強制的に再起動（Phase 20追加）
-                    bool emergencyTimerReset = _aggregationTimer.Change(_settings.CurrentValue.BufferDelayMs, Timeout.Infinite);
+                    _aggregationTimer.Change(_settings.CurrentValue.BufferDelayMs, Timeout.Infinite);
                     _lastTimerReset = DateTime.UtcNow;
-
-                    _logger.LogInformation("🔧 [PHASE_20_EMERGENCY] 緊急タイマーリセット実行 - 結果: {Result}, {DelayMs}ms後に再開予定",
-                        emergencyTimerReset, _settings.CurrentValue.BufferDelayMs);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "🚨 [PHASE_20_EMERGENCY] 緊急タイマーリセット失敗");
+                    _logger.LogError(ex, "緊急タイマーリセット失敗");
                 }
             }
             else
             {
-                // 🔥 [PHASE12.2_TIMER_DEBUG] 通常タイマーリセット処理に到達
-                Console.WriteLine("🔥 [PHASE12.2_TIMER_DEBUG] else節到達 - 通常タイマーリセット処理開始");
-                _logger?.LogDebug("🔥 [PHASE12.2_TIMER_DEBUG] else節到達 - 通常タイマーリセット処理開始");
-
-                // 🚀 Phase 19緊急修正: タイマー確実実行保証とタイマー状況監視
+                // 通常タイマーリセット
                 try
                 {
-                    var timerResetStart = DateTime.UtcNow;
-                    _logger.LogDebug("🔄 [PHASE_19_FIX] タイマーリセット開始 - DelayMs: {DelayMs}, Current: {CurrentTime}",
-                        _settings.CurrentValue.BufferDelayMs, timerResetStart);
+                    _aggregationTimer.Change(_settings.CurrentValue.BufferDelayMs, Timeout.Infinite);
+                    _lastTimerReset = DateTime.UtcNow;
 
-                    // 🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行直前
-                    Console.WriteLine($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()呼び出し直前 - DelayMs: {_settings.CurrentValue.BufferDelayMs}ms");
-                    _logger?.LogDebug($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()呼び出し直前 - DelayMs: {_settings.CurrentValue.BufferDelayMs}ms");
-
-                    // タイマーをリセット（新しいチャンクが来たら待ち時間をリセット）
-                    bool timerChangeResult = _aggregationTimer.Change(_settings.CurrentValue.BufferDelayMs, Timeout.Infinite);
-                    _lastTimerReset = DateTime.UtcNow; // タイマーリセット時刻を記録
-
-                    // 🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行直後
-                    Console.WriteLine($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行完了 - Result: {timerChangeResult}");
-                    _logger?.LogDebug($"🔥 [PHASE12.2_TIMER_DEBUG] timer.Change()実行完了 - Result: {timerChangeResult}");
-
-                    _logger.LogInformation("⏱️ [PHASE_19_FIX] タイマーリセット完了 - 結果: {Result}, {DelayMs}ms後に処理予定 (バッファ中: {Count}個)",
-                        timerChangeResult, _settings.CurrentValue.BufferDelayMs, totalChunks);
+                    _logger.LogDebug("タイマーリセット: {DelayMs}ms後に処理予定 (バッファ: {Count}個)",
+                        _settings.CurrentValue.BufferDelayMs, totalChunks);
 
                     // タイマー実行監視用のバックアップタスク（Phase 19安全機構）
                     var expectedFireTime = DateTime.UtcNow.AddMilliseconds(_settings.CurrentValue.BufferDelayMs + 50); // 50ms余裕
@@ -318,76 +314,51 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
 
     /// <summary>
     /// バッファされたチャンクを統合処理（タイマーコールバック）
-    /// UltraThink Phase A緊急修正: Fire-and-forgetパターン改善とエラーハンドリング強化
     /// </summary>
     private async void ProcessPendingChunks(object? state)
     {
-        // 🚨 [CALLBACK_ENTRY] 絶対最初に実行されるログ（例外発生前診断）
-        try { Console.WriteLine("🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {0}", Environment.CurrentManagedThreadId); } catch { }
-        try { _logger?.LogDebug($"🚨🚨🚨 [CALLBACK_ENTRY] ProcessPendingChunks()メソッド開始 - Thread: {Environment.CurrentManagedThreadId}"); } catch { }
-
-        // 🔥 [PHASE12.2_CALLBACK] タイマーコールバック実行開始
-        Console.WriteLine("🔥🔥🔥 [PHASE12.2_CALLBACK] ProcessPendingChunks()タイマーコールバック実行開始");
-        _logger?.LogDebug("🔥🔥🔥 [PHASE12.2_CALLBACK] ProcessPendingChunks()タイマーコールバック実行開始");
-
-        // 🚀 Phase 19強化: タイマーコールバック実行状況詳細監視
         var callbackStart = DateTime.UtcNow;
-        var timeSinceLastReset = (callbackStart - _lastTimerReset).TotalMilliseconds;
-
-        Console.WriteLine($"🔥 [PHASE12.2_CALLBACK] timeSinceLastReset: {timeSinceLastReset}ms, 期待値: {_settings.CurrentValue.BufferDelayMs}ms");
-        _logger?.LogDebug($"🔥 [PHASE12.2_CALLBACK] timeSinceLastReset: {timeSinceLastReset}ms, 期待値: {_settings.CurrentValue.BufferDelayMs}ms");
-
-        _logger.LogInformation("🔥 [PHASE_19_CALLBACK] タイマーコールバック実行開始 - リセットから{ElapsedMs}ms経過, 期待値: {ExpectedMs}ms",
-            timeSinceLastReset, _settings.CurrentValue.BufferDelayMs);
 
         try
         {
-            _logger.LogDebug("🔄 [PHASE_C_FIX] タイマーコールバック実行開始");
             await ProcessPendingChunksInternal().ConfigureAwait(false);
-
-            var processingTime = (DateTime.UtcNow - callbackStart).TotalMilliseconds;
-            _logger.LogInformation("✅ [PHASE_19_CALLBACK] タイマーコールバック正常完了 - 処理時間: {ProcessingMs}ms", processingTime);
+            _logger.LogDebug("タイマーコールバック完了: {ProcessingMs}ms", (DateTime.UtcNow - callbackStart).TotalMilliseconds);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "🚨 [PHASE_C_FIX] タイマーコールバック実行失敗 - 緊急フォールバック処理実行");
+            _logger.LogError(ex, "タイマーコールバック実行失敗 - フォールバック処理実行");
 
-            // 🛡️ 緊急フォールバック: 直接OnChunksAggregatedを呼び出す
             try
             {
                 await ExecuteFallbackProcessing().ConfigureAwait(false);
-                _logger.LogInformation("🔧 [PHASE_C_FIX] フォールバック処理成功 - 翻訳パイプライン復旧");
             }
             catch (Exception fallbackEx)
             {
-                _logger.LogCritical(fallbackEx, "💥 [PHASE_C_FIX] フォールバック処理も失敗 - 緊急対応が必要");
+                _logger.LogError(fallbackEx, "フォールバック処理も失敗");
             }
         }
     }
 
     /// <summary>
     /// バッファされたチャンクを統合処理（非同期実装）
-    /// UltraThink Phase A緊急修正: SemaphoreLock競合回避とフォールバック処理追加
+    /// SemaphoreLock競合回避とフォールバック処理
     /// </summary>
     private async Task ProcessPendingChunksAsync()
     {
-        // 🚀 Phase A緊急修正: 短いタイムアウト + フォールバック処理でSemaphoreLock競合回避
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
 
         try
         {
             if (!await _processingLock.WaitAsync(100, cts.Token).ConfigureAwait(false))
             {
-                _logger.LogWarning("⚠️ [PHASE_A_FIX] SemaphoreLock競合検出 - 即座にフォールバック実行 (タイムアウト: 100ms)");
-
-                // 🛡️ 即座にフォールバック処理実行
+                _logger.LogWarning("SemaphoreLock競合検出 - フォールバック実行");
                 await ExecuteFallbackProcessing().ConfigureAwait(false);
                 return;
             }
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("⚠️ [PHASE_A_FIX] ProcessPendingChunksAsync全体がタイムアウト - フォールバック実行");
+            _logger.LogWarning("処理タイムアウト - フォールバック実行");
             await ExecuteFallbackProcessing().ConfigureAwait(false);
             return;
         }
@@ -398,8 +369,7 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
         }
         catch (Exception ex)
         {
-            // async Task内での例外は適切にログ出力（アプリケーション安定性向上）
-            _logger.LogError(ex, "🚨 ProcessPendingChunksAsyncでハンドルされない例外が発生しました。");
+            _logger.LogError(ex, "ProcessPendingChunksAsyncでエラー発生");
         }
         finally
         {
@@ -408,40 +378,30 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     }
 
     /// <summary>
-    /// 緊急フォールバック処理
-    /// UltraThink Phase A緊急修正: SemaphoreLock競合時の代替処理
+    /// 緊急フォールバック処理（SemaphoreLock競合時の代替処理）
     /// </summary>
     private async Task ExecuteFallbackProcessing()
     {
         try
         {
-            _logger.LogInformation("🔧 [PHASE_A_FIX] 緊急フォールバック処理開始 - ロックバイパス実行");
-
             // ロックを取得せずに現在のチャンクを読み取り専用で処理
             var allChunks = new List<TextChunk>();
 
-            // 各ウィンドウのチャンクを安全にコピー（ロックなしで読み取り専用アクセス）
             foreach (var kvp in _pendingChunksByWindow.ToList())
             {
-                var windowHandle = kvp.Key;
                 var chunks = kvp.Value?.ToList() ?? [];
-
                 if (chunks.Count > 0)
                 {
                     allChunks.AddRange(chunks);
-                    _logger.LogDebug("📦 [PHASE_A_FIX] フォールバック: ウィンドウ {WindowHandle} から {Count}個のチャンク取得",
-                        windowHandle, chunks.Count);
                 }
             }
 
             if (allChunks.Count > 0)
             {
-                // 簡易統合（CoordinateBasedLineBreakProcessorを使用せず基本的な結合）
                 var combinedText = string.Join(" ", allChunks.Select(c => c.CombinedText ?? "").Where(t => !string.IsNullOrWhiteSpace(t)));
 
                 if (!string.IsNullOrWhiteSpace(combinedText))
                 {
-                    // 代表チャンクを作成
                     var fallbackChunk = new TextChunk
                     {
                         ChunkId = GenerateNewChunkId(),
@@ -450,63 +410,42 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                         SourceWindowHandle = allChunks.First().SourceWindowHandle,
                         DetectedLanguage = allChunks.First().DetectedLanguage,
                         TextResults = [.. allChunks.SelectMany(c => c.TextResults)],
-                        CaptureRegion = allChunks.First().CaptureRegion // 🔥 [FIX6_CONTEXT_INFO] CaptureRegion情報を引き継ぐ
+                        CaptureRegion = allChunks.First().CaptureRegion
                     };
 
-                    // 🔥 [PHASE12.2] AggregatedChunksReadyEvent発行（旧コールバック削除済み）
                     var aggregatedEvent = new AggregatedChunksReadyEvent(
                         new List<TextChunk> { fallbackChunk }.AsReadOnly(),
                         fallbackChunk.SourceWindowHandle
                     );
 
                     await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
-                    _logger.LogInformation("✅ [PHASE_A_FIX] フォールバック処理成功 - AggregatedChunksReadyEvent発行完了 (テキスト長: {Length})",
-                        combinedText.Length);
-
-                    // 統計更新
                     Interlocked.Increment(ref _totalAggregationEvents);
+
+                    _logger.LogDebug("フォールバック処理完了: テキスト長={Length}", combinedText.Length);
                 }
-                else
-                {
-                    _logger.LogWarning("⚠️ [PHASE_A_FIX] フォールバック: 統合可能テキストなし");
-                }
-            }
-            else
-            {
-                _logger.LogDebug("📭 [PHASE_A_FIX] フォールバック: 処理対象チャンクなし");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ [PHASE_A_FIX] 緊急フォールバック処理でエラー発生");
+            _logger.LogError(ex, "フォールバック処理でエラー発生");
             throw;
         }
     }
 
     /// <summary>
-    /// 内部統合処理
-    /// 戦略書フィードバック反映: ウィンドウハンドル別処理
+    /// 内部統合処理（ウィンドウハンドル別処理）
     /// </summary>
     private async Task ProcessPendingChunksInternal()
     {
-        // 🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始
-        Console.WriteLine("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
-        _logger?.LogDebug("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
-        _logger.LogCritical("🔥🔥🔥 [PHASE12.2_INTERNAL] ProcessPendingChunksInternal実行開始");
-
-        // 🚨 [STACK_TRACE] 呼び出し元特定のためスタックトレースをログ出力
-        var stackTrace = new System.Diagnostics.StackTrace(1, true); // 1フレームスキップ（自身を除く）
-        Console.WriteLine($"🚨🚨🚨 [STACK_TRACE] 呼び出し元:\n{stackTrace}");
-        _logger?.LogDebug($"🚨🚨🚨 [STACK_TRACE] 呼び出し元:\n{stackTrace}");
-
         if (_pendingChunksByWindow.IsEmpty)
         {
-            Console.WriteLine("🔥 [PHASE12.2_INTERNAL] _pendingChunksByWindow is empty - 早期リターン");
-            _logger?.LogDebug("🔥 [PHASE12.2_INTERNAL] _pendingChunksByWindow is empty - 早期リターン");
             return;
         }
 
-        // 1. 処理対象をアトミックに取得・削除（データロスト防止）
+        // [Issue #228] メモリ監視ログ
+        var memoryBefore = GC.GetTotalMemory(false);
+
+        // 処理対象をアトミックに取得・削除（データロスト防止）
         var chunksToProcessByWindow = new Dictionary<IntPtr, List<TextChunk>>();
         var windowHandles = _pendingChunksByWindow.Keys.ToList();
         foreach (var handle in windowHandles)
@@ -517,16 +456,7 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             }
         }
 
-        // 🚨 [CRITICAL_DEBUG] Line 496診断
-        try { Console.WriteLine("🚨 [LINE496_BEFORE] Sum計算直前"); } catch { }
         var totalInputChunks = chunksToProcessByWindow.Values.Sum(list => list.Count);
-        try { Console.WriteLine($"🚨 [LINE496_AFTER] Sum計算完了 - totalInputChunks: {totalInputChunks}"); } catch { }
-        try { _logger?.LogDebug($"🚨 [LINE496_AFTER] Sum計算完了 - totalInputChunks: {totalInputChunks}"); } catch { }
-
-        try { Console.WriteLine($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク"); } catch { }
-        try { _logger?.LogDebug($"🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {chunksToProcessByWindow.Count}ウィンドウ, {totalInputChunks}個のチャンク"); } catch { }
-        _logger.LogCritical("🚨🚨🚨 [COMBINE_DEBUG] 統合処理開始 - {WindowCount}ウィンドウ, {Count}個のチャンク",
-            chunksToProcessByWindow.Count, totalInputChunks);
 
         try
         {
@@ -538,42 +468,9 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                 var windowHandle = kvp.Key;
                 var chunksForWindow = kvp.Value;
 
-                var windowLog = $"🚨 [COMBINE_DEBUG] ウィンドウ {windowHandle}: {chunksForWindow.Count}個のチャンク処理開始";
-                Console.WriteLine(windowLog);
-                _logger?.LogDebug(windowLog);
-                _logger.LogCritical(windowLog);
-
                 if (chunksForWindow.Count > 0)
                 {
-                    // 🚨 [COMBINE_DEBUG] 入力チャンクの詳細情報をログ出力
-                    var logMsg = $"🚨 [COMBINE_DEBUG] CombineChunks呼び出し直前 - Count: {chunksForWindow.Count}";
-                    Console.WriteLine(logMsg);
-                    _logger?.LogDebug(logMsg);
-                    _logger.LogCritical(logMsg);
-
-                    var maxLog = Math.Min(chunksForWindow.Count, 5); // 最初の5個だけログ出力
-                    for (int i = 0; i < maxLog; i++)
-                    {
-                        var chunk = chunksForWindow[i];
-                        var chunkLog = $"  🔍 [INPUT_CHUNK_{i}] ID:{chunk.ChunkId}, Text:「{chunk.CombinedText}」, Bounds:(X:{chunk.CombinedBounds.X}, Y:{chunk.CombinedBounds.Y}, W:{chunk.CombinedBounds.Width}, H:{chunk.CombinedBounds.Height})";
-                        Console.WriteLine(chunkLog);
-                        _logger?.LogDebug(chunkLog);
-                    }
-                    if (chunksForWindow.Count > 5)
-                    {
-                        var omitLog = $"  ... (残り {chunksForWindow.Count - 5} 個のチャンクは省略)";
-                        Console.WriteLine(omitLog);
-                        _logger?.LogDebug(omitLog);
-                    }
-
                     var aggregatedChunks = CombineChunks(chunksForWindow);
-
-                    Console.WriteLine($"🚨 [COMBINE_DEBUG] CombineChunks呼び出し完了 - 結果: {aggregatedChunks.Count}個");
-                    for (int i = 0; i < aggregatedChunks.Count; i++)
-                    {
-                        var chunk = aggregatedChunks[i];
-                        Console.WriteLine($"  ✅ [OUTPUT_CHUNK_{i}] ID:{chunk.ChunkId}, Text:「{chunk.CombinedText}」, Bounds:(X:{chunk.CombinedBounds.X}, Y:{chunk.CombinedBounds.Y}, W:{chunk.CombinedBounds.Width}, H:{chunk.CombinedBounds.Height})");
-                    }
                     allAggregatedChunks.AddRange(aggregatedChunks);
 
                     _logger.LogDebug("ウィンドウ {WindowHandle}: {InputCount}個→{OutputCount}個のチャンク統合",
@@ -584,30 +481,29 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             // 統合されたチャンクを翻訳パイプラインに送信
             if (allAggregatedChunks.Count > 0)
             {
-                // 🎯 Phase 12.2: AggregatedChunksReadyEventを発行（イベント駆動アーキテクチャ）
                 var windowHandle = allAggregatedChunks.FirstOrDefault()?.SourceWindowHandle ?? IntPtr.Zero;
                 var aggregatedEvent = new AggregatedChunksReadyEvent(
                     allAggregatedChunks.AsReadOnly(),
                     windowHandle
                 );
 
-                // 🔥 [PHASE12.2_INTERNAL] イベント発行直前
-                Console.WriteLine($"🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行直前 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
-                _logger?.LogDebug($"🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行直前 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
-
                 await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
 
-                // 🔥 [PHASE12.2_INTERNAL] イベント発行完了
-                Console.WriteLine($"🔥🔥🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行完了 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
-                _logger?.LogDebug($"🔥🔥🔥 [PHASE12.2_INTERNAL] AggregatedChunksReadyEvent発行完了 - SessionId: {aggregatedEvent.SessionId}, ChunkCount: {allAggregatedChunks.Count}");
-
-                _logger.LogInformation("🎯 [PHASE12.2] AggregatedChunksReadyEvent発行完了 - SessionId: {SessionId}, ChunkCount: {Count}",
-                    aggregatedEvent.SessionId, allAggregatedChunks.Count);
+                _logger.LogDebug("AggregatedChunksReadyEvent発行: ChunkCount={Count}", allAggregatedChunks.Count);
             }
 
             Interlocked.Increment(ref _totalAggregationEvents);
 
-            _logger.LogInformation("🎯 統合処理完了 - {InputCount}個→{OutputCount}個のチャンク",
+            // [Issue #228] メモリ監視ログ
+            var memoryAfter = GC.GetTotalMemory(false);
+            var memoryDelta = memoryAfter - memoryBefore;
+            if (memoryDelta > 10_000_000) // 10MB以上の増加を警告
+            {
+                _logger.LogWarning("メモリ増加検出: {DeltaMB:F1}MB (処理前: {BeforeMB:F1}MB, 処理後: {AfterMB:F1}MB)",
+                    memoryDelta / 1_000_000.0, memoryBefore / 1_000_000.0, memoryAfter / 1_000_000.0);
+            }
+
+            _logger.LogDebug("統合処理完了: {InputCount}個→{OutputCount}個",
                 totalInputChunks, allAggregatedChunks.Count);
 
             // パフォーマンス統計ログ
@@ -654,35 +550,20 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
 
         try
         {
-            // 🚨 [ULTRA_DEBUG] CombineChunksメソッド実行確認
-            Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {chunks.Count}");
-            _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {chunks.Count}");
-            _logger.LogCritical("🚨🚨🚨 [ULTRA_DEBUG] CombineChunksメソッド実行開始！ - Count: {Count}", chunks.Count);
-
-            // 🔍 [DEBUG] 設定値のログ出力
             var enabled = _settings.CurrentValue.ProximityGrouping.Enabled;
-            var verticalFactor = _settings.CurrentValue.ProximityGrouping.VerticalDistanceFactor;
-            Console.WriteLine($"🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {enabled}, VerticalDistanceFactor: {verticalFactor}");
-            _logger?.LogDebug($"🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {enabled}, VerticalDistanceFactor: {verticalFactor}");
-            _logger.LogCritical("🚨🚨🚨 [SETTINGS_DEBUG] ProximityGrouping.Enabled: {Enabled}, VerticalDistanceFactor: {Factor}",
-                enabled, verticalFactor);
 
             // 近接度グループ化が無効の場合は従来通りの統合
             if (!enabled)
             {
-                _logger.LogInformation("🔄 [LEGACY] 近接度グループ化無効 - 従来の統合処理実行: {Count}個", chunks.Count);
                 return LegacyCombineChunks(chunks);
             }
-
-            // 🎯 UltraThink Phase 1: 近接度ベースグループ化実行
-            _logger.LogInformation("🔍 [ULTRATHINK] 近接度ベースグループ化開始 - 入力: {Count}個", chunks.Count);
 
             // 近接度でグループ化
             var proximityGroups = _proximityGroupingService.GroupByProximity(chunks);
 
             if (proximityGroups.Count == 0)
             {
-                _logger.LogWarning("⚠️ [ULTRATHINK] グループ化結果が空 - 元のチャンクを返します");
+                _logger.LogWarning("グループ化結果が空 - 元のチャンクを返します");
                 return chunks;
             }
 
@@ -695,17 +576,14 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                 combinedChunks.Add(combinedChunk);
             }
 
-            _logger.LogInformation("✅ [ULTRATHINK] 近接度グループ化完了 - " +
-                "入力: {InputCount}個 → 出力: {OutputCount}個 " +
-                "({GroupCount}グループ)",
+            _logger.LogDebug("近接度グループ化完了: {InputCount}個→{OutputCount}個 ({GroupCount}グループ)",
                 chunks.Count, combinedChunks.Count, proximityGroups.Count);
 
             return combinedChunks;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "🚨 [ULTRATHINK] 近接度グループ化でエラー - レガシー処理にフォールバック");
-            // エラー時はレガシー処理にフォールバック
+            _logger.LogError(ex, "近接度グループ化でエラー - レガシー処理にフォールバック");
             return LegacyCombineChunks(chunks);
         }
     }
@@ -717,16 +595,13 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     {
         if (groupChunks.Count == 1)
         {
-            _logger.LogDebug("📦 [GROUP_{Index}] 単一チャンク - 統合不要: {ChunkId}",
-                groupIndex, groupChunks[0].ChunkId);
             return groupChunks[0];
         }
 
-        // 従来の座標ベース改行処理を適用
         var combinedText = _lineBreakProcessor.ProcessLineBreaks(groupChunks);
         var combinedBounds = CalculateCombinedBounds(groupChunks);
 
-        var combinedChunk = new TextChunk
+        return new TextChunk
         {
             ChunkId = GenerateNewChunkId(),
             TextResults = [.. groupChunks.SelectMany(c => c.TextResults)],
@@ -734,20 +609,8 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             CombinedText = combinedText,
             SourceWindowHandle = groupChunks[0].SourceWindowHandle,
             DetectedLanguage = groupChunks[0].DetectedLanguage,
-            CaptureRegion = groupChunks[0].CaptureRegion // 🔥 [FIX6_CONTEXT_INFO] CaptureRegion情報を引き継ぐ
+            CaptureRegion = groupChunks[0].CaptureRegion
         };
-
-        if (_settings.CurrentValue.ProximityGrouping.EnableDetailedLogging)
-        {
-            var chunkIds = string.Join(", ", groupChunks.Select(c => c.ChunkId));
-            _logger.LogDebug("📦 [GROUP_{Index}] 統合完了 - " +
-                "入力: [{ChunkIds}] → 出力: {OutputId}, " +
-                "テキスト: 「{Text}」",
-                groupIndex, chunkIds, combinedChunk.ChunkId,
-                combinedText.Length > 50 ? combinedText[..50] + "..." : combinedText);
-        }
-
-        return combinedChunk;
     }
 
     /// <summary>
@@ -755,7 +618,6 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     /// </summary>
     private List<TextChunk> LegacyCombineChunks(List<TextChunk> chunks)
     {
-        // 従来の無条件統合処理
         var combinedText = _lineBreakProcessor.ProcessLineBreaks(chunks);
         var combinedBounds = CalculateCombinedBounds(chunks);
 
@@ -767,45 +629,27 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             CombinedText = combinedText,
             SourceWindowHandle = chunks[0].SourceWindowHandle,
             DetectedLanguage = chunks[0].DetectedLanguage,
-            CaptureRegion = chunks[0].CaptureRegion // 🔥 [FIX6_CONTEXT_INFO] CaptureRegion情報を引き継ぐ
+            CaptureRegion = chunks[0].CaptureRegion
         };
-
-        _logger.LogDebug("🔄 [LEGACY] 従来統合完了 - {Count}個 → 1個: 「{Text}」",
-            chunks.Count, combinedText.Length > 50 ? combinedText[..50] + "..." : combinedText);
 
         return [combinedChunk];
     }
 
     /// <summary>
     /// 統合されたバウンディングボックスを計算
-    /// 🚀 [Issue #193] 座標変換はAggregatedChunksReadyEventHandlerで行うため、ここでは単純な座標統合のみ
-    /// GPUリサイズ後の座標は既にFullScreenOcrCaptureStrategy.ScaleCoordinates()でスケーリング済み
     /// </summary>
-    private System.Drawing.Rectangle CalculateCombinedBounds(List<TextChunk> chunks)
+    private static System.Drawing.Rectangle CalculateCombinedBounds(List<TextChunk> chunks)
     {
         if (chunks.Count == 0) return System.Drawing.Rectangle.Empty;
+        if (chunks.Count == 1) return chunks[0].CombinedBounds;
 
-        if (chunks.Count == 1)
-        {
-            // 🚀 [Issue #193] 座標変換を削除 - 座標は既にスケーリング済み
-            return chunks[0].CombinedBounds;
-        }
-
-        // 🚀 [Issue #193] 複数チャンクの座標統合（座標変換なし）
         var bounds = chunks.Select(c => c.CombinedBounds).ToArray();
-
-        // 入力座標から統合バウンディングボックスを計算（変換なし）
         var minX = bounds.Min(r => r.X);
         var minY = bounds.Min(r => r.Y);
         var maxRight = bounds.Max(r => r.Right);
         var maxBottom = bounds.Max(r => r.Bottom);
 
-        var combinedBounds = new System.Drawing.Rectangle(minX, minY, maxRight - minX, maxBottom - minY);
-
-        _logger.LogDebug("🚀 [Issue #193] 統合バウンディングボックス計算完了（座標変換なし）: ChunkCount={Count}, Result=({X},{Y},{W},{H})",
-            chunks.Count, combinedBounds.X, combinedBounds.Y, combinedBounds.Width, combinedBounds.Height);
-
-        return combinedBounds;
+        return new System.Drawing.Rectangle(minX, minY, maxRight - minX, maxBottom - minY);
     }
 
     /// <summary>

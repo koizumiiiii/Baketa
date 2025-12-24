@@ -888,6 +888,11 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 🔥 [PHASE2_PROBLEM2] Pythonサーバー状態変更イベントの購読（翻訳エンジン初期化完了検知）
         SubscribeToEvent<Baketa.Core.Events.EventTypes.PythonServerStatusChangedEvent>(OnPythonServerStatusChanged);
+
+        // 最初の翻訳結果受信イベントの購読（ローディング終了用）
+        Logger?.LogWarning("🔔 [SUBSCRIBE] FirstTranslationResultReceivedEvent購読開始 - 型: {EventType}", typeof(FirstTranslationResultReceivedEvent).FullName);
+        SubscribeToEvent<FirstTranslationResultReceivedEvent>(OnFirstTranslationResultReceived);
+        Logger?.LogWarning("🔔 [SUBSCRIBE] FirstTranslationResultReceivedEvent購読完了");
     }
 
     private void InitializePropertyChangeHandlers()
@@ -919,6 +924,9 @@ public class MainOverlayViewModel : ViewModelBase
                 this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
                 this.RaisePropertyChanged(nameof(SettingsEnabled));
                 this.RaisePropertyChanged(nameof(StartStopText));
+                // ボタン有効状態の通知
+                this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
             });
             
         // IsOcrInitializedプロパティの変更を監視
@@ -1235,56 +1243,26 @@ public class MainOverlayViewModel : ViewModelBase
             Logger?.LogInformation("選択済みウィンドウを使用: '{Title}' (Handle={Handle})", selectedWindow.Title, selectedWindow.Handle);
 
             // ローディング状態開始（ウィンドウ選択後）
+            // IsLoadingは翻訳結果が返ってくるまで維持される（OnTranslationStatusChangedで解除）
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsLoading = true;
                 Logger?.LogDebug($"🔄 翻訳準備ローディング開始 - IsLoading={IsLoading}, LoadingText='{LoadingText}', IsStartStopEnabled={IsStartStopEnabled}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔄 翻訳準備ローディング開始 - IsLoading={IsLoading}, LoadingText='{LoadingText}', IsStartStopEnabled={IsStartStopEnabled}");
             });
-            
-            // 画面中央ローディングオーバーレイ表示
-            Logger?.LogDebug("🔄 LoadingOverlayManager.ShowAsync呼び出し開始");
-            try
-            {
-                await _loadingManager.ShowAsync().ConfigureAwait(false);
-                Logger?.LogDebug("✅ LoadingOverlayManager.ShowAsync呼び出し完了");
-            }
-            catch (Exception loadingEx)
-            {
-                Logger?.LogDebug($"❌ LoadingOverlayManager.ShowAsync例外: {loadingEx.Message}");
-                Logger?.LogError(loadingEx, "ローディングオーバーレイ表示に失敗");
-            }
 
             // 2. 翻訳開始
             var uiTimer = System.Diagnostics.Stopwatch.StartNew();
-            Logger?.LogDebug("📊 翻訳状態をアクティブに設定");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "📊 翻訳状態をアクティブに設定");
             Logger?.LogDebug("📊 翻訳状態をキャプチャ中に設定");
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                CurrentStatus = TranslationStatus.Capturing; // TranslationStatus.Activeがないため適切な値を使用
+                CurrentStatus = TranslationStatus.Capturing;
                 IsTranslationActive = true;
                 IsTranslationResultVisible = true; // 翻訳開始時は表示状態に設定
-                IsLoading = false; // ローディング状態終了
+                // IsLoadingは維持（翻訳結果返却時にOnTranslationStatusChangedで解除）
                 Logger?.LogDebug($"✅ 翻訳状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsLoading={IsLoading}, IsStartStopEnabled={IsStartStopEnabled}, IsTranslationResultVisible={IsTranslationResultVisible}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ 翻訳状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsLoading={IsLoading}, IsStartStopEnabled={IsStartStopEnabled}, IsTranslationResultVisible={IsTranslationResultVisible}");
             });
-            
-            // 画面中央ローディングオーバーレイ非表示
-            Logger?.LogDebug("🔄 LoadingOverlayManager.HideAsync呼び出し開始");
-            try
-            {
-                await _loadingManager.HideAsync().ConfigureAwait(false);
-                Logger?.LogDebug("✅ LoadingOverlayManager.HideAsync呼び出し完了");
-            }
-            catch (Exception loadingEx)
-            {
-                Logger?.LogDebug($"❌ LoadingOverlayManager.HideAsync例外: {loadingEx.Message}");
-                Logger?.LogError(loadingEx, "ローディングオーバーレイ非表示に失敗");
-            }
             uiTimer.Stop();
             Logger?.LogDebug($"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
-            // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⏱️ UI状態更新時間: {uiTimer.ElapsedMilliseconds}ms");
 
             // 🔧 [OVERLAY_UNIFICATION] IOverlayManagerには InitializeAsync メソッドがないため、初期化処理を削除
             // Win32OverlayManager は DIコンテナで初期化済み
@@ -1334,25 +1312,13 @@ public class MainOverlayViewModel : ViewModelBase
         catch (Exception ex)
         {
             Logger?.LogError(ex, "💥 翻訳開始に失敗: {ErrorMessage}", ex.Message);
-            
-            // エラー時はローディングオーバーレイを非表示
-            try
-            {
-                await _loadingManager.HideAsync().ConfigureAwait(false);
-            }
-            catch (Exception loadingEx)
-            {
-                Logger?.LogDebug($"⚠️ ローディング非表示エラー: {loadingEx.Message}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ ローディング非表示エラー: {loadingEx.Message}");
-            }
-            
+
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 CurrentStatus = TranslationStatus.Idle; // エラー時は待機状態に戻す
                 IsTranslationActive = false;
-                IsLoading = false; // ローディング状態終了
+                IsLoading = false; // エラー時はローディング状態終了
                 Logger?.LogDebug($"💥 エラー時状態リセット: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
-                // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 エラー時状態リセット: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}");
             });
         }
     }
@@ -1391,9 +1357,10 @@ public class MainOverlayViewModel : ViewModelBase
             {
                 CurrentStatus = IsWindowSelected ? TranslationStatus.Ready : TranslationStatus.Idle; // ウィンドウ選択状態に応じて遷移
                 IsTranslationActive = false;
+                IsLoading = false; // 翻訳停止時はローディング状態も終了
                 IsTranslationResultVisible = false; // 翻訳停止時は非表示にリセット
                 // IsWindowSelectedとSelectedWindowは維持（再選択不要）
-                Logger?.LogDebug($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}, IsWindowSelected={IsWindowSelected}");
+                Logger?.LogDebug($"✅ 翻訳停止状態更新完了: IsTranslationActive={IsTranslationActive}, IsLoading={IsLoading}, StartStopText='{StartStopText}', IsTranslationResultVisible={IsTranslationResultVisible}, IsWindowSelected={IsWindowSelected}");
 
                 // 🔥 [PHASE6.1_STOP_PROOF] UI状態変更完了のログ - ボタン表示が"Start"に変わった
                 Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"✅ [STOP_PROOF] IsTranslationActive=false設定完了、StartStopText='{StartStopText}' (ボタンが「Start」に変わった)");
@@ -1675,11 +1642,18 @@ public class MainOverlayViewModel : ViewModelBase
             // 🔥 [ISSUE#163_TOGGLE] オーバーレイ非表示時: 翻訳実行
             Logger?.LogInformation("シングルショット翻訳実行開始");
 
+            // 🔔 [LOADING] ローディング表示開始
+            IsLoading = true;
+            Logger?.LogDebug("🔄 [LOADING] シングルショット翻訳ローディング開始");
+
             // ウィンドウが選択されているか確認
             var selectedWindow = SelectedWindow;
             if (selectedWindow == null)
             {
                 Logger?.LogWarning("ウィンドウが選択されていない状態でシングルショット翻訳が要求されました");
+
+                // 🔔 [LOADING] エラー時はローディング終了
+                IsLoading = false;
 
                 // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
                 await _errorNotificationService.ShowErrorAsync(
@@ -1708,6 +1682,9 @@ public class MainOverlayViewModel : ViewModelBase
         {
             Logger?.LogError(ex, "シングルショット翻訳実行中にエラーが発生: {ErrorMessage}", ex.Message);
 
+            // 🔔 [LOADING] エラー時はローディング終了
+            IsLoading = false;
+
             // エラー時は状態をリセット
             IsSingleshotOverlayVisible = false;
         }
@@ -1720,21 +1697,40 @@ public class MainOverlayViewModel : ViewModelBase
     private async Task OnTranslationStatusChanged(TranslationStatusChangedEvent statusEvent)
     {
         var previousStatus = CurrentStatus;
-        
+
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
             CurrentStatus = statusEvent.Status;
-            IsTranslationActive = statusEvent.Status == TranslationStatus.Capturing 
-                                  || statusEvent.Status == TranslationStatus.ProcessingOCR 
-                                  || statusEvent.Status == TranslationStatus.Translating;
+
+            // 翻訳処理中のステータス判定
+            var isProcessing = statusEvent.Status == TranslationStatus.Capturing
+                            || statusEvent.Status == TranslationStatus.ProcessingOCR
+                            || statusEvent.Status == TranslationStatus.Translating;
+
+            IsTranslationActive = isProcessing;
+
+            // 翻訳が終了・エラー・キャンセルされたらローディングを終了
+            // 通常の終了は FirstTranslationResultReceivedEvent で処理
+            if (statusEvent.Status is TranslationStatus.Completed
+                or TranslationStatus.Error
+                or TranslationStatus.Cancelled
+                or TranslationStatus.Ready
+                or TranslationStatus.Idle)
+            {
+                if (IsLoading)
+                {
+                    IsLoading = false;
+                    Logger?.LogDebug($"✅ ローディング終了: Status={statusEvent.Status}");
+                }
+            }
         });
-        
-        Logger?.LogInformation("📊 翻訳状態変更: {PreviousStatus} -> {CurrentStatus}", 
+
+        Logger?.LogInformation("📊 翻訳状態変更: {PreviousStatus} -> {CurrentStatus}",
             previousStatus, statusEvent.Status);
-            
+
         // 状態に応じてUIの状態を詳細にログ出力
-        Logger?.LogDebug("🔄 UI状態更新: IsTranslationActive={IsActive}, StartStopText='{Text}', StatusClass='{Class}'", 
-            IsTranslationActive, StartStopText, StatusIndicatorClass);
+        Logger?.LogDebug("🔄 UI状態更新: IsTranslationActive={IsActive}, IsLoading={IsLoading}, StartStopText='{Text}', StatusClass='{Class}'",
+            IsTranslationActive, IsLoading, StartStopText, StatusIndicatorClass);
     }
 
     private async Task OnTranslationDisplayVisibilityChanged(TranslationDisplayVisibilityChangedEvent visibilityEvent)
@@ -1745,6 +1741,28 @@ public class MainOverlayViewModel : ViewModelBase
         });
 
         Logger?.LogDebug("Translation display visibility changed: {IsVisible}", visibilityEvent.IsVisible);
+    }
+
+    /// <summary>
+    /// 最初の翻訳結果受信イベントハンドラー（ローディング終了用）
+    /// </summary>
+    private async Task OnFirstTranslationResultReceived(FirstTranslationResultReceivedEvent evt)
+    {
+        Logger?.LogWarning("🔔 [LOADING_END] FirstTranslationResultReceivedEvent受信! ID: {EventId}", evt.Id);
+
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            Logger?.LogWarning("🔔 [LOADING_END] UIスレッドで処理開始 - IsLoading: {IsLoading}", IsLoading);
+            if (IsLoading)
+            {
+                IsLoading = false;
+                Logger?.LogWarning("✅ [LOADING_END] 最初の翻訳結果受信によりローディング終了 - IsLoading=false");
+            }
+            else
+            {
+                Logger?.LogWarning("⚠️ [LOADING_END] 既にIsLoading=false のため変更なし");
+            }
+        });
     }
 
     /// <summary>

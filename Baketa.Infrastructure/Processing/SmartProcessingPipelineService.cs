@@ -108,6 +108,14 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
 
     public async Task<ProcessingPipelineResult> ExecuteAsync(ProcessingPipelineInput input, CancellationToken cancellationToken = default)
     {
+        // 🔥🔥🔥 [ULTRA_DEBUG] ExecuteAsync最初のログ
+        try
+        {
+            System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [PIPELINE_START] SmartProcessingPipelineService.ExecuteAsync開始{Environment.NewLine}");
+        }
+        catch { /* ログ失敗は無視 */ }
+
         // 🎯 [STRATEGY_A] 並行パイプライン実行を防ぐ排他制御でラップ
         return await _pipelineExecutionManager.ExecuteExclusivelyAsync(async (ct) =>
         {
@@ -229,7 +237,17 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
 
                     // 🔧 [SINGLESHOT_FIX] ForceCompleteExecution時はShouldExecute判定を無視
                     // 段階実行の必要性判定
-                    if (!input.Options.ForceCompleteExecution && !strategy.ShouldExecute(context))
+                    var shouldExecute = strategy.ShouldExecute(context);
+
+                    // 🔥🔥🔥 [ULTRA_DEBUG] ShouldExecute結果
+                    try
+                    {
+                        System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath),
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [PIPELINE_FLOW] {stageType}.ShouldExecute = {shouldExecute}{Environment.NewLine}");
+                    }
+                    catch { /* ログ失敗は無視 */ }
+
+                    if (!input.Options.ForceCompleteExecution && !shouldExecute)
                     {
                         _logger.LogDebug("段階スキップ: {StageType} - 実行条件未満", stageType);
 
@@ -322,6 +340,14 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                         }
 
                         stageResult = await strategy.ExecuteAsync(context, ct).ConfigureAwait(false);
+
+                        // 🔥🔥🔥 [ULTRA_DEBUG] strategy.ExecuteAsync完了
+                        try
+                        {
+                            System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath),
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [PIPELINE_FLOW] {stageType}段階完了 - Success: {stageResult.Success}, Data型: {stageResult.Data?.GetType().Name ?? "NULL"}{Environment.NewLine}");
+                        }
+                        catch { /* ログ失敗は無視 */ }
                     }
                     finally
                     {
@@ -370,9 +396,26 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                         ShouldTerminateEarly(stageType, stageResult))
                     {
                         _logger.LogDebug("早期終了判定: {StageType} - 後続処理不要", stageType);
+
+                        // 🔥🔥🔥 [ULTRA_DEBUG] 早期終了
+                        try
+                        {
+                            System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath),
+                                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [PIPELINE_FLOW] 早期終了判定 - {stageType}で終了{Environment.NewLine}");
+                        }
+                        catch { /* ログ失敗は無視 */ }
+
                         earlyTerminated = true;
                         break;
                     }
+
+                    // 🔥🔥🔥 [ULTRA_DEBUG] 次段階へ
+                    try
+                    {
+                        System.IO.File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _loggingSettings.DebugLogPath),
+                            $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}→🔥🔥🔥 [PIPELINE_FLOW] {stageType}完了 - 次段階へ続行{Environment.NewLine}");
+                    }
+                    catch { /* ログ失敗は無視 */ }
                 }
 
                 // 🎯 Strategy A: パイプライン完了時の参照カウント確認
