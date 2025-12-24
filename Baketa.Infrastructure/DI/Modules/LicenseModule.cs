@@ -94,10 +94,14 @@ public sealed class LicenseModule : ServiceModuleBase
     /// </summary>
     private static void RegisterApiClient(IServiceCollection services)
     {
-        // HttpClient登録（Patreon用）
-        services.AddHttpClient<PatreonOAuthService>();
+        // HttpClient登録（Patreon用）- IHttpClientFactory経由でソケット枯渇を防止
+        services.AddHttpClient(PatreonOAuthService.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+        });
 
-        // PatreonOAuthService登録
+        // PatreonOAuthService登録（IHttpClientFactory経由でHttpClientを取得）
         services.AddSingleton<PatreonOAuthService>();
         services.AddSingleton<IPatreonOAuthService>(provider =>
             provider.GetRequiredService<PatreonOAuthService>());

@@ -20,10 +20,15 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
 {
     private readonly ILogger<PatreonOAuthService> _logger;
     private readonly PatreonSettings _settings;
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _credentialsFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
+
+    /// <summary>
+    /// HttpClient名（IHttpClientFactory用）
+    /// </summary>
+    public const string HttpClientName = "PatreonOAuth";
 
     private PatreonLocalCredentials? _cachedCredentials;
     private PatreonSyncStatus _syncStatus = PatreonSyncStatus.NotConnected;
@@ -50,11 +55,11 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     public PatreonOAuthService(
         ILogger<PatreonOAuthService> logger,
         IOptions<PatreonSettings> settings,
-        HttpClient httpClient)
+        IHttpClientFactory httpClientFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
         // 資格情報保存パス
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -164,7 +169,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
 
             _logger.LogInformation(
                 "✅ Patreon認証成功: UserId={UserId}, Plan={Plan}, PatronStatus={PatronStatus}",
-                identityResponse.Data.Id,
+                MaskIdentifier(identityResponse.Data.Id),
                 plan,
                 patronStatus);
 
@@ -236,7 +241,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
             {
                 _logger.LogDebug(
                     "Patreon資格情報を読み込み: UserId={UserId}, Plan={Plan}",
-                    _cachedCredentials.PatreonUserId,
+                    MaskIdentifier(_cachedCredentials.PatreonUserId),
                     _cachedCredentials.LastKnownPlan);
 
                 // ステータスを設定
@@ -402,13 +407,15 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         string code,
         CancellationToken cancellationToken)
     {
+        using var httpClient = _httpClientFactory.CreateClient(HttpClientName);
+
         var requestBody = new
         {
             code,
             redirect_uri = _settings.RedirectUri
         };
 
-        var response = await _httpClient.PostAsJsonAsync(
+        var response = await httpClient.PostAsJsonAsync(
             $"{_settings.RelayServerUrl}/api/patreon/token",
             requestBody,
             cancellationToken).ConfigureAwait(false);
@@ -431,11 +438,12 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         string refreshToken,
         CancellationToken cancellationToken)
     {
+        using var httpClient = _httpClientFactory.CreateClient(HttpClientName);
         var requestBody = new { refresh_token = refreshToken };
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync(
+            var response = await httpClient.PostAsJsonAsync(
                 $"{_settings.RelayServerUrl}/api/patreon/refresh",
                 requestBody,
                 cancellationToken).ConfigureAwait(false);
@@ -459,13 +467,17 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
 
     /// <summary>
     /// Patreon Identity APIを呼び出し（中継サーバー経由でプロキシ）
+    /// 401エラー時は自動的にトークンをリフレッシュしてリトライ
     /// </summary>
     private async Task<PatreonIdentityResponse?> GetPatreonIdentityAsync(
         string accessToken,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isRetry = false)
     {
         try
         {
+            using var httpClient = _httpClientFactory.CreateClient(HttpClientName);
+
             // 中継サーバーを経由してIdentity APIを呼び出す
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
@@ -473,7 +485,42 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
 
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
-            var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            // 401 Unauthorized: アクセストークン期限切れ → リフレッシュしてリトライ
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && !isRetry)
+            {
+                _logger.LogInformation("アクセストークン期限切れを検出、リフレッシュを試行");
+
+                if (_cachedCredentials != null && !string.IsNullOrEmpty(_cachedCredentials.EncryptedRefreshToken))
+                {
+                    var refreshToken = DecryptToken(_cachedCredentials.EncryptedRefreshToken);
+                    if (!string.IsNullOrEmpty(refreshToken))
+                    {
+                        var tokenResponse = await RefreshAccessTokenAsync(refreshToken, cancellationToken)
+                            .ConfigureAwait(false);
+
+                        if (tokenResponse != null)
+                        {
+                            _logger.LogInformation("トークンリフレッシュ成功、Identity APIをリトライ");
+                            // リフレッシュトークンを更新
+                            _cachedCredentials = _cachedCredentials with
+                            {
+                                EncryptedRefreshToken = EncryptToken(tokenResponse.RefreshToken),
+                                RefreshTokenObtainedAt = DateTime.UtcNow
+                            };
+                            await SaveCredentialsAsync(_cachedCredentials, cancellationToken).ConfigureAwait(false);
+
+                            // リトライ（再帰呼び出し、isRetry=trueで無限ループ防止）
+                            return await GetPatreonIdentityAsync(tokenResponse.AccessToken, cancellationToken, isRetry: true)
+                                .ConfigureAwait(false);
+                        }
+                    }
+                }
+
+                _logger.LogWarning("トークンリフレッシュに失敗、再認証が必要です");
+                return null;
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -664,6 +711,19 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
                 return null;
             }
         }
+    }
+
+    /// <summary>
+    /// 識別子をマスク（ログ出力用）
+    /// 先頭4文字と末尾2文字を表示、中間を***でマスク
+    /// </summary>
+    private static string MaskIdentifier(string? id)
+    {
+        if (string.IsNullOrEmpty(id) || id.Length <= 6)
+        {
+            return "***";
+        }
+        return $"{id[..4]}***{id[^2..]}";
     }
 
     /// <summary>

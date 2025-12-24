@@ -111,17 +111,21 @@ public sealed class PatreonSettings
             warnings.Add("Patreon Client IDが設定されていません。Patreon連携は無効です。");
         }
 
-        // 中継サーバーURL検証
+        // 中継サーバーURL検証（HTTPS必須）
         if (!string.IsNullOrWhiteSpace(RelayServerUrl))
         {
             if (!Uri.TryCreate(RelayServerUrl, UriKind.Absolute, out var uri))
             {
                 errors.Add("中継サーバーURLは有効なURLである必要があります");
             }
-            else if (uri.Scheme != "https")
+            else if (uri.Scheme != Uri.UriSchemeHttps)
             {
-                warnings.Add("中継サーバーURLはHTTPSを推奨します（セキュリティ上の理由）");
+                errors.Add("中継サーバーURLはHTTPSである必要があります（セキュリティ要件）");
             }
+        }
+        else if (!string.IsNullOrWhiteSpace(ClientId))
+        {
+            errors.Add("中継サーバーURLが設定されていません");
         }
 
         // キャッシュ時間検証
