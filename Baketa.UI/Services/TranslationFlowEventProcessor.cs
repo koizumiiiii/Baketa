@@ -636,7 +636,7 @@ public class TranslationFlowEventProcessor :
                     if (!_firstResultEventSent)
                     {
                         _firstResultEventSent = true;
-                        Console.WriteLine("✅ [TranslationFlowEventProcessor] 最初の翻訳結果受信 - ローディング終了イベント発行");
+                        _logger?.LogDebug("✅ [TranslationFlowEventProcessor] 最初の翻訳結果受信 - ローディング終了イベント発行");
                         await _eventAggregator.PublishAsync(new FirstTranslationResultReceivedEvent()).ConfigureAwait(false);
                     }
 
