@@ -919,6 +919,9 @@ public class MainOverlayViewModel : ViewModelBase
                 this.RaisePropertyChanged(nameof(IsSelectWindowEnabled));
                 this.RaisePropertyChanged(nameof(SettingsEnabled));
                 this.RaisePropertyChanged(nameof(StartStopText));
+                // ボタン有効状態の通知
+                this.RaisePropertyChanged(nameof(IsLiveEnabled));
+                this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
             });
             
         // IsOcrInitializedプロパティの変更を監視
@@ -1691,8 +1694,10 @@ public class MainOverlayViewModel : ViewModelBase
 
             IsTranslationActive = isProcessing;
 
-            // 翻訳結果が返ってきた（または終了した）らローディングを終了
-            if (statusEvent.Status is TranslationStatus.Completed
+            // 翻訳処理が開始された（Translating）、または終了したらローディングを終了
+            // Live翻訳では Completed が発行されないため、Translating で終了する
+            if (statusEvent.Status is TranslationStatus.Translating
+                or TranslationStatus.Completed
                 or TranslationStatus.Error
                 or TranslationStatus.Cancelled
                 or TranslationStatus.Ready
@@ -1701,7 +1706,7 @@ public class MainOverlayViewModel : ViewModelBase
                 if (IsLoading)
                 {
                     IsLoading = false;
-                    Logger?.LogDebug($"✅ 翻訳完了によりローディング終了: Status={statusEvent.Status}");
+                    Logger?.LogDebug($"✅ ローディング終了: Status={statusEvent.Status}");
                 }
             }
         });
