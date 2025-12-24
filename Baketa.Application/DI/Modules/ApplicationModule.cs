@@ -190,7 +190,11 @@ public sealed class ApplicationModule : ServiceModuleBase
                 var pipelineService = provider.GetRequiredService<Baketa.Core.Abstractions.Processing.ISmartProcessingPipelineService>();
                 Console.WriteLine($"✅ [OPTION_A] ISmartProcessingPipelineService取得成功: {pipelineService.GetType().Name}");
 
-                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（6パラメータ）");
+                // [Issue #230] テキストベース変化検知サービス取得
+                var textChangeDetectionService = provider.GetService<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
+                Console.WriteLine($"✅ [Issue #230] ITextChangeDetectionService取得: {(textChangeDetectionService != null ? "成功" : "null (オプショナル)")}");
+
+                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（7パラメータ）");
                 var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
                 var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                     processingFacade,
@@ -198,8 +202,9 @@ public sealed class ApplicationModule : ServiceModuleBase
                     streamingService,
                     textChunkAggregatorService, // 🎯 [OPTION_A] 追加パラメータ
                     pipelineService, // 🎯 [OPTION_A] 追加パラメータ - SmartProcessingPipelineService統合
+                    textChangeDetectionService, // [Issue #230] テキストベース変化検知
                     logger);
-                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知統合済み");
+                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知統合済み");
                 return instance;
             }
             catch (Exception ex)

@@ -599,6 +599,15 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     /// </remarks>
     private bool IsTextDisappearance(ImageChangeResult changeResult)
     {
+        // [Issue #230] 画像変化のみに基づくテキスト消失検知を無効化
+        // 理由: 画面フリッカー（小さな画像変化 + 高SSIM）がテキスト消失と誤検知され、
+        //       オーバーレイが不正にクリアされる問題が発生
+        // 正しいアプローチ: テキスト変化検知（OCR結果の比較）に基づいて判断すべき
+        // 将来実装: OCR結果が「テキストあり→なし」に変化した場合のみイベント発行
+        _logger.LogTrace("🔍 [Issue #230] IsTextDisappearance: false - 画像変化のみでのテキスト消失検知は無効化");
+        return false;
+
+        /* [Issue #230] 旧ロジック - 画面フリッカーで誤検知するため無効化
         // 条件1: 画像に変化あり（前提条件、呼び出し元で既にチェック済みだが安全性のため再確認）
         if (!changeResult.HasChanged)
         {
@@ -634,5 +643,6 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             changeResult.DetectionStage);
 
         return true;
+        */
     }
 }

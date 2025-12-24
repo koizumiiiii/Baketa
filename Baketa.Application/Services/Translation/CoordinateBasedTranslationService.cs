@@ -13,6 +13,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
+// [Issue #230] テキストベース変化検知 - 画面点滅時の不要なOCR再実行を防止
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Logging;
@@ -43,6 +44,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly IStreamingTranslationService? _streamingTranslationService;
     private readonly ITextChunkAggregatorService _textChunkAggregatorService;
     private readonly ISmartProcessingPipelineService _pipelineService; // 🎯 [OPTION_A] 段階的フィルタリングパイプライン統合
+    private readonly ITextChangeDetectionService? _textChangeDetectionService; // [Issue #230] テキストベース変化検知
     private bool _disposed;
 
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
@@ -54,6 +56,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         IStreamingTranslationService? streamingTranslationService,
         ITextChunkAggregatorService textChunkAggregatorService,
         ISmartProcessingPipelineService pipelineService, // 🎯 [OPTION_A] 段階的フィルタリングパイプライン
+        ITextChangeDetectionService? textChangeDetectionService = null, // [Issue #230] テキストベース変化検知
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -61,6 +64,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _streamingTranslationService = streamingTranslationService;
         _textChunkAggregatorService = textChunkAggregatorService ?? throw new ArgumentNullException(nameof(textChunkAggregatorService));
         _pipelineService = pipelineService ?? throw new ArgumentNullException(nameof(pipelineService)); // 🎯 [OPTION_A] パイプラインサービス注入
+        _textChangeDetectionService = textChangeDetectionService; // [Issue #230] オプショナル（nullでも機能する）
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -297,6 +301,52 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             _logger?.LogInformation("✅ バッチOCR完了 - チャンク数: {ChunkCount}, 処理時間: {ProcessingTime}ms",
                 textChunks.Count, ocrProcessingTime.TotalMilliseconds);
+
+            // ============================================================
+            // 🎯 [Issue #230] テキストベース変化検知
+            // 画面点滅等の非テキスト変化でOCRが実行されても、
+            // テキストが前回と同じなら翻訳・オーバーレイ更新をスキップ
+            // ============================================================
+            if (_textChangeDetectionService != null && textChunks.Count > 0)
+            {
+                // コンテキストIDとしてウィンドウハンドルを使用
+                var contextId = $"window_{windowHandle.ToInt64():X}";
+
+                // 全TextChunksのテキストを結合（順序を統一するためY座標→X座標でソート）
+                var currentCombinedText = string.Join(" ", textChunks
+                    .OrderBy(c => c.CombinedBounds.Y)
+                    .ThenBy(c => c.CombinedBounds.X)
+                    .Select(c => c.CombinedText));
+
+                // 前回のテキストを取得
+                var previousText = _textChangeDetectionService.GetPreviousText(contextId);
+
+                if (previousText != null)
+                {
+                    // テキスト変化を検知
+                    var changeResult = await _textChangeDetectionService.DetectTextChangeAsync(
+                        previousText, currentCombinedText, contextId).ConfigureAwait(false);
+
+                    if (!changeResult.HasChanged)
+                    {
+                        // テキスト変化なし → 翻訳・オーバーレイ更新をスキップ
+                        _logger?.LogInformation("🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (変化率: {ChangePercentage:P1})",
+                            changeResult.ChangePercentage);
+                        Console.WriteLine($"🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (前回と同じテキスト)");
+                        return; // 早期リターン
+                    }
+
+                    _logger?.LogDebug("🎯 [Issue #230] テキスト変化検知 - 翻訳を続行 (変化率: {ChangePercentage:P1})",
+                        changeResult.ChangePercentage);
+                }
+                else
+                {
+                    _logger?.LogDebug("🎯 [Issue #230] 初回実行 - テキストをキャッシュ");
+                }
+
+                // 現在のテキストをキャッシュに保存（次回比較用）
+                _textChangeDetectionService.SetPreviousText(contextId, currentCombinedText);
+            }
 
             // [Issue #227] TimedChunkAggregatorにバッチ追加
             try

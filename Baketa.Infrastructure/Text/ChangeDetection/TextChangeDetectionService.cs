@@ -145,11 +145,24 @@ public class TextChangeDetectionService : ITextChangeDetectionService
 
     /// <summary>
     /// キャッシュから前回テキストを取得
+    /// [Issue #230] OCR完了後のテキスト変化検知に使用
     /// </summary>
     public string? GetPreviousText(string contextId)
     {
         _previousTextCache.TryGetValue(contextId, out var previousText);
         return previousText;
+    }
+
+    /// <summary>
+    /// 前回テキストをキャッシュに保存
+    /// [Issue #230] OCR完了後のテキスト変化検知に使用
+    /// </summary>
+    /// <param name="contextId">処理コンテキストID（ウィンドウハンドル等）</param>
+    /// <param name="text">保存するテキスト</param>
+    public void SetPreviousText(string contextId, string text)
+    {
+        _previousTextCache.AddOrUpdate(contextId, text, (_, _) => text);
+        _logger.LogDebug("前回テキストキャッシュ更新 - Context: {ContextId}, TextLength: {Length}", contextId, text.Length);
     }
 
     /// <summary>
