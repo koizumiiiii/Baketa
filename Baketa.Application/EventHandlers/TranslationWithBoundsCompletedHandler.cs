@@ -192,8 +192,11 @@ public class TranslationWithBoundsCompletedHandler(
                     Console.WriteLine($"✅ [PHASE18_HANDLER] 統一システム表示成功 - ID: {eventData.Id}");
 
                     // 翻訳結果表示成功 - ローディング終了イベントを発行
-                    _logger.LogDebug("✅ [LOADING_END] 翻訳結果表示成功 - FirstTranslationResultReceivedEvent発行");
-                    await _eventAggregator.PublishAsync(new FirstTranslationResultReceivedEvent()).ConfigureAwait(false);
+                    var loadingEndEvent = new FirstTranslationResultReceivedEvent();
+                    _logger.LogWarning("✅ [LOADING_END] 翻訳結果表示成功 - FirstTranslationResultReceivedEvent発行開始 ID: {EventId}, 型: {EventType}",
+                        loadingEndEvent.Id, loadingEndEvent.GetType().FullName);
+                    await _eventAggregator.PublishAsync(loadingEndEvent).ConfigureAwait(false);
+                    _logger.LogWarning("✅ [LOADING_END] FirstTranslationResultReceivedEvent発行完了");
 
                     // ✅ [DUPLICATE_FIX] 統一システム成功時はLegacyシステムをスキップ
                     Console.WriteLine($"🚫 [DUPLICATE_FIX] 統一システム成功のため既存システムスキップ - ID: {eventData.Id}");

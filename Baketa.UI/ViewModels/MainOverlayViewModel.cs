@@ -890,7 +890,9 @@ public class MainOverlayViewModel : ViewModelBase
         SubscribeToEvent<Baketa.Core.Events.EventTypes.PythonServerStatusChangedEvent>(OnPythonServerStatusChanged);
 
         // 最初の翻訳結果受信イベントの購読（ローディング終了用）
+        Logger?.LogWarning("🔔 [SUBSCRIBE] FirstTranslationResultReceivedEvent購読開始 - 型: {EventType}", typeof(FirstTranslationResultReceivedEvent).FullName);
         SubscribeToEvent<FirstTranslationResultReceivedEvent>(OnFirstTranslationResultReceived);
+        Logger?.LogWarning("🔔 [SUBSCRIBE] FirstTranslationResultReceivedEvent購読完了");
     }
 
     private void InitializePropertyChangeHandlers()
@@ -1734,14 +1736,21 @@ public class MainOverlayViewModel : ViewModelBase
     /// <summary>
     /// 最初の翻訳結果受信イベントハンドラー（ローディング終了用）
     /// </summary>
-    private async Task OnFirstTranslationResultReceived(FirstTranslationResultReceivedEvent _)
+    private async Task OnFirstTranslationResultReceived(FirstTranslationResultReceivedEvent evt)
     {
+        Logger?.LogWarning("🔔 [LOADING_END] FirstTranslationResultReceivedEvent受信! ID: {EventId}", evt.Id);
+
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
         {
+            Logger?.LogWarning("🔔 [LOADING_END] UIスレッドで処理開始 - IsLoading: {IsLoading}", IsLoading);
             if (IsLoading)
             {
                 IsLoading = false;
-                Logger?.LogDebug("✅ 最初の翻訳結果受信によりローディング終了");
+                Logger?.LogWarning("✅ [LOADING_END] 最初の翻訳結果受信によりローディング終了 - IsLoading=false");
+            }
+            else
+            {
+                Logger?.LogWarning("⚠️ [LOADING_END] 既にIsLoading=false のため変更なし");
             }
         });
     }

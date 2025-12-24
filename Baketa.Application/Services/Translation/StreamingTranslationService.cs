@@ -171,7 +171,20 @@ public class StreamingTranslationService : IStreamingTranslationService
 
         stopwatch.Stop();
         _logger.LogInformation("✅ [STREAMING] バッチ翻訳完了 - 総時間: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
-        Console.WriteLine($"✅ [STREAMING] バッチ翻訳完了 - 総時間: {stopwatch.ElapsedMilliseconds}ms");
+
+        // 🔔 [LOADING_END] 翻訳完了イベントを発行してローディング終了を通知
+        if (_eventAggregator != null)
+        {
+            try
+            {
+                await _eventAggregator.PublishAsync(new FirstTranslationResultReceivedEvent()).ConfigureAwait(false);
+                _logger.LogWarning("✅ [LOADING_END] FirstTranslationResultReceivedEvent発行完了 (StreamingTranslationService)");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ [LOADING_END] FirstTranslationResultReceivedEvent発行失敗");
+            }
+        }
 
         return [.. results];
     }
