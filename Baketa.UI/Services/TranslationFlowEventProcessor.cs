@@ -59,6 +59,8 @@ public class TranslationFlowEventProcessor :
     // Stop機能: CancellationToken による確実な停止制御
     private CancellationTokenSource? _currentTranslationCancellationSource;
 
+    // ローディング終了イベント発行済みフラグ（翻訳セッションごとにリセット）
+    private bool _firstResultEventSent;
 
     public TranslationFlowEventProcessor(
         ILogger<TranslationFlowEventProcessor> logger,
@@ -607,6 +609,7 @@ public class TranslationFlowEventProcessor :
             _currentTranslationCancellationSource?.Dispose();
             _currentTranslationCancellationSource = new CancellationTokenSource();
             var cancellationToken = _currentTranslationCancellationSource.Token;
+            _firstResultEventSent = false; // 新しい翻訳セッション開始時にリセット
 
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] Observable購読オブジェクト作成開始（CancellationToken制御付き）");
             _continuousTranslationSubscription = _translationService.TranslationResults
@@ -628,6 +631,15 @@ public class TranslationFlowEventProcessor :
                         Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🚫 無効な翻訳結果のため表示をスキップ: '{result.TranslatedText}'");
                         return;
                     }
+
+                    // 最初の有効な翻訳結果受信時にローディング終了イベントを発行
+                    if (!_firstResultEventSent)
+                    {
+                        _firstResultEventSent = true;
+                        Console.WriteLine("✅ [TranslationFlowEventProcessor] 最初の翻訳結果受信 - ローディング終了イベント発行");
+                        await _eventAggregator.PublishAsync(new FirstTranslationResultReceivedEvent()).ConfigureAwait(false);
+                    }
+
                     _logger?.LogDebug($"📝 継続的翻訳結果受信:");
                     _logger?.LogDebug($"   📖 オリジナル: '{result.OriginalText}'");
                     _logger?.LogDebug($"   🌐 翻訳結果: '{result.TranslatedText}'");

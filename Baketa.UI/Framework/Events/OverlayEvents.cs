@@ -153,6 +153,17 @@ public class TranslationDisplayVisibilityChangedEvent(bool isVisible) : IEvent
 // TranslationResultDisplayEvent は削除 - マルチウィンドウオーバーレイシステムに移行
 
 /// <summary>
+/// 最初の翻訳結果受信イベント（ローディング終了用）
+/// </summary>
+public class FirstTranslationResultReceivedEvent : IEvent
+{
+    public Guid Id { get; } = Guid.NewGuid();
+    public DateTime Timestamp { get; } = DateTime.UtcNow;
+    public string Name { get; } = nameof(FirstTranslationResultReceivedEvent);
+    public string Category { get; } = "Translation";
+}
+
+/// <summary>
 /// 設定変更イベント
 /// </summary>
 public class SettingsChangedEvent : IEvent

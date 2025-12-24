@@ -888,6 +888,9 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 🔥 [PHASE2_PROBLEM2] Pythonサーバー状態変更イベントの購読（翻訳エンジン初期化完了検知）
         SubscribeToEvent<Baketa.Core.Events.EventTypes.PythonServerStatusChangedEvent>(OnPythonServerStatusChanged);
+
+        // 最初の翻訳結果受信イベントの購読（ローディング終了用）
+        SubscribeToEvent<FirstTranslationResultReceivedEvent>(OnFirstTranslationResultReceived);
     }
 
     private void InitializePropertyChangeHandlers()
@@ -1694,10 +1697,9 @@ public class MainOverlayViewModel : ViewModelBase
 
             IsTranslationActive = isProcessing;
 
-            // 翻訳処理が開始された（Translating）、または終了したらローディングを終了
-            // Live翻訳では Completed が発行されないため、Translating で終了する
-            if (statusEvent.Status is TranslationStatus.Translating
-                or TranslationStatus.Completed
+            // 翻訳が終了・エラー・キャンセルされたらローディングを終了
+            // 通常の終了は FirstTranslationResultReceivedEvent で処理
+            if (statusEvent.Status is TranslationStatus.Completed
                 or TranslationStatus.Error
                 or TranslationStatus.Cancelled
                 or TranslationStatus.Ready
@@ -1727,6 +1729,21 @@ public class MainOverlayViewModel : ViewModelBase
         });
 
         Logger?.LogDebug("Translation display visibility changed: {IsVisible}", visibilityEvent.IsVisible);
+    }
+
+    /// <summary>
+    /// 最初の翻訳結果受信イベントハンドラー（ローディング終了用）
+    /// </summary>
+    private async Task OnFirstTranslationResultReceived(FirstTranslationResultReceivedEvent _)
+    {
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (IsLoading)
+            {
+                IsLoading = false;
+                Logger?.LogDebug("✅ 最初の翻訳結果受信によりローディング終了");
+            }
+        });
     }
 
     /// <summary>
