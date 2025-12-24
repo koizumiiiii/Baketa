@@ -1262,6 +1262,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 _logger?.LogInformation("単発翻訳が完了しました: ID={Id}, テキスト長={Length}",
                     translationId, result.TranslatedText.Length);
+
+                // 🔔 [LOADING_END] シングルショット翻訳完了イベントを発行してローディング終了を通知
+                await _eventAggregator.PublishAsync(new FirstTranslationResultReceivedEvent()).ConfigureAwait(false);
+                _logger?.LogWarning("✅ [LOADING_END] FirstTranslationResultReceivedEvent発行完了 (Singleshot)");
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
