@@ -9,6 +9,7 @@ using Baketa.Infrastructure.License.Clients;
 using Baketa.Infrastructure.License.Services;
 using Baketa.Infrastructure.Payment.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.DI.Modules;
@@ -55,9 +56,14 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddOptions<PaymentSettings>()
             .BindConfiguration(PaymentSettings.SectionName);
 
+        // PatreonSettings をオプションとして登録
+        services.AddOptions<PatreonSettings>()
+            .BindConfiguration(PatreonSettings.SectionName);
+
         // 設定バリデータの登録
         services.AddSingleton<IValidateOptions<LicenseSettings>, LicenseSettingsValidator>();
         services.AddSingleton<IValidateOptions<PaymentSettings>, PaymentSettingsValidator>();
+        services.AddSingleton<IValidateOptions<PatreonSettings>, PatreonSettingsValidator>();
     }
 
     /// <summary>
@@ -84,26 +90,48 @@ public sealed class LicenseModule : ServiceModuleBase
 
     /// <summary>
     /// APIクライアントを登録
-    /// 設定に応じてモッククライアントまたは本番クライアントを使用
+    /// 設定に応じてモッククライアント、Patreon、またはSupabaseクライアントを使用
     /// </summary>
     private static void RegisterApiClient(IServiceCollection services)
     {
-        // 両方のクライアントを登録
+        // HttpClient登録（Patreon用）
+        services.AddHttpClient<PatreonOAuthService>();
+
+        // PatreonOAuthService登録
+        services.AddSingleton<PatreonOAuthService>();
+        services.AddSingleton<IPatreonOAuthService>(provider =>
+            provider.GetRequiredService<PatreonOAuthService>());
+
+        // 各クライアントを登録
         services.AddSingleton<MockLicenseApiClient>();
-        services.AddSingleton<SupabaseLicenseApiClient>();
+        services.AddSingleton<PatreonLicenseClient>();
+        // SupabaseLicenseApiClient は Patreon移行後は使用しないが、後方互換のため残す
+        // services.AddSingleton<SupabaseLicenseApiClient>();
 
         // 設定に基づいて適切なクライアントを選択
         services.AddSingleton<ILicenseApiClient>(provider =>
         {
-            var settings = provider.GetRequiredService<IOptions<LicenseSettings>>().Value;
+            var licenseSettings = provider.GetRequiredService<IOptions<LicenseSettings>>().Value;
+            var patreonSettings = provider.GetRequiredService<IOptions<PatreonSettings>>().Value;
+            var logger = provider.GetRequiredService<ILogger<LicenseModule>>();
 
-            if (settings.EnableMockMode)
+            // モックモードが有効な場合
+            if (licenseSettings.EnableMockMode)
             {
+                logger.LogInformation("🔧 ライセンスAPIクライアント: MockLicenseApiClient");
                 return provider.GetRequiredService<MockLicenseApiClient>();
             }
 
-            // 本番環境ではSupabaseLicenseApiClientを使用
-            return provider.GetRequiredService<SupabaseLicenseApiClient>();
+            // Patreon Client IDが設定されている場合はPatreonを使用
+            if (!string.IsNullOrWhiteSpace(patreonSettings.ClientId))
+            {
+                logger.LogInformation("🔗 ライセンスAPIクライアント: PatreonLicenseClient");
+                return provider.GetRequiredService<PatreonLicenseClient>();
+            }
+
+            // どちらも設定されていない場合はモッククライアントにフォールバック
+            logger.LogWarning("⚠️ ライセンス設定が不完全です。モッククライアントを使用します。");
+            return provider.GetRequiredService<MockLicenseApiClient>();
         });
     }
 
@@ -194,6 +222,28 @@ public sealed class PaymentSettingsValidator : IValidateOptions<PaymentSettings>
         {
             var errors = validationResult.GetErrorMessages();
             return ValidateOptionsResult.Fail($"決済設定の検証に失敗しました: {errors}");
+        }
+
+        return ValidateOptionsResult.Success;
+    }
+}
+
+/// <summary>
+/// Patreon設定バリデータ
+/// </summary>
+public sealed class PatreonSettingsValidator : IValidateOptions<PatreonSettings>
+{
+    /// <summary>
+    /// Patreon設定を検証
+    /// </summary>
+    public ValidateOptionsResult Validate(string? name, PatreonSettings options)
+    {
+        var validationResult = options.ValidateSettings();
+
+        if (!validationResult.IsValid)
+        {
+            var errors = validationResult.GetErrorMessages();
+            return ValidateOptionsResult.Fail($"Patreon設定の検証に失敗しました: {errors}");
         }
 
         return ValidateOptionsResult.Success;

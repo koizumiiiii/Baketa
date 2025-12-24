@@ -728,6 +728,26 @@
     <value>Failed to open plan change page</value>
   </data>
 
+  <!-- Patreon Integration -->
+  <data name="Settings_License_PatreonIntegration" xml:space="preserve">
+    <value>Patreon Integration</value>
+  </data>
+  <data name="Settings_License_PatreonStatus" xml:space="preserve">
+    <value>Connection Status</value>
+  </data>
+  <data name="Settings_License_LastSync" xml:space="preserve">
+    <value>Last Sync</value>
+  </data>
+  <data name="Settings_License_ConnectPatreon" xml:space="preserve">
+    <value>Connect to Patreon</value>
+  </data>
+  <data name="Settings_License_DisconnectPatreon" xml:space="preserve">
+    <value>Disconnect</value>
+  </data>
+  <data name="Settings_License_SyncPatreon" xml:space="preserve">
+    <value>Sync</value>
+  </data>
+
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">
     <value>Advanced Settings</value>
