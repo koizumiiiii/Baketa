@@ -775,9 +775,8 @@ internal sealed partial class App : Avalonia.Application
             else
             {
                 // 環境変数が設定されていない場合：設定は有効だがテストモードは無効
-                warningTitle = "⚠️ テストモード設定警告";
-                warningMessage = $"決済モック設定が有効ですが、環境変数 {TestModeEnvVar}=true が未設定のため、" +
-                                "プラン即時変更は無効です。テストモードを有効にするには環境変数を設定してください。";
+                warningTitle = "⚠️ テストモード警告";
+                warningMessage = $"モック設定有効、環境変数 {TestModeEnvVar}=true 未設定";
 
                 Console.WriteLine("   ⚠️ テストモード部分有効（プラン即時変更は無効）");
                 Console.WriteLine($"   → 有効化するには: set {TestModeEnvVar}=true");

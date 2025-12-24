@@ -87,9 +87,9 @@ public sealed class AvaloniaNotificationService : INotificationService, IDisposa
             {
                 _notificationManager = new WindowNotificationManager(mainWindow)
                 {
-                    Position = NotificationPosition.BottomRight,
+                    Position = NotificationPosition.TopRight,
                     MaxItems = 5,
-                    Margin = new Thickness(0, 0, 15, 40)
+                    Margin = new Thickness(0, 40, 15, 0)
                 };
 
                 _logger.LogDebug("WindowNotificationManager が正常に初期化されました");
