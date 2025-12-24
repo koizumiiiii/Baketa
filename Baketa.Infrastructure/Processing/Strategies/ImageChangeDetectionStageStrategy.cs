@@ -87,10 +87,8 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             {
                 if (_previousImages.TryRemove(contextId, out var oldImage))
                 {
-                    if (oldImage is IDisposable disposable)
-                    {
-                        disposable.Dispose();
-                    }
+                    // IImage は IDisposable を継承しているため、直接 Dispose() を呼び出す
+                    oldImage.Dispose();
                 }
                 _previousImages[contextId] = currentImage;
             }

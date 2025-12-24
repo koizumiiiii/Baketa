@@ -111,8 +111,8 @@ public class TranslationFlowEventProcessor :
         }
 
         Console.WriteLine($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
-        // 🔥 [CRITICAL_FIX] _logger?.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
-        // _logger?.LogDebug($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
+        // 🔥 [CRITICAL_FIX] _logger.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
+        // _logger.LogDebug($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
         Console.WriteLine($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
         Console.WriteLine($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
 
@@ -123,9 +123,9 @@ public class TranslationFlowEventProcessor :
         // 🚨 デッドロック問題修正: ログ出力を例外処理で囲む
         try
         {
-            _logger?.LogDebug($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
-            _logger?.LogDebug($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
-            _logger?.LogDebug($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
+            _logger.LogDebug($"🚀 TranslationFlowEventProcessor.HandleAsync開始: {eventData.Id}");
+            _logger.LogDebug($"🔍 ターゲットウィンドウ: {eventData.TargetWindow?.Title ?? "null"} (Handle={eventData.TargetWindow?.Handle ?? IntPtr.Zero})");
+            _logger.LogDebug($"🔍 現在の購読状態: {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
         }
         catch (Exception logEx)
         {
@@ -146,26 +146,26 @@ public class TranslationFlowEventProcessor :
         */
 
         Console.WriteLine("🔍 [LINE_139_DEBUG] Line 139到達 - _logger.LogInformation呼び出し直前");
-        // 🔥 [CRITICAL_FIX] _logger?.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
-        // _logger?.LogDebug("🔍 [LINE_139_DEBUG] Line 139到達 - _logger.LogInformation呼び出し直前");
+        // 🔥 [CRITICAL_FIX] _logger.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
+        // _logger.LogDebug("🔍 [LINE_139_DEBUG] Line 139到達 - _logger.LogInformation呼び出し直前");
 
         _logger.LogInformation("🚀 HandleAsync(StartTranslationRequestEvent) 呼び出し開始: {EventId}", eventData.Id);
 
         Console.WriteLine("🔍 [LINE_141_DEBUG] Line 141到達 - _logger.LogInformation(1)完了");
-        // 🔥 [CRITICAL_FIX] _logger?.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
-        // _logger?.LogDebug("🔍 [LINE_141_DEBUG] Line 141到達 - _logger.LogInformation(1)完了");
+        // 🔥 [CRITICAL_FIX] _logger.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
+        // _logger.LogDebug("🔍 [LINE_141_DEBUG] Line 141到達 - _logger.LogInformation(1)完了");
 
         _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})",
             eventData.TargetWindow?.Title ?? "null", eventData.TargetWindow?.Handle ?? IntPtr.Zero);
 
         Console.WriteLine("🔍 [LINE_145_DEBUG] Line 145到達 - START_FIX処理開始直前");
-        // 🔥 [CRITICAL_FIX] _logger?.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
-        // _logger?.LogDebug("🔍 [LINE_145_DEBUG] Line 145到達 - START_FIX処理開始直前");
+        // 🔥 [CRITICAL_FIX] _logger.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
+        // _logger.LogDebug("🔍 [LINE_145_DEBUG] Line 145到達 - START_FIX処理開始直前");
 
         // 🔥 [CRITICAL_VERIFICATION] DLLビルド検証用 - Line 156直前のチェックポイント
         Console.WriteLine("🚨🚨🚨 [LINE_156_VERIFICATION] Line 156実行直前 - このログが出ればDLLは最新版");
-        // 🔥 [CRITICAL_FIX] _logger?.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
-        // _logger?.LogDebug("🚨🚨🚨 [LINE_156_VERIFICATION] Line 156実行直前 - このログが出ればDLLは最新版");
+        // 🔥 [CRITICAL_FIX] _logger.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
+        // _logger.LogDebug("🚨🚨🚨 [LINE_156_VERIFICATION] Line 156実行直前 - このログが出ればDLLは最新版");
 
         // 🧹 [START_FIX] 画像変化検知履歴をクリア（初回キャプチャ/Stop→Start後の初回翻訳を確実に実行）
         Console.WriteLine("🧹 [START_FIX] Start時: 画像変化検知履歴をクリア中...");
@@ -200,8 +200,8 @@ public class TranslationFlowEventProcessor :
         {
             var errorMessage = "ターゲットウィンドウがnullです";
             Console.WriteLine($"❌ {errorMessage}");
-            // 🔥 [CRITICAL_FIX] _logger?.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
-            // _logger?.LogDebug($"❌ {errorMessage}");
+            // 🔥 [CRITICAL_FIX] _logger.LogDebugがデッドロックを引き起こすため一時的にコメントアウト
+            // _logger.LogDebug($"❌ {errorMessage}");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ {errorMessage}");
             _logger.LogError("{ErrorMessage}", errorMessage);
             return;
@@ -601,8 +601,8 @@ public class TranslationFlowEventProcessor :
             // 2. 翻訳結果のObservableを購読してUIイベントに変換（Stop機能: CancellationToken制御追加）
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] ステップ2 - Observable購読設定開始");
             _logger.LogDebug("Setting up translation result subscription for continuous translation");
-            _logger?.LogDebug("🔗 継続翻訳結果のObservable購読を設定中");
-            _logger?.LogDebug($"🔍 現在の購読状態(設定前): {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
+            _logger.LogDebug("🔗 継続翻訳結果のObservable購読を設定中");
+            _logger.LogDebug($"🔍 現在の購読状態(設定前): {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
 
             // 🚀 Stop機能: 新しい翻訳セッション開始時に古いCancellationTokenをキャンセル
             _currentTranslationCancellationSource?.Cancel();
@@ -636,15 +636,15 @@ public class TranslationFlowEventProcessor :
                     if (!_firstResultEventSent)
                     {
                         _firstResultEventSent = true;
-                        _logger?.LogDebug("✅ [TranslationFlowEventProcessor] 最初の翻訳結果受信 - ローディング終了イベント発行");
+                        _logger.LogDebug("✅ [TranslationFlowEventProcessor] 最初の翻訳結果受信 - ローディング終了イベント発行");
                         await _eventAggregator.PublishAsync(new FirstTranslationResultReceivedEvent()).ConfigureAwait(false);
                     }
 
-                    _logger?.LogDebug($"📝 継続的翻訳結果受信:");
-                    _logger?.LogDebug($"   📖 オリジナル: '{result.OriginalText}'");
-                    _logger?.LogDebug($"   🌐 翻訳結果: '{result.TranslatedText}'");
-                    _logger?.LogDebug($"   📊 信頼度: {result.Confidence}");
-                    _logger?.LogDebug($"   🎯 座標ベースモード: {result.IsCoordinateBasedMode}");
+                    _logger.LogDebug($"📝 継続的翻訳結果受信:");
+                    _logger.LogDebug($"   📖 オリジナル: '{result.OriginalText}'");
+                    _logger.LogDebug($"   🌐 翻訳結果: '{result.TranslatedText}'");
+                    _logger.LogDebug($"   📊 信頼度: {result.Confidence}");
+                    _logger.LogDebug($"   🎯 座標ベースモード: {result.IsCoordinateBasedMode}");
 
                     Console.WriteLine($"📝 [TranslationFlowEventProcessor] 継続的翻訳結果受信:");
                     Console.WriteLine($"   📖 オリジナル: '{result.OriginalText}'");
@@ -657,13 +657,13 @@ public class TranslationFlowEventProcessor :
                     // 座標ベース翻訳の場合は既にオーバーレイで表示されているためスキップ
                     if (result.IsCoordinateBasedMode)
                     {
-                        _logger?.LogDebug($"🎯 座標ベース翻訳モードのため、既にAR表示済み - フォールバック表示をスキップ");
+                        _logger.LogDebug($"🎯 座標ベース翻訳モードのため、既にAR表示済み - フォールバック表示をスキップ");
                         _logger.LogDebug("座標ベース翻訳結果は既に表示済み - フォールバック表示をスキップ");
                         return;
                     }
 
                     // 従来モードの場合のみフォールバック表示を実行
-                    _logger?.LogDebug($"📄 従来翻訳モード - フォールバック表示を実行");
+                    _logger.LogDebug($"📄 従来翻訳モード - フォールバック表示を実行");
 
                     // フォールバック: 簡易TextChunkを作成（従来システム用）
                     var textChunk = new Baketa.Core.Abstractions.Translation.TextChunk
@@ -678,10 +678,10 @@ public class TranslationFlowEventProcessor :
                     };
 
                     var textChunks = new List<Baketa.Core.Abstractions.Translation.TextChunk> { textChunk };
-                    _logger?.LogDebug($"🔍 フォールバックTextChunk作成: '{result.OriginalText}' -> '{result.TranslatedText}'");
+                    _logger.LogDebug($"🔍 フォールバックTextChunk作成: '{result.OriginalText}' -> '{result.TranslatedText}'");
 
                     // 🎯 [OVERLAY_FIX] 従来モードでもオーバーレイ表示を実行
-                    _logger?.LogDebug("🎯 従来モードでオーバーレイ表示を実行中...");
+                    _logger.LogDebug("🎯 従来モードでオーバーレイ表示を実行中...");
                     Console.WriteLine($"🎯 [OVERLAY_FIX] 翻訳結果オーバーレイ表示開始: '{result.TranslatedText}'");
 
                     try
@@ -690,22 +690,22 @@ public class TranslationFlowEventProcessor :
                         // PHASE18統一システム (TranslationWithBoundsCompletedHandler) で既に表示されているため、重複防止で削除
                         // await _inPlaceOverlayManager.ShowInPlaceOverlayAsync(textChunk).ConfigureAwait(false);
                         Console.WriteLine($"🚫 [DUPLICATE_FIX] TranslationFlow直接表示スキップ - PHASE18統一システム使用: '{result.TranslatedText}'");
-                        _logger?.LogDebug("✅ オーバーレイ表示完了");
+                        _logger.LogDebug("✅ オーバーレイ表示完了");
                         Console.WriteLine($"✅ [OVERLAY_FIX] オーバーレイ表示成功: ChunkId={textChunk.ChunkId}");
                     }
                     catch (Exception overlayEx)
                     {
                         _logger.LogError(overlayEx, "オーバーレイ表示エラー: {Error}", overlayEx.Message);
                         Console.WriteLine($"❌ [OVERLAY_FIX] オーバーレイ表示エラー: {overlayEx.Message}");
-                        _logger?.LogDebug($"❌ オーバーレイ表示エラー: {overlayEx.Message}");
+                        _logger.LogDebug($"❌ オーバーレイ表示エラー: {overlayEx.Message}");
                     }
                 });
 
             // 3. 継続的翻訳を開始
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] ステップ3 - TranslationService呼び出し開始");
             _logger.LogDebug("Starting continuous automatic translation");
-            _logger?.LogDebug("🏁 TranslationService.StartAutomaticTranslationAsync呼び出し中...");
-            _logger?.LogDebug($"   🔍 サービス状態: {(_translationService != null ? "利用可能" : "null")}");
+            _logger.LogDebug("🏁 TranslationService.StartAutomaticTranslationAsync呼び出し中...");
+            _logger.LogDebug($"   🔍 サービス状態: {(_translationService != null ? "利用可能" : "null")}");
 
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [ProcessTranslationAsync] _translationService の実際の型: {_translationService?.GetType()?.FullName ?? "null"}");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔍 [ProcessTranslationAsync] _translationService のハッシュコード: {_translationService?.GetHashCode() ?? -1}");
@@ -728,12 +728,12 @@ public class TranslationFlowEventProcessor :
             }
 
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] StartAutomaticTranslationAsync呼び出し完了");
-            _logger?.LogDebug("🏁 TranslationService.StartAutomaticTranslationAsync完了");
-            _logger?.LogDebug($"   🔍 自動翻訳アクティブ: {_translationService.IsAutomaticTranslationActive}");
+            _logger.LogDebug("🏁 TranslationService.StartAutomaticTranslationAsync完了");
+            _logger.LogDebug($"   🔍 自動翻訳アクティブ: {_translationService.IsAutomaticTranslationActive}");
 
             _logger.LogInformation("✅ Continuous translation started successfully for window: {WindowTitle}", targetWindow.Title);
-            _logger?.LogDebug($"✅ 継続的翻訳開始完了: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle})");
-            _logger?.LogDebug($"🔍 購読状態(終了時): {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
+            _logger.LogDebug($"✅ 継続的翻訳開始完了: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle})");
+            _logger.LogDebug($"🔍 購読状態(終了時): {(_continuousTranslationSubscription != null ? "アクティブ" : "null")}");
             // System.IO.File.AppendAllText("debug_app_logs.txt", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ✅ 継続的翻訳開始: ウィンドウ '{targetWindow.Title}' (Handle={targetWindow.Handle}){Environment.NewLine}");
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔄 [ProcessTranslationAsync] try ブロック正常終了");
         }
@@ -756,7 +756,7 @@ public class TranslationFlowEventProcessor :
     private async Task DisplayErrorMessageAsync(Exception exception)
     {
         // エラー表示は削除済み - ARシステムが自動で管理
-        _logger?.LogDebug($"⚠️ エラー表示は削除済み - ARシステムで自動管理: {exception.Message}");
+        _logger.LogDebug($"⚠️ エラー表示は削除済み - ARシステムで自動管理: {exception.Message}");
 
         var errorStatusEvent = new TranslationStatusChangedEvent(TranslationStatus.Idle);
         await _eventAggregator.PublishAsync(errorStatusEvent).ConfigureAwait(false);

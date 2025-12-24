@@ -302,7 +302,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         }
 
         // Stage 1が初回検知の場合、Stage 2キャッシュクリア
-        if (quickResult.MaxSimilarity == 0.0f)
+        // 浮動小数点の等値比較を避けるため、小さな閾値で比較
+        if (quickResult.MaxSimilarity <= float.Epsilon)
         {
             _imageHashCache.TryRemove(contextId, out _);
         }

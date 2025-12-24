@@ -189,11 +189,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     // ボーダーライン条件を満たす → 緩和閾値で採用
                     passedChunks.Add(chunk);
                     borderlineAcceptedCount++;
+                    // IsNoisePattern が false を返した時点で chunk.CombinedText は null でないことが保証される
                     _logger.LogInformation(
                         "🔍 [OCR_CHUNK] ✅BORDERLINE Conf={Confidence:F3} RelaxedThreshold={RelaxedThreshold:F2} " +
                         "TextLen={TextLen} Height={Height} AspectRatio={AspectRatio:F1} Text='{Text}'",
                         confidence, borderlineRelaxedThreshold, textLength, boundsHeight, aspectRatio,
-                        chunk.CombinedText?.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
+                        chunk.CombinedText.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
                     Console.WriteLine($"🎯 [BORDERLINE_ACCEPTED] Conf={confidence:F3} Text='{chunk.CombinedText}'");
                     continue;
                 }
@@ -807,7 +808,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             if (count >= minRepetitionCount)
             {
                 // テキストの50%以上が同じフレーズの繰り返しで構成されている
-                var repetitionRatio = (double)(phrase.Length * count) / text.Length;
+                var repetitionRatio = (double)phrase.Length * count / text.Length;
                 if (repetitionRatio >= 0.5)
                 {
                     // Geminiレビュー反映: Console.WriteLineは開発時の確認用として残す
