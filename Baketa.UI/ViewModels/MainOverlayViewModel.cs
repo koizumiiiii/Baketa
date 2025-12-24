@@ -1642,11 +1642,18 @@ public class MainOverlayViewModel : ViewModelBase
             // 🔥 [ISSUE#163_TOGGLE] オーバーレイ非表示時: 翻訳実行
             Logger?.LogInformation("シングルショット翻訳実行開始");
 
+            // 🔔 [LOADING] ローディング表示開始
+            IsLoading = true;
+            Logger?.LogDebug("🔄 [LOADING] シングルショット翻訳ローディング開始");
+
             // ウィンドウが選択されているか確認
             var selectedWindow = SelectedWindow;
             if (selectedWindow == null)
             {
                 Logger?.LogWarning("ウィンドウが選択されていない状態でシングルショット翻訳が要求されました");
+
+                // 🔔 [LOADING] エラー時はローディング終了
+                IsLoading = false;
 
                 // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
                 await _errorNotificationService.ShowErrorAsync(
@@ -1674,6 +1681,9 @@ public class MainOverlayViewModel : ViewModelBase
         catch (Exception ex)
         {
             Logger?.LogError(ex, "シングルショット翻訳実行中にエラーが発生: {ErrorMessage}", ex.Message);
+
+            // 🔔 [LOADING] エラー時はローディング終了
+            IsLoading = false;
 
             // エラー時は状態をリセット
             IsSingleshotOverlayVisible = false;
