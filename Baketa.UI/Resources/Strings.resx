@@ -748,6 +748,50 @@
     <value>同期</value>
   </data>
 
+  <!-- Patreon Integration (Account Settings) -->
+  <data name="Settings_Account_PatreonSection" xml:space="preserve">
+    <value>Patreon連携</value>
+  </data>
+  <data name="Settings_Account_PatreonUserFallback" xml:space="preserve">
+    <value>Patreonユーザー</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanLabel" xml:space="preserve">
+    <value>プラン:</value>
+  </data>
+  <data name="Settings_Account_PatreonLastSync" xml:space="preserve">
+    <value>最終同期: {0}</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncNow" xml:space="preserve">
+    <value>今すぐ同期</value>
+  </data>
+  <data name="Settings_Account_PatreonDisconnect" xml:space="preserve">
+    <value>連携解除</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectTitle" xml:space="preserve">
+    <value>Patreonアカウントと連携</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
+    <value>Patreonで支援中のアカウントと連携すると、広告なし・クラウドAI翻訳などの特典が利用できます</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
+    <value>Patreonと連携する</value>
+  </data>
+  <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
+    <value>利用可能なプラン:</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanStandard" xml:space="preserve">
+    <value>• Standard ($1/月): 広告なし</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
+    <value>• Pro ($3/月): クラウドAI翻訳 400万トークン/月</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPremia" xml:space="preserve">
+    <value>• Premia ($5/月): クラウドAI翻訳 800万トークン/月</value>
+  </data>
+  <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
+    <value>メールでログイン（オプション）</value>
+  </data>
+
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">
     <value>拡張設定</value>
