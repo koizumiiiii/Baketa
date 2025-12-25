@@ -516,9 +516,168 @@ HKCU\Software\Classes\baketa
 - **アクセストークン**: Windows Credential Manager（DPAPI暗号化）
 - **リフレッシュトークン**: Windows Credential Manager（DPAPI暗号化）
 
-## 9. 関連ドキュメント
+## 9. Patreon リレーサーバー
+
+*更新日: 2025年12月25日*
+
+Patreon OAuth認証のセキュリティを強化するため、Cloudflare Workers上でリレーサーバーを運用しています。
+
+### 9.1 概要
+
+リレーサーバーは以下の目的で導入されました：
+
+1. **クライアントシークレット保護**: Patreonクライアントシークレットをサーバー側で管理
+2. **トークン隠蔽**: アクセストークンをクライアントに渡さず、セッショントークンで管理
+3. **セキュリティ強化**: タイミング攻撃対策、redirect_uri検証等
+
+### 9.2 アーキテクチャ
+
+```
+┌─────────────────┐     ┌────────────────────────┐     ┌─────────────────┐
+│   Baketa.UI     │     │   Cloudflare Workers   │     │   Patreon API   │
+│   (C# Client)   │     │   (Relay Server)       │     │                 │
+└────────┬────────┘     └───────────┬────────────┘     └────────┬────────┘
+         │                          │                           │
+         │ POST /api/patreon/exchange                          │
+         │ (code, redirect_uri)    │                           │
+         │─────────────────────────>│                           │
+         │                          │                           │
+         │                          │ POST /api/oauth2/token    │
+         │                          │ (code, client_secret)     │
+         │                          │──────────────────────────>│
+         │                          │                           │
+         │                          │ access_token              │
+         │                          │<──────────────────────────│
+         │                          │                           │
+         │                          │ GET /api/oauth2/v2/identity
+         │                          │──────────────────────────>│
+         │                          │                           │
+         │                          │ user info, memberships    │
+         │                          │<──────────────────────────│
+         │                          │                           │
+         │                          │ Store in KV:              │
+         │                          │ session_token → {         │
+         │                          │   access_token,           │
+         │                          │   refresh_token,          │
+         │                          │   user_id                 │
+         │                          │ }                         │
+         │                          │                           │
+         │ session_token, plan,     │                           │
+         │ user_info               │                           │
+         │<─────────────────────────│                           │
+         │                          │                           │
+```
+
+### 9.3 エンドポイント
+
+| エンドポイント | メソッド | 説明 |
+|---------------|----------|------|
+| `/health` | GET | ヘルスチェック（認証不要） |
+| `/api/patreon/exchange` | POST | OAuth認証コード交換＋セッション発行 |
+| `/api/patreon/license-status` | GET | ライセンス状態取得（キャッシュ対応） |
+| `/api/patreon/revoke` | POST | セッション無効化 |
+| `/api/session/validate` | POST | セッション検証 |
+| `/oauth/token` | POST | トークン交換（低レベルAPI） |
+| `/oauth/refresh` | POST | トークンリフレッシュ |
+
+### 9.4 セキュリティ機能
+
+#### タイミング攻撃対策
+```typescript
+function timingSafeCompare(a: string, b: string): boolean {
+  // 文字列長に関わらず一定時間で比較
+  let result = 0;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    result |= a.charCodeAt(i % a.length) ^ b.charCodeAt(i % b.length);
+  }
+  return result === 0 && a.length === b.length;
+}
+```
+
+#### redirect_uri ホワイトリスト
+```typescript
+// 本番環境では ALLOWED_REDIRECT_URIS で許可するURIを制限
+function validateRedirectUri(redirectUri: string, env: Env): boolean {
+  if (env.ENVIRONMENT === 'production' && !env.ALLOWED_REDIRECT_URIS) {
+    return false;  // 本番では必須
+  }
+  const allowedUris = env.ALLOWED_REDIRECT_URIS.split(',');
+  return allowedUris.includes(redirectUri);
+}
+```
+
+#### 本番環境チェック
+- `ENVIRONMENT=production` 時は `API_KEY` と `ALLOWED_REDIRECT_URIS` が必須
+- 開発環境では警告を出力しつつ許可
+
+#### メンバーシップキャッシュ
+- Patreon Identity APIへのリクエストを5分間キャッシュ
+- レートリミット対策とレスポンス高速化
+
+### 9.5 環境変数
+
+| 変数名 | 必須 | 説明 |
+|--------|------|------|
+| `PATREON_CLIENT_ID` | ✅ | Patreon OAuthクライアントID |
+| `PATREON_CLIENT_SECRET` | ✅ | Patreon OAuthクライアントシークレット |
+| `API_KEY` | 本番のみ | クライアント認証用APIキー |
+| `ALLOWED_REDIRECT_URIS` | 本番のみ | 許可するredirect_uri（カンマ区切り） |
+| `ENVIRONMENT` | - | `production` で本番モード |
+| `ALLOWED_ORIGINS` | - | CORS許可オリジン（デフォルト: `*`） |
+| `SESSIONS` | ✅ | KV Namespace（セッション保存用） |
+
+### 9.6 デプロイ
+
+#### 初回セットアップ
+
+```bash
+cd relay-server
+
+# KV Namespaceを作成
+npx wrangler kv:namespace create "SESSIONS"
+# 出力されたIDをwrangler.tomlに設定
+
+# シークレット設定
+npx wrangler secret put PATREON_CLIENT_ID
+npx wrangler secret put PATREON_CLIENT_SECRET
+npx wrangler secret put API_KEY
+
+# 本番環境用
+npx wrangler secret put ENVIRONMENT  # → "production"
+npx wrangler secret put ALLOWED_REDIRECT_URIS  # → "http://127.0.0.1:18234/oauth/callback"
+```
+
+#### デプロイ
+
+```bash
+cd relay-server
+npx wrangler deploy
+```
+
+### 9.7 クライアント設定
+
+C#クライアント（`PatreonOAuthService`）は以下の設定を使用：
+
+```json
+// appsettings.json
+{
+  "Patreon": {
+    "RelayServerUrl": "https://baketa-relay.suke009.workers.dev",
+    "ApiKey": "YOUR_API_KEY"
+  }
+}
+```
+
+### 9.8 ソースコード
+
+- **リレーサーバー**: `relay-server/src/index.ts`
+- **設定**: `relay-server/wrangler.toml`
+- **C#クライアント**: `Baketa.Infrastructure/License/Services/PatreonOAuthService.cs`
+
+## 10. 関連ドキュメント
 
 - [Issue #167: ログインUI実装](../../issues/issue-167-login-ui.md)
 - [Issue #168: トークン管理](../../issues/issue-168-token-management.md)
 - [Issue #233: Patreon OAuth統合](../../issues/issue-233-patreon-integration.md)
+- [Issue #234: Patreonリレーサーバー実装](https://github.com/koizumiiiii/Baketa/issues/234)
 - [ReactiveUI Guide](../ui-system/reactiveui-guide.md)
