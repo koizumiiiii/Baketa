@@ -34,9 +34,12 @@ public sealed class PatreonSettings
     /// <summary>
     /// OAuth リダイレクトURI
     /// </summary>
+    /// <remarks>
+    /// Patreonはカスタムスキーム(baketa://)非対応のため、ローカルHTTPサーバーを使用。
+    /// </remarks>
     [SettingMetadata(SettingLevel.Advanced, "Patreon", "Redirect URI",
         Description = "OAuth認証後のリダイレクト先URI")]
-    public string RedirectUri { get; set; } = "baketa://patreon/callback";
+    public string RedirectUri { get; set; } = "http://localhost:8080/patreon/callback";
 
     /// <summary>
     /// Patreon Tier ID マッピング（Standard プラン）

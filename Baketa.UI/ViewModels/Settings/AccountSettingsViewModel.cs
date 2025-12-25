@@ -8,10 +8,13 @@ using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.License.Models;
+using Baketa.Core.Settings;
+using Baketa.Infrastructure.License.Services;
 using Baketa.UI.Framework;
 using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
@@ -25,6 +28,7 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     private readonly IAuthService _authService;
     private readonly INavigationService _navigationService;
     private readonly IPatreonOAuthService? _patreonService;
+    private readonly PatreonSettings? _patreonSettings;
     private readonly ILogger<AccountSettingsViewModel>? _logger;
 
     private bool _isLoggedIn;
@@ -53,11 +57,13 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         INavigationService navigationService,
         IEventAggregator eventAggregator,
         IPatreonOAuthService? patreonService = null,
+        IOptions<PatreonSettings>? patreonSettings = null,
         ILogger<AccountSettingsViewModel>? logger = null) : base(eventAggregator)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _patreonService = patreonService;
+        _patreonSettings = patreonSettings?.Value;
         _logger = logger;
 
         // 認証状態変更イベントの購読
@@ -90,8 +96,8 @@ public sealed class AccountSettingsViewModel : ViewModelBase
             x => x.IsPatreonSyncing,
             (loading, syncing) => !loading && !syncing);
 
-        ConnectPatreonCommand = ReactiveCommand.Create(
-            ExecuteConnectPatreon,
+        ConnectPatreonCommand = ReactiveCommand.CreateFromTask(
+            ExecuteConnectPatreonAsync,
             this.WhenAnyValue(x => x.IsPatreonConnected, x => x.IsPatreonSyncing,
                 (connected, syncing) => !connected && !syncing));
 
@@ -718,11 +724,11 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Patreon連携を開始します
+    /// Patreon連携を開始します（非同期版・ローカルHTTPコールバック対応）
     /// </summary>
-    private void ExecuteConnectPatreon()
+    private async Task ExecuteConnectPatreonAsync()
     {
-        if (_patreonService == null)
+        if (_patreonService == null || _patreonSettings == null)
         {
             SetStatusMessage("Patreonサービスが利用できません", true);
             return;
@@ -730,13 +736,23 @@ public sealed class AccountSettingsViewModel : ViewModelBase
 
         try
         {
+            IsPatreonSyncing = true;
             ClearStatusMessage();
+
+            // ローカルHTTPコールバックサーバーを使用
+            await using var callbackServer = new PatreonCallbackServer(
+                _patreonService,
+                Options.Create(_patreonSettings),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<PatreonCallbackServer>.Instance);
 
             // CSRF対策用のstate生成
             var state = _patreonService.GenerateSecureState();
 
             // 認証URLを生成
             var authUrl = _patreonService.GenerateAuthorizationUrl(state);
+
+            // コールバックサーバーを開始（バックグラウンドで待機）
+            var callbackTask = callbackServer.StartAndWaitForCallbackAsync();
 
             // デフォルトブラウザで開く
             Process.Start(new ProcessStartInfo
@@ -745,13 +761,42 @@ public sealed class AccountSettingsViewModel : ViewModelBase
                 UseShellExecute = true
             });
 
-            SetStatusMessage("ブラウザでPatreon認証を完了してください", false);
-            _logger?.LogInformation("Patreon認証URLをブラウザで開きました");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                SetStatusMessage("ブラウザでPatreon認証を完了してください...", false));
+
+            _logger?.LogInformation("Patreon認証URLをブラウザで開きました、コールバック待機中");
+
+            // コールバックを待機
+            var result = await callbackTask.ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (result.Success)
+                {
+                    IsPatreonConnected = true;
+                    PatreonUserName = result.UserName;
+                    CurrentPlan = result.Plan;
+                    PatreonLastSyncTime = DateTime.UtcNow;
+                    PatreonSyncStatus = PatreonSyncStatus.Synced;
+                    SetStatusMessage($"✅ Patreon連携完了！{result.Plan}プラン", false);
+                    _logger?.LogInformation("Patreon連携成功: Plan={Plan}", result.Plan);
+                }
+                else
+                {
+                    SetStatusMessage(result.ErrorMessage ?? "Patreon連携に失敗しました", true);
+                    _logger?.LogWarning("Patreon連携失敗: {Error}", result.ErrorMessage);
+                }
+            });
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Patreon連携開始中にエラーが発生しました");
-            SetStatusMessage("Patreon連携の開始に失敗しました", true);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                SetStatusMessage("Patreon連携の開始に失敗しました", true));
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => IsPatreonSyncing = false);
         }
     }
 
