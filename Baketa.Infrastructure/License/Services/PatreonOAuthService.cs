@@ -24,18 +24,32 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     private readonly string _credentialsFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
+    private readonly object _stateLock = new();
 
     /// <summary>
     /// HttpClient名（IHttpClientFactory用）
     /// </summary>
     public const string HttpClientName = "PatreonOAuth";
 
+    /// <summary>
+    /// State有効期限（10分）
+    /// </summary>
+    private static readonly TimeSpan StateExpiration = TimeSpan.FromMinutes(10);
+
     private PatreonLocalCredentials? _cachedCredentials;
     private PatreonSyncStatus _syncStatus = PatreonSyncStatus.NotConnected;
     private bool _disposed;
 
+    /// <summary>
+    /// 保留中のOAuth state（CSRF対策用）
+    /// Key: state値、Value: 生成日時
+    /// </summary>
+    private readonly Dictionary<string, DateTime> _pendingStates = new();
+
     /// <inheritdoc/>
-    public bool IsAuthenticated => _cachedCredentials != null && !string.IsNullOrEmpty(_cachedCredentials.PatreonUserId);
+    public bool IsAuthenticated => _cachedCredentials != null &&
+                                    !string.IsNullOrEmpty(_cachedCredentials.PatreonUserId) &&
+                                    !string.IsNullOrEmpty(_cachedCredentials.EncryptedSessionToken);
 
     /// <inheritdoc/>
     public PatreonSyncStatus SyncStatus => _syncStatus;
@@ -74,15 +88,109 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
             PropertyNameCaseInsensitive = true
         };
 
-        // 起動時に保存された資格情報を読み込む
+        // 起動時に保存された資格情報を読み込む（非同期、例外はログに記録）
         _ = Task.Run(async () =>
         {
-            await LoadCredentialsAsync().ConfigureAwait(false);
+            try
+            {
+                await LoadCredentialsAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "起動時のPatreon資格情報読み込みに失敗しました（後で再試行されます）");
+            }
         });
 
         _logger.LogInformation(
             "🔗 PatreonOAuthService初期化完了 - RelayServer={RelayServer}",
             _settings.RelayServerUrl);
+    }
+
+    /// <inheritdoc/>
+    public string GenerateSecureState()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // 暗号論的に安全なランダム値を生成（32バイト = 256ビット）
+        var randomBytes = new byte[32];
+        RandomNumberGenerator.Fill(randomBytes);
+        var state = Convert.ToBase64String(randomBytes)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('='); // URL-safe Base64
+
+        lock (_stateLock)
+        {
+            // 期限切れのstateをクリーンアップ
+            CleanupExpiredStates();
+
+            // 新しいstateを保存
+            _pendingStates[state] = DateTime.UtcNow;
+        }
+
+        _logger.LogDebug("CSRF state生成: {StatePrefix}... (有効期限: {Expiration}分)",
+            state[..8], StateExpiration.TotalMinutes);
+
+        return state;
+    }
+
+    /// <inheritdoc/>
+    public bool ValidateState(string state)
+    {
+        if (string.IsNullOrWhiteSpace(state))
+        {
+            _logger.LogWarning("CSRF state検証失敗: stateが空です");
+            return false;
+        }
+
+        lock (_stateLock)
+        {
+            // 検証時にも期限切れstateをクリーンアップ
+            CleanupExpiredStates();
+
+            if (!_pendingStates.TryGetValue(state, out var createdAt))
+            {
+                _logger.LogWarning("CSRF state検証失敗: 未知のstate");
+                return false;
+            }
+
+            // stateを削除（一度限りの使用）
+            _pendingStates.Remove(state);
+
+            // 有効期限チェック
+            var elapsed = DateTime.UtcNow - createdAt;
+            if (elapsed > StateExpiration)
+            {
+                _logger.LogWarning("CSRF state検証失敗: 期限切れ (経過時間: {Elapsed}分)",
+                    elapsed.TotalMinutes);
+                return false;
+            }
+
+            _logger.LogDebug("CSRF state検証成功");
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 期限切れのstateをクリーンアップ
+    /// </summary>
+    private void CleanupExpiredStates()
+    {
+        var now = DateTime.UtcNow;
+        var expiredStates = _pendingStates
+            .Where(kvp => now - kvp.Value > StateExpiration)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var expiredState in expiredStates)
+        {
+            _pendingStates.Remove(expiredState);
+        }
+
+        if (expiredStates.Count > 0)
+        {
+            _logger.LogDebug("期限切れstate {Count}件を削除", expiredStates.Count);
+        }
     }
 
     /// <inheritdoc/>
@@ -125,58 +233,58 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         {
             _logger.LogInformation("Patreon認証コールバック処理開始");
 
-            // 1. 中継サーバーでトークン交換
-            var tokenResponse = await ExchangeCodeForTokenAsync(authorizationCode, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (tokenResponse == null)
+            // CSRF対策: stateを検証
+            if (!ValidateState(state))
             {
-                return PatreonAuthResult.CreateFailure("TOKEN_EXCHANGE_FAILED", "トークン交換に失敗しました");
+                _logger.LogWarning("CSRF検証に失敗しました。不正なリクエストの可能性があります。");
+                return PatreonAuthResult.CreateFailure("CSRF_VALIDATION_FAILED", "セキュリティ検証に失敗しました。もう一度お試しください。");
             }
 
-            // 2. Identity APIでユーザー情報とTier情報を取得
-            var identityResponse = await GetPatreonIdentityAsync(tokenResponse.AccessToken, cancellationToken)
+            // 中継サーバーでトークン交換（セッショントークンを取得）
+            // 中継サーバーはPatreonトークンを保持し、クライアントにはセッショントークンのみ返す
+            var sessionResponse = await ExchangeCodeForSessionAsync(authorizationCode, state, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (identityResponse == null)
+            if (sessionResponse == null)
             {
-                return PatreonAuthResult.CreateFailure("IDENTITY_FETCH_FAILED", "ユーザー情報の取得に失敗しました");
+                return PatreonAuthResult.CreateFailure("TOKEN_EXCHANGE_FAILED", "セッショントークンの取得に失敗しました");
             }
 
-            // 3. プランを判定
-            var (plan, tierId, patronStatus, nextChargeDate) = DeterminePatreonPlan(identityResponse);
+            // プラン文字列をPlanType enumに変換
+            var plan = ParsePlanType(sessionResponse.Plan);
 
-            // 4. 資格情報をローカルに保存
+            // 資格情報をローカルに保存（セッショントークンのみ）
             var credentials = new PatreonLocalCredentials
             {
-                PatreonUserId = identityResponse.Data.Id,
-                Email = identityResponse.Data.Attributes?.Email,
-                FullName = identityResponse.Data.Attributes?.FullName,
-                EncryptedRefreshToken = EncryptToken(tokenResponse.RefreshToken),
-                RefreshTokenObtainedAt = DateTime.UtcNow,
+                PatreonUserId = sessionResponse.PatreonUserId,
+                Email = sessionResponse.Email,
+                FullName = sessionResponse.FullName,
+                EncryptedSessionToken = EncryptToken(sessionResponse.SessionToken),
+                SessionTokenObtainedAt = DateTime.UtcNow,
+                SessionTokenExpiresIn = sessionResponse.ExpiresIn,
                 LastKnownPlan = plan,
-                LastKnownTierId = tierId,
-                SubscriptionEndDate = nextChargeDate,
+                LastKnownTierId = sessionResponse.TierId,
+                SubscriptionEndDate = sessionResponse.NextChargeDate,
                 LastSyncTime = DateTime.UtcNow,
-                PatronStatus = patronStatus
+                PatronStatus = sessionResponse.PatronStatus
             };
 
             await SaveCredentialsAsync(credentials, cancellationToken).ConfigureAwait(false);
             _cachedCredentials = credentials;
 
-            // 5. ステータス更新
+            // ステータス更新
             UpdateSyncStatus(PatreonSyncStatus.Synced);
 
             _logger.LogInformation(
                 "✅ Patreon認証成功: UserId={UserId}, Plan={Plan}, PatronStatus={PatronStatus}",
-                MaskIdentifier(identityResponse.Data.Id),
+                MaskIdentifier(sessionResponse.PatreonUserId),
                 plan,
-                patronStatus);
+                sessionResponse.PatronStatus);
 
             return PatreonAuthResult.CreateSuccess(
-                identityResponse.Data.Id,
-                identityResponse.Data.Attributes?.FullName,
-                identityResponse.Data.Attributes?.Email,
+                sessionResponse.PatreonUserId,
+                sessionResponse.FullName,
+                sessionResponse.Email,
                 plan);
         }
         catch (HttpRequestException ex)
@@ -199,6 +307,24 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         await _syncLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // セッショントークンがある場合はサーバー側のセッションも無効化
+            if (_cachedCredentials != null && !string.IsNullOrEmpty(_cachedCredentials.EncryptedSessionToken))
+            {
+                try
+                {
+                    var sessionToken = DecryptToken(_cachedCredentials.EncryptedSessionToken);
+                    if (!string.IsNullOrEmpty(sessionToken))
+                    {
+                        await RevokeSessionAsync(sessionToken, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // セッション無効化の失敗はログに記録するが、ローカル切断は続行
+                    _logger.LogWarning(ex, "サーバー側セッション無効化に失敗しましたが、ローカル切断を続行します");
+                }
+            }
+
             // 資格情報ファイルを削除
             if (File.Exists(_credentialsFilePath))
             {
@@ -245,10 +371,19 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
                     _cachedCredentials.LastKnownPlan);
 
                 // ステータスを設定
-                UpdateSyncStatus(
-                    _cachedCredentials.LastSyncError != null
-                        ? PatreonSyncStatus.Error
-                        : PatreonSyncStatus.Offline);
+                if (_cachedCredentials.LastSyncError != null)
+                {
+                    UpdateSyncStatus(PatreonSyncStatus.Error);
+                }
+                else if (!_cachedCredentials.IsSessionTokenValid)
+                {
+                    // セッショントークン期限切れ
+                    UpdateSyncStatus(PatreonSyncStatus.TokenExpired);
+                }
+                else
+                {
+                    UpdateSyncStatus(PatreonSyncStatus.Offline);
+                }
             }
 
             return _cachedCredentials;
@@ -282,7 +417,8 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
             await LoadCredentialsAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        if (_cachedCredentials == null || string.IsNullOrEmpty(_cachedCredentials.EncryptedRefreshToken))
+        // セッショントークンがない場合は未接続
+        if (_cachedCredentials == null || string.IsNullOrEmpty(_cachedCredentials.EncryptedSessionToken))
         {
             return PatreonSyncResult.NotConnected;
         }
@@ -300,20 +436,21 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
                     fromCache: true);
             }
 
-            // リフレッシュトークンを使って新しいアクセストークンを取得
-            var refreshToken = DecryptToken(_cachedCredentials.EncryptedRefreshToken);
-            if (string.IsNullOrEmpty(refreshToken))
+            // セッショントークンを取得
+            var sessionToken = DecryptToken(_cachedCredentials.EncryptedSessionToken);
+            if (string.IsNullOrEmpty(sessionToken))
             {
                 UpdateSyncStatus(PatreonSyncStatus.TokenExpired);
-                return PatreonSyncResult.CreateError(PatreonSyncStatus.TokenExpired, "トークンの復号化に失敗しました");
+                return PatreonSyncResult.CreateError(PatreonSyncStatus.TokenExpired, "セッショントークンの復号化に失敗しました");
             }
 
-            var tokenResponse = await RefreshAccessTokenAsync(refreshToken, cancellationToken)
+            // 中継サーバーからライセンス状態を取得
+            var licenseStatus = await GetLicenseStatusAsync(sessionToken, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (tokenResponse == null)
+            if (licenseStatus == null)
             {
-                // オフラインまたはトークン期限切れ
+                // オフラインの場合はキャッシュを使用
                 if (IsOfflineGracePeriodValid())
                 {
                     _logger.LogWarning("Patreon同期失敗、グレースピリオド内のためキャッシュを使用");
@@ -324,16 +461,14 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
                         fromCache: true);
                 }
 
-                UpdateSyncStatus(PatreonSyncStatus.TokenExpired);
-                return PatreonSyncResult.CreateError(PatreonSyncStatus.TokenExpired, "トークンの更新に失敗しました。再認証が必要です。");
+                UpdateSyncStatus(PatreonSyncStatus.Error);
+                return PatreonSyncResult.CreateError(PatreonSyncStatus.Error, "ライセンス状態の取得に失敗しました");
             }
 
-            // Identity APIでプラン情報を取得
-            var identityResponse = await GetPatreonIdentityAsync(tokenResponse.AccessToken, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (identityResponse == null)
+            // セッション期限切れの場合
+            if (licenseStatus.SessionExpired || !licenseStatus.SessionValid)
             {
+                // グレースピリオド内なら猶予
                 if (IsOfflineGracePeriodValid())
                 {
                     UpdateSyncStatus(PatreonSyncStatus.Offline);
@@ -343,23 +478,23 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
                         fromCache: true);
                 }
 
-                UpdateSyncStatus(PatreonSyncStatus.Error);
-                return PatreonSyncResult.CreateError(PatreonSyncStatus.Error, "ユーザー情報の取得に失敗しました");
+                UpdateSyncStatus(PatreonSyncStatus.TokenExpired);
+                return PatreonSyncResult.CreateError(
+                    PatreonSyncStatus.TokenExpired,
+                    licenseStatus.Error ?? "セッションが期限切れです。再認証が必要です。");
             }
 
             // プランを判定
-            var (plan, tierId, patronStatus, nextChargeDate) = DeterminePatreonPlan(identityResponse);
+            var plan = ParsePlanType(licenseStatus.Plan);
 
             // 資格情報を更新
             _cachedCredentials = _cachedCredentials with
             {
-                EncryptedRefreshToken = EncryptToken(tokenResponse.RefreshToken),
-                RefreshTokenObtainedAt = DateTime.UtcNow,
                 LastKnownPlan = plan,
-                LastKnownTierId = tierId,
-                SubscriptionEndDate = nextChargeDate,
+                LastKnownTierId = licenseStatus.TierId,
+                SubscriptionEndDate = licenseStatus.NextChargeDate,
                 LastSyncTime = DateTime.UtcNow,
-                PatronStatus = patronStatus,
+                PatronStatus = licenseStatus.PatronStatus,
                 LastSyncError = null
             };
 
@@ -368,9 +503,9 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
 
             _logger.LogInformation(
                 "✅ Patreon同期成功: Plan={Plan}, PatronStatus={PatronStatus}, NextCharge={NextCharge}",
-                plan, patronStatus, nextChargeDate);
+                plan, licenseStatus.PatronStatus, licenseStatus.NextChargeDate);
 
-            return PatreonSyncResult.CreateSuccess(plan, nextChargeDate);
+            return PatreonSyncResult.CreateSuccess(plan, licenseStatus.NextChargeDate);
         }
         catch (HttpRequestException ex)
         {
@@ -401,10 +536,14 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     }
 
     /// <summary>
-    /// 認証コードをトークンに交換（中継サーバー経由）
+    /// 認証コードをセッショントークンに交換（中継サーバー経由）
     /// </summary>
-    private async Task<PatreonTokenResponse?> ExchangeCodeForTokenAsync(
+    /// <remarks>
+    /// 中継サーバーがPatreonトークンを保持し、クライアントにはセッショントークン（JWT）を返します。
+    /// </remarks>
+    private async Task<SessionTokenResponse?> ExchangeCodeForSessionAsync(
         string code,
+        string state,
         CancellationToken cancellationToken)
     {
         using var httpClient = _httpClientFactory.CreateClient(HttpClientName);
@@ -412,192 +551,135 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         var requestBody = new
         {
             code,
+            state,
             redirect_uri = _settings.RedirectUri
         };
-
-        var response = await httpClient.PostAsJsonAsync(
-            $"{_settings.RelayServerUrl}/api/patreon/token",
-            requestBody,
-            cancellationToken).ConfigureAwait(false);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            _logger.LogError("トークン交換失敗: Status={Status}, Body={Body}", response.StatusCode, errorContent);
-            return null;
-        }
-
-        return await response.Content.ReadFromJsonAsync<PatreonTokenResponse>(_jsonOptions, cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// リフレッシュトークンでアクセストークンを更新（中継サーバー経由）
-    /// </summary>
-    private async Task<PatreonTokenResponse?> RefreshAccessTokenAsync(
-        string refreshToken,
-        CancellationToken cancellationToken)
-    {
-        using var httpClient = _httpClientFactory.CreateClient(HttpClientName);
-        var requestBody = new { refresh_token = refreshToken };
 
         try
         {
             var response = await httpClient.PostAsJsonAsync(
-                $"{_settings.RelayServerUrl}/api/patreon/refresh",
+                $"{_settings.RelayServerUrl}/api/patreon/exchange",
                 requestBody,
                 cancellationToken).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                _logger.LogWarning("トークン更新失敗: Status={Status}, Body={Body}", response.StatusCode, errorContent);
+                _logger.LogError("セッショントークン取得失敗: Status={Status}, Body={Body}", response.StatusCode, errorContent);
                 return null;
             }
 
-            return await response.Content.ReadFromJsonAsync<PatreonTokenResponse>(_jsonOptions, cancellationToken)
+            return await response.Content.ReadFromJsonAsync<SessionTokenResponse>(_jsonOptions, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (TaskCanceledException)
         {
-            _logger.LogWarning("トークン更新がタイムアウトしました");
+            _logger.LogWarning("セッショントークン取得がタイムアウトしました");
             return null;
         }
     }
 
     /// <summary>
-    /// Patreon Identity APIを呼び出し（中継サーバー経由でプロキシ）
-    /// 401エラー時は自動的にトークンをリフレッシュしてリトライ
+    /// 中継サーバーからライセンス状態を取得
     /// </summary>
-    private async Task<PatreonIdentityResponse?> GetPatreonIdentityAsync(
-        string accessToken,
-        CancellationToken cancellationToken,
-        bool isRetry = false)
+    /// <remarks>
+    /// セッショントークンを使って中継サーバーにライセンス状態を問い合わせます。
+    /// サーバー側でPatreonトークンのリフレッシュが必要な場合は自動的に行われます。
+    /// </remarks>
+    private async Task<LicenseStatusResponse?> GetLicenseStatusAsync(
+        string sessionToken,
+        CancellationToken cancellationToken)
     {
         try
         {
             using var httpClient = _httpClientFactory.CreateClient(HttpClientName);
 
-            // 中継サーバーを経由してIdentity APIを呼び出す
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
-                $"{_settings.RelayServerUrl}/api/patreon/identity");
+                $"{_settings.RelayServerUrl}/api/patreon/license-status");
 
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessionToken);
 
             var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-
-            // 401 Unauthorized: アクセストークン期限切れ → リフレッシュしてリトライ
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && !isRetry)
-            {
-                _logger.LogInformation("アクセストークン期限切れを検出、リフレッシュを試行");
-
-                if (_cachedCredentials != null && !string.IsNullOrEmpty(_cachedCredentials.EncryptedRefreshToken))
-                {
-                    var refreshToken = DecryptToken(_cachedCredentials.EncryptedRefreshToken);
-                    if (!string.IsNullOrEmpty(refreshToken))
-                    {
-                        var tokenResponse = await RefreshAccessTokenAsync(refreshToken, cancellationToken)
-                            .ConfigureAwait(false);
-
-                        if (tokenResponse != null)
-                        {
-                            _logger.LogInformation("トークンリフレッシュ成功、Identity APIをリトライ");
-                            // リフレッシュトークンを更新
-                            _cachedCredentials = _cachedCredentials with
-                            {
-                                EncryptedRefreshToken = EncryptToken(tokenResponse.RefreshToken),
-                                RefreshTokenObtainedAt = DateTime.UtcNow
-                            };
-                            await SaveCredentialsAsync(_cachedCredentials, cancellationToken).ConfigureAwait(false);
-
-                            // リトライ（再帰呼び出し、isRetry=trueで無限ループ防止）
-                            return await GetPatreonIdentityAsync(tokenResponse.AccessToken, cancellationToken, isRetry: true)
-                                .ConfigureAwait(false);
-                        }
-                    }
-                }
-
-                _logger.LogWarning("トークンリフレッシュに失敗、再認証が必要です");
-                return null;
-            }
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                _logger.LogWarning("Identity API失敗: Status={Status}, Body={Body}", response.StatusCode, errorContent);
+                _logger.LogWarning("ライセンス状態取得失敗: Status={Status}, Body={Body}", response.StatusCode, errorContent);
+
+                // 401 Unauthorized: セッション期限切れ
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    return new LicenseStatusResponse
+                    {
+                        Success = false,
+                        SessionValid = false,
+                        SessionExpired = true,
+                        Error = "セッションが期限切れです",
+                        ErrorCode = "SESSION_EXPIRED"
+                    };
+                }
+
                 return null;
             }
 
-            return await response.Content.ReadFromJsonAsync<PatreonIdentityResponse>(_jsonOptions, cancellationToken)
+            return await response.Content.ReadFromJsonAsync<LicenseStatusResponse>(_jsonOptions, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (TaskCanceledException)
         {
-            _logger.LogWarning("Identity APIがタイムアウトしました");
+            _logger.LogWarning("ライセンス状態取得がタイムアウトしました");
             return null;
         }
     }
 
     /// <summary>
-    /// Identity応答からプランを判定
+    /// 中継サーバーでセッションを無効化
     /// </summary>
-    private (PlanType plan, string? tierId, string? patronStatus, DateTime? nextChargeDate) DeterminePatreonPlan(
-        PatreonIdentityResponse identity)
+    private async Task RevokeSessionAsync(
+        string sessionToken,
+        CancellationToken cancellationToken)
     {
-        // メンバーシップを検索
-        var membership = identity.Included?
-            .FirstOrDefault(i => i.Type == "member");
+        using var httpClient = _httpClientFactory.CreateClient(HttpClientName);
 
-        if (membership?.Attributes == null)
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"{_settings.RelayServerUrl}/api/patreon/revoke");
+
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessionToken);
+
+        try
         {
-            return (PlanType.Free, null, null, null);
-        }
+            var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
-        var patronStatus = membership.Attributes.PatronStatus;
-        var nextChargeDate = membership.Attributes.NextChargeDate;
-
-        // アクティブでなければFree
-        if (patronStatus != "active_patron")
-        {
-            return (PlanType.Free, null, patronStatus, null);
-        }
-
-        // 有効なTierを取得
-        var entitledTiers = membership.Relationships?.CurrentlyEntitledTiers?.Data;
-        if (entitledTiers == null || entitledTiers.Count == 0)
-        {
-            return (PlanType.Free, null, patronStatus, nextChargeDate);
-        }
-
-        // Tier IDからプランを判定
-        foreach (var tier in entitledTiers)
-        {
-            if (tier.Id == _settings.PremiaTierId)
+            if (response.IsSuccessStatusCode)
             {
-                return (PlanType.Premia, tier.Id, patronStatus, nextChargeDate);
+                _logger.LogInformation("サーバー側セッションを無効化しました");
             }
-            if (tier.Id == _settings.ProTierId)
+            else
             {
-                return (PlanType.Pro, tier.Id, patronStatus, nextChargeDate);
-            }
-            if (tier.Id == _settings.StandardTierId)
-            {
-                return (PlanType.Standard, tier.Id, patronStatus, nextChargeDate);
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("セッション無効化失敗: Status={Status}, Body={Body}", response.StatusCode, errorContent);
             }
         }
-
-        // マッチするTierがない場合、支払額から推測
-        var amountCents = membership.Attributes.CurrentlyEntitledAmountCents ?? 0;
-        var plan = amountCents switch
+        catch (TaskCanceledException)
         {
-            >= 500 => PlanType.Premia,  // $5+
-            >= 300 => PlanType.Pro,     // $3+
-            >= 100 => PlanType.Standard, // $1+
+            _logger.LogWarning("セッション無効化がタイムアウトしました");
+        }
+    }
+
+    /// <summary>
+    /// プラン文字列をPlanType enumに変換
+    /// </summary>
+    private static PlanType ParsePlanType(string? planString)
+    {
+        return planString?.ToLowerInvariant() switch
+        {
+            "premia" => PlanType.Premia,
+            "pro" => PlanType.Pro,
+            "standard" => PlanType.Standard,
             _ => PlanType.Free
         };
-
-        return (plan, entitledTiers.FirstOrDefault()?.Id, patronStatus, nextChargeDate);
     }
 
     /// <summary>
@@ -663,7 +745,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     /// <summary>
     /// トークンを暗号化（DPAPI + エントロピー）
     /// </summary>
-    private static string? EncryptToken(string token)
+    private string? EncryptToken(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
@@ -676,9 +758,15 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
             var encryptedBytes = ProtectedData.Protect(tokenBytes, DpapiEntropy, DataProtectionScope.CurrentUser);
             return Convert.ToBase64String(encryptedBytes);
         }
-        catch
+        catch (PlatformNotSupportedException ex)
         {
             // DPAPIが使えない環境ではBase64のみ（セキュリティ低下）
+            _logger.LogWarning(ex, "DPAPIが利用できません。トークンはBase64エンコードのみで保存されます（セキュリティ低下）");
+            return Convert.ToBase64String(Encoding.UTF8.GetBytes(token));
+        }
+        catch (CryptographicException ex)
+        {
+            _logger.LogWarning(ex, "DPAPI暗号化に失敗しました。Base64エンコードにフォールバックします");
             return Convert.ToBase64String(Encoding.UTF8.GetBytes(token));
         }
     }
@@ -686,7 +774,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     /// <summary>
     /// トークンを復号化（DPAPI + エントロピー）
     /// </summary>
-    private static string? DecryptToken(string? encryptedToken)
+    private string? DecryptToken(string? encryptedToken)
     {
         if (string.IsNullOrEmpty(encryptedToken))
         {
@@ -699,15 +787,29 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
             var decryptedBytes = ProtectedData.Unprotect(encryptedBytes, DpapiEntropy, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(decryptedBytes);
         }
-        catch
+        catch (CryptographicException)
         {
             // DPAPIで暗号化されていない場合はBase64デコードを試行
             try
             {
                 return Encoding.UTF8.GetString(Convert.FromBase64String(encryptedToken));
             }
-            catch
+            catch (FormatException ex)
             {
+                _logger.LogWarning(ex, "トークンの復号化に失敗しました。無効なフォーマットです");
+                return null;
+            }
+        }
+        catch (PlatformNotSupportedException)
+        {
+            // DPAPIが使えない環境ではBase64デコードを試行
+            try
+            {
+                return Encoding.UTF8.GetString(Convert.FromBase64String(encryptedToken));
+            }
+            catch (FormatException ex)
+            {
+                _logger.LogWarning(ex, "トークンの復号化に失敗しました。無効なフォーマットです");
                 return null;
             }
         }

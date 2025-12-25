@@ -3,8 +3,13 @@ using System.Text.Json.Serialization;
 namespace Baketa.Core.License.Models;
 
 /// <summary>
-/// Patreon OAuth トークン応答
+/// Patreon OAuth トークン応答（中継サーバー内部用、クライアントには非公開）
 /// </summary>
+/// <remarks>
+/// セキュリティ上の理由により、このレスポンスはサーバー内部でのみ使用されます。
+/// クライアントアプリケーションには <see cref="SessionTokenResponse"/> が返されます。
+/// </remarks>
+[Obsolete("中継サーバー側でトークン管理を行うため、クライアントでは使用しません。SessionTokenResponseを使用してください。")]
 public sealed record PatreonTokenResponse
 {
     /// <summary>
@@ -36,6 +41,136 @@ public sealed record PatreonTokenResponse
     /// </summary>
     [JsonPropertyName("token_type")]
     public string TokenType { get; init; } = "Bearer";
+}
+
+/// <summary>
+/// 中継サーバーからのセッショントークン応答
+/// </summary>
+/// <remarks>
+/// 認証コード交換時に中継サーバーから返されます。
+/// Patreonトークンは中継サーバー側で管理され、クライアントにはセッショントークンのみ渡されます。
+/// </remarks>
+public sealed record SessionTokenResponse
+{
+    /// <summary>
+    /// セッショントークン（JWT形式）
+    /// </summary>
+    [JsonPropertyName("session_token")]
+    public required string SessionToken { get; init; }
+
+    /// <summary>
+    /// トークン有効期限（秒）
+    /// </summary>
+    [JsonPropertyName("expires_in")]
+    public int ExpiresIn { get; init; }
+
+    /// <summary>
+    /// Patreon ユーザーID
+    /// </summary>
+    [JsonPropertyName("patreon_user_id")]
+    public required string PatreonUserId { get; init; }
+
+    /// <summary>
+    /// ユーザーのメールアドレス
+    /// </summary>
+    [JsonPropertyName("email")]
+    public string? Email { get; init; }
+
+    /// <summary>
+    /// ユーザー名
+    /// </summary>
+    [JsonPropertyName("full_name")]
+    public string? FullName { get; init; }
+
+    /// <summary>
+    /// 判定されたプラン
+    /// </summary>
+    [JsonPropertyName("plan")]
+    public string Plan { get; init; } = "free";
+
+    /// <summary>
+    /// Tier ID
+    /// </summary>
+    [JsonPropertyName("tier_id")]
+    public string? TierId { get; init; }
+
+    /// <summary>
+    /// パトロンステータス
+    /// </summary>
+    [JsonPropertyName("patron_status")]
+    public string? PatronStatus { get; init; }
+
+    /// <summary>
+    /// 次回課金日
+    /// </summary>
+    [JsonPropertyName("next_charge_date")]
+    public DateTime? NextChargeDate { get; init; }
+}
+
+/// <summary>
+/// ライセンス状態応答（中継サーバーから）
+/// </summary>
+public sealed record LicenseStatusResponse
+{
+    /// <summary>
+    /// 成功したかどうか
+    /// </summary>
+    [JsonPropertyName("success")]
+    public bool Success { get; init; }
+
+    /// <summary>
+    /// セッションが有効かどうか
+    /// </summary>
+    [JsonPropertyName("session_valid")]
+    public bool SessionValid { get; init; }
+
+    /// <summary>
+    /// Patreon ユーザーID
+    /// </summary>
+    [JsonPropertyName("patreon_user_id")]
+    public string? PatreonUserId { get; init; }
+
+    /// <summary>
+    /// 判定されたプラン
+    /// </summary>
+    [JsonPropertyName("plan")]
+    public string Plan { get; init; } = "free";
+
+    /// <summary>
+    /// Tier ID
+    /// </summary>
+    [JsonPropertyName("tier_id")]
+    public string? TierId { get; init; }
+
+    /// <summary>
+    /// パトロンステータス
+    /// </summary>
+    [JsonPropertyName("patron_status")]
+    public string? PatronStatus { get; init; }
+
+    /// <summary>
+    /// 次回課金日
+    /// </summary>
+    [JsonPropertyName("next_charge_date")]
+    public DateTime? NextChargeDate { get; init; }
+
+    /// <summary>
+    /// エラーメッセージ（失敗時）
+    /// </summary>
+    [JsonPropertyName("error")]
+    public string? Error { get; init; }
+
+    /// <summary>
+    /// エラーコード（失敗時）
+    /// </summary>
+    [JsonPropertyName("error_code")]
+    public string? ErrorCode { get; init; }
+
+    /// <summary>
+    /// セッション期限切れかどうか
+    /// </summary>
+    [JsonPropertyName("session_expired")]
+    public bool SessionExpired { get; init; }
 }
 
 /// <summary>
@@ -251,6 +386,10 @@ public sealed record PatreonMembershipRelationships
 /// <summary>
 /// ローカルに保存するPatreon認証情報
 /// </summary>
+/// <remarks>
+/// 中継サーバー方式では、Patreonトークンはサーバー側で管理されます。
+/// クライアントにはセッショントークン（JWT）のみが保存されます。
+/// </remarks>
 public sealed record PatreonLocalCredentials
 {
     /// <summary>
@@ -269,17 +408,35 @@ public sealed record PatreonLocalCredentials
     public string? FullName { get; init; }
 
     /// <summary>
-    /// 暗号化されたリフレッシュトークン
+    /// 暗号化されたセッショントークン
     /// </summary>
     /// <remarks>
-    /// Windows DPAPI または SecureStorage で暗号化。
-    /// アクセストークンは短命のため保存しない。
+    /// 中継サーバーから発行されるJWT形式のセッショントークン。
+    /// Windows DPAPI で暗号化して保存。
+    /// Patreonトークン（access_token, refresh_token）はサーバー側で管理されます。
     /// </remarks>
+    public string? EncryptedSessionToken { get; init; }
+
+    /// <summary>
+    /// セッショントークンの取得日時
+    /// </summary>
+    public DateTime? SessionTokenObtainedAt { get; init; }
+
+    /// <summary>
+    /// セッショントークンの有効期限（秒）
+    /// </summary>
+    public int SessionTokenExpiresIn { get; init; }
+
+    /// <summary>
+    /// 暗号化されたリフレッシュトークン（後方互換性のため残存、新規では使用しない）
+    /// </summary>
+    [Obsolete("セッショントークン方式に移行しました。EncryptedSessionTokenを使用してください。")]
     public string? EncryptedRefreshToken { get; init; }
 
     /// <summary>
-    /// リフレッシュトークンの取得日時
+    /// リフレッシュトークンの取得日時（後方互換性のため残存、新規では使用しない）
     /// </summary>
+    [Obsolete("セッショントークン方式に移行しました。SessionTokenObtainedAtを使用してください。")]
     public DateTime? RefreshTokenObtainedAt { get; init; }
 
     /// <summary>
@@ -311,6 +468,15 @@ public sealed record PatreonLocalCredentials
     /// パトロンステータス
     /// </summary>
     public string? PatronStatus { get; init; }
+
+    /// <summary>
+    /// セッショントークンが有効期限内かどうか
+    /// </summary>
+    public bool IsSessionTokenValid =>
+        !string.IsNullOrEmpty(EncryptedSessionToken) &&
+        SessionTokenObtainedAt.HasValue &&
+        SessionTokenExpiresIn > 0 &&
+        DateTime.UtcNow < SessionTokenObtainedAt.Value.AddSeconds(SessionTokenExpiresIn);
 }
 
 /// <summary>

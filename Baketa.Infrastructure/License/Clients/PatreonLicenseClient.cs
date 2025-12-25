@@ -91,7 +91,7 @@ public sealed class PatreonLicenseClient : ILicenseApiClient
                 PatronStatus = credentials.PatronStatus,
                 PatreonTierId = credentials.LastKnownTierId,
                 ExpirationDate = syncResult.NextChargeDate,
-                ContractStartDate = credentials.RefreshTokenObtainedAt,
+                ContractStartDate = credentials.SessionTokenObtainedAt,
                 BillingCycleEnd = syncResult.NextChargeDate,
                 LastServerSync = credentials.LastSyncTime ?? DateTime.UtcNow,
                 IsCached = syncResult.FromCache,
@@ -123,7 +123,7 @@ public sealed class PatreonLicenseClient : ILicenseApiClient
     }
 
     /// <inheritdoc/>
-    public async Task<TokenConsumptionApiResponse> ConsumeTokensAsync(
+    public Task<TokenConsumptionApiResponse> ConsumeTokensAsync(
         TokenConsumptionRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -139,16 +139,16 @@ public sealed class PatreonLicenseClient : ILicenseApiClient
             request.IdempotencyKey);
 
         // ローカルキャッシュでの消費管理は LicenseManager/LicenseCacheService に委譲
-        return new TokenConsumptionApiResponse
+        return Task.FromResult(new TokenConsumptionApiResponse
         {
             Success = true,
             NewUsageTotal = request.TokenCount, // 実際の累計はLicenseCacheServiceで管理
             RemainingTokens = long.MaxValue // ローカル管理のため上限なし表示
-        };
+        });
     }
 
     /// <inheritdoc/>
-    public async Task<SessionValidationResult> ValidateSessionAsync(
+    public Task<SessionValidationResult> ValidateSessionAsync(
         string userId,
         string sessionToken,
         CancellationToken cancellationToken = default)
@@ -157,13 +157,13 @@ public sealed class PatreonLicenseClient : ILicenseApiClient
 
         if (!_oauthService.IsAuthenticated)
         {
-            return SessionValidationResult.Invalid("Patreon連携が設定されていません");
+            return Task.FromResult(SessionValidationResult.Invalid("Patreon連携が設定されていません"));
         }
 
         // 同期ステータスをチェック
         var syncStatus = _oauthService.SyncStatus;
 
-        return syncStatus switch
+        var result = syncStatus switch
         {
             PatreonSyncStatus.Synced => SessionValidationResult.Valid,
             PatreonSyncStatus.Offline => SessionValidationResult.Valid, // オフラインでもセッションは有効
@@ -172,6 +172,8 @@ public sealed class PatreonLicenseClient : ILicenseApiClient
             PatreonSyncStatus.NotConnected => SessionValidationResult.Invalid("Patreon連携が設定されていません"),
             _ => SessionValidationResult.Valid
         };
+
+        return Task.FromResult(result);
     }
 
     /// <summary>

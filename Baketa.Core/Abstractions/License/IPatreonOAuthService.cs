@@ -28,6 +28,23 @@ public interface IPatreonOAuthService
     string? PatreonUserId { get; }
 
     /// <summary>
+    /// CSRF対策用のセキュアなstate値を生成
+    /// </summary>
+    /// <remarks>
+    /// 生成されたstateは内部に保存され、コールバック時に検証されます。
+    /// stateには有効期限（10分）があります。
+    /// </remarks>
+    /// <returns>生成されたstate値</returns>
+    string GenerateSecureState();
+
+    /// <summary>
+    /// 保存されているstateを検証
+    /// </summary>
+    /// <param name="state">検証するstate値</param>
+    /// <returns>検証結果（true: 有効、false: 無効または期限切れ）</returns>
+    bool ValidateState(string state);
+
+    /// <summary>
     /// OAuth認証URLを生成
     /// </summary>
     /// <param name="state">CSRF対策用のstate値</param>

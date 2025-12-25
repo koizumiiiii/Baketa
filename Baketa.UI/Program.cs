@@ -29,6 +29,14 @@ using ReactiveUI;
 
 namespace Baketa.UI;
 
+/// <summary>
+/// Patreon認証結果の通知データ
+/// </summary>
+public sealed record PatreonAuthNotification(
+    bool IsSuccess,
+    string? PlanName,
+    string? ErrorMessage);
+
 internal sealed class Program
 {
     /// <summary>
@@ -42,12 +50,31 @@ internal sealed class Program
     /// </summary>
     public static bool IsEventHandlerInitialized { get; private set; }
 
+    /// <summary>
+    /// 保留中のPatreonコールバックURL（起動引数から検出）
+    /// </summary>
+    public static string? PendingPatreonCallbackUrl { get; private set; }
+
+    /// <summary>
+    /// Patreon認証結果（UI起動後に通知表示用）
+    /// </summary>
+    public static PatreonAuthNotification? PendingPatreonNotification { get; set; }
+
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
     public static async Task Main(string[] args)
     {
+        // 🔗 Patreonコールバック URL 検出（baketa://patreon/callback?code=xxx&state=yyy）
+        PendingPatreonCallbackUrl = args.FirstOrDefault(arg =>
+            arg.StartsWith("baketa://", StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrEmpty(PendingPatreonCallbackUrl))
+        {
+            Console.WriteLine($"🔗 [OAUTH_CALLBACK] Patreonコールバック URL 検出: {PendingPatreonCallbackUrl[..Math.Min(50, PendingPatreonCallbackUrl.Length)]}...");
+        }
+
         // 🚧 Single Instance Application Check - 重複翻訳表示問題根本解決
         const string mutexName = "Global\\BaketaTranslationOverlayApp_SingleInstance_v3";
         const string lockFileName = "baketa_instance.lock";
@@ -276,6 +303,12 @@ internal sealed class Program
 
             // DIコンテナの初期化
             await ConfigureServices();
+
+            // 🔗 Patreonコールバック処理（DIコンテナ初期化後）
+            if (!string.IsNullOrEmpty(PendingPatreonCallbackUrl))
+            {
+                await ProcessPatreonCallbackAsync().ConfigureAwait(false);
+            }
 
             // 🩺 診断システム直接初期化 - OnFrameworkInitializationCompleted代替
             Console.WriteLine("🚨🚨🚨 [MAIN_DIAGNOSTIC] 診断システム直接初期化開始！ 🚨🚨🚨");
@@ -1346,5 +1379,79 @@ internal sealed class Program
         var suryaOcrModule = new Baketa.Infrastructure.DI.SuryaOcrModule();
         suryaOcrModule.RegisterServices(services);
         Console.WriteLine("✅ SuryaOcrModule登録完了");
+    }
+
+    /// <summary>
+    /// Patreonコールバックを処理します（baketa://patreon/callback?code=xxx&state=yyy）
+    /// </summary>
+    private static async Task ProcessPatreonCallbackAsync()
+    {
+        if (string.IsNullOrEmpty(PendingPatreonCallbackUrl))
+        {
+            return;
+        }
+
+        Console.WriteLine("🔗 [OAUTH_CALLBACK] Patreonコールバック処理開始");
+
+        try
+        {
+            // IPatreonCallbackHandlerをDIコンテナから取得
+            var callbackHandler = ServiceProvider?.GetService<Baketa.Core.Abstractions.License.IPatreonCallbackHandler>();
+            if (callbackHandler == null)
+            {
+                Console.WriteLine("⚠️ [OAUTH_CALLBACK] IPatreonCallbackHandlerが登録されていません");
+                return;
+            }
+
+            // コールバックURLが処理可能か確認
+            if (!callbackHandler.CanHandle(PendingPatreonCallbackUrl))
+            {
+                Console.WriteLine($"⚠️ [OAUTH_CALLBACK] 処理不可能なURL: {PendingPatreonCallbackUrl}");
+                return;
+            }
+
+            // コールバック処理を実行
+            Console.WriteLine("🔄 [OAUTH_CALLBACK] HandleCallbackUrlAsync実行中...");
+            var result = await callbackHandler.HandleCallbackUrlAsync(
+                PendingPatreonCallbackUrl,
+                CancellationToken.None).ConfigureAwait(false);
+
+            if (result.Success)
+            {
+                Console.WriteLine($"✅ [OAUTH_CALLBACK] Patreon認証成功！ Plan: {result.Plan}");
+                // UI起動後に通知表示するため結果を保存
+                PendingPatreonNotification = new PatreonAuthNotification(
+                    IsSuccess: true,
+                    PlanName: result.Plan.ToString(),
+                    ErrorMessage: null);
+            }
+            else
+            {
+                Console.WriteLine($"❌ [OAUTH_CALLBACK] Patreon認証失敗: {result.ErrorCode} - {result.ErrorMessage}");
+                // UI起動後に通知表示するため結果を保存
+                PendingPatreonNotification = new PatreonAuthNotification(
+                    IsSuccess: false,
+                    PlanName: null,
+                    ErrorMessage: result.ErrorMessage ?? result.ErrorCode ?? "認証に失敗しました");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"💥 [OAUTH_CALLBACK] Patreonコールバック処理エラー: {ex.GetType().Name}");
+            Console.WriteLine($"💥 [OAUTH_CALLBACK] Message: {ex.Message}");
+            Console.WriteLine($"💥 [OAUTH_CALLBACK] StackTrace: {ex.StackTrace}");
+
+            // 例外発生時もUI通知のため結果を保存
+            PendingPatreonNotification = new PatreonAuthNotification(
+                IsSuccess: false,
+                PlanName: null,
+                ErrorMessage: $"認証処理中にエラーが発生しました: {ex.Message}");
+        }
+        finally
+        {
+            // コールバックURLをクリア（再処理防止）
+            PendingPatreonCallbackUrl = null;
+            Console.WriteLine("🔗 [OAUTH_CALLBACK] Patreonコールバック処理完了");
+        }
     }
 }

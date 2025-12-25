@@ -9,6 +9,7 @@ using Baketa.Infrastructure.License.Clients;
 using Baketa.Infrastructure.License.Services;
 using Baketa.Infrastructure.Payment.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -39,8 +40,22 @@ public sealed class LicenseModule : ServiceModuleBase
         // 決済サービスの登録
         RegisterPaymentService(services);
 
+        // 自動同期サービスの登録
+        RegisterAutoSyncService(services);
+
         // NOTE: IUserPlanService後方互換アダプタはUI層で登録（Clean Architecture準拠）
         // NOTE: ログ出力はLicenseManagerのコンストラクタで行う
+    }
+
+    /// <summary>
+    /// 自動同期サービスを登録
+    /// </summary>
+    private static void RegisterAutoSyncService(IServiceCollection services)
+    {
+        // Patreon自動同期サービス（30分間隔でライセンス状態を同期）
+        services.AddSingleton<PatreonSyncHostedService>();
+        services.AddSingleton<IHostedService>(provider =>
+            provider.GetRequiredService<PatreonSyncHostedService>());
     }
 
     /// <summary>
@@ -105,6 +120,9 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddSingleton<PatreonOAuthService>();
         services.AddSingleton<IPatreonOAuthService>(provider =>
             provider.GetRequiredService<PatreonOAuthService>());
+
+        // PatreonCallbackHandler登録（URIスキームコールバック処理）
+        services.AddSingleton<IPatreonCallbackHandler, PatreonCallbackHandler>();
 
         // 各クライアントを登録
         services.AddSingleton<MockLicenseApiClient>();
