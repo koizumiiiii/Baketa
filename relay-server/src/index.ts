@@ -7,6 +7,12 @@
  * - リフレッシュトークンによるアクセストークン更新
  * - メンバーシップ情報取得（Tier判定）
  * - セキュアなセッション管理
+ *
+ * セキュリティ:
+ * - タイミング攻撃対策（timingSafeCompare）
+ * - redirect_uri ホワイトリスト検証
+ * - 本番環境でのAPI_KEY必須化
+ * - stateパラメータはクライアント側（C#）で検証
  */
 
 // ============================================
@@ -19,6 +25,7 @@ const PATREON_IDENTITY_URL = `${PATREON_API_BASE}/v2/identity`;
 const PATREON_IDENTITY_PARAMS = 'include=memberships.currently_entitled_tiers,memberships.campaign&fields[user]=email,full_name&fields[member]=patron_status,currently_entitled_amount_cents,next_charge_date,campaign_lifetime_support_cents&fields[tier]=title,amount_cents';
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const IDENTITY_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 
 /** Tier金額しきい値（円） */
 const TIER_AMOUNTS = {
@@ -37,7 +44,9 @@ export interface Env {
   PATREON_CLIENT_ID: string;
   PATREON_CLIENT_SECRET: string;
   ALLOWED_ORIGINS: string;
+  ALLOWED_REDIRECT_URIS?: string;  // カンマ区切りのホワイトリスト
   API_KEY: string;
+  ENVIRONMENT?: string;  // 'production' | 'development'
   SESSIONS: KVNamespace;
 }
 
@@ -46,6 +55,12 @@ interface SessionData {
   refreshToken: string;
   expiresAt: number;
   userId: string;
+}
+
+/** キャッシュ済みメンバーシップ情報 */
+interface CachedMembership {
+  membership: ParsedMembership;
+  cachedAt: number;
 }
 
 /** Patreon OAuth トークンレスポンス */
@@ -116,6 +131,13 @@ interface ParsedMembership {
   entitledAmountCents: number;
 }
 
+/** リクエストボディ検証結果 */
+interface ValidationResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
 // ============================================
 // セキュリティユーティリティ
 // ============================================
@@ -149,6 +171,98 @@ function generateSessionToken(): string {
   return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * redirect_uri のホワイトリスト検証
+ */
+function validateRedirectUri(redirectUri: string, env: Env): boolean {
+  // ホワイトリスト未設定の場合（開発環境）
+  if (!env.ALLOWED_REDIRECT_URIS) {
+    if (env.ENVIRONMENT === 'production') {
+      console.error('CRITICAL: ALLOWED_REDIRECT_URIS is not set in production');
+      return false;
+    }
+    console.warn('ALLOWED_REDIRECT_URIS is not set - allowing all redirect URIs (development mode)');
+    return true;
+  }
+
+  const allowedUris = env.ALLOWED_REDIRECT_URIS.split(',').map(uri => uri.trim());
+  return allowedUris.includes(redirectUri);
+}
+
+// ============================================
+// リクエストボディ検証
+// ============================================
+
+interface TokenExchangeBody {
+  code: string;
+  redirect_uri: string;
+}
+
+interface TokenRefreshBody {
+  refresh_token: string;
+}
+
+interface PatreonExchangeBody {
+  code: string;
+  redirect_uri: string;
+  state?: string;  // Note: stateはクライアント側（C#）で検証される
+}
+
+interface SessionValidateBody {
+  session_token: string;
+}
+
+function validateTokenExchangeBody(body: unknown): ValidationResult<TokenExchangeBody> {
+  if (!body || typeof body !== 'object') {
+    return { success: false, error: 'Invalid request body' };
+  }
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.code !== 'string' || !obj.code) {
+    return { success: false, error: 'Missing or invalid field: code' };
+  }
+  if (typeof obj.redirect_uri !== 'string' || !obj.redirect_uri) {
+    return { success: false, error: 'Missing or invalid field: redirect_uri' };
+  }
+  return { success: true, data: { code: obj.code, redirect_uri: obj.redirect_uri } };
+}
+
+function validateTokenRefreshBody(body: unknown): ValidationResult<TokenRefreshBody> {
+  if (!body || typeof body !== 'object') {
+    return { success: false, error: 'Invalid request body' };
+  }
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.refresh_token !== 'string' || !obj.refresh_token) {
+    return { success: false, error: 'Missing or invalid field: refresh_token' };
+  }
+  return { success: true, data: { refresh_token: obj.refresh_token } };
+}
+
+function validatePatreonExchangeBody(body: unknown): ValidationResult<PatreonExchangeBody> {
+  if (!body || typeof body !== 'object') {
+    return { success: false, error: 'Invalid request body' };
+  }
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.code !== 'string' || !obj.code) {
+    return { success: false, error: 'Missing or invalid field: code' };
+  }
+  if (typeof obj.redirect_uri !== 'string' || !obj.redirect_uri) {
+    return { success: false, error: 'Missing or invalid field: redirect_uri' };
+  }
+  const state = typeof obj.state === 'string' ? obj.state : undefined;
+  return { success: true, data: { code: obj.code, redirect_uri: obj.redirect_uri, state } };
+}
+
+function validateSessionValidateBody(body: unknown): ValidationResult<SessionValidateBody> {
+  if (!body || typeof body !== 'object') {
+    return { success: false, error: 'Invalid request body' };
+  }
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.session_token !== 'string' || !obj.session_token) {
+    return { success: false, error: 'Missing or invalid field: session_token' };
+  }
+  return { success: true, data: { session_token: obj.session_token } };
+}
+
 // ============================================
 // KVヘルパー関数
 // ============================================
@@ -171,6 +285,30 @@ async function setSession(env: Env, sessionToken: string, session: SessionData):
 
 async function deleteSession(env: Env, sessionToken: string): Promise<void> {
   await env.SESSIONS.delete(sessionToken);
+}
+
+/** メンバーシップキャッシュを取得 */
+async function getCachedMembership(env: Env, userId: string): Promise<CachedMembership | null> {
+  try {
+    const cacheKey = `membership:${userId}`;
+    const data = await env.SESSIONS.get<CachedMembership>(cacheKey, 'json');
+    if (data && data.membership && typeof data.cachedAt === 'number') {
+      // キャッシュが有効期限内かチェック
+      if (Date.now() - data.cachedAt < IDENTITY_CACHE_TTL_SECONDS * 1000) {
+        return data;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** メンバーシップをキャッシュに保存 */
+async function setCachedMembership(env: Env, userId: string, membership: ParsedMembership): Promise<void> {
+  const cacheKey = `membership:${userId}`;
+  const cached: CachedMembership = { membership, cachedAt: Date.now() };
+  await env.SESSIONS.put(cacheKey, JSON.stringify(cached), { expirationTtl: IDENTITY_CACHE_TTL_SECONDS });
 }
 
 // ============================================
@@ -271,6 +409,36 @@ function parsePatreonMembership(identityData: PatreonIdentityResponse): ParsedMe
   };
 }
 
+/** Patreon API エラー */
+class PatreonApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'PatreonApiError';
+  }
+}
+
+/**
+ * Patreon トークンAPIを呼び出す共通関数
+ */
+async function fetchPatreonToken(
+  env: Env,
+  params: URLSearchParams
+): Promise<PatreonTokenResponse> {
+  const response = await fetch(PATREON_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Patreon token API failed: status=${response.status}, body=${errorText}`);
+    throw new PatreonApiError('Token API failed', response.status);
+  }
+
+  return await response.json() as PatreonTokenResponse;
+}
+
 /**
  * Patreon Identity APIを呼び出してメンバーシップ情報を取得
  */
@@ -288,12 +456,51 @@ async function fetchPatreonIdentity(accessToken: string): Promise<PatreonIdentit
   return await response.json() as PatreonIdentityResponse;
 }
 
-/** Patreon API エラー */
-class PatreonApiError extends Error {
-  constructor(message: string, public readonly status: number) {
-    super(message);
-    this.name = 'PatreonApiError';
+/**
+ * セッションからメンバーシップ情報を取得（キャッシュ対応）
+ */
+async function getMembershipFromSession(
+  env: Env,
+  session: SessionData,
+  useCache: boolean = true
+): Promise<ParsedMembership> {
+  // キャッシュをチェック
+  if (useCache) {
+    const cached = await getCachedMembership(env, session.userId);
+    if (cached) {
+      console.log(`Cache hit for user ${session.userId}`);
+      return cached.membership;
+    }
   }
+
+  // Patreon APIから取得
+  const identityData = await fetchPatreonIdentity(session.accessToken);
+  const membership = parsePatreonMembership(identityData);
+
+  // キャッシュに保存
+  await setCachedMembership(env, session.userId, membership);
+
+  return membership;
+}
+
+/**
+ * セッショントークンを検証してセッションを取得
+ */
+async function validateAndGetSession(
+  env: Env,
+  sessionToken: string
+): Promise<{ session: SessionData } | { error: string; errorCode: string }> {
+  const session = await getSession(env, sessionToken);
+  if (!session) {
+    return { error: 'Invalid or expired session', errorCode: 'SESSION_INVALID' };
+  }
+
+  if (Date.now() > session.expiresAt) {
+    await deleteSession(env, sessionToken);
+    return { error: 'Session expired', errorCode: 'SESSION_EXPIRED' };
+  }
+
+  return { session };
 }
 
 // ============================================
@@ -301,7 +508,12 @@ class PatreonApiError extends Error {
 // ============================================
 
 function validateApiKey(request: Request, env: Env): boolean {
+  // 本番環境ではAPI_KEY必須
   if (!env.API_KEY) {
+    if (env.ENVIRONMENT === 'production') {
+      console.error('CRITICAL: API_KEY is not set in a production environment');
+      return false;
+    }
     console.warn('API_KEY is not set - allowing all requests (development mode)');
     return true;
   }
@@ -327,6 +539,12 @@ function validateEnvironment(env: Env): EnvValidationResult {
   if (!env.PATREON_CLIENT_ID) missingVars.push('PATREON_CLIENT_ID');
   if (!env.PATREON_CLIENT_SECRET) missingVars.push('PATREON_CLIENT_SECRET');
   if (!env.SESSIONS) missingVars.push('SESSIONS');
+
+  // 本番環境では追加の検証
+  if (env.ENVIRONMENT === 'production') {
+    if (!env.API_KEY) missingVars.push('API_KEY');
+    if (!env.ALLOWED_REDIRECT_URIS) missingVars.push('ALLOWED_REDIRECT_URIS');
+  }
 
   return {
     valid: missingVars.length === 0,
@@ -354,7 +572,11 @@ export default {
 
     // ヘルスチェック（認証不要）
     if (url.pathname === '/health') {
-      return successResponse({ status: 'ok', timestamp: new Date().toISOString() }, origin, allowedOrigins);
+      return successResponse({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        environment: env.ENVIRONMENT || 'development',
+      }, origin, allowedOrigins);
     }
 
     // 環境変数検証
@@ -415,35 +637,34 @@ async function handleTokenExchange(
   }
 
   try {
-    const body = await request.json() as { code?: string; redirect_uri?: string };
-    const { code, redirect_uri } = body;
-
-    if (!code || !redirect_uri) {
-      return errorResponse('Missing required fields: code, redirect_uri', 400, origin, allowedOrigins);
+    const body = await request.json();
+    const validation = validateTokenExchangeBody(body);
+    if (!validation.success || !validation.data) {
+      return errorResponse(validation.error || 'Invalid request', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
     }
 
-    const tokenResponse = await fetch(PATREON_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        grant_type: 'authorization_code',
-        client_id: env.PATREON_CLIENT_ID,
-        client_secret: env.PATREON_CLIENT_SECRET,
-        redirect_uri,
-      }),
-    });
+    const { code, redirect_uri } = validation.data;
 
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error('Patreon token exchange failed:', errorText);
-      return errorResponse('Token exchange failed', tokenResponse.status, origin, allowedOrigins);
+    // redirect_uri ホワイトリスト検証
+    if (!validateRedirectUri(redirect_uri, env)) {
+      console.error(`Invalid redirect_uri: ${redirect_uri}`);
+      return errorResponse('Invalid redirect_uri', 400, origin, allowedOrigins, 'INVALID_REDIRECT_URI');
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await fetchPatreonToken(env, new URLSearchParams({
+      code,
+      grant_type: 'authorization_code',
+      client_id: env.PATREON_CLIENT_ID,
+      client_secret: env.PATREON_CLIENT_SECRET,
+      redirect_uri,
+    }));
+
     return successResponse(tokenData, origin, allowedOrigins);
 
   } catch (error) {
+    if (error instanceof PatreonApiError) {
+      return errorResponse('Token exchange failed', error.status, origin, allowedOrigins, 'TOKEN_EXCHANGE_FAILED');
+    }
     console.error('Token exchange error:', error);
     return errorResponse('Internal server error', 500, origin, allowedOrigins);
   }
@@ -464,34 +685,27 @@ async function handleTokenRefresh(
   }
 
   try {
-    const body = await request.json() as { refresh_token?: string };
-    const { refresh_token } = body;
-
-    if (!refresh_token) {
-      return errorResponse('Missing required field: refresh_token', 400, origin, allowedOrigins);
+    const body = await request.json();
+    const validation = validateTokenRefreshBody(body);
+    if (!validation.success || !validation.data) {
+      return errorResponse(validation.error || 'Invalid request', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
     }
 
-    const tokenResponse = await fetch(PATREON_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        refresh_token,
-        grant_type: 'refresh_token',
-        client_id: env.PATREON_CLIENT_ID,
-        client_secret: env.PATREON_CLIENT_SECRET,
-      }),
-    });
+    const { refresh_token } = validation.data;
 
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error('Patreon token refresh failed:', errorText);
-      return errorResponse('Token refresh failed', tokenResponse.status, origin, allowedOrigins);
-    }
+    const tokenData = await fetchPatreonToken(env, new URLSearchParams({
+      refresh_token,
+      grant_type: 'refresh_token',
+      client_id: env.PATREON_CLIENT_ID,
+      client_secret: env.PATREON_CLIENT_SECRET,
+    }));
 
-    const tokenData = await tokenResponse.json();
     return successResponse(tokenData, origin, allowedOrigins);
 
   } catch (error) {
+    if (error instanceof PatreonApiError) {
+      return errorResponse('Token refresh failed', error.status, origin, allowedOrigins, 'TOKEN_REFRESH_FAILED');
+    }
     console.error('Token refresh error:', error);
     return errorResponse('Internal server error', 500, origin, allowedOrigins);
   }
@@ -543,6 +757,9 @@ async function handleMembershipCheck(
 /**
  * Patreon認証コード交換とユーザー情報取得（統合エンドポイント）
  * POST /api/patreon/exchange
+ *
+ * Note: stateパラメータはクライアント側（C# PatreonOAuthService）で検証されます。
+ * このサーバーはstateの生成・検証には関与しません。
  */
 async function handlePatreonExchange(
   request: Request,
@@ -555,35 +772,31 @@ async function handlePatreonExchange(
   }
 
   try {
-    const body = await request.json() as { code?: string; state?: string; redirect_uri?: string };
-    const { code, redirect_uri } = body;
+    const body = await request.json();
+    const validation = validatePatreonExchangeBody(body);
+    if (!validation.success || !validation.data) {
+      return errorResponse(validation.error || 'Invalid request', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+    }
 
-    if (!code || !redirect_uri) {
-      return errorResponse('Missing required fields: code, redirect_uri', 400, origin, allowedOrigins, 'MISSING_FIELDS');
+    const { code, redirect_uri } = validation.data;
+
+    // redirect_uri ホワイトリスト検証
+    if (!validateRedirectUri(redirect_uri, env)) {
+      console.error(`Invalid redirect_uri: ${redirect_uri}`);
+      return errorResponse('Invalid redirect_uri', 400, origin, allowedOrigins, 'INVALID_REDIRECT_URI');
     }
 
     console.log(`Patreon exchange request received: redirect_uri=${redirect_uri}`);
 
     // Step 1: トークン交換
-    const tokenResponse = await fetch(PATREON_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        grant_type: 'authorization_code',
-        client_id: env.PATREON_CLIENT_ID,
-        client_secret: env.PATREON_CLIENT_SECRET,
-        redirect_uri,
-      }),
-    });
+    const tokenData = await fetchPatreonToken(env, new URLSearchParams({
+      code,
+      grant_type: 'authorization_code',
+      client_id: env.PATREON_CLIENT_ID,
+      client_secret: env.PATREON_CLIENT_SECRET,
+      redirect_uri,
+    }));
 
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error(`Patreon token exchange failed: status=${tokenResponse.status}, body=${errorText}`);
-      return errorResponse(`Token exchange failed (status: ${tokenResponse.status})`, tokenResponse.status, origin, allowedOrigins, 'TOKEN_EXCHANGE_FAILED');
-    }
-
-    const tokenData = await tokenResponse.json() as PatreonTokenResponse;
     console.log('Token exchange successful, fetching identity...');
 
     // Step 2: ユーザー情報取得
@@ -602,6 +815,9 @@ async function handlePatreonExchange(
       expiresAt: Date.now() + (tokenData.expires_in * 1000),
       userId: membership.userId,
     });
+
+    // メンバーシップをキャッシュに保存
+    await setCachedMembership(env, membership.userId, membership);
 
     // C#側はsnake_caseのJSONプロパティ名を期待
     const sessionResponse = {
@@ -623,7 +839,8 @@ async function handlePatreonExchange(
 
   } catch (error) {
     if (error instanceof PatreonApiError) {
-      return errorResponse(`Failed to fetch user identity (status: ${error.status})`, error.status, origin, allowedOrigins, 'IDENTITY_FETCH_FAILED');
+      const errorCode = error.message.includes('Token') ? 'TOKEN_EXCHANGE_FAILED' : 'IDENTITY_FETCH_FAILED';
+      return errorResponse(`Operation failed (status: ${error.status})`, error.status, origin, allowedOrigins, errorCode);
     }
     console.error('Patreon exchange error:', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
     return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
@@ -645,26 +862,24 @@ async function handleSessionValidate(
   }
 
   try {
-    const body = await request.json() as { session_token?: string };
-    const { session_token } = body;
-
-    if (!session_token) {
-      return errorResponse('Missing required field: session_token', 400, origin, allowedOrigins);
+    const body = await request.json();
+    const validation = validateSessionValidateBody(body);
+    if (!validation.success || !validation.data) {
+      return errorResponse(validation.error || 'Invalid request', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
     }
 
-    const session = await getSession(env, session_token);
-    if (!session) {
-      return errorResponse('Invalid or expired session', 401, origin, allowedOrigins, 'SESSION_INVALID');
-    }
+    const { session_token } = validation.data;
 
-    if (Date.now() > session.expiresAt) {
-      await deleteSession(env, session_token);
-      return errorResponse('Session expired', 401, origin, allowedOrigins, 'SESSION_EXPIRED');
+    const sessionResult = await validateAndGetSession(env, session_token);
+    if ('error' in sessionResult) {
+      if (sessionResult.errorCode === 'SESSION_EXPIRED') {
+        await deleteSession(env, session_token);
+      }
+      return errorResponse(sessionResult.error, 401, origin, allowedOrigins, sessionResult.errorCode);
     }
 
     try {
-      const identityData = await fetchPatreonIdentity(session.accessToken);
-      const membership = parsePatreonMembership(identityData);
+      const membership = await getMembershipFromSession(env, sessionResult.session, true);
 
       return successResponse({
         SessionValid: true,
@@ -675,7 +890,7 @@ async function handleSessionValidate(
         TierId: membership.tierId,
         PatronStatus: membership.patronStatus,
         NextChargeDate: membership.nextChargeDate,
-        SessionExpiresAt: session.expiresAt,
+        SessionExpiresAt: sessionResult.session.expiresAt,
       }, origin, allowedOrigins);
 
     } catch (error) {
@@ -706,7 +921,7 @@ async function handleLicenseStatus(
     return errorResponse('Method not allowed', 405, origin, allowedOrigins);
   }
 
-  const createErrorResponse = (error: string, errorCode: string, status: number) => {
+  const createLicenseErrorResponse = (error: string, errorCode: string, status: number) => {
     return new Response(
       JSON.stringify({
         success: false,
@@ -725,24 +940,18 @@ async function handleLicenseStatus(
   try {
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return createErrorResponse('Missing or invalid Authorization header', 'MISSING_AUTH', 401);
+      return createLicenseErrorResponse('Missing or invalid Authorization header', 'MISSING_AUTH', 401);
     }
 
     const sessionToken = authHeader.substring(7);
 
-    const session = await getSession(env, sessionToken);
-    if (!session) {
-      return createErrorResponse('Invalid or expired session', 'SESSION_EXPIRED', 401);
-    }
-
-    if (Date.now() > session.expiresAt) {
-      await deleteSession(env, sessionToken);
-      return createErrorResponse('Session expired', 'SESSION_EXPIRED', 401);
+    const sessionResult = await validateAndGetSession(env, sessionToken);
+    if ('error' in sessionResult) {
+      return createLicenseErrorResponse(sessionResult.error, sessionResult.errorCode, 401);
     }
 
     try {
-      const identityData = await fetchPatreonIdentity(session.accessToken);
-      const membership = parsePatreonMembership(identityData);
+      const membership = await getMembershipFromSession(env, sessionResult.session, true);
 
       // C#のLicenseStatusResponseが期待する形式（snake_case）
       return successResponse({
@@ -760,7 +969,7 @@ async function handleLicenseStatus(
     } catch (error) {
       if (error instanceof PatreonApiError && error.status === 401) {
         await deleteSession(env, sessionToken);
-        return createErrorResponse('Patreon token expired, re-authentication required', 'PATREON_TOKEN_EXPIRED', 401);
+        return createLicenseErrorResponse('Patreon token expired, re-authentication required', 'PATREON_TOKEN_EXPIRED', 401);
       }
       throw error;
     }
@@ -795,8 +1004,10 @@ async function handlePatreonRevoke(
 
     const session = await getSession(env, sessionToken);
     if (session) {
+      // セッションとキャッシュを削除
       await deleteSession(env, sessionToken);
-      console.log(`Revoke: Session deleted for user ${session.userId}`);
+      await env.SESSIONS.delete(`membership:${session.userId}`);
+      console.log(`Revoke: Session and cache deleted for user ${session.userId}`);
     } else {
       console.log('Revoke: Session not found, treating as already revoked');
     }
