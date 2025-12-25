@@ -134,6 +134,8 @@ export default {
         return handleSessionValidate(request, env, origin);
       case '/api/patreon/license-status':
         return handleLicenseStatus(request, env, origin);
+      case '/api/patreon/revoke':
+        return handlePatreonRevoke(request, env, origin);
       default:
         return errorResponse('Not Found', 404, origin, env.ALLOWED_ORIGINS || '*');
     }
@@ -712,6 +714,56 @@ async function handleLicenseStatus(request: Request, env: Env, origin: string): 
 
   } catch (error) {
     console.error('License status error:', error);
+    return errorResponse('Internal server error', 500, origin, env.ALLOWED_ORIGINS || '*');
+  }
+}
+
+/**
+ * Patreonセッションを無効化（ログアウト）
+ * POST /api/patreon/revoke
+ * Header: Authorization: Bearer <session_token>
+ *
+ * セッショントークンを削除し、Patreon連携を解除します
+ */
+async function handlePatreonRevoke(request: Request, env: Env, origin: string): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, env.ALLOWED_ORIGINS || '*');
+  }
+
+  try {
+    // セッショントークンを取得
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return errorResponse('Missing or invalid Authorization header', 401, origin, env.ALLOWED_ORIGINS || '*');
+    }
+
+    const sessionToken = authHeader.substring(7);
+
+    // セッション情報をKVから取得（存在確認）
+    const session = await getSession(env, sessionToken);
+    if (!session) {
+      // セッションが存在しなくても成功として扱う（冪等性）
+      console.log('Revoke: Session not found, treating as already revoked');
+      return successResponse({
+        success: true,
+        message: 'Session already revoked or not found'
+      }, origin, env.ALLOWED_ORIGINS || '*');
+    }
+
+    // セッションを削除
+    await deleteSession(env, sessionToken);
+    console.log(`Revoke: Session deleted for user ${session.userId}`);
+
+    // Note: Patreon APIにはトークン無効化エンドポイントがないため、
+    // サーバー側のセッション削除のみで対応
+
+    return successResponse({
+      success: true,
+      message: 'Session revoked successfully'
+    }, origin, env.ALLOWED_ORIGINS || '*');
+
+  } catch (error) {
+    console.error('Revoke error:', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
     return errorResponse('Internal server error', 500, origin, env.ALLOWED_ORIGINS || '*');
   }
 }
