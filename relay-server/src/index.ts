@@ -13,15 +13,32 @@ export interface Env {
   PATREON_CLIENT_SECRET: string;
   ALLOWED_ORIGINS: string;
   API_KEY: string;  // クライアント認証用APIキー
+  SESSIONS: KVNamespace;  // セッション永続化用KV
 }
 
-// セッション情報を一時保存（本番ではKVを使用）
-const sessionStore = new Map<string, {
+// セッション情報の型定義
+interface SessionData {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
   userId: string;
-}>();
+}
+
+// KVヘルパー関数
+async function getSession(env: Env, sessionToken: string): Promise<SessionData | null> {
+  const data = await env.SESSIONS.get(sessionToken, 'json');
+  return data as SessionData | null;
+}
+
+async function setSession(env: Env, sessionToken: string, session: SessionData): Promise<void> {
+  // セッションは30日間有効（Patreonトークンの有効期限に合わせる）
+  const expirationTtl = 30 * 24 * 60 * 60; // 30 days in seconds
+  await env.SESSIONS.put(sessionToken, JSON.stringify(session), { expirationTtl });
+}
+
+async function deleteSession(env: Env, sessionToken: string): Promise<void> {
+  await env.SESSIONS.delete(sessionToken);
+}
 
 // CORS headers
 const corsHeaders = (origin: string, allowedOrigins: string) => {
@@ -115,6 +132,8 @@ export default {
         return handlePatreonExchange(request, env, origin);
       case '/api/session/validate':
         return handleSessionValidate(request, env, origin);
+      case '/api/patreon/license-status':
+        return handleLicenseStatus(request, env, origin);
       default:
         return errorResponse('Not Found', 404, origin, env.ALLOWED_ORIGINS || '*');
     }
@@ -276,6 +295,20 @@ async function handlePatreonExchange(request: Request, env: Env, origin: string)
   }
 
   try {
+    // 環境変数チェック
+    if (!env.PATREON_CLIENT_ID) {
+      console.error('PATREON_CLIENT_ID is not set');
+      return errorResponse('Server configuration error: missing client_id', 500, origin, env.ALLOWED_ORIGINS || '*');
+    }
+    if (!env.PATREON_CLIENT_SECRET) {
+      console.error('PATREON_CLIENT_SECRET is not set');
+      return errorResponse('Server configuration error: missing client_secret', 500, origin, env.ALLOWED_ORIGINS || '*');
+    }
+    if (!env.SESSIONS) {
+      console.error('SESSIONS KV namespace is not bound');
+      return errorResponse('Server configuration error: missing KV binding', 500, origin, env.ALLOWED_ORIGINS || '*');
+    }
+
     const body = await request.json() as { code?: string; state?: string; redirect_uri?: string };
     const { code, state, redirect_uri } = body;
 
@@ -283,7 +316,7 @@ async function handlePatreonExchange(request: Request, env: Env, origin: string)
       return errorResponse('Missing required fields: code, redirect_uri', 400, origin, env.ALLOWED_ORIGINS || '*');
     }
 
-    console.log('Patreon exchange request received');
+    console.log(`Patreon exchange request received: redirect_uri=${redirect_uri}`);
 
     // Step 1: Exchange code for tokens with Patreon
     const tokenResponse = await fetch('https://www.patreon.com/api/oauth2/token', {
@@ -302,8 +335,9 @@ async function handlePatreonExchange(request: Request, env: Env, origin: string)
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('Patreon token exchange failed:', errorText);
-      return errorResponse(`Token exchange failed: ${errorText}`, tokenResponse.status, origin, env.ALLOWED_ORIGINS || '*');
+      console.error(`Patreon token exchange failed: status=${tokenResponse.status}, body=${errorText}`);
+      // セキュリティのため詳細エラーはログのみ、クライアントには簡潔なメッセージ
+      return errorResponse(`Token exchange failed (status: ${tokenResponse.status})`, tokenResponse.status, origin, env.ALLOWED_ORIGINS || '*');
     }
 
     const tokenData = await tokenResponse.json() as {
@@ -328,8 +362,9 @@ async function handlePatreonExchange(request: Request, env: Env, origin: string)
 
     if (!identityResponse.ok) {
       const errorText = await identityResponse.text();
-      console.error('Patreon identity fetch failed:', errorText);
-      return errorResponse(`Failed to fetch user identity: ${errorText}`, identityResponse.status, origin, env.ALLOWED_ORIGINS || '*');
+      console.error(`Patreon identity fetch failed: status=${identityResponse.status}, body=${errorText}`);
+      // セキュリティのため詳細エラーはログのみ
+      return errorResponse(`Failed to fetch user identity (status: ${identityResponse.status})`, identityResponse.status, origin, env.ALLOWED_ORIGINS || '*');
     }
 
     const identityData = await identityResponse.json() as any;
@@ -368,8 +403,8 @@ async function handlePatreonExchange(request: Request, env: Env, origin: string)
     const sessionToken = generateSessionToken();
     const userId = user?.id || '';
 
-    // トークンをサーバー側で保存（本番ではCloudflare KVを使用）
-    sessionStore.set(sessionToken, {
+    // トークンをKVに保存
+    await setSession(env, sessionToken, {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
       expiresAt: Date.now() + (tokenData.expires_in * 1000),
@@ -378,17 +413,18 @@ async function handlePatreonExchange(request: Request, env: Env, origin: string)
 
     // Build response in format expected by PatreonOAuthService.SessionTokenResponse
     // 注意: access_token/refresh_tokenは返さない（セキュリティ対策）
+    // C#側は snake_case の JSON プロパティ名を期待
     const sessionResponse = {
-      PatreonUserId: userId,
-      Email: user?.attributes?.email || '',
-      FullName: user?.attributes?.full_name || '',
-      SessionToken: sessionToken,  // サーバー生成のセッショントークン（access_tokenではない）
-      ExpiresIn: tokenData.expires_in,
-      Plan: plan,
-      TierId: highestTier?.id || '',
-      PatronStatus: membership?.attributes?.patron_status || 'not_patron',
-      NextChargeDate: membership?.attributes?.next_charge_date || null,
-      EntitledAmountCents: membership?.attributes?.currently_entitled_amount_cents || 0,
+      session_token: sessionToken,  // サーバー生成のセッショントークン（access_tokenではない）
+      patreon_user_id: userId,
+      email: user?.attributes?.email || '',
+      full_name: user?.attributes?.full_name || '',
+      expires_in: tokenData.expires_in,
+      plan: plan,
+      tier_id: highestTier?.id || '',
+      patron_status: membership?.attributes?.patron_status || 'not_patron',
+      next_charge_date: membership?.attributes?.next_charge_date || null,
+      entitled_amount_cents: membership?.attributes?.currently_entitled_amount_cents || 0,
     };
 
     console.log(`Exchange successful: UserId=${userId}, Plan=${plan}, SessionToken generated`);
@@ -396,8 +432,8 @@ async function handlePatreonExchange(request: Request, env: Env, origin: string)
     return successResponse(sessionResponse, origin, env.ALLOWED_ORIGINS || '*');
 
   } catch (error) {
-    console.error('Patreon exchange error:', error);
-    return errorResponse(`Internal server error: ${error}`, 500, origin, env.ALLOWED_ORIGINS || '*');
+    console.error('Patreon exchange error:', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+    return errorResponse('Internal server error', 500, origin, env.ALLOWED_ORIGINS || '*');
   }
 }
 
@@ -419,15 +455,15 @@ async function handleSessionValidate(request: Request, env: Env, origin: string)
       return errorResponse('Missing required field: session_token', 400, origin, env.ALLOWED_ORIGINS || '*');
     }
 
-    // セッション情報を取得
-    const session = sessionStore.get(session_token);
+    // セッション情報をKVから取得
+    const session = await getSession(env, session_token);
     if (!session) {
       return errorResponse('Invalid or expired session', 401, origin, env.ALLOWED_ORIGINS || '*');
     }
 
     // セッション有効期限チェック
     if (Date.now() > session.expiresAt) {
-      sessionStore.delete(session_token);
+      await deleteSession(env, session_token);
       return errorResponse('Session expired', 401, origin, env.ALLOWED_ORIGINS || '*');
     }
 
@@ -444,7 +480,7 @@ async function handleSessionValidate(request: Request, env: Env, origin: string)
     if (!identityResponse.ok) {
       // トークンが無効な場合はセッションを削除
       if (identityResponse.status === 401) {
-        sessionStore.delete(session_token);
+        await deleteSession(env, session_token);
         return errorResponse('Session invalid, re-authentication required', 401, origin, env.ALLOWED_ORIGINS || '*');
       }
       return errorResponse('Failed to fetch membership', identityResponse.status, origin, env.ALLOWED_ORIGINS || '*');
@@ -484,7 +520,7 @@ async function handleSessionValidate(request: Request, env: Env, origin: string)
 
   } catch (error) {
     console.error('Session validate error:', error);
-    return errorResponse(`Internal server error: ${error}`, 500, origin, env.ALLOWED_ORIGINS || '*');
+    return errorResponse('Internal server error', 500, origin, env.ALLOWED_ORIGINS || '*');
   }
 }
 
@@ -527,4 +563,155 @@ function parseMembershipData(data: any): object {
       amount_cents: t.attributes?.amount_cents,
     })),
   };
+}
+
+/**
+ * ライセンス状態を取得
+ * GET /api/patreon/license-status
+ * Header: Authorization: Bearer <session_token>
+ *
+ * C#側のPatreonOAuthService.GetLicenseStatusAsyncが期待する形式でレスポンスを返す
+ */
+async function handleLicenseStatus(request: Request, env: Env, origin: string): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, env.ALLOWED_ORIGINS || '*');
+  }
+
+  try {
+    // セッショントークンを取得
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          session_valid: false,
+          session_expired: true,
+          error: 'Missing or invalid Authorization header',
+          error_code: 'MISSING_AUTH'
+        }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders(origin, env.ALLOWED_ORIGINS || '*'),
+          },
+        }
+      );
+    }
+
+    const sessionToken = authHeader.substring(7);
+
+    // セッション情報をKVから取得
+    const session = await getSession(env, sessionToken);
+    if (!session) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          session_valid: false,
+          session_expired: true,
+          error: 'Invalid or expired session',
+          error_code: 'SESSION_EXPIRED'
+        }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders(origin, env.ALLOWED_ORIGINS || '*'),
+          },
+        }
+      );
+    }
+
+    // セッション有効期限チェック
+    if (Date.now() > session.expiresAt) {
+      await deleteSession(env, sessionToken);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          session_valid: false,
+          session_expired: true,
+          error: 'Session expired',
+          error_code: 'SESSION_EXPIRED'
+        }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders(origin, env.ALLOWED_ORIGINS || '*'),
+          },
+        }
+      );
+    }
+
+    // Patreon APIで最新のメンバーシップ情報を取得
+    const identityResponse = await fetch(
+      'https://www.patreon.com/api/oauth2/v2/identity?include=memberships.currently_entitled_tiers&fields[user]=email,full_name&fields[member]=patron_status,currently_entitled_amount_cents,next_charge_date&fields[tier]=title,amount_cents',
+      {
+        headers: {
+          'Authorization': `Bearer ${session.accessToken}`,
+        },
+      }
+    );
+
+    if (!identityResponse.ok) {
+      // トークンが無効な場合はセッションを削除
+      if (identityResponse.status === 401) {
+        await deleteSession(env, sessionToken);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            session_valid: false,
+            session_expired: true,
+            error: 'Patreon token expired, re-authentication required',
+            error_code: 'PATREON_TOKEN_EXPIRED'
+          }),
+          {
+            status: 401,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders(origin, env.ALLOWED_ORIGINS || '*'),
+            },
+          }
+        );
+      }
+      return errorResponse('Failed to fetch membership', identityResponse.status, origin, env.ALLOWED_ORIGINS || '*');
+    }
+
+    const identityData = await identityResponse.json() as any;
+    const user = identityData.data;
+    const included = identityData.included || [];
+
+    const membership = included.find((item: any) =>
+      item.type === 'member' && item.attributes?.patron_status === 'active_patron'
+    );
+
+    const tiers = included.filter((item: any) => item.type === 'tier');
+    const highestTier = tiers.reduce((max: any, tier: any) => {
+      const amount = tier.attributes?.amount_cents || 0;
+      return amount > (max?.attributes?.amount_cents || 0) ? tier : max;
+    }, null);
+
+    let plan = 'Free';
+    const amountCents = highestTier?.attributes?.amount_cents || 0;
+    if (amountCents >= 500) plan = 'Premia';
+    else if (amountCents >= 300) plan = 'Pro';
+    else if (amountCents >= 100) plan = 'Standard';
+
+    // C#のLicenseStatusResponseが期待する形式（snake_case）
+    return successResponse({
+      success: true,
+      session_valid: true,
+      session_expired: false,
+      plan: plan,
+      tier_id: highestTier?.id || '',
+      patron_status: membership?.attributes?.patron_status || 'not_patron',
+      next_charge_date: membership?.attributes?.next_charge_date || null,
+      error: null,
+      error_code: null
+    }, origin, env.ALLOWED_ORIGINS || '*');
+
+  } catch (error) {
+    console.error('License status error:', error);
+    return errorResponse('Internal server error', 500, origin, env.ALLOWED_ORIGINS || '*');
+  }
 }

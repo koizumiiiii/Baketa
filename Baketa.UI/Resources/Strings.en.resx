@@ -791,6 +791,27 @@
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>Login with Email (Optional)</value>
   </data>
+  <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
+    <value>Syncing...</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusSynced" xml:space="preserve">
+    <value>Synced</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusOffline" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusTokenExpired" xml:space="preserve">
+    <value>Re-authentication required</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusError" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusNotConnected" xml:space="preserve">
+    <value>Not connected</value>
+  </data>
+  <data name="Settings_Account_PatreonLinkedFormat" xml:space="preserve">
+    <value>Connected ({0})</value>
+  </data>
 
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">

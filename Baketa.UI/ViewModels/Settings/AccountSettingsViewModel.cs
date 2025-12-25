@@ -306,14 +306,14 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     /// 同期ステータス表示文字列
     /// </summary>
     public string PatreonSyncStatusDisplay => IsPatreonSyncing
-        ? "同期中..."
+        ? Strings.Settings_Account_PatreonSyncing
         : PatreonSyncStatus switch
         {
-            PatreonSyncStatus.Synced => "同期済み",
-            PatreonSyncStatus.Offline => "オフライン",
-            PatreonSyncStatus.TokenExpired => "再認証が必要",
-            PatreonSyncStatus.Error => "エラー",
-            _ => "未連携"
+            PatreonSyncStatus.Synced => Strings.Settings_Account_PatreonStatusSynced,
+            PatreonSyncStatus.Offline => Strings.Settings_Account_PatreonStatusOffline,
+            PatreonSyncStatus.TokenExpired => Strings.Settings_Account_PatreonStatusTokenExpired,
+            PatreonSyncStatus.Error => Strings.Settings_Account_PatreonStatusError,
+            _ => Strings.Settings_Account_PatreonStatusNotConnected
         };
 
     /// <summary>
