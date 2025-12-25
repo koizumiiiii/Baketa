@@ -482,4 +482,5 @@ public static class Strings
     public static string Loading_LoadingOCR => GetString("Loading_LoadingOCR");
     public static string Loading_InitializingTranslation => GetString("Loading_InitializingTranslation");
     public static string Loading_PreparingUI => GetString("Loading_PreparingUI");
+    public static string Loading_SetupGpu => GetString("Loading_SetupGpu");
 }

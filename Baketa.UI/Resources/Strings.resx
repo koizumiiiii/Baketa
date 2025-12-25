@@ -1148,5 +1148,8 @@
   <data name="Loading_PreparingUI" xml:space="preserve">
     <value>UIコンポーネントを準備しています...</value>
   </data>
+  <data name="Loading_SetupGpu" xml:space="preserve">
+    <value>GPU環境をセットアップしています...</value>
+  </data>
 
 </root>

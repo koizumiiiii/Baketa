@@ -108,10 +108,6 @@
                         <!-- ユーザー情報 -->
                         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <!-- Patreonアイコン -->
-                                <PathIcon Data="M14.82 2.41C18.78 4.57 20.91 9.01 19.32 13.11C17.73 17.22 13.29 19.35 9.33 17.19C5.37 15.03 3.24 10.59 4.83 6.48C6.42 2.38 10.86 0.25 14.82 2.41"
-                                          Width="20" Height="20"
-                                          Foreground="#FF424242"/>
                                 <TextBlock Text="{Binding PatreonUserName}"
                                            FontSize="14"
                                            FontWeight="SemiBold"/>
@@ -170,10 +166,6 @@
                         Padding="20">
                     <StackPanel Spacing="16">
                         <StackPanel Spacing="8" HorizontalAlignment="Center">
-                            <!-- Patreonアイコン -->
-                            <PathIcon Data="M14.82 2.41C18.78 4.57 20.91 9.01 19.32 13.11C17.73 17.22 13.29 19.35 9.33 17.19C5.37 15.03 3.24 10.59 4.83 6.48C6.42 2.38 10.86 0.25 14.82 2.41"
-                                      Width="48" Height="48"
-                                      Foreground="#FF424242"/>
                             <TextBlock Text="{local:Localize Settings_Account_PatreonConnectTitle}"
                                        FontSize="16"
                                        FontWeight="SemiBold"

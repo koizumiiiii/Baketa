@@ -50,7 +50,7 @@ public class LoadingViewModel : ViewModelBase
         InitializationSteps =
         [
             new("download_components", Strings.Loading_DownloadingComponents),
-            new("setup_gpu", "GPU環境をセットアップしています..."),
+            new("setup_gpu", Strings.Loading_SetupGpu),
             new("resolve_dependencies", Strings.Loading_ResolvingDependencies),
             new("load_ocr", Strings.Loading_LoadingOCR),
             new("init_translation", Strings.Loading_InitializingTranslation),
