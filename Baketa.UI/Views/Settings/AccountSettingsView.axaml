@@ -166,11 +166,11 @@
                             <PathIcon Data="M14.82 2.41C18.78 4.57 20.91 9.01 19.32 13.11C17.73 17.22 13.29 19.35 9.33 17.19C5.37 15.03 3.24 10.59 4.83 6.48C6.42 2.38 10.86 0.25 14.82 2.41"
                                       Width="48" Height="48"
                                       Foreground="#FF424242"/>
-                            <TextBlock Text="Patreonでログイン"
+                            <TextBlock Text="Patreonアカウントと連携"
                                        FontSize="16"
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center"/>
-                            <TextBlock Text="Patreonで支援いただくと、広告なし・クラウドAI翻訳などの特典が利用できます"
+                            <TextBlock Text="Patreonで支援中のアカウントと連携すると、広告なし・クラウドAI翻訳などの特典が利用できます"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap"
@@ -178,7 +178,7 @@
                                        MaxWidth="300"/>
                         </StackPanel>
 
-                        <Button Content="Patreonでログイン"
+                        <Button Content="Patreonと連携する"
                                 Command="{Binding ConnectPatreonCommand}"
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Center"
