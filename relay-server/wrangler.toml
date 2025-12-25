@@ -1,0 +1,14 @@
+name = "baketa-relay"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Environment variables (set via Cloudflare dashboard or wrangler secret)
+# PATREON_CLIENT_ID - Patreon OAuth Client ID
+# PATREON_CLIENT_SECRET - Patreon OAuth Client Secret (use wrangler secret)
+# ALLOWED_ORIGINS - Comma-separated list of allowed origins
+
+[vars]
+ALLOWED_ORIGINS = "*"
+
+# Note: PATREON_CLIENT_SECRET should be set as a secret:
+# wrangler secret put PATREON_CLIENT_SECRET
