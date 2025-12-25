@@ -76,6 +76,8 @@ export default {
         return handleTokenRefresh(request, env, origin);
       case '/api/membership':
         return handleMembershipCheck(request, env, origin);
+      case '/api/patreon/exchange':
+        return handlePatreonExchange(request, env, origin);
       case '/health':
         return successResponse({ status: 'ok', timestamp: new Date().toISOString() }, origin, env.ALLOWED_ORIGINS || '*');
       default:
@@ -223,6 +225,132 @@ async function handleMembershipCheck(request: Request, env: Env, origin: string)
   } catch (error) {
     console.error('Membership check error:', error);
     return errorResponse('Internal server error', 500, origin, env.ALLOWED_ORIGINS || '*');
+  }
+}
+
+/**
+ * Patreon認証コード交換とユーザー情報取得（統合エンドポイント）
+ * POST /api/patreon/exchange
+ * Body: { code: string, state: string, redirect_uri: string }
+ *
+ * PatreonOAuthService.ExchangeCodeForSessionAsync が期待する形式でレスポンスを返す
+ */
+async function handlePatreonExchange(request: Request, env: Env, origin: string): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, env.ALLOWED_ORIGINS || '*');
+  }
+
+  try {
+    const body = await request.json() as { code?: string; state?: string; redirect_uri?: string };
+    const { code, state, redirect_uri } = body;
+
+    if (!code || !redirect_uri) {
+      return errorResponse('Missing required fields: code, redirect_uri', 400, origin, env.ALLOWED_ORIGINS || '*');
+    }
+
+    console.log('Patreon exchange request received');
+
+    // Step 1: Exchange code for tokens with Patreon
+    const tokenResponse = await fetch('https://www.patreon.com/api/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code,
+        grant_type: 'authorization_code',
+        client_id: env.PATREON_CLIENT_ID,
+        client_secret: env.PATREON_CLIENT_SECRET,
+        redirect_uri,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Patreon token exchange failed:', errorText);
+      return errorResponse(`Token exchange failed: ${errorText}`, tokenResponse.status, origin, env.ALLOWED_ORIGINS || '*');
+    }
+
+    const tokenData = await tokenResponse.json() as {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      scope: string;
+      token_type: string;
+    };
+
+    console.log('Token exchange successful, fetching identity...');
+
+    // Step 2: Fetch user identity and memberships
+    const identityResponse = await fetch(
+      'https://www.patreon.com/api/oauth2/v2/identity?include=memberships.currently_entitled_tiers,memberships.campaign&fields[user]=email,full_name&fields[member]=patron_status,currently_entitled_amount_cents,next_charge_date,campaign_lifetime_support_cents&fields[tier]=title,amount_cents',
+      {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+        },
+      }
+    );
+
+    if (!identityResponse.ok) {
+      const errorText = await identityResponse.text();
+      console.error('Patreon identity fetch failed:', errorText);
+      return errorResponse(`Failed to fetch user identity: ${errorText}`, identityResponse.status, origin, env.ALLOWED_ORIGINS || '*');
+    }
+
+    const identityData = await identityResponse.json() as any;
+    console.log('Identity fetched successfully');
+
+    // Step 3: Parse membership data and determine plan
+    const user = identityData.data;
+    const included = identityData.included || [];
+
+    // Find active membership
+    const membership = included.find((item: any) =>
+      item.type === 'member' && item.attributes?.patron_status === 'active_patron'
+    );
+
+    // Find entitled tiers
+    const tiers = included.filter((item: any) => item.type === 'tier');
+
+    // Get the highest tier (by amount)
+    const highestTier = tiers.reduce((max: any, tier: any) => {
+      const amount = tier.attributes?.amount_cents || 0;
+      return amount > (max?.attributes?.amount_cents || 0) ? tier : max;
+    }, null);
+
+    // Determine plan based on tier amount
+    let plan = 'Free';
+    const amountCents = highestTier?.attributes?.amount_cents || 0;
+    if (amountCents >= 500) {
+      plan = 'Premia';
+    } else if (amountCents >= 300) {
+      plan = 'Pro';
+    } else if (amountCents >= 100) {
+      plan = 'Standard';
+    }
+
+    // Build response in format expected by PatreonOAuthService.SessionTokenResponse
+    const sessionResponse = {
+      PatreonUserId: user?.id || '',
+      Email: user?.attributes?.email || '',
+      FullName: user?.attributes?.full_name || '',
+      SessionToken: tokenData.access_token,  // Using access_token as session token
+      RefreshToken: tokenData.refresh_token,
+      ExpiresIn: tokenData.expires_in,
+      Plan: plan,
+      TierId: highestTier?.id || '',
+      PatronStatus: membership?.attributes?.patron_status || 'not_patron',
+      NextChargeDate: membership?.attributes?.next_charge_date || null,
+      EntitledAmountCents: membership?.attributes?.currently_entitled_amount_cents || 0,
+    };
+
+    console.log(`Exchange successful: UserId=${sessionResponse.PatreonUserId}, Plan=${plan}`);
+
+    return successResponse(sessionResponse, origin, env.ALLOWED_ORIGINS || '*');
+
+  } catch (error) {
+    console.error('Patreon exchange error:', error);
+    return errorResponse(`Internal server error: ${error}`, 500, origin, env.ALLOWED_ORIGINS || '*');
   }
 }
 
