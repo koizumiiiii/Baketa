@@ -29,6 +29,7 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IPatreonOAuthService? _patreonService;
     private readonly PatreonSettings? _patreonSettings;
+    private readonly ILoggerFactory? _loggerFactory;
     private readonly ILogger<AccountSettingsViewModel>? _logger;
 
     private bool _isLoggedIn;
@@ -58,12 +59,14 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         IEventAggregator eventAggregator,
         IPatreonOAuthService? patreonService = null,
         IOptions<PatreonSettings>? patreonSettings = null,
+        ILoggerFactory? loggerFactory = null,
         ILogger<AccountSettingsViewModel>? logger = null) : base(eventAggregator)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _patreonService = patreonService;
         _patreonSettings = patreonSettings?.Value;
+        _loggerFactory = loggerFactory;
         _logger = logger;
 
         // 認証状態変更イベントの購読
@@ -739,11 +742,13 @@ public sealed class AccountSettingsViewModel : ViewModelBase
             IsPatreonSyncing = true;
             ClearStatusMessage();
 
-            // ローカルHTTPコールバックサーバーを使用
+            // ローカルHTTPコールバックサーバーを使用（DIからロガーを取得）
+            var callbackLogger = _loggerFactory?.CreateLogger<PatreonCallbackServer>()
+                ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<PatreonCallbackServer>.Instance;
             await using var callbackServer = new PatreonCallbackServer(
                 _patreonService,
                 Options.Create(_patreonSettings),
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<PatreonCallbackServer>.Instance);
+                callbackLogger);
 
             // CSRF対策用のstate生成
             var state = _patreonService.GenerateSecureState();
