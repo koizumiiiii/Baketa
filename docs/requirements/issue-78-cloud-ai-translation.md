@@ -617,12 +617,9 @@ Relay Server（`patreon-relay-server`）に以下のエンドポイントを追�
 ### 14.3 環境変数設定
 
 ```bash
-# Relay Server環境変数（Vercel/Railway等で設定）
+# Relay Server環境変数（Cloudflare Workers wrangler secret で設定）
 GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_KEY=your_supabase_service_key
-JWT_SECRET=your_jwt_secret
 ```
 
 ### 14.4 APIキー取得手順
@@ -639,10 +636,15 @@ JWT_SECRET=your_jwt_secret
 3. 「API Keys」→「Create new secret key」
 4. 生成されたキーをコピー
 
-#### 環境変数への登録（Vercelの場合）
-1. Vercelダッシュボード → プロジェクト選択
-2. Settings → Environment Variables
-3. 各キーを追加（Production/Preview/Development）
+#### 環境変数への登録（Cloudflare Workers）
+```bash
+cd relay-server
+wrangler secret put GEMINI_API_KEY
+wrangler secret put OPENAI_API_KEY
+```
+または Cloudflareダッシュボードから:
+1. Workers & Pages → baketa-relay → Settings → Variables
+2. 「Edit Variables」→「Add Variable」でシークレットとして追加
 
 ---
 
