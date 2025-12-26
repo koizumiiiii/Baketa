@@ -192,12 +192,12 @@ public sealed class PatreonCallbackServer : IAsyncDisposable, IDisposable
 
         try
         {
-            // ログインジェクション対策: ユーザー入力をサニタイズ
-            var sanitizedPath = SanitizeForLog(request.Url?.LocalPath);
-            _logger.LogDebug("[PATREON_CALLBACK] リクエスト受信: {Path}", sanitizedPath);
+            // ログインジェクション対策: ユーザー入力は記録せず、検証結果のみログ
+            var isValidPath = request.Url?.LocalPath == CallbackPath;
+            _logger.LogDebug("[PATREON_CALLBACK] リクエスト受信: ValidPath={IsValid}", isValidPath);
 
             // パスを検証
-            if (request.Url?.LocalPath != CallbackPath)
+            if (!isValidPath)
             {
                 response.StatusCode = 404;
                 await SendResponseAsync(response, "Not Found", "ページが見つかりませんでした。", false).ConfigureAwait(false);
@@ -213,17 +213,27 @@ public sealed class PatreonCallbackServer : IAsyncDisposable, IDisposable
             // Patreonからのエラーチェック
             if (!string.IsNullOrEmpty(error))
             {
-                // ログインジェクション対策: ユーザー入力をサニタイズ
-                var sanitizedError = SanitizeForLog(error);
-                var sanitizedDescription = SanitizeForLog(errorDescription);
-                _logger.LogWarning("[PATREON_CALLBACK] Patreonエラー: {Error} - {Description}", sanitizedError, sanitizedDescription);
+                // ログインジェクション対策: ユーザー入力は記録せず、エラー発生の事実のみログ
+                // エラーコードは既知の値のみ許可（access_denied等）
+                var knownErrorCode = error switch
+                {
+                    "access_denied" => "ACCESS_DENIED",
+                    "invalid_request" => "INVALID_REQUEST",
+                    "unauthorized_client" => "UNAUTHORIZED_CLIENT",
+                    "unsupported_response_type" => "UNSUPPORTED_RESPONSE_TYPE",
+                    "invalid_scope" => "INVALID_SCOPE",
+                    "server_error" => "SERVER_ERROR",
+                    "temporarily_unavailable" => "TEMPORARILY_UNAVAILABLE",
+                    _ => "UNKNOWN_ERROR"
+                };
+                _logger.LogWarning("[PATREON_CALLBACK] Patreonエラー: ErrorCode={ErrorCode}", knownErrorCode);
 
                 // XSS対策: HTMLエンコードされた安全なメッセージを使用
-                var safeMessage = string.IsNullOrEmpty(errorDescription)
+                var safeMessage = knownErrorCode == "ACCESS_DENIED"
                     ? "Patreonで認証がキャンセルされました。"
                     : "認証エラーが発生しました。再度お試しください。";
                 await SendResponseAsync(response, "認証エラー", safeMessage, false).ConfigureAwait(false);
-                _callbackTcs?.TrySetResult(PatreonAuthResult.CreateFailure($"PATREON_{error.ToUpperInvariant()}", errorDescription ?? "認証エラー"));
+                _callbackTcs?.TrySetResult(PatreonAuthResult.CreateFailure($"PATREON_{knownErrorCode}", safeMessage));
                 return;
             }
 
@@ -397,28 +407,6 @@ public sealed class PatreonCallbackServer : IAsyncDisposable, IDisposable
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-    }
-
-    /// <summary>
-    /// ログインジェクション対策: ユーザー入力をサニタイズ
-    /// 改行、制御文字を除去し、長さを制限
-    /// </summary>
-    private static string? SanitizeForLog(string? input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return input;
-
-        // 制御文字と改行を除去
-        var sanitized = new string(input
-            .Where(c => !char.IsControl(c) && c != '\r' && c != '\n')
-            .ToArray());
-
-        // 長さを制限（ログ肥大化防止）
-        const int maxLength = 200;
-        if (sanitized.Length > maxLength)
-            sanitized = sanitized[..maxLength] + "...";
-
-        return sanitized;
     }
 
     public async ValueTask DisposeAsync()
