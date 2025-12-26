@@ -176,6 +176,9 @@ public class InfrastructureModule : ServiceModuleBase
         // 翻訳サービス（エンジン登録後）
         RegisterTranslationServices(services);
 
+        // Issue #78: Cloud AI翻訳サービス（Pro/Premia向け）
+        RegisterCloudAIServices(services);
+
         // Step 1: Python環境解決と診断サービス（即座の応急処置）
         RegisterPythonEnvironmentServices(services);
 
@@ -864,6 +867,34 @@ public class InfrastructureModule : ServiceModuleBase
         yield return typeof(ObjectPoolModule);
         // 🔧 UltraThink Phase 29: TimedAggregatorModule依存追加 - ITextChunkAggregatorService登録確保
         yield return typeof(TimedAggregatorModule);
+    }
+
+    /// <summary>
+    /// Issue #78: Cloud AI翻訳サービスを登録します
+    /// Pro/Premiaプラン向けのCloud AI翻訳機能
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterCloudAIServices(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 Issue #78: Cloud AI翻訳サービス登録開始");
+
+        // エンジン状態管理（フォールバック制御）
+        services.AddSingleton<IEngineStatusManager, EngineStatusManager>();
+        Console.WriteLine("✅ IEngineStatusManager登録完了 - フォールバック状態管理");
+
+        // トークン使用量リポジトリ（永続化）
+        services.AddSingleton<ITokenUsageRepository, TokenUsageRepository>();
+        Console.WriteLine("✅ ITokenUsageRepository登録完了 - トークン使用量永続化");
+
+        // トークン消費追跡
+        services.AddSingleton<CoreTranslation.ITokenConsumptionTracker, TokenConsumptionTracker>();
+        Console.WriteLine("✅ ITokenConsumptionTracker登録完了 - トークン消費追跡");
+
+        // エンジンアクセス制御（プラン別制限）
+        services.AddSingleton<IEngineAccessController, EngineAccessController>();
+        Console.WriteLine("✅ IEngineAccessController登録完了 - プラン別アクセス制御");
+
+        Console.WriteLine("🎉 Issue #78: Cloud AI翻訳サービス登録完了");
     }
 
     /// <summary>
