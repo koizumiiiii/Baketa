@@ -500,41 +500,65 @@ ParallelTranslationOrchestrator
 - タイムアウト: ローカルOCR 2秒、Cloud AI 10秒
 - 片方がタイムアウトしても、もう片方の結果で続行可能
 
-### 13.3 セキュリティ（Geminiレビュー反映）
+### 13.3 セキュリティ（Geminiレビュー反映 v2）
 
-#### 13.3.1 APIキー管理
-**問題**: `appsettings.json`に暗号化キーを保存しても、復号キーがコード内にあれば安全ではない
+#### 13.3.1 Relay Serverアーキテクチャ（必須）
 
-**対策**:
-- **Windows Credential Manager (資格情報マネージャー)** を使用
-- または **DPAPI (Data Protection API)** でユーザー/マシンスコープで暗号化
-- APIキーはファイルとして保存せず、OSの安全な資格情報ストアに格納
+**⚠️ 重要: ユーザーはAPIキーを持たない。すべてのCloud AI呼び出しはRelay Server経由で行う。**
 
-```csharp
-// Windows Credential Manager使用例
-using System.Security.Cryptography;
-using Windows.Security.Credentials;
-
-var vault = new PasswordVault();
-vault.Add(new PasswordCredential("Baketa_CloudAI", "primary", apiKey));
+```
+┌─────────────┐    ┌─────────────────┐    ┌───────────────┐
+│   ユーザー   │───▶│  Relay Server   │───▶│  Gemini/OpenAI │
+│  (Baketa)   │    │ (APIキー保持)    │    │     API        │
+└─────────────┘    └─────────────────┘    └───────────────┘
+       │                    │
+       │  Patreon認証       │  トークン消費記録
+       ▼                    ▼
+┌─────────────┐    ┌─────────────────┐
+│   Patreon   │    │   Supabase DB   │
+└─────────────┘    └─────────────────┘
 ```
 
-#### 13.3.2 プラン検証のバイパス防止
-**問題**: クライアントサイドのみの検証は容易にバイパス可能
+**フロー**:
+1. ユーザー: PatreonでPro/Premia購入
+2. Baketa: Patreon OAuth認証でJWTトークン取得
+3. Baketa: 画像をRelay Serverに送信（JWTトークン付き）
+4. Relay Server: JWTトークン検証 → プラン確認 → トークン残量チェック → Cloud AI呼び出し → 消費記録
+5. Baketa: 翻訳結果を受信
 
-**対策**:
-- **Patreon Relay Server（Issue #233/234で実装済み）との連携を強化**
-- アプリ起動時および定期的にサーバーでプラン情報を検証
-- 署名付きの短期的なアクセストークンを発行
-- クライアント側のトークン追跡はUI表示用、最終判断はサーバー側
+#### 13.3.2 Relay Server セキュリティ要件
 
-#### 13.3.3 画像データのメモリ管理
-**問題**: C#とC++/WinRTの混在環境で意図しないメモリリークが発生しやすい
+**画像データ保護**:
+- 画像データはメモリ上でのみストリーム処理、ディスク保存禁止
+- ロギングには画像ハッシュ・サイズのみ記録、本体は記録しない
+- プライバシーポリシーで「画像は翻訳処理のためにのみ転送、サーバー保存なし」を明記
 
-**対策**:
-- **`IDisposable`の徹底**: すべての画像関連クラスで実装、`using`ステートメント必須
-- **`Span<T>`と`Memory<T>`の活用**: 不要なバイト配列コピーを防止
-- **ネイティブリソース解放の確認**: C++/WinRT側のキャプチャリソース解放をクロスチェック
+**APIキー保護**:
+- 環境変数で管理（Vercel/Railway等のシークレット機能を使用）
+- 推奨: AWS Secrets Manager / HashiCorp Vault / Doppler 等の専用シークレット管理サービス
+- 3〜6ヶ月ごとのAPIキーローテーション運用ルール策定
+
+**トークン消費の不正回避**:
+- JWTの有効期間を15分〜1時間に短縮、リフレッシュトークン導入
+- アトミックなDB操作: `SELECT ... FOR UPDATE` で競合状態防止
+- リプレイアタック対策: JWTに `jti` (JWT ID) 追加、Upstash Redis等でキャッシュして重複拒否
+
+**レート制限**:
+- ユーザー単位のレートリミッター導入（`@upstash/ratelimit` + Upstash Redis）
+- 翻訳エンドポイント: 10リクエスト/分
+- 全体: 100リクエスト/分
+
+**コスト管理**:
+- ハードリミット: 月間/日次の厳格な利用上限
+- サーキットブレーカー: エラー率急上昇時に自動停止
+- Google Cloud/OpenAI課金アラート: 予算80%で管理者通知
+
+#### 13.3.3 クライアント側セキュリティ
+
+**画像データのメモリ管理**:
+- `IDisposable`の徹底: すべての画像関連クラスで実装、`using`ステートメント必須
+- `Span<T>`と`Memory<T>`の活用: 不要なバイト配列コピーを防止
+- ネイティブリソース解放の確認: C++/WinRT側のキャプチャリソース解放をクロスチェック
 
 ```csharp
 // 画像処理時の安全なパターン
@@ -544,10 +568,81 @@ Span<byte> imageSpan = capturedImage.AsSpan();
 Array.Clear(capturedImage, 0, capturedImage.Length);
 ```
 
+**OAuth セキュリティ**:
+- `state`パラメータにランダム値を設定、コールバック時に検証（CSRF対策）
+
 #### 13.3.4 通信の安全性
 - HTTPS必須（TLS 1.2以上）
 - APIリクエストにリトライ制限
 - レート制限超過時の適切なバックオフ
+
+---
+
+## 14. Relay Server 実装要件
+
+### 14.1 新規エンドポイント
+
+Relay Server（`patreon-relay-server`）に以下のエンドポイントを追加:
+
+| エンドポイント | メソッド | 説明 |
+|---------------|---------|------|
+| `/api/translate` | POST | 画像翻訳リクエスト |
+| `/api/usage` | GET | トークン使用量取得 |
+| `/api/usage/remaining` | GET | 残りトークン数取得 |
+
+### 14.2 `/api/translate` 仕様
+
+**リクエスト**:
+```json
+{
+  "image": "base64エンコードされた画像",
+  "source_language": "en",
+  "target_language": "ja",
+  "provider": "primary"  // "primary" or "secondary"
+}
+```
+
+**レスポンス**:
+```json
+{
+  "success": true,
+  "translations": [
+    { "original_text": "Hello", "translated_text": "こんにちは" }
+  ],
+  "tokens_used": 1234,
+  "remaining_tokens": 3998766
+}
+```
+
+### 14.3 環境変数設定
+
+```bash
+# Relay Server環境変数（Vercel/Railway等で設定）
+GEMINI_API_KEY=your_gemini_api_key
+OPENAI_API_KEY=your_openai_api_key
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_KEY=your_supabase_service_key
+JWT_SECRET=your_jwt_secret
+```
+
+### 14.4 APIキー取得手順
+
+#### Gemini API Key
+1. [Google AI Studio](https://aistudio.google.com/) にアクセス
+2. Googleアカウントでログイン
+3. 「Get API Key」→「Create API Key」をクリック
+4. 生成されたキーをコピー
+
+#### OpenAI API Key
+1. [OpenAI Platform](https://platform.openai.com/) にアクセス
+2. アカウント作成/ログイン
+3. 「API Keys」→「Create new secret key」
+4. 生成されたキーをコピー
+
+#### 環境変数への登録（Vercelの場合）
+1. Vercelダッシュボード → プロジェクト選択
+2. Settings → Environment Variables
+3. 各キーを追加（Production/Preview/Development）
 
 ---
 
