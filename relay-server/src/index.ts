@@ -7,12 +7,19 @@
  * - リフレッシュトークンによるアクセストークン更新
  * - メンバーシップ情報取得（Tier判定）
  * - セキュアなセッション管理
+ * - Webhooks（リアルタイムサブスク変更検知）
+ * - レートリミット
+ * - シングルデバイス強制（他デバイスでログイン時に元デバイスをログアウト）
  *
  * セキュリティ:
  * - タイミング攻撃対策（timingSafeCompare）
  * - redirect_uri ホワイトリスト検証
- * - 本番環境でのAPI_KEY必須化
+ * - 本番環境でのAPI_KEY/WEBHOOK_SECRET必須化
+ * - Webhook署名検証（HMAC-MD5）
  * - stateパラメータはクライアント側（C#）で検証
+ *   ※ デスクトップアプリのため、OAuthフローはクライアントが開始し、
+ *     stateの生成・保存・検証もクライアントで完結。
+ *     リレーサーバーはstateを透過的に転送するのみ。
  */
 
 // ============================================
@@ -26,6 +33,12 @@ const PATREON_IDENTITY_PARAMS = 'include=memberships.currently_entitled_tiers,me
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const IDENTITY_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
+const USER_TOKEN_TTL_SECONDS = 31 * 24 * 60 * 60; // 31 days (トークン集約用)
+
+// レートリミット設定
+const RATE_LIMIT_WINDOW_SECONDS = 60; // 1分間
+const RATE_LIMIT_MAX_REQUESTS = 60; // 1分間に60リクエストまで
+const RATE_LIMIT_WEBHOOK_MAX = 100; // Webhookは1分間に100リクエストまで
 
 /** Tier金額しきい値（円） */
 const TIER_AMOUNTS = {
@@ -36,6 +49,21 @@ const TIER_AMOUNTS = {
 
 type PlanType = 'Free' | 'Standard' | 'Pro' | 'Premia';
 
+/** Patreonリソースタイプ定数 */
+const PATREON_RESOURCE_TYPES = {
+  USER: 'user',
+  MEMBER: 'member',
+  TIER: 'tier',
+  CAMPAIGN: 'campaign',
+} as const;
+
+/** Patron ステータス定数 */
+const PATRON_STATUS = {
+  ACTIVE: 'active_patron',
+  FORMER: 'former_patron',
+  DECLINED: 'declined_patron',
+} as const;
+
 // ============================================
 // 型定義
 // ============================================
@@ -43,10 +71,11 @@ type PlanType = 'Free' | 'Standard' | 'Pro' | 'Premia';
 export interface Env {
   PATREON_CLIENT_ID: string;
   PATREON_CLIENT_SECRET: string;
+  PATREON_WEBHOOK_SECRET?: string;  // Webhook署名検証用
   ALLOWED_ORIGINS: string;
-  ALLOWED_REDIRECT_URIS?: string;  // カンマ区切りのホワイトリスト
+  ALLOWED_REDIRECT_URIS?: string;
   API_KEY: string;
-  ENVIRONMENT?: string;  // 'production' | 'development'
+  ENVIRONMENT?: string;
   SESSIONS: KVNamespace;
 }
 
@@ -57,10 +86,27 @@ interface SessionData {
   userId: string;
 }
 
+/** ユーザートークン（シングルデバイス強制用） */
+interface UserTokenData {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  email: string;
+  fullName: string;
+  sessionTokens: string[];  // 常に1要素のみ（シングルデバイス強制）
+  updatedAt: number;
+}
+
 /** キャッシュ済みメンバーシップ情報 */
 interface CachedMembership {
   membership: ParsedMembership;
   cachedAt: number;
+}
+
+/** レートリミットデータ */
+interface RateLimitData {
+  count: number;
+  windowStart: number;
 }
 
 /** Patreon OAuth トークンレスポンス */
@@ -131,6 +177,32 @@ interface ParsedMembership {
   entitledAmountCents: number;
 }
 
+/** Patreon Webhookペイロード */
+interface PatreonWebhookPayload {
+  data: {
+    id: string;
+    type: string;
+    attributes: {
+      patron_status?: string;
+      currently_entitled_amount_cents?: number;
+      last_charge_status?: string;
+    };
+    relationships?: {
+      user?: {
+        data: { id: string; type: 'user' };
+      };
+      campaign?: {
+        data: { id: string; type: 'campaign' };
+      };
+    };
+  };
+  included?: Array<{
+    id: string;
+    type: string;
+    attributes: Record<string, unknown>;
+  }>;
+}
+
 /** リクエストボディ検証結果 */
 interface ValidationResult<T> {
   success: boolean;
@@ -144,11 +216,9 @@ interface ValidationResult<T> {
 
 /**
  * タイミング攻撃対策の文字列比較
- * 文字列の長さに関わらず一定時間で比較を完了する
  */
 function timingSafeCompare(a: string, b: string): boolean {
   if (a.length !== b.length) {
-    // 長さが異なる場合でも同等の時間をかける
     let result = 0;
     for (let i = 0; i < Math.max(a.length, b.length); i++) {
       result |= (a.charCodeAt(i % a.length) || 0) ^ (b.charCodeAt(i % b.length) || 0);
@@ -163,7 +233,7 @@ function timingSafeCompare(a: string, b: string): boolean {
 }
 
 /**
- * セッショントークン生成（暗号学的に安全な乱数）
+ * セッショントークン生成
  */
 function generateSessionToken(): string {
   const array = new Uint8Array(32);
@@ -175,7 +245,6 @@ function generateSessionToken(): string {
  * redirect_uri のホワイトリスト検証
  */
 function validateRedirectUri(redirectUri: string, env: Env): boolean {
-  // ホワイトリスト未設定の場合（開発環境）
   if (!env.ALLOWED_REDIRECT_URIS) {
     if (env.ENVIRONMENT === 'production') {
       console.error('CRITICAL: ALLOWED_REDIRECT_URIS is not set in production');
@@ -184,9 +253,76 @@ function validateRedirectUri(redirectUri: string, env: Env): boolean {
     console.warn('ALLOWED_REDIRECT_URIS is not set - allowing all redirect URIs (development mode)');
     return true;
   }
-
   const allowedUris = env.ALLOWED_REDIRECT_URIS.split(',').map(uri => uri.trim());
   return allowedUris.includes(redirectUri);
+}
+
+/**
+ * Webhook署名検証（HMAC-MD5）
+ * PatreonはX-Patreon-SignatureヘッダーでHMAC-MD5署名を送信
+ */
+async function verifyWebhookSignature(
+  payload: string,
+  signature: string,
+  secret: string
+): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'MD5' },
+    false,
+    ['sign']
+  );
+  const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  const expectedSignature = Array.from(new Uint8Array(signatureBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return timingSafeCompare(expectedSignature, signature.toLowerCase());
+}
+
+// ============================================
+// レートリミット
+// ============================================
+
+/**
+ * レートリミットをチェック
+ * @returns true if rate limited (should reject), false if allowed
+ */
+async function checkRateLimit(
+  env: Env,
+  identifier: string,
+  maxRequests: number = RATE_LIMIT_MAX_REQUESTS
+): Promise<{ limited: boolean; remaining: number; resetAt: number }> {
+  const key = `ratelimit:${identifier}`;
+  const now = Date.now();
+  const windowStart = Math.floor(now / (RATE_LIMIT_WINDOW_SECONDS * 1000)) * (RATE_LIMIT_WINDOW_SECONDS * 1000);
+  const resetAt = windowStart + (RATE_LIMIT_WINDOW_SECONDS * 1000);
+
+  try {
+    const data = await env.SESSIONS.get<RateLimitData>(key, 'json');
+
+    if (!data || data.windowStart !== windowStart) {
+      // 新しいウィンドウを開始
+      await env.SESSIONS.put(key, JSON.stringify({ count: 1, windowStart }), {
+        expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2,
+      });
+      return { limited: false, remaining: maxRequests - 1, resetAt };
+    }
+
+    if (data.count >= maxRequests) {
+      return { limited: true, remaining: 0, resetAt };
+    }
+
+    // カウントをインクリメント
+    await env.SESSIONS.put(key, JSON.stringify({ count: data.count + 1, windowStart }), {
+      expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2,
+    });
+    return { limited: false, remaining: maxRequests - data.count - 1, resetAt };
+  } catch {
+    // エラー時は許可（フェイルオープン）
+    return { limited: false, remaining: maxRequests, resetAt };
+  }
 }
 
 // ============================================
@@ -205,7 +341,7 @@ interface TokenRefreshBody {
 interface PatreonExchangeBody {
   code: string;
   redirect_uri: string;
-  state?: string;  // Note: stateはクライアント側（C#）で検証される
+  state?: string;
 }
 
 interface SessionValidateBody {
@@ -287,13 +423,67 @@ async function deleteSession(env: Env, sessionToken: string): Promise<void> {
   await env.SESSIONS.delete(sessionToken);
 }
 
+/** ユーザートークンを取得（トークン集約） */
+async function getUserToken(env: Env, userId: string): Promise<UserTokenData | null> {
+  try {
+    const key = `usertoken:${userId}`;
+    const data = await env.SESSIONS.get<UserTokenData>(key, 'json');
+    if (data && typeof data.accessToken === 'string') {
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** ユーザートークンを保存（トークン集約） */
+async function setUserToken(env: Env, userId: string, token: UserTokenData): Promise<void> {
+  const key = `usertoken:${userId}`;
+  await env.SESSIONS.put(key, JSON.stringify(token), { expirationTtl: USER_TOKEN_TTL_SECONDS });
+}
+
+/** ユーザートークンを削除 */
+async function deleteUserToken(env: Env, userId: string): Promise<void> {
+  const key = `usertoken:${userId}`;
+  await env.SESSIONS.delete(key);
+}
+
+/** セッションをユーザートークンに紐付け */
+async function linkSessionToUser(env: Env, userId: string, sessionToken: string): Promise<void> {
+  const userToken = await getUserToken(env, userId);
+  if (userToken) {
+    if (!userToken.sessionTokens.includes(sessionToken)) {
+      userToken.sessionTokens.push(sessionToken);
+      userToken.updatedAt = Date.now();
+      await setUserToken(env, userId, userToken);
+    }
+  }
+}
+
+/** ユーザーの全セッションを無効化 */
+async function revokeAllUserSessions(env: Env, userId: string): Promise<number> {
+  const userToken = await getUserToken(env, userId);
+  if (!userToken) return 0;
+
+  let revokedCount = 0;
+  for (const sessionToken of userToken.sessionTokens) {
+    await deleteSession(env, sessionToken);
+    revokedCount++;
+  }
+
+  await deleteUserToken(env, userId);
+  await env.SESSIONS.delete(`membership:${userId}`);
+
+  return revokedCount;
+}
+
 /** メンバーシップキャッシュを取得 */
 async function getCachedMembership(env: Env, userId: string): Promise<CachedMembership | null> {
   try {
     const cacheKey = `membership:${userId}`;
     const data = await env.SESSIONS.get<CachedMembership>(cacheKey, 'json');
     if (data && data.membership && typeof data.cachedAt === 'number') {
-      // キャッシュが有効期限内かチェック
       if (Date.now() - data.cachedAt < IDENTITY_CACHE_TTL_SECONDS * 1000) {
         return data;
       }
@@ -309,6 +499,12 @@ async function setCachedMembership(env: Env, userId: string, membership: ParsedM
   const cacheKey = `membership:${userId}`;
   const cached: CachedMembership = { membership, cachedAt: Date.now() };
   await env.SESSIONS.put(cacheKey, JSON.stringify(cached), { expirationTtl: IDENTITY_CACHE_TTL_SECONDS });
+}
+
+/** メンバーシップキャッシュを無効化 */
+async function invalidateMembershipCache(env: Env, userId: string): Promise<void> {
+  const cacheKey = `membership:${userId}`;
+  await env.SESSIONS.delete(cacheKey);
 }
 
 // ============================================
@@ -359,13 +555,29 @@ function successResponse(data: object, origin: string, allowedOrigins: string): 
   );
 }
 
+function rateLimitResponse(
+  origin: string,
+  allowedOrigins: string,
+  resetAt: number
+): Response {
+  return new Response(
+    JSON.stringify({ error: 'Too Many Requests', error_code: 'RATE_LIMITED' }),
+    {
+      status: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)),
+        'X-RateLimit-Reset': String(Math.floor(resetAt / 1000)),
+        ...corsHeaders(origin, allowedOrigins),
+      },
+    }
+  );
+}
+
 // ============================================
 // 共通ビジネスロジック
 // ============================================
 
-/**
- * 金額からプランを判定
- */
 function determinePlan(amountCents: number): PlanType {
   if (amountCents >= TIER_AMOUNTS.PREMIA) return 'Premia';
   if (amountCents >= TIER_AMOUNTS.PRO) return 'Pro';
@@ -373,23 +585,17 @@ function determinePlan(amountCents: number): PlanType {
   return 'Free';
 }
 
-/**
- * Patreon Identity APIレスポンスからメンバーシップ情報を抽出
- */
 function parsePatreonMembership(identityData: PatreonIdentityResponse): ParsedMembership {
   const user = identityData.data;
   const included = identityData.included || [];
 
-  // アクティブなメンバーシップを検索
   const activeMembership = included.find(
     (item): item is PatreonMember =>
-      item.type === 'member' && item.attributes.patron_status === 'active_patron'
+      item.type === PATREON_RESOURCE_TYPES.MEMBER && item.attributes.patron_status === PATRON_STATUS.ACTIVE
   );
 
-  // Tierを検索
-  const tiers = included.filter((item): item is PatreonTier => item.type === 'tier');
+  const tiers = included.filter((item): item is PatreonTier => item.type === PATREON_RESOURCE_TYPES.TIER);
 
-  // 最高額のTierを取得
   const highestTier = tiers.reduce<PatreonTier | null>((max, tier) => {
     const amount = tier.attributes.amount_cents;
     return amount > (max?.attributes.amount_cents ?? 0) ? tier : max;
@@ -409,7 +615,6 @@ function parsePatreonMembership(identityData: PatreonIdentityResponse): ParsedMe
   };
 }
 
-/** Patreon API エラー */
 class PatreonApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);
@@ -417,9 +622,6 @@ class PatreonApiError extends Error {
   }
 }
 
-/**
- * Patreon トークンAPIを呼び出す共通関数
- */
 async function fetchPatreonToken(
   env: Env,
   params: URLSearchParams
@@ -439,9 +641,6 @@ async function fetchPatreonToken(
   return await response.json() as PatreonTokenResponse;
 }
 
-/**
- * Patreon Identity APIを呼び出してメンバーシップ情報を取得
- */
 async function fetchPatreonIdentity(accessToken: string): Promise<PatreonIdentityResponse> {
   const response = await fetch(`${PATREON_IDENTITY_URL}?${PATREON_IDENTITY_PARAMS}`, {
     headers: { 'Authorization': `Bearer ${accessToken}` },
@@ -456,15 +655,11 @@ async function fetchPatreonIdentity(accessToken: string): Promise<PatreonIdentit
   return await response.json() as PatreonIdentityResponse;
 }
 
-/**
- * セッションからメンバーシップ情報を取得（キャッシュ対応）
- */
 async function getMembershipFromSession(
   env: Env,
   session: SessionData,
   useCache: boolean = true
 ): Promise<ParsedMembership> {
-  // キャッシュをチェック
   if (useCache) {
     const cached = await getCachedMembership(env, session.userId);
     if (cached) {
@@ -473,19 +668,14 @@ async function getMembershipFromSession(
     }
   }
 
-  // Patreon APIから取得
   const identityData = await fetchPatreonIdentity(session.accessToken);
   const membership = parsePatreonMembership(identityData);
 
-  // キャッシュに保存
   await setCachedMembership(env, session.userId, membership);
 
   return membership;
 }
 
-/**
- * セッショントークンを検証してセッションを取得
- */
 async function validateAndGetSession(
   env: Env,
   sessionToken: string
@@ -508,7 +698,6 @@ async function validateAndGetSession(
 // ============================================
 
 function validateApiKey(request: Request, env: Env): boolean {
-  // 本番環境ではAPI_KEY必須
   if (!env.API_KEY) {
     if (env.ENVIRONMENT === 'production') {
       console.error('CRITICAL: API_KEY is not set in a production environment');
@@ -540,10 +729,10 @@ function validateEnvironment(env: Env): EnvValidationResult {
   if (!env.PATREON_CLIENT_SECRET) missingVars.push('PATREON_CLIENT_SECRET');
   if (!env.SESSIONS) missingVars.push('SESSIONS');
 
-  // 本番環境では追加の検証
   if (env.ENVIRONMENT === 'production') {
     if (!env.API_KEY) missingVars.push('API_KEY');
     if (!env.ALLOWED_REDIRECT_URIS) missingVars.push('ALLOWED_REDIRECT_URIS');
+    if (!env.PATREON_WEBHOOK_SECRET) missingVars.push('PATREON_WEBHOOK_SECRET');
   }
 
   return {
@@ -570,13 +759,18 @@ export default {
       });
     }
 
-    // ヘルスチェック（認証不要）
+    // ヘルスチェック（認証不要・レートリミットなし）
     if (url.pathname === '/health') {
       return successResponse({
         status: 'ok',
         timestamp: new Date().toISOString(),
         environment: env.ENVIRONMENT || 'development',
       }, origin, allowedOrigins);
+    }
+
+    // Webhook（別の認証方式）
+    if (url.pathname === '/webhook') {
+      return handleWebhook(request, env, origin, allowedOrigins);
     }
 
     // 環境変数検証
@@ -589,6 +783,14 @@ export default {
     // APIキー検証
     if (!validateApiKey(request, env)) {
       return errorResponse('Unauthorized: Invalid API Key', 401, origin, allowedOrigins, 'INVALID_API_KEY');
+    }
+
+    // レートリミット（IPベース）
+    const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const rateLimit = await checkRateLimit(env, `ip:${clientIP}`);
+    if (rateLimit.limited) {
+      console.warn(`Rate limited: IP=${clientIP}`);
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
     }
 
     // ルーティング
@@ -608,6 +810,8 @@ export default {
           return handleLicenseStatus(request, env, origin, allowedOrigins);
         case '/api/patreon/revoke':
           return handlePatreonRevoke(request, env, origin, allowedOrigins);
+        case '/api/patreon/revoke-all':
+          return handlePatreonRevokeAll(request, env, origin, allowedOrigins);
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');
       }
@@ -621,6 +825,94 @@ export default {
 // ============================================
 // エンドポイントハンドラ
 // ============================================
+
+/**
+ * Patreon Webhook受信
+ * POST /webhook
+ *
+ * Patreonからのリアルタイム通知を処理:
+ * - members:pledge:create - 新規支援
+ * - members:pledge:update - Tier変更
+ * - members:pledge:delete - 支援停止
+ */
+async function handleWebhook(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  // Webhookレートリミット
+  const clientIP = request.headers.get('CF-Connecting-IP') || 'webhook';
+  const rateLimit = await checkRateLimit(env, `webhook:${clientIP}`, RATE_LIMIT_WEBHOOK_MAX);
+  if (rateLimit.limited) {
+    return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+  }
+
+  try {
+    const signature = request.headers.get('X-Patreon-Signature');
+    const eventType = request.headers.get('X-Patreon-Event');
+    const body = await request.text();
+
+    // 署名検証（設定されている場合）
+    if (env.PATREON_WEBHOOK_SECRET) {
+      if (!signature) {
+        console.error('Webhook: Missing signature');
+        return errorResponse('Missing signature', 401, origin, allowedOrigins, 'MISSING_SIGNATURE');
+      }
+
+      const isValid = await verifyWebhookSignature(body, signature, env.PATREON_WEBHOOK_SECRET);
+      if (!isValid) {
+        console.error('Webhook: Invalid signature');
+        return errorResponse('Invalid signature', 401, origin, allowedOrigins, 'INVALID_SIGNATURE');
+      }
+    } else {
+      console.warn('Webhook: PATREON_WEBHOOK_SECRET not set, skipping signature verification');
+    }
+
+    const payload = JSON.parse(body) as PatreonWebhookPayload;
+    const userId = payload.data.relationships?.user?.data?.id;
+
+    console.log(`Webhook received: event=${eventType}, userId=${userId}`);
+
+    if (userId) {
+      // メンバーシップキャッシュを無効化（次回アクセス時に最新情報を取得）
+      await invalidateMembershipCache(env, userId);
+      console.log(`Webhook: Invalidated membership cache for user ${userId}`);
+
+      // イベントタイプに応じた処理
+      switch (eventType) {
+        case 'members:pledge:delete':
+          // 支援停止時はユーザーの全セッションを無効化
+          const revokedCount = await revokeAllUserSessions(env, userId);
+          console.log(`Webhook: Revoked ${revokedCount} sessions for user ${userId} (pledge deleted)`);
+          break;
+
+        case 'members:pledge:create':
+        case 'members:pledge:update':
+          // 新規支援・更新時はキャッシュ無効化のみ（次回API呼び出しで最新情報取得）
+          console.log(`Webhook: Processed ${eventType} for user ${userId}`);
+          break;
+
+        default:
+          console.log(`Webhook: Unknown event type ${eventType}`);
+      }
+    }
+
+    return successResponse({
+      success: true,
+      event: eventType,
+      processed: true,
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('Webhook error:', error instanceof Error ? error.message : String(error));
+    return errorResponse('Webhook processing failed', 500, origin, allowedOrigins, 'WEBHOOK_ERROR');
+  }
+}
 
 /**
  * OAuth認証コードをトークンに交換
@@ -645,7 +937,6 @@ async function handleTokenExchange(
 
     const { code, redirect_uri } = validation.data;
 
-    // redirect_uri ホワイトリスト検証
     if (!validateRedirectUri(redirect_uri, env)) {
       console.error(`Invalid redirect_uri: ${redirect_uri}`);
       return errorResponse('Invalid redirect_uri', 400, origin, allowedOrigins, 'INVALID_REDIRECT_URI');
@@ -739,7 +1030,7 @@ async function handleMembershipCheck(
       user_id: membership.userId,
       email: membership.email,
       full_name: membership.fullName,
-      is_active_patron: membership.patronStatus === 'active_patron',
+      is_active_patron: membership.patronStatus === PATRON_STATUS.ACTIVE,
       patron_status: membership.patronStatus,
       entitled_amount_cents: membership.entitledAmountCents,
       tier: membership.tierId ? { id: membership.tierId } : null,
@@ -758,8 +1049,10 @@ async function handleMembershipCheck(
  * Patreon認証コード交換とユーザー情報取得（統合エンドポイント）
  * POST /api/patreon/exchange
  *
- * Note: stateパラメータはクライアント側（C# PatreonOAuthService）で検証されます。
- * このサーバーはstateの生成・検証には関与しません。
+ * シングルデバイス強制:
+ * - 新規ログイン時に既存の全セッションを無効化
+ * - 1ユーザー1セッションのみ有効（他デバイスでログインすると元デバイスはログアウト）
+ * - ユーザーIDベースでトークンを保存
  */
 async function handlePatreonExchange(
   request: Request,
@@ -780,7 +1073,6 @@ async function handlePatreonExchange(
 
     const { code, redirect_uri } = validation.data;
 
-    // redirect_uri ホワイトリスト検証
     if (!validateRedirectUri(redirect_uri, env)) {
       console.error(`Invalid redirect_uri: ${redirect_uri}`);
       return errorResponse('Invalid redirect_uri', 400, origin, allowedOrigins, 'INVALID_REDIRECT_URI');
@@ -806,7 +1098,19 @@ async function handlePatreonExchange(
     // Step 3: メンバーシップ解析
     const membership = parsePatreonMembership(identityData);
 
-    // Step 4: セッション作成
+    // Step 4: シングルデバイス強制 - 既存セッションをすべて無効化
+    const existingUserToken = await getUserToken(env, membership.userId);
+    let revokedCount = 0;
+    if (existingUserToken && existingUserToken.sessionTokens.length > 0) {
+      // 既存の全セッションを削除（他デバイスをログアウト）
+      for (const oldSessionToken of existingUserToken.sessionTokens) {
+        await deleteSession(env, oldSessionToken);
+        revokedCount++;
+      }
+      console.log(`Single-device enforcement: Revoked ${revokedCount} existing sessions for user ${membership.userId}`);
+    }
+
+    // Step 5: 新しいセッション作成（唯一の有効セッション）
     const sessionToken = generateSessionToken();
 
     await setSession(env, sessionToken, {
@@ -816,10 +1120,20 @@ async function handlePatreonExchange(
       userId: membership.userId,
     });
 
+    // Step 6: ユーザートークン保存（単一セッションのみ）
+    await setUserToken(env, membership.userId, {
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      expiresAt: Date.now() + (tokenData.expires_in * 1000),
+      email: membership.email,
+      fullName: membership.fullName,
+      sessionTokens: [sessionToken],  // 常に1セッションのみ
+      updatedAt: Date.now(),
+    });
+
     // メンバーシップをキャッシュに保存
     await setCachedMembership(env, membership.userId, membership);
 
-    // C#側はsnake_caseのJSONプロパティ名を期待
     const sessionResponse = {
       session_token: sessionToken,
       patreon_user_id: membership.userId,
@@ -833,7 +1147,7 @@ async function handlePatreonExchange(
       entitled_amount_cents: membership.entitledAmountCents,
     };
 
-    console.log(`Exchange successful: UserId=${membership.userId}, Plan=${membership.plan}`);
+    console.log(`Exchange successful: UserId=${membership.userId}, Plan=${membership.plan}, RevokedSessions=${revokedCount}`);
 
     return successResponse(sessionResponse, origin, allowedOrigins);
 
@@ -953,7 +1267,6 @@ async function handleLicenseStatus(
     try {
       const membership = await getMembershipFromSession(env, sessionResult.session, true);
 
-      // C#のLicenseStatusResponseが期待する形式（snake_case）
       return successResponse({
         success: true,
         session_valid: true,
@@ -1004,16 +1317,27 @@ async function handlePatreonRevoke(
 
     const session = await getSession(env, sessionToken);
     if (session) {
-      // セッションとキャッシュを削除
+      // セッションを削除
       await deleteSession(env, sessionToken);
+
+      // ユーザートークンからこのセッションを削除
+      const userToken = await getUserToken(env, session.userId);
+      if (userToken) {
+        userToken.sessionTokens = userToken.sessionTokens.filter(t => t !== sessionToken);
+        if (userToken.sessionTokens.length > 0) {
+          await setUserToken(env, session.userId, userToken);
+        } else {
+          // セッションがなくなったらユーザートークンも削除
+          await deleteUserToken(env, session.userId);
+        }
+      }
+
+      // メンバーシップキャッシュも削除
       await env.SESSIONS.delete(`membership:${session.userId}`);
-      console.log(`Revoke: Session and cache deleted for user ${session.userId}`);
+      console.log(`Revoke: Session deleted for user ${session.userId}`);
     } else {
       console.log('Revoke: Session not found, treating as already revoked');
     }
-
-    // Note: Patreon APIにはトークン無効化エンドポイントがないため、
-    // サーバー側のセッション削除のみで対応
 
     return successResponse({
       success: true,
@@ -1022,6 +1346,53 @@ async function handlePatreonRevoke(
 
   } catch (error) {
     console.error('Revoke error:', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * ユーザーの全セッションを無効化（緊急用）
+ * POST /api/patreon/revoke-all
+ *
+ * シングルデバイス強制下では通常1セッションのみだが、
+ * 不正アクセスが疑われる場合などに全セッションを強制無効化
+ */
+async function handlePatreonRevokeAll(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return errorResponse('Missing or invalid Authorization header', 401, origin, allowedOrigins, 'MISSING_AUTH');
+    }
+
+    const sessionToken = authHeader.substring(7);
+
+    const session = await getSession(env, sessionToken);
+    if (!session) {
+      return errorResponse('Invalid session', 401, origin, allowedOrigins, 'SESSION_INVALID');
+    }
+
+    // ユーザーの全セッションを無効化
+    const revokedCount = await revokeAllUserSessions(env, session.userId);
+
+    console.log(`Revoke-all: ${revokedCount} sessions revoked for user ${session.userId}`);
+
+    return successResponse({
+      success: true,
+      message: 'All sessions revoked successfully',
+      revoked_count: revokedCount,
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('Revoke-all error:', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
     return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
   }
 }
