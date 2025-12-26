@@ -94,11 +94,6 @@ public sealed class AccountSettingsViewModel : ViewModelBase
                 (email, loading) => !string.IsNullOrWhiteSpace(email) && !loading));
 
         // Patreonコマンドの初期化
-        var canExecutePatreonWhenNotLoading = this.WhenAnyValue(
-            x => x.IsLoading,
-            x => x.IsPatreonSyncing,
-            (loading, syncing) => !loading && !syncing);
-
         ConnectPatreonCommand = ReactiveCommand.CreateFromTask(
             ExecuteConnectPatreonAsync,
             this.WhenAnyValue(x => x.IsPatreonConnected, x => x.IsPatreonSyncing,

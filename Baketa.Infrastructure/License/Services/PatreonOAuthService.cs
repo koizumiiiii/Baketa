@@ -701,14 +701,20 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     /// </summary>
     private bool IsOfflineGracePeriodValid()
     {
-        if (_cachedCredentials?.LastSyncTime == null || _cachedCredentials?.SubscriptionEndDate == null)
+        // null チェックを明示的に分離して定数条件警告を回避
+        if (_cachedCredentials is null)
+        {
+            return false;
+        }
+
+        if (!_cachedCredentials.LastSyncTime.HasValue || !_cachedCredentials.SubscriptionEndDate.HasValue)
         {
             return false;
         }
 
         // サブスクリプション有効期限内かつグレースピリオド内
         var now = DateTime.UtcNow;
-        var subscriptionValid = _cachedCredentials.SubscriptionEndDate > now;
+        var subscriptionValid = _cachedCredentials.SubscriptionEndDate.Value > now;
         var elapsed = now - _cachedCredentials.LastSyncTime.Value;
         var withinGracePeriod = elapsed.TotalDays < _settings.OfflineGracePeriodDays;
 

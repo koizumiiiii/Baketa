@@ -192,7 +192,9 @@ public sealed class PatreonCallbackServer : IAsyncDisposable, IDisposable
 
         try
         {
-            _logger.LogDebug("[PATREON_CALLBACK] リクエスト受信: {Path}", request.Url?.LocalPath);
+            // ログインジェクション対策: ユーザー入力をサニタイズ
+            var sanitizedPath = SanitizeForLog(request.Url?.LocalPath);
+            _logger.LogDebug("[PATREON_CALLBACK] リクエスト受信: {Path}", sanitizedPath);
 
             // パスを検証
             if (request.Url?.LocalPath != CallbackPath)
@@ -211,8 +213,16 @@ public sealed class PatreonCallbackServer : IAsyncDisposable, IDisposable
             // Patreonからのエラーチェック
             if (!string.IsNullOrEmpty(error))
             {
-                _logger.LogWarning("[PATREON_CALLBACK] Patreonエラー: {Error} - {Description}", error, errorDescription);
-                await SendResponseAsync(response, "認証エラー", errorDescription ?? "Patreonで認証がキャンセルされました。", false).ConfigureAwait(false);
+                // ログインジェクション対策: ユーザー入力をサニタイズ
+                var sanitizedError = SanitizeForLog(error);
+                var sanitizedDescription = SanitizeForLog(errorDescription);
+                _logger.LogWarning("[PATREON_CALLBACK] Patreonエラー: {Error} - {Description}", sanitizedError, sanitizedDescription);
+
+                // XSS対策: HTMLエンコードされた安全なメッセージを使用
+                var safeMessage = string.IsNullOrEmpty(errorDescription)
+                    ? "Patreonで認証がキャンセルされました。"
+                    : "認証エラーが発生しました。再度お試しください。";
+                await SendResponseAsync(response, "認証エラー", safeMessage, false).ConfigureAwait(false);
                 _callbackTcs?.TrySetResult(PatreonAuthResult.CreateFailure($"PATREON_{error.ToUpperInvariant()}", errorDescription ?? "認証エラー"));
                 return;
             }
@@ -269,12 +279,17 @@ public sealed class PatreonCallbackServer : IAsyncDisposable, IDisposable
     {
         var statusColor = success ? "#4CAF50" : "#f44336";
         var statusIcon = success ? "✓" : "✗";
+
+        // XSS対策: HTMLエンコード
+        var safeTitle = WebUtility.HtmlEncode(title);
+        var safeMessage = WebUtility.HtmlEncode(message);
+
         var html = $$"""
             <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>Baketa - {{title}}</title>
+                <title>Baketa - {{safeTitle}}</title>
                 <style>
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -321,8 +336,8 @@ public sealed class PatreonCallbackServer : IAsyncDisposable, IDisposable
                 <div class="container">
                     <div class="logo">🎮 Baketa</div>
                     <div class="status">{{statusIcon}}</div>
-                    <h1>{{title}}</h1>
-                    <p>{{message}}</p>
+                    <h1>{{safeTitle}}</h1>
+                    <p>{{safeMessage}}</p>
                 </div>
             </body>
             </html>
@@ -382,6 +397,28 @@ public sealed class PatreonCallbackServer : IAsyncDisposable, IDisposable
     private void ThrowIfDisposed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+    }
+
+    /// <summary>
+    /// ログインジェクション対策: ユーザー入力をサニタイズ
+    /// 改行、制御文字を除去し、長さを制限
+    /// </summary>
+    private static string? SanitizeForLog(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        // 制御文字と改行を除去
+        var sanitized = new string(input
+            .Where(c => !char.IsControl(c) && c != '\r' && c != '\n')
+            .ToArray());
+
+        // 長さを制限（ログ肥大化防止）
+        const int maxLength = 200;
+        if (sanitized.Length > maxLength)
+            sanitized = sanitized[..maxLength] + "...";
+
+        return sanitized;
     }
 
     public async ValueTask DisposeAsync()
