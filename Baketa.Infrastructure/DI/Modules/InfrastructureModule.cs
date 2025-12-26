@@ -878,6 +878,7 @@ public class InfrastructureModule : ServiceModuleBase
     {
         Console.WriteLine("🚀 Issue #78: Cloud AI翻訳サービス登録開始");
 
+        // Phase 1: 基盤サービス
         // エンジン状態管理（フォールバック制御）
         services.AddSingleton<IEngineStatusManager, EngineStatusManager>();
         Console.WriteLine("✅ IEngineStatusManager登録完了 - フォールバック状態管理");
@@ -894,7 +895,57 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddSingleton<IEngineAccessController, EngineAccessController>();
         Console.WriteLine("✅ IEngineAccessController登録完了 - プラン別アクセス制御");
 
+        // Phase 2: Cloud AI画像翻訳
+        RegisterCloudAIPhase2Services(services);
+
         Console.WriteLine("🎉 Issue #78: Cloud AI翻訳サービス登録完了");
+    }
+
+    /// <summary>
+    /// Issue #78 Phase 2: Cloud AI画像翻訳サービスを登録します
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterCloudAIPhase2Services(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 Issue #78 Phase 2: Cloud AI画像翻訳サービス登録開始");
+
+        // CloudTranslationSettings設定登録
+        var configurationDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IConfiguration));
+        if (configurationDescriptor?.ImplementationInstance is IConfiguration configuration)
+        {
+            services.Configure<Core.Settings.CloudTranslationSettings>(
+                configuration.GetSection(Core.Settings.CloudTranslationSettings.SectionName));
+            Console.WriteLine("✅ CloudTranslationSettings登録完了 - appsettings.jsonから読み込み");
+        }
+        else
+        {
+            services.Configure<Core.Settings.CloudTranslationSettings>(options =>
+            {
+                options.RelayServerUrl = "https://baketa-relay.suke009.workers.dev";
+                options.TimeoutSeconds = 30;
+                options.MaxRetries = 2;
+                options.PrimaryProviderId = "gemini";
+            });
+            Console.WriteLine("⚠️ CloudTranslationSettings登録完了 - デフォルト値使用");
+        }
+
+        // RelayServerClient登録（HttpClientFactory使用）
+        services.AddHttpClient<Translation.Cloud.RelayServerClient>();
+        Console.WriteLine("✅ RelayServerClient登録完了 - HttpClientFactory使用");
+
+        // Primary Cloud翻訳エンジン（Gemini）- Keyed Service
+        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator, Translation.Cloud.PrimaryCloudTranslator>("primary");
+        Console.WriteLine("✅ PrimaryCloudTranslator登録完了 - Keyed Service [primary]");
+
+        // Secondary Cloud翻訳エンジン（スタブ）- Keyed Service
+        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator, Translation.Cloud.SecondaryCloudTranslator>("secondary");
+        Console.WriteLine("✅ SecondaryCloudTranslator登録完了 - Keyed Service [secondary]");
+
+        // FallbackOrchestrator登録
+        services.AddSingleton<CoreTranslation.IFallbackOrchestrator, Translation.Services.FallbackOrchestrator>();
+        Console.WriteLine("✅ IFallbackOrchestrator登録完了 - 3段階フォールバック制御");
+
+        Console.WriteLine("🎉 Issue #78 Phase 2: Cloud AI画像翻訳サービス登録完了");
     }
 
     /// <summary>
