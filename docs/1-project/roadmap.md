@@ -1,6 +1,6 @@
 # Baketa プロジェクト開発ロードマップ
 
-*最終更新: 2025年11月28日*
+*最終更新: 2025年12月25日*
 
 > **プロダクション状態**: **Phase 5.3完全実装達成** - Baketa翻訳システムはプロダクション環境での安定運用が可能です。gRPC翻訳システム、Surya OCR統合（Issue #189）、Windows Graphics Capture API、ArrayPoolメモリ最適化が完了し、1,518テストケース（100%成功率）で品質が実証されています。
 
@@ -105,7 +105,7 @@ Baketaプロジェクトは以下のフェーズで開発を進め、**Phase 5�
 - ✅ **パスワード強度検証**: ブラックリストチェック、強度インジケーター
 - ✅ **GitHub Pages**: ランディングページ、利用規約、プライバシーポリシー
 
-### 🔄 フェーズ6-B: ライセンス管理システム（Issue #77）（進行中）
+### 🔄 フェーズ6-B: ライセンス管理システム（Issue #77, #233）（進行中）
 - ✅ **Core層基盤**: PlanType/FeatureType Enum、LicenseState、PlanTypeExtensions
 - ✅ **イベントシステム**: LicenseStateChanged、TokenUsageWarning、SessionInvalidated、PlanExpirationWarning
 - ✅ **インターフェース定義**: ILicenseManager、ILicenseApiClient、ILicenseCacheService
@@ -113,6 +113,10 @@ Baketaプロジェクトは以下のフェーズで開発を進め、**Phase 5�
 - ✅ **後方互換アダプタ**: UserPlanServiceAdapter（既存IUserPlanService互換）
 - ✅ **UI統合**: LicenseInfoViewModel、LicenseInfoView、設定画面統合
 - ✅ **単体テスト**: PlanTypeExtensionsTests（145件）、LicenseStateTests、LicenseManagerTests（28件）
+- ✅ **Patreon OAuth統合** (Issue #233): PatreonOAuthService、PatreonCallbackHandler
+- ✅ **Patreon自動同期**: PatreonSyncHostedService（30分間隔の自動ライセンス同期）
+- ✅ **URIスキームハンドラー**: `baketa://`カスタムURIスキーム登録
+- ✅ **設定画面Patreon連携**: Patreon連携/解除UI、通知トースト
 - 🔄 Supabaseテーブル作成・Edge Function実装（将来対応）
 - 🔄 決済連携（将来対応）
 

@@ -301,6 +301,30 @@ public static class Strings
     public static string Settings_Account_CurrentPlan => GetString("Settings_Account_CurrentPlan");
     public static string Settings_Account_UpgradeToPremium => GetString("Settings_Account_UpgradeToPremium");
 
+    // ========== Account Settings - Patreon ==========
+
+    public static string Settings_Account_PatreonSection => GetString("Settings_Account_PatreonSection");
+    public static string Settings_Account_PatreonUserFallback => GetString("Settings_Account_PatreonUserFallback");
+    public static string Settings_Account_PatreonPlanLabel => GetString("Settings_Account_PatreonPlanLabel");
+    public static string Settings_Account_PatreonLastSync => GetString("Settings_Account_PatreonLastSync");
+    public static string Settings_Account_PatreonSyncNow => GetString("Settings_Account_PatreonSyncNow");
+    public static string Settings_Account_PatreonDisconnect => GetString("Settings_Account_PatreonDisconnect");
+    public static string Settings_Account_PatreonConnectTitle => GetString("Settings_Account_PatreonConnectTitle");
+    public static string Settings_Account_PatreonConnectDescription => GetString("Settings_Account_PatreonConnectDescription");
+    public static string Settings_Account_PatreonConnectButton => GetString("Settings_Account_PatreonConnectButton");
+    public static string Settings_Account_PatreonAvailablePlans => GetString("Settings_Account_PatreonAvailablePlans");
+    public static string Settings_Account_PatreonPlanStandard => GetString("Settings_Account_PatreonPlanStandard");
+    public static string Settings_Account_PatreonPlanPro => GetString("Settings_Account_PatreonPlanPro");
+    public static string Settings_Account_PatreonPlanPremia => GetString("Settings_Account_PatreonPlanPremia");
+    public static string Settings_Account_EmailLoginOptional => GetString("Settings_Account_EmailLoginOptional");
+    public static string Settings_Account_PatreonSyncing => GetString("Settings_Account_PatreonSyncing");
+    public static string Settings_Account_PatreonStatusSynced => GetString("Settings_Account_PatreonStatusSynced");
+    public static string Settings_Account_PatreonStatusOffline => GetString("Settings_Account_PatreonStatusOffline");
+    public static string Settings_Account_PatreonStatusTokenExpired => GetString("Settings_Account_PatreonStatusTokenExpired");
+    public static string Settings_Account_PatreonStatusError => GetString("Settings_Account_PatreonStatusError");
+    public static string Settings_Account_PatreonStatusNotConnected => GetString("Settings_Account_PatreonStatusNotConnected");
+    public static string Settings_Account_PatreonLinkedFormat => GetString("Settings_Account_PatreonLinkedFormat");
+
     // ========== License Settings ==========
 
     public static string Settings_License_Title => GetString("Settings_License_Title");
@@ -482,4 +506,5 @@ public static class Strings
     public static string Loading_LoadingOCR => GetString("Loading_LoadingOCR");
     public static string Loading_InitializingTranslation => GetString("Loading_InitializingTranslation");
     public static string Loading_PreparingUI => GetString("Loading_PreparingUI");
+    public static string Loading_SetupGpu => GetString("Loading_SetupGpu");
 }

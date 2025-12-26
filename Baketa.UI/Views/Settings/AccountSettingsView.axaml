@@ -95,8 +95,113 @@
                 </StackPanel>
             </StackPanel>
 
-            <!-- Not Logged In State -->
+            <!-- Patreon連携セクション -->
+            <StackPanel Spacing="16">
+                <TextBlock Text="{local:Localize Settings_Account_PatreonSection}" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0"/>
+
+                <!-- Patreon連携済み -->
+                <Border IsVisible="{Binding IsPatreonConnected}"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                        <!-- ユーザー情報 -->
+                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{Binding PatreonUserName}"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{local:Localize Settings_Account_PatreonPlanLabel}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock Text="{Binding CurrentPlanDisplay}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="{local:Localize Settings_License_LastSync}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock Text=":"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock Text="{Binding PatreonLastSyncTimeDisplay}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- ステータスバッジ -->
+                        <Border Grid.Row="0" Grid.Column="1"
+                                Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                                CornerRadius="4"
+                                Padding="8,4"
+                                VerticalAlignment="Top">
+                            <TextBlock Text="{Binding PatreonSyncStatusDisplay}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                        </Border>
+
+                        <!-- アクションボタン -->
+                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+                            <Button Content="{local:Localize Settings_Account_PatreonSyncNow}"
+                                    Command="{Binding SyncPatreonCommand}"
+                                    IsEnabled="{Binding !IsPatreonSyncing}"
+                                    Width="100"/>
+                            <Button Content="{local:Localize Settings_Account_PatreonDisconnect}"
+                                    Command="{Binding DisconnectPatreonCommand}"
+                                    IsEnabled="{Binding !IsPatreonSyncing}"
+                                    Classes="danger"
+                                    Width="100"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Patreon未連携 -->
+                <Border IsVisible="{Binding !IsPatreonConnected}"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="20">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="8" HorizontalAlignment="Center">
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonConnectTitle}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonConnectDescription}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       MaxWidth="300"/>
+                        </StackPanel>
+
+                        <Button Content="{local:Localize Settings_Account_PatreonConnectButton}"
+                                Command="{Binding ConnectPatreonCommand}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Classes="accent"
+                                Padding="16,12"/>
+
+                        <!-- プラン説明 -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonAvailablePlans}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonPlanStandard}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonPlanPro}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonPlanPremia}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <Separator Margin="0,8"/>
+
+            <!-- Not Logged In State (従来のログイン) -->
             <StackPanel IsVisible="{Binding !IsLoggedIn}" Spacing="16">
+                <TextBlock Text="{local:Localize Settings_Account_EmailLoginOptional}" FontSize="16" FontWeight="SemiBold"/>
+
                 <!-- Info Card -->
                 <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="8"

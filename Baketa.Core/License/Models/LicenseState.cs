@@ -77,6 +77,36 @@ public sealed record LicenseState
     /// </summary>
     public string? ChallengeToken { get; init; }
 
+    // --- Patreon連携情報 ---
+
+    /// <summary>
+    /// PatreonユーザーID
+    /// </summary>
+    public string? PatreonUserId { get; init; }
+
+    /// <summary>
+    /// Patreon同期ステータス
+    /// </summary>
+    public PatreonSyncStatus PatreonSyncStatus { get; init; } = PatreonSyncStatus.NotConnected;
+
+    /// <summary>
+    /// 最終同期エラーメッセージ
+    /// </summary>
+    public string? LastSyncError { get; init; }
+
+    /// <summary>
+    /// Patreon パトロンステータス
+    /// </summary>
+    /// <remarks>
+    /// "active_patron", "declined_patron", "former_patron", null
+    /// </remarks>
+    public string? PatronStatus { get; init; }
+
+    /// <summary>
+    /// 現在有効なPatreon Tier ID
+    /// </summary>
+    public string? PatreonTierId { get; init; }
+
     // --- 計算プロパティ ---
 
     /// <summary>
@@ -146,6 +176,21 @@ public sealed record LicenseState
     public bool IsAdFree => !CurrentPlan.ShowsAds();
 
     /// <summary>
+    /// Patreon連携済みかどうか
+    /// </summary>
+    public bool IsPatreonConnected => !string.IsNullOrEmpty(PatreonUserId);
+
+    /// <summary>
+    /// Patreon同期が正常かどうか
+    /// </summary>
+    public bool IsPatreonSynced => PatreonSyncStatus == PatreonSyncStatus.Synced;
+
+    /// <summary>
+    /// アクティブなパトロンかどうか
+    /// </summary>
+    public bool IsActivePatron => PatronStatus == "active_patron";
+
+    /// <summary>
     /// 指定された機能が利用可能かどうか
     /// </summary>
     public bool IsFeatureAvailable(FeatureType feature)
@@ -209,5 +254,69 @@ public sealed record LicenseState
     {
         IsCached = false,
         LastServerSync = DateTime.UtcNow
+    };
+
+    /// <summary>
+    /// Patreon同期後の新しい状態を作成
+    /// </summary>
+    public LicenseState WithPatreonSync(
+        PatreonSyncStatus syncStatus,
+        PlanType? plan = null,
+        string? patronStatus = null,
+        string? tierId = null,
+        DateTime? subscriptionEnd = null) => this with
+    {
+        PatreonSyncStatus = syncStatus,
+        CurrentPlan = plan ?? CurrentPlan,
+        PatronStatus = patronStatus ?? PatronStatus,
+        PatreonTierId = tierId ?? PatreonTierId,
+        ExpirationDate = subscriptionEnd ?? ExpirationDate,
+        LastServerSync = DateTime.UtcNow,
+        IsCached = syncStatus == PatreonSyncStatus.Offline,
+        LastSyncError = null
+    };
+
+    /// <summary>
+    /// Patreon同期エラー後の新しい状態を作成
+    /// </summary>
+    public LicenseState WithPatreonError(PatreonSyncStatus errorStatus, string errorMessage) => this with
+    {
+        PatreonSyncStatus = errorStatus,
+        LastSyncError = errorMessage,
+        IsCached = true
+    };
+
+    /// <summary>
+    /// Patreon連携解除後の状態を作成
+    /// </summary>
+    public LicenseState WithPatreonDisconnected() => this with
+    {
+        PatreonUserId = null,
+        PatreonSyncStatus = PatreonSyncStatus.NotConnected,
+        PatronStatus = null,
+        PatreonTierId = null,
+        CurrentPlan = PlanType.Free,
+        ExpirationDate = null,
+        LastSyncError = null
+    };
+
+    /// <summary>
+    /// Patreon認証後の状態を作成
+    /// </summary>
+    public static LicenseState FromPatreonAuth(
+        string patreonUserId,
+        PlanType plan,
+        string? patronStatus,
+        string? tierId,
+        DateTime? subscriptionEnd) => new()
+    {
+        CurrentPlan = plan,
+        PatreonUserId = patreonUserId,
+        PatreonSyncStatus = PatreonSyncStatus.Synced,
+        PatronStatus = patronStatus,
+        PatreonTierId = tierId,
+        ExpirationDate = subscriptionEnd,
+        LastServerSync = DateTime.UtcNow,
+        IsCached = false
     };
 }

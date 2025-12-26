@@ -728,6 +728,91 @@
     <value>プラン変更ページを開けませんでした</value>
   </data>
 
+  <!-- Patreon Integration -->
+  <data name="Settings_License_PatreonIntegration" xml:space="preserve">
+    <value>Patreon連携</value>
+  </data>
+  <data name="Settings_License_PatreonStatus" xml:space="preserve">
+    <value>接続状態</value>
+  </data>
+  <data name="Settings_License_LastSync" xml:space="preserve">
+    <value>最終同期</value>
+  </data>
+  <data name="Settings_License_ConnectPatreon" xml:space="preserve">
+    <value>Patreonに接続</value>
+  </data>
+  <data name="Settings_License_DisconnectPatreon" xml:space="preserve">
+    <value>連携解除</value>
+  </data>
+  <data name="Settings_License_SyncPatreon" xml:space="preserve">
+    <value>同期</value>
+  </data>
+
+  <!-- Patreon Integration (Account Settings) -->
+  <data name="Settings_Account_PatreonSection" xml:space="preserve">
+    <value>Patreon連携</value>
+  </data>
+  <data name="Settings_Account_PatreonUserFallback" xml:space="preserve">
+    <value>Patreonユーザー</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanLabel" xml:space="preserve">
+    <value>プラン:</value>
+  </data>
+  <data name="Settings_Account_PatreonLastSync" xml:space="preserve">
+    <value>最終同期: {0}</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncNow" xml:space="preserve">
+    <value>今すぐ同期</value>
+  </data>
+  <data name="Settings_Account_PatreonDisconnect" xml:space="preserve">
+    <value>連携解除</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectTitle" xml:space="preserve">
+    <value>Patreonアカウントと連携</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
+    <value>Patreonで支援中のアカウントと連携すると、広告なし・クラウドAI翻訳などの特典が利用できます</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
+    <value>Patreonと連携する</value>
+  </data>
+  <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
+    <value>利用可能なプラン:</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanStandard" xml:space="preserve">
+    <value>• Standard ($1/月): 広告なし</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
+    <value>• Pro ($3/月): クラウドAI翻訳 400万トークン/月</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPremia" xml:space="preserve">
+    <value>• Premia ($5/月): クラウドAI翻訳 800万トークン/月</value>
+  </data>
+  <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
+    <value>メールでログイン（オプション）</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
+    <value>同期中...</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusSynced" xml:space="preserve">
+    <value>同期済み</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusOffline" xml:space="preserve">
+    <value>オフライン</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusTokenExpired" xml:space="preserve">
+    <value>再認証が必要</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusError" xml:space="preserve">
+    <value>エラー</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusNotConnected" xml:space="preserve">
+    <value>未連携</value>
+  </data>
+  <data name="Settings_Account_PatreonLinkedFormat" xml:space="preserve">
+    <value>連携済み（{0}）</value>
+  </data>
+
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">
     <value>拡張設定</value>
@@ -1083,6 +1168,9 @@
   </data>
   <data name="Loading_PreparingUI" xml:space="preserve">
     <value>UIコンポーネントを準備しています...</value>
+  </data>
+  <data name="Loading_SetupGpu" xml:space="preserve">
+    <value>GPU環境をセットアップしています...</value>
   </data>
 
 </root>

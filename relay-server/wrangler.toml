@@ -1,0 +1,24 @@
+name = "baketa-relay"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# KV Namespace for session storage
+# Create with: wrangler kv:namespace create "SESSIONS"
+# Then update the id below with the returned namespace ID
+kv_namespaces = [
+  { binding = "SESSIONS", id = "7fdcdf963f8649578fe1ccaadaa74ea8" }
+]
+
+# Environment variables (set via Cloudflare dashboard or wrangler secret)
+# PATREON_CLIENT_ID - Patreon OAuth Client ID (set via dashboard)
+# PATREON_CLIENT_SECRET - Patreon OAuth Client Secret (use wrangler secret)
+# API_KEY - Client authentication key (set via dashboard)
+# ALLOWED_ORIGINS - Comma-separated list of allowed origins
+
+[vars]
+ALLOWED_ORIGINS = "*"
+
+# Note: Secrets should be set via wrangler secret:
+# wrangler secret put PATREON_CLIENT_ID
+# wrangler secret put PATREON_CLIENT_SECRET
+# wrangler secret put API_KEY

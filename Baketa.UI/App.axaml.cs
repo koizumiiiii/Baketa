@@ -427,7 +427,10 @@ internal sealed partial class App : Avalonia.Application
                         mainOverlayView.Show();
                         Console.WriteLine("✅ MainOverlayView.Show()実行完了");
 
-                        // --- 4.5 テストモード警告表示（Issue #110: 決済統合） ---
+                        // --- 4.5 Patreon認証結果の通知表示（Issue #233） ---
+                        await ShowPendingPatreonNotificationAsync(serviceProvider);
+
+                        // --- 4.6 テストモード警告表示（Issue #110: 決済統合） ---
                         await ShowTestModeWarningIfNeededAsync(serviceProvider, mainOverlayView);
 
                         // 未認証の場合はLoginViewをダイアログとして表示
@@ -799,6 +802,55 @@ internal sealed partial class App : Avalonia.Application
         {
             // 警告表示の失敗はアプリケーション起動をブロックしない
             _logger?.LogWarning(ex, "テストモード警告表示中にエラー（継続）");
+        }
+    }
+
+    /// <summary>
+    /// Patreon認証結果の通知表示 (Issue #233)
+    /// Program.PendingPatreonNotification にセットされた認証結果を表示
+    /// </summary>
+    private async Task ShowPendingPatreonNotificationAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            var notification = Program.PendingPatreonNotification;
+            if (notification == null)
+            {
+                return;
+            }
+
+            // 通知を消費（一度だけ表示）
+            Program.PendingPatreonNotification = null;
+
+            var notificationService = serviceProvider.GetService<INotificationService>();
+            if (notificationService == null)
+            {
+                _logger?.LogWarning("INotificationService が見つかりません。Patreon認証結果の通知をスキップします。");
+                return;
+            }
+
+            if (notification.IsSuccess)
+            {
+                await notificationService.ShowSuccessAsync(
+                    "Patreon連携成功",
+                    $"Patreonアカウントとの連携が完了しました。プラン: {notification.PlanName}",
+                    duration: 5000);
+
+                _logger?.LogInformation("Patreon認証成功通知を表示: Plan={Plan}", notification.PlanName);
+            }
+            else
+            {
+                await notificationService.ShowErrorAsync(
+                    "Patreon連携失敗",
+                    notification.ErrorMessage ?? "認証処理中にエラーが発生しました",
+                    duration: 0); // エラーは手動で閉じるまで表示
+
+                _logger?.LogWarning("Patreon認証失敗通知を表示: Error={Error}", notification.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Patreon認証結果通知表示中にエラー（継続）");
         }
     }
 

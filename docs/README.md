@@ -92,6 +92,7 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [ログイン/登録UI実装](issues/issue-167-login-ui.md) - Email/Password、OAuth（Google/Discord/Twitch）
 - [トークン管理](issues/issue-168-token-management.md) - Windows Credential Manager統合
 - [認証UI拡張](issues/issue-169-auth-ui-extensions.md) - パスワードリセット等
+- [認証システムアーキテクチャ](3-architecture/auth/authentication-system.md) - Supabase Auth/Patreon OAuth設計
 
 ### 4. 実装ガイド
 
@@ -112,6 +113,52 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 - [翻訳システム実装確認完了レポート](development-notes/baketa-translation-status.md) **最新** - Phase 5完了・実ファイル検証済み・プロダクション品質達成
 
 ## 最新の更新情報
+
+**2025年12月25日** - **Issue #234 Patreonリレーサーバー実装** 🔐
+
+### 📋 **セキュアなPatreon認証基盤**
+
+Cloudflare Workers上にリレーサーバーを実装し、Patreon OAuth認証のセキュリティを強化しました。
+
+#### **✅ Issue #234 完了項目**
+- **リレーサーバー実装**: Cloudflare Workers + KV Storage
+- **セッション管理**: クライアントにアクセストークンを渡さないセキュアな設計
+- **セキュリティ強化**:
+  - タイミング攻撃対策（`timingSafeCompare`）
+  - `redirect_uri` ホワイトリスト検証
+  - 本番環境でのAPI_KEY必須化
+  - リクエストボディのランタイム検証
+- **パフォーマンス**: メンバーシップ情報の5分キャッシュ
+- **コード品質**: Geminiコードレビュー全指摘対応
+
+#### **📄 新規コンポーネント**
+- `relay-server/src/index.ts` - Cloudflare Workersリレーサーバー
+- `relay-server/wrangler.toml` - デプロイ設定
+
+#### **📖 ドキュメント**
+- [認証システムアーキテクチャ](3-architecture/auth/authentication-system.md) - セクション9「Patreonリレーサーバー」追加
+
+---
+
+**2025年12月25日** - **Issue #233 Patreon OAuth統合** 🎫
+
+### 📋 **Patreonライセンス連携システム**
+
+Patreon連携によるライセンス認証システムを実装しました。
+
+#### **✅ Issue #233 完了項目**
+- **Patreon OAuth認証**: CSRF保護付きPKCEフロー、ローカルHTTPコールバック
+- **PatreonOAuthService**: OAuth認証フロー管理、リレーサーバー連携
+- **PatreonCallbackHandler**: コールバック処理、CSRF検証
+- **PatreonSyncHostedService**: 30分間隔の自動同期バックグラウンドサービス
+- **設定画面統合**: アカウント設定タブでPatreon連携/解除操作
+
+#### **📄 新規コンポーネント**
+- `PatreonOAuthService.cs` - OAuth認証サービス
+- `PatreonCallbackHandler.cs` - コールバックハンドラー
+- `PatreonSyncHostedService.cs` - 自動同期サービス
+
+---
 
 **2025年11月29日** - **Issue #176 設定画面から認証機能へのアクセス** ⚙️
 

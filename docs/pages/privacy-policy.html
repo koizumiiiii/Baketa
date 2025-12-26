@@ -134,10 +134,48 @@
                 </ul>
                 <p>法令で定められた保持期間がある場合は、それに従います。</p>
 
-                <h2 class="section-title">10. サービス改善のための統計データ収集</h2>
+                <h2 class="section-title">10. Patreon連携によるライセンス管理</h2>
+                <p>本サービスでは、有料プランの認証にPatreon（https://www.patreon.com/）を利用しています。</p>
+
+                <h3 class="subsection-title">10.1 Patreonから取得する情報</h3>
+                <p>Patreon連携時に、以下の情報を取得します：</p>
+                <ul>
+                    <li><strong>Patreon ユーザーID</strong>：ライセンス認証のための一意識別子</li>
+                    <li><strong>メールアドレス</strong>：アカウント確認および重要な通知用</li>
+                    <li><strong>支援Tier情報</strong>：ご利用プラン（Standard/Pro/Premia）の判定</li>
+                    <li><strong>支援状態</strong>：有効/無効の確認</li>
+                </ul>
+
+                <h3 class="subsection-title">10.2 認証トークンの管理</h3>
+                <div class="callout callout--info">
+                    <p><strong>セキュリティ対策：</strong>Patreonの認証トークン（アクセストークン・リフレッシュトークン）は、お客様のデバイスには保存されません。当社が運営する中継サーバー（Cloudflare Workers）で安全に管理され、暗号化された状態で保存されます。</p>
+                </div>
+                <ul>
+                    <li>お客様のデバイスには、当社独自のセッショントークンのみが保存されます</li>
+                    <li>セッショントークンは暗号化され、有効期限が設定されています</li>
+                    <li>Patreonトークンへの直接アクセスは当社サーバーからのみ行われます</li>
+                </ul>
+
+                <h3 class="subsection-title">10.3 データの保持期間</h3>
+                <ul>
+                    <li>Patreon認証トークン：Patreon連携解除まで（中継サーバーで保持）</li>
+                    <li>セッショントークン：発行から7日間（デバイス上）</li>
+                    <li>ライセンスキャッシュ：最終確認から7日間（オフライン利用のため）</li>
+                </ul>
+
+                <h3 class="subsection-title">10.4 連携の解除</h3>
+                <p>Patreon連携はいつでも解除できます。解除すると：</p>
+                <ul>
+                    <li>中継サーバー上のPatreonトークンは即座に削除されます</li>
+                    <li>デバイス上のセッショントークンとキャッシュは削除されます</li>
+                    <li>有料プランの機能は利用できなくなります</li>
+                </ul>
+                <p>Patreon側からも連携を解除できます：Patreon設定 → 接続済みアプリ → Baketa → アクセスを取り消す</p>
+
+                <h2 class="section-title">11. サービス改善のための統計データ収集</h2>
                 <p>本サービスでは、サービス改善を目的として以下の情報を収集します。</p>
 
-                <h3 class="subsection-title">10.1 収集する情報</h3>
+                <h3 class="subsection-title">11.1 収集する情報</h3>
                 <ul>
                     <li>ゲームウィンドウタイトル（翻訳対象のゲーム名）</li>
                     <li>翻訳言語ペア（翻訳元言語・翻訳先言語）</li>
@@ -149,7 +187,7 @@
                     <p><strong>IPアドレスについて：</strong>IPアドレスは利用国の推定にのみ使用し、推定後は即座に破棄します。IPアドレス自体をサーバーに保存することはありません。</p>
                 </div>
 
-                <h3 class="subsection-title">10.2 利用目的</h3>
+                <h3 class="subsection-title">11.2 利用目的</h3>
                 <div class="table-wrapper">
                     <table>
                         <thead>
@@ -175,22 +213,22 @@
                     </table>
                 </div>
 
-                <h3 class="subsection-title">10.3 データの保持期間</h3>
+                <h3 class="subsection-title">11.3 データの保持期間</h3>
                 <ul>
                     <li>個別セッションデータ：90日間</li>
                     <li>日次集計データ：無期限（個人を特定できない形式）</li>
                 </ul>
 
-                <h3 class="subsection-title">10.4 注意事項</h3>
+                <h3 class="subsection-title">11.4 注意事項</h3>
                 <ul>
                     <li>収集したデータは統計目的のみに使用し、個人を特定する目的では使用しません</li>
                     <li>ゲームタイトル等の情報は集計・統計処理後に分析に使用されます</li>
                 </ul>
 
-                <h2 class="section-title">11. プライバシーポリシーの変更</h2>
+                <h2 class="section-title">12. プライバシーポリシーの変更</h2>
                 <p>当社は、必要に応じて本プライバシーポリシーを変更することがあります。重要な変更がある場合は、サービス内での通知またはメールでお知らせします。</p>
 
-                <h2 class="section-title">12. お問い合わせ</h2>
+                <h2 class="section-title">13. お問い合わせ</h2>
                 <p>本プライバシーポリシーに関するご質問やご要望は、以下までお問い合わせください。</p>
                 <p>メール: <a href="mailto:privacy@baketa.app">privacy@baketa.app</a></p>
             </div>
@@ -200,7 +238,7 @@
     <footer class="footer">
         <div class="container">
             <p>&copy; 2025 Baketa. All rights reserved.</p>
-            <p>最終更新日: 2025年12月18日</p>
+            <p>最終更新日: 2025年12月25日</p>
         </div>
     </footer>
 </body>

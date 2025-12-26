@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.Reactive;
-using System.Reactive.Linq;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
@@ -19,6 +18,9 @@ namespace Baketa.UI.ViewModels.Settings;
 /// ライセンス情報設定画面のViewModel
 /// プラン情報、トークン使用量、プラン詳細を表示
 /// </summary>
+/// <remarks>
+/// Patreon連携機能はAccountSettingsViewModelに集約されています。
+/// </remarks>
 public sealed class LicenseInfoViewModel : ViewModelBase
 {
     private readonly ILicenseManager _licenseManager;

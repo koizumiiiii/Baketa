@@ -1,14 +1,20 @@
 using System;
+using System.Diagnostics;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.License;
+using Baketa.Core.License.Models;
+using Baketa.Core.Settings;
+using Baketa.Infrastructure.License.Services;
 using Baketa.UI.Framework;
 using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ReactiveUI;
 
 namespace Baketa.UI.ViewModels.Settings;
@@ -21,6 +27,9 @@ public sealed class AccountSettingsViewModel : ViewModelBase
 {
     private readonly IAuthService _authService;
     private readonly INavigationService _navigationService;
+    private readonly IPatreonOAuthService? _patreonService;
+    private readonly PatreonSettings? _patreonSettings;
+    private readonly ILoggerFactory? _loggerFactory;
     private readonly ILogger<AccountSettingsViewModel>? _logger;
 
     private bool _isLoggedIn;
@@ -33,6 +42,14 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     private bool _showPasswordResetForm;
     private bool _passwordResetSent;
 
+    // Patreon連携関連
+    private bool _isPatreonConnected;
+    private string? _patreonUserName;
+    private PlanType _currentPlan = PlanType.Free;
+    private DateTime? _patreonLastSyncTime;
+    private PatreonSyncStatus _patreonSyncStatus = PatreonSyncStatus.NotConnected;
+    private bool _isPatreonSyncing;
+
     /// <summary>
     /// AccountSettingsViewModelを初期化します
     /// </summary>
@@ -40,14 +57,26 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         IAuthService authService,
         INavigationService navigationService,
         IEventAggregator eventAggregator,
+        IPatreonOAuthService? patreonService = null,
+        IOptions<PatreonSettings>? patreonSettings = null,
+        ILoggerFactory? loggerFactory = null,
         ILogger<AccountSettingsViewModel>? logger = null) : base(eventAggregator)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+        _patreonService = patreonService;
+        _patreonSettings = patreonSettings?.Value;
+        _loggerFactory = loggerFactory;
         _logger = logger;
 
         // 認証状態変更イベントの購読
         _authService.AuthStatusChanged += OnAuthStatusChanged;
+
+        // Patreonステータス変更イベントの購読
+        if (_patreonService != null)
+        {
+            _patreonService.StatusChanged += OnPatreonStatusChanged;
+        }
 
         // コマンドの初期化
         var canExecuteWhenNotLoading = this.WhenAnyValue(x => x.IsLoading).Select(loading => !loading);
@@ -64,6 +93,22 @@ public sealed class AccountSettingsViewModel : ViewModelBase
             this.WhenAnyValue(x => x.ResetEmail, x => x.IsLoading,
                 (email, loading) => !string.IsNullOrWhiteSpace(email) && !loading));
 
+        // Patreonコマンドの初期化
+        ConnectPatreonCommand = ReactiveCommand.CreateFromTask(
+            ExecuteConnectPatreonAsync,
+            this.WhenAnyValue(x => x.IsPatreonConnected, x => x.IsPatreonSyncing,
+                (connected, syncing) => !connected && !syncing));
+
+        SyncPatreonCommand = ReactiveCommand.CreateFromTask(
+            ExecuteSyncPatreonAsync,
+            this.WhenAnyValue(x => x.IsPatreonConnected, x => x.IsPatreonSyncing,
+                (connected, syncing) => connected && !syncing));
+
+        DisconnectPatreonCommand = ReactiveCommand.CreateFromTask(
+            ExecuteDisconnectPatreonAsync,
+            this.WhenAnyValue(x => x.IsPatreonConnected, x => x.IsPatreonSyncing,
+                (connected, syncing) => connected && !syncing));
+
         // 初期状態の読み込み（例外を適切に処理）
         _ = LoadCurrentSessionAsync().ContinueWith(t =>
         {
@@ -72,6 +117,9 @@ public sealed class AccountSettingsViewModel : ViewModelBase
                 _logger?.LogError(t.Exception, "セッション読み込みの初期化に失敗しました");
             }
         }, TaskScheduler.Default);
+
+        // Patreon状態の読み込み
+        _ = LoadPatreonStatusAsync();
     }
 
     #region プロパティ
@@ -174,6 +222,108 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _passwordResetSent, value);
     }
 
+    /// <summary>
+    /// Patreonと連携済みかどうか
+    /// </summary>
+    public bool IsPatreonConnected
+    {
+        get => _isPatreonConnected;
+        private set => this.RaiseAndSetIfChanged(ref _isPatreonConnected, value);
+    }
+
+    /// <summary>
+    /// Patreonユーザー名
+    /// </summary>
+    public string? PatreonUserName
+    {
+        get => _patreonUserName;
+        private set => this.RaiseAndSetIfChanged(ref _patreonUserName, value);
+    }
+
+    /// <summary>
+    /// 現在のプラン
+    /// </summary>
+    public PlanType CurrentPlan
+    {
+        get => _currentPlan;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _currentPlan, value);
+            this.RaisePropertyChanged(nameof(CurrentPlanDisplay));
+        }
+    }
+
+    /// <summary>
+    /// プラン表示文字列
+    /// </summary>
+    public string CurrentPlanDisplay => CurrentPlan switch
+    {
+        PlanType.Premia => "Premia",
+        PlanType.Pro => "Pro",
+        PlanType.Standard => "Standard",
+        _ => "Free"
+    };
+
+    /// <summary>
+    /// Patreon最終同期日時
+    /// </summary>
+    public DateTime? PatreonLastSyncTime
+    {
+        get => _patreonLastSyncTime;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _patreonLastSyncTime, value);
+            this.RaisePropertyChanged(nameof(PatreonLastSyncTimeDisplay));
+        }
+    }
+
+    /// <summary>
+    /// 最終同期日時の表示文字列
+    /// </summary>
+    public string PatreonLastSyncTimeDisplay => PatreonLastSyncTime.HasValue
+        ? PatreonLastSyncTime.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm")
+        : "未同期";
+
+    /// <summary>
+    /// Patreon同期ステータス
+    /// </summary>
+    public PatreonSyncStatus PatreonSyncStatus
+    {
+        get => _patreonSyncStatus;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _patreonSyncStatus, value);
+            this.RaisePropertyChanged(nameof(PatreonSyncStatusDisplay));
+        }
+    }
+
+    /// <summary>
+    /// 同期ステータス表示文字列
+    /// </summary>
+    public string PatreonSyncStatusDisplay => IsPatreonSyncing
+        ? Strings.Settings_Account_PatreonSyncing
+        : PatreonSyncStatus switch
+        {
+            PatreonSyncStatus.Synced => Strings.Settings_Account_PatreonStatusSynced,
+            PatreonSyncStatus.Offline => Strings.Settings_Account_PatreonStatusOffline,
+            PatreonSyncStatus.TokenExpired => Strings.Settings_Account_PatreonStatusTokenExpired,
+            PatreonSyncStatus.Error => Strings.Settings_Account_PatreonStatusError,
+            _ => Strings.Settings_Account_PatreonStatusNotConnected
+        };
+
+    /// <summary>
+    /// Patreon同期中かどうか
+    /// </summary>
+    public bool IsPatreonSyncing
+    {
+        get => _isPatreonSyncing;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _isPatreonSyncing, value);
+            this.RaisePropertyChanged(nameof(PatreonSyncStatusDisplay));
+        }
+    }
+
     #endregion
 
     #region コマンド
@@ -207,6 +357,21 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     /// パスワードリセットメール送信コマンド
     /// </summary>
     public ReactiveCommand<Unit, Unit> SendPasswordResetCommand { get; }
+
+    /// <summary>
+    /// Patreon連携開始コマンド
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> ConnectPatreonCommand { get; }
+
+    /// <summary>
+    /// Patreon同期コマンド
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> SyncPatreonCommand { get; }
+
+    /// <summary>
+    /// Patreon連携解除コマンド
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> DisconnectPatreonCommand { get; }
 
     #endregion
 
@@ -482,6 +647,252 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         return maskedLocal + domain;
     }
 
+    #region Patreonメソッド
+
+    /// <summary>
+    /// Patreon状態を読み込みます
+    /// </summary>
+    private async Task LoadPatreonStatusAsync()
+    {
+        if (_patreonService == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var credentials = await _patreonService.LoadCredentialsAsync().ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (credentials != null)
+                {
+                    IsPatreonConnected = _patreonService.IsAuthenticated;
+                    PatreonUserName = credentials.FullName;
+                    CurrentPlan = credentials.LastKnownPlan;
+                    PatreonLastSyncTime = credentials.LastSyncTime;
+                    PatreonSyncStatus = _patreonService.SyncStatus;
+                    _logger?.LogDebug("Patreon状態を読み込みました: Connected={Connected}, Plan={Plan}",
+                        IsPatreonConnected, CurrentPlan);
+                }
+                else
+                {
+                    IsPatreonConnected = false;
+                    PatreonUserName = null;
+                    CurrentPlan = PlanType.Free;
+                    PatreonLastSyncTime = null;
+                    PatreonSyncStatus = PatreonSyncStatus.NotConnected;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Patreon状態の読み込みに失敗しました");
+        }
+    }
+
+    /// <summary>
+    /// Patreonステータス変更イベントハンドラ
+    /// </summary>
+    private void OnPatreonStatusChanged(object? sender, PatreonStatusChangedEventArgs e)
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            PatreonSyncStatus = e.NewStatus;
+            CurrentPlan = e.Plan;
+            PatreonLastSyncTime = e.LastSyncTime;
+
+            if (e.NewStatus == PatreonSyncStatus.Synced)
+            {
+                IsPatreonConnected = true;
+                SetStatusMessage($"Patreon同期完了: {CurrentPlanDisplay}プラン", false);
+            }
+            else if (e.NewStatus == PatreonSyncStatus.Error)
+            {
+                SetStatusMessage(e.ErrorMessage ?? "Patreon同期エラー", true);
+            }
+            else if (e.NewStatus == PatreonSyncStatus.NotConnected)
+            {
+                IsPatreonConnected = false;
+                PatreonUserName = null;
+            }
+
+            _logger?.LogDebug("Patreonステータス変更: {Status}, Plan={Plan}", e.NewStatus, e.Plan);
+        });
+    }
+
+    /// <summary>
+    /// Patreon連携を開始します（非同期版・ローカルHTTPコールバック対応）
+    /// </summary>
+    private async Task ExecuteConnectPatreonAsync()
+    {
+        if (_patreonService == null || _patreonSettings == null)
+        {
+            SetStatusMessage("Patreonサービスが利用できません", true);
+            return;
+        }
+
+        try
+        {
+            IsPatreonSyncing = true;
+            ClearStatusMessage();
+
+            // ローカルHTTPコールバックサーバーを使用（DIからロガーを取得）
+            var callbackLogger = _loggerFactory?.CreateLogger<PatreonCallbackServer>()
+                ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<PatreonCallbackServer>.Instance;
+            await using var callbackServer = new PatreonCallbackServer(
+                _patreonService,
+                Options.Create(_patreonSettings),
+                callbackLogger);
+
+            // CSRF対策用のstate生成
+            var state = _patreonService.GenerateSecureState();
+
+            // 認証URLを生成
+            var authUrl = _patreonService.GenerateAuthorizationUrl(state);
+
+            // コールバックサーバーを開始（バックグラウンドで待機）
+            var callbackTask = callbackServer.StartAndWaitForCallbackAsync();
+
+            // デフォルトブラウザで開く
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = authUrl,
+                UseShellExecute = true
+            });
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                SetStatusMessage("ブラウザでPatreon認証を完了してください...", false));
+
+            _logger?.LogInformation("Patreon認証URLをブラウザで開きました、コールバック待機中");
+
+            // コールバックを待機
+            var result = await callbackTask.ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (result.Success)
+                {
+                    IsPatreonConnected = true;
+                    PatreonUserName = result.UserName;
+                    CurrentPlan = result.Plan;
+                    PatreonLastSyncTime = DateTime.UtcNow;
+                    PatreonSyncStatus = PatreonSyncStatus.Synced;
+                    SetStatusMessage($"✅ Patreon連携完了！{result.Plan}プラン", false);
+                    _logger?.LogInformation("Patreon連携成功: Plan={Plan}", result.Plan);
+                }
+                else
+                {
+                    SetStatusMessage(result.ErrorMessage ?? "Patreon連携に失敗しました", true);
+                    _logger?.LogWarning("Patreon連携失敗: {Error}", result.ErrorMessage);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Patreon連携開始中にエラーが発生しました");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                SetStatusMessage("Patreon連携の開始に失敗しました", true));
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => IsPatreonSyncing = false);
+        }
+    }
+
+    /// <summary>
+    /// Patreon状態を同期します
+    /// </summary>
+    private async Task ExecuteSyncPatreonAsync()
+    {
+        if (_patreonService == null)
+        {
+            return;
+        }
+
+        try
+        {
+            IsPatreonSyncing = true;
+            ClearStatusMessage();
+
+            var result = await _patreonService.SyncLicenseAsync(forceRefresh: true).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (result.Success)
+                {
+                    CurrentPlan = result.Plan;
+                    PatreonLastSyncTime = DateTime.UtcNow;
+                    PatreonSyncStatus = PatreonSyncStatus.Synced;
+                    SetStatusMessage($"同期完了: {CurrentPlanDisplay}プラン", false);
+                    _logger?.LogInformation("Patreon同期成功: Plan={Plan}", result.Plan);
+                }
+                else
+                {
+                    PatreonSyncStatus = result.Status;
+                    SetStatusMessage(result.ErrorMessage ?? "同期に失敗しました", true);
+                    _logger?.LogWarning("Patreon同期失敗: {Error}", result.ErrorMessage);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Patreon同期中にエラーが発生しました");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                SetStatusMessage("同期中にエラーが発生しました", true);
+            });
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => IsPatreonSyncing = false);
+        }
+    }
+
+    /// <summary>
+    /// Patreon連携を解除します
+    /// </summary>
+    private async Task ExecuteDisconnectPatreonAsync()
+    {
+        if (_patreonService == null)
+        {
+            return;
+        }
+
+        try
+        {
+            IsPatreonSyncing = true;
+            ClearStatusMessage();
+
+            await _patreonService.DisconnectAsync().ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsPatreonConnected = false;
+                PatreonUserName = null;
+                CurrentPlan = PlanType.Free;
+                PatreonLastSyncTime = null;
+                PatreonSyncStatus = PatreonSyncStatus.NotConnected;
+                SetStatusMessage("Patreon連携を解除しました", false);
+                _logger?.LogInformation("Patreon連携を解除しました");
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Patreon連携解除中にエラーが発生しました");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                SetStatusMessage("連携解除中にエラーが発生しました", true);
+            });
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => IsPatreonSyncing = false);
+        }
+    }
+
+    #endregion
+
     /// <summary>
     /// リソースを解放します
     /// </summary>
@@ -490,6 +901,11 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         if (disposing)
         {
             _authService.AuthStatusChanged -= OnAuthStatusChanged;
+
+            if (_patreonService != null)
+            {
+                _patreonService.StatusChanged -= OnPatreonStatusChanged;
+            }
         }
         base.Dispose(disposing);
     }
