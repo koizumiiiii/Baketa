@@ -35,6 +35,8 @@ using Baketa.Infrastructure.Services.Setup;
 using Baketa.Infrastructure.Services.Translation;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
+using Baketa.Infrastructure.Validation;
+using Baketa.Core.Abstractions.Validation;
 // 翻訳エンジンをNLLB-200に統一
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
@@ -898,6 +900,9 @@ public class InfrastructureModule : ServiceModuleBase
         // Phase 2: Cloud AI画像翻訳
         RegisterCloudAIPhase2Services(services);
 
+        // Phase 3: 相互検証ロジック
+        RegisterCloudAIPhase3Services(services);
+
         Console.WriteLine("🎉 Issue #78: Cloud AI翻訳サービス登録完了");
     }
 
@@ -946,6 +951,41 @@ public class InfrastructureModule : ServiceModuleBase
         Console.WriteLine("✅ IFallbackOrchestrator登録完了 - 3段階フォールバック制御");
 
         Console.WriteLine("🎉 Issue #78 Phase 2: Cloud AI画像翻訳サービス登録完了");
+    }
+
+    /// <summary>
+    /// Issue #78 Phase 3: 相互検証ロジックを登録します
+    /// ローカルOCRとCloud AI結果の相互検証・ハルシネーション除去
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterCloudAIPhase3Services(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 Issue #78 Phase 3/3.5: 相互検証ロジック登録開始");
+
+        // ファジーテキストマッチング（レーベンシュタイン距離）
+        services.AddSingleton<IFuzzyTextMatcher, FuzzyTextMatcher>();
+        Console.WriteLine("✅ IFuzzyTextMatcher登録完了 - レーベンシュタイン距離マッチング");
+
+        // 低信頼度テキスト救済
+        services.AddSingleton<IConfidenceRescuer, ConfidenceRescuer>();
+        Console.WriteLine("✅ IConfidenceRescuer登録完了 - 低信頼度テキスト救済");
+
+        // Phase 3.5: 包含マッチング（双方向マッチング）
+        services.AddSingleton<IContainmentMatcher, ContainmentMatcher>();
+        Console.WriteLine("✅ IContainmentMatcher登録完了 - 包含マッチング（統合/分割）");
+
+        // 相互検証（ローカルOCR × Cloud AI）- Phase 3.5対応コンストラクタ
+        services.AddSingleton<ICrossValidator>(provider =>
+        {
+            var fuzzyMatcher = provider.GetRequiredService<IFuzzyTextMatcher>();
+            var rescuer = provider.GetRequiredService<IConfidenceRescuer>();
+            var containmentMatcher = provider.GetRequiredService<IContainmentMatcher>();
+            var logger = provider.GetRequiredService<ILogger<CrossValidator>>();
+            return new CrossValidator(fuzzyMatcher, rescuer, containmentMatcher, logger);
+        });
+        Console.WriteLine("✅ ICrossValidator登録完了 - 相互検証ロジック（Phase 3.5統合）");
+
+        Console.WriteLine("🎉 Issue #78 Phase 3/3.5: 相互検証ロジック登録完了");
     }
 
     /// <summary>
