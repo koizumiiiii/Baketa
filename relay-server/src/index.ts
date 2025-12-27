@@ -80,8 +80,10 @@ export interface Env {
   API_KEY: string;
   ENVIRONMENT?: string;
   SESSIONS: KVNamespace;
-  GEMINI_API_KEY?: string;  // Cloud AI翻訳用
-  OPENAI_API_KEY?: string;  // Cloud AI翻訳用（Phase 2予定）
+  GEMINI_API_KEY?: string;   // Cloud AI翻訳用
+  GEMINI_MODEL?: string;     // Geminiモデル名（デフォルト: gemini-2.5-flash-lite）
+  OPENAI_API_KEY?: string;   // Cloud AI翻訳用
+  OPENAI_MODEL?: string;     // OpenAIモデル名（デフォルト: gpt-4.1-nano）
 }
 
 interface SessionData {

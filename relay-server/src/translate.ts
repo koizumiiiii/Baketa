@@ -1,6 +1,10 @@
 /**
  * Cloud AI翻訳エンドポイント
- * Gemini APIを使用した画像テキスト翻訳
+ * Gemini / OpenAI APIを使用した画像テキスト翻訳
+ *
+ * 対応プロバイダー:
+ * - Gemini (gemini-2.5-flash-lite)
+ * - OpenAI (gpt-4.1-nano)
  *
  * セキュリティ:
  * - セッショントークン検証（Patreon認証済みユーザーのみ）
@@ -16,7 +20,8 @@ export interface TranslateEnv {
   SESSIONS: KVNamespace;
   GEMINI_API_KEY?: string;
   OPENAI_API_KEY?: string;
-  GEMINI_MODEL?: string;  // モデル名（デフォルト: gemini-2.0-flash-exp）
+  GEMINI_MODEL?: string;  // モデル名（デフォルト: gemini-2.5-flash-lite）
+  OPENAI_MODEL?: string;  // モデル名（デフォルト: gpt-4.1-nano）
   API_KEY: string;
   ALLOWED_ORIGINS: string;
   ENVIRONMENT?: string;
@@ -98,6 +103,50 @@ interface GeminiResponse {
   };
 }
 
+/** OpenAI API リクエスト */
+interface OpenAIRequest {
+  model: string;
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string | Array<{
+      type: 'text' | 'image_url';
+      text?: string;
+      image_url?: {
+        url: string;
+        detail?: 'low' | 'high' | 'auto';
+      };
+    }>;
+  }>;
+  max_tokens?: number;
+  temperature?: number;
+}
+
+/** OpenAI API レスポンス */
+interface OpenAIResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  error?: {
+    message: string;
+    type: string;
+    code: string;
+  };
+}
+
 /** 翻訳レスポンス */
 interface TranslateResponse {
   success: boolean;
@@ -124,9 +173,11 @@ interface TranslateResponse {
 // ============================================
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash-exp';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const OPENAI_API_BASE = 'https://api.openai.com/v1';
+const DEFAULT_OPENAI_MODEL = 'gpt-4.1-nano';
 const IDENTITY_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
-const GEMINI_TIMEOUT_MS = 30000; // 30秒タイムアウト
+const API_TIMEOUT_MS = 30000; // 30秒タイムアウト
 
 /** Cloud AI翻訳が利用可能なプラン */
 const ALLOWED_PLANS = ['Pro', 'Premia'] as const;
@@ -260,6 +311,31 @@ function estimateImageTokens(base64Length: number): number {
   return Math.max(258, Math.min(1032, Math.floor(estimatedBytes / 2000)));
 }
 
+/**
+ * AIレスポンスからJSONをパース
+ * マークダウンコードブロック（```json...```）を除去してパース
+ */
+function parseAiJsonResponse(textContent: string): { detected_text?: string; translated_text?: string; detected_language?: string } | null {
+  let jsonText = textContent.trim();
+
+  // マークダウンコードブロックを除去
+  if (jsonText.startsWith('```json')) {
+    jsonText = jsonText.slice(7);
+  } else if (jsonText.startsWith('```')) {
+    jsonText = jsonText.slice(3);
+  }
+  if (jsonText.endsWith('```')) {
+    jsonText = jsonText.slice(0, -3);
+  }
+  jsonText = jsonText.trim();
+
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    return null;
+  }
+}
+
 // ============================================
 // Gemini API 呼び出し
 // ============================================
@@ -325,7 +401,7 @@ If no text is visible, respond with:
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geminiRequest),
-      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -369,22 +445,9 @@ If no text is visible, respond with:
       };
     }
 
-    // JSONをパース（マークダウンコードブロックを除去）
-    let jsonText = textContent.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.slice(7);
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.slice(3);
-    }
-    if (jsonText.endsWith('```')) {
-      jsonText = jsonText.slice(0, -3);
-    }
-    jsonText = jsonText.trim();
-
-    let parsed: { detected_text?: string; translated_text?: string; detected_language?: string };
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
+    // JSONをパース
+    const parsed = parseAiJsonResponse(textContent);
+    if (!parsed) {
       console.error(`Failed to parse Gemini response as JSON: ${textContent}`);
       return {
         success: false,
@@ -412,13 +475,179 @@ If no text is visible, respond with:
     if (error instanceof Error && error.name === 'TimeoutError') {
       return {
         success: false,
-        error: { code: 'TIMEOUT', message: `Gemini API request timed out after ${GEMINI_TIMEOUT_MS}ms`, isRetryable: true },
+        error: { code: 'TIMEOUT', message: `Gemini API request timed out after ${API_TIMEOUT_MS}ms`, isRetryable: true },
       };
     }
 
     return {
       success: false,
       error: { code: 'NETWORK_ERROR', message: 'Failed to connect to Gemini API', isRetryable: true },
+    };
+  }
+}
+
+// ============================================
+// OpenAI API 呼び出し
+// ============================================
+
+async function translateWithOpenAI(
+  request: TranslateRequest,
+  apiKey: string,
+  modelName: string = DEFAULT_OPENAI_MODEL
+): Promise<{
+  success: boolean;
+  detectedText?: string;
+  translatedText?: string;
+  detectedLanguage?: string;
+  tokenUsage?: { input: number; output: number; image: number };
+  error?: { code: string; message: string; isRetryable: boolean };
+}> {
+  const contextHint = request.context ? `\nContext: This is from a ${request.context}.` : '';
+  const sourceHint = request.source_language !== 'auto'
+    ? `The source language is ${request.source_language}.`
+    : 'Detect the source language.';
+
+  const systemPrompt = `You are a translation assistant for game UI text. Always respond with valid JSON only, no markdown formatting.`;
+
+  const userPrompt = `${contextHint}
+
+Task: Extract all visible text from this image and translate it to ${request.target_language}.
+${sourceHint}
+
+Response format (JSON only, no markdown):
+{
+  "detected_text": "original text from image",
+  "translated_text": "translation in ${request.target_language}",
+  "detected_language": "ISO 639-1 code of source language"
+}
+
+If no text is visible, respond with:
+{
+  "detected_text": "",
+  "translated_text": "",
+  "detected_language": ""
+}`;
+
+  const openaiRequest: OpenAIRequest = {
+    model: modelName,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: userPrompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:${request.mime_type};base64,${request.image_base64}`,
+              detail: 'high',
+            },
+          },
+        ],
+      },
+    ],
+    max_tokens: 1024,
+    temperature: 0.1,
+  };
+
+  const url = `${OPENAI_API_BASE}/chat/completions`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openaiRequest),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`OpenAI API error: status=${response.status}, body=${errorBody}`);
+
+      if (response.status === 429) {
+        return {
+          success: false,
+          error: { code: 'RATE_LIMITED', message: 'OpenAI API rate limit exceeded', isRetryable: true },
+        };
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          error: { code: 'API_ERROR', message: 'OpenAI API authentication failed', isRetryable: false },
+        };
+      }
+
+      if (response.status === 402) {
+        return {
+          success: false,
+          error: { code: 'PAYMENT_REQUIRED', message: 'OpenAI API credit exhausted', isRetryable: false },
+        };
+      }
+
+      return {
+        success: false,
+        error: { code: 'API_ERROR', message: `OpenAI API error: ${response.status}`, isRetryable: response.status >= 500 },
+      };
+    }
+
+    const openaiResponse = await response.json() as OpenAIResponse;
+
+    if (openaiResponse.error) {
+      return {
+        success: false,
+        error: { code: 'API_ERROR', message: openaiResponse.error.message, isRetryable: false },
+      };
+    }
+
+    const textContent = openaiResponse.choices?.[0]?.message?.content;
+    if (!textContent) {
+      return {
+        success: false,
+        error: { code: 'API_ERROR', message: 'No content in OpenAI response', isRetryable: false },
+      };
+    }
+
+    // JSONをパース
+    const parsed = parseAiJsonResponse(textContent);
+    if (!parsed) {
+      console.error(`Failed to parse OpenAI response as JSON: ${textContent}`);
+      return {
+        success: false,
+        error: { code: 'API_ERROR', message: 'Invalid JSON response from OpenAI', isRetryable: false },
+      };
+    }
+
+    const usage = openaiResponse.usage;
+
+    return {
+      success: true,
+      detectedText: parsed.detected_text || '',
+      translatedText: parsed.translated_text || '',
+      detectedLanguage: parsed.detected_language,
+      tokenUsage: {
+        input: usage?.prompt_tokens || 0,
+        output: usage?.completion_tokens || 0,
+        image: estimateImageTokens(request.image_base64.length),
+      },
+    };
+  } catch (error) {
+    console.error('OpenAI API call failed:', error);
+
+    // タイムアウトエラーの判定
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return {
+        success: false,
+        error: { code: 'TIMEOUT', message: `OpenAI API request timed out after ${API_TIMEOUT_MS}ms`, isRetryable: true },
+      };
+    }
+
+    return {
+      success: false,
+      error: { code: 'NETWORK_ERROR', message: 'Failed to connect to OpenAI API', isRetryable: true },
     };
   }
 }
@@ -531,14 +760,51 @@ export async function handleTranslate(
       processing_time_ms: processingTimeMs,
     };
 
-    console.log(`Translate success: requestId=${requestId}, userId=${session.userId}, plan=${plan}, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
+    console.log(`Translate success: requestId=${requestId}, userId=${session.userId}, plan=${plan}, provider=gemini, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
 
     return successResponse(response, origin, allowedOrigins);
   }
 
   if (translateRequest.provider === 'openai') {
-    // Phase 2ではOpenAI APIはスタブ
-    return errorResponse(requestId, 'NOT_IMPLEMENTED', 'OpenAI provider is not yet implemented', false, 501, origin, allowedOrigins);
+    if (!env.OPENAI_API_KEY) {
+      return errorResponse(requestId, 'NOT_IMPLEMENTED', 'OpenAI API is not configured', false, 503, origin, allowedOrigins);
+    }
+
+    const modelName = env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+    const result = await translateWithOpenAI(translateRequest, env.OPENAI_API_KEY, modelName);
+    const processingTimeMs = Date.now() - startTime;
+
+    if (!result.success) {
+      return errorResponse(
+        requestId,
+        result.error!.code,
+        result.error!.message,
+        result.error!.isRetryable,
+        result.error!.code === 'RATE_LIMITED' ? 429 : (result.error!.code === 'PAYMENT_REQUIRED' ? 402 : 500),
+        origin,
+        allowedOrigins,
+        processingTimeMs
+      );
+    }
+
+    const response: TranslateResponse = {
+      success: true,
+      request_id: requestId,
+      detected_text: result.detectedText,
+      translated_text: result.translatedText,
+      detected_language: result.detectedLanguage,
+      provider_id: 'openai',
+      token_usage: result.tokenUsage ? {
+        input_tokens: result.tokenUsage.input,
+        output_tokens: result.tokenUsage.output,
+        image_tokens: result.tokenUsage.image,
+      } : undefined,
+      processing_time_ms: processingTimeMs,
+    };
+
+    console.log(`Translate success: requestId=${requestId}, userId=${session.userId}, plan=${plan}, provider=openai, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
+
+    return successResponse(response, origin, allowedOrigins);
   }
 
   return errorResponse(requestId, 'VALIDATION_ERROR', 'Invalid provider', false, 400, origin, allowedOrigins);
