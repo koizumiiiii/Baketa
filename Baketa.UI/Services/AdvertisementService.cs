@@ -126,8 +126,15 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
     /// <param name="e">Event arguments</param>
     private async void OnAuthStatusChanged(object? sender, AuthStatusChangedEventArgs e)
     {
-        _logger.LogDebug("認証状態変更を検出: IsLoggedIn={IsLoggedIn}", e.IsLoggedIn);
-        await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+        try
+        {
+            _logger.LogDebug("認証状態変更を検出: IsLoggedIn={IsLoggedIn}", e.IsLoggedIn);
+            await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "認証状態変更処理中にエラーが発生しました");
+        }
     }
 
     /// <summary>
@@ -137,8 +144,15 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
     /// <param name="e">Event arguments</param>
     private async void OnPlanChanged(object? sender, UserPlanChangedEventArgs e)
     {
-        _logger.LogInformation("プラン変更を検出: {OldPlan} → {NewPlan}", e.OldPlan, e.NewPlan);
-        await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+        try
+        {
+            _logger.LogInformation("プラン変更を検出: {OldPlan} → {NewPlan}", e.OldPlan, e.NewPlan);
+            await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "プラン変更処理中にエラーが発生しました");
+        }
     }
 
     /// <summary>
