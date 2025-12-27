@@ -113,6 +113,10 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<IDisposable>(provider =>
             provider.GetRequiredService<UserPlanServiceAdapter>());
 
+        // 📢 広告サービスの登録（Issue #174: WebView統合）
+        // IUserPlanServiceに依存するため、UserPlanServiceAdapter登録後に配置
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IAdvertisementService, AdvertisementService>();
+
         // ウィンドウ選択ダイアログサービス（UIレイヤー）
         services.AddSingleton<Baketa.Application.Services.UI.IWindowSelectionDialogService, WindowSelectionDialogService>();
 

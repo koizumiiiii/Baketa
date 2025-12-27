@@ -37,14 +37,16 @@ public static class UIServiceCollectionExtensions
             configuration.GetSection("GpuSettings"));
 
         // 基本サービスの登録
-        services.AddSingleton<IUserPlanService, UserPlanService>();
+        // NOTE: IUserPlanServiceとIAdvertisementServiceはUIModule.csで登録
+        //       ILicenseManagerに依存するため、UIModuleで統合管理
+
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
         services.AddSingleton<SettingsFileManager>();
 
-        // 📢 広告サービスの登録（Issue #174: WebView統合）
-        services.AddSingleton<Baketa.Core.Abstractions.Services.IAdvertisementService, AdvertisementService>();
+        // NOTE: 広告サービス（IAdvertisementService）はUIModule.csで登録
+        //       IUserPlanServiceへの依存があるため、UIModuleで統合管理
 
         // ファイルダイアログ・エクスポート/インポートサービスの登録
         services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
@@ -107,7 +109,8 @@ public static class UIServiceCollectionExtensions
         });
 
         // テスト用サービス
-        services.AddSingleton<IUserPlanService, UserPlanService>();
+        // NOTE: IUserPlanServiceはUIModule.csでUserPlanServiceAdapterとして登録
+        // services.AddSingleton<IUserPlanService, UserPlanService>();  // 削除
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
