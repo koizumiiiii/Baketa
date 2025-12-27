@@ -259,6 +259,15 @@
   <data name="Settings_General_AlphaNote" xml:space="preserve">
     <value>※ αテストではオフライン翻訳のみ利用可能</value>
   </data>
+  <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
+    <value>Pro/Premiaプランで利用可能</value>
+  </data>
+  <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
+    <value>今月の使用量:</value>
+  </data>
+  <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
+    <value>トークン</value>
+  </data>
   <data name="Settings_General_TranslationLanguage" xml:space="preserve">
     <value>翻訳言語</value>
   </data>
@@ -1171,6 +1180,23 @@
   </data>
   <data name="Loading_SetupGpu" xml:space="preserve">
     <value>GPU環境をセットアップしています...</value>
+  </data>
+
+  <!-- [Issue #78 Phase 5] Token Usage Alerts -->
+  <data name="TokenUsage_Warning_Title" xml:space="preserve">
+    <value>トークン使用量警告</value>
+  </data>
+  <data name="TokenUsage_Warning80_Message" xml:space="preserve">
+    <value>今月のCloud AIトークンを80%使用しました（残り: {0}）</value>
+  </data>
+  <data name="TokenUsage_Warning90_Message" xml:space="preserve">
+    <value>今月のCloud AIトークンを90%使用しました（残り: {0}）</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
+    <value>トークン上限到達</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
+    <value>今月のCloud AIトークン上限に達しました。ローカル翻訳に自動切替します。</value>
   </data>
 
 </root>

@@ -164,6 +164,7 @@ public static class Strings
     public static string Settings_General_OfflineTranslation => GetString("Settings_General_OfflineTranslation");
     public static string Settings_General_AITranslation => GetString("Settings_General_AITranslation");
     public static string Settings_General_AlphaNote => GetString("Settings_General_AlphaNote");
+    public static string Settings_General_CloudTranslationUpgradeNote => GetString("Settings_General_CloudTranslationUpgradeNote");
     public static string Settings_General_TranslationLanguage => GetString("Settings_General_TranslationLanguage");
     public static string Settings_General_TranslationLanguageDescription => GetString("Settings_General_TranslationLanguageDescription");
     public static string Settings_General_FontSize => GetString("Settings_General_FontSize");
@@ -507,4 +508,17 @@ public static class Strings
     public static string Loading_InitializingTranslation => GetString("Loading_InitializingTranslation");
     public static string Loading_PreparingUI => GetString("Loading_PreparingUI");
     public static string Loading_SetupGpu => GetString("Loading_SetupGpu");
+
+    // ========== [Issue #78 Phase 5] Token Usage Alerts ==========
+
+    public static string TokenUsage_Warning_Title => GetString("TokenUsage_Warning_Title");
+    public static string TokenUsage_Warning80_Message => GetString("TokenUsage_Warning80_Message");
+    public static string TokenUsage_Warning90_Message => GetString("TokenUsage_Warning90_Message");
+    public static string TokenUsage_Exceeded_Title => GetString("TokenUsage_Exceeded_Title");
+    public static string TokenUsage_Exceeded_Message => GetString("TokenUsage_Exceeded_Message");
+
+    // ========== [Issue #78 Phase 5] Cloud Usage Display ==========
+
+    public static string Settings_General_CloudUsageLabel => GetString("Settings_General_CloudUsageLabel");
+    public static string Settings_General_CloudUsageTokens => GetString("Settings_General_CloudUsageTokens");
 }

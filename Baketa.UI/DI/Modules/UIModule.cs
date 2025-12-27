@@ -171,6 +171,9 @@ internal sealed class UIModule : ServiceModuleBase
         // 🔐 [Issue #168] TokenExpirationHandler - トークン失効時の処理ハンドラー
         services.AddSingleton<TokenExpirationHandler>();
 
+        // 🔔 [Issue #78 Phase 5] TokenUsageAlertService - トークン使用量80%/90%/100%警告通知
+        services.AddSingleton<TokenUsageAlertService>();
+
         // ウィンドウ管理
         // 例: services.AddSingleton<IWindowService, AvaloniaWindowService>();
 

@@ -830,7 +830,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     }
 
     /// <summary>
-    /// [Issue #78 Phase 4] 並列翻訳を使用すべきかを判定
+    /// [Issue #78 Phase 4/5] 並列翻訳を使用すべきかを判定
     /// </summary>
     /// <param name="eventData">集約チャンクイベントデータ</param>
     /// <returns>並列翻訳を使用すべき場合true</returns>
@@ -851,9 +851,19 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         }
 
         // Cloud AI翻訳機能が利用可能か（Pro/Premiaプラン）
+        // 注意: ライセンスチェックを設定取得より先に行うことで、
+        // Free/Standardユーザーの場合は不要な設定取得をスキップ
         if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
         {
             _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: Cloud AI翻訳機能が無効（Free/Standardプラン）");
+            return false;
+        }
+
+        // [Issue #78 Phase 5] ユーザー設定でCloud AI翻訳が有効か
+        var translationSettings = _unifiedSettingsService.GetTranslationSettings();
+        if (!translationSettings.EnableCloudAiTranslation)
+        {
+            _logger?.LogDebug("🔍 [Phase5] 並列翻訳スキップ: Cloud AI翻訳が設定で無効");
             return false;
         }
 
@@ -872,7 +882,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             return false;
         }
 
-        _logger?.LogDebug("✅ [Phase4] 並列翻訳使用: 全条件クリア");
+        _logger?.LogDebug("✅ [Phase4/5] 並列翻訳使用: 全条件クリア");
         return true;
     }
 

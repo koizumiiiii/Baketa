@@ -259,6 +259,15 @@
   <data name="Settings_General_AlphaNote" xml:space="preserve">
     <value>* Only offline translation is available in alpha test</value>
   </data>
+  <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
+    <value>Available with Pro/Premia plan</value>
+  </data>
+  <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
+    <value>This month's usage:</value>
+  </data>
+  <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
+    <value>tokens</value>
+  </data>
   <data name="Settings_General_TranslationLanguage" xml:space="preserve">
     <value>Translation Language</value>
   </data>
@@ -1171,6 +1180,23 @@
   </data>
   <data name="Loading_SetupGpu" xml:space="preserve">
     <value>Setting up GPU environment...</value>
+  </data>
+
+  <!-- [Issue #78 Phase 5] Token Usage Alerts -->
+  <data name="TokenUsage_Warning_Title" xml:space="preserve">
+    <value>Token Usage Warning</value>
+  </data>
+  <data name="TokenUsage_Warning80_Message" xml:space="preserve">
+    <value>You've used 80% of your Cloud AI tokens this month (remaining: {0})</value>
+  </data>
+  <data name="TokenUsage_Warning90_Message" xml:space="preserve">
+    <value>You've used 90% of your Cloud AI tokens this month (remaining: {0})</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
+    <value>Token Limit Reached</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
+    <value>You've reached your Cloud AI token limit. Switching to local translation.</value>
   </data>
 
 </root>
