@@ -113,6 +113,10 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<IDisposable>(provider =>
             provider.GetRequiredService<UserPlanServiceAdapter>());
 
+        // 📢 広告サービスの登録（Issue #174: WebView統合）
+        // IUserPlanServiceに依存するため、UserPlanServiceAdapter登録後に配置
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IAdvertisementService, AdvertisementService>();
+
         // ウィンドウ選択ダイアログサービス（UIレイヤー）
         services.AddSingleton<Baketa.Application.Services.UI.IWindowSelectionDialogService, WindowSelectionDialogService>();
 
@@ -170,6 +174,9 @@ internal sealed class UIModule : ServiceModuleBase
 
         // 🔐 [Issue #168] TokenExpirationHandler - トークン失効時の処理ハンドラー
         services.AddSingleton<TokenExpirationHandler>();
+
+        // 🔔 [Issue #78 Phase 5] TokenUsageAlertService - トークン使用量80%/90%/100%警告通知
+        services.AddSingleton<TokenUsageAlertService>();
 
         // ウィンドウ管理
         // 例: services.AddSingleton<IWindowService, AvaloniaWindowService>();

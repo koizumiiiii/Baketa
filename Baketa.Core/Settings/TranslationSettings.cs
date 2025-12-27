@@ -131,6 +131,14 @@ public sealed class TranslationSettings : ITranslationSettings
     public bool EnableParallelTranslation { get; set; } = true;
 
     /// <summary>
+    /// [Issue #78 Phase 5] Cloud AI翻訳の有効化（Pro/Premiaプラン専用）
+    /// ローカルOCRとCloud AI翻訳を並列実行し、相互検証で高品質な翻訳を実現
+    /// </summary>
+    [SettingMetadata(SettingLevel.Basic, "Translation", "Cloud AI翻訳",
+        Description = "Cloud AI翻訳を使用して翻訳品質を向上させます（Pro/Premiaプラン専用）")]
+    public bool EnableCloudAiTranslation { get; set; } = true;
+
+    /// <summary>
     /// 最大並列翻訳数
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "最大並列数",
@@ -441,6 +449,8 @@ public sealed class TranslationSettings : ITranslationSettings
             DuplicateSimilarityThreshold = DuplicateSimilarityThreshold,
             EnableParallelTranslation = EnableParallelTranslation,
             MaxParallelTranslations = MaxParallelTranslations,
+            // [Issue #78 Phase 5] Cloud AI翻訳設定
+            EnableCloudAiTranslation = EnableCloudAiTranslation,
             CacheRetentionHours = CacheRetentionHours,
             MaxCacheEntries = MaxCacheEntries,
             EncryptApiKeys = EncryptApiKeys,

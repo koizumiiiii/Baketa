@@ -36,10 +36,11 @@ public sealed class LicenseSettings
 
     /// <summary>
     /// トークン使用量警告閾値（%）
+    /// [Issue #78 Phase 5] 80%到達で警告表示
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "License", "Token Warning Threshold",
         Description = "トークン使用量がこの割合に達したら警告を表示")]
-    public int TokenWarningThresholdPercent { get; set; } = 75;
+    public int TokenWarningThresholdPercent { get; set; } = 80;
 
     /// <summary>
     /// トークン使用量危険閾値（%）

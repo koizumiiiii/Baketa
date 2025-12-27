@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
@@ -35,6 +36,7 @@ public static class SettingsModule
             var localizationService = provider.GetService<ILocalizationService>();
             var changeTracker = provider.GetService<ISettingsChangeTracker>();
             var logger = provider.GetService<ILogger<GeneralSettingsViewModel>>();
+            var licenseManager = provider.GetService<ILicenseManager>();
 
             // ランタイムで設定を読み込む
             var generalSettings = settingsService.GetCategorySettings<GeneralSettings>() ?? new GeneralSettings();
@@ -46,7 +48,8 @@ public static class SettingsModule
                 localizationService,
                 changeTracker,
                 logger,
-                translationSettings);
+                translationSettings,
+                licenseManager);
         });
 
         // アカウント設定ViewModel

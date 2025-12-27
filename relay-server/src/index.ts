@@ -10,6 +10,7 @@
  * - Webhooks（リアルタイムサブスク変更検知）
  * - レートリミット
  * - シングルデバイス強制（他デバイスでログイン時に元デバイスをログアウト）
+ * - Cloud AI翻訳（Gemini API経由）
  *
  * セキュリティ:
  * - タイミング攻撃対策（timingSafeCompare）
@@ -21,6 +22,8 @@
  *     stateの生成・保存・検証もクライアントで完結。
  *     リレーサーバーはstateを透過的に転送するのみ。
  */
+
+import { handleTranslate, TranslateEnv } from './translate';
 
 // ============================================
 // 定数
@@ -77,6 +80,10 @@ export interface Env {
   API_KEY: string;
   ENVIRONMENT?: string;
   SESSIONS: KVNamespace;
+  GEMINI_API_KEY?: string;   // Cloud AI翻訳用
+  GEMINI_MODEL?: string;     // Geminiモデル名（デフォルト: gemini-2.5-flash-lite）
+  OPENAI_API_KEY?: string;   // Cloud AI翻訳用
+  OPENAI_MODEL?: string;     // OpenAIモデル名（デフォルト: gpt-4.1-nano）
 }
 
 interface SessionData {
@@ -812,6 +819,8 @@ export default {
           return handlePatreonRevoke(request, env, origin, allowedOrigins);
         case '/api/patreon/revoke-all':
           return handlePatreonRevokeAll(request, env, origin, allowedOrigins);
+        case '/api/translate':
+          return handleTranslate(request, env as TranslateEnv, origin, allowedOrigins);
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');
       }

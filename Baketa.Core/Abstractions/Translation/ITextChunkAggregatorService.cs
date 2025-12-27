@@ -7,6 +7,10 @@ namespace Baketa.Core.Abstractions.Translation;
 /// Phase 26-1: Clean Architecture修正 - Application層でのInfrastructure層抽象化
 /// 翻訳品質向上のための文章ぶつ切り防止機能を提供します
 /// </summary>
+/// <remarks>
+/// Issue #78 Phase 4: Cloud AI翻訳統合
+/// - SetImageContext を追加（並列翻訳用画像データ設定）
+/// </remarks>
 public interface ITextChunkAggregatorService
 {
     /// <summary>
@@ -34,4 +38,18 @@ public interface ITextChunkAggregatorService
     /// 現在の集約待機チャンク数を取得します
     /// </summary>
     int PendingChunksCount { get; }
+
+    /// <summary>
+    /// [Issue #78 Phase 4] Cloud AI翻訳用の画像コンテキストを設定
+    /// 次回のAggregatedChunksReadyEvent発行時に画像データが含まれます
+    /// </summary>
+    /// <param name="imageBase64">画像データ（Base64エンコード）</param>
+    /// <param name="width">画像幅</param>
+    /// <param name="height">画像高さ</param>
+    void SetImageContext(string imageBase64, int width, int height);
+
+    /// <summary>
+    /// [Issue #78 Phase 4] 画像コンテキストをクリア
+    /// </summary>
+    void ClearImageContext();
 }

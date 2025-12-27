@@ -126,8 +126,15 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
     /// <param name="e">Event arguments</param>
     private async void OnAuthStatusChanged(object? sender, AuthStatusChangedEventArgs e)
     {
-        _logger.LogDebug("認証状態変更を検出: IsLoggedIn={IsLoggedIn}", e.IsLoggedIn);
-        await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+        try
+        {
+            _logger.LogDebug("認証状態変更を検出: IsLoggedIn={IsLoggedIn}", e.IsLoggedIn);
+            await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "認証状態変更処理中にエラーが発生しました");
+        }
     }
 
     /// <summary>
@@ -137,8 +144,15 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
     /// <param name="e">Event arguments</param>
     private async void OnPlanChanged(object? sender, UserPlanChangedEventArgs e)
     {
-        _logger.LogInformation("プラン変更を検出: {OldPlan} → {NewPlan}", e.OldPlan, e.NewPlan);
-        await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+        try
+        {
+            _logger.LogInformation("プラン変更を検出: {OldPlan} → {NewPlan}", e.OldPlan, e.NewPlan);
+            await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "プラン変更処理中にエラーが発生しました");
+        }
     }
 
     /// <summary>
@@ -148,16 +162,18 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
     {
         try
         {
-            // Check if user is authenticated
+            // プランがFree以外なら広告非表示（認証状態に関係なく）
+            // モックモードでもプラン設定が正しく反映されるようにする
+            var currentPlan = _userPlanService.CurrentPlan;
+            var isPaidPlan = currentPlan != UserPlanType.Free;
+
+            // 認証状態は参考情報としてログ出力のみ
             var session = await _authService.GetCurrentSessionAsync().ConfigureAwait(false);
             var isAuthenticated = session != null;
 
-            // Check if user has premium plan
-            var isPremium = isAuthenticated && _userPlanService.CurrentPlan == UserPlanType.Premium;
-
-            // Show ads for free plan users and unauthenticated users
-            var shouldShow = !isPremium;
-            var reason = isPremium ? "Premium plan" : "Free plan or not logged in";
+            // Free以外のプランなら広告を非表示
+            var shouldShow = !isPaidPlan;
+            var reason = isPaidPlan ? $"Paid plan ({currentPlan})" : "Free plan";
 
             if (ShouldShowAd != shouldShow)
             {

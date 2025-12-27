@@ -38,6 +38,12 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     private DateTime _lastTimerReset;
     private volatile int _nextChunkId;
 
+    // [Issue #78 Phase 4] Cloud AI翻訳用画像コンテキスト
+    private string? _currentImageBase64;
+    private int _currentImageWidth;
+    private int _currentImageHeight;
+    private readonly object _imageContextLock = new();
+
     public TimedChunkAggregator(
         IOptionsMonitor<TimedAggregatorSettings> settings,
         CoordinateBasedLineBreakProcessor lineBreakProcessor,
@@ -413,9 +419,14 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                         CaptureRegion = allChunks.First().CaptureRegion
                     };
 
+                    // [Issue #78 Phase 4] 画像コンテキストを含めてイベント発行
+                    var imageContext = GetAndClearImageContext();
                     var aggregatedEvent = new AggregatedChunksReadyEvent(
                         new List<TextChunk> { fallbackChunk }.AsReadOnly(),
-                        fallbackChunk.SourceWindowHandle
+                        fallbackChunk.SourceWindowHandle,
+                        imageContext.ImageBase64,
+                        imageContext.Width,
+                        imageContext.Height
                     );
 
                     await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
@@ -482,9 +493,15 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             if (allAggregatedChunks.Count > 0)
             {
                 var windowHandle = allAggregatedChunks.FirstOrDefault()?.SourceWindowHandle ?? IntPtr.Zero;
+
+                // [Issue #78 Phase 4] 画像コンテキストを含めてイベント発行
+                var imageContext = GetAndClearImageContext();
                 var aggregatedEvent = new AggregatedChunksReadyEvent(
                     allAggregatedChunks.AsReadOnly(),
-                    windowHandle
+                    windowHandle,
+                    imageContext.ImageBase64,
+                    imageContext.Width,
+                    imageContext.Height
                 );
 
                 await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
@@ -680,6 +697,59 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     public (long TotalChunksProcessed, long TotalAggregationEvents) GetStatistics()
     {
         return (Interlocked.Read(ref _totalChunksProcessed), Interlocked.Read(ref _totalAggregationEvents));
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 4] Cloud AI翻訳用の画像コンテキストを設定
+    /// 次回のAggregatedChunksReadyEvent発行時に画像データが含まれます
+    /// </summary>
+    /// <param name="imageBase64">画像データ（Base64エンコード）</param>
+    /// <param name="width">画像幅</param>
+    /// <param name="height">画像高さ</param>
+    public void SetImageContext(string imageBase64, int width, int height)
+    {
+        lock (_imageContextLock)
+        {
+            _currentImageBase64 = imageBase64;
+            _currentImageWidth = width;
+            _currentImageHeight = height;
+
+            _logger.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height}, Base64Length={Length}",
+                width, height, imageBase64?.Length ?? 0);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 4] 画像コンテキストをクリア
+    /// </summary>
+    public void ClearImageContext()
+    {
+        lock (_imageContextLock)
+        {
+            _currentImageBase64 = null;
+            _currentImageWidth = 0;
+            _currentImageHeight = 0;
+
+            _logger.LogDebug("[Issue #78] 画像コンテキストクリア");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 4] 現在の画像コンテキストを取得
+    /// </summary>
+    private (string? ImageBase64, int Width, int Height) GetAndClearImageContext()
+    {
+        lock (_imageContextLock)
+        {
+            var result = (_currentImageBase64, _currentImageWidth, _currentImageHeight);
+
+            // 使用後にクリア（次回のイベント発行で再利用されないように）
+            _currentImageBase64 = null;
+            _currentImageWidth = 0;
+            _currentImageHeight = 0;
+
+            return result;
+        }
     }
 
     public void Dispose()

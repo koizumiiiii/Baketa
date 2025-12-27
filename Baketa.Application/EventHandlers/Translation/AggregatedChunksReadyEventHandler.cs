@@ -5,15 +5,17 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.License; // [Issue #78 Phase 4] ILicenseManager用
 using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager統一インターフェース用
-using Baketa.Core.Events.EventTypes; // 🔥 [INDIVIDUAL_TRANSLATION_EVENT] TranslationWithBoundsCompletedEvent用
 using Baketa.Core.Events.Translation;
+using Baketa.Core.License.Models; // [Issue #78 Phase 4] FeatureType用
 using Baketa.Core.Models.Translation;
+using Baketa.Core.Models.Validation; // [Issue #78 Phase 4] ValidatedTextChunk用
+using Baketa.Core.Translation.Abstractions; // [Issue #78 Phase 4] IParallelTranslationOrchestrator用
 using Baketa.Core.Translation.Models;
-using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 using Language = Baketa.Core.Translation.Models.Language;
 
@@ -41,6 +43,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly ILogger<AggregatedChunksReadyEventHandler> _logger;
     private readonly ICoordinateTransformationService _coordinateTransformationService; // 🔥 [COORDINATE_FIX]
     private readonly Core.Abstractions.Settings.IUnifiedSettingsService _unifiedSettingsService;
+    // [Issue #78 Phase 4] 並列翻訳オーケストレーター
+    private readonly IParallelTranslationOrchestrator? _parallelTranslationOrchestrator;
+    private readonly ILicenseManager? _licenseManager;
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
@@ -51,7 +56,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         ILogger<AggregatedChunksReadyEventHandler> logger,
         ICoordinateTransformationService coordinateTransformationService, // 🔥 [COORDINATE_FIX]
         Core.Abstractions.Settings.IUnifiedSettingsService unifiedSettingsService,
-        IStreamingTranslationService? streamingTranslationService = null)
+        IStreamingTranslationService? streamingTranslationService = null,
+        // [Issue #78 Phase 4] 並列翻訳オーケストレーター（オプショナル）
+        IParallelTranslationOrchestrator? parallelTranslationOrchestrator = null,
+        ILicenseManager? licenseManager = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -61,6 +69,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService)); // 🔥 [COORDINATE_FIX]
         _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _streamingTranslationService = streamingTranslationService;
+        // [Issue #78 Phase 4] 並列翻訳オーケストレーター
+        _parallelTranslationOrchestrator = parallelTranslationOrchestrator;
+        _licenseManager = licenseManager;
     }
 
     /// <inheritdoc />
@@ -137,7 +148,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
             _logger.LogInformation("🔥 [PHASE12.2] 集約チャンク受信 - {Count}個, SessionId: {SessionId}",
                 eventData.AggregatedChunks.Count, eventData.SessionId);
-            _logger.LogCritical("✅✅✅ [PHASE12.2_NEW_ARCH] AggregatedChunksReadyEventHandler開始. SessionId: {SessionId}", eventData.SessionId);
+            // [Code Review] LogCritical → LogDebug に変更（通常処理の開始ログにCriticalは不適切）
+            _logger.LogDebug("✅✅✅ [PHASE12.2_NEW_ARCH] AggregatedChunksReadyEventHandler開始. SessionId: {SessionId}", eventData.SessionId);
 
             // 集約されたチャンクをリストに変換
             var aggregatedChunks = eventData.AggregatedChunks.ToList();
@@ -247,16 +259,93 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 return;
             }
 
-            // バッチ翻訳実行
-            _logger?.LogDebug($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
-            Console.WriteLine($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
+            // [Issue #78 Phase 4] Cloud AI翻訳が利用可能かチェック
+            var useParallelTranslation = ShouldUseParallelTranslation(eventData);
 
-            var translationResults = await ExecuteBatchTranslationAsync(
-                nonEmptyChunks,
-                CancellationToken.None).ConfigureAwait(false);
+            List<string> translationResults;
 
-            _logger?.LogDebug($"✅✅✅ [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync完了 - 結果数: {translationResults.Count}");
-            Console.WriteLine($"✅✅✅ [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync完了 - 結果数: {translationResults.Count}");
+            if (useParallelTranslation)
+            {
+                // [Issue #78 Phase 4] 並列翻訳（ローカル + Cloud AI）を実行
+                _logger?.LogDebug("🌐 [Phase4] 並列翻訳モード開始 - ChunkCount: {Count}", nonEmptyChunks.Count);
+#if DEBUG
+                Console.WriteLine($"🌐 [Phase4] 並列翻訳モード開始 - ChunkCount: {nonEmptyChunks.Count}");
+#endif
+
+                // [Code Review] タイムアウト付きキャンセルトークン（Cloud AI翻訳は最大60秒）
+                using var parallelCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+                var parallelResult = await ExecuteParallelTranslationAsync(
+                    nonEmptyChunks,
+                    eventData,
+                    parallelCts.Token).ConfigureAwait(false);
+
+                if (parallelResult.IsSuccess && parallelResult.ValidatedChunks.Count > 0)
+                {
+                    // ValidatedChunksから翻訳結果を取得
+                    translationResults = parallelResult.ValidatedChunks
+                        .Select(v => v.TranslatedText)
+                        .ToList();
+
+                    // [Code Review] 相互検証でチャンク数が変化した場合は警告
+                    var originalChunkCount = nonEmptyChunks.Count;
+
+                    // nonEmptyChunksをValidatedChunksのOriginalChunkで更新（座標情報保持）
+                    nonEmptyChunks = parallelResult.ValidatedChunks
+                        .Select(v => v.OriginalChunk)
+                        .ToList();
+
+                    if (originalChunkCount != nonEmptyChunks.Count)
+                    {
+                        _logger?.LogWarning(
+                            "⚠️ [Phase4] 相互検証でチャンク数が変化: {Original} → {Validated}（フィルタリングまたは統合/分割）",
+                            originalChunkCount, nonEmptyChunks.Count);
+                    }
+
+                    _logger?.LogDebug("✅ [Phase4] 並列翻訳完了 - Engine: {Engine}, 結果数: {Count}",
+                        parallelResult.EngineUsed, translationResults.Count);
+#if DEBUG
+                    Console.WriteLine($"✅ [Phase4] 並列翻訳完了 - Engine: {parallelResult.EngineUsed}, 結果数: {translationResults.Count}");
+#endif
+
+                    // 統計ログ
+                    if (parallelResult.ValidationStatistics != null)
+                    {
+                        _logger?.LogInformation(
+                            "📊 [Phase4] 相互検証統計: AcceptanceRate={Rate:P1}, CrossValidated={CrossValidated}, LocalOnly={LocalOnly}, Rescued={Rescued}",
+                            parallelResult.ValidationStatistics.AcceptanceRate,
+                            parallelResult.ValidationStatistics.CrossValidatedCount,
+                            parallelResult.ValidationStatistics.LocalOnlyCount,
+                            parallelResult.ValidationStatistics.RescuedCount);
+                    }
+                }
+                else
+                {
+                    // 並列翻訳失敗 → ローカル翻訳にフォールバック
+                    _logger?.LogWarning("⚠️ [Phase4] 並列翻訳失敗 - ローカル翻訳にフォールバック: {Error}",
+                        parallelResult.Error?.Message ?? "不明");
+#if DEBUG
+                    Console.WriteLine($"⚠️ [Phase4] 並列翻訳失敗 - ローカル翻訳にフォールバック");
+#endif
+
+                    translationResults = await ExecuteBatchTranslationAsync(
+                        nonEmptyChunks,
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                // 従来のローカル翻訳のみ
+                _logger?.LogDebug($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
+                Console.WriteLine($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
+
+                translationResults = await ExecuteBatchTranslationAsync(
+                    nonEmptyChunks,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+
+            _logger?.LogDebug($"✅✅✅ [PHASE12.2_HANDLER] 翻訳完了 - 結果数: {translationResults.Count}");
+            Console.WriteLine($"✅✅✅ [PHASE12.2_HANDLER] 翻訳完了 - 結果数: {translationResults.Count}");
 
 #if DEBUG
             // 🚨 [ULTRATHINK_TRACE1] 翻訳完了直後トレースログ
@@ -485,7 +574,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private TextChunk NormalizeChunkCoordinates(TextChunk chunk)
     {
         // 座標は前段のPaddleOcrResultConverterで既に絶対座標に変換済みのため、ここでは何もしない。
-        _logger.LogInformation("ℹ️ [COORD_FIX] 座標正規化は不要です。座標は既に絶対値のはずです: ({X},{Y})",
+        // [Code Review] no-opメソッドのためLogDebugに変更（本番ログを汚染しない）
+        _logger.LogDebug("ℹ️ [COORD_FIX] 座標正規化は不要です。座標は既に絶対値のはずです: ({X},{Y})",
             chunk.CombinedBounds.X, chunk.CombinedBounds.Y);
         return chunk;
     }
@@ -609,91 +699,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         }
     }
 
-    /// <summary>
-    /// オーバーレイ表示処理
-    /// CoordinateBasedTranslationService.ProcessBatchTranslationAsync()のオーバーレイ表示処理相当
-    /// </summary>
-    private async Task DisplayTranslationOverlayAsync(
-        List<TextChunk> translatedChunks,
-        IntPtr windowHandle,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            _logger?.LogDebug($"🎯🎯🎯 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync メソッド開始 - ChunkCount: {translatedChunks.Count}");
-            Console.WriteLine($"🎯🎯🎯 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync メソッド開始 - ChunkCount: {translatedChunks.Count}");
-
-            _logger.LogInformation("🎯 [PHASE12.2] インプレースオーバーレイ表示開始 - チャンク数: {Count}",
-                translatedChunks.Count);
-
-            // 翻訳結果の詳細ログ
-            for (int i = 0; i < translatedChunks.Count; i++)
-            {
-                var chunk = translatedChunks[i];
-                _logger?.LogDebug($"   🔍 [PHASE12.2_OVERLAY] チャンク[{i}]: '{chunk.CombinedText}' → '{chunk.TranslatedText}'");
-                _logger.LogDebug("   [{Index}] '{Original}' → '{Translated}'",
-                    i, chunk.CombinedText, chunk.TranslatedText);
-            }
-
-            // 各チャンクをインプレース表示
-            int displayedCount = 0;
-            foreach (var chunk in translatedChunks)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    _logger?.LogDebug($"⚠️ [PHASE12.2_OVERLAY] キャンセル要求検出 - 表示中断");
-                    break;
-                }
-
-                if (chunk.CanShowInPlace() && !string.IsNullOrWhiteSpace(chunk.TranslatedText))
-                {
-                    _logger?.LogDebug($"🔧 [OVERLAY_UNIFICATION] ShowAsync実行開始 - ChunkId: {chunk.ChunkId}");
-                    _logger.LogDebug("🔧 [OVERLAY_UNIFICATION] ShowAsync実行 - ChunkId: {ChunkId}",
-                        chunk.ChunkId);
-
-                    // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()でオーバーレイ表示
-                    var translationSettings = _unifiedSettingsService.GetTranslationSettings();
-                    var content = new OverlayContent
-                    {
-                        Text = chunk.TranslatedText,
-                        OriginalText = chunk.CombinedText,
-                        FontSize = translationSettings.OverlayFontSize
-                    };
-
-                    var position = new OverlayPosition
-                    {
-                        X = chunk.CombinedBounds.X,
-                        Y = chunk.CombinedBounds.Y,
-                        Width = chunk.CombinedBounds.Width,
-                        Height = chunk.CombinedBounds.Height
-                    };
-
-                    await _overlayManager.ShowAsync(content, position).ConfigureAwait(false);
-
-                    displayedCount++;
-                    _logger?.LogDebug($"   ✅ [OVERLAY_UNIFICATION] ShowAsync完了 - ChunkId: {chunk.ChunkId}, 累計表示: {displayedCount}個");
-                    _logger.LogDebug("   ✅ [OVERLAY_UNIFICATION] インプレース表示完了 - ChunkId: {ChunkId}",
-                        chunk.ChunkId);
-                }
-                else
-                {
-                    _logger?.LogDebug($"⚠️ [PHASE12.2_OVERLAY] スキップ - ChunkId: {chunk.ChunkId}, CanShowInPlace: {chunk.CanShowInPlace()}, HasTranslation: {!string.IsNullOrWhiteSpace(chunk.TranslatedText)}");
-                }
-            }
-
-            _logger?.LogDebug($"🎉🎉🎉 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync完了 - 表示数: {displayedCount}/{translatedChunks.Count}");
-            Console.WriteLine($"🎉🎉🎉 [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync完了 - 表示数: {displayedCount}/{translatedChunks.Count}");
-
-            _logger.LogInformation("🎉 [PHASE12.2] 座標ベース翻訳処理完了 - オーバーレイ表示成功");
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogDebug($"❌❌❌ [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync例外: {ex.GetType().Name} - {ex.Message}");
-            Console.WriteLine($"❌❌❌ [PHASE12.2_OVERLAY] DisplayTranslationOverlayAsync例外: {ex.GetType().Name} - {ex.Message}");
-            _logger.LogError(ex, "❌ [PHASE12.2] オーバーレイ表示エラー");
-            throw;
-        }
-    }
+    // [Code Review] 未使用メソッド DisplayTranslationOverlayAsync を削除
+    // HandleAsync 内で直接オーバーレイ表示ロジックを実装済みのため不要
 
     /// <summary>
     /// [Issue #229] ノイズパターンを検出（ボーダーライン緩和の除外条件）
@@ -820,5 +827,131 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 4/5] 並列翻訳を使用すべきかを判定
+    /// </summary>
+    /// <param name="eventData">集約チャンクイベントデータ</param>
+    /// <returns>並列翻訳を使用すべき場合true</returns>
+    private bool ShouldUseParallelTranslation(AggregatedChunksReadyEvent eventData)
+    {
+        // 並列翻訳オーケストレーターが利用可能か
+        if (_parallelTranslationOrchestrator == null)
+        {
+            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: オーケストレーター未登録");
+            return false;
+        }
+
+        // ライセンスマネージャーが利用可能か
+        if (_licenseManager == null)
+        {
+            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: ライセンスマネージャー未登録");
+            return false;
+        }
+
+        // Cloud AI翻訳機能が利用可能か（Pro/Premiaプラン）
+        // 注意: ライセンスチェックを設定取得より先に行うことで、
+        // Free/Standardユーザーの場合は不要な設定取得をスキップ
+        if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
+        {
+            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: Cloud AI翻訳機能が無効（Free/Standardプラン）");
+            return false;
+        }
+
+        // [Issue #78 Phase 5] ユーザー設定でCloud AI翻訳が有効か
+        var translationSettings = _unifiedSettingsService.GetTranslationSettings();
+        if (!translationSettings.EnableCloudAiTranslation)
+        {
+            _logger?.LogDebug("🔍 [Phase5] 並列翻訳スキップ: Cloud AI翻訳が設定で無効");
+            return false;
+        }
+
+        // 画像データが利用可能か
+        if (!eventData.HasImageData)
+        {
+            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: 画像データなし");
+            return false;
+        }
+
+        // セッショントークンが利用可能か
+        var sessionId = _licenseManager.CurrentState.SessionId;
+        if (string.IsNullOrEmpty(sessionId))
+        {
+            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: セッショントークンなし");
+            return false;
+        }
+
+        _logger?.LogDebug("✅ [Phase4/5] 並列翻訳使用: 全条件クリア");
+        return true;
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 4] 並列翻訳を実行
+    /// </summary>
+    /// <param name="chunks">翻訳対象のテキストチャンク</param>
+    /// <param name="eventData">集約チャンクイベントデータ</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>並列翻訳結果</returns>
+    private async Task<ParallelTranslationResult> ExecuteParallelTranslationAsync(
+        List<TextChunk> chunks,
+        AggregatedChunksReadyEvent eventData,
+        CancellationToken cancellationToken)
+    {
+        // 前提条件: このメソッドは ShouldUseParallelTranslation() が true を返した場合のみ呼び出される
+        // したがって、以下の null-forgiving operator (!) は安全:
+        // - _licenseManager: ShouldUseParallelTranslation() で null チェック済み
+        // - _parallelTranslationOrchestrator: ShouldUseParallelTranslation() で null チェック済み
+        // - eventData.ImageBase64: ShouldUseParallelTranslation() で HasImageData チェック済み
+
+        try
+        {
+            // 言語ペアを取得
+            var languagePair = _languageConfig.GetCurrentLanguagePair();
+
+            // セッショントークンを取得（ShouldUseParallelTranslation で存在確認済み）
+            var sessionToken = _licenseManager!.CurrentState.SessionId;
+
+            // 並列翻訳リクエストを作成
+            var request = new ParallelTranslationRequest
+            {
+                OcrChunks = chunks,
+                ImageBase64 = eventData.ImageBase64!, // HasImageData で null でないことが保証済み
+                ImageWidth = eventData.ImageWidth,
+                ImageHeight = eventData.ImageHeight,
+                SourceLanguage = languagePair.SourceCode,
+                TargetLanguage = languagePair.TargetCode,
+                SessionToken = sessionToken,
+                UseCloudTranslation = true,
+                EnableCrossValidation = true
+            };
+
+            _logger?.LogDebug(
+                "🌐 [Phase4] ParallelTranslationRequest作成: Chunks={Chunks}, ImageSize={Width}x{Height}, Lang={Source}→{Target}",
+                chunks.Count, eventData.ImageWidth, eventData.ImageHeight,
+                languagePair.SourceCode, languagePair.TargetCode);
+
+            // 並列翻訳を実行（ShouldUseParallelTranslation で null でないことが保証済み）
+            var result = await _parallelTranslationOrchestrator!.TranslateAsync(request, cancellationToken)
+                .ConfigureAwait(false);
+
+            _logger?.LogInformation(
+                "🌐 [Phase4] 並列翻訳完了: Success={Success}, Engine={Engine}, TotalTime={TotalTime}ms",
+                result.IsSuccess, result.EngineUsed, result.Timing.TotalDuration.TotalMilliseconds);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "❌ [Phase4] 並列翻訳エラー");
+
+            return ParallelTranslationResult.Failure(
+                new TranslationErrorDetail
+                {
+                    Code = TranslationErrorDetail.Codes.InternalError,
+                    Message = ex.Message,
+                    IsRetryable = true
+                });
+        }
     }
 }

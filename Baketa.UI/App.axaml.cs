@@ -570,6 +570,18 @@ internal sealed partial class App : Avalonia.Application
                 {
                     _logger?.LogWarning(singleshotEx, "SingleshotEventProcessor登録失敗");
                 }
+
+                // 🔔 [Issue #78 Phase 5] TokenUsageAlertService初期化
+                // トークン使用量80%/90%/100%到達時のトースト通知サービス
+                try
+                {
+                    _ = serviceProvider.GetRequiredService<Services.TokenUsageAlertService>();
+                    Console.WriteLine("✅ TokenUsageAlertService初期化完了");
+                }
+                catch (Exception alertEx)
+                {
+                    _logger?.LogWarning(alertEx, "TokenUsageAlertService初期化失敗");
+                }
             }
             catch (InvalidOperationException ex)
             {

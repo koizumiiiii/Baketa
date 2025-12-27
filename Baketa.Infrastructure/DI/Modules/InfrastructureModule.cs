@@ -35,6 +35,8 @@ using Baketa.Infrastructure.Services.Setup;
 using Baketa.Infrastructure.Services.Translation;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Local;
+using Baketa.Infrastructure.Validation;
+using Baketa.Core.Abstractions.Validation;
 // 翻訳エンジンをNLLB-200に統一
 using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
@@ -175,6 +177,9 @@ public class InfrastructureModule : ServiceModuleBase
 
         // 翻訳サービス（エンジン登録後）
         RegisterTranslationServices(services);
+
+        // Issue #78: Cloud AI翻訳サービス（Pro/Premia向け）
+        RegisterCloudAIServices(services);
 
         // Step 1: Python環境解決と診断サービス（即座の応急処置）
         RegisterPythonEnvironmentServices(services);
@@ -864,6 +869,123 @@ public class InfrastructureModule : ServiceModuleBase
         yield return typeof(ObjectPoolModule);
         // 🔧 UltraThink Phase 29: TimedAggregatorModule依存追加 - ITextChunkAggregatorService登録確保
         yield return typeof(TimedAggregatorModule);
+    }
+
+    /// <summary>
+    /// Issue #78: Cloud AI翻訳サービスを登録します
+    /// Pro/Premiaプラン向けのCloud AI翻訳機能
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterCloudAIServices(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 Issue #78: Cloud AI翻訳サービス登録開始");
+
+        // Phase 1: 基盤サービス
+        // エンジン状態管理（フォールバック制御）
+        services.AddSingleton<IEngineStatusManager, EngineStatusManager>();
+        Console.WriteLine("✅ IEngineStatusManager登録完了 - フォールバック状態管理");
+
+        // トークン使用量リポジトリ（永続化）
+        services.AddSingleton<ITokenUsageRepository, TokenUsageRepository>();
+        Console.WriteLine("✅ ITokenUsageRepository登録完了 - トークン使用量永続化");
+
+        // トークン消費追跡
+        services.AddSingleton<CoreTranslation.ITokenConsumptionTracker, TokenConsumptionTracker>();
+        Console.WriteLine("✅ ITokenConsumptionTracker登録完了 - トークン消費追跡");
+
+        // エンジンアクセス制御（プラン別制限）
+        services.AddSingleton<IEngineAccessController, EngineAccessController>();
+        Console.WriteLine("✅ IEngineAccessController登録完了 - プラン別アクセス制御");
+
+        // Phase 2: Cloud AI画像翻訳
+        RegisterCloudAIPhase2Services(services);
+
+        // Phase 3: 相互検証ロジック
+        RegisterCloudAIPhase3Services(services);
+
+        Console.WriteLine("🎉 Issue #78: Cloud AI翻訳サービス登録完了");
+    }
+
+    /// <summary>
+    /// Issue #78 Phase 2: Cloud AI画像翻訳サービスを登録します
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterCloudAIPhase2Services(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 Issue #78 Phase 2: Cloud AI画像翻訳サービス登録開始");
+
+        // CloudTranslationSettings設定登録
+        var configurationDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IConfiguration));
+        if (configurationDescriptor?.ImplementationInstance is IConfiguration configuration)
+        {
+            services.Configure<Core.Settings.CloudTranslationSettings>(
+                configuration.GetSection(Core.Settings.CloudTranslationSettings.SectionName));
+            Console.WriteLine("✅ CloudTranslationSettings登録完了 - appsettings.jsonから読み込み");
+        }
+        else
+        {
+            services.Configure<Core.Settings.CloudTranslationSettings>(options =>
+            {
+                options.RelayServerUrl = "https://baketa-relay.suke009.workers.dev";
+                options.TimeoutSeconds = 30;
+                options.MaxRetries = 2;
+                options.PrimaryProviderId = "gemini";
+            });
+            Console.WriteLine("⚠️ CloudTranslationSettings登録完了 - デフォルト値使用");
+        }
+
+        // RelayServerClient登録（HttpClientFactory使用）
+        services.AddHttpClient<Translation.Cloud.RelayServerClient>();
+        Console.WriteLine("✅ RelayServerClient登録完了 - HttpClientFactory使用");
+
+        // Primary Cloud翻訳エンジン（Gemini）- Keyed Service
+        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator, Translation.Cloud.PrimaryCloudTranslator>("primary");
+        Console.WriteLine("✅ PrimaryCloudTranslator登録完了 - Keyed Service [primary]");
+
+        // Secondary Cloud翻訳エンジン（スタブ）- Keyed Service
+        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator, Translation.Cloud.SecondaryCloudTranslator>("secondary");
+        Console.WriteLine("✅ SecondaryCloudTranslator登録完了 - Keyed Service [secondary]");
+
+        // FallbackOrchestrator登録
+        services.AddSingleton<CoreTranslation.IFallbackOrchestrator, Translation.Services.FallbackOrchestrator>();
+        Console.WriteLine("✅ IFallbackOrchestrator登録完了 - 3段階フォールバック制御");
+
+        Console.WriteLine("🎉 Issue #78 Phase 2: Cloud AI画像翻訳サービス登録完了");
+    }
+
+    /// <summary>
+    /// Issue #78 Phase 3: 相互検証ロジックを登録します
+    /// ローカルOCRとCloud AI結果の相互検証・ハルシネーション除去
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterCloudAIPhase3Services(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 Issue #78 Phase 3/3.5: 相互検証ロジック登録開始");
+
+        // ファジーテキストマッチング（レーベンシュタイン距離）
+        services.AddSingleton<IFuzzyTextMatcher, FuzzyTextMatcher>();
+        Console.WriteLine("✅ IFuzzyTextMatcher登録完了 - レーベンシュタイン距離マッチング");
+
+        // 低信頼度テキスト救済
+        services.AddSingleton<IConfidenceRescuer, ConfidenceRescuer>();
+        Console.WriteLine("✅ IConfidenceRescuer登録完了 - 低信頼度テキスト救済");
+
+        // Phase 3.5: 包含マッチング（双方向マッチング）
+        services.AddSingleton<IContainmentMatcher, ContainmentMatcher>();
+        Console.WriteLine("✅ IContainmentMatcher登録完了 - 包含マッチング（統合/分割）");
+
+        // 相互検証（ローカルOCR × Cloud AI）- Phase 3.5対応コンストラクタ
+        services.AddSingleton<ICrossValidator>(provider =>
+        {
+            var fuzzyMatcher = provider.GetRequiredService<IFuzzyTextMatcher>();
+            var rescuer = provider.GetRequiredService<IConfidenceRescuer>();
+            var containmentMatcher = provider.GetRequiredService<IContainmentMatcher>();
+            var logger = provider.GetRequiredService<ILogger<CrossValidator>>();
+            return new CrossValidator(fuzzyMatcher, rescuer, containmentMatcher, logger);
+        });
+        Console.WriteLine("✅ ICrossValidator登録完了 - 相互検証ロジック（Phase 3.5統合）");
+
+        Console.WriteLine("🎉 Issue #78 Phase 3/3.5: 相互検証ロジック登録完了");
     }
 
     /// <summary>

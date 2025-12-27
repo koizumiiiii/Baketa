@@ -172,4 +172,8 @@ internal sealed class TranslationSettingsImpl : ITranslationSettings
     public double ConfidenceThreshold { get; set; }
     public int TimeoutMs { get; set; }
     public int OverlayFontSize { get; set; }
+    /// <summary>
+    /// [Issue #78 Phase 5] Cloud AI翻訳の有効化フラグ
+    /// </summary>
+    public bool EnableCloudAiTranslation { get; set; }
 }

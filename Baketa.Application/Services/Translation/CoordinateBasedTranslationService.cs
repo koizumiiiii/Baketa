@@ -348,6 +348,20 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 _textChangeDetectionService.SetPreviousText(contextId, currentCombinedText);
             }
 
+            // [Issue #78 Phase 4] Cloud AI翻訳用の画像コンテキストを設定
+            try
+            {
+                var imageMemory = image.GetImageMemory();
+                var imageBase64 = Convert.ToBase64String(imageMemory.Span);
+                _textChunkAggregatorService.SetImageContext(imageBase64, image.Width, image.Height);
+                _logger?.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height}, Base64Length={Length}",
+                    image.Width, image.Height, imageBase64.Length);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[Issue #78] 画像コンテキスト設定失敗 - Cloud AI翻訳は利用不可");
+            }
+
             // [Issue #227] TimedChunkAggregatorにバッチ追加
             try
             {

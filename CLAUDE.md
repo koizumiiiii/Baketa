@@ -294,6 +294,23 @@ When creating new scripts:
 - Automatic JSON serialization/deserialization
 - Version-based migration system
 
+### External Services
+
+Baketaは複数の外部サービスと連携しています。詳細は `docs/3-architecture/external-services.md` を参照。
+
+| サービス | 役割 | URL/識別子 |
+|---------|------|-----------|
+| **Cloudflare Workers** | Patreon認証プロキシ、Cloud AI翻訳 | `baketa-relay.suke009.workers.dev` |
+| **Cloudflare KV** | セッション保存 | `SESSIONS` namespace |
+| **Supabase** | 認証(OAuth)、ユーザー管理、ライセンスDB | `kajsoietcikivrwidqcs.supabase.co` |
+| **Patreon** | 課金管理、Tier判定 | Cloudflare経由 |
+
+**認証フロー**:
+- **一般認証**: Supabase Auth (Google/Discord/Twitch OAuth, Email)
+- **課金認証**: Cloudflare Workers経由 Patreon OAuth
+
+**重要**: Cloud AI翻訳のAPIキー（Gemini/OpenAI）はRelay Server（Cloudflare Workers）の環境変数で管理。ユーザーのローカル環境にAPIキーは保存しない。
+
 ## Important Implementation Details
 
 ### Namespace Migration

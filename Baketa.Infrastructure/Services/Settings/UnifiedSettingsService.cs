@@ -260,7 +260,8 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             true, // ユーザー設定がない場合はローカルエンジンを使用
             BaketaConstants.Ocr.DefaultConfidenceThreshold, // デフォルト信頼度しきい値
             appSettings.TimeoutSeconds * 1000, // 秒をミリ秒に変換
-            14); // デフォルトフォントサイズ
+            14, // デフォルトフォントサイズ
+            appSettings.EnableCloudAiTranslation); // [Issue #78 Phase 5] Cloud AI翻訳設定
     }
 
     private UnifiedOcrSettings LoadOcrSettings()
@@ -338,7 +339,9 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             GetBoolValue(userSettings, "useLocalEngine", true),
             GetDoubleValue(userSettings, "confidenceThreshold", 0.7),
             GetIntValue(userSettings, "timeoutMs", appSettings.TimeoutSeconds * 1000),
-            GetIntValue(userSettings, "overlayFontSize", 14));
+            GetIntValue(userSettings, "overlayFontSize", 14),
+            // [Issue #78 Phase 5] Cloud AI翻訳設定
+            GetBoolValue(userSettings, "enableCloudAiTranslation", appSettings.EnableCloudAiTranslation));
     }
 
     private static UnifiedOcrSettings CreateOcrSettingsFromUser(
@@ -468,7 +471,9 @@ internal sealed record UnifiedTranslationSettings(
     bool UseLocalEngine,
     double ConfidenceThreshold,
     int TimeoutMs,
-    int OverlayFontSize) : ITranslationSettings;
+    int OverlayFontSize,
+    // [Issue #78 Phase 5] Cloud AI翻訳の有効化フラグ
+    bool EnableCloudAiTranslation = true) : ITranslationSettings;
 
 /// <summary>
 /// 統一OCR設定実装
