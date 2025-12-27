@@ -821,6 +821,9 @@
   <data name="Settings_Account_PatreonLinkedFormat" xml:space="preserve">
     <value>連携済み（{0}）</value>
   </data>
+  <data name="Settings_Account_MockModeTestUser" xml:space="preserve">
+    <value>テストユーザー (モックモード)</value>
+  </data>
 
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">

@@ -155,10 +155,10 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
         var engines = CreateAvailableEnginesList();
         AvailableEngines = [.. engines];
 
-        // 初期設定
-        SelectedEngine = ParseEngineFromString(_options.DefaultEngineStrategy);
-        UpdateEngineDescription();
+        // 初期設定 - CloudOnlyが利用可能ならデフォルトにする
         UpdateCloudOnlyAvailability();
+        SelectedEngine = DetermineDefaultEngine();
+        UpdateEngineDescription();
 
         // コマンドの作成
         var canSelectEngine = this.WhenAnyValue(x => x.IsLoading).Select(loading => !loading);
@@ -511,6 +511,26 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             "CLOUDONLY" => TranslationEngine.CloudOnly,
             _ => TranslationEngine.LocalOnly // デフォルト
         };
+    }
+
+    /// <summary>
+    /// プランに基づいてデフォルトエンジンを決定
+    /// Pro/Premiaプランでクォータ未超過の場合はCloudOnlyをデフォルトにする
+    /// </summary>
+    private TranslationEngine DetermineDefaultEngine()
+    {
+        // CloudOnlyが利用可能（Pro/Premia かつ クォータ未超過）ならCloudOnlyをデフォルトに
+        if (IsCloudOnlyEnabled)
+        {
+            _logger.LogDebug(
+                "CloudOnly engine available - setting as default (Plan has cloud access and quota not exceeded)");
+            return TranslationEngine.CloudOnly;
+        }
+
+        // それ以外は設定ファイルのデフォルトを使用
+        var configuredDefault = ParseEngineFromString(_options.DefaultEngineStrategy);
+        _logger.LogDebug("Using configured default engine: {Engine}", configuredDefault);
+        return configuredDefault;
     }
 
     /// <summary>

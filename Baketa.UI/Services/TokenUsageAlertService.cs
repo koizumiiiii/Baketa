@@ -91,9 +91,16 @@ public sealed class TokenUsageAlertService : IDisposable
     /// <summary>
     /// 警告レベルに応じた通知を表示
     /// </summary>
+    /// <remarks>
+    /// CA1863抑制理由: この通知は閾値到達時（80%/90%/100%）にのみ発生し、
+    /// セッション内で最大3回しか呼ばれないため、CompositeFormatキャッシュの
+    /// パフォーマンス効果は無視できる。また、リソース文字列は言語設定で変わる可能性がある。
+    /// </remarks>
+#pragma warning disable CA1863 // CompositeFormat caching - infrequent notification, localized resource strings
     private async Task ShowAlertNotificationAsync(TokenUsageWarningEventArgs e)
     {
         var remaining = Math.Max(0, e.MonthlyLimit - e.CurrentUsage);
+        var remainingFormatted = remaining.ToString("N0");
 
         switch (e.Level)
         {
@@ -101,7 +108,7 @@ public sealed class TokenUsageAlertService : IDisposable
                 // 80%到達警告
                 await _notificationService.ShowWarningAsync(
                     Strings.TokenUsage_Warning_Title,
-                    string.Format(Strings.TokenUsage_Warning80_Message, remaining.ToString("N0")),
+                    string.Format(Strings.TokenUsage_Warning80_Message, remainingFormatted),
                     duration: 6000).ConfigureAwait(false);
                 break;
 
@@ -109,7 +116,7 @@ public sealed class TokenUsageAlertService : IDisposable
                 // 90%到達警告
                 await _notificationService.ShowWarningAsync(
                     Strings.TokenUsage_Warning_Title,
-                    string.Format(Strings.TokenUsage_Warning90_Message, remaining.ToString("N0")),
+                    string.Format(Strings.TokenUsage_Warning90_Message, remainingFormatted),
                     duration: 8000).ConfigureAwait(false);
                 break;
 
@@ -127,6 +134,7 @@ public sealed class TokenUsageAlertService : IDisposable
                 break;
         }
     }
+#pragma warning restore CA1863
 
     /// <summary>
     /// 通知済みレベルをリセット（テスト用または月次リセット時）

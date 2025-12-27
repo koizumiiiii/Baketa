@@ -325,6 +325,7 @@ public static class Strings
     public static string Settings_Account_PatreonStatusError => GetString("Settings_Account_PatreonStatusError");
     public static string Settings_Account_PatreonStatusNotConnected => GetString("Settings_Account_PatreonStatusNotConnected");
     public static string Settings_Account_PatreonLinkedFormat => GetString("Settings_Account_PatreonLinkedFormat");
+    public static string Settings_Account_MockModeTestUser => GetString("Settings_Account_MockModeTestUser");
 
     // ========== License Settings ==========
 

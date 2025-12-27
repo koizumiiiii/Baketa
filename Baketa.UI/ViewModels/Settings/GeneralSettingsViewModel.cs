@@ -502,12 +502,14 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _fontSize = settings.OverlayFontSize;
 
         // [Issue #78 Phase 5] Cloud AI翻訳設定の復元
-        // EnableCloudAiTranslation=true → UseLocalEngine=false (AI翻訳)
-        // EnableCloudAiTranslation=false → UseLocalEngine=true (ローカル翻訳)
-        // ただし、Cloud AI翻訳が利用できないプラン（Free/Standard）の場合は強制的にローカル翻訳
-        // 注意: 初期化時点で_licenseManagerがnullの可能性があるため、直接null-safeにチェック
+        // Pro/Premiaプランでトークン上限未達の場合はAI翻訳をデフォルトにする
+        // Free/Standardプランまたはトークン上限超過の場合はローカル翻訳をデフォルトにする
         var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
-        _useLocalEngine = !settings.EnableCloudAiTranslation || !isCloudAvailable;
+
+        // Cloud AI翻訳が利用可能ならデフォルトでAI翻訳を選択
+        // ユーザーが明示的にローカル翻訳を選択した場合（EnableCloudAiTranslation=false）は
+        // その設定を尊重するが、Cloud利用不可なら強制的にローカル翻訳
+        _useLocalEngine = !isCloudAvailable || (isCloudAvailable && !settings.EnableCloudAiTranslation);
     }
 
     /// <summary>
