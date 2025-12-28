@@ -1,9 +1,13 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Services;
+using Baketa.UI.ViewModels;
+using Baketa.UI.Views;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Services;
@@ -13,11 +17,16 @@ namespace Baketa.UI.Services;
 /// </summary>
 public sealed class AdvertisementService : IAdvertisementService, IDisposable
 {
+    private const string BAKETA_ICON_PATH = "avares://Baketa/Assets/Icons/baketa.ico";
+
     private readonly IAuthService _authService;
     private readonly IUserPlanService _userPlanService;
     private readonly ILogger<AdvertisementService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IServiceProvider _serviceProvider;
     private readonly SemaphoreSlim _loadLock = new(1, 1);
+    private AdWindow? _adWindow;
+    private bool _adWindowInitialized;
     private bool _disposed;
 
     /// <inheritdoc/>
@@ -36,16 +45,19 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
     /// <param name="userPlanService">User plan service</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="configuration">Configuration instance</param>
+    /// <param name="serviceProvider">Service provider for resolving AdWindow dependencies</param>
     public AdvertisementService(
         IAuthService authService,
         IUserPlanService userPlanService,
         ILogger<AdvertisementService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IServiceProvider serviceProvider)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _userPlanService = userPlanService ?? throw new ArgumentNullException(nameof(userPlanService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 
         // Subscribe to authentication status changes
         _authService.AuthStatusChanged += OnAuthStatusChanged;
@@ -110,13 +122,146 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
 
         _logger.LogInformation("広告を非表示にしました");
 
+        // Issue #240: AdWindowも非表示にする
+        await UpdateAdWindowVisibilityAsync(false).ConfigureAwait(false);
+
         AdDisplayChanged?.Invoke(this, new AdDisplayChangedEventArgs
         {
             ShouldShowAd = false,
             Reason = "User request"
         });
+    }
 
-        await Task.CompletedTask;
+    /// <inheritdoc/>
+    public async Task InitializeAdWindowAsync(CancellationToken cancellationToken = default)
+    {
+        if (_adWindowInitialized)
+        {
+            _logger.LogDebug("AdWindow already initialized, skipping");
+            return;
+        }
+
+        _adWindowInitialized = true;
+        _logger.LogInformation("Issue #240: AdWindow初期化開始");
+
+        try
+        {
+            // まず現在のプラン状態を確認
+            await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+
+            // プレミアムプランの場合はAdWindowを生成しない
+            if (!ShouldShowAd)
+            {
+                _logger.LogInformation("Premium plan detected - AdWindow creation skipped");
+                return;
+            }
+
+            // UIスレッドでAdWindowを生成・表示
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                try
+                {
+                    var adViewModel = _serviceProvider.GetRequiredService<AdViewModel>();
+                    var adWindowLogger = _serviceProvider.GetRequiredService<ILogger<AdWindow>>();
+
+                    _adWindow = new AdWindow(adViewModel, adWindowLogger);
+
+                    // アイコン設定
+                    try
+                    {
+                        var iconUri = new Uri(BAKETA_ICON_PATH);
+                        _adWindow.Icon = new Avalonia.Controls.WindowIcon(
+                            Avalonia.Platform.AssetLoader.Open(iconUri));
+                    }
+                    catch (Exception iconEx)
+                    {
+                        _logger.LogWarning(iconEx, "AdWindowアイコン設定失敗");
+                    }
+
+                    _adWindow.Show();
+                    _logger.LogInformation("AdWindow created and shown successfully");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "AdWindow creation failed: {Message}", ex.Message);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "InitializeAdWindowAsync failed: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Issue #240: Update AdWindow visibility based on plan state
+    /// </summary>
+    private async Task UpdateAdWindowVisibilityAsync(bool show)
+    {
+        if (_adWindow == null)
+        {
+            // AdWindowがまだ作成されていない場合
+            if (show && _adWindowInitialized)
+            {
+                // 表示が必要で、初期化済みなら新規作成
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        var adViewModel = _serviceProvider.GetRequiredService<AdViewModel>();
+                        var adWindowLogger = _serviceProvider.GetRequiredService<ILogger<AdWindow>>();
+
+                        _adWindow = new AdWindow(adViewModel, adWindowLogger);
+
+                        try
+                        {
+                            var iconUri = new Uri(BAKETA_ICON_PATH);
+                            _adWindow.Icon = new Avalonia.Controls.WindowIcon(
+                                Avalonia.Platform.AssetLoader.Open(iconUri));
+                        }
+                        catch (Exception iconEx)
+                        {
+                            _logger.LogWarning(iconEx, "AdWindowアイコン設定失敗");
+                        }
+
+                        _adWindow.Show();
+                        _logger.LogInformation("AdWindow recreated and shown");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "AdWindow recreation failed: {Message}", ex.Message);
+                    }
+                });
+            }
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            try
+            {
+                if (show)
+                {
+                    if (!_adWindow.IsVisible)
+                    {
+                        _adWindow.Show();
+                        _logger.LogInformation("AdWindow shown (plan changed to free)");
+                    }
+                }
+                else
+                {
+                    if (_adWindow.IsVisible)
+                    {
+                        _adWindow.Hide();
+                        _logger.LogInformation("AdWindow hidden (plan changed to premium)");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "AdWindow visibility update failed: {Message}", ex.Message);
+            }
+        });
     }
 
     /// <summary>
@@ -167,6 +312,12 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
                 _logger.LogInformation(
                     "広告表示状態変更: {OldState} → {NewState} (理由: {Reason})",
                     oldState, shouldShow, reason);
+
+                // Issue #240: プラン変更時にAdWindowの表示/非表示を切り替え
+                if (_adWindowInitialized)
+                {
+                    await UpdateAdWindowVisibilityAsync(shouldShow).ConfigureAwait(false);
+                }
 
                 AdDisplayChanged?.Invoke(this, new AdDisplayChangedEventArgs
                 {

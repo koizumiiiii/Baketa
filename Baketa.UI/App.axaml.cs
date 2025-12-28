@@ -10,6 +10,7 @@ using Avalonia.Markup.Xaml;
 using Baketa.Application.Services;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
 using Baketa.UI.Services;
@@ -498,35 +499,23 @@ internal sealed partial class App : Avalonia.Application
                 // [Issue #170] UIスレッド非同期フロー内でメインUI表示が完了するため、
                 // この時点では追加の初期化は不要。AdWindowと診断システムは別途処理。
 
-                // 📢 [Issue #174] 広告ウィンドウの起動（メインUIとは独立）
-                _logger?.LogInformation("AdWindow起動開始（Issue #174: WebView統合）");
+                // 📢 [Issue #240] 広告ウィンドウの起動（AdvertisementServiceが管理）
+                // プラン判定をAdvertisementService内で行い、DI初期化順序問題を解決
+                _logger?.LogInformation("AdWindow起動開始（Issue #240: AdvertisementService管理）");
                 try
                 {
-                    var adViewModel = serviceProvider.GetRequiredService<AdViewModel>();
-                    var adWindow = new Views.AdWindow(adViewModel, serviceProvider.GetRequiredService<ILogger<Views.AdWindow>>());
-
-                    // アプリケーションアイコンを設定
-                    try
+                    var advertisementService = serviceProvider.GetRequiredService<IAdvertisementService>();
+                    _ = Task.Run(async () =>
                     {
-                        var iconUri = new Uri(BAKETA_ICON_PATH);
-                        adWindow.Icon = new Avalonia.Controls.WindowIcon(
-                            Avalonia.Platform.AssetLoader.Open(iconUri));
-                    }
-                    catch (Exception iconEx)
-                    {
-                        _logger?.LogWarning(iconEx, "AdWindowアイコン設定失敗");
-                    }
-
-                    // 広告表示が有効な場合のみ表示
-                    if (adViewModel.ShouldShowAd)
-                    {
-                        adWindow.Show();
-                        _logger?.LogInformation("AdWindow表示完了: 画面右下に配置");
-                    }
-                    else
-                    {
-                        _logger?.LogInformation("AdWindow非表示: Premiumプランまたは広告非表示設定");
-                    }
+                        try
+                        {
+                            await advertisementService.InitializeAdWindowAsync().ConfigureAwait(false);
+                        }
+                        catch (Exception initEx)
+                        {
+                            _logger?.LogWarning(initEx, "AdWindow初期化失敗: {Message}", initEx.Message);
+                        }
+                    });
                 }
                 catch (Exception adEx)
                 {
