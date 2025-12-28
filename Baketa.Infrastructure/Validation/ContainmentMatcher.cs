@@ -401,7 +401,8 @@ public sealed class ContainmentMatcher : IContainmentMatcher
         else if (b.Bottom < a.Top)
             dy = a.Top - b.Bottom;
 
-        return (int)Math.Sqrt(dx * dx + dy * dy);
+        // double にキャストしてから乗算（整数オーバーフロー回避）
+        return (int)Math.Sqrt((double)dx * dx + (double)dy * dy);
     }
 
     /// <summary>

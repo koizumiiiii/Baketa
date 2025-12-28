@@ -141,7 +141,7 @@ public class TokenConsumptionTrackerTests
         // Arrange
         _mockRepository
             .Setup(x => x.GetMonthlySummaryAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((MonthlyUsageSummary?)null);
+            .ReturnsAsync(null as MonthlyUsageSummary);
 
         _mockAccessController
             .Setup(x => x.GetCurrentPlanAsync(It.IsAny<CancellationToken>()))

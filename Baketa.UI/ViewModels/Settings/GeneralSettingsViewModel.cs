@@ -509,7 +509,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         // Cloud AI翻訳が利用可能ならデフォルトでAI翻訳を選択
         // ユーザーが明示的にローカル翻訳を選択した場合（EnableCloudAiTranslation=false）は
         // その設定を尊重するが、Cloud利用不可なら強制的にローカル翻訳
-        _useLocalEngine = !isCloudAvailable || (isCloudAvailable && !settings.EnableCloudAiTranslation);
+        _useLocalEngine = !isCloudAvailable || !settings.EnableCloudAiTranslation;
     }
 
     /// <summary>

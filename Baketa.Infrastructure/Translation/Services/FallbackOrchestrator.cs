@@ -120,7 +120,8 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
             Duration = TimeSpan.Zero
         });
 
-        var totalDuration = DateTime.UtcNow - startTime;
+        // startTimeは将来のメトリクス用に保持（現時点では未使用）
+        _ = DateTime.UtcNow - startTime;
 
         return FallbackTranslationResult.Failure(
             new TranslationErrorDetail

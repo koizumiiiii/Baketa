@@ -283,7 +283,7 @@ public class CloudAIPerformanceTests(ITestOutputHelper output)
 
         // Act
         var stopwatch = Stopwatch.StartNew();
-        var alertLevel = await tracker.CheckAlertLevelAsync();
+        _ = await tracker.CheckAlertLevelAsync();
         stopwatch.Stop();
 
         // Assert

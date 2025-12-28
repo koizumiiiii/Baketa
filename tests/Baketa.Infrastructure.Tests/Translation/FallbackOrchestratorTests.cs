@@ -199,7 +199,7 @@ public class FallbackOrchestratorTests
     {
         // Arrange
         var request = CreateTestRequest();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         var mockTranslator = new Mock<ICloudImageTranslator>();

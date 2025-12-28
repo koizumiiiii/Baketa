@@ -115,7 +115,8 @@ public sealed class EngineAccessController : IEngineAccessController
     public async Task<IReadOnlyList<TranslationEngineInfo>> GetAvailableEnginesAsync(
         CancellationToken cancellationToken = default)
     {
-        var state = await _licenseManager.GetCurrentStateAsync(cancellationToken)
+        // ライセンス状態は将来の拡張用に取得（現時点ではCanUseEngineAsyncで判定）
+        _ = await _licenseManager.GetCurrentStateAsync(cancellationToken)
             .ConfigureAwait(false);
 
         var result = new List<TranslationEngineInfo>();

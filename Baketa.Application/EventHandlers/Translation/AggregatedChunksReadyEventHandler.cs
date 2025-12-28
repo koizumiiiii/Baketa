@@ -146,10 +146,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             _logger?.LogDebug($"🔥🔥🔥 [PHASE12.2_HANDLER] HandleAsync tryブロック開始 - SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
             Console.WriteLine($"🔥🔥🔥 [PHASE12.2_HANDLER] HandleAsync tryブロック開始 - SessionId: {eventData.SessionId}, ChunkCount: {eventData.AggregatedChunks.Count}");
 
-            _logger.LogInformation("🔥 [PHASE12.2] 集約チャンク受信 - {Count}個, SessionId: {SessionId}",
+            _logger?.LogInformation("🔥 [PHASE12.2] 集約チャンク受信 - {Count}個, SessionId: {SessionId}",
                 eventData.AggregatedChunks.Count, eventData.SessionId);
             // [Code Review] LogCritical → LogDebug に変更（通常処理の開始ログにCriticalは不適切）
-            _logger.LogDebug("✅✅✅ [PHASE12.2_NEW_ARCH] AggregatedChunksReadyEventHandler開始. SessionId: {SessionId}", eventData.SessionId);
+            _logger?.LogDebug("✅✅✅ [PHASE12.2_NEW_ARCH] AggregatedChunksReadyEventHandler開始. SessionId: {SessionId}", eventData.SessionId);
 
             // 集約されたチャンクをリストに変換
             var aggregatedChunks = eventData.AggregatedChunks.ToList();
@@ -435,7 +435,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     alreadyScaledToOriginalSize: true);  // 🚀 [Issue #193] 座標は既にスケーリング済み
                 Console.WriteLine($"🚀🚀🚀 [Issue #193 DEBUG] ConvertRoiToScreenCoordinates呼び出し後 - Result: ({screenBounds.X},{screenBounds.Y},{screenBounds.Width}x{screenBounds.Height})");
 
-                _logger.LogDebug("🔥 [FIX4_FULLSCREEN_COORD] 座標変換実行 - 画像座標:({X},{Y}) → スクリーン座標:({SX},{SY})",
+                _logger?.LogDebug("🔥 [FIX4_FULLSCREEN_COORD] 座標変換実行 - 画像座標:({X},{Y}) → スクリーン座標:({SX},{SY})",
                     chunk.CombinedBounds.X, chunk.CombinedBounds.Y, screenBounds.X, screenBounds.Y);
 
                 // 座標変換不要 - chunk.CombinedBoundsをそのまま使用して新しいチャンクインスタンスを作成
