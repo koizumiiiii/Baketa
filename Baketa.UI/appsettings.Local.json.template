@@ -1,22 +1,6 @@
 {
-  "Authentication": {
-    "SupabaseUrl": "https://YOUR-PROJECT-ID.supabase.co",
-    "SupabaseAnonKey": "YOUR-SUPABASE-ANON-KEY",
-    "IsFreePlan": true,
-    "OAuthCallbackPort": 38438
-  },
-  "OAuth": {
-    "Google": {
-      "ClientId": "YOUR-GOOGLE-CLIENT-ID",
-      "ClientSecret": "YOUR-GOOGLE-CLIENT-SECRET"
-    },
-    "Discord": {
-      "ClientId": "YOUR-DISCORD-CLIENT-ID",
-      "ClientSecret": "YOUR-DISCORD-CLIENT-SECRET"
-    },
-    "Twitch": {
-      "ClientId": "YOUR-TWITCH-CLIENT-ID",
-      "ClientSecret": "YOUR-TWITCH-CLIENT-SECRET"
-    }
+  "CloudTranslation": {
+    "UseDirectApiMode": true,
+    "DirectGeminiApiKey": "YOUR_GEMINI_API_KEY_HERE"
   }
 }

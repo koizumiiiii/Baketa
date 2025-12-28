@@ -80,6 +80,28 @@ public sealed class CloudTranslationSettings
     public bool EnableDebugMode { get; set; }
 
     /// <summary>
+    /// Direct APIモードを使用するか（開発・テスト用）
+    /// </summary>
+    /// <remarks>
+    /// trueの場合、Relay Serverを経由せずに直接Gemini APIを呼び出します。
+    /// Patreon認証をバイパスするため、開発・テスト目的でのみ使用してください。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Debug, "Cloud Translation", "Direct API Mode",
+        Description = "Relay Serverを経由せずに直接Gemini APIを使用（開発用）")]
+    public bool UseDirectApiMode { get; set; }
+
+    /// <summary>
+    /// Direct APIモード用のGemini APIキー
+    /// </summary>
+    /// <remarks>
+    /// UseDirectApiMode=true の場合に使用されます。
+    /// セキュリティのため appsettings.Local.json で管理し、.gitignore に追加してください。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Debug, "Cloud Translation", "Direct Gemini API Key",
+        Description = "Direct APIモード用のGemini APIキー")]
+    public string DirectGeminiApiKey { get; set; } = string.Empty;
+
+    /// <summary>
     /// 設定を検証
     /// </summary>
     public SettingsValidationResult ValidateSettings()
