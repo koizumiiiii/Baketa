@@ -29,6 +29,8 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IPatreonOAuthService? _patreonService;
     private readonly PatreonSettings? _patreonSettings;
+    private readonly ILicenseManager? _licenseManager;
+    private readonly LicenseSettings? _licenseSettings;
     private readonly ILoggerFactory? _loggerFactory;
     private readonly ILogger<AccountSettingsViewModel>? _logger;
 
@@ -59,6 +61,8 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         IEventAggregator eventAggregator,
         IPatreonOAuthService? patreonService = null,
         IOptions<PatreonSettings>? patreonSettings = null,
+        ILicenseManager? licenseManager = null,
+        IOptions<LicenseSettings>? licenseSettings = null,
         ILoggerFactory? loggerFactory = null,
         ILogger<AccountSettingsViewModel>? logger = null) : base(eventAggregator)
     {
@@ -66,6 +70,8 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _patreonService = patreonService;
         _patreonSettings = patreonSettings?.Value;
+        _licenseManager = licenseManager;
+        _licenseSettings = licenseSettings?.Value;
         _loggerFactory = loggerFactory;
         _logger = logger;
 
@@ -654,6 +660,22 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     /// </summary>
     private async Task LoadPatreonStatusAsync()
     {
+        // モックモード時はライセンスマネージャーから直接プランを取得
+        if (_licenseSettings?.EnableMockMode == true && _licenseManager != null)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var licenseState = _licenseManager.CurrentState;
+                IsPatreonConnected = true; // モックモードでは常に連携済みとして扱う
+                PatreonUserName = Strings.Settings_Account_MockModeTestUser;
+                CurrentPlan = licenseState.CurrentPlan;
+                PatreonLastSyncTime = DateTime.Now;
+                PatreonSyncStatus = PatreonSyncStatus.Synced;
+                _logger?.LogDebug("モックモード: ライセンス状態からプランを取得 Plan={Plan}", CurrentPlan);
+            });
+            return;
+        }
+
         if (_patreonService == null)
         {
             return;

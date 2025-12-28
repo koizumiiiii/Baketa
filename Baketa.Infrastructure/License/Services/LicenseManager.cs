@@ -102,6 +102,35 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 interval);
         }
 
+        // モックモードの場合、自動的にテスト用認証情報を設定
+        if (_settings.EnableMockMode)
+        {
+            var mockPlanType = (PlanType)_settings.MockPlanType;
+            _userId = "mock_user_" + Guid.NewGuid().ToString("N")[..8];
+            _sessionToken = "mock_session_" + Guid.NewGuid().ToString("N");
+
+            // モックモード用の初期状態を設定
+            _currentState = new LicenseState
+            {
+                CurrentPlan = mockPlanType,
+                UserId = _userId,
+                SessionId = _sessionToken,
+                ContractStartDate = DateTime.UtcNow.AddDays(-15),
+                ExpirationDate = DateTime.UtcNow.AddDays(15),
+                CloudAiTokensUsed = _settings.MockTokenUsage,
+                IsCached = false,
+                LastServerSync = DateTime.UtcNow,
+                PatreonSyncStatus = PatreonSyncStatus.Synced,
+                PatronStatus = "active_patron"
+            };
+
+            _logger.LogWarning(
+                "🧪 モックモード有効: UserId={UserId}, Plan={Plan}, TokenLimit={TokenLimit}",
+                _userId,
+                mockPlanType,
+                _currentState.MonthlyTokenLimit);
+        }
+
         _logger.LogInformation(
             "🔐 LicenseManager初期化完了 - Plan={Plan}, MockMode={MockMode}, TokenLimit={TokenLimit}, BackgroundRefresh={Interval}min",
             _currentState.CurrentPlan,

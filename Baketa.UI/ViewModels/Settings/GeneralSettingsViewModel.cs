@@ -4,10 +4,14 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Reactive;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Avalonia.Styling;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.License;
+using Baketa.Core.License.Events;
+using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
 using Baketa.UI.Framework;
 using Baketa.UI.Services;
@@ -27,6 +31,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     private readonly ILogger<GeneralSettingsViewModel>? _logger;
     private readonly ILocalizationService? _localizationService;
     private readonly ISettingsChangeTracker? _changeTracker;
+    private readonly ILicenseManager? _licenseManager;
 
     // バッキングフィールド
     private bool _autoStartWithWindows;
@@ -49,6 +54,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     private string _targetLanguage = "English";
     private int _fontSize = 14;
 
+    // [Issue #78 Phase 5] Cloud AI使用量表示用バッキングフィールド
+    private long _cloudTokensUsed;
+    private long _cloudTokenLimit;
+    private double _cloudUsagePercentage;
+
     // テーマ設定用バッキングフィールド
     private UiTheme _selectedTheme = UiTheme.Auto;
 
@@ -64,23 +74,39 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// <param name="changeTracker">設定変更追跡サービス（オプション）</param>
     /// <param name="logger">ロガー（オプション）</param>
     /// <param name="translationSettings">翻訳設定データ（オプション）</param>
+    /// <param name="licenseManager">ライセンスマネージャー（オプション）</param>
     public GeneralSettingsViewModel(
         GeneralSettings settings,
         IEventAggregator eventAggregator,
         ILocalizationService? localizationService = null,
         ISettingsChangeTracker? changeTracker = null,
         ILogger<GeneralSettingsViewModel>? logger = null,
-        TranslationSettings? translationSettings = null) : base(eventAggregator)
+        TranslationSettings? translationSettings = null,
+        ILicenseManager? licenseManager = null) : base(eventAggregator)
     {
         _originalSettings = settings ?? throw new ArgumentNullException(nameof(settings));
         _originalTranslationSettings = translationSettings ?? new TranslationSettings();
         _logger = logger;
         _localizationService = localizationService;
         _changeTracker = changeTracker;
+        _licenseManager = licenseManager;
+
+        // [Issue #78 Phase 5] ライセンス状態変更時のUI更新を購読
+        if (_licenseManager != null)
+        {
+            _licenseManager.StateChanged += OnLicenseStateChanged;
+            Disposables.Add(Disposable.Create(() =>
+            {
+                _licenseManager.StateChanged -= OnLicenseStateChanged;
+            }));
+        }
 
         // 初期化
         InitializeFromSettings(settings);
         InitializeFromTranslationSettings(_originalTranslationSettings);
+
+        // [Issue #78 Phase 5] Cloud AI使用量の初期化
+        InitializeCloudUsageFromLicenseState();
 
         // 変更追跡の設定
         SetupChangeTracking();
@@ -214,9 +240,19 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// AI翻訳が有効かどうか（αテストでは無効）
+    /// AI翻訳が有効かどうか（Pro/Premiaプランで利用可能）
     /// </summary>
-    public bool IsCloudTranslationEnabled => false;
+    public bool IsCloudTranslationEnabled =>
+        _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
+
+    /// <summary>
+    /// クラウド翻訳の注記テキスト（プランに応じて表示）
+    /// Pro/Premia: 空文字、Free/Standard: "Pro/Premiaプランで利用可能"
+    /// </summary>
+    public string CloudTranslationNote =>
+        IsCloudTranslationEnabled
+            ? string.Empty
+            : Resources.Strings.Settings_General_CloudTranslationUpgradeNote;
 
     /// <summary>
     /// 翻訳元言語
@@ -268,6 +304,50 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// 言語ペアが有効かどうか
     /// </summary>
     public bool IsLanguagePairValid => !string.Equals(SourceLanguage, TargetLanguage, StringComparison.OrdinalIgnoreCase);
+
+    #endregion
+
+    #region [Issue #78 Phase 5] Cloud AI使用量表示プロパティ
+
+    /// <summary>
+    /// Cloud AI使用済みトークン数
+    /// </summary>
+    public long CloudTokensUsed
+    {
+        get => _cloudTokensUsed;
+        private set => this.RaiseAndSetIfChanged(ref _cloudTokensUsed, value);
+    }
+
+    /// <summary>
+    /// Cloud AIトークン上限
+    /// </summary>
+    public long CloudTokenLimit
+    {
+        get => _cloudTokenLimit;
+        private set => this.RaiseAndSetIfChanged(ref _cloudTokenLimit, value);
+    }
+
+    /// <summary>
+    /// Cloud AI使用率（0-100）
+    /// </summary>
+    public double CloudUsagePercentage
+    {
+        get => _cloudUsagePercentage;
+        private set => this.RaiseAndSetIfChanged(ref _cloudUsagePercentage, value);
+    }
+
+    /// <summary>
+    /// Cloud AI使用量表示文字列（例: "1,234,567 / 4,000,000"）
+    /// </summary>
+    public string CloudUsageDisplay => CloudTokenLimit > 0
+        ? $"{CloudTokensUsed:N0} / {CloudTokenLimit:N0}"
+        : string.Empty;
+
+    /// <summary>
+    /// Cloud AI使用量情報を表示するかどうか
+    /// Pro/Premiaプランでのみ表示
+    /// </summary>
+    public bool ShowCloudUsageInfo => IsCloudTranslationEnabled;
 
     #endregion
 
@@ -420,6 +500,16 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _sourceLanguage = settings.DefaultSourceLanguage == "ja" ? "Japanese" : "English";
         _targetLanguage = settings.DefaultTargetLanguage == "ja" ? "Japanese" : "English";
         _fontSize = settings.OverlayFontSize;
+
+        // [Issue #78 Phase 5] Cloud AI翻訳設定の復元
+        // Pro/Premiaプランでトークン上限未達の場合はAI翻訳をデフォルトにする
+        // Free/Standardプランまたはトークン上限超過の場合はローカル翻訳をデフォルトにする
+        var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
+
+        // Cloud AI翻訳が利用可能ならデフォルトでAI翻訳を選択
+        // ユーザーが明示的にローカル翻訳を選択した場合（EnableCloudAiTranslation=false）は
+        // その設定を尊重するが、Cloud利用不可なら強制的にローカル翻訳
+        _useLocalEngine = !isCloudAvailable || !settings.EnableCloudAiTranslation;
     }
 
     /// <summary>
@@ -712,6 +802,10 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             settings.DefaultSourceLanguage = SourceLanguage == "Japanese" ? "ja" : "en";
             settings.DefaultTargetLanguage = TargetLanguage == "Japanese" ? "ja" : "en";
             settings.OverlayFontSize = FontSize;
+            // [Issue #78 Phase 5] Cloud AI翻訳設定を反映
+            // UseLocalEngine=true(ローカル翻訳) → EnableCloudAiTranslation=false
+            // UseLocalEngine=false(AI翻訳) → EnableCloudAiTranslation=true
+            settings.EnableCloudAiTranslation = !UseLocalEngine;
             return settings;
         }
     }
@@ -727,6 +821,69 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         InitializeFromSettings(settings);
         HasChanges = false;
         _logger?.LogDebug("一般設定を更新しました");
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 5] ライセンス状態変更時のハンドラ
+    /// プランが変更された場合、Cloud AI翻訳関連のプロパティを更新
+    /// </summary>
+    private void OnLicenseStateChanged(object? sender, LicenseStateChangedEventArgs e)
+    {
+        _logger?.LogDebug("ライセンス状態変更を検出: {OldPlan} → {NewPlan}, Tokens: {Used}/{Limit}",
+            e.OldState.CurrentPlan, e.NewState.CurrentPlan,
+            e.NewState.CloudAiTokensUsed, e.NewState.MonthlyTokenLimit);
+
+        // UIスレッドでプロパティ変更通知を発行
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            // プランが変更された場合
+            if (e.OldState.CurrentPlan != e.NewState.CurrentPlan)
+            {
+                this.RaisePropertyChanged(nameof(IsCloudTranslationEnabled));
+                this.RaisePropertyChanged(nameof(CloudTranslationNote));
+                this.RaisePropertyChanged(nameof(ShowCloudUsageInfo));
+
+                // Cloud AI翻訳が利用可能になった/なくなった場合、UseLocalEngineも更新
+                var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
+                if (!isCloudAvailable && !UseLocalEngine)
+                {
+                    // Cloud AIが使えなくなった場合はローカル翻訳に切り替え
+                    UseLocalEngine = true;
+                }
+            }
+
+            // 使用量の更新（プラン変更とトークン消費の両方で更新）
+            UpdateCloudUsageFromState(e.NewState);
+        });
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 5] Cloud AI使用量をライセンス状態から初期化
+    /// </summary>
+    private void InitializeCloudUsageFromLicenseState()
+    {
+        if (_licenseManager == null)
+        {
+            return;
+        }
+
+        var state = _licenseManager.CurrentState;
+        UpdateCloudUsageFromState(state);
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 5] ライセンス状態からCloud AI使用量プロパティを更新
+    /// </summary>
+    private void UpdateCloudUsageFromState(Core.License.Models.LicenseState state)
+    {
+        CloudTokensUsed = state.CloudAiTokensUsed;
+        CloudTokenLimit = state.MonthlyTokenLimit;
+        CloudUsagePercentage = CloudTokenLimit > 0
+            ? (double)CloudTokensUsed / CloudTokenLimit * 100
+            : 0;
+
+        // 派生プロパティの更新通知
+        this.RaisePropertyChanged(nameof(CloudUsageDisplay));
     }
 
     #endregion

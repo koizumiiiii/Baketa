@@ -37,10 +37,36 @@
                                          IsChecked="{Binding !UseLocalEngine}"
                                          IsEnabled="{Binding IsCloudTranslationEnabled}"
                                          GroupName="TranslationEngine"/>
-                            <TextBlock Text="{local:Localize Settings_General_AlphaNote}"
+                            <TextBlock Text="{Binding CloudTranslationNote}"
                                        FontSize="11"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       Margin="0,4,0,0"/>
+                                       Margin="0,4,0,0"
+                                       IsVisible="{Binding CloudTranslationNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                            <!-- [Issue #78 Phase 5] Cloud AI使用量表示 -->
+                            <Border IsVisible="{Binding ShowCloudUsageInfo}"
+                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                    CornerRadius="4"
+                                    Padding="12,8"
+                                    Margin="0,8,0,0">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{local:Localize Settings_General_CloudUsageLabel}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding CloudUsageDisplay}"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"/>
+                                        <TextBlock Text="{local:Localize Settings_General_CloudUsageTokens}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                    </StackPanel>
+                                    <ProgressBar Value="{Binding CloudUsagePercentage}"
+                                                 Maximum="100"
+                                                 Height="6"
+                                                 CornerRadius="3"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>

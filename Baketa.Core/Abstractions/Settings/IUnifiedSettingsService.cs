@@ -104,6 +104,12 @@ public interface ITranslationSettings
     double ConfidenceThreshold { get; }
     int TimeoutMs { get; }
     int OverlayFontSize { get; }
+
+    /// <summary>
+    /// [Issue #78 Phase 5] Cloud AI翻訳の有効化フラグ
+    /// Pro/Premiaプランでのみ利用可能
+    /// </summary>
+    bool EnableCloudAiTranslation { get; }
 }
 
 /// <summary>

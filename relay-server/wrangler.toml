@@ -22,3 +22,7 @@ ALLOWED_ORIGINS = "*"
 # wrangler secret put PATREON_CLIENT_ID
 # wrangler secret put PATREON_CLIENT_SECRET
 # wrangler secret put API_KEY
+# wrangler secret put GEMINI_API_KEY  # Cloud AI翻訳用
+
+# Optional: Gemini model name (default: gemini-2.0-flash-exp)
+# Set via dashboard or: wrangler secret put GEMINI_MODEL

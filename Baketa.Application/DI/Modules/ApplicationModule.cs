@@ -284,6 +284,31 @@ public sealed class ApplicationModule : ServiceModuleBase
         // 翻訳カスタマイズ（将来拡張）
         // 例: services.AddSingleton<IDictionaryService, DictionaryService>();
         // 例: services.AddSingleton<ITextReplacementService, TextReplacementService>();
+
+        // 🔥 [Issue #78 Phase 4] 並列翻訳オーケストレーター登録
+        // Pro/Premiaプラン向けのCloud AI翻訳並列実行・相互検証機能
+        Console.WriteLine("🔥 [Issue #78 Phase 4] ParallelTranslationOrchestrator DI登録開始");
+        services.AddSingleton<Baketa.Application.Services.Translation.ParallelTranslationOrchestrator>(provider =>
+        {
+            var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
+
+            // Cloud AI関連サービス（オプショナル - Pro/Premiaプランのみ）
+            var fallbackOrchestrator = provider.GetService<Baketa.Core.Translation.Abstractions.IFallbackOrchestrator>();
+            var crossValidator = provider.GetService<Baketa.Core.Abstractions.Validation.ICrossValidator>();
+            var logger = provider.GetRequiredService<ILogger<Baketa.Application.Services.Translation.ParallelTranslationOrchestrator>>();
+
+            Console.WriteLine($"✅ [Issue #78 Phase 4] ParallelTranslationOrchestrator作成: " +
+                $"FallbackOrchestrator={fallbackOrchestrator != null}, CrossValidator={crossValidator != null}");
+
+            return new Baketa.Application.Services.Translation.ParallelTranslationOrchestrator(
+                translationService,
+                fallbackOrchestrator,
+                crossValidator,
+                logger);
+        });
+        services.AddSingleton<Baketa.Core.Translation.Abstractions.IParallelTranslationOrchestrator>(
+            provider => provider.GetRequiredService<Baketa.Application.Services.Translation.ParallelTranslationOrchestrator>());
+        Console.WriteLine("✅ [Issue #78 Phase 4] ParallelTranslationOrchestrator DI登録完了");
     }
 
     /// <summary>
