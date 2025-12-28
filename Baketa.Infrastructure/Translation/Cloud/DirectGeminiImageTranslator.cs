@@ -185,8 +185,8 @@ public sealed class DirectGeminiImageTranslator : ICloudImageTranslator
     {
         var startTime = DateTime.UtcNow;
 
-        // Gemini APIエンドポイント
-        var url = $"{GeminiApiBaseUrl}/models/{DefaultModel}:generateContent?key={_settings.DirectGeminiApiKey}";
+        // Gemini APIエンドポイント（APIキーはヘッダーで送信）
+        var url = $"{GeminiApiBaseUrl}/models/{DefaultModel}:generateContent";
 
         // プロンプト作成（OCR + 翻訳を1回で実行）
         var targetLang = GetLanguageDisplayName(request.TargetLanguage);
@@ -232,6 +232,9 @@ JSONのみを出力し、他の説明は不要です。";
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         httpRequest.Content = JsonContent.Create(requestBody, options: _jsonOptions);
+
+        // APIキーをヘッダーで送信（URLに含めるとログに記録されるリスクがあるため）
+        httpRequest.Headers.Add("x-goog-api-key", _settings.DirectGeminiApiKey);
 
         using var httpResponse = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
         var processingTime = DateTime.UtcNow - startTime;
