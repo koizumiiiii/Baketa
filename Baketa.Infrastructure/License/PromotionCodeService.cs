@@ -31,7 +31,6 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<PromotionCodeService> _logger;
-    private readonly LicenseSettings _settings;
     private readonly IOptionsMonitor<LicenseSettings> _settingsMonitor;
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
@@ -46,7 +45,6 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _settingsMonitor = settingsMonitor ?? throw new ArgumentNullException(nameof(settingsMonitor));
-        _settings = settingsMonitor.CurrentValue;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _jsonOptions = new JsonSerializerOptions
@@ -84,7 +82,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         }
 
         // モックモード対応
-        if (_settings.EnableMockMode)
+        if (_settingsMonitor.CurrentValue.EnableMockMode)
         {
             return await ApplyCodeMockAsync(normalizedCode, cancellationToken).ConfigureAwait(false);
         }
@@ -163,11 +161,13 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
         if (!DateTime.TryParse(settings.PromotionExpiresAt, out var expiresAt))
         {
+            _logger.LogWarning("Failed to parse PromotionExpiresAt: {Value}", settings.PromotionExpiresAt);
             return null;
         }
 
         if (!DateTime.TryParse(settings.PromotionAppliedAt, out var appliedAt))
         {
+            _logger.LogWarning("Failed to parse PromotionAppliedAt: {Value}, using current time", settings.PromotionAppliedAt);
             appliedAt = DateTime.UtcNow;
         }
 
@@ -252,7 +252,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         var request = new RedeemRequest { Code = code };
         var content = JsonContent.Create(request, options: _jsonOptions);
 
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _settings.PromotionApiEndpoint)
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _settingsMonitor.CurrentValue.PromotionApiEndpoint)
         {
             Content = content
         };
