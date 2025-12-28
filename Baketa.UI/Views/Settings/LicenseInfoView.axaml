@@ -176,6 +176,83 @@
                 </Border>
             </StackPanel>
 
+            <!-- Issue #237 Phase 2: プロモーションコードセクション -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="プロモーションコード" FontSize="16" FontWeight="SemiBold"/>
+
+                <!-- アクティブなプロモーション表示 -->
+                <Border IsVisible="{Binding HasActivePromotion}"
+                        Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                      Width="16" Height="16"
+                                      Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                            <TextBlock Text="Proプランが適用されています"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="有効期限:"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock Text="{Binding PromotionExpiresDisplay}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- プロモーションコード入力 -->
+                <Border IsVisible="{Binding !HasActivePromotion}"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="プロモーションコードをお持ちの場合は、下記に入力してください。"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+
+                        <!-- コード入力 -->
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding PromotionCode}"
+                                     Watermark="BAKETA-XXXX-XXXX"
+                                     IsEnabled="{Binding !IsApplyingPromotion}"
+                                     Margin="0,0,8,0"/>
+                            <Button Grid.Column="1"
+                                    Content="適用"
+                                    Command="{Binding ApplyPromotionCommand}"
+                                    IsEnabled="{Binding !IsApplyingPromotion}"
+                                    Padding="16,8"
+                                    Classes="accent"/>
+                        </Grid>
+
+                        <!-- ローディングインジケータ -->
+                        <StackPanel IsVisible="{Binding IsApplyingPromotion}"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    HorizontalAlignment="Center">
+                            <ProgressBar IsIndeterminate="True" Width="100" Height="4"/>
+                            <TextBlock Text="確認中..." FontSize="12"/>
+                        </StackPanel>
+
+                        <!-- ステータスメッセージ -->
+                        <Border IsVisible="{Binding PromotionStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                Padding="12,8"
+                                CornerRadius="6"
+                                Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+                            <TextBlock Text="{Binding PromotionStatusMessage}"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
             <!-- Action Buttons -->
             <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
                 <Button Content="{local:Localize Settings_License_Refresh}"

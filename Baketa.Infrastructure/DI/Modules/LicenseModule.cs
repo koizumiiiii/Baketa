@@ -96,6 +96,15 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddSingleton<ILicenseManager>(provider =>
             provider.GetRequiredService<LicenseManager>());
 
+        // Issue #237 Phase 2: プロモーションコードサービス
+        services.AddHttpClient<License.PromotionCodeService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+        });
+        services.AddSingleton<IPromotionCodeService>(provider =>
+            provider.GetRequiredService<License.PromotionCodeService>());
+
         // Disposable登録（アプリケーション終了時の適切なクリーンアップ）
         services.AddSingleton<IDisposable>(provider =>
             provider.GetRequiredService<LicenseCacheService>());
