@@ -219,6 +219,12 @@ internal sealed partial class App : Avalonia.Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // 🔥 [Issue #243] ShutdownModeをOnExplicitShutdownに設定
+            // デフォルトのOnLastWindowCloseだと、Loading Window閉じた時に
+            // MainWindowがまだ設定されていないため、アプリが早期終了する問題を修正
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Console.WriteLine("🔧 ShutdownMode set to OnExplicitShutdown");
+
             Console.WriteLine("🚨🚨🚨 [DESKTOP] デスクトップアプリケーション初期化開始！ 🚨🚨🚨");
 
             // デバッグログ追加

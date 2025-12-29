@@ -37,7 +37,8 @@ public static class UIServiceCollectionExtensions
             configuration.GetSection("GpuSettings"));
 
         // 基本サービスの登録
-        services.AddSingleton<IUserPlanService, UserPlanService>();
+        // NOTE: IUserPlanServiceはUIModule.csでUserPlanServiceAdapter（ILicenseManager連携）として登録
+        // ここでの重複登録を削除（Issue #243: Proプランでも広告が表示されるバグ修正）
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
@@ -107,7 +108,8 @@ public static class UIServiceCollectionExtensions
         });
 
         // テスト用サービス
-        services.AddSingleton<IUserPlanService, UserPlanService>();
+        // NOTE: IUserPlanServiceはUIModule.csでUserPlanServiceAdapter（ILicenseManager連携）として登録
+        // ここでの重複登録を削除（Issue #243: Proプランでも広告が表示されるバグ修正）
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<INotificationService, AvaloniaNotificationService>();
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
