@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Avalonia.Styling;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
@@ -32,6 +33,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     private readonly ILocalizationService? _localizationService;
     private readonly ISettingsChangeTracker? _changeTracker;
     private readonly ILicenseManager? _licenseManager;
+    private readonly IUnifiedSettingsService? _unifiedSettingsService;
 
     // バッキングフィールド
     private bool _autoStartWithWindows;
@@ -75,6 +77,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// <param name="logger">ロガー（オプション）</param>
     /// <param name="translationSettings">翻訳設定データ（オプション）</param>
     /// <param name="licenseManager">ライセンスマネージャー（オプション）</param>
+    /// <param name="unifiedSettingsService">統一設定サービス（オプション）</param>
     public GeneralSettingsViewModel(
         GeneralSettings settings,
         IEventAggregator eventAggregator,
@@ -82,7 +85,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         ISettingsChangeTracker? changeTracker = null,
         ILogger<GeneralSettingsViewModel>? logger = null,
         TranslationSettings? translationSettings = null,
-        ILicenseManager? licenseManager = null) : base(eventAggregator)
+        ILicenseManager? licenseManager = null,
+        IUnifiedSettingsService? unifiedSettingsService = null) : base(eventAggregator)
     {
         _originalSettings = settings ?? throw new ArgumentNullException(nameof(settings));
         _originalTranslationSettings = translationSettings ?? new TranslationSettings();
@@ -90,6 +94,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _localizationService = localizationService;
         _changeTracker = changeTracker;
         _licenseManager = licenseManager;
+        _unifiedSettingsService = unifiedSettingsService;
 
         // [Issue #78 Phase 5] ライセンス状態変更時のUI更新を購読
         if (_licenseManager != null)
@@ -98,6 +103,16 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             Disposables.Add(Disposable.Create(() =>
             {
                 _licenseManager.StateChanged -= OnLicenseStateChanged;
+            }));
+        }
+
+        // [Issue #243] 統一設定変更時のUI更新を購読
+        if (_unifiedSettingsService != null)
+        {
+            _unifiedSettingsService.SettingsChanged += OnUnifiedSettingsChanged;
+            Disposables.Add(Disposable.Create(() =>
+            {
+                _unifiedSettingsService.SettingsChanged -= OnUnifiedSettingsChanged;
             }));
         }
 
@@ -884,6 +899,46 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
         // 派生プロパティの更新通知
         this.RaisePropertyChanged(nameof(CloudUsageDisplay));
+    }
+
+    /// <summary>
+    /// [Issue #243] 統一設定変更時のハンドラ
+    /// 外部から翻訳設定が変更された場合にUIを更新
+    /// </summary>
+    private void OnUnifiedSettingsChanged(object? sender, SettingsChangedEventArgs e)
+    {
+        // 翻訳設定の変更のみ処理
+        if (e.SettingsType != SettingsType.Translation)
+        {
+            return;
+        }
+
+        _logger?.LogDebug("[Issue #243] 統一設定変更を検出: Section={Section}", e.SectionName);
+
+        // UIスレッドでプロパティ更新
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (_unifiedSettingsService == null)
+            {
+                return;
+            }
+
+            var newSettings = _unifiedSettingsService.GetTranslationSettings();
+
+            // Cloud AI翻訳設定の変更を反映
+            // EnableCloudAiTranslation=true → UseLocalEngine=false（AI翻訳）
+            // EnableCloudAiTranslation=false → UseLocalEngine=true（ローカル翻訳）
+            var newUseLocalEngine = !newSettings.EnableCloudAiTranslation;
+            if (UseLocalEngine != newUseLocalEngine)
+            {
+                _logger?.LogInformation(
+                    "[Issue #243] 翻訳エンジン設定を外部変更から更新: UseLocalEngine={Old} → {New}",
+                    UseLocalEngine,
+                    newUseLocalEngine);
+
+                UseLocalEngine = newUseLocalEngine;
+            }
+        });
     }
 
     #endregion

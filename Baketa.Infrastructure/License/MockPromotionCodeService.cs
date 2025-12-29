@@ -22,6 +22,7 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
 {
     private readonly IPromotionSettingsPersistence _settingsPersistence;
     private readonly IEventAggregator _eventAggregator;
+    private readonly ILicenseManager _licenseManager;
     private readonly ILogger<MockPromotionCodeService> _logger;
     private bool _disposed;
 
@@ -31,10 +32,12 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
     public MockPromotionCodeService(
         IPromotionSettingsPersistence settingsPersistence,
         IEventAggregator eventAggregator,
+        ILicenseManager licenseManager,
         ILogger<MockPromotionCodeService> logger)
     {
         _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+        _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _logger.LogDebug("MockPromotionCodeService initialized");
@@ -61,7 +64,30 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
         // テスト用: BAKETA-TEST で始まるコードはProプランを適用
         if (normalizedCode.StartsWith("BAKETA-TEST", StringComparison.OrdinalIgnoreCase))
         {
-            var expiresAt = DateTime.UtcNow.AddMonths(1);
+            // Issue #243: 延長方式 - 既存Pro以上の場合は期限を延長
+            var currentState = _licenseManager.CurrentState;
+            var isAlreadyPro = currentState.CurrentPlan is PlanType.Pro or PlanType.Standard;
+            var currentExpiration = currentState.ExpirationDate ?? DateTime.UtcNow;
+
+            DateTime expiresAt;
+            string message;
+
+            if (isAlreadyPro && currentExpiration > DateTime.UtcNow)
+            {
+                // 既存のPro期限から1ヶ月延長
+                expiresAt = currentExpiration.AddMonths(1);
+                message = $"[モックモード] Proプラン期限を延長しました。新しい有効期限: {expiresAt:yyyy/MM/dd}";
+                _logger.LogInformation(
+                    "[MockMode] Pro plan extended: {OldExpiration} → {NewExpiration}",
+                    currentExpiration,
+                    expiresAt);
+            }
+            else
+            {
+                // 新規適用: 現在から1ヶ月
+                expiresAt = DateTime.UtcNow.AddMonths(1);
+                message = "[モックモード] Proプランが適用されました。";
+            }
 
             await _settingsPersistence.SavePromotionAsync(
                 normalizedCode,
@@ -81,7 +107,7 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
             PromotionStateChanged?.Invoke(this, new PromotionStateChangedEventArgs
             {
                 NewPromotion = promotionInfo,
-                Reason = "Mock promotion code applied"
+                Reason = isAlreadyPro ? "Mock promotion code extended" : "Mock promotion code applied"
             });
 
             // Issue #243: EventAggregator経由でLicenseManagerに通知
@@ -92,7 +118,7 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
             return PromotionCodeResult.CreateSuccess(
                 PlanType.Pro,
                 expiresAt,
-                "[モックモード] Proプランが適用されました。");
+                message);
         }
 
         // BAKETA-EXPIRE で始まるコードは期限切れ
