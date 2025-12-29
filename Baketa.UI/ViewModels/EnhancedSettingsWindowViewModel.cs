@@ -7,6 +7,8 @@ using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.UI.Framework;
@@ -29,6 +31,8 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     private readonly ISettingsChangeTracker _changeTracker;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILocalizationService? _localizationService;
+    private readonly ILicenseManager? _licenseManager;
+    private readonly IUnifiedSettingsService? _unifiedSettingsService;
     private readonly ILogger<EnhancedSettingsWindowViewModel>? _logger;
     private bool _showAdvancedSettings;
     private SettingCategory? _selectedCategory;
@@ -44,18 +48,24 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     /// <param name="changeTracker">設定変更追跡サービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="localizationService">ローカライゼーションサービス（オプション）</param>
+    /// <param name="licenseManager">ライセンスマネージャー（オプション）</param>
+    /// <param name="unifiedSettingsService">統一設定サービス（オプション）</param>
     /// <param name="logger">ロガー（オプション）</param>
     public EnhancedSettingsWindowViewModel(
         ISettingsService settingsService,
         ISettingsChangeTracker changeTracker,
         IEventAggregator eventAggregator,
         ILocalizationService? localizationService = null,
+        ILicenseManager? licenseManager = null,
+        IUnifiedSettingsService? unifiedSettingsService = null,
         ILogger<EnhancedSettingsWindowViewModel>? logger = null) : base(eventAggregator)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _changeTracker = changeTracker ?? throw new ArgumentNullException(nameof(changeTracker));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _localizationService = localizationService;
+        _licenseManager = licenseManager;
+        _unifiedSettingsService = unifiedSettingsService;
         _logger = logger;
 
         // カテゴリの初期化
@@ -296,10 +306,18 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
     {
         try
         {
+            // [Issue #243] キャッシュされたViewModelがある場合でも最新設定を確認
+            // プロモーション適用後の設定変更が即時反映されるようにするため
+            // キャッシュを使わず毎回新規作成する
             if (_settingsViewModels.TryGetValue("general", out var cachedViewModel) &&
                 cachedViewModel is GeneralSettingsViewModel generalViewModel)
             {
-                return new GeneralSettingsView(generalViewModel);
+                // [Issue #243] キャッシュを無効化 - 常に最新設定で新規作成
+                _settingsViewModels.Remove("general");
+                if (generalViewModel is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
             }
 
             // 実際の設定データを読み込み（テスト環境では同期処理を回避）
@@ -315,7 +333,26 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 else
                 {
                     settings = _settingsService.GetAsync<GeneralSettings>().GetAwaiter().GetResult() ?? new GeneralSettings();
-                    translationSettings = _settingsService.GetAsync<TranslationSettings>().GetAwaiter().GetResult() ?? new TranslationSettings();
+
+                    // [Issue #243] IUnifiedSettingsServiceから最新の翻訳設定を取得
+                    // プロモーション適用後の設定変更が反映されるようにする
+                    if (_unifiedSettingsService != null)
+                    {
+                        var unifiedSettings = _unifiedSettingsService.GetTranslationSettings();
+                        translationSettings = new TranslationSettings
+                        {
+                            DefaultSourceLanguage = unifiedSettings.DefaultSourceLanguage,
+                            DefaultTargetLanguage = unifiedSettings.DefaultTargetLanguage,
+                            AutoDetectSourceLanguage = unifiedSettings.AutoDetectSourceLanguage,
+                            TimeoutSeconds = unifiedSettings.TimeoutMs / 1000,
+                            OverlayFontSize = unifiedSettings.OverlayFontSize,
+                            EnableCloudAiTranslation = unifiedSettings.EnableCloudAiTranslation
+                        };
+                    }
+                    else
+                    {
+                        translationSettings = _settingsService.GetAsync<TranslationSettings>().GetAwaiter().GetResult() ?? new TranslationSettings();
+                    }
                 }
             }
             catch (Exception settingsEx)
@@ -324,7 +361,15 @@ public sealed class EnhancedSettingsWindowViewModel : Framework.ViewModelBase
                 settings = new GeneralSettings();
                 translationSettings = new TranslationSettings();
             }
-            var viewModel = new GeneralSettingsViewModel(settings, _eventAggregator, localizationService: _localizationService, changeTracker: _changeTracker, logger: _logger as ILogger<GeneralSettingsViewModel>, translationSettings: translationSettings);
+            var viewModel = new GeneralSettingsViewModel(
+                settings,
+                _eventAggregator,
+                localizationService: _localizationService,
+                changeTracker: _changeTracker,
+                logger: _logger as ILogger<GeneralSettingsViewModel>,
+                translationSettings: translationSettings,
+                licenseManager: _licenseManager,
+                unifiedSettingsService: _unifiedSettingsService);
 
             _settingsViewModels["general"] = viewModel;
             return new GeneralSettingsView(viewModel);

@@ -179,18 +179,18 @@ public class UserPlanService : IUserPlanService, IDisposable
         if (oldPlan != newPlan)
         {
             _logger.LogInformation(
-                "🔄 License plan changed: {OldPlan} -> {NewPlan} (Reason: {Reason})",
+                "License plan changed: {OldPlan} -> {NewPlan} (Reason: {Reason})",
                 oldPlan,
                 newPlan,
                 evt.Reason);
 
             ChangePlan(newPlan);
+        }
 
-            // Issue #243: プランアップグレード時にCloud AI翻訳を自動有効化
-            if (oldPlan == UserPlanType.Free && newPlan == UserPlanType.Premium)
-            {
-                await EnableCloudAiTranslationAsync().ConfigureAwait(false);
-            }
+        // Issue #243: Premiumプランになった場合はCloud AI翻訳を自動有効化
+        if (newPlan == UserPlanType.Premium && evt.Reason == LicenseChangeReason.PromotionApplied)
+        {
+            await EnableCloudAiTranslationAsync().ConfigureAwait(false);
         }
     }
 
@@ -214,7 +214,7 @@ public class UserPlanService : IUserPlanService, IDisposable
             var newSettings = new CloudAiEnabledTranslationSettings(currentSettings);
             await _settingsService.UpdateTranslationSettingsAsync(newSettings).ConfigureAwait(false);
 
-            _logger.LogInformation("🎉 Cloud AI翻訳を自動で有効化しました（プランアップグレード）");
+            _logger.LogInformation("[Issue #243] Cloud AI翻訳を自動で有効化しました（プランアップグレード）");
         }
         catch (Exception ex)
         {

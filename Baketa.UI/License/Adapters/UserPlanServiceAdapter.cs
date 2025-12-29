@@ -1,4 +1,5 @@
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Extensions;
 using Baketa.Core.License.Models;
@@ -14,6 +15,7 @@ namespace Baketa.UI.License.Adapters;
 public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
 {
     private readonly ILicenseManager _licenseManager;
+    private readonly IUnifiedSettingsService? _unifiedSettingsService;
     private readonly ILogger<UserPlanServiceAdapter> _logger;
     private bool _disposed;
 
@@ -42,10 +44,12 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     /// </summary>
     public UserPlanServiceAdapter(
         ILicenseManager licenseManager,
-        ILogger<UserPlanServiceAdapter> logger)
+        ILogger<UserPlanServiceAdapter> logger,
+        IUnifiedSettingsService? unifiedSettingsService = null)
     {
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _unifiedSettingsService = unifiedSettingsService;
 
         // イベント購読のセットアップ
         SetupEventSubscriptions();
@@ -146,6 +150,70 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
 
             PlanChanged?.Invoke(this, new UserPlanChangedEventArgs(oldUserPlanType, newUserPlanType));
         }
+
+        // [Issue #243] プロモーション適用時にCloud AI翻訳を自動有効化
+        if (newUserPlanType == UserPlanType.Premium && e.Reason == LicenseChangeReason.PromotionApplied)
+        {
+            _ = EnableCloudAiTranslationAsync();
+        }
+    }
+
+    /// <summary>
+    /// [Issue #243] Cloud AI翻訳を有効化
+    /// プロモーションコード適用時に自動でCloud AI翻訳を有効にする
+    /// </summary>
+    private async Task EnableCloudAiTranslationAsync()
+    {
+        if (_unifiedSettingsService == null)
+        {
+            _logger.LogWarning("[Issue #243] UnifiedSettingsServiceがnullのためCloud AI翻訳を有効化できません");
+            return;
+        }
+
+        try
+        {
+            var currentSettings = _unifiedSettingsService.GetTranslationSettings();
+
+            // 既に有効な場合はスキップ
+            if (currentSettings.EnableCloudAiTranslation)
+            {
+                _logger.LogDebug("Cloud AI翻訳は既に有効です");
+                return;
+            }
+
+            // 新しい設定を作成（EnableCloudAiTranslation = true）
+            var newSettings = new CloudAiEnabledTranslationSettings(currentSettings);
+            await _unifiedSettingsService.UpdateTranslationSettingsAsync(newSettings).ConfigureAwait(false);
+
+            _logger.LogInformation("[Issue #243] Cloud AI翻訳を自動で有効化しました（プランアップグレード）");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cloud AI翻訳の自動有効化に失敗しました");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #243] Cloud AI翻訳を有効化した設定ラッパー
+    /// </summary>
+    private sealed class CloudAiEnabledTranslationSettings : ITranslationSettings
+    {
+        private readonly ITranslationSettings _baseSettings;
+
+        public CloudAiEnabledTranslationSettings(ITranslationSettings baseSettings)
+        {
+            _baseSettings = baseSettings;
+        }
+
+        public bool AutoDetectSourceLanguage => _baseSettings.AutoDetectSourceLanguage;
+        public string DefaultSourceLanguage => _baseSettings.DefaultSourceLanguage;
+        public string DefaultTargetLanguage => _baseSettings.DefaultTargetLanguage;
+        public string DefaultEngine => _baseSettings.DefaultEngine;
+        public bool UseLocalEngine => false; // Cloud AI使用時はfalse
+        public double ConfidenceThreshold => _baseSettings.ConfidenceThreshold;
+        public int TimeoutMs => _baseSettings.TimeoutMs;
+        public int OverlayFontSize => _baseSettings.OverlayFontSize;
+        public bool EnableCloudAiTranslation => true; // 有効化
     }
 
     /// <inheritdoc/>

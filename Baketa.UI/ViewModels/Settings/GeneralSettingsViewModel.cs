@@ -860,10 +860,22 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
                 // Cloud AI翻訳が利用可能になった/なくなった場合、UseLocalEngineも更新
                 var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
+
                 if (!isCloudAvailable && !UseLocalEngine)
                 {
                     // Cloud AIが使えなくなった場合はローカル翻訳に切り替え
+                    _logger?.LogInformation("[Issue #243] Cloud AIが利用不可になったためローカル翻訳に切り替え");
                     UseLocalEngine = true;
+                }
+                else if (isCloudAvailable && UseLocalEngine)
+                {
+                    // [Issue #243] Cloud AIが使えるようになった場合、設定に基づいてCloud AIに切り替え
+                    var currentSettings = _unifiedSettingsService?.GetTranslationSettings();
+                    if (currentSettings?.EnableCloudAiTranslation == true)
+                    {
+                        _logger?.LogInformation("[Issue #243] Cloud AIが利用可能になったためCloud AI翻訳に切り替え");
+                        UseLocalEngine = false;
+                    }
                 }
             }
 

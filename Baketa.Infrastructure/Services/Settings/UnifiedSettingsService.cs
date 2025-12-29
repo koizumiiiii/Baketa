@@ -135,7 +135,9 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             ["defaultEngine"] = settings.DefaultEngine,
             ["confidenceThreshold"] = settings.ConfidenceThreshold,
             ["timeoutMs"] = settings.TimeoutMs,
-            ["overlayFontSize"] = settings.OverlayFontSize
+            ["overlayFontSize"] = settings.OverlayFontSize,
+            // [Issue #243] Cloud AI翻訳設定を保存
+            ["enableCloudAiTranslation"] = settings.EnableCloudAiTranslation
         };
 
         var json = JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true });
@@ -153,8 +155,11 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             _settingsLock.Release();
         }
 
-        _logger?.LogInformation("翻訳設定を更新しました: {SelectedLanguagePair}, Engine: {Engine}",
-            selectedLanguagePair, settings.DefaultEngine);
+        _logger?.LogInformation("翻訳設定を更新しました: {SelectedLanguagePair}, Engine: {Engine}, CloudAI: {CloudAI}",
+            selectedLanguagePair, settings.DefaultEngine, settings.EnableCloudAiTranslation);
+
+        // [Issue #243] 設定変更イベントを発火してUI更新をトリガー
+        SettingsChanged?.Invoke(this, new SettingsChangedEventArgs("translation", SettingsType.Translation));
     }
 
     /// <inheritdoc />
