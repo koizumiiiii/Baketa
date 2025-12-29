@@ -33,7 +33,13 @@ public enum LicenseChangeReason
     Logout,
 
     /// <summary>サブスクリプション期限切れ</summary>
-    SubscriptionExpired
+    SubscriptionExpired,
+
+    /// <summary>プロモーションコード適用</summary>
+    PromotionApplied,
+
+    /// <summary>プロモーション期限切れ/解除</summary>
+    PromotionExpired
 }
 
 /// <summary>

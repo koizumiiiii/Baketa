@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Events;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Extensions;
 using Baketa.Core.License.Models;
@@ -43,6 +44,10 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private readonly System.Threading.Timer? _backgroundRefreshTimer;
     private int _backgroundUpdateCount;
     private bool _disposed;
+
+    // Issue #243: プロモーションイベント購読用プロセッサ
+    private readonly IEventProcessor<PromotionAppliedEvent> _promotionAppliedProcessor;
+    private readonly IEventProcessor<PromotionRemovedEvent> _promotionRemovedProcessor;
 
     /// <inheritdoc/>
     public LicenseState CurrentState
@@ -102,17 +107,32 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 interval);
         }
 
+        // Issue #243: PromotionAppliedEventを購読（循環依存回避）
+        _promotionAppliedProcessor = new InlineEventProcessor<PromotionAppliedEvent>(evt =>
+        {
+            OnPromotionApplied(evt);
+            return Task.CompletedTask;
+        });
+        _promotionRemovedProcessor = new InlineEventProcessor<PromotionRemovedEvent>(evt =>
+        {
+            OnPromotionRemoved(evt);
+            return Task.CompletedTask;
+        });
+        _eventAggregator.Subscribe(_promotionAppliedProcessor);
+        _eventAggregator.Subscribe(_promotionRemovedProcessor);
+
         // モックモードの場合、自動的にテスト用認証情報を設定
         if (_settings.EnableMockMode)
         {
-            var mockPlanType = (PlanType)_settings.MockPlanType;
+            // Issue #243: プロモーションが有効なら優先
+            var effectivePlan = DetermineEffectivePlan();
             _userId = "mock_user_" + Guid.NewGuid().ToString("N")[..8];
             _sessionToken = "mock_session_" + Guid.NewGuid().ToString("N");
 
             // モックモード用の初期状態を設定
             _currentState = new LicenseState
             {
-                CurrentPlan = mockPlanType,
+                CurrentPlan = effectivePlan,
                 UserId = _userId,
                 SessionId = _sessionToken,
                 ContractStartDate = DateTime.UtcNow.AddDays(-15),
@@ -125,10 +145,11 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             };
 
             _logger.LogWarning(
-                "🧪 モックモード有効: UserId={UserId}, Plan={Plan}, TokenLimit={TokenLimit}",
+                "🧪 モックモード有効: UserId={UserId}, Plan={Plan}, TokenLimit={TokenLimit}, HasPromotion={HasPromotion}",
                 _userId,
-                mockPlanType,
-                _currentState.MonthlyTokenLimit);
+                effectivePlan,
+                _currentState.MonthlyTokenLimit,
+                _settings.PromotionPlanType.HasValue);
         }
 
         _logger.LogInformation(
@@ -773,6 +794,82 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
     #endregion
 
+    #region Promotion Support (Issue #243)
+
+    /// <summary>
+    /// 有効なプランを決定（プロモーション優先）
+    /// </summary>
+    private PlanType DetermineEffectivePlan()
+    {
+        // プロモーションが有効かチェック
+        if (_settings.PromotionPlanType.HasValue &&
+            !string.IsNullOrEmpty(_settings.PromotionExpiresAt) &&
+            DateTime.TryParse(_settings.PromotionExpiresAt, out var expiresAt) &&
+            expiresAt > DateTime.UtcNow)
+        {
+            var promotionPlan = (PlanType)_settings.PromotionPlanType.Value;
+            _logger.LogInformation(
+                "🎁 有効なプロモーション検出: Plan={Plan}, ExpiresAt={ExpiresAt}",
+                promotionPlan, expiresAt);
+            return promotionPlan;
+        }
+
+        // プロモーションなしの場合はMockPlanTypeを使用
+        return (PlanType)_settings.MockPlanType;
+    }
+
+    /// <summary>
+    /// プロモーション適用イベントハンドラ
+    /// </summary>
+    private void OnPromotionApplied(PromotionAppliedEvent evt)
+    {
+        if (evt?.Promotion == null)
+        {
+            _logger.LogWarning("PromotionAppliedEvent received with null promotion");
+            return;
+        }
+
+        _logger.LogInformation(
+            "🎁 プロモーション適用イベント受信: Plan={Plan}, ExpiresAt={ExpiresAt}",
+            evt.AppliedPlan, evt.ExpiresAt);
+
+        lock (_stateLock)
+        {
+            var oldState = _currentState;
+            var newState = _currentState with
+            {
+                CurrentPlan = evt.AppliedPlan,
+                ExpirationDate = evt.ExpiresAt
+            };
+
+            _currentState = newState;
+            OnStateChanged(oldState, newState, LicenseChangeReason.PromotionApplied);
+        }
+    }
+
+    /// <summary>
+    /// プロモーション解除イベントハンドラ
+    /// </summary>
+    private void OnPromotionRemoved(PromotionRemovedEvent evt)
+    {
+        _logger.LogInformation("🎁 プロモーション解除イベント受信: Reason={Reason}", evt?.Reason ?? "Unknown");
+
+        lock (_stateLock)
+        {
+            var oldState = _currentState;
+            var basePlan = (PlanType)_settings.MockPlanType;
+            var newState = _currentState with
+            {
+                CurrentPlan = basePlan
+            };
+
+            _currentState = newState;
+            OnStateChanged(oldState, newState, LicenseChangeReason.PromotionExpired);
+        }
+    }
+
+    #endregion
+
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -794,6 +891,32 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         _refreshRateLimiter.Dispose();
         _consumeRateLimiter.Dispose();
 
+        // 5. Issue #243: イベント購読を解除
+        _eventAggregator.Unsubscribe(_promotionAppliedProcessor);
+        _eventAggregator.Unsubscribe(_promotionRemovedProcessor);
+
         _logger.LogDebug("LicenseManager disposed");
+    }
+
+    /// <summary>
+    /// インラインイベントプロセッサ（ラムダ式をIEventProcessorにラップ）
+    /// </summary>
+    /// <remarks>
+    /// Issue #243: LicenseManager内でのプロモーションイベント購読に使用
+    /// ViewModelBase.csのパターンを踏襲
+    /// </remarks>
+    private sealed class InlineEventProcessor<TEvent> : IEventProcessor<TEvent>
+        where TEvent : IEvent
+    {
+        private readonly Func<TEvent, Task> _handler;
+
+        public InlineEventProcessor(Func<TEvent, Task> handler)
+        {
+            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+        }
+
+        public int Priority => 100;
+        public bool SynchronousExecution => false;
+        public Task HandleAsync(TEvent eventData) => _handler(eventData);
     }
 }

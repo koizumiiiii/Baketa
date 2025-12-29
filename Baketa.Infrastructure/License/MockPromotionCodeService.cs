@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Constants;
+using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +21,7 @@ namespace Baketa.Infrastructure.License;
 public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposable
 {
     private readonly IPromotionSettingsPersistence _settingsPersistence;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<MockPromotionCodeService> _logger;
     private bool _disposed;
 
@@ -27,9 +30,11 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
 
     public MockPromotionCodeService(
         IPromotionSettingsPersistence settingsPersistence,
+        IEventAggregator eventAggregator,
         ILogger<MockPromotionCodeService> logger)
     {
         _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _logger.LogDebug("MockPromotionCodeService initialized");
@@ -64,17 +69,24 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
                 expiresAt,
                 cancellationToken).ConfigureAwait(false);
 
+            var promotionInfo = new PromotionInfo
+            {
+                Code = normalizedCode,
+                Plan = PlanType.Pro,
+                ExpiresAt = expiresAt,
+                AppliedAt = DateTime.UtcNow
+            };
+
+            // 従来のイベント（ViewModel向け）
             PromotionStateChanged?.Invoke(this, new PromotionStateChangedEventArgs
             {
-                NewPromotion = new PromotionInfo
-                {
-                    Code = normalizedCode,
-                    Plan = PlanType.Pro,
-                    ExpiresAt = expiresAt,
-                    AppliedAt = DateTime.UtcNow
-                },
+                NewPromotion = promotionInfo,
                 Reason = "Mock promotion code applied"
             });
+
+            // Issue #243: EventAggregator経由でLicenseManagerに通知
+            await _eventAggregator.PublishAsync(new PromotionAppliedEvent(promotionInfo))
+                .ConfigureAwait(false);
 
             _logger.LogInformation("[MockMode] Promotion code applied: BAKETA-****-****");
             return PromotionCodeResult.CreateSuccess(
