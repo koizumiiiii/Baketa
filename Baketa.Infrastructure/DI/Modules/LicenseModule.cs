@@ -96,14 +96,31 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddSingleton<ILicenseManager>(provider =>
             provider.GetRequiredService<LicenseManager>());
 
-        // Issue #237 Phase 2: プロモーションコードサービス
+        // Issue #237 Phase 2: プロモーション設定永続化サービス
+        services.AddSingleton<License.PromotionSettingsPersistence>();
+        services.AddSingleton<IPromotionSettingsPersistence>(provider =>
+            provider.GetRequiredService<License.PromotionSettingsPersistence>());
+
+        // Issue #237 Phase 2: プロモーションコードサービス（モック/本番切り替え）
         services.AddHttpClient<License.PromotionCodeService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
         });
+        services.AddSingleton<License.MockPromotionCodeService>();
         services.AddSingleton<IPromotionCodeService>(provider =>
-            provider.GetRequiredService<License.PromotionCodeService>());
+        {
+            var licenseSettings = provider.GetRequiredService<IOptions<LicenseSettings>>().Value;
+
+            if (licenseSettings.EnableMockMode)
+            {
+                var logger = provider.GetRequiredService<ILogger<LicenseModule>>();
+                logger.LogInformation("🔧 プロモーションコードサービス: MockPromotionCodeService");
+                return provider.GetRequiredService<License.MockPromotionCodeService>();
+            }
+
+            return provider.GetRequiredService<License.PromotionCodeService>();
+        });
 
         // Disposable登録（アプリケーション終了時の適切なクリーンアップ）
         services.AddSingleton<IDisposable>(provider =>

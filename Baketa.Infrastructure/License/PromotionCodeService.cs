@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Constants;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
@@ -22,16 +24,61 @@ namespace Baketa.Infrastructure.License;
 /// </remarks>
 public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 {
+    #region 定数定義
+
     /// <summary>
     /// コード形式: BAKETA-XXXX-XXXX (Base32 Crockford、O/0/I/1除外)
     /// </summary>
     private static readonly Regex CodeFormatRegex = new(
-        @"^BAKETA-[0-9A-HJ-NP-TV-Z]{4}-[0-9A-HJ-NP-TV-Z]{4}$",
+        ValidationPatterns.PromotionCode,
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// コードの最大長（DoS対策）
+    /// </summary>
+    private const int MaxCodeLength = 20;
+
+    /// <summary>
+    /// レスポンスメッセージの最大長
+    /// </summary>
+    private const int MaxMessageLength = 500;
+
+    /// <summary>
+    /// Relay ServerからのAPIエラーコード定数
+    /// </summary>
+    private static class ApiErrorCodes
+    {
+        public const string InvalidCode = "INVALID_CODE";
+        public const string CodeNotFound = "CODE_NOT_FOUND";
+        public const string AlreadyRedeemed = "CODE_ALREADY_REDEEMED";
+        public const string AlreadyRedeemedAlt = "ALREADY_REDEEMED";
+        public const string CodeExpired = "CODE_EXPIRED";
+        public const string ExpiredAlt = "EXPIRED";
+        public const string NotApplicable = "CODE_NOT_APPLICABLE";
+        public const string AlreadyPro = "ALREADY_PRO";
+        public const string RateLimited = "RATE_LIMITED";
+        public const string TooManyRequests = "TOO_MANY_REQUESTS";
+        public const string ParseError = "PARSE_ERROR";
+        public const string Unknown = "UNKNOWN";
+    }
+
+    /// <summary>
+    /// プランタイプ文字列定数
+    /// </summary>
+    private static class PlanTypeStrings
+    {
+        public const string Free = "free";
+        public const string Standard = "standard";
+        public const string Pro = "pro";
+        public const string Premia = "premia";
+    }
+
+    #endregion
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<PromotionCodeService> _logger;
     private readonly IOptionsMonitor<LicenseSettings> _settingsMonitor;
+    private readonly IPromotionSettingsPersistence _settingsPersistence;
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
 
@@ -41,10 +88,12 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     public PromotionCodeService(
         HttpClient httpClient,
         IOptionsMonitor<LicenseSettings> settingsMonitor,
+        IPromotionSettingsPersistence settingsPersistence,
         ILogger<PromotionCodeService> logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _settingsMonitor = settingsMonitor ?? throw new ArgumentNullException(nameof(settingsMonitor));
+        _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _jsonOptions = new JsonSerializerOptions
@@ -53,7 +102,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
-        _logger.LogInformation("PromotionCodeService initialized");
+        _logger.LogDebug("PromotionCodeService initialized");
     }
 
     /// <inheritdoc/>
@@ -81,12 +130,6 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 "既にProプラン以上が適用されています。");
         }
 
-        // モックモード対応
-        if (_settingsMonitor.CurrentValue.EnableMockMode)
-        {
-            return await ApplyCodeMockAsync(normalizedCode, cancellationToken).ConfigureAwait(false);
-        }
-
         // Relay Server APIに検証リクエスト
         try
         {
@@ -95,7 +138,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             if (response.Success)
             {
                 // ローカルに保存
-                SavePromotionToSettings(normalizedCode, response);
+                await SavePromotionToSettingsAsync(normalizedCode, response, cancellationToken).ConfigureAwait(false);
 
                 _logger.LogInformation(
                     "Promotion code applied successfully: Plan={Plan}, ExpiresAt={ExpiresAt}",
@@ -112,7 +155,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 return PromotionCodeResult.CreateSuccess(
                     ParsePlanType(response.PlanType),
                     response.ExpiresAt ?? DateTime.UtcNow.AddMonths(1),
-                    response.Message ?? "プロモーションコードが適用されました。");
+                    TruncateMessage(response.Message, "プロモーションコードが適用されました。"));
             }
             else
             {
@@ -121,7 +164,9 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                     "Promotion code rejected: ErrorCode={ErrorCode}, Message={Message}",
                     response.ErrorCode, response.Message);
 
-                return PromotionCodeResult.CreateFailure(errorCode, response.Message ?? "コードの適用に失敗しました。");
+                return PromotionCodeResult.CreateFailure(
+                    errorCode,
+                    TruncateMessage(response.Message, "コードの適用に失敗しました。"));
             }
         }
         catch (HttpRequestException ex)
@@ -159,13 +204,13 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             return null;
         }
 
-        if (!DateTime.TryParse(settings.PromotionExpiresAt, out var expiresAt))
+        if (!DateTime.TryParse(settings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expiresAt))
         {
             _logger.LogWarning("Failed to parse PromotionExpiresAt: {Value}", settings.PromotionExpiresAt);
             return null;
         }
 
-        if (!DateTime.TryParse(settings.PromotionAppliedAt, out var appliedAt))
+        if (!DateTime.TryParse(settings.PromotionAppliedAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var appliedAt))
         {
             _logger.LogWarning("Failed to parse PromotionAppliedAt: {Value}, using current time", settings.PromotionAppliedAt);
             appliedAt = DateTime.UtcNow;
@@ -192,56 +237,51 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     #region Private Methods
 
     /// <summary>
-    /// コードを正規化（大文字変換、空白除去）
+    /// コードを正規化（大文字変換、空白除去、長さ制限）
     /// </summary>
     private static string NormalizeCode(string code)
     {
-        return code.Trim().ToUpperInvariant();
+        var normalized = code.Trim().ToUpperInvariant();
+        // DoS対策: 過度に長い入力を制限
+        return normalized.Length > MaxCodeLength
+            ? normalized[..MaxCodeLength]
+            : normalized;
+    }
+
+    /// <summary>
+    /// メッセージを安全な長さに切り詰め
+    /// </summary>
+    private static string TruncateMessage(string? message, string defaultMessage)
+    {
+        if (string.IsNullOrEmpty(message))
+            return defaultMessage;
+
+        return message.Length > MaxMessageLength
+            ? message[..MaxMessageLength] + "..."
+            : message;
     }
 
     /// <summary>
     /// コードをマスク（ログ用）
+    /// プレフィックス（BAKETA-）のみ表示し、残りはマスク
     /// </summary>
     private static string MaskCode(string code)
     {
-        if (code.Length <= 8)
+        if (string.IsNullOrEmpty(code))
             return "***";
-        return $"{code[..8]}****";
-    }
 
-    /// <summary>
-    /// モックモードでのコード適用
-    /// </summary>
-    private async Task<PromotionCodeResult> ApplyCodeMockAsync(string code, CancellationToken cancellationToken)
-    {
-        await Task.Delay(500, cancellationToken).ConfigureAwait(false); // シミュレート
-
-        // テスト用: BAKETA-TEST-PROx で始まるコードはProプランを適用
-        if (code.StartsWith("BAKETA-TEST", StringComparison.OrdinalIgnoreCase))
+        // BAKETA-XXXX-XXXX 形式の場合、BAKETA-****-**** と表示
+        const string prefix = "BAKETA-";
+        if (code.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
-            var expiresAt = DateTime.UtcNow.AddMonths(1);
-            SavePromotionToSettings(code, new RedeemResponse
-            {
-                Success = true,
-                PlanType = "pro",
-                ExpiresAt = expiresAt,
-                Message = "[モックモード] プロモーションコードが適用されました。"
-            });
-
-            var promotionInfo = GetCurrentPromotion();
-            PromotionStateChanged?.Invoke(this, new PromotionStateChangedEventArgs
-            {
-                NewPromotion = promotionInfo,
-                Reason = "Mock promotion code applied"
-            });
-
-            _logger.LogInformation("[MockMode] Promotion code applied: {Code}", MaskCode(code));
-            return PromotionCodeResult.CreateSuccess(PlanType.Pro, expiresAt, "[モックモード] Proプランが適用されました。");
+            return $"{prefix}****-****";
         }
 
-        return PromotionCodeResult.CreateFailure(
-            PromotionErrorCode.CodeNotFound,
-            "[モックモード] 無効なプロモーションコードです。");
+        // その他の形式の場合は先頭3文字のみ表示
+        if (code.Length <= 3)
+            return "***";
+
+        return $"{code[..3]}***";
     }
 
     /// <summary>
@@ -264,43 +304,160 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
+        // レスポンスのセキュリティ検証
+        var validationError = ValidateApiResponse(response, responseContent);
+        if (validationError != null)
+        {
+            return validationError;
+        }
+
         if (response.IsSuccessStatusCode)
         {
-            return JsonSerializer.Deserialize<RedeemResponse>(responseContent, _jsonOptions)
-                   ?? new RedeemResponse { Success = false, ErrorCode = "PARSE_ERROR", Message = "応答の解析に失敗しました" };
+            return ParseAndValidateSuccessResponse(responseContent);
         }
 
         // エラーレスポンスの解析
-        try
+        return ParseErrorResponse(response, responseContent);
+    }
+
+    /// <summary>
+    /// APIレスポンスのセキュリティ検証
+    /// </summary>
+    private RedeemResponse? ValidateApiResponse(HttpResponseMessage response, string responseContent)
+    {
+        // Content-Type厳格検証（application/json のみ許可）
+        var contentTypeHeader = response.Content.Headers.ContentType;
+        if (contentTypeHeader != null)
         {
-            return JsonSerializer.Deserialize<RedeemResponse>(responseContent, _jsonOptions)
-                   ?? new RedeemResponse { Success = false, ErrorCode = "UNKNOWN", Message = "不明なエラーが発生しました" };
+            var mediaType = contentTypeHeader.MediaType;
+            // application/json または application/problem+json を許可
+            if (!string.Equals(mediaType, "application/json", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(mediaType, "application/problem+json", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Unexpected Content-Type: {ContentType}", contentTypeHeader);
+                return new RedeemResponse
+                {
+                    Success = false,
+                    ErrorCode = ApiErrorCodes.ParseError,
+                    Message = "サーバーからの応答形式が不正です"
+                };
+            }
         }
-        catch
+
+        // レスポンスサイズ検証（DoS対策: 1MBまで）
+        const int maxResponseSize = 1024 * 1024;
+        if (responseContent.Length > maxResponseSize)
         {
+            _logger.LogWarning("Response too large: {Size} bytes", responseContent.Length);
             return new RedeemResponse
             {
                 Success = false,
-                ErrorCode = $"HTTP_{(int)response.StatusCode}",
-                Message = $"サーバーエラー: {response.StatusCode}"
+                ErrorCode = ApiErrorCodes.ParseError,
+                Message = "サーバーからの応答が大きすぎます"
+            };
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 成功レスポンスの解析と検証
+    /// </summary>
+    private RedeemResponse ParseAndValidateSuccessResponse(string responseContent)
+    {
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<RedeemResponse>(responseContent, _jsonOptions);
+
+            if (parsed == null)
+            {
+                return new RedeemResponse
+                {
+                    Success = false,
+                    ErrorCode = ApiErrorCodes.ParseError,
+                    Message = "応答の解析に失敗しました"
+                };
+            }
+
+            // 成功時の必須フィールド検証
+            if (parsed.Success)
+            {
+                if (string.IsNullOrEmpty(parsed.PlanType))
+                {
+                    _logger.LogWarning("Success response missing PlanType");
+                    return new RedeemResponse
+                    {
+                        Success = false,
+                        ErrorCode = ApiErrorCodes.ParseError,
+                        Message = "サーバーからの応答にプラン情報がありません"
+                    };
+                }
+            }
+
+            return parsed;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse success response");
+            return new RedeemResponse
+            {
+                Success = false,
+                ErrorCode = ApiErrorCodes.ParseError,
+                Message = "応答の解析に失敗しました"
             };
         }
     }
 
     /// <summary>
+    /// エラーレスポンスの解析
+    /// </summary>
+    private RedeemResponse ParseErrorResponse(HttpResponseMessage response, string responseContent)
+    {
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<RedeemResponse>(responseContent, _jsonOptions);
+            if (parsed != null)
+            {
+                // メッセージの安全な切り詰め
+                parsed.Message = TruncateMessage(parsed.Message, "不明なエラーが発生しました");
+                return parsed;
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogDebug(ex, "Could not parse error response as JSON");
+        }
+
+        return new RedeemResponse
+        {
+            Success = false,
+            ErrorCode = $"HTTP_{(int)response.StatusCode}",
+            Message = $"サーバーエラー: {response.StatusCode}"
+        };
+    }
+
+    /// <summary>
     /// プロモーション情報を設定に保存
     /// </summary>
-    private void SavePromotionToSettings(string code, RedeemResponse response)
+    private async Task SavePromotionToSettingsAsync(string code, RedeemResponse response, CancellationToken cancellationToken)
     {
-        var settings = _settingsMonitor.CurrentValue;
-        settings.AppliedPromotionCode = code;
-        settings.PromotionPlanType = (int)ParsePlanType(response.PlanType);
-        settings.PromotionExpiresAt = response.ExpiresAt?.ToString("O");
-        settings.PromotionAppliedAt = DateTime.UtcNow.ToString("O");
-        settings.LastOnlineVerification = DateTime.UtcNow.ToString("O");
+        var plan = ParsePlanType(response.PlanType);
+        var expiresAt = response.ExpiresAt ?? DateTime.UtcNow.AddMonths(1);
 
-        // TODO: 設定の永続化をトリガー
-        _logger.LogDebug("Promotion saved to settings: Code={Code}, Plan={Plan}", MaskCode(code), response.PlanType);
+        var saved = await _settingsPersistence.SavePromotionAsync(
+            code,
+            plan,
+            expiresAt,
+            cancellationToken).ConfigureAwait(false);
+
+        if (saved)
+        {
+            _logger.LogDebug("Promotion saved to settings: Code={Code}, Plan={Plan}", MaskCode(code), response.PlanType);
+        }
+        else
+        {
+            _logger.LogWarning("Failed to save promotion to settings: Code={Code}", MaskCode(code));
+        }
     }
 
     /// <summary>
@@ -310,10 +467,10 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     {
         return planType?.ToLowerInvariant() switch
         {
-            "free" => PlanType.Free,
-            "standard" => PlanType.Standard,
-            "pro" => PlanType.Pro,
-            "premia" => PlanType.Premia,
+            PlanTypeStrings.Free => PlanType.Free,
+            PlanTypeStrings.Standard => PlanType.Standard,
+            PlanTypeStrings.Pro => PlanType.Pro,
+            PlanTypeStrings.Premia => PlanType.Premia,
             _ => PlanType.Pro // デフォルトはPro
         };
     }
@@ -325,11 +482,11 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     {
         return errorCode?.ToUpperInvariant() switch
         {
-            "INVALID_CODE" or "CODE_NOT_FOUND" => PromotionErrorCode.CodeNotFound,
-            "CODE_ALREADY_REDEEMED" or "ALREADY_REDEEMED" => PromotionErrorCode.AlreadyRedeemed,
-            "CODE_EXPIRED" or "EXPIRED" => PromotionErrorCode.CodeExpired,
-            "CODE_NOT_APPLICABLE" or "ALREADY_PRO" => PromotionErrorCode.AlreadyProOrHigher,
-            "RATE_LIMITED" or "TOO_MANY_REQUESTS" => PromotionErrorCode.RateLimited,
+            ApiErrorCodes.InvalidCode or ApiErrorCodes.CodeNotFound => PromotionErrorCode.CodeNotFound,
+            ApiErrorCodes.AlreadyRedeemed or ApiErrorCodes.AlreadyRedeemedAlt => PromotionErrorCode.AlreadyRedeemed,
+            ApiErrorCodes.CodeExpired or ApiErrorCodes.ExpiredAlt => PromotionErrorCode.CodeExpired,
+            ApiErrorCodes.NotApplicable or ApiErrorCodes.AlreadyPro => PromotionErrorCode.AlreadyProOrHigher,
+            ApiErrorCodes.RateLimited or ApiErrorCodes.TooManyRequests => PromotionErrorCode.RateLimited,
             _ => PromotionErrorCode.ServerError
         };
     }
