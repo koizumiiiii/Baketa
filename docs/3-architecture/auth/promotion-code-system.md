@@ -148,12 +148,105 @@ POST https://baketa-relay.suke009.workers.dev/api/promotion/redeem
 | `CODE_NOT_APPLICABLE` | 適用条件不一致 | このコードは適用できません |
 | `RATE_LIMITED` | レート制限 | しばらく待ってから再試行してください |
 
+## データベーススキーマ（Supabase）
+
+### promotion_codes テーブル
+
+プロモーションコードのマスタデータを管理:
+
+```sql
+CREATE TABLE promotion_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXX-XXXX" (Base32 Crockford)
+  plan_type INT NOT NULL,                       -- 0=Free, 1=Standard, 2=Pro, 3=Premia
+  expires_at TIMESTAMPTZ NOT NULL,              -- コード自体の有効期限
+  duration_days INT NOT NULL DEFAULT 30,        -- 適用後のプラン有効期間（日数）
+  usage_type TEXT NOT NULL DEFAULT 'single_use', -- single_use, multi_use, limited
+  max_uses INT DEFAULT 1,                       -- 最大使用回数（single_use=1）
+  current_uses INT DEFAULT 0,                   -- 現在の使用回数
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  is_active BOOLEAN DEFAULT true,               -- 無効化フラグ
+  description TEXT                              -- 管理用メモ
+);
+```
+
+### promotion_code_redemptions テーブル（監査ログ）
+
+コード使用履歴を追跡:
+
+```sql
+CREATE TABLE promotion_code_redemptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  promotion_code_id UUID REFERENCES promotion_codes(id),
+  device_id TEXT,                               -- デバイス識別子（将来用）
+  redeemed_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT NOT NULL,                         -- 'success', 'failed_not_found', 'failed_expired', 'failed_limit'
+  error_message TEXT,
+  client_ip TEXT
+);
+```
+
+### redeem_promotion_code 関数（アトミック処理）
+
+レースコンディション対策のためのDB関数。`FOR UPDATE`で行ロックを取得し、チェック→更新→ログ記録をアトミックに実行:
+
+```sql
+CREATE OR REPLACE FUNCTION redeem_promotion_code(
+  code_to_redeem TEXT,
+  client_ip_address TEXT DEFAULT NULL
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  rec RECORD;
+BEGIN
+  -- 行をロックして競合を防止
+  SELECT * INTO rec FROM promotion_codes
+  WHERE code = code_to_redeem AND is_active = true
+  FOR UPDATE;
+
+  -- 検証: 存在チェック、有効期限、使用回数
+  -- 成功時: current_uses++, 監査ログ記録
+  -- 失敗時: エラーコードとメッセージを返却
+
+  RETURN json_build_object('success', true, 'plan_type', rec.plan_type, ...);
+END;
+$$;
+```
+
+詳細なSQL定義: `docs/database/promotion_codes.sql`
+
 ## ローカル設定保存
 
-プロモーション情報は `LicenseSettings` に保存されます。
+プロモーション情報は `IUnifiedSettingsService` 経由で `~/.baketa/settings/promotion-settings.json` に保存されます（Issue #237 C案）。
+
+### 保存フィールド
+
+```json
+{
+  "AppliedPromotionCode": "BAKETA-XXXX-XXXX",
+  "PromotionPlanType": 2,
+  "PromotionExpiresAt": "2025-03-29T00:00:00Z",
+  "PromotionAppliedAt": "2025-01-15T10:30:00Z",
+  "LastOnlineVerification": "2025-01-15T10:30:00Z"
+}
+```
+
+### 関連コンポーネント
+
+| コンポーネント | 役割 |
+|--------------|------|
+| `IPromotionSettings` | 読み取り専用インターフェース |
+| `IUnifiedSettingsService` | 設定の読み書き |
+| `PromotionSettingsPersistence` | 永続化サービス |
+| `PromotionSettingsExtensions` | `IsCurrentlyActive()` 拡張メソッド |
+
+### レガシー設定（互換性）
 
 ```csharp
-// Baketa.Core/Settings/LicenseSettings.cs
+// Baketa.Core/Settings/LicenseSettings.cs（後方互換用）
 
 // 適用済みプロモーションコード
 public string? AppliedPromotionCode { get; set; }
@@ -390,7 +483,7 @@ public async Task ApplyCodeAsync_ValidCode_ReturnsSuccess()
     var service = new PromotionCodeService(mockHttpClient, ...);
 
     // Act
-    var result = await service.ApplyCodeAsync("BAKETA-TEST-PRO1");
+    var result = await service.ApplyCodeAsync("BAKETA-TEST-PR01");
 
     // Assert
     Assert.True(result.Success);

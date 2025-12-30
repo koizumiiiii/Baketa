@@ -24,6 +24,7 @@
  */
 
 import { handleTranslate, TranslateEnv } from './translate';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================
 // 定数
@@ -84,6 +85,8 @@ export interface Env {
   GEMINI_MODEL?: string;     // Geminiモデル名（デフォルト: gemini-2.5-flash-lite）
   OPENAI_API_KEY?: string;   // Cloud AI翻訳用
   OPENAI_MODEL?: string;     // OpenAIモデル名（デフォルト: gpt-4.1-nano）
+  SUPABASE_URL?: string;     // プロモーションコード検証用
+  SUPABASE_SERVICE_KEY?: string;  // プロモーションコード検証用
 }
 
 interface SessionData {
@@ -749,6 +752,146 @@ function validateEnvironment(env: Env): EnvValidationResult {
 }
 
 // ============================================
+// プロモーションコード関連
+// ============================================
+
+/** Supabaseクライアント取得 */
+function getSupabaseClient(env: Env): SupabaseClient | null {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
+    return null;
+  }
+  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY, {
+    auth: { persistSession: false }
+  });
+}
+
+/** プロモーションコードリクエスト */
+interface PromotionRedeemBody {
+  code: string;
+}
+
+/** プロモーションコードバリデーション */
+function validatePromotionRedeemBody(body: unknown): ValidationResult<PromotionRedeemBody> {
+  if (!body || typeof body !== 'object') {
+    return { success: false, error: 'Invalid request body' };
+  }
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.code !== 'string' || !obj.code) {
+    return { success: false, error: 'Missing or invalid field: code' };
+  }
+  return { success: true, data: { code: obj.code } };
+}
+
+/** Base32 Crockford形式検証 */
+const PROMOTION_CODE_PATTERN = /^BAKETA-[0-9A-HJ-NP-TV-Z]{4}-[0-9A-HJ-NP-TV-Z]{4}$/;
+
+function isValidPromotionCodeFormat(code: string): boolean {
+  return PROMOTION_CODE_PATTERN.test(code);
+}
+
+/** プロモーションコードRPC結果 */
+interface PromotionRpcResult {
+  success: boolean;
+  plan_type?: number;
+  duration_days?: number;
+  expires_at?: string;
+  redemption_id?: string;
+  error_code?: string;
+  message?: string;
+}
+
+/**
+ * プロモーションコード適用
+ * POST /api/promotion/redeem
+ */
+async function handlePromotionRedeem(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. リクエスト検証
+    const body = await request.json();
+    const validation = validatePromotionRedeemBody(body);
+    if (!validation.success || !validation.data) {
+      return errorResponse(validation.error || 'Invalid request', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+    }
+
+    const { code } = validation.data;
+    const normalizedCode = code.toUpperCase().trim();
+
+    // 2. コード形式検証（Base32 Crockford）- 早期リジェクト
+    if (!isValidPromotionCodeFormat(normalizedCode)) {
+      return successResponse({
+        success: false,
+        error_code: 'INVALID_CODE',
+        message: '無効なプロモーションコードの形式です'
+      }, origin, allowedOrigins);
+    }
+
+    // 3. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('Supabase not configured for promotion codes');
+      return errorResponse('Promotion service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 4. クライアントIP取得（監査用）
+    const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+
+    // 5. Supabase RPC呼び出し（アトミック処理）
+    const { data, error } = await supabase.rpc('redeem_promotion_code', {
+      code_to_redeem: normalizedCode,
+      client_ip_address: clientIP
+    });
+
+    if (error) {
+      console.error('Supabase RPC error:', error);
+      return errorResponse('Server error', 500, origin, allowedOrigins, 'SERVER_ERROR');
+    }
+
+    // 6. RPC結果を解析してレスポンス生成
+    const result = data as PromotionRpcResult;
+
+    if (!result.success) {
+      console.log(`Promotion code rejected: code=${normalizedCode.substring(0, 10)}****, error=${result.error_code}`);
+      return successResponse({
+        success: false,
+        error_code: result.error_code || 'UNKNOWN_ERROR',
+        message: result.message || '予期せぬエラーが発生しました'
+      }, origin, allowedOrigins);
+    }
+
+    // 7. 成功レスポンス
+    // PlanType型と一致させるため大文字で定義（C#側はToLowerInvariant()で正規化）
+    const planTypeMap: Record<number, PlanType> = {
+      0: 'Free', 1: 'Standard', 2: 'Pro', 3: 'Premia'
+    };
+
+    console.log(`Promotion code redeemed: code=${normalizedCode.substring(0, 10)}****, plan=${result.plan_type}`);
+
+    // DBスキーマ上 plan_type は NOT NULL だが、万が一のフォールバックとして 'Pro' を使用
+    const plan = planTypeMap[result.plan_type ?? 2] ?? 'Pro';
+
+    return successResponse({
+      success: true,
+      plan_type: plan,
+      expires_at: result.expires_at,
+      message: 'プロモーションコードが適用されました。'
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('Promotion redeem error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+// ============================================
 // メインハンドラ
 // ============================================
 
@@ -821,6 +964,8 @@ export default {
           return handlePatreonRevokeAll(request, env, origin, allowedOrigins);
         case '/api/translate':
           return handleTranslate(request, env as TranslateEnv, origin, allowedOrigins);
+        case '/api/promotion/redeem':
+          return handlePromotionRedeem(request, env, origin, allowedOrigins);
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');
       }
