@@ -770,6 +770,40 @@ interface PromotionRedeemBody {
   code: string;
 }
 
+/**
+ * Supabase JWTからユーザーIDを抽出・検証
+ * @returns user_id (UUID) or null if not authenticated
+ */
+async function extractUserIdFromJwt(
+  request: Request,
+  supabase: SupabaseClient
+): Promise<string | null> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;  // 未ログイン（許容）
+  }
+
+  const jwt = authHeader.substring(7);
+  if (!jwt) {
+    return null;
+  }
+
+  try {
+    // Supabase Auth でJWTを検証し、ユーザー情報を取得
+    const { data: { user }, error } = await supabase.auth.getUser(jwt);
+
+    if (error || !user) {
+      console.log(`JWT validation failed: ${error?.message || 'No user found'}`);
+      return null;  // 無効なJWTでも未ログイン扱い（エラーにしない）
+    }
+
+    return user.id;
+  } catch (error) {
+    console.error('JWT extraction error:', error);
+    return null;
+  }
+}
+
 /** プロモーションコードバリデーション */
 function validatePromotionRedeemBody(body: unknown): ValidationResult<PromotionRedeemBody> {
   if (!body || typeof body !== 'object') {
@@ -844,10 +878,19 @@ async function handlePromotionRedeem(
     // 4. クライアントIP取得（監査用）
     const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
 
-    // 5. Supabase RPC呼び出し（アトミック処理）
+    // 5. JWT検証してユーザーID抽出（未ログインはnull）
+    const userId = await extractUserIdFromJwt(request, supabase);
+    if (userId) {
+      console.log(`Promotion redeem: authenticated user ${userId.substring(0, 8)}...`);
+    } else {
+      console.log('Promotion redeem: anonymous user');
+    }
+
+    // 6. Supabase RPC呼び出し（アトミック処理）
     const { data, error } = await supabase.rpc('redeem_promotion_code', {
       code_to_redeem: normalizedCode,
-      client_ip_address: clientIP
+      client_ip_address: clientIP,
+      redeeming_user_id: userId  // JWT検証済みユーザーID（nullable）
     });
 
     if (error) {
@@ -855,7 +898,7 @@ async function handlePromotionRedeem(
       return errorResponse('Server error', 500, origin, allowedOrigins, 'SERVER_ERROR');
     }
 
-    // 6. RPC結果を解析してレスポンス生成
+    // 7. RPC結果を解析してレスポンス生成
     const result = data as PromotionRpcResult;
 
     if (!result.success) {
@@ -867,13 +910,13 @@ async function handlePromotionRedeem(
       }, origin, allowedOrigins);
     }
 
-    // 7. 成功レスポンス
+    // 8. 成功レスポンス
     // PlanType型と一致させるため大文字で定義（C#側はToLowerInvariant()で正規化）
     const planTypeMap: Record<number, PlanType> = {
       0: 'Free', 1: 'Standard', 2: 'Pro', 3: 'Premia'
     };
 
-    console.log(`Promotion code redeemed: code=${normalizedCode.substring(0, 10)}****, plan=${result.plan_type}`);
+    console.log(`Promotion code redeemed: code=${normalizedCode.substring(0, 10)}****, plan=${result.plan_type}, user=${userId?.substring(0, 8) || 'anonymous'}`);
 
     // DBスキーマ上 plan_type は NOT NULL だが、万が一のフォールバックとして 'Pro' を使用
     const plan = planTypeMap[result.plan_type ?? 2] ?? 'Pro';

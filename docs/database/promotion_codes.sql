@@ -52,6 +52,7 @@ CREATE POLICY "Service role can manage promotion_codes" ON promotion_codes
 CREATE TABLE IF NOT EXISTS promotion_code_redemptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   promotion_code_id UUID REFERENCES promotion_codes(id),  -- NULLable for not_found cases
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,  -- Supabase Auth ユーザーID（未ログインはNULL）
   device_id TEXT,                               -- デバイス識別子（将来用）
   redeemed_at TIMESTAMPTZ DEFAULT NOW(),
   status TEXT NOT NULL,                         -- 'success', 'failed_not_found', 'failed_expired', 'failed_limit'
@@ -62,6 +63,10 @@ CREATE TABLE IF NOT EXISTS promotion_code_redemptions (
 -- コードID検索用インデックス
 CREATE INDEX IF NOT EXISTS idx_redemptions_code
   ON promotion_code_redemptions(promotion_code_id);
+
+-- ユーザーID検索用インデックス
+CREATE INDEX IF NOT EXISTS idx_redemptions_user
+  ON promotion_code_redemptions(user_id);
 
 -- 時系列検索用インデックス
 CREATE INDEX IF NOT EXISTS idx_redemptions_time
@@ -90,7 +95,8 @@ CREATE POLICY "Service role can manage redemptions" ON promotion_code_redemption
 -- ===========================================
 CREATE OR REPLACE FUNCTION redeem_promotion_code(
   code_to_redeem TEXT,
-  client_ip_address TEXT DEFAULT NULL
+  client_ip_address TEXT DEFAULT NULL,
+  redeeming_user_id UUID DEFAULT NULL  -- JWT検証済みのユーザーID（未ログインはNULL）
 )
 RETURNS json
 LANGUAGE plpgsql
@@ -110,8 +116,8 @@ BEGIN
 
   -- レコードが見つからない場合
   IF rec IS NULL THEN
-    INSERT INTO promotion_code_redemptions (promotion_code_id, status, error_message, client_ip)
-    VALUES (NULL, 'failed_not_found', 'Code not found or inactive', client_ip_address);
+    INSERT INTO promotion_code_redemptions (promotion_code_id, user_id, status, error_message, client_ip)
+    VALUES (NULL, redeeming_user_id, 'failed_not_found', 'Code not found or inactive', client_ip_address);
     RETURN json_build_object(
       'success', false,
       'error_code', 'CODE_NOT_FOUND',
@@ -121,8 +127,8 @@ BEGIN
 
   -- 有効期限チェック
   IF rec.expires_at < NOW() THEN
-    INSERT INTO promotion_code_redemptions (promotion_code_id, status, error_message, client_ip)
-    VALUES (rec.id, 'failed_expired', 'Code expired', client_ip_address);
+    INSERT INTO promotion_code_redemptions (promotion_code_id, user_id, status, error_message, client_ip)
+    VALUES (rec.id, redeeming_user_id, 'failed_expired', 'Code expired', client_ip_address);
     RETURN json_build_object(
       'success', false,
       'error_code', 'CODE_EXPIRED',
@@ -132,8 +138,8 @@ BEGIN
 
   -- 使用回数上限チェック
   IF rec.current_uses >= rec.max_uses THEN
-    INSERT INTO promotion_code_redemptions (promotion_code_id, status, error_message, client_ip)
-    VALUES (rec.id, 'failed_limit', 'Usage limit reached', client_ip_address);
+    INSERT INTO promotion_code_redemptions (promotion_code_id, user_id, status, error_message, client_ip)
+    VALUES (rec.id, redeeming_user_id, 'failed_limit', 'Usage limit reached', client_ip_address);
     RETURN json_build_object(
       'success', false,
       'error_code', 'CODE_ALREADY_REDEEMED',
@@ -146,9 +152,9 @@ BEGIN
   SET current_uses = current_uses + 1
   WHERE id = rec.id;
 
-  -- 監査ログに記録
-  INSERT INTO promotion_code_redemptions (promotion_code_id, status, client_ip)
-  VALUES (rec.id, 'success', client_ip_address)
+  -- 監査ログに記録（user_id含む）
+  INSERT INTO promotion_code_redemptions (promotion_code_id, user_id, status, client_ip)
+  VALUES (rec.id, redeeming_user_id, 'success', client_ip_address)
   RETURNING id INTO redemption_id;
 
   -- 適用後の有効期限を計算（現在時刻 + duration_days）
@@ -159,7 +165,8 @@ BEGIN
     'plan_type', rec.plan_type,
     'duration_days', rec.duration_days,
     'expires_at', result_expires_at,
-    'redemption_id', redemption_id
+    'redemption_id', redemption_id,
+    'user_id', redeeming_user_id  -- 適用したユーザーID（確認用）
   );
 EXCEPTION
   WHEN OTHERS THEN
@@ -206,3 +213,30 @@ $$;
 
 -- コード無効化
 -- UPDATE promotion_codes SET is_active = false WHERE code = 'BAKETA-XXXX-XXXX';
+
+-- ===========================================
+-- 5. マイグレーション用SQL（既存テーブル更新）
+-- ===========================================
+-- 既存のpromotion_code_redemptionsテーブルにuser_id列を追加する場合:
+--
+-- ALTER TABLE promotion_code_redemptions
+-- ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+--
+-- CREATE INDEX IF NOT EXISTS idx_redemptions_user
+--   ON promotion_code_redemptions(user_id);
+
+-- ===========================================
+-- 6. ユーザー追跡付き利用履歴確認クエリ
+-- ===========================================
+-- SELECT
+--   r.redeemed_at,
+--   p.code,
+--   r.status,
+--   u.email as user_email,
+--   r.user_id,
+--   r.client_ip
+-- FROM promotion_code_redemptions r
+-- LEFT JOIN promotion_codes p ON r.promotion_code_id = p.id
+-- LEFT JOIN auth.users u ON r.user_id = u.id
+-- ORDER BY r.redeemed_at DESC
+-- LIMIT 100;

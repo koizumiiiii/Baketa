@@ -1,9 +1,11 @@
 using System.Globalization;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Constants;
 using Baketa.Core.License.Models;
@@ -79,6 +81,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     private readonly ILogger<PromotionCodeService> _logger;
     private readonly IOptionsMonitor<LicenseSettings> _settingsMonitor;
     private readonly IPromotionSettingsPersistence _settingsPersistence;
+    private readonly IAuthService _authService;
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
 
@@ -89,11 +92,13 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         HttpClient httpClient,
         IOptionsMonitor<LicenseSettings> settingsMonitor,
         IPromotionSettingsPersistence settingsPersistence,
+        IAuthService authService,
         ILogger<PromotionCodeService> logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _settingsMonitor = settingsMonitor ?? throw new ArgumentNullException(nameof(settingsMonitor));
         _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _jsonOptions = new JsonSerializerOptions
@@ -237,6 +242,35 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     #region Private Methods
 
     /// <summary>
+    /// Supabase Auth JWTをAuthorizationヘッダーに追加
+    /// </summary>
+    /// <remarks>
+    /// ログイン済みの場合のみJWTを追加。未ログインでもプロモーション適用は可能。
+    /// サーバー側でJWTを検証し、user_idを監査ログに記録する。
+    /// </remarks>
+    private async Task AddAuthorizationHeaderAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var session = await _authService.GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+            if (session?.IsValid == true && !string.IsNullOrEmpty(session.AccessToken))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", session.AccessToken);
+                _logger.LogDebug("Added JWT authorization header for user tracking");
+            }
+            else
+            {
+                _logger.LogDebug("No valid session, proceeding without authorization header (anonymous promotion)");
+            }
+        }
+        catch (Exception ex)
+        {
+            // 認証情報取得に失敗しても処理は継続（未ログイン扱い）
+            _logger.LogDebug(ex, "Failed to get auth session, proceeding without authorization header");
+        }
+    }
+
+    /// <summary>
     /// コードを正規化（大文字変換、空白除去、長さ制限）
     /// </summary>
     private static string NormalizeCode(string code)
@@ -297,8 +331,9 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             Content = content
         };
 
-        // TODO: セッショントークンがある場合はヘッダーに追加
-        // httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
+        // Supabase Auth JWTをヘッダーに追加（ユーザー追跡用）
+        // Issue #237: サーバー側でJWTを検証してuser_idを監査ログに記録
+        await AddAuthorizationHeaderAsync(httpRequest, cancellationToken).ConfigureAwait(false);
 
         using var response = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
 
