@@ -1,8 +1,11 @@
+using System.Globalization;
 using System.Net.Http;
 using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Events;
+using Baketa.Core.Extensions;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Extensions;
 using Baketa.Core.License.Models;
@@ -23,6 +26,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private readonly ILicenseCacheService _cacheService;
     private readonly IEventAggregator _eventAggregator;
     private readonly LicenseSettings _settings;
+    private readonly IUnifiedSettingsService? _unifiedSettingsService;
 
     // 現在のライセンス状態
     private LicenseState _currentState;
@@ -81,13 +85,15 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         ILicenseApiClient apiClient,
         ILicenseCacheService cacheService,
         IEventAggregator eventAggregator,
-        IOptions<LicenseSettings> settings)
+        IOptions<LicenseSettings> settings,
+        IUnifiedSettingsService? unifiedSettingsService = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
         _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
+        _unifiedSettingsService = unifiedSettingsService;
 
         // 初期状態はFreeプラン
         _currentState = LicenseState.Default;
@@ -801,15 +807,29 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     /// </summary>
     private PlanType DetermineEffectivePlan()
     {
-        // プロモーションが有効かチェック
+        // [Issue #237 C案] IUnifiedSettingsService経由でプロモーション設定を読み込む
+        if (_unifiedSettingsService is not null)
+        {
+            var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+            if (promotionSettings.IsCurrentlyActive() && promotionSettings.PromotionPlanType.HasValue)
+            {
+                var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
+                _logger.LogInformation(
+                    "🎁 [Issue #237] 有効なプロモーション検出（promotion-settings.json）: Plan={Plan}, ExpiresAt={ExpiresAt}",
+                    promotionPlan, promotionSettings.PromotionExpiresAt);
+                return promotionPlan;
+            }
+        }
+
+        // レガシー: LicenseSettings経由のプロモーションチェック（後方互換性）
         if (_settings.PromotionPlanType.HasValue &&
             !string.IsNullOrEmpty(_settings.PromotionExpiresAt) &&
-            DateTime.TryParse(_settings.PromotionExpiresAt, out var expiresAt) &&
+            DateTime.TryParse(_settings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expiresAt) &&
             expiresAt > DateTime.UtcNow)
         {
             var promotionPlan = (PlanType)_settings.PromotionPlanType.Value;
             _logger.LogInformation(
-                "🎁 有効なプロモーション検出: Plan={Plan}, ExpiresAt={ExpiresAt}",
+                "🎁 有効なプロモーション検出（appsettings）: Plan={Plan}, ExpiresAt={ExpiresAt}",
                 promotionPlan, expiresAt);
             return promotionPlan;
         }

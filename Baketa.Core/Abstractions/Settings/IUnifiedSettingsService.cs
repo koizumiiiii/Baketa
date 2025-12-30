@@ -48,6 +48,19 @@ public interface IUnifiedSettingsService
     Task UpdateOcrSettingsAsync(IOcrSettings settings, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// [Issue #237] プロモーション設定を取得します
+    /// </summary>
+    /// <returns>現在有効なプロモーション設定</returns>
+    IPromotionSettings GetPromotionSettings();
+
+    /// <summary>
+    /// [Issue #237] プロモーション設定を更新します
+    /// </summary>
+    /// <param name="settings">新しいプロモーション設定</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    Task UpdatePromotionSettingsAsync(IPromotionSettings settings, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 設定をファイルからリロードします
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
@@ -88,7 +101,11 @@ public enum SettingsType
     Translation,
     Ocr,
     Application,
-    User
+    User,
+    /// <summary>
+    /// [Issue #237] プロモーション設定
+    /// </summary>
+    Promotion
 }
 
 /// <summary>
@@ -140,4 +157,41 @@ public interface IAppSettings
     IOcrSettings Ocr { get; }
     string LogLevel { get; }
     bool EnableDebugMode { get; }
+}
+
+/// <summary>
+/// [Issue #237] プロモーション設定インターフェース（読み取り専用）
+/// プロモーションコードの適用状態と有効期限を管理
+/// </summary>
+public interface IPromotionSettings
+{
+    /// <summary>
+    /// 適用済みプロモーションコード（暗号化済み）
+    /// </summary>
+    string? AppliedPromotionCode { get; }
+
+    /// <summary>
+    /// プロモーションで適用されたプラン（int型：0=Free, 1=Standard, 2=Pro, 3=Premia）
+    /// </summary>
+    int? PromotionPlanType { get; }
+
+    /// <summary>
+    /// プロモーション有効期限（ISO 8601形式）
+    /// </summary>
+    string? PromotionExpiresAt { get; }
+
+    /// <summary>
+    /// プロモーション適用日時（ISO 8601形式）
+    /// </summary>
+    string? PromotionAppliedAt { get; }
+
+    /// <summary>
+    /// 最終オンライン検証日時（時計巻き戻し対策用）
+    /// </summary>
+    string? LastOnlineVerification { get; }
+
+    /// <summary>
+    /// プロモーションが有効かどうか
+    /// </summary>
+    bool IsPromotionActive { get; }
 }
