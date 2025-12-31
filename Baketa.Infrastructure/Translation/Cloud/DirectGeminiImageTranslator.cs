@@ -188,18 +188,21 @@ public sealed class DirectGeminiImageTranslator : ICloudImageTranslator
         // Gemini APIエンドポイント（APIキーはヘッダーで送信）
         var url = $"{GeminiApiBaseUrl}/models/{DefaultModel}:generateContent";
 
-        // プロンプト作成（OCR + 翻訳を1回で実行）
+        // プロンプト作成（OCR + 翻訳を1回で実行）- Issue #242: 複数テキスト対応
         var targetLang = GetLanguageDisplayName(request.TargetLanguage);
-        var prompt = $@"この画像に含まれるテキストを検出し、{targetLang}に翻訳してください。
+        var prompt = $@"この画像に含まれる全てのテキストを検出し、{targetLang}に翻訳してください。
+複数のテキストがある場合は全て含めてください。
 
 以下のJSON形式で回答してください：
 {{
-  ""detected_text"": ""検出された元のテキスト"",
-  ""detected_language"": ""検出された言語コード（例: en, ja, ko）"",
-  ""translated_text"": ""翻訳されたテキスト""
+  ""texts"": [
+    {{ ""original"": ""検出された元のテキスト1"", ""translation"": ""翻訳されたテキスト1"" }},
+    {{ ""original"": ""検出された元のテキスト2"", ""translation"": ""翻訳されたテキスト2"" }}
+  ],
+  ""detected_language"": ""検出された言語コード（例: en, ja, ko）""
 }}
 
-テキストが検出されない場合は、detected_textを空文字列にしてください。
+テキストが検出されない場合は、textsを空配列[]にしてください。
 JSONのみを出力し、他の説明は不要です。";
 
         // リクエストボディ作成
@@ -288,7 +291,7 @@ JSONのみを出力し、他の説明は不要です。";
         // JSONをパース
         var translationResult = ParseTranslationResult(geminiText);
 
-        if (translationResult == null)
+        if (translationResult == null || translationResult.Texts == null || translationResult.Texts.Count == 0)
         {
             return ImageTranslationResponse.Failure(
                 request.RequestId,
@@ -309,48 +312,142 @@ JSONのみを出力し、他の説明は不要です。";
             ImageTokens = 0 // Gemini APIはイメージトークンを個別に報告しない
         };
 
-        return ImageTranslationResponse.Success(
+        // Issue #242: 複数テキスト対応レスポンス生成
+        var translatedTexts = translationResult.Texts
+            .Where(t => !string.IsNullOrEmpty(t.Original) || !string.IsNullOrEmpty(t.Translation))
+            .Select(t => new TranslatedTextItem
+            {
+                Original = t.Original ?? string.Empty,
+                Translation = t.Translation ?? string.Empty
+            })
+            .ToList();
+
+        if (translatedTexts.Count == 0)
+        {
+            return ImageTranslationResponse.Failure(
+                request.RequestId,
+                new TranslationErrorDetail
+                {
+                    Code = TranslationErrorDetail.Codes.ApiError,
+                    Message = "テキストが検出されませんでした",
+                    IsRetryable = false
+                },
+                processingTime);
+        }
+
+        _logger.LogDebug(
+            "Direct Gemini翻訳結果: {Count}件のテキストを検出",
+            translatedTexts.Count);
+
+        return ImageTranslationResponse.SuccessWithMultipleTexts(
             request.RequestId,
-            translationResult.DetectedText ?? string.Empty,
-            translationResult.TranslatedText ?? string.Empty,
+            translatedTexts,
             ProviderId,
             tokenUsage,
             processingTime,
             translationResult.DetectedLanguage);
     }
 
-    private TranslationResultDto? ParseTranslationResult(string geminiText)
+    /// <summary>
+    /// 複数テキスト翻訳結果をパース（Issue #242）
+    /// </summary>
+    private MultiTextTranslationResultDto? ParseTranslationResult(string geminiText)
     {
+        var jsonText = ExtractJsonFromResponse(geminiText);
+        if (string.IsNullOrEmpty(jsonText))
+        {
+            return null;
+        }
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        };
+
         try
         {
-            // Geminiがマークダウンのコードブロックで囲む場合があるので除去
-            var jsonText = geminiText.Trim();
-            if (jsonText.StartsWith("```json", StringComparison.Ordinal))
+            // まず新形式（複数テキスト）でパースを試みる
+            var multiResult = JsonSerializer.Deserialize<MultiTextTranslationResultDto>(jsonText, jsonOptions);
+            if (multiResult?.Texts != null)
             {
-                jsonText = jsonText[7..];
+                return multiResult;
             }
-            else if (jsonText.StartsWith("```", StringComparison.Ordinal))
+        }
+        catch (JsonException)
+        {
+            // 新形式でパース失敗、旧形式を試みる
+        }
+
+        // フォールバック: 旧形式（単一テキスト）でパースを試みる
+        try
+        {
+            var legacyResult = JsonSerializer.Deserialize<LegacyTranslationResultDto>(jsonText, jsonOptions);
+            if (legacyResult != null && !string.IsNullOrEmpty(legacyResult.DetectedText))
             {
-                jsonText = jsonText[3..];
+                _logger.LogDebug("旧形式JSONからのパースにフォールバック");
+                return new MultiTextTranslationResultDto
+                {
+                    Texts =
+                    [
+                        new TextItemDto
+                        {
+                            Original = legacyResult.DetectedText,
+                            Translation = legacyResult.TranslatedText
+                        }
+                    ],
+                    DetectedLanguage = legacyResult.DetectedLanguage
+                };
             }
-
-            if (jsonText.EndsWith("```", StringComparison.Ordinal))
-            {
-                jsonText = jsonText[..^3];
-            }
-
-            jsonText = jsonText.Trim();
-
-            return JsonSerializer.Deserialize<TranslationResultDto>(jsonText, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-            });
         }
         catch (JsonException ex)
         {
             _logger.LogWarning(ex, "翻訳結果JSONのパース失敗: {Text}", geminiText);
-            return null;
         }
+
+        // 最終フォールバック: レスポンス全体を単一テキストとして扱う
+        if (!string.IsNullOrWhiteSpace(geminiText))
+        {
+            _logger.LogDebug("非JSONレスポンスをフォールバック処理");
+            return new MultiTextTranslationResultDto
+            {
+                Texts =
+                [
+                    new TextItemDto
+                    {
+                        Original = string.Empty,
+                        Translation = geminiText.Trim()
+                    }
+                ],
+                DetectedLanguage = null
+            };
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// レスポンスからJSON部分を抽出
+    /// </summary>
+    private static string ExtractJsonFromResponse(string response)
+    {
+        var jsonText = response.Trim();
+
+        // Geminiがマークダウンのコードブロックで囲む場合があるので除去
+        if (jsonText.StartsWith("```json", StringComparison.Ordinal))
+        {
+            jsonText = jsonText[7..];
+        }
+        else if (jsonText.StartsWith("```", StringComparison.Ordinal))
+        {
+            jsonText = jsonText[3..];
+        }
+
+        if (jsonText.EndsWith("```", StringComparison.Ordinal))
+        {
+            jsonText = jsonText[..^3];
+        }
+
+        return jsonText.Trim();
     }
 
     private static string GetLanguageDisplayName(string languageCode)
@@ -383,7 +480,34 @@ JSONのみを出力し、他の説明は不要です。";
 
     #region DTOs
 
-    private sealed class TranslationResultDto
+    /// <summary>
+    /// 複数テキスト翻訳結果DTO（Issue #242）
+    /// </summary>
+    private sealed class MultiTextTranslationResultDto
+    {
+        [JsonPropertyName("texts")]
+        public List<TextItemDto>? Texts { get; set; }
+
+        [JsonPropertyName("detected_language")]
+        public string? DetectedLanguage { get; set; }
+    }
+
+    /// <summary>
+    /// 個別テキストアイテムDTO
+    /// </summary>
+    private sealed class TextItemDto
+    {
+        [JsonPropertyName("original")]
+        public string? Original { get; set; }
+
+        [JsonPropertyName("translation")]
+        public string? Translation { get; set; }
+    }
+
+    /// <summary>
+    /// 旧形式（単一テキスト）のDTO - フォールバック用
+    /// </summary>
+    private sealed class LegacyTranslationResultDto
     {
         [JsonPropertyName("detected_text")]
         public string? DetectedText { get; set; }
