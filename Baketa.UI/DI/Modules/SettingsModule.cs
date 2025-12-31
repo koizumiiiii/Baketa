@@ -37,10 +37,31 @@ public static class SettingsModule
             var changeTracker = provider.GetService<ISettingsChangeTracker>();
             var logger = provider.GetService<ILogger<GeneralSettingsViewModel>>();
             var licenseManager = provider.GetService<ILicenseManager>();
+            var unifiedSettingsService = provider.GetService<IUnifiedSettingsService>();
 
             // ランタイムで設定を読み込む
             var generalSettings = settingsService.GetCategorySettings<GeneralSettings>() ?? new GeneralSettings();
-            var translationSettings = settingsService.GetCategorySettings<TranslationSettings>() ?? new TranslationSettings();
+
+            // [Issue #243] IUnifiedSettingsServiceから最新の翻訳設定を取得
+            // プロモーション適用後の設定変更が反映されるようにする
+            TranslationSettings translationSettings;
+            if (unifiedSettingsService != null)
+            {
+                var unifiedSettings = unifiedSettingsService.GetTranslationSettings();
+                translationSettings = new TranslationSettings
+                {
+                    DefaultSourceLanguage = unifiedSettings.DefaultSourceLanguage,
+                    DefaultTargetLanguage = unifiedSettings.DefaultTargetLanguage,
+                    AutoDetectSourceLanguage = unifiedSettings.AutoDetectSourceLanguage,
+                    TimeoutSeconds = unifiedSettings.TimeoutMs / 1000,
+                    OverlayFontSize = unifiedSettings.OverlayFontSize,
+                    EnableCloudAiTranslation = unifiedSettings.EnableCloudAiTranslation
+                };
+            }
+            else
+            {
+                translationSettings = settingsService.GetCategorySettings<TranslationSettings>() ?? new TranslationSettings();
+            }
 
             return new GeneralSettingsViewModel(
                 generalSettings,
@@ -49,7 +70,8 @@ public static class SettingsModule
                 changeTracker,
                 logger,
                 translationSettings,
-                licenseManager);
+                licenseManager,
+                unifiedSettingsService);
         });
 
         // アカウント設定ViewModel

@@ -26,3 +26,7 @@ ALLOWED_ORIGINS = "*"
 
 # Optional: Gemini model name (default: gemini-2.0-flash-exp)
 # Set via dashboard or: wrangler secret put GEMINI_MODEL
+
+# Supabase (プロモーションコード検証用)
+# wrangler secret put SUPABASE_URL        # https://xxxxx.supabase.co
+# wrangler secret put SUPABASE_SERVICE_KEY # service_roleキー（Supabase Console → Settings → API）

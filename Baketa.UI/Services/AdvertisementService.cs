@@ -1,10 +1,17 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.License.Models;
+using Baketa.Core.Settings;
+using Baketa.UI.ViewModels;
+using Baketa.UI.Views;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.UI.Services;
 
@@ -13,11 +20,17 @@ namespace Baketa.UI.Services;
 /// </summary>
 public sealed class AdvertisementService : IAdvertisementService, IDisposable
 {
+    private const string BAKETA_ICON_PATH = "avares://Baketa/Assets/Icons/baketa.ico";
+
     private readonly IAuthService _authService;
     private readonly IUserPlanService _userPlanService;
     private readonly ILogger<AdvertisementService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly LicenseSettings _licenseSettings;
     private readonly SemaphoreSlim _loadLock = new(1, 1);
+    private AdWindow? _adWindow;
+    private bool _adWindowInitialized;
     private bool _disposed;
 
     /// <inheritdoc/>
@@ -36,16 +49,22 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
     /// <param name="userPlanService">User plan service</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="configuration">Configuration instance</param>
+    /// <param name="serviceProvider">Service provider for resolving AdWindow dependencies</param>
+    /// <param name="licenseSettings">License settings for mock mode detection</param>
     public AdvertisementService(
         IAuthService authService,
         IUserPlanService userPlanService,
         ILogger<AdvertisementService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IServiceProvider serviceProvider,
+        IOptions<LicenseSettings> licenseSettings)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _userPlanService = userPlanService ?? throw new ArgumentNullException(nameof(userPlanService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _licenseSettings = licenseSettings?.Value ?? throw new ArgumentNullException(nameof(licenseSettings));
 
         // Subscribe to authentication status changes
         _authService.AuthStatusChanged += OnAuthStatusChanged;
@@ -110,13 +129,166 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
 
         _logger.LogInformation("広告を非表示にしました");
 
+        // Issue #240: AdWindowも非表示にする
+        await UpdateAdWindowVisibilityAsync(false).ConfigureAwait(false);
+
         AdDisplayChanged?.Invoke(this, new AdDisplayChangedEventArgs
         {
             ShouldShowAd = false,
             Reason = "User request"
         });
+    }
 
-        await Task.CompletedTask;
+    /// <inheritdoc/>
+    public async Task InitializeAdWindowAsync(CancellationToken cancellationToken = default)
+    {
+        if (_adWindowInitialized)
+        {
+            _logger.LogDebug("AdWindow already initialized, skipping");
+            return;
+        }
+
+        _logger.LogInformation("Issue #240: AdWindow初期化開始");
+
+        try
+        {
+            // まず現在のプラン状態を確認
+            // NOTE: UpdateAdDisplayStateAsync内でUpdateAdWindowVisibilityAsyncが呼ばれる可能性があるが、
+            // _adWindowInitializedがfalseのため、AdWindow作成はスキップされる
+            await UpdateAdDisplayStateAsync().ConfigureAwait(false);
+
+            // プレミアムプランの場合はAdWindowを生成しない
+            if (!ShouldShowAd)
+            {
+                _logger.LogInformation("Premium plan detected - AdWindow creation skipped");
+                _adWindowInitialized = true; // フラグは設定（再初期化防止）
+                return;
+            }
+
+            // Issue #243: _adWindowが既に作成されている場合はスキップ（2重作成防止）
+            if (_adWindow != null)
+            {
+                _logger.LogDebug("AdWindow already exists, skipping creation");
+                _adWindowInitialized = true;
+                return;
+            }
+
+            // UIスレッドでAdWindowを生成・表示
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                try
+                {
+                    // 再度チェック（UIスレッドへの切り替え中に作成された可能性）
+                    if (_adWindow != null)
+                    {
+                        _logger.LogDebug("AdWindow already exists (race condition), skipping");
+                        return;
+                    }
+
+                    var adViewModel = _serviceProvider.GetRequiredService<AdViewModel>();
+                    var adWindowLogger = _serviceProvider.GetRequiredService<ILogger<AdWindow>>();
+
+                    _adWindow = new AdWindow(adViewModel, adWindowLogger);
+
+                    // アイコン設定
+                    try
+                    {
+                        var iconUri = new Uri(BAKETA_ICON_PATH);
+                        _adWindow.Icon = new Avalonia.Controls.WindowIcon(
+                            Avalonia.Platform.AssetLoader.Open(iconUri));
+                    }
+                    catch (Exception iconEx)
+                    {
+                        _logger.LogWarning(iconEx, "AdWindowアイコン設定失敗");
+                    }
+
+                    _adWindow.Show();
+                    _logger.LogInformation("AdWindow created and shown successfully");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "AdWindow creation failed: {Message}", ex.Message);
+                }
+            });
+
+            // フラグは最後に設定（すべての処理が完了後）
+            _adWindowInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "InitializeAdWindowAsync failed: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Issue #240: Update AdWindow visibility based on plan state
+    /// </summary>
+    private async Task UpdateAdWindowVisibilityAsync(bool show)
+    {
+        if (_adWindow == null)
+        {
+            // AdWindowがまだ作成されていない場合
+            if (show && _adWindowInitialized)
+            {
+                // 表示が必要で、初期化済みなら新規作成
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        var adViewModel = _serviceProvider.GetRequiredService<AdViewModel>();
+                        var adWindowLogger = _serviceProvider.GetRequiredService<ILogger<AdWindow>>();
+
+                        _adWindow = new AdWindow(adViewModel, adWindowLogger);
+
+                        try
+                        {
+                            var iconUri = new Uri(BAKETA_ICON_PATH);
+                            _adWindow.Icon = new Avalonia.Controls.WindowIcon(
+                                Avalonia.Platform.AssetLoader.Open(iconUri));
+                        }
+                        catch (Exception iconEx)
+                        {
+                            _logger.LogWarning(iconEx, "AdWindowアイコン設定失敗");
+                        }
+
+                        _adWindow.Show();
+                        _logger.LogInformation("AdWindow recreated and shown");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "AdWindow recreation failed: {Message}", ex.Message);
+                    }
+                });
+            }
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            try
+            {
+                if (show)
+                {
+                    if (!_adWindow.IsVisible)
+                    {
+                        _adWindow.Show();
+                        _logger.LogInformation("AdWindow shown (plan changed to free)");
+                    }
+                }
+                else
+                {
+                    if (_adWindow.IsVisible)
+                    {
+                        _adWindow.Hide();
+                        _logger.LogInformation("AdWindow hidden (plan changed to premium)");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "AdWindow visibility update failed: {Message}", ex.Message);
+            }
+        });
     }
 
     /// <summary>
@@ -148,16 +320,32 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
     {
         try
         {
-            // Check if user is authenticated
-            var session = await _authService.GetCurrentSessionAsync().ConfigureAwait(false);
-            var isAuthenticated = session != null;
+            // Issue #243: モックモードでは認証チェックをスキップ
+            bool isPremium;
+            string reason;
 
-            // Check if user has premium plan
-            var isPremium = isAuthenticated && _userPlanService.CurrentPlan == UserPlanType.Premium;
+            if (_licenseSettings.EnableMockMode)
+            {
+                // モックモードではプランのみで判定（認証不要）
+                isPremium = _userPlanService.CurrentPlan == UserPlanType.Premium;
+                reason = isPremium
+                    ? $"Premium plan (MockMode, PlanType={(PlanType)_licenseSettings.MockPlanType})"
+                    : "Free plan (MockMode)";
 
-            // Show ads for free plan users and unauthenticated users
+                _logger.LogDebug("モックモード広告判定: Plan={Plan}, IsPremium={IsPremium}",
+                    _userPlanService.CurrentPlan, isPremium);
+            }
+            else
+            {
+                // 本番モードでは認証 + プランで判定
+                var session = await _authService.GetCurrentSessionAsync().ConfigureAwait(false);
+                var isAuthenticated = session != null;
+                isPremium = isAuthenticated && _userPlanService.CurrentPlan == UserPlanType.Premium;
+                reason = isPremium ? "Premium plan" : "Free plan or not logged in";
+            }
+
+            // Show ads for free plan users
             var shouldShow = !isPremium;
-            var reason = isPremium ? "Premium plan" : "Free plan or not logged in";
 
             if (ShouldShowAd != shouldShow)
             {
@@ -167,6 +355,12 @@ public sealed class AdvertisementService : IAdvertisementService, IDisposable
                 _logger.LogInformation(
                     "広告表示状態変更: {OldState} → {NewState} (理由: {Reason})",
                     oldState, shouldShow, reason);
+
+                // Issue #240: プラン変更時にAdWindowの表示/非表示を切り替え
+                if (_adWindowInitialized)
+                {
+                    await UpdateAdWindowVisibilityAsync(shouldShow).ConfigureAwait(false);
+                }
 
                 AdDisplayChanged?.Invoke(this, new AdDisplayChangedEventArgs
                 {

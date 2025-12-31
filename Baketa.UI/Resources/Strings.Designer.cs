@@ -346,6 +346,18 @@ public static class Strings
     public static string License_Plan_Pro => GetString("License_Plan_Pro");
     public static string License_Plan_Premia => GetString("License_Plan_Premia");
     public static string License_Plan_Unknown => GetString("License_Plan_Unknown");
+    public static string License_Plan_PromotionSuffix => GetString("License_Plan_PromotionSuffix");
+
+    // ========== Promotion Code Section ==========
+
+    public static string Settings_License_PromotionCode => GetString("Settings_License_PromotionCode");
+    public static string Settings_License_PromotionExpires => GetString("Settings_License_PromotionExpires");
+    public static string Settings_License_PromotionCodeDescription => GetString("Settings_License_PromotionCodeDescription");
+    public static string Settings_License_PromotionApply => GetString("Settings_License_PromotionApply");
+    public static string Settings_License_PromotionVerifying => GetString("Settings_License_PromotionVerifying");
+    public static string Settings_License_PromotionAppliedFormat => GetString("Settings_License_PromotionAppliedFormat");
+    public static string Settings_License_PromotionPlanPromo => GetString("Settings_License_PromotionPlanPromo");
+
     public static string License_Desc_Free => GetString("License_Desc_Free");
     public static string License_Desc_Standard => GetString("License_Desc_Standard");
     public static string License_Desc_Pro => GetString("License_Desc_Pro");

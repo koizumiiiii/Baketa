@@ -37,6 +37,15 @@ public interface IAdvertisementService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Task representing the async operation</returns>
     Task HideAdAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Issue #240: Initialize and show advertisement window if needed.
+    /// This method should be called during app startup to let the service
+    /// manage the AdWindow lifecycle based on user plan.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Task representing the async operation</returns>
+    Task InitializeAdWindowAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>

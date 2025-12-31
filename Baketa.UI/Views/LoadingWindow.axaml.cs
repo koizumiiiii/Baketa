@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Baketa.UI.ViewModels;
 
@@ -13,6 +14,15 @@ public partial class LoadingWindow : Window
     public LoadingWindow()
     {
         InitializeComponent();
+    }
+
+    /// <summary>
+    /// Issue #239: 閉じるボタンクリック時にアプリケーションを終了
+    /// </summary>
+    private void OnCloseButtonClick(object? sender, RoutedEventArgs e)
+    {
+        // アプリケーション全体を終了
+        Environment.Exit(0);
     }
 
     /// <summary>

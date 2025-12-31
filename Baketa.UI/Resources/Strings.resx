@@ -700,6 +700,33 @@
   <data name="License_Plan_Unknown" xml:space="preserve">
     <value>不明</value>
   </data>
+  <data name="License_Plan_PromotionSuffix" xml:space="preserve">
+    <value>(プロモーションコード適用)</value>
+  </data>
+
+  <!-- Promotion Code Section -->
+  <data name="Settings_License_PromotionCode" xml:space="preserve">
+    <value>プロモーションコード</value>
+  </data>
+  <data name="Settings_License_PromotionExpires" xml:space="preserve">
+    <value>有効期限:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
+    <value>プロモーションコードをお持ちの場合は、下記に入力してください。</value>
+  </data>
+  <data name="Settings_License_PromotionApply" xml:space="preserve">
+    <value>適用</value>
+  </data>
+  <data name="Settings_License_PromotionVerifying" xml:space="preserve">
+    <value>確認中...</value>
+  </data>
+  <data name="Settings_License_PromotionAppliedFormat" xml:space="preserve">
+    <value>{0}が適用されています</value>
+  </data>
+  <data name="Settings_License_PromotionPlanPromo" xml:space="preserve">
+    <value>プロモーション</value>
+  </data>
+
   <data name="License_Desc_Free" xml:space="preserve">
     <value>無料プラン - 広告表示あり、ローカル翻訳のみ</value>
   </data>

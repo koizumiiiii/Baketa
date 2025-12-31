@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Reactive;
+using System.Reactive.Linq;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
@@ -24,6 +25,7 @@ namespace Baketa.UI.ViewModels.Settings;
 public sealed class LicenseInfoViewModel : ViewModelBase
 {
     private readonly ILicenseManager _licenseManager;
+    private readonly IPromotionCodeService _promotionCodeService;
     private readonly ILogger<LicenseInfoViewModel>? _logger;
 
     private PlanType _currentPlan;
@@ -38,26 +40,47 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private string _statusMessage = string.Empty;
     private bool _isStatusError;
 
+    // Issue #237 Phase 2: プロモーションコード関連
+    private string _promotionCode = string.Empty;
+    private bool _isApplyingPromotion;
+    private string _promotionStatusMessage = string.Empty;
+    private bool _isPromotionError;
+    private bool _hasActivePromotion;
+    private PromotionInfo? _activePromotion;
+
     /// <summary>
     /// LicenseInfoViewModelを初期化します
     /// </summary>
     public LicenseInfoViewModel(
         ILicenseManager licenseManager,
+        IPromotionCodeService promotionCodeService,
         IEventAggregator eventAggregator,
         ILogger<LicenseInfoViewModel>? logger = null) : base(eventAggregator)
     {
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
+        _promotionCodeService = promotionCodeService ?? throw new ArgumentNullException(nameof(promotionCodeService));
         _logger = logger;
 
         // ライセンス状態変更イベントの購読
         _licenseManager.StateChanged += OnLicenseStateChanged;
 
+        // プロモーション状態変更イベントの購読
+        _promotionCodeService.PromotionStateChanged += OnPromotionStateChanged;
+
         // コマンドの初期化
         RefreshCommand = ReactiveCommand.CreateFromTask(RefreshLicenseStateAsync);
         ChangePlanCommand = ReactiveCommand.Create(OpenPlanChangePage);
 
+        // Issue #237 Phase 2: プロモーションコード適用コマンド
+        var canApplyPromotion = this.WhenAnyValue(
+            x => x.PromotionCode,
+            x => x.IsApplyingPromotion,
+            (code, applying) => !string.IsNullOrWhiteSpace(code) && !applying);
+        ApplyPromotionCommand = ReactiveCommand.CreateFromTask(ApplyPromotionCodeAsync, canApplyPromotion);
+
         // 初期状態の読み込み
         LoadCurrentState();
+        LoadPromotionState();
 
         _logger?.LogDebug("LicenseInfoViewModel初期化完了");
     }
@@ -184,6 +207,102 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _isStatusError, value);
     }
 
+    #region Issue #237 Phase 2: プロモーションコード関連プロパティ
+
+    /// <summary>
+    /// 入力されたプロモーションコード
+    /// </summary>
+    public string PromotionCode
+    {
+        get => _promotionCode;
+        set => this.RaiseAndSetIfChanged(ref _promotionCode, value);
+    }
+
+    /// <summary>
+    /// プロモーションコード適用中かどうか
+    /// </summary>
+    public bool IsApplyingPromotion
+    {
+        get => _isApplyingPromotion;
+        private set => this.RaiseAndSetIfChanged(ref _isApplyingPromotion, value);
+    }
+
+    /// <summary>
+    /// プロモーションステータスメッセージ
+    /// </summary>
+    public string PromotionStatusMessage
+    {
+        get => _promotionStatusMessage;
+        private set => this.RaiseAndSetIfChanged(ref _promotionStatusMessage, value);
+    }
+
+    /// <summary>
+    /// プロモーションステータスがエラーかどうか
+    /// </summary>
+    public bool IsPromotionError
+    {
+        get => _isPromotionError;
+        private set => this.RaiseAndSetIfChanged(ref _isPromotionError, value);
+    }
+
+    /// <summary>
+    /// アクティブなプロモーションがあるかどうか
+    /// </summary>
+    public bool HasActivePromotion
+    {
+        get => _hasActivePromotion;
+        private set => this.RaiseAndSetIfChanged(ref _hasActivePromotion, value);
+    }
+
+    /// <summary>
+    /// アクティブなプロモーションの有効期限表示
+    /// </summary>
+    public string PromotionExpiresDisplay
+    {
+        get
+        {
+            var promotion = _promotionCodeService.GetCurrentPromotion();
+            if (promotion == null || !promotion.IsValid)
+                return string.Empty;
+            return promotion.ExpiresAt.ToString("yyyy/MM/dd");
+        }
+    }
+
+    /// <summary>
+    /// アクティブなプロモーションのプラン表示名
+    /// </summary>
+    public string PromotionPlanDisplayName
+    {
+        get
+        {
+            if (_activePromotion == null || !_activePromotion.IsValid)
+                return string.Empty;
+            return _activePromotion.Plan switch
+            {
+                PlanType.Premia => Strings.License_Plan_Premia,
+                PlanType.Pro => Strings.License_Plan_Pro,
+                PlanType.Standard => Strings.License_Plan_Standard,
+                _ => Strings.Settings_License_PromotionPlanPromo
+            };
+        }
+    }
+
+    /// <summary>
+    /// プロモーション適用メッセージ（UI表示用）
+    /// </summary>
+    public string PromotionAppliedMessage
+    {
+        get
+        {
+            var planName = PromotionPlanDisplayName;
+            if (string.IsNullOrEmpty(planName))
+                planName = Strings.Settings_License_PromotionPlanPromo;
+            return string.Format(Strings.Settings_License_PromotionAppliedFormat, planName);
+        }
+    }
+
+    #endregion
+
     #endregion
 
     #region コマンド
@@ -197,6 +316,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// プラン変更コマンド（外部Webページを開く）
     /// </summary>
     public ReactiveCommand<Unit, Unit> ChangePlanCommand { get; }
+
+    /// <summary>
+    /// Issue #237 Phase 2: プロモーションコード適用コマンド
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> ApplyPromotionCommand { get; }
 
     #endregion
 
@@ -217,7 +341,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private void UpdateFromState(LicenseState state)
     {
         CurrentPlan = state.CurrentPlan;
-        PlanDisplayName = GetPlanDisplayName(state.CurrentPlan);
+        // プロモーション適用中の場合はサフィックスを追加
+        var basePlanName = GetPlanDisplayName(state.CurrentPlan);
+        PlanDisplayName = HasActivePromotion && state.CurrentPlan != PlanType.Free
+            ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
+            : basePlanName;
         PlanDescription = GetPlanDescription(state.CurrentPlan);
         TokensUsed = state.CloudAiTokensUsed;
         TokenLimit = state.MonthlyTokenLimit;
@@ -337,6 +465,94 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         };
     }
 
+    #region Issue #237 Phase 2: プロモーションコード関連メソッド
+
+    /// <summary>
+    /// プロモーション状態を読み込みます
+    /// </summary>
+    private void LoadPromotionState()
+    {
+        var promotion = _promotionCodeService.GetCurrentPromotion();
+        _activePromotion = promotion;
+        HasActivePromotion = promotion?.IsValid == true;
+        if (HasActivePromotion)
+        {
+            this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
+            this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
+            this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
+        }
+    }
+
+    /// <summary>
+    /// プロモーションコードを適用します
+    /// </summary>
+    private async System.Threading.Tasks.Task ApplyPromotionCodeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(PromotionCode))
+            return;
+
+        try
+        {
+            IsApplyingPromotion = true;
+            PromotionStatusMessage = string.Empty;
+            IsPromotionError = false;
+
+            var result = await _promotionCodeService.ApplyCodeAsync(PromotionCode).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                PromotionStatusMessage = result.Message;
+                IsPromotionError = !result.Success;
+
+                if (result.Success)
+                {
+                    PromotionCode = string.Empty;
+                    HasActivePromotion = true;
+                    // _activePromotionはOnPromotionStateChangedで設定される
+                    this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
+                    this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
+                    this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
+                    _logger?.LogInformation("プロモーションコード適用成功: Plan={Plan}", result.AppliedPlan);
+                }
+                else
+                {
+                    _logger?.LogWarning("プロモーションコード適用失敗: {ErrorCode}", result.ErrorCode);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "プロモーションコード適用中にエラーが発生しました");
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                PromotionStatusMessage = "予期しないエラーが発生しました。";
+                IsPromotionError = true;
+            });
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => IsApplyingPromotion = false);
+        }
+    }
+
+    /// <summary>
+    /// プロモーション状態変更イベントハンドラ
+    /// </summary>
+    private void OnPromotionStateChanged(object? sender, PromotionStateChangedEventArgs e)
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _activePromotion = e.NewPromotion;
+            HasActivePromotion = e.NewPromotion?.IsValid == true;
+            this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
+            this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
+            this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
+            _logger?.LogDebug("プロモーション状態が変更されました: {Reason}", e.Reason);
+        });
+    }
+
+    #endregion
+
     /// <summary>
     /// リソースを解放します
     /// </summary>
@@ -345,6 +561,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         if (disposing)
         {
             _licenseManager.StateChanged -= OnLicenseStateChanged;
+            _promotionCodeService.PromotionStateChanged -= OnPromotionStateChanged;
         }
         base.Dispose(disposing);
     }

@@ -58,8 +58,8 @@ internal static class UIServiceCollectionExtensions
         services.AddSettingsServices();
 
         // 📢 広告関連サービスの登録（Issue #174: WebView統合）
-        // AdvertisementServiceの依存関係を先に登録
-        services.AddSingleton<Baketa.UI.Services.IUserPlanService, Baketa.UI.Services.UserPlanService>();
+        // NOTE: IUserPlanServiceはUIModule.csでUserPlanServiceAdapter（ILicenseManager連携）として登録
+        // ここでの重複登録を削除（Issue #243: Proプランでも広告が表示されるバグ修正）
 
         // 広告サービス本体
         services.AddSingleton<Baketa.Core.Abstractions.Services.IAdvertisementService, Baketa.UI.Services.AdvertisementService>();

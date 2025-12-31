@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.ErrorHandling;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Services.ErrorHandling;
@@ -9,15 +11,20 @@ namespace Baketa.Application.Services.ErrorHandling;
 /// <summary>
 /// シンプルなエラーハンドリング実装
 /// 複雑なエラー階層を排除し、実用的なエラー処理を提供
+/// Issue #239: メモリ不足エラー通知機能追加
 /// </summary>
 public sealed class SimpleErrorHandler : ISimpleErrorHandler
 {
     private readonly ILogger<SimpleErrorHandler> _logger;
+    private readonly IEventAggregator _eventAggregator;
     private readonly ConcurrentDictionary<string, ErrorStatistics> _errorStats;
 
-    public SimpleErrorHandler(ILogger<SimpleErrorHandler> logger)
+    public SimpleErrorHandler(
+        ILogger<SimpleErrorHandler> logger,
+        IEventAggregator eventAggregator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _errorStats = new ConcurrentDictionary<string, ErrorStatistics>();
     }
 
@@ -182,8 +189,6 @@ public sealed class SimpleErrorHandler : ISimpleErrorHandler
 
     private async Task<bool> RecoverImageErrorAsync(SimpleError errorInfo)
     {
-        await Task.CompletedTask.ConfigureAwait(false);
-
         // 画像作成エラーの復旧戦略
         if (errorInfo.Exception is OutOfMemoryException)
         {
@@ -196,7 +201,21 @@ public sealed class SimpleErrorHandler : ISimpleErrorHandler
             GC.WaitForPendingFinalizers();
             GC.Collect();
 
-            return true;
+            var memoryAfterGC = GC.GetTotalMemory(false);
+            var recoverySucceeded = memoryAfterGC < 1024 * 1024 * 500; // 500MB未満なら成功とみなす
+
+            // Issue #239: メモリ不足エラーイベントを発行してUI通知をトリガー
+            var memoryEvent = new MemoryErrorEvent(
+                errorInfo.Operation,
+                errorInfo.Exception.Message,
+                memoryAfterGC,
+                recoverySucceeded);
+
+            await _eventAggregator.PublishAsync(memoryEvent).ConfigureAwait(false);
+            _logger.LogInformation("Memory error event published: Operation={Operation}, MemoryMB={MemoryMB:F1}, RecoverySucceeded={RecoverySucceeded}",
+                errorInfo.Operation, memoryEvent.CurrentMemoryMB, recoverySucceeded);
+
+            return recoverySucceeded;
         }
 
         return true;

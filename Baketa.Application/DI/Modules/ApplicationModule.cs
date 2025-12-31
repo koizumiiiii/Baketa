@@ -194,8 +194,9 @@ public sealed class ApplicationModule : ServiceModuleBase
                 var textChangeDetectionService = provider.GetService<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
                 Console.WriteLine($"✅ [Issue #230] ITextChangeDetectionService取得: {(textChangeDetectionService != null ? "成功" : "null (オプショナル)")}");
 
-                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（7パラメータ）");
+                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（8パラメータ）");
                 var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
+                var translationModeService = provider.GetService<Baketa.Core.Abstractions.Services.ITranslationModeService>(); // 🔧 [SINGLESHOT_FIX]
                 var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                     processingFacade,
                     configurationFacade,
@@ -203,8 +204,9 @@ public sealed class ApplicationModule : ServiceModuleBase
                     textChunkAggregatorService, // 🎯 [OPTION_A] 追加パラメータ
                     pipelineService, // 🎯 [OPTION_A] 追加パラメータ - SmartProcessingPipelineService統合
                     textChangeDetectionService, // [Issue #230] テキストベース変化検知
+                    translationModeService, // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
                     logger);
-                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知統合済み");
+                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス統合済み");
                 return instance;
             }
             catch (Exception ex)

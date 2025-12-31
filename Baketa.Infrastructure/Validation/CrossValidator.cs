@@ -80,8 +80,8 @@ public sealed class CrossValidator : ICrossValidator
             return Task.FromResult(CrossValidationResult.Empty(stopwatch.Elapsed));
         }
 
-        // Cloud AI検出テキストを分割してリスト化
-        var cloudDetectedTexts = ExtractCloudTexts(cloudAiResponse.DetectedText);
+        // Cloud AI検出テキストを分割してリスト化（Issue #242: Textsプロパティ優先）
+        var cloudDetectedTexts = ExtractCloudDetectedTexts(cloudAiResponse);
 
         _logger.LogDebug(
             "相互検証開始: ローカルOCR={LocalCount}チャンク, CloudAI={CloudCount}テキスト",
@@ -95,8 +95,8 @@ public sealed class CrossValidator : ICrossValidator
             TotalCloudDetections = cloudDetectedTexts.Count
         };
 
-        // Cloud AIの翻訳テキストも分割
-        var translatedTexts = ExtractCloudTexts(cloudAiResponse.TranslatedText);
+        // Cloud AIの翻訳テキストも分割（Issue #242: Textsプロパティ優先）
+        var translatedTexts = ExtractCloudTranslatedTexts(cloudAiResponse);
 
         // Phase 3: ファジーマッチング
         var unmatchedChunks = new List<TextChunk>();
@@ -545,23 +545,57 @@ public sealed class CrossValidator : ICrossValidator
     }
 
     /// <summary>
-    /// Cloud AIのテキストを分割してリスト化
+    /// Cloud AIの検出テキストをリスト化（Issue #242: Textsプロパティ優先）
+    /// </summary>
+    /// <remarks>
+    /// Issue #242対応: Textsプロパティがある場合はそちらを使用
+    /// 後方互換性のため、Textsがない場合はDetectedTextを改行で分割
+    /// </remarks>
+    private static List<string> ExtractCloudDetectedTexts(ImageTranslationResponse response)
+    {
+        // Issue #242: Textsプロパティがある場合は優先使用
+        if (response.Texts is { Count: > 0 })
+        {
+            return response.Texts.Select(t => t.Original).ToList();
+        }
+
+        // 後方互換性: DetectedTextを改行で分割
+        return ExtractTextByLineBreak(response.DetectedText);
+    }
+
+    /// <summary>
+    /// Cloud AIの翻訳テキストをリスト化（Issue #242: Textsプロパティ優先）
+    /// </summary>
+    private static List<string> ExtractCloudTranslatedTexts(ImageTranslationResponse response)
+    {
+        // Issue #242: Textsプロパティがある場合は優先使用
+        if (response.Texts is { Count: > 0 })
+        {
+            return response.Texts.Select(t => t.Translation).ToList();
+        }
+
+        // 後方互換性: TranslatedTextを改行で分割
+        return ExtractTextByLineBreak(response.TranslatedText);
+    }
+
+    /// <summary>
+    /// テキストを改行で分割してリスト化（後方互換性用ヘルパー）
     /// </summary>
     /// <remarks>
     /// 改行文字で分割してテキスト要素のリストを取得
     /// Geminiレビュー反映: 到達不能コードを削除（string.Splitは区切り文字がない場合も
     /// 元の文字列を単一要素の配列で返すため、texts.Count == 0にならない）
     /// </remarks>
-    private static List<string> ExtractCloudTexts(string? cloudText)
+    private static List<string> ExtractTextByLineBreak(string? text)
     {
-        if (string.IsNullOrWhiteSpace(cloudText))
+        if (string.IsNullOrWhiteSpace(text))
         {
             return [];
         }
 
         // 改行で分割（C# 12 コレクション式）
         char[] separators = ['\n', '\r'];
-        return cloudText
+        return text
             .Split(separators, StringSplitOptions.RemoveEmptyEntries)
             .Select(t => t.Trim())
             .Where(t => !string.IsNullOrEmpty(t))

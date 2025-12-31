@@ -255,6 +255,79 @@ public sealed class CrossValidatorTests
 
     #endregion
 
+    #region Issue #242: Multiple Texts Property Tests
+
+    /// <summary>
+    /// Issue #242: Textsプロパティがある場合はそちらを優先使用
+    /// </summary>
+    [Fact]
+    public async Task ValidateAsync_WithTextsProperty_UsesMultipleTexts()
+    {
+        // Arrange: ローカルOCRで複数テキスト検出
+        var chunks = new[]
+        {
+            CreateChunk("Document", 0.90f),
+            CreateChunk("Skip", 0.95f),
+            CreateChunk("Menu", 0.92f)
+        };
+
+        // Geminiから複数テキストを含むレスポンス（Textsプロパティ使用）
+        var cloudResponse = CreateCloudResponseWithTexts(new[]
+        {
+            ("Document", "ドキュメント"),
+            ("Skip", "スキップ"),
+            ("Menu", "メニュー"),
+            ("Other", "その他") // ローカルにないテキスト
+        });
+
+        // 全てのテキストでマッチ設定
+        SetupFuzzyMatch("Document", "Document", isMatch: true, similarity: 1.0f);
+        SetupFuzzyMatch("Document", "Skip", isMatch: false, similarity: 0.10f);
+        SetupFuzzyMatch("Document", "Menu", isMatch: false, similarity: 0.15f);
+        SetupFuzzyMatch("Document", "Other", isMatch: false, similarity: 0.10f);
+        SetupFuzzyMatch("Skip", "Document", isMatch: false, similarity: 0.10f);
+        SetupFuzzyMatch("Skip", "Skip", isMatch: true, similarity: 1.0f);
+        SetupFuzzyMatch("Skip", "Menu", isMatch: false, similarity: 0.20f);
+        SetupFuzzyMatch("Skip", "Other", isMatch: false, similarity: 0.10f);
+        SetupFuzzyMatch("Menu", "Document", isMatch: false, similarity: 0.15f);
+        SetupFuzzyMatch("Menu", "Skip", isMatch: false, similarity: 0.20f);
+        SetupFuzzyMatch("Menu", "Menu", isMatch: true, similarity: 1.0f);
+        SetupFuzzyMatch("Menu", "Other", isMatch: false, similarity: 0.10f);
+
+        // Act
+        var result = await _sut.ValidateAsync(chunks, cloudResponse);
+
+        // Assert: 全3チャンクがCrossValidatedになるはず
+        Assert.Equal(3, result.ValidatedChunks.Count);
+        Assert.All(result.ValidatedChunks, c =>
+            Assert.Equal(ValidationStatus.CrossValidated, c.Status));
+        Assert.Equal(3, result.Statistics.CrossValidatedCount);
+        Assert.Equal(0, result.Statistics.LocalOnlyCount);
+    }
+
+    /// <summary>
+    /// Issue #242: 後方互換性 - Textsがnullの場合はDetectedTextを使用
+    /// </summary>
+    [Fact]
+    public async Task ValidateAsync_WithoutTextsProperty_FallsBackToDetectedText()
+    {
+        // Arrange
+        var chunks = new[] { CreateChunk("hello", 0.80f) };
+        var cloudResponse = CreateCloudResponse("hello\nworld", "こんにちは\n世界");
+
+        SetupFuzzyMatch("hello", "hello", isMatch: true, similarity: 1.0f);
+        SetupFuzzyMatch("hello", "world", isMatch: false, similarity: 0.20f);
+
+        // Act
+        var result = await _sut.ValidateAsync(chunks, cloudResponse);
+
+        // Assert
+        Assert.Single(result.ValidatedChunks);
+        Assert.Equal(ValidationStatus.CrossValidated, result.ValidatedChunks[0].Status);
+    }
+
+    #endregion
+
     #region Cancellation Tests
 
     [Fact]
@@ -333,6 +406,26 @@ public sealed class CrossValidatorTests
                 Message = "Test error",
                 IsRetryable = false
             },
+            processingTime: TimeSpan.FromMilliseconds(100));
+    }
+
+    /// <summary>
+    /// Issue #242: 複数テキストを含むレスポンス作成
+    /// </summary>
+    private static ImageTranslationResponse CreateCloudResponseWithTexts(
+        (string original, string translation)[] texts)
+    {
+        var textItems = texts.Select(t => new TranslatedTextItem
+        {
+            Original = t.original,
+            Translation = t.translation
+        }).ToList();
+
+        return ImageTranslationResponse.SuccessWithMultipleTexts(
+            requestId: "test-request",
+            texts: textItems,
+            providerId: "gemini",
+            tokenUsage: TokenUsageDetail.Empty,
             processingTime: TimeSpan.FromMilliseconds(100));
     }
 

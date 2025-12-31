@@ -3,6 +3,8 @@
         xmlns:vm="using:Baketa.UI.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:i="using:Avalonia.Xaml.Interactivity"
+        xmlns:behaviors="using:Baketa.UI.Behaviors"
         mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="400"
         x:Class="Baketa.UI.Views.LoadingWindow"
         x:DataType="vm:LoadingViewModel"
@@ -34,7 +36,31 @@
           Background="#1E1E1E"
           BorderBrush="#3F3F46"
           BorderThickness="1">
+    <!-- Issue #239: ウィンドウドラッグ移動を有効化 -->
+    <i:Interaction.Behaviors>
+      <behaviors:WindowDragBehavior />
+    </i:Interaction.Behaviors>
+
     <Grid RowDefinitions="Auto,*,Auto" Margin="40">
+
+      <!-- Issue #239: 閉じるボタン（右上に配置） -->
+      <Button Grid.Row="0"
+              Name="CloseButton"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Top"
+              Margin="0,-28,-28,0"
+              Width="32" Height="32"
+              CornerRadius="16"
+              Background="#27272A"
+              BorderThickness="0"
+              ToolTip.Tip="Close Application"
+              Click="OnCloseButtonClick">
+        <TextBlock Text="✕"
+                   Foreground="#A1A1AA"
+                   FontSize="14"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
+      </Button>
 
       <!-- Baketaアイコン (256px) -->
       <Image Grid.Row="0"

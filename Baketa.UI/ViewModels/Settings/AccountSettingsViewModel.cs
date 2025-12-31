@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.License.Services;
@@ -82,6 +83,12 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         if (_patreonService != null)
         {
             _patreonService.StatusChanged += OnPatreonStatusChanged;
+        }
+
+        // ライセンス状態変更イベントの購読（プロモーションコード適用時のUI更新用）
+        if (_licenseManager != null)
+        {
+            _licenseManager.StateChanged += OnLicenseStateChanged;
         }
 
         // コマンドの初期化
@@ -247,22 +254,18 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 現在のプラン
+    /// 現在のプラン（内部使用）
     /// </summary>
-    public PlanType CurrentPlan
+    private PlanType CurrentPlan
     {
         get => _currentPlan;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _currentPlan, value);
-            this.RaisePropertyChanged(nameof(CurrentPlanDisplay));
-        }
+        set => _currentPlan = value;
     }
 
     /// <summary>
-    /// プラン表示文字列
+    /// プラン名を取得（ステータスメッセージ用）
     /// </summary>
-    public string CurrentPlanDisplay => CurrentPlan switch
+    private string GetPlanName(PlanType plan) => plan switch
     {
         PlanType.Premia => "Premia",
         PlanType.Pro => "Pro",
@@ -727,7 +730,7 @@ public sealed class AccountSettingsViewModel : ViewModelBase
             if (e.NewStatus == PatreonSyncStatus.Synced)
             {
                 IsPatreonConnected = true;
-                SetStatusMessage($"Patreon同期完了: {CurrentPlanDisplay}プラン", false);
+                SetStatusMessage($"Patreon同期完了: {GetPlanName(CurrentPlan)}プラン", false);
             }
             else if (e.NewStatus == PatreonSyncStatus.Error)
             {
@@ -740,6 +743,19 @@ public sealed class AccountSettingsViewModel : ViewModelBase
             }
 
             _logger?.LogDebug("Patreonステータス変更: {Status}, Plan={Plan}", e.NewStatus, e.Plan);
+        });
+    }
+
+    /// <summary>
+    /// ライセンス状態変更イベントハンドラ
+    /// </summary>
+    private void OnLicenseStateChanged(object? sender, LicenseStateChangedEventArgs e)
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            CurrentPlan = e.NewState.CurrentPlan;
+            _logger?.LogDebug("ライセンス状態変更: {OldPlan} -> {NewPlan}, Reason={Reason}",
+                e.OldState.CurrentPlan, e.NewState.CurrentPlan, e.Reason);
         });
     }
 
@@ -846,7 +862,7 @@ public sealed class AccountSettingsViewModel : ViewModelBase
                     CurrentPlan = result.Plan;
                     PatreonLastSyncTime = DateTime.UtcNow;
                     PatreonSyncStatus = PatreonSyncStatus.Synced;
-                    SetStatusMessage($"同期完了: {CurrentPlanDisplay}プラン", false);
+                    SetStatusMessage($"同期完了: {GetPlanName(CurrentPlan)}プラン", false);
                     _logger?.LogInformation("Patreon同期成功: Plan={Plan}", result.Plan);
                 }
                 else
@@ -927,6 +943,11 @@ public sealed class AccountSettingsViewModel : ViewModelBase
             if (_patreonService != null)
             {
                 _patreonService.StatusChanged -= OnPatreonStatusChanged;
+            }
+
+            if (_licenseManager != null)
+            {
+                _licenseManager.StateChanged -= OnLicenseStateChanged;
             }
         }
         base.Dispose(disposing);

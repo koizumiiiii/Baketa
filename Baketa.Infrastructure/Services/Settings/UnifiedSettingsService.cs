@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Constants;
+using Baketa.Core.Extensions;
 using Baketa.Core.Settings;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
@@ -27,6 +28,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     private UnifiedTranslationSettings? _cachedTranslationSettings;
     private UnifiedOcrSettings? _cachedOcrSettings;
     private UnifiedAppSettings? _cachedAppSettings;
+    private UnifiedPromotionSettings? _cachedPromotionSettings;
     private bool _isWatching;
     private bool _disposed;
 
@@ -135,11 +137,24 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             ["defaultEngine"] = settings.DefaultEngine,
             ["confidenceThreshold"] = settings.ConfidenceThreshold,
             ["timeoutMs"] = settings.TimeoutMs,
-            ["overlayFontSize"] = settings.OverlayFontSize
+            ["overlayFontSize"] = settings.OverlayFontSize,
+            // [Issue #243] Cloud AI翻訳設定を保存
+            ["enableCloudAiTranslation"] = settings.EnableCloudAiTranslation
         };
 
         var json = JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(BaketaSettingsPaths.TranslationSettingsPath, json, cancellationToken).ConfigureAwait(false);
+
+        // [Issue #237] FileSystemWatcher競合状態回避: 自己書き込み中は監視を一時停止
+        var wasWatching = _isWatching;
+        if (wasWatching) StopWatching();
+        try
+        {
+            await File.WriteAllTextAsync(BaketaSettingsPaths.TranslationSettingsPath, json, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (wasWatching) StartWatching();
+        }
 
         // キャッシュをクリア
         await _settingsLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -153,8 +168,11 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             _settingsLock.Release();
         }
 
-        _logger?.LogInformation("翻訳設定を更新しました: {SelectedLanguagePair}, Engine: {Engine}",
-            selectedLanguagePair, settings.DefaultEngine);
+        _logger?.LogInformation("翻訳設定を更新しました: {SelectedLanguagePair}, Engine: {Engine}, CloudAI: {CloudAI}",
+            selectedLanguagePair, settings.DefaultEngine, settings.EnableCloudAiTranslation);
+
+        // [Issue #243] 設定変更イベントを発火してUI更新をトリガー
+        SettingsChanged?.Invoke(this, new SettingsChangedEventArgs("translation", SettingsType.Translation));
     }
 
     /// <inheritdoc />
@@ -169,7 +187,18 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         };
 
         var json = JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(BaketaSettingsPaths.OcrSettingsPath, json, cancellationToken).ConfigureAwait(false);
+
+        // [Issue #237] FileSystemWatcher競合状態回避: 自己書き込み中は監視を一時停止
+        var wasWatching = _isWatching;
+        if (wasWatching) StopWatching();
+        try
+        {
+            await File.WriteAllTextAsync(BaketaSettingsPaths.OcrSettingsPath, json, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (wasWatching) StartWatching();
+        }
 
         // キャッシュをクリア
         await _settingsLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -188,6 +217,79 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     }
 
     /// <inheritdoc />
+    public IPromotionSettings GetPromotionSettings()
+    {
+        if (_cachedPromotionSettings is not null)
+            return _cachedPromotionSettings;
+
+        _settingsLock.Wait();
+        try
+        {
+            _cachedPromotionSettings ??= LoadPromotionSettings();
+            return _cachedPromotionSettings;
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task UpdatePromotionSettingsAsync(IPromotionSettings settings, CancellationToken cancellationToken = default)
+    {
+        // [Issue #237] ディレクトリが存在することを確認
+        BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+
+        var promotionData = new Dictionary<string, object?>();
+
+        if (settings.AppliedPromotionCode is not null)
+            promotionData["appliedPromotionCode"] = settings.AppliedPromotionCode;
+
+        if (settings.PromotionPlanType.HasValue)
+            promotionData["promotionPlanType"] = settings.PromotionPlanType.Value;
+
+        if (settings.PromotionExpiresAt is not null)
+            promotionData["promotionExpiresAt"] = settings.PromotionExpiresAt;
+
+        if (settings.PromotionAppliedAt is not null)
+            promotionData["promotionAppliedAt"] = settings.PromotionAppliedAt;
+
+        if (settings.LastOnlineVerification is not null)
+            promotionData["lastOnlineVerification"] = settings.LastOnlineVerification;
+
+        var json = JsonSerializer.Serialize(promotionData, new JsonSerializerOptions { WriteIndented = true });
+
+        // [Issue #237] FileSystemWatcher競合状態回避: 自己書き込み中は監視を一時停止
+        var wasWatching = _isWatching;
+        if (wasWatching) StopWatching();
+        try
+        {
+            await File.WriteAllTextAsync(BaketaSettingsPaths.PromotionSettingsPath, json, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (wasWatching) StartWatching();
+        }
+
+        // キャッシュをクリア
+        await _settingsLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _cachedPromotionSettings = null;
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
+
+        _logger?.LogInformation("[Issue #237] プロモーション設定を更新しました: Plan: {Plan}, ExpiresAt: {ExpiresAt}",
+            settings.PromotionPlanType, settings.PromotionExpiresAt);
+
+        // 設定変更イベントを発火
+        SettingsChanged?.Invoke(this, new SettingsChangedEventArgs("promotion", SettingsType.Promotion));
+    }
+
+    /// <inheritdoc />
     public async Task ReloadSettingsAsync(CancellationToken cancellationToken = default)
     {
         await _settingsLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -197,6 +299,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             _cachedTranslationSettings = null;
             _cachedOcrSettings = null;
             _cachedAppSettings = null;
+            _cachedPromotionSettings = null;
 
             _logger?.LogInformation("設定をリロードしました");
         }
@@ -293,6 +396,65 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             appSettings.ConfidenceThreshold,
             BaketaConstants.Ocr.DefaultTimeoutMs, // デフォルトタイムアウト30秒
             appSettings.AutoOptimizationEnabled);
+    }
+
+    /// <summary>
+    /// [Issue #237] プロモーション設定をファイルから読み込む
+    /// </summary>
+    private UnifiedPromotionSettings LoadPromotionSettings()
+    {
+        // プロモーション設定ファイルが存在する場合は読み込み
+        if (File.Exists(BaketaSettingsPaths.PromotionSettingsPath))
+        {
+            try
+            {
+                var jsonContent = File.ReadAllText(BaketaSettingsPaths.PromotionSettingsPath);
+                var promotionData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonContent);
+
+                if (promotionData is not null)
+                {
+                    return CreatePromotionSettingsFromData(promotionData);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[Issue #237] プロモーション設定ファイルの読み込みに失敗しました。デフォルト設定を使用します");
+            }
+        }
+
+        // デフォルト設定（プロモーション未適用）
+        return new UnifiedPromotionSettings(null, null, null, null, null);
+    }
+
+    /// <summary>
+    /// [Issue #237] Dictionary からプロモーション設定を作成
+    /// </summary>
+    private static UnifiedPromotionSettings CreatePromotionSettingsFromData(Dictionary<string, object> data)
+    {
+        return new UnifiedPromotionSettings(
+            GetStringFromValue(data.GetValueOrDefault("appliedPromotionCode")),
+            GetNullableIntValue(data, "promotionPlanType"),
+            GetStringFromValue(data.GetValueOrDefault("promotionExpiresAt")),
+            GetStringFromValue(data.GetValueOrDefault("promotionAppliedAt")),
+            GetStringFromValue(data.GetValueOrDefault("lastOnlineVerification")));
+    }
+
+    /// <summary>
+    /// [Issue #237] Nullable int 値の取得
+    /// </summary>
+    private static int? GetNullableIntValue(Dictionary<string, object> settings, string key)
+    {
+        if (!settings.TryGetValue(key, out var value) || value is null)
+            return null;
+
+        return value switch
+        {
+            int intValue => intValue,
+            JsonElement element when element.ValueKind == JsonValueKind.Number => element.GetInt32(),
+            JsonElement element when element.ValueKind == JsonValueKind.Null => null,
+            string stringValue when int.TryParse(stringValue, out var parsed) => parsed,
+            _ => null
+        };
     }
 
     private static UnifiedTranslationSettings CreateTranslationSettingsFromUser(
@@ -432,6 +594,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
                 {
                     "translation-settings" => SettingsType.Translation,
                     "ocr-settings" => SettingsType.Ocr,
+                    "promotion-settings" => SettingsType.Promotion,
                     _ => SettingsType.User
                 };
 
@@ -500,4 +663,20 @@ internal sealed class UnifiedAppSettings(ITranslationSettings translation, IOcrS
     public IOcrSettings Ocr { get; } = ocr;
     public string LogLevel { get; } = "Information"; // デフォルトログレベル
     public bool EnableDebugMode { get; } // デフォルトデバッグモード
+}
+
+/// <summary>
+/// [Issue #237] 統一プロモーション設定実装
+/// </summary>
+internal sealed record UnifiedPromotionSettings(
+    string? AppliedPromotionCode,
+    int? PromotionPlanType,
+    string? PromotionExpiresAt,
+    string? PromotionAppliedAt,
+    string? LastOnlineVerification) : IPromotionSettings
+{
+    /// <summary>
+    /// プロモーションが有効かどうかを判定（拡張メソッドに委譲）
+    /// </summary>
+    public bool IsPromotionActive => this.IsCurrentlyActive();
 }

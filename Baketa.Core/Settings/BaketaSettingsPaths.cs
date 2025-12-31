@@ -39,6 +39,13 @@ public static class BaketaSettingsPaths
         "ui-settings.json");
 
     /// <summary>
+    /// [Issue #237] プロモーション設定ファイルのパス
+    /// </summary>
+    public static string PromotionSettingsPath { get; } = Path.Combine(
+        UserSettingsDirectory,
+        "promotion-settings.json");
+
+    /// <summary>
     /// キャッシュディレクトリのパス
     /// </summary>
     public static string CacheDirectory { get; } = Path.Combine(

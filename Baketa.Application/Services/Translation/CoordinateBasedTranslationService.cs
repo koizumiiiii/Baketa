@@ -11,6 +11,7 @@ using Baketa.Core.Abstractions.Configuration;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 // [Issue #230] テキストベース変化検知 - 画面点滅時の不要なOCR再実行を防止
@@ -45,6 +46,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly ITextChunkAggregatorService _textChunkAggregatorService;
     private readonly ISmartProcessingPipelineService _pipelineService; // 🎯 [OPTION_A] 段階的フィルタリングパイプライン統合
     private readonly ITextChangeDetectionService? _textChangeDetectionService; // [Issue #230] テキストベース変化検知
+    private readonly ITranslationModeService? _translationModeService; // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
     private bool _disposed;
 
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
@@ -57,6 +59,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         ITextChunkAggregatorService textChunkAggregatorService,
         ISmartProcessingPipelineService pipelineService, // 🎯 [OPTION_A] 段階的フィルタリングパイプライン
         ITextChangeDetectionService? textChangeDetectionService = null, // [Issue #230] テキストベース変化検知
+        ITranslationModeService? translationModeService = null, // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -65,6 +68,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _textChunkAggregatorService = textChunkAggregatorService ?? throw new ArgumentNullException(nameof(textChunkAggregatorService));
         _pipelineService = pipelineService ?? throw new ArgumentNullException(nameof(pipelineService)); // 🎯 [OPTION_A] パイプラインサービス注入
         _textChangeDetectionService = textChangeDetectionService; // [Issue #230] オプショナル（nullでも機能する）
+        _translationModeService = translationModeService; // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -323,21 +327,32 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
                 if (previousText != null)
                 {
-                    // テキスト変化を検知
-                    var changeResult = await _textChangeDetectionService.DetectTextChangeAsync(
-                        previousText, currentCombinedText, contextId).ConfigureAwait(false);
+                    // 🔧 [SINGLESHOT_FIX] Singleshotモードの場合はテキスト変化検出をバイパス
+                    var isSingleshotMode = _translationModeService?.CurrentMode == TranslationMode.Singleshot;
 
-                    if (!changeResult.HasChanged)
+                    if (isSingleshotMode)
                     {
-                        // テキスト変化なし → 翻訳・オーバーレイ更新をスキップ
-                        _logger?.LogInformation("🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (変化率: {ChangePercentage:P1})",
-                            changeResult.ChangePercentage);
-                        Console.WriteLine($"🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (前回と同じテキスト)");
-                        return; // 早期リターン
+                        _logger?.LogInformation("🎯 [SINGLESHOT_FIX] Singleshotモード - テキスト変化検出をバイパス");
+                        Console.WriteLine("🎯 [SINGLESHOT_FIX] Singleshotモード - テキスト変化検出をバイパスして翻訳続行");
                     }
+                    else
+                    {
+                        // テキスト変化を検知（Liveモードのみ）
+                        var changeResult = await _textChangeDetectionService.DetectTextChangeAsync(
+                            previousText, currentCombinedText, contextId).ConfigureAwait(false);
 
-                    _logger?.LogDebug("🎯 [Issue #230] テキスト変化検知 - 翻訳を続行 (変化率: {ChangePercentage:P1})",
-                        changeResult.ChangePercentage);
+                        if (!changeResult.HasChanged)
+                        {
+                            // テキスト変化なし → 翻訳・オーバーレイ更新をスキップ
+                            _logger?.LogInformation("🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (変化率: {ChangePercentage:P1})",
+                                changeResult.ChangePercentage);
+                            Console.WriteLine($"🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (前回と同じテキスト)");
+                            return; // 早期リターン
+                        }
+
+                        _logger?.LogDebug("🎯 [Issue #230] テキスト変化検知 - 翻訳を続行 (変化率: {ChangePercentage:P1})",
+                            changeResult.ChangePercentage);
+                    }
                 }
                 else
                 {

@@ -170,6 +170,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Avalonia.ReactiveUI" Version="11.2.7" />
+    <PackageReference Include="Avalonia.Xaml.Interactivity" Version="11.2.7" />
     <PackageReference Include="ReactiveUI" Version="20.1.63" />
     <!-- ReactiveUI.Fodyは意図的に無効化 (OutOfMemoryException回避) - PrivateAssetsで警告抑制 -->
     <PackageReference Include="ReactiveUI.Fody" Version="19.5.41" PrivateAssets="All" />

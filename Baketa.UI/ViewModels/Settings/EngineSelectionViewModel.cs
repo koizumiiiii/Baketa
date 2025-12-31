@@ -397,6 +397,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     /// </summary>
     private void UpdateCloudOnlyAvailability()
     {
+        var wasCloudOnlyEnabled = IsCloudOnlyEnabled;
         IsCloudOnlyEnabled = _planService.CanUseCloudOnlyEngine;
 
         if (!IsCloudOnlyEnabled && SelectedEngine == TranslationEngine.CloudOnly)
@@ -404,6 +405,12 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             // プランダウングレード時のフォールバック
             SelectedEngine = TranslationEngine.LocalOnly;
             _logger.LogInformation("Fallback to LocalOnly due to plan limitation");
+        }
+        else if (IsCloudOnlyEnabled && !wasCloudOnlyEnabled && SelectedEngine == TranslationEngine.LocalOnly)
+        {
+            // Issue #243: プランアップグレード時にCloudOnlyに自動切り替え
+            SelectedEngine = TranslationEngine.CloudOnly;
+            _logger.LogInformation("🎉 Auto-switched to CloudOnly due to plan upgrade to Premium");
         }
     }
 

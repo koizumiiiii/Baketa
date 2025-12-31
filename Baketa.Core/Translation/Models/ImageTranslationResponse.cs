@@ -1,3 +1,5 @@
+using Baketa.Core.Models;
+
 namespace Baketa.Core.Translation.Abstractions;
 
 /// <summary>
@@ -51,6 +53,20 @@ public sealed class ImageTranslationResponse
     public TranslationErrorDetail? Error { get; init; }
 
     /// <summary>
+    /// 複数テキストの翻訳結果（Issue #242: 複数テキスト対応）
+    /// </summary>
+    /// <remarks>
+    /// 複数テキストが検出された場合、このプロパティに全テキストが格納されます。
+    /// 後方互換性のため、DetectedText/TranslatedTextには最初のテキストが設定されます。
+    /// </remarks>
+    public IReadOnlyList<TranslatedTextItem>? Texts { get; init; }
+
+    /// <summary>
+    /// 複数テキストが含まれるかどうか
+    /// </summary>
+    public bool HasMultipleTexts => Texts is { Count: > 1 };
+
+    /// <summary>
     /// 成功レスポンス作成
     /// </summary>
     public static ImageTranslationResponse Success(
@@ -85,6 +101,60 @@ public sealed class ImageTranslationResponse
         Error = error,
         ProcessingTime = processingTime
     };
+
+    /// <summary>
+    /// 複数テキスト成功レスポンス作成（Issue #242）
+    /// </summary>
+    public static ImageTranslationResponse SuccessWithMultipleTexts(
+        string requestId,
+        IReadOnlyList<TranslatedTextItem> texts,
+        string providerId,
+        TokenUsageDetail tokenUsage,
+        TimeSpan processingTime,
+        string? detectedLanguage = null)
+    {
+        var firstText = texts.Count > 0 ? texts[0] : null;
+
+        return new()
+        {
+            RequestId = requestId,
+            IsSuccess = true,
+            DetectedText = firstText?.Original ?? string.Empty,
+            TranslatedText = firstText?.Translation ?? string.Empty,
+            DetectedLanguage = detectedLanguage,
+            ProviderId = providerId,
+            TokenUsage = tokenUsage,
+            ProcessingTime = processingTime,
+            Texts = texts
+        };
+    }
+}
+
+/// <summary>
+/// 翻訳されたテキストアイテム（Issue #242: 複数テキスト対応）
+/// </summary>
+public sealed class TranslatedTextItem
+{
+    /// <summary>
+    /// 検出された元のテキスト
+    /// </summary>
+    public required string Original { get; init; }
+
+    /// <summary>
+    /// 翻訳されたテキスト
+    /// </summary>
+    public required string Translation { get; init; }
+
+    /// <summary>
+    /// テキストのバウンディングボックス（ピクセル座標）
+    /// Phase 2: 座標ベースオーバーレイ表示用
+    /// </summary>
+    public Int32Rect? BoundingBox { get; init; }
+
+    /// <summary>
+    /// バウンディングボックスが設定されているか
+    /// </summary>
+    public bool HasBoundingBox => BoundingBox.HasValue;
 }
 
 /// <summary>

@@ -105,6 +105,52 @@ public sealed class LicenseSettings
         Description = "モックモード時のテスト用トークン使用量")]
     public long MockTokenUsage { get; set; }
 
+    #region プロモーションコード関連 (Issue #237 Phase 2)
+
+    /// <summary>
+    /// プロモーションコードAPIエンドポイント
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "License", "Promotion API Endpoint",
+        Description = "プロモーションコード検証サーバーのエンドポイントURL")]
+    public string PromotionApiEndpoint { get; set; } = "https://baketa-relay.suke009.workers.dev/api/promotion/redeem";
+
+    /// <summary>
+    /// 適用済みプロモーションコード（DPAPI暗号化）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Debug, "License", "Applied Promotion Code",
+        Description = "適用済みプロモーションコード（内部使用）")]
+    public string? AppliedPromotionCode { get; set; }
+
+    /// <summary>
+    /// プロモーションで適用されたプラン
+    /// </summary>
+    [SettingMetadata(SettingLevel.Debug, "License", "Promotion Plan Type",
+        Description = "プロモーションで適用されたプラン（内部使用）")]
+    public int? PromotionPlanType { get; set; }
+
+    /// <summary>
+    /// プロモーション有効期限（ISO 8601形式）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Debug, "License", "Promotion Expires At",
+        Description = "プロモーション有効期限（内部使用）")]
+    public string? PromotionExpiresAt { get; set; }
+
+    /// <summary>
+    /// プロモーション適用日時（ISO 8601形式）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Debug, "License", "Promotion Applied At",
+        Description = "プロモーション適用日時（内部使用）")]
+    public string? PromotionAppliedAt { get; set; }
+
+    /// <summary>
+    /// 最終オンライン検証日時（時計巻き戻し対策）
+    /// </summary>
+    [SettingMetadata(SettingLevel.Debug, "License", "Last Online Verification",
+        Description = "最終オンライン検証日時（内部使用）")]
+    public string? LastOnlineVerification { get; set; }
+
+    #endregion
+
     /// <summary>
     /// 設定を検証
     /// </summary>
