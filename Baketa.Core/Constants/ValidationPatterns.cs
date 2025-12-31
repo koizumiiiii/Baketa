@@ -11,7 +11,7 @@ public static class ValidationPatterns
 {
     /// <summary>
     /// プロモーションコードの形式 (BAKETA-XXXX-XXXX) を検証する正規表現
-    /// Base32 Crockford形式（O/0/I/1を除外）
+    /// 英数字（A-Z, 0-9）を許可
     /// </summary>
-    public const string PromotionCode = @"^BAKETA-[0-9A-HJ-NP-TV-Z]{4}-[0-9A-HJ-NP-TV-Z]{4}$";
+    public const string PromotionCode = @"^BAKETA-[0-9A-Z]{4}-[0-9A-Z]{4}$";
 }

@@ -6,8 +6,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Baketa.Core.Abstractions.Auth;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Constants;
+using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
@@ -82,6 +84,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     private readonly IOptionsMonitor<LicenseSettings> _settingsMonitor;
     private readonly IPromotionSettingsPersistence _settingsPersistence;
     private readonly IAuthService _authService;
+    private readonly IEventAggregator _eventAggregator;
     private readonly JsonSerializerOptions _jsonOptions;
     private bool _disposed;
 
@@ -93,12 +96,14 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         IOptionsMonitor<LicenseSettings> settingsMonitor,
         IPromotionSettingsPersistence settingsPersistence,
         IAuthService authService,
+        IEventAggregator eventAggregator,
         ILogger<PromotionCodeService> logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _settingsMonitor = settingsMonitor ?? throw new ArgumentNullException(nameof(settingsMonitor));
         _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _jsonOptions = new JsonSerializerOptions
@@ -142,24 +147,40 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
             if (response.Success)
             {
+                // プラン情報を解析
+                var appliedPlan = ParsePlanType(response.PlanType);
+                var expiresAt = response.ExpiresAt ?? DateTime.UtcNow.AddMonths(1);
+
                 // ローカルに保存
                 await SavePromotionToSettingsAsync(normalizedCode, response, cancellationToken).ConfigureAwait(false);
 
                 _logger.LogInformation(
                     "Promotion code applied successfully: Plan={Plan}, ExpiresAt={ExpiresAt}",
-                    response.PlanType, response.ExpiresAt);
+                    appliedPlan, expiresAt);
+
+                // Issue #237: 保存とは別に直接PromotionInfoを作成（IOptionsMonitorの遅延更新を回避）
+                var promotionInfo = new PromotionInfo
+                {
+                    Code = normalizedCode,
+                    Plan = appliedPlan,
+                    ExpiresAt = expiresAt,
+                    AppliedAt = DateTime.UtcNow
+                };
 
                 // イベント発火
-                var promotionInfo = GetCurrentPromotion();
                 PromotionStateChanged?.Invoke(this, new PromotionStateChangedEventArgs
                 {
                     NewPromotion = promotionInfo,
                     Reason = "Promotion code applied"
                 });
 
+                // Issue #237: EventAggregator経由でLicenseManagerに通知（UI即時更新のため）
+                await _eventAggregator.PublishAsync(new PromotionAppliedEvent(promotionInfo))
+                    .ConfigureAwait(false);
+
                 return PromotionCodeResult.CreateSuccess(
-                    ParsePlanType(response.PlanType),
-                    response.ExpiresAt ?? DateTime.UtcNow.AddMonths(1),
+                    appliedPlan,
+                    expiresAt,
                     TruncateMessage(response.Message, "プロモーションコードが適用されました。"));
             }
             else

@@ -816,8 +816,8 @@ function validatePromotionRedeemBody(body: unknown): ValidationResult<PromotionR
   return { success: true, data: { code: obj.code } };
 }
 
-/** Base32 Crockford形式検証 */
-const PROMOTION_CODE_PATTERN = /^BAKETA-[0-9A-HJ-NP-TV-Z]{4}-[0-9A-HJ-NP-TV-Z]{4}$/;
+/** プロモーションコード形式検証（英数字許可） */
+const PROMOTION_CODE_PATTERN = /^BAKETA-[0-9A-Z]{4}-[0-9A-Z]{4}$/;
 
 function isValidPromotionCodeFormat(code: string): boolean {
   return PROMOTION_CODE_PATTERN.test(code);

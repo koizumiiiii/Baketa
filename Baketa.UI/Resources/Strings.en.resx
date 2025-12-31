@@ -700,6 +700,33 @@
   <data name="License_Plan_Unknown" xml:space="preserve">
     <value>Unknown</value>
   </data>
+  <data name="License_Plan_PromotionSuffix" xml:space="preserve">
+    <value>(Promotion Code Applied)</value>
+  </data>
+
+  <!-- Promotion Code Section -->
+  <data name="Settings_License_PromotionCode" xml:space="preserve">
+    <value>Promotion Code</value>
+  </data>
+  <data name="Settings_License_PromotionExpires" xml:space="preserve">
+    <value>Expires:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
+    <value>If you have a promotion code, enter it below.</value>
+  </data>
+  <data name="Settings_License_PromotionApply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="Settings_License_PromotionVerifying" xml:space="preserve">
+    <value>Verifying...</value>
+  </data>
+  <data name="Settings_License_PromotionAppliedFormat" xml:space="preserve">
+    <value>{0} has been applied</value>
+  </data>
+  <data name="Settings_License_PromotionPlanPromo" xml:space="preserve">
+    <value>Promotion</value>
+  </data>
+
   <data name="License_Desc_Free" xml:space="preserve">
     <value>Free Plan - With ads, local translation only</value>
   </data>

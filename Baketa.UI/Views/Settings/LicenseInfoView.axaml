@@ -178,7 +178,7 @@
 
             <!-- Issue #237 Phase 2: プロモーションコードセクション -->
             <StackPanel Spacing="12">
-                <TextBlock Text="プロモーションコード" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_License_PromotionCode}" FontSize="16" FontWeight="SemiBold"/>
 
                 <!-- アクティブなプロモーション表示 -->
                 <Border IsVisible="{Binding HasActivePromotion}"
@@ -190,12 +190,12 @@
                             <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
                                       Width="16" Height="16"
                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
-                            <TextBlock Text="Proプランが適用されています"
+                            <TextBlock Text="{Binding PromotionAppliedMessage}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock Text="有効期限:"
+                            <TextBlock Text="{local:Localize Settings_License_PromotionExpires}"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                             <TextBlock Text="{Binding PromotionExpiresDisplay}"
@@ -211,7 +211,7 @@
                         CornerRadius="8"
                         Padding="16">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="プロモーションコードをお持ちの場合は、下記に入力してください。"
+                        <TextBlock Text="{local:Localize Settings_License_PromotionCodeDescription}"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    TextWrapping="Wrap"/>
@@ -224,7 +224,7 @@
                                      IsEnabled="{Binding !IsApplyingPromotion}"
                                      Margin="0,0,8,0"/>
                             <Button Grid.Column="1"
-                                    Content="適用"
+                                    Content="{local:Localize Settings_License_PromotionApply}"
                                     Command="{Binding ApplyPromotionCommand}"
                                     IsEnabled="{Binding !IsApplyingPromotion}"
                                     Padding="16,8"
@@ -237,7 +237,7 @@
                                     Spacing="8"
                                     HorizontalAlignment="Center">
                             <ProgressBar IsIndeterminate="True" Width="100" Height="4"/>
-                            <TextBlock Text="確認中..." FontSize="12"/>
+                            <TextBlock Text="{local:Localize Settings_License_PromotionVerifying}" FontSize="12"/>
                         </StackPanel>
 
                         <!-- ステータスメッセージ -->

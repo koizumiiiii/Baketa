@@ -46,6 +46,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private string _promotionStatusMessage = string.Empty;
     private bool _isPromotionError;
     private bool _hasActivePromotion;
+    private PromotionInfo? _activePromotion;
 
     /// <summary>
     /// LicenseInfoViewModelを初期化します
@@ -267,6 +268,39 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// アクティブなプロモーションのプラン表示名
+    /// </summary>
+    public string PromotionPlanDisplayName
+    {
+        get
+        {
+            if (_activePromotion == null || !_activePromotion.IsValid)
+                return string.Empty;
+            return _activePromotion.Plan switch
+            {
+                PlanType.Premia => Strings.License_Plan_Premia,
+                PlanType.Pro => Strings.License_Plan_Pro,
+                PlanType.Standard => Strings.License_Plan_Standard,
+                _ => Strings.Settings_License_PromotionPlanPromo
+            };
+        }
+    }
+
+    /// <summary>
+    /// プロモーション適用メッセージ（UI表示用）
+    /// </summary>
+    public string PromotionAppliedMessage
+    {
+        get
+        {
+            var planName = PromotionPlanDisplayName;
+            if (string.IsNullOrEmpty(planName))
+                planName = Strings.Settings_License_PromotionPlanPromo;
+            return string.Format(Strings.Settings_License_PromotionAppliedFormat, planName);
+        }
+    }
+
     #endregion
 
     #endregion
@@ -307,7 +341,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private void UpdateFromState(LicenseState state)
     {
         CurrentPlan = state.CurrentPlan;
-        PlanDisplayName = GetPlanDisplayName(state.CurrentPlan);
+        // プロモーション適用中の場合はサフィックスを追加
+        var basePlanName = GetPlanDisplayName(state.CurrentPlan);
+        PlanDisplayName = HasActivePromotion && state.CurrentPlan != PlanType.Free
+            ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
+            : basePlanName;
         PlanDescription = GetPlanDescription(state.CurrentPlan);
         TokensUsed = state.CloudAiTokensUsed;
         TokenLimit = state.MonthlyTokenLimit;
@@ -435,10 +473,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private void LoadPromotionState()
     {
         var promotion = _promotionCodeService.GetCurrentPromotion();
+        _activePromotion = promotion;
         HasActivePromotion = promotion?.IsValid == true;
         if (HasActivePromotion)
         {
             this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
+            this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
+            this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
         }
     }
 
@@ -467,7 +508,10 @@ public sealed class LicenseInfoViewModel : ViewModelBase
                 {
                     PromotionCode = string.Empty;
                     HasActivePromotion = true;
+                    // _activePromotionはOnPromotionStateChangedで設定される
                     this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
+                    this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
+                    this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
                     _logger?.LogInformation("プロモーションコード適用成功: Plan={Plan}", result.AppliedPlan);
                 }
                 else
@@ -498,8 +542,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
+            _activePromotion = e.NewPromotion;
             HasActivePromotion = e.NewPromotion?.IsValid == true;
             this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
+            this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
+            this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
             _logger?.LogDebug("プロモーション状態が変更されました: {Reason}", e.Reason);
         });
     }
