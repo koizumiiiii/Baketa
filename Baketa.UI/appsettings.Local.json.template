@@ -1,6 +1,28 @@
 {
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft.AspNetCore": "Warning",
+      "Baketa.Infrastructure.Translation": "Debug",
+      "Baketa.Infrastructure.OCR": "Debug",
+      "Baketa.Infrastructure.Platform": "Debug",
+      "Baketa.UI.Services": "Debug",
+      "Baketa.Application.Services": "Debug",
+      "Baketa.UI.ViewModels": "Debug"
+    },
+    "EnableDebugFileLogging": true
+  },
+  "Authentication": {
+    "IsFreePlan": true
+  },
+  "License": {
+    "EnableMockMode": true,
+    "MockPlanType": 0,
+    "MockTokenUsage": 0
+  },
   "CloudTranslation": {
     "UseDirectApiMode": true,
-    "DirectGeminiApiKey": "YOUR_GEMINI_API_KEY_HERE"
+    "DirectGeminiApiKey": "YOUR_GEMINI_API_KEY_HERE",
+    "DirectOpenAIApiKey": "YOUR_OPENAI_API_KEY_HERE"
   }
 }
