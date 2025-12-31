@@ -196,10 +196,10 @@ public sealed class DirectGeminiImageTranslator : ICloudImageTranslator
 以下のJSON形式で回答してください：
 {{
   ""texts"": [
-    {{ ""original"": ""検出された元のテキスト1"", ""translation"": ""翻訳されたテキスト1"" }},
-    {{ ""original"": ""検出された元のテキスト2"", ""translation"": ""翻訳されたテキスト2"" }}
+    {{ ""original"": ""original_text_1"", ""translation"": ""translated_text_1"" }},
+    {{ ""original"": ""original_text_2"", ""translation"": ""translated_text_2"" }}
   ],
-  ""detected_language"": ""検出された言語コード（例: en, ja, ko）""
+  ""detected_language"": ""en, ja, ko, etc.""
 }}
 
 テキストが検出されない場合は、textsを空配列[]にしてください。
@@ -407,7 +407,7 @@ JSONのみを出力し、他の説明は不要です。";
         // 最終フォールバック: レスポンス全体を単一テキストとして扱う
         if (!string.IsNullOrWhiteSpace(geminiText))
         {
-            _logger.LogDebug("非JSONレスポンスをフォールバック処理");
+            _logger.LogWarning("非JSONレスポンスをフォールバック処理: {Text}", geminiText);
             return new MultiTextTranslationResultDto
             {
                 Texts =
