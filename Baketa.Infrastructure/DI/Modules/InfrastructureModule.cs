@@ -946,6 +946,10 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddHttpClient<Translation.Cloud.DirectGeminiImageTranslator>();
         Console.WriteLine("✅ DirectGeminiImageTranslator登録完了 - HttpClientFactory使用");
 
+        // DirectOpenAIImageTranslator登録（HttpClientFactory使用）- フォールバック用
+        services.AddHttpClient<Translation.Cloud.DirectOpenAIImageTranslator>();
+        Console.WriteLine("✅ DirectOpenAIImageTranslator登録完了 - HttpClientFactory使用（フォールバック用）");
+
         // Primary Cloud翻訳エンジン登録
         // UseDirectApiMode=true の場合は DirectGeminiImageTranslator を使用
         // UseDirectApiMode=false の場合は PrimaryCloudTranslator（Relay Server経由）を使用
@@ -966,9 +970,25 @@ public class InfrastructureModule : ServiceModuleBase
         });
         Console.WriteLine("✅ Primary Cloud翻訳エンジン登録完了 - Keyed Service [primary] (Direct API切り替え対応)");
 
-        // Secondary Cloud翻訳エンジン（スタブ）- Keyed Service
-        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator, Translation.Cloud.SecondaryCloudTranslator>("secondary");
-        Console.WriteLine("✅ SecondaryCloudTranslator登録完了 - Keyed Service [secondary]");
+        // Secondary Cloud翻訳エンジン - Keyed Service
+        // UseDirectApiMode=true の場合は DirectOpenAIImageTranslator を使用（Gemini失敗時のフォールバック）
+        // UseDirectApiMode=false の場合は SecondaryCloudTranslator（スタブ - Relay Server経由を推奨）
+        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>("secondary", (provider, key) =>
+        {
+            var settings = provider.GetRequiredService<IOptions<Core.Settings.CloudTranslationSettings>>().Value;
+
+            if (settings.UseDirectApiMode && !string.IsNullOrEmpty(settings.DirectOpenAIApiKey))
+            {
+                Console.WriteLine("🔧 [Fallback] Direct APIモード有効 & OpenAI APIキーあり - DirectOpenAIImageTranslator使用");
+                return provider.GetRequiredService<Translation.Cloud.DirectOpenAIImageTranslator>();
+            }
+            else
+            {
+                Console.WriteLine("🔧 [Fallback] SecondaryCloudTranslator（スタブ）使用 - OpenAI APIキー未設定");
+                return provider.GetRequiredService<Translation.Cloud.SecondaryCloudTranslator>();
+            }
+        });
+        Console.WriteLine("✅ Secondary Cloud翻訳エンジン登録完了 - Keyed Service [secondary] (OpenAIフォールバック対応)");
 
         // FallbackOrchestrator登録
         services.AddSingleton<CoreTranslation.IFallbackOrchestrator, Translation.Services.FallbackOrchestrator>();

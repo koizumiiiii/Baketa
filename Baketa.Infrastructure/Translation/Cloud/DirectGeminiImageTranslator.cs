@@ -190,7 +190,7 @@ public sealed class DirectGeminiImageTranslator : ICloudImageTranslator
         var url = $"{GeminiApiBaseUrl}/models/{DefaultModel}:generateContent";
 
         // プロンプト作成（OCR + 翻訳を1回で実行）- Issue #242: 複数テキスト対応 + Phase 2座標
-        var targetLang = GetLanguageDisplayName(request.TargetLanguage);
+        var targetLang = CloudTranslationHelpers.GetLanguageDisplayName(request.TargetLanguage);
         var prompt = $@"あなたはゲームローカライズの専門家です。この画像に含まれる全てのテキストを検出し、{targetLang}に翻訳してください。
 
 ## 翻訳ガイドライン
@@ -368,21 +368,17 @@ JSONのみを出力し、他の説明は不要です。";
     /// </summary>
     internal MultiTextTranslationResultDto? ParseTranslationResult(string geminiText)
     {
-        var jsonText = ExtractJsonFromResponse(geminiText);
+        var jsonText = CloudTranslationHelpers.ExtractJsonFromResponse(geminiText);
         if (string.IsNullOrEmpty(jsonText))
         {
             return null;
         }
 
-        var jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-        };
-
         try
         {
             // まず新形式（複数テキスト）でパースを試みる
-            var multiResult = JsonSerializer.Deserialize<MultiTextTranslationResultDto>(jsonText, jsonOptions);
+            var multiResult = JsonSerializer.Deserialize<MultiTextTranslationResultDto>(
+                jsonText, CloudTranslationHelpers.SnakeCaseJsonOptions);
             if (multiResult?.Texts != null)
             {
                 return multiResult;
@@ -396,7 +392,8 @@ JSONのみを出力し、他の説明は不要です。";
         // フォールバック: 旧形式（単一テキスト）でパースを試みる
         try
         {
-            var legacyResult = JsonSerializer.Deserialize<LegacyTranslationResultDto>(jsonText, jsonOptions);
+            var legacyResult = JsonSerializer.Deserialize<LegacyTranslationResultDto>(
+                jsonText, CloudTranslationHelpers.SnakeCaseJsonOptions);
             if (legacyResult != null && !string.IsNullOrEmpty(legacyResult.DetectedText))
             {
                 _logger.LogDebug("旧形式JSONからのパースにフォールバック");
@@ -438,50 +435,6 @@ JSONのみを出力し、他の説明は不要です。";
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// レスポンスからJSON部分を抽出
-    /// </summary>
-    private static string ExtractJsonFromResponse(string response)
-    {
-        var jsonText = response.Trim();
-
-        // Geminiがマークダウンのコードブロックで囲む場合があるので除去
-        if (jsonText.StartsWith("```json", StringComparison.Ordinal))
-        {
-            jsonText = jsonText[7..];
-        }
-        else if (jsonText.StartsWith("```", StringComparison.Ordinal))
-        {
-            jsonText = jsonText[3..];
-        }
-
-        if (jsonText.EndsWith("```", StringComparison.Ordinal))
-        {
-            jsonText = jsonText[..^3];
-        }
-
-        return jsonText.Trim();
-    }
-
-    private static string GetLanguageDisplayName(string languageCode)
-    {
-        return languageCode.ToLowerInvariant() switch
-        {
-            "ja" => "日本語",
-            "en" => "英語",
-            "ko" => "韓国語",
-            "zh" or "zh-cn" => "中国語（簡体字）",
-            "zh-tw" => "中国語（繁体字）",
-            "es" => "スペイン語",
-            "fr" => "フランス語",
-            "de" => "ドイツ語",
-            "it" => "イタリア語",
-            "pt" => "ポルトガル語",
-            "ru" => "ロシア語",
-            _ => languageCode
-        };
     }
 
     /// <summary>

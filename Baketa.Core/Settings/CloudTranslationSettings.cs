@@ -102,6 +102,17 @@ public sealed class CloudTranslationSettings
     public string DirectGeminiApiKey { get; set; } = string.Empty;
 
     /// <summary>
+    /// Direct APIモード用のOpenAI APIキー
+    /// </summary>
+    /// <remarks>
+    /// UseDirectApiMode=true の場合にSecondary翻訳エンジンとして使用されます。
+    /// セキュリティのため appsettings.Local.json で管理し、.gitignore に追加してください。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Debug, "Cloud Translation", "Direct OpenAI API Key",
+        Description = "Direct APIモード用のOpenAI APIキー（フォールバック用）")]
+    public string DirectOpenAIApiKey { get; set; } = string.Empty;
+
+    /// <summary>
     /// 設定を検証
     /// </summary>
     public SettingsValidationResult ValidateSettings()
