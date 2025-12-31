@@ -32,6 +32,11 @@
 		<ProjectReference Include="..\Baketa.Core\Baketa.Core.csproj" />
 	</ItemGroup>
 
+	<!-- テスタビリティ向上: internal メンバーをテストプロジェクトからアクセス可能に -->
+	<ItemGroup>
+		<InternalsVisibleTo Include="Baketa.Infrastructure.Tests" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<!-- Phase 2.1: gRPC翻訳サービス定義 -->
 		<Protobuf Include="Translation\Protos\translation.proto" GrpcServices="Client" />

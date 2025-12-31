@@ -358,7 +358,7 @@ JSONのみを出力し、他の説明は不要です。";
     /// <summary>
     /// 複数テキスト翻訳結果をパース（Issue #242）
     /// </summary>
-    private MultiTextTranslationResultDto? ParseTranslationResult(string geminiText)
+    internal MultiTextTranslationResultDto? ParseTranslationResult(string geminiText)
     {
         var jsonText = ExtractJsonFromResponse(geminiText);
         if (string.IsNullOrEmpty(jsonText))
@@ -484,7 +484,7 @@ JSONのみを出力し、他の説明は不要です。";
     /// <param name="imageWidth">画像幅（ピクセル）</param>
     /// <param name="imageHeight">画像高さ（ピクセル）</param>
     /// <returns>ピクセル座標のInt32Rect、無効な場合はnull</returns>
-    private static Int32Rect? ConvertToPixelRect(int[]? box, int imageWidth, int imageHeight)
+    internal static Int32Rect? ConvertToPixelRect(int[]? box, int imageWidth, int imageHeight)
     {
         // 無効な入力をチェック
         if (box is not { Length: 4 } || imageWidth <= 0 || imageHeight <= 0)
@@ -524,7 +524,7 @@ JSONのみを出力し、他の説明は不要です。";
     /// <summary>
     /// 複数テキスト翻訳結果DTO（Issue #242）
     /// </summary>
-    private sealed class MultiTextTranslationResultDto
+    internal sealed class MultiTextTranslationResultDto
     {
         [JsonPropertyName("texts")]
         public List<TextItemDto>? Texts { get; set; }
@@ -536,7 +536,7 @@ JSONのみを出力し、他の説明は不要です。";
     /// <summary>
     /// 個別テキストアイテムDTO
     /// </summary>
-    private sealed class TextItemDto
+    internal sealed class TextItemDto
     {
         [JsonPropertyName("original")]
         public string? Original { get; set; }
@@ -555,7 +555,7 @@ JSONのみを出力し、他の説明は不要です。";
     /// <summary>
     /// 旧形式（単一テキスト）のDTO - フォールバック用
     /// </summary>
-    private sealed class LegacyTranslationResultDto
+    internal sealed class LegacyTranslationResultDto
     {
         [JsonPropertyName("detected_text")]
         public string? DetectedText { get; set; }
