@@ -1,3 +1,5 @@
+using Baketa.Core.Models;
+
 namespace Baketa.Core.Translation.Abstractions;
 
 /// <summary>
@@ -142,6 +144,17 @@ public sealed class TranslatedTextItem
     /// 翻訳されたテキスト
     /// </summary>
     public required string Translation { get; init; }
+
+    /// <summary>
+    /// テキストのバウンディングボックス（ピクセル座標）
+    /// Phase 2: 座標ベースオーバーレイ表示用
+    /// </summary>
+    public Int32Rect? BoundingBox { get; init; }
+
+    /// <summary>
+    /// バウンディングボックスが設定されているか
+    /// </summary>
+    public bool HasBoundingBox => BoundingBox.HasValue;
 }
 
 /// <summary>

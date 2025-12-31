@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Baketa.Core.Models;
 using Baketa.Core.Settings;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -188,20 +189,25 @@ public sealed class DirectGeminiImageTranslator : ICloudImageTranslator
         // Gemini APIエンドポイント（APIキーはヘッダーで送信）
         var url = $"{GeminiApiBaseUrl}/models/{DefaultModel}:generateContent";
 
-        // プロンプト作成（OCR + 翻訳を1回で実行）- Issue #242: 複数テキスト対応
+        // プロンプト作成（OCR + 翻訳を1回で実行）- Issue #242: 複数テキスト対応 + Phase 2座標
         var targetLang = GetLanguageDisplayName(request.TargetLanguage);
         var prompt = $@"この画像に含まれる全てのテキストを検出し、{targetLang}に翻訳してください。
 複数のテキストがある場合は全て含めてください。
+各テキストのバウンディングボックス座標も含めてください。
 
 以下のJSON形式で回答してください：
 {{
   ""texts"": [
-    {{ ""original"": ""original_text_1"", ""translation"": ""translated_text_1"" }},
-    {{ ""original"": ""original_text_2"", ""translation"": ""translated_text_2"" }}
+    {{
+      ""original"": ""original_text_1"",
+      ""translation"": ""translated_text_1"",
+      ""bounding_box"": [y_min, x_min, y_max, x_max]
+    }}
   ],
   ""detected_language"": ""en, ja, ko, etc.""
 }}
 
+bounding_boxは0-1000スケールの正規化座標で、[y_min, x_min, y_max, x_max]の順序です。
 テキストが検出されない場合は、textsを空配列[]にしてください。
 JSONのみを出力し、他の説明は不要です。";
 
@@ -312,13 +318,14 @@ JSONのみを出力し、他の説明は不要です。";
             ImageTokens = 0 // Gemini APIはイメージトークンを個別に報告しない
         };
 
-        // Issue #242: 複数テキスト対応レスポンス生成
+        // Issue #242: 複数テキスト対応レスポンス生成 + Phase 2座標統合
         var translatedTexts = translationResult.Texts
             .Where(t => !string.IsNullOrEmpty(t.Original) || !string.IsNullOrEmpty(t.Translation))
             .Select(t => new TranslatedTextItem
             {
                 Original = t.Original ?? string.Empty,
-                Translation = t.Translation ?? string.Empty
+                Translation = t.Translation ?? string.Empty,
+                BoundingBox = ConvertToPixelRect(t.BoundingBox, request.Width, request.Height)
             })
             .ToList();
 
@@ -469,6 +476,40 @@ JSONのみを出力し、他の説明は不要です。";
         };
     }
 
+    /// <summary>
+    /// 正規化座標(0-1000)をピクセル座標に変換
+    /// Phase 2: 座標ベースオーバーレイ表示用
+    /// </summary>
+    /// <param name="box">正規化座標 [y_min, x_min, y_max, x_max]</param>
+    /// <param name="imageWidth">画像幅（ピクセル）</param>
+    /// <param name="imageHeight">画像高さ（ピクセル）</param>
+    /// <returns>ピクセル座標のInt32Rect、無効な場合はnull</returns>
+    private static Int32Rect? ConvertToPixelRect(int[]? box, int imageWidth, int imageHeight)
+    {
+        // 無効な入力をチェック
+        if (box is not { Length: 4 } || imageWidth <= 0 || imageHeight <= 0)
+        {
+            return null;
+        }
+
+        // Gemini座標形式: [y_min, x_min, y_max, x_max] (0-1000スケール)
+        int yMin = box[0], xMin = box[1], yMax = box[2], xMax = box[3];
+
+        // 座標値の妥当性チェック
+        if (yMin < 0 || xMin < 0 || yMax > 1000 || xMax > 1000 || yMin >= yMax || xMin >= xMax)
+        {
+            return null;
+        }
+
+        // ピクセル座標に変換
+        return new Int32Rect(
+            X: xMin * imageWidth / 1000,
+            Y: yMin * imageHeight / 1000,
+            Width: (xMax - xMin) * imageWidth / 1000,
+            Height: (yMax - yMin) * imageHeight / 1000
+        );
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -502,6 +543,13 @@ JSONのみを出力し、他の説明は不要です。";
 
         [JsonPropertyName("translation")]
         public string? Translation { get; set; }
+
+        /// <summary>
+        /// バウンディングボックス [y_min, x_min, y_max, x_max] (0-1000スケール)
+        /// Phase 2: 座標ベースオーバーレイ表示用
+        /// </summary>
+        [JsonPropertyName("bounding_box")]
+        public int[]? BoundingBox { get; set; }
     }
 
     /// <summary>
