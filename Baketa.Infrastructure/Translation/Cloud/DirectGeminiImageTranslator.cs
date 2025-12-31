@@ -191,7 +191,15 @@ public sealed class DirectGeminiImageTranslator : ICloudImageTranslator
 
         // プロンプト作成（OCR + 翻訳を1回で実行）- Issue #242: 複数テキスト対応 + Phase 2座標
         var targetLang = GetLanguageDisplayName(request.TargetLanguage);
-        var prompt = $@"この画像に含まれる全てのテキストを検出し、{targetLang}に翻訳してください。
+        var prompt = $@"あなたはゲームローカライズの専門家です。この画像に含まれる全てのテキストを検出し、{targetLang}に翻訳してください。
+
+## 翻訳ガイドライン
+- 直訳ではなく、自然で流暢な{targetLang}の表現を使用してください
+- ゲームのUIやダイアログに適した口調を維持してください
+- 固有名詞（キャラクター名、地名など）はそのまま残すか、一般的なカタカナ表記にしてください
+- 文脈に応じて適切な敬語レベルを選択してください
+
+## 出力形式
 複数のテキストがある場合は全て含めてください。
 各テキストのバウンディングボックス座標も含めてください。
 

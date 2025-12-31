@@ -558,6 +558,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        // 🔍 [DEBUG] セマフォ待機前の状態をログ
+        var requestId = Guid.NewGuid().ToString("N")[..8];
+        _logger?.LogInformation("🔒 [SEMAPHORE] 単発翻訳リクエスト開始: ID={RequestId}, CurrentCount={Count}",
+            requestId, _singleTranslationSemaphore.CurrentCount);
+
         // 翻訳対象ウィンドウハンドルを保存
         _targetWindowHandle = targetWindowHandle;
 
@@ -565,20 +570,22 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             cancellationToken, _disposeCts.Token);
 
         // セマフォを使用して同時実行を制御
+        _logger?.LogDebug("🔒 [SEMAPHORE] セマフォ取得待機中: ID={RequestId}", requestId);
         await _singleTranslationSemaphore.WaitAsync(combinedCts.Token).ConfigureAwait(false);
+        _logger?.LogInformation("🔓 [SEMAPHORE] セマフォ取得完了: ID={RequestId}", requestId);
 
         try
         {
             if (_isSingleTranslationActive)
             {
-                _logger?.LogWarning("単発翻訳は既に実行中です");
+                _logger?.LogWarning("単発翻訳は既に実行中です: ID={RequestId}", requestId);
                 return;
             }
 
             _isSingleTranslationActive = true;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
 
-            _logger?.LogInformation("単発翻訳を実行します");
+            _logger?.LogInformation("単発翻訳を実行します: ID={RequestId}", requestId);
 
             // TODO: 翻訳実行イベントの発行はViewModelで実行
             // await _eventAggregator.PublishAsync(new TranslationTriggeredEvent(TranslationMode.Singleshot))
@@ -592,6 +599,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             _isSingleTranslationActive = false;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
             _singleTranslationSemaphore.Release();
+            _logger?.LogInformation("🔓 [SEMAPHORE] セマフォ解放完了: ID={RequestId}", requestId);
         }
     }
 

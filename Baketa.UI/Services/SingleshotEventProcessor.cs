@@ -43,7 +43,9 @@ public class SingleshotEventProcessor : IEventProcessor<ExecuteSingleshotRequest
     /// </summary>
     public async Task HandleAsync(ExecuteSingleshotRequestEvent eventData)
     {
-        _logger.LogInformation("📸 シングルショット翻訳実行開始: {EventId}", eventData.Id);
+        var processorId = Guid.NewGuid().ToString("N")[..8];
+        _logger.LogInformation("📸 [PROCESSOR] シングルショット翻訳イベント受信: EventId={EventId}, ProcessorId={ProcessorId}",
+            eventData.Id, processorId);
         _logger.LogInformation("🎯 ターゲットウィンドウ: {WindowTitle} (Handle={Handle})",
             eventData.TargetWindow?.Title ?? "null", eventData.TargetWindow?.Handle ?? IntPtr.Zero);
 
@@ -58,17 +60,17 @@ public class SingleshotEventProcessor : IEventProcessor<ExecuteSingleshotRequest
         try
         {
             // 🔧 [SINGLESHOT_FIX] Singleshotモードに切り替え - CaptureCompletedHandlerで早期終了を無効化
-            _logger.LogInformation("🔄 Singleshotモードに切り替え開始");
+            _logger.LogInformation("🔄 [PROCESSOR:{ProcessorId}] Singleshotモードに切り替え開始", processorId);
             await _translationModeService.SwitchToSingleshotModeAsync().ConfigureAwait(false);
-            _logger.LogInformation("✅ Singleshotモード切り替え完了");
+            _logger.LogInformation("✅ [PROCESSOR:{ProcessorId}] Singleshotモード切り替え完了", processorId);
 
-            _logger.LogInformation("Processing singleshot translation request for window: {WindowTitle} (Handle={Handle})",
-                eventData.TargetWindow.Title, eventData.TargetWindow.Handle);
+            _logger.LogInformation("[PROCESSOR:{ProcessorId}] TriggerSingleTranslationAsync呼び出し開始: {WindowTitle}",
+                processorId, eventData.TargetWindow.Title);
 
             // TranslationOrchestrationServiceの単発翻訳メソッドを呼び出し
             await _translationService.TriggerSingleTranslationAsync(eventData.TargetWindow.Handle).ConfigureAwait(false);
 
-            _logger.LogInformation("✅ シングルショット翻訳実行完了");
+            _logger.LogInformation("✅ [PROCESSOR:{ProcessorId}] シングルショット翻訳実行完了", processorId);
         }
         catch (Exception ex)
         {
@@ -91,13 +93,14 @@ public class SingleshotEventProcessor : IEventProcessor<ExecuteSingleshotRequest
             // 🔧 [SINGLESHOT_FIX] 翻訳完了後、モードをリセット
             try
             {
-                _logger.LogInformation("🔄 翻訳モードリセット開始");
+                _logger.LogInformation("🔄 [PROCESSOR:{ProcessorId}] 翻訳モードリセット開始", processorId);
                 await _translationModeService.ResetModeAsync().ConfigureAwait(false);
-                _logger.LogInformation("✅ 翻訳モードリセット完了");
+                _logger.LogInformation("✅ [PROCESSOR:{ProcessorId}] 翻訳モードリセット完了", processorId);
             }
             catch (Exception resetEx)
             {
-                _logger.LogError(resetEx, "翻訳モードリセット失敗: {ErrorMessage}", resetEx.Message);
+                _logger.LogError(resetEx, "[PROCESSOR:{ProcessorId}] 翻訳モードリセット失敗: {ErrorMessage}",
+                    processorId, resetEx.Message);
             }
         }
     }
