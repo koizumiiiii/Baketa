@@ -11,6 +11,7 @@ using Baketa.Core.Abstractions.License;
 using Baketa.Core.Constants;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
+using Baketa.Core.Resources;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -127,7 +128,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             _logger.LogWarning("Invalid promotion code format: {Code}", MaskCode(code));
             return PromotionCodeResult.CreateFailure(
                 PromotionErrorCode.InvalidFormat,
-                "プロモーションコードの形式が正しくありません。BAKETA-XXXX-XXXX の形式で入力してください。");
+                Messages.Promotion_InvalidFormat);
         }
 
         // 既にPro以上の場合は適用不可
@@ -137,7 +138,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             _logger.LogInformation("User already has Pro or higher plan via promotion");
             return PromotionCodeResult.CreateFailure(
                 PromotionErrorCode.AlreadyProOrHigher,
-                "既にProプラン以上が適用されています。");
+                Messages.Promotion_AlreadyProOrHigher);
         }
 
         // Relay Server APIに検証リクエスト
@@ -181,7 +182,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 return PromotionCodeResult.CreateSuccess(
                     appliedPlan,
                     expiresAt,
-                    TruncateMessage(response.Message, "プロモーションコードが適用されました。"));
+                    TruncateMessage(response.Message, Messages.Promotion_Applied));
             }
             else
             {
@@ -192,7 +193,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
                 return PromotionCodeResult.CreateFailure(
                     errorCode,
-                    TruncateMessage(response.Message, "コードの適用に失敗しました。"));
+                    TruncateMessage(response.Message, Messages.Promotion_ApplyFailed));
             }
         }
         catch (HttpRequestException ex)
@@ -200,21 +201,21 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             _logger.LogError(ex, "Network error while applying promotion code");
             return PromotionCodeResult.CreateFailure(
                 PromotionErrorCode.NetworkError,
-                "サーバーに接続できません。インターネット接続を確認してください。");
+                Messages.Promotion_ConnectionError);
         }
         catch (TaskCanceledException ex) when (ex.CancellationToken != cancellationToken)
         {
             _logger.LogError(ex, "Timeout while applying promotion code");
             return PromotionCodeResult.CreateFailure(
                 PromotionErrorCode.NetworkError,
-                "サーバーからの応答がタイムアウトしました。");
+                Messages.Promotion_Timeout);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error while applying promotion code");
             return PromotionCodeResult.CreateFailure(
                 PromotionErrorCode.ServerError,
-                "予期しないエラーが発生しました。");
+                Messages.Promotion_UnexpectedError);
         }
     }
 
@@ -395,7 +396,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 {
                     Success = false,
                     ErrorCode = ApiErrorCodes.ParseError,
-                    Message = "サーバーからの応答形式が不正です"
+                    Message = Messages.Promotion_InvalidResponseFormat
                 };
             }
         }
@@ -409,7 +410,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             {
                 Success = false,
                 ErrorCode = ApiErrorCodes.ParseError,
-                Message = "サーバーからの応答が大きすぎます"
+                Message = Messages.Promotion_ResponseTooLarge
             };
         }
 
@@ -431,7 +432,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 {
                     Success = false,
                     ErrorCode = ApiErrorCodes.ParseError,
-                    Message = "応答の解析に失敗しました"
+                    Message = Messages.Promotion_ParseError
                 };
             }
 
@@ -445,7 +446,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                     {
                         Success = false,
                         ErrorCode = ApiErrorCodes.ParseError,
-                        Message = "サーバーからの応答にプラン情報がありません"
+                        Message = Messages.Promotion_NoPlanInfo
                     };
                 }
             }
@@ -459,7 +460,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             {
                 Success = false,
                 ErrorCode = ApiErrorCodes.ParseError,
-                Message = "応答の解析に失敗しました"
+                Message = Messages.Promotion_ParseError
             };
         }
     }
@@ -475,7 +476,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             if (parsed != null)
             {
                 // メッセージの安全な切り詰め
-                parsed.Message = TruncateMessage(parsed.Message, "不明なエラーが発生しました");
+                parsed.Message = TruncateMessage(parsed.Message, Messages.Promotion_UnknownError);
                 return parsed;
             }
         }
@@ -488,7 +489,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         {
             Success = false,
             ErrorCode = $"HTTP_{(int)response.StatusCode}",
-            Message = $"サーバーエラー: {response.StatusCode}"
+            Message = string.Format(Messages.Promotion_ServerError, response.StatusCode)
         };
     }
 

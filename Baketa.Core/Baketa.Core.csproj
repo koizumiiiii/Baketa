@@ -13,6 +13,8 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<!-- Windows専用アプリの適切な警告抑制 - コード品質向上後の最適化版 -->
 		<NoWarn>$(NoWarn);CA1848;CA1711;CA2227;CA1819</NoWarn>
+		<!-- リソースファイルのニュートラル言語設定 -->
+		<NeutralLanguage>ja</NeutralLanguage>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -30,6 +32,22 @@
 		<None Remove="**/*.backup*" />
 		<None Remove="**/*.old*" />
 		<None Remove="**/*removed*" />
+	</ItemGroup>
+
+	<!-- リソースファイル設定 -->
+	<ItemGroup>
+		<EmbeddedResource Update="Resources\Messages.resx">
+			<Generator>PublicResXFileCodeGenerator</Generator>
+			<LastGenOutput>Messages.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.en.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
+		<Compile Update="Resources\Messages.Designer.cs">
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>Messages.resx</DependentUpon>
+		</Compile>
 	</ItemGroup>
 
 </Project>
