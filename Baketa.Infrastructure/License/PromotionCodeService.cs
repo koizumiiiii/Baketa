@@ -489,7 +489,9 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         {
             Success = false,
             ErrorCode = $"HTTP_{(int)response.StatusCode}",
+#pragma warning disable CA1863 // エラーメッセージ生成は低頻度のため最適化不要
             Message = string.Format(Messages.Promotion_ServerError, response.StatusCode)
+#pragma warning restore CA1863
         };
     }
 

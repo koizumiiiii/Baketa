@@ -297,7 +297,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             var planName = PromotionPlanDisplayName;
             if (string.IsNullOrEmpty(planName))
                 planName = Strings.Settings_License_PromotionPlanPromo;
+#pragma warning disable CA1863 // UI表示用メッセージ生成は低頻度のため最適化不要
             return string.Format(Strings.Settings_License_PromotionAppliedFormat, planName);
+#pragma warning restore CA1863
         }
     }
 
