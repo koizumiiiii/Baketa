@@ -265,11 +265,11 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     /// <summary>
     /// プラン名を取得（ステータスメッセージ用）
     /// </summary>
+    // Issue #125: Standardプラン廃止
     private string GetPlanName(PlanType plan) => plan switch
     {
         PlanType.Premia => "Premia",
         PlanType.Pro => "Pro",
-        PlanType.Standard => "Standard",
         _ => "Free"
     };
 

@@ -250,11 +250,11 @@ public class UserPlanService : IUserPlanService, IDisposable
     /// </summary>
     private static UserPlanType ConvertToPlanType(PlanType licensePlan)
     {
-        // ProまたはStandard以上はPremium扱い（CloudOnly利用可能）
+        // Issue #125: Standardプラン廃止、Pro以上はPremium扱い
         return licensePlan switch
         {
             PlanType.Pro => UserPlanType.Premium,
-            PlanType.Standard => UserPlanType.Premium,
+            PlanType.Premia => UserPlanType.Premium,
             _ => UserPlanType.Free
         };
     }

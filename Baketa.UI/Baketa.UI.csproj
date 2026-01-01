@@ -184,7 +184,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
-    <PackageReference Include="WebView.Avalonia.Desktop" Version="11.0.0.1" />
+    <!-- Issue #125: WebView.Avalonia参照は削除（広告機能廃止） -->
   </ItemGroup>
 
 	<!-- ネイティブDLLの自動コピー（Platform層からも継承される） -->

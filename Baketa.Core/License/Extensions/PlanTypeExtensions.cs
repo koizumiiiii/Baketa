@@ -4,6 +4,7 @@ namespace Baketa.Core.License.Extensions;
 
 /// <summary>
 /// PlanType enumの拡張メソッド
+/// Issue #125: Standardプラン廃止、広告機能廃止に対応
 /// </summary>
 public static class PlanTypeExtensions
 {
@@ -15,9 +16,10 @@ public static class PlanTypeExtensions
 
     /// <summary>
     /// 広告が表示されるかどうか
+    /// Issue #125: 広告機能は廃止、全プランで広告なし
     /// </summary>
-    public static bool ShowsAds(this PlanType plan) =>
-        plan == PlanType.Free;
+    [Obsolete("Issue #125: 広告機能は廃止されました。常にfalseを返します。")]
+    public static bool ShowsAds(this PlanType plan) => false;
 
     /// <summary>
     /// 月間トークン上限を取得
@@ -35,7 +37,6 @@ public static class PlanTypeExtensions
     public static int GetMonthlyPriceYen(this PlanType plan) => plan switch
     {
         PlanType.Free => 0,
-        PlanType.Standard => 100,
         PlanType.Pro => 300,
         PlanType.Premia => 500,
         _ => 0
@@ -47,7 +48,6 @@ public static class PlanTypeExtensions
     public static string GetDisplayName(this PlanType plan) => plan switch
     {
         PlanType.Free => "無料プラン",
-        PlanType.Standard => "スタンダードプラン",
         PlanType.Pro => "プロプラン",
         PlanType.Premia => "プレミアプラン",
         _ => "不明なプラン"
@@ -59,7 +59,6 @@ public static class PlanTypeExtensions
     public static string GetEnglishDisplayName(this PlanType plan) => plan switch
     {
         PlanType.Free => "Free Plan",
-        PlanType.Standard => "Standard Plan",
         PlanType.Pro => "Pro Plan",
         PlanType.Premia => "Premia Plan",
         _ => "Unknown Plan"
@@ -70,8 +69,7 @@ public static class PlanTypeExtensions
     /// </summary>
     public static string GetDescription(this PlanType plan) => plan switch
     {
-        PlanType.Free => "ローカル翻訳のみ利用可能。広告表示あり。",
-        PlanType.Standard => "ローカル翻訳利用可能。広告なし。",
+        PlanType.Free => "ローカル翻訳のみ利用可能。",
         PlanType.Pro => "ローカル + クラウドAI翻訳利用可能。月400万トークン。",
         PlanType.Premia => "ローカル + クラウドAI翻訳利用可能。月800万トークン。優先サポート。",
         _ => "不明なプラン"
@@ -84,7 +82,7 @@ public static class PlanTypeExtensions
     {
         FeatureType.LocalTranslation => true, // 全プランで利用可能
         FeatureType.CloudAiTranslation => plan.HasCloudAiAccess(),
-        FeatureType.AdFree => plan != PlanType.Free,
+        FeatureType.AdFree => true, // Issue #125: 広告機能廃止、全プランで広告なし
         FeatureType.PrioritySupport => plan == PlanType.Premia,
         FeatureType.AdvancedOcrSettings => plan is PlanType.Pro or PlanType.Premia,
         FeatureType.BatchTranslation => plan is PlanType.Pro or PlanType.Premia,

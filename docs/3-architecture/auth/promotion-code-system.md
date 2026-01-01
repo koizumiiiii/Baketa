@@ -71,34 +71,34 @@ public enum PromotionErrorCode
 ### Base32 Crockford形式
 
 ```
-BAKETA-XXXX-XXXX
+BAKETA-XXXXXXXX
 ```
 
 - **プレフィックス**: `BAKETA-`（固定）
-- **本体**: 8文字（4文字-4文字）
-- **文字セット**: `0-9`, `A-H`, `J-N`, `P-T`, `V-Z`（O/0, I/1の混同を回避）
+- **本体**: 8文字（ランダム生成）
+- **文字セット**: `0-9`, `A-H`, `J-N`, `P-T`, `V-Z`（O/0, I/1, L/Uの混同を回避）
 - **大文字/小文字**: 大文字小文字を区別しない（内部で正規化）
 
 ### 正規表現パターン
 
 ```regex
-^BAKETA-[0-9A-HJ-NP-TV-Z]{4}-[0-9A-HJ-NP-TV-Z]{4}$
+^BAKETA-[0-9A-HJ-NP-TV-Z]{8}$
 ```
 
 ### 有効なコード例
 
 ```
-BAKETA-AB12-CD34
-BAKETA-WXYZ-9876
-BAKETA-TEST-PRO1  (モックモード用)
+BAKETA-AB12CD34
+BAKETA-WXYZ9876
+BAKETA-TESTPRO1  (モックモード用)
 ```
 
 ### 無効なコード例
 
 ```
-BAKETA-OIOI-1L1L  (O, I, L を含む)
-BAKETA-ABC         (文字数不足)
-PROMO-ABCD-1234    (プレフィックス不正)
+BAKETA-OIOI1L1L  (O, I, L を含む)
+BAKETA-ABC       (文字数不足)
+PROMO-ABCD1234   (プレフィックス不正)
 ```
 
 ## API仕様
@@ -157,8 +157,8 @@ POST https://baketa-relay.suke009.workers.dev/api/promotion/redeem
 ```sql
 CREATE TABLE promotion_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXX-XXXX" (Base32 Crockford)
-  plan_type INT NOT NULL,                       -- 0=Free, 1=Standard, 2=Pro, 3=Premia
+  code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXXXXXX" (Base32 Crockford 8桁)
+  plan_type INT NOT NULL,                       -- 0=Free, 1=Pro, 2=Premia (Issue #125: Standard廃止)
   expires_at TIMESTAMPTZ NOT NULL,              -- コード自体の有効期限
   duration_days INT NOT NULL DEFAULT 30,        -- 適用後のプラン有効期間（日数）
   usage_type TEXT NOT NULL DEFAULT 'single_use', -- single_use, multi_use, limited
@@ -251,7 +251,7 @@ $$;
 // 適用済みプロモーションコード
 public string? AppliedPromotionCode { get; set; }
 
-// プロモーションで適用されたプラン (0=Free, 1=Standard, 2=Pro, 3=Premia)
+// プロモーションで適用されたプラン (0=Free, 1=Pro, 2=Premia) Issue #125: Standard廃止
 public int? PromotionPlanType { get; set; }
 
 // 有効期限 (ISO 8601形式)
@@ -283,15 +283,15 @@ public string? LastOnlineVerification { get; set; }
 
 | コード形式 | 動作 |
 |-----------|------|
-| `BAKETA-TEST-XXXX` | Proプラン適用（1ヶ月間有効） |
+| `BAKETA-TESTXXXX` | Proプラン適用（1ヶ月間有効） |
 | その他 | エラー（CODE_NOT_FOUND） |
 
 ### モックモード使用例
 
 ```
-BAKETA-TEST-PRO1  → Proプラン適用成功
-BAKETA-TEST-ABCD  → Proプラン適用成功
-BAKETA-REAL-CODE  → エラー
+BAKETA-TESTPRO1  → Proプラン適用成功
+BAKETA-TESTABCD  → Proプラン適用成功
+BAKETA-REALCODE  → エラー
 ```
 
 ## UI仕様
@@ -352,7 +352,7 @@ ApplyPromotionCommand = ReactiveCommand.CreateFromTask(
 
 | 要素 | 説明 |
 |-----|------|
-| プロモーションコード入力欄 | `TextBox` with Watermark "BAKETA-XXXX-XXXX" |
+| プロモーションコード入力欄 | `TextBox` with Watermark "BAKETA-XXXXXXXX" |
 | 適用ボタン | `Button` with Command binding |
 | ローディング | `ProgressBar` (IsIndeterminate) |
 | 成功表示 | 緑背景のBorder + チェックアイコン |
@@ -493,8 +493,8 @@ public async Task ApplyCodeAsync_ValidCode_ReturnsSuccess()
 [Theory]
 [InlineData("", false)]           // 空文字
 [InlineData("BAKETA-ABC", false)] // 文字数不足
-[InlineData("BAKETA-OIOI-1L1L", false)] // 無効文字
-[InlineData("BAKETA-AB12-CD34", true)]  // 有効
+[InlineData("BAKETA-OIOI1L1L", false)] // 無効文字
+[InlineData("BAKETA-AB12CD34", true)]  // 有効
 public void ValidateCodeFormat_ReturnsExpected(string code, bool expected)
 {
     var result = _service.ValidateCodeFormat(code);
@@ -562,7 +562,7 @@ Feature: プロモーションコード適用
 Scenario: 有効なプロモーションコードを適用する
   Given アプリケーションを起動している
   And 設定 > ライセンスタブを開いている
-  When プロモーションコード入力欄に "BAKETA-TEST-PRO1" を入力する
+  When プロモーションコード入力欄に "BAKETA-TESTPRO1" を入力する
   And 「適用」ボタンをクリックする
   Then 「Proプランが適用されています」と表示される
   And 有効期限が表示される

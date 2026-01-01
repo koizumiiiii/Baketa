@@ -44,8 +44,7 @@ public static class UIServiceCollectionExtensions
         services.AddSingleton<ITranslationEngineStatusService, TranslationEngineStatusService>();
         services.AddSingleton<SettingsFileManager>();
 
-        // 📢 広告サービスの登録（Issue #174: WebView統合）
-        services.AddSingleton<Baketa.Core.Abstractions.Services.IAdvertisementService, AdvertisementService>();
+        // Issue #125: 広告機能は廃止（AdvertisementService削除済み）
 
         // ファイルダイアログ・エクスポート/インポートサービスの登録
         services.AddSingleton<IFileDialogService, AvaloniaFileDialogService>();
@@ -72,8 +71,7 @@ public static class UIServiceCollectionExtensions
         services.AddTransient<Baketa.UI.ViewModels.Settings.TranslationStrategyViewModel>();
         services.AddTransient<Baketa.UI.ViewModels.Settings.EngineStatusViewModel>();
 
-        // 📢 広告ViewModel登録（Issue #174: WebView統合）
-        services.AddTransient<Baketa.UI.ViewModels.AdViewModel>();
+        // Issue #125: AdViewModel削除済み（広告機能廃止）
 
         return services;
     }
@@ -133,6 +131,7 @@ public static class UIServiceCollectionExtensions
         var result = new ServiceRegistrationValidationResult();
 
         // 必須サービスの存在確認
+        // Issue #125: IAdvertisementService削除（広告機能廃止）
         var requiredServices = new[]
         {
             typeof(IUserPlanService),
@@ -140,8 +139,7 @@ public static class UIServiceCollectionExtensions
             typeof(INotificationService),
             typeof(ITranslationEngineStatusService),
             typeof(IFileDialogService),
-            typeof(SettingsExportImportService),
-            typeof(Baketa.Core.Abstractions.Services.IAdvertisementService)
+            typeof(SettingsExportImportService)
         };
 
         foreach (var serviceType in requiredServices)

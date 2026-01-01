@@ -673,11 +673,12 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     /// </summary>
     private static PlanType ParsePlanType(string? planString)
     {
+        // Issue #125: Standardプラン廃止
         return planString?.ToLowerInvariant() switch
         {
             "premia" => PlanType.Premia,
             "pro" => PlanType.Pro,
-            "standard" => PlanType.Standard,
+            "standard" => PlanType.Free, // Issue #125: Standardプラン廃止
             _ => PlanType.Free
         };
     }

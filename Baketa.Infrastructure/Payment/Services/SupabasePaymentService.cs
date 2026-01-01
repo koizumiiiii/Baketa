@@ -423,10 +423,11 @@ public sealed class SupabasePaymentService : IPaymentService
         if (string.IsNullOrEmpty(planType))
             return PlanType.Free;
 
+        // Issue #125: Standardプラン廃止
         return planType.ToLowerInvariant() switch
         {
             "free" => PlanType.Free,
-            "standard" => PlanType.Standard,
+            "standard" => PlanType.Free, // Issue #125: Standardプラン廃止
             "pro" => PlanType.Pro,
             "premia" => PlanType.Premia,
             _ => PlanType.Free

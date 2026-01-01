@@ -522,10 +522,11 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     /// </summary>
     private static PlanType ParsePlanType(string? planType)
     {
+        // Issue #125: Standardプラン廃止
         return planType?.ToLowerInvariant() switch
         {
             PlanTypeStrings.Free => PlanType.Free,
-            PlanTypeStrings.Standard => PlanType.Standard,
+            PlanTypeStrings.Standard => PlanType.Pro, // Issue #125: Standardプラン廃止、Proにアップグレード
             PlanTypeStrings.Pro => PlanType.Pro,
             PlanTypeStrings.Premia => PlanType.Premia,
             _ => PlanType.Pro // デフォルトはPro

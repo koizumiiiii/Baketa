@@ -41,12 +41,7 @@ public sealed class PatreonSettings
         Description = "OAuth認証後のリダイレクト先URI")]
     public string RedirectUri { get; set; } = "http://localhost:8080/patreon/callback";
 
-    /// <summary>
-    /// Patreon Tier ID マッピング（Standard プラン）
-    /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Patreon", "Standard Tier ID",
-        Description = "Standardプラン ($1) に対応するPatreon Tier ID")]
-    public string StandardTierId { get; set; } = string.Empty;
+    // Issue #125: StandardTierId削除（Standardプラン廃止）
 
     /// <summary>
     /// Patreon Tier ID マッピング（Pro プラン）
@@ -144,8 +139,8 @@ public sealed class PatreonSettings
         }
 
         // Tier ID検証（少なくとも1つは設定推奨）
-        if (string.IsNullOrWhiteSpace(StandardTierId) &&
-            string.IsNullOrWhiteSpace(ProTierId) &&
+        // Issue #125: StandardTierId削除（Standardプラン廃止）
+        if (string.IsNullOrWhiteSpace(ProTierId) &&
             string.IsNullOrWhiteSpace(PremiaTierId))
         {
             warnings.Add("Patreon Tier IDが設定されていません。有料プランの判定ができません。");

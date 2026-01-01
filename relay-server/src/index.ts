@@ -45,13 +45,13 @@ const RATE_LIMIT_MAX_REQUESTS = 60; // 1分間に60リクエストまで
 const RATE_LIMIT_WEBHOOK_MAX = 100; // Webhookは1分間に100リクエストまで
 
 /** Tier金額しきい値（円） */
+// Issue #125: Standardプラン廃止
 const TIER_AMOUNTS = {
   PREMIA: 500,
   PRO: 300,
-  STANDARD: 100,
 } as const;
 
-type PlanType = 'Free' | 'Standard' | 'Pro' | 'Premia';
+type PlanType = 'Free' | 'Pro' | 'Premia';
 
 /** Patreonリソースタイプ定数 */
 const PATREON_RESOURCE_TYPES = {
@@ -589,9 +589,9 @@ function rateLimitResponse(
 // ============================================
 
 function determinePlan(amountCents: number): PlanType {
+  // Issue #125: Standardプラン廃止、3段階構成に簡素化
   if (amountCents >= TIER_AMOUNTS.PREMIA) return 'Premia';
   if (amountCents >= TIER_AMOUNTS.PRO) return 'Pro';
-  if (amountCents >= TIER_AMOUNTS.STANDARD) return 'Standard';
   return 'Free';
 }
 
@@ -912,8 +912,9 @@ async function handlePromotionRedeem(
 
     // 8. 成功レスポンス
     // PlanType型と一致させるため大文字で定義（C#側はToLowerInvariant()で正規化）
+    // Issue #125: Standardプラン廃止、enum値を詰めた (Free=0, Pro=1, Premia=2)
     const planTypeMap: Record<number, PlanType> = {
-      0: 'Free', 1: 'Standard', 2: 'Pro', 3: 'Premia'
+      0: 'Free', 1: 'Pro', 2: 'Premia'
     };
 
     console.log(`Promotion code redeemed: code=${normalizedCode.substring(0, 10)}****, plan=${result.plan_type}, user=${userId?.substring(0, 8) || 'anonymous'}`);

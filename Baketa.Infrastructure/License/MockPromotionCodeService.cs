@@ -65,8 +65,9 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
         if (normalizedCode.StartsWith("BAKETA-TEST", StringComparison.OrdinalIgnoreCase))
         {
             // Issue #243: 延長方式 - 既存Pro以上の場合は期限を延長
+            // Issue #125: Standardプラン廃止
             var currentState = _licenseManager.CurrentState;
-            var isAlreadyPro = currentState.CurrentPlan is PlanType.Pro or PlanType.Standard;
+            var isAlreadyPro = currentState.CurrentPlan is PlanType.Pro or PlanType.Premia;
             var currentExpiration = currentState.ExpirationDate ?? DateTime.UtcNow;
 
             DateTime expiresAt;

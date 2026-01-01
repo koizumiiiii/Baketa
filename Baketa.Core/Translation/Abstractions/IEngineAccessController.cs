@@ -117,11 +117,11 @@ public static class PlanFeatures
     /// <summary>
     /// プラン別月間トークン上限
     /// </summary>
+    // Issue #125: Standardプラン廃止
     public static readonly IReadOnlyDictionary<PlanType, long> MonthlyTokenLimits =
         new Dictionary<PlanType, long>
         {
             [PlanType.Free] = 0,           // Cloud AI利用不可
-            [PlanType.Standard] = 0,       // Cloud AI利用不可
             [PlanType.Pro] = 4_000_000,    // 400万トークン
             [PlanType.Premia] = 8_000_000  // 800万トークン
         };
