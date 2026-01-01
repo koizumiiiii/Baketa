@@ -10,9 +10,15 @@
         /* Pricing specific styles */
         .pricing-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: var(--space-4);
             margin: var(--space-6) 0;
+        }
+
+        @media (max-width: 768px) {
+            .pricing-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .plan-card {
@@ -65,6 +71,18 @@
             font-size: var(--text-sm);
             color: var(--text-muted);
             margin-bottom: var(--space-4);
+        }
+
+        .plan-card__price-inline {
+            display: inline;
+        }
+
+        .feature-highlight {
+            background: linear-gradient(135deg, var(--color-primary), #7c3aed);
+            color: white;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-md);
+            font-weight: var(--font-semibold);
         }
 
         .plan-card__description {
@@ -166,13 +184,11 @@
             <!-- Free Plan -->
             <div class="plan-card">
                 <div class="plan-card__name">Free</div>
-                <div class="plan-card__price">$0</div>
-                <div class="plan-card__price-period">永久無料</div>
+                <div class="plan-card__price">$0<span class="plan-card__price-inline plan-card__price-period"> 永久無料</span></div>
                 <div class="plan-card__description">まずは試してみたい方に</div>
                 <ul class="plan-card__features">
                     <li><span class="check">✓</span> ローカル翻訳（無制限）</li>
                     <li><span class="check">✓</span> 基本OCR機能</li>
-                    <li><span class="check">✓</span> 広告なし</li>
                     <li><span class="cross">−</span> クラウドAI翻訳なし</li>
                 </ul>
                 <a href="https://github.com/koizumiiiii/Baketa/releases" class="btn btn--secondary plan-card__cta">
@@ -183,14 +199,12 @@
             <!-- Pro Plan -->
             <div class="plan-card plan-card--recommended">
                 <div class="plan-card__name">Pro</div>
-                <div class="plan-card__price">$3</div>
-                <div class="plan-card__price-period">/ 月</div>
+                <div class="plan-card__price">$3<span class="plan-card__price-inline plan-card__price-period">/月</span></div>
                 <div class="plan-card__description">高精度なクラウドAI翻訳</div>
                 <ul class="plan-card__features">
                     <li><span class="check">✓</span> ローカル翻訳（無制限）</li>
-                    <li><span class="check">✓</span> 高度なOCR設定</li>
-                    <li><span class="check">✓</span> 広告なし</li>
-                    <li><span class="check">✓</span> クラウドAI 400万トークン/月</li>
+                    <li><span class="check">✓</span> <span class="feature-highlight">高度なOCR設定</span></li>
+                    <li><span class="check">✓</span> <span class="feature-highlight">クラウドAI 400万トークン/月</span></li>
                 </ul>
                 <a href="https://www.patreon.com/c/baketaapp" class="btn btn--primary plan-card__cta">
                     Patreonで支援
@@ -200,14 +214,12 @@
             <!-- Premia Plan -->
             <div class="plan-card">
                 <div class="plan-card__name">Premia</div>
-                <div class="plan-card__price">$5</div>
-                <div class="plan-card__price-period">/ 月</div>
+                <div class="plan-card__price">$5<span class="plan-card__price-inline plan-card__price-period">/月</span></div>
                 <div class="plan-card__description">ヘビーユーザー向け</div>
                 <ul class="plan-card__features">
                     <li><span class="check">✓</span> ローカル翻訳（無制限）</li>
-                    <li><span class="check">✓</span> 高度なOCR設定</li>
-                    <li><span class="check">✓</span> 広告なし</li>
-                    <li><span class="check">✓</span> クラウドAI 800万トークン/月</li>
+                    <li><span class="check">✓</span> <span class="feature-highlight">高度なOCR設定</span></li>
+                    <li><span class="check">✓</span> <span class="feature-highlight">クラウドAI 800万トークン/月</span></li>
                 </ul>
                 <a href="https://www.patreon.com/c/baketaapp" class="btn btn--secondary plan-card__cta">
                     Patreonで支援
