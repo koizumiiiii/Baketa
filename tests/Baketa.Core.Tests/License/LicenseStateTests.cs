@@ -66,7 +66,6 @@ public class LicenseStateTests
     }
 
     [Theory]
-    [InlineData(PlanType.Standard)]
     [InlineData(PlanType.Pro)]
     [InlineData(PlanType.Premia)]
     public void IsPaid_PaidPlans_ReturnsTrue(PlanType plan)
@@ -85,7 +84,6 @@ public class LicenseStateTests
 
     [Theory]
     [InlineData(PlanType.Free, 0L)]
-    [InlineData(PlanType.Standard, 0L)]
     [InlineData(PlanType.Pro, 4_000_000L)]
     [InlineData(PlanType.Premia, 8_000_000L)]
     public void MonthlyTokenLimit_DelegatesToPlanTypeExtensions(
@@ -590,17 +588,17 @@ public class LicenseStateTests
     #region IsAdFree Tests
 
     [Fact]
-    public void IsAdFree_FreePlan_ReturnsFalse()
+    public void IsAdFree_FreePlan_ReturnsTrue_AfterAdRemoval()
     {
         // Arrange
+        // Issue #125: 広告機能廃止により、全プランでIsAdFree=true
         var state = new LicenseState { CurrentPlan = PlanType.Free };
 
         // Assert
-        Assert.False(state.IsAdFree);
+        Assert.True(state.IsAdFree);
     }
 
     [Theory]
-    [InlineData(PlanType.Standard)]
     [InlineData(PlanType.Pro)]
     [InlineData(PlanType.Premia)]
     public void IsAdFree_PaidPlans_ReturnsTrue(PlanType plan)
@@ -667,7 +665,8 @@ public class LicenseStateTests
         // Assert
         Assert.True(state.IsFeatureAvailable(FeatureType.LocalTranslation));
         Assert.False(state.IsFeatureAvailable(FeatureType.CloudAiTranslation));
-        Assert.False(state.IsFeatureAvailable(FeatureType.AdFree));
+        // Issue #125: 広告機能廃止により、AdFreeは常にTrue
+        Assert.True(state.IsFeatureAvailable(FeatureType.AdFree));
     }
 
     [Fact]

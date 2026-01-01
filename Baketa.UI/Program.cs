@@ -6,8 +6,7 @@ using System.Linq;
 using System.Reactive;
 using Avalonia;
 using Avalonia.ReactiveUI;
-// TODO: WebView統合完了後に有効化
-// using Avalonia.WebView.Desktop; // 📢 Issue #174: WebView統合
+// Issue #125: WebView統合は削除（広告機能廃止）
 using Baketa.Application.DI.Modules;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
@@ -353,9 +352,8 @@ internal sealed class Program
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace()
-            .UseReactiveUI();
-            // TODO: WebView統合完了後に有効化
-            // .UseDesktopWebView(); // 📢 Issue #174: WebView統合
+            .UseReactiveUI()
+            ; // Issue #125: WebView統合は削除（広告機能廃止）
 
     /// <summary>
     /// EventHandlerInitializationServiceを即座に実行（競合状態根本解決）

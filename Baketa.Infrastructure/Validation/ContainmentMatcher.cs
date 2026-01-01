@@ -344,10 +344,9 @@ public sealed class ContainmentMatcher : IContainmentMatcher
         }
 
         // Y座標→X座標でソート
-        return result
+        return [.. result
             .OrderBy(c => c.CombinedBounds.Y)
-            .ThenBy(c => c.CombinedBounds.X)
-            .ToList();
+            .ThenBy(c => c.CombinedBounds.X)];
     }
 
     /// <summary>

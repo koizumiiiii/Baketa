@@ -106,12 +106,12 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     /// <summary>
     /// プラン表示名を取得
     /// </summary>
+    // Issue #125: Standardプラン廃止
     private static string GetPlanDisplayName(PlanType planType)
     {
         return planType switch
         {
             PlanType.Free => "Free",
-            PlanType.Standard => "Standard",
             PlanType.Pro => "Pro",
             PlanType.Premia => "Premia",
             _ => "Unknown"
@@ -121,12 +121,12 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     /// <summary>
     /// プラン説明を取得
     /// </summary>
+    // Issue #125: Standardプラン廃止、広告機能廃止
     private static string GetPlanDescription(PlanType planType)
     {
         return planType switch
         {
-            PlanType.Free => "無料プラン - 広告表示あり、ローカル翻訳のみ",
-            PlanType.Standard => "Standardプラン - 広告なし、ローカル翻訳のみ",
+            PlanType.Free => "無料プラン - ローカル翻訳のみ",
             PlanType.Pro => "Proプラン - クラウドAI翻訳 400万トークン/月",
             PlanType.Premia => "Premiaプラン - クラウドAI翻訳 800万トークン/月",
             _ => "不明なプラン"

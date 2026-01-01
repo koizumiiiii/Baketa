@@ -332,10 +332,11 @@ public sealed class SupabaseLicenseApiClient : ILicenseApiClient
         if (string.IsNullOrEmpty(planType))
             return PlanType.Free;
 
+        // Issue #125: Standardプラン廃止、後方互換性のためFreeにフォールバック
         return planType.ToLowerInvariant() switch
         {
             "free" => PlanType.Free,
-            "standard" => PlanType.Standard,
+            "standard" => PlanType.Free, // Issue #125: Standardプラン廃止
             "pro" => PlanType.Pro,
             "premia" => PlanType.Premia,
             _ => PlanType.Free

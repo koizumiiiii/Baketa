@@ -503,30 +503,9 @@ internal sealed partial class App : Avalonia.Application
                 }, Avalonia.Threading.DispatcherPriority.Normal);
 
                 // [Issue #170] UIスレッド非同期フロー内でメインUI表示が完了するため、
-                // この時点では追加の初期化は不要。AdWindowと診断システムは別途処理。
+                // この時点では追加の初期化は不要。診断システムは別途処理。
 
-                // 📢 [Issue #240] 広告ウィンドウの起動（AdvertisementServiceが管理）
-                // プラン判定をAdvertisementService内で行い、DI初期化順序問題を解決
-                _logger?.LogInformation("AdWindow起動開始（Issue #240: AdvertisementService管理）");
-                try
-                {
-                    var advertisementService = serviceProvider.GetRequiredService<IAdvertisementService>();
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await advertisementService.InitializeAdWindowAsync().ConfigureAwait(false);
-                        }
-                        catch (Exception initEx)
-                        {
-                            _logger?.LogWarning(initEx, "AdWindow初期化失敗: {Message}", initEx.Message);
-                        }
-                    });
-                }
-                catch (Exception adEx)
-                {
-                    _logger?.LogWarning(adEx, "AdWindow起動失敗: {Message}。アプリケーションは継続します", adEx.Message);
-                }
+                // Issue #125: 広告機能は廃止（AdWindow削除済み）
 
                 // 🩺 診断システム開始（メインUIとは独立）
                 try

@@ -5,6 +5,7 @@ namespace Baketa.Infrastructure.Tests.License;
 
 /// <summary>
 /// PatreonSettingsのテスト
+/// Issue #125: StandardTierId削除（Standardプラン廃止）に対応
 /// </summary>
 public class PatreonSettingsTests
 {
@@ -16,7 +17,7 @@ public class PatreonSettingsTests
         {
             ClientId = "test-client-id",
             RelayServerUrl = "https://baketa-relay.workers.dev",
-            StandardTierId = "123456"
+            ProTierId = "123456"
         };
 
         // Act
@@ -35,7 +36,7 @@ public class PatreonSettingsTests
         {
             ClientId = "test-client-id",
             RelayServerUrl = "http://insecure-server.com",
-            StandardTierId = "123456"
+            ProTierId = "123456"
         };
 
         // Act
@@ -54,7 +55,7 @@ public class PatreonSettingsTests
         {
             ClientId = "test-client-id",
             RelayServerUrl = "",
-            StandardTierId = "123456"
+            ProTierId = "123456"
         };
 
         // Act
@@ -73,7 +74,7 @@ public class PatreonSettingsTests
         {
             ClientId = "test-client-id",
             RelayServerUrl = "not-a-valid-url",
-            StandardTierId = "123456"
+            ProTierId = "123456"
         };
 
         // Act
@@ -104,11 +105,11 @@ public class PatreonSettingsTests
     public void ValidateSettings_WithMissingTierIds_ReturnsWarning()
     {
         // Arrange
+        // Issue #125: StandardTierId削除
         var settings = new PatreonSettings
         {
             ClientId = "test-client-id",
             RelayServerUrl = "https://baketa-relay.workers.dev",
-            StandardTierId = "",
             ProTierId = "",
             PremiaTierId = ""
         };
@@ -134,7 +135,7 @@ public class PatreonSettingsTests
             ClientId = "test-client-id",
             RelayServerUrl = "https://baketa-relay.workers.dev",
             CacheDurationMinutes = minutes,
-            StandardTierId = "123456"
+            ProTierId = "123456"
         };
 
         // Act
@@ -160,7 +161,7 @@ public class PatreonSettingsTests
             ClientId = "test-client-id",
             RelayServerUrl = "https://baketa-relay.workers.dev",
             OfflineGracePeriodDays = days,
-            StandardTierId = "123456"
+            ProTierId = "123456"
         };
 
         // Act

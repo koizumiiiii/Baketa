@@ -597,9 +597,10 @@ public class LicenseManagerTests : IDisposable
         // Arrange
         _licenseManager.SetUserCredentials("user-123", "session-abc");
 
+        // Issue #125: Standardプラン廃止、Proでテスト
         var cachedState = new LicenseState
         {
-            CurrentPlan = PlanType.Standard,
+            CurrentPlan = PlanType.Pro,
             UserId = "user-123"
         };
 
@@ -619,7 +620,8 @@ public class LicenseManagerTests : IDisposable
         var state = await _licenseManager.RefreshStateAsync();
 
         // Assert
-        Assert.Equal(PlanType.Standard, state.CurrentPlan);
+        // Issue #125: Standardプラン廃止、Proでテスト
+        Assert.Equal(PlanType.Pro, state.CurrentPlan);
     }
 
     #endregion

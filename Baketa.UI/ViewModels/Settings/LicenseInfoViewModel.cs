@@ -277,11 +277,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         {
             if (_activePromotion == null || !_activePromotion.IsValid)
                 return string.Empty;
+            // Issue #125: Standardプラン廃止
             return _activePromotion.Plan switch
             {
                 PlanType.Premia => Strings.License_Plan_Premia,
                 PlanType.Pro => Strings.License_Plan_Pro,
-                PlanType.Standard => Strings.License_Plan_Standard,
                 _ => Strings.Settings_License_PromotionPlanPromo
             };
         }
@@ -297,7 +297,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             var planName = PromotionPlanDisplayName;
             if (string.IsNullOrEmpty(planName))
                 planName = Strings.Settings_License_PromotionPlanPromo;
+#pragma warning disable CA1863 // UI表示用メッセージ生成は低頻度のため最適化不要
             return string.Format(Strings.Settings_License_PromotionAppliedFormat, planName);
+#pragma warning restore CA1863
         }
     }
 
@@ -438,12 +440,12 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// <summary>
     /// プラン表示名を取得
     /// </summary>
+    // Issue #125: Standardプラン廃止
     private static string GetPlanDisplayName(PlanType planType)
     {
         return planType switch
         {
             PlanType.Free => Strings.License_Plan_Free,
-            PlanType.Standard => Strings.License_Plan_Standard,
             PlanType.Pro => Strings.License_Plan_Pro,
             PlanType.Premia => Strings.License_Plan_Premia,
             _ => Strings.License_Plan_Unknown
@@ -453,12 +455,12 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// <summary>
     /// プラン説明を取得
     /// </summary>
+    // Issue #125: Standardプラン廃止
     private static string GetPlanDescription(PlanType planType)
     {
         return planType switch
         {
             PlanType.Free => Strings.License_Desc_Free,
-            PlanType.Standard => Strings.License_Desc_Standard,
             PlanType.Pro => Strings.License_Desc_Pro,
             PlanType.Premia => Strings.License_Desc_Premia,
             _ => string.Empty

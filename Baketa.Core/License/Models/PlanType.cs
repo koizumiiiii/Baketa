@@ -2,26 +2,22 @@ namespace Baketa.Core.License.Models;
 
 /// <summary>
 /// サブスクリプションプランの種類
+/// Issue #125: Standardプランを廃止し、3段階構成に簡素化
 /// </summary>
 public enum PlanType
 {
     /// <summary>
-    /// 無料プラン - ローカル翻訳のみ、広告表示あり
+    /// 無料プラン - ローカル翻訳のみ
     /// </summary>
     Free = 0,
 
     /// <summary>
-    /// スタンダードプラン (100円/月) - ローカル翻訳のみ、広告なし
-    /// </summary>
-    Standard = 1,
-
-    /// <summary>
     /// プロプラン (300円/月) - ローカル + クラウドAI翻訳 (400万トークン/月)
     /// </summary>
-    Pro = 2,
+    Pro = 1,
 
     /// <summary>
     /// プレミアプラン (500円/月) - ローカル + クラウドAI翻訳 (800万トークン/月)
     /// </summary>
-    Premia = 3
+    Premia = 2
 }

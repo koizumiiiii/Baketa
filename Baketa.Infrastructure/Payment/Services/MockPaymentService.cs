@@ -190,9 +190,9 @@ public sealed class MockPaymentService : IPaymentService
     /// </summary>
     private static int GetPlanPrice(PlanType plan, BillingCycle cycle)
     {
+        // Issue #125: Standardプラン廃止
         var monthlyPrice = plan switch
         {
-            PlanType.Standard => 100,
             PlanType.Pro => 300,
             PlanType.Premia => 500,
             _ => 0

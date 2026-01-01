@@ -98,16 +98,6 @@
         <!-- フッター / ステータスバー -->
         <Border Grid.Row="2" Classes="statusBar">
             <Grid ColumnDefinitions="*,Auto">
-                <!-- ステータスメッセージ -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Ellipse Width="8" Height="8" 
-                             Fill="{Binding HasChanges, Converter={x:Static converters:BoolToStatusColorConverter.Instance}}"
-                             VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding StatusMessage}" 
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-                
                 <!-- アクションボタン -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
                     <Button Content="{local:Localize Settings_Button_Reset}"

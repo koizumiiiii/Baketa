@@ -57,12 +57,7 @@ internal static class UIServiceCollectionExtensions
         // 設定関連サービスの登録
         services.AddSettingsServices();
 
-        // 📢 広告関連サービスの登録（Issue #174: WebView統合）
-        // NOTE: IUserPlanServiceはUIModule.csでUserPlanServiceAdapter（ILicenseManager連携）として登録
-        // ここでの重複登録を削除（Issue #243: Proプランでも広告が表示されるバグ修正）
-
-        // 広告サービス本体
-        services.AddSingleton<Baketa.Core.Abstractions.Services.IAdvertisementService, Baketa.UI.Services.AdvertisementService>();
+        // Issue #125: 広告機能は廃止（AdvertisementService削除済み）
 
         // 翻訳エンジン状態監視サービス（モック実装）
         services.AddSingleton<ITranslationEngineStatusService, MockTranslationEngineStatusService>();
@@ -133,8 +128,7 @@ internal static class UIServiceCollectionExtensions
     /// <param name="services">サービスコレクション</param>
     private static void RegisterViewModels(IServiceCollection services)
     {
-        // 📢 広告ViewModel登録（Issue #174: WebView統合）
-        services.AddTransient<Baketa.UI.ViewModels.AdViewModel>();
+        // Issue #125: AdViewModel削除済み（広告機能廃止）
 
         // その他のビューモデル
         // 例: services.AddTransient<MainWindowViewModel>();

@@ -489,7 +489,9 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         {
             Success = false,
             ErrorCode = $"HTTP_{(int)response.StatusCode}",
+#pragma warning disable CA1863 // エラーメッセージ生成は低頻度のため最適化不要
             Message = string.Format(Messages.Promotion_ServerError, response.StatusCode)
+#pragma warning restore CA1863
         };
     }
 
@@ -522,10 +524,11 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     /// </summary>
     private static PlanType ParsePlanType(string? planType)
     {
+        // Issue #125: Standardプラン廃止
         return planType?.ToLowerInvariant() switch
         {
             PlanTypeStrings.Free => PlanType.Free,
-            PlanTypeStrings.Standard => PlanType.Standard,
+            PlanTypeStrings.Standard => PlanType.Pro, // Issue #125: Standardプラン廃止、Proにアップグレード
             PlanTypeStrings.Pro => PlanType.Pro,
             PlanTypeStrings.Premia => PlanType.Premia,
             _ => PlanType.Pro // デフォルトはPro

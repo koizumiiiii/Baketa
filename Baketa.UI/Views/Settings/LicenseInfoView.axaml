@@ -176,6 +176,17 @@
                 </Border>
             </StackPanel>
 
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                <Button Content="{local:Localize Settings_License_Refresh}"
+                        Command="{Binding RefreshCommand}"
+                        Padding="24,12"/>
+                <Button Content="{local:Localize Settings_License_Upgrade}"
+                        Command="{Binding ChangePlanCommand}"
+                        Padding="24,12"
+                        Classes="accent"/>
+            </StackPanel>
+
             <!-- Issue #237 Phase 2: プロモーションコードセクション -->
             <StackPanel Spacing="12">
                 <TextBlock Text="{local:Localize Settings_License_PromotionCode}" FontSize="16" FontWeight="SemiBold"/>
@@ -220,7 +231,7 @@
                         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
                             <TextBox Grid.Column="0"
                                      Text="{Binding PromotionCode}"
-                                     Watermark="BAKETA-XXXX-XXXX"
+                                     Watermark="BAKETA-XXXXXXXX"
                                      IsEnabled="{Binding !IsApplyingPromotion}"
                                      Margin="0,0,8,0"/>
                             <Button Grid.Column="1"
@@ -251,17 +262,6 @@
                         </Border>
                     </StackPanel>
                 </Border>
-            </StackPanel>
-
-            <!-- Action Buttons -->
-            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                <Button Content="{local:Localize Settings_License_Refresh}"
-                        Command="{Binding RefreshCommand}"
-                        Padding="24,12"/>
-                <Button Content="{local:Localize Settings_License_Upgrade}"
-                        Command="{Binding ChangePlanCommand}"
-                        Padding="24,12"
-                        Classes="accent"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

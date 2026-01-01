@@ -173,7 +173,8 @@ public sealed record LicenseState
     /// <summary>
     /// 広告非表示かどうか
     /// </summary>
-    public bool IsAdFree => !CurrentPlan.ShowsAds();
+    /// <remarks>Issue #125: 広告機能廃止により常にtrue</remarks>
+    public bool IsAdFree => true;
 
     /// <summary>
     /// Patreon連携済みかどうか
