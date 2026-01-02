@@ -80,7 +80,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         // コマンドの初期化
         SaveCommand = ReactiveCommand.CreateFromTask(SaveAsync, this.WhenAnyValue(x => x.HasChanges));
         CancelCommand = ReactiveCommand.CreateFromTask(CancelAsync);
-        ResetCommand = ReactiveCommand.CreateFromTask(ResetAsync);
 
         // 初期カテゴリの選択
         SelectedCategory = AllCategories.Count > 0 ? AllCategories[0] : null;
@@ -158,11 +157,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// キャンセルコマンド
     /// </summary>
     public ReactiveCommand<Unit, Unit> CancelCommand { get; }
-
-    /// <summary>
-    /// リセットコマンド
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> ResetCommand { get; }
 
     #endregion
 
@@ -432,16 +426,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
 
         // ウィンドウを閉じる
         RequestClose();
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 設定をリセットします
-    /// </summary>
-    private Task ResetAsync()
-    {
-        // TODO: 設定のリセット処理を実装
-        StatusMessage = Strings.Settings_Status_Reset;
         return Task.CompletedTask;
     }
 

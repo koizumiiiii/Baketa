@@ -490,6 +490,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _logRetentionDays = settings.LogRetentionDays;
         _enableDebugMode = settings.EnableDebugMode;
         _activeGameProfile = settings.ActiveGameProfile;
+        _selectedTheme = settings.Theme;
 
         // UI言語設定の復元（AvailableUiLanguagesから検索）
         if (!string.IsNullOrEmpty(settings.UiLanguage))
@@ -802,7 +803,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         LogRetentionDays = LogRetentionDays,
         EnableDebugMode = EnableDebugMode,
         ActiveGameProfile = _activeGameProfile,
-        UiLanguage = SelectedUiLanguage?.Code
+        UiLanguage = SelectedUiLanguage?.Code,
+        Theme = SelectedTheme
     };
 
     /// <summary>

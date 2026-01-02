@@ -100,10 +100,6 @@
             <Grid ColumnDefinitions="*,Auto">
                 <!-- アクションボタン -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
-                    <Button Content="{local:Localize Settings_Button_Reset}"
-                            Command="{Binding ResetCommand}"
-                            ToolTip.Tip="{local:Localize Settings_Tooltip_Reset}"
-                            Width="100"/>
                     <Button Content="{local:Localize Settings_Button_Cancel}"
                             Command="{Binding CancelCommand}"
                             ToolTip.Tip="{local:Localize Settings_Tooltip_Cancel}"
