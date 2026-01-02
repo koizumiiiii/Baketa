@@ -308,6 +308,28 @@ internal sealed partial class App : Avalonia.Application
                 Console.WriteLine("✅ Program.ServiceProvider確認成功");
                 // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ Program.ServiceProvider確認成功");
 
+                // [Issue #245] 保存されたテーマを起動時に適用
+                try
+                {
+                    var settingsService = serviceProvider.GetService<Baketa.Core.Services.ISettingsService>();
+                    if (settingsService != null)
+                    {
+                        var generalSettings = settingsService.GetCategorySettings<GeneralSettings>();
+                        RequestedThemeVariant = generalSettings.Theme switch
+                        {
+                            UiTheme.Light => Avalonia.Styling.ThemeVariant.Light,
+                            UiTheme.Dark => Avalonia.Styling.ThemeVariant.Dark,
+                            UiTheme.Auto => Avalonia.Styling.ThemeVariant.Default,
+                            _ => Avalonia.Styling.ThemeVariant.Default
+                        };
+                        Console.WriteLine($"✅ 保存されたテーマを適用: {generalSettings.Theme}");
+                    }
+                }
+                catch (Exception themeEx)
+                {
+                    Console.WriteLine($"⚠️ テーマ適用エラー（継続）: {themeEx.Message}");
+                }
+
                 // [Issue #170] UIスレッドで単一の非同期フローを実行（ローディング→初期化→メインUI表示）
                 _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                 {
