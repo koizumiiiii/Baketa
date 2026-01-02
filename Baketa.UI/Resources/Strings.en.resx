@@ -145,6 +145,9 @@
   <data name="MainOverlay_Exit" xml:space="preserve">
     <value>Exit</value>
   </data>
+  <data name="MainOverlay_DragToMove" xml:space="preserve">
+    <value>Drag to move</value>
+  </data>
   <data name="MainOverlay_Expand" xml:space="preserve">
     <value>Expand</value>
   </data>
@@ -1227,6 +1230,38 @@
   </data>
   <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
     <value>You've reached your Cloud AI token limit. Switching to local translation.</value>
+  </data>
+
+  <!-- [Issue #245] Window Selection Dialog -->
+  <data name="WindowSelection_Title" xml:space="preserve">
+    <value>Select Window</value>
+  </data>
+  <data name="WindowSelection_Header" xml:space="preserve">
+    <value>Select Translation Target Window</value>
+  </data>
+  <data name="WindowSelection_Subtitle" xml:space="preserve">
+    <value>Select the application window to translate (including minimized windows)</value>
+  </data>
+  <data name="WindowSelection_Refresh" xml:space="preserve">
+    <value>Refresh window list</value>
+  </data>
+  <data name="WindowSelection_Searching" xml:space="preserve">
+    <value>Searching for windows...</value>
+  </data>
+  <data name="WindowSelection_NoWindows" xml:space="preserve">
+    <value>No available windows found</value>
+  </data>
+  <data name="WindowSelection_Minimized" xml:space="preserve">
+    <value>Minimized</value>
+  </data>
+  <data name="WindowSelection_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="WindowSelection_Select" xml:space="preserve">
+    <value>Select</value>
+  </data>
+  <data name="WindowSelection_Update" xml:space="preserve">
+    <value>Refresh</value>
   </data>
 
 </root>

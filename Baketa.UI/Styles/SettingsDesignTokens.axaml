@@ -1,0 +1,231 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ============================================================ -->
+    <!-- Issue #245: 設定画面デザイントークン                          -->
+    <!-- Discord風の洗練されたUI向けに統一されたデザインシステム        -->
+    <!-- ============================================================ -->
+
+    <!-- =========================== -->
+    <!-- フォント設定                 -->
+    <!-- =========================== -->
+    <FontFamily x:Key="SettingsFontFamily">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Yu Gothic UI, Meiryo UI, Segoe UI, sans-serif</FontFamily>
+
+    <!-- =========================== -->
+    <!-- テーマ対応カラー             -->
+    <!-- =========================== -->
+    <ResourceDictionary.ThemeDictionaries>
+        <!-- ライトテーマ -->
+        <ResourceDictionary x:Key="Light">
+            <!-- サイドバー背景 -->
+            <Color x:Key="SettingsSidebarBackgroundColor">#F2F3F5</Color>
+
+            <!-- コンテンツ背景 -->
+            <Color x:Key="SettingsContentBackgroundColor">#FFFFFF</Color>
+
+            <!-- カード背景 -->
+            <Color x:Key="SettingsCardBackgroundColor">#F8F9FA</Color>
+
+            <!-- ホバー状態 -->
+            <Color x:Key="SettingsHoverColor">#E3E5E8</Color>
+
+            <!-- 選択状態 -->
+            <Color x:Key="SettingsSelectedColor">#E0E7FF</Color>
+
+            <!-- ボーダー -->
+            <Color x:Key="SettingsBorderColor">#E5E7EB</Color>
+
+            <!-- 区切り線 -->
+            <Color x:Key="SettingsDividerColor">#E5E7EB</Color>
+
+            <!-- テキストカラー -->
+            <Color x:Key="SettingsTextPrimaryColor">#111827</Color>
+            <Color x:Key="SettingsTextSecondaryColor">#6B7280</Color>
+            <Color x:Key="SettingsTextMutedColor">#9CA3AF</Color>
+
+            <!-- ステータス背景色 (Light) -->
+            <Color x:Key="SettingsSuccessBackgroundColor">#D1FAE5</Color>
+            <Color x:Key="SettingsWarningBackgroundColor">#FEF3C7</Color>
+            <Color x:Key="SettingsErrorBackgroundColor">#FEE2E2</Color>
+            <Color x:Key="SettingsInfoBackgroundColor">#EBF5FF</Color>
+        </ResourceDictionary>
+
+        <!-- ダークテーマ (Discord風濃いグレー系) -->
+        <ResourceDictionary x:Key="Dark">
+            <!-- サイドバー背景 -->
+            <Color x:Key="SettingsSidebarBackgroundColor">#2B2D31</Color>
+
+            <!-- コンテンツ背景 (サイドバーより少し明るい) -->
+            <Color x:Key="SettingsContentBackgroundColor">#313338</Color>
+
+            <!-- カード背景 -->
+            <Color x:Key="SettingsCardBackgroundColor">#383A40</Color>
+
+            <!-- ホバー状態 -->
+            <Color x:Key="SettingsHoverColor">#404249</Color>
+
+            <!-- 選択状態 -->
+            <Color x:Key="SettingsSelectedColor">#404EED</Color>
+
+            <!-- ボーダー -->
+            <Color x:Key="SettingsBorderColor">#404249</Color>
+
+            <!-- 区切り線 -->
+            <Color x:Key="SettingsDividerColor">#3F4147</Color>
+
+            <!-- テキストカラー (白系) -->
+            <Color x:Key="SettingsTextPrimaryColor">#F2F3F5</Color>
+            <Color x:Key="SettingsTextSecondaryColor">#B5BAC1</Color>
+            <Color x:Key="SettingsTextMutedColor">#949BA4</Color>
+
+            <!-- ステータス背景色 (Dark) -->
+            <Color x:Key="SettingsSuccessBackgroundColor">#1E4620</Color>
+            <Color x:Key="SettingsWarningBackgroundColor">#4A3419</Color>
+            <Color x:Key="SettingsErrorBackgroundColor">#4A1E1E</Color>
+            <Color x:Key="SettingsInfoBackgroundColor">#1E3A5F</Color>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- =========================== -->
+    <!-- テーマに依存するブラシ       -->
+    <!-- =========================== -->
+    <SolidColorBrush x:Key="SettingsSidebarBackground" Color="{DynamicResource SettingsSidebarBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsContentBackground" Color="{DynamicResource SettingsContentBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsCardBackground" Color="{DynamicResource SettingsCardBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsHoverBackground" Color="{DynamicResource SettingsHoverColor}"/>
+    <SolidColorBrush x:Key="SettingsSelectedBackground" Color="{DynamicResource SettingsSelectedColor}"/>
+    <SolidColorBrush x:Key="SettingsBorderBrush" Color="{DynamicResource SettingsBorderColor}"/>
+    <SolidColorBrush x:Key="SettingsDividerBrush" Color="{DynamicResource SettingsDividerColor}"/>
+    <SolidColorBrush x:Key="SettingsTextPrimary" Color="{DynamicResource SettingsTextPrimaryColor}"/>
+    <SolidColorBrush x:Key="SettingsTextSecondary" Color="{DynamicResource SettingsTextSecondaryColor}"/>
+    <SolidColorBrush x:Key="SettingsTextMuted" Color="{DynamicResource SettingsTextMutedColor}"/>
+    <SolidColorBrush x:Key="SettingsSuccessBackground" Color="{DynamicResource SettingsSuccessBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsWarningBackground" Color="{DynamicResource SettingsWarningBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsErrorBackground" Color="{DynamicResource SettingsErrorBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsInfoBackground" Color="{DynamicResource SettingsInfoBackgroundColor}"/>
+
+    <!-- =========================== -->
+    <!-- テーマに依存しないカラー     -->
+    <!-- =========================== -->
+
+    <!-- アクセントカラー (テーマ共通) -->
+    <Color x:Key="SettingsAccentColor">#5865F2</Color>
+    <SolidColorBrush x:Key="SettingsAccentBrush" Color="{StaticResource SettingsAccentColor}"/>
+
+    <Color x:Key="SettingsAccentHoverColor">#4752C4</Color>
+    <SolidColorBrush x:Key="SettingsAccentHoverBrush" Color="{StaticResource SettingsAccentHoverColor}"/>
+
+    <!-- ステータスカラー (テーマ共通) -->
+    <Color x:Key="SettingsSuccessColor">#10B981</Color>
+    <SolidColorBrush x:Key="SettingsSuccessBrush" Color="{StaticResource SettingsSuccessColor}"/>
+
+    <Color x:Key="SettingsWarningColor">#F59E0B</Color>
+    <SolidColorBrush x:Key="SettingsWarningBrush" Color="{StaticResource SettingsWarningColor}"/>
+
+    <Color x:Key="SettingsErrorColor">#EF4444</Color>
+    <SolidColorBrush x:Key="SettingsErrorBrush" Color="{StaticResource SettingsErrorColor}"/>
+
+    <Color x:Key="SettingsInfoColor">#3B82F6</Color>
+    <SolidColorBrush x:Key="SettingsInfoBrush" Color="{StaticResource SettingsInfoColor}"/>
+
+    <!-- =========================== -->
+    <!-- スペーシングスケール          -->
+    <!-- =========================== -->
+
+    <!-- 4pxベースのスケーリングシステム -->
+    <sys:Double x:Key="SpacingXxs">2</sys:Double>
+    <sys:Double x:Key="SpacingXs">4</sys:Double>
+    <sys:Double x:Key="SpacingSm">8</sys:Double>
+    <sys:Double x:Key="SpacingMd">12</sys:Double>
+    <sys:Double x:Key="SpacingLg">16</sys:Double>
+    <sys:Double x:Key="SpacingXl">20</sys:Double>
+    <sys:Double x:Key="SpacingXxl">24</sys:Double>
+    <sys:Double x:Key="SpacingXxxl">32</sys:Double>
+    <sys:Double x:Key="SpacingHuge">48</sys:Double>
+
+    <!-- レイアウト用スペーシング -->
+    <Thickness x:Key="SettingsContentPadding">24</Thickness>
+    <Thickness x:Key="SettingsCardPadding">16</Thickness>
+    <Thickness x:Key="SettingsSectionMargin">0,0,0,24</Thickness>
+    <Thickness x:Key="SettingsItemMargin">0,0,0,12</Thickness>
+
+    <!-- サイドバー関連 -->
+    <sys:Double x:Key="SettingsSidebarWidth">280</sys:Double>
+    <Thickness x:Key="SettingsSidebarPadding">12</Thickness>
+    <Thickness x:Key="SettingsNavItemPadding">12,10</Thickness>
+    <Thickness x:Key="SettingsNavItemMargin">0,2</Thickness>
+
+    <!-- =========================== -->
+    <!-- タイポグラフィスケール        -->
+    <!-- =========================== -->
+
+    <!-- フォントサイズ [Issue #245] 視認性向上のため全体的に+1px -->
+    <sys:Double x:Key="SettingsFontSizeXs">11</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeSm">13</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeMd">15</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeLg">17</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeXl">19</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeXxl">21</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeTitle">25</sys:Double>
+
+    <!-- 行の高さ -->
+    <sys:Double x:Key="SettingsLineHeightTight">1.25</sys:Double>
+    <sys:Double x:Key="SettingsLineHeightNormal">1.5</sys:Double>
+    <sys:Double x:Key="SettingsLineHeightRelaxed">1.75</sys:Double>
+
+    <!-- =========================== -->
+    <!-- 角丸 (Border Radius)         -->
+    <!-- =========================== -->
+
+    <CornerRadius x:Key="SettingsRadiusNone">0</CornerRadius>
+    <CornerRadius x:Key="SettingsRadiusSm">4</CornerRadius>
+    <CornerRadius x:Key="SettingsRadiusMd">6</CornerRadius>
+    <CornerRadius x:Key="SettingsRadiusLg">8</CornerRadius>
+    <CornerRadius x:Key="SettingsRadiusXl">12</CornerRadius>
+    <CornerRadius x:Key="SettingsRadiusFull">9999</CornerRadius>
+
+    <!-- カード・ダイアログ用 -->
+    <CornerRadius x:Key="SettingsCardRadius">8</CornerRadius>
+    <CornerRadius x:Key="SettingsDialogRadius">12</CornerRadius>
+    <CornerRadius x:Key="SettingsButtonRadius">6</CornerRadius>
+    <CornerRadius x:Key="SettingsInputRadius">6</CornerRadius>
+
+    <!-- =========================== -->
+    <!-- シャドウ                     -->
+    <!-- =========================== -->
+
+    <BoxShadows x:Key="SettingsShadowSm">0 1 2 0 #0D000000</BoxShadows>
+    <BoxShadows x:Key="SettingsShadowMd">0 4 6 -1 #14000000, 0 2 4 -2 #0D000000</BoxShadows>
+    <BoxShadows x:Key="SettingsShadowLg">0 10 15 -3 #1A000000, 0 4 6 -4 #14000000</BoxShadows>
+    <BoxShadows x:Key="SettingsShadowCard">0 2 8 0 #0F000000</BoxShadows>
+
+    <!-- =========================== -->
+    <!-- アニメーション               -->
+    <!-- =========================== -->
+
+    <sys:TimeSpan x:Key="SettingsTransitionFast">0:0:0.1</sys:TimeSpan>
+    <sys:TimeSpan x:Key="SettingsTransitionNormal">0:0:0.2</sys:TimeSpan>
+    <sys:TimeSpan x:Key="SettingsTransitionSlow">0:0:0.3</sys:TimeSpan>
+
+    <!-- =========================== -->
+    <!-- コンポーネントサイズ          -->
+    <!-- =========================== -->
+
+    <!-- アイコンサイズ -->
+    <sys:Double x:Key="SettingsIconSizeSm">16</sys:Double>
+    <sys:Double x:Key="SettingsIconSizeMd">20</sys:Double>
+    <sys:Double x:Key="SettingsIconSizeLg">24</sys:Double>
+
+    <!-- ボタン高さ -->
+    <sys:Double x:Key="SettingsButtonHeightSm">28</sys:Double>
+    <sys:Double x:Key="SettingsButtonHeightMd">36</sys:Double>
+    <sys:Double x:Key="SettingsButtonHeightLg">44</sys:Double>
+
+    <!-- インプット高さ -->
+    <sys:Double x:Key="SettingsInputHeight">40</sys:Double>
+
+    <!-- ナビゲーション項目 -->
+    <sys:Double x:Key="SettingsNavItemHeight">44</sys:Double>
+
+</ResourceDictionary>

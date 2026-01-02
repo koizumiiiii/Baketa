@@ -10,7 +10,7 @@
                 <Border Classes="settings-item">
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" Spacing="4">
-                            <TextBlock Text="設定項目のタイトル" FontWeight="SemiBold"/>
+                            <TextBlock Text="設定項目のタイトル" FontWeight="Medium"/>
                             <TextBlock Text="設定項目の説明文です。" 
                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                      FontSize="12"/>
@@ -23,7 +23,7 @@
                 <Border Classes="settings-item">
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" Spacing="4">
-                            <TextBlock Text="スライダー設定" FontWeight="SemiBold"/>
+                            <TextBlock Text="スライダー設定" FontWeight="Medium"/>
                             <TextBlock Text="0から100までの値を設定します。" 
                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                      FontSize="12"/>
@@ -43,7 +43,7 @@
             <!-- Left side: Title and Description -->
             <StackPanel Grid.Column="0" Spacing="4">
                 <TextBlock Text="{Binding #Root.Title}" 
-                           FontWeight="SemiBold"/>
+                           FontWeight="Medium"/>
                 
                 <TextBlock Text="{Binding #Root.Description}" 
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"

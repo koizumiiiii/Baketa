@@ -80,7 +80,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
         // コマンドの初期化
         SaveCommand = ReactiveCommand.CreateFromTask(SaveAsync, this.WhenAnyValue(x => x.HasChanges));
         CancelCommand = ReactiveCommand.CreateFromTask(CancelAsync);
-        ResetCommand = ReactiveCommand.CreateFromTask(ResetAsync);
 
         // 初期カテゴリの選択
         SelectedCategory = AllCategories.Count > 0 ? AllCategories[0] : null;
@@ -158,11 +157,6 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// キャンセルコマンド
     /// </summary>
     public ReactiveCommand<Unit, Unit> CancelCommand { get; }
-
-    /// <summary>
-    /// リセットコマンド
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> ResetCommand { get; }
 
     #endregion
 
@@ -378,6 +372,9 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 if (generalViewModel != null)
                 {
                     await generalViewModel.ApplyUiLanguageAsync().ConfigureAwait(false);
+
+                    // テーマを適用（保存後に実際にテーマを変更）
+                    generalViewModel.ApplySelectedTheme();
                 }
             }
             else
@@ -422,28 +419,14 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// <summary>
     /// 変更をキャンセルして閉じます
     /// </summary>
-    private async Task CancelAsync()
+    private Task CancelAsync()
     {
-        if (await this._changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
-        {
-            StatusMessage = Strings.Settings_Status_Cancelled;
-            _logger?.LogInformation("設定の変更がキャンセルされました");
+        StatusMessage = Strings.Settings_Status_Cancelled;
+        _logger?.LogInformation("設定の変更がキャンセルされました");
 
-            // ウィンドウを閉じる
-            RequestClose();
-        }
-    }
-
-    /// <summary>
-    /// 設定をリセットします
-    /// </summary>
-    private async Task ResetAsync()
-    {
-        if (await this._changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
-        {
-            // TODO: 設定のリセット処理を実装
-            StatusMessage = Strings.Settings_Status_Reset;
-        }
+        // ウィンドウを閉じる
+        RequestClose();
+        return Task.CompletedTask;
     }
 
     #endregion

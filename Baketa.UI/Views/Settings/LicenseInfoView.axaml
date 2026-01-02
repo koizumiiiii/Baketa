@@ -12,11 +12,10 @@
         </Border>
     </Design.PreviewWith>
 
-    <ScrollViewer>
-        <StackPanel Margin="20" Spacing="20">
+        <StackPanel Margin="20,20,20,40" Spacing="20">
             <!-- Header -->
             <StackPanel Spacing="8">
-                <TextBlock Text="{local:Localize Settings_License_Title}" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_License_Title}" FontSize="20" FontWeight="Medium"/>
                 <TextBlock Text="{local:Localize Settings_License_Subtitle}"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
@@ -50,7 +49,7 @@
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
                         <TextBlock Text="{Binding PlanDisplayName}"
                                    FontSize="18"
-                                   FontWeight="SemiBold"/>
+                                   FontWeight="Medium"/>
                         <TextBlock Text="{Binding PlanDescription}"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -65,7 +64,7 @@
                             VerticalAlignment="Top">
                         <TextBlock Text="{Binding PlanDisplayName}"
                                    FontSize="12"
-                                   FontWeight="SemiBold"
+                                   FontWeight="Medium"
                                    Foreground="White"/>
                     </Border>
                 </Grid>
@@ -73,7 +72,7 @@
 
             <!-- Token Usage Section (Only for Pro/Premia) -->
             <StackPanel IsVisible="{Binding HasCloudAccess}" Spacing="12">
-                <TextBlock Text="{local:Localize Settings_License_TokenUsage}" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_License_TokenUsage}" FontSize="16" FontWeight="Medium"/>
 
                 <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="8"
@@ -88,7 +87,7 @@
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding TokenUsageDisplay}"
                                            FontSize="12"
-                                           FontWeight="SemiBold"/>
+                                           FontWeight="Medium"/>
                             </Grid>
                             <ProgressBar Value="{Binding UsagePercentage}"
                                          Maximum="100"
@@ -134,7 +133,7 @@
 
             <!-- Plan Details Section -->
             <StackPanel Spacing="12">
-                <TextBlock Text="{local:Localize Settings_License_PlanDetails}" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_License_PlanDetails}" FontSize="16" FontWeight="Medium"/>
 
                 <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="8"
@@ -147,7 +146,7 @@
                                        VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
                                        Text="{Binding ExpirationDateDisplay}"
-                                       FontWeight="SemiBold"
+                                       FontWeight="Medium"
                                        VerticalAlignment="Center"/>
                         </Grid>
 
@@ -158,7 +157,7 @@
                                        VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
                                        Text="{Binding CloudAccessDisplay}"
-                                       FontWeight="SemiBold"
+                                       FontWeight="Medium"
                                        VerticalAlignment="Center"/>
                         </Grid>
 
@@ -169,7 +168,7 @@
                                        VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
                                        Text="{Binding TokenLimit, StringFormat='{}{0:N0}'}"
-                                       FontWeight="SemiBold"
+                                       FontWeight="Medium"
                                        VerticalAlignment="Center"/>
                         </Grid>
                     </StackPanel>
@@ -177,19 +176,19 @@
             </StackPanel>
 
             <!-- Action Buttons -->
-            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left">
                 <Button Content="{local:Localize Settings_License_Refresh}"
                         Command="{Binding RefreshCommand}"
-                        Padding="24,12"/>
+                        Padding="16,8"/>
                 <Button Content="{local:Localize Settings_License_Upgrade}"
                         Command="{Binding ChangePlanCommand}"
-                        Padding="24,12"
+                        Padding="16,8"
                         Classes="accent"/>
             </StackPanel>
 
             <!-- Issue #237 Phase 2: プロモーションコードセクション -->
             <StackPanel Spacing="12">
-                <TextBlock Text="{local:Localize Settings_License_PromotionCode}" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_License_PromotionCode}" FontSize="16" FontWeight="Medium"/>
 
                 <!-- アクティブなプロモーション表示 -->
                 <Border IsVisible="{Binding HasActivePromotion}"
@@ -202,7 +201,7 @@
                                       Width="16" Height="16"
                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
                             <TextBlock Text="{Binding PromotionAppliedMessage}"
-                                       FontWeight="SemiBold"
+                                       FontWeight="Medium"
                                        Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="4">
@@ -211,7 +210,7 @@
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                             <TextBlock Text="{Binding PromotionExpiresDisplay}"
                                        FontSize="12"
-                                       FontWeight="SemiBold"/>
+                                       FontWeight="Medium"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -264,5 +263,4 @@
                 </Border>
             </StackPanel>
         </StackPanel>
-    </ScrollViewer>
 </UserControl>

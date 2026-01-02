@@ -97,6 +97,13 @@ public sealed class GeneralSettings
     [SettingMetadata(SettingLevel.Basic, "General", "表示言語",
         Description = "アプリケーションの表示言語を設定します")]
     public string? UiLanguage { get; set; }
+
+    /// <summary>
+    /// UIテーマ
+    /// </summary>
+    [SettingMetadata(SettingLevel.Basic, "General", "テーマ",
+        Description = "アプリケーションの表示テーマを設定します")]
+    public UiTheme Theme { get; set; } = UiTheme.Auto;
 }
 
 

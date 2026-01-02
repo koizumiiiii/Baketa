@@ -16,14 +16,14 @@
         <StackPanel Margin="20" Spacing="20">
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
-                <TextBlock Text="外観設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="外観設定" FontSize="20" FontWeight="Medium"/>
                 <TextBlock Text="アプリケーションのテーマと外観の設定" 
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
             <!-- テーマ設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="テーマ設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="テーマ設定" FontSize="16" FontWeight="Medium"/>
 
                 <controls:SettingsItem Title="アプリケーションテーマ"
                                         Description="ライト、ダーク、または自動（システム設定に従う）">

@@ -63,12 +63,73 @@ internal sealed partial class App : Avalonia.Application
     /// </summary>
     private LoadingWindow? _earlyLoadingWindow;
 
+    /// <summary>
+    /// [Issue #245] 保存されたテーマを適用
+    /// 設定ファイルを直接読み込んでテーマを設定
+    /// </summary>
+    private void ApplyStoredTheme()
+    {
+        Console.WriteLine("[Theme] ApplyStoredTheme() 開始");
+        try
+        {
+            var settingsFilePath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Baketa", "settings.json");
+
+            Console.WriteLine($"[Theme] 設定ファイルパス: {settingsFilePath}");
+            Console.WriteLine($"[Theme] ファイル存在: {File.Exists(settingsFilePath)}");
+
+            if (File.Exists(settingsFilePath))
+            {
+                var json = File.ReadAllText(settingsFilePath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+                // AppSettings.General.Theme を読み取る
+                if (doc.RootElement.TryGetProperty("General", out var generalElement) &&
+                    generalElement.TryGetProperty("Theme", out var themeElement))
+                {
+                    var themeValue = themeElement.GetInt32();
+                    var theme = (UiTheme)themeValue;
+
+                    Console.WriteLine($"[Theme] 読み込んだテーマ値: {themeValue} -> {theme}");
+
+                    RequestedThemeVariant = theme switch
+                    {
+                        UiTheme.Light => Avalonia.Styling.ThemeVariant.Light,
+                        UiTheme.Dark => Avalonia.Styling.ThemeVariant.Dark,
+                        UiTheme.Auto => Avalonia.Styling.ThemeVariant.Default,
+                        _ => Avalonia.Styling.ThemeVariant.Default
+                    };
+
+                    Console.WriteLine($"[Theme] ✅ 保存されたテーマを適用: {theme}, RequestedThemeVariant={RequestedThemeVariant}");
+                }
+                else
+                {
+                    Console.WriteLine("[Theme] 設定ファイルにGeneral.Themeが見つからない");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[Theme] 設定ファイルなし - デフォルトテーマを使用");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Theme] テーマ適用エラー（継続）: {ex.Message}");
+            Console.WriteLine($"[Theme] スタックトレース: {ex.StackTrace}");
+        }
+        Console.WriteLine("[Theme] ApplyStoredTheme() 終了");
+    }
+
     public override void Initialize()
     {
         Console.WriteLine("🔥🔥🔥 [INIT_DEBUG] App.Initialize() 開始 - ServiceProvider状態確認 🔥🔥🔥");
         Console.WriteLine($"[INIT_DEBUG] Program.ServiceProvider == null: {Program.ServiceProvider == null}");
 
         AvaloniaXamlLoader.Load(this);
+
+        // [Issue #245] 保存されたテーマを起動時に適用（XAML読み込み直後、UIウィンドウ表示前）
+        ApplyStoredTheme();
 
         // [Issue #170] 早期ローディング画面を即座に表示（ServiceProvider不要）
         try
@@ -307,6 +368,8 @@ internal sealed partial class App : Avalonia.Application
 
                 Console.WriteLine("✅ Program.ServiceProvider確認成功");
                 // SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ Program.ServiceProvider確認成功");
+
+                // [Issue #245] テーマはInitialize()で既に適用済み
 
                 // [Issue #170] UIスレッドで単一の非同期フローを実行（ローディング→初期化→メインUI表示）
                 _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>

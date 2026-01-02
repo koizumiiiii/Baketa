@@ -1,0 +1,277 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================ -->
+    <!-- Issue #245: 設定画面スタイル                                  -->
+    <!-- Discord風の洗練されたUI向けに統一されたコントロールスタイル    -->
+    <!-- ============================================================ -->
+
+    <!-- =========================== -->
+    <!-- ウィンドウ・レイアウト       -->
+    <!-- =========================== -->
+
+    <!-- 設定ウィンドウ全体のスタイル -->
+    <Style Selector="Window.settings-window">
+        <Setter Property="Background" Value="{DynamicResource SettingsContentBackground}"/>
+        <Setter Property="FontFamily" Value="{StaticResource SettingsFontFamily}"/>
+    </Style>
+
+    <!-- ナビゲーションヘッダー -->
+    <Style Selector="Border.navigationHeader">
+        <Setter Property="Background" Value="{DynamicResource SettingsContentBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="Padding" Value="{StaticResource SettingsContentPadding}"/>
+    </Style>
+
+    <!-- サイドバーコンテナ -->
+    <Style Selector="Border.settings-navigation">
+        <Setter Property="Background" Value="{DynamicResource SettingsSidebarBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,1,0"/>
+    </Style>
+
+    <!-- コンテンツエリア -->
+    <Style Selector="ScrollViewer.settings-content">
+        <Setter Property="Padding" Value="{StaticResource SettingsContentPadding}"/>
+    </Style>
+
+    <!-- ステータスバー -->
+    <Style Selector="Border.statusBar">
+        <Setter Property="Background" Value="{DynamicResource SettingsContentBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0,1,0,0"/>
+        <Setter Property="Padding" Value="16,12"/>
+    </Style>
+
+    <!-- =========================== -->
+    <!-- ナビゲーション項目          -->
+    <!-- =========================== -->
+
+    <!-- 設定ナビゲーション項目 -->
+    <Style Selector="ListBoxItem.settings-nav-item">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="{StaticResource SettingsNavItemPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource SettingsNavItemMargin}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsRadiusMd}"/>
+        <Setter Property="MinHeight" Value="{StaticResource SettingsNavItemHeight}"/>
+    </Style>
+
+    <Style Selector="ListBoxItem.settings-nav-item:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SettingsHoverBackground}"/>
+    </Style>
+
+    <Style Selector="ListBoxItem.settings-nav-item:selected">
+        <Setter Property="Background" Value="{DynamicResource SettingsSelectedBackground}"/>
+    </Style>
+
+    <Style Selector="ListBoxItem.settings-nav-item:selected /template/ ContentPresenter">
+        <Setter Property="TextBlock.Foreground" Value="{StaticResource SettingsAccentBrush}"/>
+    </Style>
+
+    <!-- =========================== -->
+    <!-- カード                       -->
+    <!-- =========================== -->
+
+    <!-- 設定カード -->
+    <Style Selector="Border.settings-card">
+        <Setter Property="Background" Value="{DynamicResource SettingsCardBackground}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsCardRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource SettingsCardPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource SettingsItemMargin}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource SettingsShadowSm}"/>
+    </Style>
+
+    <!-- 強調カード（警告・情報表示用） -->
+    <Style Selector="Border.settings-card-info">
+        <Setter Property="Background" Value="{DynamicResource SettingsInfoBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource SettingsInfoBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsCardRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource SettingsCardPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource SettingsItemMargin}"/>
+    </Style>
+
+    <Style Selector="Border.settings-card-warning">
+        <Setter Property="Background" Value="{DynamicResource SettingsWarningBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource SettingsWarningBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsCardRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource SettingsCardPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource SettingsItemMargin}"/>
+    </Style>
+
+    <Style Selector="Border.settings-card-success">
+        <Setter Property="Background" Value="{DynamicResource SettingsSuccessBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource SettingsSuccessBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsCardRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource SettingsCardPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource SettingsItemMargin}"/>
+    </Style>
+
+    <Style Selector="Border.settings-card-error">
+        <Setter Property="Background" Value="{DynamicResource SettingsErrorBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource SettingsErrorBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsCardRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource SettingsCardPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource SettingsItemMargin}"/>
+    </Style>
+
+    <!-- =========================== -->
+    <!-- テキストスタイル             -->
+    <!-- =========================== -->
+
+    <!-- セクションタイトル -->
+    <!-- [Issue #245] FontWeight最大500（Medium）に制限 -->
+    <Style Selector="TextBlock.settings-section-title">
+        <Setter Property="FontSize" Value="{StaticResource SettingsFontSizeXl}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextPrimary}"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <!-- セクションサブタイトル -->
+    <Style Selector="TextBlock.settings-section-subtitle">
+        <Setter Property="FontSize" Value="{StaticResource SettingsFontSizeSm}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextSecondary}"/>
+        <Setter Property="Margin" Value="0,0,0,16"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- ラベル -->
+    <Style Selector="TextBlock.settings-label">
+        <Setter Property="FontSize" Value="{StaticResource SettingsFontSizeMd}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextPrimary}"/>
+    </Style>
+
+    <!-- 説明テキスト -->
+    <Style Selector="TextBlock.settings-description">
+        <Setter Property="FontSize" Value="{StaticResource SettingsFontSizeSm}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextSecondary}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- キャプション -->
+    <Style Selector="TextBlock.settings-caption">
+        <Setter Property="FontSize" Value="{StaticResource SettingsFontSizeXs}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextMuted}"/>
+    </Style>
+
+    <!-- =========================== -->
+    <!-- ボタンスタイル               -->
+    <!-- =========================== -->
+
+    <!-- プライマリボタン -->
+    <Style Selector="Button.settings-primary">
+        <Setter Property="Background" Value="{StaticResource SettingsAccentBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsButtonRadius}"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="MinHeight" Value="{StaticResource SettingsButtonHeightMd}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+
+    <Style Selector="Button.settings-primary:pointerover">
+        <Setter Property="Background" Value="{StaticResource SettingsAccentHoverBrush}"/>
+    </Style>
+
+    <!-- セカンダリボタン -->
+    <Style Selector="Button.settings-secondary">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextPrimary}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsButtonRadius}"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="MinHeight" Value="{StaticResource SettingsButtonHeightMd}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+
+    <Style Selector="Button.settings-secondary:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SettingsHoverBackground}"/>
+    </Style>
+
+    <!-- ゴーストボタン（テキストのみ） -->
+    <Style Selector="Button.settings-ghost">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground" Value="{StaticResource SettingsAccentBrush}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsButtonRadius}"/>
+        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+
+    <Style Selector="Button.settings-ghost:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SettingsHoverBackground}"/>
+    </Style>
+
+    <!-- =========================== -->
+    <!-- 入力コントロール             -->
+    <!-- =========================== -->
+
+    <!-- テキストボックス -->
+    <Style Selector="TextBox.settings-input">
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsInputRadius}"/>
+        <Setter Property="MinHeight" Value="{StaticResource SettingsInputHeight}"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource SettingsContentBackground}"/>
+    </Style>
+
+    <Style Selector="TextBox.settings-input:focus">
+        <Setter Property="BorderBrush" Value="{StaticResource SettingsAccentBrush}"/>
+    </Style>
+
+    <!-- コンボボックス -->
+    <Style Selector="ComboBox.settings-select">
+        <Setter Property="CornerRadius" Value="{StaticResource SettingsInputRadius}"/>
+        <Setter Property="MinHeight" Value="{StaticResource SettingsInputHeight}"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource SettingsContentBackground}"/>
+    </Style>
+
+    <!-- =========================== -->
+    <!-- 区切り線                     -->
+    <!-- =========================== -->
+
+    <Style Selector="Separator.settings-divider">
+        <Setter Property="Background" Value="{DynamicResource SettingsDividerBrush}"/>
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Margin" Value="0,16"/>
+    </Style>
+
+    <Style Selector="Rectangle.settings-divider">
+        <Setter Property="Fill" Value="{DynamicResource SettingsDividerBrush}"/>
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Margin" Value="0,16"/>
+    </Style>
+
+    <!-- =========================== -->
+    <!-- アイコン                     -->
+    <!-- =========================== -->
+
+    <Style Selector="PathIcon.settings-icon-sm">
+        <Setter Property="Width" Value="{StaticResource SettingsIconSizeSm}"/>
+        <Setter Property="Height" Value="{StaticResource SettingsIconSizeSm}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextSecondary}"/>
+    </Style>
+
+    <Style Selector="PathIcon.settings-icon-md">
+        <Setter Property="Width" Value="{StaticResource SettingsIconSizeMd}"/>
+        <Setter Property="Height" Value="{StaticResource SettingsIconSizeMd}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextSecondary}"/>
+    </Style>
+
+    <Style Selector="PathIcon.settings-icon-lg">
+        <Setter Property="Width" Value="{StaticResource SettingsIconSizeLg}"/>
+        <Setter Property="Height" Value="{StaticResource SettingsIconSizeLg}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SettingsTextSecondary}"/>
+    </Style>
+
+</Styles>

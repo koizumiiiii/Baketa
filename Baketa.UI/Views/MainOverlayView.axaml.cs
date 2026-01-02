@@ -1,39 +1,69 @@
 using System;
 using System.IO;
+using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
-using Baketa.UI.Utils;
+using Baketa.Core.Settings;
 using Baketa.UI.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Views;
 
 public partial class MainOverlayView : Window
 {
+    // #246: 位置永続化用の設定ファイル名
+    private static readonly string OverlayPositionFilePath = Path.Combine(
+        BaketaSettingsPaths.UserSettingsDirectory,
+        "overlay-position.json");
+
+    // 位置保存のデバウンス用（ドラッグ中の頻繁な保存を防ぐ）
+    private DateTime _lastPositionSave = DateTime.MinValue;
+    private static readonly TimeSpan PositionSaveDebounce = TimeSpan.FromMilliseconds(500);
+
+    // ログ統一: ILoggerを使用
+    private readonly ILogger<MainOverlayView>? _logger;
+
     public MainOverlayView()
     {
-        Console.WriteLine("🔧 MainOverlayView初期化開始");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 MainOverlayView初期化開始");
+        // ILoggerをServiceProviderから取得
+        _logger = Program.ServiceProvider?.GetService<ILogger<MainOverlayView>>();
+
+        _logger?.LogDebug("MainOverlayView初期化開始");
 
         InitializeComponent();
 
-        Console.WriteLine("🔧 MainOverlayView - InitializeComponent完了");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 MainOverlayView - InitializeComponent完了");
+        _logger?.LogDebug("MainOverlayView - InitializeComponent完了");
 
-        // 画面左端から16px、縦中央に配置
+        // 保存された位置を復元、または画面左端から16px、縦中央に配置
         ConfigurePosition();
 
+        // #246: 位置変更イベントを購読して位置を永続化
+        PositionChanged += OnPositionChanged;
+
         // 可視性確認
-        Console.WriteLine($"🔧 MainOverlayView - IsVisible: {IsVisible}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 MainOverlayView - IsVisible: {IsVisible}");
-        Console.WriteLine($"🔧 MainOverlayView - WindowState: {WindowState}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 MainOverlayView - WindowState: {WindowState}");
+        _logger?.LogDebug("MainOverlayView - IsVisible: {IsVisible}, WindowState: {WindowState}", IsVisible, WindowState);
     }
 
     private void ConfigurePosition()
     {
-        // 画面サイズを取得
+        // #246: 保存された位置を復元
+        var savedPosition = LoadSavedPosition();
+        if (savedPosition.HasValue)
+        {
+            // 保存位置が有効なモニター内かを検証
+            if (IsPositionOnValidScreen(savedPosition.Value))
+            {
+                Position = savedPosition.Value;
+                _logger?.LogDebug("MainOverlayView - 保存位置を復元: {Position}", Position);
+                return;
+            }
+            _logger?.LogDebug("MainOverlayView - 保存位置がモニター外のため無視: {SavedPosition}", savedPosition.Value);
+        }
+
+        // 保存位置がない場合、または無効な場合はデフォルト位置を使用
         var screen = Screens.Primary;
         if (screen != null)
         {
@@ -50,106 +80,195 @@ public partial class MainOverlayView : Window
         }
     }
 
+    /// <summary>
+    /// #246: 位置変更時に保存（デバウンス付き）
+    /// </summary>
+    private void OnPositionChanged(object? sender, PixelPointEventArgs e)
+    {
+        // デバウンス：頻繁な保存を防ぐ
+        var now = DateTime.UtcNow;
+        if (now - _lastPositionSave < PositionSaveDebounce)
+        {
+            return;
+        }
+        _lastPositionSave = now;
+
+        SavePosition(e.Point);
+    }
+
+    /// <summary>
+    /// #246: 位置をファイルに保存
+    /// </summary>
+    private void SavePosition(Avalonia.PixelPoint position)
+    {
+        try
+        {
+            BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+
+            var positionData = new OverlayPositionData
+            {
+                X = position.X,
+                Y = position.Y,
+                SavedAt = DateTime.UtcNow.ToString("O")
+            };
+
+            var json = JsonSerializer.Serialize(positionData, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(OverlayPositionFilePath, json);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "オーバーレイ位置保存エラー");
+        }
+    }
+
+    /// <summary>
+    /// #246: 保存された位置を読み込み
+    /// </summary>
+    private Avalonia.PixelPoint? LoadSavedPosition()
+    {
+        try
+        {
+            if (!File.Exists(OverlayPositionFilePath))
+            {
+                return null;
+            }
+
+            var json = File.ReadAllText(OverlayPositionFilePath);
+            var positionData = JsonSerializer.Deserialize<OverlayPositionData>(json);
+
+            if (positionData != null)
+            {
+                return new Avalonia.PixelPoint(positionData.X, positionData.Y);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "オーバーレイ位置読み込みエラー");
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// #246: 位置が有効なスクリーン上にあるか確認
+    /// </summary>
+    private bool IsPositionOnValidScreen(Avalonia.PixelPoint position)
+    {
+        foreach (var screen in Screens.All)
+        {
+            var bounds = screen.Bounds;
+            if (position.X >= bounds.X && position.X < bounds.X + bounds.Width &&
+                position.Y >= bounds.Y && position.Y < bounds.Y + bounds.Height)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// #246: オーバーレイ位置データ
+    /// </summary>
+    private sealed class OverlayPositionData
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+        public string? SavedAt { get; set; }
+    }
+
     protected override void OnLoaded(RoutedEventArgs e)
     {
-        Console.WriteLine("🔧 MainOverlayView - OnLoaded呼び出し");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 MainOverlayView - OnLoaded呼び出し");
+        _logger?.LogDebug("MainOverlayView - OnLoaded呼び出し");
 
         base.OnLoaded(e);
 
         // 位置を再設定（画面解像度が変わった可能性があるため）
         ConfigurePosition();
 
-        // 🔥 [PHASE6.1_DIAGNOSTIC_DEEP] StartStopボタンのCommand/DataContext確認
+        // StartStopボタンのCommand/DataContext確認
         try
         {
             var startStopButton = this.FindControl<Button>("StartStopButton");
             if (startStopButton != null)
             {
-                Console.WriteLine($"🔧🔧🔧 [BUTTON_BINDING] StartStopButton発見 - Command: {startStopButton.Command != null}, IsEnabled: {startStopButton.IsEnabled}, DataContext: {startStopButton.DataContext != null}");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧🔧🔧 [BUTTON_BINDING] StartStopButton - Command: {startStopButton.Command != null}, IsEnabled: {startStopButton.IsEnabled}, DataContext: {startStopButton.DataContext != null}");
+                _logger?.LogDebug("StartStopButton発見 - Command: {HasCommand}, IsEnabled: {IsEnabled}, DataContext: {HasDataContext}",
+                    startStopButton.Command != null, startStopButton.IsEnabled, startStopButton.DataContext != null);
 
                 if (DataContext is MainOverlayViewModel viewModel)
                 {
-                    Console.WriteLine($"🔧🔧🔧 [BUTTON_BINDING] ViewModel確認 - IsStartStopEnabled: {viewModel.IsStartStopEnabled}, IsTranslationActive: {viewModel.IsTranslationActive}");
-                    SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧🔧🔧 [BUTTON_BINDING] ViewModel - IsStartStopEnabled: {viewModel.IsStartStopEnabled}, IsTranslationActive: {viewModel.IsTranslationActive}");
+                    _logger?.LogDebug("ViewModel確認 - IsStartStopEnabled: {IsStartStopEnabled}, IsTranslationActive: {IsTranslationActive}",
+                        viewModel.IsStartStopEnabled, viewModel.IsTranslationActive);
                 }
             }
             else
             {
-                Console.WriteLine("❌ [BUTTON_BINDING] StartStopButton が見つかりません！");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "❌ [BUTTON_BINDING] StartStopButton が見つかりません！");
+                _logger?.LogWarning("StartStopButtonが見つかりません");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ [BUTTON_BINDING] ボタン検証エラー: {ex.Message}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"❌ [BUTTON_BINDING] ボタン検証エラー: {ex.Message}");
+            _logger?.LogError(ex, "ボタン検証エラー");
         }
 
         // ウィンドウの状態確認
-        Console.WriteLine($"🔧 MainOverlayView - OnLoaded後: IsVisible={IsVisible}, IsEnabled={IsEnabled}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 MainOverlayView - OnLoaded後: IsVisible={IsVisible}, IsEnabled={IsEnabled}");
-        Console.WriteLine($"🔧 MainOverlayView - Position: {Position}, Width: {Width}, Height: {Height}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 MainOverlayView - Position: {Position}, Width: {Width}, Height: {Height}");
+        _logger?.LogDebug("MainOverlayView - OnLoaded後: IsVisible={IsVisible}, IsEnabled={IsEnabled}, Position={Position}",
+            IsVisible, IsEnabled, Position);
 
         // ウィンドウを前面に表示
         try
         {
             Show();
             Activate();
-            Console.WriteLine("🔧 MainOverlayView - Show()とActivate()を実行");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔧 MainOverlayView - Show()とActivate()を実行");
+            _logger?.LogDebug("MainOverlayView - Show()とActivate()を実行");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"🔧 MainOverlayView - Show/Activate失敗: {ex.Message}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🔧 MainOverlayView - Show/Activate失敗: {ex.Message}");
+            _logger?.LogWarning(ex, "MainOverlayView - Show/Activate失敗");
         }
     }
 
 
     private void OnExitButtonClick(object? sender, RoutedEventArgs e)
     {
-        Console.WriteLine("🔴 ExitButtonClick呼び出し");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 ExitButtonClick呼び出し");
+        _logger?.LogInformation("ExitButtonClick呼び出し");
 
         try
         {
             // アプリケーション終了
             if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
-                Console.WriteLine("🔴 アプリケーション終了を実行");
-                SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🔴 アプリケーション終了を実行");
+                _logger?.LogInformation("アプリケーション終了を実行");
                 desktop.Shutdown();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"💥 アプリケーション終了エラー: {ex.Message}");
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"💥 アプリケーション終了エラー: {ex.Message}");
+            _logger?.LogError(ex, "アプリケーション終了エラー");
         }
     }
 
     /// <summary>
-    /// 🔧 [PHASE6.1_DIAGNOSTIC] StartStopボタンの物理的クリック検出
-    /// 目的: ボタンがクリックされているかを100%確実に検証
+    /// StartStopボタンの物理的クリック検出（診断用）
     /// </summary>
     private void StartStopButton_OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         var button = sender as Button;
         var viewModel = DataContext as MainOverlayViewModel;
 
-        Console.WriteLine($"🖱️ [DIAGNOSTIC] StartStopButton物理的クリック検出！");
-        Console.WriteLine($"🖱️ [DIAGNOSTIC] Button.IsEnabled: {button?.IsEnabled}");
-        Console.WriteLine($"🖱️ [DIAGNOSTIC] Button.Command: {button?.Command != null}");
-        Console.WriteLine($"🖱️ [DIAGNOSTIC] ViewModel.IsTranslationActive: {viewModel?.IsTranslationActive}");
-        Console.WriteLine($"🖱️ [DIAGNOSTIC] ViewModel.IsStartStopEnabled: {viewModel?.IsStartStopEnabled}");
+        _logger?.LogDebug("StartStopButton物理的クリック検出 - IsEnabled: {IsEnabled}, HasCommand: {HasCommand}, IsTranslationActive: {IsTranslationActive}, IsStartStopEnabled: {IsStartStopEnabled}",
+            button?.IsEnabled, button?.Command != null, viewModel?.IsTranslationActive, viewModel?.IsStartStopEnabled);
+    }
 
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "🖱️ [DIAGNOSTIC] StartStopButton物理的クリック検出！");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖱️ [DIAGNOSTIC] Button.IsEnabled: {button?.IsEnabled}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖱️ [DIAGNOSTIC] Button.Command: {button?.Command != null}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖱️ [DIAGNOSTIC] ViewModel.IsTranslationActive: {viewModel?.IsTranslationActive}");
-        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🖱️ [DIAGNOSTIC] ViewModel.IsStartStopEnabled: {viewModel?.IsStartStopEnabled}");
+    /// <summary>
+    /// ドラッグハンドルのPointerPressedイベントハンドラ (#246)
+    /// BeginMoveDragを使用してウィンドウのネイティブドラッグ移動を開始
+    /// </summary>
+    private void OnDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // 左クリックのみ処理
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            BeginMoveDrag(e);
+        }
     }
 }

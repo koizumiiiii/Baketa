@@ -16,14 +16,14 @@
         <StackPanel Margin="20" Spacing="20">
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
-                <TextBlock Text="キャプチャ設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="キャプチャ設定" FontSize="20" FontWeight="Medium"/>
                 <TextBlock Text="画面キャプチャとスクリーンショット機能の詳細設定" 
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
             <!-- 基本設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="基本設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="基本設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="キャプチャ機能"
                                         Description="画面キャプチャ機能を有効にします">
@@ -69,7 +69,7 @@
 
             <!-- 固定領域設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding IsFixedAreaEnabled}">
-                <TextBlock Text="固定キャプチャ領域" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="固定キャプチャ領域" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="位置とサイズ"
                                         Description="固定キャプチャ領域の位置とサイズを指定">
@@ -106,7 +106,7 @@
 
             <!-- 詳細設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="詳細設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="詳細設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="対象モニター"
                                         Description="マルチモニター環境でキャプチャするモニターを選択">
@@ -140,7 +140,7 @@
 
             <!-- 差分検出設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="差分検出設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="差分検出設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="差分検出機能"
                                         Description="画面変更の差分検出機能を有効にします">
@@ -190,7 +190,7 @@
 
             <!-- ゲーム対応設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="ゲーム対応設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="ゲーム対応設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="フルスクリーン最適化"
                                         Description="フルスクリーンゲームからのキャプチャを最適化します">
@@ -209,7 +209,7 @@
 
             <!-- 履歴設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="履歴設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="履歴設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="キャプチャ履歴保存"
                                         Description="キャプチャした画像の履歴を保存します">
@@ -231,7 +231,7 @@
 
             <!-- デバッグ設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding SaveDebugCaptures}">
-                <TextBlock Text="デバッグ設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="デバッグ設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="デバッグキャプチャ保存"
                                         Description="デバッグ用にキャプチャ画像を保存します（開発者向け）"

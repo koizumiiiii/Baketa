@@ -12,11 +12,10 @@
         </Border>
     </Design.PreviewWith>
 
-    <ScrollViewer>
-        <StackPanel Margin="20" Spacing="20">
+        <StackPanel Margin="20,20,20,40" Spacing="20">
             <!-- Header -->
             <StackPanel Spacing="8">
-                <TextBlock Text="{local:Localize Settings_Account_Title}" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_Account_Title}" FontSize="20" FontWeight="Medium"/>
                 <TextBlock Text="{local:Localize Settings_Account_Subtitle}"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
@@ -52,7 +51,7 @@
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="4">
                             <TextBlock Text="{Binding UserDisplayName}"
                                        FontSize="16"
-                                       FontWeight="SemiBold"/>
+                                       FontWeight="Medium"/>
                             <TextBlock Text="{Binding UserEmail}"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
@@ -81,23 +80,22 @@
 
                 <!-- Account Actions Section -->
                 <StackPanel Spacing="12">
-                    <TextBlock Text="{local:Localize Settings_Account_Actions}" FontSize="16" FontWeight="SemiBold"/>
-
-                    <controls:SettingsItem Title="{local:Localize Settings_Account_Logout}"
-                                           Description="{local:Localize Settings_Account_LogoutDescription}">
-                        <controls:SettingsItem.SettingContent>
-                            <Button Content="{local:Localize Settings_Account_Logout}"
-                                    Command="{Binding LogoutCommand}"
-                                    Classes="danger"
-                                    Width="100"/>
-                        </controls:SettingsItem.SettingContent>
-                    </controls:SettingsItem>
+                    <TextBlock Text="{local:Localize Settings_Account_Actions}" FontSize="16" FontWeight="Medium"/>
+                    <TextBlock Text="{local:Localize Settings_Account_LogoutDescription}"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap"/>
+                    <Button Content="{local:Localize Settings_Account_Logout}"
+                            Command="{Binding LogoutCommand}"
+                            Classes="danger"
+                            HorizontalAlignment="Left"
+                            Padding="16,8"/>
                 </StackPanel>
             </StackPanel>
 
             <!-- Patreon連携セクション -->
             <StackPanel Spacing="16">
-                <TextBlock Text="{local:Localize Settings_Account_PatreonSection}" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                <TextBlock Text="{local:Localize Settings_Account_PatreonSection}" FontSize="16" FontWeight="Medium" Margin="0,8,0,0"/>
 
                 <!-- Patreon連携済み -->
                 <Border IsVisible="{Binding IsPatreonConnected}"
@@ -109,7 +107,7 @@
                         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
                             <TextBlock Text="{Binding PatreonUserName}"
                                        FontSize="14"
-                                       FontWeight="SemiBold"/>
+                                       FontWeight="Medium"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <TextBlock Text="{local:Localize Settings_License_LastSync}"
                                            FontSize="11"
@@ -158,7 +156,7 @@
                         <StackPanel Spacing="8" HorizontalAlignment="Center">
                             <TextBlock Text="{local:Localize Settings_Account_PatreonConnectTitle}"
                                        FontSize="16"
-                                       FontWeight="SemiBold"
+                                       FontWeight="Medium"
                                        HorizontalAlignment="Center"/>
                             <TextBlock Text="{local:Localize Settings_Account_PatreonConnectDescription}"
                                        FontSize="12"
@@ -177,7 +175,7 @@
 
                         <!-- プラン説明 -->
                         <StackPanel Spacing="4">
-                            <TextBlock Text="{local:Localize Settings_Account_PatreonAvailablePlans}" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonAvailablePlans}" FontSize="12" FontWeight="Medium"/>
                             <TextBlock Text="{local:Localize Settings_Account_PatreonPlanStandard}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                             <TextBlock Text="{local:Localize Settings_Account_PatreonPlanPro}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                             <TextBlock Text="{local:Localize Settings_Account_PatreonPlanPremia}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
@@ -190,7 +188,7 @@
 
             <!-- Not Logged In State (従来のログイン) -->
             <StackPanel IsVisible="{Binding !IsLoggedIn}" Spacing="16">
-                <TextBlock Text="{local:Localize Settings_Account_EmailLoginOptional}" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_Account_EmailLoginOptional}" FontSize="16" FontWeight="Medium"/>
 
                 <!-- Info Card -->
                 <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
@@ -202,7 +200,7 @@
                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                         <TextBlock Text="{local:Localize Settings_Account_NotLoggedIn}"
                                    FontSize="16"
-                                   FontWeight="SemiBold"
+                                   FontWeight="Medium"
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="{local:Localize Settings_Account_LoginBenefits}"
                                    FontSize="12"
@@ -246,7 +244,7 @@
                     <StackPanel Spacing="4">
                         <TextBlock Text="{local:Localize Settings_Account_PasswordReset}"
                                    FontSize="16"
-                                   FontWeight="SemiBold"/>
+                                   FontWeight="Medium"/>
                         <TextBlock Text="{local:Localize Settings_Account_PasswordResetDescription}"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -270,7 +268,7 @@
 
                     <!-- Email Input -->
                     <StackPanel Spacing="8" IsVisible="{Binding !PasswordResetSent}">
-                        <TextBlock Text="{local:Localize Settings_Account_EmailAddress}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{local:Localize Settings_Account_EmailAddress}" FontWeight="Medium"/>
                         <TextBox Text="{Binding ResetEmail}"
                                  Watermark="example@email.com"
                                  Classes="clearButton"/>
@@ -290,5 +288,4 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-    </ScrollViewer>
 </UserControl>

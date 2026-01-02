@@ -10,14 +10,14 @@
         <StackPanel Margin="20" Spacing="20">
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
-                <TextBlock Text="OCR設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="OCR設定" FontSize="20" FontWeight="Medium"/>
                 <TextBlock Text="光学文字認識の詳細設定" 
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
             <!-- 基本設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="基本設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="基本設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="OCRを有効化"
                                         Description="画面上のテキストを自動的に認識します">
@@ -84,7 +84,7 @@
 
             <!-- 詳細設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="詳細設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="詳細設定" FontSize="16" FontWeight="Medium"/>
                 
                 <!-- 画像前処理設定 -->
                 <TextBlock Text="画像前処理" FontSize="14" FontWeight="Medium" Margin="0,10,0,5"/>

@@ -13,8 +13,22 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="/Resources/FluentIcons.axaml"/>
                 <ResourceInclude Source="/Resources/FontResources.axaml"/>
+                <!-- #245: 設定画面デザイントークン -->
+                <ResourceInclude Source="/Styles/SettingsDesignTokens.axaml"/>
+                <!-- #245: オーバーレイデザイントークン（テーマ対応） -->
+                <ResourceInclude Source="/Styles/OverlayDesignTokens.axaml"/>
             </ResourceDictionary.MergedDictionaries>
-            
+
+            <!-- アプリ全体のデフォルトフォント（言語別NotoSans） -->
+            <!-- 日本語用 -->
+            <FontFamily x:Key="FontFamily.Japanese">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansJP-Regular.otf#Noto Sans CJK JP, Yu Gothic UI, Meiryo UI, sans-serif</FontFamily>
+            <!-- 英語用 -->
+            <FontFamily x:Key="FontFamily.English">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSans-Regular.ttf#Noto Sans, Segoe UI, sans-serif</FontFamily>
+            <!-- 中国語用（簡体字） -->
+            <FontFamily x:Key="FontFamily.Chinese">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Microsoft YaHei UI, sans-serif</FontFamily>
+            <!-- デフォルト（日本語優先） -->
+            <FontFamily x:Key="DefaultFontFamily">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansJP-Regular.otf#Noto Sans CJK JP, Yu Gothic UI, Meiryo UI, Segoe UI, sans-serif</FontFamily>
+
             <!-- Converters -->
             <converters:TranslationStateToIconConverter x:Key="TranslationStateToIconConverter"/>
             <converters:VisibilityStateToIconConverter x:Key="VisibilityStateToIconConverter"/>
@@ -22,14 +36,44 @@
             <converters:BooleanToHeightConverter x:Key="BooleanToHeightConverter"/>
         </ResourceDictionary>
     </Application.Resources>
-  
+
     <Application.Styles>
         <FluentTheme />
+
+        <!-- アプリ全体のデフォルトフォントを NotoSans に設定（言語切替で動的変更） -->
+        <!-- [Issue #245] FontWeight最大500（Medium）、FontSize基準14px -->
+        <Style Selector="Window">
+            <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="UserControl">
+            <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+        <Style Selector="ComboBox">
+            <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
+        </Style>
+        <Style Selector="Label">
+            <Setter Property="FontFamily" Value="{DynamicResource DefaultFontFamily}"/>
+        </Style>
+
         <StyleInclude Source="/Styles/FontStyles.axaml"/>
         <StyleInclude Source="/Styles/OverlayStyles.axaml"/>
         <StyleInclude Source="/Styles/MainOverlayStyles.axaml"/>
         <!-- 🔥 [ISSUE#164] ボタンスタイル -->
         <StyleInclude Source="/Styles/ButtonStyles.axaml"/>
+        <!-- #245: 設定画面スタイル -->
+        <StyleInclude Source="/Styles/SettingsStyles.axaml"/>
 
     </Application.Styles>
 </Application>

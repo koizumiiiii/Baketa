@@ -16,7 +16,7 @@
     <StackPanel Spacing="16">
       <!-- ヘッダー -->
       <TextBlock Text="翻訳戦略選択" 
-                 FontWeight="SemiBold" 
+                 FontWeight="Medium" 
                  FontSize="16" />
 
       <!-- 戦略選択 -->

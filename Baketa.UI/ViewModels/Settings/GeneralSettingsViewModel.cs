@@ -370,19 +370,12 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
     /// <summary>
     /// 選択されたテーマ
+    /// テーマの実際の適用は保存時に行われます
     /// </summary>
     public UiTheme SelectedTheme
     {
         get => _selectedTheme;
-        set
-        {
-            var oldValue = _selectedTheme;
-            this.RaiseAndSetIfChanged(ref _selectedTheme, value);
-            if (oldValue != value)
-            {
-                ApplyTheme(value);
-            }
-        }
+        set => this.RaiseAndSetIfChanged(ref _selectedTheme, value);
     }
 
     /// <summary>
@@ -497,6 +490,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _logRetentionDays = settings.LogRetentionDays;
         _enableDebugMode = settings.EnableDebugMode;
         _activeGameProfile = settings.ActiveGameProfile;
+        _selectedTheme = settings.Theme;
 
         // UI言語設定の復元（AvailableUiLanguagesから検索）
         if (!string.IsNullOrEmpty(settings.UiLanguage))
@@ -671,10 +665,25 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
+    /// 現在選択されているテーマを適用します（保存時に呼び出される）
+    /// </summary>
+    public void ApplySelectedTheme()
+    {
+        ApplyTheme(SelectedTheme);
+    }
+
+    /// <summary>
     /// テーマを適用します
     /// </summary>
     private void ApplyTheme(UiTheme theme)
     {
+        // UIスレッドで実行する必要がある
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyTheme(theme));
+            return;
+        }
+
         try
         {
             var app = Avalonia.Application.Current;
@@ -801,7 +810,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         LogRetentionDays = LogRetentionDays,
         EnableDebugMode = EnableDebugMode,
         ActiveGameProfile = _activeGameProfile,
-        UiLanguage = SelectedUiLanguage?.Code
+        UiLanguage = SelectedUiLanguage?.Code,
+        Theme = SelectedTheme
     };
 
     /// <summary>

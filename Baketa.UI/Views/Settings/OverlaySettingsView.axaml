@@ -16,7 +16,7 @@
         <StackPanel Margin="20" Spacing="20">
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
-                <TextBlock Text="オーバーレイ設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="オーバーレイ設定" FontSize="20" FontWeight="Medium"/>
                 <StackPanel Spacing="4">
                     <TextBlock Text="翻訳結果をゲーム画面上に表示するオーバーレイの設定" 
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
@@ -28,7 +28,7 @@
 
             <!-- 基本設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="基本設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="基本設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="オーバーレイ表示"
                                         Description="翻訳結果をゲーム画面上にオーバーレイ表示します">
@@ -94,7 +94,7 @@
 
             <!-- 自動非表示設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="自動非表示設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="自動非表示設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="自動翻訳の自動非表示"
                                         Description="自動翻訳の結果を指定時間後に自動的に非表示にします">
@@ -151,7 +151,7 @@
 
             <!-- 詳細設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="表示位置設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="表示位置設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="表示位置モード"
                                         Description="オーバーレイの表示位置の決定方法">
@@ -180,7 +180,7 @@
 
             <!-- サイズとレイアウト設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="サイズとレイアウト" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="サイズとレイアウト" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="最大サイズ"
                                         Description="オーバーレイの最大幅と高さ（0で制限なし）">
@@ -213,7 +213,7 @@
 
             <!-- 外観設定 - AR風UIでは境界線は使用されないため非表示化 -->
             <StackPanel Spacing="12" IsVisible="False">
-                <TextBlock Text="外観設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="外観設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="境界線表示"
                                         Description="オーバーレイの周囲に境界線を表示します">
@@ -274,7 +274,7 @@
 
             <!-- デバッグ設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowDebugBounds}">
-                <TextBlock Text="デバッグ設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="デバッグ設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="デバッグ境界表示"
                                         Description="オーバーレイの境界をデバッグ用に表示します（開発者向け）"

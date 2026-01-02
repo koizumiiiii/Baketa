@@ -86,7 +86,7 @@
                            Width="48" Height="48"
                            HorizontalAlignment="Center"/>
                     <TextBlock Text="{local:Localize Auth_Login_Title}"
-                               FontSize="22" FontWeight="SemiBold"
+                               FontSize="22" FontWeight="Medium"
                                HorizontalAlignment="Center"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </StackPanel>

@@ -18,7 +18,7 @@
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Grid.Column="0"
                    Text="言語ペア選択" 
-                   FontWeight="SemiBold" 
+                   FontWeight="Medium" 
                    FontSize="16" />
         <Button Grid.Column="1"
                 Classes="Icon"
