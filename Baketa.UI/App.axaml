@@ -15,6 +15,8 @@
                 <ResourceInclude Source="/Resources/FontResources.axaml"/>
                 <!-- #245: 設定画面デザイントークン -->
                 <ResourceInclude Source="/Styles/SettingsDesignTokens.axaml"/>
+                <!-- #245: オーバーレイデザイントークン（テーマ対応） -->
+                <ResourceInclude Source="/Styles/OverlayDesignTokens.axaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!-- アプリ全体のデフォルトフォント（言語別NotoSans） -->

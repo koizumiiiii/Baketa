@@ -2,28 +2,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!-- メインオーバーレイ：αテスト向けスタイル -->
-  
-  <Styles.Resources>
-    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#FFFFFFFF"/>
-    <SolidColorBrush x:Key="OverlayBorderBrush" Color="#FF404040"/>
-    <SolidColorBrush x:Key="SeparatorBrush" Color="#FFD0D0D0"/>
-    <SolidColorBrush x:Key="StatusBackgroundBrush" Color="#FFFFFFFF"/>
-    <SolidColorBrush x:Key="StatusBorderBrush" Color="#FF404040"/>
-    
-    <!-- 状態別色定義 -->
-    <SolidColorBrush x:Key="StatusColorBrush" Color="#605E5C"/> <!-- デフォルト: グレー -->
-    <SolidColorBrush x:Key="StatusActiveColorBrush" Color="#107C10"/> <!-- アクティブ: 緑 -->
-    <SolidColorBrush x:Key="StatusErrorColorBrush" Color="#D13438"/> <!-- エラー: 赤 -->
-    <SolidColorBrush x:Key="StatusWarningColorBrush" Color="#FF8C00"/> <!-- 警告: オレンジ -->
-    
-    <!-- BoxShadow用の色定義 -->
-    <Color x:Key="BoxShadowColor">#60000000</Color>
-  </Styles.Resources>
+  <!-- [Issue #245] ローカルリソース定義を削除し、OverlayDesignTokens.axamlのDynamicResourceを使用 -->
 
   <!-- オーバーレイ背景スタイル -->
   <Style Selector="Border#MainOverlayBorder, Border#CollapsedOverlayBorder">
-    <Setter Property="Background" Value="{StaticResource OverlayBackgroundBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource OverlayBorderBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource OverlayBackgroundBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource OverlayBorderBrush}"/>
     <Setter Property="BorderThickness" Value="1"/>
   </Style>
 
@@ -100,20 +84,21 @@
   </Style>
 
   <!-- 状態インジケーターの色分け -->
+  <!-- [Issue #245] DynamicResourceでテーマ対応 -->
   <Style Selector="Ellipse.inactive">
-    <Setter Property="Fill" Value="{StaticResource StatusColorBrush}"/>
+    <Setter Property="Fill" Value="{DynamicResource OverlayStatusIdleBrush}"/>
   </Style>
 
   <Style Selector="Ellipse.active">
-    <Setter Property="Fill" Value="{StaticResource StatusActiveColorBrush}"/>
+    <Setter Property="Fill" Value="{DynamicResource OverlayStatusActiveBrush}"/>
   </Style>
 
   <Style Selector="Ellipse.error">
-    <Setter Property="Fill" Value="{StaticResource StatusErrorColorBrush}"/>
+    <Setter Property="Fill" Value="{DynamicResource OverlayStatusErrorBrush}"/>
   </Style>
 
   <Style Selector="Ellipse.warning">
-    <Setter Property="Fill" Value="{StaticResource StatusWarningColorBrush}"/>
+    <Setter Property="Fill" Value="{DynamicResource OverlayStatusWarningBrush}"/>
   </Style>
 
   <!-- 状態インジケーターのアニメーション -->
@@ -135,7 +120,7 @@
 
   <!-- 区切り線スタイル -->
   <Style Selector="Rectangle">
-    <Setter Property="Fill" Value="{StaticResource SeparatorBrush}"/>
+    <Setter Property="Fill" Value="{DynamicResource OverlaySeparatorBrush}"/>
   </Style>
 
   <!-- ツールチップスタイル -->

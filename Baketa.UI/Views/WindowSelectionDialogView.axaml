@@ -23,13 +23,14 @@
     <converters:StringNullToBoolConverter x:Key="StringNullToBoolConverter"/>
 
     <!-- #245: デザイントークンを使用したカラーリソース -->
-    <SolidColorBrush x:Key="DialogBackgroundBrush" Color="{StaticResource SettingsSidebarBackgroundColor}"/>
-    <SolidColorBrush x:Key="WindowItemBackgroundBrush" Color="{StaticResource SettingsContentBackgroundColor}"/>
-    <SolidColorBrush x:Key="WindowItemBorderBrush" Color="{StaticResource SettingsBorderColor}"/>
-    <SolidColorBrush x:Key="WindowItemHoverBrush" Color="{StaticResource SettingsSelectedColor}"/>
-    <SolidColorBrush x:Key="WindowItemSelectedBrush" Color="{StaticResource SettingsSelectedColor}"/>
-    <SolidColorBrush x:Key="ButtonPrimaryBrush" Color="{StaticResource SettingsAccentColor}"/>
-    <SolidColorBrush x:Key="ButtonSecondaryBrush" Color="{StaticResource SettingsCardBackgroundColor}"/>
+    <!-- ThemeDictionaries内のColorはDynamicResourceでアクセスする必要がある -->
+    <SolidColorBrush x:Key="DialogBackgroundBrush" Color="{DynamicResource SettingsSidebarBackgroundColor}"/>
+    <SolidColorBrush x:Key="WindowItemBackgroundBrush" Color="{DynamicResource SettingsContentBackgroundColor}"/>
+    <SolidColorBrush x:Key="WindowItemBorderBrush" Color="{DynamicResource SettingsBorderColor}"/>
+    <SolidColorBrush x:Key="WindowItemHoverBrush" Color="{DynamicResource SettingsSelectedColor}"/>
+    <SolidColorBrush x:Key="WindowItemSelectedBrush" Color="{DynamicResource SettingsSelectedColor}"/>
+    <SolidColorBrush x:Key="ButtonPrimaryBrush" Color="{DynamicResource SettingsAccentColor}"/>
+    <SolidColorBrush x:Key="ButtonSecondaryBrush" Color="{DynamicResource SettingsCardBackgroundColor}"/>
     
     <!-- アイコンはFluentIcons.axamlからグローバル参照 -->
   </Window.Resources>

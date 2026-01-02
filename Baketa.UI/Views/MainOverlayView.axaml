@@ -20,30 +20,14 @@
         ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="0">
   
-  <Window.Resources>
-    <!-- カラーリソース -->
-    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="#F5FFFFFF"/>
-    <SolidColorBrush x:Key="OverlayBorderBrush" Color="#A0A0A0A0"/>
-    <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="Transparent"/>
-    <SolidColorBrush x:Key="ButtonHoverBrush" Color="#F0F4F8"/>
-    <SolidColorBrush x:Key="ButtonPressedBrush" Color="#E0E8F0"/>
-    <SolidColorBrush x:Key="IconBrush" Color="#202020"/>
-    <SolidColorBrush x:Key="IconDisabledBrush" Color="#C0C0C0"/>
-    <SolidColorBrush x:Key="TextBrush" Color="#000000"/>
-    <SolidColorBrush x:Key="StatusIndicatorBrush" Color="#17A2B8"/>
-    
-    <!-- ステータス別カラー -->
-    <SolidColorBrush x:Key="StatusIdleBrush" Color="#6C757D"/>
-    <SolidColorBrush x:Key="StatusActiveBrush" Color="#28A745"/>
-    <SolidColorBrush x:Key="StatusProcessingBrush" Color="#FD7E14"/>
-    <SolidColorBrush x:Key="StatusErrorBrush" Color="#DC3545"/>
-  </Window.Resources>
+  <!-- [Issue #245] Window.Resourcesを削除し、OverlayDesignTokens.axamlのDynamicResourceを使用 -->
 
   <Window.Styles>
     <!-- メニュー項目スタイル -->
     <!-- 🔥 [ISSUE#171] 多言語対応: Width固定値 → MinWidth に変更（テキスト長に応じて自動調整） -->
+    <!-- [Issue #245] StaticResource → DynamicResource（テーマ対応） -->
     <Style Selector="Button.menu-item">
-      <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource OverlayButtonBackgroundBrush}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Padding" Value="8"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -53,18 +37,18 @@
       <Setter Property="Margin" Value="4,2"/>
       <Setter Property="MinWidth" Value="50"/>
     </Style>
-    
-    <Style Selector="Button.menu-item:hover">
-      <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+
+    <Style Selector="Button.menu-item:pointerover">
+      <Setter Property="Background" Value="{DynamicResource OverlayButtonHoverBrush}"/>
     </Style>
-    
+
     <Style Selector="Button.menu-item:pressed">
-      <Setter Property="Background" Value="{StaticResource ButtonPressedBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource OverlayButtonPressedBrush}"/>
     </Style>
-    
+
     <!-- ステータス表示スタイル（未使用 - Status削除済み） -->
     <Style Selector="Border.status-item">
-      <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource OverlayButtonBackgroundBrush}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Padding" Value="8"/>
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -86,26 +70,26 @@
       <Setter Property="MinWidth" Value="50"/>
       <Setter Property="Margin" Value="4,8,4,4"/>
     </Style>
-    
-    <Style Selector="Button.minimize-button:hover">
-      <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+
+    <Style Selector="Button.minimize-button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource OverlayButtonHoverBrush}"/>
     </Style>
-    
+
     <!-- 非アクティブボタンスタイル - 背景色なし、アイコンとテキストのみ薄いグレー -->
     <Style Selector="Button.menu-item:disabled">
       <Setter Property="Background" Value="Transparent"/>
     </Style>
-    
+
     <Style Selector="Button.menu-item:disabled PathIcon">
-      <Setter Property="Foreground" Value="{StaticResource IconDisabledBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource OverlayIconDisabledBrush}"/>
     </Style>
-    
+
     <Style Selector="Button.menu-item:disabled TextBlock">
-      <Setter Property="Foreground" Value="{StaticResource IconDisabledBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource OverlayIconDisabledBrush}"/>
     </Style>
-    
+
     <!-- 非アクティブ状態でホバー効果も無効化 -->
-    <Style Selector="Button.menu-item:disabled:hover">
+    <Style Selector="Button.menu-item:disabled:pointerover">
       <Setter Property="Background" Value="Transparent"/>
     </Style>
 
@@ -118,7 +102,7 @@
     </Style>
 
     <Style Selector="Border.drag-handle:pointerover">
-      <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource OverlayButtonHoverBrush}"/>
     </Style>
   </Window.Styles>
 
@@ -126,9 +110,10 @@
   <Grid>
   
   <!-- メインオーバーレイ: 縦型アイコン+テキスト構成 -->
+  <!-- [Issue #245] DynamicResourceでテーマ対応 -->
   <Border Name="MainOverlayBorder"
-          Background="{StaticResource OverlayBackgroundBrush}"
-          BorderBrush="{StaticResource OverlayBorderBrush}"
+          Background="{DynamicResource OverlayBackgroundBrush}"
+          BorderBrush="{DynamicResource OverlayBorderBrush}"
           BorderThickness="1"
           CornerRadius="8"
           BoxShadow="0 4 12 0 #40000000"
@@ -149,14 +134,14 @@
           <!-- 6ドットグリップパターン (⋮⋮) -->
           <StackPanel Orientation="Horizontal" Spacing="3">
             <StackPanel Orientation="Vertical" Spacing="2">
-              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
-              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
-              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
             </StackPanel>
             <StackPanel Orientation="Vertical" Spacing="2">
-              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
-              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
-              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
             </StackPanel>
           </StackPanel>
         </Grid>
@@ -164,18 +149,20 @@
 
       <!-- 最小化ボタン - ウィンドウ選択後のみ表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Minテキスト削除、アイコンサイズをexpandと統一（16px） -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応） -->
       <Button Classes="minimize-button"
               Command="{Binding FoldCommand}"
               ToolTip.Tip="{local:Localize MainOverlay_Minimize}"
               AutomationProperties.Name="最小化ボタン"
               IsVisible="{Binding IsWindowSelected}">
-        <Image Width="16" Height="16"
-               Source="avares://Baketa/Assets/Icons/minimize.png"
-               VerticalAlignment="Center"/>
+        <PathIcon Width="16" Height="16"
+                  Data="{StaticResource CollapseIcon}"
+                  Foreground="{DynamicResource OverlayIconBrush}"/>
       </Button>
       
       <!-- ウィンドウ選択ボタン - 常に表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Select → Target に変更 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応） -->
       <Button Classes="menu-item"
               Command="{Binding SelectWindowCommand}"
               ToolTip.Tip="{local:Localize MainOverlay_SelectWindow}"
@@ -183,13 +170,14 @@
               IsEnabled="{Binding IsSelectWindowEnabled}"
               AutomationProperties.Name="翻訳対象ウィンドウを選択">
         <StackPanel Orientation="Vertical" Spacing="4">
-          <Image Width="18" Height="18"
-                 Source="avares://Baketa/Assets/Icons/target.png"/>
+          <PathIcon Width="18" Height="18"
+                    Data="{StaticResource TargetIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}"/>
           <TextBlock Text="{local:Localize MainOverlay_Target}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"
+                     Foreground="{DynamicResource OverlayTextBrush}"
                      IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
@@ -212,7 +200,7 @@
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"
+                     Foreground="{DynamicResource OverlayTextBrush}"
                      IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
@@ -234,7 +222,7 @@
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"
+                     Foreground="{DynamicResource OverlayTextBrush}"
                      IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
@@ -243,17 +231,18 @@
       <Border Classes="status-item" IsVisible="{Binding IsLoading}">
         <StackPanel Orientation="Vertical" Spacing="4">
           <Ellipse Width="16" Height="16"
-                   Fill="{StaticResource StatusProcessingBrush}"
+                   Fill="{DynamicResource OverlayStatusProcessingBrush}"
                    Opacity="0.8"/>
           <TextBlock Text="{local:Localize MainOverlay_Preparing}"
                      FontSize="9"
                      HorizontalAlignment="Center"
-                     Foreground="{StaticResource StatusProcessingBrush}"/>
+                     Foreground="{DynamicResource OverlayStatusProcessingBrush}"/>
         </StackPanel>
       </Border>
       
       <!-- 翻訳表示切り替えボタン - ウィンドウ選択後のみ表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Show → 翻訳表示 に変更、状態による表示制御 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応） -->
       <Button Classes="menu-item"
               Command="{Binding ShowHideCommand}"
               IsEnabled="{Binding ShowHideEnabled}"
@@ -261,57 +250,62 @@
               ToolTip.Tip="{local:Localize MainOverlay_ShowHideTranslation}">
         <StackPanel Orientation="Vertical" Spacing="4" HorizontalAlignment="Center">
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-            <Image Width="18" Height="18"
-                   Source="avares://Baketa/Assets/Icons/visible.png"/>
+            <PathIcon Width="18" Height="18"
+                      Data="{StaticResource ViewIcon}"
+                      Foreground="{DynamicResource OverlayIconBrush}"/>
             <Ellipse Width="8" Height="8"
-                     Fill="{StaticResource StatusActiveBrush}"
+                     Fill="{DynamicResource OverlayStatusActiveBrush}"
                      Margin="2,0,0,0"
                      IsVisible="{Binding IsTranslationActive}"/>
           </StackPanel>
           <TextBlock Text="{local:Localize MainOverlay_ShowTranslation}"
                      FontSize="10"
                      HorizontalAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"
+                     Foreground="{DynamicResource OverlayTextBrush}"
                      IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
       
       <!-- 設定ボタン - 常に表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Set → 設定 に変更 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応） -->
       <Button Classes="menu-item"
               Command="{Binding SettingsCommand}"
               IsEnabled="{Binding SettingsEnabled}"
               ToolTip.Tip="{local:Localize MainOverlay_Settings}">
         <StackPanel Orientation="Vertical" Spacing="4">
-          <Image Width="18" Height="18"
-                 Source="avares://Baketa/Assets/Icons/settings.png"/>
+          <PathIcon Width="18" Height="18"
+                    Data="{StaticResource SettingsIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}"/>
           <TextBlock Text="{local:Localize MainOverlay_Settings}"
                      FontSize="10"
                      HorizontalAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"
+                     Foreground="{DynamicResource OverlayTextBrush}"
                      IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
       
       <!-- 区切り線 -->
       <Rectangle Height="1"
-                 Fill="{StaticResource OverlayBorderBrush}"
+                 Fill="{DynamicResource OverlayBorderBrush}"
                  Margin="8,4"
                  Opacity="0.5"/>
 
       <!-- 終了ボタン - 常に表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Exit テキストは展開時のみ表示 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応） -->
       <Button Classes="menu-item"
               Command="{Binding ExitCommand}"
               ToolTip.Tip="{local:Localize MainOverlay_Exit}"
               Click="OnExitButtonClick">
         <StackPanel Orientation="Vertical" Spacing="4">
-          <Image Width="18" Height="18"
-                 Source="avares://Baketa/Assets/Icons/exit.png"/>
+          <PathIcon Width="18" Height="18"
+                    Data="{StaticResource ExitIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}"/>
           <TextBlock Text="{local:Localize MainOverlay_Exit}"
                      FontSize="10"
                      HorizontalAlignment="Center"
-                     Foreground="{StaticResource TextBrush}"
+                     Foreground="{DynamicResource OverlayTextBrush}"
                      IsVisible="{Binding !IsCollapsed}"/>
         </StackPanel>
       </Button>
@@ -324,8 +318,8 @@
   <!-- Height削除: ウィンドウ選択状態に応じて自動調整 -->
   <Border Name="CollapsedOverlayBorder"
           Width="40"
-          Background="{StaticResource OverlayBackgroundBrush}"
-          BorderBrush="{StaticResource OverlayBorderBrush}"
+          Background="{DynamicResource OverlayBackgroundBrush}"
+          BorderBrush="{DynamicResource OverlayBorderBrush}"
           BorderThickness="1"
           CornerRadius="8"
           BoxShadow="0 2 8 0 #40000000"
@@ -344,20 +338,21 @@
           <!-- 6ドットグリップパターン (⋮⋮) - 縮小版 -->
           <StackPanel Orientation="Horizontal" Spacing="2">
             <StackPanel Orientation="Vertical" Spacing="1">
-              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
-              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
-              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
             </StackPanel>
             <StackPanel Orientation="Vertical" Spacing="1">
-              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
-              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
-              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{DynamicResource OverlayIconBrush}" Opacity="0.5"/>
             </StackPanel>
           </StackPanel>
         </Grid>
       </Border>
 
       <!-- 展開ボタン -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応） -->
       <Button Classes="minimize-button"
               Command="{Binding FoldCommand}"
               ToolTip.Tip="{local:Localize MainOverlay_Expand}"
@@ -366,8 +361,9 @@
               Width="36"
               Height="36"
               Margin="2">
-        <Image Width="16" Height="16"
-               Source="avares://Baketa/Assets/Icons/expand.png"/>
+        <PathIcon Width="16" Height="16"
+                  Data="{StaticResource ExpandIcon}"
+                  Foreground="{DynamicResource OverlayIconBrush}"/>
       </Button>
 
       <!-- Live翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
@@ -402,6 +398,7 @@
       </Button>
 
       <!-- 翻訳表示ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応） -->
       <Button Classes="minimize-button"
               Command="{Binding ShowHideCommand}"
               ToolTip.Tip="{local:Localize MainOverlay_ShowHideTranslation}"
@@ -413,10 +410,11 @@
               Height="36"
               Margin="2">
         <StackPanel>
-          <Image Width="16" Height="16"
-                 Source="avares://Baketa/Assets/Icons/visible.png"/>
+          <PathIcon Width="16" Height="16"
+                    Data="{StaticResource ViewIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}"/>
           <Ellipse Width="6" Height="6"
-                   Fill="{StaticResource StatusActiveBrush}"
+                   Fill="{DynamicResource OverlayStatusActiveBrush}"
                    Margin="0,-2,0,0"
                    HorizontalAlignment="Center"
                    IsVisible="{Binding IsTranslationActive}"/>

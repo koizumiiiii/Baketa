@@ -1,0 +1,96 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================ -->
+    <!-- Issue #245: MainOverlayテーマ対応デザイントークン              -->
+    <!-- Light/Darkテーマに対応したオーバーレイ用カラー定義            -->
+    <!-- ============================================================ -->
+
+    <ResourceDictionary.ThemeDictionaries>
+        <!-- ライトテーマ -->
+        <ResourceDictionary x:Key="Light">
+            <!-- 背景 -->
+            <Color x:Key="OverlayBackgroundColor">#F5FFFFFF</Color>
+            <Color x:Key="OverlayBorderColor">#A0A0A0A0</Color>
+
+            <!-- ボタン -->
+            <Color x:Key="OverlayButtonBackgroundColor">Transparent</Color>
+            <Color x:Key="OverlayButtonHoverColor">#F0F4F8</Color>
+            <Color x:Key="OverlayButtonPressedColor">#E0E8F0</Color>
+
+            <!-- アイコン・テキスト -->
+            <Color x:Key="OverlayIconColor">#202020</Color>
+            <Color x:Key="OverlayIconDisabledColor">#C0C0C0</Color>
+            <Color x:Key="OverlayTextColor">#000000</Color>
+
+            <!-- ステータス -->
+            <Color x:Key="OverlayStatusIndicatorColor">#17A2B8</Color>
+            <Color x:Key="OverlayStatusIdleColor">#6C757D</Color>
+            <Color x:Key="OverlayStatusActiveColor">#28A745</Color>
+            <Color x:Key="OverlayStatusProcessingColor">#FD7E14</Color>
+            <Color x:Key="OverlayStatusErrorColor">#DC3545</Color>
+            <Color x:Key="OverlayStatusWarningColor">#FF8C00</Color>
+
+            <!-- セパレーター -->
+            <Color x:Key="OverlaySeparatorColor">#D0D0D0</Color>
+        </ResourceDictionary>
+
+        <!-- ダークテーマ -->
+        <ResourceDictionary x:Key="Dark">
+            <!-- 背景 -->
+            <Color x:Key="OverlayBackgroundColor">#F5303030</Color>
+            <Color x:Key="OverlayBorderColor">#60FFFFFF</Color>
+
+            <!-- ボタン -->
+            <Color x:Key="OverlayButtonBackgroundColor">Transparent</Color>
+            <Color x:Key="OverlayButtonHoverColor">#40FFFFFF</Color>
+            <Color x:Key="OverlayButtonPressedColor">#30FFFFFF</Color>
+
+            <!-- アイコン・テキスト -->
+            <Color x:Key="OverlayIconColor">#E0E0E0</Color>
+            <Color x:Key="OverlayIconDisabledColor">#606060</Color>
+            <Color x:Key="OverlayTextColor">#FFFFFF</Color>
+
+            <!-- ステータス -->
+            <Color x:Key="OverlayStatusIndicatorColor">#5BC0DE</Color>
+            <Color x:Key="OverlayStatusIdleColor">#8E9297</Color>
+            <Color x:Key="OverlayStatusActiveColor">#43B581</Color>
+            <Color x:Key="OverlayStatusProcessingColor">#FAA61A</Color>
+            <Color x:Key="OverlayStatusErrorColor">#F04747</Color>
+            <Color x:Key="OverlayStatusWarningColor">#FAA61A</Color>
+
+            <!-- セパレーター -->
+            <Color x:Key="OverlaySeparatorColor">#505050</Color>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- =========================== -->
+    <!-- テーマ対応ブラシ             -->
+    <!-- =========================== -->
+
+    <!-- 背景 -->
+    <SolidColorBrush x:Key="OverlayBackgroundBrush" Color="{DynamicResource OverlayBackgroundColor}"/>
+    <SolidColorBrush x:Key="OverlayBorderBrush" Color="{DynamicResource OverlayBorderColor}"/>
+
+    <!-- ボタン -->
+    <SolidColorBrush x:Key="OverlayButtonBackgroundBrush" Color="{DynamicResource OverlayButtonBackgroundColor}"/>
+    <SolidColorBrush x:Key="OverlayButtonHoverBrush" Color="{DynamicResource OverlayButtonHoverColor}"/>
+    <SolidColorBrush x:Key="OverlayButtonPressedBrush" Color="{DynamicResource OverlayButtonPressedColor}"/>
+
+    <!-- アイコン・テキスト -->
+    <SolidColorBrush x:Key="OverlayIconBrush" Color="{DynamicResource OverlayIconColor}"/>
+    <SolidColorBrush x:Key="OverlayIconDisabledBrush" Color="{DynamicResource OverlayIconDisabledColor}"/>
+    <SolidColorBrush x:Key="OverlayTextBrush" Color="{DynamicResource OverlayTextColor}"/>
+
+    <!-- ステータス -->
+    <SolidColorBrush x:Key="OverlayStatusIndicatorBrush" Color="{DynamicResource OverlayStatusIndicatorColor}"/>
+    <SolidColorBrush x:Key="OverlayStatusIdleBrush" Color="{DynamicResource OverlayStatusIdleColor}"/>
+    <SolidColorBrush x:Key="OverlayStatusActiveBrush" Color="{DynamicResource OverlayStatusActiveColor}"/>
+    <SolidColorBrush x:Key="OverlayStatusProcessingBrush" Color="{DynamicResource OverlayStatusProcessingColor}"/>
+    <SolidColorBrush x:Key="OverlayStatusErrorBrush" Color="{DynamicResource OverlayStatusErrorColor}"/>
+    <SolidColorBrush x:Key="OverlayStatusWarningBrush" Color="{DynamicResource OverlayStatusWarningColor}"/>
+
+    <!-- セパレーター -->
+    <SolidColorBrush x:Key="OverlaySeparatorBrush" Color="{DynamicResource OverlaySeparatorColor}"/>
+
+</ResourceDictionary>
