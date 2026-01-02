@@ -46,7 +46,7 @@
                               Foreground="{DynamicResource PrimaryBrush}"/>
                     <TextBlock Text="{local:Localize Settings_Window_Title}"
                                FontSize="18" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                               Foreground="{DynamicResource SettingsTextPrimary}"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -64,16 +64,16 @@
                             <DataTemplate x:DataType="models:SettingCategory">
                                 <Border Classes="settings-nav-item">
                                     <StackPanel Orientation="Horizontal" Spacing="12">
-                                        <PathIcon Data="{Binding IconData}" 
-                                                  Width="20" Height="20" 
-                                                  Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <PathIcon Data="{Binding IconData}"
+                                                  Width="20" Height="20"
+                                                  Foreground="{DynamicResource SettingsTextPrimary}"/>
                                         <StackPanel Spacing="2">
-                                            <TextBlock Text="{Binding Name}" 
+                                            <TextBlock Text="{Binding Name}"
                                                        FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            <TextBlock Text="{Binding Description}" 
+                                                       Foreground="{DynamicResource SettingsTextPrimary}"/>
+                                            <TextBlock Text="{Binding Description}"
                                                        FontSize="11"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Foreground="{DynamicResource SettingsTextSecondary}"
                                                        TextWrapping="Wrap"/>
                                         </StackPanel>
                                     </StackPanel>
@@ -85,7 +85,7 @@
             </Border>
             
             <!-- 設定コンテンツエリア -->
-            <Border Grid.Column="1" Background="{DynamicResource BackgroundBrush}">
+            <Border Grid.Column="1" Background="{DynamicResource SettingsContentBackground}">
                 <ScrollViewer Classes="settings-content"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"

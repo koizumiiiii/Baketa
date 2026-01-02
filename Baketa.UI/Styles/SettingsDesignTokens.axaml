@@ -8,74 +8,121 @@
     <!-- ============================================================ -->
 
     <!-- =========================== -->
-    <!-- セマンティックカラー (Light) -->
+    <!-- テーマ対応カラー             -->
+    <!-- =========================== -->
+    <ResourceDictionary.ThemeDictionaries>
+        <!-- ライトテーマ -->
+        <ResourceDictionary x:Key="Light">
+            <!-- サイドバー背景 -->
+            <Color x:Key="SettingsSidebarBackgroundColor">#F2F3F5</Color>
+
+            <!-- コンテンツ背景 -->
+            <Color x:Key="SettingsContentBackgroundColor">#FFFFFF</Color>
+
+            <!-- カード背景 -->
+            <Color x:Key="SettingsCardBackgroundColor">#F8F9FA</Color>
+
+            <!-- ホバー状態 -->
+            <Color x:Key="SettingsHoverColor">#E3E5E8</Color>
+
+            <!-- 選択状態 -->
+            <Color x:Key="SettingsSelectedColor">#E0E7FF</Color>
+
+            <!-- ボーダー -->
+            <Color x:Key="SettingsBorderColor">#E5E7EB</Color>
+
+            <!-- 区切り線 -->
+            <Color x:Key="SettingsDividerColor">#E5E7EB</Color>
+
+            <!-- テキストカラー -->
+            <Color x:Key="SettingsTextPrimaryColor">#111827</Color>
+            <Color x:Key="SettingsTextSecondaryColor">#6B7280</Color>
+            <Color x:Key="SettingsTextMutedColor">#9CA3AF</Color>
+
+            <!-- ステータス背景色 (Light) -->
+            <Color x:Key="SettingsSuccessBackgroundColor">#D1FAE5</Color>
+            <Color x:Key="SettingsWarningBackgroundColor">#FEF3C7</Color>
+            <Color x:Key="SettingsErrorBackgroundColor">#FEE2E2</Color>
+            <Color x:Key="SettingsInfoBackgroundColor">#EBF5FF</Color>
+        </ResourceDictionary>
+
+        <!-- ダークテーマ (Discord風濃いグレー系) -->
+        <ResourceDictionary x:Key="Dark">
+            <!-- サイドバー背景 -->
+            <Color x:Key="SettingsSidebarBackgroundColor">#2B2D31</Color>
+
+            <!-- コンテンツ背景 (サイドバーより少し明るい) -->
+            <Color x:Key="SettingsContentBackgroundColor">#313338</Color>
+
+            <!-- カード背景 -->
+            <Color x:Key="SettingsCardBackgroundColor">#383A40</Color>
+
+            <!-- ホバー状態 -->
+            <Color x:Key="SettingsHoverColor">#404249</Color>
+
+            <!-- 選択状態 -->
+            <Color x:Key="SettingsSelectedColor">#404EED</Color>
+
+            <!-- ボーダー -->
+            <Color x:Key="SettingsBorderColor">#404249</Color>
+
+            <!-- 区切り線 -->
+            <Color x:Key="SettingsDividerColor">#3F4147</Color>
+
+            <!-- テキストカラー (白系) -->
+            <Color x:Key="SettingsTextPrimaryColor">#F2F3F5</Color>
+            <Color x:Key="SettingsTextSecondaryColor">#B5BAC1</Color>
+            <Color x:Key="SettingsTextMutedColor">#949BA4</Color>
+
+            <!-- ステータス背景色 (Dark) -->
+            <Color x:Key="SettingsSuccessBackgroundColor">#1E4620</Color>
+            <Color x:Key="SettingsWarningBackgroundColor">#4A3419</Color>
+            <Color x:Key="SettingsErrorBackgroundColor">#4A1E1E</Color>
+            <Color x:Key="SettingsInfoBackgroundColor">#1E3A5F</Color>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- =========================== -->
+    <!-- テーマに依存するブラシ       -->
+    <!-- =========================== -->
+    <SolidColorBrush x:Key="SettingsSidebarBackground" Color="{DynamicResource SettingsSidebarBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsContentBackground" Color="{DynamicResource SettingsContentBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsCardBackground" Color="{DynamicResource SettingsCardBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsHoverBackground" Color="{DynamicResource SettingsHoverColor}"/>
+    <SolidColorBrush x:Key="SettingsSelectedBackground" Color="{DynamicResource SettingsSelectedColor}"/>
+    <SolidColorBrush x:Key="SettingsBorderBrush" Color="{DynamicResource SettingsBorderColor}"/>
+    <SolidColorBrush x:Key="SettingsDividerBrush" Color="{DynamicResource SettingsDividerColor}"/>
+    <SolidColorBrush x:Key="SettingsTextPrimary" Color="{DynamicResource SettingsTextPrimaryColor}"/>
+    <SolidColorBrush x:Key="SettingsTextSecondary" Color="{DynamicResource SettingsTextSecondaryColor}"/>
+    <SolidColorBrush x:Key="SettingsTextMuted" Color="{DynamicResource SettingsTextMutedColor}"/>
+    <SolidColorBrush x:Key="SettingsSuccessBackground" Color="{DynamicResource SettingsSuccessBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsWarningBackground" Color="{DynamicResource SettingsWarningBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsErrorBackground" Color="{DynamicResource SettingsErrorBackgroundColor}"/>
+    <SolidColorBrush x:Key="SettingsInfoBackground" Color="{DynamicResource SettingsInfoBackgroundColor}"/>
+
+    <!-- =========================== -->
+    <!-- テーマに依存しないカラー     -->
     <!-- =========================== -->
 
-    <!-- サイドバー背景 -->
-    <Color x:Key="SettingsSidebarBackgroundColor">#F2F3F5</Color>
-    <SolidColorBrush x:Key="SettingsSidebarBackground" Color="{StaticResource SettingsSidebarBackgroundColor}"/>
-
-    <!-- コンテンツ背景 -->
-    <Color x:Key="SettingsContentBackgroundColor">#FFFFFF</Color>
-    <SolidColorBrush x:Key="SettingsContentBackground" Color="{StaticResource SettingsContentBackgroundColor}"/>
-
-    <!-- カード背景 -->
-    <Color x:Key="SettingsCardBackgroundColor">#F8F9FA</Color>
-    <SolidColorBrush x:Key="SettingsCardBackground" Color="{StaticResource SettingsCardBackgroundColor}"/>
-
-    <!-- ホバー状態 -->
-    <Color x:Key="SettingsHoverColor">#E3E5E8</Color>
-    <SolidColorBrush x:Key="SettingsHoverBackground" Color="{StaticResource SettingsHoverColor}"/>
-
-    <!-- 選択状態 -->
-    <Color x:Key="SettingsSelectedColor">#E0E7FF</Color>
-    <SolidColorBrush x:Key="SettingsSelectedBackground" Color="{StaticResource SettingsSelectedColor}"/>
-
-    <!-- ボーダー -->
-    <Color x:Key="SettingsBorderColor">#E5E7EB</Color>
-    <SolidColorBrush x:Key="SettingsBorderBrush" Color="{StaticResource SettingsBorderColor}"/>
-
-    <!-- 区切り線 -->
-    <Color x:Key="SettingsDividerColor">#E5E7EB</Color>
-    <SolidColorBrush x:Key="SettingsDividerBrush" Color="{StaticResource SettingsDividerColor}"/>
-
-    <!-- テキストカラー -->
-    <Color x:Key="SettingsTextPrimaryColor">#111827</Color>
-    <SolidColorBrush x:Key="SettingsTextPrimary" Color="{StaticResource SettingsTextPrimaryColor}"/>
-
-    <Color x:Key="SettingsTextSecondaryColor">#6B7280</Color>
-    <SolidColorBrush x:Key="SettingsTextSecondary" Color="{StaticResource SettingsTextSecondaryColor}"/>
-
-    <Color x:Key="SettingsTextMutedColor">#9CA3AF</Color>
-    <SolidColorBrush x:Key="SettingsTextMuted" Color="{StaticResource SettingsTextMutedColor}"/>
-
-    <!-- アクセントカラー -->
+    <!-- アクセントカラー (テーマ共通) -->
     <Color x:Key="SettingsAccentColor">#5865F2</Color>
     <SolidColorBrush x:Key="SettingsAccentBrush" Color="{StaticResource SettingsAccentColor}"/>
 
     <Color x:Key="SettingsAccentHoverColor">#4752C4</Color>
     <SolidColorBrush x:Key="SettingsAccentHoverBrush" Color="{StaticResource SettingsAccentHoverColor}"/>
 
-    <!-- ステータスカラー -->
+    <!-- ステータスカラー (テーマ共通) -->
     <Color x:Key="SettingsSuccessColor">#10B981</Color>
     <SolidColorBrush x:Key="SettingsSuccessBrush" Color="{StaticResource SettingsSuccessColor}"/>
-    <Color x:Key="SettingsSuccessBackgroundColor">#D1FAE5</Color>
-    <SolidColorBrush x:Key="SettingsSuccessBackground" Color="{StaticResource SettingsSuccessBackgroundColor}"/>
 
     <Color x:Key="SettingsWarningColor">#F59E0B</Color>
     <SolidColorBrush x:Key="SettingsWarningBrush" Color="{StaticResource SettingsWarningColor}"/>
-    <Color x:Key="SettingsWarningBackgroundColor">#FEF3C7</Color>
-    <SolidColorBrush x:Key="SettingsWarningBackground" Color="{StaticResource SettingsWarningBackgroundColor}"/>
 
     <Color x:Key="SettingsErrorColor">#EF4444</Color>
     <SolidColorBrush x:Key="SettingsErrorBrush" Color="{StaticResource SettingsErrorColor}"/>
-    <Color x:Key="SettingsErrorBackgroundColor">#FEE2E2</Color>
-    <SolidColorBrush x:Key="SettingsErrorBackground" Color="{StaticResource SettingsErrorBackgroundColor}"/>
 
     <Color x:Key="SettingsInfoColor">#3B82F6</Color>
     <SolidColorBrush x:Key="SettingsInfoBrush" Color="{StaticResource SettingsInfoColor}"/>
-    <Color x:Key="SettingsInfoBackgroundColor">#EBF5FF</Color>
-    <SolidColorBrush x:Key="SettingsInfoBackground" Color="{StaticResource SettingsInfoBackgroundColor}"/>
 
     <!-- =========================== -->
     <!-- スペーシングスケール          -->
