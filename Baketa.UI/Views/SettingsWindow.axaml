@@ -86,11 +86,11 @@
             
             <!-- 設定コンテンツエリア -->
             <Border Grid.Column="1" Background="{DynamicResource BackgroundBrush}">
-                <ScrollViewer Classes="settings-content" 
+                <ScrollViewer Classes="settings-content"
                               VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <ContentControl Content="{Binding SelectedCategory.Content}"
-                                    Margin="0,0,0,20"/>
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="0,0,0,20">
+                    <ContentControl Content="{Binding SelectedCategory.Content}"/>
                 </ScrollViewer>
             </Border>
         </Grid>

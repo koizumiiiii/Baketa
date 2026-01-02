@@ -13,6 +13,8 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="/Resources/FluentIcons.axaml"/>
                 <ResourceInclude Source="/Resources/FontResources.axaml"/>
+                <!-- #245: 設定画面デザイントークン -->
+                <ResourceInclude Source="/Styles/SettingsDesignTokens.axaml"/>
             </ResourceDictionary.MergedDictionaries>
             
             <!-- Converters -->
@@ -30,6 +32,8 @@
         <StyleInclude Source="/Styles/MainOverlayStyles.axaml"/>
         <!-- 🔥 [ISSUE#164] ボタンスタイル -->
         <StyleInclude Source="/Styles/ButtonStyles.axaml"/>
+        <!-- #245: 設定画面スタイル -->
+        <StyleInclude Source="/Styles/SettingsStyles.axaml"/>
 
     </Application.Styles>
 </Application>

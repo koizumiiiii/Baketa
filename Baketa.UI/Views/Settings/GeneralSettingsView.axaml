@@ -13,8 +13,7 @@
         </Border>
     </Design.PreviewWith>
 
-    <ScrollViewer>
-        <StackPanel Margin="20" Spacing="20">
+        <StackPanel Margin="20,20,20,40" Spacing="20">
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
                 <TextBlock Text="{local:Localize Settings_General_Title}" FontSize="20" FontWeight="SemiBold"/>
@@ -142,5 +141,4 @@
                 </controls:SettingsItem>
             </StackPanel>
         </StackPanel>
-    </ScrollViewer>
 </UserControl>

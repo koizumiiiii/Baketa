@@ -10,7 +10,6 @@
         Title="Baketa Overlay"
         SizeToContent="WidthAndHeight"
         MaxWidth="200"
-        MaxHeight="600"
         WindowStartupLocation="Manual"
         ShowInTaskbar="False"
         Topmost="True"
@@ -109,6 +108,18 @@
     <Style Selector="Button.menu-item:disabled:hover">
       <Setter Property="Background" Value="Transparent"/>
     </Style>
+
+    <!-- ドラッグハンドルスタイル (#246) -->
+    <Style Selector="Border.drag-handle">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Cursor" Value="SizeAll"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="Padding" Value="4"/>
+    </Style>
+
+    <Style Selector="Border.drag-handle:pointerover">
+      <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+    </Style>
   </Window.Styles>
 
   <!-- メインコンテナ -->
@@ -124,10 +135,33 @@
           Padding="4"
           IsVisible="{Binding !IsCollapsed}">
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                  VerticalScrollBarVisibility="Auto">
       <StackPanel Orientation="Vertical" Spacing="2">
-      
+
+      <!-- ドラッグハンドル (#246) -->
+      <Border Classes="drag-handle"
+              Name="DragHandle"
+              CornerRadius="4"
+              Margin="4,4,4,2"
+              Height="20"
+              ToolTip.Tip="{local:Localize MainOverlay_DragToMove}"
+              PointerPressed="OnDragHandlePointerPressed">
+        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+          <!-- 6ドットグリップパターン (⋮⋮) -->
+          <StackPanel Orientation="Horizontal" Spacing="3">
+            <StackPanel Orientation="Vertical" Spacing="2">
+              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Spacing="2">
+              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="3" Height="3" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Border>
+
       <!-- 最小化ボタン - ウィンドウ選択後のみ表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Minテキスト削除、アイコンサイズをexpandと統一（16px） -->
       <Button Classes="minimize-button"
@@ -283,7 +317,6 @@
       </Button>
 
     </StackPanel>
-    </ScrollViewer>
   </Border>
 
   <!-- 最小化状態 -->
@@ -299,6 +332,31 @@
           IsVisible="{Binding IsCollapsed}">
 
     <StackPanel Orientation="Vertical" Spacing="0">
+      <!-- ドラッグハンドル（縮小時） (#246) -->
+      <Border Classes="drag-handle"
+              Name="CollapsedDragHandle"
+              CornerRadius="4"
+              Margin="2,2,2,0"
+              Height="16"
+              ToolTip.Tip="{local:Localize MainOverlay_DragToMove}"
+              PointerPressed="OnDragHandlePointerPressed">
+        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+          <!-- 6ドットグリップパターン (⋮⋮) - 縮小版 -->
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <StackPanel Orientation="Vertical" Spacing="1">
+              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Spacing="1">
+              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+              <Ellipse Width="2" Height="2" Fill="{StaticResource IconBrush}" Opacity="0.5"/>
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Border>
+
       <!-- 展開ボタン -->
       <Button Classes="minimize-button"
               Command="{Binding FoldCommand}"

@@ -145,6 +145,9 @@
   <data name="MainOverlay_Exit" xml:space="preserve">
     <value>終了</value>
   </data>
+  <data name="MainOverlay_DragToMove" xml:space="preserve">
+    <value>ドラッグして移動</value>
+  </data>
   <data name="MainOverlay_Expand" xml:space="preserve">
     <value>展開</value>
   </data>
@@ -1227,6 +1230,38 @@
   </data>
   <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
     <value>今月のCloud AIトークン上限に達しました。ローカル翻訳に自動切替します。</value>
+  </data>
+
+  <!-- [Issue #245] Window Selection Dialog -->
+  <data name="WindowSelection_Title" xml:space="preserve">
+    <value>ウィンドウ選択</value>
+  </data>
+  <data name="WindowSelection_Header" xml:space="preserve">
+    <value>翻訳対象ウィンドウを選択</value>
+  </data>
+  <data name="WindowSelection_Subtitle" xml:space="preserve">
+    <value>翻訳を開始するアプリケーションウィンドウを選択してください（最小化されているものも含む）</value>
+  </data>
+  <data name="WindowSelection_Refresh" xml:space="preserve">
+    <value>ウィンドウリストを更新</value>
+  </data>
+  <data name="WindowSelection_Searching" xml:space="preserve">
+    <value>ウィンドウを検索中...</value>
+  </data>
+  <data name="WindowSelection_NoWindows" xml:space="preserve">
+    <value>利用可能なウィンドウが見つかりません</value>
+  </data>
+  <data name="WindowSelection_Minimized" xml:space="preserve">
+    <value>最小化</value>
+  </data>
+  <data name="WindowSelection_Cancel" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="WindowSelection_Select" xml:space="preserve">
+    <value>選択</value>
+  </data>
+  <data name="WindowSelection_Update" xml:space="preserve">
+    <value>更新</value>
   </data>
 
 </root>

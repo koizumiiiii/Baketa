@@ -4,10 +4,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Baketa.UI.ViewModels"
         xmlns:converters="using:Baketa.UI.Converters"
+        xmlns:local="using:Baketa.UI.Extensions"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
         x:Class="Baketa.UI.Views.WindowSelectionDialogView"
         x:DataType="vm:WindowSelectionDialogViewModel"
-        Title="ウィンドウ選択"
+        Title="{local:Localize WindowSelection_Title}"
         Width="800"
         Height="600"
         WindowStartupLocation="CenterScreen"
@@ -20,21 +21,17 @@
     <converters:Base64ToImageConverter x:Key="Base64ToImageConverter"/>
     <converters:StringNotNullToBoolConverter x:Key="StringNotNullToBoolConverter"/>
     <converters:StringNullToBoolConverter x:Key="StringNullToBoolConverter"/>
+
+    <!-- #245: デザイントークンを使用したカラーリソース -->
+    <SolidColorBrush x:Key="DialogBackgroundBrush" Color="{StaticResource SettingsSidebarBackgroundColor}"/>
+    <SolidColorBrush x:Key="WindowItemBackgroundBrush" Color="{StaticResource SettingsContentBackgroundColor}"/>
+    <SolidColorBrush x:Key="WindowItemBorderBrush" Color="{StaticResource SettingsBorderColor}"/>
+    <SolidColorBrush x:Key="WindowItemHoverBrush" Color="{StaticResource SettingsSelectedColor}"/>
+    <SolidColorBrush x:Key="WindowItemSelectedBrush" Color="{StaticResource SettingsSelectedColor}"/>
+    <SolidColorBrush x:Key="ButtonPrimaryBrush" Color="{StaticResource SettingsAccentColor}"/>
+    <SolidColorBrush x:Key="ButtonSecondaryBrush" Color="{StaticResource SettingsCardBackgroundColor}"/>
     
-    <!-- カラーリソース -->
-    <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#F3F3F3"/>
-    <SolidColorBrush x:Key="WindowItemBackgroundBrush" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="WindowItemBorderBrush" Color="#E0E0E0"/>
-    <SolidColorBrush x:Key="WindowItemHoverBrush" Color="#E3F2FD"/>
-    <SolidColorBrush x:Key="WindowItemSelectedBrush" Color="#BBDEFB"/>
-    <SolidColorBrush x:Key="ButtonPrimaryBrush" Color="#0078D4"/>
-    <SolidColorBrush x:Key="ButtonSecondaryBrush" Color="#F0F0F0"/>
-    
-    <!-- アイコン -->
-    <StreamGeometry x:Key="RefreshIcon">M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z</StreamGeometry>
-    <StreamGeometry x:Key="WindowIcon">M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V10H20V6H4M4,18H8V12H4V18M10,18H20V12H10V18Z</StreamGeometry>
-    <StreamGeometry x:Key="MinimizedIcon">M3,11H21V13H3V11Z</StreamGeometry>
-    <StreamGeometry x:Key="VisibleIcon">M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z</StreamGeometry>
+    <!-- アイコンはFluentIcons.axamlからグローバル参照 -->
   </Window.Resources>
 
   <Window.Styles>
@@ -54,22 +51,22 @@
     <!-- ホバー状態 -->
     <Style Selector="Border.WindowItem:pointerover">
       <Setter Property="Background" Value="{StaticResource WindowItemHoverBrush}"/>
-      <Setter Property="BorderBrush" Value="#0078D4"/>
+      <Setter Property="BorderBrush" Value="{StaticResource SettingsAccentBrush}"/>
       <Setter Property="BorderThickness" Value="2"/>
     </Style>
 
     <!-- 押下状態 -->
     <Style Selector="Border.WindowItem:pressed">
       <Setter Property="Background" Value="{StaticResource WindowItemSelectedBrush}"/>
-      <Setter Property="BorderBrush" Value="#0078D4"/>
+      <Setter Property="BorderBrush" Value="{StaticResource SettingsAccentBrush}"/>
       <Setter Property="BorderThickness" Value="2"/>
     </Style>
 
     <!-- 選択済み状態（最優先） -->
     <Style Selector="Border.WindowItem.IsCurrentlySelected">
-      <Setter Property="BorderBrush" Value="#28A745"/>
+      <Setter Property="BorderBrush" Value="{StaticResource SettingsSuccessBrush}"/>
       <Setter Property="BorderThickness" Value="3"/>
-      <Setter Property="Background" Value="#E8F5E9"/>
+      <Setter Property="Background" Value="{StaticResource SettingsSuccessBackground}"/>
     </Style>
   </Window.Styles>
 
@@ -81,10 +78,10 @@
     </Grid.RowDefinitions>
 
     <!-- ヘッダー -->
-    <Border Grid.Row="0" 
-            Background="White" 
-            BorderBrush="{StaticResource WindowItemBorderBrush}" 
-            BorderThickness="0,0,0,1" 
+    <Border Grid.Row="0"
+            Background="{StaticResource SettingsContentBackground}"
+            BorderBrush="{StaticResource WindowItemBorderBrush}"
+            BorderThickness="0,0,0,1"
             Padding="20">
       <Grid>
         <Grid.ColumnDefinitions>
@@ -93,37 +90,37 @@
         </Grid.ColumnDefinitions>
         
         <StackPanel Grid.Column="0">
-          <TextBlock Text="翻訳対象ウィンドウを選択"
+          <TextBlock Text="{local:Localize WindowSelection_Header}"
                      FontSize="18"
                      FontWeight="Medium"
-                     Foreground="#1F1F1F"/>
-          <TextBlock Text="翻訳を開始するアプリケーションウィンドウを選択してください（最小化されているものも含む）"
+                     Foreground="{StaticResource SettingsTextPrimary}"/>
+          <TextBlock Text="{local:Localize WindowSelection_Subtitle}"
                      FontSize="12"
-                     Foreground="#606060"
+                     Foreground="{StaticResource SettingsTextSecondary}"
                      Margin="0,4,0,0"/>
         </StackPanel>
         
         <Button Grid.Column="1"
                 Width="40" Height="32"
-                Background="#F0F0F0"
-                BorderBrush="#D0D0D0"
+                Background="{StaticResource SettingsCardBackground}"
+                BorderBrush="{StaticResource SettingsBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6"
                 Command="{Binding RefreshCommand}"
-                ToolTip.Tip="ウィンドウリストを更新">
+                ToolTip.Tip="{local:Localize WindowSelection_Refresh}">
           <Button.Styles>
             <Style Selector="Button:pointerover">
-              <Setter Property="Background" Value="#E3F2FD"/>
-              <Setter Property="BorderBrush" Value="#0078D4"/>
+              <Setter Property="Background" Value="{StaticResource SettingsHoverBackground}"/>
+              <Setter Property="BorderBrush" Value="{StaticResource SettingsAccentBrush}"/>
             </Style>
             <Style Selector="Button:pressed">
-              <Setter Property="Background" Value="#BBDEFB"/>
-              <Setter Property="BorderBrush" Value="#0078D4"/>
+              <Setter Property="Background" Value="{StaticResource SettingsSelectedBackground}"/>
+              <Setter Property="BorderBrush" Value="{StaticResource SettingsAccentBrush}"/>
             </Style>
           </Button.Styles>
           <PathIcon Width="16" Height="16"
                     Data="{StaticResource RefreshIcon}"
-                    Foreground="#0078D4"/>
+                    Foreground="{StaticResource SettingsAccentBrush}"/>
         </Button>
       </Grid>
     </Border>
@@ -138,12 +135,12 @@
         <StackPanel IsVisible="{Binding IsLoading}"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
-          <ProgressBar IsIndeterminate="True" 
-                       Width="200" 
+          <ProgressBar IsIndeterminate="True"
+                       Width="200"
                        Height="4"/>
-          <TextBlock Text="ウィンドウを検索中..."
+          <TextBlock Text="{local:Localize WindowSelection_Searching}"
                      FontSize="14"
-                     Foreground="#606060"
+                     Foreground="{StaticResource SettingsTextSecondary}"
                      HorizontalAlignment="Center"
                      Margin="0,10,0,0"/>
         </StackPanel>
@@ -176,7 +173,7 @@
                   <!-- サムネイルと選択状態 -->
                   <Grid Grid.Row="0">
                     <Border Width="120" Height="80"
-                            Background="#F0F0F0"
+                            Background="{StaticResource SettingsCardBackground}"
                             CornerRadius="6"
                             HorizontalAlignment="Center"
                             ClipToBounds="True">
@@ -188,15 +185,15 @@
                         
                         <!-- フォールバックアイコン -->
                         <PathIcon Width="24" Height="24"
-                                  Data="{StaticResource WindowIcon}"
-                                  Foreground="#606060"
+                                  Data="{StaticResource WindowThumbnailIcon}"
+                                  Foreground="{StaticResource SettingsTextMuted}"
                                   IsVisible="{Binding ThumbnailBase64, Converter={StaticResource StringNullToBoolConverter}}"/>
                       </Grid>
                     </Border>
                     
                     <!-- 選択状態インジケーター - UltraThink修正版: 複雑バインディングを安全化 -->
                     <Ellipse Width="16" Height="16"
-                             Fill="#0078D4"
+                             Fill="{StaticResource SettingsAccentBrush}"
                              HorizontalAlignment="Right"
                              VerticalAlignment="Top"
                              Margin="0,-4,-4,0"
@@ -211,7 +208,7 @@
                     <TextBlock Text="{Binding Title}"
                                FontSize="12"
                                FontWeight="Medium"
-                               Foreground="#1F1F1F"
+                               Foreground="{StaticResource SettingsTextPrimary}"
                                TextTrimming="CharacterEllipsis"
                                TextWrapping="Wrap"
                                MaxLines="2"
@@ -225,13 +222,13 @@
                     <!-- 最小化状態のみ表示 -->
                     <Border CornerRadius="10"
                             Padding="8,2"
-                            Background="#F0AD00"
+                            Background="{StaticResource SettingsWarningBrush}"
                             IsVisible="{Binding IsMinimized}">
                       <StackPanel Orientation="Horizontal" Spacing="4">
                         <PathIcon Width="8" Height="8"
                                   Data="{StaticResource MinimizedIcon}"
                                   Foreground="White"/>
-                        <TextBlock Text="最小化"
+                        <TextBlock Text="{local:Localize WindowSelection_Minimized}"
                                    FontSize="10"
                                    Foreground="White"
                                    FontWeight="Medium"/>
@@ -249,11 +246,11 @@
                     IsVisible="False"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
-          <TextBlock Text="利用可能なウィンドウが見つかりません"
+          <TextBlock Text="{local:Localize WindowSelection_NoWindows}"
                      FontSize="14"
-                     Foreground="#606060"
+                     Foreground="{StaticResource SettingsTextSecondary}"
                      HorizontalAlignment="Center"/>
-          <Button Content="更新"
+          <Button Content="{local:Localize WindowSelection_Update}"
                   Command="{Binding RefreshCommand}"
                   Margin="0,10,0,0"
                   HorizontalAlignment="Center"/>
@@ -262,21 +259,21 @@
     </ScrollViewer>
 
     <!-- フッター -->
-    <Border Grid.Row="2" 
-            Background="White" 
-            BorderBrush="{StaticResource WindowItemBorderBrush}" 
-            BorderThickness="0,1,0,0" 
+    <Border Grid.Row="2"
+            Background="{StaticResource SettingsContentBackground}"
+            BorderBrush="{StaticResource WindowItemBorderBrush}"
+            BorderThickness="0,1,0,0"
             Padding="20">
-      <StackPanel Orientation="Horizontal" 
-                  HorizontalAlignment="Right" 
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Right"
                   Spacing="12">
-        <Button Content="キャンセル"
+        <Button Content="{local:Localize WindowSelection_Cancel}"
                 Width="100" Height="32"
                 Background="{StaticResource ButtonSecondaryBrush}"
-                Foreground="#1F1F1F"
+                Foreground="{StaticResource SettingsTextPrimary}"
                 Command="{Binding CancelCommand}"/>
         <!-- 🔥 [ISSUE#225] CommandParameterをSelectedWindowViewModel（WindowInfoViewModel型）に修正 -->
-        <Button Content="選択"
+        <Button Content="{local:Localize WindowSelection_Select}"
                 Width="100" Height="32"
                 Background="{StaticResource ButtonPrimaryBrush}"
                 Foreground="White"
