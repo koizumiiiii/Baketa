@@ -378,6 +378,9 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
                 if (generalViewModel != null)
                 {
                     await generalViewModel.ApplyUiLanguageAsync().ConfigureAwait(false);
+
+                    // テーマを適用（保存後に実際にテーマを変更）
+                    generalViewModel.ApplySelectedTheme();
                 }
             }
             else
@@ -422,28 +425,24 @@ public sealed class SettingsWindowViewModel : UiFramework.ViewModelBase
     /// <summary>
     /// 変更をキャンセルして閉じます
     /// </summary>
-    private async Task CancelAsync()
+    private Task CancelAsync()
     {
-        if (await this._changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
-        {
-            StatusMessage = Strings.Settings_Status_Cancelled;
-            _logger?.LogInformation("設定の変更がキャンセルされました");
+        StatusMessage = Strings.Settings_Status_Cancelled;
+        _logger?.LogInformation("設定の変更がキャンセルされました");
 
-            // ウィンドウを閉じる
-            RequestClose();
-        }
+        // ウィンドウを閉じる
+        RequestClose();
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// 設定をリセットします
     /// </summary>
-    private async Task ResetAsync()
+    private Task ResetAsync()
     {
-        if (await this._changeTracker.ConfirmDiscardChangesAsync().ConfigureAwait(false))
-        {
-            // TODO: 設定のリセット処理を実装
-            StatusMessage = Strings.Settings_Status_Reset;
-        }
+        // TODO: 設定のリセット処理を実装
+        StatusMessage = Strings.Settings_Status_Reset;
+        return Task.CompletedTask;
     }
 
     #endregion

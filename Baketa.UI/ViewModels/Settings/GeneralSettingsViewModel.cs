@@ -370,19 +370,12 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
     /// <summary>
     /// 選択されたテーマ
+    /// テーマの実際の適用は保存時に行われます
     /// </summary>
     public UiTheme SelectedTheme
     {
         get => _selectedTheme;
-        set
-        {
-            var oldValue = _selectedTheme;
-            this.RaiseAndSetIfChanged(ref _selectedTheme, value);
-            if (oldValue != value)
-            {
-                ApplyTheme(value);
-            }
-        }
+        set => this.RaiseAndSetIfChanged(ref _selectedTheme, value);
     }
 
     /// <summary>
@@ -668,6 +661,14 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         {
             _logger?.LogError(ex, "無効なパスが指定されました: {LogPath}", logPath);
         }
+    }
+
+    /// <summary>
+    /// 現在選択されているテーマを適用します（保存時に呼び出される）
+    /// </summary>
+    public void ApplySelectedTheme()
+    {
+        ApplyTheme(SelectedTheme);
     }
 
     /// <summary>
