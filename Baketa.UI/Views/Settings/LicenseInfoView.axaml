@@ -176,13 +176,13 @@
             </StackPanel>
 
             <!-- Action Buttons -->
-            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left">
                 <Button Content="{local:Localize Settings_License_Refresh}"
                         Command="{Binding RefreshCommand}"
-                        Padding="24,12"/>
+                        Padding="16,8"/>
                 <Button Content="{local:Localize Settings_License_Upgrade}"
                         Command="{Binding ChangePlanCommand}"
-                        Padding="24,12"
+                        Padding="16,8"
                         Classes="accent"/>
             </StackPanel>
 

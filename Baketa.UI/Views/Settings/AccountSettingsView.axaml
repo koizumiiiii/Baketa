@@ -81,16 +81,15 @@
                 <!-- Account Actions Section -->
                 <StackPanel Spacing="12">
                     <TextBlock Text="{local:Localize Settings_Account_Actions}" FontSize="16" FontWeight="SemiBold"/>
-
-                    <controls:SettingsItem Title="{local:Localize Settings_Account_Logout}"
-                                           Description="{local:Localize Settings_Account_LogoutDescription}">
-                        <controls:SettingsItem.SettingContent>
-                            <Button Content="{local:Localize Settings_Account_Logout}"
-                                    Command="{Binding LogoutCommand}"
-                                    Classes="danger"
-                                    Width="100"/>
-                        </controls:SettingsItem.SettingContent>
-                    </controls:SettingsItem>
+                    <TextBlock Text="{local:Localize Settings_Account_LogoutDescription}"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap"/>
+                    <Button Content="{local:Localize Settings_Account_Logout}"
+                            Command="{Binding LogoutCommand}"
+                            Classes="danger"
+                            HorizontalAlignment="Left"
+                            Padding="16,8"/>
                 </StackPanel>
             </StackPanel>
 
