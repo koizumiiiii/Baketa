@@ -399,11 +399,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// プラン変更ページを外部ブラウザで開きます
+    /// プラン変更ページ（Patreon）を外部ブラウザで開きます
     /// </summary>
     private void OpenPlanChangePage()
     {
-        const string planChangeUrl = "https://koizumiiiii.github.io/Baketa/pages/pricing.html";
+        const string planChangeUrl = "https://patreon.com/baketa_translation";
 
         try
         {
