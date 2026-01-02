@@ -18,26 +18,59 @@
         </Border>
     </Design.PreviewWith>
 
-    <Window.Styles>
-        <!-- Signup window specific styles -->
-        <Style Selector="Button.oauth-button">
+    <Window.Resources>
+        <!-- OAuthボタン用のカスタムテーマ（Fluentテーマをオーバーライド） -->
+        <ControlTheme x:Key="OAuthButtonTheme" TargetType="Button">
             <Setter Property="Height" Value="48" />
             <Setter Property="Margin" Value="0,4" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Padding" Value="16,0" />
-            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Background" Value="White" />
+            <Setter Property="Foreground" Value="#333333" />
             <Setter Property="BorderBrush" Value="#E0E0E0" />
             <Setter Property="BorderThickness" Value="1" />
-        </Style>
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
 
-        <Style Selector="Button.oauth-button:pointerover">
-            <Setter Property="Background" Value="#FAFAFA" />
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
-        </Style>
-        
+            <!-- ホバー時: 透過効果 + アクセントボーダー -->
+            <Style Selector="^:pointerover">
+                <Setter Property="Opacity" Value="0.85" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+            </Style>
+
+            <!-- 押下時: より強い透過 -->
+            <Style Selector="^:pressed">
+                <Setter Property="Opacity" Value="0.7" />
+            </Style>
+
+            <!-- 無効時 -->
+            <Style Selector="^:disabled">
+                <Setter Property="Opacity" Value="0.5" />
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- Signup window specific styles -->
+
         <Style Selector="Button.primary-button">
             <Setter Property="Height" Value="44" />
             <Setter Property="Margin" Value="0,12,0,8" />
@@ -103,7 +136,7 @@
                     
                     <!-- OAuth Signup Buttons -->
                     <StackPanel Spacing="6">
-                        <Button Classes="oauth-button"
+                        <Button Theme="{StaticResource OAuthButtonTheme}"
                                 Command="{Binding SignupWithGoogleCommand}"
                                 IsEnabled="{Binding !IsLoading}">
                             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
@@ -114,7 +147,7 @@
                             </StackPanel>
                         </Button>
 
-                        <Button Classes="oauth-button"
+                        <Button Theme="{StaticResource OAuthButtonTheme}"
                                 Command="{Binding SignupWithDiscordCommand}"
                                 IsEnabled="{Binding !IsLoading}">
                             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
@@ -125,7 +158,7 @@
                             </StackPanel>
                         </Button>
 
-                        <Button Classes="oauth-button"
+                        <Button Theme="{StaticResource OAuthButtonTheme}"
                                 Command="{Binding SignupWithTwitchCommand}"
                                 IsEnabled="{Binding !IsLoading}">
                             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
