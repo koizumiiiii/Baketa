@@ -16,14 +16,14 @@
         <StackPanel Margin="20,20,20,40" Spacing="20">
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
-                <TextBlock Text="{local:Localize Settings_General_Title}" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_General_Title}" FontSize="20" FontWeight="Medium"/>
                 <TextBlock Text="{local:Localize Settings_General_Subtitle}"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
             <!-- 翻訳設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="{local:Localize Settings_General_Translation}" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_General_Translation}" FontSize="16" FontWeight="Medium"/>
 
                 <controls:SettingsItem Title="{local:Localize Settings_General_TranslationEngine}"
                                         Description="{local:Localize Settings_General_TranslationEngineDescription}">
@@ -55,7 +55,7 @@
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                                         <TextBlock Text="{Binding CloudUsageDisplay}"
                                                    FontSize="12"
-                                                   FontWeight="SemiBold"/>
+                                                   FontWeight="Medium"/>
                                         <TextBlock Text="{local:Localize Settings_General_CloudUsageTokens}"
                                                    FontSize="12"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
@@ -108,7 +108,7 @@
 
             <!-- 外観設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="{local:Localize Settings_General_Appearance}" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="{local:Localize Settings_General_Appearance}" FontSize="16" FontWeight="Medium"/>
 
                 <controls:SettingsItem Title="{local:Localize Settings_General_Theme}"
                                         Description="{local:Localize Settings_General_ThemeDescription}">

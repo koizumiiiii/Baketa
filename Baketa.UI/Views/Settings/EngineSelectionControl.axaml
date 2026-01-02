@@ -16,7 +16,7 @@
     <StackPanel Spacing="16">
       <!-- ヘッダー -->
       <TextBlock Text="翻訳エンジン選択" 
-                 FontWeight="SemiBold" 
+                 FontWeight="Medium" 
                  FontSize="16" />
 
       <!-- エンジン選択ラジオボタン -->

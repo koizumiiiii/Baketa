@@ -38,7 +38,7 @@
       <!-- タイトル -->
       <TextBlock Grid.Column="1" Grid.Row="0"
                  Name="TitleText"
-                 FontWeight="SemiBold"
+                 FontWeight="Medium"
                  FontSize="13"
                  TextWrapping="Wrap"
                  Foreground="#202020"/>

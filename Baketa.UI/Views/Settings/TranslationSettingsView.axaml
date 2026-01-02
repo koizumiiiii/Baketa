@@ -125,7 +125,7 @@
         <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="2" Classes="SettingsSummary">
           <StackPanel Spacing="16">
             <TextBlock Text="現在の設定サマリー" 
-                       FontWeight="SemiBold" 
+                       FontWeight="Medium" 
                        FontSize="16" />
 
             <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto">
@@ -139,7 +139,7 @@
               <TextBlock Grid.Column="0" Grid.Row="1" 
                          Text="{Binding CurrentSettings.SelectedEngine, Converter={x:Static converters:EngineToDisplayConverter.Instance}}" 
                          FontSize="13" 
-                         FontWeight="SemiBold"
+                         FontWeight="Medium"
                          Margin="0,0,8,4" />
 
               <!-- 言語ペア -->
@@ -152,7 +152,7 @@
               <TextBlock Grid.Column="1" Grid.Row="1" 
                          Text="{Binding CurrentSettings.SelectedLanguagePair}" 
                          FontSize="13" 
-                         FontWeight="SemiBold"
+                         FontWeight="Medium"
                          Margin="8,0,8,4" />
 
               <!-- 翻訳戦略 -->
@@ -165,7 +165,7 @@
               <TextBlock Grid.Column="2" Grid.Row="1" 
                          Text="{Binding CurrentSettings.SelectedStrategy, Converter={x:Static converters:StrategyToDisplayConverter.Instance}}" 
                          FontSize="13" 
-                         FontWeight="SemiBold"
+                         FontWeight="Medium"
                          Margin="8,0,8,4" />
 
               <!-- 中国語変種 -->
@@ -178,7 +178,7 @@
               <TextBlock Grid.Column="3" Grid.Row="1" 
                          Text="{Binding CurrentSettings.SelectedChineseVariant, Converter={x:Static converters:ChineseVariantToDisplayConverter.Instance}}" 
                          FontSize="13" 
-                         FontWeight="SemiBold"
+                         FontWeight="Medium"
                          Margin="8,0,0,4" />
 
               <!-- フォールバック -->
@@ -191,7 +191,7 @@
               <TextBlock Grid.Column="0" Grid.Row="3" 
                          Text="{Binding CurrentSettings.EnableFallback, Converter={x:Static converters:BoolToEnabledConverter.Instance}}" 
                          FontSize="13" 
-                         FontWeight="SemiBold"
+                         FontWeight="Medium"
                          Margin="0,0,8,0" />
 
               <!-- 最終保存 -->
@@ -204,7 +204,7 @@
               <TextBlock Grid.Column="1" Grid.Row="3" 
                          Text="{Binding CurrentSettings.LastSaved, StringFormat='{}{0:MM/dd HH:mm}'}" 
                          FontSize="13" 
-                         FontWeight="SemiBold"
+                         FontWeight="Medium"
                          Margin="8,0,8,0" />
 
               <!-- 変更状態 -->
@@ -217,7 +217,7 @@
               <TextBlock Grid.Column="2" Grid.Row="3" 
                          Text="{Binding CurrentSettings.HasChanges, Converter={x:Static converters:BoolToChangesConverter.Instance}}" 
                          FontSize="13" 
-                         FontWeight="SemiBold"
+                         FontWeight="Medium"
                          Margin="8,0,8,0" />
             </Grid>
           </StackPanel>

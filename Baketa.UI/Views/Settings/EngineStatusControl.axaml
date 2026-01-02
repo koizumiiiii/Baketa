@@ -17,7 +17,7 @@
       <!-- ヘッダー -->
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Text="エンジン状態" 
-                   FontWeight="SemiBold" 
+                   FontWeight="Medium" 
                    FontSize="16" />
         <Button Grid.Column="1" 
                 Classes="Icon"

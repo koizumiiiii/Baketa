@@ -175,6 +175,9 @@ public class LocalizationService : ILocalizationService, IDisposable
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 LocalizationManager.Instance.RefreshAllBindings();
+
+                // [Issue #245] 言語に応じてフォントを切り替え
+                UpdateFontForLanguage(cultureCode);
             });
 
             // オブザーバブルに変更を通知
@@ -195,6 +198,45 @@ public class LocalizationService : ILocalizationService, IDisposable
             Console.WriteLine($"[LocalizationService] CultureNotFoundException: {ex.Message}");
             _logger.LogError(ex, "Invalid culture code: {CultureCode}", cultureCode);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #245] 言語に応じてフォントを切り替えます
+    /// </summary>
+    /// <param name="cultureCode">言語コード</param>
+    private void UpdateFontForLanguage(string cultureCode)
+    {
+        try
+        {
+            var app = Avalonia.Application.Current;
+            if (app?.Resources == null) return;
+
+            // 言語コードに基づいて適切なフォントキーを選択
+            var fontKey = cultureCode switch
+            {
+                "ja" or "ja-JP" => "FontFamily.Japanese",
+                "en" or "en-US" => "FontFamily.English",
+                "zh" or "zh-CN" or "zh-Hans" => "FontFamily.Chinese",
+                _ => "FontFamily.Japanese" // デフォルトは日本語
+            };
+
+            // フォントリソースを取得
+            if (app.Resources.TryGetResource(fontKey, app.ActualThemeVariant, out var fontResource) &&
+                fontResource is Avalonia.Media.FontFamily fontFamily)
+            {
+                // DefaultFontFamilyを更新
+                app.Resources["DefaultFontFamily"] = fontFamily;
+                _logger.LogInformation("フォント切り替え: {FontKey} -> {FontFamily}", fontKey, fontFamily.Name);
+            }
+            else
+            {
+                _logger.LogWarning("フォントリソースが見つかりません: {FontKey}", fontKey);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "フォント切り替えエラー: {CultureCode}", cultureCode);
         }
     }
 

@@ -16,19 +16,19 @@
         <StackPanel Margin="20" Spacing="20">
             <!-- ヘッダー -->
             <StackPanel Spacing="8">
-                <TextBlock Text="拡張設定" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="拡張設定" FontSize="20" FontWeight="Medium"/>
                 <TextBlock Text="高度な機能とシステム最適化の詳細設定" 
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                 <Border Background="{DynamicResource SystemFillColorAttentionBrush}" 
                         CornerRadius="5" Padding="10" Margin="0,10,0,0">
                     <TextBlock Text="⚠️ 警告: これらの設定は上級ユーザー向けです。変更すると予期しない動作が発生する可能性があります。" 
-                               FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCriticalBrush}"/>
+                               FontWeight="Medium" Foreground="{DynamicResource SystemFillColorCriticalBrush}"/>
                 </Border>
             </StackPanel>
 
             <!-- 基本最適化設定 -->
             <StackPanel Spacing="12">
-                <TextBlock Text="基本最適化設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="基本最適化設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="高度な設定を有効化"
                                         Description="高度な設定とオプションを有効にします"
@@ -66,7 +66,7 @@
 
             <!-- CPU/プロセス設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="CPU・プロセス設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="CPU・プロセス設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="CPU親和性マスク"
                                         Description="特定のCPUコアにプロセスを割り当てます（0=自動）">
@@ -111,7 +111,7 @@
 
             <!-- メモリ・バッファリング設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="メモリ・バッファリング設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="メモリ・バッファリング設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="バッファリング戦略"
                                         Description="メモリバッファリングの戦略">
@@ -134,7 +134,7 @@
 
             <!-- ネットワーク設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="ネットワーク設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="ネットワーク設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="ネットワークタイムアウト"
                                         Description="ネットワーク通信のタイムアウト時間">
@@ -165,7 +165,7 @@
 
             <!-- リトライ設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="リトライ設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="リトライ設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="リトライ戦略"
                                         Description="失敗時の再試行戦略">
@@ -207,7 +207,7 @@
 
             <!-- 統計・監視設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowAdvancedSettings}">
-                <TextBlock Text="統計・監視設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="統計・監視設定" FontSize="16" FontWeight="Medium"/>
                 
                 <controls:SettingsItem Title="統計情報収集"
                                         Description="パフォーマンス統計情報を収集します">
@@ -266,11 +266,11 @@
 
             <!-- 実験的・デバッグ設定 -->
             <StackPanel Spacing="12" IsVisible="{Binding ShowExperimentalSettings}">
-                <TextBlock Text="実験的機能・デバッグ設定" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="実験的機能・デバッグ設定" FontSize="16" FontWeight="Medium"/>
                 <Border Background="{DynamicResource SystemFillColorCriticalBrush}" 
                         CornerRadius="5" Padding="10" Margin="0,0,0,10">
                     <TextBlock Text="🚨 危険: これらの設定は開発者向けです。本番環境では使用しないでください。" 
-                               FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorOnCriticalBrush}"/>
+                               FontWeight="Medium" Foreground="{DynamicResource SystemFillColorOnCriticalBrush}"/>
                 </Border>
                 
                 <controls:SettingsItem Title="実験的機能"

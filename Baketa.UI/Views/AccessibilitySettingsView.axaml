@@ -6,14 +6,14 @@
   
   <ScrollViewer>
     <StackPanel Spacing="16" Margin="20">
-      <TextBlock Text="アクセシビリティ設定" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"
+      <TextBlock Text="アクセシビリティ設定" FontSize="18" FontWeight="Medium" Margin="0,0,0,12"
                  AutomationProperties.Name="アクセシビリティ設定見出し" />
       
       <!-- アニメーション制御 -->
       <Border Background="{DynamicResource CardBackground}" CornerRadius="4" Padding="16" 
               BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
         <StackPanel Spacing="16">
-          <TextBlock Text="アニメーションとトランジション" FontWeight="SemiBold" 
+          <TextBlock Text="アニメーションとトランジション" FontWeight="Medium" 
                      AutomationProperties.Name="アニメーション設定セクション" />
           
           <CheckBox Content="アニメーションを無効にする" IsChecked="{Binding DisableAnimations}" 
@@ -31,7 +31,7 @@
       <Border Background="{DynamicResource CardBackground}" CornerRadius="4" Padding="16"
               BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
         <StackPanel Spacing="16">
-          <TextBlock Text="表示設定" FontWeight="SemiBold"
+          <TextBlock Text="表示設定" FontWeight="Medium"
                      AutomationProperties.Name="表示設定セクション" />
           
           <CheckBox Content="ハイコントラストモードを使用" IsChecked="{Binding HighContrastMode}"
@@ -63,7 +63,7 @@
       <Border Background="{DynamicResource CardBackground}" CornerRadius="4" Padding="16"
               BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
         <StackPanel Spacing="16">
-          <TextBlock Text="キーボード操作設定" FontWeight="SemiBold"
+          <TextBlock Text="キーボード操作設定" FontWeight="Medium"
                      AutomationProperties.Name="キーボード操作設定セクション" />
           
           <CheckBox Content="キーボードフォーカスを常に表示" IsChecked="{Binding AlwaysShowKeyboardFocus}"

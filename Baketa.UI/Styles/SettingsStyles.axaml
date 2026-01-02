@@ -13,6 +13,7 @@
     <!-- 設定ウィンドウ全体のスタイル -->
     <Style Selector="Window.settings-window">
         <Setter Property="Background" Value="{DynamicResource SettingsContentBackground}"/>
+        <Setter Property="FontFamily" Value="{StaticResource SettingsFontFamily}"/>
     </Style>
 
     <!-- ナビゲーションヘッダー -->
@@ -123,9 +124,10 @@
     <!-- =========================== -->
 
     <!-- セクションタイトル -->
+    <!-- [Issue #245] FontWeight最大500（Medium）に制限 -->
     <Style Selector="TextBlock.settings-section-title">
         <Setter Property="FontSize" Value="{StaticResource SettingsFontSizeXl}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource SettingsTextPrimary}"/>
         <Setter Property="Margin" Value="0,0,0,8"/>
     </Style>

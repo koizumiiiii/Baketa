@@ -91,7 +91,7 @@
                            Width="48" Height="48"
                            HorizontalAlignment="Center"/>
                     <TextBlock Text="{local:Localize Auth_Signup_Title}"
-                               FontSize="20" FontWeight="SemiBold"
+                               FontSize="20" FontWeight="Medium"
                                HorizontalAlignment="Center"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </StackPanel>

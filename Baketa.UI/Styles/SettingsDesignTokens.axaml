@@ -8,6 +8,11 @@
     <!-- ============================================================ -->
 
     <!-- =========================== -->
+    <!-- フォント設定                 -->
+    <!-- =========================== -->
+    <FontFamily x:Key="SettingsFontFamily">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Yu Gothic UI, Meiryo UI, Segoe UI, sans-serif</FontFamily>
+
+    <!-- =========================== -->
     <!-- テーマ対応カラー             -->
     <!-- =========================== -->
     <ResourceDictionary.ThemeDictionaries>
@@ -155,14 +160,14 @@
     <!-- タイポグラフィスケール        -->
     <!-- =========================== -->
 
-    <!-- フォントサイズ -->
-    <sys:Double x:Key="SettingsFontSizeXs">10</sys:Double>
-    <sys:Double x:Key="SettingsFontSizeSm">12</sys:Double>
-    <sys:Double x:Key="SettingsFontSizeMd">14</sys:Double>
-    <sys:Double x:Key="SettingsFontSizeLg">16</sys:Double>
-    <sys:Double x:Key="SettingsFontSizeXl">18</sys:Double>
-    <sys:Double x:Key="SettingsFontSizeXxl">20</sys:Double>
-    <sys:Double x:Key="SettingsFontSizeTitle">24</sys:Double>
+    <!-- フォントサイズ [Issue #245] 視認性向上のため全体的に+1px -->
+    <sys:Double x:Key="SettingsFontSizeXs">11</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeSm">13</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeMd">15</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeLg">17</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeXl">19</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeXxl">21</sys:Double>
+    <sys:Double x:Key="SettingsFontSizeTitle">25</sys:Double>
 
     <!-- 行の高さ -->
     <sys:Double x:Key="SettingsLineHeightTight">1.25</sys:Double>

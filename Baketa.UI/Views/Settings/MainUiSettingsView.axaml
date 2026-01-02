@@ -23,7 +23,7 @@
             <!-- 基本設定セクション -->
             <StackPanel Classes="settings-section">
                 <TextBlock Text="表示設定" 
-                           FontSize="16" FontWeight="SemiBold" 
+                           FontSize="16" FontWeight="Medium" 
                            Foreground="{DynamicResource TextPrimaryBrush}"
                            Margin="0,0,0,12"/>
 
@@ -70,7 +70,7 @@
             <!-- 操作設定セクション -->
             <StackPanel Classes="settings-section">
                 <TextBlock Text="操作設定" 
-                           FontSize="16" FontWeight="SemiBold" 
+                           FontSize="16" FontWeight="Medium" 
                            Foreground="{DynamicResource TextPrimaryBrush}"
                            Margin="0,0,0,12"/>
 
@@ -115,7 +115,7 @@
             <!-- 詳細設定セクション（条件表示） -->
             <StackPanel Classes="settings-section" IsVisible="{Binding ShowAdvancedSettings}">
                 <TextBlock Text="詳細設定" 
-                           FontSize="16" FontWeight="SemiBold" 
+                           FontSize="16" FontWeight="Medium" 
                            Foreground="{DynamicResource TextPrimaryBrush}"
                            Margin="0,0,0,12"/>
 
@@ -175,7 +175,7 @@
             <!-- デバッグ設定セクション（条件表示） -->
             <StackPanel Classes="settings-section" IsVisible="{Binding ShowAdvancedSettings}">
                 <TextBlock Text="デバッグ設定" 
-                           FontSize="16" FontWeight="SemiBold" 
+                           FontSize="16" FontWeight="Medium" 
                            Foreground="{DynamicResource WarningBrush}"
                            Margin="0,0,0,12"/>
 
