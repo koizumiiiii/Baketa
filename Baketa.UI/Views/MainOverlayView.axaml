@@ -156,7 +156,7 @@
               AutomationProperties.Name="最小化ボタン"
               IsVisible="{Binding IsWindowSelected}">
         <PathIcon Width="16" Height="16"
-                  Data="{StaticResource CollapseIcon}"
+                  Data="{StaticResource ChevronUpIcon}"
                   Foreground="{DynamicResource OverlayIconBrush}"/>
       </Button>
       
@@ -184,6 +184,7 @@
       
       <!-- Live翻訳ボタン - ウィンドウ選択後のみ表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Start → Live翻訳 に変更、状態による表示制御 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
       <Button Classes="translation-mode-button"
               Classes.pulsing="{Binding IsLiveActive}"
               IsEnabled="{Binding IsLiveEnabled}"
@@ -193,9 +194,16 @@
               Name="StartStopButton"
               PointerPressed="StartStopButton_OnPointerPressed">
         <StackPanel Orientation="Vertical" Spacing="4">
-          <!-- 🔥 [ISSUE#164] ObservableAsPropertyHelperでIImage型を直接バインディング（ReactiveUIベストプラクティス） -->
-          <Image Width="20" Height="20"
-                 Source="{Binding LiveIconSource}" />
+          <Grid Width="20" Height="20">
+            <!-- 通常状態: 再生アイコン -->
+            <PathIcon Data="{StaticResource PlayIcon}"
+                      Foreground="{DynamicResource OverlayIconBrush}"
+                      IsVisible="{Binding !IsLiveActive}"/>
+            <!-- アクティブ状態: 停止アイコン（赤） -->
+            <PathIcon Data="{StaticResource StopIcon}"
+                      Foreground="{DynamicResource OverlayStatusErrorBrush}"
+                      IsVisible="{Binding IsLiveActive}"/>
+          </Grid>
           <TextBlock Text="{local:Localize MainOverlay_LiveTranslation}"
                      FontSize="10"
                      HorizontalAlignment="Center"
@@ -207,6 +215,7 @@
 
       <!-- Shot翻訳ボタン - ウィンドウ選択後のみ表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Shot → Shot翻訳 に変更、状態による表示制御 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
       <Button Classes="translation-mode-button"
               Classes.pulsing="{Binding IsSingleshotActive}"
               IsEnabled="{Binding IsSingleshotEnabled}"
@@ -215,9 +224,16 @@
               ToolTip.Tip="{Binding SingleshotButtonTooltip}"
               Name="SingleshotButton">
         <StackPanel Orientation="Vertical" Spacing="4">
-          <!-- 🔥 [ISSUE#164] ObservableAsPropertyHelperでIImage型を直接バインディング（ReactiveUIベストプラクティス） -->
-          <Image Width="20" Height="20"
-                 Source="{Binding SingleshotIconSource}" />
+          <Grid Width="20" Height="20">
+            <!-- 通常状態: カメラアイコン -->
+            <PathIcon Data="{StaticResource CameraIcon}"
+                      Foreground="{DynamicResource OverlayIconBrush}"
+                      IsVisible="{Binding !IsSingleshotActive}"/>
+            <!-- アクティブ状態: カメラアイコン（赤） -->
+            <PathIcon Data="{StaticResource CameraIcon}"
+                      Foreground="{DynamicResource OverlayStatusErrorBrush}"
+                      IsVisible="{Binding IsSingleshotActive}"/>
+          </Grid>
           <TextBlock Text="{local:Localize MainOverlay_ShotTranslation}"
                      FontSize="10"
                      HorizontalAlignment="Center"
@@ -367,6 +383,7 @@
       </Button>
 
       <!-- Live翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
       <Button Classes="minimize-button"
               Command="{Binding StartStopCommand}"
               ToolTip.Tip="{Binding StartButtonTooltip}"
@@ -378,11 +395,18 @@
               Height="36"
               Margin="2"
               PointerPressed="StartStopButton_OnPointerPressed">
-        <Image Width="16" Height="16"
-               Source="{Binding LiveIconSource}"/>
+        <Grid Width="16" Height="16">
+          <PathIcon Data="{StaticResource PlayIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}"
+                    IsVisible="{Binding !IsLiveActive}"/>
+          <PathIcon Data="{StaticResource StopIcon}"
+                    Foreground="{DynamicResource OverlayStatusErrorBrush}"
+                    IsVisible="{Binding IsLiveActive}"/>
+        </Grid>
       </Button>
 
       <!-- Shot翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
       <Button Classes="minimize-button"
               Command="{Binding ExecuteSingleshotCommand}"
               ToolTip.Tip="{Binding SingleshotButtonTooltip}"
@@ -393,8 +417,14 @@
               Width="36"
               Height="36"
               Margin="2">
-        <Image Width="16" Height="16"
-               Source="{Binding SingleshotIconSource}"/>
+        <Grid Width="16" Height="16">
+          <PathIcon Data="{StaticResource CameraIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}"
+                    IsVisible="{Binding !IsSingleshotActive}"/>
+          <PathIcon Data="{StaticResource CameraIcon}"
+                    Foreground="{DynamicResource OverlayStatusErrorBrush}"
+                    IsVisible="{Binding IsSingleshotActive}"/>
+        </Grid>
       </Button>
 
       <!-- 翻訳表示ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
