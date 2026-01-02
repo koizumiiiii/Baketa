@@ -828,7 +828,7 @@
     <value>• Premia ($5/月): クラウドAI翻訳 800万トークン/月</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
-    <value>メールでログイン（オプション）</value>
+    <value>ログイン</value>
   </data>
   <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
     <value>同期中...</value>

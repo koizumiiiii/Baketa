@@ -828,7 +828,7 @@
     <value>• Premia ($5/month): Cloud AI translation 8M tokens/month</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
-    <value>Login with Email (Optional)</value>
+    <value>Login</value>
   </data>
   <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
     <value>Syncing...</value>
