@@ -677,6 +677,13 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// </summary>
     private void ApplyTheme(UiTheme theme)
     {
+        // UIスレッドで実行する必要がある
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyTheme(theme));
+            return;
+        }
+
         try
         {
             var app = Avalonia.Application.Current;

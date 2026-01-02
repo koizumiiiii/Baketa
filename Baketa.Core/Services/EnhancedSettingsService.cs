@@ -353,6 +353,7 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
                 try
                 {
                     await File.WriteAllTextAsync(_settingsFilePath, json).ConfigureAwait(false);
+                    _logger.LogDebug("設定ファイル保存成功: {FilePath}", _settingsFilePath);
                     break; // Success, exit retry loop
                 }
                 catch (IOException ex) when (attempt < maxRetries - 1 &&

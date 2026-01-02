@@ -302,23 +302,7 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         viewModel.StatusMessage.Should().Be(originalStatus);
     }
 
-    [Fact(Skip = "ハングアップ問題のため一時的に無効化")]
-    public async Task ResetCommand_WhenConfirmed_UpdatesStatusMessage()
-    {
-        // Arrange
-        _mockChangeTracker.Setup(x => x.ConfirmDiscardChangesAsync()).ReturnsAsync(true);
-        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockServiceProvider.Object, _mockChangeTracker.Object, _mockEventAggregator.Object, _mockSettingsService.Object, null, null, _mockLogger.Object));
-
-        // Act
-        await viewModel.ResetCommand.Execute().FirstAsync();
-
-        // Assert
-        viewModel.StatusMessage.Should().Be("設定をリセットしました");
-        _mockChangeTracker.Verify(x => x.ConfirmDiscardChangesAsync(), Times.Once);
-
-        // Cleanup
-        viewModel.Dispose();
-    }
+    // [Issue #245] ResetCommand削除によりテストも削除
 
     [Fact(Skip = "ハングアップ問題のため一時的に無効化")]
     public void CategoryContent_AllCategoriesHaveNullContentInTestEnvironment()
