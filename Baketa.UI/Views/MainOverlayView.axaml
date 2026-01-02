@@ -195,12 +195,12 @@
               PointerPressed="StartStopButton_OnPointerPressed">
         <StackPanel Orientation="Vertical" Spacing="4">
           <Grid Width="20" Height="20">
-            <!-- 通常状態: 再生アイコン -->
-            <PathIcon Data="{StaticResource PlayIcon}"
+            <!-- 通常状態: ビデオカメラアイコン -->
+            <PathIcon Data="{StaticResource VideoIcon}"
                       Foreground="{DynamicResource OverlayIconBrush}"
                       IsVisible="{Binding !IsLiveActive}"/>
-            <!-- アクティブ状態: 停止アイコン（赤） -->
-            <PathIcon Data="{StaticResource StopIcon}"
+            <!-- アクティブ状態: ビデオカメラアイコン（赤） -->
+            <PathIcon Data="{StaticResource VideoIcon}"
                       Foreground="{DynamicResource OverlayStatusErrorBrush}"
                       IsVisible="{Binding IsLiveActive}"/>
           </Grid>
@@ -396,10 +396,10 @@
               Margin="2"
               PointerPressed="StartStopButton_OnPointerPressed">
         <Grid Width="16" Height="16">
-          <PathIcon Data="{StaticResource PlayIcon}"
+          <PathIcon Data="{StaticResource VideoIcon}"
                     Foreground="{DynamicResource OverlayIconBrush}"
                     IsVisible="{Binding !IsLiveActive}"/>
-          <PathIcon Data="{StaticResource StopIcon}"
+          <PathIcon Data="{StaticResource VideoIcon}"
                     Foreground="{DynamicResource OverlayStatusErrorBrush}"
                     IsVisible="{Binding IsLiveActive}"/>
         </Grid>
