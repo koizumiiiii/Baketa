@@ -29,10 +29,11 @@ using Baketa.UI.Framework.Events;
 
 namespace Baketa.UI;
 
-internal sealed partial class App : Avalonia.Application
+internal sealed partial class App : Avalonia.Application, IDisposable
 {
     private ILogger<App>? _logger;
     private IEventAggregator? _eventAggregator;
+    private bool _disposed;
 
     // アプリケーションアイコンのパス定数 (Issue #179)
     private const string BAKETA_ICON_PATH = "avares://Baketa/Assets/Icons/baketa.ico";
@@ -1071,6 +1072,22 @@ internal sealed partial class App : Avalonia.Application
             }
             catch { /* ログ出力失敗も無視 */ }
         }
+    }
+
+    /// <summary>
+    /// IDisposable実装 - CA1001対応
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _updateService?.Dispose();
+        _updateService = null;
+
+        _disposed = true;
     }
 
     // 以下、削除された元のコードを残す（削除済み部分）
