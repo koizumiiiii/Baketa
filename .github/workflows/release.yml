@@ -257,6 +257,58 @@ jobs:
         echo "- Package: $zipName" >> $env:GITHUB_STEP_SUMMARY
         echo "- Size: $size MB" >> $env:GITHUB_STEP_SUMMARY
 
+    # [Issue #249] Generate AppCast for auto-update
+    - name: Install NetSparkle AppCast Generator
+      run: |
+        Write-Host "📦 Installing NetSparkle AppCast Generator..."
+        dotnet tool install --global NetSparkleUpdater.Tools.AppCastGenerator
+        Write-Host "✅ AppCast Generator installed"
+      shell: pwsh
+
+    - name: Generate AppCast with Ed25519 signature
+      env:
+        SPARKLE_PRIVATE_KEY: ${{ secrets.NETSPARKLE_ED25519_PRIVATE_KEY }}
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $zipFile = "./publish/Baketa-$version.zip"
+        $downloadUrl = "https://github.com/koizumiiiii/Baketa/releases/download/v$version"
+
+        Write-Host "🔐 Generating AppCast with Ed25519 signature..."
+
+        # Check if private key is set
+        if ([string]::IsNullOrWhiteSpace($env:SPARKLE_PRIVATE_KEY)) {
+          Write-Host "⚠️ NETSPARKLE_ED25519_PRIVATE_KEY secret not set - skipping AppCast generation"
+          Write-Host "   To enable auto-update, add the secret to repository settings"
+          exit 0
+        }
+
+        # Create a dedicated directory for AppCast generation (zip only)
+        $appcastDir = "./appcast-build"
+        New-Item -ItemType Directory -Path $appcastDir -Force | Out-Null
+        Copy-Item $zipFile $appcastDir -Force
+
+        # Generate appcast.json
+        # Note: The tool uses SPARKLE_PRIVATE_KEY environment variable automatically
+        netsparkle-generate-appcast `
+          --binaries $appcastDir `
+          --appcast-output-directory ./publish `
+          --base-url $downloadUrl `
+          --output-type json `
+          --os windows `
+          --file-extract-version
+
+        # Verify generation
+        if (Test-Path "./publish/appcast.json") {
+          Write-Host "✅ appcast.json generated successfully"
+          Get-Content "./publish/appcast.json" | Write-Host
+          echo "## AppCast" >> $env:GITHUB_STEP_SUMMARY
+          echo "- appcast.json generated with Ed25519 signature" >> $env:GITHUB_STEP_SUMMARY
+        } else {
+          Write-Host "❌ Failed to generate appcast.json"
+          exit 1
+        }
+      shell: pwsh
+
     - name: Generate release notes
       run: |
         $version = "${{ steps.version.outputs.version }}"
@@ -269,6 +321,7 @@ jobs:
         | File | Description |
         |------|-------------|
         | ``Baketa-$version.zip`` | Main application (Windows x64, self-contained) |
+        | ``appcast.json`` | Auto-update manifest (for existing installations) |
 
         ### Installation
 
@@ -276,6 +329,13 @@ jobs:
         2. Extract to desired location
         3. Run ``Baketa.UI.exe``
         4. On first run, required components will be downloaded automatically from [Model Assets v1](https://github.com/koizumiiiii/Baketa/releases/tag/models-v1)
+
+        ### Auto-Update (New in this release!)
+
+        Baketa now supports automatic updates. When a new version is available:
+        - You'll see an update notification on startup
+        - Click to download and install the update automatically
+        - The application will restart with the new version
 
         ### Auto-Downloaded Components (from models-v1)
 
@@ -289,7 +349,7 @@ jobs:
         ### System Requirements
 
         - Windows 10/11 (x64)
-        - Internet connection (for first-time setup)
+        - Internet connection (for first-time setup and auto-updates)
         - ~4GB disk space (including auto-downloaded components)
         "@ | Out-File -FilePath "release_notes.md" -Encoding utf8
 
@@ -298,7 +358,9 @@ jobs:
       with:
         name: "Baketa ${{ steps.version.outputs.version }}"
         body_path: release_notes.md
-        files: ./publish/Baketa-${{ steps.version.outputs.version }}.zip
+        files: |
+          ./publish/Baketa-${{ steps.version.outputs.version }}.zip
+          ./publish/appcast.json
         prerelease: ${{ steps.version.outputs.is-prerelease == 'true' }}
         make_latest: ${{ steps.version.outputs.is-prerelease == 'false' }}
         fail_on_unmatched_files: false

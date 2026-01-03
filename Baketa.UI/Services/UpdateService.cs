@@ -16,11 +16,24 @@ namespace Baketa.UI.Services;
 /// </summary>
 public sealed class UpdateService : IDisposable, IAsyncDisposable
 {
-    // GitHub AppCast URL（リリース時に実際のURLに変更）
+    /// <summary>
+    /// GitHub AppCast URL
+    /// 自動アップデートのマニフェストファイル（release.ymlで自動生成）
+    /// </summary>
     private const string AppCastUrl = "https://github.com/koizumiiiii/Baketa/releases/latest/download/appcast.json";
 
-    // Ed25519 公開鍵（Phase 2で設定予定）
-    // CI/CDでキーペア生成後、この値を更新
+    /// <summary>
+    /// Ed25519 公開鍵（Base64エンコード）
+    ///
+    /// 設定手順:
+    /// 1. scripts/generate-update-keys.ps1 を実行してキーペアを生成
+    /// 2. 表示される PUBLIC KEY をここに貼り付け
+    /// 3. PRIVATE KEY は GitHub Secrets に NETSPARKLE_ED25519_PRIVATE_KEY として登録
+    ///
+    /// 空の場合:
+    /// - DEBUGビルド: 署名検証をスキップ（開発用）
+    /// - Releaseビルド: 例外をスロー（セキュリティ必須）
+    /// </summary>
     private const string Ed25519PublicKey = "";
 
     private readonly ILogger<UpdateService>? _logger;
