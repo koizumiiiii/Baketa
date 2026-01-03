@@ -33,6 +33,15 @@ public sealed partial class CrashReportService : ICrashReportService
     };
 
     /// <summary>
+    /// 静的HttpClient（Socket Exhaustion対策）
+    /// クラッシュレポート送信は低頻度のため、静的インスタンスで十分
+    /// </summary>
+    private static readonly HttpClient SharedHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(30)
+    };
+
+    /// <summary>
     /// CrashReportServiceを初期化
     /// </summary>
     /// <param name="logger">ロガー（オプション）</param>
@@ -266,17 +275,11 @@ public sealed partial class CrashReportService : ICrashReportService
     {
         try
         {
-            using var httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(30)
-            };
-
+            // 静的HttpClientを使用（Socket Exhaustion対策）
             // リクエストボディ作成
             var requestBody = new Dictionary<string, object?>
             {
-                ["report_id"] = Guid.TryParse(report.ReportId, out _)
-                    ? report.ReportId
-                    : Guid.NewGuid().ToString(), // UUID形式でなければ新規生成
+                ["report_id"] = report.ReportId, // UUID形式で生成済み
                 ["crash_timestamp"] = report.CrashedAt.ToString("O"),
                 ["error_message"] = report.Exception.Message,
                 ["stack_trace"] = report.Exception.StackTrace,
@@ -307,8 +310,8 @@ public sealed partial class CrashReportService : ICrashReportService
             var json = JsonSerializer.Serialize(requestBody, JsonOptions);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            // Relay ServerへPOST
-            var response = await httpClient.PostAsync(
+            // Relay ServerへPOST（静的HttpClient使用）
+            var response = await SharedHttpClient.PostAsync(
                 CrashReportEndpointUrl,
                 content,
                 cancellationToken).ConfigureAwait(false);
@@ -372,7 +375,8 @@ public sealed partial class CrashReportService : ICrashReportService
 
     private static string GenerateReportId()
     {
-        return $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}"[..24];
+        // UUID形式で生成（Cloudflare Worker側のバリデーションと一致）
+        return Guid.NewGuid().ToString();
     }
 
     private ExceptionInfo ExtractExceptionInfo(Exception exception)

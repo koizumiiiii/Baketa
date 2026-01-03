@@ -8,9 +8,11 @@
  * - レートリミット（IP単位で10件/分）
  *
  * セキュリティ:
- * - 認証不要（クラッシュ時はログインできない可能性があるため）
+ * - APIキー認証不要（クラッシュ時は設定ロード前の可能性があるため）
+ *   → index.tsでAPIキー検証前に呼び出される
  * - サイズ制限（ログは最大100KB）
- * - IPベースのレートリミット
+ * - IPベースのレートリミット（DoS対策）
+ * - Supabase RLS（service_roleのみ書き込み可能）
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
