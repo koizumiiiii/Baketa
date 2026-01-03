@@ -1296,6 +1296,29 @@
     <value>クラッシュ詳細</value>
   </data>
 
+  <!-- ========== Crash Report Settings [Issue #252] ========== -->
+  <data name="Settings_CrashReport_Title" xml:space="preserve">
+    <value>クラッシュレポート</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSend" xml:space="preserve">
+    <value>クラッシュレポートを自動送信</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSendDescription" xml:space="preserve">
+    <value>アプリケーションのクラッシュ時に確認ダイアログを表示せずに自動的にレポートを送信します</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>システム情報を含める</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfoDescription" xml:space="preserve">
+    <value>CPU、メモリ使用量などのシステム情報をレポートに含めます</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogs" xml:space="preserve">
+    <value>アプリログを含める</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogsDescription" xml:space="preserve">
+    <value>最近のアプリケーションログをレポートに含めます</value>
+  </data>
+
   <!-- ========== Update Dialog [Issue #249] ========== -->
   <data name="Update_WindowTitle" xml:space="preserve">
     <value>ソフトウェア更新</value>

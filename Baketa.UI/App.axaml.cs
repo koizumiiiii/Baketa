@@ -11,6 +11,7 @@ using Baketa.Application.Services;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
@@ -910,8 +911,58 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     }
 
     /// <summary>
+    /// [Issue #252 Phase 4] クラッシュレポート設定を取得
+    /// 設定ファイルから直接読み込み（DIコンテナに依存しない）
+    /// </summary>
+    private static CrashReportSettings GetCrashReportSettings()
+    {
+        try
+        {
+            var settingsFilePath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Baketa", "settings.json");
+
+            if (File.Exists(settingsFilePath))
+            {
+                var json = File.ReadAllText(settingsFilePath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+                if (doc.RootElement.TryGetProperty("CrashReport", out var crashReportElement))
+                {
+                    var settings = new CrashReportSettings();
+
+                    if (crashReportElement.TryGetProperty("AutoSendCrashReports", out var autoSendElement))
+                    {
+                        settings.AutoSendCrashReports = autoSendElement.GetBoolean();
+                    }
+
+                    if (crashReportElement.TryGetProperty("IncludeSystemInfo", out var systemInfoElement))
+                    {
+                        settings.IncludeSystemInfo = systemInfoElement.GetBoolean();
+                    }
+
+                    if (crashReportElement.TryGetProperty("IncludeLogs", out var logsElement))
+                    {
+                        settings.IncludeLogs = logsElement.GetBoolean();
+                    }
+
+                    Console.WriteLine($"[CRASH_DEBUG] 設定読み込み: AutoSend={settings.AutoSendCrashReports}, SystemInfo={settings.IncludeSystemInfo}, Logs={settings.IncludeLogs}");
+                    return settings;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CRASH_DEBUG] 設定読み込みエラー（デフォルト使用）: {ex.Message}");
+        }
+
+        // デフォルト設定を返す
+        return new CrashReportSettings();
+    }
+
+    /// <summary>
     /// [Issue #252] クラッシュレポート検出・ダイアログ表示
-    /// .crash_pendingフラグが存在する場合、ダイアログを表示してユーザーに送信を促す
+    /// .crash_pendingフラグが存在する場合、設定に応じて自動送信またはダイアログを表示
     /// </summary>
     private async Task CheckAndShowCrashReportDialogAsync(IServiceProvider serviceProvider)
     {
@@ -933,8 +984,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 return;
             }
 
-            Console.WriteLine("🚨 [CRASH_DEBUG] .crash_pending検出！ダイアログ表示開始");
-            _logger?.LogInformation("[Issue #252] 前回クラッシュを検出 - ダイアログ表示");
+            Console.WriteLine("🚨 [CRASH_DEBUG] .crash_pending検出！");
+            _logger?.LogInformation("[Issue #252] 前回クラッシュを検出");
 
             // 未送信のクラッシュレポートを取得
             var crashReports = await crashReportService.GetPendingCrashReportsAsync().ConfigureAwait(true);
@@ -947,75 +998,64 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
             Console.WriteLine($"📝 [CRASH_DEBUG] 未送信レポート: {crashReports.Count}件");
 
-            // ダイアログを表示
-            var viewModel = new ViewModels.CrashReportDialogViewModel(crashReports);
-            var dialog = new Views.CrashReportDialogWindow(viewModel);
+            // [Phase 4] 自動送信設定を確認
+            var crashReportSettings = GetCrashReportSettings();
 
-            // ダイアログアイコンを設定
-            try
+            if (crashReportSettings.AutoSendCrashReports)
             {
-                var iconUri = new Uri(BAKETA_ICON_PATH);
-                dialog.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(iconUri));
-            }
-            catch (Exception iconEx)
-            {
-                Console.WriteLine($"⚠️ クラッシュダイアログアイコン設定失敗: {iconEx.Message}");
-            }
+                // 自動送信モード：ダイアログなしで送信
+                Console.WriteLine("🤖 [CRASH_DEBUG] 自動送信モード - ダイアログをスキップ");
+                _logger?.LogInformation("[Issue #252] 自動送信モード - ダイアログなしでクラッシュレポートを送信");
 
-            // クラッシュダイアログは起動時に表示されるため、親ウィンドウは存在しない
-            // ShowDialogの代わりにShowを使用し、ユーザー操作完了をイベントで待機
-            dialog.Show();
-            var tcs = new System.Threading.Tasks.TaskCompletionSource<ViewModels.CrashReportDialogResult>();
-            dialog.Closed += (_, _) => tcs.TrySetResult(viewModel.Result);
-            var result = await tcs.Task.ConfigureAwait(true);
-
-            if (result == ViewModels.CrashReportDialogResult.Send)
-            {
-                Console.WriteLine("📤 [CRASH_DEBUG] ユーザーが送信を選択");
-                _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信を選択");
-
-                // [Phase 3] Cloudflare Workers経由でSupabaseに送信
-                var includeSystemInfo = viewModel.IncludeSystemInfo;
-                var includeLogs = viewModel.IncludeLogs;
-                var sentCount = 0;
-                var failedCount = 0;
-
-                foreach (var summary in crashReports)
-                {
-                    // レポート詳細を読み込み
-                    var fullReport = await crashReportService.LoadCrashReportAsync(summary.ReportId).ConfigureAwait(false);
-                    if (fullReport == null)
-                    {
-                        Console.WriteLine($"⚠️ [CRASH_DEBUG] レポート読み込み失敗: {summary.ReportId}");
-                        continue;
-                    }
-
-                    // サーバーに送信
-                    var success = await crashReportService.SendCrashReportAsync(
-                        fullReport,
-                        includeSystemInfo,
-                        includeLogs).ConfigureAwait(false);
-
-                    if (success)
-                    {
-                        await crashReportService.MarkReportAsSentAsync(summary.ReportId).ConfigureAwait(false);
-                        sentCount++;
-                        Console.WriteLine($"✅ [CRASH_DEBUG] レポート送信成功: {summary.ReportId}");
-                    }
-                    else
-                    {
-                        failedCount++;
-                        Console.WriteLine($"❌ [CRASH_DEBUG] レポート送信失敗: {summary.ReportId}");
-                    }
-                }
-
-                Console.WriteLine($"📊 [CRASH_DEBUG] 送信結果: 成功={sentCount}, 失敗={failedCount}");
-                _logger?.LogInformation("[Issue #252] クラッシュレポート送信完了: 成功={SentCount}, 失敗={FailedCount}", sentCount, failedCount);
+                await SendCrashReportsAsync(
+                    crashReportService,
+                    crashReports,
+                    crashReportSettings.IncludeSystemInfo,
+                    crashReportSettings.IncludeLogs).ConfigureAwait(false);
             }
             else
             {
-                Console.WriteLine("🚫 [CRASH_DEBUG] ユーザーが送信をスキップ");
-                _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信をスキップ");
+                // ダイアログ表示モード：ユーザーに確認
+                Console.WriteLine("💬 [CRASH_DEBUG] ダイアログ表示モード");
+                _logger?.LogInformation("[Issue #252] ダイアログを表示してユーザーに確認");
+
+                var viewModel = new ViewModels.CrashReportDialogViewModel(crashReports);
+                var dialog = new Views.CrashReportDialogWindow(viewModel);
+
+                // ダイアログアイコンを設定
+                try
+                {
+                    var iconUri = new Uri(BAKETA_ICON_PATH);
+                    dialog.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(iconUri));
+                }
+                catch (Exception iconEx)
+                {
+                    Console.WriteLine($"⚠️ クラッシュダイアログアイコン設定失敗: {iconEx.Message}");
+                }
+
+                // クラッシュダイアログは起動時に表示されるため、親ウィンドウは存在しない
+                // ShowDialogの代わりにShowを使用し、ユーザー操作完了をイベントで待機
+                dialog.Show();
+                var tcs = new System.Threading.Tasks.TaskCompletionSource<ViewModels.CrashReportDialogResult>();
+                dialog.Closed += (_, _) => tcs.TrySetResult(viewModel.Result);
+                var result = await tcs.Task.ConfigureAwait(true);
+
+                if (result == ViewModels.CrashReportDialogResult.Send)
+                {
+                    Console.WriteLine("📤 [CRASH_DEBUG] ユーザーが送信を選択");
+                    _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信を選択");
+
+                    await SendCrashReportsAsync(
+                        crashReportService,
+                        crashReports,
+                        viewModel.IncludeSystemInfo,
+                        viewModel.IncludeLogs).ConfigureAwait(false);
+                }
+                else
+                {
+                    Console.WriteLine("🚫 [CRASH_DEBUG] ユーザーが送信をスキップ");
+                    _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信をスキップ");
+                }
             }
 
             // フラグをクリア（UI非依存のためConfigureAwait(false)）
@@ -1028,6 +1068,52 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             Console.WriteLine($"⚠️ [CRASH_DEBUG] クラッシュレポート処理エラー（継続）: {ex.Message}");
             _logger?.LogWarning(ex, "[Issue #252] クラッシュレポート処理中にエラー（継続）");
         }
+    }
+
+    /// <summary>
+    /// [Issue #252 Phase 4] クラッシュレポートを送信
+    /// 自動送信・ダイアログ送信の共通処理
+    /// </summary>
+    private async Task SendCrashReportsAsync(
+        Core.Abstractions.CrashReporting.ICrashReportService crashReportService,
+        System.Collections.Generic.IReadOnlyList<Core.Abstractions.CrashReporting.CrashReportSummary> crashReports,
+        bool includeSystemInfo,
+        bool includeLogs)
+    {
+        var sentCount = 0;
+        var failedCount = 0;
+
+        foreach (var summary in crashReports)
+        {
+            // レポート詳細を読み込み
+            var fullReport = await crashReportService.LoadCrashReportAsync(summary.ReportId).ConfigureAwait(false);
+            if (fullReport == null)
+            {
+                Console.WriteLine($"⚠️ [CRASH_DEBUG] レポート読み込み失敗: {summary.ReportId}");
+                continue;
+            }
+
+            // サーバーに送信
+            var success = await crashReportService.SendCrashReportAsync(
+                fullReport,
+                includeSystemInfo,
+                includeLogs).ConfigureAwait(false);
+
+            if (success)
+            {
+                await crashReportService.MarkReportAsSentAsync(summary.ReportId).ConfigureAwait(false);
+                sentCount++;
+                Console.WriteLine($"✅ [CRASH_DEBUG] レポート送信成功: {summary.ReportId}");
+            }
+            else
+            {
+                failedCount++;
+                Console.WriteLine($"❌ [CRASH_DEBUG] レポート送信失敗: {summary.ReportId}");
+            }
+        }
+
+        Console.WriteLine($"📊 [CRASH_DEBUG] 送信結果: 成功={sentCount}, 失敗={failedCount}");
+        _logger?.LogInformation("[Issue #252] クラッシュレポート送信完了: 成功={SentCount}, 失敗={FailedCount}", sentCount, failedCount);
     }
 
     /// <summary>

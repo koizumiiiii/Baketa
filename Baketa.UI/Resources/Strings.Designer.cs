@@ -556,4 +556,13 @@ public static class Strings
     public static string CrashReport_SendButton => GetString("CrashReport_SendButton");
     public static string CrashReport_DontSendButton => GetString("CrashReport_DontSendButton");
     public static string CrashReport_CrashDetailsTitle => GetString("CrashReport_CrashDetailsTitle");
+
+    // ========== [Issue #252] Crash Report Settings ==========
+    public static string Settings_CrashReport_Title => GetString("Settings_CrashReport_Title");
+    public static string Settings_CrashReport_AutoSend => GetString("Settings_CrashReport_AutoSend");
+    public static string Settings_CrashReport_AutoSendDescription => GetString("Settings_CrashReport_AutoSendDescription");
+    public static string Settings_CrashReport_IncludeSystemInfo => GetString("Settings_CrashReport_IncludeSystemInfo");
+    public static string Settings_CrashReport_IncludeSystemInfoDescription => GetString("Settings_CrashReport_IncludeSystemInfoDescription");
+    public static string Settings_CrashReport_IncludeLogs => GetString("Settings_CrashReport_IncludeLogs");
+    public static string Settings_CrashReport_IncludeLogsDescription => GetString("Settings_CrashReport_IncludeLogsDescription");
 }
