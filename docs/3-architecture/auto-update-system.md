@@ -227,9 +227,79 @@ CheckForUpdatesInBackgroundAsync()
 - [NetSparkle GitHub](https://github.com/NetSparkleUpdater/NetSparkle)
 - [AppCastGenerator NuGet](https://www.nuget.org/packages/NetSparkleUpdater.Tools.AppCastGenerator)
 
+## 自動バージョニング (MinVer)
+
+Baketa は [MinVer](https://github.com/adamralph/minver) を使用して Git タグから自動的にバージョンを設定します。
+
+### 仕組み
+
+```
+Git タグ (v0.2.1)
+        │
+        ▼
+┌───────────────────────┐
+│    MinVer (MSBuild)    │
+│ ・Version              │
+│ ・AssemblyVersion      │
+│ ・FileVersion          │
+│ ・InformationalVersion │
+└───────────────────────┘
+        │
+        ▼
+  アセンブリに埋め込み
+        │
+        ▼
+┌───────────────────────┐
+│  UpdateService.cs      │
+│  Assembly.GetName()    │
+│  .Version で取得       │
+└───────────────────────┘
+        │
+        ▼
+  AppCast と比較して
+  更新判定
+```
+
+### 設定
+
+`Baketa.UI.csproj`:
+
+```xml
+<PropertyGroup>
+  <!-- MinVerによる自動バージョニング - Gitタグ(v0.2.0等)から自動設定 -->
+  <MinVerTagPrefix>v</MinVerTagPrefix>
+</PropertyGroup>
+
+<ItemGroup>
+  <PackageReference Include="MinVer" Version="6.0.0">
+    <PrivateAssets>all</PrivateAssets>
+    <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+  </PackageReference>
+</ItemGroup>
+```
+
+### バージョン形式
+
+| 状態 | 例 | 説明 |
+|------|-----|------|
+| タグあり | `0.2.1` | タグ `v0.2.1` から生成 |
+| タグなし (開発中) | `0.2.0-alpha.0.5` | 直近タグ + コミット数 |
+| プレリリース | `0.3.0-beta.1` | タグ `v0.3.0-beta.1` から生成 |
+
+### CI/CD 要件
+
+GitHub Actions で MinVer を使用するには、Git 履歴の完全取得が必要です:
+
+```yaml
+- uses: actions/checkout@v6
+  with:
+    fetch-depth: 0  # 必須: 全履歴を取得
+```
+
 ## 更新履歴
 
 | 日付 | バージョン | 内容 |
 |------|-----------|------|
+| 2025-01-03 | Phase 3 | MinVer導入、自動バージョニング |
 | 2025-01-03 | Phase 2 | CI/CD統合、AppCast自動生成 |
 | 2025-01-03 | Phase 1 | NetSparkle基本実装 |
