@@ -1264,4 +1264,24 @@
     <value>更新</value>
   </data>
 
+  <!-- ========== Update Dialog [Issue #249] ========== -->
+  <data name="Update_WindowTitle" xml:space="preserve">
+    <value>ソフトウェア更新</value>
+  </data>
+  <data name="Update_HeaderText" xml:space="preserve">
+    <value>{0}の新しいバージョンが利用可能です</value>
+  </data>
+  <data name="Update_InfoText" xml:space="preserve">
+    <value>{0} {1}が利用可能です（現在のバージョン: {2}）。今すぐダウンロードしますか？</value>
+  </data>
+  <data name="Update_SkipButton" xml:space="preserve">
+    <value>このバージョンをスキップ</value>
+  </data>
+  <data name="Update_RemindLaterButton" xml:space="preserve">
+    <value>後で通知</value>
+  </data>
+  <data name="Update_DownloadButton" xml:space="preserve">
+    <value>ダウンロード / インストール</value>
+  </data>
+
 </root>

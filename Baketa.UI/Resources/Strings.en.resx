@@ -1264,4 +1264,24 @@
     <value>Refresh</value>
   </data>
 
+  <!-- ========== Update Dialog [Issue #249] ========== -->
+  <data name="Update_WindowTitle" xml:space="preserve">
+    <value>Software Update</value>
+  </data>
+  <data name="Update_HeaderText" xml:space="preserve">
+    <value>A new version of {0} is available</value>
+  </data>
+  <data name="Update_InfoText" xml:space="preserve">
+    <value>{0} {1} is available (your version: {2}). Would you like to download it now?</value>
+  </data>
+  <data name="Update_SkipButton" xml:space="preserve">
+    <value>Skip This Version</value>
+  </data>
+  <data name="Update_RemindLaterButton" xml:space="preserve">
+    <value>Remind Me Later</value>
+  </data>
+  <data name="Update_DownloadButton" xml:space="preserve">
+    <value>Download / Install</value>
+  </data>
+
 </root>

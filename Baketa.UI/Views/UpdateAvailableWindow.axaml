@@ -1,0 +1,70 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        x:Class="Baketa.UI.Views.UpdateAvailableWindow"
+        Title="{Binding WindowTitle}"
+        Width="500"
+        Height="300"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True"
+        x:DataType="vm:UpdateAvailableViewModel">
+
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="MinWidth" Value="120"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="8">
+            <TextBlock Text="{Binding HeaderText}"
+                       FontSize="18"
+                       FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding InfoText}"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource SystemBaseMediumColor}"/>
+        </StackPanel>
+
+        <!-- 更新リスト -->
+        <Border Grid.Row="1"
+                Margin="0,16"
+                BorderBrush="{DynamicResource SystemBaseLowColor}"
+                BorderThickness="1"
+                CornerRadius="4">
+            <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Updates}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="12,8"
+                                    Background="{DynamicResource SystemAccentColorLight3}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <TextBlock Text="{Binding Title}" FontWeight="Medium"/>
+                                    <TextBlock Text="{Binding DateText}"
+                                               Foreground="{DynamicResource SystemBaseMediumColor}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ボタン -->
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto">
+            <Button Grid.Column="0"
+                    Content="{Binding SkipButtonText}"
+                    Command="{Binding SkipCommand}"/>
+            <Button Grid.Column="2"
+                    Content="{Binding RemindLaterButtonText}"
+                    Command="{Binding RemindLaterCommand}"
+                    Margin="0,0,8,0"/>
+            <Button Grid.Column="3"
+                    Content="{Binding DownloadButtonText}"
+                    Command="{Binding DownloadCommand}"
+                    Classes="accent"/>
+        </Grid>
+    </Grid>
+</Window>
