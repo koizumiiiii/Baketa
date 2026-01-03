@@ -295,6 +295,7 @@ jobs:
           --base-url $downloadUrl `
           --output-type json `
           --os windows `
+          --ext zip `
           --file-extract-version
 
         # Verify generation
