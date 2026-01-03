@@ -10,6 +10,22 @@ namespace Baketa.Core.Settings;
 public static class BaketaSettingsPaths
 {
     /// <summary>
+    /// [Issue #252] メイン設定ディレクトリ（%APPDATA%\Baketa）
+    /// EnhancedSettingsService と App.axaml.cs で使用
+    /// </summary>
+    public static string MainSettingsDirectory { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Baketa");
+
+    /// <summary>
+    /// [Issue #252] メイン設定ファイルのパス（settings.json）
+    /// アプリケーション全体で共有される設定ファイル
+    /// </summary>
+    public static string MainSettingsPath { get; } = Path.Combine(
+        MainSettingsDirectory,
+        "settings.json");
+
+    /// <summary>
     /// ユーザー設定ディレクトリのベースパス
     /// </summary>
     public static string UserSettingsDirectory { get; } = Path.Combine(

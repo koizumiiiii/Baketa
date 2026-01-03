@@ -693,10 +693,10 @@ public sealed class EnhancedSettingsService : ISettingsService, IDisposable
         return 0;
     }
 
-    private string GetDefaultSettingsFilePath()
+    private static string GetDefaultSettingsFilePath()
     {
-        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appDataPath, "Baketa", "settings.json");
+        // [Issue #252] BaketaSettingsPaths を使用してパスを一元管理
+        return Settings.BaketaSettingsPaths.MainSettingsPath;
     }
 
     private string GenerateBackupFilePath()

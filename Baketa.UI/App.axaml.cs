@@ -81,9 +81,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         Console.WriteLine("[Theme] ApplyStoredTheme() 開始");
         try
         {
-            var settingsFilePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Baketa", "settings.json");
+            // [Issue #252] BaketaSettingsPaths を使用してパスを一元管理
+            var settingsFilePath = BaketaSettingsPaths.MainSettingsPath;
 
             Console.WriteLine($"[Theme] 設定ファイルパス: {settingsFilePath}");
             Console.WriteLine($"[Theme] ファイル存在: {File.Exists(settingsFilePath)}");
@@ -918,9 +917,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     {
         try
         {
-            var settingsFilePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Baketa", "settings.json");
+            // [Issue #252] BaketaSettingsPaths を使用してパスを一元管理
+            var settingsFilePath = BaketaSettingsPaths.MainSettingsPath;
 
             if (File.Exists(settingsFilePath))
             {
