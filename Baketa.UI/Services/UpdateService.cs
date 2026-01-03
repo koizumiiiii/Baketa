@@ -128,7 +128,7 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
 
             _sparkle = new SparkleUpdater(AppCastUrl, signatureVerifier)
             {
-                UIFactory = new UIFactory(),
+                UIFactory = new LocalizedUIFactory("Baketa"),
                 RelaunchAfterUpdate = true,
             };
 

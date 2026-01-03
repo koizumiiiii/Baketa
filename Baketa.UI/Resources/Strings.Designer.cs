@@ -534,4 +534,13 @@ public static class Strings
 
     public static string Settings_General_CloudUsageLabel => GetString("Settings_General_CloudUsageLabel");
     public static string Settings_General_CloudUsageTokens => GetString("Settings_General_CloudUsageTokens");
+
+    // ========== [Issue #249] Update Dialog ==========
+
+    public static string Update_WindowTitle => GetString("Update_WindowTitle");
+    public static string Update_HeaderText => GetString("Update_HeaderText");
+    public static string Update_InfoText => GetString("Update_InfoText");
+    public static string Update_SkipButton => GetString("Update_SkipButton");
+    public static string Update_RemindLaterButton => GetString("Update_RemindLaterButton");
+    public static string Update_DownloadButton => GetString("Update_DownloadButton");
 }

@@ -92,6 +92,28 @@ py -3.10 -m venv venv_build
 .\venv_build\Scripts\pip install -r requirements.txt pyinstaller
 ```
 
+### 自動バージョニング (MinVer)
+
+Baketa は [MinVer](https://github.com/adamralph/minver) を使用して Git タグから自動的にバージョンを設定します。
+
+**仕組み:**
+- Git タグ（例: `v0.2.1`）から `Version`, `AssemblyVersion`, `FileVersion` を自動設定
+- タグがない場合は直近のタグ + コミット数でプレリリースバージョン生成（例: `0.2.0-alpha.0.5`）
+- `Baketa.UI.csproj` で `<MinVerTagPrefix>v</MinVerTagPrefix>` を設定
+
+**リリース手順:**
+```bash
+# 1. 新しいバージョンのタグを作成
+git tag v0.2.1
+
+# 2. タグをプッシュ（GitHub Actions が自動でリリースを作成）
+git push origin v0.2.1
+```
+
+**注意:**
+- GitHub Actions の `checkout` で `fetch-depth: 0` が必須（設定済み）
+- ローカル開発時はタグなしでビルドしても問題なし（プレリリースバージョンになる）
+
 **リリースパッケージ構成:**
 ```
 release/
