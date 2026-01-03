@@ -11,6 +11,21 @@ using NetSparkleUpdater.UI.Avalonia;
 namespace Baketa.UI.Services;
 
 /// <summary>
+/// NetSparkle用ロガーアダプター
+/// </summary>
+internal sealed class SparkleLogger : NetSparkleUpdater.Interfaces.ILogger
+{
+    private readonly Microsoft.Extensions.Logging.ILogger? _logger;
+
+    public SparkleLogger(Microsoft.Extensions.Logging.ILogger? logger) => _logger = logger;
+
+    public void PrintMessage(string message, params object[]? arguments)
+    {
+        _logger?.LogInformation("[NetSparkle] " + message, arguments ?? []);
+    }
+}
+
+/// <summary>
 /// [Issue #249] アプリケーション自動アップデートサービス
 /// NetSparkle を使用して GitHub Releases からアップデートを確認・適用
 /// </summary>
@@ -87,8 +102,9 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
             // 開発ビルド: 公開鍵が設定されている場合のみ署名検証
             if (!string.IsNullOrEmpty(Ed25519PublicKey))
             {
+                // OnlyVerifySoftwareDownloads: AppCast署名検証をスキップ、ZIPファイルの署名のみ検証
                 signatureVerifier = new Ed25519Checker(
-                    SecurityMode.Strict,
+                    SecurityMode.OnlyVerifySoftwareDownloads,
                     Ed25519PublicKey);
             }
             else
@@ -106,7 +122,8 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
                 _logger?.LogCritical("[Issue #249] Ed25519公開鍵が設定されていません。リリースビルドでは必須です。");
                 throw new InvalidOperationException("Ed25519 public key is missing in release build. Auto-update disabled.");
             }
-            signatureVerifier = new Ed25519Checker(SecurityMode.Strict, Ed25519PublicKey);
+            // OnlyVerifySoftwareDownloads: AppCast署名検証をスキップ、ZIPファイルの署名のみ検証
+            signatureVerifier = new Ed25519Checker(SecurityMode.OnlyVerifySoftwareDownloads, Ed25519PublicKey);
 #endif
 
             _sparkle = new SparkleUpdater(AppCastUrl, signatureVerifier)
@@ -115,12 +132,25 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
                 RelaunchAfterUpdate = true,
             };
 
+            // JSON形式のAppCastを使用（デフォルトはXML）
+            _sparkle.AppCastGenerator = new NetSparkleUpdater.AppCastHandlers.JsonAppCastGenerator(_sparkle.LogWriter);
+
+            // デバッグ: 現在のアプリバージョンをログ出力
+            var appAssembly = System.Reflection.Assembly.GetEntryAssembly();
+            var appVersion = appAssembly?.GetName().Version;
+            var fileVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(appAssembly?.Location ?? "")?.FileVersion;
+            _logger?.LogInformation("[Issue #249] アプリバージョン: Assembly={AssemblyVersion}, File={FileVersion}",
+                appVersion, fileVersion);
+
             // 更新前イベントハンドラ（Pythonサーバー終了処理）
             // NetSparkle 3.0ではCloseApplicationAsyncを使用
             _sparkle.CloseApplicationAsync += OnCloseApplicationAsync;
 
             // 更新チェック完了イベント
             _sparkle.UpdateCheckFinished += OnUpdateCheckFinished;
+
+            // ログダウンロード/解析イベント（デバッグ用）
+            _sparkle.LogWriter = new SparkleLogger(_logger);
 
             _logger?.LogInformation("[Issue #249] SparkleUpdater初期化完了: AppCast={AppCastUrl}", AppCastUrl);
         }
@@ -189,15 +219,18 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
     {
         if (_disposed || _sparkle == null)
         {
+            _logger?.LogWarning("[Issue #249] UpdateService未初期化のためスキップ: disposed={Disposed}, sparkle={Sparkle}",
+                _disposed, _sparkle == null ? "null" : "not null");
             return;
         }
 
         try
         {
             IsCheckingForUpdates = true;
-            _logger?.LogDebug("[Issue #249] サイレント更新チェック開始...");
+            _logger?.LogInformation("[Issue #249] サイレント更新チェック開始: URL={Url}", AppCastUrl);
 
             var result = await _sparkle.CheckForUpdatesQuietly().ConfigureAwait(false);
+            _logger?.LogInformation("[Issue #249] 更新チェック結果: Status={Status}", result.Status);
 
             UpdateAvailable = result.Status == UpdateStatus.UpdateAvailable;
 
@@ -208,13 +241,31 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
                     "[Issue #249] サイレントチェック: 更新利用可能 v{Version}",
                     LatestVersion.Version);
 
-                // 更新が利用可能な場合のみUIダイアログを表示
-                _sparkle.ShowUpdateNeededUI(result.Updates);
+                // 更新が利用可能な場合のみUIダイアログを表示（UIスレッドで実行）
+                _logger?.LogInformation("[Issue #249] 更新ダイアログ表示開始...");
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        _logger?.LogInformation("[Issue #249] ShowUpdateNeededUI呼び出し中...");
+                        _sparkle?.ShowUpdateNeededUI(result.Updates);
+                        _logger?.LogInformation("[Issue #249] ShowUpdateNeededUI呼び出し完了");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "[Issue #249] ダイアログ表示エラー: {Message}", ex.Message);
+                    }
+                });
+            }
+            else
+            {
+                _logger?.LogInformation("[Issue #249] 更新なし: Status={Status}, UpdateCount={Count}",
+                    result.Status, result.Updates?.Count ?? 0);
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "[Issue #249] サイレント更新チェック中にエラー（継続）");
+            _logger?.LogError(ex, "[Issue #249] サイレント更新チェック中にエラー: {Message}", ex.Message);
         }
         finally
         {
