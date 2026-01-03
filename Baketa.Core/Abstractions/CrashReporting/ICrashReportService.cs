@@ -61,6 +61,20 @@ public interface ICrashReportService
     Task MarkReportAsSentAsync(string reportId);
 
     /// <summary>
+    /// クラッシュレポートをサーバーに送信
+    /// </summary>
+    /// <param name="report">送信するレポート</param>
+    /// <param name="includeSystemInfo">システム情報を含めるか</param>
+    /// <param name="includeLogs">ログを含めるか</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>送信成功時はtrue</returns>
+    Task<bool> SendCrashReportAsync(
+        CrashReport report,
+        bool includeSystemInfo,
+        bool includeLogs,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// クラッシュレポートを削除
     /// </summary>
     /// <param name="reportId">レポートID</param>

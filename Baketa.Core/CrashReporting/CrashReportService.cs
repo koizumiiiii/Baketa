@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -254,6 +256,91 @@ public sealed partial class CrashReportService : ICrashReportService
             _logger?.LogDebug("[Issue #252] レポート送信済みマーク完了: {ReportId}", reportId);
         }
     }
+
+    /// <inheritdoc />
+    public async Task<bool> SendCrashReportAsync(
+        CrashReport report,
+        bool includeSystemInfo,
+        bool includeLogs,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+
+            // リクエストボディ作成
+            var requestBody = new Dictionary<string, object?>
+            {
+                ["report_id"] = Guid.TryParse(report.ReportId, out _)
+                    ? report.ReportId
+                    : Guid.NewGuid().ToString(), // UUID形式でなければ新規生成
+                ["crash_timestamp"] = report.CrashedAt.ToString("O"),
+                ["error_message"] = report.Exception.Message,
+                ["stack_trace"] = report.Exception.StackTrace,
+                ["app_version"] = report.BaketaVersion,
+                ["os_version"] = report.SystemInfo.OsVersion,
+                ["include_system_info"] = includeSystemInfo,
+                ["include_logs"] = includeLogs
+            };
+
+            // システム情報を含める場合
+            if (includeSystemInfo)
+            {
+                requestBody["system_info"] = new Dictionary<string, object?>
+                {
+                    ["cpu"] = $"{report.SystemInfo.ProcessorCount} cores",
+                    ["ram_mb"] = report.SystemInfo.WorkingSetBytes / 1024 / 1024,
+                    ["dotnet_version"] = report.SystemInfo.ClrVersion,
+                    ["is_64bit"] = report.SystemInfo.Is64BitProcess
+                };
+            }
+
+            // ログを含める場合
+            if (includeLogs && report.RecentLogs.Count > 0)
+            {
+                requestBody["logs"] = string.Join(Environment.NewLine, report.RecentLogs);
+            }
+
+            var json = JsonSerializer.Serialize(requestBody, JsonOptions);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            // Relay ServerへPOST
+            var response = await httpClient.PostAsync(
+                CrashReportEndpointUrl,
+                content,
+                cancellationToken).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger?.LogInformation("[Issue #252] クラッシュレポート送信成功: {ReportId}", report.ReportId);
+                return true;
+            }
+
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            _logger?.LogWarning(
+                "[Issue #252] クラッシュレポート送信失敗: StatusCode={StatusCode}, Body={Body}",
+                response.StatusCode, errorBody);
+            return false;
+        }
+        catch (TaskCanceledException)
+        {
+            _logger?.LogWarning("[Issue #252] クラッシュレポート送信タイムアウト: {ReportId}", report.ReportId);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "[Issue #252] クラッシュレポート送信エラー: {ReportId}", report.ReportId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// クラッシュレポート送信先エンドポイント
+    /// </summary>
+    private const string CrashReportEndpointUrl = "https://baketa-relay.suke009.workers.dev/api/crash-report";
 
     /// <inheritdoc />
     public Task DeleteCrashReportAsync(string reportId)

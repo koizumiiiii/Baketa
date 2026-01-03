@@ -974,14 +974,43 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 Console.WriteLine("📤 [CRASH_DEBUG] ユーザーが送信を選択");
                 _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信を選択");
 
-                // TODO: Phase 3でCloudflare Workers経由でSupabaseに送信
-                // 現時点では送信済みとしてマーク（UI非依存のためConfigureAwait(false)）
-                foreach (var report in crashReports)
+                // [Phase 3] Cloudflare Workers経由でSupabaseに送信
+                var includeSystemInfo = viewModel.IncludeSystemInfo;
+                var includeLogs = viewModel.IncludeLogs;
+                var sentCount = 0;
+                var failedCount = 0;
+
+                foreach (var summary in crashReports)
                 {
-                    await crashReportService.MarkReportAsSentAsync(report.ReportId).ConfigureAwait(false);
+                    // レポート詳細を読み込み
+                    var fullReport = await crashReportService.LoadCrashReportAsync(summary.ReportId).ConfigureAwait(false);
+                    if (fullReport == null)
+                    {
+                        Console.WriteLine($"⚠️ [CRASH_DEBUG] レポート読み込み失敗: {summary.ReportId}");
+                        continue;
+                    }
+
+                    // サーバーに送信
+                    var success = await crashReportService.SendCrashReportAsync(
+                        fullReport,
+                        includeSystemInfo,
+                        includeLogs).ConfigureAwait(false);
+
+                    if (success)
+                    {
+                        await crashReportService.MarkReportAsSentAsync(summary.ReportId).ConfigureAwait(false);
+                        sentCount++;
+                        Console.WriteLine($"✅ [CRASH_DEBUG] レポート送信成功: {summary.ReportId}");
+                    }
+                    else
+                    {
+                        failedCount++;
+                        Console.WriteLine($"❌ [CRASH_DEBUG] レポート送信失敗: {summary.ReportId}");
+                    }
                 }
 
-                Console.WriteLine("✅ [CRASH_DEBUG] クラッシュレポート送信処理完了（Phase 3で実際の送信実装）");
+                Console.WriteLine($"📊 [CRASH_DEBUG] 送信結果: 成功={sentCount}, 失敗={failedCount}");
+                _logger?.LogInformation("[Issue #252] クラッシュレポート送信完了: 成功={SentCount}, 失敗={FailedCount}", sentCount, failedCount);
             }
             else
             {
