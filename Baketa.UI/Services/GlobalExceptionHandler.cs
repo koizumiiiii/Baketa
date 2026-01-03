@@ -130,10 +130,12 @@ public sealed class GlobalExceptionHandler : IDisposable
 
     /// <summary>
     /// ReactiveUI例外ハンドラ
+    /// [Issue #252] ReactiveUIExceptionHandlerを統合し、UIスレッド違反を適切に処理
     /// </summary>
     private void OnReactiveUIException(Exception exception)
     {
         Console.WriteLine($"🚨 [ReactiveUI] 例外: {exception.GetType().Name}: {exception.Message}");
+        Console.WriteLine($"🚨 [ReactiveUI] スタックトレース: {exception.StackTrace}");
 
         // リングバッファに記録
         RingBufferLogger.Instance.LogError(
@@ -141,13 +143,21 @@ public sealed class GlobalExceptionHandler : IDisposable
             nameof(GlobalExceptionHandler),
             exception);
 
-        // UIスレッド違反例外は詳細ログを出力
-        if (exception is InvalidOperationException && exception.Message.Contains("thread"))
+        // UIスレッド違反例外は吸収して継続（アプリ終了を防止）
+        if (exception is InvalidOperationException invalidOp &&
+            (invalidOp.Message.Contains("invalid thread", StringComparison.OrdinalIgnoreCase) ||
+             invalidOp.Message.Contains("VerifyAccess", StringComparison.OrdinalIgnoreCase) ||
+             invalidOp.StackTrace?.Contains("VerifyAccess") == true ||
+             invalidOp.StackTrace?.Contains("CheckAccess") == true ||
+             invalidOp.StackTrace?.Contains("ReactiveCommand") == true))
         {
-            Console.WriteLine($"🧵 UIスレッド違反詳細: {exception.StackTrace}");
+            Console.WriteLine("🧵 [ReactiveUI] UIスレッド違反を検出 - 例外を吸収してアプリケーションを継続");
+            _logger?.LogWarning(exception, "[Issue #252] UIスレッド違反を検出 - 例外を吸収");
+            // UIスレッド違反は吸収し、クラッシュレポートは生成しない
+            return;
         }
 
-        // ReactiveUI例外は通常致命的ではないため、レポートは生成するが終了しない
+        // その他のReactiveUI例外はレポート生成（終了はしない）
         _ = GenerateCrashReportAsync(exception, "RxApp.DefaultExceptionHandler");
     }
 

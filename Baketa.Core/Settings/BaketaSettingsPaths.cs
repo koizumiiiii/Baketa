@@ -26,6 +26,22 @@ public static class BaketaSettingsPaths
         "settings.json");
 
     /// <summary>
+    /// [Issue #252] クラッシュレポートディレクトリのパス
+    /// </summary>
+    public static string CrashReportsDirectory { get; } = Path.Combine(
+        MainSettingsDirectory,
+        "Reports",
+        "Crashes");
+
+    /// <summary>
+    /// [Issue #252] クラッシュペンディングフラグのパス
+    /// 前回クラッシュを検出するためのフラグファイル
+    /// </summary>
+    public static string CrashPendingFlagPath { get; } = Path.Combine(
+        MainSettingsDirectory,
+        ".crash_pending");
+
+    /// <summary>
     /// ユーザー設定ディレクトリのベースパス
     /// </summary>
     public static string UserSettingsDirectory { get; } = Path.Combine(

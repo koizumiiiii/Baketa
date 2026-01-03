@@ -54,13 +54,9 @@ public sealed partial class CrashReportService : ICrashReportService
         _ringBuffer = ringBuffer ?? RingBufferLogger.Instance;
         _startTime = DateTime.UtcNow;
 
-        _reportsDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Baketa", "Reports", "Crashes");
-
-        _crashPendingFlagPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Baketa", ".crash_pending");
+        // [Issue #252] BaketaSettingsPathsを使用してパスを一元管理
+        _reportsDirectory = Settings.BaketaSettingsPaths.CrashReportsDirectory;
+        _crashPendingFlagPath = Settings.BaketaSettingsPaths.CrashPendingFlagPath;
 
         EnsureDirectoryExists();
     }

@@ -307,20 +307,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // 未監視タスク例外のハンドラーを登録（早期登録）
             // TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-            // ReactiveUIのエラーハンドラーを登録
-            RxApp.DefaultExceptionHandler = new ReactiveUIExceptionHandler();
-
-            // ReactiveUIログ出力
-            Console.WriteLine("🎆 ReactiveUIエラーハンドラー設定完了");
-
-#if DEBUG
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "reactive_ui_startup.txt");
-                File.WriteAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎆 ReactiveUIエラーハンドラー設定完了");
-            }
-            catch { /* ファイル出力失敗は無視 */ }
-#endif
+            // [Issue #252] ReactiveUIのエラーハンドラーはGlobalExceptionHandlerに統合済み
+            // GlobalExceptionHandler.Initialize()でRxApp.DefaultExceptionHandlerが設定される
+            Console.WriteLine("🎆 ReactiveUIエラーハンドラーはGlobalExceptionHandlerで統合管理");
 
             try
             {
@@ -1392,49 +1381,5 @@ internal sealed class ApplicationShutdownEvent : CoreEvents.EventBase
     public override string Category => "Application";
 }
 
-/// <summary>
-/// ReactiveUI用エラーハンドラー
-/// </summary>
-internal sealed class ReactiveUIExceptionHandler : IObserver<Exception>
-{
-    public void OnNext(Exception ex)
-    {
-        Console.WriteLine($"🚨 ReactiveUI例外: {ex.GetType().Name}: {ex.Message}");
-        Console.WriteLine($"🚨 スタックトレース: {ex.StackTrace}");
-
-        try
-        {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "reactive_ui_errors.txt");
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 ReactiveUI例外: {ex.GetType().Name}: {ex.Message}");
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 スタックトレース: {ex.StackTrace}");
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ===== ReactiveUI例外終了 =====");
-            Console.WriteLine($"📝 ReactiveUIエラーログ: {logPath}");
-        }
-        catch { /* ファイル出力失敗は無視 */ }
-
-        // InvalidOperationExceptionのUIスレッド違反は吸収
-        if (ex is InvalidOperationException invalidOp &&
-            (invalidOp.Message.Contains("invalid thread", StringComparison.OrdinalIgnoreCase) ||
-             invalidOp.Message.Contains("VerifyAccess", StringComparison.OrdinalIgnoreCase) ||
-             invalidOp.StackTrace?.Contains("VerifyAccess") == true ||
-             invalidOp.StackTrace?.Contains("CheckAccess") == true ||
-             invalidOp.StackTrace?.Contains("ReactiveCommand") == true))
-        {
-            Console.WriteLine("🚨 ReactiveUI: UIスレッド違反を検出 - アプリケーションを継続");
-            return; // 例外を吸収
-        }
-
-        // その他の例外は再スロー
-        throw ex;
-    }
-
-    public void OnError(Exception error)
-    {
-        OnNext(error);
-    }
-
-    public void OnCompleted()
-    {
-        // 何もしない
-    }
-}
+// [Issue #252] ReactiveUIExceptionHandlerはGlobalExceptionHandlerに統合されました
+// 詳細: Baketa.UI/Services/GlobalExceptionHandler.cs の OnReactiveUIException メソッド
