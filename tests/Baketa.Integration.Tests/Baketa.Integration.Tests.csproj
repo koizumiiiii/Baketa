@@ -36,10 +36,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     
-    <!-- Avalonia UI (統合テスト用) -->
-    <PackageReference Include="Avalonia" Version="11.2.7" />
-    <PackageReference Include="Avalonia.Headless" Version="11.2.7" />
-    <PackageReference Include="Avalonia.ReactiveUI" Version="11.2.7" />
+    <!-- Avalonia UI (統合テスト用) - 11.3.3 (NetSparkle互換性のためアップグレード) -->
+    <PackageReference Include="Avalonia" Version="11.3.3" />
+    <PackageReference Include="Avalonia.Headless" Version="11.3.3" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.3" />
   </ItemGroup>
 
   <ItemGroup>

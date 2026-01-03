@@ -44,9 +44,9 @@
     <!-- ReactiveUI Testing -->
     <PackageReference Include="ReactiveUI.Testing" Version="20.1.1" />
     
-    <!-- Avalonia UI Testing -->
-    <PackageReference Include="Avalonia" Version="11.2.7" />
-    <PackageReference Include="Avalonia.Headless" Version="11.2.7" />
+    <!-- Avalonia UI Testing - 11.3.3 (NetSparkle互換性のためアップグレード) -->
+    <PackageReference Include="Avalonia" Version="11.3.3" />
+    <PackageReference Include="Avalonia.Headless" Version="11.3.3" />
   </ItemGroup>
 
   <ItemGroup>
