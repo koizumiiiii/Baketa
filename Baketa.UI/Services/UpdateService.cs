@@ -25,16 +25,13 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
     /// <summary>
     /// Ed25519 公開鍵（Base64エンコード）
     ///
-    /// 設定手順:
-    /// 1. scripts/generate-update-keys.ps1 を実行してキーペアを生成
-    /// 2. 表示される PUBLIC KEY をここに貼り付け
-    /// 3. PRIVATE KEY は GitHub Secrets に NETSPARKLE_ED25519_PRIVATE_KEY として登録
+    /// 生成日: 2026-01-03
+    /// 生成方法: scripts/generate-update-keys.ps1
     ///
-    /// 空の場合:
-    /// - DEBUGビルド: 署名検証をスキップ（開発用）
-    /// - Releaseビルド: 例外をスロー（セキュリティ必須）
+    /// 対応する秘密鍵は GitHub Secrets に登録:
+    /// - Secret名: NETSPARKLE_ED25519_PRIVATE_KEY
     /// </summary>
-    private const string Ed25519PublicKey = "";
+    private const string Ed25519PublicKey = "mhVnvb6OPFeEaId0GsB+p1CGrQBsbNlJRDhb5RryHd0=";
 
     private readonly ILogger<UpdateService>? _logger;
     private readonly IPythonServerManager? _pythonServerManager;
