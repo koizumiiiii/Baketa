@@ -11,6 +11,7 @@ using Baketa.Application.Services;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
 using Baketa.UI.Services;
@@ -62,6 +63,12 @@ internal sealed partial class App : Avalonia.Application
     /// App.Initialize()で作成し、OnFrameworkInitializationCompleted()で閉じる
     /// </summary>
     private LoadingWindow? _earlyLoadingWindow;
+
+    /// <summary>
+    /// [Issue #249] 自動アップデートサービス
+    /// NetSparkleを使用してGitHub Releasesからアップデートを確認・適用
+    /// </summary>
+    private UpdateService? _updateService;
 
     /// <summary>
     /// [Issue #245] 保存されたテーマを適用
@@ -497,6 +504,9 @@ internal sealed partial class App : Avalonia.Application
                         mainOverlayView.Show();
                         Console.WriteLine("✅ MainOverlayView.Show()実行完了");
 
+                        // --- 4.4 自動アップデートチェック（Issue #249） ---
+                        await InitializeUpdateServiceAsync(serviceProvider);
+
                         // --- 4.5 Patreon認証結果の通知表示（Issue #233） ---
                         await ShowPendingPatreonNotificationAsync(serviceProvider);
 
@@ -855,6 +865,47 @@ internal sealed partial class App : Avalonia.Application
     }
 
     /// <summary>
+    /// [Issue #249] 自動アップデートサービスの初期化
+    /// アプリ起動時にサイレントで更新チェックを実行
+    /// </summary>
+    private async Task InitializeUpdateServiceAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            _logger?.LogInformation("[Issue #249] UpdateService初期化開始...");
+
+            // UpdateServiceをDI経由ではなく直接作成（現時点ではシンプルな実装）
+            var pythonServerManager = serviceProvider.GetService<IPythonServerManager>();
+            var updateLogger = serviceProvider.GetService<ILogger<UpdateService>>();
+
+            _updateService = new UpdateService(pythonServerManager, updateLogger);
+            _updateService.Initialize();
+
+            // バックグラウンドでサイレント更新チェック
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    // 起動直後の負荷を避けるため少し待機
+                    await Task.Delay(5000).ConfigureAwait(false);
+                    await _updateService.CheckForUpdatesInBackgroundAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "[Issue #249] サイレント更新チェック失敗（継続）");
+                }
+            });
+
+            _logger?.LogInformation("[Issue #249] UpdateService初期化完了");
+        }
+        catch (Exception ex)
+        {
+            // 更新チェック失敗はアプリ起動をブロックしない
+            _logger?.LogWarning(ex, "[Issue #249] UpdateService初期化失敗（継続）");
+        }
+    }
+
+    /// <summary>
     /// Patreon認証結果の通知表示 (Issue #233)
     /// Program.PendingPatreonNotification にセットされた認証結果を表示
     /// </summary>
@@ -917,6 +968,18 @@ internal sealed partial class App : Avalonia.Application
         try
         {
             _logger?.LogInformation("アプリケーションシャットダウン要求を受信");
+
+            // [Issue #249] UpdateServiceの破棄
+            try
+            {
+                _updateService?.Dispose();
+                _updateService = null;
+                Console.WriteLine("✅ [SHUTDOWN_DEBUG] UpdateService破棄完了");
+            }
+            catch (Exception updateEx)
+            {
+                Console.WriteLine($"⚠️ [SHUTDOWN_DEBUG] UpdateService破棄失敗: {updateEx.Message}");
+            }
 
             // 🔥 [P0_GC_FIX] Win32ウィンドウクラスの完全クリーンアップ
             // WndProcDelegate参照を解放し、UnregisterClassでウィンドウクラス登録解除
