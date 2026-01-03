@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.ReactiveUI;
 // Issue #125: WebView統合は削除（広告機能廃止）
 using Baketa.Application.DI.Modules;
+using Baketa.Core.CrashReporting;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Modules;
 using Baketa.Core.Performance;
@@ -18,6 +19,7 @@ using Baketa.Infrastructure.DI.Modules;
 using Baketa.Infrastructure.Platform.DI;
 using Baketa.UI.DI.Modules;
 using Baketa.UI.DI.Services;
+using Baketa.Core.Abstractions.CrashReporting;
 using Baketa.UI.Extensions;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Configuration;
@@ -256,6 +258,9 @@ internal sealed class Program
             Console.WriteLine($"⚠️ [ENCODING_INIT] Failed to configure UTF-8 console: {ex.Message}");
         }
 
+        // [Issue #252] 起動時ログファイルクリア - ファイル肥大化防止
+        ClearStartupLogs();
+
         // 統一パフォーマンス測定システムを初期化
         PerformanceLogger.Initialize();
         PerformanceLogger.LogSystemInfo();
@@ -268,32 +273,11 @@ internal sealed class Program
         // 重要な初期化タイミングをログ
         appStartMeasurement.LogCheckpoint("統一ログシステム初期化完了");
 
-        // 未処理例外の強制ログ出力
-        AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
-        {
-            Console.WriteLine($"💥 FATAL: 未処理例外: {e.ExceptionObject}");
-            System.Diagnostics.Debug.WriteLine($"💥 FATAL: 未処理例外: {e.ExceptionObject}");
-            if (e.ExceptionObject is Exception ex)
-            {
-                Console.WriteLine($"💥 FATAL: Exception Type: {ex.GetType().Name}");
-                Console.WriteLine($"💥 FATAL: Message: {ex.Message}");
-                Console.WriteLine($"💥 FATAL: StackTrace: {ex.StackTrace}");
-                System.Diagnostics.Debug.WriteLine($"💥 FATAL: Exception Type: {ex.GetType().Name}");
-                System.Diagnostics.Debug.WriteLine($"💥 FATAL: Message: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"💥 FATAL: StackTrace: {ex.StackTrace}");
-
-                // ファイルにも記録
-                try
-                {
-                    var crashLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log.txt");
-                    File.AppendAllText(crashLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 FATAL: {ex.GetType().Name}: {ex.Message}\n");
-                    File.AppendAllText(crashLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 StackTrace: {ex.StackTrace}\n");
-                    File.AppendAllText(crashLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 💥 IsTerminating: {e.IsTerminating}\n");
-                    Console.WriteLine($"📝 クラッシュログ作成: {crashLogPath}");
-                }
-                catch { /* ファイル出力失敗は無視 */ }
-            }
-        };
+        // [Issue #252] GlobalExceptionHandler - 統合クラッシュレポートシステム
+        // DI初期化前は簡易ハンドラのみ（CrashReportService未使用）
+        // DI初期化後にGlobalExceptionHandler.Initializeで完全なハンドラを設定
+        Console.WriteLine("🔧 [Issue #252] 簡易例外ハンドラを登録（DI初期化前）");
+        GlobalExceptionHandler.Initialize(); // CrashReportServiceなしで初期化（後で再設定）
 
         try
         {
@@ -741,6 +725,20 @@ internal sealed class Program
         Console.WriteLine("✅ ServiceProvider構築完了");
         System.Diagnostics.Debug.WriteLine("✅ ServiceProvider構築完了");
 
+        // [Issue #252] GlobalExceptionHandler完全初期化（CrashReportService付き）
+        Console.WriteLine("🔧 [Issue #252] GlobalExceptionHandler完全初期化開始");
+        try
+        {
+            var crashReportService = ServiceProvider.GetService<ICrashReportService>();
+            var exceptionLogger = ServiceProvider.GetService<ILogger<GlobalExceptionHandler>>();
+            GlobalExceptionHandler.Initialize(crashReportService, exceptionLogger);
+            Console.WriteLine("✅ [Issue #252] GlobalExceptionHandler完全初期化完了");
+        }
+        catch (Exception exHandlerEx)
+        {
+            Console.WriteLine($"⚠️ [Issue #252] GlobalExceptionHandler初期化エラー（処理は継続）: {exHandlerEx.Message}");
+        }
+
         // 🌐 [i18n] ILocalizationService早期初期化 - 保存された言語設定をXAML読み込み前に適用
         Console.WriteLine("🌐 [i18n] ILocalizationService早期初期化開始");
         try
@@ -881,19 +879,10 @@ internal sealed class Program
         {
             Console.WriteLine("🔧 ReactiveUI設定開始");
 
-            // デフォルトエラーハンドラを設定
-            RxApp.DefaultExceptionHandler = Observer.Create<Exception>(ex =>
-            {
-                Console.WriteLine($"🚨 ReactiveUI例外: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"🚨 ReactiveUI例外: {ex.Message}");
-                // UIスレッド違反例外は詳細ログを出力
-                if (ex is InvalidOperationException && ex.Message.Contains("thread"))
-                {
-                    Console.WriteLine($"🧵 UIスレッド違反詳細: {ex.StackTrace}");
-                }
-            });
+            // [Issue #252] ReactiveUI例外ハンドラはGlobalExceptionHandlerで一元管理
+            // GlobalExceptionHandler.RegisterHandlers()でRxApp.DefaultExceptionHandlerを設定済み
 
-            Console.WriteLine("✅ ReactiveUI設定完了");
+            Console.WriteLine("✅ ReactiveUI設定完了（GlobalExceptionHandler統合済み）");
         }
         catch (Exception ex)
         {
@@ -1207,6 +1196,13 @@ internal sealed class Program
         coreModule.RegisterWithDependencies(services, registeredModules, moduleStack);
         Console.WriteLine("✅ Core基盤モジュール登録完了");
 
+        // [Issue #252] CrashReportingModuleの登録
+        Console.WriteLine("🔧 [Issue #252] CrashReportingModule登録開始");
+        var crashReportingModule = new CrashReportingModule();
+        crashReportingModule.RegisterServices(services);
+        registeredModules.Add(typeof(CrashReportingModule));
+        Console.WriteLine("✅ [Issue #252] CrashReportingModule登録完了");
+
         // 設定システムを登録（ISettingsServiceを提供）
         Console.WriteLine("⚙️ 設定システム登録開始");
         services.AddSettingsSystem();
@@ -1451,5 +1447,51 @@ internal sealed class Program
             PendingPatreonCallbackUrl = null;
             Console.WriteLine("🔗 [OAUTH_CALLBACK] Patreonコールバック処理完了");
         }
+    }
+
+    /// <summary>
+    /// [Issue #252] 起動時ログファイルクリア
+    /// ログファイル肥大化防止のため、起動時に既存ログをクリア
+    /// </summary>
+    private static void ClearStartupLogs()
+    {
+        var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        var logFilesToClear = new[]
+        {
+            Path.Combine(baseDirectory, "debug_app_logs.txt"),
+            Path.Combine(baseDirectory, "grouping_debug.txt"),
+            Path.Combine(baseDirectory, "config_diagnostic.log")
+        };
+
+        Console.WriteLine("🧹 [Issue #252] 起動時ログクリア開始");
+
+        foreach (var logFile in logFilesToClear)
+        {
+            try
+            {
+                if (File.Exists(logFile))
+                {
+                    // ファイルサイズを取得してログ
+                    var fileInfo = new FileInfo(logFile);
+                    var fileSizeKb = fileInfo.Length / 1024.0;
+
+                    // ファイルをクリア（空にする）
+                    File.WriteAllText(logFile, $"=== Baketa Log Cleared at {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==={Environment.NewLine}");
+
+                    Console.WriteLine($"🧹 [Issue #252] クリア完了: {Path.GetFileName(logFile)} ({fileSizeKb:F1} KB)");
+                }
+            }
+            catch (IOException ioEx)
+            {
+                // ファイルがロックされている場合は無視
+                Console.WriteLine($"⚠️ [Issue #252] ログクリアスキップ（使用中）: {Path.GetFileName(logFile)} - {ioEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ [Issue #252] ログクリアエラー: {Path.GetFileName(logFile)} - {ex.Message}");
+            }
+        }
+
+        Console.WriteLine("🧹 [Issue #252] 起動時ログクリア完了");
     }
 }
