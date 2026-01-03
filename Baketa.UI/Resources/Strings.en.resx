@@ -1264,6 +1264,38 @@
     <value>Refresh</value>
   </data>
 
+  <!-- ========== Crash Report Dialog [Issue #252] ========== -->
+  <data name="CrashReport_WindowTitle" xml:space="preserve">
+    <value>Crash Report</value>
+  </data>
+  <data name="CrashReport_HeaderText" xml:space="preserve">
+    <value>Unexpected Shutdown Detected</value>
+  </data>
+  <data name="CrashReport_DescriptionSingle" xml:space="preserve">
+    <value>The application unexpectedly quit during the last session. Would you like to send a crash report to help us improve?</value>
+  </data>
+  <data name="CrashReport_DescriptionMultiple" xml:space="preserve">
+    <value>{0} recent crashes were detected. Would you like to send crash reports to help us improve?</value>
+  </data>
+  <data name="CrashReport_PrivacyNote" xml:space="preserve">
+    <value>For your privacy, reports do not contain personally identifiable information (username, email, IP address, etc.).</value>
+  </data>
+  <data name="CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>Include system information (OS, memory usage, etc.)</value>
+  </data>
+  <data name="CrashReport_IncludeLogs" xml:space="preserve">
+    <value>Include recent logs</value>
+  </data>
+  <data name="CrashReport_SendButton" xml:space="preserve">
+    <value>Send Report</value>
+  </data>
+  <data name="CrashReport_DontSendButton" xml:space="preserve">
+    <value>Don't Send</value>
+  </data>
+  <data name="CrashReport_CrashDetailsTitle" xml:space="preserve">
+    <value>Crash Details</value>
+  </data>
+
   <!-- ========== Update Dialog [Issue #249] ========== -->
   <data name="Update_WindowTitle" xml:space="preserve">
     <value>Software Update</value>

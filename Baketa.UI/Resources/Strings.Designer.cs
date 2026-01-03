@@ -543,4 +543,17 @@ public static class Strings
     public static string Update_SkipButton => GetString("Update_SkipButton");
     public static string Update_RemindLaterButton => GetString("Update_RemindLaterButton");
     public static string Update_DownloadButton => GetString("Update_DownloadButton");
+
+    // ========== [Issue #252] Crash Report Dialog ==========
+
+    public static string CrashReport_WindowTitle => GetString("CrashReport_WindowTitle");
+    public static string CrashReport_HeaderText => GetString("CrashReport_HeaderText");
+    public static string CrashReport_DescriptionSingle => GetString("CrashReport_DescriptionSingle");
+    public static string CrashReport_DescriptionMultiple => GetString("CrashReport_DescriptionMultiple");
+    public static string CrashReport_PrivacyNote => GetString("CrashReport_PrivacyNote");
+    public static string CrashReport_IncludeSystemInfo => GetString("CrashReport_IncludeSystemInfo");
+    public static string CrashReport_IncludeLogs => GetString("CrashReport_IncludeLogs");
+    public static string CrashReport_SendButton => GetString("CrashReport_SendButton");
+    public static string CrashReport_DontSendButton => GetString("CrashReport_DontSendButton");
+    public static string CrashReport_CrashDetailsTitle => GetString("CrashReport_CrashDetailsTitle");
 }

@@ -436,6 +436,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 3: ローディング画面クローズ完了");
                         _logger?.LogInformation("ローディング画面クローズ完了");
 
+                        // --- 3.5 [Issue #252] クラッシュレポート検出・ダイアログ表示 ---
+                        await CheckAndShowCrashReportDialogAsync(serviceProvider);
+
                         // --- 4. 認証状態チェックとメインUI表示 ---
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 4: 認証状態チェック開始");
                         _logger?.LogInformation("認証状態をチェック中...");
@@ -903,6 +906,98 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         {
             // 更新チェック失敗はアプリ起動をブロックしない
             _logger?.LogWarning(ex, "[Issue #249] UpdateService初期化失敗（継続）");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #252] クラッシュレポート検出・ダイアログ表示
+    /// .crash_pendingフラグが存在する場合、ダイアログを表示してユーザーに送信を促す
+    /// </summary>
+    private async Task CheckAndShowCrashReportDialogAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            Console.WriteLine("📌 [CRASH_DEBUG] クラッシュレポート検出開始");
+
+            var crashReportService = serviceProvider.GetService<Core.Abstractions.CrashReporting.ICrashReportService>();
+            if (crashReportService == null)
+            {
+                Console.WriteLine("⚠️ [CRASH_DEBUG] ICrashReportService未登録 - クラッシュ検出スキップ");
+                return;
+            }
+
+            // .crash_pendingフラグの存在チェック
+            if (!crashReportService.HasPendingCrashReport())
+            {
+                Console.WriteLine("✅ [CRASH_DEBUG] .crash_pendingなし - 正常終了");
+                return;
+            }
+
+            Console.WriteLine("🚨 [CRASH_DEBUG] .crash_pending検出！ダイアログ表示開始");
+            _logger?.LogInformation("[Issue #252] 前回クラッシュを検出 - ダイアログ表示");
+
+            // 未送信のクラッシュレポートを取得
+            var crashReports = await crashReportService.GetPendingCrashReportsAsync().ConfigureAwait(true);
+            if (crashReports.Count == 0)
+            {
+                Console.WriteLine("⚠️ [CRASH_DEBUG] 未送信レポートなし - フラグのみクリア");
+                await crashReportService.ClearCrashPendingFlagAsync().ConfigureAwait(true);
+                return;
+            }
+
+            Console.WriteLine($"📝 [CRASH_DEBUG] 未送信レポート: {crashReports.Count}件");
+
+            // ダイアログを表示
+            var viewModel = new ViewModels.CrashReportDialogViewModel(crashReports);
+            var dialog = new Views.CrashReportDialogWindow(viewModel);
+
+            // ダイアログアイコンを設定
+            try
+            {
+                var iconUri = new Uri(BAKETA_ICON_PATH);
+                dialog.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(iconUri));
+            }
+            catch (Exception iconEx)
+            {
+                Console.WriteLine($"⚠️ クラッシュダイアログアイコン設定失敗: {iconEx.Message}");
+            }
+
+            // クラッシュダイアログは起動時に表示されるため、親ウィンドウは存在しない
+            // ShowDialogの代わりにShowを使用し、ユーザー操作完了をイベントで待機
+            dialog.Show();
+            var tcs = new System.Threading.Tasks.TaskCompletionSource<ViewModels.CrashReportDialogResult>();
+            dialog.Closed += (_, _) => tcs.TrySetResult(viewModel.Result);
+            var result = await tcs.Task.ConfigureAwait(true);
+
+            if (result == ViewModels.CrashReportDialogResult.Send)
+            {
+                Console.WriteLine("📤 [CRASH_DEBUG] ユーザーが送信を選択");
+                _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信を選択");
+
+                // TODO: Phase 3でCloudflare Workers経由でSupabaseに送信
+                // 現時点では送信済みとしてマーク（UI非依存のためConfigureAwait(false)）
+                foreach (var report in crashReports)
+                {
+                    await crashReportService.MarkReportAsSentAsync(report.ReportId).ConfigureAwait(false);
+                }
+
+                Console.WriteLine("✅ [CRASH_DEBUG] クラッシュレポート送信処理完了（Phase 3で実際の送信実装）");
+            }
+            else
+            {
+                Console.WriteLine("🚫 [CRASH_DEBUG] ユーザーが送信をスキップ");
+                _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信をスキップ");
+            }
+
+            // フラグをクリア（UI非依存のためConfigureAwait(false)）
+            await crashReportService.ClearCrashPendingFlagAsync().ConfigureAwait(false);
+            Console.WriteLine("✅ [CRASH_DEBUG] .crash_pendingフラグクリア完了");
+        }
+        catch (Exception ex)
+        {
+            // クラッシュレポート処理の失敗はアプリ起動をブロックしない
+            Console.WriteLine($"⚠️ [CRASH_DEBUG] クラッシュレポート処理エラー（継続）: {ex.Message}");
+            _logger?.LogWarning(ex, "[Issue #252] クラッシュレポート処理中にエラー（継続）");
         }
     }
 
