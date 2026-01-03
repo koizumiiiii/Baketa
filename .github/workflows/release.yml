@@ -273,6 +273,9 @@ jobs:
         $zipFile = "./publish/Baketa-$version.zip"
         $downloadUrl = "https://github.com/koizumiiiii/Baketa/releases/download/v$version"
 
+        # Ed25519 公開鍵（UpdateService.csと同じ値）
+        $publicKey = "mhVnvb6OPFeEaId0GsB+p1CGrQBsbNlJRDhb5RryHd0="
+
         Write-Host "🔐 Generating AppCast with Ed25519 signature..."
 
         # Check if private key is set
@@ -282,13 +285,17 @@ jobs:
           exit 0
         }
 
+        # Debug: Show key length (not the actual key for security)
+        $keyLength = $env:SPARKLE_PRIVATE_KEY.Length
+        Write-Host "✅ Private key found (length: $keyLength characters)"
+
         # Create a dedicated directory for AppCast generation (zip only)
         $appcastDir = "./appcast-build"
         New-Item -ItemType Directory -Path $appcastDir -Force | Out-Null
         Copy-Item $zipFile $appcastDir -Force
 
         # Generate appcast.json with Ed25519 signature
-        # Use --private-key-override for explicit key passing
+        # Use both --private-key-override and --public-key-override
         netsparkle-generate-appcast `
           --binaries $appcastDir `
           --appcast-output-directory ./publish `
@@ -297,7 +304,8 @@ jobs:
           --os windows `
           --ext zip `
           --file-extract-version `
-          --private-key-override "$env:SPARKLE_PRIVATE_KEY"
+          --private-key-override $env:SPARKLE_PRIVATE_KEY `
+          --public-key-override $publicKey
 
         # Verify generation and signature
         if (Test-Path "./publish/appcast.json") {
