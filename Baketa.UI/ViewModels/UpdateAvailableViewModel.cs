@@ -182,7 +182,7 @@ public sealed class UpdateItemViewModel
     public string Title => $"{_appName} {_item.Version}";
 
     /// <summary>
-    /// 日付テキスト
+    /// 日付テキスト（言語に依存しないISO形式）
     /// </summary>
     public string DateText
     {
@@ -191,9 +191,8 @@ public sealed class UpdateItemViewModel
             if (_item.PublicationDate == DateTime.MinValue)
                 return string.Empty;
 
-            // ユーザーのカルチャで日付をフォーマット
-            var culture = CultureInfo.CurrentUICulture;
-            return _item.PublicationDate.ToString("D", culture);
+            // 言語に依存しない形式: YYYY-MM-DD
+            return _item.PublicationDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         }
     }
 }

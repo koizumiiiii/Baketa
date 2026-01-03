@@ -33,19 +33,18 @@
                 Margin="0,16"
                 BorderBrush="{DynamicResource TextControlBorderBrush}"
                 BorderThickness="1"
-                CornerRadius="4">
+                CornerRadius="4"
+                Background="{DynamicResource SettingsCardBackground}">
             <ScrollViewer>
                 <ItemsControl ItemsSource="{Binding Updates}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="12,8"
-                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                            <Border Padding="12,8">
                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                     <TextBlock Text="{Binding Title}"
-                                               FontWeight="Medium"
-                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                               FontWeight="Medium"/>
                                     <TextBlock Text="{Binding DateText}"
-                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                               Opacity="0.7"/>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
