@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reactive;
+using System.Reactive.Disposables;
 using Baketa.UI.Resources;
 using NetSparkleUpdater;
 using NetSparkleUpdater.Enums;
-using NetSparkleUpdater.Interfaces;
 using ReactiveUI;
 
 namespace Baketa.UI.ViewModels;
@@ -15,29 +15,33 @@ namespace Baketa.UI.ViewModels;
 /// [Issue #249] 更新ダイアログViewModel
 /// i18n対応
 /// </summary>
-public sealed class UpdateAvailableViewModel : ReactiveObject
+public sealed class UpdateAvailableViewModel : ReactiveObject, IDisposable
 {
-    private readonly List<AppCastItem> _updates;
+    private readonly CompositeDisposable _disposables = [];
+    private bool _disposed;
 
     public UpdateAvailableViewModel(
         List<AppCastItem> updates,
         string currentVersion,
         string appName = "Baketa")
     {
-        _updates = updates;
         CurrentVersion = currentVersion;
         AppName = appName;
 
         // 最新の更新アイテムを設定
         CurrentItem = updates.FirstOrDefault();
 
-        // 更新アイテムをViewModelに変換
-        Updates = updates.Select(u => new UpdateItemViewModel(u)).ToList();
+        // 更新アイテムをViewModelに変換（アプリ名を渡す）
+        Updates = updates.Select(u => new UpdateItemViewModel(u, appName)).ToList();
 
-        // コマンド初期化
+        // コマンド初期化（Disposeに登録）
         SkipCommand = ReactiveCommand.Create(OnSkip);
         RemindLaterCommand = ReactiveCommand.Create(OnRemindLater);
         DownloadCommand = ReactiveCommand.Create(OnDownload);
+
+        _disposables.Add(SkipCommand);
+        _disposables.Add(RemindLaterCommand);
+        _disposables.Add(DownloadCommand);
     }
 
     /// <summary>
@@ -146,6 +150,16 @@ public sealed class UpdateAvailableViewModel : ReactiveObject
         var plusIndex = version.IndexOf('+');
         return plusIndex > 0 ? version[..plusIndex] : version;
     }
+
+    /// <summary>
+    /// リソースを解放
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _disposables.Dispose();
+    }
 }
 
 /// <summary>
@@ -154,16 +168,18 @@ public sealed class UpdateAvailableViewModel : ReactiveObject
 public sealed class UpdateItemViewModel
 {
     private readonly AppCastItem _item;
+    private readonly string _appName;
 
-    public UpdateItemViewModel(AppCastItem item)
+    public UpdateItemViewModel(AppCastItem item, string appName = "Baketa")
     {
         _item = item;
+        _appName = appName;
     }
 
     /// <summary>
     /// タイトル（アプリ名 + バージョン）
     /// </summary>
-    public string Title => $"Baketa {_item.Version}";
+    public string Title => $"{_appName} {_item.Version}";
 
     /// <summary>
     /// 日付テキスト

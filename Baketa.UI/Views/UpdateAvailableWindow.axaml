@@ -25,13 +25,13 @@
                        FontWeight="SemiBold"/>
             <TextBlock Text="{Binding InfoText}"
                        TextWrapping="Wrap"
-                       Foreground="{DynamicResource SystemBaseMediumColor}"/>
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
         </StackPanel>
 
         <!-- 更新リスト -->
         <Border Grid.Row="1"
                 Margin="0,16"
-                BorderBrush="{DynamicResource SystemBaseLowColor}"
+                BorderBrush="{DynamicResource TextControlBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="4">
             <ScrollViewer>
@@ -39,11 +39,13 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Padding="12,8"
-                                    Background="{DynamicResource SystemAccentColorLight3}">
+                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
                                 <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <TextBlock Text="{Binding Title}" FontWeight="Medium"/>
+                                    <TextBlock Text="{Binding Title}"
+                                               FontWeight="Medium"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
                                     <TextBlock Text="{Binding DateText}"
-                                               Foreground="{DynamicResource SystemBaseMediumColor}"/>
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

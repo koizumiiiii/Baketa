@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Baketa.UI.ViewModels;
 using NetSparkleUpdater;
@@ -22,11 +23,23 @@ public partial class UpdateAvailableWindow : Window, IUpdateAvailable
         DataContext = viewModel;
 
         // ViewModelのイベントをウィンドウアクションにバインド
-        _viewModel.CloseRequested += (_, result) =>
-        {
-            UserResponded?.Invoke(this, new UpdateResponseEventArgs(result, _viewModel.CurrentItem));
-            Close();
-        };
+        _viewModel.CloseRequested += OnViewModelCloseRequested;
+    }
+
+    private void OnViewModelCloseRequested(object? sender, UpdateAvailableResult result)
+    {
+        UserResponded?.Invoke(this, new UpdateResponseEventArgs(result, _viewModel.CurrentItem));
+        Close();
+    }
+
+    /// <summary>
+    /// ウィンドウが閉じられたときにリソースをクリーンアップ
+    /// </summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        _viewModel.CloseRequested -= OnViewModelCloseRequested;
+        _viewModel.Dispose();
+        base.OnClosed(e);
     }
 
     /// <summary>
@@ -42,7 +55,12 @@ public partial class UpdateAvailableWindow : Window, IUpdateAvailable
     /// <summary>
     /// 現在のアイテム（互換性のため）
     /// </summary>
-    public AppCastItem CurrentItem => _viewModel.CurrentItem!;
+    /// <remarks>
+    /// IUpdateAvailableインターフェースはnon-nullを期待するが、
+    /// updatesリストが空の場合はnullになる可能性がある。
+    /// その場合はダミーのAppCastItemを返す。
+    /// </remarks>
+    public AppCastItem CurrentItem => _viewModel.CurrentItem ?? new AppCastItem();
 
     /// <summary>
     /// ウィンドウを表示してユーザー応答を待つ
