@@ -287,8 +287,8 @@ jobs:
         New-Item -ItemType Directory -Path $appcastDir -Force | Out-Null
         Copy-Item $zipFile $appcastDir -Force
 
-        # Generate appcast.json
-        # Note: The tool uses SPARKLE_PRIVATE_KEY environment variable automatically
+        # Generate appcast.json with Ed25519 signature
+        # Use --private-key-override for explicit key passing
         netsparkle-generate-appcast `
           --binaries $appcastDir `
           --appcast-output-directory ./publish `
@@ -296,14 +296,25 @@ jobs:
           --output-type json `
           --os windows `
           --ext zip `
-          --file-extract-version
+          --file-extract-version `
+          --private-key-override "$env:SPARKLE_PRIVATE_KEY"
 
-        # Verify generation
+        # Verify generation and signature
         if (Test-Path "./publish/appcast.json") {
           Write-Host "✅ appcast.json generated successfully"
-          Get-Content "./publish/appcast.json" | Write-Host
-          echo "## AppCast" >> $env:GITHUB_STEP_SUMMARY
-          echo "- appcast.json generated with Ed25519 signature" >> $env:GITHUB_STEP_SUMMARY
+          $content = Get-Content "./publish/appcast.json" -Raw
+          Write-Host $content
+
+          # Verify signature is present
+          if ($content -match '"signature"') {
+            Write-Host "✅ Ed25519 signature verified in appcast.json"
+            echo "## AppCast" >> $env:GITHUB_STEP_SUMMARY
+            echo "- appcast.json generated with Ed25519 signature ✅" >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            Write-Host "❌ ERROR: No signature found in appcast.json!"
+            Write-Host "   Check that NETSPARKLE_ED25519_PRIVATE_KEY secret is correctly set"
+            exit 1
+          }
         } else {
           Write-Host "❌ Failed to generate appcast.json"
           exit 1
