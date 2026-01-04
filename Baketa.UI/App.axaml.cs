@@ -311,6 +311,20 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // GlobalExceptionHandler.Initialize()でRxApp.DefaultExceptionHandlerが設定される
             Console.WriteLine("🎆 ReactiveUIエラーハンドラーはGlobalExceptionHandlerで統合管理");
 
+#if DEBUG
+            // [Issue #252 DEBUG] クラッシュレポートテスト用トリガー
+            // %APPDATA%\Baketa\.trigger_crash ファイルが存在する場合、意図的にクラッシュ
+            var crashTriggerPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Baketa", ".trigger_crash");
+            if (File.Exists(crashTriggerPath))
+            {
+                Console.WriteLine("💥 [CRASH_TEST] クラッシュトリガー検出！テスト例外を発生させます...");
+                File.Delete(crashTriggerPath); // トリガーを削除（無限ループ防止）
+                throw new InvalidOperationException("[Issue #252 TEST] クラッシュレポートテスト用の意図的な例外です");
+            }
+#endif
+
             try
             {
                 Console.WriteLine("🖥️ IClassicDesktopStyleApplicationLifetime取得成功");
@@ -933,14 +947,13 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         settings.IncludeLogs = logsElement.GetBoolean();
                     }
 
-                    Console.WriteLine($"[CRASH_DEBUG] 設定読み込み: AutoSend={settings.AutoSendCrashReports}, SystemInfo={settings.IncludeSystemInfo}, Logs={settings.IncludeLogs}");
                     return settings;
                 }
             }
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"[CRASH_DEBUG] 設定読み込みエラー（デフォルト使用）: {ex.Message}");
+            // 設定読み込みエラー時はデフォルト設定を使用
         }
 
         // デフォルト設定を返す
@@ -955,35 +968,27 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     {
         try
         {
-            Console.WriteLine("📌 [CRASH_DEBUG] クラッシュレポート検出開始");
-
             var crashReportService = serviceProvider.GetService<Core.Abstractions.CrashReporting.ICrashReportService>();
             if (crashReportService == null)
             {
-                Console.WriteLine("⚠️ [CRASH_DEBUG] ICrashReportService未登録 - クラッシュ検出スキップ");
                 return;
             }
 
             // .crash_pendingフラグの存在チェック
             if (!crashReportService.HasPendingCrashReport())
             {
-                Console.WriteLine("✅ [CRASH_DEBUG] .crash_pendingなし - 正常終了");
                 return;
             }
 
-            Console.WriteLine("🚨 [CRASH_DEBUG] .crash_pending検出！");
             _logger?.LogInformation("[Issue #252] 前回クラッシュを検出");
 
             // 未送信のクラッシュレポートを取得
             var crashReports = await crashReportService.GetPendingCrashReportsAsync().ConfigureAwait(true);
             if (crashReports.Count == 0)
             {
-                Console.WriteLine("⚠️ [CRASH_DEBUG] 未送信レポートなし - フラグのみクリア");
                 await crashReportService.ClearCrashPendingFlagAsync().ConfigureAwait(true);
                 return;
             }
-
-            Console.WriteLine($"📝 [CRASH_DEBUG] 未送信レポート: {crashReports.Count}件");
 
             // [Phase 4] 自動送信設定を確認
             var crashReportSettings = GetCrashReportSettings();
@@ -991,7 +996,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             if (crashReportSettings.AutoSendCrashReports)
             {
                 // 自動送信モード：ダイアログなしで送信
-                Console.WriteLine("🤖 [CRASH_DEBUG] 自動送信モード - ダイアログをスキップ");
                 _logger?.LogInformation("[Issue #252] 自動送信モード - ダイアログなしでクラッシュレポートを送信");
 
                 await SendCrashReportsAsync(
@@ -1003,7 +1007,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             else
             {
                 // ダイアログ表示モード：ユーザーに確認
-                Console.WriteLine("💬 [CRASH_DEBUG] ダイアログ表示モード");
                 _logger?.LogInformation("[Issue #252] ダイアログを表示してユーザーに確認");
 
                 var viewModel = new ViewModels.CrashReportDialogViewModel(crashReports);
@@ -1029,7 +1032,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
                 if (result == ViewModels.CrashReportDialogResult.Send)
                 {
-                    Console.WriteLine("📤 [CRASH_DEBUG] ユーザーが送信を選択");
                     _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信を選択");
 
                     await SendCrashReportsAsync(
@@ -1040,19 +1042,22 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 }
                 else
                 {
-                    Console.WriteLine("🚫 [CRASH_DEBUG] ユーザーが送信をスキップ");
                     _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信をスキップ");
+
+                    // 送信しない場合もレポートを削除（次回表示されないように）
+                    foreach (var summary in crashReports)
+                    {
+                        await crashReportService.DeleteCrashReportAsync(summary.ReportId).ConfigureAwait(false);
+                    }
                 }
             }
 
-            // フラグをクリア（UI非依存のためConfigureAwait(false)）
+            // フラグをクリア
             await crashReportService.ClearCrashPendingFlagAsync().ConfigureAwait(false);
-            Console.WriteLine("✅ [CRASH_DEBUG] .crash_pendingフラグクリア完了");
         }
         catch (Exception ex)
         {
             // クラッシュレポート処理の失敗はアプリ起動をブロックしない
-            Console.WriteLine($"⚠️ [CRASH_DEBUG] クラッシュレポート処理エラー（継続）: {ex.Message}");
             _logger?.LogWarning(ex, "[Issue #252] クラッシュレポート処理中にエラー（継続）");
         }
     }
@@ -1070,13 +1075,23 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         var sentCount = 0;
         var failedCount = 0;
 
-        foreach (var summary in crashReports)
+        // [Issue #252] レート制限対策: 最新5件のみ送信、古いものは削除のみ
+        const int maxSendCount = 5;
+        var reportsToSend = crashReports.Take(maxSendCount).ToList();
+        var reportsToDeleteOnly = crashReports.Skip(maxSendCount).ToList();
+
+        // 古いレポートは送信せず削除のみ
+        foreach (var summary in reportsToDeleteOnly)
+        {
+            await crashReportService.DeleteCrashReportAsync(summary.ReportId).ConfigureAwait(false);
+        }
+
+        foreach (var summary in reportsToSend)
         {
             // レポート詳細を読み込み
             var fullReport = await crashReportService.LoadCrashReportAsync(summary.ReportId).ConfigureAwait(false);
             if (fullReport == null)
             {
-                Console.WriteLine($"⚠️ [CRASH_DEBUG] レポート読み込み失敗: {summary.ReportId}");
                 continue;
             }
 
@@ -1088,18 +1103,19 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
             if (success)
             {
-                await crashReportService.MarkReportAsSentAsync(summary.ReportId).ConfigureAwait(false);
+                // 送信成功したレポートは削除
+                await crashReportService.DeleteCrashReportAsync(summary.ReportId).ConfigureAwait(false);
                 sentCount++;
-                Console.WriteLine($"✅ [CRASH_DEBUG] レポート送信成功: {summary.ReportId}");
             }
             else
             {
                 failedCount++;
-                Console.WriteLine($"❌ [CRASH_DEBUG] レポート送信失敗: {summary.ReportId}");
             }
+
+            // [Issue #252] レート制限回避のため送信間に遅延（10件/分制限 → 7秒間隔）
+            await Task.Delay(7000).ConfigureAwait(false);
         }
 
-        Console.WriteLine($"📊 [CRASH_DEBUG] 送信結果: 成功={sentCount}, 失敗={failedCount}");
         _logger?.LogInformation("[Issue #252] クラッシュレポート送信完了: 成功={SentCount}, 失敗={FailedCount}", sentCount, failedCount);
     }
 

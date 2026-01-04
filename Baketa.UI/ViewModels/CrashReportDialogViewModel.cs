@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Disposables;
 using Baketa.Core.Abstractions.CrashReporting;
@@ -15,14 +16,24 @@ namespace Baketa.UI.ViewModels;
 public sealed class CrashReportDialogViewModel : ReactiveObject, IDisposable
 {
     private readonly CompositeDisposable _disposables = [];
-    private readonly IReadOnlyList<CrashReportSummary> _crashReports;
     private bool _disposed;
     private bool _includeSystemInfo = true;
     private bool _includeLogs = true;
 
+    /// <summary>
+    /// クラッシュレポートのリスト（ObservableCollectionで変更通知対応）
+    /// </summary>
+    public ObservableCollection<CrashReportSummary> CrashReports { get; } = [];
+
     public CrashReportDialogViewModel(IReadOnlyList<CrashReportSummary> crashReports)
     {
-        _crashReports = crashReports ?? throw new ArgumentNullException(nameof(crashReports));
+        ArgumentNullException.ThrowIfNull(crashReports);
+
+        // ObservableCollectionにデータをコピー
+        foreach (var report in crashReports)
+        {
+            CrashReports.Add(report);
+        }
 
         // コマンド初期化
         SendCommand = ReactiveCommand.Create(OnSend);
@@ -33,14 +44,9 @@ public sealed class CrashReportDialogViewModel : ReactiveObject, IDisposable
     }
 
     /// <summary>
-    /// クラッシュレポートのリスト
-    /// </summary>
-    public IReadOnlyList<CrashReportSummary> CrashReports => _crashReports;
-
-    /// <summary>
     /// クラッシュレポートの数
     /// </summary>
-    public int CrashCount => _crashReports.Count;
+    public int CrashCount => CrashReports.Count;
 
     /// <summary>
     /// 単一のクラッシュかどうか

@@ -181,7 +181,8 @@ public sealed partial class CrashReportService : ICrashReportService
         }
 
         var files = Directory.GetFiles(_reportsDirectory, "crash_*.json")
-            .OrderByDescending(f => File.GetCreationTimeUtc(f));
+            .OrderByDescending(f => File.GetCreationTimeUtc(f))
+            .ToArray();
 
         foreach (var file in files)
         {
