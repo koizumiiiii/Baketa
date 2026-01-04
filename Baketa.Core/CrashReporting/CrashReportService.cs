@@ -274,12 +274,20 @@ public sealed partial class CrashReportService : ICrashReportService
         {
             // 静的HttpClientを使用（Socket Exhaustion対策）
             // リクエストボディ作成
+            // AggregateException（UnobservedTaskException等）の場合、
+            // 親のStackTraceはnullになるため、InnerExceptionのスタックトレースを使用
+            var stackTrace = report.Exception.StackTrace;
+            if (string.IsNullOrEmpty(stackTrace) && report.Exception.InnerException != null)
+            {
+                stackTrace = report.Exception.InnerException.StackTrace;
+            }
+
             var requestBody = new Dictionary<string, object?>
             {
                 ["report_id"] = report.ReportId, // UUID形式で生成済み
                 ["crash_timestamp"] = report.CrashedAt.ToString("O"),
                 ["error_message"] = report.Exception.Message,
-                ["stack_trace"] = report.Exception.StackTrace,
+                ["stack_trace"] = stackTrace,
                 ["app_version"] = report.BaketaVersion,
                 ["os_version"] = report.SystemInfo.OsVersion,
                 ["include_system_info"] = includeSystemInfo,
