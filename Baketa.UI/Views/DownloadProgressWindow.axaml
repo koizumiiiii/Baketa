@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        x:Class="Baketa.UI.Views.DownloadProgressWindow"
+        Title="{Binding WindowTitle}"
+        Width="400"
+        MinHeight="180"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True"
+        x:DataType="vm:DownloadProgressViewModel">
+
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="MinWidth" Value="140"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto" Margin="20">
+        <!-- ステータステキスト -->
+        <TextBlock Grid.Row="0"
+                   Text="{Binding StatusText}"
+                   FontSize="16"
+                   FontWeight="SemiBold"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,16"/>
+
+        <!-- プログレスバー -->
+        <ProgressBar Grid.Row="1"
+                     Value="{Binding ProgressValue}"
+                     Minimum="0"
+                     Maximum="100"
+                     Height="20"
+                     Margin="0,0,0,16"
+                     IsIndeterminate="{Binding IsDownloading}"/>
+
+        <!-- エラーメッセージ -->
+        <TextBlock Grid.Row="2"
+                   Text="{Binding ErrorMessage}"
+                   Foreground="Red"
+                   TextWrapping="Wrap"
+                   TextAlignment="Center"
+                   Margin="0,0,0,16"
+                   IsVisible="{Binding HasError}"/>
+
+        <!-- ボタン -->
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Spacing="8">
+            <!-- インストールと再起動ボタン（ダウンロード完了後に表示） -->
+            <Button Content="{Binding ActionButtonText}"
+                    Command="{Binding ActionCommand}"
+                    IsEnabled="{Binding IsActionButtonEnabled}"
+                    IsVisible="{Binding !IsDownloading}"
+                    Classes="accent"/>
+            <!-- キャンセルボタン -->
+            <Button Content="{Binding CancelButtonText}"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding IsDownloading}"/>
+        </StackPanel>
+    </Grid>
+</Window>

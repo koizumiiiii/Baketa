@@ -544,6 +544,14 @@ public static class Strings
     public static string Update_RemindLaterButton => GetString("Update_RemindLaterButton");
     public static string Update_DownloadButton => GetString("Update_DownloadButton");
 
+    // ========== [Issue #249] Download Progress Dialog ==========
+
+    public static string Update_DownloadProgress_Title => GetString("Update_DownloadProgress_Title");
+    public static string Update_DownloadProgress_Downloading => GetString("Update_DownloadProgress_Downloading");
+    public static string Update_DownloadProgress_Complete => GetString("Update_DownloadProgress_Complete");
+    public static string Update_DownloadProgress_InstallAndRelaunch => GetString("Update_DownloadProgress_InstallAndRelaunch");
+    public static string Update_DownloadProgress_Cancel => GetString("Update_DownloadProgress_Cancel");
+
     // ========== [Issue #252] Crash Report Dialog ==========
 
     public static string CrashReport_WindowTitle => GetString("CrashReport_WindowTitle");

@@ -1336,7 +1336,22 @@
     <value>後で通知</value>
   </data>
   <data name="Update_DownloadButton" xml:space="preserve">
-    <value>ダウンロード / インストール</value>
+    <value>ダウンロード</value>
+  </data>
+  <data name="Update_DownloadProgress_Title" xml:space="preserve">
+    <value>ソフトウェア更新</value>
+  </data>
+  <data name="Update_DownloadProgress_Downloading" xml:space="preserve">
+    <value>{0} をダウンロード中...</value>
+  </data>
+  <data name="Update_DownloadProgress_Complete" xml:space="preserve">
+    <value>ダウンロード完了</value>
+  </data>
+  <data name="Update_DownloadProgress_InstallAndRelaunch" xml:space="preserve">
+    <value>インストールと再起動</value>
+  </data>
+  <data name="Update_DownloadProgress_Cancel" xml:space="preserve">
+    <value>キャンセル</value>
   </data>
 
 </root>

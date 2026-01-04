@@ -1336,7 +1336,22 @@
     <value>Remind Me Later</value>
   </data>
   <data name="Update_DownloadButton" xml:space="preserve">
-    <value>Download / Install</value>
+    <value>Download</value>
+  </data>
+  <data name="Update_DownloadProgress_Title" xml:space="preserve">
+    <value>Software Update</value>
+  </data>
+  <data name="Update_DownloadProgress_Downloading" xml:space="preserve">
+    <value>Downloading {0}...</value>
+  </data>
+  <data name="Update_DownloadProgress_Complete" xml:space="preserve">
+    <value>Download Complete</value>
+  </data>
+  <data name="Update_DownloadProgress_InstallAndRelaunch" xml:space="preserve">
+    <value>Install and Relaunch</value>
+  </data>
+  <data name="Update_DownloadProgress_Cancel" xml:space="preserve">
+    <value>Cancel</value>
   </data>
 
 </root>
