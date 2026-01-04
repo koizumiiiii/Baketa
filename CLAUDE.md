@@ -110,14 +110,14 @@ OCRサーバー（BaketaSuryaOcrServer.exe）は `models-v1` リリースで配�
 | ファイル | 説明 | サイズ |
 |----------|------|--------|
 | BaketaSuryaOcrServer-cpu.zip | CPU版OCRサーバー | ~225MB |
-| BaketaSuryaOcrServer-cuda.zip.part1/2 | CUDA版OCRサーバー（分割） | ~2.5GB |
+| BaketaSuryaOcrServer-cuda.zip.001/.002 | CUDA版OCRサーバー（分割） | ~2.5GB |
 | BaketaTranslationServer.zip | 翻訳サーバー | - |
 | surya-*.zip | Surya OCRモデル | - |
 | nllb-*.zip | NLLB翻訳モデル | - |
 
 **CUDA版の結合方法:**
 ```cmd
-copy /b BaketaSuryaOcrServer-cuda.zip.part1+BaketaSuryaOcrServer-cuda.zip.part2 BaketaSuryaOcrServer-cuda.zip
+copy /b BaketaSuryaOcrServer-cuda.zip.001+BaketaSuryaOcrServer-cuda.zip.002 BaketaSuryaOcrServer-cuda.zip
 ```
 
 **OCRサーバー再ビルド手順:**
