@@ -386,7 +386,8 @@ def serve(port: int = 50052, model_path: Optional[str] = None, use_gpu: bool = T
             OcrServiceServicer(engine), server
         )
 
-    server.add_insecure_port(f'[::]:{port}')
+    # localhost only - Windowsファイアウォールダイアログを回避
+    server.add_insecure_port(f'127.0.0.1:{port}')
     server.start()
 
     logger.info(f"Surya OCR (ONNX) gRPCサーバー起動 (port: {port})")

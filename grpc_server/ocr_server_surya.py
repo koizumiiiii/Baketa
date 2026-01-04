@@ -438,7 +438,8 @@ def serve(port: int = 50052, device: str = "cuda", use_quantized: bool = False):
             OcrServiceServicer(engine), server
         )
 
-    server.add_insecure_port(f'[::]:{port}')
+    # localhost only - Windowsファイアウォールダイアログを回避
+    server.add_insecure_port(f'127.0.0.1:{port}')
     server.start()
 
     logger.info(f"Surya OCR gRPCサーバー起動 (port: {port})")

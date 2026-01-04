@@ -352,7 +352,8 @@ def serve(port: int = 50053, device: str = "cuda"):
             OcrServiceServicer(engine), server
         )
 
-    server.add_insecure_port(f'[::]:{port}')
+    # localhost only - Windowsファイアウォールダイアログを回避
+    server.add_insecure_port(f'127.0.0.1:{port}')
     server.start()
 
     logger.info(f"PaddleOCR-VL gRPCサーバー起動 (port: {port})")
