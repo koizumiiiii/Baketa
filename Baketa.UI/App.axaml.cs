@@ -311,20 +311,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // GlobalExceptionHandler.Initialize()でRxApp.DefaultExceptionHandlerが設定される
             Console.WriteLine("🎆 ReactiveUIエラーハンドラーはGlobalExceptionHandlerで統合管理");
 
-#if DEBUG
-            // [Issue #252 DEBUG] クラッシュレポートテスト用トリガー
-            // %APPDATA%\Baketa\.trigger_crash ファイルが存在する場合、意図的にクラッシュ
-            var crashTriggerPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Baketa", ".trigger_crash");
-            if (File.Exists(crashTriggerPath))
-            {
-                Console.WriteLine("💥 [CRASH_TEST] クラッシュトリガー検出！テスト例外を発生させます...");
-                File.Delete(crashTriggerPath); // トリガーを削除（無限ループ防止）
-                throw new InvalidOperationException("[Issue #252 TEST] クラッシュレポートテスト用の意図的な例外です");
-            }
-#endif
-
             try
             {
                 Console.WriteLine("🖥️ IClassicDesktopStyleApplicationLifetime取得成功");
