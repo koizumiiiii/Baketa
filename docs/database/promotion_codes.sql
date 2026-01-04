@@ -17,7 +17,7 @@
 -- ===========================================
 CREATE TABLE IF NOT EXISTS promotion_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXX-XXXX" (Base32 Crockford)
+  code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXXXXXX" (Base32 Crockford 8文字)
   plan_type INT NOT NULL,                       -- 0=Free, 1=Standard, 2=Pro, 3=Premia
   expires_at TIMESTAMPTZ NOT NULL,              -- コード自体の有効期限
   duration_days INT NOT NULL DEFAULT 30,        -- 適用後のプラン有効期間（日数）
@@ -91,7 +91,7 @@ CREATE POLICY "Service role can manage redemptions" ON promotion_code_redemption
 -- 4. 監査ログ記録
 --
 -- 使用例:
--- SELECT * FROM redeem_promotion_code('BAKETA-XXXX-XXXX', '192.168.1.1');
+-- SELECT * FROM redeem_promotion_code('BAKETA-XXXXXXXX', '192.168.1.1');
 -- ===========================================
 CREATE OR REPLACE FUNCTION redeem_promotion_code(
   code_to_redeem TEXT,
@@ -212,7 +212,7 @@ $$;
 -- LIMIT 100;
 
 -- コード無効化
--- UPDATE promotion_codes SET is_active = false WHERE code = 'BAKETA-XXXX-XXXX';
+-- UPDATE promotion_codes SET is_active = false WHERE code = 'BAKETA-XXXXXXXX';
 
 -- ===========================================
 -- 5. マイグレーション用SQL（既存テーブル更新）

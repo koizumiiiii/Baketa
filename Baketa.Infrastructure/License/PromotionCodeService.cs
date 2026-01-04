@@ -32,7 +32,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     #region 定数定義
 
     /// <summary>
-    /// コード形式: BAKETA-XXXX-XXXX (Base32 Crockford、O/0/I/1除外)
+    /// コード形式: BAKETA-XXXXXXXX (Base32 Crockford 8文字、O/I/L/U除外)
     /// </summary>
     private static readonly Regex CodeFormatRegex = new(
         ValidationPatterns.PromotionCode,
@@ -326,11 +326,11 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         if (string.IsNullOrEmpty(code))
             return "***";
 
-        // BAKETA-XXXX-XXXX 形式の場合、BAKETA-****-**** と表示
+        // BAKETA-XXXXXXXX 形式の場合、BAKETA-******** と表示
         const string prefix = "BAKETA-";
         if (code.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
-            return $"{prefix}****-****";
+            return $"{prefix}********";
         }
 
         // その他の形式の場合は先頭3文字のみ表示

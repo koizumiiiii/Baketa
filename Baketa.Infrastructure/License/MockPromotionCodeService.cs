@@ -158,7 +158,7 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
         if (string.IsNullOrWhiteSpace(code))
             return false;
 
-        // BAKETA-XXXX-XXXX 形式をチェック
+        // BAKETA-XXXXXXXX 形式をチェック
         var normalized = code.Trim().ToUpperInvariant();
         return Regex.IsMatch(
             normalized,

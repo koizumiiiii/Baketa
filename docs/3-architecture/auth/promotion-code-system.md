@@ -113,7 +113,7 @@ POST https://baketa-relay.suke009.workers.dev/api/promotion/redeem
 
 ```json
 {
-  "code": "BAKETA-XXXX-XXXX"
+  "code": "BAKETA-XXXXXXXX"
 }
 ```
 
@@ -226,7 +226,7 @@ $$;
 
 ```json
 {
-  "AppliedPromotionCode": "BAKETA-XXXX-XXXX",
+  "AppliedPromotionCode": "BAKETA-XXXXXXXX",
   "PromotionPlanType": 2,
   "PromotionExpiresAt": "2025-03-29T00:00:00Z",
   "PromotionAppliedAt": "2025-01-15T10:30:00Z",

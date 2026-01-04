@@ -11,7 +11,7 @@ public interface IPromotionCodeService
     /// <summary>
     /// プロモーションコードを適用
     /// </summary>
-    /// <param name="code">プロモーションコード（例: BAKETA-XXXX-XXXX）</param>
+    /// <param name="code">プロモーションコード（例: BAKETA-XXXXXXXX）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>適用結果</returns>
     Task<PromotionCodeResult> ApplyCodeAsync(string code, CancellationToken cancellationToken = default);

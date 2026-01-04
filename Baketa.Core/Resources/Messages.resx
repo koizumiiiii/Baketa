@@ -61,7 +61,7 @@
 
   <!-- ========== Promotion Code Messages ========== -->
   <data name="Promotion_InvalidFormat" xml:space="preserve">
-    <value>プロモーションコードの形式が正しくありません。BAKETA-XXXX-XXXX の形式で入力してください。</value>
+    <value>プロモーションコードの形式が正しくありません。BAKETA-XXXXXXXX の形式で入力してください。</value>
   </data>
   <data name="Promotion_Applied" xml:space="preserve">
     <value>プロモーションコードが適用されました。</value>
