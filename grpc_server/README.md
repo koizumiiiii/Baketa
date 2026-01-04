@@ -93,7 +93,7 @@ python start_server.py --use-ctranslate2
 ```
 
 **CTranslate2エンジン設定**:
-- ホスト: `0.0.0.0` (全インターフェース)
+- ホスト: `127.0.0.1` (localhost only、ファイアウォールダイアログ回避)
 - ポート: `50051`
 - モデル: `../models/nllb-200-ct2` (int8量子化、610MB)
 - デバイス: GPU利用可能ならCUDA、なければCPU
@@ -107,7 +107,7 @@ python start_server.py
 ```
 
 **NllbEngine設定**:
-- ホスト: `0.0.0.0` (全インターフェース)
+- ホスト: `127.0.0.1` (localhost only、ファイアウォールダイアログ回避)
 - ポート: `50051`
 - モデル: `facebook/nllb-200-distilled-600M` (transformers、2.4GB)
 - デバイス: GPU利用可能ならCUDA、なければCPU
@@ -140,7 +140,7 @@ python start_server.py --debug
 
 ```
 ================================================================================
-gRPC Translation Server is running on 0.0.0.0:50051
+gRPC Translation Server is running on 127.0.0.1:50051
    Engine: CTranslate2Engine
    Model: CTranslate2 (int8)
    Device: cuda
@@ -153,7 +153,7 @@ Press Ctrl+C to stop the server
 
 ```
 ================================================================================
-gRPC Translation Server is running on 0.0.0.0:50051
+gRPC Translation Server is running on 127.0.0.1:50051
    Engine: NllbEngine
    Model: facebook/nllb-200-distilled-600M
    Device: cuda

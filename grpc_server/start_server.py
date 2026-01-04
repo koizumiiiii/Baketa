@@ -381,8 +381,8 @@ def main():
     parser.add_argument(
         "--host",
         type=str,
-        default="0.0.0.0",
-        help="gRPC server host (default: 0.0.0.0 for all interfaces)"
+        default="127.0.0.1",
+        help="gRPC server host (default: 127.0.0.1 for localhost only, use 0.0.0.0 for all interfaces)"
     )
     parser.add_argument(
         "--debug",
