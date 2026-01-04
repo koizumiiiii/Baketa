@@ -276,10 +276,30 @@ public sealed partial class CrashReportService : ICrashReportService
             // リクエストボディ作成
             // AggregateException（UnobservedTaskException等）の場合、
             // 親のStackTraceはnullになるため、InnerExceptionのスタックトレースを使用
-            var stackTrace = report.Exception.StackTrace;
-            if (string.IsNullOrEmpty(stackTrace) && report.Exception.InnerException != null)
+            var exception = report.Exception;
+            var stackTrace = exception.StackTrace;
+
+            if (string.IsNullOrEmpty(stackTrace))
             {
-                stackTrace = report.Exception.InnerException.StackTrace;
+                // ExceptionInfoはデータ構造のため、InnerExceptionチェーンを走査してスタックトレースを収集
+                var innerTraces = new List<string>();
+                var currentException = exception.InnerException;
+
+                while (currentException != null)
+                {
+                    if (!string.IsNullOrEmpty(currentException.StackTrace))
+                    {
+                        innerTraces.Add(currentException.StackTrace);
+                    }
+                    currentException = currentException.InnerException;
+                }
+
+                if (innerTraces.Count > 0)
+                {
+                    stackTrace = string.Join(
+                        $"{Environment.NewLine}--- End of Inner Exception Stack Trace ---{Environment.NewLine}",
+                        innerTraces);
+                }
             }
 
             var requestBody = new Dictionary<string, object?>
@@ -395,14 +415,46 @@ public sealed partial class CrashReportService : ICrashReportService
             }
         }
 
+        // AggregateExceptionの場合、Flatten()で全内部例外を取得しチェーンを構築
+        ExceptionInfo? innerExceptionInfo = null;
+        string? stackTrace = exception.StackTrace;
+
+        if (exception is AggregateException aggEx)
+        {
+            var flattenedExceptions = aggEx.Flatten().InnerExceptions;
+            if (flattenedExceptions.Count > 0)
+            {
+                // 最初の内部例外から再帰的にチェーンを構築
+                innerExceptionInfo = ExtractExceptionInfo(flattenedExceptions[0]);
+
+                // 複数の内部例外がある場合、スタックトレースを連結してDataに保存
+                if (flattenedExceptions.Count > 1)
+                {
+                    data["AggregateExceptionCount"] = flattenedExceptions.Count.ToString();
+                    var allInnerTraces = flattenedExceptions
+                        .Select((ex, i) => $"[InnerException {i}] {ex.GetType().Name}: {ex.Message}")
+                        .ToList();
+                    data["AllInnerExceptions"] = string.Join(" | ", allInnerTraces);
+                }
+
+                // AggregateExceptionの親StackTraceがnullの場合、最初の内部例外のスタックトレースを使用
+                if (string.IsNullOrEmpty(stackTrace) && !string.IsNullOrEmpty(flattenedExceptions[0].StackTrace))
+                {
+                    stackTrace = flattenedExceptions[0].StackTrace;
+                }
+            }
+        }
+        else if (exception.InnerException != null)
+        {
+            innerExceptionInfo = ExtractExceptionInfo(exception.InnerException);
+        }
+
         return new ExceptionInfo
         {
             Type = exception.GetType().FullName ?? exception.GetType().Name,
             Message = SanitizeText(exception.Message),
-            StackTrace = SanitizeStackTrace(exception.StackTrace),
-            InnerException = exception.InnerException != null
-                ? ExtractExceptionInfo(exception.InnerException)
-                : null,
+            StackTrace = SanitizeStackTrace(stackTrace),
+            InnerException = innerExceptionInfo,
             Source = SanitizeText(exception.Source ?? ""),
             HResult = exception.HResult,
             Data = data
