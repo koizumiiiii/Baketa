@@ -169,17 +169,17 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
         var canShowPremiumInfo = this.WhenAnyValue(x => x.IsCloudOnlyEnabled).Select(enabled => !enabled);
         ShowPremiumInfoCommand = ReactiveCommand.Create(ShowPremiumInfo, canShowPremiumInfo);
 
+        // プラン変更の監視（ビュー非表示時でも受信するためコンストラクタで購読）
+        Observable.FromEventPattern<UserPlanChangedEventArgs>(
+            h => _planService.PlanChanged += h,
+            h => _planService.PlanChanged -= h)
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => UpdateCloudOnlyAvailability())
+            .DisposeWith(_disposables);
+
         // ViewModel活性化時の処理
         this.WhenActivated(disposables =>
         {
-            // プラン変更の監視
-            Observable.FromEventPattern<UserPlanChangedEventArgs>(
-                h => _planService.PlanChanged += h,
-                h => _planService.PlanChanged -= h)
-                .ObserveOn(RxApp.MainThreadScheduler)
-                .Subscribe(_ => UpdateCloudOnlyAvailability())
-                .DisposeWith(disposables);
-
             // エンジン状態更新の監視
             _statusService.StatusUpdates
                 .ObserveOn(RxApp.MainThreadScheduler)
