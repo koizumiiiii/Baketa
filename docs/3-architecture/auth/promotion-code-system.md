@@ -483,7 +483,7 @@ public async Task ApplyCodeAsync_ValidCode_ReturnsSuccess()
     var service = new PromotionCodeService(mockHttpClient, ...);
 
     // Act
-    var result = await service.ApplyCodeAsync("BAKETA-TEST-PR01");
+    var result = await service.ApplyCodeAsync("BAKETA-TESTPR01");
 
     // Assert
     Assert.True(result.Success);
@@ -514,7 +514,7 @@ public async Task ApplyPromotionCommand_Success_UpdatesHasActivePromotion()
         .ReturnsAsync(PromotionCodeResult.CreateSuccess(...));
 
     var viewModel = new LicenseInfoViewModel(mockService.Object, ...);
-    viewModel.PromotionCode = "BAKETA-TEST-PRO1";
+    viewModel.PromotionCode = "BAKETA-TESTPRO1";
 
     // Act
     await viewModel.ApplyPromotionCommand.Execute();
@@ -535,7 +535,7 @@ describe('POST /api/promotion/redeem', () => {
   it('returns success for valid code', async () => {
     const response = await fetch(endpoint, {
       method: 'POST',
-      body: JSON.stringify({ code: 'BAKETA-VALID-CODE' })
+      body: JSON.stringify({ code: 'BAKETA-TESTCODE' })
     });
     expect(response.ok).toBe(true);
     const data = await response.json();
