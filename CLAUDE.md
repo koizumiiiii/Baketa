@@ -92,6 +92,39 @@ py -3.10 -m venv venv_build
 .\venv_build\Scripts\pip install -r requirements.txt pyinstaller
 ```
 
+**CUDA版ビルド環境のセットアップ:**
+```cmd
+cd grpc_server
+py -3.10 -m venv venv_build_cuda
+.\venv_build_cuda\Scripts\pip install -r requirements.txt pyinstaller
+.\venv_build_cuda\Scripts\pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cu126
+```
+
+### models-v1 リリース（OCRサーバー配布）
+
+OCRサーバー（BaketaSuryaOcrServer.exe）は `models-v1` リリースで配布されます。
+
+**リリースURL:** https://github.com/koizumiiiii/Baketa/releases/tag/models-v1
+
+**アセット構成:**
+| ファイル | 説明 | サイズ |
+|----------|------|--------|
+| BaketaSuryaOcrServer-cpu.zip | CPU版OCRサーバー | ~225MB |
+| BaketaSuryaOcrServer-cuda.zip.part1/2 | CUDA版OCRサーバー（分割） | ~2.5GB |
+| BaketaTranslationServer.zip | 翻訳サーバー | - |
+| surya-*.zip | Surya OCRモデル | - |
+| nllb-*.zip | NLLB翻訳モデル | - |
+
+**CUDA版の結合方法:**
+```cmd
+copy /b BaketaSuryaOcrServer-cuda.zip.part1+BaketaSuryaOcrServer-cuda.zip.part2 BaketaSuryaOcrServer-cuda.zip
+```
+
+**OCRサーバー再ビルド手順:**
+1. CPU版: `.\venv_build\Scripts\pyinstaller BaketaSuryaOcrServer.spec`
+2. CUDA版: `.\venv_build_cuda\Scripts\pyinstaller BaketaSuryaOcrServer.spec`
+3. GitHub 2GB制限のため、CUDA版は分割してアップロード
+
 ### 自動バージョニング (MinVer)
 
 Baketa は [MinVer](https://github.com/adamralph/minver) を使用して Git タグから自動的にバージョンを設定します。
