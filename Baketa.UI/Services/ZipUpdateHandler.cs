@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NetSparkleUpdater;
@@ -20,6 +21,7 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
     private readonly Microsoft.Extensions.Logging.ILogger? _logger;
     private readonly string _appDirectory;
     private readonly string _appExecutablePath;
+    private static int _isUpdating;
 
     public ZipSparkleUpdater(
         string appcastUrl,
@@ -33,6 +35,19 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             ?? throw new InvalidOperationException("Cannot determine application path");
         _appDirectory = Path.GetDirectoryName(_appExecutablePath)
             ?? throw new InvalidOperationException("Cannot determine application directory");
+    }
+
+    /// <summary>
+    /// バッチファイル内で安全に使用するためのパスエスケープ
+    /// </summary>
+    private static string EscapeBatchPath(string path)
+    {
+        return path.Replace("^", "^^")
+                   .Replace("&", "^&")
+                   .Replace("|", "^|")
+                   .Replace("<", "^<")
+                   .Replace(">", "^>")
+                   .Replace("%", "%%");
     }
 
     /// <summary>
@@ -51,10 +66,18 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             return;
         }
 
+        // 複数回の更新実行を防止
+        if (Interlocked.CompareExchange(ref _isUpdating, 1, 0) != 0)
+        {
+            _logger?.LogWarning("[Issue #249] 更新処理が既に実行中です");
+            return;
+        }
+
+        string? extractDir = null;
         try
         {
             // 一時ディレクトリに展開
-            var extractDir = Path.Combine(Path.GetTempPath(), $"Baketa_Update_{Guid.NewGuid():N}");
+            extractDir = Path.Combine(Path.GetTempPath(), $"Baketa_Update_{Guid.NewGuid():N}");
             Directory.CreateDirectory(extractDir);
 
             _logger?.LogInformation("[Issue #249] ZIP展開先: {Path}", extractDir);
@@ -101,13 +124,33 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
                 WindowStyle = ProcessWindowStyle.Hidden
             };
 
-            Process.Start(psi);
+            var process = Process.Start(psi);
+            if (process == null)
+            {
+                throw new InvalidOperationException("Failed to start update batch script");
+            }
 
             _logger?.LogInformation("[Issue #249] 更新スクリプト起動完了 - アプリケーション終了します");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "[Issue #249] ZIPアップデート失敗");
+
+            // エラー時のクリーンアップ
+            if (extractDir != null && Directory.Exists(extractDir))
+            {
+                try
+                {
+                    Directory.Delete(extractDir, recursive: true);
+                    _logger?.LogDebug("[Issue #249] 一時ディレクトリを削除しました: {Path}", extractDir);
+                }
+                catch (Exception cleanupEx)
+                {
+                    _logger?.LogWarning(cleanupEx, "[Issue #249] 一時ディレクトリの削除に失敗: {Path}", extractDir);
+                }
+            }
+
+            Interlocked.Exchange(ref _isUpdating, 0);
             throw;
         }
     }
@@ -118,10 +161,17 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
     private string CreateUpdateBatchScript(string sourceDir, string targetDir, string appExePath)
     {
         var processId = Environment.ProcessId;
+        var appExeName = Path.GetFileName(appExePath);
+
+        // パスをエスケープしてコマンドインジェクションを防止
+        var escapedSourceDir = EscapeBatchPath(sourceDir);
+        var escapedTargetDir = EscapeBatchPath(targetDir);
+        var escapedAppExePath = EscapeBatchPath(appExePath);
+        var escapedTempDir = EscapeBatchPath(Path.GetDirectoryName(sourceDir) ?? sourceDir);
 
         // バッチスクリプト：
         // 1. 現在のプロセスが終了するまで待機
-        // 2. 新しいファイルをコピー
+        // 2. 新しいファイルをコピー（リトライ付き）
         // 3. アプリを再起動
         // 4. 一時ファイルを削除
 
@@ -135,7 +185,7 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             :: 現在のプロセスが終了するまで待機（最大30秒）
             set /a count=0
             :wait_loop
-            tasklist /fi "PID eq {processId}" 2>nul | find /i "{processId}" >nul
+            tasklist /fi "PID eq {processId}" /fi "IMAGENAME eq {appExeName}" 2>nul | find /i "{processId}" >nul
             if not errorlevel 1 (
                 timeout /t 1 /nobreak > nul
                 set /a count+=1
@@ -144,11 +194,21 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
 
             echo Application closed. Starting update...
 
-            :: 新しいファイルをコピー（/Y で上書き確認なし）
-            xcopy "{sourceDir}\*" "{targetDir}\" /E /Y /Q
+            :: 読み取り専用属性を解除
+            attrib -R "{escapedTargetDir}\*" /S /D 2>nul
 
+            :: 新しいファイルをコピー（リトライ機能付き）
+            set /a retry=0
+            :copy_retry
+            xcopy "{escapedSourceDir}\*" "{escapedTargetDir}\" /E /Y /Q /R
             if errorlevel 1 (
-                echo Update failed! Error copying files.
+                set /a retry+=1
+                if %retry% lss 3 (
+                    echo Retry %retry%/3...
+                    timeout /t 2 /nobreak > nul
+                    goto copy_retry
+                )
+                echo Update failed after 3 retries!
                 pause
                 exit /b 1
             )
@@ -156,11 +216,11 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             echo Update complete. Restarting application...
 
             :: アプリを再起動
-            start "" "{appExePath}"
+            start "" "{escapedAppExePath}"
 
             :: 一時ファイルを削除（少し待ってから）
             timeout /t 2 /nobreak > nul
-            rd /s /q "{Path.GetDirectoryName(sourceDir)}" 2>nul
+            rd /s /q "{escapedTempDir}" 2>nul
 
             exit /b 0
             """;
