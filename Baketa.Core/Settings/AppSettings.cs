@@ -85,6 +85,11 @@ public sealed class AppSettings
     public AuthSettings Auth { get; set; } = new();
 
     /// <summary>
+    /// [Issue #252] クラッシュレポート設定
+    /// </summary>
+    public CrashReportSettings CrashReport { get; set; } = new();
+
+    /// <summary>
     /// 詳細設定
     /// </summary>
     public AdvancedSettings Advanced { get; set; } = new();
@@ -157,6 +162,7 @@ public sealed class AppSettings
                 filtered.Overlay = Overlay;
                 filtered.MainUi = MainUi;
                 filtered.Auth = Auth;
+                filtered.CrashReport = CrashReport;
                 break;
 
             case SettingLevel.Advanced:
@@ -170,6 +176,7 @@ public sealed class AppSettings
                 filtered.Overlay = Overlay;
                 filtered.MainUi = MainUi;
                 filtered.Auth = Auth;
+                filtered.CrashReport = CrashReport;
                 filtered.Advanced = Advanced;
                 filtered.GameProfiles = GameProfiles;
                 break;
@@ -246,6 +253,7 @@ public sealed class AppSettings
             ("Overlay", Overlay),
             ("MainUi", MainUi),
             ("Auth", Auth),
+            ("CrashReport", CrashReport),
             ("Advanced", Advanced),
             ("Backup", BackupSettings),
             ("Sync", SyncSettings)

@@ -11,6 +11,7 @@
  * - レートリミット
  * - シングルデバイス強制（他デバイスでログイン時に元デバイスをログアウト）
  * - Cloud AI翻訳（Gemini API経由）
+ * - クラッシュレポート受信（Issue #252）
  *
  * セキュリティ:
  * - タイミング攻撃対策（timingSafeCompare）
@@ -24,6 +25,7 @@
  */
 
 import { handleTranslate, TranslateEnv } from './translate';
+import { handleCrashReport, CrashReportEnv } from './crash-report';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================
@@ -967,6 +969,12 @@ export default {
       return handleWebhook(request, env, origin, allowedOrigins);
     }
 
+    // クラッシュレポート（認証不要 - クラッシュ時は設定ロード前の可能性があるため）
+    // 独自のレートリミットを持つ
+    if (url.pathname === '/api/crash-report') {
+      return handleCrashReport(request, env as CrashReportEnv, origin, allowedOrigins);
+    }
+
     // 環境変数検証
     const envValidation = validateEnvironment(env);
     if (!envValidation.valid) {
@@ -1010,6 +1018,7 @@ export default {
           return handleTranslate(request, env as TranslateEnv, origin, allowedOrigins);
         case '/api/promotion/redeem':
           return handlePromotionRedeem(request, env, origin, allowedOrigins);
+        // Note: /api/crash-report is handled earlier (before API key validation)
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');
       }

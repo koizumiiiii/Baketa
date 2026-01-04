@@ -543,4 +543,34 @@ public static class Strings
     public static string Update_SkipButton => GetString("Update_SkipButton");
     public static string Update_RemindLaterButton => GetString("Update_RemindLaterButton");
     public static string Update_DownloadButton => GetString("Update_DownloadButton");
+
+    // ========== [Issue #249] Download Progress Dialog ==========
+
+    public static string Update_DownloadProgress_Title => GetString("Update_DownloadProgress_Title");
+    public static string Update_DownloadProgress_Downloading => GetString("Update_DownloadProgress_Downloading");
+    public static string Update_DownloadProgress_Complete => GetString("Update_DownloadProgress_Complete");
+    public static string Update_DownloadProgress_InstallAndRelaunch => GetString("Update_DownloadProgress_InstallAndRelaunch");
+    public static string Update_DownloadProgress_Cancel => GetString("Update_DownloadProgress_Cancel");
+
+    // ========== [Issue #252] Crash Report Dialog ==========
+
+    public static string CrashReport_WindowTitle => GetString("CrashReport_WindowTitle");
+    public static string CrashReport_HeaderText => GetString("CrashReport_HeaderText");
+    public static string CrashReport_DescriptionSingle => GetString("CrashReport_DescriptionSingle");
+    public static string CrashReport_DescriptionMultiple => GetString("CrashReport_DescriptionMultiple");
+    public static string CrashReport_PrivacyNote => GetString("CrashReport_PrivacyNote");
+    public static string CrashReport_IncludeSystemInfo => GetString("CrashReport_IncludeSystemInfo");
+    public static string CrashReport_IncludeLogs => GetString("CrashReport_IncludeLogs");
+    public static string CrashReport_SendButton => GetString("CrashReport_SendButton");
+    public static string CrashReport_DontSendButton => GetString("CrashReport_DontSendButton");
+    public static string CrashReport_CrashDetailsTitle => GetString("CrashReport_CrashDetailsTitle");
+
+    // ========== [Issue #252] Crash Report Settings ==========
+    public static string Settings_CrashReport_Title => GetString("Settings_CrashReport_Title");
+    public static string Settings_CrashReport_AutoSend => GetString("Settings_CrashReport_AutoSend");
+    public static string Settings_CrashReport_AutoSendDescription => GetString("Settings_CrashReport_AutoSendDescription");
+    public static string Settings_CrashReport_IncludeSystemInfo => GetString("Settings_CrashReport_IncludeSystemInfo");
+    public static string Settings_CrashReport_IncludeSystemInfoDescription => GetString("Settings_CrashReport_IncludeSystemInfoDescription");
+    public static string Settings_CrashReport_IncludeLogs => GetString("Settings_CrashReport_IncludeLogs");
+    public static string Settings_CrashReport_IncludeLogsDescription => GetString("Settings_CrashReport_IncludeLogsDescription");
 }

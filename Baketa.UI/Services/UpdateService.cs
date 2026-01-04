@@ -237,9 +237,24 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
             if (UpdateAvailable && result.Updates?.Count > 0)
             {
                 LatestVersion = result.Updates[0];
+
+                // [Fix] 同一バージョンへの更新を防止
+                // NetSparkleがバージョン形式の違い（0.2.2 vs 0.2.2.0）で誤判定する場合がある
+                var currentVersion = GetCurrentAppVersion();
+                var latestVersionStr = LatestVersion.Version?.TrimStart('v', 'V') ?? "";
+
+                if (IsVersionEqual(currentVersion, latestVersionStr))
+                {
+                    _logger?.LogInformation(
+                        "[Issue #249] 同一バージョンのため更新スキップ: Current={Current}, Latest={Latest}",
+                        currentVersion, latestVersionStr);
+                    UpdateAvailable = false;
+                    return;
+                }
+
                 _logger?.LogInformation(
-                    "[Issue #249] サイレントチェック: 更新利用可能 v{Version}",
-                    LatestVersion.Version);
+                    "[Issue #249] サイレントチェック: 更新利用可能 v{Version} (現在: {Current})",
+                    LatestVersion.Version, currentVersion);
 
                 // 更新が利用可能な場合のみUIダイアログを表示（UIスレッドで実行）
                 _logger?.LogInformation("[Issue #249] 更新ダイアログ表示開始...");
@@ -339,6 +354,57 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
     private void OnUpdateCheckFinished(object? sender, UpdateStatus status)
     {
         _logger?.LogDebug("[Issue #249] 更新チェック完了: Status={Status}", status);
+    }
+
+    /// <summary>
+    /// [Fix] 現在のアプリバージョンを取得
+    /// </summary>
+    private static string GetCurrentAppVersion()
+    {
+        var appAssembly = System.Reflection.Assembly.GetEntryAssembly();
+        var version = appAssembly?.GetName().Version;
+        if (version == null) return "0.0.0";
+
+        // Major.Minor.Build 形式で返す（Revision は省略）
+        return $"{version.Major}.{version.Minor}.{version.Build}";
+    }
+
+    /// <summary>
+    /// [Fix] バージョン文字列を比較（形式の違いを吸収）
+    /// "0.2.2" と "0.2.2.0" を同一とみなす
+    /// </summary>
+    private static bool IsVersionEqual(string version1, string version2)
+    {
+        if (string.IsNullOrEmpty(version1) || string.IsNullOrEmpty(version2))
+            return false;
+
+        // バージョン文字列を正規化してVersion型で比較
+        try
+        {
+            var v1 = NormalizeVersion(version1);
+            var v2 = NormalizeVersion(version2);
+            return v1 == v2;
+        }
+        catch
+        {
+            // パース失敗時は文字列比較
+            return string.Equals(version1.Trim(), version2.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// [Fix] バージョン文字列を正規化（Major.Minor.Build形式）
+    /// </summary>
+    private static Version NormalizeVersion(string versionStr)
+    {
+        var cleaned = versionStr.TrimStart('v', 'V').Trim();
+        var parts = cleaned.Split('.');
+
+        int major = parts.Length > 0 && int.TryParse(parts[0], out var m) ? m : 0;
+        int minor = parts.Length > 1 && int.TryParse(parts[1], out var n) ? n : 0;
+        int build = parts.Length > 2 && int.TryParse(parts[2], out var b) ? b : 0;
+
+        return new Version(major, minor, build);
     }
 
     /// <summary>

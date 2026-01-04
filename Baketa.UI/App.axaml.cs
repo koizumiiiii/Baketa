@@ -11,6 +11,7 @@ using Baketa.Application.Services;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
@@ -80,9 +81,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         Console.WriteLine("[Theme] ApplyStoredTheme() 開始");
         try
         {
-            var settingsFilePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Baketa", "settings.json");
+            // [Issue #252] BaketaSettingsPaths を使用してパスを一元管理
+            var settingsFilePath = BaketaSettingsPaths.MainSettingsPath;
 
             Console.WriteLine($"[Theme] 設定ファイルパス: {settingsFilePath}");
             Console.WriteLine($"[Theme] ファイル存在: {File.Exists(settingsFilePath)}");
@@ -307,20 +307,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // 未監視タスク例外のハンドラーを登録（早期登録）
             // TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-            // ReactiveUIのエラーハンドラーを登録
-            RxApp.DefaultExceptionHandler = new ReactiveUIExceptionHandler();
-
-            // ReactiveUIログ出力
-            Console.WriteLine("🎆 ReactiveUIエラーハンドラー設定完了");
-
-#if DEBUG
-            try
-            {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "reactive_ui_startup.txt");
-                File.WriteAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🎆 ReactiveUIエラーハンドラー設定完了");
-            }
-            catch { /* ファイル出力失敗は無視 */ }
-#endif
+            // [Issue #252] ReactiveUIのエラーハンドラーはGlobalExceptionHandlerに統合済み
+            // GlobalExceptionHandler.Initialize()でRxApp.DefaultExceptionHandlerが設定される
+            Console.WriteLine("🎆 ReactiveUIエラーハンドラーはGlobalExceptionHandlerで統合管理");
 
             try
             {
@@ -435,6 +424,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         await loadingWindow.CloseWithFadeOutAsync();
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 3: ローディング画面クローズ完了");
                         _logger?.LogInformation("ローディング画面クローズ完了");
+
+                        // --- 3.5 [Issue #252] クラッシュレポート検出・ダイアログ表示 ---
+                        await CheckAndShowCrashReportDialogAsync(serviceProvider);
 
                         // --- 4. 認証状態チェックとメインUI表示 ---
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 4: 認証状態チェック開始");
@@ -907,6 +899,213 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     }
 
     /// <summary>
+    /// [Issue #252 Phase 4] クラッシュレポート設定を取得
+    /// 設定ファイルから直接読み込み（DIコンテナに依存しない）
+    /// </summary>
+    private static CrashReportSettings GetCrashReportSettings()
+    {
+        try
+        {
+            // [Issue #252] BaketaSettingsPaths を使用してパスを一元管理
+            var settingsFilePath = BaketaSettingsPaths.MainSettingsPath;
+
+            if (File.Exists(settingsFilePath))
+            {
+                var json = File.ReadAllText(settingsFilePath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+                if (doc.RootElement.TryGetProperty("CrashReport", out var crashReportElement))
+                {
+                    var settings = new CrashReportSettings();
+
+                    if (crashReportElement.TryGetProperty("AutoSendCrashReports", out var autoSendElement))
+                    {
+                        settings.AutoSendCrashReports = autoSendElement.GetBoolean();
+                    }
+
+                    if (crashReportElement.TryGetProperty("IncludeSystemInfo", out var systemInfoElement))
+                    {
+                        settings.IncludeSystemInfo = systemInfoElement.GetBoolean();
+                    }
+
+                    if (crashReportElement.TryGetProperty("IncludeLogs", out var logsElement))
+                    {
+                        settings.IncludeLogs = logsElement.GetBoolean();
+                    }
+
+                    return settings;
+                }
+            }
+        }
+        catch
+        {
+            // 設定読み込みエラー時はデフォルト設定を使用
+        }
+
+        // デフォルト設定を返す
+        return new CrashReportSettings();
+    }
+
+    /// <summary>
+    /// [Issue #252] クラッシュレポート検出・ダイアログ表示
+    /// .crash_pendingフラグが存在する場合、設定に応じて自動送信またはダイアログを表示
+    /// </summary>
+    private async Task CheckAndShowCrashReportDialogAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            var crashReportService = serviceProvider.GetService<Core.Abstractions.CrashReporting.ICrashReportService>();
+            if (crashReportService == null)
+            {
+                return;
+            }
+
+            // .crash_pendingフラグの存在チェック
+            if (!crashReportService.HasPendingCrashReport())
+            {
+                return;
+            }
+
+            _logger?.LogInformation("[Issue #252] 前回クラッシュを検出");
+
+            // 未送信のクラッシュレポートを取得
+            var crashReports = await crashReportService.GetPendingCrashReportsAsync().ConfigureAwait(true);
+            if (crashReports.Count == 0)
+            {
+                await crashReportService.ClearCrashPendingFlagAsync().ConfigureAwait(true);
+                return;
+            }
+
+            // [Phase 4] 自動送信設定を確認
+            var crashReportSettings = GetCrashReportSettings();
+
+            if (crashReportSettings.AutoSendCrashReports)
+            {
+                // 自動送信モード：ダイアログなしで送信
+                _logger?.LogInformation("[Issue #252] 自動送信モード - ダイアログなしでクラッシュレポートを送信");
+
+                await SendCrashReportsAsync(
+                    crashReportService,
+                    crashReports,
+                    crashReportSettings.IncludeSystemInfo,
+                    crashReportSettings.IncludeLogs).ConfigureAwait(false);
+            }
+            else
+            {
+                // ダイアログ表示モード：ユーザーに確認
+                _logger?.LogInformation("[Issue #252] ダイアログを表示してユーザーに確認");
+
+                var viewModel = new ViewModels.CrashReportDialogViewModel(crashReports);
+                var dialog = new Views.CrashReportDialogWindow(viewModel);
+
+                // ダイアログアイコンを設定
+                try
+                {
+                    var iconUri = new Uri(BAKETA_ICON_PATH);
+                    dialog.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(iconUri));
+                }
+                catch (Exception iconEx)
+                {
+                    Console.WriteLine($"⚠️ クラッシュダイアログアイコン設定失敗: {iconEx.Message}");
+                }
+
+                // クラッシュダイアログは起動時に表示されるため、親ウィンドウは存在しない
+                // ShowDialogの代わりにShowを使用し、ユーザー操作完了をイベントで待機
+                dialog.Show();
+                var tcs = new System.Threading.Tasks.TaskCompletionSource<ViewModels.CrashReportDialogResult>();
+                dialog.Closed += (_, _) => tcs.TrySetResult(viewModel.Result);
+                var result = await tcs.Task.ConfigureAwait(true);
+
+                if (result == ViewModels.CrashReportDialogResult.Send)
+                {
+                    _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信を選択");
+
+                    await SendCrashReportsAsync(
+                        crashReportService,
+                        crashReports,
+                        viewModel.IncludeSystemInfo,
+                        viewModel.IncludeLogs).ConfigureAwait(false);
+                }
+                else
+                {
+                    _logger?.LogInformation("[Issue #252] ユーザーがクラッシュレポート送信をスキップ");
+
+                    // 送信しない場合もレポートを削除（次回表示されないように）
+                    foreach (var summary in crashReports)
+                    {
+                        await crashReportService.DeleteCrashReportAsync(summary.ReportId).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            // フラグをクリア
+            await crashReportService.ClearCrashPendingFlagAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // クラッシュレポート処理の失敗はアプリ起動をブロックしない
+            _logger?.LogWarning(ex, "[Issue #252] クラッシュレポート処理中にエラー（継続）");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #252 Phase 4] クラッシュレポートを送信
+    /// 自動送信・ダイアログ送信の共通処理
+    /// </summary>
+    private async Task SendCrashReportsAsync(
+        Core.Abstractions.CrashReporting.ICrashReportService crashReportService,
+        System.Collections.Generic.IReadOnlyList<Core.Abstractions.CrashReporting.CrashReportSummary> crashReports,
+        bool includeSystemInfo,
+        bool includeLogs)
+    {
+        var sentCount = 0;
+        var failedCount = 0;
+
+        // [Issue #252] レート制限対策: 最新5件のみ送信、古いものは削除のみ
+        const int maxSendCount = 5;
+        var reportsToSend = crashReports.Take(maxSendCount).ToList();
+        var reportsToDeleteOnly = crashReports.Skip(maxSendCount).ToList();
+
+        // 古いレポートは送信せず削除のみ
+        foreach (var summary in reportsToDeleteOnly)
+        {
+            await crashReportService.DeleteCrashReportAsync(summary.ReportId).ConfigureAwait(false);
+        }
+
+        foreach (var summary in reportsToSend)
+        {
+            // レポート詳細を読み込み
+            var fullReport = await crashReportService.LoadCrashReportAsync(summary.ReportId).ConfigureAwait(false);
+            if (fullReport == null)
+            {
+                continue;
+            }
+
+            // サーバーに送信
+            var success = await crashReportService.SendCrashReportAsync(
+                fullReport,
+                includeSystemInfo,
+                includeLogs).ConfigureAwait(false);
+
+            if (success)
+            {
+                // 送信成功したレポートは削除
+                await crashReportService.DeleteCrashReportAsync(summary.ReportId).ConfigureAwait(false);
+                sentCount++;
+            }
+            else
+            {
+                failedCount++;
+            }
+
+            // [Issue #252] レート制限回避のため送信間に遅延（10件/分制限 → 7秒間隔）
+            await Task.Delay(7000).ConfigureAwait(false);
+        }
+
+        _logger?.LogInformation("[Issue #252] クラッシュレポート送信完了: 成功={SentCount}, 失敗={FailedCount}", sentCount, failedCount);
+    }
+
+    /// <summary>
     /// Patreon認証結果の通知表示 (Issue #233)
     /// Program.PendingPatreonNotification にセットされた認証結果を表示
     /// </summary>
@@ -1184,49 +1383,5 @@ internal sealed class ApplicationShutdownEvent : CoreEvents.EventBase
     public override string Category => "Application";
 }
 
-/// <summary>
-/// ReactiveUI用エラーハンドラー
-/// </summary>
-internal sealed class ReactiveUIExceptionHandler : IObserver<Exception>
-{
-    public void OnNext(Exception ex)
-    {
-        Console.WriteLine($"🚨 ReactiveUI例外: {ex.GetType().Name}: {ex.Message}");
-        Console.WriteLine($"🚨 スタックトレース: {ex.StackTrace}");
-
-        try
-        {
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "reactive_ui_errors.txt");
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 ReactiveUI例外: {ex.GetType().Name}: {ex.Message}");
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} 🚨 スタックトレース: {ex.StackTrace}");
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ===== ReactiveUI例外終了 =====");
-            Console.WriteLine($"📝 ReactiveUIエラーログ: {logPath}");
-        }
-        catch { /* ファイル出力失敗は無視 */ }
-
-        // InvalidOperationExceptionのUIスレッド違反は吸収
-        if (ex is InvalidOperationException invalidOp &&
-            (invalidOp.Message.Contains("invalid thread", StringComparison.OrdinalIgnoreCase) ||
-             invalidOp.Message.Contains("VerifyAccess", StringComparison.OrdinalIgnoreCase) ||
-             invalidOp.StackTrace?.Contains("VerifyAccess") == true ||
-             invalidOp.StackTrace?.Contains("CheckAccess") == true ||
-             invalidOp.StackTrace?.Contains("ReactiveCommand") == true))
-        {
-            Console.WriteLine("🚨 ReactiveUI: UIスレッド違反を検出 - アプリケーションを継続");
-            return; // 例外を吸収
-        }
-
-        // その他の例外は再スロー
-        throw ex;
-    }
-
-    public void OnError(Exception error)
-    {
-        OnNext(error);
-    }
-
-    public void OnCompleted()
-    {
-        // 何もしない
-    }
-}
+// [Issue #252] ReactiveUIExceptionHandlerはGlobalExceptionHandlerに統合されました
+// 詳細: Baketa.UI/Services/GlobalExceptionHandler.cs の OnReactiveUIException メソッド
