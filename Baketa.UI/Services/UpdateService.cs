@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
 using Microsoft.Extensions.Logging;
@@ -126,21 +127,30 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
             signatureVerifier = new Ed25519Checker(SecurityMode.OnlyVerifySoftwareDownloads, Ed25519PublicKey);
 #endif
 
-            _sparkle = new SparkleUpdater(AppCastUrl, signatureVerifier)
+            // Single-file app対応: バージョン取得が失敗しないようにフォールバック
+            // referenceAssembly に有効なパスを渡すことで、NetSparkleのバージョン取得エラーを回避
+            var currentVersion = GetCurrentAppVersion();
+            string? referenceAssemblyPath = null;
+
+            // Single-file appでも動作するパスを取得
+            var entryAssembly = Assembly.GetEntryAssembly();
+            var assemblyLocation = entryAssembly?.Location;
+            if (!string.IsNullOrEmpty(assemblyLocation) && System.IO.File.Exists(assemblyLocation))
+            {
+                referenceAssemblyPath = assemblyLocation;
+            }
+
+            _sparkle = new SparkleUpdater(AppCastUrl, signatureVerifier, referenceAssemblyPath)
             {
                 UIFactory = new LocalizedUIFactory("Baketa"),
                 RelaunchAfterUpdate = true,
             };
 
+            _logger?.LogInformation("[Issue #249] Single-file対応: バージョン {Version}、ReferenceAssembly={Path}",
+                currentVersion, referenceAssemblyPath ?? "(null - will use fallback)");
+
             // JSON形式のAppCastを使用（デフォルトはXML）
             _sparkle.AppCastGenerator = new NetSparkleUpdater.AppCastHandlers.JsonAppCastGenerator(_sparkle.LogWriter);
-
-            // デバッグ: 現在のアプリバージョンをログ出力
-            var appAssembly = System.Reflection.Assembly.GetEntryAssembly();
-            var appVersion = appAssembly?.GetName().Version;
-            var fileVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(appAssembly?.Location ?? "")?.FileVersion;
-            _logger?.LogInformation("[Issue #249] アプリバージョン: Assembly={AssemblyVersion}, File={FileVersion}",
-                appVersion, fileVersion);
 
             // 更新前イベントハンドラ（Pythonサーバー終了処理）
             // NetSparkle 3.0ではCloseApplicationAsyncを使用
@@ -358,11 +368,24 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
 
     /// <summary>
     /// [Fix] 現在のアプリバージョンを取得
+    /// Single-file app対応: AssemblyInformationalVersionを優先使用
     /// </summary>
     private static string GetCurrentAppVersion()
     {
-        var appAssembly = System.Reflection.Assembly.GetEntryAssembly();
-        var version = appAssembly?.GetName().Version;
+        var appAssembly = Assembly.GetEntryAssembly();
+        if (appAssembly == null) return "0.0.0";
+
+        // MinVerが設定するAssemblyInformationalVersionを優先
+        var infoVersion = appAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrEmpty(infoVersion))
+        {
+            // "0.2.3+abc123" 形式から "0.2.3" を抽出
+            var plusIndex = infoVersion.IndexOf('+');
+            return plusIndex > 0 ? infoVersion[..plusIndex] : infoVersion;
+        }
+
+        // フォールバック: AssemblyVersion
+        var version = appAssembly.GetName().Version;
         if (version == null) return "0.0.0";
 
         // Major.Minor.Build 形式で返す（Revision は省略）
