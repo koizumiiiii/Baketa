@@ -139,10 +139,11 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
                 referenceAssemblyPath = null;
             }
 
-            _sparkle = new SparkleUpdater(AppCastUrl, signatureVerifier, referenceAssemblyPath)
+            // ZIPファイルの自動更新に対応したカスタムSparkleUpdaterを使用
+            _sparkle = new ZipSparkleUpdater(AppCastUrl, signatureVerifier, referenceAssemblyPath, _logger)
             {
                 UIFactory = new LocalizedUIFactory("Baketa"),
-                RelaunchAfterUpdate = true,
+                RelaunchAfterUpdate = false, // カスタム処理で再起動するのでfalse
             };
 
             _logger?.LogInformation("[Issue #249] Single-file対応: バージョン {Version}、ReferenceAssembly={Path}",
