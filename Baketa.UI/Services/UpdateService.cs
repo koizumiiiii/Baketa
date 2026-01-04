@@ -128,16 +128,15 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
 #endif
 
             // Single-file app対応: バージョン取得が失敗しないようにフォールバック
-            // referenceAssembly に有効なパスを渡すことで、NetSparkleのバージョン取得エラーを回避
+            // Assembly.Locationはsingle-fileでは空になるため、プロセスのメインモジュールのパスを使用
             var currentVersion = GetCurrentAppVersion();
-            string? referenceAssemblyPath = null;
 
-            // Single-file appでも動作するパスを取得
-            var entryAssembly = Assembly.GetEntryAssembly();
-            var assemblyLocation = entryAssembly?.Location;
-            if (!string.IsNullOrEmpty(assemblyLocation) && System.IO.File.Exists(assemblyLocation))
+            // Single-file appでも動作するパスを取得（Geminiレビュー指摘対応）
+            var referenceAssemblyPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+            if (string.IsNullOrEmpty(referenceAssemblyPath) || !System.IO.File.Exists(referenceAssemblyPath))
             {
-                referenceAssemblyPath = assemblyLocation;
+                _logger?.LogWarning("[Issue #249] MainModule.FileNameから有効なパスを取得できませんでした。NetSparkleのフォールバックに任せます。");
+                referenceAssemblyPath = null;
             }
 
             _sparkle = new SparkleUpdater(AppCastUrl, signatureVerifier, referenceAssemblyPath)
