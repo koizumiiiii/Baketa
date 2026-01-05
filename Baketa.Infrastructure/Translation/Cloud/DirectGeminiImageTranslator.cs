@@ -350,9 +350,16 @@ JSONのみを出力し、他の説明は不要です。";
                 processingTime);
         }
 
-        _logger.LogDebug(
-            "Direct Gemini翻訳結果: {Count}件のテキストを検出",
+#if DEBUG
+        _logger.LogInformation(
+            "翻訳成功: RequestId={RequestId}, Provider={Provider}, Input={InputTokens}, Output={OutputTokens}, Total={TotalTokens}, TextCount={TextCount}",
+            request.RequestId,
+            ProviderId,
+            tokenUsage.InputTokens,
+            tokenUsage.OutputTokens,
+            tokenUsage.TotalTokens,
             translatedTexts.Count);
+#endif
 
         return ImageTranslationResponse.SuccessWithMultipleTexts(
             request.RequestId,

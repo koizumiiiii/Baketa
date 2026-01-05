@@ -223,4 +223,101 @@ public class EngineSelectionViewModelTests
             _mockLogger.Object,
             _mockEventAggregator.Object);
     }
+
+    #region PlanChanged Event Tests
+
+    [Fact]
+    public void PlanChanged_WhenUpgradedToPremium_ShouldAutoSwitchToCloudOnly()
+    {
+        // Arrange - Start with Free plan (CloudOnly disabled)
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(false);
+        var viewModel = CreateViewModel();
+        viewModel.SelectedEngine.Should().Be(TranslationEngine.LocalOnly);
+
+        // Simulate plan upgrade - CloudOnly becomes available
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(true);
+
+        // Act - Raise PlanChanged event
+        _mockPlanService.Raise(x => x.PlanChanged += null,
+            new UserPlanChangedEventArgs(UserPlanType.Free, UserPlanType.Premium));
+
+        // Assert - Should auto-switch to CloudOnly
+        viewModel.SelectedEngine.Should().Be(TranslationEngine.CloudOnly);
+        viewModel.IsCloudOnlyEnabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public void PlanChanged_WhenDowngradedToFree_ShouldFallbackToLocalOnly()
+    {
+        // Arrange - Start with Premium plan (CloudOnly enabled)
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(true);
+        var viewModel = CreateViewModel();
+        viewModel.SelectedEngine.Should().Be(TranslationEngine.CloudOnly);
+
+        // Simulate plan downgrade - CloudOnly becomes unavailable
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(false);
+
+        // Act - Raise PlanChanged event
+        _mockPlanService.Raise(x => x.PlanChanged += null,
+            new UserPlanChangedEventArgs(UserPlanType.Premium, UserPlanType.Free));
+
+        // Assert - Should fallback to LocalOnly
+        viewModel.SelectedEngine.Should().Be(TranslationEngine.LocalOnly);
+        viewModel.IsCloudOnlyEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void PlanChanged_WhenAlreadyOnCloudOnly_ShouldRemainCloudOnly()
+    {
+        // Arrange - Start with Premium plan
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(true);
+        var viewModel = CreateViewModel();
+        viewModel.SelectedEngine.Should().Be(TranslationEngine.CloudOnly);
+
+        // Act - Raise another plan change (still premium)
+        _mockPlanService.Raise(x => x.PlanChanged += null,
+            new UserPlanChangedEventArgs(UserPlanType.Premium, UserPlanType.Premium));
+
+        // Assert - Should remain CloudOnly
+        viewModel.SelectedEngine.Should().Be(TranslationEngine.CloudOnly);
+    }
+
+    [Fact]
+    public void PlanChanged_SubscriptionIsActiveWithoutViewActivation()
+    {
+        // Arrange - Create ViewModel (subscription happens in constructor, not WhenActivated)
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(false);
+        var viewModel = CreateViewModel();
+
+        // Simulate plan upgrade after creation (without view activation)
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(true);
+
+        // Act - Raise event
+        _mockPlanService.Raise(x => x.PlanChanged += null,
+            new UserPlanChangedEventArgs(UserPlanType.Free, UserPlanType.Premium));
+
+        // Assert - Event should be received even without WhenActivated
+        viewModel.SelectedEngine.Should().Be(TranslationEngine.CloudOnly);
+    }
+
+    [Fact]
+    public void Dispose_ShouldUnsubscribeFromPlanChanged()
+    {
+        // Arrange
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(false);
+        var viewModel = CreateViewModel();
+
+        // Act - Dispose the ViewModel
+        viewModel.Dispose();
+
+        // Simulate plan upgrade after dispose
+        _mockPlanService.Setup(x => x.CanUseCloudOnlyEngine).Returns(true);
+        _mockPlanService.Raise(x => x.PlanChanged += null,
+            new UserPlanChangedEventArgs(UserPlanType.Free, UserPlanType.Premium));
+
+        // Assert - Engine should remain LocalOnly as subscription is disposed
+        viewModel.SelectedEngine.Should().Be(TranslationEngine.LocalOnly);
+    }
+
+    #endregion
 }

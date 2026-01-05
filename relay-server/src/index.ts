@@ -818,8 +818,8 @@ function validatePromotionRedeemBody(body: unknown): ValidationResult<PromotionR
   return { success: true, data: { code: obj.code } };
 }
 
-/** プロモーションコード形式検証（英数字許可） */
-const PROMOTION_CODE_PATTERN = /^BAKETA-[0-9A-Z]{4}-[0-9A-Z]{4}$/;
+/** プロモーションコード形式検証（Base32 Crockford: O/I/L/U除外） */
+const PROMOTION_CODE_PATTERN = /^BAKETA-[0-9A-HJKMNP-TV-Z]{8}$/;
 
 function isValidPromotionCodeFormat(code: string): boolean {
   return PROMOTION_CODE_PATTERN.test(code);
