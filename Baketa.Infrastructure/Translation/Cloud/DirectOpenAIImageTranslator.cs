@@ -373,6 +373,7 @@ JSONのみを出力。説明文は不要です。";
                 processingTime);
         }
 
+#if DEBUG
         _logger.LogInformation(
             "翻訳成功: RequestId={RequestId}, Provider={Provider}, Input={InputTokens}, Output={OutputTokens}, Total={TotalTokens}, TextCount={TextCount}",
             request.RequestId,
@@ -381,6 +382,7 @@ JSONのみを出力。説明文は不要です。";
             tokenUsage.OutputTokens,
             tokenUsage.TotalTokens,
             translatedTexts.Count);
+#endif
 
         return ImageTranslationResponse.SuccessWithMultipleTexts(
             request.RequestId,
