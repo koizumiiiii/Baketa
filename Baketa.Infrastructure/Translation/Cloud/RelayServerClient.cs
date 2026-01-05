@@ -88,10 +88,12 @@ public sealed class RelayServerClient : IAsyncDisposable
 
                 if (response.IsSuccess)
                 {
-                    _logger.LogDebug(
-                        "翻訳成功: RequestId={RequestId}, Provider={Provider}, Tokens={Tokens}",
+                    _logger.LogInformation(
+                        "翻訳成功: RequestId={RequestId}, Provider={Provider}, Input={InputTokens}, Output={OutputTokens}, Total={TotalTokens}",
                         response.RequestId,
                         response.ProviderId,
+                        response.TokenUsage?.InputTokens ?? 0,
+                        response.TokenUsage?.OutputTokens ?? 0,
                         response.TokenUsage?.TotalTokens ?? 0);
                 }
                 else if (response.Error?.IsRetryable == true && attempt < _settings.MaxRetries)

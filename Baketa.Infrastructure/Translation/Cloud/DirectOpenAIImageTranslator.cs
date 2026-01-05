@@ -373,8 +373,13 @@ JSONのみを出力。説明文は不要です。";
                 processingTime);
         }
 
-        _logger.LogDebug(
-            "Direct OpenAI翻訳結果: {Count}件のテキストを検出",
+        _logger.LogInformation(
+            "翻訳成功: RequestId={RequestId}, Provider={Provider}, Input={InputTokens}, Output={OutputTokens}, Total={TotalTokens}, TextCount={TextCount}",
+            request.RequestId,
+            ProviderId,
+            tokenUsage.InputTokens,
+            tokenUsage.OutputTokens,
+            tokenUsage.TotalTokens,
             translatedTexts.Count);
 
         return ImageTranslationResponse.SuccessWithMultipleTexts(
