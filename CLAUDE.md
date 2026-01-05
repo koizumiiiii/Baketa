@@ -11,6 +11,25 @@ These files contain the following critical settings:
 - **PowerShell Priority**: Command execution uses PowerShell environment
 - **Auto-approval Settings**: Command and file operation permissions are configured in `.claude/settings.json`
 
+### Claude Code 拡張機能
+
+#### 条件付きルール (`.claude/rules/`)
+特定ファイル編集時にのみ読み込まれるルール:
+- `core-layer.md` - Baketa.Core レイヤー固有ルール
+- `infrastructure-layer.md` - Infrastructure レイヤー固有ルール
+- `ui-layer.md` - Avalonia UI / ReactiveUI 固有ルール
+- `test-files.md` - テストファイル固有ルール
+- `config-files.md` - 設定ファイル編集時の注意事項
+
+#### カスタムコマンド (`.claude/commands/`)
+`/コマンド名` で呼び出せるショートカット:
+- `/commit` - 標準フォーマットでGitコミット作成
+- `/review` - Gemini AIによるコードレビュー
+- `/test` - 変更に関連するテスト実行
+- `/build` - ソリューションビルド＋エラーチェック
+- `/issue` - GitHub Issue作成テンプレート
+- `/ultrathink` - 深い分析（根本原因分析、影響範囲調査）
+
 ## Project Overview
 
 Baketa is a Windows-specific real-time text translation overlay application for games. It uses OCR technology to detect text from game screens and displays translation results as a transparent overlay. The application features advanced image processing and OCR optimization for effective text detection and translation across various gaming scenarios.
