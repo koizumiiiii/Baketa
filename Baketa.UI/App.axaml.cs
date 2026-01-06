@@ -459,6 +459,16 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                                 var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
                                 isAuthenticated = session != null;
                                 _logger?.LogInformation("セッション復元結果: {IsAuthenticated}", isAuthenticated);
+
+                                // [Issue #261] 認証成功時にローカル同意をDBに同期
+                                if (isAuthenticated && session?.User?.Id != null)
+                                {
+                                    var consentService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IConsentService>();
+                                    if (consentService != null)
+                                    {
+                                        await consentService.SyncLocalConsentToServerAsync(session.User.Id).ConfigureAwait(true);
+                                    }
+                                }
                             }
                             else
                             {

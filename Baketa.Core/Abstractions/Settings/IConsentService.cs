@@ -90,6 +90,17 @@ public interface IConsentService
         ConsentType consentType,
         string version,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// ローカルの同意状態をサーバーに同期（認証成功後に呼び出し）
+    /// [Issue #261] 認証前に同意したローカル記録をDBに同期
+    /// </summary>
+    /// <param name="userId">認証されたユーザーID</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>同期タスク</returns>
+    Task SyncLocalConsentToServerAsync(
+        string userId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

@@ -242,6 +242,49 @@ public sealed class ConsentService : IConsentService, IDisposable
         }
     }
 
+    /// <inheritdoc/>
+    public async Task SyncLocalConsentToServerAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        try
+        {
+            var settings = await GetConsentStateAsync(cancellationToken).ConfigureAwait(false);
+
+            // プライバシーポリシー同意をサーバーに同期
+            if (settings.HasAcceptedPrivacyPolicy && !string.IsNullOrEmpty(settings.PrivacyPolicyVersion))
+            {
+                await RecordConsentToServerAsync(
+                    userId,
+                    ConsentType.PrivacyPolicy,
+                    settings.PrivacyPolicyVersion,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            // 利用規約同意をサーバーに同期
+            if (settings.HasAcceptedTermsOfService && !string.IsNullOrEmpty(settings.TermsOfServiceVersion))
+            {
+                await RecordConsentToServerAsync(
+                    userId,
+                    ConsentType.TermsOfService,
+                    settings.TermsOfServiceVersion,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            _logger.LogInformation(
+                "[Issue #261] ローカル同意状態をサーバーに同期完了: UserId={UserId}",
+                userId);
+        }
+        catch (Exception ex)
+        {
+            // 同期失敗はアプリ動作をブロックしない
+            _logger.LogWarning(ex,
+                "[Issue #261] ローカル同意のサーバー同期に失敗しました（継続）");
+        }
+    }
+
     /// <summary>
     /// ロックを既に取得している状態で設定を読み込むための内部メソッド
     /// </summary>

@@ -11,6 +11,7 @@ using Baketa.Application.Services.Diagnostics;
 using Baketa.Application.Services.Translation;
 using Baketa.Application.Services.UI;
 using Baketa.Core.Abstractions.Auth; // 🔥 [ISSUE#176] 認証状態監視用
+using Baketa.Core.Abstractions.Settings; // [Issue #261] 同意同期用
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.GPU; // 🔥 [PHASE5.2E] IWarmupService用
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
@@ -81,7 +82,8 @@ public class MainOverlayViewModel : ViewModelBase
         Baketa.Infrastructure.Services.IFirstRunService firstRunService, // 初回起動判定サービス
         ITranslationModeService translationModeService, // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス依存追加
         IErrorNotificationService errorNotificationService, // 🔥 [ISSUE#171_PHASE2] エラー通知サービス依存追加
-        IAuthService authService) // 🔥 [ISSUE#176] 認証状態監視用
+        IAuthService authService, // 🔥 [ISSUE#176] 認証状態監視用
+        IConsentService? consentService = null) // [Issue #261] 同意同期用（オプショナル）
         : base(eventAggregator, logger)
     {
         _windowManager = windowManager ?? throw new ArgumentNullException(nameof(windowManager));
@@ -109,6 +111,9 @@ public class MainOverlayViewModel : ViewModelBase
         // 🔥 [ISSUE#176] 認証サービス設定とイベント購読（ログアウト時のUI状態リセット用）
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _authService.AuthStatusChanged += OnAuthStatusChanged;
+
+        // [Issue #261] 同意サービス（オプショナル - 同期に使用）
+        _consentService = consentService;
 
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
@@ -159,6 +164,7 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly ITranslationModeService _translationModeService; // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス
     private readonly IErrorNotificationService _errorNotificationService; // 🔥 [ISSUE#171_PHASE2] エラー通知サービス
     private readonly IAuthService _authService; // 🔥 [ISSUE#176] 認証状態監視用
+    private readonly IConsentService? _consentService; // [Issue #261] 同意同期用
 
     #region Properties
 
@@ -1984,7 +1990,25 @@ public class MainOverlayViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
             this.RaisePropertyChanged(nameof(SettingsEnabled));
 
-            if (!e.IsLoggedIn)
+            if (e.IsLoggedIn && e.User?.Id != null)
+            {
+                // [Issue #261] ログイン時: ローカル同意をDBに同期
+                Logger?.LogDebug("[Issue #261] ログイン検出 - 同意同期開始");
+                try
+                {
+                    if (_consentService != null)
+                    {
+                        await _consentService.SyncLocalConsentToServerAsync(e.User.Id);
+                        Logger?.LogDebug("[Issue #261] 同意同期完了");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // 同期失敗はアプリ動作をブロックしない
+                    Logger?.LogWarning(ex, "[Issue #261] 同意同期失敗（継続）");
+                }
+            }
+            else if (!e.IsLoggedIn)
             {
                 // ログアウト時: UIを起動時状態にリセット
                 Logger?.LogDebug("[AUTH_DEBUG] ログアウト検出 - UIリセット開始");
