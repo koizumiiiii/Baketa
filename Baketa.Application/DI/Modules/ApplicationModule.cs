@@ -288,15 +288,18 @@ public sealed class ApplicationModule : ServiceModuleBase
         // 例: services.AddSingleton<ITextReplacementService, TextReplacementService>();
 
         // 🔥 [Issue #78 Phase 4] 並列翻訳オーケストレーター登録
-        // Pro/Premiaプラン向けのCloud AI翻訳並列実行・相互検証機能
+        // Pro/Premium/Ultimateプラン向けのCloud AI翻訳並列実行・相互検証機能
         Console.WriteLine("🔥 [Issue #78 Phase 4] ParallelTranslationOrchestrator DI登録開始");
         services.AddSingleton<Baketa.Application.Services.Translation.ParallelTranslationOrchestrator>(provider =>
         {
             var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
 
-            // Cloud AI関連サービス（オプショナル - Pro/Premiaプランのみ）
+            // Cloud AI関連サービス（オプショナル - Pro/Premium/Ultimateプランのみ）
             var fallbackOrchestrator = provider.GetService<Baketa.Core.Translation.Abstractions.IFallbackOrchestrator>();
             var crossValidator = provider.GetService<Baketa.Core.Abstractions.Validation.ICrossValidator>();
+
+            // Issue #258: トークン消費記録用にILicenseManagerを追加
+            var licenseManager = provider.GetRequiredService<Baketa.Core.Abstractions.License.ILicenseManager>();
             var logger = provider.GetRequiredService<ILogger<Baketa.Application.Services.Translation.ParallelTranslationOrchestrator>>();
 
             Console.WriteLine($"✅ [Issue #78 Phase 4] ParallelTranslationOrchestrator作成: " +
@@ -306,6 +309,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                 translationService,
                 fallbackOrchestrator,
                 crossValidator,
+                licenseManager,
                 logger);
         });
         services.AddSingleton<Baketa.Core.Translation.Abstractions.IParallelTranslationOrchestrator>(

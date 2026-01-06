@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Validation;
 using Baketa.Core.Models.Validation;
@@ -35,6 +36,7 @@ public sealed class ParallelTranslationOrchestrator : IParallelTranslationOrches
     private readonly ITranslationServiceCore _translationService;
     private readonly IFallbackOrchestrator? _fallbackOrchestrator;
     private readonly ICrossValidator? _crossValidator;
+    private readonly ILicenseManager _licenseManager;
     private readonly ILogger<ParallelTranslationOrchestrator> _logger;
 
     // 設定値
@@ -46,15 +48,22 @@ public sealed class ParallelTranslationOrchestrator : IParallelTranslationOrches
     /// <summary>
     /// コンストラクタ
     /// </summary>
+    /// <param name="translationService">翻訳サービス</param>
+    /// <param name="fallbackOrchestrator">フォールバックオーケストレーター（Cloud AI翻訳）</param>
+    /// <param name="crossValidator">相互検証サービス</param>
+    /// <param name="licenseManager">ライセンスマネージャー（トークン消費記録用）</param>
+    /// <param name="logger">ロガー</param>
     public ParallelTranslationOrchestrator(
         ITranslationServiceCore translationService,
         IFallbackOrchestrator? fallbackOrchestrator,
         ICrossValidator? crossValidator,
+        ILicenseManager licenseManager,
         ILogger<ParallelTranslationOrchestrator> logger)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _fallbackOrchestrator = fallbackOrchestrator;
         _crossValidator = crossValidator;
+        _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -295,6 +304,16 @@ public sealed class ParallelTranslationOrchestrator : IParallelTranslationOrches
         // ケース1: 両方成功 → 相互検証
         if (localResult.Success && cloudResult.Success && cloudResult.Result?.Response != null)
         {
+            // Issue #258: Cloud AI翻訳成功時にトークン消費を記録
+            var tokenUsage = cloudResult.Result.Response.TokenUsage;
+            if (tokenUsage != null)
+            {
+                await RecordTokenConsumptionAsync(
+                    tokenUsage.TotalTokens,
+                    request.RequestId,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             if (request.EnableCrossValidation && _crossValidator != null)
             {
                 validationStopwatch.Start();
@@ -375,6 +394,16 @@ public sealed class ParallelTranslationOrchestrator : IParallelTranslationOrches
         {
             overallStopwatch.Stop();
 
+            // Issue #258: Cloud AI翻訳成功時にトークン消費を記録
+            var tokenUsage = cloudResult.Result.Response.TokenUsage;
+            if (tokenUsage != null)
+            {
+                await RecordTokenConsumptionAsync(
+                    tokenUsage.TotalTokens,
+                    request.RequestId,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             _logger.LogWarning(
                 "ローカル翻訳失敗、Cloud AI結果を使用: RequestId={RequestId}, Error={Error}",
                 request.RequestId, localResult.Error?.Message);
@@ -448,6 +477,53 @@ public sealed class ParallelTranslationOrchestrator : IParallelTranslationOrches
         }
 
         return chunks;
+    }
+
+    /// <summary>
+    /// Cloud AI翻訳成功時にトークン消費を記録
+    /// </summary>
+    /// <remarks>
+    /// Issue #258: Cloud AI翻訳後のトークン消費がUIに反映されない問題の修正
+    /// - LicenseManager.ConsumeCloudAiTokensAsync()を呼び出してトークン消費を記録
+    /// - idempotencyKeyでリクエストIDを使用し、二重消費を防止
+    /// - 失敗しても翻訳結果には影響させない（ログのみ）
+    /// </remarks>
+    private async Task RecordTokenConsumptionAsync(
+        int totalTokens,
+        string requestId,
+        CancellationToken cancellationToken)
+    {
+        if (totalTokens <= 0)
+        {
+            _logger.LogDebug("トークン消費記録スキップ: TotalTokens={Tokens}", totalTokens);
+            return;
+        }
+
+        try
+        {
+            var result = await _licenseManager.ConsumeCloudAiTokensAsync(
+                totalTokens,
+                $"translation-{requestId}",  // idempotencyKey
+                cancellationToken).ConfigureAwait(false);
+
+            if (result.Success)
+            {
+                _logger.LogDebug(
+                    "トークン消費記録完了: Tokens={Tokens}, NewTotal={NewTotal}, Remaining={Remaining}",
+                    totalTokens, result.NewUsageTotal, result.RemainingTokens);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "トークン消費記録失敗: Reason={Reason}, Error={Error}",
+                    result.FailureReason, result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            // トークン消費記録の失敗は翻訳結果に影響させない
+            _logger.LogError(ex, "トークン消費記録で例外発生: RequestId={RequestId}", requestId);
+        }
     }
 
     /// <summary>

@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Services.Translation;
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Validation;
@@ -29,6 +30,7 @@ public class ParallelTranslationOrchestratorTests : IDisposable
     private readonly Mock<TranslationAbstractions.ITranslationService> _translationServiceMock;
     private readonly Mock<IFallbackOrchestrator> _fallbackOrchestratorMock;
     private readonly Mock<ICrossValidator> _crossValidatorMock;
+    private readonly Mock<ILicenseManager> _licenseManagerMock;
     private readonly Mock<ILogger<ParallelTranslationOrchestrator>> _loggerMock;
 
     private readonly ParallelTranslationOrchestrator _orchestrator;
@@ -39,6 +41,7 @@ public class ParallelTranslationOrchestratorTests : IDisposable
         _translationServiceMock = new Mock<TranslationAbstractions.ITranslationService>();
         _fallbackOrchestratorMock = new Mock<IFallbackOrchestrator>();
         _crossValidatorMock = new Mock<ICrossValidator>();
+        _licenseManagerMock = new Mock<ILicenseManager>();
         _loggerMock = new Mock<ILogger<ParallelTranslationOrchestrator>>();
 
         SetupDefaultMocks();
@@ -47,6 +50,7 @@ public class ParallelTranslationOrchestratorTests : IDisposable
             _translationServiceMock.Object,
             _fallbackOrchestratorMock.Object,
             _crossValidatorMock.Object,
+            _licenseManagerMock.Object,
             _loggerMock.Object);
     }
 
@@ -83,6 +87,14 @@ public class ParallelTranslationOrchestratorTests : IDisposable
                     TranslatedText = $"[Translated] {t}"
                 }).ToList();
             });
+
+        // Issue #258: デフォルトのトークン消費記録結果
+        _licenseManagerMock
+            .Setup(x => x.ConsumeCloudAiTokensAsync(
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TokenConsumptionResult.CreateSuccess(1000, 9_999_000));
     }
 
     #region IsCloudTranslationAvailable テスト
@@ -430,6 +442,194 @@ public class ParallelTranslationOrchestratorTests : IDisposable
         result.IsSuccess.Should().BeFalse();
         result.EngineUsed.Should().Be(TranslationEngineUsed.None);
         result.Error.Should().NotBeNull();
+    }
+
+    #endregion
+
+    #region Issue #258: トークン消費記録テスト
+
+    [Fact]
+    public async Task TranslateAsync_WhenCloudSucceeds_RecordsTokenConsumption()
+    {
+        // Arrange: Cloud AI翻訳成功時にトークン消費が記録されることを検証
+        var chunks = CreateTestChunks(1);
+        var request = new ParallelTranslationRequest
+        {
+            OcrChunks = chunks,
+            ImageBase64 = "dGVzdA==",
+            TargetLanguage = "ja",
+            UseCloudTranslation = true,
+            SessionToken = "test-token",
+            EnableCrossValidation = false
+        };
+
+        var tokenUsage = new TokenUsageDetail
+        {
+            InputTokens = 100,
+            OutputTokens = 50
+        };
+
+        var cloudResponse = ImageTranslationResponse.Success(
+            "req-123",
+            "Hello World",
+            "こんにちは世界",
+            "gemini",
+            tokenUsage,
+            TimeSpan.FromMilliseconds(100));
+
+        _fallbackOrchestratorMock
+            .Setup(x => x.TranslateWithFallbackAsync(It.IsAny<ImageTranslationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FallbackTranslationResult.Success(cloudResponse, FallbackLevel.Primary, []));
+
+        // Act
+        var result = await _orchestrator.TranslateAsync(request);
+
+        // Assert: トークン消費が正しい引数で1回呼び出されること
+        result.IsSuccess.Should().BeTrue();
+        _licenseManagerMock.Verify(
+            x => x.ConsumeCloudAiTokensAsync(
+                150, // InputTokens + OutputTokens = TotalTokens
+                It.Is<string>(key => key.StartsWith("translation-")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task TranslateAsync_WhenTokenUsageIsZero_SkipsTokenConsumption()
+    {
+        // Arrange: TotalTokensが0の場合にトークン消費記録をスキップすることを検証
+        var chunks = CreateTestChunks(1);
+        var request = new ParallelTranslationRequest
+        {
+            OcrChunks = chunks,
+            ImageBase64 = "dGVzdA==",
+            TargetLanguage = "ja",
+            UseCloudTranslation = true,
+            SessionToken = "test-token",
+            EnableCrossValidation = false
+        };
+
+        var zeroTokenUsage = new TokenUsageDetail
+        {
+            InputTokens = 0,
+            OutputTokens = 0
+        };
+
+        var cloudResponse = ImageTranslationResponse.Success(
+            "req-123",
+            "Hello",
+            "こんにちは",
+            "gemini",
+            zeroTokenUsage,
+            TimeSpan.FromMilliseconds(100));
+
+        _fallbackOrchestratorMock
+            .Setup(x => x.TranslateWithFallbackAsync(It.IsAny<ImageTranslationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FallbackTranslationResult.Success(cloudResponse, FallbackLevel.Primary, []));
+
+        // Act
+        var result = await _orchestrator.TranslateAsync(request);
+
+        // Assert: ConsumeCloudAiTokensAsyncが呼び出されないこと
+        result.IsSuccess.Should().BeTrue();
+        _licenseManagerMock.Verify(
+            x => x.ConsumeCloudAiTokensAsync(
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task TranslateAsync_WhenTokenConsumptionFails_StillReturnsSuccess()
+    {
+        // Arrange: トークン消費記録が失敗しても翻訳は成功として扱われることを検証
+        var chunks = CreateTestChunks(1);
+        var request = new ParallelTranslationRequest
+        {
+            OcrChunks = chunks,
+            ImageBase64 = "dGVzdA==",
+            TargetLanguage = "ja",
+            UseCloudTranslation = true,
+            SessionToken = "test-token",
+            EnableCrossValidation = false
+        };
+
+        var tokenUsage = new TokenUsageDetail { InputTokens = 100, OutputTokens = 50 };
+
+        var cloudResponse = ImageTranslationResponse.Success(
+            "req-123",
+            "Hello",
+            "こんにちは",
+            "gemini",
+            tokenUsage,
+            TimeSpan.FromMilliseconds(100));
+
+        _fallbackOrchestratorMock
+            .Setup(x => x.TranslateWithFallbackAsync(It.IsAny<ImageTranslationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FallbackTranslationResult.Success(cloudResponse, FallbackLevel.Primary, []));
+
+        // トークン消費記録が失敗を返す
+        _licenseManagerMock
+            .Setup(x => x.ConsumeCloudAiTokensAsync(
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TokenConsumptionResult.CreateFailure(
+                TokenConsumptionFailureReason.QuotaExceeded,
+                "Monthly token quota exceeded"));
+
+        // Act
+        var result = await _orchestrator.TranslateAsync(request);
+
+        // Assert: 翻訳自体は成功
+        result.IsSuccess.Should().BeTrue();
+        result.EngineUsed.Should().NotBe(TranslationEngineUsed.None);
+    }
+
+    [Fact]
+    public async Task TranslateAsync_WhenTokenConsumptionThrows_StillReturnsSuccess()
+    {
+        // Arrange: トークン消費記録で例外が発生しても翻訳は成功として扱われることを検証
+        var chunks = CreateTestChunks(1);
+        var request = new ParallelTranslationRequest
+        {
+            OcrChunks = chunks,
+            ImageBase64 = "dGVzdA==",
+            TargetLanguage = "ja",
+            UseCloudTranslation = true,
+            SessionToken = "test-token",
+            EnableCrossValidation = false
+        };
+
+        var tokenUsage = new TokenUsageDetail { InputTokens = 100, OutputTokens = 50 };
+
+        var cloudResponse = ImageTranslationResponse.Success(
+            "req-123",
+            "Hello",
+            "こんにちは",
+            "gemini",
+            tokenUsage,
+            TimeSpan.FromMilliseconds(100));
+
+        _fallbackOrchestratorMock
+            .Setup(x => x.TranslateWithFallbackAsync(It.IsAny<ImageTranslationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FallbackTranslationResult.Success(cloudResponse, FallbackLevel.Primary, []));
+
+        // トークン消費記録で例外をスロー
+        _licenseManagerMock
+            .Setup(x => x.ConsumeCloudAiTokensAsync(
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Network error"));
+
+        // Act
+        var result = await _orchestrator.TranslateAsync(request);
+
+        // Assert: 例外がキャッチされ、翻訳自体は成功
+        result.IsSuccess.Should().BeTrue();
+        result.EngineUsed.Should().NotBe(TranslationEngineUsed.None);
     }
 
     #endregion
