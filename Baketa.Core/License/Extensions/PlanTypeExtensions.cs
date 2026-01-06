@@ -5,6 +5,7 @@ namespace Baketa.Core.License.Extensions;
 /// <summary>
 /// PlanType enumの拡張メソッド
 /// Issue #125: Standardプラン廃止、広告機能廃止に対応
+/// Issue #257: Pro/Premium/Ultimate 3段階構成に改定
 /// </summary>
 public static class PlanTypeExtensions
 {
@@ -12,7 +13,7 @@ public static class PlanTypeExtensions
     /// クラウドAI翻訳が利用可能かどうか
     /// </summary>
     public static bool HasCloudAiAccess(this PlanType plan) =>
-        plan is PlanType.Pro or PlanType.Premia;
+        plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
 
     /// <summary>
     /// 広告が表示されるかどうか
@@ -23,22 +24,39 @@ public static class PlanTypeExtensions
 
     /// <summary>
     /// 月間トークン上限を取得
+    /// Issue #257: Pro 1000万, Premium 2000万, Ultimate 5000万
     /// </summary>
     public static long GetMonthlyTokenLimit(this PlanType plan) => plan switch
     {
-        PlanType.Pro => 4_000_000,
-        PlanType.Premia => 8_000_000,
+        PlanType.Pro => 10_000_000,      // 1,000万トークン（約10時間）
+        PlanType.Premium => 20_000_000,  // 2,000万トークン（約21時間）
+        PlanType.Ultimate => 50_000_000, // 5,000万トークン（約52時間）
         _ => 0
+    };
+
+    /// <summary>
+    /// 月額料金（USD）を取得
+    /// Issue #257: Patreon準拠のドル建て価格
+    /// </summary>
+    public static decimal GetMonthlyPriceUsd(this PlanType plan) => plan switch
+    {
+        PlanType.Free => 0m,
+        PlanType.Pro => 3m,
+        PlanType.Premium => 5m,
+        PlanType.Ultimate => 9m,
+        _ => 0m
     };
 
     /// <summary>
     /// 月額料金（円）を取得
     /// </summary>
+    [Obsolete("Issue #257: USD建て価格に移行。GetMonthlyPriceUsd()を使用してください。")]
     public static int GetMonthlyPriceYen(this PlanType plan) => plan switch
     {
         PlanType.Free => 0,
-        PlanType.Pro => 300,
-        PlanType.Premia => 500,
+        PlanType.Pro => 450,     // $3 x 約150円
+        PlanType.Premium => 750, // $5 x 約150円
+        PlanType.Ultimate => 1350, // $9 x 約150円
         _ => 0
     };
 
@@ -49,7 +67,8 @@ public static class PlanTypeExtensions
     {
         PlanType.Free => "無料プラン",
         PlanType.Pro => "プロプラン",
-        PlanType.Premia => "プレミアプラン",
+        PlanType.Premium => "プレミアムプラン",
+        PlanType.Ultimate => "アルティメットプラン",
         _ => "不明なプラン"
     };
 
@@ -60,7 +79,8 @@ public static class PlanTypeExtensions
     {
         PlanType.Free => "Free Plan",
         PlanType.Pro => "Pro Plan",
-        PlanType.Premia => "Premia Plan",
+        PlanType.Premium => "Premium Plan",
+        PlanType.Ultimate => "Ultimate Plan",
         _ => "Unknown Plan"
     };
 
@@ -70,8 +90,9 @@ public static class PlanTypeExtensions
     public static string GetDescription(this PlanType plan) => plan switch
     {
         PlanType.Free => "ローカル翻訳のみ利用可能。",
-        PlanType.Pro => "ローカル + クラウドAI翻訳利用可能。月400万トークン。",
-        PlanType.Premia => "ローカル + クラウドAI翻訳利用可能。月800万トークン。優先サポート。",
+        PlanType.Pro => "ライトゲーマー向け。月1,000万トークン（約10時間分）。",
+        PlanType.Premium => "カジュアルゲーマー向け。月2,000万トークン（約21時間分）。",
+        PlanType.Ultimate => "ヘビーゲーマー向け。月5,000万トークン（約52時間分）。",
         _ => "不明なプラン"
     };
 
@@ -83,9 +104,9 @@ public static class PlanTypeExtensions
         FeatureType.LocalTranslation => true, // 全プランで利用可能
         FeatureType.CloudAiTranslation => plan.HasCloudAiAccess(),
         FeatureType.AdFree => true, // Issue #125: 広告機能廃止、全プランで広告なし
-        FeatureType.PrioritySupport => plan == PlanType.Premia,
-        FeatureType.AdvancedOcrSettings => plan is PlanType.Pro or PlanType.Premia,
-        FeatureType.BatchTranslation => plan is PlanType.Pro or PlanType.Premia,
+        FeatureType.PrioritySupport => plan is PlanType.Premium or PlanType.Ultimate,
+        FeatureType.AdvancedOcrSettings => plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate,
+        FeatureType.BatchTranslation => plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate,
         _ => false
     };
 

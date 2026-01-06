@@ -1,4 +1,5 @@
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.License.Extensions;
 using Baketa.Core.License.Models;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -84,20 +85,8 @@ public sealed class EngineAccessController : IEngineAccessController
         var state = await _licenseManager.GetCurrentStateAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        // プラン確認
-        if (!PlanFeatures.IsCloudAIEnabled(state.CurrentPlan))
-        {
-            return false;
-        }
-
-        // サブスクリプション有効性
-        if (!state.IsSubscriptionActive)
-        {
-            return false;
-        }
-
-        // トークンクォータ
-        if (state.IsQuotaExceeded)
+        // プラン・サブスクリプション・クォータ確認 (Issue #257: HasCloudAiAccessに一本化)
+        if (!state.HasCloudAiAccess)
         {
             return false;
         }
@@ -171,8 +160,8 @@ public sealed class EngineAccessController : IEngineAccessController
         var state = await _licenseManager.GetCurrentStateAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        // プラン確認
-        if (!PlanFeatures.IsCloudAIEnabled(state.CurrentPlan))
+        // プラン確認 (Issue #257: HasCloudAiAccess拡張メソッドを使用)
+        if (!state.CurrentPlan.HasCloudAiAccess())
         {
             return $"Cloud AI翻訳は{PlanType.Pro}以上のプランが必要です";
         }
@@ -228,7 +217,8 @@ public sealed class EngineAccessController : IEngineAccessController
     /// <inheritdoc/>
     public long GetMonthlyTokenLimit(PlanType planType)
     {
-        return PlanFeatures.GetTokenLimit(planType);
+        // Issue #257: PlanTypeExtensions に一本化
+        return planType.GetMonthlyTokenLimit();
     }
 
     /// <summary>

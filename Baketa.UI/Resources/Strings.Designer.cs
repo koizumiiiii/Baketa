@@ -345,6 +345,8 @@ public static class Strings
     public static string License_Plan_Standard => GetString("License_Plan_Standard");
     public static string License_Plan_Pro => GetString("License_Plan_Pro");
     public static string License_Plan_Premia => GetString("License_Plan_Premia");
+    public static string License_Plan_Premium => GetString("License_Plan_Premium");
+    public static string License_Plan_Ultimate => GetString("License_Plan_Ultimate");
     public static string License_Plan_Unknown => GetString("License_Plan_Unknown");
     public static string License_Plan_PromotionSuffix => GetString("License_Plan_PromotionSuffix");
 
@@ -362,6 +364,8 @@ public static class Strings
     public static string License_Desc_Standard => GetString("License_Desc_Standard");
     public static string License_Desc_Pro => GetString("License_Desc_Pro");
     public static string License_Desc_Premia => GetString("License_Desc_Premia");
+    public static string License_Desc_Premium => GetString("License_Desc_Premium");
+    public static string License_Desc_Ultimate => GetString("License_Desc_Ultimate");
     public static string License_NoExpiration => GetString("License_NoExpiration");
     public static string License_LocalOnly => GetString("License_LocalOnly");
     public static string License_RefreshSuccess => GetString("License_RefreshSuccess");

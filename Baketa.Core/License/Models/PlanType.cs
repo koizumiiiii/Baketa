@@ -2,7 +2,8 @@ namespace Baketa.Core.License.Models;
 
 /// <summary>
 /// サブスクリプションプランの種類
-/// Issue #125: Standardプランを廃止し、3段階構成に簡素化
+/// Issue #125: Standardプランを廃止
+/// Issue #257: Pro/Premium/Ultimate 3段階構成に改定
 /// </summary>
 public enum PlanType
 {
@@ -12,12 +13,23 @@ public enum PlanType
     Free = 0,
 
     /// <summary>
-    /// プロプラン (300円/月) - ローカル + クラウドAI翻訳 (400万トークン/月)
+    /// プロプラン ($3/月) - ライトゲーマー向け
+    /// ローカル + クラウドAI翻訳 (1,000万トークン/月)
+    /// ノベルゲームで約10時間分
     /// </summary>
     Pro = 1,
 
     /// <summary>
-    /// プレミアプラン (500円/月) - ローカル + クラウドAI翻訳 (800万トークン/月)
+    /// プレミアムプラン ($5/月) - カジュアルゲーマー向け
+    /// ローカル + クラウドAI翻訳 (2,000万トークン/月)
+    /// ノベルゲームで約21時間分
     /// </summary>
-    Premia = 2
+    Premium = 2,
+
+    /// <summary>
+    /// アルティメットプラン ($9/月) - ヘビーゲーマー向け
+    /// ローカル + クラウドAI翻訳 (5,000万トークン/月)
+    /// ノベルゲームで約52時間分
+    /// </summary>
+    Ultimate = 3
 }

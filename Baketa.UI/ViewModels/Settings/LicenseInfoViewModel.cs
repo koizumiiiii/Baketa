@@ -278,9 +278,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             if (_activePromotion == null || !_activePromotion.IsValid)
                 return string.Empty;
             // Issue #125: Standardプラン廃止
+            // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
             return _activePromotion.Plan switch
             {
-                PlanType.Premia => Strings.License_Plan_Premia,
+                PlanType.Ultimate => Strings.License_Plan_Ultimate,
+                PlanType.Premium => Strings.License_Plan_Premium,
                 PlanType.Pro => Strings.License_Plan_Pro,
                 _ => Strings.Settings_License_PromotionPlanPromo
             };
@@ -441,13 +443,15 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// プラン表示名を取得
     /// </summary>
     // Issue #125: Standardプラン廃止
+    // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
     private static string GetPlanDisplayName(PlanType planType)
     {
         return planType switch
         {
             PlanType.Free => Strings.License_Plan_Free,
             PlanType.Pro => Strings.License_Plan_Pro,
-            PlanType.Premia => Strings.License_Plan_Premia,
+            PlanType.Premium => Strings.License_Plan_Premium,
+            PlanType.Ultimate => Strings.License_Plan_Ultimate,
             _ => Strings.License_Plan_Unknown
         };
     }
@@ -456,13 +460,15 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// プラン説明を取得
     /// </summary>
     // Issue #125: Standardプラン廃止
+    // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
     private static string GetPlanDescription(PlanType planType)
     {
         return planType switch
         {
             PlanType.Free => Strings.License_Desc_Free,
             PlanType.Pro => Strings.License_Desc_Pro,
-            PlanType.Premia => Strings.License_Desc_Premia,
+            PlanType.Premium => Strings.License_Desc_Premium,
+            PlanType.Ultimate => Strings.License_Desc_Ultimate,
             _ => string.Empty
         };
     }

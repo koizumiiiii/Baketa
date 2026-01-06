@@ -106,12 +106,14 @@ public class PatreonSettingsTests
     {
         // Arrange
         // Issue #125: StandardTierId削除
+        // Issue #257: PremiaTierId → PremiumTierId, UltimateTierId追加
         var settings = new PatreonSettings
         {
             ClientId = "test-client-id",
             RelayServerUrl = "https://baketa-relay.workers.dev",
             ProTierId = "",
-            PremiaTierId = ""
+            PremiumTierId = "",
+            UltimateTierId = ""
         };
 
         // Act

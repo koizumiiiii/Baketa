@@ -8,7 +8,7 @@
  *
  * セキュリティ:
  * - セッショントークン検証（Patreon認証済みユーザーのみ）
- * - プランチェック（Pro/Premiaのみ利用可能）
+ * - プランチェック（Pro/Premium/Ultimateのみ利用可能）
  * - レートリミット
  */
 
@@ -46,7 +46,7 @@ interface ParsedMembership {
   userId: string;
   email: string;
   fullName: string;
-  plan: 'Free' | 'Standard' | 'Pro' | 'Premia';
+  plan: 'Free' | 'Pro' | 'Premium' | 'Ultimate';  // Issue #257
   tierId: string;
   patronStatus: string;
   nextChargeDate: string | null;
@@ -180,7 +180,8 @@ const IDENTITY_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 const API_TIMEOUT_MS = 30000; // 30秒タイムアウト
 
 /** Cloud AI翻訳が利用可能なプラン */
-const ALLOWED_PLANS = ['Pro', 'Premia'] as const;
+// Issue #257: Pro/Premium/Ultimate 3段階構成に改定
+const ALLOWED_PLANS = ['Pro', 'Premium', 'Ultimate'] as const;
 
 // ============================================
 // ヘルパー関数
@@ -698,7 +699,7 @@ export async function handleTranslate(
     return errorResponse(
       defaultRequestId,
       'PLAN_NOT_SUPPORTED',
-      `Cloud AI translation requires Pro or Premia plan. Current plan: ${plan}`,
+      `Cloud AI translation requires Pro, Premium, or Ultimate plan. Current plan: ${plan}`,
       false,
       403,
       origin,

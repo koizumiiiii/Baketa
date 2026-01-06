@@ -10,9 +10,12 @@
         /* Pricing specific styles */
         .pricing-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: var(--space-4);
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-3);
             margin: var(--space-6) 0;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         @media (max-width: 768px) {
@@ -167,7 +170,7 @@
     </style>
 </head>
 <body class="page page--hero page--centered">
-    <div class="card card--elevated" style="max-width: 900px;">
+    <div class="card card--elevated" style="max-width: 980px;">
 
         <!-- Header -->
         <p class="hero-tagline">シンプルな料金体系</p>
@@ -195,31 +198,46 @@
             </div>
 
             <!-- Pro Plan -->
-            <div class="plan-card plan-card--recommended">
+            <div class="plan-card">
                 <div class="plan-card__name">Pro</div>
                 <div class="plan-card__price">$3<span class="plan-card__price-inline plan-card__price-period">/月</span></div>
-                <div class="plan-card__description">高精度なクラウドAI翻訳</div>
+                <div class="plan-card__description">ライトゲーマー向け</div>
                 <ul class="plan-card__features">
                     <li><span class="check">✓</span> ローカル翻訳（無制限）</li>
                     <li><span class="check">✓</span> <span class="feature-highlight">高度なOCR設定</span></li>
-                    <li><span class="check">✓</span> <span class="feature-highlight">クラウドAI<br>400万トークン/月</span></li>
+                    <li><span class="check">✓</span> <span class="feature-highlight">クラウドAI<br>1,000万トークン/月</span></li>
                 </ul>
-                <a href="https://www.patreon.com/checkout/baketa_translation?rid=27562987" class="btn btn--primary plan-card__cta">
+                <a href="https://www.patreon.com/checkout/baketa_translation?rid=27562987" class="btn btn--secondary plan-card__cta">
                     Patreonで支援
                 </a>
             </div>
 
-            <!-- Premia Plan -->
-            <div class="plan-card">
-                <div class="plan-card__name">Premia</div>
+            <!-- Premium Plan (Issue #257) -->
+            <div class="plan-card plan-card--recommended">
+                <div class="plan-card__name">Premium</div>
                 <div class="plan-card__price">$5<span class="plan-card__price-inline plan-card__price-period">/月</span></div>
-                <div class="plan-card__description">ヘビーユーザー向け</div>
+                <div class="plan-card__description">カジュアルゲーマー向け</div>
                 <ul class="plan-card__features">
                     <li><span class="check">✓</span> ローカル翻訳（無制限）</li>
                     <li><span class="check">✓</span> <span class="feature-highlight">高度なOCR設定</span></li>
-                    <li><span class="check">✓</span> <span class="feature-highlight">クラウドAI<br>800万トークン/月</span></li>
+                    <li><span class="check">✓</span> <span class="feature-highlight">クラウドAI<br>2,000万トークン/月</span></li>
                 </ul>
-                <a href="https://www.patreon.com/checkout/baketa_translation?rid=27562988" class="btn btn--secondary plan-card__cta">
+                <a href="https://www.patreon.com/checkout/baketa_translation?rid=27562988" class="btn btn--primary plan-card__cta">
+                    Patreonで支援
+                </a>
+            </div>
+
+            <!-- Ultimate Plan (Issue #257) -->
+            <div class="plan-card">
+                <div class="plan-card__name">Ultimate</div>
+                <div class="plan-card__price">$9<span class="plan-card__price-inline plan-card__price-period">/月</span></div>
+                <div class="plan-card__description">ヘビーゲーマー向け</div>
+                <ul class="plan-card__features">
+                    <li><span class="check">✓</span> ローカル翻訳（無制限）</li>
+                    <li><span class="check">✓</span> <span class="feature-highlight">高度なOCR設定</span></li>
+                    <li><span class="check">✓</span> <span class="feature-highlight">クラウドAI<br>5,000万トークン/月</span></li>
+                </ul>
+                <a href="https://www.patreon.com/checkout/baketa_translation?rid=27642807" class="btn btn--secondary plan-card__cta">
                     Patreonで支援
                 </a>
             </div>
@@ -243,7 +261,7 @@
                 <div class="faq-item__question">トークンとは何ですか？</div>
                 <p class="faq-item__answer">
                     トークンは翻訳処理の単位です。おおよそ1文字が1トークンに相当します。
-                    Proプランの400万トークンは、一般的な使用で約1ヶ月分に相当します。
+                    Proプランの1,000万トークンは、一般的な使用で約2-3ヶ月分に相当します。
                 </p>
             </div>
 

@@ -7,6 +7,7 @@ namespace Baketa.Core.Tests.License;
 /// <summary>
 /// PlanTypeExtensions拡張メソッドの単体テスト
 /// Issue #125: Standardプラン廃止に対応
+/// Issue #257: Pro/Premium/Ultimate 3段階構成に改定
 /// </summary>
 public class PlanTypeExtensionsTests
 {
@@ -20,7 +21,8 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, false)]
     [InlineData(PlanType.Pro, true)]
-    [InlineData(PlanType.Premia, true)]
+    [InlineData(PlanType.Premium, true)]
+    [InlineData(PlanType.Ultimate, true)]
     public void HasCloudAiAccess_ReturnsExpectedValue(PlanType plan, bool expected)
     {
         // Act
@@ -37,7 +39,8 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, false)]   // Issue #125: 広告機能廃止、常にfalse
     [InlineData(PlanType.Pro, false)]
-    [InlineData(PlanType.Premia, false)]
+    [InlineData(PlanType.Premium, false)]
+    [InlineData(PlanType.Ultimate, false)]
 #pragma warning disable CS0618 // Type or member is obsolete
     public void ShowsAds_AlwaysReturnsFalse_AfterAdRemoval(PlanType plan, bool expected)
     {
@@ -55,8 +58,9 @@ public class PlanTypeExtensionsTests
 
     [Theory]
     [InlineData(PlanType.Free, 0L)]
-    [InlineData(PlanType.Pro, 4_000_000L)]
-    [InlineData(PlanType.Premia, 8_000_000L)]
+    [InlineData(PlanType.Pro, 10_000_000L)]       // Issue #257: 1,000万トークン
+    [InlineData(PlanType.Premium, 20_000_000L)]   // Issue #257: 2,000万トークン
+    [InlineData(PlanType.Ultimate, 50_000_000L)]  // Issue #257: 5,000万トークン
     public void GetMonthlyTokenLimit_ReturnsExpectedValue(PlanType plan, long expected)
     {
         // Act
@@ -68,12 +72,45 @@ public class PlanTypeExtensionsTests
 
     #endregion
 
-    #region GetMonthlyPriceYen Tests
+    #region GetMonthlyPriceUsd Tests
 
     [Theory]
     [InlineData(PlanType.Free, 0)]
-    [InlineData(PlanType.Pro, 300)]
-    [InlineData(PlanType.Premia, 500)]
+    [InlineData(PlanType.Pro, 3)]       // Issue #257: $3
+    [InlineData(PlanType.Premium, 5)]   // Issue #257: $5
+    [InlineData(PlanType.Ultimate, 9)]  // Issue #257: $9
+    public void GetMonthlyPriceUsd_ReturnsExpectedValue(PlanType plan, decimal expected)
+    {
+        // Act
+        var result = plan.GetMonthlyPriceUsd();
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void GetMonthlyPriceUsd_UndefinedPlan_ReturnsZero()
+    {
+        // Arrange
+        var undefinedPlan = UndefinedPlan;
+
+        // Act
+        var result = undefinedPlan.GetMonthlyPriceUsd();
+
+        // Assert
+        Assert.Equal(0m, result);
+    }
+
+    #endregion
+
+    #region GetMonthlyPriceYen Tests (Deprecated)
+
+    [Theory]
+    [InlineData(PlanType.Free, 0)]
+    [InlineData(PlanType.Pro, 450)]       // Issue #257: $3 x 約150円
+    [InlineData(PlanType.Premium, 750)]   // Issue #257: $5 x 約150円
+    [InlineData(PlanType.Ultimate, 1350)] // Issue #257: $9 x 約150円
+#pragma warning disable CS0618 // Type or member is obsolete
     public void GetMonthlyPriceYen_ReturnsExpectedValue(PlanType plan, int expected)
     {
         // Act
@@ -95,6 +132,7 @@ public class PlanTypeExtensionsTests
         // Assert
         Assert.Equal(0, result);
     }
+#pragma warning restore CS0618
 
     #endregion
 
@@ -103,7 +141,8 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, "無料プラン")]
     [InlineData(PlanType.Pro, "プロプラン")]
-    [InlineData(PlanType.Premia, "プレミアプラン")]
+    [InlineData(PlanType.Premium, "プレミアムプラン")]
+    [InlineData(PlanType.Ultimate, "アルティメットプラン")]
     public void GetDisplayName_ReturnsJapaneseName(PlanType plan, string expected)
     {
         // Act
@@ -133,7 +172,8 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, "Free Plan")]
     [InlineData(PlanType.Pro, "Pro Plan")]
-    [InlineData(PlanType.Premia, "Premia Plan")]
+    [InlineData(PlanType.Premium, "Premium Plan")]
+    [InlineData(PlanType.Ultimate, "Ultimate Plan")]
     public void GetEnglishDisplayName_ReturnsEnglishName(PlanType plan, string expected)
     {
         // Act
@@ -168,7 +208,6 @@ public class PlanTypeExtensionsTests
 
         // Assert
         Assert.Contains("ローカル翻訳のみ", result);
-        // Issue #125: 広告機能廃止、広告表示あり記述は削除済み
     }
 
     [Fact]
@@ -178,20 +217,30 @@ public class PlanTypeExtensionsTests
         var result = PlanType.Pro.GetDescription();
 
         // Assert
-        Assert.Contains("クラウドAI翻訳", result);
-        Assert.Contains("400万トークン", result);
+        Assert.Contains("ライトゲーマー", result);
+        Assert.Contains("1,000万トークン", result);
     }
 
     [Fact]
-    public void GetDescription_Premia_ReturnsCorrectDescription()
+    public void GetDescription_Premium_ReturnsCorrectDescription()
     {
         // Act
-        var result = PlanType.Premia.GetDescription();
+        var result = PlanType.Premium.GetDescription();
 
         // Assert
-        Assert.Contains("クラウドAI翻訳", result);
-        Assert.Contains("800万トークン", result);
-        Assert.Contains("優先サポート", result);
+        Assert.Contains("カジュアルゲーマー", result);
+        Assert.Contains("2,000万トークン", result);
+    }
+
+    [Fact]
+    public void GetDescription_Ultimate_ReturnsCorrectDescription()
+    {
+        // Act
+        var result = PlanType.Ultimate.GetDescription();
+
+        // Assert
+        Assert.Contains("ヘビーゲーマー", result);
+        Assert.Contains("5,000万トークン", result);
     }
 
     [Fact]
@@ -214,7 +263,8 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free)]
     [InlineData(PlanType.Pro)]
-    [InlineData(PlanType.Premia)]
+    [InlineData(PlanType.Premium)]
+    [InlineData(PlanType.Ultimate)]
     public void IsFeatureAvailable_LocalTranslation_AlwaysTrue(PlanType plan)
     {
         // Act
@@ -231,8 +281,9 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, false)]
     [InlineData(PlanType.Pro, true)]
-    [InlineData(PlanType.Premia, true)]
-    public void IsFeatureAvailable_CloudAiTranslation_OnlyProAndPremiaPlan(
+    [InlineData(PlanType.Premium, true)]
+    [InlineData(PlanType.Ultimate, true)]
+    public void IsFeatureAvailable_CloudAiTranslation_PaidPlansOnly(
         PlanType plan, bool expected)
     {
         // Act
@@ -249,7 +300,8 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, true)]    // Issue #125: 広告機能廃止、全プランでtrue
     [InlineData(PlanType.Pro, true)]
-    [InlineData(PlanType.Premia, true)]
+    [InlineData(PlanType.Premium, true)]
+    [InlineData(PlanType.Ultimate, true)]
     public void IsFeatureAvailable_AdFree_AlwaysTrue_AfterAdRemoval(PlanType plan, bool expected)
     {
         // Act
@@ -266,8 +318,9 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, false)]
     [InlineData(PlanType.Pro, false)]
-    [InlineData(PlanType.Premia, true)]
-    public void IsFeatureAvailable_PrioritySupport_OnlyPremiaPlan(
+    [InlineData(PlanType.Premium, true)]   // Issue #257: Premium以上で優先サポート
+    [InlineData(PlanType.Ultimate, true)]
+    public void IsFeatureAvailable_PrioritySupport_PremiumAndUltimateOnly(
         PlanType plan, bool expected)
     {
         // Act
@@ -284,8 +337,9 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, false)]
     [InlineData(PlanType.Pro, true)]
-    [InlineData(PlanType.Premia, true)]
-    public void IsFeatureAvailable_AdvancedOcrSettings_ProAndPremiaOnly(
+    [InlineData(PlanType.Premium, true)]
+    [InlineData(PlanType.Ultimate, true)]
+    public void IsFeatureAvailable_AdvancedOcrSettings_PaidPlansOnly(
         PlanType plan, bool expected)
     {
         // Act
@@ -302,8 +356,9 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, false)]
     [InlineData(PlanType.Pro, true)]
-    [InlineData(PlanType.Premia, true)]
-    public void IsFeatureAvailable_BatchTranslation_ProAndPremiaOnly(
+    [InlineData(PlanType.Premium, true)]
+    [InlineData(PlanType.Ultimate, true)]
+    public void IsFeatureAvailable_BatchTranslation_PaidPlansOnly(
         PlanType plan, bool expected)
     {
         // Act
@@ -324,7 +379,7 @@ public class PlanTypeExtensionsTests
         var undefinedFeature = (FeatureType)999;
 
         // Act
-        var result = PlanType.Premia.IsFeatureAvailable(undefinedFeature);
+        var result = PlanType.Ultimate.IsFeatureAvailable(undefinedFeature);
 
         // Assert
         Assert.False(result);
@@ -336,8 +391,9 @@ public class PlanTypeExtensionsTests
 
     [Theory]
     [InlineData(PlanType.Free, 0)]
-    [InlineData(PlanType.Pro, 1)]      // Issue #125: enum値変更 (Standard削除、Proが1に)
-    [InlineData(PlanType.Premia, 2)]   // Issue #125: enum値変更 (Premiaが2に)
+    [InlineData(PlanType.Pro, 1)]
+    [InlineData(PlanType.Premium, 2)]
+    [InlineData(PlanType.Ultimate, 3)]
     public void GetRank_ReturnsEnumIntegerValue(PlanType plan, int expected)
     {
         // Act
@@ -362,20 +418,40 @@ public class PlanTypeExtensionsTests
     }
 
     [Fact]
-    public void IsUpgradeTo_FreeToPremi_ReturnsTrue()
+    public void IsUpgradeTo_FreeToPremium_ReturnsTrue()
     {
         // Act
-        var result = PlanType.Free.IsUpgradeTo(PlanType.Premia);
+        var result = PlanType.Free.IsUpgradeTo(PlanType.Premium);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void IsUpgradeTo_ProToPremi_ReturnsTrue()
+    public void IsUpgradeTo_FreeToUltimate_ReturnsTrue()
     {
         // Act
-        var result = PlanType.Pro.IsUpgradeTo(PlanType.Premia);
+        var result = PlanType.Free.IsUpgradeTo(PlanType.Ultimate);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsUpgradeTo_ProToPremium_ReturnsTrue()
+    {
+        // Act
+        var result = PlanType.Pro.IsUpgradeTo(PlanType.Premium);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsUpgradeTo_PremiumToUltimate_ReturnsTrue()
+    {
+        // Act
+        var result = PlanType.Premium.IsUpgradeTo(PlanType.Ultimate);
 
         // Assert
         Assert.True(result);
@@ -416,10 +492,20 @@ public class PlanTypeExtensionsTests
     }
 
     [Fact]
-    public void IsDowngradeTo_PremiaToPro_ReturnsTrue()
+    public void IsDowngradeTo_PremiumToPro_ReturnsTrue()
     {
         // Act
-        var result = PlanType.Premia.IsDowngradeTo(PlanType.Pro);
+        var result = PlanType.Premium.IsDowngradeTo(PlanType.Pro);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsDowngradeTo_UltimateToPremium_ReturnsTrue()
+    {
+        // Act
+        var result = PlanType.Ultimate.IsDowngradeTo(PlanType.Premium);
 
         // Assert
         Assert.True(result);
@@ -439,7 +525,7 @@ public class PlanTypeExtensionsTests
     public void IsDowngradeTo_LowerToHigher_ReturnsFalse()
     {
         // Act
-        var result = PlanType.Free.IsDowngradeTo(PlanType.Premia);
+        var result = PlanType.Free.IsDowngradeTo(PlanType.Ultimate);
 
         // Assert
         Assert.False(result);
@@ -452,7 +538,8 @@ public class PlanTypeExtensionsTests
     [Theory]
     [InlineData(PlanType.Free, true)]
     [InlineData(PlanType.Pro, true)]
-    [InlineData(PlanType.Premia, true)]
+    [InlineData(PlanType.Premium, true)]
+    [InlineData(PlanType.Ultimate, true)]
     public void IsValid_DefinedPlanType_ReturnsTrue(PlanType plan, bool expected)
     {
         // Act

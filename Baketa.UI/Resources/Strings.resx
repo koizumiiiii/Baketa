@@ -700,6 +700,12 @@
   <data name="License_Plan_Premia" xml:space="preserve">
     <value>Premia</value>
   </data>
+  <data name="License_Plan_Premium" xml:space="preserve">
+    <value>Premium</value>
+  </data>
+  <data name="License_Plan_Ultimate" xml:space="preserve">
+    <value>Ultimate</value>
+  </data>
   <data name="License_Plan_Unknown" xml:space="preserve">
     <value>不明</value>
   </data>
@@ -737,10 +743,16 @@
     <value>スタンダードプラン - 広告なし、ローカル翻訳のみ</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Proプラン - クラウドAI翻訳 月間400万トークン</value>
+    <value>Proプラン - クラウドAI翻訳 月間1,000万トークン</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
     <value>Premiaプラン - クラウドAI翻訳 月間800万トークン</value>
+  </data>
+  <data name="License_Desc_Premium" xml:space="preserve">
+    <value>Premiumプラン - クラウドAI翻訳 月間2,000万トークン</value>
+  </data>
+  <data name="License_Desc_Ultimate" xml:space="preserve">
+    <value>Ultimateプラン - クラウドAI翻訳 月間5,000万トークン</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>無期限</value>

@@ -333,12 +333,15 @@ public sealed class SupabaseLicenseApiClient : ILicenseApiClient
             return PlanType.Free;
 
         // Issue #125: Standardプラン廃止、後方互換性のためFreeにフォールバック
+        // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
         return planType.ToLowerInvariant() switch
         {
             "free" => PlanType.Free,
             "standard" => PlanType.Free, // Issue #125: Standardプラン廃止
             "pro" => PlanType.Pro,
-            "premia" => PlanType.Premia,
+            "premium" => PlanType.Premium,
+            "premia" => PlanType.Premium, // 後方互換性
+            "ultimate" => PlanType.Ultimate,
             _ => PlanType.Free
         };
     }

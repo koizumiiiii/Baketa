@@ -34,6 +34,7 @@ public class LicenseManagerTests : IDisposable
         _settings = new LicenseSettings
         {
             EnableMockMode = true, // タイマーを無効化
+            MockPlanType = 0, // Issue #257: デフォルトFreeプランで初期化
             TokenWarningThresholdPercent = 75,
             TokenCriticalThresholdPercent = 90,
             PlanExpirationWarningDays = 7,
@@ -240,7 +241,7 @@ public class LicenseManagerTests : IDisposable
 
         var serverState = new LicenseState
         {
-            CurrentPlan = PlanType.Premia,
+            CurrentPlan = PlanType.Premium,
             UserId = "user-123"
         };
 
@@ -260,7 +261,7 @@ public class LicenseManagerTests : IDisposable
             x => x.ClearCacheAsync("user-123", It.IsAny<CancellationToken>()),
             Times.Once);
 
-        Assert.Equal(PlanType.Premia, state.CurrentPlan);
+        Assert.Equal(PlanType.Premium, state.CurrentPlan);
     }
 
     #endregion
@@ -294,8 +295,24 @@ public class LicenseManagerTests : IDisposable
     [Fact]
     public async Task ConsumeCloudAiTokensAsync_Unauthenticated_ReturnsSessionInvalid()
     {
-        // Act
-        var result = await _licenseManager.ConsumeCloudAiTokensAsync(100, "key-1");
+        // Arrange - モックモード無効の新しいLicenseManagerを作成
+        // （モックモードでは自動的に認証情報が設定されるため）
+        var settingsWithoutMock = new LicenseSettings
+        {
+            EnableMockMode = false,
+            TokenWarningThresholdPercent = 75,
+            TokenCriticalThresholdPercent = 90
+        };
+        var options = Options.Create(settingsWithoutMock);
+        using var unauthenticatedManager = new LicenseManager(
+            _mockLogger.Object,
+            _mockApiClient.Object,
+            _mockCacheService.Object,
+            _mockEventAggregator.Object,
+            options);
+
+        // Act - SetUserCredentialsを呼ばない
+        var result = await unauthenticatedManager.ConsumeCloudAiTokensAsync(100, "key-1");
 
         // Assert
         Assert.False(result.Success);
@@ -748,12 +765,13 @@ public class LicenseManagerTests : IDisposable
         // Arrange
         _licenseManager.SetUserCredentials("user-123", "session-abc");
 
-        // Set up Pro plan with 75% usage (warning threshold)
+        // Issue #257: Pro plan now has 10M tokens
+        // Set up Pro plan with ~74% usage (just below 75% warning threshold)
         var proState = new LicenseState
         {
-            CurrentPlan = PlanType.Pro, // 4M tokens
+            CurrentPlan = PlanType.Pro, // 10M tokens
             UserId = "user-123",
-            CloudAiTokensUsed = 2_900_000 // Already at ~72.5%
+            CloudAiTokensUsed = 7_400_000 // Already at 74%
         };
 
         _mockCacheService
@@ -768,8 +786,8 @@ public class LicenseManagerTests : IDisposable
             .ReturnsAsync(new TokenConsumptionApiResponse
             {
                 Success = true,
-                NewUsageTotal = 3_100_000, // 77.5% - exceeds 75% warning threshold
-                RemainingTokens = 900_000
+                NewUsageTotal = 7_600_000, // 76% - exceeds 75% warning threshold
+                RemainingTokens = 2_400_000
             });
 
         TokenUsageWarningEventArgs? warningEventArgs = null;
@@ -780,8 +798,8 @@ public class LicenseManagerTests : IDisposable
 
         // Assert
         Assert.NotNull(warningEventArgs);
-        Assert.Equal(3_100_000, warningEventArgs.CurrentUsage);
-        Assert.Equal(4_000_000, warningEventArgs.MonthlyLimit);
+        Assert.Equal(7_600_000, warningEventArgs.CurrentUsage);
+        Assert.Equal(10_000_000, warningEventArgs.MonthlyLimit);
     }
 
     [Fact]
@@ -790,11 +808,13 @@ public class LicenseManagerTests : IDisposable
         // Arrange
         _licenseManager.SetUserCredentials("user-123", "session-abc");
 
+        // Issue #257: Pro plan now has 10M tokens
+        // Set up Pro plan with ~89% usage (just below 90% critical threshold)
         var proState = new LicenseState
         {
-            CurrentPlan = PlanType.Pro,
+            CurrentPlan = PlanType.Pro, // 10M tokens
             UserId = "user-123",
-            CloudAiTokensUsed = 3_500_000 // 87.5%
+            CloudAiTokensUsed = 8_900_000 // 89%
         };
 
         _mockCacheService
@@ -809,8 +829,8 @@ public class LicenseManagerTests : IDisposable
             .ReturnsAsync(new TokenConsumptionApiResponse
             {
                 Success = true,
-                NewUsageTotal = 3_700_000, // 92.5% - exceeds 90% critical threshold
-                RemainingTokens = 300_000
+                NewUsageTotal = 9_100_000, // 91% - exceeds 90% critical threshold
+                RemainingTokens = 900_000
             });
 
         TokenUsageWarningEventArgs? warningEventArgs = null;

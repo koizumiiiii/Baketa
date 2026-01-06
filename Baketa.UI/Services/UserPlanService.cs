@@ -251,10 +251,12 @@ public class UserPlanService : IUserPlanService, IDisposable
     private static UserPlanType ConvertToPlanType(PlanType licensePlan)
     {
         // Issue #125: Standardプラン廃止、Pro以上はPremium扱い
+        // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
         return licensePlan switch
         {
             PlanType.Pro => UserPlanType.Premium,
-            PlanType.Premia => UserPlanType.Premium,
+            PlanType.Premium => UserPlanType.Premium,
+            PlanType.Ultimate => UserPlanType.Premium,
             _ => UserPlanType.Free
         };
     }

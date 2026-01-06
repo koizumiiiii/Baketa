@@ -266,9 +266,11 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     /// プラン名を取得（ステータスメッセージ用）
     /// </summary>
     // Issue #125: Standardプラン廃止
+    // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
     private string GetPlanName(PlanType plan) => plan switch
     {
-        PlanType.Premia => "Premia",
+        PlanType.Ultimate => "Ultimate",
+        PlanType.Premium => "Premium",
         PlanType.Pro => "Pro",
         _ => "Free"
     };
