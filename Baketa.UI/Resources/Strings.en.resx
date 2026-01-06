@@ -1366,4 +1366,48 @@
     <value>Cancel</value>
   </data>
 
+  <!-- ========== Consent Dialog (Issue #261) ========== -->
+  <data name="Consent_WindowTitle_Initial" xml:space="preserve">
+    <value>Privacy Policy Agreement</value>
+  </data>
+  <data name="Consent_WindowTitle_Account" xml:space="preserve">
+    <value>Terms of Service Agreement</value>
+  </data>
+  <data name="Consent_Header_Initial" xml:space="preserve">
+    <value>Welcome to Baketa</value>
+  </data>
+  <data name="Consent_Header_Account" xml:space="preserve">
+    <value>Create Account</value>
+  </data>
+  <data name="Consent_Description_Initial" xml:space="preserve">
+    <value>To use Baketa, you need to agree to our Privacy Policy.</value>
+  </data>
+  <data name="Consent_Description_Account" xml:space="preserve">
+    <value>To create an account, you need to agree to our Terms of Service and Privacy Policy.</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Label" xml:space="preserve">
+    <value>Privacy Policy</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Link" xml:space="preserve">
+    <value>Read Privacy Policy</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Checkbox" xml:space="preserve">
+    <value>I agree to the Privacy Policy</value>
+  </data>
+  <data name="Consent_TermsOfService_Label" xml:space="preserve">
+    <value>Terms of Service</value>
+  </data>
+  <data name="Consent_TermsOfService_Link" xml:space="preserve">
+    <value>Read Terms of Service</value>
+  </data>
+  <data name="Consent_TermsOfService_Checkbox" xml:space="preserve">
+    <value>I agree to the Terms of Service</value>
+  </data>
+  <data name="Consent_Button_Accept" xml:space="preserve">
+    <value>Agree and Continue</value>
+  </data>
+  <data name="Consent_Button_Decline" xml:space="preserve">
+    <value>Decline</value>
+  </data>
+
 </root>

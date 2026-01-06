@@ -577,4 +577,20 @@ public static class Strings
     public static string Settings_CrashReport_IncludeSystemInfoDescription => GetString("Settings_CrashReport_IncludeSystemInfoDescription");
     public static string Settings_CrashReport_IncludeLogs => GetString("Settings_CrashReport_IncludeLogs");
     public static string Settings_CrashReport_IncludeLogsDescription => GetString("Settings_CrashReport_IncludeLogsDescription");
+
+    // ========== [Issue #261] Consent Dialog ==========
+    public static string Consent_WindowTitle_Initial => GetString("Consent_WindowTitle_Initial");
+    public static string Consent_WindowTitle_Account => GetString("Consent_WindowTitle_Account");
+    public static string Consent_Header_Initial => GetString("Consent_Header_Initial");
+    public static string Consent_Header_Account => GetString("Consent_Header_Account");
+    public static string Consent_Description_Initial => GetString("Consent_Description_Initial");
+    public static string Consent_Description_Account => GetString("Consent_Description_Account");
+    public static string Consent_PrivacyPolicy_Label => GetString("Consent_PrivacyPolicy_Label");
+    public static string Consent_PrivacyPolicy_Link => GetString("Consent_PrivacyPolicy_Link");
+    public static string Consent_PrivacyPolicy_Checkbox => GetString("Consent_PrivacyPolicy_Checkbox");
+    public static string Consent_TermsOfService_Label => GetString("Consent_TermsOfService_Label");
+    public static string Consent_TermsOfService_Link => GetString("Consent_TermsOfService_Link");
+    public static string Consent_TermsOfService_Checkbox => GetString("Consent_TermsOfService_Checkbox");
+    public static string Consent_Button_Accept => GetString("Consent_Button_Accept");
+    public static string Consent_Button_Decline => GetString("Consent_Button_Decline");
 }

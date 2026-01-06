@@ -680,6 +680,9 @@ public class InfrastructureModule : ServiceModuleBase
         // 統一設定管理サービス
         RegisterUnifiedSettings(_1);
 
+        // [Issue #261] 同意管理サービス
+        RegisterConsentServices(_1);
+
         // 統一ログサービス
         RegisterLoggingServices(_1);
     }
@@ -692,6 +695,16 @@ public class InfrastructureModule : ServiceModuleBase
     {
         // 統一設定管理サービス（Singleton: アプリケーション全体で共有）
         services.AddSingleton<IUnifiedSettingsService, UnifiedSettingsService>();
+    }
+
+    /// <summary>
+    /// [Issue #261] 同意管理サービスを登録します
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterConsentServices(IServiceCollection services)
+    {
+        // 利用規約・プライバシーポリシー同意管理サービス（Singleton: アプリケーション全体で共有）
+        services.AddSingleton<IConsentService, ConsentService>();
     }
 
     /// <summary>

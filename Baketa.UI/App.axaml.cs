@@ -428,6 +428,15 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         // --- 3.5 [Issue #252] クラッシュレポート検出・ダイアログ表示 ---
                         await CheckAndShowCrashReportDialogAsync(serviceProvider);
 
+                        // --- 3.6 [Issue #261] プライバシーポリシー同意確認 ---
+                        var consentAccepted = await CheckAndShowConsentDialogAsync(serviceProvider);
+                        if (!consentAccepted)
+                        {
+                            _logger?.LogInformation("[Issue #261] 同意が得られなかったため、アプリケーションを終了します");
+                            desktop.Shutdown();
+                            return;
+                        }
+
                         // --- 4. 認証状態チェックとメインUI表示 ---
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 4: 認証状態チェック開始");
                         _logger?.LogInformation("認証状態をチェック中...");
@@ -1045,6 +1054,79 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         {
             // クラッシュレポート処理の失敗はアプリ起動をブロックしない
             _logger?.LogWarning(ex, "[Issue #252] クラッシュレポート処理中にエラー（継続）");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #261] プライバシーポリシー同意確認・ダイアログ表示
+    /// 初回起動時にプライバシーポリシーへの同意を確認し、同意しない場合はアプリを終了
+    /// </summary>
+    /// <returns>同意された場合はtrue、拒否された場合はfalse（アプリ終了が必要）</returns>
+    private async Task<bool> CheckAndShowConsentDialogAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            var consentService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IConsentService>();
+            if (consentService == null)
+            {
+                _logger?.LogWarning("[Issue #261] IConsentServiceが登録されていません");
+                return true; // サービスがない場合は続行
+            }
+
+            // [Gemini Review] 非同期化: UIスレッドブロック回避
+            // 初回起動時の同意が必要か確認
+            var needsConsent = await consentService.NeedsInitialConsentAsync().ConfigureAwait(true);
+            if (!needsConsent)
+            {
+                _logger?.LogDebug("[Issue #261] プライバシーポリシー同意済み、スキップ");
+                return true;
+            }
+
+            _logger?.LogInformation("[Issue #261] プライバシーポリシー同意が必要、ダイアログを表示");
+
+            // [Gemini Review] 非同期ファクトリメソッドでViewModelを初期化
+            var viewModel = await ViewModels.ConsentDialogViewModel.CreateAsync(
+                consentService,
+                ViewModels.ConsentDialogMode.InitialLaunch).ConfigureAwait(true);
+            var dialog = new Views.ConsentDialogWindow(viewModel);
+
+            // ダイアログアイコンを設定
+            try
+            {
+                var iconUri = new Uri(BAKETA_ICON_PATH);
+                dialog.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(iconUri));
+            }
+            catch (Exception iconEx)
+            {
+                Console.WriteLine($"⚠️ 同意ダイアログアイコン設定失敗: {iconEx.Message}");
+            }
+
+            // ダイアログを表示
+            dialog.Show();
+            var tcs = new TaskCompletionSource<ViewModels.ConsentDialogResult>();
+            dialog.Closed += (_, _) => tcs.TrySetResult(viewModel.Result);
+            var result = await tcs.Task.ConfigureAwait(true);
+
+            if (result == ViewModels.ConsentDialogResult.Accepted)
+            {
+                _logger?.LogInformation("[Issue #261] ユーザーがプライバシーポリシーに同意");
+
+                // 同意を記録
+                await consentService.AcceptPrivacyPolicyAsync().ConfigureAwait(true);
+
+                return true;
+            }
+            else
+            {
+                _logger?.LogInformation("[Issue #261] ユーザーがプライバシーポリシーに同意しなかった、アプリを終了");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            // 同意確認処理の失敗はアプリ起動をブロックしない（セキュリティ考慮で要検討）
+            _logger?.LogWarning(ex, "[Issue #261] 同意確認処理中にエラー（継続）");
+            return true;
         }
     }
 

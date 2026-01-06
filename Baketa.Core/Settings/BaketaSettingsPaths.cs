@@ -78,6 +78,14 @@ public static class BaketaSettingsPaths
         "promotion-settings.json");
 
     /// <summary>
+    /// [Issue #261] 同意設定ファイルのパス
+    /// 利用規約・プライバシーポリシー同意状態を保存
+    /// </summary>
+    public static string ConsentSettingsPath { get; } = Path.Combine(
+        UserSettingsDirectory,
+        "consent-settings.json");
+
+    /// <summary>
     /// キャッシュディレクトリのパス
     /// </summary>
     public static string CacheDirectory { get; } = Path.Combine(

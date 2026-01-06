@@ -1366,4 +1366,48 @@
     <value>キャンセル</value>
   </data>
 
+  <!-- ========== Consent Dialog (Issue #261) ========== -->
+  <data name="Consent_WindowTitle_Initial" xml:space="preserve">
+    <value>プライバシーポリシーへの同意</value>
+  </data>
+  <data name="Consent_WindowTitle_Account" xml:space="preserve">
+    <value>利用規約への同意</value>
+  </data>
+  <data name="Consent_Header_Initial" xml:space="preserve">
+    <value>Baketaへようこそ</value>
+  </data>
+  <data name="Consent_Header_Account" xml:space="preserve">
+    <value>アカウント作成</value>
+  </data>
+  <data name="Consent_Description_Initial" xml:space="preserve">
+    <value>Baketaをご利用いただくには、プライバシーポリシーへの同意が必要です。</value>
+  </data>
+  <data name="Consent_Description_Account" xml:space="preserve">
+    <value>アカウントを作成するには、利用規約とプライバシーポリシーへの同意が必要です。</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Label" xml:space="preserve">
+    <value>プライバシーポリシー</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Link" xml:space="preserve">
+    <value>プライバシーポリシーを読む</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Checkbox" xml:space="preserve">
+    <value>プライバシーポリシーに同意します</value>
+  </data>
+  <data name="Consent_TermsOfService_Label" xml:space="preserve">
+    <value>利用規約</value>
+  </data>
+  <data name="Consent_TermsOfService_Link" xml:space="preserve">
+    <value>利用規約を読む</value>
+  </data>
+  <data name="Consent_TermsOfService_Checkbox" xml:space="preserve">
+    <value>利用規約に同意します</value>
+  </data>
+  <data name="Consent_Button_Accept" xml:space="preserve">
+    <value>同意して続行</value>
+  </data>
+  <data name="Consent_Button_Decline" xml:space="preserve">
+    <value>同意しない</value>
+  </data>
+
 </root>
