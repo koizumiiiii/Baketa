@@ -67,7 +67,8 @@ public class LicenseStateTests
 
     [Theory]
     [InlineData(PlanType.Pro)]
-    [InlineData(PlanType.Premia)]
+    [InlineData(PlanType.Premium)]
+    [InlineData(PlanType.Ultimate)]
     public void IsPaid_PaidPlans_ReturnsTrue(PlanType plan)
     {
         // Arrange
@@ -84,8 +85,9 @@ public class LicenseStateTests
 
     [Theory]
     [InlineData(PlanType.Free, 0L)]
-    [InlineData(PlanType.Pro, 4_000_000L)]
-    [InlineData(PlanType.Premia, 8_000_000L)]
+    [InlineData(PlanType.Pro, 10_000_000L)]
+    [InlineData(PlanType.Premium, 20_000_000L)]
+    [InlineData(PlanType.Ultimate, 50_000_000L)]
     public void MonthlyTokenLimit_DelegatesToPlanTypeExtensions(
         PlanType plan, long expected)
     {
@@ -106,7 +108,7 @@ public class LicenseStateTests
     [Fact]
     public void RemainingTokens_NoTokensUsed_ReturnsFullLimit()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
@@ -114,13 +116,13 @@ public class LicenseStateTests
         };
 
         // Assert
-        Assert.Equal(4_000_000L, state.RemainingTokens);
+        Assert.Equal(10_000_000L, state.RemainingTokens);
     }
 
     [Fact]
     public void RemainingTokens_SomeTokensUsed_ReturnsCorrectValue()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
@@ -128,17 +130,17 @@ public class LicenseStateTests
         };
 
         // Assert
-        Assert.Equal(3_000_000L, state.RemainingTokens);
+        Assert.Equal(9_000_000L, state.RemainingTokens);
     }
 
     [Fact]
     public void RemainingTokens_AllTokensUsed_ReturnsZero()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 4_000_000
+            CloudAiTokensUsed = 10_000_000
         };
 
         // Assert
@@ -148,11 +150,11 @@ public class LicenseStateTests
     [Fact]
     public void RemainingTokens_ExceededQuota_ReturnsZero()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 5_000_000
+            CloudAiTokensUsed = 12_000_000
         };
 
         // Assert
@@ -194,11 +196,11 @@ public class LicenseStateTests
     [Fact]
     public void IsQuotaExceeded_AtLimit_ReturnsTrue()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 4_000_000
+            CloudAiTokensUsed = 10_000_000  // At Pro's 10M limit
         };
 
         // Assert
@@ -208,11 +210,11 @@ public class LicenseStateTests
     [Fact]
     public void IsQuotaExceeded_OverLimit_ReturnsTrue()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 5_000_000
+            CloudAiTokensUsed = 11_000_000  // Exceeds Pro's 10M limit
         };
 
         // Assert
@@ -467,11 +469,11 @@ public class LicenseStateTests
     [Fact]
     public void TokenUsagePercentage_HalfUsed_Returns50()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 2_000_000
+            CloudAiTokensUsed = 5_000_000  // 50% of Pro's 10M limit
         };
 
         // Assert
@@ -481,11 +483,11 @@ public class LicenseStateTests
     [Fact]
     public void TokenUsagePercentage_AllUsed_Returns100()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 4_000_000
+            CloudAiTokensUsed = 10_000_000  // 100% of Pro's 10M limit
         };
 
         // Assert
@@ -495,11 +497,11 @@ public class LicenseStateTests
     [Fact]
     public void TokenUsagePercentage_OverLimit_CapsAt100()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 5_000_000
+            CloudAiTokensUsed = 12_000_000  // Exceeds Pro's 10M limit
         };
 
         // Assert
@@ -556,11 +558,11 @@ public class LicenseStateTests
     [Fact]
     public void HasCloudAiAccess_QuotaExceeded_ReturnsFalse()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 4_000_000,
+            CloudAiTokensUsed = 11_000_000,  // Exceeds Pro's 10M limit
             ExpirationDate = DateTime.UtcNow.AddDays(30)
         };
 
@@ -600,7 +602,8 @@ public class LicenseStateTests
 
     [Theory]
     [InlineData(PlanType.Pro)]
-    [InlineData(PlanType.Premia)]
+    [InlineData(PlanType.Premium)]
+    [InlineData(PlanType.Ultimate)]
     public void IsAdFree_PaidPlans_ReturnsTrue(PlanType plan)
     {
         // Arrange
@@ -627,11 +630,11 @@ public class LicenseStateTests
     [Fact]
     public void IsFeatureAvailable_CloudAiTranslation_QuotaExceeded_ReturnsFalse()
     {
-        // Arrange
+        // Arrange - Issue #257: Pro plan now has 10,000,000 token limit
         var state = new LicenseState
         {
             CurrentPlan = PlanType.Pro,
-            CloudAiTokensUsed = 4_000_000
+            CloudAiTokensUsed = 11_000_000  // Exceeds Pro's 10M limit
         };
 
         // Assert
@@ -670,15 +673,17 @@ public class LicenseStateTests
     }
 
     [Fact]
-    public void IsFeatureAvailable_PrioritySupport_OnlyPremiaPlan()
+    public void IsFeatureAvailable_PrioritySupport_PremiumAndUltimateOnly()
     {
         // Arrange
         var proState = new LicenseState { CurrentPlan = PlanType.Pro };
-        var premiaState = new LicenseState { CurrentPlan = PlanType.Premia };
+        var premiumState = new LicenseState { CurrentPlan = PlanType.Premium };
+        var ultimateState = new LicenseState { CurrentPlan = PlanType.Ultimate };
 
         // Assert
         Assert.False(proState.IsFeatureAvailable(FeatureType.PrioritySupport));
-        Assert.True(premiaState.IsFeatureAvailable(FeatureType.PrioritySupport));
+        Assert.True(premiumState.IsFeatureAvailable(FeatureType.PrioritySupport));
+        Assert.True(ultimateState.IsFeatureAvailable(FeatureType.PrioritySupport));
     }
 
     #endregion

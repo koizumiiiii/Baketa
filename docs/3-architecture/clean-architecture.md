@@ -77,7 +77,7 @@ Baketa.Core (基底層 - 依存なし)
   - `ICaptureService`, `IWindowManager` - キャプチャシステム抽象化
   - `ILicenseManager`, `ILicenseApiClient`, `ILicenseCacheService` - ライセンス管理抽象化
 - **License/** - ライセンス管理コンポーネント（Issue #77）
-  - `Models/PlanType.cs` - 4プランEnum（Free/Standard/Pro/Premia）
+  - `Models/PlanType.cs` - 4プランEnum（Free/Pro/Premium/Ultimate）Issue #257
   - `Models/FeatureType.cs` - 機能ゲートEnum
   - `Models/LicenseState.cs` - ライセンス状態モデル
   - `Extensions/PlanTypeExtensions.cs` - プラン判定拡張メソッド

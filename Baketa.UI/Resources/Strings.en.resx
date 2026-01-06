@@ -700,6 +700,12 @@
   <data name="License_Plan_Premia" xml:space="preserve">
     <value>Premia</value>
   </data>
+  <data name="License_Plan_Premium" xml:space="preserve">
+    <value>Premium</value>
+  </data>
+  <data name="License_Plan_Ultimate" xml:space="preserve">
+    <value>Ultimate</value>
+  </data>
   <data name="License_Plan_Unknown" xml:space="preserve">
     <value>Unknown</value>
   </data>
@@ -737,10 +743,16 @@
     <value>Standard Plan - No ads, local translation only</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Pro Plan - Cloud AI translation, 4M tokens/month</value>
+    <value>Pro Plan - Cloud AI translation, 10M tokens/month</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
     <value>Premia Plan - Cloud AI translation, 8M tokens/month</value>
+  </data>
+  <data name="License_Desc_Premium" xml:space="preserve">
+    <value>Premium Plan - Cloud AI translation, 20M tokens/month</value>
+  </data>
+  <data name="License_Desc_Ultimate" xml:space="preserve">
+    <value>Ultimate Plan - Cloud AI translation, 50M tokens/month</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>No Expiration</value>

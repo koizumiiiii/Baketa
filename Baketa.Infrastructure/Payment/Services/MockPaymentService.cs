@@ -191,10 +191,12 @@ public sealed class MockPaymentService : IPaymentService
     private static int GetPlanPrice(PlanType plan, BillingCycle cycle)
     {
         // Issue #125: Standardプラン廃止
+        // Issue #257: Pro/Premium/Ultimate 3段階構成に改定（USD建て）
         var monthlyPrice = plan switch
         {
-            PlanType.Pro => 300,
-            PlanType.Premia => 500,
+            PlanType.Pro => 300,       // $3
+            PlanType.Premium => 500,   // $5
+            PlanType.Ultimate => 900,  // $9
             _ => 0
         };
 

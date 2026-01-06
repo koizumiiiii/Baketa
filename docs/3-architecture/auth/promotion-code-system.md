@@ -158,7 +158,7 @@ POST https://baketa-relay.suke009.workers.dev/api/promotion/redeem
 CREATE TABLE promotion_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXXXXXX" (Base32 Crockford 8桁)
-  plan_type INT NOT NULL,                       -- 0=Free, 1=Pro, 2=Premia (Issue #125: Standard廃止)
+  plan_type INT NOT NULL,                       -- 0=Free, 1=Pro, 2=Premium, 3=Ultimate (Issue #257)
   expires_at TIMESTAMPTZ NOT NULL,              -- コード自体の有効期限
   duration_days INT NOT NULL DEFAULT 30,        -- 適用後のプラン有効期間（日数）
   usage_type TEXT NOT NULL DEFAULT 'single_use', -- single_use, multi_use, limited
@@ -251,7 +251,7 @@ $$;
 // 適用済みプロモーションコード
 public string? AppliedPromotionCode { get; set; }
 
-// プロモーションで適用されたプラン (0=Free, 1=Pro, 2=Premia) Issue #125: Standard廃止
+// プロモーションで適用されたプラン (0=Free, 1=Pro, 2=Premium, 3=Ultimate) Issue #257
 public int? PromotionPlanType { get; set; }
 
 // 有効期限 (ISO 8601形式)

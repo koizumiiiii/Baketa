@@ -51,11 +51,20 @@ public sealed class PatreonSettings
     public string ProTierId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Patreon Tier ID マッピング（Premia プラン）
+    /// Patreon Tier ID マッピング（Premium プラン）
     /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Patreon", "Premia Tier ID",
-        Description = "Premiaプラン ($5) に対応するPatreon Tier ID")]
-    public string PremiaTierId { get; set; } = string.Empty;
+    /// <remarks>Issue #257: Premia → Premium に名称変更</remarks>
+    [SettingMetadata(SettingLevel.Advanced, "Patreon", "Premium Tier ID",
+        Description = "Premiumプラン ($5) に対応するPatreon Tier ID")]
+    public string PremiumTierId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Patreon Tier ID マッピング（Ultimate プラン）
+    /// </summary>
+    /// <remarks>Issue #257: 新規追加</remarks>
+    [SettingMetadata(SettingLevel.Advanced, "Patreon", "Ultimate Tier ID",
+        Description = "Ultimateプラン ($9) に対応するPatreon Tier ID")]
+    public string UltimateTierId { get; set; } = string.Empty;
 
     /// <summary>
     /// API結果のキャッシュ有効期間（分）
@@ -140,8 +149,10 @@ public sealed class PatreonSettings
 
         // Tier ID検証（少なくとも1つは設定推奨）
         // Issue #125: StandardTierId削除（Standardプラン廃止）
+        // Issue #257: PremiaTierId → PremiumTierId, UltimateTierId追加
         if (string.IsNullOrWhiteSpace(ProTierId) &&
-            string.IsNullOrWhiteSpace(PremiaTierId))
+            string.IsNullOrWhiteSpace(PremiumTierId) &&
+            string.IsNullOrWhiteSpace(UltimateTierId))
         {
             warnings.Add("Patreon Tier IDが設定されていません。有料プランの判定ができません。");
         }

@@ -18,7 +18,7 @@
 CREATE TABLE IF NOT EXISTS promotion_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXXXXXX" (Base32 Crockford 8文字)
-  plan_type INT NOT NULL,                       -- 0=Free, 1=Standard, 2=Pro, 3=Premia
+  plan_type INT NOT NULL,                       -- 0=Free, 1=Pro, 2=Premium, 3=Ultimate (Issue #257)
   expires_at TIMESTAMPTZ NOT NULL,              -- コード自体の有効期限
   duration_days INT NOT NULL DEFAULT 30,        -- 適用後のプラン有効期間（日数）
   usage_type TEXT NOT NULL DEFAULT 'single_use', -- single_use, multi_use, limited
@@ -193,7 +193,7 @@ $$;
 -- 使用状況確認
 -- SELECT
 --   code,
---   CASE plan_type WHEN 0 THEN 'Free' WHEN 1 THEN 'Standard' WHEN 2 THEN 'Pro' WHEN 3 THEN 'Premia' END as plan,
+--   CASE plan_type WHEN 0 THEN 'Free' WHEN 1 THEN 'Pro' WHEN 2 THEN 'Premium' WHEN 3 THEN 'Ultimate' END as plan,
 --   current_uses || '/' || max_uses as usage,
 --   expires_at,
 --   is_active

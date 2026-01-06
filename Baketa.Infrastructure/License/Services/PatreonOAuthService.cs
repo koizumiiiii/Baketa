@@ -674,9 +674,12 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     private static PlanType ParsePlanType(string? planString)
     {
         // Issue #125: Standardプラン廃止
+        // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
         return planString?.ToLowerInvariant() switch
         {
-            "premia" => PlanType.Premia,
+            "ultimate" => PlanType.Ultimate,
+            "premium" => PlanType.Premium,
+            "premia" => PlanType.Premium, // 後方互換性
             "pro" => PlanType.Pro,
             "standard" => PlanType.Free, // Issue #125: Standardプラン廃止
             _ => PlanType.Free

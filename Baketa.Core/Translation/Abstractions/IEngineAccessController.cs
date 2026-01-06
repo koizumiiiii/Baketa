@@ -104,37 +104,6 @@ public sealed class TranslationEngineInfo
     public string? IconName { get; init; }
 }
 
-/// <summary>
-/// プラン別の機能制限情報
-/// </summary>
-public static class PlanFeatures
-{
-    /// <summary>
-    /// Cloud AI翻訳が利用可能なプラン
-    /// </summary>
-    public static readonly PlanType[] CloudAIEnabledPlans = [PlanType.Pro, PlanType.Premia];
-
-    /// <summary>
-    /// プラン別月間トークン上限
-    /// </summary>
-    // Issue #125: Standardプラン廃止
-    public static readonly IReadOnlyDictionary<PlanType, long> MonthlyTokenLimits =
-        new Dictionary<PlanType, long>
-        {
-            [PlanType.Free] = 0,           // Cloud AI利用不可
-            [PlanType.Pro] = 4_000_000,    // 400万トークン
-            [PlanType.Premia] = 8_000_000  // 800万トークン
-        };
-
-    /// <summary>
-    /// 指定されたプランでCloud AIが利用可能かチェック
-    /// </summary>
-    public static bool IsCloudAIEnabled(PlanType plan) =>
-        Array.Exists(CloudAIEnabledPlans, p => p == plan);
-
-    /// <summary>
-    /// 指定されたプランの月間トークン上限を取得
-    /// </summary>
-    public static long GetTokenLimit(PlanType plan) =>
-        MonthlyTokenLimits.TryGetValue(plan, out var limit) ? limit : 0;
-}
+// Issue #257: PlanFeaturesクラスは削除されました
+// - MonthlyTokenLimits, GetTokenLimit() → PlanTypeExtensions.GetMonthlyTokenLimit()
+// - CloudAIEnabledPlans, IsCloudAIEnabled() → PlanTypeExtensions.HasCloudAiAccess()

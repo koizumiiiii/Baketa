@@ -94,9 +94,10 @@ public sealed class LicenseSettings
     /// <summary>
     /// モックモード時のプランタイプ
     /// </summary>
+    // Issue #257: プラン構成変更に対応
     [SettingMetadata(SettingLevel.Debug, "License", "Mock Plan Type",
-        Description = "モックモード時のテスト用プランタイプ（0=Free, 1=Standard, 2=Pro, 3=Premia）")]
-    public int MockPlanType { get; set; } = 2; // デフォルトはProプラン
+        Description = "モックモード時のテスト用プランタイプ（0=Free, 1=Pro, 2=Premium, 3=Ultimate）")]
+    public int MockPlanType { get; set; } = 1; // デフォルトはProプラン
 
     /// <summary>
     /// モックモード時のトークン使用量

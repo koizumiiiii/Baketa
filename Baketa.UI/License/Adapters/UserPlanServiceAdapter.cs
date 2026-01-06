@@ -109,11 +109,13 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     // Issue #125: Standardプラン廃止
     private static string GetPlanDisplayName(PlanType planType)
     {
+        // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
         return planType switch
         {
             PlanType.Free => "Free",
             PlanType.Pro => "Pro",
-            PlanType.Premia => "Premia",
+            PlanType.Premium => "Premium",
+            PlanType.Ultimate => "Ultimate",
             _ => "Unknown"
         };
     }
@@ -122,13 +124,15 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     /// プラン説明を取得
     /// </summary>
     // Issue #125: Standardプラン廃止、広告機能廃止
+    // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
     private static string GetPlanDescription(PlanType planType)
     {
         return planType switch
         {
             PlanType.Free => "無料プラン - ローカル翻訳のみ",
-            PlanType.Pro => "Proプラン - クラウドAI翻訳 400万トークン/月",
-            PlanType.Premia => "Premiaプラン - クラウドAI翻訳 800万トークン/月",
+            PlanType.Pro => "Proプラン - クラウドAI翻訳 1,000万トークン/月",
+            PlanType.Premium => "Premiumプラン - クラウドAI翻訳 2,000万トークン/月",
+            PlanType.Ultimate => "Ultimateプラン - クラウドAI翻訳 5,000万トークン/月",
             _ => "不明なプラン"
         };
     }

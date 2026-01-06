@@ -69,13 +69,16 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
     /// <summary>
     /// プランタイプ文字列定数
+    /// Issue #257: Pro/Premium/Ultimate 3段階構成に改定
     /// </summary>
     private static class PlanTypeStrings
     {
         public const string Free = "free";
         public const string Standard = "standard";
         public const string Pro = "pro";
-        public const string Premia = "premia";
+        public const string Premium = "premium";
+        public const string Premia = "premia"; // 後方互換性
+        public const string Ultimate = "ultimate";
     }
 
     #endregion
@@ -525,12 +528,15 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     private static PlanType ParsePlanType(string? planType)
     {
         // Issue #125: Standardプラン廃止
+        // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
         return planType?.ToLowerInvariant() switch
         {
             PlanTypeStrings.Free => PlanType.Free,
             PlanTypeStrings.Standard => PlanType.Pro, // Issue #125: Standardプラン廃止、Proにアップグレード
             PlanTypeStrings.Pro => PlanType.Pro,
-            PlanTypeStrings.Premia => PlanType.Premia,
+            PlanTypeStrings.Premium => PlanType.Premium,
+            PlanTypeStrings.Premia => PlanType.Premium, // 後方互換性
+            PlanTypeStrings.Ultimate => PlanType.Ultimate,
             _ => PlanType.Pro // デフォルトはPro
         };
     }
