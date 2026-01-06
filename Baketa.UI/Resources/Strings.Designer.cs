@@ -526,6 +526,16 @@ public static class Strings
     public static string Loading_PreparingUI => GetString("Loading_PreparingUI");
     public static string Loading_SetupGpu => GetString("Loading_SetupGpu");
 
+    // [Issue #259] Loading Tips
+    public static string Loading_Tip_FirstLaunch_Ja => GetString("Loading_Tip_FirstLaunch_Ja");
+    public static string Loading_Tip_FirstLaunch_En => GetString("Loading_Tip_FirstLaunch_En");
+    public static string Loading_Tip_About_Ja => GetString("Loading_Tip_About_Ja");
+    public static string Loading_Tip_About_En => GetString("Loading_Tip_About_En");
+    public static string Loading_Tip_LiveMode_Ja => GetString("Loading_Tip_LiveMode_Ja");
+    public static string Loading_Tip_LiveMode_En => GetString("Loading_Tip_LiveMode_En");
+    public static string Loading_Tip_SingleshotMode_Ja => GetString("Loading_Tip_SingleshotMode_Ja");
+    public static string Loading_Tip_SingleshotMode_En => GetString("Loading_Tip_SingleshotMode_En");
+
     // ========== [Issue #78 Phase 5] Token Usage Alerts ==========
 
     public static string TokenUsage_Warning_Title => GetString("TokenUsage_Warning_Title");

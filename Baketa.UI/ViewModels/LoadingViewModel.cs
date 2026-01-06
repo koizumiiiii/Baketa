@@ -1,4 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Reflection;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Events;
@@ -7,29 +10,88 @@ using Baketa.UI.Framework;
 using Baketa.UI.Resources;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
+using ReactiveUI.Fody.Helpers;
 
 namespace Baketa.UI.ViewModels;
 
 /// <summary>
 /// ローディング画面用ViewModel
-/// 初期化ステップの進捗を管理します
-/// [Issue #193] GPU環境自動セットアップステップ追加
+/// [Issue #259] UI簡素化 + Tips機能追加
 /// </summary>
 public class LoadingViewModel : ViewModelBase
 {
     private readonly ILoadingScreenInitializer _initializer;
     private readonly ILogger<LoadingViewModel> _logger;
+    private readonly ObservableCollection<InitializationStep> _steps;
+    private readonly List<LoadingTip> _tips;
+    private int _currentTipIndex;
     private bool _disposed;
 
+    #region 表示用プロパティ（Issue #259: UI簡素化）
+
     /// <summary>
-    /// 初期化ステップのコレクション
+    /// 現在のステップメッセージ
     /// </summary>
-    public ObservableCollection<InitializationStep> InitializationSteps { get; }
+    [Reactive]
+    public string CurrentStepMessage { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 全体進捗率 (0-100)
+    /// </summary>
+    [Reactive]
+    public int OverallProgress { get; set; }
+
+    /// <summary>
+    /// 不確定進捗モード
+    /// </summary>
+    [Reactive]
+    public bool IsIndeterminate { get; set; } = true;
+
+    /// <summary>
+    /// 現在表示中のTips
+    /// </summary>
+    [Reactive]
+    public string CurrentTip { get; set; } = string.Empty;
 
     /// <summary>
     /// バージョン情報テキスト
     /// </summary>
     public string VersionText { get; }
+
+    #endregion
+
+    #region 後方互換性（内部使用）
+
+    /// <summary>
+    /// 初期化ステップのコレクション（内部管理用）
+    /// UI表示には使用しないが、進捗計算に使用
+    /// </summary>
+    public ObservableCollection<InitializationStep> InitializationSteps => _steps;
+
+    #endregion
+
+    #region 設定値（Issue #259）
+
+    /// <summary>
+    /// Tipsローテーション間隔（秒）
+    /// </summary>
+    private const int TipRotationIntervalSeconds = 5;
+
+    /// <summary>
+    /// 各ステップの重み（合計100）
+    /// 初回ダウンロードは時間がかかるため重く設定
+    /// </summary>
+    private static readonly Dictionary<string, int> StepWeights = new()
+    {
+        ["download_components"] = 40,   // 初回は重い
+        ["setup_gpu"] = 10,
+        ["resolve_dependencies"] = 10,
+        ["load_ocr"] = 15,
+        ["init_translation"] = 15,
+        ["prepare_ui"] = 10
+    };
+
+    #endregion
 
     public LoadingViewModel(
         IEventAggregator eventAggregator,
@@ -44,10 +106,8 @@ public class LoadingViewModel : ViewModelBase
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         VersionText = $"Version {version?.ToString(3) ?? "0.0.0"}";
 
-        // 初期化ステップを作成（ローカライズリソースを使用）
-        // [Issue #185] ダウンロードステップを先頭に追加
-        // [Issue #193] GPU環境セットアップステップを追加
-        InitializationSteps =
+        // 初期化ステップを作成（内部管理用）
+        _steps =
         [
             new("download_components", Strings.Loading_DownloadingComponents),
             new("setup_gpu", Strings.Loading_SetupGpu),
@@ -57,54 +117,166 @@ public class LoadingViewModel : ViewModelBase
             new("prepare_ui", Strings.Loading_PreparingUI)
         ];
 
-        // 進捗イベントを購読
-        _initializer.ProgressChanged += OnProgressChanged;
+        // Tips定義（Issue #259）
+        _tips = InitializeTips();
+
+        // 初期Tipを設定
+        if (_tips.Count > 0)
+        {
+            CurrentTip = GetLocalizedTip(_tips[0]);
+        }
+
+        // WhenActivatedでライフサイクル管理を統一
+        this.WhenActivated(disposables =>
+        {
+            // 進捗イベントを購読（Dispose時に自動解除）
+            _initializer.ProgressChanged += OnProgressChanged;
+            Disposable.Create(() => _initializer.ProgressChanged -= OnProgressChanged)
+                .DisposeWith(disposables);
+
+            // Observable.IntervalでTipsをローテーション
+            Observable.Interval(TimeSpan.FromSeconds(TipRotationIntervalSeconds), RxApp.MainThreadScheduler)
+                .Subscribe(_ => RotateToNextTip())
+                .DisposeWith(disposables);
+
+            _logger.LogDebug("[Issue259] Tips rotation timer started");
+        });
     }
+
+    #region Tips機能（Issue #259）
+
+    /// <summary>
+    /// Tips定義を初期化
+    /// </summary>
+    private static List<LoadingTip> InitializeTips()
+    {
+        return
+        [
+            new LoadingTip(
+                Strings.Loading_Tip_FirstLaunch_Ja,
+                Strings.Loading_Tip_FirstLaunch_En),
+            new LoadingTip(
+                Strings.Loading_Tip_About_Ja,
+                Strings.Loading_Tip_About_En),
+            new LoadingTip(
+                Strings.Loading_Tip_LiveMode_Ja,
+                Strings.Loading_Tip_LiveMode_En),
+            new LoadingTip(
+                Strings.Loading_Tip_SingleshotMode_Ja,
+                Strings.Loading_Tip_SingleshotMode_En)
+        ];
+    }
+
+    /// <summary>
+    /// 次のTipに切り替え
+    /// </summary>
+    private void RotateToNextTip()
+    {
+        if (_tips.Count == 0) return;
+
+        _currentTipIndex = (_currentTipIndex + 1) % _tips.Count;
+        CurrentTip = GetLocalizedTip(_tips[_currentTipIndex]);
+        _logger.LogDebug("[Issue259] Tip rotated to index {Index}", _currentTipIndex);
+    }
+
+    /// <summary>
+    /// 言語に応じたTipメッセージを取得
+    /// </summary>
+    private static string GetLocalizedTip(LoadingTip tip)
+    {
+        var culture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        return culture == "ja" ? tip.MessageJa : tip.MessageEn;
+    }
+
+    #endregion
+
+    #region 進捗管理
 
     /// <summary>
     /// 初期化進捗イベントハンドラ
     /// </summary>
     private void OnProgressChanged(object? sender, LoadingProgressEventArgs e)
     {
-        // [Issue #185] デバッグログ: 進捗イベント受信確認
-        _logger.LogDebug("[Issue185] OnProgressChanged受信: StepId={StepId}, Progress={Progress}%, IsCompleted={IsCompleted}",
+        _logger.LogDebug("[Issue259] OnProgressChanged: StepId={StepId}, Progress={Progress}%, IsCompleted={IsCompleted}",
             e.StepId, e.Progress, e.IsCompleted);
-        _logger.LogDebug("[Issue185] Message: {Message}", e.Message);
 
-        // [Issue #185] UIスレッドへディスパッチしてプロパティ更新
-        // バックグラウンドスレッドからの呼び出しでもUIが正しく更新されるようにする
         Dispatcher.UIThread.Post(() =>
         {
-            var step = InitializationSteps.FirstOrDefault(s => s.StepId == e.StepId);
+            var step = _steps.FirstOrDefault(s => s.StepId == e.StepId);
             if (step != null)
             {
-                // [Issue #185] 詳細メッセージ（ダウンロード進捗など）も渡す
+                // ステップの状態を更新
                 step.Update(e.IsCompleted, e.Progress, e.Message);
-                _logger.LogDebug("[Issue185] ステップ更新完了: {StepId}, DetailMessage: {DetailMessage}", e.StepId, e.Message);
+
+                // 現在のステップメッセージを更新
+                if (!e.IsCompleted)
+                {
+                    CurrentStepMessage = step.Message;
+                    if (!string.IsNullOrEmpty(e.Message))
+                    {
+                        CurrentStepMessage = e.Message; // 詳細メッセージがあればそれを表示
+                    }
+                }
+
+                // 全体進捗を再計算
+                UpdateOverallProgress();
+
+                _logger.LogDebug("[Issue259] Overall progress updated: {Progress}%", OverallProgress);
             }
             else
             {
-                _logger.LogWarning("[Issue185] 対応するステップが見つかりません: {StepId}", e.StepId);
+                _logger.LogWarning("[Issue259] Unknown step: {StepId}", e.StepId);
             }
         });
     }
 
     /// <summary>
+    /// 全体進捗を計算（Issue #259: 重み付け計算）
+    /// </summary>
+    private void UpdateOverallProgress()
+    {
+        // 完了済みステップの重みを合計
+        var completedWeight = _steps
+            .Where(s => s.IsCompleted)
+            .Sum(s => StepWeights.GetValueOrDefault(s.StepId, 10));
+
+        // 実行中ステップの部分進捗
+        var inProgressStep = _steps.FirstOrDefault(s => s.IsInProgress);
+        var inProgressWeight = 0;
+        if (inProgressStep != null)
+        {
+            var stepWeight = StepWeights.GetValueOrDefault(inProgressStep.StepId, 10);
+            inProgressWeight = stepWeight * inProgressStep.Progress / 100;
+        }
+
+        var newProgress = completedWeight + inProgressWeight;
+        OverallProgress = Math.Min(newProgress, 100);
+
+        // 進捗が開始されたら不確定モードを解除
+        IsIndeterminate = OverallProgress == 0 && !_steps.Any(s => s.IsInProgress);
+    }
+
+    #endregion
+
+    #region Dispose
+
+    /// <summary>
     /// リソース解放
     /// </summary>
+    /// <remarks>
+    /// 進捗イベントのアンサブスクライブはWhenActivated内で自動管理されるため、
+    /// ここでは追加のクリーンアップは不要
+    /// </remarks>
     protected override void Dispose(bool disposing)
     {
         if (_disposed)
             return;
 
-        if (disposing)
-        {
-            _initializer.ProgressChanged -= OnProgressChanged;
-        }
-
         _disposed = true;
         base.Dispose(disposing);
     }
+
+    #endregion
 }
 
 /// <summary>
@@ -128,8 +300,7 @@ public class InitializationStep : ReactiveObject
     public string Message { get; }
 
     /// <summary>
-    /// [Issue #185] 詳細メッセージ（動的更新用）
-    /// ダウンロード進捗など、リアルタイムで更新される情報を表示
+    /// 詳細メッセージ（動的更新用）
     /// </summary>
     public string DetailMessage
     {
@@ -138,7 +309,7 @@ public class InitializationStep : ReactiveObject
     }
 
     /// <summary>
-    /// [Issue #185] 詳細メッセージが存在するか
+    /// 詳細メッセージが存在するか
     /// </summary>
     public bool HasDetailMessage => !string.IsNullOrEmpty(DetailMessage);
 
@@ -170,7 +341,7 @@ public class InitializationStep : ReactiveObject
     }
 
     /// <summary>
-    /// 不確定進捗モード（進捗が0で実行中の場合）
+    /// 不確定進捗モード
     /// </summary>
     public bool IsIndeterminate => IsInProgress && Progress == 0;
 
@@ -202,23 +373,25 @@ public class InitializationStep : ReactiveObject
     }
 
     /// <summary>
-    /// [Issue #185] ステップの状態を詳細メッセージ付きで更新
-    /// [Issue #189] IsInProgress条件を修正: progress > 0 の条件を削除
+    /// ステップの状態を詳細メッセージ付きで更新
     /// </summary>
     public void Update(bool isCompleted, int progress, string? detailMessage)
     {
         IsCompleted = isCompleted;
-        // Issue #189: ステップ開始時（progress=0）でもスピナーを表示するように修正
         IsInProgress = !isCompleted;
         Progress = progress;
-
-        // [Issue #185] 詳細メッセージを更新（完了時はクリア）
         DetailMessage = isCompleted ? string.Empty : (detailMessage ?? string.Empty);
 
-        // StatusIconとStatusColorの変更通知
         this.RaisePropertyChanged(nameof(StatusIcon));
         this.RaisePropertyChanged(nameof(StatusColor));
         this.RaisePropertyChanged(nameof(HasDetailMessage));
         this.RaisePropertyChanged(nameof(IsIndeterminate));
     }
 }
+
+/// <summary>
+/// Tips定義（Issue #259）
+/// </summary>
+/// <param name="MessageJa">日本語メッセージ</param>
+/// <param name="MessageEn">英語メッセージ</param>
+public record LoadingTip(string MessageJa, string MessageEn);

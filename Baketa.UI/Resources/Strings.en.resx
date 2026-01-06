@@ -1227,6 +1227,32 @@
     <value>Setting up GPU environment...</value>
   </data>
 
+  <!-- [Issue #259] Loading Tips -->
+  <data name="Loading_Tip_FirstLaunch_Ja" xml:space="preserve">
+    <value>初回起動時は約10分かかることがあります。OCRモデルのダウンロードと初期化を行っています。</value>
+  </data>
+  <data name="Loading_Tip_FirstLaunch_En" xml:space="preserve">
+    <value>First launch may take up to 10 minutes. Downloading and initializing OCR models.</value>
+  </data>
+  <data name="Loading_Tip_About_Ja" xml:space="preserve">
+    <value>Baketaは画面上のテキストをリアルタイムで翻訳するオーバーレイアプリです。</value>
+  </data>
+  <data name="Loading_Tip_About_En" xml:space="preserve">
+    <value>Baketa is an overlay app that translates on-screen text in real-time.</value>
+  </data>
+  <data name="Loading_Tip_LiveMode_Ja" xml:space="preserve">
+    <value>Liveモード: 画面の変化を自動検出して継続的に翻訳します。ゲームプレイに最適。</value>
+  </data>
+  <data name="Loading_Tip_LiveMode_En" xml:space="preserve">
+    <value>Live mode: Automatically detects screen changes and translates continuously. Perfect for gameplay.</value>
+  </data>
+  <data name="Loading_Tip_SingleshotMode_Ja" xml:space="preserve">
+    <value>Singleshotモード: ボタンを押すたびに翻訳。静止画の翻訳に最適。</value>
+  </data>
+  <data name="Loading_Tip_SingleshotMode_En" xml:space="preserve">
+    <value>Singleshot mode: Translates when you press the button. Perfect for static images.</value>
+  </data>
+
   <!-- [Issue #78 Phase 5] Token Usage Alerts -->
   <data name="TokenUsage_Warning_Title" xml:space="preserve">
     <value>Token Usage Warning</value>
