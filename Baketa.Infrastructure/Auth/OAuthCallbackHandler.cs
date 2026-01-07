@@ -265,9 +265,34 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             // Handle OAuth provider errors
             if (!string.IsNullOrEmpty(error))
             {
-                _logger.LogWarning("OAuthプロバイダーからエラーが返されました");
-                await SendResponseAsync(response, "認証エラー", "認証プロバイダーでエラーが発生しました。再度お試しください。", false).ConfigureAwait(false);
-                _callbackTcs?.TrySetResult(new AuthFailure(AuthErrorCodes.OAuthError, "認証プロバイダーエラー"));
+                _logger.LogWarning(
+                    "OAuthプロバイダーからエラーが返されました: Error={Error}, Description={Description}",
+                    error, errorDescription ?? "(なし)");
+
+                // エラーコード別のユーザーフレンドリーメッセージ
+                var (userMessage, errorCode) = error.ToLowerInvariant() switch
+                {
+                    "access_denied" => (
+                        "アクセスが拒否されました。認証をキャンセルしたか、アクセス権限がありません。",
+                        AuthErrorCodes.OAuthAccessDenied),
+                    "invalid_request" => (
+                        "認証リクエストが無効です。Redirect URLがSupabaseに登録されているか確認してください。",
+                        AuthErrorCodes.OAuthInvalidRequest),
+                    "unauthorized_client" => (
+                        "OAuthクライアントが承認されていません。Supabaseの認証設定を確認してください。",
+                        AuthErrorCodes.OAuthUnauthorizedClient),
+                    "server_error" => (
+                        "認証サーバーでエラーが発生しました。しばらく待ってから再度お試しください。",
+                        AuthErrorCodes.OAuthServerError),
+                    _ => (
+                        !string.IsNullOrEmpty(errorDescription)
+                            ? $"認証エラー: {errorDescription}"
+                            : "認証プロバイダーでエラーが発生しました。再度お試しください。",
+                        AuthErrorCodes.OAuthError)
+                };
+
+                await SendResponseAsync(response, "認証エラー", userMessage, false).ConfigureAwait(false);
+                _callbackTcs?.TrySetResult(new AuthFailure(errorCode, $"OAuth Error: {error} - {errorDescription}"));
                 return;
             }
 
