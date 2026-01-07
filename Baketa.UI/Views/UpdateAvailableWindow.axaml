@@ -8,6 +8,7 @@
         WindowStartupLocation="CenterScreen"
         CanResize="False"
         ShowInTaskbar="True"
+        Topmost="True"
         x:DataType="vm:UpdateAvailableViewModel">
 
     <Window.Styles>

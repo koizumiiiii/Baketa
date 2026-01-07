@@ -9,6 +9,7 @@
         WindowStartupLocation="CenterScreen"
         CanResize="False"
         ShowInTaskbar="True"
+        Topmost="True"
         x:DataType="vm:DownloadProgressViewModel">
 
     <Window.Styles>
