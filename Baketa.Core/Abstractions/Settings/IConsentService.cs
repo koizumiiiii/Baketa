@@ -79,14 +79,17 @@ public interface IConsentService
 
     /// <summary>
     /// サーバーに同意記録を送信（監査ログ用）
+    /// [Gemini Review] セキュリティ強化: 認証トークンを必須化
     /// </summary>
     /// <param name="userId">ユーザーID</param>
+    /// <param name="accessToken">Supabase認証トークン（JWT）</param>
     /// <param name="consentType">同意タイプ</param>
     /// <param name="version">同意したバージョン</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>サーバー記録タスク</returns>
     Task RecordConsentToServerAsync(
         string userId,
+        string accessToken,
         ConsentType consentType,
         string version,
         CancellationToken cancellationToken = default);
@@ -94,12 +97,15 @@ public interface IConsentService
     /// <summary>
     /// ローカルの同意状態をサーバーに同期（認証成功後に呼び出し）
     /// [Issue #261] 認証前に同意したローカル記録をDBに同期
+    /// [Gemini Review] セキュリティ強化: 認証トークンを必須化
     /// </summary>
     /// <param name="userId">認証されたユーザーID</param>
+    /// <param name="accessToken">Supabase認証トークン（JWT）</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>同期タスク</returns>
     Task SyncLocalConsentToServerAsync(
         string userId,
+        string accessToken,
         CancellationToken cancellationToken = default);
 }
 

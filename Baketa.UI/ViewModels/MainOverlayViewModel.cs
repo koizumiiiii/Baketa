@@ -1993,13 +1993,23 @@ public class MainOverlayViewModel : ViewModelBase
             if (e.IsLoggedIn && e.User?.Id != null)
             {
                 // [Issue #261] ログイン時: ローカル同意をDBに同期
+                // [Gemini Review] セキュリティ強化: JWTを渡して認証付きで同期
                 Logger?.LogDebug("[Issue #261] ログイン検出 - 同意同期開始");
                 try
                 {
                     if (_consentService != null)
                     {
-                        await _consentService.SyncLocalConsentToServerAsync(e.User.Id);
-                        Logger?.LogDebug("[Issue #261] 同意同期完了");
+                        // 現在のセッションからアクセストークンを取得
+                        var session = await _authService.GetCurrentSessionAsync().ConfigureAwait(false);
+                        if (session != null && !string.IsNullOrEmpty(session.AccessToken))
+                        {
+                            await _consentService.SyncLocalConsentToServerAsync(e.User.Id, session.AccessToken).ConfigureAwait(false);
+                            Logger?.LogDebug("[Issue #261] 同意同期完了");
+                        }
+                        else
+                        {
+                            Logger?.LogWarning("[Issue #261] アクセストークンが取得できないため同意同期をスキップ");
+                        }
                     }
                 }
                 catch (Exception ex)

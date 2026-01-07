@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Reflection;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Events;
@@ -14,6 +16,7 @@ namespace Baketa.UI.ViewModels;
 /// ローディング画面用ViewModel
 /// 初期化ステップの進捗を管理します
 /// [Issue #193] GPU環境自動セットアップステップ追加
+/// [Issue #259] UI簡素化 - 統合プログレスバー + Tips機能追加
 /// </summary>
 public class LoadingViewModel : ViewModelBase
 {
@@ -21,15 +24,76 @@ public class LoadingViewModel : ViewModelBase
     private readonly ILogger<LoadingViewModel> _logger;
     private bool _disposed;
 
+    // [Issue #259] 統合プログレス用プロパティ
+    private string _currentStepMessage = string.Empty;
+    private int _overallProgress;
+    private bool _isIndeterminate = true;
+    private string _currentTip = string.Empty;
+    private int _currentTipIndex;
+
     /// <summary>
-    /// 初期化ステップのコレクション
+    /// [Issue #259] ステップごとの重み（合計100%）
     /// </summary>
-    public ObservableCollection<InitializationStep> InitializationSteps { get; }
+    private static readonly Dictionary<string, int> StepWeights = new()
+    {
+        ["download_components"] = 30,   // モデルダウンロード（最大）
+        ["setup_gpu"] = 10,             // GPU環境セットアップ
+        ["resolve_dependencies"] = 15,  // 依存関係解決
+        ["load_ocr"] = 20,              // OCRエンジン読み込み
+        ["init_translation"] = 15,      // 翻訳エンジン初期化
+        ["prepare_ui"] = 10             // UI準備
+    };
+
+    /// <summary>
+    /// [Issue #259] Tips文字列リスト（ローカライズはリソースファイルの Loading_Tip_X を参照）
+    /// </summary>
+    private readonly string[] _tips;
+
+    /// <summary>
+    /// 初期化ステップのコレクション（内部管理用）
+    /// </summary>
+    private ObservableCollection<InitializationStep> InitializationSteps { get; }
 
     /// <summary>
     /// バージョン情報テキスト
     /// </summary>
     public string VersionText { get; }
+
+    /// <summary>
+    /// [Issue #259] 現在のステップメッセージ
+    /// </summary>
+    public string CurrentStepMessage
+    {
+        get => _currentStepMessage;
+        private set => this.RaiseAndSetIfChanged(ref _currentStepMessage, value);
+    }
+
+    /// <summary>
+    /// [Issue #259] 統合プログレス（0-100）
+    /// </summary>
+    public int OverallProgress
+    {
+        get => _overallProgress;
+        private set => this.RaiseAndSetIfChanged(ref _overallProgress, value);
+    }
+
+    /// <summary>
+    /// [Issue #259] 不確定プログレスモード
+    /// </summary>
+    public bool IsIndeterminate
+    {
+        get => _isIndeterminate;
+        private set => this.RaiseAndSetIfChanged(ref _isIndeterminate, value);
+    }
+
+    /// <summary>
+    /// [Issue #259] 現在のTipテキスト
+    /// </summary>
+    public string CurrentTip
+    {
+        get => _currentTip;
+        private set => this.RaiseAndSetIfChanged(ref _currentTip, value);
+    }
 
     public LoadingViewModel(
         IEventAggregator eventAggregator,
@@ -44,7 +108,7 @@ public class LoadingViewModel : ViewModelBase
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         VersionText = $"Version {version?.ToString(3) ?? "0.0.0"}";
 
-        // 初期化ステップを作成（ローカライズリソースを使用）
+        // 初期化ステップを作成（内部管理用）
         // [Issue #185] ダウンロードステップを先頭に追加
         // [Issue #193] GPU環境セットアップステップを追加
         InitializationSteps =
@@ -57,8 +121,63 @@ public class LoadingViewModel : ViewModelBase
             new("prepare_ui", Strings.Loading_PreparingUI)
         ];
 
+        // [Issue #259] Tips文字列を初期化（リソースファイルから取得）
+        _tips = LoadTips();
+        _currentTip = _tips.Length > 0 ? _tips[0] : string.Empty;
+
         // 進捗イベントを購読
         _initializer.ProgressChanged += OnProgressChanged;
+    }
+
+    /// <summary>
+    /// [Issue #259] HandleActivationをオーバーライドしてTipsローテーションを開始
+    /// </summary>
+    protected override void HandleActivation()
+    {
+        base.HandleActivation();
+
+        // Tips自動ローテーション（5秒ごと）
+        Observable.Interval(TimeSpan.FromSeconds(5))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => RotateTip())
+            .DisposeWith(Disposables);
+    }
+
+    /// <summary>
+    /// [Issue #259] リソースファイルからTipsを読み込む
+    /// </summary>
+    private static string[] LoadTips()
+    {
+        // ResourceManagerを使用してリソースを取得
+        var resourceManager = Strings.ResourceManager;
+        var tips = new List<string>();
+
+        for (var i = 1; i <= 10; i++) // 最大10個まで対応
+        {
+            var tip = resourceManager.GetString($"Loading_Tip_{i}");
+            if (!string.IsNullOrEmpty(tip))
+            {
+                tips.Add(tip);
+            }
+            else
+            {
+                break; // 連続しなくなったら終了
+            }
+        }
+
+        return tips.Count > 0
+            ? [.. tips]
+            : ["Baketa - Game Translation Overlay"]; // フォールバック
+    }
+
+    /// <summary>
+    /// [Issue #259] Tipをローテーション
+    /// </summary>
+    private void RotateTip()
+    {
+        if (_tips.Length == 0) return;
+        _currentTipIndex = (_currentTipIndex + 1) % _tips.Length;
+        CurrentTip = _tips[_currentTipIndex];
     }
 
     /// <summary>
@@ -81,12 +200,60 @@ public class LoadingViewModel : ViewModelBase
                 // [Issue #185] 詳細メッセージ（ダウンロード進捗など）も渡す
                 step.Update(e.IsCompleted, e.Progress, e.Message);
                 _logger.LogDebug("[Issue185] ステップ更新完了: {StepId}, DetailMessage: {DetailMessage}", e.StepId, e.Message);
+
+                // [Issue #259] 統合プログレスを更新
+                UpdateOverallProgress(step, e);
             }
             else
             {
                 _logger.LogWarning("[Issue185] 対応するステップが見つかりません: {StepId}", e.StepId);
             }
         });
+    }
+
+    /// <summary>
+    /// [Issue #259] 統合プログレスを計算・更新
+    /// </summary>
+    private void UpdateOverallProgress(InitializationStep currentStep, LoadingProgressEventArgs e)
+    {
+        // 現在のステップメッセージを更新
+        CurrentStepMessage = !string.IsNullOrEmpty(e.Message) ? e.Message : currentStep.Message;
+
+        // 重み付き進捗を計算
+        var totalProgress = 0;
+        var stepIndex = 0;
+        var currentStepFound = false;
+
+        foreach (var step in InitializationSteps)
+        {
+            if (!StepWeights.TryGetValue(step.StepId, out var weight))
+            {
+                weight = 10; // デフォルト重み
+            }
+
+            if (step.IsCompleted)
+            {
+                // 完了したステップは100%寄与
+                totalProgress += weight;
+            }
+            else if (step.StepId == e.StepId)
+            {
+                // 現在のステップは進捗率に応じて寄与
+                totalProgress += (weight * e.Progress) / 100;
+                currentStepFound = true;
+            }
+            // 未開始のステップは0%寄与
+
+            stepIndex++;
+        }
+
+        OverallProgress = totalProgress;
+
+        // 不確定モードの判定（進捗が0で実行中の場合）
+        IsIndeterminate = !currentStepFound || (e.Progress == 0 && !e.IsCompleted);
+
+        _logger.LogDebug("[Issue259] 統合プログレス: {OverallProgress}%, IsIndeterminate: {IsIndeterminate}",
+            OverallProgress, IsIndeterminate);
     }
 
     /// <summary>

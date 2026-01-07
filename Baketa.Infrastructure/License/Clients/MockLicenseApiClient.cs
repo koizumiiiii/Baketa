@@ -96,19 +96,11 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
         var planType = (PlanType)_settings.MockPlanType;
         var monthlyLimit = planType.GetMonthlyTokenLimit();
 
-        // プランがクラウドAI非対応の場合
-        if (!planType.HasCloudAiAccess())
-        {
-            _logger.LogWarning(
-                "Mock: クラウドAI非対応プラン Plan={Plan}", planType);
-
-            return new TokenConsumptionApiResponse
-            {
-                Success = false,
-                ErrorCode = "PLAN_NOT_SUPPORTED",
-                ErrorMessage = "現在のプランではクラウドAI翻訳を利用できません"
-            };
-        }
+        // [Issue #258] プランチェック削除
+        // 理由:
+        // 1. トークン消費記録は「課金追跡」であり「認可」ではない
+        // 2. 認可は翻訳実行前にサーバー側で行われる
+        // 3. Mockでプランチェックすると、LicenseManagerのプロモーション適用が反映されない
 
         lock (_lock)
         {
@@ -128,8 +120,9 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
                 };
             }
 
-            // クォータチェック
-            if (_totalTokensConsumed + request.TokenCount > monthlyLimit)
+            // [Issue #258] クォータチェック
+            // monthlyLimit == 0 の場合はスキップ（Freeプランでもプロモーション適用時は制限なし）
+            if (monthlyLimit > 0 && _totalTokensConsumed + request.TokenCount > monthlyLimit)
             {
                 _logger.LogWarning(
                     "Mock: トークンクォータ超過 Current={Current}, Requested={Requested}, Limit={Limit}",

@@ -47,11 +47,22 @@ public partial class ConsentDialogWindow : Window
 
     private void OnAcceptClick(object? sender, RoutedEventArgs e)
     {
-        Close(_viewModel?.Result ?? ConsentDialogResult.Declined);
+        // ViewModelのResultを先に設定してから閉じる
+        // App.axaml.cs の Closed イベントハンドラで viewModel.Result を読み取るため
+        if (_viewModel != null)
+        {
+            _viewModel.SetResult(ConsentDialogResult.Accepted);
+        }
+        Close(ConsentDialogResult.Accepted);
     }
 
     private void OnDeclineClick(object? sender, RoutedEventArgs e)
     {
+        // ViewModelのResultを先に設定してから閉じる
+        if (_viewModel != null)
+        {
+            _viewModel.SetResult(ConsentDialogResult.Declined);
+        }
         Close(ConsentDialogResult.Declined);
     }
 

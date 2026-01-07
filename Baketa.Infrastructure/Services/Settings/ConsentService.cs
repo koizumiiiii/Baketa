@@ -195,31 +195,35 @@ public sealed class ConsentService : IConsentService, IDisposable
     /// <inheritdoc/>
     public async Task RecordConsentToServerAsync(
         string userId,
+        string accessToken,
         ConsentType consentType,
         string version,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(accessToken);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
 
         try
         {
             var client = _httpClientFactory.CreateClient("RelayServer");
 
+            // [Gemini Review] セキュリティ強化: Supabase JWTをAuthorizationヘッダーで送信
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/consent/record");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
             var payload = new
             {
                 user_id = userId,
-                consent_type = consentType.ToString().ToLowerInvariant(),
+                consent_type = consentType.ToApiString(),  // [Issue #261] snake_case変換
                 version,
                 accepted_at = DateTime.UtcNow.ToString("O"),
                 client_version = GetClientVersion()
             };
 
-            var response = await client.PostAsJsonAsync(
-                "/api/consent/record",
-                payload,
-                _jsonOptions,
-                cancellationToken).ConfigureAwait(false);
+            request.Content = JsonContent.Create(payload, options: _jsonOptions);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
             {
@@ -245,9 +249,11 @@ public sealed class ConsentService : IConsentService, IDisposable
     /// <inheritdoc/>
     public async Task SyncLocalConsentToServerAsync(
         string userId,
+        string accessToken,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(accessToken);
 
         try
         {
@@ -258,6 +264,7 @@ public sealed class ConsentService : IConsentService, IDisposable
             {
                 await RecordConsentToServerAsync(
                     userId,
+                    accessToken,
                     ConsentType.PrivacyPolicy,
                     settings.PrivacyPolicyVersion,
                     cancellationToken).ConfigureAwait(false);
@@ -268,6 +275,7 @@ public sealed class ConsentService : IConsentService, IDisposable
             {
                 await RecordConsentToServerAsync(
                     userId,
+                    accessToken,
                     ConsentType.TermsOfService,
                     settings.TermsOfServiceVersion,
                     cancellationToken).ConfigureAwait(false);

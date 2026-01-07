@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,7 @@ public class FallbackOrchestratorTests
     private readonly Mock<IServiceProvider> _mockServiceProvider;
     private readonly Mock<IKeyedServiceProvider> _mockKeyedServiceProvider;
     private readonly Mock<IEngineStatusManager> _mockEngineStatusManager;
+    private readonly Mock<ILicenseManager> _mockLicenseManager;
     private readonly Mock<ILogger<FallbackOrchestrator>> _mockLogger;
     private readonly FallbackOrchestrator _orchestrator;
 
@@ -26,6 +28,7 @@ public class FallbackOrchestratorTests
         _mockKeyedServiceProvider = new Mock<IKeyedServiceProvider>();
         _mockServiceProvider = _mockKeyedServiceProvider.As<IServiceProvider>();
         _mockEngineStatusManager = new Mock<IEngineStatusManager>();
+        _mockLicenseManager = new Mock<ILicenseManager>();
         _mockLogger = new Mock<ILogger<FallbackOrchestrator>>();
 
         // IKeyedServiceProviderを返すように設定
@@ -33,9 +36,15 @@ public class FallbackOrchestratorTests
             .Setup(x => x.GetService(typeof(IKeyedServiceProvider)))
             .Returns(_mockKeyedServiceProvider.Object);
 
+        // [Issue #258] ILicenseManagerのデフォルト動作設定
+        _mockLicenseManager
+            .Setup(x => x.ConsumeCloudAiTokensAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TokenConsumptionResult.CreateSuccess(0, 0));
+
         _orchestrator = new FallbackOrchestrator(
             _mockServiceProvider.Object,
             _mockEngineStatusManager.Object,
+            _mockLicenseManager.Object,
             _mockLogger.Object);
     }
 
@@ -48,6 +57,7 @@ public class FallbackOrchestratorTests
         Assert.Throws<ArgumentNullException>(() => new FallbackOrchestrator(
             null!,
             _mockEngineStatusManager.Object,
+            _mockLicenseManager.Object,
             _mockLogger.Object));
     }
 
@@ -57,6 +67,18 @@ public class FallbackOrchestratorTests
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => new FallbackOrchestrator(
             _mockServiceProvider.Object,
+            null!,
+            _mockLicenseManager.Object,
+            _mockLogger.Object));
+    }
+
+    [Fact]
+    public void Constructor_ThrowsOnNullLicenseManager()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => new FallbackOrchestrator(
+            _mockServiceProvider.Object,
+            _mockEngineStatusManager.Object,
             null!,
             _mockLogger.Object));
     }
@@ -68,6 +90,7 @@ public class FallbackOrchestratorTests
         Assert.Throws<ArgumentNullException>(() => new FallbackOrchestrator(
             _mockServiceProvider.Object,
             _mockEngineStatusManager.Object,
+            _mockLicenseManager.Object,
             null!));
     }
 

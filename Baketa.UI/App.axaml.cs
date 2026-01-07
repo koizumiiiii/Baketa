@@ -461,12 +461,13 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                                 _logger?.LogInformation("セッション復元結果: {IsAuthenticated}", isAuthenticated);
 
                                 // [Issue #261] 認証成功時にローカル同意をDBに同期
-                                if (isAuthenticated && session?.User?.Id != null)
+                                // [Gemini Review] セキュリティ強化: JWTを渡して認証付きで同期
+                                if (isAuthenticated && session?.User?.Id != null && !string.IsNullOrEmpty(session.AccessToken))
                                 {
                                     var consentService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IConsentService>();
                                     if (consentService != null)
                                     {
-                                        await consentService.SyncLocalConsentToServerAsync(session.User.Id).ConfigureAwait(true);
+                                        await consentService.SyncLocalConsentToServerAsync(session.User.Id, session.AccessToken).ConfigureAwait(true);
                                     }
                                 }
                             }

@@ -174,3 +174,20 @@ public enum ConsentType
     /// </summary>
     TermsOfService
 }
+
+/// <summary>
+/// ConsentType拡張メソッド
+/// </summary>
+public static class ConsentTypeExtensions
+{
+    /// <summary>
+    /// [Issue #261] API用のsnake_case文字列に変換
+    /// Relay Serverが期待する形式: "privacy_policy", "terms_of_service"
+    /// </summary>
+    public static string ToApiString(this ConsentType consentType) => consentType switch
+    {
+        ConsentType.PrivacyPolicy => "privacy_policy",
+        ConsentType.TermsOfService => "terms_of_service",
+        _ => consentType.ToString().ToLowerInvariant()
+    };
+}

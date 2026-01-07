@@ -34,6 +34,14 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
     public ConsentDialogResult Result { get; private set; } = ConsentDialogResult.Declined;
 
     /// <summary>
+    /// 結果を設定する（Windowからの呼び出し用）
+    /// </summary>
+    public void SetResult(ConsentDialogResult result)
+    {
+        Result = result;
+    }
+
+    /// <summary>
     /// 非同期ファクトリメソッド
     /// [Gemini Review] コンストラクタでの同期I/Oを回避するため非同期初期化
     /// </summary>
@@ -200,7 +208,7 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
     private async System.Threading.Tasks.Task OpenPrivacyPolicyAsync()
     {
         // プライバシーポリシーURLを開く
-        var url = "https://baketa.app/privacy-policy";
+        var url = "https://koizumiiiii.github.io/Baketa/pages/privacy-policy.html";
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -220,7 +228,7 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
     private async System.Threading.Tasks.Task OpenTermsOfServiceAsync()
     {
         // 利用規約URLを開く
-        var url = "https://baketa.app/terms-of-service";
+        var url = "https://koizumiiiii.github.io/Baketa/pages/terms-of-service.html";
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo

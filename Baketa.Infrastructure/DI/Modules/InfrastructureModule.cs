@@ -951,6 +951,14 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddHttpClient<Translation.Cloud.RelayServerClient>();
         Console.WriteLine("✅ RelayServerClient登録完了 - HttpClientFactory使用");
 
+        // [Issue #261] Named HttpClient "RelayServer" 登録（ConsentService等で使用）
+        services.AddHttpClient("RelayServer", client =>
+        {
+            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+        Console.WriteLine("✅ Named HttpClient [RelayServer] 登録完了");
+
         // PrimaryCloudTranslator登録（RelayServerClient依存）- Issue #237 Geminiレビュー指摘修正
         services.AddSingleton<Translation.Cloud.PrimaryCloudTranslator>();
         Console.WriteLine("✅ PrimaryCloudTranslator登録完了 - Relay Server経由");
