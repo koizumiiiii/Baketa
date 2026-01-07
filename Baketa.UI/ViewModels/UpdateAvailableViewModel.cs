@@ -77,16 +77,20 @@ public sealed class UpdateAvailableViewModel : ReactiveObject, IDisposable
     /// <summary>
     /// ヘッダーテキスト
     /// </summary>
+#pragma warning disable CA1863 // リソース文字列のフォーマットはキャッシュ不要
     public string HeaderText => string.Format(Strings.Update_HeaderText, AppName);
+#pragma warning restore CA1863
 
     /// <summary>
     /// 情報テキスト
     /// </summary>
+#pragma warning disable CA1863 // リソース文字列のフォーマットはキャッシュ不要
     public string InfoText => string.Format(
         Strings.Update_InfoText,
         AppName,
         CurrentItem?.Version ?? "?",
         GetSimpleVersion(CurrentVersion));
+#pragma warning restore CA1863
 
     /// <summary>
     /// スキップボタンテキスト

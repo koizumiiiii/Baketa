@@ -16,6 +16,13 @@ public partial class UpdateAvailableWindow : Window, IUpdateAvailable
 {
     private readonly UpdateAvailableViewModel _viewModel;
 
+    /// <summary>
+    /// デザイナー/XAMLローダー用パラメータなしコンストラクタ
+    /// </summary>
+    public UpdateAvailableWindow() : this(null!)
+    {
+    }
+
     public UpdateAvailableWindow(UpdateAvailableViewModel viewModel)
     {
         InitializeComponent();

@@ -12,6 +12,13 @@ public partial class CrashReportDialogWindow : Window
 {
     private readonly CrashReportDialogViewModel _viewModel;
 
+    /// <summary>
+    /// デザイナー/XAMLローダー用パラメータなしコンストラクタ
+    /// </summary>
+    public CrashReportDialogWindow() : this(null!)
+    {
+    }
+
     public CrashReportDialogWindow(CrashReportDialogViewModel viewModel)
     {
         InitializeComponent();

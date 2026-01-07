@@ -24,7 +24,9 @@ public sealed class DownloadProgressViewModel : ReactiveObject, IDisposable
     public DownloadProgressViewModel(string appVersion)
     {
         AppVersion = appVersion;
+#pragma warning disable CA1863 // リソース文字列のフォーマットはキャッシュ不要
         StatusText = string.Format(Strings.Update_DownloadProgress_Downloading, $"v{appVersion}");
+#pragma warning restore CA1863
 
         // コマンド初期化
         ActionCommand = ReactiveCommand.Create(OnAction);
@@ -153,9 +155,11 @@ public sealed class DownloadProgressViewModel : ReactiveObject, IDisposable
 
         var receivedMB = bytesReceived / (1024.0 * 1024.0);
         var totalMB = totalBytes / (1024.0 * 1024.0);
+#pragma warning disable CA1863 // リソース文字列のフォーマットはキャッシュ不要
         StatusText = string.Format(
             Strings.Update_DownloadProgress_Downloading,
             $"v{AppVersion}") + $"\n({receivedMB:F2} MB / {totalMB:F2} MB)";
+#pragma warning restore CA1863
     }
 
     /// <summary>

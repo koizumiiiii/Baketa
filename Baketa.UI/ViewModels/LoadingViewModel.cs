@@ -154,7 +154,7 @@ public class LoadingViewModel : ViewModelBase
 
         for (var i = 1; i <= 10; i++) // 最大10個まで対応
         {
-            var tip = resourceManager.GetString($"Loading_Tip_{i}");
+            var tip = resourceManager.GetString($"Loading_Tip_{i}", System.Globalization.CultureInfo.CurrentUICulture);
             if (!string.IsNullOrEmpty(tip))
             {
                 tips.Add(tip);

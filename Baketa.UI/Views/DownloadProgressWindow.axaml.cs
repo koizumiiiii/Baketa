@@ -15,6 +15,13 @@ public partial class DownloadProgressWindow : Window, IDownloadProgress
 {
     private readonly DownloadProgressViewModel _viewModel;
 
+    /// <summary>
+    /// デザイナー/XAMLローダー用パラメータなしコンストラクタ
+    /// </summary>
+    public DownloadProgressWindow() : this(null!)
+    {
+    }
+
     public DownloadProgressWindow(DownloadProgressViewModel viewModel)
     {
         InitializeComponent();

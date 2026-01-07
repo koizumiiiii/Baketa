@@ -100,7 +100,7 @@ public sealed class RingBufferLogger : IDisposable
     /// </summary>
     public IReadOnlyList<LogEntry> GetAllEntries()
     {
-        return _buffer.ToArray();
+        return [.. _buffer];
     }
 
     /// <summary>
