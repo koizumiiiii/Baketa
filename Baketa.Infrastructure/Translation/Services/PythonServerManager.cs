@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Services;
@@ -541,6 +542,9 @@ public class PythonServerManager(
                 }
                 catch { /* ファイル書き込み失敗は無視 */ }
 
+                // 🔥 [Issue #264] メモリエラー検出 & ユーザー通知
+                DetectAndPublishServerError(line, languagePair, port);
+
                 // Pythonエラーの重要度分類
                 if (line.Contains("Error") || line.Contains("Exception") || line.Contains("Traceback"))
                 {
@@ -849,6 +853,78 @@ public class PythonServerManager(
         {
             logger.LogDebug("❌ ヘルスチェック失敗: {Server}, Error: {Error}", server, ex.Message);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #264] stderrからメモリエラー等を検出してServerErrorEventを発行
+    /// </summary>
+    private void DetectAndPublishServerError(string line, string languagePair, int port)
+    {
+        ServerErrorEvent? errorEvent = null;
+
+        // Intel MKLメモリエラー
+        if (line.Contains("mkl_malloc", StringComparison.OrdinalIgnoreCase))
+        {
+            errorEvent = ServerErrorEvent.CreateMemoryError(
+                ServerErrorSources.TranslationServer,
+                $"[Port:{port}] {line}");
+        }
+        // Python標準メモリエラー
+        else if (line.Contains("MemoryError") || line.Contains("OutOfMemoryError"))
+        {
+            errorEvent = ServerErrorEvent.CreateMemoryError(
+                ServerErrorSources.TranslationServer,
+                $"[Port:{port}] {line}");
+        }
+        // 一般的なメモリ割り当て失敗
+        else if (line.Contains("failed to allocate", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("out of memory", StringComparison.OrdinalIgnoreCase))
+        {
+            errorEvent = ServerErrorEvent.CreateMemoryError(
+                ServerErrorSources.TranslationServer,
+                $"[Port:{port}] {line}");
+        }
+        // CUDAメモリエラー
+        else if (line.Contains("CUDA out of memory", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("hipErrorOutOfMemory", StringComparison.OrdinalIgnoreCase))
+        {
+            errorEvent = ServerErrorEvent.CreateCudaMemoryError(
+                ServerErrorSources.TranslationServer,
+                $"[Port:{port}] {line}");
+        }
+        // モジュール不足エラー
+        else if (line.Contains("ModuleNotFoundError"))
+        {
+            // モジュール名を抽出（"No module named 'xxx'"形式）
+            var moduleMatch = System.Text.RegularExpressions.Regex.Match(
+                line, @"No module named ['""]*(\w+)['""]*");
+            var moduleName = moduleMatch.Success ? moduleMatch.Groups[1].Value : "unknown";
+
+            errorEvent = ServerErrorEvent.CreateModuleNotFoundError(
+                ServerErrorSources.TranslationServer,
+                moduleName,
+                $"[Port:{port}] {line}");
+        }
+
+        if (errorEvent != null)
+        {
+            logger.LogWarning(
+                "[Issue #264] サーバーエラー検出: {ErrorType} - {LanguagePair}:{Port}",
+                errorEvent.ErrorType, languagePair, port);
+
+            // 非同期でイベント発行（Fire-and-forget、ErrorDataReceivedはvoidなので）
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "[Issue #264] ServerErrorEvent発行失敗");
+                }
+            });
         }
     }
 

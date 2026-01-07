@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.DI;
 using Baketa.Infrastructure.OCR.Clients;
@@ -42,6 +43,8 @@ public sealed class SuryaOcrModule : ServiceModuleBase
         {
             var settings = serviceProvider.GetRequiredService<SuryaOcrSettings>();
             var logger = serviceProvider.GetRequiredService<ILogger<SuryaServerManager>>();
+            // [Issue #264] IEventAggregatorを取得（存在しない場合はnull）
+            var eventAggregator = serviceProvider.GetService<IEventAggregator>();
 
             // ポート番号をアドレスから抽出
             var port = 50052; // デフォルト
@@ -52,7 +55,7 @@ public sealed class SuryaOcrModule : ServiceModuleBase
             }
 
             Console.WriteLine($"🔧 [Issue #189] SuryaServerManager初期化: Port {port}");
-            return new SuryaServerManager(port, logger);
+            return new SuryaServerManager(port, logger, eventAggregator);
         });
     }
 

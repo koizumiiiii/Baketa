@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events;
 using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +16,7 @@ namespace Baketa.Infrastructure.OCR.Services;
 public sealed class SuryaServerManager : IAsyncDisposable
 {
     private readonly ILogger<SuryaServerManager> _logger;
+    private readonly IEventAggregator? _eventAggregator;
     private readonly int _port;
     private Process? _serverProcess;
     private ProcessJobObject? _jobObject;
@@ -31,10 +34,11 @@ public sealed class SuryaServerManager : IAsyncDisposable
     /// </summary>
     public int Port => _port;
 
-    public SuryaServerManager(int port, ILogger<SuryaServerManager> logger)
+    public SuryaServerManager(int port, ILogger<SuryaServerManager> logger, IEventAggregator? eventAggregator = null)
     {
         _port = port;
         _logger = logger;
+        _eventAggregator = eventAggregator;
 
         // Issue #189: Job Object初期化 - ゾンビプロセス対策
         _jobObject = new ProcessJobObject(logger);
@@ -130,6 +134,9 @@ public sealed class SuryaServerManager : IAsyncDisposable
             _serverProcess.ErrorDataReceived += (_, e) =>
             {
                 if (e.Data == null) return;
+
+                // [Issue #264] メモリエラー検出 & ユーザー通知
+                DetectAndPublishServerError(e.Data);
 
                 // PyTorch/CUDA警告はDEBUGレベル
                 if (e.Data.Contains("UserWarning") || e.Data.Contains("FutureWarning"))
@@ -600,6 +607,80 @@ public sealed class SuryaServerManager : IAsyncDisposable
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "[Surya] 孤立プロセス検索中のエラー（無視）");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #264] stderrからメモリエラー等を検出してServerErrorEventを発行
+    /// </summary>
+    private void DetectAndPublishServerError(string line)
+    {
+        if (_eventAggregator == null) return;
+
+        ServerErrorEvent? errorEvent = null;
+
+        // Intel MKLメモリエラー
+        if (line.Contains("mkl_malloc", StringComparison.OrdinalIgnoreCase))
+        {
+            errorEvent = ServerErrorEvent.CreateMemoryError(
+                ServerErrorSources.OcrServer,
+                $"[Port:{_port}] {line}");
+        }
+        // Python標準メモリエラー
+        else if (line.Contains("MemoryError") || line.Contains("OutOfMemoryError"))
+        {
+            errorEvent = ServerErrorEvent.CreateMemoryError(
+                ServerErrorSources.OcrServer,
+                $"[Port:{_port}] {line}");
+        }
+        // 一般的なメモリ割り当て失敗
+        else if (line.Contains("failed to allocate", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("out of memory", StringComparison.OrdinalIgnoreCase))
+        {
+            errorEvent = ServerErrorEvent.CreateMemoryError(
+                ServerErrorSources.OcrServer,
+                $"[Port:{_port}] {line}");
+        }
+        // CUDAメモリエラー
+        else if (line.Contains("CUDA out of memory", StringComparison.OrdinalIgnoreCase) ||
+                 line.Contains("hipErrorOutOfMemory", StringComparison.OrdinalIgnoreCase))
+        {
+            errorEvent = ServerErrorEvent.CreateCudaMemoryError(
+                ServerErrorSources.OcrServer,
+                $"[Port:{_port}] {line}");
+        }
+        // モジュール不足エラー
+        else if (line.Contains("ModuleNotFoundError"))
+        {
+            // モジュール名を抽出
+            var moduleMatch = System.Text.RegularExpressions.Regex.Match(
+                line, @"No module named ['""]*(\w+)['""]*");
+            var moduleName = moduleMatch.Success ? moduleMatch.Groups[1].Value : "unknown";
+
+            errorEvent = ServerErrorEvent.CreateModuleNotFoundError(
+                ServerErrorSources.OcrServer,
+                moduleName,
+                $"[Port:{_port}] {line}");
+        }
+
+        if (errorEvent != null)
+        {
+            _logger.LogWarning(
+                "[Issue #264] OCRサーバーエラー検出: {ErrorType} - Port:{Port}",
+                errorEvent.ErrorType, _port);
+
+            // 非同期でイベント発行
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _eventAggregator.PublishAsync(errorEvent).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[Issue #264] ServerErrorEvent発行失敗");
+                }
+            });
         }
     }
 
