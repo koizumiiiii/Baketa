@@ -138,6 +138,10 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             _userId = "mock_user_" + Guid.NewGuid().ToString("N")[..8];
             _sessionToken = "mock_session_" + Guid.NewGuid().ToString("N");
 
+            // [Issue #258] 永続化されたトークン使用量を読み込み（IUnifiedSettingsService優先）
+            var persistedTokenUsage = _unifiedSettingsService?.GetPromotionSettings().MockTokenUsage ?? 0;
+            var initialTokenUsage = persistedTokenUsage > 0 ? persistedTokenUsage : _settings.MockTokenUsage;
+
             // モックモード用の初期状態を設定
             _currentState = new LicenseState
             {
@@ -146,7 +150,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 SessionId = _sessionToken,
                 ContractStartDate = DateTime.UtcNow.AddDays(-15),
                 ExpirationDate = DateTime.UtcNow.AddDays(15),
-                CloudAiTokensUsed = _settings.MockTokenUsage,
+                CloudAiTokensUsed = initialTokenUsage,
                 IsCached = false,
                 LastServerSync = DateTime.UtcNow,
                 PatreonSyncStatus = PatreonSyncStatus.Synced,

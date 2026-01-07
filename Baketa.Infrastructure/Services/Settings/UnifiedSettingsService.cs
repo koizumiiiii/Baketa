@@ -257,6 +257,10 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         if (settings.LastOnlineVerification is not null)
             promotionData["lastOnlineVerification"] = settings.LastOnlineVerification;
 
+        // [Issue #258] MockTokenUsageを保存（0でない場合のみ）
+        if (settings.MockTokenUsage > 0)
+            promotionData["mockTokenUsage"] = settings.MockTokenUsage;
+
         var json = JsonSerializer.Serialize(promotionData, new JsonSerializerOptions { WriteIndented = true });
 
         // [Issue #237] FileSystemWatcher競合状態回避: 自己書き込み中は監視を一時停止
@@ -287,6 +291,31 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
 
         // 設定変更イベントを発火
         SettingsChanged?.Invoke(this, new SettingsChangedEventArgs("promotion", SettingsType.Promotion));
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateMockTokenUsageAsync(long tokenUsage, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var currentSettings = GetPromotionSettings();
+
+            // 変更がない場合はスキップ
+            if (currentSettings.MockTokenUsage == tokenUsage)
+                return;
+
+            // record の with 式でイミュータブルに更新
+            var updatedSettings = (currentSettings as UnifiedPromotionSettings) with { MockTokenUsage = tokenUsage };
+
+            await UpdatePromotionSettingsAsync(updatedSettings, cancellationToken).ConfigureAwait(false);
+
+            _logger?.LogDebug("[Issue #258] トークン使用量を永続化しました: {Usage}", tokenUsage);
+        }
+        catch (Exception ex)
+        {
+            // 永続化失敗はログのみ（処理続行、呼び出し元に例外を伝播させない）
+            _logger?.LogWarning(ex, "[Issue #258] トークン使用量の永続化に失敗しました");
+        }
     }
 
     /// <inheritdoc />
@@ -423,7 +452,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         }
 
         // デフォルト設定（プロモーション未適用）
-        return new UnifiedPromotionSettings(null, null, null, null, null);
+        return new UnifiedPromotionSettings(null, null, null, null, null, 0);
     }
 
     /// <summary>
@@ -431,12 +460,31 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     /// </summary>
     private static UnifiedPromotionSettings CreatePromotionSettingsFromData(Dictionary<string, object> data)
     {
+        // [Issue #258] MockTokenUsageをlongとして読み込み
+        long mockTokenUsage = 0;
+        if (data.TryGetValue("mockTokenUsage", out var tokenValue))
+        {
+            if (tokenValue is JsonElement jsonElement && jsonElement.TryGetInt64(out var longValue))
+            {
+                mockTokenUsage = longValue;
+            }
+            else if (tokenValue is long l)
+            {
+                mockTokenUsage = l;
+            }
+            else if (tokenValue is int i)
+            {
+                mockTokenUsage = i;
+            }
+        }
+
         return new UnifiedPromotionSettings(
             GetStringFromValue(data.GetValueOrDefault("appliedPromotionCode")),
             GetNullableIntValue(data, "promotionPlanType"),
             GetStringFromValue(data.GetValueOrDefault("promotionExpiresAt")),
             GetStringFromValue(data.GetValueOrDefault("promotionAppliedAt")),
-            GetStringFromValue(data.GetValueOrDefault("lastOnlineVerification")));
+            GetStringFromValue(data.GetValueOrDefault("lastOnlineVerification")),
+            mockTokenUsage);
     }
 
     /// <summary>
@@ -673,7 +721,8 @@ internal sealed record UnifiedPromotionSettings(
     int? PromotionPlanType,
     string? PromotionExpiresAt,
     string? PromotionAppliedAt,
-    string? LastOnlineVerification) : IPromotionSettings
+    string? LastOnlineVerification,
+    long MockTokenUsage = 0) : IPromotionSettings
 {
     /// <summary>
     /// プロモーションが有効かどうかを判定（拡張メソッドに委譲）
