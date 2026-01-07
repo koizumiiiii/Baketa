@@ -328,11 +328,19 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             if (result is AuthSuccess success)
             {
                 // Store tokens securely
-                await _tokenStorage.StoreTokensAsync(
+                var tokensStored = await _tokenStorage.StoreTokensAsync(
                     success.Session.AccessToken,
                     success.Session.RefreshToken).ConfigureAwait(false);
 
-                _logger.LogInformation("OAuth authentication successful, tokens stored");
+                if (!tokensStored)
+                {
+                    _logger.LogWarning("OAuth authentication successful but token storage failed - session will not persist");
+                }
+                else
+                {
+                    _logger.LogInformation("OAuth authentication successful, tokens stored");
+                }
+
                 await SendResponseAsync(response, "認証成功", "ログインに成功しました！このウィンドウを閉じてアプリケーションに戻ってください。", true).ConfigureAwait(false);
                 _callbackTcs?.TrySetResult(result);
             }

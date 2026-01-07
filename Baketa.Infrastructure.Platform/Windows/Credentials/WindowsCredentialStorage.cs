@@ -49,10 +49,31 @@ public sealed class WindowsCredentialStorage : ITokenStorage
 
         try
         {
-            _logger.LogDebug("Storing authentication tokens in Windows Credential Manager");
+            // トークンサイズをログ出力（デバッグ用）
+            // JWT tokens contain only ASCII characters, so UTF-8 encoding uses 1 byte per character
+            // This allows storing tokens up to 2560 characters (within Windows Credential Manager limit)
+            var accessBytes = Encoding.UTF8.GetBytes(accessToken);
+            var refreshBytes = Encoding.UTF8.GetBytes(refreshToken);
+            _logger.LogDebug("Storing tokens - AccessToken: {AccessChars} chars ({AccessBytes} bytes), RefreshToken: {RefreshChars} chars ({RefreshBytes} bytes)",
+                accessToken.Length, accessBytes.Length, refreshToken.Length, refreshBytes.Length);
 
-            bool accessStored = WriteCredential(AccessTokenTarget, "BaketaAccessToken", accessToken);
-            bool refreshStored = WriteCredential(RefreshTokenTarget, "BaketaRefreshToken", refreshToken);
+            // Windows Credential Manager の制限は 2560 bytes
+            const int MaxCredentialBlobSize = 2560;
+            if (accessBytes.Length > MaxCredentialBlobSize)
+            {
+                _logger.LogError("AccessToken exceeds Windows Credential Manager limit: {Size} bytes > {Limit} bytes",
+                    accessBytes.Length, MaxCredentialBlobSize);
+                return Task.FromResult(false);
+            }
+            if (refreshBytes.Length > MaxCredentialBlobSize)
+            {
+                _logger.LogError("RefreshToken exceeds Windows Credential Manager limit: {Size} bytes > {Limit} bytes",
+                    refreshBytes.Length, MaxCredentialBlobSize);
+                return Task.FromResult(false);
+            }
+
+            bool accessStored = WriteCredential(AccessTokenTarget, "BaketaAccessToken", accessToken, out int accessError);
+            bool refreshStored = WriteCredential(RefreshTokenTarget, "BaketaRefreshToken", refreshToken, out int refreshError);
 
             if (accessStored && refreshStored)
             {
@@ -60,7 +81,8 @@ public sealed class WindowsCredentialStorage : ITokenStorage
                 return Task.FromResult(true);
             }
 
-            _logger.LogWarning("Failed to store some authentication tokens");
+            _logger.LogWarning("Failed to store authentication tokens - AccessToken: {AccessResult} (Error: {AccessError}), RefreshToken: {RefreshResult} (Error: {RefreshError})",
+                accessStored, accessError, refreshStored, refreshError);
             return Task.FromResult(false);
         }
         catch (Exception ex)
@@ -146,9 +168,11 @@ public sealed class WindowsCredentialStorage : ITokenStorage
     /// <summary>
     /// Write a credential to Windows Credential Manager
     /// </summary>
-    private static bool WriteCredential(string targetName, string userName, string secret)
+    private static bool WriteCredential(string targetName, string userName, string secret, out int win32ErrorCode)
     {
-        var byteArray = Encoding.Unicode.GetBytes(secret);
+        // Use UTF-8 encoding: JWT tokens are ASCII-only, so 1 byte per character
+        // This halves the storage size compared to UTF-16/Unicode encoding
+        var byteArray = Encoding.UTF8.GetBytes(secret);
 
         var credential = new NativeMethods.CREDENTIAL
         {
@@ -163,7 +187,9 @@ public sealed class WindowsCredentialStorage : ITokenStorage
         try
         {
             Marshal.Copy(byteArray, 0, credential.CredentialBlob, byteArray.Length);
-            return NativeMethods.CredWrite(ref credential, 0);
+            var result = NativeMethods.CredWrite(ref credential, 0);
+            win32ErrorCode = result ? 0 : Marshal.GetLastWin32Error();
+            return result;
         }
         finally
         {
@@ -193,7 +219,7 @@ public sealed class WindowsCredentialStorage : ITokenStorage
             var byteArray = new byte[credential.CredentialBlobSize];
             Marshal.Copy(credential.CredentialBlob, byteArray, 0, (int)credential.CredentialBlobSize);
 
-            return Encoding.Unicode.GetString(byteArray);
+            return Encoding.UTF8.GetString(byteArray);
         }
         finally
         {

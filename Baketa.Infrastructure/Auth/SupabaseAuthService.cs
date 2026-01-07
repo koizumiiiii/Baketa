@@ -455,7 +455,11 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
                 AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(true, authSession.User, false));
 
                 // Update stored tokens with potentially refreshed ones
-                await _tokenStorage.StoreTokensAsync(session.AccessToken, session.RefreshToken, cancellationToken).ConfigureAwait(false);
+                var tokensStored = await _tokenStorage.StoreTokensAsync(session.AccessToken, session.RefreshToken, cancellationToken).ConfigureAwait(false);
+                if (!tokensStored)
+                {
+                    _logger.LogWarning("Session restored but failed to update stored tokens - next restart may require re-login");
+                }
             }
             else
             {
