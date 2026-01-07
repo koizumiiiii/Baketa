@@ -1084,6 +1084,13 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 return true; // サービスがない場合は続行
             }
 
+            var localizationService = serviceProvider.GetService<Services.ILocalizationService>();
+            if (localizationService == null)
+            {
+                _logger?.LogWarning("[Issue #261] ILocalizationServiceが登録されていません");
+                return true; // サービスがない場合は続行
+            }
+
             // [Gemini Review] 非同期化: UIスレッドブロック回避
             // 初回起動時の同意が必要か確認
             var needsConsent = await consentService.NeedsInitialConsentAsync().ConfigureAwait(true);
@@ -1098,6 +1105,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // [Gemini Review] 非同期ファクトリメソッドでViewModelを初期化
             var viewModel = await ViewModels.ConsentDialogViewModel.CreateAsync(
                 consentService,
+                localizationService,
                 ViewModels.ConsentDialogMode.InitialLaunch).ConfigureAwait(true);
             var dialog = new Views.ConsentDialogWindow(viewModel);
 

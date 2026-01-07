@@ -37,6 +37,18 @@
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="24">
         <!-- Header -->
         <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,20">
+            <!-- Language Selector -->
+            <ComboBox ItemsSource="{Binding AvailableUiLanguages}"
+                      SelectedItem="{Binding SelectedUiLanguage}"
+                      HorizontalAlignment="Right"
+                      MinWidth="120"
+                      Margin="0,0,0,8">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding NativeName}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
             <Image Source="avares://Baketa/Assets/Icons/baketa-256.png"
                    Width="64" Height="64"
                    HorizontalAlignment="Center"

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Settings;
 using Baketa.UI.Resources;
+using Baketa.UI.Services;
 using ReactiveUI;
 
 namespace Baketa.UI.ViewModels;
@@ -19,9 +21,12 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
 {
     private readonly CompositeDisposable _disposables = [];
     private readonly IConsentService _consentService;
+    private readonly ILocalizationService _localizationService;
     private bool _disposed;
     private bool _hasAcceptedPrivacyPolicy;
     private bool _hasAcceptedTermsOfService;
+    private SupportedLanguage _selectedUiLanguage;
+    private string _currentAppliedLanguageCode;
 
     /// <summary>
     /// ダイアログモード
@@ -46,27 +51,45 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
     /// [Gemini Review] コンストラクタでの同期I/Oを回避するため非同期初期化
     /// </summary>
     /// <param name="consentService">同意サービス</param>
+    /// <param name="localizationService">ローカライズサービス</param>
     /// <param name="mode">ダイアログモード</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     /// <returns>初期化済みViewModel</returns>
     public static async Task<ConsentDialogViewModel> CreateAsync(
         IConsentService consentService,
+        ILocalizationService localizationService,
         ConsentDialogMode mode,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(consentService);
+        ArgumentNullException.ThrowIfNull(localizationService);
 
-        var viewModel = new ConsentDialogViewModel(consentService, mode);
+        var viewModel = new ConsentDialogViewModel(consentService, localizationService, mode);
         await viewModel.InitializeAsync(cancellationToken).ConfigureAwait(false);
         return viewModel;
     }
 
     private ConsentDialogViewModel(
         IConsentService consentService,
+        ILocalizationService localizationService,
         ConsentDialogMode mode)
     {
         _consentService = consentService;
+        _localizationService = localizationService;
         Mode = mode;
+
+        // 現在の言語を初期値として設定
+        _selectedUiLanguage = AvailableUiLanguages[0]; // デフォルトは日本語
+        var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        foreach (var lang in AvailableUiLanguages)
+        {
+            if (lang.Code == currentCulture)
+            {
+                _selectedUiLanguage = lang;
+                break;
+            }
+        }
+        _currentAppliedLanguageCode = _selectedUiLanguage.Code;
 
         // Accept可能条件を監視
         var canAccept = this.WhenAnyValue(
@@ -83,11 +106,20 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
         DeclineCommand = ReactiveCommand.Create(OnDecline);
         OpenPrivacyPolicyCommand = ReactiveCommand.CreateFromTask(OpenPrivacyPolicyAsync);
         OpenTermsOfServiceCommand = ReactiveCommand.CreateFromTask(OpenTermsOfServiceAsync);
+        ChangeLanguageCommand = ReactiveCommand.CreateFromTask<SupportedLanguage>(ChangeLanguageAsync);
 
         _disposables.Add(AcceptCommand);
         _disposables.Add(DeclineCommand);
         _disposables.Add(OpenPrivacyPolicyCommand);
         _disposables.Add(OpenTermsOfServiceCommand);
+        _disposables.Add(ChangeLanguageCommand);
+
+        // [Issue #261] 言語選択変更時に自動的にコマンドを実行
+        this.WhenAnyValue(x => x.SelectedUiLanguage)
+            .Skip(1) // 初期値をスキップ
+            .WhereNotNull()
+            .InvokeCommand(ChangeLanguageCommand)
+            .DisposeWith(_disposables);
     }
 
     /// <summary>
@@ -130,6 +162,24 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
     /// </summary>
     public bool ShowTermsOfServiceSection => Mode == ConsentDialogMode.AccountCreation;
 
+    /// <summary>
+    /// 利用可能なUI言語一覧
+    /// </summary>
+    public IReadOnlyList<SupportedLanguage> AvailableUiLanguages { get; } = new List<SupportedLanguage>
+    {
+        new("ja", "日本語", "Japanese"),
+        new("en", "English", "English")
+    }.AsReadOnly();
+
+    /// <summary>
+    /// 選択中のUI言語
+    /// </summary>
+    public SupportedLanguage SelectedUiLanguage
+    {
+        get => _selectedUiLanguage;
+        set => this.RaiseAndSetIfChanged(ref _selectedUiLanguage, value);
+    }
+
     #endregion
 
     #region Commands
@@ -153,6 +203,11 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
     /// 利用規約を開くコマンド
     /// </summary>
     public ReactiveCommand<Unit, Unit> OpenTermsOfServiceCommand { get; }
+
+    /// <summary>
+    /// 言語変更コマンド
+    /// </summary>
+    public ReactiveCommand<SupportedLanguage, Unit> ChangeLanguageCommand { get; }
 
     #endregion
 
@@ -243,6 +298,33 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
         }
 
         await System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 言語を変更
+    /// </summary>
+    private async System.Threading.Tasks.Task ChangeLanguageAsync(SupportedLanguage language)
+    {
+        // 既に適用済みの言語と同じ場合はスキップ
+        if (language == null || language.Code == _currentAppliedLanguageCode)
+            return;
+
+        // 言語を変更（設定にも保存される）
+        await _localizationService.ChangeLanguageAsync(language.Code).ConfigureAwait(false);
+        _currentAppliedLanguageCode = language.Code;
+
+        // UIテキストを更新するためにプロパティ変更を通知
+        this.RaisePropertyChanged(nameof(WindowTitle));
+        this.RaisePropertyChanged(nameof(HeaderText));
+        this.RaisePropertyChanged(nameof(DescriptionText));
+        this.RaisePropertyChanged(nameof(PrivacyPolicyLabel));
+        this.RaisePropertyChanged(nameof(PrivacyPolicyLinkText));
+        this.RaisePropertyChanged(nameof(PrivacyPolicyCheckboxText));
+        this.RaisePropertyChanged(nameof(TermsOfServiceLabel));
+        this.RaisePropertyChanged(nameof(TermsOfServiceLinkText));
+        this.RaisePropertyChanged(nameof(TermsOfServiceCheckboxText));
+        this.RaisePropertyChanged(nameof(AcceptButtonText));
+        this.RaisePropertyChanged(nameof(DeclineButtonText));
     }
 
     #endregion
