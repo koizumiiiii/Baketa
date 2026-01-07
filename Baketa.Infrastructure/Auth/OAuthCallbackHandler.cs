@@ -265,9 +265,13 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             // Handle OAuth provider errors
             if (!string.IsNullOrEmpty(error))
             {
+                // セキュリティ: ユーザー入力をログに出力する前にサニタイズ
+                // CodeQL: cs/log-forging 対策
+                var sanitizedError = SanitizeForLogging(error);
+                var sanitizedDescription = SanitizeForLogging(errorDescription);
                 _logger.LogWarning(
                     "OAuthプロバイダーからエラーが返されました: Error={Error}, Description={Description}",
-                    error, errorDescription ?? "(なし)");
+                    sanitizedError, sanitizedDescription);
 
                 // エラーコード別のユーザーフレンドリーメッセージ
                 var (userMessage, errorCode) = error.ToLowerInvariant() switch
@@ -285,14 +289,16 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
                         "認証サーバーでエラーが発生しました。しばらく待ってから再度お試しください。",
                         AuthErrorCodes.OAuthServerError),
                     _ => (
+                        // セキュリティ: ユーザー入力をUIに表示する場合もサニタイズ
                         !string.IsNullOrEmpty(errorDescription)
-                            ? $"認証エラー: {errorDescription}"
+                            ? $"認証エラー: {sanitizedDescription}"
                             : "認証プロバイダーでエラーが発生しました。再度お試しください。",
                         AuthErrorCodes.OAuthError)
                 };
 
                 await SendResponseAsync(response, "認証エラー", userMessage, false).ConfigureAwait(false);
-                _callbackTcs?.TrySetResult(new AuthFailure(errorCode, $"OAuth Error: {error} - {errorDescription}"));
+                // セキュリティ: 内部エラーメッセージもサニタイズ済み値を使用
+                _callbackTcs?.TrySetResult(new AuthFailure(errorCode, $"OAuth Error: {sanitizedError} - {sanitizedDescription}"));
                 return;
             }
 
@@ -359,6 +365,34 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             await SendResponseAsync(response, "エラー", "内部エラーが発生しました。", false).ConfigureAwait(false);
             _callbackTcs?.TrySetResult(new AuthFailure(AuthErrorCodes.UnexpectedError, ex.Message));
         }
+    }
+
+    /// <summary>
+    /// Sanitize user input for safe logging to prevent log forging/injection attacks
+    /// CodeQL: cs/log-forging mitigation
+    /// </summary>
+    /// <param name="input">User-provided input that may contain malicious content</param>
+    /// <returns>Sanitized string safe for logging (max 100 chars, no control characters)</returns>
+    private static string SanitizeForLogging(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "(empty)";
+
+        // 1. 制御文字と改行を除去（ログインジェクション対策）
+        var sanitized = new string(input
+            .Where(c => !char.IsControl(c) && c != '\r' && c != '\n')
+            .ToArray());
+
+        // 2. 長さを制限（100文字）
+        const int MaxLength = 100;
+        if (sanitized.Length > MaxLength)
+            sanitized = sanitized[..MaxLength] + "...";
+
+        // 3. 空になった場合
+        if (string.IsNullOrWhiteSpace(sanitized))
+            return "(invalid)";
+
+        return sanitized;
     }
 
     /// <summary>
