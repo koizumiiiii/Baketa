@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IEngineStatusManager _engineStatusManager;
+    private readonly ILicenseManager _licenseManager;
     private readonly ILogger<FallbackOrchestrator> _logger;
 
     /// <summary>
@@ -35,10 +37,12 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
     public FallbackOrchestrator(
         IServiceProvider serviceProvider,
         IEngineStatusManager engineStatusManager,
+        ILicenseManager licenseManager,
         ILogger<FallbackOrchestrator> logger)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _engineStatusManager = engineStatusManager ?? throw new ArgumentNullException(nameof(engineStatusManager));
+        _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -225,6 +229,42 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
                 });
 
                 _engineStatusManager.MarkEngineAvailable(engineKey);
+
+                // [Issue #258] トークン消費をLicenseManagerに記録
+                // これによりUIにトークン使用量が反映される
+                if (response.TokenUsage?.TotalTokens > 0)
+                {
+                    try
+                    {
+                        var consumeResult = await _licenseManager.ConsumeCloudAiTokensAsync(
+                            response.TokenUsage.TotalTokens,
+                            request.RequestId,
+                            cancellationToken).ConfigureAwait(false);
+
+                        if (!consumeResult.Success)
+                        {
+                            _logger.LogWarning(
+                                "[Issue #258] トークン消費記録に失敗: RequestId={RequestId}, Reason={Reason}",
+                                request.RequestId,
+                                consumeResult.FailureReason);
+                        }
+                        else
+                        {
+                            _logger.LogDebug(
+                                "[Issue #258] トークン消費記録完了: RequestId={RequestId}, Tokens={Tokens}, NewTotal={NewTotal}",
+                                request.RequestId,
+                                response.TokenUsage.TotalTokens,
+                                consumeResult.NewUsageTotal);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // トークン消費記録の失敗は翻訳結果には影響しない
+                        _logger.LogWarning(ex,
+                            "[Issue #258] トークン消費記録でエラー（継続）: RequestId={RequestId}",
+                            request.RequestId);
+                    }
+                }
 
                 return FallbackTranslationResult.Success(response, level, attempts);
             }

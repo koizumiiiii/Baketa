@@ -1226,6 +1226,22 @@
   <data name="Loading_SetupGpu" xml:space="preserve">
     <value>GPU環境をセットアップしています...</value>
   </data>
+  <!-- [Issue #259] Loading Tips -->
+  <data name="Loading_Tip_1" xml:space="preserve">
+    <value>ゲーム画面のテキストをリアルタイムで翻訳します</value>
+  </data>
+  <data name="Loading_Tip_2" xml:space="preserve">
+    <value>OCRと機械翻訳を組み合わせた翻訳オーバーレイです</value>
+  </data>
+  <data name="Loading_Tip_3" xml:space="preserve">
+    <value>初回起動時はモデルのダウンロードに時間がかかる場合があります</value>
+  </data>
+  <data name="Loading_Tip_4" xml:space="preserve">
+    <value>翻訳結果はゲーム画面に重ねて表示されます</value>
+  </data>
+  <data name="Loading_Tip_5" xml:space="preserve">
+    <value>設定画面で各種オプションをカスタマイズできます</value>
+  </data>
 
   <!-- [Issue #78 Phase 5] Token Usage Alerts -->
   <data name="TokenUsage_Warning_Title" xml:space="preserve">
@@ -1364,6 +1380,50 @@
   </data>
   <data name="Update_DownloadProgress_Cancel" xml:space="preserve">
     <value>キャンセル</value>
+  </data>
+
+  <!-- ========== Consent Dialog (Issue #261) ========== -->
+  <data name="Consent_WindowTitle_Initial" xml:space="preserve">
+    <value>プライバシーポリシーへの同意</value>
+  </data>
+  <data name="Consent_WindowTitle_Account" xml:space="preserve">
+    <value>利用規約への同意</value>
+  </data>
+  <data name="Consent_Header_Initial" xml:space="preserve">
+    <value>Baketaへようこそ</value>
+  </data>
+  <data name="Consent_Header_Account" xml:space="preserve">
+    <value>アカウント作成</value>
+  </data>
+  <data name="Consent_Description_Initial" xml:space="preserve">
+    <value>Baketaをご利用いただくには、プライバシーポリシーへの同意が必要です。</value>
+  </data>
+  <data name="Consent_Description_Account" xml:space="preserve">
+    <value>アカウントを作成するには、利用規約とプライバシーポリシーへの同意が必要です。</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Label" xml:space="preserve">
+    <value>プライバシーポリシー</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Link" xml:space="preserve">
+    <value>プライバシーポリシーを読む</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Checkbox" xml:space="preserve">
+    <value>プライバシーポリシーに同意します</value>
+  </data>
+  <data name="Consent_TermsOfService_Label" xml:space="preserve">
+    <value>利用規約</value>
+  </data>
+  <data name="Consent_TermsOfService_Link" xml:space="preserve">
+    <value>利用規約を読む</value>
+  </data>
+  <data name="Consent_TermsOfService_Checkbox" xml:space="preserve">
+    <value>利用規約に同意します</value>
+  </data>
+  <data name="Consent_Button_Accept" xml:space="preserve">
+    <value>同意して続行</value>
+  </data>
+  <data name="Consent_Button_Decline" xml:space="preserve">
+    <value>同意しない</value>
   </data>
 
 </root>

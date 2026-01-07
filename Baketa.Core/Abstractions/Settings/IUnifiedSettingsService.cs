@@ -61,6 +61,13 @@ public interface IUnifiedSettingsService
     Task UpdatePromotionSettingsAsync(IPromotionSettings settings, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// [Issue #258] モックモードのトークン使用量を永続化します
+    /// </summary>
+    /// <param name="tokenUsage">トークン使用量</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    Task UpdateMockTokenUsageAsync(long tokenUsage, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 設定をファイルからリロードします
     /// </summary>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
@@ -194,4 +201,10 @@ public interface IPromotionSettings
     /// プロモーションが有効かどうか
     /// </summary>
     bool IsPromotionActive { get; }
+
+    /// <summary>
+    /// [Issue #258] モックモード時のトークン使用量
+    /// 開発/テスト用の永続化（本番では使用しない）
+    /// </summary>
+    long MockTokenUsage { get; }
 }

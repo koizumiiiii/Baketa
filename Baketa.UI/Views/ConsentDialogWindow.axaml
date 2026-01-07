@@ -1,0 +1,150 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        x:Class="Baketa.UI.Views.ConsentDialogWindow"
+        Title="{Binding WindowTitle}"
+        Width="500"
+        MinHeight="350"
+        MaxHeight="550"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True"
+        Topmost="True"
+        x:DataType="vm:ConsentDialogViewModel">
+
+    <Window.Styles>
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.secondary">
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="MinWidth" Value="100"/>
+        </Style>
+        <Style Selector="TextBlock.link">
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="TextBlock.link:pointerover">
+            <Setter Property="TextDecorations" Value="Underline"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="24">
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,20">
+            <!-- Language Selector -->
+            <ComboBox ItemsSource="{Binding AvailableUiLanguages}"
+                      SelectedItem="{Binding SelectedUiLanguage}"
+                      HorizontalAlignment="Right"
+                      MinWidth="120"
+                      Margin="0,0,0,8">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding NativeName}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Image Source="avares://Baketa/Assets/Icons/baketa-256.png"
+                   Width="64" Height="64"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,8"/>
+            <TextBlock Text="{Binding HeaderText}"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding DescriptionText}"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       HorizontalAlignment="Center"
+                       MaxWidth="400"/>
+        </StackPanel>
+
+        <!-- Privacy Policy Section -->
+        <Border Grid.Row="1"
+                IsVisible="{Binding ShowPrivacyPolicySection}"
+                Margin="0,0,0,16"
+                Padding="16"
+                Background="{DynamicResource SystemFillColorNeutralBackgroundBrush}"
+                CornerRadius="8">
+            <StackPanel Spacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding PrivacyPolicyLabel}"
+                               FontWeight="SemiBold"
+                               FontSize="14"/>
+                    <TextBlock Text="{Binding PrivacyPolicyVersion}"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               FontSize="12"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <Button Command="{Binding OpenPrivacyPolicyCommand}"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding PrivacyPolicyLinkText}"
+                               Classes="link"
+                               FontSize="13"/>
+                </Button>
+
+                <CheckBox IsChecked="{Binding HasAcceptedPrivacyPolicy}"
+                          Content="{Binding PrivacyPolicyCheckboxText}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Terms of Service Section -->
+        <Border Grid.Row="2"
+                IsVisible="{Binding ShowTermsOfServiceSection}"
+                Margin="0,0,0,16"
+                Padding="16"
+                Background="{DynamicResource SystemFillColorNeutralBackgroundBrush}"
+                CornerRadius="8">
+            <StackPanel Spacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding TermsOfServiceLabel}"
+                               FontWeight="SemiBold"
+                               FontSize="14"/>
+                    <TextBlock Text="{Binding TermsOfServiceVersion}"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               FontSize="12"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <Button Command="{Binding OpenTermsOfServiceCommand}"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding TermsOfServiceLinkText}"
+                               Classes="link"
+                               FontSize="13"/>
+                </Button>
+
+                <CheckBox IsChecked="{Binding HasAcceptedTermsOfService}"
+                          Content="{Binding TermsOfServiceCheckboxText}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Spacing="16"
+                    Margin="0,8,0,0">
+            <Button Classes="secondary"
+                    Content="{Binding DeclineButtonText}"
+                    Command="{Binding DeclineCommand}"
+                    Name="DeclineButton"/>
+            <Button Classes="primary"
+                    Content="{Binding AcceptButtonText}"
+                    Command="{Binding AcceptCommand}"
+                    Name="AcceptButton"/>
+        </StackPanel>
+    </Grid>
+</Window>

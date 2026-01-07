@@ -119,7 +119,7 @@ public sealed class PromotionSettingsPersistence : IPromotionSettingsPersistence
     /// <summary>
     /// [Issue #237] 書き込み可能なプロモーション設定
     /// </summary>
-    private sealed class WritablePromotionSettings : IPromotionSettings
+    internal sealed class WritablePromotionSettings : IPromotionSettings
     {
         public string? AppliedPromotionCode { get; init; }
         public int? PromotionPlanType { get; init; }
@@ -131,5 +131,10 @@ public sealed class PromotionSettingsPersistence : IPromotionSettingsPersistence
         /// プロモーションが有効かどうかを判定（拡張メソッドに委譲）
         /// </summary>
         public bool IsPromotionActive => this.IsCurrentlyActive();
+
+        /// <summary>
+        /// [Issue #258] モックモード時のトークン使用量
+        /// </summary>
+        public long MockTokenUsage { get; init; }
     }
 }

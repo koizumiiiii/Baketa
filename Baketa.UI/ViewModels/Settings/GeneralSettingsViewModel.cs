@@ -738,24 +738,30 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// </summary>
     private void InitializeUiLanguage()
     {
-        // InitializeFromSettings で既に設定済みの場合はスキップ
-        if (_selectedUiLanguage != null)
-        {
-            return;
-        }
-
         if (_localizationService == null)
         {
             // サービスがない場合はデフォルトで日本語
-            _selectedUiLanguage = AvailableUiLanguages.First();
+            if (_selectedUiLanguage == null)
+            {
+                _selectedUiLanguage = AvailableUiLanguages.First();
+            }
             return;
         }
 
-        // 設定から復元できなかった場合は、現在のカルチャに基づいて初期化
+        // [Issue #261] 常にランタイムのカルチャを優先
+        // 同意ダイアログで言語変更された場合、設定ファイルより現在のカルチャが正しい
         var currentCultureCode = _localizationService.CurrentCulture.TwoLetterISOLanguageName;
-        _selectedUiLanguage = AvailableUiLanguages
+        var runtimeLanguage = AvailableUiLanguages
             .FirstOrDefault(l => l.Code == currentCultureCode || l.Code == _localizationService.CurrentCulture.Name)
             ?? AvailableUiLanguages.First();
+
+        // 設定とランタイムが異なる場合はランタイムを優先
+        if (_selectedUiLanguage == null || _selectedUiLanguage.Code != runtimeLanguage.Code)
+        {
+            _logger?.LogDebug("[Issue #261] UI言語をランタイムカルチャに同期: {SavedCode} → {RuntimeCode}",
+                _selectedUiLanguage?.Code ?? "(null)", runtimeLanguage.Code);
+            _selectedUiLanguage = runtimeLanguage;
+        }
     }
 
     /// <summary>

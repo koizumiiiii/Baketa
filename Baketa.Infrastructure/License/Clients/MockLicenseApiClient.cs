@@ -1,4 +1,5 @@
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.License.Extensions;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
@@ -15,6 +16,7 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
 {
     private readonly ILogger<MockLicenseApiClient> _logger;
     private readonly LicenseSettings _settings;
+    private readonly IUnifiedSettingsService _unifiedSettingsService;
 
     // モック状態
     private long _totalTokensConsumed;
@@ -29,13 +31,18 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
     /// </summary>
     public MockLicenseApiClient(
         ILogger<MockLicenseApiClient> logger,
-        IOptions<LicenseSettings> settings)
+        IOptions<LicenseSettings> settings,
+        IUnifiedSettingsService unifiedSettingsService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
+        _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
 
-        // 初期トークン使用量を設定から読み込み
-        _totalTokensConsumed = _settings.MockTokenUsage;
+        // [Issue #258] 初期トークン使用量を永続化設定から読み込み（プロモーション設定優先）
+        var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+        _totalTokensConsumed = promotionSettings.MockTokenUsage > 0
+            ? promotionSettings.MockTokenUsage
+            : _settings.MockTokenUsage;
 
         _logger.LogInformation(
             "MockLicenseApiClient初期化: PlanType={Plan}, InitialTokenUsage={Usage}",
@@ -96,19 +103,15 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
         var planType = (PlanType)_settings.MockPlanType;
         var monthlyLimit = planType.GetMonthlyTokenLimit();
 
-        // プランがクラウドAI非対応の場合
-        if (!planType.HasCloudAiAccess())
-        {
-            _logger.LogWarning(
-                "Mock: クラウドAI非対応プラン Plan={Plan}", planType);
+        // [Issue #258] プランチェック削除
+        // 理由:
+        // 1. トークン消費記録は「課金追跡」であり「認可」ではない
+        // 2. 認可は翻訳実行前にサーバー側で行われる
+        // 3. Mockでプランチェックすると、LicenseManagerのプロモーション適用が反映されない
 
-            return new TokenConsumptionApiResponse
-            {
-                Success = false,
-                ErrorCode = "PLAN_NOT_SUPPORTED",
-                ErrorMessage = "現在のプランではクラウドAI翻訳を利用できません"
-            };
-        }
+        TokenConsumptionApiResponse response;
+        bool shouldPersist = false;
+        long newTotal = 0;
 
         lock (_lock)
         {
@@ -119,7 +122,7 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
                     "Mock: IdempotencyKey重複 Key={Key}",
                     request.IdempotencyKey);
 
-                return new TokenConsumptionApiResponse
+                response = new TokenConsumptionApiResponse
                 {
                     Success = true,
                     WasIdempotent = true,
@@ -127,15 +130,15 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
                     RemainingTokens = monthlyLimit - _totalTokensConsumed
                 };
             }
-
-            // クォータチェック
-            if (_totalTokensConsumed + request.TokenCount > monthlyLimit)
+            // [Issue #258] クォータチェック
+            // monthlyLimit == 0 の場合はスキップ（Freeプランでもプロモーション適用時は制限なし）
+            else if (monthlyLimit > 0 && _totalTokensConsumed + request.TokenCount > monthlyLimit)
             {
                 _logger.LogWarning(
                     "Mock: トークンクォータ超過 Current={Current}, Requested={Requested}, Limit={Limit}",
                     _totalTokensConsumed, request.TokenCount, monthlyLimit);
 
-                return new TokenConsumptionApiResponse
+                response = new TokenConsumptionApiResponse
                 {
                     Success = false,
                     ErrorCode = "QUOTA_EXCEEDED",
@@ -144,25 +147,39 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
                     RemainingTokens = monthlyLimit - _totalTokensConsumed
                 };
             }
-
-            // トークン消費を記録
-            _totalTokensConsumed += request.TokenCount;
-            _usedIdempotencyKeys.Add(request.IdempotencyKey);
-
-            _logger.LogDebug(
-                "Mock: トークン消費成功 Consumed={Consumed}, NewTotal={NewTotal}, Remaining={Remaining}",
-                request.TokenCount,
-                _totalTokensConsumed,
-                monthlyLimit - _totalTokensConsumed);
-
-            return new TokenConsumptionApiResponse
+            else
             {
-                Success = true,
-                WasIdempotent = false,
-                NewUsageTotal = _totalTokensConsumed,
-                RemainingTokens = monthlyLimit - _totalTokensConsumed
-            };
+                // トークン消費を記録
+                _totalTokensConsumed += request.TokenCount;
+                _usedIdempotencyKeys.Add(request.IdempotencyKey);
+                newTotal = _totalTokensConsumed;
+                shouldPersist = true;
+
+                _logger.LogDebug(
+                    "Mock: トークン消費成功 Consumed={Consumed}, NewTotal={NewTotal}, Remaining={Remaining}",
+                    request.TokenCount,
+                    _totalTokensConsumed,
+                    monthlyLimit - _totalTokensConsumed);
+
+                response = new TokenConsumptionApiResponse
+                {
+                    Success = true,
+                    WasIdempotent = false,
+                    NewUsageTotal = _totalTokensConsumed,
+                    RemainingTokens = monthlyLimit - _totalTokensConsumed
+                };
+            }
         }
+
+        // [Issue #258] トークン消費成功後に永続化（lock外で非同期実行）
+        // 永続化の責務はUnifiedSettingsServiceに委譲
+        if (shouldPersist)
+        {
+            await _unifiedSettingsService.UpdateMockTokenUsageAsync(newTotal, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return response;
     }
 
     /// <inheritdoc/>

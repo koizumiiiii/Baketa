@@ -680,6 +680,9 @@ public class InfrastructureModule : ServiceModuleBase
         // 統一設定管理サービス
         RegisterUnifiedSettings(_1);
 
+        // [Issue #261] 同意管理サービス
+        RegisterConsentServices(_1);
+
         // 統一ログサービス
         RegisterLoggingServices(_1);
     }
@@ -692,6 +695,16 @@ public class InfrastructureModule : ServiceModuleBase
     {
         // 統一設定管理サービス（Singleton: アプリケーション全体で共有）
         services.AddSingleton<IUnifiedSettingsService, UnifiedSettingsService>();
+    }
+
+    /// <summary>
+    /// [Issue #261] 同意管理サービスを登録します
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterConsentServices(IServiceCollection services)
+    {
+        // 利用規約・プライバシーポリシー同意管理サービス（Singleton: アプリケーション全体で共有）
+        services.AddSingleton<IConsentService, ConsentService>();
     }
 
     /// <summary>
@@ -937,6 +950,14 @@ public class InfrastructureModule : ServiceModuleBase
         // RelayServerClient登録（HttpClientFactory使用）
         services.AddHttpClient<Translation.Cloud.RelayServerClient>();
         Console.WriteLine("✅ RelayServerClient登録完了 - HttpClientFactory使用");
+
+        // [Issue #261] Named HttpClient "RelayServer" 登録（ConsentService等で使用）
+        services.AddHttpClient("RelayServer", client =>
+        {
+            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+        Console.WriteLine("✅ Named HttpClient [RelayServer] 登録完了");
 
         // PrimaryCloudTranslator登録（RelayServerClient依存）- Issue #237 Geminiレビュー指摘修正
         services.AddSingleton<Translation.Cloud.PrimaryCloudTranslator>();

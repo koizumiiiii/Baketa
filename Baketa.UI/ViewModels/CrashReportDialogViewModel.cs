@@ -91,9 +91,11 @@ public sealed class CrashReportDialogViewModel : ReactiveObject, IDisposable
     /// <summary>
     /// 説明テキスト
     /// </summary>
+#pragma warning disable CA1863 // リソース文字列のフォーマットはキャッシュ不要
     public string DescriptionText => IsSingleCrash
         ? Strings.CrashReport_DescriptionSingle
         : string.Format(Strings.CrashReport_DescriptionMultiple, CrashCount);
+#pragma warning restore CA1863
 
     /// <summary>
     /// プライバシーノート

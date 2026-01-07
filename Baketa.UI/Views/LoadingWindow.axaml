@@ -69,60 +69,50 @@
              HorizontalAlignment="Center"
              Margin="0,0,0,32"/>
 
-      <!-- 初期化ステップリスト -->
-      <ItemsControl Grid.Row="1"
-                    ItemsSource="{Binding InitializationSteps}"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Center">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <StackPanel Margin="0,6">
-              <Grid ColumnDefinitions="Auto,*">
-                <!-- ステータスアイコン -->
-                <Border Grid.Column="0"
-                        Width="24" Height="24"
-                        CornerRadius="12"
-                        Background="{Binding StatusColor}"
-                        Margin="0,0,16,0">
-                  <TextBlock Text="{Binding StatusIcon}"
-                             Foreground="White"
-                             FontSize="12"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center"/>
-                </Border>
+      <!-- [Issue #259] 簡素化UI: 統合プログレスバー + Tips -->
+      <StackPanel Grid.Row="1"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Center"
+                  Margin="0,20">
 
-                <!-- メッセージ -->
-                <TextBlock Grid.Column="1"
-                           Text="{Binding Message}"
-                           Foreground="#E4E4E7"
-                           FontSize="14"
-                           VerticalAlignment="Center"/>
-              </Grid>
+        <!-- 現在のステップメッセージ -->
+        <TextBlock Text="{Binding CurrentStepMessage}"
+                   Foreground="#E4E4E7"
+                   FontSize="14"
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"
+                   Margin="0,0,0,16"/>
 
-              <!-- プログレスバー（実行中のステップで表示） -->
-              <StackPanel IsVisible="{Binding IsInProgress}"
-                          Margin="40,4,0,0">
-                <!-- [Issue #185] 詳細メッセージ (ダウンロード進捗など) -->
-                <TextBlock Text="{Binding DetailMessage}"
-                           Foreground="#A1A1AA"
-                           FontSize="12"
-                           TextWrapping="NoWrap"
-                           TextTrimming="CharacterEllipsis"
-                           IsVisible="{Binding HasDetailMessage}"/>
-                <!-- プログレスバー（不確定アニメーション対応） -->
-                <ProgressBar Value="{Binding Progress}"
-                             IsIndeterminate="{Binding IsIndeterminate}"
-                             Minimum="0"
-                             Maximum="100"
-                             Height="4"
-                             Margin="0,4,0,0"
-                             Foreground="#3B82F6"
-                             Background="#27272A"/>
-              </StackPanel>
-            </StackPanel>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+        <!-- 統合プログレスバー -->
+        <ProgressBar Value="{Binding OverallProgress}"
+                     IsIndeterminate="{Binding IsIndeterminate}"
+                     Minimum="0"
+                     Maximum="100"
+                     Height="6"
+                     CornerRadius="3"
+                     Foreground="#3B82F6"
+                     Background="#27272A"
+                     Margin="0,0,0,24"/>
+
+        <!-- Tips表示エリア（フェードアニメーション） -->
+        <Border Background="#27272A"
+                CornerRadius="8"
+                Padding="16,12"
+                HorizontalAlignment="Stretch">
+          <TextBlock Text="{Binding CurrentTip}"
+                     Foreground="#A1A1AA"
+                     FontSize="12"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap">
+            <TextBlock.Transitions>
+              <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.3"/>
+              </Transitions>
+            </TextBlock.Transitions>
+          </TextBlock>
+        </Border>
+      </StackPanel>
 
       <!-- フッター -->
       <StackPanel Grid.Row="2"

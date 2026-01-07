@@ -12,6 +12,7 @@
  * - シングルデバイス強制（他デバイスでログイン時に元デバイスをログアウト）
  * - Cloud AI翻訳（Gemini API経由）
  * - クラッシュレポート受信（Issue #252）
+ * - 同意記録（GDPR/CCPA監査ログ）（Issue #261）
  *
  * セキュリティ:
  * - タイミング攻撃対策（timingSafeCompare）
@@ -774,6 +775,15 @@ interface PromotionRedeemBody {
   code: string;
 }
 
+/** [Issue #261] 同意記録リクエスト */
+interface ConsentRecordBody {
+  user_id: string;
+  consent_type: string;
+  version: string;
+  accepted_at: string;
+  client_version?: string;
+}
+
 /**
  * Supabase JWTからユーザーIDを抽出・検証
  * @returns user_id (UUID) or null if not authenticated
@@ -818,6 +828,42 @@ function validatePromotionRedeemBody(body: unknown): ValidationResult<PromotionR
     return { success: false, error: 'Missing or invalid field: code' };
   }
   return { success: true, data: { code: obj.code } };
+}
+
+/** [Issue #261] 同意記録バリデーション */
+function validateConsentRecordBody(body: unknown): ValidationResult<ConsentRecordBody> {
+  if (!body || typeof body !== 'object') {
+    return { success: false, error: 'Invalid request body' };
+  }
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.user_id !== 'string' || !obj.user_id) {
+    return { success: false, error: 'Missing or invalid field: user_id' };
+  }
+  if (typeof obj.consent_type !== 'string' || !obj.consent_type) {
+    return { success: false, error: 'Missing or invalid field: consent_type' };
+  }
+  // consent_type は privacy_policy または terms_of_service のみ
+  const validTypes = ['privacy_policy', 'terms_of_service'];
+  if (!validTypes.includes(obj.consent_type)) {
+    return { success: false, error: `Invalid consent_type: must be one of ${validTypes.join(', ')}` };
+  }
+  if (typeof obj.version !== 'string' || !obj.version) {
+    return { success: false, error: 'Missing or invalid field: version' };
+  }
+  if (typeof obj.accepted_at !== 'string' || !obj.accepted_at) {
+    return { success: false, error: 'Missing or invalid field: accepted_at' };
+  }
+  const clientVersion = typeof obj.client_version === 'string' ? obj.client_version : undefined;
+  return {
+    success: true,
+    data: {
+      user_id: obj.user_id,
+      consent_type: obj.consent_type,
+      version: obj.version,
+      accepted_at: obj.accepted_at,
+      client_version: clientVersion
+    }
+  };
 }
 
 /** プロモーションコード形式検証（Base32 Crockford: O/I/L/U除外） */
@@ -939,6 +985,92 @@ async function handlePromotionRedeem(
   }
 }
 
+/**
+ * [Issue #261] 同意記録をSupabaseに保存
+ * POST /api/consent/record
+ *
+ * GDPR/CCPA準拠の監査ログとして同意記録をDBに保存
+ * - INSERT only（監査の整合性のため更新・削除は不可）
+ * - RLSでユーザー自身の記録のみ参照可能
+ */
+async function handleConsentRecord(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. リクエスト検証
+    const body = await request.json();
+    const validation = validateConsentRecordBody(body);
+    if (!validation.success || !validation.data) {
+      return errorResponse(validation.error || 'Invalid request', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+    }
+
+    const { user_id, consent_type, version, accepted_at, client_version } = validation.data;
+
+    // 2. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #261] Supabase not configured for consent records');
+      return errorResponse('Consent service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 3. JWT検証でユーザーID確認（セキュリティ: なりすまし防止）
+    // [Gemini Review] 監査ログの信頼性確保のため、認証を必須化
+    const authenticatedUserId = await extractUserIdFromJwt(request, supabase);
+    if (!authenticatedUserId) {
+      // 未認証は拒否（GDPR監査ログの整合性確保）
+      console.warn('[Issue #261] Consent record rejected: no authentication');
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'AUTHENTICATION_REQUIRED');
+    }
+
+    // 認証済みユーザーIDとリクエストのuser_idが一致するか検証
+    if (authenticatedUserId !== user_id) {
+      console.warn(`[Issue #261] User ID mismatch: jwt=${authenticatedUserId.substring(0, 8)}, body=${user_id.substring(0, 8)}`);
+      return errorResponse('User ID mismatch', 403, origin, allowedOrigins, 'USER_ID_MISMATCH');
+    }
+
+    // 4. consent_records テーブルにINSERT
+    const { error } = await supabase
+      .from('consent_records')
+      .insert({
+        user_id,
+        consent_type,
+        version,
+        status: 'granted',
+        recorded_at: accepted_at,
+        client_version: client_version || null,
+        metadata: {}
+      });
+
+    if (error) {
+      // 外部キー制約エラー（user_idが存在しない）の場合は特別なエラーコード
+      if (error.code === '23503') {
+        console.warn(`[Issue #261] User not found: user_id=${user_id.substring(0, 8)}...`);
+        return errorResponse('User not found', 404, origin, allowedOrigins, 'USER_NOT_FOUND');
+      }
+      console.error('[Issue #261] Supabase insert error:', error);
+      return errorResponse('Failed to record consent', 500, origin, allowedOrigins, 'DATABASE_ERROR');
+    }
+
+    console.log(`[Issue #261] Consent recorded: user=${user_id.substring(0, 8)}..., type=${consent_type}, version=${version}`);
+
+    return successResponse({
+      success: true,
+      message: 'Consent recorded successfully'
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #261] Consent record error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
 // ============================================
 // メインハンドラ
 // ============================================
@@ -1020,6 +1152,8 @@ export default {
           return handleTranslate(request, env as TranslateEnv, origin, allowedOrigins);
         case '/api/promotion/redeem':
           return handlePromotionRedeem(request, env, origin, allowedOrigins);
+        case '/api/consent/record':
+          return handleConsentRecord(request, env, origin, allowedOrigins);
         // Note: /api/crash-report is handled earlier (before API key validation)
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');

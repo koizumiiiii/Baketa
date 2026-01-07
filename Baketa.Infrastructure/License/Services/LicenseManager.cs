@@ -98,6 +98,9 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // 初期状態はFreeプラン
         _currentState = LicenseState.Default;
 
+        // [Issue #258] 非モックモードでも起動時にプロモーション設定をチェック
+        ApplyPersistedPromotionIfValid();
+
         // レート制限セマフォ
         _refreshRateLimiter = new SemaphoreSlim(1, 1);
         _consumeRateLimiter = new SemaphoreSlim(_settings.CloudAiRateLimitPerMinute, _settings.CloudAiRateLimitPerMinute);
@@ -135,6 +138,10 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             _userId = "mock_user_" + Guid.NewGuid().ToString("N")[..8];
             _sessionToken = "mock_session_" + Guid.NewGuid().ToString("N");
 
+            // [Issue #258] 永続化されたトークン使用量を読み込み（IUnifiedSettingsService優先）
+            var persistedTokenUsage = _unifiedSettingsService?.GetPromotionSettings().MockTokenUsage ?? 0;
+            var initialTokenUsage = persistedTokenUsage > 0 ? persistedTokenUsage : _settings.MockTokenUsage;
+
             // モックモード用の初期状態を設定
             _currentState = new LicenseState
             {
@@ -143,7 +150,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 SessionId = _sessionToken,
                 ContractStartDate = DateTime.UtcNow.AddDays(-15),
                 ExpirationDate = DateTime.UtcNow.AddDays(15),
-                CloudAiTokensUsed = _settings.MockTokenUsage,
+                CloudAiTokensUsed = initialTokenUsage,
                 IsCached = false,
                 LastServerSync = DateTime.UtcNow,
                 PatreonSyncStatus = PatreonSyncStatus.Synced,
@@ -532,8 +539,11 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             _currentState = newState;
         }
 
-        // プランが変更された場合のみイベント発行
-        if (oldState.CurrentPlan != newState.CurrentPlan || reason == LicenseChangeReason.ServerRefresh)
+        // [Issue #258] プラン変更またはトークン消費時にイベント発行
+        // TokenConsumptionを追加: UI側でトークン使用量表示を更新するため
+        if (oldState.CurrentPlan != newState.CurrentPlan ||
+            reason == LicenseChangeReason.ServerRefresh ||
+            reason == LicenseChangeReason.TokenConsumption)
         {
             OnStateChanged(oldState, newState, reason);
         }
@@ -801,6 +811,80 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     #endregion
 
     #region Promotion Support (Issue #243)
+
+    /// <summary>
+    /// [Issue #258] プロモーション設定を_currentStateに適用するヘルパー
+    /// [Gemini Review] DRY原則に従い共通ロジックを抽出
+    /// </summary>
+    private void ApplyPromotionToState(PlanType plan, DateTime expiresAt, string source)
+    {
+        _currentState = _currentState with
+        {
+            CurrentPlan = plan,
+            ExpirationDate = expiresAt
+        };
+        _logger.LogInformation(
+            "🎁 [Issue #258] 起動時にプロモーション設定を適用 ({Source}): Plan={Plan}, ExpiresAt={ExpiresAt}",
+            source, plan, expiresAt);
+    }
+
+    /// <summary>
+    /// [Issue #258] 永続化されたプロモーション設定を読み込み、有効なら適用
+    /// アプリ再起動時にプロモーション設定を反映するため
+    /// </summary>
+    private void ApplyPersistedPromotionIfValid()
+    {
+        // [Issue #258] デバッグ: IUnifiedSettingsServiceの状態を確認
+        _logger.LogDebug(
+            "[Issue #258] ApplyPersistedPromotionIfValid開始: IUnifiedSettingsService={HasService}",
+            _unifiedSettingsService is not null);
+
+        // IUnifiedSettingsService経由でプロモーション設定を読み込む
+        if (_unifiedSettingsService is not null)
+        {
+            var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+
+            // [Issue #258] デバッグ: プロモーション設定の詳細
+            _logger.LogDebug(
+                "[Issue #258] プロモーション設定確認: IsActive={IsActive}, PlanType={PlanType}, ExpiresAt={ExpiresAt}",
+                promotionSettings.IsCurrentlyActive(),
+                promotionSettings.PromotionPlanType,
+                promotionSettings.PromotionExpiresAt ?? "(null)");
+
+            if (promotionSettings.IsCurrentlyActive() &&
+                promotionSettings.PromotionPlanType.HasValue &&
+                !string.IsNullOrEmpty(promotionSettings.PromotionExpiresAt) &&
+                DateTime.TryParse(promotionSettings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expiresAtUnified))
+            {
+                var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
+                ApplyPromotionToState(promotionPlan, expiresAtUnified, "Unified");
+                return;
+            }
+            else
+            {
+                _logger.LogDebug("[Issue #258] Unified設定は無効または期限切れ");
+            }
+        }
+
+        // レガシー: LicenseSettings経由のプロモーションチェック（後方互換性）
+        _logger.LogDebug(
+            "[Issue #258] レガシー設定確認: PlanType={PlanType}, ExpiresAt={ExpiresAt}",
+            _settings.PromotionPlanType,
+            _settings.PromotionExpiresAt ?? "(null)");
+
+        if (_settings.PromotionPlanType.HasValue &&
+            !string.IsNullOrEmpty(_settings.PromotionExpiresAt) &&
+            DateTime.TryParse(_settings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expiresAt) &&
+            expiresAt > DateTime.UtcNow)
+        {
+            var promotionPlan = (PlanType)_settings.PromotionPlanType.Value;
+            ApplyPromotionToState(promotionPlan, expiresAt, "Legacy");
+        }
+        else
+        {
+            _logger.LogDebug("[Issue #258] プロモーション設定なし、または期限切れ - Freeプランのまま");
+        }
+    }
 
     /// <summary>
     /// 有効なプランを決定（プロモーション優先）
