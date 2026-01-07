@@ -13,7 +13,7 @@ using NetSparkleUpdater.SignatureVerifiers;
 namespace Baketa.UI.Services;
 
 /// <summary>
-/// [Issue #249] ZIPファイルからの自動更新を処理するカスタムSparkleUpdater
+/// [Updater] ZIPファイルからの自動更新を処理するカスタムSparkleUpdater
 /// Single-file appの自動更新に対応
 /// </summary>
 public sealed class ZipSparkleUpdater : SparkleUpdater
@@ -38,6 +38,48 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
     }
 
     /// <summary>
+    /// ZIPファイルのマジックナンバー (50 4B 03 04 = "PK\x03\x04")
+    /// </summary>
+    private static readonly byte[] ZipMagicNumber = [0x50, 0x4B, 0x03, 0x04];
+
+    /// <summary>
+    /// ファイルがZIP形式かどうかをマジックナンバーで判定
+    /// NetSparkleは拡張子なしの一時ファイル名を使用するため、拡張子での判定は不可
+    /// </summary>
+    private bool IsZipFile(string filePath)
+    {
+        try
+        {
+            // File.Existsは不要。FileStreamのコンストラクタがFileNotFoundExceptionをスローするため、
+            // try-catchブロックでハンドリングできる。
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+            // ファイルサイズがマジックナンバーの長さより小さい場合はZIPではない
+            if (fs.Length < ZipMagicNumber.Length)
+            {
+                _logger?.LogDebug("[Updater] ファイルサイズが小さすぎます: {Size} bytes", fs.Length);
+                return false;
+            }
+
+            // ReadExactlyを使って確実に4バイト読み込むことを保証する
+            Span<byte> header = stackalloc byte[ZipMagicNumber.Length];
+            fs.ReadExactly(header);
+
+            var isZip = header.SequenceEqual(ZipMagicNumber);
+            _logger?.LogDebug("[Updater] マジックナンバー: {Bytes:X2} {Bytes1:X2} {Bytes2:X2} {Bytes3:X2} -> IsZip={IsZip}",
+                header[0], header[1], header[2], header[3], isZip);
+
+            return isZip;
+        }
+        catch (Exception ex)
+        {
+            // FileNotFoundExceptionやEndOfStreamExceptionなどもここでキャッチされる
+            _logger?.LogWarning(ex, "[Updater] マジックナンバー判定エラー: {Path}", filePath);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// バッチファイル内で安全に使用するためのパスエスケープ
     /// </summary>
     private static string EscapeBatchPath(string path)
@@ -56,20 +98,23 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
     /// </summary>
     protected override async Task RunDownloadedInstaller(string downloadFilePath)
     {
-        _logger?.LogInformation("[Issue #249] RunDownloadedInstaller: {Path}", downloadFilePath);
+        _logger?.LogInformation("[Updater] RunDownloadedInstaller: {Path}", downloadFilePath);
 
-        // ZIPファイルでない場合はデフォルト処理
-        if (!downloadFilePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        // ZIPファイルかどうかをマジックナンバーで判定
+        // NetSparkleは拡張子なしの一時ファイル名を使用するため、拡張子での判定は不可
+        if (!IsZipFile(downloadFilePath))
         {
-            _logger?.LogInformation("[Issue #249] ZIPファイルではないためデフォルト処理");
+            _logger?.LogInformation("[Updater] ZIPファイルではないためデフォルト処理 (マジックナンバー不一致)");
             await base.RunDownloadedInstaller(downloadFilePath).ConfigureAwait(false);
             return;
         }
 
+        _logger?.LogInformation("[Updater] ZIPファイルとして処理開始 (マジックナンバー確認済)");
+
         // 複数回の更新実行を防止
         if (Interlocked.CompareExchange(ref _isUpdating, 1, 0) != 0)
         {
-            _logger?.LogWarning("[Issue #249] 更新処理が既に実行中です");
+            _logger?.LogWarning("[Updater] 更新処理が既に実行中です");
             return;
         }
 
@@ -80,7 +125,7 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             extractDir = Path.Combine(Path.GetTempPath(), $"Baketa_Update_{Guid.NewGuid():N}");
             Directory.CreateDirectory(extractDir);
 
-            _logger?.LogInformation("[Issue #249] ZIP展開先: {Path}", extractDir);
+            _logger?.LogInformation("[Updater] ZIP展開先: {Path}", extractDir);
 
             await Task.Run(() => ZipFile.ExtractToDirectory(downloadFilePath, extractDir, overwriteFiles: true))
                 .ConfigureAwait(false);
@@ -92,7 +137,7 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             if (subDirs.Length == 1 && subDirs[0].Contains("Baketa", StringComparison.OrdinalIgnoreCase))
             {
                 sourceDir = subDirs[0];
-                _logger?.LogInformation("[Issue #249] サブディレクトリを使用: {Path}", sourceDir);
+                _logger?.LogInformation("[Updater] サブディレクトリを使用: {Path}", sourceDir);
             }
 
             // 新しい実行ファイルのパスを確認
@@ -105,14 +150,14 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
                     ?? throw new FileNotFoundException("Baketa executable not found in update package");
             }
 
-            _logger?.LogInformation("[Issue #249] 新しい実行ファイル: {Path}", newExePath);
+            _logger?.LogInformation("[Updater] 新しい実行ファイル: {Path}", newExePath);
 
             // バッチスクリプトを作成してファイルを置き換え
             var batchPath = Path.Combine(extractDir, "update.bat");
             var batchContent = CreateUpdateBatchScript(sourceDir, _appDirectory, _appExecutablePath);
             await File.WriteAllTextAsync(batchPath, batchContent).ConfigureAwait(false);
 
-            _logger?.LogInformation("[Issue #249] 更新スクリプト作成: {Path}", batchPath);
+            _logger?.LogInformation("[Updater] 更新スクリプト作成: {Path}", batchPath);
 
             // バッチスクリプトを実行（現在のプロセスが終了した後に実行される）
             var psi = new ProcessStartInfo
@@ -130,11 +175,11 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
                 throw new InvalidOperationException("Failed to start update batch script");
             }
 
-            _logger?.LogInformation("[Issue #249] 更新スクリプト起動完了 - アプリケーション終了します");
+            _logger?.LogInformation("[Updater] 更新スクリプト起動完了 - アプリケーション終了します");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "[Issue #249] ZIPアップデート失敗");
+            _logger?.LogError(ex, "[Updater] ZIPアップデート失敗");
 
             // エラー時のクリーンアップ
             if (extractDir != null && Directory.Exists(extractDir))
@@ -142,11 +187,11 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
                 try
                 {
                     Directory.Delete(extractDir, recursive: true);
-                    _logger?.LogDebug("[Issue #249] 一時ディレクトリを削除しました: {Path}", extractDir);
+                    _logger?.LogDebug("[Updater] 一時ディレクトリを削除しました: {Path}", extractDir);
                 }
                 catch (Exception cleanupEx)
                 {
-                    _logger?.LogWarning(cleanupEx, "[Issue #249] 一時ディレクトリの削除に失敗: {Path}", extractDir);
+                    _logger?.LogWarning(cleanupEx, "[Updater] 一時ディレクトリの削除に失敗: {Path}", extractDir);
                 }
             }
 
