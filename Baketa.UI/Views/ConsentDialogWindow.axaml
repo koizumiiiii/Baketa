@@ -3,9 +3,9 @@
         xmlns:vm="using:Baketa.UI.ViewModels"
         x:Class="Baketa.UI.Views.ConsentDialogWindow"
         Title="{Binding WindowTitle}"
-        Width="500"
-        MinHeight="350"
-        MaxHeight="550"
+        Width="520"
+        MinHeight="400"
+        MaxHeight="700"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
@@ -34,109 +34,114 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="24">
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,20">
-            <!-- Language Selector -->
-            <ComboBox ItemsSource="{Binding AvailableUiLanguages}"
-                      SelectedItem="{Binding SelectedUiLanguage}"
-                      HorizontalAlignment="Right"
-                      MinWidth="120"
-                      Margin="0,0,0,8">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding NativeName}"/>
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-            <Image Source="avares://Baketa/Assets/Icons/baketa-256.png"
-                   Width="64" Height="64"
-                   HorizontalAlignment="Center"
-                   Margin="0,0,0,8"/>
-            <TextBlock Text="{Binding HeaderText}"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="{Binding DescriptionText}"
-                       TextWrapping="Wrap"
-                       TextAlignment="Center"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                       HorizontalAlignment="Center"
-                       MaxWidth="400"/>
-        </StackPanel>
-
-        <!-- Privacy Policy Section -->
-        <Border Grid.Row="1"
-                IsVisible="{Binding ShowPrivacyPolicySection}"
-                Margin="0,0,0,16"
-                Padding="16"
-                Background="{DynamicResource SystemFillColorNeutralBackgroundBrush}"
-                CornerRadius="8">
-            <StackPanel Spacing="12">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="{Binding PrivacyPolicyLabel}"
+    <Grid RowDefinitions="*,Auto" Margin="24">
+        <!-- Scrollable Content -->
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="0">
+                <!-- Header -->
+                <StackPanel Spacing="8" Margin="0,0,0,20">
+                    <!-- Language Selector -->
+                    <ComboBox ItemsSource="{Binding AvailableUiLanguages}"
+                              SelectedItem="{Binding SelectedUiLanguage}"
+                              HorizontalAlignment="Right"
+                              MinWidth="120"
+                              Margin="0,0,0,8">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding NativeName}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Image Source="avares://Baketa/Assets/Icons/baketa-256.png"
+                           Width="64" Height="64"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding HeaderText}"
+                               FontSize="22"
                                FontWeight="SemiBold"
-                               FontSize="14"/>
-                    <TextBlock Text="{Binding PrivacyPolicyVersion}"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               FontSize="12"
-                               VerticalAlignment="Center"/>
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding DescriptionText}"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               MaxWidth="400"/>
                 </StackPanel>
 
-                <Button Command="{Binding OpenPrivacyPolicyCommand}"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Padding="0"
-                        HorizontalAlignment="Left">
-                    <TextBlock Text="{Binding PrivacyPolicyLinkText}"
-                               Classes="link"
-                               FontSize="13"/>
-                </Button>
+                <!-- Privacy Policy Section -->
+                <Border IsVisible="{Binding ShowPrivacyPolicySection}"
+                        Margin="0,0,0,16"
+                        Padding="16"
+                        Background="{DynamicResource SystemFillColorNeutralBackgroundBrush}"
+                        CornerRadius="8">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding PrivacyPolicyLabel}"
+                                       FontWeight="SemiBold"
+                                       FontSize="14"/>
+                            <TextBlock Text="{Binding PrivacyPolicyVersion}"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
 
-                <CheckBox IsChecked="{Binding HasAcceptedPrivacyPolicy}"
-                          Content="{Binding PrivacyPolicyCheckboxText}"/>
+                        <Button Command="{Binding OpenPrivacyPolicyCommand}"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="0"
+                                HorizontalAlignment="Left">
+                            <TextBlock Text="{Binding PrivacyPolicyLinkText}"
+                                       Classes="link"
+                                       FontSize="13"/>
+                        </Button>
+
+                        <CheckBox IsChecked="{Binding HasAcceptedPrivacyPolicy}"
+                                  Content="{Binding PrivacyPolicyCheckboxText}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Terms of Service Section -->
+                <Border IsVisible="{Binding ShowTermsOfServiceSection}"
+                        Margin="0,0,0,16"
+                        Padding="16"
+                        Background="{DynamicResource SystemFillColorNeutralBackgroundBrush}"
+                        CornerRadius="8">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding TermsOfServiceLabel}"
+                                       FontWeight="SemiBold"
+                                       FontSize="14"/>
+                            <TextBlock Text="{Binding TermsOfServiceVersion}"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <Button Command="{Binding OpenTermsOfServiceCommand}"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="0"
+                                HorizontalAlignment="Left">
+                            <TextBlock Text="{Binding TermsOfServiceLinkText}"
+                                       Classes="link"
+                                       FontSize="13"/>
+                        </Button>
+
+                        <CheckBox IsChecked="{Binding HasAcceptedTermsOfService}"
+                                  Content="{Binding TermsOfServiceCheckboxText}"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
-        </Border>
+        </ScrollViewer>
 
-        <!-- Terms of Service Section -->
-        <Border Grid.Row="2"
-                IsVisible="{Binding ShowTermsOfServiceSection}"
-                Margin="0,0,0,16"
-                Padding="16"
-                Background="{DynamicResource SystemFillColorNeutralBackgroundBrush}"
-                CornerRadius="8">
-            <StackPanel Spacing="12">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="{Binding TermsOfServiceLabel}"
-                               FontWeight="SemiBold"
-                               FontSize="14"/>
-                    <TextBlock Text="{Binding TermsOfServiceVersion}"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               FontSize="12"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-
-                <Button Command="{Binding OpenTermsOfServiceCommand}"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Padding="0"
-                        HorizontalAlignment="Left">
-                    <TextBlock Text="{Binding TermsOfServiceLinkText}"
-                               Classes="link"
-                               FontSize="13"/>
-                </Button>
-
-                <CheckBox IsChecked="{Binding HasAcceptedTermsOfService}"
-                          Content="{Binding TermsOfServiceCheckboxText}"/>
-            </StackPanel>
-        </Border>
-
-        <!-- Buttons -->
-        <StackPanel Grid.Row="4"
+        <!-- Buttons (always visible at bottom) -->
+        <StackPanel Grid.Row="1"
                     Orientation="Horizontal"
                     HorizontalAlignment="Center"
                     Spacing="16"
-                    Margin="0,8,0,0">
+                    Margin="0,16,0,0">
             <Button Classes="secondary"
                     Content="{Binding DeclineButtonText}"
                     Command="{Binding DeclineCommand}"

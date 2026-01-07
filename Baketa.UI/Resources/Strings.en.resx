@@ -1228,7 +1228,7 @@
   </data>
   <!-- [Issue #259] Loading Tips -->
   <data name="Loading_Tip_1" xml:space="preserve">
-    <value>Translates game screen text in real-time</value>
+    <value>Initial setup may take about 10 minutes. Please wait.</value>
   </data>
   <data name="Loading_Tip_2" xml:space="preserve">
     <value>Translation overlay combining OCR and machine translation</value>
@@ -1384,7 +1384,7 @@
 
   <!-- ========== Consent Dialog (Issue #261) ========== -->
   <data name="Consent_WindowTitle_Initial" xml:space="preserve">
-    <value>Privacy Policy Agreement</value>
+    <value>Terms of Service Agreement</value>
   </data>
   <data name="Consent_WindowTitle_Account" xml:space="preserve">
     <value>Terms of Service Agreement</value>
@@ -1396,7 +1396,7 @@
     <value>Create Account</value>
   </data>
   <data name="Consent_Description_Initial" xml:space="preserve">
-    <value>To use Baketa, you need to agree to our Privacy Policy.</value>
+    <value>To use Baketa, you need to agree to our Terms of Service and Privacy Policy.</value>
   </data>
   <data name="Consent_Description_Account" xml:space="preserve">
     <value>To create an account, you need to agree to our Terms of Service and Privacy Policy.</value>
@@ -1423,7 +1423,7 @@
     <value>Agree and Continue</value>
   </data>
   <data name="Consent_Button_Decline" xml:space="preserve">
-    <value>Decline</value>
+    <value>Decline and Exit</value>
   </data>
 
 </root>

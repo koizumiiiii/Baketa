@@ -114,9 +114,6 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         viewModel.Email.Should().Be(string.Empty);
         viewModel.Password.Should().Be(string.Empty);
         viewModel.ConfirmPassword.Should().Be(string.Empty);
-        viewModel.DisplayName.Should().Be(string.Empty);
-        viewModel.AcceptTerms.Should().BeFalse();
-        viewModel.AcceptPrivacyPolicy.Should().BeFalse();
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.IsLoading.Should().BeFalse();
 
@@ -191,36 +188,6 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
 
         // Assert
         viewModel.Email.Should().Be("test@example.com");
-        // Note: FodyWeavers.xmlでReactiveUIが無効化されているため、PropertyChangedイベントは発生しない
-        // プロパティの値の更新が正しく行われていることを確認
-    }
-
-    [Fact]
-    public void DisplayName_WhenSet_UpdatesProperty()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-
-        // Act
-        viewModel.DisplayName = "Test User";
-
-        // Assert
-        viewModel.DisplayName.Should().Be("Test User");
-        // Note: FodyWeavers.xmlでReactiveUIが無効化されているため、PropertyChangedイベントは発生しない
-        // プロパティの値の更新が正しく行われていることを確認
-    }
-
-    [Fact]
-    public void AcceptTerms_WhenSetToTrue_UpdatesProperty()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-
-        // Act
-        viewModel.AcceptTerms = true;
-
-        // Assert
-        viewModel.AcceptTerms.Should().BeTrue();
         // Note: FodyWeavers.xmlでReactiveUIが無効化されているため、PropertyChangedイベントは発生しない
         // プロパティの値の更新が正しく行われていることを確認
     }
@@ -425,9 +392,6 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         viewModel.Email = "test@example.com";
         viewModel.Password = "Password123";
         viewModel.ConfirmPassword = "Password123";
-        viewModel.DisplayName = "Test User";
-        viewModel.AcceptTerms = true;
-        viewModel.AcceptPrivacyPolicy = true;
     }
 
     #endregion
