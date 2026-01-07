@@ -27,8 +27,10 @@ public sealed class ServerErrorEventProcessor : IEventProcessor<ServerErrorEvent
         INotificationService notificationService,
         ILogger<ServerErrorEventProcessor> logger)
     {
-        _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        ArgumentNullException.ThrowIfNull(notificationService);
+        ArgumentNullException.ThrowIfNull(logger);
+        _notificationService = notificationService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -79,17 +81,18 @@ public sealed class ServerErrorEventProcessor : IEventProcessor<ServerErrorEvent
             eventData.Severity, eventData.Source, eventData.ErrorType, eventData.Message);
 
         // UIスレッドで通知を表示
+        // Note: UIスレッド内ではConfigureAwait(false)を使用しない（Geminiレビュー指摘）
         await Dispatcher.UIThread.InvokeAsync(async () =>
         {
             if (eventData.Severity == ErrorSeverity.Warn)
             {
                 // Warnは手動で閉じるまで表示（duration = 0）
-                await _notificationService.ShowErrorAsync(title, message, 0).ConfigureAwait(false);
+                await _notificationService.ShowErrorAsync(title, message, 0);
             }
             else
             {
                 // Cautionは10秒表示
-                await _notificationService.ShowWarningAsync(title, message, 10000).ConfigureAwait(false);
+                await _notificationService.ShowWarningAsync(title, message, 10000);
             }
         });
     }

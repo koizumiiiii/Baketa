@@ -897,8 +897,9 @@ public class PythonServerManager(
         else if (line.Contains("ModuleNotFoundError"))
         {
             // モジュール名を抽出（"No module named 'xxx'"形式）
+            // ドット付きモジュール名（例: numpy.core）にも対応（Geminiレビュー指摘）
             var moduleMatch = System.Text.RegularExpressions.Regex.Match(
-                line, @"No module named ['""]*(\w+)['""]*");
+                line, @"No module named ['""]*([\w\.]+)['""]*");
             var moduleName = moduleMatch.Success ? moduleMatch.Groups[1].Value : "unknown";
 
             errorEvent = ServerErrorEvent.CreateModuleNotFoundError(

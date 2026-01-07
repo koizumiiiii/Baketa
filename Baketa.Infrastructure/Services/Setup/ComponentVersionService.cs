@@ -9,11 +9,12 @@ namespace Baketa.Infrastructure.Services.Setup;
 /// Issue #256: ローカルコンポーネントバージョン管理サービス
 /// %LOCALAPPDATA%/Baketa/component-versions.json を管理
 /// </summary>
-public sealed class ComponentVersionService : IComponentVersionService
+public sealed class ComponentVersionService : IComponentVersionService, IDisposable
 {
     private readonly ILogger<ComponentVersionService> _logger;
     private readonly string _versionsFilePath;
     private readonly SemaphoreSlim _fileLock = new(1, 1);
+    private bool _disposed;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -151,18 +152,19 @@ public sealed class ComponentVersionService : IComponentVersionService
             return true; // 未インストール = 更新が必要
         }
 
-        try
-        {
-            var installed = ParseVersion(installedVersion);
-            var latest = ParseVersion(latestVersion);
+        var installed = TryParseVersion(installedVersion);
+        var latest = TryParseVersion(latestVersion);
 
-            return latest > installed;
-        }
-        catch
+        // パース失敗時は安全のため更新なしと判断（Geminiレビュー指摘）
+        if (installed is null || latest is null)
         {
-            // パース失敗時は文字列比較にフォールバック
-            return string.Compare(latestVersion, installedVersion, StringComparison.OrdinalIgnoreCase) > 0;
+            _logger.LogWarning(
+                "[Issue #256] バージョン比較失敗。Installed: '{Installed}', Latest: '{Latest}'",
+                installedVersion, latestVersion);
+            return false;
         }
+
+        return latest > installed;
     }
 
     /// <summary>
@@ -175,21 +177,25 @@ public sealed class ComponentVersionService : IComponentVersionService
             return true; // 要件なし
         }
 
-        try
-        {
-            var app = ParseVersion(appVersion);
-            var min = ParseVersion(minAppVersion);
+        var app = TryParseVersion(appVersion);
+        var min = TryParseVersion(minAppVersion);
 
-            return app >= min;
-        }
-        catch
+        // パース失敗時は安全のため要件を満たさないと判断（Geminiレビュー指摘）
+        if (app is null || min is null)
         {
-            // パース失敗時は満たしていると仮定
-            return true;
+            _logger.LogWarning(
+                "[Issue #256] バージョン要件チェック失敗。App: '{App}', Min: '{Min}'",
+                appVersion, minAppVersion);
+            return false;
         }
+
+        return app >= min;
     }
 
-    private static Version ParseVersion(string versionString)
+    /// <summary>
+    /// バージョン文字列をパース（TryParseパターン）
+    /// </summary>
+    private static Version? TryParseVersion(string versionString)
     {
         // "v" プレフィックスを除去
         var normalized = versionString.TrimStart('v', 'V');
@@ -201,7 +207,8 @@ public sealed class ComponentVersionService : IComponentVersionService
             normalized = normalized[..dashIndex];
         }
 
-        return Version.Parse(normalized);
+        // TryParseを使用して例外を発生させない（Geminiレビュー指摘）
+        return Version.TryParse(normalized, out var version) ? version : null;
     }
 
     private async Task<LocalComponentVersions> LoadVersionsInternalAsync(CancellationToken cancellationToken)
@@ -234,6 +241,16 @@ public sealed class ComponentVersionService : IComponentVersionService
 
         var json = JsonSerializer.Serialize(versions, JsonOptions);
         await File.WriteAllTextAsync(_versionsFilePath, json, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// リソースを解放
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _fileLock.Dispose();
+        _disposed = true;
     }
 }
 

@@ -9,11 +9,12 @@ namespace Baketa.Infrastructure.Services.Setup;
 /// Issue #256: コンポーネントマニフェスト取得サービス
 /// models-v1リリースからmanifest.jsonを取得し、キャッシュ管理
 /// </summary>
-public sealed class ManifestFetcher : IManifestFetcher
+public sealed class ManifestFetcher : IManifestFetcher, IDisposable
 {
     private readonly ILogger<ManifestFetcher> _logger;
     private readonly HttpClient _httpClient;
     private readonly SemaphoreSlim _fetchLock = new(1, 1);
+    private bool _disposed;
 
     /// <summary>
     /// マニフェストURL（raw.githubusercontent.com経由でAPI制限回避）
@@ -189,6 +190,16 @@ public sealed class ManifestFetcher : IManifestFetcher
             results.Count);
 
         return results;
+    }
+
+    /// <summary>
+    /// リソースを解放
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _fetchLock.Dispose();
+        _disposed = true;
     }
 }
 
