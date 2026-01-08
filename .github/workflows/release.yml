@@ -245,8 +245,8 @@ jobs:
         $publishDir = "./publish/Baketa-$version"
         $zipName = "Baketa-$version.zip"
 
-        # Copy additional files
-        Copy-Item "README.md" "$publishDir/" -ErrorAction SilentlyContinue
+        # Copy additional files (Issue #268: Use user-friendly README for release package)
+        Copy-Item "docs/release/README.md" "$publishDir/" -ErrorAction SilentlyContinue
         Copy-Item "LICENSE" "$publishDir/" -ErrorAction SilentlyContinue
 
         # Create zip package
