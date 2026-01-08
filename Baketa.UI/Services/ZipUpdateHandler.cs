@@ -152,9 +152,12 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
 
             _logger?.LogInformation("[Updater] 新しい実行ファイル: {Path}", newExePath);
 
-            // バッチスクリプトを作成してファイルを置き換え
-            var batchPath = Path.Combine(extractDir, "update.bat");
-            var batchContent = CreateUpdateBatchScript(sourceDir, _appDirectory, _appExecutablePath);
+            // バッチスクリプトを別の一時ディレクトリに作成
+            // 重要: スクリプトがextractDirを削除するため、スクリプト自体はextractDir外に配置する必要がある
+            var batchDir = Path.Combine(Path.GetTempPath(), $"Baketa_UpdateScript_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(batchDir);
+            var batchPath = Path.Combine(batchDir, "update.bat");
+            var batchContent = CreateUpdateBatchScript(sourceDir, _appDirectory, _appExecutablePath, extractDir, batchDir);
             await File.WriteAllTextAsync(batchPath, batchContent).ConfigureAwait(false);
 
             _logger?.LogInformation("[Updater] 更新スクリプト作成: {Path}", batchPath);
@@ -203,7 +206,12 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
     /// <summary>
     /// 更新用バッチスクリプトを生成
     /// </summary>
-    private string CreateUpdateBatchScript(string sourceDir, string targetDir, string appExePath)
+    /// <param name="sourceDir">展開されたファイルのソースディレクトリ</param>
+    /// <param name="targetDir">アプリのインストール先ディレクトリ</param>
+    /// <param name="appExePath">アプリの実行ファイルパス</param>
+    /// <param name="extractDir">ZIP展開先ディレクトリ（削除対象）</param>
+    /// <param name="batchDir">バッチスクリプトのディレクトリ（自己削除対象）</param>
+    private string CreateUpdateBatchScript(string sourceDir, string targetDir, string appExePath, string extractDir, string batchDir)
     {
         var processId = Environment.ProcessId;
         var appExeName = Path.GetFileName(appExePath);
@@ -212,13 +220,14 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
         var escapedSourceDir = EscapeBatchPath(sourceDir);
         var escapedTargetDir = EscapeBatchPath(targetDir);
         var escapedAppExePath = EscapeBatchPath(appExePath);
-        var escapedTempDir = EscapeBatchPath(Path.GetDirectoryName(sourceDir) ?? sourceDir);
+        var escapedExtractDir = EscapeBatchPath(extractDir);
+        var escapedBatchDir = EscapeBatchPath(batchDir);
 
         // バッチスクリプト：
         // 1. 現在のプロセスが終了するまで待機
         // 2. 新しいファイルをコピー（リトライ付き）
         // 3. アプリを再起動
-        // 4. 一時ファイルを削除
+        // 4. 一時ファイルを削除（extractDirとbatchDir）
 
         return $"""
             @echo off
@@ -260,12 +269,15 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
 
             echo Update complete. Restarting application...
 
-            :: アプリを再起動
+            :: アプリを再起動（startコマンドは非同期で実行されるため、後続のクリーンアップに影響しない）
             start "" "{escapedAppExePath}"
 
-            :: 一時ファイルを削除（少し待ってから）
-            timeout /t 2 /nobreak > nul
-            rd /s /q "{escapedTempDir}" 2>nul
+            :: 展開先ディレクトリを削除
+            rd /s /q "{escapedExtractDir}" 2>nul
+
+            :: バッチスクリプト自身のディレクトリを削除（自己削除）
+            :: cmd.exeはバッチファイルを読み込んで実行するため、ファイル削除後も実行継続可能
+            rd /s /q "{escapedBatchDir}" 2>nul
 
             exit /b 0
             """;
