@@ -21,6 +21,7 @@ using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
+using Baketa.Infrastructure.Analytics;
 using Baketa.Infrastructure.Imaging.ChangeDetection;
 using Baketa.Infrastructure.Logging;
 using Baketa.Infrastructure.OCR;
@@ -1410,6 +1411,20 @@ public class InfrastructureModule : ServiceModuleBase
         });
 
         // 設定値のログ出力はファクトリー内のILoggerで実行されます
+
+        // [Issue #256] Phase 3.5: ComponentInstallerService登録
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IComponentInstallerService>(provider =>
+        {
+            var logger = provider.GetRequiredService<ILogger<ComponentInstallerService>>();
+            var versionService = provider.GetRequiredService<IComponentVersionService>();
+            return new ComponentInstallerService(logger, versionService);
+        });
+        Console.WriteLine("✅ [Issue #256] ComponentInstallerService登録完了");
+
+        // [Issue #269] UsageAnalyticsService登録
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IUsageAnalyticsService,
+            Baketa.Infrastructure.Analytics.UsageAnalyticsService>();
+        Console.WriteLine("✅ [Issue #269] UsageAnalyticsService登録完了");
     }
 
     /// <summary>

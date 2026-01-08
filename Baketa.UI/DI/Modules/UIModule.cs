@@ -178,11 +178,19 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<IEventProcessor<Baketa.Core.Events.ServerErrorEvent>>(
             provider => provider.GetRequiredService<Baketa.UI.Events.ServerErrorEventProcessor>());
 
+        // Issue #269: AnalyticsEventProcessor登録 - 翻訳完了時の使用統計記録
+        services.AddSingleton<AnalyticsEventProcessor>();
+        services.AddSingleton<IEventProcessor<Baketa.Core.Events.TranslationEvents.TranslationCompletedEvent>>(
+            provider => provider.GetRequiredService<AnalyticsEventProcessor>());
+
         // 🔐 [Issue #168] TokenExpirationHandler - トークン失効時の処理ハンドラー
         services.AddSingleton<TokenExpirationHandler>();
 
         // 🔔 [Issue #78 Phase 5] TokenUsageAlertService - トークン使用量80%/90%/100%警告通知
         services.AddSingleton<TokenUsageAlertService>();
+
+        // 🔄 [Issue #256] ComponentUpdateNotificationService - コンポーネント更新通知UI
+        services.AddSingleton<IComponentUpdateNotificationService, ComponentUpdateNotificationService>();
 
         // ウィンドウ管理
         // 例: services.AddSingleton<IWindowService, AvaloniaWindowService>();

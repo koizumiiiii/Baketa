@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Baketa.Core.Abstractions.Services;
 
 namespace Baketa.Infrastructure.Services.Setup.Models;
 
@@ -47,8 +48,9 @@ public sealed class InstalledComponentInfo
 
 /// <summary>
 /// コンポーネント更新チェック結果
+/// IComponentUpdateCheckResultを実装し、UI層がCore層の抽象に依存できるようにする
 /// </summary>
-public sealed class ComponentUpdateCheckResult
+public sealed class ComponentUpdateCheckResult : IComponentUpdateCheckResult
 {
     /// <summary>
     /// コンポーネントID

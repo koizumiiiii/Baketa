@@ -593,4 +593,29 @@ public static class Strings
     public static string Consent_TermsOfService_Checkbox => GetString("Consent_TermsOfService_Checkbox");
     public static string Consent_Button_Accept => GetString("Consent_Button_Accept");
     public static string Consent_Button_Decline => GetString("Consent_Button_Decline");
+
+    // ========== [Issue #256] Component Update Dialog ==========
+    public static string ComponentUpdate_WindowTitle => GetString("ComponentUpdate_WindowTitle");
+    public static string ComponentUpdate_HeaderText => GetString("ComponentUpdate_HeaderText");
+    public static string ComponentUpdate_Description => GetString("ComponentUpdate_Description");
+    public static string ComponentUpdate_TotalSize => GetString("ComponentUpdate_TotalSize");
+    public static string ComponentUpdate_VersionFormat => GetString("ComponentUpdate_VersionFormat");
+    public static string ComponentUpdate_NotInstalled => GetString("ComponentUpdate_NotInstalled");
+    public static string ComponentUpdate_SizeFormat => GetString("ComponentUpdate_SizeFormat");
+    public static string ComponentUpdate_UpdateNowButton => GetString("ComponentUpdate_UpdateNowButton");
+    public static string ComponentUpdate_RemindLaterButton => GetString("ComponentUpdate_RemindLaterButton");
+    public static string ComponentUpdate_SkipButton => GetString("ComponentUpdate_SkipButton");
+    public static string ComponentUpdate_CancelButton => GetString("ComponentUpdate_CancelButton");
+    public static string ComponentUpdate_CloseButton => GetString("ComponentUpdate_CloseButton");
+    public static string ComponentUpdate_Status_Pending => GetString("ComponentUpdate_Status_Pending");
+    public static string ComponentUpdate_Status_Downloading => GetString("ComponentUpdate_Status_Downloading");
+    public static string ComponentUpdate_Status_Installing => GetString("ComponentUpdate_Status_Installing");
+    public static string ComponentUpdate_Status_Completed => GetString("ComponentUpdate_Status_Completed");
+    public static string ComponentUpdate_Status_Failed => GetString("ComponentUpdate_Status_Failed");
+    public static string ComponentUpdate_Status_Skipped => GetString("ComponentUpdate_Status_Skipped");
+    public static string ComponentUpdate_AllCompleted => GetString("ComponentUpdate_AllCompleted");
+    public static string ComponentUpdate_SomeFailed => GetString("ComponentUpdate_SomeFailed");
+    public static string ComponentUpdate_InsufficientDiskSpace => GetString("ComponentUpdate_InsufficientDiskSpace");
+    public static string ComponentUpdate_NoUpdatesAvailable => GetString("ComponentUpdate_NoUpdatesAvailable");
+    public static string ComponentUpdate_CheckingForUpdates => GetString("ComponentUpdate_CheckingForUpdates");
 }

@@ -1,0 +1,143 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        x:Class="Baketa.UI.Views.ComponentUpdateDialogWindow"
+        Title="{Binding WindowTitle}"
+        Width="560"
+        Height="500"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True"
+        Topmost="True"
+        x:DataType="vm:ComponentUpdateDialogViewModel">
+
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="MinWidth" Value="100"/>
+        </Style>
+        <Style Selector="CheckBox">
+            <Setter Property="Margin" Value="0,4"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="20">
+        <!-- ヘッダー -->
+        <StackPanel Grid.Row="0" Spacing="8">
+            <TextBlock Text="{Binding HeaderText}"
+                       FontSize="18"
+                       FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding DescriptionText}"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+        </StackPanel>
+
+        <!-- コンポーネントリスト -->
+        <Border Grid.Row="1"
+                Margin="0,16"
+                BorderBrush="{DynamicResource TextControlBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Background="{DynamicResource SettingsCardBackground}">
+            <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding AvailableUpdates}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ComponentUpdateItem">
+                            <Border Padding="12,10"
+                                    BorderBrush="{DynamicResource TextControlBorderBrush}"
+                                    BorderThickness="0,0,0,1">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <!-- チェックボックス -->
+                                    <CheckBox Grid.Column="0"
+                                              IsChecked="{Binding IsSelected}"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,12,0"/>
+
+                                    <!-- コンポーネント情報 -->
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   FontWeight="Medium"
+                                                   FontSize="14"/>
+                                        <TextBlock Text="{Binding VersionText}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding SizeText}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding Changelog}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   IsVisible="{Binding Changelog, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    </StackPanel>
+
+                                    <!-- ステータス/進捗 -->
+                                    <StackPanel Grid.Column="2"
+                                                VerticalAlignment="Center"
+                                                Width="100"
+                                                Margin="12,0,0,0">
+                                        <!-- 進捗バー (ダウンロード中のみ表示) -->
+                                        <ProgressBar Value="{Binding DownloadProgress}"
+                                                     Maximum="1"
+                                                     Height="4"
+                                                     IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:ComponentUpdateStatus.Downloading}}"/>
+                                        <!-- ステータステキスト -->
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   FontSize="11"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- 合計サイズとステータス -->
+        <StackPanel Grid.Row="2" Spacing="4" Margin="0,0,0,16">
+            <TextBlock Text="{Binding TotalDownloadSizeText}"
+                       FontWeight="Medium"/>
+            <TextBlock Text="{Binding StatusMessage}"
+                       IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
+        </StackPanel>
+
+        <!-- ボタン -->
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+            <!-- 左側: スキップボタン (更新前のみ表示) -->
+            <Button Grid.Column="0"
+                    Content="{Binding SkipButtonText}"
+                    Command="{Binding SkipCommand}"
+                    IsVisible="{Binding !IsComplete}"/>
+
+            <!-- 右側: アクションボタン -->
+            <Button Grid.Column="2"
+                    Content="{Binding RemindLaterButtonText}"
+                    Command="{Binding RemindLaterCommand}"
+                    IsVisible="{Binding !IsComplete}"
+                    Margin="0,0,8,0"/>
+
+            <!-- 更新ボタン (更新前) -->
+            <Button Grid.Column="3"
+                    Content="{Binding UpdateNowButtonText}"
+                    Command="{Binding UpdateNowCommand}"
+                    IsVisible="{Binding !IsComplete}"
+                    Classes="accent"/>
+
+            <!-- キャンセルボタン (更新中) -->
+            <Button Grid.Column="3"
+                    Content="{Binding CancelButtonText}"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding IsUpdating}"/>
+
+            <!-- 閉じるボタン (完了後) -->
+            <Button Grid.Column="4"
+                    Content="{Binding CloseButtonText}"
+                    Command="{Binding CloseCommand}"
+                    IsVisible="{Binding IsComplete}"
+                    Classes="accent"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baketa - 認証処理中...</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 48px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 24px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+        h1 {
+            color: #333;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .error {
+            display: none;
+            background: #fff3f3;
+            border: 1px solid #ffcdd2;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+        .error p {
+            color: #c62828;
+        }
+    </style>
+    <script>
+        (function() {
+            'use strict';
+
+            // URLフラグメントからパラメータを取得
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const type = params.get('type');
+
+            // デバッグ用（本番では削除可能）
+            console.log('[Baketa Auth Router] type:', type);
+            console.log('[Baketa Auth Router] hash:', hash);
+
+            // ベースパス（GitHub Pages用）
+            const basePath = '/Baketa/pages/auth';
+
+            // タイプ別ルーティングマップ
+            const routes = {
+                'signup': '/confirm/',           // 新規登録確認
+                'invite': '/invite/',            // ユーザー招待
+                'magiclink': '/magic-link/',     // Magic Link認証
+                'email_change': '/email-changed/', // メールアドレス変更
+                'recovery': '/reset-password/'   // パスワードリセット
+            };
+
+            // ルーティング実行
+            if (type && routes[type]) {
+                // トークン情報を維持してリダイレクト
+                const targetUrl = basePath + routes[type] + window.location.hash;
+                console.log('[Baketa Auth Router] Redirecting to:', targetUrl);
+                window.location.replace(targetUrl);
+            } else if (type) {
+                // 未知のtypeの場合はconfirmにフォールバック
+                console.warn('[Baketa Auth Router] Unknown type:', type, '- falling back to confirm');
+                window.location.replace(basePath + '/confirm/' + window.location.hash);
+            } else if (hash) {
+                // typeがないがhashがある場合もconfirmにフォールバック
+                console.warn('[Baketa Auth Router] No type found - falling back to confirm');
+                window.location.replace(basePath + '/confirm/' + window.location.hash);
+            }
+            // hashがない場合はこのページを表示（エラー状態）
+        })();
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <div class="logo">Baketa</div>
+        <h1>認証処理中...</h1>
+        <p>自動的にリダイレクトされます。<br>しばらくお待ちください。</p>
+
+        <div class="error" id="errorMessage">
+            <p>リダイレクトに失敗しました。<br>このページを閉じて、再度メール内のリンクをクリックしてください。</p>
+        </div>
+    </div>
+
+    <script>
+        // 3秒後もリダイレクトされていない場合はエラー表示
+        setTimeout(function() {
+            if (window.location.pathname.includes('/callback/')) {
+                document.getElementById('errorMessage').style.display = 'block';
+                document.querySelector('.spinner').style.display = 'none';
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

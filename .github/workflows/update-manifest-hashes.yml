@@ -1,0 +1,112 @@
+name: Update Manifest SHA256 Hashes
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to update manifest for'
+        required: true
+        default: 'models-v1'
+
+jobs:
+  update-hashes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          mkdir -p assets
+          cd assets
+
+          # Download all assets from the release
+          gh release download "$RELEASE_TAG" --repo ${{ github.repository }}
+
+          # List downloaded files
+          echo "Downloaded assets:"
+          ls -la
+
+      - name: Calculate SHA256 hashes
+        run: |
+          cd assets
+
+          # Calculate hashes for all files using find for robustness
+          echo "Calculating SHA256 hashes..."
+          find . -maxdepth 1 -type f -print0 | while IFS= read -r -d '' file; do
+            # Remove ./ prefix from find output
+            local_file="${file#./}"
+            hash=$(sha256sum "$local_file" | cut -d' ' -f1)
+            echo "$local_file: $hash"
+            echo "${local_file}=${hash}" >> ../hashes.txt
+          done
+
+          cat ../hashes.txt
+
+      - name: Update manifest.json with hashes
+        run: |
+          # Read manifest
+          MANIFEST_PATH="docs/models-v1/manifest.json"
+
+          # Update each hash in the manifest
+          while IFS='=' read -r filename hash; do
+            echo "Updating hash for $filename: $hash"
+
+            # Use jq to update the sha256 field for matching filename
+            # This handles the nested structure properly
+            tmp=$(mktemp)
+            jq --arg filename "$filename" --arg hash "$hash" '
+              .components |= with_entries(
+                .value.variants |= with_entries(
+                  .value.files |= map(
+                    if .filename == $filename then .sha256 = $hash else . end
+                  )
+                )
+              )
+            ' "$MANIFEST_PATH" > "$tmp" && mv "$tmp" "$MANIFEST_PATH"
+          done < hashes.txt
+
+          # Update lastUpdated timestamp
+          tmp=$(mktemp)
+          jq --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.lastUpdated = $ts' "$MANIFEST_PATH" > "$tmp" && mv "$tmp" "$MANIFEST_PATH"
+
+          # Show updated manifest
+          echo "Updated manifest.json:"
+          cat "$MANIFEST_PATH"
+
+      - name: Commit updated manifest
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add docs/models-v1/manifest.json
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: Update manifest.json SHA256 hashes for $RELEASE_TAG"
+            git push
+          fi
+
+      - name: Upload manifest to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          # Delete existing manifest if present
+          gh release delete-asset "$RELEASE_TAG" manifest.json --yes --repo ${{ github.repository }} 2>/dev/null || true
+
+          # Upload updated manifest
+          gh release upload "$RELEASE_TAG" docs/models-v1/manifest.json --repo ${{ github.repository }}
+
+          echo "Manifest uploaded to release $RELEASE_TAG"

@@ -91,6 +91,7 @@ export interface Env {
   OPENAI_MODEL?: string;     // OpenAIモデル名（デフォルト: gpt-4.1-nano）
   SUPABASE_URL?: string;     // プロモーションコード検証用
   SUPABASE_SERVICE_KEY?: string;  // プロモーションコード検証用
+  ANALYTICS_API_KEY?: string;  // Issue #269: 使用統計収集用APIキー
 }
 
 interface SessionData {
@@ -121,6 +122,17 @@ interface CachedMembership {
 interface RateLimitData {
   count: number;
   windowStart: number;
+}
+
+/** Issue #269: 使用統計イベント */
+interface UsageEvent {
+  session_id: string;
+  user_id?: string;
+  event_type: string;
+  event_data?: Record<string, unknown>;
+  schema_version: number;
+  app_version: string;
+  occurred_at: string;  // ISO 8601
 }
 
 /** Patreon OAuth トークンレスポンス */
@@ -1071,6 +1083,108 @@ async function handleConsentRecord(
   }
 }
 
+/**
+ * Issue #269: 使用統計イベント収集
+ * POST /api/analytics/events
+ *
+ * クライアントから送信された使用統計イベントをSupabaseに保存。
+ * - 独自のAPIキー認証（ANALYTICS_API_KEY）
+ * - CloudflareのCF-IPCountryヘッダーから国コードを取得
+ * - バッチ送信対応（最大1000件）
+ */
+async function handleAnalyticsEvents(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  // 1. APIキー認証
+  const apiKey = request.headers.get('X-Analytics-Key');
+  if (!env.ANALYTICS_API_KEY) {
+    console.error('[Issue #269] ANALYTICS_API_KEY not configured');
+    return errorResponse('Analytics service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+  }
+  if (!apiKey || apiKey !== env.ANALYTICS_API_KEY) {
+    return errorResponse('Unauthorized', 401, origin, allowedOrigins, 'INVALID_API_KEY');
+  }
+
+  // 2. レートリミット（IP単位）
+  const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const rateLimit = await checkRateLimit(env, `analytics:${clientIP}`, 120);  // 1分間に120リクエストまで
+  if (rateLimit.limited) {
+    return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+  }
+
+  try {
+    // 3. リクエストボディのパース
+    const events: UsageEvent[] = await request.json();
+
+    // 4. バリデーション
+    if (!Array.isArray(events)) {
+      return errorResponse('Request body must be an array', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+    }
+    if (events.length === 0) {
+      return errorResponse('No events provided', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+    }
+    if (events.length > 1000) {
+      return errorResponse('Too many events (max 1000)', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+    }
+
+    // 各イベントの必須フィールドチェック
+    for (const event of events) {
+      if (!event.session_id || !event.event_type || !event.app_version || !event.occurred_at) {
+        return errorResponse('Missing required fields in event', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+      }
+    }
+
+    // 5. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #269] Supabase not configured for analytics');
+      return errorResponse('Analytics service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 6. 国コード取得（Cloudflare自動付与）
+    const countryCode = (request as Request & { cf?: { country?: string } }).cf?.country || 'UNKNOWN';
+
+    // 7. イベントにcountry_codeを付与してSupabaseに挿入
+    const eventsWithCountry = events.map(event => ({
+      session_id: event.session_id,
+      user_id: event.user_id || null,
+      event_type: event.event_type,
+      event_data: event.event_data || null,
+      schema_version: event.schema_version || 1,
+      app_version: event.app_version,
+      country_code: countryCode,
+      occurred_at: event.occurred_at,
+    }));
+
+    const { error } = await supabase
+      .from('usage_events')
+      .insert(eventsWithCountry);
+
+    if (error) {
+      console.error('[Issue #269] Supabase insert error:', error);
+      return errorResponse('Failed to store events', 500, origin, allowedOrigins, 'DATABASE_ERROR');
+    }
+
+    console.log(`[Issue #269] Analytics events stored: count=${events.length}, country=${countryCode}, ip=${clientIP.substring(0, 8)}...`);
+
+    return successResponse({
+      success: true,
+      stored_count: events.length,
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #269] Analytics error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
 // ============================================
 // メインハンドラ
 // ============================================
@@ -1107,6 +1221,11 @@ export default {
     // 独自のレートリミットを持つ
     if (url.pathname === '/api/crash-report') {
       return handleCrashReport(request, env as CrashReportEnv, origin, allowedOrigins);
+    }
+
+    // Issue #269: 使用統計収集（独自のAPIキー認証）
+    if (url.pathname === '/api/analytics/events') {
+      return handleAnalyticsEvents(request, env, origin, allowedOrigins);
     }
 
     // 環境変数検証
