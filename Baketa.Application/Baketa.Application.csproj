@@ -13,6 +13,11 @@
 		<NoWarn>$(NoWarn);CA1848;CA1711</NoWarn>
 	</PropertyGroup>
 
+	<!-- 配布版判定用コンパイル時シンボル（Release時はGPU自動セットアップをスキップ） -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DefineConstants>$(DefineConstants);IS_DISTRIBUTION</DefineConstants>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
