@@ -178,6 +178,11 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<IEventProcessor<Baketa.Core.Events.ServerErrorEvent>>(
             provider => provider.GetRequiredService<Baketa.UI.Events.ServerErrorEventProcessor>());
 
+        // Issue #269: AnalyticsEventProcessor登録 - 翻訳完了時の使用統計記録
+        services.AddSingleton<AnalyticsEventProcessor>();
+        services.AddSingleton<IEventProcessor<Baketa.Core.Events.TranslationEvents.TranslationCompletedEvent>>(
+            provider => provider.GetRequiredService<AnalyticsEventProcessor>());
+
         // 🔐 [Issue #168] TokenExpirationHandler - トークン失効時の処理ハンドラー
         services.AddSingleton<TokenExpirationHandler>();
 

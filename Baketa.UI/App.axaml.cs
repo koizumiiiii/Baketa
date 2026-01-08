@@ -1,5 +1,6 @@
 #pragma warning disable CS0618 // Type or member is obsolete
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading;
@@ -34,6 +35,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 {
     private ILogger<App>? _logger;
     private IEventAggregator? _eventAggregator;
+    private IUsageAnalyticsService? _usageAnalyticsService;  // Issue #269
     private bool _disposed;
 
     // アプリケーションアイコンのパス定数 (Issue #179)
@@ -563,6 +565,27 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         _ = _eventAggregator?.PublishAsync(new ApplicationStartupEvent());
                         _logStartupCompleted(_logger, null);
 
+                        // --- 5.2 [Issue #269] 使用統計 session_start イベント記録 ---
+                        try
+                        {
+                            _usageAnalyticsService = serviceProvider.GetService<IUsageAnalyticsService>();
+                            if (_usageAnalyticsService?.IsEnabled == true)
+                            {
+                                var sessionData = new Dictionary<string, object>
+                                {
+                                    ["os_version"] = Environment.OSVersion.VersionString,
+                                    ["runtime_version"] = Environment.Version.ToString(),
+                                    ["app_version"] = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0"
+                                };
+                                _usageAnalyticsService.TrackEvent("session_start", sessionData);
+                                _logger?.LogDebug("[Issue #269] session_start イベント記録完了");
+                            }
+                        }
+                        catch (Exception analyticsEx)
+                        {
+                            _logger?.LogWarning(analyticsEx, "[Issue #269] session_start イベント記録失敗（継続）");
+                        }
+
                         desktop.ShutdownRequested += OnShutdownRequested;
                         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
                     }
@@ -629,6 +652,19 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 catch (Exception singleshotEx)
                 {
                     _logger?.LogWarning(singleshotEx, "SingleshotEventProcessor登録失敗");
+                }
+
+                // 📊 [Issue #269] AnalyticsEventProcessor登録 - 翻訳イベントの使用統計記録
+                try
+                {
+                    var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
+                    var analyticsProcessor = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.TranslationEvents.TranslationCompletedEvent>>();
+                    eventAggregator.Subscribe<Baketa.Core.Events.TranslationEvents.TranslationCompletedEvent>(analyticsProcessor);
+                    Console.WriteLine("✅ AnalyticsEventProcessor登録完了");
+                }
+                catch (Exception analyticsEx)
+                {
+                    _logger?.LogWarning(analyticsEx, "[Issue #269] AnalyticsEventProcessor登録失敗（継続）");
                 }
 
                 // 🔔 [Issue #78 Phase 5] TokenUsageAlertService初期化
@@ -1269,6 +1305,33 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         try
         {
             _logger?.LogInformation("アプリケーションシャットダウン要求を受信");
+
+            // [Issue #269] 使用統計 session_end イベント記録とフラッシュ
+            // [Gemini Review] UIスレッドデッドロック回避のため Task.Run で実行
+            try
+            {
+                if (_usageAnalyticsService?.IsEnabled == true)
+                {
+                    _usageAnalyticsService.TrackEvent("session_end");
+                    // バックグラウンドスレッドで同期待機（UIスレッドブロック回避）
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _usageAnalyticsService.FlushAsync().ConfigureAwait(false);
+                        }
+                        catch (Exception flushEx)
+                        {
+                            _logger?.LogWarning(flushEx, "[Issue #269] FlushAsync失敗（継続）");
+                        }
+                    }).Wait(TimeSpan.FromSeconds(5));  // 最大5秒待機
+                    _logger?.LogDebug("[Issue #269] session_end イベント記録・フラッシュ完了");
+                }
+            }
+            catch (Exception analyticsEx)
+            {
+                _logger?.LogWarning(analyticsEx, "[Issue #269] session_end 処理失敗（継続）");
+            }
 
             // [Issue #249] UpdateServiceの破棄
             try
