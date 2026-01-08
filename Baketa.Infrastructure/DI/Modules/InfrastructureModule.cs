@@ -409,6 +409,12 @@ public class InfrastructureModule : ServiceModuleBase
         // services.AddSingleton<ITranslationService, DefaultTranslationService>(); // TranslationServiceExtensions.AddTranslationServices()で登録
 
         Console.WriteLine("✅ Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録完了");
+
+        // 🆕 Issue #273: Cloud翻訳可用性統合サービス
+        // ライセンス状態とユーザー設定を統合して一貫した可用性判定を提供
+        services.AddSingleton<Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService,
+            Baketa.Infrastructure.Translation.Services.CloudTranslationAvailabilityService>();
+        Console.WriteLine("✅ [Issue #273] CloudTranslationAvailabilityService登録完了 - ライセンス×設定統合");
     }
 
     /// <summary>
