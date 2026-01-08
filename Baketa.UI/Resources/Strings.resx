@@ -1426,4 +1426,75 @@
     <value>同意せず終了</value>
   </data>
 
+  <!-- ========== Component Update Dialog [Issue #256] ========== -->
+  <data name="ComponentUpdate_WindowTitle" xml:space="preserve">
+    <value>コンポーネント更新</value>
+  </data>
+  <data name="ComponentUpdate_HeaderText" xml:space="preserve">
+    <value>コンポーネントの更新が利用可能です</value>
+  </data>
+  <data name="ComponentUpdate_Description" xml:space="preserve">
+    <value>以下のコンポーネントに新しいバージョンがあります。更新しますか？</value>
+  </data>
+  <data name="ComponentUpdate_TotalSize" xml:space="preserve">
+    <value>合計ダウンロードサイズ: {0}</value>
+  </data>
+  <data name="ComponentUpdate_VersionFormat" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="ComponentUpdate_NotInstalled" xml:space="preserve">
+    <value>未インストール → {0}</value>
+  </data>
+  <data name="ComponentUpdate_SizeFormat" xml:space="preserve">
+    <value>サイズ: {0}</value>
+  </data>
+  <data name="ComponentUpdate_UpdateNowButton" xml:space="preserve">
+    <value>今すぐ更新</value>
+  </data>
+  <data name="ComponentUpdate_RemindLaterButton" xml:space="preserve">
+    <value>後で通知</value>
+  </data>
+  <data name="ComponentUpdate_SkipButton" xml:space="preserve">
+    <value>このバージョンをスキップ</value>
+  </data>
+  <data name="ComponentUpdate_CancelButton" xml:space="preserve">
+    <value>キャンセル</value>
+  </data>
+  <data name="ComponentUpdate_CloseButton" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
+  <data name="ComponentUpdate_Status_Pending" xml:space="preserve">
+    <value>待機中</value>
+  </data>
+  <data name="ComponentUpdate_Status_Downloading" xml:space="preserve">
+    <value>ダウンロード中...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Installing" xml:space="preserve">
+    <value>インストール中...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Completed" xml:space="preserve">
+    <value>完了</value>
+  </data>
+  <data name="ComponentUpdate_Status_Failed" xml:space="preserve">
+    <value>失敗</value>
+  </data>
+  <data name="ComponentUpdate_Status_Skipped" xml:space="preserve">
+    <value>スキップ</value>
+  </data>
+  <data name="ComponentUpdate_AllCompleted" xml:space="preserve">
+    <value>すべてのコンポーネントの更新が完了しました</value>
+  </data>
+  <data name="ComponentUpdate_SomeFailed" xml:space="preserve">
+    <value>一部のコンポーネントの更新に失敗しました</value>
+  </data>
+  <data name="ComponentUpdate_InsufficientDiskSpace" xml:space="preserve">
+    <value>ディスク容量が不足しています（必要: {0}、空き: {1}）</value>
+  </data>
+  <data name="ComponentUpdate_NoUpdatesAvailable" xml:space="preserve">
+    <value>すべてのコンポーネントは最新です</value>
+  </data>
+  <data name="ComponentUpdate_CheckingForUpdates" xml:space="preserve">
+    <value>更新を確認中...</value>
+  </data>
+
 </root>

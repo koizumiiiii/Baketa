@@ -184,6 +184,9 @@ internal sealed class UIModule : ServiceModuleBase
         // 🔔 [Issue #78 Phase 5] TokenUsageAlertService - トークン使用量80%/90%/100%警告通知
         services.AddSingleton<TokenUsageAlertService>();
 
+        // 🔄 [Issue #256] ComponentUpdateNotificationService - コンポーネント更新通知UI
+        services.AddSingleton<IComponentUpdateNotificationService, ComponentUpdateNotificationService>();
+
         // ウィンドウ管理
         // 例: services.AddSingleton<IWindowService, AvaloniaWindowService>();
 

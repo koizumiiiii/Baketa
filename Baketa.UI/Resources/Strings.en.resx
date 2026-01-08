@@ -1426,4 +1426,75 @@
     <value>Decline and Exit</value>
   </data>
 
+  <!-- ========== Component Update Dialog [Issue #256] ========== -->
+  <data name="ComponentUpdate_WindowTitle" xml:space="preserve">
+    <value>Component Update</value>
+  </data>
+  <data name="ComponentUpdate_HeaderText" xml:space="preserve">
+    <value>Component updates are available</value>
+  </data>
+  <data name="ComponentUpdate_Description" xml:space="preserve">
+    <value>New versions are available for the following components. Would you like to update?</value>
+  </data>
+  <data name="ComponentUpdate_TotalSize" xml:space="preserve">
+    <value>Total download size: {0}</value>
+  </data>
+  <data name="ComponentUpdate_VersionFormat" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="ComponentUpdate_NotInstalled" xml:space="preserve">
+    <value>Not installed → {0}</value>
+  </data>
+  <data name="ComponentUpdate_SizeFormat" xml:space="preserve">
+    <value>Size: {0}</value>
+  </data>
+  <data name="ComponentUpdate_UpdateNowButton" xml:space="preserve">
+    <value>Update Now</value>
+  </data>
+  <data name="ComponentUpdate_RemindLaterButton" xml:space="preserve">
+    <value>Remind Later</value>
+  </data>
+  <data name="ComponentUpdate_SkipButton" xml:space="preserve">
+    <value>Skip This Version</value>
+  </data>
+  <data name="ComponentUpdate_CancelButton" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="ComponentUpdate_CloseButton" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="ComponentUpdate_Status_Pending" xml:space="preserve">
+    <value>Pending</value>
+  </data>
+  <data name="ComponentUpdate_Status_Downloading" xml:space="preserve">
+    <value>Downloading...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Installing" xml:space="preserve">
+    <value>Installing...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Completed" xml:space="preserve">
+    <value>Completed</value>
+  </data>
+  <data name="ComponentUpdate_Status_Failed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="ComponentUpdate_Status_Skipped" xml:space="preserve">
+    <value>Skipped</value>
+  </data>
+  <data name="ComponentUpdate_AllCompleted" xml:space="preserve">
+    <value>All component updates completed</value>
+  </data>
+  <data name="ComponentUpdate_SomeFailed" xml:space="preserve">
+    <value>Some component updates failed</value>
+  </data>
+  <data name="ComponentUpdate_InsufficientDiskSpace" xml:space="preserve">
+    <value>Insufficient disk space (Required: {0}, Available: {1})</value>
+  </data>
+  <data name="ComponentUpdate_NoUpdatesAvailable" xml:space="preserve">
+    <value>All components are up to date</value>
+  </data>
+  <data name="ComponentUpdate_CheckingForUpdates" xml:space="preserve">
+    <value>Checking for updates...</value>
+  </data>
+
 </root>
