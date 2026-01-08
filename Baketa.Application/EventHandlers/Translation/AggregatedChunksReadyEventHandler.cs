@@ -46,6 +46,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     // [Issue #78 Phase 4] 並列翻訳オーケストレーター
     private readonly IParallelTranslationOrchestrator? _parallelTranslationOrchestrator;
     private readonly ILicenseManager? _licenseManager;
+    // [Issue #273] Cloud翻訳可用性統合サービス
+    private readonly Core.Abstractions.Translation.ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService;
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
@@ -59,7 +61,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         IStreamingTranslationService? streamingTranslationService = null,
         // [Issue #78 Phase 4] 並列翻訳オーケストレーター（オプショナル）
         IParallelTranslationOrchestrator? parallelTranslationOrchestrator = null,
-        ILicenseManager? licenseManager = null)
+        ILicenseManager? licenseManager = null,
+        // [Issue #273] Cloud翻訳可用性統合サービス（オプショナル）
+        Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -72,6 +76,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         // [Issue #78 Phase 4] 並列翻訳オーケストレーター
         _parallelTranslationOrchestrator = parallelTranslationOrchestrator;
         _licenseManager = licenseManager;
+        // [Issue #273] Cloud翻訳可用性統合サービス
+        _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
     }
 
     /// <inheritdoc />
@@ -850,21 +856,39 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             return false;
         }
 
-        // Cloud AI翻訳機能が利用可能か（Pro/Premiaプラン）
-        // 注意: ライセンスチェックを設定取得より先に行うことで、
-        // Free/Standardユーザーの場合は不要な設定取得をスキップ
-        if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
+        // [Issue #273] Cloud翻訳可用性統合サービスで判定
+        // ライセンス状態とユーザー設定の両方を統合チェック
+        if (_cloudTranslationAvailabilityService != null)
         {
-            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: Cloud AI翻訳機能が無効（Free/Standardプラン）");
-            return false;
+            if (!_cloudTranslationAvailabilityService.IsEffectivelyEnabled)
+            {
+                _logger?.LogDebug(
+                    "🔍 [Issue #273] 並列翻訳スキップ: Cloud翻訳無効 (Entitled={Entitled}, Preferred={Preferred})",
+                    _cloudTranslationAvailabilityService.IsEntitled,
+                    _cloudTranslationAvailabilityService.IsPreferred);
+                return false;
+            }
         }
-
-        // [Issue #78 Phase 5] ユーザー設定でCloud AI翻訳が有効か
-        var translationSettings = _unifiedSettingsService.GetTranslationSettings();
-        if (!translationSettings.EnableCloudAiTranslation)
+        else
         {
-            _logger?.LogDebug("🔍 [Phase5] 並列翻訳スキップ: Cloud AI翻訳が設定で無効");
-            return false;
+            // フォールバック: 旧ロジック（ICloudTranslationAvailabilityService未登録時）
+            // 注: このフォールバックは段階的移行のため意図的に残しています。
+            // ICloudTranslationAvailabilityServiceがDIコンテナに登録されるまでの互換性を保つため。
+            // 将来的にすべての環境で新サービスが利用可能になれば削除可能です。
+            // Cloud AI翻訳機能が利用可能か（Pro/Premiaプラン）
+            if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
+            {
+                _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: Cloud AI翻訳機能が無効（Free/Standardプラン）");
+                return false;
+            }
+
+            // [Issue #78 Phase 5] ユーザー設定でCloud AI翻訳が有効か
+            var translationSettings = _unifiedSettingsService.GetTranslationSettings();
+            if (!translationSettings.EnableCloudAiTranslation)
+            {
+                _logger?.LogDebug("🔍 [Phase5] 並列翻訳スキップ: Cloud AI翻訳が設定で無効");
+                return false;
+            }
         }
 
         // 画像データが利用可能か
@@ -882,7 +906,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             return false;
         }
 
-        _logger?.LogDebug("✅ [Phase4/5] 並列翻訳使用: 全条件クリア");
+        _logger?.LogDebug("✅ [Issue #273] 並列翻訳使用: 全条件クリア");
         return true;
     }
 
