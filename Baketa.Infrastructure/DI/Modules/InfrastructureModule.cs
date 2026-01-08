@@ -1410,6 +1410,15 @@ public class InfrastructureModule : ServiceModuleBase
         });
 
         // 設定値のログ出力はファクトリー内のILoggerで実行されます
+
+        // [Issue #256] Phase 3.5: ComponentInstallerService登録
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IComponentInstallerService>(provider =>
+        {
+            var logger = provider.GetRequiredService<ILogger<ComponentInstallerService>>();
+            var versionService = provider.GetRequiredService<IComponentVersionService>();
+            return new ComponentInstallerService(logger, versionService);
+        });
+        Console.WriteLine("✅ [Issue #256] ComponentInstallerService登録完了");
     }
 
     /// <summary>
