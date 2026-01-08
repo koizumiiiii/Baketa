@@ -10,6 +10,7 @@ using Baketa.Core.Abstractions.License;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.License.Mapping;
 using Baketa.Infrastructure.License.Services;
 using Baketa.UI.Framework;
 using Baketa.UI.Resources;
@@ -857,6 +858,9 @@ public sealed class AccountSettingsViewModel : ViewModelBase
 
             var result = await _patreonService.SyncLicenseAsync(forceRefresh: true).ConfigureAwait(false);
 
+            // 資格情報を取得（LicenseState構築に必要）
+            var credentials = await _patreonService.LoadCredentialsAsync().ConfigureAwait(false);
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (result.Success)
@@ -866,6 +870,17 @@ public sealed class AccountSettingsViewModel : ViewModelBase
                     PatreonSyncStatus = PatreonSyncStatus.Synced;
                     SetStatusMessage($"同期完了: {GetPlanName(CurrentPlan)}プラン", false);
                     _logger?.LogInformation("Patreon同期成功: Plan={Plan}", result.Plan);
+
+                    // LicenseManagerに同期結果を伝播 (DRY: PatreonLicenseMapper使用)
+                    if (_licenseManager != null && credentials != null)
+                    {
+                        var state = PatreonLicenseMapper.ToLicenseState(result, credentials);
+
+                        _licenseManager.SetResolvedLicenseState(
+                            state,
+                            "AccountSettingsViewModel",
+                            LicenseChangeReason.ServerRefresh);
+                    }
                 }
                 else
                 {

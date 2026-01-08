@@ -86,6 +86,15 @@ public interface ILicenseManager
     /// 本番環境では何も行わずfalseを返します。
     /// </remarks>
     Task<bool> SetTestPlanAsync(PlanType plan, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 外部ソースから取得したライセンス状態を設定
+    /// Patreon同期など、独自の認証機構を持つサービスからの状態更新に使用
+    /// </summary>
+    /// <param name="state">設定するライセンス状態</param>
+    /// <param name="source">状態の取得元（ログ用）</param>
+    /// <param name="reason">状態変更理由</param>
+    void SetResolvedLicenseState(LicenseState state, string source, LicenseChangeReason reason);
 }
 
 /// <summary>

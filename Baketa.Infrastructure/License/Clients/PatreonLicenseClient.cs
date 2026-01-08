@@ -23,6 +23,13 @@ public sealed class PatreonLicenseClient : ILicenseApiClient
     /// <inheritdoc/>
     public bool IsAvailable => _isAvailable && _oauthService.IsAuthenticated;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// PatreonLicenseClientは独自の認証管理（IPatreonOAuthService）を使用するため、
+    /// LicenseManagerからのuserId/sessionTokenは不要
+    /// </remarks>
+    public bool RequiresCredentials => false;
+
     /// <summary>
     /// PatreonLicenseClientを初期化
     /// </summary>

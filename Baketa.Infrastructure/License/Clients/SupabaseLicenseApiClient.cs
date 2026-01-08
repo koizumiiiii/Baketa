@@ -26,6 +26,12 @@ public sealed class SupabaseLicenseApiClient : ILicenseApiClient
     /// <inheritdoc/>
     public bool IsAvailable => _isAvailable;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// SupabaseクライアントはuserIdとsessionTokenによる認証が必要
+    /// </remarks>
+    public bool RequiresCredentials => true;
+
     /// <summary>
     /// SupabaseLicenseApiClientを初期化
     /// </summary>

@@ -217,10 +217,11 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // ユーザー未認証の場合
-        if (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken))
+        // APIクライアントが認証情報を必要とする場合のみチェック
+        // Patreonなど独自認証を持つクライアントはこのチェックをスキップ
+        if (_apiClient.RequiresCredentials && (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken)))
         {
-            _logger.LogDebug("ユーザー未認証のためリフレッシュをスキップ");
+            _logger.LogDebug("ユーザー未認証のためリフレッシュをスキップ（RequiresCredentials={RequiresCredentials}）", _apiClient.RequiresCredentials);
             return LicenseState.Default;
         }
 
@@ -231,14 +232,18 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             return _currentState;
         }
 
-        // キャッシュが有効な場合はキャッシュを返す
-        if (await _cacheService.IsCacheValidAsync(_userId, cancellationToken).ConfigureAwait(false))
+        // 認証情報がある場合のみキャッシュをチェック
+        if (!string.IsNullOrEmpty(_userId))
         {
-            var cachedState = await _cacheService.GetCachedStateAsync(_userId, cancellationToken)
-                .ConfigureAwait(false);
-            if (cachedState is not null)
+            // キャッシュが有効な場合はキャッシュを返す
+            if (await _cacheService.IsCacheValidAsync(_userId, cancellationToken).ConfigureAwait(false))
             {
-                return cachedState;
+                var cachedState = await _cacheService.GetCachedStateAsync(_userId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (cachedState is not null)
+                {
+                    return cachedState;
+                }
             }
         }
 
@@ -251,10 +256,10 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // ユーザー未認証の場合
-        if (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken))
+        // APIクライアントが認証情報を必要とする場合のみチェック
+        if (_apiClient.RequiresCredentials && (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken)))
         {
-            _logger.LogDebug("ユーザー未認証のため強制リフレッシュをスキップ");
+            _logger.LogDebug("ユーザー未認証のため強制リフレッシュをスキップ（RequiresCredentials={RequiresCredentials}）", _apiClient.RequiresCredentials);
             return LicenseState.Default;
         }
 
@@ -806,6 +811,43 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             plan);
 
         return Task.FromResult(true);
+    }
+
+    /// <inheritdoc/>
+    public void SetResolvedLicenseState(LicenseState state, string source, LicenseChangeReason reason)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        _logger.LogInformation(
+            "🔄 外部ソースからライセンス状態を設定: Source={Source}, Plan={Plan}, Reason={Reason}",
+            source, state.CurrentPlan, reason);
+
+        // Patreon連携の場合、userIdを設定しておく（キャッシュ用）
+        // スレッドセーフティのためlockで保護 (Gemini Review指摘)
+        if (!string.IsNullOrEmpty(state.PatreonUserId))
+        {
+            lock (_stateLock)
+            {
+                _userId = state.PatreonUserId;
+            }
+            _logger.LogDebug("PatreonUserIdをuserIdに設定: {UserId}", MaskUserId(_userId));
+        }
+
+        // 状態を更新（イベントも発火）
+        // UpdateCurrentState内部でも_stateLockを使用するが、ここでは別の操作
+        UpdateCurrentState(state, reason);
+    }
+
+    /// <summary>
+    /// UserIdをマスクするヘルパー（ログ用）
+    /// </summary>
+    private static string MaskUserId(string? userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return "(empty)";
+        if (userId.Length <= 4) return "****";
+        return userId[..2] + "****" + userId[^2..];
     }
 
     #endregion
