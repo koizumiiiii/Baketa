@@ -649,6 +649,72 @@ public sealed class CrossValidatorTests
     }
 
     /// <summary>
+    /// Issue #275 + Geminiレビュー: CloudBoundingBoxが無効値（Width=0）の場合は比率計算にフォールバック
+    /// </summary>
+    [Fact]
+    public async Task ValidateAsync_WithInvalidCloudBoundingBox_FallsBackToRatioCalculation()
+    {
+        // Arrange
+        var chunk = CreateChunkWithBounds("Hello World", 0.95f, new Rectangle(0, 0, 200, 30));
+        var cloudResponse = CreateCloudResponseWithBoundingBoxes([
+            ("Hello", "こんにちは", new Core.Models.Int32Rect(100, 100, 0, 0))  // 無効: Width=0, Height=0
+        ]);
+
+        var containmentMatcherMock = new Mock<IContainmentMatcher>();
+        containmentMatcherMock
+            .Setup(m => m.FindMergeGroups(It.IsAny<IReadOnlyList<TextChunk>>(), It.IsAny<IReadOnlyList<string>>()))
+            .Returns([]);
+        containmentMatcherMock
+            .Setup(m => m.FindSplitInfo(It.IsAny<TextChunk>(), It.IsAny<IReadOnlyList<TranslatedTextItem>>()))
+            .Returns(new SplitInfo
+            {
+                LocalChunk = chunk,
+                Segments =
+                [
+                    new SplitSegment
+                    {
+                        CloudTextIndex = 0,
+                        CloudText = "Hello",
+                        StartIndex = 0,
+                        EndIndex = 5,
+                        CloudBoundingBox = new Core.Models.Int32Rect(100, 100, 0, 0)  // 無効値
+                    }
+                ]
+            });
+
+        _fuzzyMatcherMock
+            .Setup(m => m.IsMatch(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(new FuzzyMatchResult
+            {
+                IsMatch = false,
+                Similarity = 0.10f,
+                AppliedThreshold = 0.80f,
+                Text1 = "any",
+                Text2 = "any",
+                EditDistance = 10
+            });
+
+        var sutWithContainment = new CrossValidator(
+            _fuzzyMatcherMock.Object,
+            _rescuerMock.Object,
+            containmentMatcherMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        var result = await sutWithContainment.ValidateAsync([chunk], cloudResponse);
+
+        // Assert
+        Assert.Single(result.ValidatedChunks);
+
+        var validatedChunk = result.ValidatedChunks[0];
+        // 無効なCloudBoundingBoxは無視され、比率計算が使用される
+        // ローカルチャンクのY座標（0）が使用される（Cloud AI座標の100ではない）
+        Assert.Equal(0, validatedChunk.OriginalChunk.CombinedBounds.Y);
+        // X座標も比率計算される（StartIndex=0 なので X=0）
+        Assert.Equal(0, validatedChunk.OriginalChunk.CombinedBounds.X);
+    }
+
+    /// <summary>
     /// テスト用TextChunk作成ヘルパー（座標指定可能）
     /// </summary>
     private static TextChunk CreateChunkWithBounds(string text, float confidence, Rectangle bounds)

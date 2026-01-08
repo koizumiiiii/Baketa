@@ -298,7 +298,10 @@ public sealed class CrossValidator : ICrossValidator
             System.Drawing.Rectangle splitBounds;
 
             // Issue #275: CloudBoundingBoxがある場合はCloud AI座標を優先使用
-            if (segment.CloudBoundingBox.HasValue)
+            // Geminiレビュー: Width/Height > 0 のガード句追加（無効な値のフォールバック）
+            if (segment.CloudBoundingBox.HasValue &&
+                segment.CloudBoundingBox.Value.Width > 0 &&
+                segment.CloudBoundingBox.Value.Height > 0)
             {
                 var box = segment.CloudBoundingBox.Value;
                 splitBounds = new System.Drawing.Rectangle(box.X, box.Y, box.Width, box.Height);
@@ -310,7 +313,9 @@ public sealed class CrossValidator : ICrossValidator
             }
             else
             {
-                // フォールバック: テキスト長比率から座標按分計算（ローカルOCRのみの場合）
+                // フォールバック: テキスト長比率から座標按分計算
+                // - CloudBoundingBoxがない場合
+                // - CloudBoundingBoxのWidth/Heightが無効（0以下）の場合
                 var ratio = localText.Length > 0
                     ? (float)segment.StartIndex / localText.Length
                     : 0f;
@@ -326,9 +331,10 @@ public sealed class CrossValidator : ICrossValidator
                 );
 
                 _logger.LogDebug(
-                    "分割（比率計算）: CloudText='{CloudText}', Box=({X},{Y},{W},{H})",
+                    "分割（比率計算）: CloudText='{CloudText}', Box=({X},{Y},{W},{H}), HasCloudBox={HasBox}",
                     segment.CloudText.Length > 20 ? segment.CloudText[..20] + "..." : segment.CloudText,
-                    splitBounds.X, splitBounds.Y, splitBounds.Width, splitBounds.Height);
+                    splitBounds.X, splitBounds.Y, splitBounds.Width, splitBounds.Height,
+                    segment.CloudBoundingBox.HasValue);
             }
 
             // 分割チャンク生成
