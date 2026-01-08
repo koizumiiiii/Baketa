@@ -92,12 +92,13 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
         _currentAppliedLanguageCode = _selectedUiLanguage.Code;
 
         // Accept可能条件を監視
+        // [Fix] InitialLaunchでも利用規約への同意を必須にする（OAuthフローでの同意漏れ防止）
         var canAccept = this.WhenAnyValue(
             vm => vm.HasAcceptedPrivacyPolicy,
             vm => vm.HasAcceptedTermsOfService,
             (privacy, terms) => mode switch
             {
-                ConsentDialogMode.InitialLaunch => privacy,
+                ConsentDialogMode.InitialLaunch => privacy && terms,
                 ConsentDialogMode.AccountCreation => privacy && terms,
                 _ => false
             });
@@ -159,8 +160,9 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
 
     /// <summary>
     /// 利用規約セクションを表示するか
+    /// [Fix] InitialLaunchでも表示（OAuthフローでの同意漏れ防止）
     /// </summary>
-    public bool ShowTermsOfServiceSection => Mode == ConsentDialogMode.AccountCreation;
+    public bool ShowTermsOfServiceSection => Mode is ConsentDialogMode.InitialLaunch or ConsentDialogMode.AccountCreation;
 
     /// <summary>
     /// 利用可能なUI言語一覧

@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Events;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Services;
@@ -541,6 +542,9 @@ public class PythonServerManager(
                 }
                 catch { /* ファイル書き込み失敗は無視 */ }
 
+                // 🔥 [Issue #264] メモリエラー検出 & ユーザー通知
+                DetectAndPublishServerError(line, languagePair, port);
+
                 // Pythonエラーの重要度分類
                 if (line.Contains("Error") || line.Contains("Exception") || line.Contains("Traceback"))
                 {
@@ -850,6 +854,21 @@ public class PythonServerManager(
             logger.LogDebug("❌ ヘルスチェック失敗: {Server}, Error: {Error}", server, ex.Message);
             return false;
         }
+    }
+
+    /// <summary>
+    /// [Issue #264] stderrからメモリエラー等を検出してServerErrorEventを発行
+    /// ServerErrorDetectorヘルパークラスに共通ロジックを委譲
+    /// </summary>
+    private void DetectAndPublishServerError(string line, string languagePair, int port)
+    {
+        var context = $"Port:{port}";
+        Infrastructure.Services.ServerErrorDetector.DetectAndPublish(
+            line,
+            ServerErrorSources.TranslationServer,
+            context,
+            eventAggregator,
+            logger);
     }
 
     /// <summary>

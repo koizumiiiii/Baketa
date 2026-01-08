@@ -76,27 +76,6 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         set => this.RaiseAndSetIfChanged(ref _confirmPassword, value);
     }
 
-    private string _displayName = string.Empty;
-    public string DisplayName
-    {
-        get => _displayName;
-        set => this.RaiseAndSetIfChanged(ref _displayName, value);
-    }
-
-    private bool _acceptTerms;
-    public bool AcceptTerms
-    {
-        get => _acceptTerms;
-        set => this.RaiseAndSetIfChanged(ref _acceptTerms, value);
-    }
-
-    private bool _acceptPrivacyPolicy;
-    public bool AcceptPrivacyPolicy
-    {
-        get => _acceptPrivacyPolicy;
-        set => this.RaiseAndSetIfChanged(ref _acceptPrivacyPolicy, value);
-    }
-
     // ErrorMessageとIsLoadingはViewModelBaseに既に定義済み
 
     // 成功メッセージ（緑色で表示）
@@ -207,33 +186,12 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             "パスワードは8文字以上で、大文字・小文字・数字・記号のうち3種類以上を含む必要があります");
         Disposables.Add(passwordRule);
 
-        // ConfirmPasswordバリデーション  
+        // ConfirmPasswordバリデーション
         var confirmPasswordRule = this.ValidationRule(
             vm => vm.ConfirmPassword,
             confirmPassword => confirmPassword == Password,
             "パスワードが一致しません");
         Disposables.Add(confirmPasswordRule);
-
-        // DisplayNameバリデーション
-        var displayNameRule = this.ValidationRule(
-            vm => vm.DisplayName,
-            name => !string.IsNullOrWhiteSpace(name) && name.Length >= 2 && name.Length <= 50,
-            "表示名は2文字以上50文字以下で入力してください");
-        Disposables.Add(displayNameRule);
-
-        // 利用規約同意バリデーション
-        var termsRule = this.ValidationRule(
-            vm => vm.AcceptTerms,
-            accepted => accepted,
-            "利用規約に同意する必要があります");
-        Disposables.Add(termsRule);
-
-        // プライバシーポリシー同意バリデーション
-        var privacyRule = this.ValidationRule(
-            vm => vm.AcceptPrivacyPolicy,
-            accepted => accepted,
-            "プライバシーポリシーに同意する必要があります");
-        Disposables.Add(privacyRule);
     }
 
     /// <summary>
@@ -243,22 +201,17 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     {
         // メール/パスワードサインアップコマンド
         // 注意: このセレクタ内でログ出力やプロパティ変更を行わないこと（StackOverflowの原因になる）
+        // Note: 利用規約への同意はConsentDialog（初回起動時）で既に取得済み
         var canExecuteEmailSignup = this.WhenAnyValue(
             x => x.Email,
             x => x.Password,
             x => x.ConfirmPassword,
-            x => x.DisplayName,
-            x => x.AcceptTerms,
-            x => x.AcceptPrivacyPolicy,
             x => x.IsLoading,
-            (email, password, confirmPassword, displayName, acceptTerms, acceptPrivacy, isLoading) =>
+            (email, password, confirmPassword, isLoading) =>
                 !string.IsNullOrWhiteSpace(email) &&
                 !string.IsNullOrWhiteSpace(password) &&
                 !string.IsNullOrWhiteSpace(confirmPassword) &&
-                !string.IsNullOrWhiteSpace(displayName) &&
                 password == confirmPassword &&
-                acceptTerms &&
-                acceptPrivacy &&
                 !isLoading);
 
         SignupWithEmailCommand = ReactiveCommand.CreateFromTask(
@@ -448,7 +401,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
                 SuccessMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...";
                 ErrorMessage = null; // エラーメッセージをクリア
 
-                _logger?.LogInformation("サインアップ成功: 確認メールを送信しました（Email: {Email}）", Email);
+                _logger?.LogInformation("サインアップ成功: 確認メールを送信しました");
 
                 // 3秒待ってからログイン画面へ遷移
                 await Task.Delay(3000);
@@ -471,7 +424,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
                     SuccessMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...";
                     ErrorMessage = null;
 
-                    _logger?.LogInformation("サインアップ成功（メール確認待ち）: 確認メールを送信しました（Email: {Email}）", Email);
+                    _logger?.LogInformation("サインアップ成功（メール確認待ち）: 確認メールを送信しました");
 
                     // 3秒待ってからログイン画面へ遷移
                     await Task.Delay(3000);

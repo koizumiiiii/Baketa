@@ -526,24 +526,24 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         // --- 4.6 テストモード警告表示（Issue #110: 決済統合） ---
                         await ShowTestModeWarningIfNeededAsync(serviceProvider, mainOverlayView);
 
-                        // 未認証の場合はLoginViewをダイアログとして表示
+                        // 未認証の場合はSignupViewをダイアログとして表示（初回起動時はサインアップを推奨）
                         if (!isAuthenticated)
                         {
-                            Console.WriteLine("📌 [AUTH_DEBUG] Step 6: LoginViewダイアログ表示（未認証）");
-                            _logger?.LogInformation("未認証: LoginViewをダイアログとして表示します");
+                            Console.WriteLine("📌 [AUTH_DEBUG] Step 6: SignupViewダイアログ表示（未認証）");
+                            _logger?.LogInformation("未認証: SignupViewをダイアログとして表示します");
 
                             // 認証完了後にダイアログが閉じるよう、非同期で表示
                             _ = Task.Run(async () =>
                             {
                                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                                 {
-                                    var loginViewModel = serviceProvider.GetRequiredService<LoginViewModel>();
-                                    var loginView = new LoginView(loginViewModel);
-                                    var loginIconUri = new Uri(BAKETA_ICON_PATH);
-                                    loginView.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(loginIconUri));
+                                    var signupViewModel = serviceProvider.GetRequiredService<SignupViewModel>();
+                                    var signupView = new SignupView(signupViewModel);
+                                    var signupIconUri = new Uri(BAKETA_ICON_PATH);
+                                    signupView.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(signupIconUri));
 
-                                    await loginView.ShowDialog<bool?>(mainOverlayView);
-                                    Console.WriteLine("✅ LoginViewダイアログ終了");
+                                    await signupView.ShowDialog<bool?>(mainOverlayView);
+                                    Console.WriteLine("✅ SignupViewダイアログ終了");
                                 });
                             });
                         }
@@ -1128,16 +1128,16 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
             if (result == ViewModels.ConsentDialogResult.Accepted)
             {
-                _logger?.LogInformation("[Issue #261] ユーザーがプライバシーポリシーに同意");
+                _logger?.LogInformation("[Issue #261] ユーザーが利用規約・プライバシーポリシーに同意");
 
-                // 同意を記録
-                await consentService.AcceptPrivacyPolicyAsync().ConfigureAwait(true);
+                // 両方の同意を記録
+                await consentService.AcceptAllAsync().ConfigureAwait(true);
 
                 return true;
             }
             else
             {
-                _logger?.LogInformation("[Issue #261] ユーザーがプライバシーポリシーに同意しなかった、アプリを終了");
+                _logger?.LogInformation("[Issue #261] ユーザーが利用規約に同意しなかった、アプリを終了");
                 return false;
             }
         }

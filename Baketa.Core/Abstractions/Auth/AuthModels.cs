@@ -107,4 +107,10 @@ public static class AuthErrorCodes
     public const string OAuthError = "OAuthError";
     public const string PasswordResetFailed = "PasswordResetFailed";
     public const string UnexpectedError = "UnexpectedError";
+
+    // OAuth specific error codes
+    public const string OAuthAccessDenied = "OAuthAccessDenied";
+    public const string OAuthInvalidRequest = "OAuthInvalidRequest";
+    public const string OAuthUnauthorizedClient = "OAuthUnauthorizedClient";
+    public const string OAuthServerError = "OAuthServerError";
 }

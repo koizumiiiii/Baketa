@@ -265,9 +265,38 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             // Handle OAuth provider errors
             if (!string.IsNullOrEmpty(error))
             {
-                _logger.LogWarning("OAuthプロバイダーからエラーが返されました");
-                await SendResponseAsync(response, "認証エラー", "認証プロバイダーでエラーが発生しました。再度お試しください。", false).ConfigureAwait(false);
-                _callbackTcs?.TrySetResult(new AuthFailure(AuthErrorCodes.OAuthError, "認証プロバイダーエラー"));
+                // エラーコード別のユーザーフレンドリーメッセージを決定
+                // セキュリティ: ユーザー入力は既知のエラーコードにマッピングしてログ出力
+                // （CodeQL cs/log-forging 対策: 生のユーザー入力をログに含めない）
+                var (userMessage, errorCode, logMessage) = error.ToLowerInvariant() switch
+                {
+                    "access_denied" => (
+                        "アクセスが拒否されました。認証をキャンセルしたか、アクセス権限がありません。",
+                        AuthErrorCodes.OAuthAccessDenied,
+                        "OAuth access_denied error"),
+                    "invalid_request" => (
+                        "認証リクエストが無効です。Redirect URLがSupabaseに登録されているか確認してください。",
+                        AuthErrorCodes.OAuthInvalidRequest,
+                        "OAuth invalid_request error"),
+                    "unauthorized_client" => (
+                        "OAuthクライアントが承認されていません。Supabaseの認証設定を確認してください。",
+                        AuthErrorCodes.OAuthUnauthorizedClient,
+                        "OAuth unauthorized_client error"),
+                    "server_error" => (
+                        "認証サーバーでエラーが発生しました。しばらく待ってから再度お試しください。",
+                        AuthErrorCodes.OAuthServerError,
+                        "OAuth server_error from provider"),
+                    _ => (
+                        "認証プロバイダーでエラーが発生しました。再度お試しください。",
+                        AuthErrorCodes.OAuthError,
+                        "OAuth unknown error type")
+                };
+
+                // セキュリティ: ログには定義済みメッセージのみ出力（ユーザー入力を含めない）
+                _logger.LogWarning("OAuthプロバイダーからエラーが返されました: {LogMessage}", logMessage);
+
+                await SendResponseAsync(response, "認証エラー", userMessage, false).ConfigureAwait(false);
+                _callbackTcs?.TrySetResult(new AuthFailure(errorCode, logMessage));
                 return;
             }
 
@@ -303,11 +332,19 @@ public sealed class OAuthCallbackHandler : IOAuthCallbackHandler, IAsyncDisposab
             if (result is AuthSuccess success)
             {
                 // Store tokens securely
-                await _tokenStorage.StoreTokensAsync(
+                var tokensStored = await _tokenStorage.StoreTokensAsync(
                     success.Session.AccessToken,
                     success.Session.RefreshToken).ConfigureAwait(false);
 
-                _logger.LogInformation("OAuth authentication successful, tokens stored");
+                if (!tokensStored)
+                {
+                    _logger.LogWarning("OAuth authentication successful but token storage failed - session will not persist");
+                }
+                else
+                {
+                    _logger.LogInformation("OAuth authentication successful, tokens stored");
+                }
+
                 await SendResponseAsync(response, "認証成功", "ログインに成功しました！このウィンドウを閉じてアプリケーションに戻ってください。", true).ConfigureAwait(false);
                 _callbackTcs?.TrySetResult(result);
             }

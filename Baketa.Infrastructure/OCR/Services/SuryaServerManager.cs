@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Events;
 using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +16,7 @@ namespace Baketa.Infrastructure.OCR.Services;
 public sealed class SuryaServerManager : IAsyncDisposable
 {
     private readonly ILogger<SuryaServerManager> _logger;
+    private readonly IEventAggregator? _eventAggregator;
     private readonly int _port;
     private Process? _serverProcess;
     private ProcessJobObject? _jobObject;
@@ -31,10 +34,11 @@ public sealed class SuryaServerManager : IAsyncDisposable
     /// </summary>
     public int Port => _port;
 
-    public SuryaServerManager(int port, ILogger<SuryaServerManager> logger)
+    public SuryaServerManager(int port, ILogger<SuryaServerManager> logger, IEventAggregator? eventAggregator = null)
     {
         _port = port;
         _logger = logger;
+        _eventAggregator = eventAggregator;
 
         // Issue #189: Job Object初期化 - ゾンビプロセス対策
         _jobObject = new ProcessJobObject(logger);
@@ -130,6 +134,9 @@ public sealed class SuryaServerManager : IAsyncDisposable
             _serverProcess.ErrorDataReceived += (_, e) =>
             {
                 if (e.Data == null) return;
+
+                // [Issue #264] メモリエラー検出 & ユーザー通知
+                DetectAndPublishServerError(e.Data);
 
                 // PyTorch/CUDA警告はDEBUGレベル
                 if (e.Data.Contains("UserWarning") || e.Data.Contains("FutureWarning"))
@@ -601,6 +608,21 @@ public sealed class SuryaServerManager : IAsyncDisposable
         {
             _logger.LogDebug(ex, "[Surya] 孤立プロセス検索中のエラー（無視）");
         }
+    }
+
+    /// <summary>
+    /// [Issue #264] stderrからメモリエラー等を検出してServerErrorEventを発行
+    /// ServerErrorDetectorヘルパークラスに共通ロジックを委譲
+    /// </summary>
+    private void DetectAndPublishServerError(string line)
+    {
+        var context = $"Port:{_port}";
+        Infrastructure.Services.ServerErrorDetector.DetectAndPublish(
+            line,
+            ServerErrorSources.OcrServer,
+            context,
+            _eventAggregator,
+            _logger);
     }
 
     public async ValueTask DisposeAsync()

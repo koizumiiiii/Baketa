@@ -186,17 +186,6 @@
                     <!-- Email/Password Form -->
                     <StackPanel Spacing="8">
                         <StackPanel>
-                            <TextBlock Text="{local:Localize Auth_Signup_DisplayName}"
-                                       FontSize="13" FontWeight="Medium"
-                                       Margin="0,0,0,2"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBox Classes="input-field"
-                                     Text="{Binding DisplayName}"
-                                     Watermark="{local:Localize Auth_Signup_DisplayNamePlaceholder}"
-                                     KeyboardNavigation.TabIndex="1"/>
-                        </StackPanel>
-                        
-                        <StackPanel>
                             <TextBlock Text="{local:Localize Auth_Signup_Email}"
                                        FontSize="13" FontWeight="Medium"
                                        Margin="0,0,0,2"
@@ -204,7 +193,7 @@
                             <TextBox Classes="input-field"
                                      Text="{Binding Email}"
                                      Watermark="{local:Localize Auth_Login_EmailPlaceholder}"
-                                     KeyboardNavigation.TabIndex="2"/>
+                                     KeyboardNavigation.TabIndex="1"/>
                         </StackPanel>
                         
                         <StackPanel>
@@ -216,7 +205,7 @@
                                      Text="{Binding Password}"
                                      PasswordChar="•"
                                      Watermark="{local:Localize Auth_Signup_PasswordPlaceholder}"
-                                     KeyboardNavigation.TabIndex="3"/>
+                                     KeyboardNavigation.TabIndex="2"/>
                             <!-- Password Strength Indicator -->
                             <Grid ColumnDefinitions="*,Auto" Margin="2,6,0,0">
                                 <!-- Strength Bar -->
@@ -255,33 +244,10 @@
                                      Text="{Binding ConfirmPassword}"
                                      PasswordChar="•"
                                      Watermark="{local:Localize Auth_Signup_ConfirmPasswordPlaceholder}"
-                                     KeyboardNavigation.TabIndex="4"/>
+                                     KeyboardNavigation.TabIndex="3"/>
                         </StackPanel>
                     </StackPanel>
                     
-                    <!-- Agreement Checkboxes -->
-                    <StackPanel Spacing="6" Margin="0,8,0,0">
-                        <CheckBox Classes="agreement-checkbox"
-                                  IsChecked="{Binding AcceptTerms}"
-                                  KeyboardNavigation.TabIndex="5">
-                            <TextBlock TextWrapping="Wrap">
-                                <Run Text="{local:Localize Auth_Signup_TermsAgree}"/>
-                                <Button Classes="link" Content="{local:Localize Auth_Signup_Terms}" Padding="0" FontSize="13"
-                                        Command="{Binding OpenTermsCommand}"/>
-                            </TextBlock>
-                        </CheckBox>
-
-                        <CheckBox Classes="agreement-checkbox"
-                                  IsChecked="{Binding AcceptPrivacyPolicy}"
-                                  KeyboardNavigation.TabIndex="6">
-                            <TextBlock TextWrapping="Wrap">
-                                <Run Text="{local:Localize Auth_Signup_TermsAgree}"/>
-                                <Button Classes="link" Content="{local:Localize Auth_Signup_Privacy}" Padding="0" FontSize="13"
-                                        Command="{Binding OpenPrivacyPolicyCommand}"/>
-                            </TextBlock>
-                        </CheckBox>
-                    </StackPanel>
-
                     <!-- Success Message (緑色・ボタンの上に配置) -->
                     <Border IsVisible="{Binding SuccessMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                             Background="#E8F5E9"
@@ -347,7 +313,7 @@
                     <Button Classes="primary-button"
                             Command="{Binding SignupWithEmailCommand}"
                             Content="{local:Localize Auth_Signup_Button}"
-                            KeyboardNavigation.TabIndex="7"/>
+                            KeyboardNavigation.TabIndex="4"/>
                 </StackPanel>
             </ScrollViewer>
             
