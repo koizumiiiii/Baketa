@@ -101,26 +101,31 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddSingleton<IPromotionSettingsPersistence>(provider =>
             provider.GetRequiredService<License.PromotionSettingsPersistence>());
 
-        // Issue #237 Phase 2: プロモーションコードサービス（モック/本番切り替え）
+        // Issue #237 Phase 2: プロモーションコードサービス
+        // DEBUGビルド: HybridPromotionCodeService（モック＋本番両対応）
+        // RELEASEビルド: PromotionCodeService（本番のみ、モックコード拒否）
         services.AddHttpClient<License.PromotionCodeService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
         });
         services.AddSingleton<License.MockPromotionCodeService>();
+#if DEBUG
+        services.AddSingleton<License.HybridPromotionCodeService>();
         services.AddSingleton<IPromotionCodeService>(provider =>
         {
-            var licenseSettings = provider.GetRequiredService<IOptions<LicenseSettings>>().Value;
-
-            if (licenseSettings.EnableMockMode)
-            {
-                var logger = provider.GetRequiredService<ILogger<LicenseModule>>();
-                logger.LogInformation("🔧 プロモーションコードサービス: MockPromotionCodeService");
-                return provider.GetRequiredService<License.MockPromotionCodeService>();
-            }
-
+            var logger = provider.GetRequiredService<ILogger<LicenseModule>>();
+            logger.LogInformation("🔧 プロモーションコードサービス: HybridPromotionCodeService (DEBUG)");
+            return provider.GetRequiredService<License.HybridPromotionCodeService>();
+        });
+#else
+        services.AddSingleton<IPromotionCodeService>(provider =>
+        {
+            var logger = provider.GetRequiredService<ILogger<LicenseModule>>();
+            logger.LogInformation("🔒 プロモーションコードサービス: PromotionCodeService (RELEASE)");
             return provider.GetRequiredService<License.PromotionCodeService>();
         });
+#endif
 
         // Disposable登録（アプリケーション終了時の適切なクリーンアップ）
         services.AddSingleton<IDisposable>(provider =>

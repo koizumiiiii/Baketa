@@ -2,6 +2,7 @@ using System.Drawing;
 using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Validation;
+using Baketa.Core.Models;
 using Baketa.Core.Models.Validation;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Infrastructure.Validation;
@@ -444,6 +445,230 @@ public sealed class CrossValidatorTests
         _fuzzyMatcherMock
             .Setup(m => m.IsMatch(text1, text2))
             .Returns(result);
+    }
+
+    /// <summary>
+    /// Issue #275: BoundingBox付きTranslatedTextItemを含むレスポンス作成
+    /// </summary>
+    private static ImageTranslationResponse CreateCloudResponseWithBoundingBoxes(
+        (string original, string translation, Int32Rect? boundingBox)[] texts)
+    {
+        var textItems = texts.Select(t => new TranslatedTextItem
+        {
+            Original = t.original,
+            Translation = t.translation,
+            BoundingBox = t.boundingBox
+        }).ToList();
+
+        return ImageTranslationResponse.SuccessWithMultipleTexts(
+            requestId: "test-request",
+            texts: textItems,
+            providerId: "gemini",
+            tokenUsage: TokenUsageDetail.Empty,
+            processingTime: TimeSpan.FromMilliseconds(100));
+    }
+
+    #endregion
+
+    #region Issue #275 CloudBoundingBox Tests
+
+    /// <summary>
+    /// Issue #275: CloudBoundingBoxがある場合、Cloud AI座標を優先使用することを検証
+    /// </summary>
+    [Fact]
+    public async Task ValidateAsync_WithCloudBoundingBox_UsesCloudAiCoordinates()
+    {
+        // Arrange
+        // ローカルチャンク: "Hello World" (0,0,100,20)
+        var chunk = CreateChunkWithBounds("Hello World", 0.80f, new Rectangle(0, 0, 100, 20));
+
+        // Cloud AIレスポンス: "Hello"と"World"が縦に配置されている（Y座標が異なる）
+        var cloudResponse = CreateCloudResponseWithBoundingBoxes([
+            ("Hello", "こんにちは", new Int32Rect(10, 50, 40, 15)),   // Y=50
+            ("World", "世界", new Int32Rect(10, 70, 40, 15))          // Y=70 (縦配置)
+        ]);
+
+        // IContainmentMatcherのモック設定
+        var containmentMatcherMock = new Mock<IContainmentMatcher>();
+
+        // FindMergeGroupsは空を返す
+        containmentMatcherMock
+            .Setup(m => m.FindMergeGroups(It.IsAny<IReadOnlyList<TextChunk>>(), It.IsAny<IReadOnlyList<string>>()))
+            .Returns([]);
+
+        // FindSplitInfoはCloudBoundingBox付きのSplitInfoを返す
+        containmentMatcherMock
+            .Setup(m => m.FindSplitInfo(It.IsAny<TextChunk>(), It.IsAny<IReadOnlyList<TranslatedTextItem>>()))
+            .Returns(new SplitInfo
+            {
+                LocalChunk = chunk,
+                Segments =
+                [
+                    new SplitSegment
+                    {
+                        CloudTextIndex = 0,
+                        CloudText = "Hello",
+                        StartIndex = 0,
+                        EndIndex = 5,
+                        CloudBoundingBox = new Int32Rect(10, 50, 40, 15)  // Cloud AI座標
+                    },
+                    new SplitSegment
+                    {
+                        CloudTextIndex = 1,
+                        CloudText = "World",
+                        StartIndex = 6,
+                        EndIndex = 11,
+                        CloudBoundingBox = new Int32Rect(10, 70, 40, 15)  // Cloud AI座標（縦配置）
+                    }
+                ]
+            });
+
+        // FuzzyMatcherはマッチしないように設定（Split処理に進むため）
+        _fuzzyMatcherMock
+            .Setup(m => m.IsMatch(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(new FuzzyMatchResult
+            {
+                IsMatch = false,
+                Similarity = 0.10f,
+                AppliedThreshold = 0.80f,
+                Text1 = "any",
+                Text2 = "any",
+                EditDistance = 10
+            });
+
+        // ContainmentMatcher付きでCrossValidatorを作成
+        var sutWithContainment = new CrossValidator(
+            _fuzzyMatcherMock.Object,
+            _rescuerMock.Object,
+            containmentMatcherMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        var result = await sutWithContainment.ValidateAsync([chunk], cloudResponse);
+
+        // Assert
+        Assert.Equal(2, result.ValidatedChunks.Count);
+
+        // Cloud AI座標が使用されていることを検証（比率計算ではなくCloudBoundingBoxの値）
+        var helloChunk = result.ValidatedChunks.FirstOrDefault(c => c.CloudDetectedText == "Hello");
+        var worldChunk = result.ValidatedChunks.FirstOrDefault(c => c.CloudDetectedText == "World");
+
+        Assert.NotNull(helloChunk);
+        Assert.NotNull(worldChunk);
+
+        // Y座標がCloud AIの値（50, 70）であることを確認
+        // 比率計算だと両方Y=0になるはずなので、これでCloud AI座標が使われていることを検証
+        Assert.Equal(50, helloChunk.OriginalChunk.CombinedBounds.Y);
+        Assert.Equal(70, worldChunk.OriginalChunk.CombinedBounds.Y);
+
+        // X座標も検証
+        Assert.Equal(10, helloChunk.OriginalChunk.CombinedBounds.X);
+        Assert.Equal(10, worldChunk.OriginalChunk.CombinedBounds.X);
+    }
+
+    /// <summary>
+    /// Issue #275: CloudBoundingBoxがない場合、従来の比率計算にフォールバックすることを検証
+    /// </summary>
+    [Fact]
+    public async Task ValidateAsync_WithoutCloudBoundingBox_UsesRatioCalculation()
+    {
+        // Arrange
+        var chunk = CreateChunkWithBounds("Hello World", 0.80f, new Rectangle(0, 0, 110, 20));
+
+        // Cloud AIレスポンス: BoundingBoxなし
+        var cloudResponse = CreateCloudResponseWithBoundingBoxes([
+            ("Hello", "こんにちは", null),
+            ("World", "世界", null)
+        ]);
+
+        var containmentMatcherMock = new Mock<IContainmentMatcher>();
+
+        containmentMatcherMock
+            .Setup(m => m.FindMergeGroups(It.IsAny<IReadOnlyList<TextChunk>>(), It.IsAny<IReadOnlyList<string>>()))
+            .Returns([]);
+
+        // CloudBoundingBoxがnullのSplitInfo
+        containmentMatcherMock
+            .Setup(m => m.FindSplitInfo(It.IsAny<TextChunk>(), It.IsAny<IReadOnlyList<TranslatedTextItem>>()))
+            .Returns(new SplitInfo
+            {
+                LocalChunk = chunk,
+                Segments =
+                [
+                    new SplitSegment
+                    {
+                        CloudTextIndex = 0,
+                        CloudText = "Hello",
+                        StartIndex = 0,
+                        EndIndex = 5,
+                        CloudBoundingBox = null  // BoundingBoxなし
+                    },
+                    new SplitSegment
+                    {
+                        CloudTextIndex = 1,
+                        CloudText = "World",
+                        StartIndex = 6,
+                        EndIndex = 11,
+                        CloudBoundingBox = null  // BoundingBoxなし
+                    }
+                ]
+            });
+
+        _fuzzyMatcherMock
+            .Setup(m => m.IsMatch(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(new FuzzyMatchResult
+            {
+                IsMatch = false,
+                Similarity = 0.10f,
+                AppliedThreshold = 0.80f,
+                Text1 = "any",
+                Text2 = "any",
+                EditDistance = 10
+            });
+
+        var sutWithContainment = new CrossValidator(
+            _fuzzyMatcherMock.Object,
+            _rescuerMock.Object,
+            containmentMatcherMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        var result = await sutWithContainment.ValidateAsync([chunk], cloudResponse);
+
+        // Assert
+        Assert.Equal(2, result.ValidatedChunks.Count);
+
+        // フォールバック（比率計算）の座標が使用されていることを検証
+        // ローカルチャンクのY座標（0）がそのまま使用される
+        Assert.All(result.ValidatedChunks, c => Assert.Equal(0, c.OriginalChunk.CombinedBounds.Y));
+
+        // X座標は比率計算される（0から開始）
+        var helloChunk = result.ValidatedChunks.FirstOrDefault(c => c.CloudDetectedText == "Hello");
+        Assert.NotNull(helloChunk);
+        Assert.Equal(0, helloChunk.OriginalChunk.CombinedBounds.X);  // StartIndex=0 なので X=0
+    }
+
+    /// <summary>
+    /// テスト用TextChunk作成ヘルパー（座標指定可能）
+    /// </summary>
+    private static TextChunk CreateChunkWithBounds(string text, float confidence, Rectangle bounds)
+    {
+        var textResult = new PositionedTextResult
+        {
+            Text = text,
+            BoundingBox = bounds,
+            Confidence = confidence,
+            ChunkId = 1
+        };
+
+        return new TextChunk
+        {
+            ChunkId = 1,
+            TextResults = [textResult],
+            CombinedBounds = bounds,
+            CombinedText = text,
+            SourceWindowHandle = IntPtr.Zero
+        };
     }
 
     #endregion

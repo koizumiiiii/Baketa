@@ -134,6 +134,15 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 Messages.Promotion_InvalidFormat);
         }
 
+        // モックコードは本番環境では使用不可
+        if (IsMockCode(normalizedCode))
+        {
+            _logger.LogWarning("Mock promotion code rejected in production: {Code}", MaskCode(code));
+            return PromotionCodeResult.CreateFailure(
+                PromotionErrorCode.CodeNotFound,
+                "このコードは本番環境では使用できません。");
+        }
+
         // 既にPro以上の場合は適用不可
         var currentPromotion = GetCurrentPromotion();
         if (currentPromotion?.IsValid == true && currentPromotion.Plan >= PlanType.Pro)
@@ -265,6 +274,19 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     }
 
     #region Private Methods
+
+    /// <summary>
+    /// モックコード（テスト用プレフィックス）かどうかを判定
+    /// </summary>
+    /// <remarks>
+    /// BAKETA-TEST*, BAKETA-EXPI*, BAKETA-USED* はモック専用コード
+    /// </remarks>
+    internal static bool IsMockCode(string normalizedCode)
+    {
+        return normalizedCode.StartsWith("BAKETA-TEST", StringComparison.OrdinalIgnoreCase) ||
+               normalizedCode.StartsWith("BAKETA-EXPI", StringComparison.OrdinalIgnoreCase) ||
+               normalizedCode.StartsWith("BAKETA-USED", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Supabase Auth JWTをAuthorizationヘッダーに追加

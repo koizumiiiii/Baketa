@@ -1,5 +1,7 @@
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Validation;
+using Baketa.Core.Models;
+using Baketa.Core.Translation.Abstractions;
 using Baketa.Infrastructure.Validation;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -280,10 +282,10 @@ public sealed class ContainmentMatcherTests
     {
         // Arrange - 1つのCloud AIテキストでは分割不要
         var chunk = CreateTextChunk(1, "Hello World", new Rectangle(0, 0, 100, 20));
-        var cloudTexts = new[] { "Hello" };
+        var cloudTextItems = new[] { CreateTranslatedTextItem("Hello", null) };
 
         // Act
-        var result = _sut.FindSplitInfo(chunk, cloudTexts);
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
 
         // Assert
         Assert.Null(result);
@@ -294,10 +296,14 @@ public sealed class ContainmentMatcherTests
     {
         // Arrange
         var chunk = CreateTextChunk(1, "Hello World", new Rectangle(0, 0, 100, 20));
-        var cloudTexts = new[] { "Hello", "World" };
+        var cloudTextItems = new[]
+        {
+            CreateTranslatedTextItem("Hello", null),
+            CreateTranslatedTextItem("World", null)
+        };
 
         // Act
-        var result = _sut.FindSplitInfo(chunk, cloudTexts);
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
 
         // Assert
         Assert.NotNull(result);
@@ -310,10 +316,14 @@ public sealed class ContainmentMatcherTests
     {
         // Arrange
         var chunk = CreateTextChunk(1, "Hello World", new Rectangle(0, 0, 100, 20));
-        var cloudTexts = new[] { "Goodbye", "Universe" };
+        var cloudTextItems = new[]
+        {
+            CreateTranslatedTextItem("Goodbye", null),
+            CreateTranslatedTextItem("Universe", null)
+        };
 
         // Act
-        var result = _sut.FindSplitInfo(chunk, cloudTexts);
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
 
         // Assert
         Assert.Null(result);
@@ -325,10 +335,15 @@ public sealed class ContainmentMatcherTests
         // Arrange - Cloud AIテキストは順番に検索されるため、出現順に並べる
         // FindSplitInfoはsearchStartIndexを使って重複を防ぐ仕様
         var chunk = CreateTextChunk(1, "Hello World Test", new Rectangle(0, 0, 150, 20));
-        var cloudTexts = new[] { "Hello", "World", "Test" }; // 出現順
+        var cloudTextItems = new[]
+        {
+            CreateTranslatedTextItem("Hello", null),
+            CreateTranslatedTextItem("World", null),
+            CreateTranslatedTextItem("Test", null)
+        };
 
         // Act
-        var result = _sut.FindSplitInfo(chunk, cloudTexts);
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
 
         // Assert
         Assert.NotNull(result);
@@ -343,10 +358,16 @@ public sealed class ContainmentMatcherTests
     {
         // Arrange - 3文字未満のCloud AIテキストは除外
         var chunk = CreateTextChunk(1, "A B C D", new Rectangle(0, 0, 100, 20));
-        var cloudTexts = new[] { "A", "B", "C", "D" }; // すべて2文字未満
+        var cloudTextItems = new[]
+        {
+            CreateTranslatedTextItem("A", null),
+            CreateTranslatedTextItem("B", null),
+            CreateTranslatedTextItem("C", null),
+            CreateTranslatedTextItem("D", null)
+        };
 
         // Act
-        var result = _sut.FindSplitInfo(chunk, cloudTexts);
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
 
         // Assert
         Assert.Null(result); // 全て3文字未満なので分割対象なし
@@ -358,10 +379,15 @@ public sealed class ContainmentMatcherTests
         // Arrange - 最長一致優先テスト（Geminiレビュー反映）
         // "Hello" と "Hello World" の両方が候補にある場合、長い方を優先
         var chunk = CreateTextChunk(1, "Say Hello World Today", new Rectangle(0, 0, 200, 20));
-        var cloudTexts = new[] { "Hello", "Hello World", "Today" };
+        var cloudTextItems = new[]
+        {
+            CreateTranslatedTextItem("Hello", null),
+            CreateTranslatedTextItem("Hello World", null),
+            CreateTranslatedTextItem("Today", null)
+        };
 
         // Act
-        var result = _sut.FindSplitInfo(chunk, cloudTexts);
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
 
         // Assert
         Assert.NotNull(result);
@@ -377,10 +403,15 @@ public sealed class ContainmentMatcherTests
     {
         // Arrange - Cloud AIテキストが出現順でなくても全て検出
         var chunk = CreateTextChunk(1, "Hello World Test", new Rectangle(0, 0, 150, 20));
-        var cloudTexts = new[] { "Test", "Hello", "World" }; // 出現順と異なる
+        var cloudTextItems = new[]
+        {
+            CreateTranslatedTextItem("Test", null),
+            CreateTranslatedTextItem("Hello", null),
+            CreateTranslatedTextItem("World", null)
+        };
 
         // Act
-        var result = _sut.FindSplitInfo(chunk, cloudTexts);
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
 
         // Assert
         Assert.NotNull(result);
@@ -389,6 +420,53 @@ public sealed class ContainmentMatcherTests
         Assert.Contains(result.Segments, s => s.CloudText == "Hello");
         Assert.Contains(result.Segments, s => s.CloudText == "World");
         Assert.Contains(result.Segments, s => s.CloudText == "Test");
+    }
+
+    [Fact]
+    public void FindSplitInfo_WithBoundingBox_PreservesCloudAiCoordinates()
+    {
+        // Arrange - Issue #275: BoundingBoxがある場合はCloud AI座標を保持
+        var chunk = CreateTextChunk(1, "Hello World", new Rectangle(0, 0, 100, 20));
+        var cloudTextItems = new[]
+        {
+            CreateTranslatedTextItem("Hello", new Int32Rect(10, 50, 40, 15)),
+            CreateTranslatedTextItem("World", new Int32Rect(10, 70, 40, 15))  // 縦配置
+        };
+
+        // Act
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Segments.Count);
+
+        // BoundingBoxが保持されていることを確認
+        var helloSegment = result.Segments.First(s => s.CloudText == "Hello");
+        var worldSegment = result.Segments.First(s => s.CloudText == "World");
+
+        Assert.True(helloSegment.CloudBoundingBox.HasValue);
+        Assert.True(worldSegment.CloudBoundingBox.HasValue);
+        Assert.Equal(50, helloSegment.CloudBoundingBox!.Value.Y);  // Y=50
+        Assert.Equal(70, worldSegment.CloudBoundingBox!.Value.Y);  // Y=70（縦配置）
+    }
+
+    [Fact]
+    public void FindSplitInfo_WithoutBoundingBox_ReturnsNullBoundingBox()
+    {
+        // Arrange - BoundingBoxがない場合はnull
+        var chunk = CreateTextChunk(1, "Hello World", new Rectangle(0, 0, 100, 20));
+        var cloudTextItems = new[]
+        {
+            CreateTranslatedTextItem("Hello", null),
+            CreateTranslatedTextItem("World", null)
+        };
+
+        // Act
+        var result = _sut.FindSplitInfo(chunk, cloudTextItems);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.All(result.Segments, s => Assert.False(s.CloudBoundingBox.HasValue));
     }
 
     #endregion
@@ -485,6 +563,19 @@ public sealed class ContainmentMatcherTests
             CombinedBounds = bounds,
             TextResults = [],
             SourceWindowHandle = IntPtr.Zero
+        };
+    }
+
+    /// <summary>
+    /// テスト用TranslatedTextItem作成ヘルパー（Issue #275）
+    /// </summary>
+    private static TranslatedTextItem CreateTranslatedTextItem(string original, Int32Rect? boundingBox)
+    {
+        return new TranslatedTextItem
+        {
+            Original = original,
+            Translation = $"[翻訳]{original}",
+            BoundingBox = boundingBox
         };
     }
 

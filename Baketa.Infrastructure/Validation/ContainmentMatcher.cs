@@ -1,6 +1,7 @@
 using System.Globalization;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Validation;
+using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Validation;
@@ -132,10 +133,11 @@ public sealed class ContainmentMatcher : IContainmentMatcher
     /// <remarks>
     /// Geminiレビュー反映: 最長一致優先ロジック
     /// 全候補をリストアップし、包含関係にあるものを除外して最長マッチを優先
+    /// Issue #275: TranslatedTextItemを受け取り、BoundingBox座標を保持
     /// </remarks>
     public SplitInfo? FindSplitInfo(
         TextChunk unmatchedChunk,
-        IReadOnlyList<string> cloudTexts)
+        IReadOnlyList<TranslatedTextItem> cloudTextItems)
     {
         var localText = unmatchedChunk.CombinedText;
         if (string.IsNullOrEmpty(localText))
@@ -144,9 +146,10 @@ public sealed class ContainmentMatcher : IContainmentMatcher
         // Step 1: 全候補をリストアップ（位置0から全て検索）
         var allCandidates = new List<SplitSegment>();
 
-        for (int cloudIndex = 0; cloudIndex < cloudTexts.Count; cloudIndex++)
+        for (int cloudIndex = 0; cloudIndex < cloudTextItems.Count; cloudIndex++)
         {
-            var cloudText = cloudTexts[cloudIndex];
+            var cloudItem = cloudTextItems[cloudIndex];
+            var cloudText = cloudItem.Original;
             if (string.IsNullOrEmpty(cloudText))
                 continue;
 
@@ -169,12 +172,14 @@ public sealed class ContainmentMatcher : IContainmentMatcher
 
                 if (beforeOk && afterOk)
                 {
+                    // Issue #275: Cloud AIのBoundingBox座標を保持
                     allCandidates.Add(new SplitSegment
                     {
                         CloudTextIndex = cloudIndex,
                         CloudText = cloudText,
                         StartIndex = index,
-                        EndIndex = index + cloudText.Length
+                        EndIndex = index + cloudText.Length,
+                        CloudBoundingBox = cloudItem.BoundingBox
                     });
                 }
 
@@ -206,10 +211,11 @@ public sealed class ContainmentMatcher : IContainmentMatcher
                 selectedSegments.Add(candidate);
 
                 _logger.LogDebug(
-                    "分割セグメント検出: CloudText='{CloudText}', Position={Start}-{End}",
+                    "分割セグメント検出: CloudText='{CloudText}', Position={Start}-{End}, HasBoundingBox={HasBox}",
                     candidate.CloudText.Length > 20 ? candidate.CloudText[..20] + "..." : candidate.CloudText,
                     candidate.StartIndex,
-                    candidate.EndIndex);
+                    candidate.EndIndex,
+                    candidate.CloudBoundingBox.HasValue);
             }
         }
 

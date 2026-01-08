@@ -1,5 +1,7 @@
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Models;
 using Baketa.Core.Models.Validation;
+using Baketa.Core.Translation.Abstractions;
 
 namespace Baketa.Core.Abstractions.Validation;
 
@@ -40,11 +42,14 @@ public interface IContainmentMatcher
     /// 分割が必要なチャンクを検出（1 ローカル ⊃ 複数 Cloud AI）
     /// </summary>
     /// <param name="unmatchedChunk">ファジーマッチングで未マッチのローカルチャンク</param>
-    /// <param name="cloudTexts">Cloud AI検出テキスト</param>
+    /// <param name="cloudTextItems">Cloud AI検出テキスト（BoundingBox座標含む）</param>
     /// <returns>分割情報（null = 分割不要）</returns>
+    /// <remarks>
+    /// Issue #275: TranslatedTextItemを受け取ることでBoundingBox座標を保持
+    /// </remarks>
     SplitInfo? FindSplitInfo(
         TextChunk unmatchedChunk,
-        IReadOnlyList<string> cloudTexts);
+        IReadOnlyList<TranslatedTextItem> cloudTextItems);
 }
 
 /// <summary>
@@ -108,4 +113,10 @@ public sealed class SplitSegment
     /// ローカルテキスト内での終了位置
     /// </summary>
     public required int EndIndex { get; init; }
+
+    /// <summary>
+    /// Cloud AIのBoundingBox座標（ピクセル座標）
+    /// Issue #275: AI翻訳時の正確な座標配置のため
+    /// </summary>
+    public Int32Rect? CloudBoundingBox { get; init; }
 }

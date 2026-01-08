@@ -118,11 +118,13 @@ public sealed class CrossValidator : ICrossValidator
         }
 
         // Phase 3.5: 包含マッチングフォールバック
+        // Issue #275: TranslatedTextItem（BoundingBox含む）を渡してAI座標を保持
         if (_containmentMatcher != null && unmatchedChunks.Count > 0)
         {
             ProcessContainmentFallback(
                 unmatchedChunks,
                 cloudDetectedTexts,
+                cloudAiResponse.Texts ?? [],  // Issue #275: BoundingBox座標含むTranslatedTextItem
                 translatedTexts,
                 validatedChunks,
                 stats,
@@ -163,9 +165,13 @@ public sealed class CrossValidator : ICrossValidator
     /// <summary>
     /// Phase 3.5: 包含マッチングフォールバック処理
     /// </summary>
+    /// <remarks>
+    /// Issue #275: cloudTextItemsパラメータ追加でBoundingBox座標を保持
+    /// </remarks>
     private void ProcessContainmentFallback(
         List<TextChunk> unmatchedChunks,
         IReadOnlyList<string> cloudDetectedTexts,
+        IReadOnlyList<TranslatedTextItem> cloudTextItems,  // Issue #275: BoundingBox含む
         IReadOnlyList<string> translatedTexts,
         List<ValidatedTextChunk> validatedChunks,
         ValidationStatisticsBuilder stats,
@@ -179,6 +185,7 @@ public sealed class CrossValidator : ICrossValidator
             unmatchedChunks.Count);
 
         // Step 3A: 統合グループ検出（複数ローカル ⊂ 1 Cloud AI）
+        // FindMergeGroupsは文字列リストを使用（座標は統合されるため）
         var mergeGroups = _containmentMatcher.FindMergeGroups(unmatchedChunks, cloudDetectedTexts);
         var mergedChunkIds = new HashSet<int>();
 
@@ -201,6 +208,7 @@ public sealed class CrossValidator : ICrossValidator
         }
 
         // Step 3B: 分割検出（1 ローカル ⊃ 複数 Cloud AI）
+        // Issue #275: FindSplitInfoにTranslatedTextItem（BoundingBox含む）を渡す
         foreach (var chunk in unmatchedChunks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -209,7 +217,7 @@ public sealed class CrossValidator : ICrossValidator
             if (mergedChunkIds.Contains(chunk.ChunkId))
                 continue;
 
-            var splitInfo = _containmentMatcher.FindSplitInfo(chunk, cloudDetectedTexts);
+            var splitInfo = _containmentMatcher.FindSplitInfo(chunk, cloudTextItems);
             if (splitInfo != null)
             {
                 var splitResults = ProcessSplitInfo(splitInfo, translatedTexts);
@@ -274,6 +282,9 @@ public sealed class CrossValidator : ICrossValidator
     /// <summary>
     /// 分割情報を処理
     /// </summary>
+    /// <remarks>
+    /// Issue #275: CloudBoundingBoxがある場合はCloud AI座標を優先使用
+    /// </remarks>
     private List<ValidatedTextChunk> ProcessSplitInfo(
         SplitInfo splitInfo,
         IReadOnlyList<string> translatedTexts)
@@ -284,20 +295,41 @@ public sealed class CrossValidator : ICrossValidator
 
         foreach (var segment in splitInfo.Segments)
         {
-            // 座標按分計算
-            var ratio = localText.Length > 0
-                ? (float)segment.StartIndex / localText.Length
-                : 0f;
-            var widthRatio = localText.Length > 0
-                ? (float)segment.CloudText.Length / localText.Length
-                : 1f;
+            System.Drawing.Rectangle splitBounds;
 
-            var splitBounds = new System.Drawing.Rectangle(
-                localBounds.X + (int)(localBounds.Width * ratio),
-                localBounds.Y,
-                (int)(localBounds.Width * widthRatio),
-                localBounds.Height
-            );
+            // Issue #275: CloudBoundingBoxがある場合はCloud AI座標を優先使用
+            if (segment.CloudBoundingBox.HasValue)
+            {
+                var box = segment.CloudBoundingBox.Value;
+                splitBounds = new System.Drawing.Rectangle(box.X, box.Y, box.Width, box.Height);
+
+                _logger.LogDebug(
+                    "分割（Cloud AI座標使用）: CloudText='{CloudText}', Box=({X},{Y},{W},{H})",
+                    segment.CloudText.Length > 20 ? segment.CloudText[..20] + "..." : segment.CloudText,
+                    box.X, box.Y, box.Width, box.Height);
+            }
+            else
+            {
+                // フォールバック: テキスト長比率から座標按分計算（ローカルOCRのみの場合）
+                var ratio = localText.Length > 0
+                    ? (float)segment.StartIndex / localText.Length
+                    : 0f;
+                var widthRatio = localText.Length > 0
+                    ? (float)segment.CloudText.Length / localText.Length
+                    : 1f;
+
+                splitBounds = new System.Drawing.Rectangle(
+                    localBounds.X + (int)(localBounds.Width * ratio),
+                    localBounds.Y,
+                    (int)(localBounds.Width * widthRatio),
+                    localBounds.Height
+                );
+
+                _logger.LogDebug(
+                    "分割（比率計算）: CloudText='{CloudText}', Box=({X},{Y},{W},{H})",
+                    segment.CloudText.Length > 20 ? segment.CloudText[..20] + "..." : segment.CloudText,
+                    splitBounds.X, splitBounds.Y, splitBounds.Width, splitBounds.Height);
+            }
 
             // 分割チャンク生成
             var splitChunk = new TextChunk
