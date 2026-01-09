@@ -902,15 +902,16 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             "🔄 外部ソースからライセンス状態を設定: Source={Source}, Plan={Plan}, Reason={Reason}",
             source, state.CurrentPlan, reason);
 
-        // Patreon連携の場合、userIdを設定しておく（キャッシュ用）
-        // スレッドセーフティのためlockで保護 (Gemini Review指摘)
-        if (!string.IsNullOrEmpty(state.PatreonUserId))
+        // [Issue #279] スレッドセーフにuserIdを取得・設定 (Gemini Review指摘対応)
+        string? userIdForCache;
+        lock (_stateLock)
         {
-            lock (_stateLock)
+            if (!string.IsNullOrEmpty(state.PatreonUserId))
             {
                 _userId = state.PatreonUserId;
+                _logger.LogDebug("PatreonUserIdをuserIdに設定: {UserId}", MaskUserId(_userId));
             }
-            _logger.LogDebug("PatreonUserIdをuserIdに設定: {UserId}", MaskUserId(_userId));
+            userIdForCache = _userId;
         }
 
         // [Issue #275] プロモーションが有効な場合、プロモーションのプランと有効期限を優先
@@ -919,6 +920,32 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // 状態を更新（イベントも発火）
         // [Issue #275] SessionIdの保持はUpdateCurrentState内でアトミックに実行される（Gemini Review対応）
         UpdateCurrentState(stateToApply, reason);
+
+        // [Issue #279] キャッシュも更新（同期済み状態をキャッシュに反映）
+        // これにより「ライセンス情報を更新」ボタンでキャッシュの古い値に戻る問題を解消
+        if (!string.IsNullOrEmpty(userIdForCache))
+        {
+            _ = UpdateCacheWithLoggingAsync(userIdForCache, stateToApply);
+        }
+    }
+
+    /// <summary>
+    /// キャッシュを更新し、エラーをログに記録する (Issue #279 Gemini Review対応)
+    /// </summary>
+    private async Task UpdateCacheWithLoggingAsync(string userId, LicenseState state)
+    {
+        try
+        {
+            await _cacheService.SetCachedStateAsync(userId, state, CancellationToken.None)
+                .ConfigureAwait(false);
+            _logger.LogDebug("キャッシュ更新成功: UserId={UserId}", MaskUserId(userId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "キャッシュ更新に失敗しましたが、メモリ上の状態は正常に更新されています: UserId={UserId}",
+                MaskUserId(userId));
+        }
     }
 
     /// <inheritdoc/>
