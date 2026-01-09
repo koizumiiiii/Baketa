@@ -33,6 +33,17 @@ public interface IPromotionCodeService
     /// プロモーションコードの適用状態変更イベント
     /// </summary>
     event EventHandler<PromotionStateChangedEventArgs>? PromotionStateChanged;
+
+    /// <summary>
+    /// サーバーからプロモーション状態を同期
+    /// Issue #276: ローカルファイル依存からの脱却
+    /// </summary>
+    /// <param name="accessToken">Supabase認証トークン（JWT）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>同期結果</returns>
+    Task<ServerSyncResult> SyncFromServerAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

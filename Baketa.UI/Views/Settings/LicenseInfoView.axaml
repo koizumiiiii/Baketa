@@ -204,13 +204,26 @@
                                        FontWeight="Medium"
                                        Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="4">
+                        <!-- プロモーションコード表示 -->
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,0,0">
+                            <TextBlock Text="{local:Localize Settings_License_PromotionCodeLabel}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding PromotionCodeDisplay}"
+                                       FontSize="12"
+                                       FontWeight="Medium"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,0,0">
                             <TextBlock Text="{local:Localize Settings_License_PromotionExpires}"
                                        FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding PromotionExpiresDisplay}"
                                        FontSize="12"
-                                       FontWeight="Medium"/>
+                                       FontWeight="Medium"
+                                       VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>

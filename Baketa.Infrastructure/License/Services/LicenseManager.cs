@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Events;
 using Baketa.Core.Extensions;
@@ -27,6 +28,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private readonly IEventAggregator _eventAggregator;
     private readonly LicenseSettings _settings;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
+    private readonly IUsageAnalyticsService? _analyticsService;
 
     // 現在のライセンス状態
     private LicenseState _currentState;
@@ -86,7 +88,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         ILicenseCacheService cacheService,
         IEventAggregator eventAggregator,
         IOptions<LicenseSettings> settings,
-        IUnifiedSettingsService? unifiedSettingsService = null)
+        IUnifiedSettingsService? unifiedSettingsService = null,
+        IUsageAnalyticsService? analyticsService = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
@@ -94,6 +97,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _unifiedSettingsService = unifiedSettingsService;
+        _analyticsService = analyticsService;
 
         // 初期状態はFreeプラン
         _currentState = LicenseState.Default;
@@ -790,6 +794,21 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
         // EventAggregatorにも発行
         _ = _eventAggregator.PublishAsync(new LicenseStateChangedEvent(oldState, newState, reason));
+
+        // [Issue #271] プラン変更を使用統計に記録
+        if (oldState.CurrentPlan != newState.CurrentPlan && _analyticsService != null)
+        {
+            _analyticsService.TrackEvent("plan_changed", new Dictionary<string, object>
+            {
+                ["old_plan"] = oldState.CurrentPlan.ToString(),
+                ["new_plan"] = newState.CurrentPlan.ToString(),
+                ["change_reason"] = reason.ToString()
+            });
+
+            _logger.LogInformation(
+                "[Issue #271] プラン変更をUsageAnalyticsに記録: {OldPlan} -> {NewPlan}, Reason={Reason}",
+                oldState.CurrentPlan, newState.CurrentPlan, reason);
+        }
 
         if (_settings.EnableDebugMode)
         {

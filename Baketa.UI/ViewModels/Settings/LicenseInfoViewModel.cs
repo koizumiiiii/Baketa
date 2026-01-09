@@ -277,6 +277,38 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// アクティブなプロモーションのコード表示（マスク済み）
+    /// </summary>
+    public string PromotionCodeDisplay
+    {
+        get
+        {
+            var promotion = _promotionCodeService.GetCurrentPromotion();
+            if (promotion == null || !promotion.IsValid)
+                return string.Empty;
+
+            var code = promotion.Code;
+
+            // 既にマスクされている場合はそのまま返す
+            if (code.Contains('*'))
+                return code;
+
+            // 下4桁以外をマスク
+            // 例: BAKETA-15D12788 → ************2788
+            // 例: BAKETA-VIP1-ABCD → ************ABCD
+            if (code.Length > 4)
+            {
+                var lastFour = code[^4..];
+                var maskLength = code.Length - 4;
+                return new string('*', maskLength) + lastFour;
+            }
+
+            // 4文字以下の場合はそのまま（通常ありえない）
+            return code;
+        }
+    }
+
+    /// <summary>
     /// アクティブなプロモーションのプラン表示名
     /// </summary>
     public string PromotionPlanDisplayName

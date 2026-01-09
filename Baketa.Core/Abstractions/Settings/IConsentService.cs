@@ -1,3 +1,4 @@
+using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
 
 namespace Baketa.Core.Abstractions.Settings;
@@ -105,6 +106,28 @@ public interface IConsentService
     /// <returns>同期タスク</returns>
     Task SyncLocalConsentToServerAsync(
         string userId,
+        string accessToken,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// サーバーから同意状態を同期
+    /// Issue #277: ローカルファイル依存からの脱却
+    /// </summary>
+    /// <param name="accessToken">Supabase認証トークン（JWT）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>同期結果</returns>
+    Task<ServerSyncResult> SyncFromServerAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 同意が有効か確認（24時間以上経過していれば再同期）
+    /// Issue #277: GDPR撤回の即時反映
+    /// </summary>
+    /// <param name="accessToken">Supabase認証トークン（JWT）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>検証状態</returns>
+    Task<ConsentVerificationState> EnsureConsentValidAsync(
         string accessToken,
         CancellationToken cancellationToken = default);
 }

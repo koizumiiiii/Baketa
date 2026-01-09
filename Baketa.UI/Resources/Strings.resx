@@ -720,6 +720,9 @@
   <data name="Settings_License_PromotionExpires" xml:space="preserve">
     <value>有効期限:</value>
   </data>
+  <data name="Settings_License_PromotionCodeLabel" xml:space="preserve">
+    <value>コード:</value>
+  </data>
   <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
     <value>プロモーションコードをお持ちの場合は、下記に入力してください。</value>
   </data>

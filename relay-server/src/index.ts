@@ -998,6 +998,120 @@ async function handlePromotionRedeem(
 }
 
 /**
+ * [Issue #276] プロモーション状態取得
+ * GET /api/promotion/status
+ *
+ * 認証済みユーザーのプロモーション適用状態をDBから取得
+ * ローカルファイル依存からの脱却
+ */
+async function handlePromotionStatus(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('Supabase not configured for promotion status');
+      return errorResponse('Promotion service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）- サーバーサイド検証
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'PROMO_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'PROMO_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（10回/分）
+    const rateLimit = await checkRateLimit(env, `promotion-status:${user.id}`, 10);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. RPC関数を使用してプロモーション状態を取得
+    // [Gemini Review] 日付計算をDB側で行い、タイムゾーン問題を回避
+    const { data, error } = await supabase.rpc('get_promotion_status');
+
+    if (error) {
+      console.error('[Promotion] RPC error:', error);
+      return errorResponse('Database error', 500, origin, allowedOrigins, 'PROMO_DB_ERROR');
+    }
+
+    // RPC関数は常に1行を返す（プロモーションなしの場合はhas_promotion=false）
+    const result = Array.isArray(data) ? data[0] : data;
+
+    if (!result || !result.has_promotion) {
+      // プロモーションなし（正常系）
+      console.log(JSON.stringify({
+        event: 'promotion_status_check',
+        user_id: user.id.substring(0, 8) + '...',
+        has_promotion: false,
+        expired: result?.is_expired ?? false,
+        timestamp: new Date().toISOString()
+      }));
+
+      return successResponse({
+        has_promotion: false,
+        promotion: null,
+        expired: result?.is_expired ?? false
+      }, origin, allowedOrigins);
+    }
+
+    // 5. 有効期限チェック（DB側で計算済み）
+    if (result.is_expired) {
+      console.log(JSON.stringify({
+        event: 'promotion_status_check',
+        user_id: user.id.substring(0, 8) + '...',
+        has_promotion: false,
+        expired: true,
+        timestamp: new Date().toISOString()
+      }));
+
+      return successResponse({
+        has_promotion: false,
+        promotion: null,
+        expired: true
+      }, origin, allowedOrigins);
+    }
+
+    // 6. 成功レスポンス
+    console.log(JSON.stringify({
+      event: 'promotion_status_check',
+      user_id: user.id.substring(0, 8) + '...',
+      has_promotion: true,
+      plan_type: result.plan_name,
+      timestamp: new Date().toISOString()
+    }));
+
+    return successResponse({
+      has_promotion: true,
+      promotion: {
+        code_masked: result.code_masked,
+        plan_type: result.plan_name,
+        applied_at: result.applied_at,
+        expires_at: result.expires_at
+      }
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('Promotion status error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
  * [Issue #261] 同意記録をSupabaseに保存
  * POST /api/consent/record
  *
@@ -1079,6 +1193,91 @@ async function handleConsentRecord(
 
   } catch (error) {
     console.error('[Issue #261] Consent record error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * [Issue #277] 同意状態取得
+ * GET /api/consent/status
+ *
+ * 認証済みユーザーの同意状態をDBから取得
+ * ローカルファイル依存からの脱却
+ */
+async function handleConsentStatus(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('Supabase not configured for consent status');
+      return errorResponse('Consent service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）- サーバーサイド検証
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'CONSENT_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'CONSENT_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（10回/分）
+    const rateLimit = await checkRateLimit(env, `consent-status:${user.id}`, 10);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. RPC関数を使用して同意状態を取得
+    // [Gemini Review] ビュー直接アクセスからRPC関数に移行
+    const { data, error } = await supabase.rpc('get_consent_status');
+
+    if (error) {
+      console.error('[Consent] RPC error:', error);
+      return errorResponse('Database error', 500, origin, allowedOrigins, 'CONSENT_DB_ERROR');
+    }
+
+    // 5. レスポンス構築
+    const results = Array.isArray(data) ? data : [];
+    const privacyPolicy = results.find((r: { consent_type: string }) => r.consent_type === 'privacy_policy');
+    const termsOfService = results.find((r: { consent_type: string }) => r.consent_type === 'terms_of_service');
+
+    // 6. 監査ログ記録
+    console.log(JSON.stringify({
+      event: 'consent_status_retrieved',
+      user_id: user.id.substring(0, 8) + '...',
+      has_privacy_policy: !!privacyPolicy,
+      has_terms: !!termsOfService,
+      timestamp: new Date().toISOString()
+    }));
+
+    return successResponse({
+      privacy_policy: privacyPolicy ? {
+        status: privacyPolicy.status,
+        version: privacyPolicy.version,
+        recorded_at: privacyPolicy.recorded_at
+      } : null,
+      terms_of_service: termsOfService ? {
+        status: termsOfService.status,
+        version: termsOfService.version,
+        recorded_at: termsOfService.recorded_at
+      } : null
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #277] Consent status error:', error);
     return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
   }
 }
@@ -1271,8 +1470,12 @@ export default {
           return handleTranslate(request, env as TranslateEnv, origin, allowedOrigins);
         case '/api/promotion/redeem':
           return handlePromotionRedeem(request, env, origin, allowedOrigins);
+        case '/api/promotion/status':
+          return handlePromotionStatus(request, env, origin, allowedOrigins);
         case '/api/consent/record':
           return handleConsentRecord(request, env, origin, allowedOrigins);
+        case '/api/consent/status':
+          return handleConsentStatus(request, env, origin, allowedOrigins);
         // Note: /api/crash-report is handled earlier (before API key validation)
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');

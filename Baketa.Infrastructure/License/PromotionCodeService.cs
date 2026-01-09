@@ -581,6 +581,120 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
     #endregion
 
+    #region Server Sync (Issue #276)
+
+    /// <inheritdoc/>
+    public async Task<ServerSyncResult> SyncFromServerAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            _logger.LogWarning("[Issue #276] SyncFromServerAsync: accessToken is null or empty");
+            return ServerSyncResult.NotAuthenticated;
+        }
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/promotion/status");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                _logger.LogWarning("[Issue #276] SyncFromServerAsync: Rate limited");
+                return ServerSyncResult.RateLimited;
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _logger.LogWarning("[Issue #276] SyncFromServerAsync: Unauthorized");
+                return ServerSyncResult.NotAuthenticated;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("[Issue #276] SyncFromServerAsync: Server error {StatusCode}", response.StatusCode);
+                return ServerSyncResult.ServerError;
+            }
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var result = JsonSerializer.Deserialize<PromotionStatusResponse>(content, _jsonOptions);
+
+            if (result == null)
+            {
+                _logger.LogWarning("[Issue #276] SyncFromServerAsync: Invalid response");
+                return ServerSyncResult.InvalidResponse;
+            }
+
+            // プロモーションなし
+            if (!result.HasPromotion || result.Promotion == null)
+            {
+                if (result.Expired == true)
+                {
+                    _logger.LogInformation("[Issue #276] SyncFromServerAsync: Promotion expired");
+                    return ServerSyncResult.Expired;
+                }
+
+                _logger.LogDebug("[Issue #276] SyncFromServerAsync: No promotion found");
+                return ServerSyncResult.NoDataFound;
+            }
+
+            // プロモーションあり - ローカル設定を更新
+            var planType = ParsePlanType(result.Promotion.PlanType);
+            var expiresAt = DateTime.Parse(result.Promotion.ExpiresAt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
+
+            await _settingsPersistence.SavePromotionAsync(
+                result.Promotion.CodeMasked ?? "****-****",
+                planType,
+                expiresAt,
+                cancellationToken).ConfigureAwait(false);
+
+            // イベント発行
+            var promotionInfo = new PromotionInfo
+            {
+                Code = result.Promotion.CodeMasked ?? "****-****",
+                Plan = planType,
+                ExpiresAt = expiresAt,
+                AppliedAt = DateTime.Parse(result.Promotion.AppliedAt!, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
+            };
+
+            PromotionStateChanged?.Invoke(this, new PromotionStateChangedEventArgs
+            {
+                NewPromotion = promotionInfo,
+                Reason = "Synced from server"
+            });
+
+            _logger.LogInformation("[Issue #276] SyncFromServerAsync: Promotion synced successfully (Plan: {PlanType}, Expires: {ExpiresAt})",
+                planType, expiresAt);
+
+            return ServerSyncResult.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("[Issue #276] SyncFromServerAsync: Timeout");
+            return ServerSyncResult.Timeout;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "[Issue #276] SyncFromServerAsync: Network error");
+            return ServerSyncResult.NetworkError;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "[Issue #276] SyncFromServerAsync: JSON parse error");
+            return ServerSyncResult.InvalidResponse;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #276] SyncFromServerAsync: Unexpected error");
+            return ServerSyncResult.ServerError;
+        }
+    }
+
+    #endregion
+
     #region Request/Response Models
 
     private sealed class RedeemRequest
@@ -605,6 +719,39 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
         [JsonPropertyName("message")]
         public string? Message { get; set; }
+    }
+
+    /// <summary>
+    /// Issue #276: プロモーション状態取得レスポンス
+    /// </summary>
+    private sealed class PromotionStatusResponse
+    {
+        [JsonPropertyName("has_promotion")]
+        public bool HasPromotion { get; set; }
+
+        [JsonPropertyName("promotion")]
+        public PromotionDetail? Promotion { get; set; }
+
+        [JsonPropertyName("expired")]
+        public bool? Expired { get; set; }
+    }
+
+    /// <summary>
+    /// Issue #276: プロモーション詳細
+    /// </summary>
+    private sealed class PromotionDetail
+    {
+        [JsonPropertyName("code_masked")]
+        public string? CodeMasked { get; set; }
+
+        [JsonPropertyName("plan_type")]
+        public string? PlanType { get; set; }
+
+        [JsonPropertyName("applied_at")]
+        public string? AppliedAt { get; set; }
+
+        [JsonPropertyName("expires_at")]
+        public string ExpiresAt { get; set; } = string.Empty;
     }
 
     #endregion

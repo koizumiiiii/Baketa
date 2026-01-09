@@ -2,7 +2,9 @@ using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 
@@ -354,6 +356,203 @@ public sealed class ConsentService : IConsentService, IDisposable
         var version = assembly.GetName().Version;
         return version?.ToString() ?? "0.0.0";
     }
+
+    #region Server Sync (Issue #277)
+
+    /// <inheritdoc/>
+    public async Task<ServerSyncResult> SyncFromServerAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            _logger.LogWarning("[Issue #277] SyncFromServerAsync: accessToken is null or empty");
+            return ServerSyncResult.NotAuthenticated;
+        }
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient("RelayServer");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/consent/status");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+            using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                _logger.LogWarning("[Issue #277] SyncFromServerAsync: Rate limited");
+                return ServerSyncResult.RateLimited;
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _logger.LogWarning("[Issue #277] SyncFromServerAsync: Unauthorized");
+                return ServerSyncResult.NotAuthenticated;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("[Issue #277] SyncFromServerAsync: Server error {StatusCode}", response.StatusCode);
+                return ServerSyncResult.ServerError;
+            }
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var result = JsonSerializer.Deserialize<ConsentStatusResponse>(content, _jsonOptions);
+
+            if (result == null)
+            {
+                _logger.LogWarning("[Issue #277] SyncFromServerAsync: Invalid response");
+                return ServerSyncResult.InvalidResponse;
+            }
+
+            await _settingsLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var settings = await LoadSettingsInternalAsync(cancellationToken).ConfigureAwait(false);
+                var updated = false;
+
+                // プライバシーポリシー
+                if (result.PrivacyPolicy != null)
+                {
+                    if (result.PrivacyPolicy.Status == "revoked")
+                    {
+                        settings.HasAcceptedPrivacyPolicy = false;
+                        settings.PrivacyPolicyVersion = null;
+                        updated = true;
+                        _logger.LogInformation("[Issue #277] Privacy policy consent revoked by server");
+                    }
+                    else if (result.PrivacyPolicy.Status == "granted")
+                    {
+                        settings.HasAcceptedPrivacyPolicy = true;
+                        settings.PrivacyPolicyVersion = result.PrivacyPolicy.Version;
+                        updated = true;
+                    }
+                }
+
+                // 利用規約
+                if (result.TermsOfService != null)
+                {
+                    if (result.TermsOfService.Status == "revoked")
+                    {
+                        settings.HasAcceptedTermsOfService = false;
+                        settings.TermsOfServiceVersion = null;
+                        updated = true;
+                        _logger.LogInformation("[Issue #277] Terms of service consent revoked by server");
+                    }
+                    else if (result.TermsOfService.Status == "granted")
+                    {
+                        settings.HasAcceptedTermsOfService = true;
+                        settings.TermsOfServiceVersion = result.TermsOfService.Version;
+                        updated = true;
+                    }
+                }
+
+                if (updated)
+                {
+                    settings.LastSyncedAt = DateTime.UtcNow.ToString("O");
+                    await SaveSettingsAsync(settings, cancellationToken).ConfigureAwait(false);
+                    _logger.LogInformation("[Issue #277] Consent state synced from server");
+                }
+
+                return ServerSyncResult.Success;
+            }
+            finally
+            {
+                _settingsLock.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("[Issue #277] SyncFromServerAsync: Timeout");
+            return ServerSyncResult.Timeout;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "[Issue #277] SyncFromServerAsync: Network error");
+            return ServerSyncResult.NetworkError;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "[Issue #277] SyncFromServerAsync: JSON parse error");
+            return ServerSyncResult.InvalidResponse;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #277] SyncFromServerAsync: Unexpected error");
+            return ServerSyncResult.ServerError;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ConsentVerificationState> EnsureConsentValidAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await GetConsentStateAsync(cancellationToken).ConfigureAwait(false);
+
+        // 24時間以上経過していれば再同期
+        if (settings.NeedsResync)
+        {
+            var result = await SyncFromServerAsync(accessToken, cancellationToken).ConfigureAwait(false);
+
+            if (result == ServerSyncResult.NetworkError || result == ServerSyncResult.Timeout)
+            {
+                _logger.LogWarning("[Issue #277] EnsureConsentValidAsync: Sync failed, using local cache");
+                return ConsentVerificationState.LocalOnly;
+            }
+
+            if (result != ServerSyncResult.Success)
+            {
+                return ConsentVerificationState.Unknown;
+            }
+
+            // 再取得
+            settings = await GetConsentStateAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        // 撤回チェック
+        if (!settings.HasAcceptedPrivacyPolicy || !settings.HasAcceptedTermsOfService)
+        {
+            return ConsentVerificationState.RequiresReconsent;
+        }
+
+        // バージョンチェック
+        if (settings.NeedsPrivacyPolicyReConsent || settings.NeedsTermsOfServiceReConsent)
+        {
+            return ConsentVerificationState.RequiresReconsent;
+        }
+
+        return ConsentVerificationState.Verified;
+    }
+
+    /// <summary>
+    /// Issue #277: 同意状態レスポンス
+    /// </summary>
+    private sealed class ConsentStatusResponse
+    {
+        [JsonPropertyName("privacy_policy")]
+        public ConsentDetail? PrivacyPolicy { get; set; }
+
+        [JsonPropertyName("terms_of_service")]
+        public ConsentDetail? TermsOfService { get; set; }
+    }
+
+    /// <summary>
+    /// Issue #277: 同意詳細
+    /// </summary>
+    private sealed class ConsentDetail
+    {
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [JsonPropertyName("version")]
+        public string? Version { get; set; }
+
+        [JsonPropertyName("recorded_at")]
+        public string? RecordedAt { get; set; }
+    }
+
+    #endregion
 
     public void Dispose()
     {

@@ -62,3 +62,49 @@ SELECT DISTINCT ON (user_id, consent_type)
     recorded_at
 FROM consent_records
 ORDER BY user_id, consent_type, recorded_at DESC;
+
+-- ============================================================
+-- Issue #277: 同意状態取得RPC関数
+-- ============================================================
+-- ユーザーの現在の同意状態を取得
+-- ローカルファイル依存からの脱却
+--
+-- 使用例:
+-- SELECT * FROM get_consent_status();
+-- ============================================================
+CREATE OR REPLACE FUNCTION get_consent_status()
+RETURNS TABLE (
+    consent_type VARCHAR(50),
+    status VARCHAR(20),
+    version VARCHAR(20),
+    recorded_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_user_id UUID;
+BEGIN
+    -- 現在のユーザーIDを取得
+    v_user_id := auth.uid();
+
+    IF v_user_id IS NULL THEN
+        -- 未認証ユーザー: 空の結果を返す
+        RETURN;
+    END IF;
+
+    -- latest_consent_statusビューから取得
+    RETURN QUERY
+    SELECT
+        lcs.consent_type,
+        lcs.status,
+        lcs.version,
+        lcs.recorded_at
+    FROM latest_consent_status lcs
+    WHERE lcs.user_id = v_user_id;
+END;
+$$;
+
+-- RPC関数の実行権限をauthenticated roleに付与
+GRANT EXECUTE ON FUNCTION get_consent_status() TO authenticated;

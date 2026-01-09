@@ -720,6 +720,9 @@
   <data name="Settings_License_PromotionExpires" xml:space="preserve">
     <value>Expires:</value>
   </data>
+  <data name="Settings_License_PromotionCodeLabel" xml:space="preserve">
+    <value>Code:</value>
+  </data>
   <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
     <value>If you have a promotion code, enter it below.</value>
   </data>
