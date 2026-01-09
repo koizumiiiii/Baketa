@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.License;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Extensions;
 using Baketa.Core.License.Models;
+using Baketa.Core.Translation.Abstractions;
 using Baketa.UI.Framework;
 using Baketa.UI.Resources;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 {
     private readonly ILicenseManager _licenseManager;
     private readonly IPromotionCodeService _promotionCodeService;
+    private readonly ITokenConsumptionTracker _tokenTracker;
     private readonly ILogger<LicenseInfoViewModel>? _logger;
 
     private PlanType _currentPlan;
@@ -55,10 +57,12 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         ILicenseManager licenseManager,
         IPromotionCodeService promotionCodeService,
         IEventAggregator eventAggregator,
+        ITokenConsumptionTracker tokenTracker,
         ILogger<LicenseInfoViewModel>? logger = null) : base(eventAggregator)
     {
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _promotionCodeService = promotionCodeService ?? throw new ArgumentNullException(nameof(promotionCodeService));
+        _tokenTracker = tokenTracker ?? throw new ArgumentNullException(nameof(tokenTracker));
         _logger = logger;
 
         // ライセンス状態変更イベントの購読
@@ -81,6 +85,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         // 初期状態の読み込み
         LoadCurrentState();
         LoadPromotionState();
+
+        // [Issue #275再発防止] 起動時にTokenUsageRepositoryからトークン使用量を読み込む
+        _ = LoadTokenUsageFromRepositoryAsync();
 
         _logger?.LogDebug("LicenseInfoViewModel初期化完了");
     }
@@ -351,7 +358,16 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
             : basePlanName;
         PlanDescription = GetPlanDescription(state.CurrentPlan);
-        TokensUsed = state.CloudAiTokensUsed;
+
+        // [Issue #275再発防止] トークン使用量は2つのデータソースがある:
+        // 1. LicenseState.CloudAiTokensUsed - サーバー同期値（起動時は0の可能性）
+        // 2. TokenUsageRepository - ローカル永続化値
+        // LicenseStateの値が0で、ローカルに保存された値がある場合は上書きしない
+        if (state.CloudAiTokensUsed > 0 || TokensUsed == 0)
+        {
+            TokensUsed = state.CloudAiTokensUsed;
+        }
+
         TokenLimit = state.MonthlyTokenLimit;
         UsagePercentage = TokenLimit > 0 ? (double)TokensUsed / TokenLimit * 100 : 0;
         HasCloudAccess = state.CurrentPlan.HasCloudAiAccess();
@@ -488,6 +504,34 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
             this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
             this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
+        }
+    }
+
+    /// <summary>
+    /// [Issue #275再発防止] TokenUsageRepositoryからトークン使用量を読み込む
+    /// LicenseState.CloudAiTokensUsedとは別データソースのため、起動時に同期が必要
+    /// </summary>
+    private async System.Threading.Tasks.Task LoadTokenUsageFromRepositoryAsync()
+    {
+        try
+        {
+            var usage = await _tokenTracker.GetMonthlyUsageAsync().ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                TokensUsed = usage.TotalTokensUsed;
+                TokenLimit = usage.MonthlyLimit;
+                UsagePercentage = TokenLimit > 0 ? (double)TokensUsed / TokenLimit * 100 : 0;
+                this.RaisePropertyChanged(nameof(TokenUsageDisplay));
+
+                _logger?.LogDebug(
+                    "トークン使用量をリポジトリから読み込み: Used={Used}, Limit={Limit}",
+                    usage.TotalTokensUsed, usage.MonthlyLimit);
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "トークン使用量の読み込みに失敗しました");
         }
     }
 
