@@ -1274,6 +1274,20 @@ internal sealed class Program
         authModule.RegisterWithDependencies(services, registeredModules, moduleStack);
         Console.WriteLine("✅ Auth基盤モジュール登録完了");
 
+        // FeatureFlagModuleの登録（PrivacyModuleの依存モジュール）
+        Console.WriteLine("🚩 FeatureFlagModule登録開始");
+        var featureFlagModule = new FeatureFlagModule(configurationForInfrastructure);
+        featureFlagModule.RegisterServices(services);
+        registeredModules.Add(typeof(FeatureFlagModule));
+        Console.WriteLine("✅ FeatureFlagModule登録完了");
+
+        // PrivacyModuleの登録（IPrivacyConsentServiceを提供）
+        Console.WriteLine("🔒 PrivacyModule登録開始");
+        var privacyModule = new PrivacyModule(configurationForInfrastructure);
+        privacyModule.RegisterServices(services);
+        registeredModules.Add(typeof(PrivacyModule));
+        Console.WriteLine("✅ PrivacyModule登録完了");
+
         Console.WriteLine($"📊 基盤モジュール登録済み数: {registeredModules.Count}");
     }
 
