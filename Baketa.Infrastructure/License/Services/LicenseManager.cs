@@ -142,6 +142,11 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             var persistedTokenUsage = _unifiedSettingsService?.GetPromotionSettings().MockTokenUsage ?? 0;
             var initialTokenUsage = persistedTokenUsage > 0 ? persistedTokenUsage : _settings.MockTokenUsage;
 
+            // [Issue #275] ApplyPersistedPromotionIfValid()で設定されたExpirationDateを保持
+            var promotionExpirationDate = _currentState.ExpirationDate;
+            // プロモーションが設定されており、かつ有効期限が切れていないかを確認
+            var hasActivePromotion = promotionExpirationDate.HasValue && promotionExpirationDate > DateTime.UtcNow;
+
             // モックモード用の初期状態を設定
             _currentState = new LicenseState
             {
@@ -149,7 +154,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 UserId = _userId,
                 SessionId = _sessionToken,
                 ContractStartDate = DateTime.UtcNow.AddDays(-15),
-                ExpirationDate = DateTime.UtcNow.AddDays(15),
+                // 有効なプロモーションがあればその有効期限を、なければデフォルト(15日後)を設定
+                ExpirationDate = hasActivePromotion ? promotionExpirationDate : DateTime.UtcNow.AddDays(15),
                 CloudAiTokensUsed = initialTokenUsage,
                 IsCached = false,
                 LastServerSync = DateTime.UtcNow,
@@ -158,11 +164,12 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             };
 
             _logger.LogWarning(
-                "🧪 モックモード有効: UserId={UserId}, Plan={Plan}, TokenLimit={TokenLimit}, HasPromotion={HasPromotion}",
+                "🧪 モックモード有効: UserId={UserId}, Plan={Plan}, TokenLimit={TokenLimit}, HasActivePromotion={HasActivePromotion}, ExpiresAt={ExpiresAt}",
                 _userId,
                 effectivePlan,
                 _currentState.MonthlyTokenLimit,
-                _settings.PromotionPlanType.HasValue);
+                hasActivePromotion,
+                _currentState.ExpirationDate);
         }
 
         _logger.LogInformation(
@@ -538,19 +545,38 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private void UpdateCurrentState(LicenseState newState, LicenseChangeReason reason)
     {
         LicenseState oldState;
+        LicenseState stateToApply;
+
         lock (_stateLock)
         {
             oldState = _currentState;
-            _currentState = newState;
+
+            // [Issue #275] SessionIdを保持する（Gemini Review: アトミック性保証）
+            // 外部ソースから渡されたstateにSessionIdがない場合、現在の値を引き継ぐ
+            // string.IsNullOrWhiteSpace を使用してホワイトスペースのみの場合も考慮
+            if (string.IsNullOrWhiteSpace(newState.SessionId) && !string.IsNullOrWhiteSpace(_currentState.SessionId))
+            {
+                _logger.LogDebug(
+                    "🔑 [Issue #275] SessionIdを保持: {SessionId}",
+                    _currentState.SessionId[..Math.Min(10, _currentState.SessionId.Length)] + "...");
+
+                stateToApply = newState with { SessionId = _currentState.SessionId };
+            }
+            else
+            {
+                stateToApply = newState;
+            }
+
+            _currentState = stateToApply;
         }
 
         // [Issue #258] プラン変更またはトークン消費時にイベント発行
         // TokenConsumptionを追加: UI側でトークン使用量表示を更新するため
-        if (oldState.CurrentPlan != newState.CurrentPlan ||
+        if (oldState.CurrentPlan != stateToApply.CurrentPlan ||
             reason == LicenseChangeReason.ServerRefresh ||
             reason == LicenseChangeReason.TokenConsumption)
         {
-            OnStateChanged(oldState, newState, reason);
+            OnStateChanged(oldState, stateToApply, reason);
         }
     }
 
@@ -835,9 +861,57 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             _logger.LogDebug("PatreonUserIdをuserIdに設定: {UserId}", MaskUserId(_userId));
         }
 
+        // [Issue #275] プロモーションが有効な場合、プロモーションのプランと有効期限を優先
+        var stateToApply = ApplyPromotionOverride(state);
+
         // 状態を更新（イベントも発火）
-        // UpdateCurrentState内部でも_stateLockを使用するが、ここでは別の操作
-        UpdateCurrentState(state, reason);
+        // [Issue #275] SessionIdの保持はUpdateCurrentState内でアトミックに実行される（Gemini Review対応）
+        UpdateCurrentState(stateToApply, reason);
+    }
+
+    /// <summary>
+    /// [Issue #275] 有効なプロモーションがある場合、状態にプロモーション設定をマージ
+    /// プロモーションのプランがより上位であれば優先する
+    /// </summary>
+    private LicenseState ApplyPromotionOverride(LicenseState incomingState)
+    {
+        // IUnifiedSettingsService経由でプロモーション設定を確認
+        if (_unifiedSettingsService is null)
+        {
+            return incomingState;
+        }
+
+        var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+        if (!promotionSettings.IsCurrentlyActive() || !promotionSettings.PromotionPlanType.HasValue)
+        {
+            return incomingState;
+        }
+
+        var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
+
+        // プロモーションのプランが入力されたプランより上位かチェック
+        if ((int)promotionPlan <= (int)incomingState.CurrentPlan)
+        {
+            // 入力プランの方が上位または同等なので、そのまま使用
+            return incomingState;
+        }
+
+        // プロモーションプランの方が上位なので、プランと有効期限を上書き
+        if (!string.IsNullOrEmpty(promotionSettings.PromotionExpiresAt) &&
+            DateTime.TryParse(promotionSettings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var promotionExpires))
+        {
+            _logger.LogInformation(
+                "🎁 [Issue #275] プロモーション優先適用: IncomingPlan={IncomingPlan} → PromotionPlan={PromotionPlan}, ExpiresAt={ExpiresAt}",
+                incomingState.CurrentPlan, promotionPlan, promotionExpires);
+
+            return incomingState with
+            {
+                CurrentPlan = promotionPlan,
+                ExpirationDate = promotionExpires
+            };
+        }
+
+        return incomingState;
     }
 
     /// <summary>
