@@ -509,7 +509,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
     /// <summary>
     /// [Issue #275再発防止] TokenUsageRepositoryからトークン使用量を読み込む
-    /// LicenseState.CloudAiTokensUsedとは別データソースのため、起動時に同期が必要
+    /// LicenseState.CloudAiTokensUsedとは別データソースのため、大きい方の値を採用
     /// </summary>
     private async System.Threading.Tasks.Task LoadTokenUsageFromRepositoryAsync()
     {
@@ -519,14 +519,30 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                TokensUsed = usage.TotalTokensUsed;
+                // 2つのデータソース（LicenseState vs Repository）から大きい方を採用
+                // - LicenseState.CloudAiTokensUsed: モック設定 / サーバー同期値
+                // - TokenUsageRepository: 実際の翻訳使用量記録
+                var currentValue = TokensUsed;
+                var repositoryValue = usage.TotalTokensUsed;
+
+                if (repositoryValue > currentValue)
+                {
+                    TokensUsed = repositoryValue;
+                    _logger?.LogDebug(
+                        "トークン使用量をリポジトリから更新: {Current} → {Repository}",
+                        currentValue, repositoryValue);
+                }
+                else
+                {
+                    _logger?.LogDebug(
+                        "トークン使用量はLicenseState値を維持: LicenseState={Current}, Repository={Repository}",
+                        currentValue, repositoryValue);
+                }
+
+                // TokenLimitは常に最新を使用
                 TokenLimit = usage.MonthlyLimit;
                 UsagePercentage = TokenLimit > 0 ? (double)TokensUsed / TokenLimit * 100 : 0;
                 this.RaisePropertyChanged(nameof(TokenUsageDisplay));
-
-                _logger?.LogDebug(
-                    "トークン使用量をリポジトリから読み込み: Used={Used}, Limit={Limit}",
-                    usage.TotalTokensUsed, usage.MonthlyLimit);
             });
         }
         catch (Exception ex)

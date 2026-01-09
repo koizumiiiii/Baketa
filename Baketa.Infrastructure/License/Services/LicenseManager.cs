@@ -550,6 +550,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         lock (_stateLock)
         {
             oldState = _currentState;
+            stateToApply = newState;
 
             // [Issue #275] SessionIdを保持する（Gemini Review: アトミック性保証）
             // 外部ソースから渡されたstateにSessionIdがない場合、現在の値を引き継ぐ
@@ -560,11 +561,23 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                     "🔑 [Issue #275] SessionIdを保持: {SessionId}",
                     _currentState.SessionId[..Math.Min(10, _currentState.SessionId.Length)] + "...");
 
-                stateToApply = newState with { SessionId = _currentState.SessionId };
+                stateToApply = stateToApply with { SessionId = _currentState.SessionId };
             }
-            else
+
+            // [Issue #275] プロモーション適用済みのプランを保持
+            // キャッシュ/サーバーから読み込んだ状態が現在のプランより低い場合、
+            // 有効なプロモーションがあれば現在のプランを維持
+            if (ShouldPreservePromotionPlan(oldState, newState, reason))
             {
-                stateToApply = newState;
+                _logger.LogDebug(
+                    "🎁 [Issue #275] プロモーション適用済みプランを保持: {OldPlan} (降格防止: {NewPlan})",
+                    oldState.CurrentPlan, newState.CurrentPlan);
+
+                stateToApply = stateToApply with
+                {
+                    CurrentPlan = oldState.CurrentPlan,
+                    ExpirationDate = oldState.ExpirationDate
+                };
             }
 
             _currentState = stateToApply;
@@ -578,6 +591,42 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         {
             OnStateChanged(oldState, stateToApply, reason);
         }
+    }
+
+    /// <summary>
+    /// [Issue #275] プロモーション適用済みのプランを保持すべきか判定
+    /// </summary>
+    private bool ShouldPreservePromotionPlan(LicenseState oldState, LicenseState newState, LicenseChangeReason reason)
+    {
+        // プロモーション関連の変更は保持しない（正当な変更）
+        if (reason == LicenseChangeReason.PromotionApplied ||
+            reason == LicenseChangeReason.PromotionExpired)
+        {
+            return false;
+        }
+
+        // プランが同じか上がる場合は保持不要
+        if ((int)newState.CurrentPlan >= (int)oldState.CurrentPlan)
+        {
+            return false;
+        }
+
+        // 有効なプロモーションがあるか確認
+        if (_unifiedSettingsService is null)
+        {
+            return false;
+        }
+
+        var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+        if (!promotionSettings.IsCurrentlyActive() || !promotionSettings.PromotionPlanType.HasValue)
+        {
+            return false;
+        }
+
+        var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
+
+        // 現在のプランがプロモーションプランと一致する場合のみ保持
+        return oldState.CurrentPlan == promotionPlan;
     }
 
     /// <summary>
