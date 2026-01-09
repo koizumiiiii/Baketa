@@ -295,47 +295,27 @@ public sealed class CrossValidator : ICrossValidator
 
         foreach (var segment in splitInfo.Segments)
         {
-            System.Drawing.Rectangle splitBounds;
+            // 🔥 [Issue #275] 常にローカルOCR座標を使用
+            // Cloud AI (Gemini) 座標は不安定で毎回位置がずれるため、
+            // 安定したローカルOCR座標からテキスト長比率で按分計算する
+            var ratio = localText.Length > 0
+                ? (float)segment.StartIndex / localText.Length
+                : 0f;
+            var widthRatio = localText.Length > 0
+                ? (float)segment.CloudText.Length / localText.Length
+                : 1f;
 
-            // Issue #275: CloudBoundingBoxがある場合はCloud AI座標を優先使用
-            // Geminiレビュー: Width/Height > 0 のガード句追加（無効な値のフォールバック）
-            if (segment.CloudBoundingBox.HasValue &&
-                segment.CloudBoundingBox.Value.Width > 0 &&
-                segment.CloudBoundingBox.Value.Height > 0)
-            {
-                var box = segment.CloudBoundingBox.Value;
-                splitBounds = new System.Drawing.Rectangle(box.X, box.Y, box.Width, box.Height);
+            var splitBounds = new System.Drawing.Rectangle(
+                localBounds.X + (int)(localBounds.Width * ratio),
+                localBounds.Y,
+                (int)(localBounds.Width * widthRatio),
+                localBounds.Height
+            );
 
-                _logger.LogDebug(
-                    "分割（Cloud AI座標使用）: CloudText='{CloudText}', Box=({X},{Y},{W},{H})",
-                    segment.CloudText.Length > 20 ? segment.CloudText[..20] + "..." : segment.CloudText,
-                    box.X, box.Y, box.Width, box.Height);
-            }
-            else
-            {
-                // フォールバック: テキスト長比率から座標按分計算
-                // - CloudBoundingBoxがない場合
-                // - CloudBoundingBoxのWidth/Heightが無効（0以下）の場合
-                var ratio = localText.Length > 0
-                    ? (float)segment.StartIndex / localText.Length
-                    : 0f;
-                var widthRatio = localText.Length > 0
-                    ? (float)segment.CloudText.Length / localText.Length
-                    : 1f;
-
-                splitBounds = new System.Drawing.Rectangle(
-                    localBounds.X + (int)(localBounds.Width * ratio),
-                    localBounds.Y,
-                    (int)(localBounds.Width * widthRatio),
-                    localBounds.Height
-                );
-
-                _logger.LogDebug(
-                    "分割（比率計算）: CloudText='{CloudText}', Box=({X},{Y},{W},{H}), HasCloudBox={HasBox}",
-                    segment.CloudText.Length > 20 ? segment.CloudText[..20] + "..." : segment.CloudText,
-                    splitBounds.X, splitBounds.Y, splitBounds.Width, splitBounds.Height,
-                    segment.CloudBoundingBox.HasValue);
-            }
+            _logger.LogDebug(
+                "分割（ローカルOCR座標）: CloudText='{CloudText}', Box=({X},{Y},{W},{H})",
+                segment.CloudText.Length > 20 ? segment.CloudText[..20] + "..." : segment.CloudText,
+                splitBounds.X, splitBounds.Y, splitBounds.Width, splitBounds.Height);
 
             // 分割チャンク生成
             var splitChunk = new TextChunk
