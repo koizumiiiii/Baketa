@@ -587,6 +587,18 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 };
             }
 
+            // [Issue #275] CloudAiTokensUsedを保持
+            // Patreon同期時など外部ソースがCloudAiTokensUsed=0を返す場合、
+            // 現在の値（プロモーション設定から読み込んだ値）を維持
+            if (newState.CloudAiTokensUsed == 0 && oldState.CloudAiTokensUsed > 0)
+            {
+                _logger.LogDebug(
+                    "💰 [Issue #275] CloudAiTokensUsedを保持: {OldValue} (外部ソース: {NewValue})",
+                    oldState.CloudAiTokensUsed, newState.CloudAiTokensUsed);
+
+                stateToApply = stateToApply with { CloudAiTokensUsed = oldState.CloudAiTokensUsed };
+            }
+
             _currentState = stateToApply;
         }
 
