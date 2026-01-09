@@ -14,6 +14,8 @@ using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
+using Baketa.Core.Abstractions.Platform.Windows; // 🔧 [Issue #275] IWindowsImage.OriginalWidth/Height
+using Baketa.Infrastructure.Platform.Adapters; // 🔧 [Issue #275] WindowsImageAdapter.OriginalWidth/Height
 // [Issue #230] テキストベース変化検知 - 画面点滅時の不要なOCR再実行を防止
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Events.EventTypes;
@@ -364,13 +366,25 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             }
 
             // [Issue #78 Phase 4] Cloud AI翻訳用の画像コンテキストを設定
+            // [Issue #275] 元サイズ(OriginalWidth/Height)を使用してGemini座標変換を正しく行う
+            // リサイズ後サイズ(Width/Height)を使うとCloud AI座標がローカルOCR座標とずれる
             try
             {
                 var imageMemory = image.GetImageMemory();
                 var imageBase64 = Convert.ToBase64String(imageMemory.Span);
-                _textChunkAggregatorService.SetImageContext(imageBase64, image.Width, image.Height);
-                _logger?.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height}, Base64Length={Length}",
-                    image.Width, image.Height, imageBase64.Length);
+                // 🔥 [Issue #275] OriginalWidth/OriginalHeightを使用
+                // ローカルOCR座標は元サイズにスケールバック済み(Issue #193)なので、
+                // Cloud AI座標も元サイズ基準で計算する必要がある
+                // IWindowsImageまたはWindowsImageAdapterにキャストできればOriginalWidth/Heightを使用
+                var (contextWidth, contextHeight) = image switch
+                {
+                    IWindowsImage windowsImage => (windowsImage.OriginalWidth, windowsImage.OriginalHeight),
+                    WindowsImageAdapter adapter => (adapter.OriginalWidth, adapter.OriginalHeight),
+                    _ => (image.Width, image.Height)
+                };
+                _textChunkAggregatorService.SetImageContext(imageBase64, contextWidth, contextHeight);
+                _logger?.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height} (元サイズ), Base64Length={Length}",
+                    contextWidth, contextHeight, imageBase64.Length);
             }
             catch (Exception ex)
             {
