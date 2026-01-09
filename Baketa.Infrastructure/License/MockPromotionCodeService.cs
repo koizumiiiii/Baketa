@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Constants;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
@@ -21,6 +23,7 @@ namespace Baketa.Infrastructure.License;
 public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposable
 {
     private readonly IPromotionSettingsPersistence _settingsPersistence;
+    private readonly IUnifiedSettingsService _unifiedSettingsService;
     private readonly IEventAggregator _eventAggregator;
     private readonly ILicenseManager _licenseManager;
     private readonly ILogger<MockPromotionCodeService> _logger;
@@ -31,11 +34,13 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
 
     public MockPromotionCodeService(
         IPromotionSettingsPersistence settingsPersistence,
+        IUnifiedSettingsService unifiedSettingsService,
         IEventAggregator eventAggregator,
         ILicenseManager licenseManager,
         ILogger<MockPromotionCodeService> logger)
     {
         _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
+        _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -147,9 +152,35 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
     /// <inheritdoc/>
     public PromotionInfo? GetCurrentPromotion()
     {
-        // モックモードでは常にnullを返す（実際の設定は読まない）
-        // 必要に応じて設定から読み取るように変更可能
-        return null;
+        // [Issue #275] IUnifiedSettingsServiceから読み取る（promotion-settings.jsonに保存されている）
+        var settings = _unifiedSettingsService.GetPromotionSettings();
+
+        if (string.IsNullOrEmpty(settings.AppliedPromotionCode) ||
+            !settings.PromotionPlanType.HasValue ||
+            string.IsNullOrEmpty(settings.PromotionExpiresAt))
+        {
+            return null;
+        }
+
+        if (!DateTime.TryParse(settings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expiresAt))
+        {
+            _logger.LogWarning("[MockMode] Failed to parse PromotionExpiresAt: {Value}", settings.PromotionExpiresAt);
+            return null;
+        }
+
+        if (!DateTime.TryParse(settings.PromotionAppliedAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var appliedAt))
+        {
+            _logger.LogWarning("[MockMode] Failed to parse PromotionAppliedAt: {Value}, using current time", settings.PromotionAppliedAt);
+            appliedAt = DateTime.UtcNow;
+        }
+
+        return new PromotionInfo
+        {
+            Code = settings.AppliedPromotionCode,
+            Plan = (PlanType)settings.PromotionPlanType.Value,
+            ExpiresAt = expiresAt,
+            AppliedAt = appliedAt
+        };
     }
 
     /// <inheritdoc/>

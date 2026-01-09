@@ -83,8 +83,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         ApplyPromotionCommand = ReactiveCommand.CreateFromTask(ApplyPromotionCodeAsync, canApplyPromotion);
 
         // 初期状態の読み込み
-        LoadCurrentState();
+        // [Issue #275] プロモーション状態を先に読み込む（PlanDisplayNameのサフィックス表示に必要）
         LoadPromotionState();
+        LoadCurrentState();
 
         // [Issue #275再発防止] 起動時にTokenUsageRepositoryからトークン使用量を読み込む
         _ = LoadTokenUsageFromRepositoryAsync();
@@ -499,6 +500,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         var promotion = _promotionCodeService.GetCurrentPromotion();
         _activePromotion = promotion;
         HasActivePromotion = promotion?.IsValid == true;
+
         if (HasActivePromotion)
         {
             this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
@@ -635,6 +637,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         {
             _activePromotion = e.NewPromotion;
             HasActivePromotion = e.NewPromotion?.IsValid == true;
+
+            // [Issue #275] プラン表示名を再計算（プロモーションサフィックスの更新）
+            var basePlanName = GetPlanDisplayName(CurrentPlan);
+            PlanDisplayName = HasActivePromotion && CurrentPlan != PlanType.Free
+                ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
+                : basePlanName;
+
             this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
             this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
             this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
