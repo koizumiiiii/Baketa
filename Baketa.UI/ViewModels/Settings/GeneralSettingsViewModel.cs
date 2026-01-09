@@ -11,6 +11,7 @@ using Avalonia.Styling;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
@@ -34,6 +35,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     private readonly ISettingsChangeTracker? _changeTracker;
     private readonly ILicenseManager? _licenseManager;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
+    private readonly ITokenConsumptionTracker? _tokenTracker;
 
     // バッキングフィールド
     private bool _autoStartWithWindows;
@@ -78,6 +80,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// <param name="translationSettings">翻訳設定データ（オプション）</param>
     /// <param name="licenseManager">ライセンスマネージャー（オプション）</param>
     /// <param name="unifiedSettingsService">統一設定サービス（オプション）</param>
+    /// <param name="tokenTracker">トークン消費トラッカー（オプション）</param>
     public GeneralSettingsViewModel(
         GeneralSettings settings,
         IEventAggregator eventAggregator,
@@ -86,7 +89,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         ILogger<GeneralSettingsViewModel>? logger = null,
         TranslationSettings? translationSettings = null,
         ILicenseManager? licenseManager = null,
-        IUnifiedSettingsService? unifiedSettingsService = null) : base(eventAggregator)
+        IUnifiedSettingsService? unifiedSettingsService = null,
+        ITokenConsumptionTracker? tokenTracker = null) : base(eventAggregator)
     {
         _originalSettings = settings ?? throw new ArgumentNullException(nameof(settings));
         _originalTranslationSettings = translationSettings ?? new TranslationSettings();
@@ -95,6 +99,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _changeTracker = changeTracker;
         _licenseManager = licenseManager;
         _unifiedSettingsService = unifiedSettingsService;
+        _tokenTracker = tokenTracker;
 
         // [Issue #78 Phase 5] ライセンス状態変更時のUI更新を購読
         if (_licenseManager != null)
@@ -122,6 +127,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
         // [Issue #78 Phase 5] Cloud AI使用量の初期化
         InitializeCloudUsageFromLicenseState();
+
+        // [Issue #275] TokenUsageRepositoryからトークン使用量を読み込み、LicenseManagerに同期
+        _ = LoadTokenUsageFromRepositoryAsync();
 
         // 変更追跡の設定
         SetupChangeTracking();
@@ -912,6 +920,62 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
         var state = _licenseManager.CurrentState;
         UpdateCloudUsageFromState(state);
+    }
+
+    /// <summary>
+    /// [Issue #275] TokenUsageRepositoryからトークン使用量を読み込み、LicenseManagerに同期
+    /// </summary>
+    private async Task LoadTokenUsageFromRepositoryAsync()
+    {
+        if (_tokenTracker == null || _licenseManager == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var usage = await _tokenTracker.GetMonthlyUsageAsync().ConfigureAwait(false);
+
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // リポジトリから取得した値がLicenseStateより大きい場合は更新
+                var currentValue = CloudTokensUsed;
+                var repositoryValue = usage.TotalTokensUsed;
+
+                if (repositoryValue > currentValue)
+                {
+                    CloudTokensUsed = repositoryValue;
+                    // LicenseManagerの内部状態も同期
+                    _licenseManager.SyncTokenUsage(repositoryValue);
+                    _logger?.LogDebug(
+                        "[Issue #275] GeneralSettings: トークン使用量をリポジトリから更新: {Current} → {Repository}",
+                        currentValue, repositoryValue);
+                }
+                else if (currentValue > repositoryValue && currentValue > 0)
+                {
+                    // 現在の値を維持し、LicenseManagerにも同期
+                    _licenseManager.SyncTokenUsage(currentValue);
+                }
+
+                // TokenLimitも大きい方を採用
+                var currentLimit = CloudTokenLimit;
+                var repositoryLimit = usage.MonthlyLimit;
+                if (repositoryLimit > currentLimit)
+                {
+                    CloudTokenLimit = repositoryLimit;
+                }
+
+                CloudUsagePercentage = CloudTokenLimit > 0
+                    ? (double)CloudTokensUsed / CloudTokenLimit * 100
+                    : 0;
+
+                this.RaisePropertyChanged(nameof(CloudUsageDisplay));
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "[Issue #275] GeneralSettings: トークン使用量の読み込みに失敗しました");
+        }
     }
 
     /// <summary>

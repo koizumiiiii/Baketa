@@ -528,19 +528,42 @@ public sealed class LicenseInfoViewModel : ViewModelBase
                 if (repositoryValue > currentValue)
                 {
                     TokensUsed = repositoryValue;
+                    // [Issue #275] LicenseManagerの内部状態も同期（他のViewModelでも正しい値を表示するため）
+                    _licenseManager.SyncTokenUsage(repositoryValue);
                     _logger?.LogDebug(
                         "トークン使用量をリポジトリから更新: {Current} → {Repository}",
                         currentValue, repositoryValue);
                 }
                 else
                 {
+                    // 現在の値を維持するが、LicenseManagerにも同期（初回起動時の0対策）
+                    if (currentValue > 0)
+                    {
+                        _licenseManager.SyncTokenUsage(currentValue);
+                    }
                     _logger?.LogDebug(
                         "トークン使用量はLicenseState値を維持: LicenseState={Current}, Repository={Repository}",
                         currentValue, repositoryValue);
                 }
 
-                // TokenLimitは常に最新を使用
-                TokenLimit = usage.MonthlyLimit;
+                // [Issue #275] TokenLimitも大きい方を採用（プロモーション適用済みの場合を保護）
+                // LoadCurrentState()で設定されたLicenseState.MonthlyTokenLimitが正しい値
+                // usage.MonthlyLimitはGetCurrentPlanAsync経由で取得するが、タイミングによりFreeプランを返す場合がある
+                var currentLimit = TokenLimit;
+                var repositoryLimit = usage.MonthlyLimit;
+                if (repositoryLimit > currentLimit)
+                {
+                    TokenLimit = repositoryLimit;
+                    _logger?.LogDebug(
+                        "TokenLimitをリポジトリから更新: {Current} → {Repository}",
+                        currentLimit, repositoryLimit);
+                }
+                else if (currentLimit > repositoryLimit && repositoryLimit == 0)
+                {
+                    _logger?.LogDebug(
+                        "TokenLimitはLicenseState値を維持（リポジトリが0）: LicenseState={Current}, Repository={Repository}",
+                        currentLimit, repositoryLimit);
+                }
                 UsagePercentage = TokenLimit > 0 ? (double)TokensUsed / TokenLimit * 100 : 0;
                 this.RaisePropertyChanged(nameof(TokenUsageDisplay));
             });

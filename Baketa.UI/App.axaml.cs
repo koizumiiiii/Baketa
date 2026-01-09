@@ -497,6 +497,10 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
                         Console.WriteLine($"📌 [AUTH_DEBUG] Step 4: 認証チェック完了 isAuthenticated={isAuthenticated}");
 
+                        // --- 4.9 [Issue #275] トークン使用量の起動時同期 ---
+                        // 設定画面を開く前にLicenseManagerに実際のトークン使用量を同期
+                        await SyncTokenUsageAtStartupAsync(serviceProvider).ConfigureAwait(true);
+
                         // 🔥 [ISSUE#167] 常にMainOverlayViewを最初に表示
                         // 認証前はExitボタンのみ有効、認証後は全ボタン有効
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 5: MainOverlayView表示開始");
@@ -1240,6 +1244,40 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         }
 
         _logger?.LogInformation("[Issue #252] クラッシュレポート送信完了: 成功={SentCount}, 失敗={FailedCount}", sentCount, failedCount);
+    }
+
+    /// <summary>
+    /// [Issue #275] 起動時のトークン使用量同期
+    /// TokenUsageRepositoryから実際の使用量を読み込み、LicenseManagerに同期する
+    /// これにより、設定画面を最初に開いた時から正しい値が表示される
+    /// </summary>
+    private async Task SyncTokenUsageAtStartupAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            var tokenTracker = serviceProvider.GetService<Core.Translation.Abstractions.ITokenConsumptionTracker>();
+            var licenseManager = serviceProvider.GetService<Core.Abstractions.License.ILicenseManager>();
+
+            if (tokenTracker == null || licenseManager == null)
+            {
+                _logger?.LogDebug("[Issue #275] トークン同期スキップ: サービスが利用不可");
+                return;
+            }
+
+            var usage = await tokenTracker.GetMonthlyUsageAsync().ConfigureAwait(false);
+
+            if (usage.TotalTokensUsed > 0)
+            {
+                licenseManager.SyncTokenUsage(usage.TotalTokensUsed);
+                _logger?.LogDebug("[Issue #275] 起動時トークン同期完了: {TokensUsed}", usage.TotalTokensUsed);
+                Console.WriteLine($"✅ [Issue #275] 起動時トークン同期完了: {usage.TotalTokensUsed}");
+            }
+        }
+        catch (Exception ex)
+        {
+            // トークン同期の失敗はアプリ起動をブロックしない
+            _logger?.LogWarning(ex, "[Issue #275] 起動時トークン同期失敗（継続）");
+        }
     }
 
     /// <summary>

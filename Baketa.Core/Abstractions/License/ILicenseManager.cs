@@ -95,6 +95,17 @@ public interface ILicenseManager
     /// <param name="source">状態の取得元（ログ用）</param>
     /// <param name="reason">状態変更理由</param>
     void SetResolvedLicenseState(LicenseState state, string source, LicenseChangeReason reason);
+
+    /// <summary>
+    /// トークン使用量を更新（Issue #275）
+    /// TokenUsageRepositoryから読み込んだ実際の使用量で内部状態を同期するために使用
+    /// </summary>
+    /// <param name="tokensUsed">トークン使用量</param>
+    /// <remarks>
+    /// プランやその他の状態は変更せず、CloudAiTokensUsedのみを更新します。
+    /// UI層がリポジトリから正確な使用量を取得した後に呼び出すことを想定。
+    /// </remarks>
+    void SyncTokenUsage(long tokensUsed);
 }
 
 /// <summary>

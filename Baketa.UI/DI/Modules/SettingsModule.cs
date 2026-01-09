@@ -38,6 +38,7 @@ public static class SettingsModule
             var logger = provider.GetService<ILogger<GeneralSettingsViewModel>>();
             var licenseManager = provider.GetService<ILicenseManager>();
             var unifiedSettingsService = provider.GetService<IUnifiedSettingsService>();
+            var tokenTracker = provider.GetService<Core.Translation.Abstractions.ITokenConsumptionTracker>();
 
             // ランタイムで設定を読み込む
             var generalSettings = settingsService.GetCategorySettings<GeneralSettings>() ?? new GeneralSettings();
@@ -71,7 +72,8 @@ public static class SettingsModule
                 logger,
                 translationSettings,
                 licenseManager,
-                unifiedSettingsService);
+                unifiedSettingsService,
+                tokenTracker);
         });
 
         // アカウント設定ViewModel

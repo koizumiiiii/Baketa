@@ -199,10 +199,11 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // ユーザー未認証の場合はデフォルト状態
+        // [Issue #275] ユーザー未認証の場合でも、プロモーション適用済みの現在状態を返す
+        // LicenseState.Defaultを返すと、プロモーションで適用されたプランが無視される
         if (string.IsNullOrEmpty(_userId))
         {
-            return LicenseState.Default;
+            return _currentState;
         }
 
         // キャッシュから取得を試行
@@ -228,8 +229,9 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // Patreonなど独自認証を持つクライアントはこのチェックをスキップ
         if (_apiClient.RequiresCredentials && (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken)))
         {
+            // [Issue #275] プロモーション適用済みの現在状態を返す
             _logger.LogDebug("ユーザー未認証のためリフレッシュをスキップ（RequiresCredentials={RequiresCredentials}）", _apiClient.RequiresCredentials);
-            return LicenseState.Default;
+            return _currentState;
         }
 
         // レート制限チェック
@@ -267,7 +269,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         if (_apiClient.RequiresCredentials && (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken)))
         {
             _logger.LogDebug("ユーザー未認証のため強制リフレッシュをスキップ（RequiresCredentials={RequiresCredentials}）", _apiClient.RequiresCredentials);
-            return LicenseState.Default;
+            // Issue #275: プロモーション適用済み状態を保持するため、Defaultではなく現在の状態を返す
+            return _currentState;
         }
 
         // キャッシュをクリア
@@ -916,6 +919,36 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // 状態を更新（イベントも発火）
         // [Issue #275] SessionIdの保持はUpdateCurrentState内でアトミックに実行される（Gemini Review対応）
         UpdateCurrentState(stateToApply, reason);
+    }
+
+    /// <inheritdoc/>
+    public void SyncTokenUsage(long tokensUsed)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentOutOfRangeException.ThrowIfNegative(tokensUsed);
+
+        LicenseState oldState;
+        LicenseState newState;
+
+        lock (_stateLock)
+        {
+            if (_currentState.CloudAiTokensUsed == tokensUsed)
+            {
+                return; // 変更なし
+            }
+
+            oldState = _currentState;
+            _currentState = _currentState with { CloudAiTokensUsed = tokensUsed };
+            newState = _currentState;
+
+            _logger.LogDebug(
+                "[Issue #275] トークン使用量を同期: {OldUsage} → {NewUsage}",
+                oldState.CloudAiTokensUsed, tokensUsed);
+        }
+
+        // [Issue #275] StateChangedイベントを発火して他のViewModelにも通知
+        // GeneralSettingsViewModelなどが更新された値を取得できるようにする
+        OnStateChanged(oldState, newState, LicenseChangeReason.TokenUsageUpdated);
     }
 
     /// <summary>
