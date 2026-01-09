@@ -983,14 +983,27 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     /// </summary>
     private void ApplyPromotionToState(PlanType plan, DateTime expiresAt, string source)
     {
+        // [Issue #275] トークン使用量も永続化設定から読み込む
+        long tokenUsage = 0;
+        if (_unifiedSettingsService is not null)
+        {
+            var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+            tokenUsage = promotionSettings.MockTokenUsage;
+        }
+        if (tokenUsage == 0)
+        {
+            tokenUsage = _settings.MockTokenUsage;
+        }
+
         _currentState = _currentState with
         {
             CurrentPlan = plan,
-            ExpirationDate = expiresAt
+            ExpirationDate = expiresAt,
+            CloudAiTokensUsed = tokenUsage
         };
         _logger.LogInformation(
-            "🎁 [Issue #258] 起動時にプロモーション設定を適用 ({Source}): Plan={Plan}, ExpiresAt={ExpiresAt}",
-            source, plan, expiresAt);
+            "🎁 [Issue #258] 起動時にプロモーション設定を適用 ({Source}): Plan={Plan}, ExpiresAt={ExpiresAt}, TokenUsage={TokenUsage}",
+            source, plan, expiresAt, tokenUsage);
     }
 
     /// <summary>
