@@ -312,50 +312,27 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// 更新前の終了処理（Pythonサーバー停止など）
+    /// 更新前の終了処理
     /// NetSparkle 3.0: CloseApplicationAsyncイベントハンドラ
-    /// ⚠️ 90秒以内に終了する必要があります
+    ///
+    /// 即座にアプリケーションを終了します。
+    /// Pythonサーバーはプロセス終了時に自動的にクリーンアップされます。
+    /// バッチスクリプトがプロセス終了を待機してから更新処理を行うため、
+    /// ここで待機する必要はありません。
     /// </summary>
-    private async Task OnCloseApplicationAsync()
+    private Task OnCloseApplicationAsync()
     {
-        _logger?.LogInformation("[Issue #249] 更新適用のためアプリケーション終了準備開始...");
+        _logger?.LogInformation("[Issue #249] 更新適用のためアプリケーション即時終了");
 
-        try
-        {
-            // Pythonサーバーの停止
-            // Note: サーバーの破棄はDIコンテナの責務なので、ここでは停止のみ行う
-            if (_pythonServerManager != null)
-            {
-                _logger?.LogInformation("[Issue #249] Pythonサーバー停止中...");
-
-                var servers = await _pythonServerManager.GetActiveServersAsync().ConfigureAwait(false);
-                foreach (var server in servers)
-                {
-                    try
-                    {
-                        await _pythonServerManager.StopServerAsync(server.Port).ConfigureAwait(false);
-                        _logger?.LogDebug("[Issue #249] サーバー停止完了: Port={Port}", server.Port);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "[Issue #249] サーバー停止失敗: Port={Port}", server.Port);
-                    }
-                }
-
-                _logger?.LogInformation("[Issue #249] 全Pythonサーバー停止完了");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "[Issue #249] 更新前終了処理中にエラー");
-        }
-
-        // アプリケーションを終了
-        _logger?.LogInformation("[Issue #249] アプリケーション終了");
+        // 即座にアプリケーションを終了
+        // Pythonサーバーはプロセス終了時に自動的に終了される（PythonServerManagerのDisposeで処理）
+        // バッチスクリプトがプロセス終了を30秒まで待機するため、ここで待つ必要なし
         if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.Shutdown();
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>

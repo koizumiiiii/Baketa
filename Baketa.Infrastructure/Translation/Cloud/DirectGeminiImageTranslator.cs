@@ -470,6 +470,8 @@ JSONのみを出力し、他の説明は不要です。";
         }
 
         // ピクセル座標に変換
+        // 注: この座標は参考値として保持されるが、実際のオーバーレイ配置には
+        // ローカルOCR座標が使用される（Issue #275: Cloud AI座標は不安定なため）
         return new Int32Rect(
             X: xMin * imageWidth / 1000,
             Y: yMin * imageHeight / 1000,

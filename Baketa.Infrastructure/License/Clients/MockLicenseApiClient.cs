@@ -26,6 +26,12 @@ public sealed class MockLicenseApiClient : ILicenseApiClient
     /// <inheritdoc/>
     public bool IsAvailable => true;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// モッククライアントはLicenseManager内で自動的に認証情報が設定されるため不要
+    /// </remarks>
+    public bool RequiresCredentials => false;
+
     /// <summary>
     /// MockLicenseApiClientを初期化
     /// </summary>

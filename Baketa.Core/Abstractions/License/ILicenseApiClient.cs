@@ -45,6 +45,12 @@ public interface ILicenseApiClient
     /// APIが利用可能かどうか（オンライン状態）
     /// </summary>
     bool IsAvailable { get; }
+
+    /// <summary>
+    /// ユーザー認証情報（userId/sessionToken）が必要かどうか
+    /// Patreonなど独自の認証管理を持つクライアントはfalseを返す
+    /// </summary>
+    bool RequiresCredentials { get; }
 }
 
 /// <summary>

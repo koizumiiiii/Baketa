@@ -17,7 +17,7 @@
 -- ===========================================
 CREATE TABLE IF NOT EXISTS promotion_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXXXXXX" (Base32 Crockford 8文字)
+  code TEXT UNIQUE NOT NULL,                    -- "BAKETA-XXXXXXXX" (英数字のみ、+=/等の特殊文字不可)
   plan_type INT NOT NULL,                       -- 0=Free, 1=Pro, 2=Premium, 3=Ultimate (Issue #257)
   expires_at TIMESTAMPTZ NOT NULL,              -- コード自体の有効期限
   duration_days INT NOT NULL DEFAULT 30,        -- 適用後のプラン有効期間（日数）
@@ -184,11 +184,30 @@ $$;
 -- 4. 管理用クエリ例
 -- ===========================================
 
--- コード発行例
+-- ■ コード形式ルール
+-- - プレフィックス: "BAKETA-"
+-- - サフィックス: 英数字のみ (A-Z, 0-9)
+-- - 禁止文字: +, =, /, その他特殊文字（Base64由来の文字は使用不可）
+-- - 例: BAKETA-BETA2025, BAKETA-A1B2C3D4, BAKETA-ULT10YRS
+
+-- ■ コード発行例（固定コード）
 -- INSERT INTO promotion_codes (code, plan_type, expires_at, duration_days, usage_type, max_uses, description)
 -- VALUES
---   ('BAKETA-BETA-2025', 2, '2025-12-31 23:59:59+00', 30, 'multi_use', 1000, 'ベータテスター向け'),
---   ('BAKETA-PREM-VIP1', 3, '2025-06-30 23:59:59+00', 90, 'single_use', 1, 'VIPユーザー向け');
+--   ('BAKETA-BETA2025', 2, '2025-12-31 23:59:59+00', 30, 'multi_use', 1000, 'ベータテスター向け'),
+--   ('BAKETA-PREMVIP1', 3, '2025-06-30 23:59:59+00', 90, 'single_use', 1, 'VIPユーザー向け');
+
+-- ■ コード発行例（ランダム生成 - 英数字のみ）
+-- INSERT INTO promotion_codes (code, plan_type, expires_at, duration_days, usage_type, max_uses, description)
+-- VALUES (
+--   'BAKETA-' || upper(substr(md5(random()::text), 1, 8)),  -- 8文字の英数字ランダムコード
+--   3,
+--   '2026-01-31 23:59:59+00',
+--   30,
+--   'single_use',
+--   1,
+--   'ランダム生成コード'
+-- )
+-- RETURNING code, plan_type, expires_at, duration_days;
 
 -- 使用状況確認
 -- SELECT

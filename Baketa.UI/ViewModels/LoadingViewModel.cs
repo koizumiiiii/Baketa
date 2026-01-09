@@ -104,9 +104,13 @@ public class LoadingViewModel : ViewModelBase
         _initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // バージョン情報を取得
-        var version = Assembly.GetExecutingAssembly().GetName().Version;
-        VersionText = $"Version {version?.ToString(3) ?? "0.0.0"}";
+        // バージョン情報を取得（MinVerはInformationalVersionに設定する）
+        var assembly = Assembly.GetExecutingAssembly();
+        var infoVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        // InformationalVersionは "0.2.14-alpha.0.13+build" のような形式になる場合がある
+        // 表示用にはメジャー.マイナー.パッチのみを抽出（ハイフンや+以降を除去）
+        var versionDisplay = infoVersion?.Split(['-', '+'])[0] ?? assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+        VersionText = $"Version {versionDisplay}";
 
         // 初期化ステップを作成（内部管理用）
         // [Issue #185] ダウンロードステップを先頭に追加

@@ -39,7 +39,10 @@ public enum LicenseChangeReason
     PromotionApplied,
 
     /// <summary>プロモーション期限切れ/解除</summary>
-    PromotionExpired
+    PromotionExpired,
+
+    /// <summary>トークン使用量の同期更新（Issue #275）</summary>
+    TokenUsageUpdated
 }
 
 /// <summary>

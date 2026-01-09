@@ -104,6 +104,20 @@ public class WindowsImageAdapter : DisposableBase, IAdvancedImage
     }
 
     /// <summary>
+    /// 🔥 [Issue #275] 元キャプチャ幅（リサイズ前）
+    /// GPUリサイズキャプチャの場合、リサイズ前の元サイズを保持
+    /// Cloud AI座標変換で使用
+    /// </summary>
+    public int OriginalWidth => _windowsImage.OriginalWidth;
+
+    /// <summary>
+    /// 🔥 [Issue #275] 元キャプチャ高さ（リサイズ前）
+    /// GPUリサイズキャプチャの場合、リサイズ前の元サイズを保持
+    /// Cloud AI座標変換で使用
+    /// </summary>
+    public int OriginalHeight => _windowsImage.OriginalHeight;
+
+    /// <summary>
     /// 画像のフォーマット
     /// </summary>
     public CoreImageFormat Format => DetermineImageFormat();

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Baketa.Core.Abstractions.OCR.Results;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.Validation;
 using Baketa.Core.Models.Validation;
@@ -118,11 +119,13 @@ public sealed class CrossValidator : ICrossValidator
         }
 
         // Phase 3.5: 包含マッチングフォールバック
+        // Issue #275: TranslatedTextItem（BoundingBox含む）を渡してAI座標を保持
         if (_containmentMatcher != null && unmatchedChunks.Count > 0)
         {
             ProcessContainmentFallback(
                 unmatchedChunks,
                 cloudDetectedTexts,
+                cloudAiResponse.Texts ?? [],  // Issue #275: BoundingBox座標含むTranslatedTextItem
                 translatedTexts,
                 validatedChunks,
                 stats,
@@ -163,9 +166,13 @@ public sealed class CrossValidator : ICrossValidator
     /// <summary>
     /// Phase 3.5: 包含マッチングフォールバック処理
     /// </summary>
+    /// <remarks>
+    /// Issue #275: cloudTextItemsパラメータ追加でBoundingBox座標を保持
+    /// </remarks>
     private void ProcessContainmentFallback(
         List<TextChunk> unmatchedChunks,
         IReadOnlyList<string> cloudDetectedTexts,
+        IReadOnlyList<TranslatedTextItem> cloudTextItems,  // Issue #275: BoundingBox含む
         IReadOnlyList<string> translatedTexts,
         List<ValidatedTextChunk> validatedChunks,
         ValidationStatisticsBuilder stats,
@@ -179,6 +186,7 @@ public sealed class CrossValidator : ICrossValidator
             unmatchedChunks.Count);
 
         // Step 3A: 統合グループ検出（複数ローカル ⊂ 1 Cloud AI）
+        // FindMergeGroupsは文字列リストを使用（座標は統合されるため）
         var mergeGroups = _containmentMatcher.FindMergeGroups(unmatchedChunks, cloudDetectedTexts);
         var mergedChunkIds = new HashSet<int>();
 
@@ -201,6 +209,7 @@ public sealed class CrossValidator : ICrossValidator
         }
 
         // Step 3B: 分割検出（1 ローカル ⊃ 複数 Cloud AI）
+        // Issue #275: FindSplitInfoにTranslatedTextItem（BoundingBox含む）を渡す
         foreach (var chunk in unmatchedChunks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -209,7 +218,7 @@ public sealed class CrossValidator : ICrossValidator
             if (mergedChunkIds.Contains(chunk.ChunkId))
                 continue;
 
-            var splitInfo = _containmentMatcher.FindSplitInfo(chunk, cloudDetectedTexts);
+            var splitInfo = _containmentMatcher.FindSplitInfo(chunk, cloudTextItems);
             if (splitInfo != null)
             {
                 var splitResults = ProcessSplitInfo(splitInfo, translatedTexts);
@@ -274,30 +283,42 @@ public sealed class CrossValidator : ICrossValidator
     /// <summary>
     /// 分割情報を処理
     /// </summary>
+    /// <remarks>
+    /// Issue #275: グルーピング前の個別OCR座標を使用
+    /// 1. Cloud AIテキストとTextResults（元のOCR結果）をマッチング
+    /// 2. マッチした場合 → 個別座標を使用
+    /// 3. マッチしない場合 → Y座標順の位置ベースフォールバック
+    /// </remarks>
     private List<ValidatedTextChunk> ProcessSplitInfo(
         SplitInfo splitInfo,
         IReadOnlyList<string> translatedTexts)
     {
         var results = new List<ValidatedTextChunk>();
         var localBounds = splitInfo.LocalChunk.CombinedBounds;
-        var localText = splitInfo.LocalChunk.CombinedText ?? string.Empty;
+        var textResults = splitInfo.LocalChunk.TextResults;
+
+        // Issue #275: Y座標順にソートした元のOCR結果（位置ベースフォールバック用）
+        var orderedTextResults = textResults
+            .OrderBy(tr => tr.BoundingBox.Y)
+            .ThenBy(tr => tr.BoundingBox.X)
+            .ToList();
+
+        // 使用済みOCR結果のインデックスをトラッキング（重複マッチ防止）
+        var usedIndices = new HashSet<int>();
 
         foreach (var segment in splitInfo.Segments)
         {
-            // 座標按分計算
-            var ratio = localText.Length > 0
-                ? (float)segment.StartIndex / localText.Length
-                : 0f;
-            var widthRatio = localText.Length > 0
-                ? (float)segment.CloudText.Length / localText.Length
-                : 1f;
+            var splitBounds = FindMatchingBounds(
+                segment.CloudText,
+                orderedTextResults,
+                usedIndices,
+                localBounds);
 
-            var splitBounds = new System.Drawing.Rectangle(
-                localBounds.X + (int)(localBounds.Width * ratio),
-                localBounds.Y,
-                (int)(localBounds.Width * widthRatio),
-                localBounds.Height
-            );
+            _logger.LogDebug(
+                "分割座標決定: CloudText='{CloudText}', Box=({X},{Y},{W},{H}), UsedIndices={UsedCount}",
+                segment.CloudText.Length > 20 ? segment.CloudText[..20] + "..." : segment.CloudText,
+                splitBounds.X, splitBounds.Y, splitBounds.Width, splitBounds.Height,
+                usedIndices.Count);
 
             // 分割チャンク生成
             var splitChunk = new TextChunk
@@ -329,6 +350,76 @@ public sealed class CrossValidator : ICrossValidator
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Cloud AIテキストに対応する座標を検索
+    /// </summary>
+    /// <remarks>
+    /// Issue #275: グルーピング前の個別OCR座標を使用するためのマッチングロジック
+    /// 優先度1: 正規化付きテキスト完全一致
+    /// 優先度2: Y座標順の位置ベースフォールバック
+    /// </remarks>
+    private System.Drawing.Rectangle FindMatchingBounds(
+        string cloudText,
+        IReadOnlyList<PositionedTextResult> orderedTextResults,
+        HashSet<int> usedIndices,
+        System.Drawing.Rectangle fallbackBounds)
+    {
+        var normalizedCloudText = NormalizeTextForMatching(cloudText);
+
+        // 優先度1: 正規化付きテキスト完全一致
+        for (int i = 0; i < orderedTextResults.Count; i++)
+        {
+            if (usedIndices.Contains(i))
+                continue;
+
+            var normalizedOcrText = NormalizeTextForMatching(orderedTextResults[i].Text);
+            if (normalizedOcrText == normalizedCloudText)
+            {
+                usedIndices.Add(i);
+                _logger.LogDebug(
+                    "テキストマッチ成功: CloudText='{CloudText}' → OCR='{OcrText}'",
+                    cloudText, orderedTextResults[i].Text);
+                return orderedTextResults[i].BoundingBox;
+            }
+        }
+
+        // 優先度2: Y座標順の位置ベースフォールバック（未使用の最初の結果を使用）
+        for (int i = 0; i < orderedTextResults.Count; i++)
+        {
+            // CA1868: HashSet.Addの戻り値を使用（追加成功=未使用だった）
+            if (usedIndices.Add(i))
+            {
+                _logger.LogDebug(
+                    "位置ベースフォールバック: CloudText='{CloudText}' → OCR[{Index}]='{OcrText}'",
+                    cloudText, i, orderedTextResults[i].Text);
+                return orderedTextResults[i].BoundingBox;
+            }
+        }
+
+        // 最終フォールバック: 統合座標を使用
+        _logger.LogDebug(
+            "統合座標フォールバック: CloudText='{CloudText}' → CombinedBounds",
+            cloudText);
+        return fallbackBounds;
+    }
+
+    /// <summary>
+    /// テキストマッチング用の正規化
+    /// </summary>
+    /// <remarks>
+    /// Issue #275: 空白・全角スペースを除去してマッチング精度を向上
+    /// </remarks>
+    private static string NormalizeTextForMatching(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        return text
+            .Replace(" ", "")   // 半角スペース除去
+            .Replace("　", "")  // 全角スペース除去
+            .Trim();
     }
 
     /// <summary>

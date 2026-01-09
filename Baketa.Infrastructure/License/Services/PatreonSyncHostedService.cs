@@ -1,5 +1,7 @@
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
+using Baketa.Infrastructure.License.Mapping;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +14,7 @@ namespace Baketa.Infrastructure.License.Services;
 public sealed class PatreonSyncHostedService : BackgroundService
 {
     private readonly IPatreonOAuthService _patreonService;
+    private readonly ILicenseManager _licenseManager;
     private readonly ILogger<PatreonSyncHostedService> _logger;
 
     /// <summary>
@@ -26,9 +29,11 @@ public sealed class PatreonSyncHostedService : BackgroundService
 
     public PatreonSyncHostedService(
         IPatreonOAuthService patreonService,
+        ILicenseManager licenseManager,
         ILogger<PatreonSyncHostedService> logger)
     {
         _patreonService = patreonService ?? throw new ArgumentNullException(nameof(patreonService));
+        _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -92,6 +97,14 @@ public sealed class PatreonSyncHostedService : BackgroundService
         {
             _logger.LogInformation("✅ Patreon自動同期成功: Plan={Plan}, FromCache={FromCache}",
                 result.Plan, result.FromCache);
+
+            // LicenseStateを構築してLicenseManagerに伝播 (DRY: PatreonLicenseMapper使用)
+            var state = PatreonLicenseMapper.ToLicenseState(result, credentials);
+
+            _licenseManager.SetResolvedLicenseState(
+                state,
+                "PatreonSyncHostedService",
+                LicenseChangeReason.ServerRefresh);
         }
         else
         {

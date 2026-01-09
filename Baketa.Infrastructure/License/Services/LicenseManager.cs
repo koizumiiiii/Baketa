@@ -142,6 +142,11 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             var persistedTokenUsage = _unifiedSettingsService?.GetPromotionSettings().MockTokenUsage ?? 0;
             var initialTokenUsage = persistedTokenUsage > 0 ? persistedTokenUsage : _settings.MockTokenUsage;
 
+            // [Issue #275] ApplyPersistedPromotionIfValid()で設定されたExpirationDateを保持
+            var promotionExpirationDate = _currentState.ExpirationDate;
+            // プロモーションが設定されており、かつ有効期限が切れていないかを確認
+            var hasActivePromotion = promotionExpirationDate.HasValue && promotionExpirationDate > DateTime.UtcNow;
+
             // モックモード用の初期状態を設定
             _currentState = new LicenseState
             {
@@ -149,7 +154,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 UserId = _userId,
                 SessionId = _sessionToken,
                 ContractStartDate = DateTime.UtcNow.AddDays(-15),
-                ExpirationDate = DateTime.UtcNow.AddDays(15),
+                // 有効なプロモーションがあればその有効期限を、なければデフォルト(15日後)を設定
+                ExpirationDate = hasActivePromotion ? promotionExpirationDate : DateTime.UtcNow.AddDays(15),
                 CloudAiTokensUsed = initialTokenUsage,
                 IsCached = false,
                 LastServerSync = DateTime.UtcNow,
@@ -158,11 +164,12 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             };
 
             _logger.LogWarning(
-                "🧪 モックモード有効: UserId={UserId}, Plan={Plan}, TokenLimit={TokenLimit}, HasPromotion={HasPromotion}",
+                "🧪 モックモード有効: UserId={UserId}, Plan={Plan}, TokenLimit={TokenLimit}, HasActivePromotion={HasActivePromotion}, ExpiresAt={ExpiresAt}",
                 _userId,
                 effectivePlan,
                 _currentState.MonthlyTokenLimit,
-                _settings.PromotionPlanType.HasValue);
+                hasActivePromotion,
+                _currentState.ExpirationDate);
         }
 
         _logger.LogInformation(
@@ -192,10 +199,11 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // ユーザー未認証の場合はデフォルト状態
+        // [Issue #275] ユーザー未認証の場合でも、プロモーション適用済みの現在状態を返す
+        // LicenseState.Defaultを返すと、プロモーションで適用されたプランが無視される
         if (string.IsNullOrEmpty(_userId))
         {
-            return LicenseState.Default;
+            return _currentState;
         }
 
         // キャッシュから取得を試行
@@ -217,11 +225,13 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // ユーザー未認証の場合
-        if (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken))
+        // APIクライアントが認証情報を必要とする場合のみチェック
+        // Patreonなど独自認証を持つクライアントはこのチェックをスキップ
+        if (_apiClient.RequiresCredentials && (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken)))
         {
-            _logger.LogDebug("ユーザー未認証のためリフレッシュをスキップ");
-            return LicenseState.Default;
+            // [Issue #275] プロモーション適用済みの現在状態を返す
+            _logger.LogDebug("ユーザー未認証のためリフレッシュをスキップ（RequiresCredentials={RequiresCredentials}）", _apiClient.RequiresCredentials);
+            return _currentState;
         }
 
         // レート制限チェック
@@ -231,14 +241,18 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             return _currentState;
         }
 
-        // キャッシュが有効な場合はキャッシュを返す
-        if (await _cacheService.IsCacheValidAsync(_userId, cancellationToken).ConfigureAwait(false))
+        // 認証情報がある場合のみキャッシュをチェック
+        if (!string.IsNullOrEmpty(_userId))
         {
-            var cachedState = await _cacheService.GetCachedStateAsync(_userId, cancellationToken)
-                .ConfigureAwait(false);
-            if (cachedState is not null)
+            // キャッシュが有効な場合はキャッシュを返す
+            if (await _cacheService.IsCacheValidAsync(_userId, cancellationToken).ConfigureAwait(false))
             {
-                return cachedState;
+                var cachedState = await _cacheService.GetCachedStateAsync(_userId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (cachedState is not null)
+                {
+                    return cachedState;
+                }
             }
         }
 
@@ -251,11 +265,12 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // ユーザー未認証の場合
-        if (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken))
+        // APIクライアントが認証情報を必要とする場合のみチェック
+        if (_apiClient.RequiresCredentials && (string.IsNullOrEmpty(_userId) || string.IsNullOrEmpty(_sessionToken)))
         {
-            _logger.LogDebug("ユーザー未認証のため強制リフレッシュをスキップ");
-            return LicenseState.Default;
+            _logger.LogDebug("ユーザー未認証のため強制リフレッシュをスキップ（RequiresCredentials={RequiresCredentials}）", _apiClient.RequiresCredentials);
+            // Issue #275: プロモーション適用済み状態を保持するため、Defaultではなく現在の状態を返す
+            return _currentState;
         }
 
         // キャッシュをクリア
@@ -533,20 +548,88 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private void UpdateCurrentState(LicenseState newState, LicenseChangeReason reason)
     {
         LicenseState oldState;
+        LicenseState stateToApply;
+
         lock (_stateLock)
         {
             oldState = _currentState;
-            _currentState = newState;
+            stateToApply = newState;
+
+            // [Issue #275] SessionIdを保持する（Gemini Review: アトミック性保証）
+            // 外部ソースから渡されたstateにSessionIdがない場合、現在の値を引き継ぐ
+            // string.IsNullOrWhiteSpace を使用してホワイトスペースのみの場合も考慮
+            if (string.IsNullOrWhiteSpace(newState.SessionId) && !string.IsNullOrWhiteSpace(_currentState.SessionId))
+            {
+                _logger.LogDebug(
+                    "🔑 [Issue #275] SessionIdを保持: {SessionId}",
+                    _currentState.SessionId[..Math.Min(10, _currentState.SessionId.Length)] + "...");
+
+                stateToApply = stateToApply with { SessionId = _currentState.SessionId };
+            }
+
+            // [Issue #275] プロモーション適用済みのプランを保持
+            // キャッシュ/サーバーから読み込んだ状態が現在のプランより低い場合、
+            // 有効なプロモーションがあれば現在のプランを維持
+            if (ShouldPreservePromotionPlan(oldState, newState, reason))
+            {
+                _logger.LogDebug(
+                    "🎁 [Issue #275] プロモーション適用済みプランを保持: {OldPlan} (降格防止: {NewPlan})",
+                    oldState.CurrentPlan, newState.CurrentPlan);
+
+                stateToApply = stateToApply with
+                {
+                    CurrentPlan = oldState.CurrentPlan,
+                    ExpirationDate = oldState.ExpirationDate
+                };
+            }
+
+            _currentState = stateToApply;
         }
 
         // [Issue #258] プラン変更またはトークン消費時にイベント発行
         // TokenConsumptionを追加: UI側でトークン使用量表示を更新するため
-        if (oldState.CurrentPlan != newState.CurrentPlan ||
+        if (oldState.CurrentPlan != stateToApply.CurrentPlan ||
             reason == LicenseChangeReason.ServerRefresh ||
             reason == LicenseChangeReason.TokenConsumption)
         {
-            OnStateChanged(oldState, newState, reason);
+            OnStateChanged(oldState, stateToApply, reason);
         }
+    }
+
+    /// <summary>
+    /// [Issue #275] プロモーション適用済みのプランを保持すべきか判定
+    /// </summary>
+    private bool ShouldPreservePromotionPlan(LicenseState oldState, LicenseState newState, LicenseChangeReason reason)
+    {
+        // プロモーション関連の変更は保持しない（正当な変更）
+        if (reason == LicenseChangeReason.PromotionApplied ||
+            reason == LicenseChangeReason.PromotionExpired)
+        {
+            return false;
+        }
+
+        // プランが同じか上がる場合は保持不要
+        if ((int)newState.CurrentPlan >= (int)oldState.CurrentPlan)
+        {
+            return false;
+        }
+
+        // 有効なプロモーションがあるか確認
+        if (_unifiedSettingsService is null)
+        {
+            return false;
+        }
+
+        var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+        if (!promotionSettings.IsCurrentlyActive() || !promotionSettings.PromotionPlanType.HasValue)
+        {
+            return false;
+        }
+
+        var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
+
+        // 現在のプランがプロモーションプランと一致する場合のみ保持
+        return oldState.CurrentPlan == promotionPlan;
     }
 
     /// <summary>
@@ -808,6 +891,121 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         return Task.FromResult(true);
     }
 
+    /// <inheritdoc/>
+    public void SetResolvedLicenseState(LicenseState state, string source, LicenseChangeReason reason)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        _logger.LogInformation(
+            "🔄 外部ソースからライセンス状態を設定: Source={Source}, Plan={Plan}, Reason={Reason}",
+            source, state.CurrentPlan, reason);
+
+        // Patreon連携の場合、userIdを設定しておく（キャッシュ用）
+        // スレッドセーフティのためlockで保護 (Gemini Review指摘)
+        if (!string.IsNullOrEmpty(state.PatreonUserId))
+        {
+            lock (_stateLock)
+            {
+                _userId = state.PatreonUserId;
+            }
+            _logger.LogDebug("PatreonUserIdをuserIdに設定: {UserId}", MaskUserId(_userId));
+        }
+
+        // [Issue #275] プロモーションが有効な場合、プロモーションのプランと有効期限を優先
+        var stateToApply = ApplyPromotionOverride(state);
+
+        // 状態を更新（イベントも発火）
+        // [Issue #275] SessionIdの保持はUpdateCurrentState内でアトミックに実行される（Gemini Review対応）
+        UpdateCurrentState(stateToApply, reason);
+    }
+
+    /// <inheritdoc/>
+    public void SyncTokenUsage(long tokensUsed)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentOutOfRangeException.ThrowIfNegative(tokensUsed);
+
+        LicenseState oldState;
+        LicenseState newState;
+
+        lock (_stateLock)
+        {
+            if (_currentState.CloudAiTokensUsed == tokensUsed)
+            {
+                return; // 変更なし
+            }
+
+            oldState = _currentState;
+            _currentState = _currentState with { CloudAiTokensUsed = tokensUsed };
+            newState = _currentState;
+
+            _logger.LogDebug(
+                "[Issue #275] トークン使用量を同期: {OldUsage} → {NewUsage}",
+                oldState.CloudAiTokensUsed, tokensUsed);
+        }
+
+        // [Issue #275] StateChangedイベントを発火して他のViewModelにも通知
+        // GeneralSettingsViewModelなどが更新された値を取得できるようにする
+        OnStateChanged(oldState, newState, LicenseChangeReason.TokenUsageUpdated);
+    }
+
+    /// <summary>
+    /// [Issue #275] 有効なプロモーションがある場合、状態にプロモーション設定をマージ
+    /// プロモーションのプランがより上位であれば優先する
+    /// </summary>
+    private LicenseState ApplyPromotionOverride(LicenseState incomingState)
+    {
+        // IUnifiedSettingsService経由でプロモーション設定を確認
+        if (_unifiedSettingsService is null)
+        {
+            return incomingState;
+        }
+
+        var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+        if (!promotionSettings.IsCurrentlyActive() || !promotionSettings.PromotionPlanType.HasValue)
+        {
+            return incomingState;
+        }
+
+        var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
+
+        // プロモーションのプランが入力されたプランより上位かチェック
+        if ((int)promotionPlan <= (int)incomingState.CurrentPlan)
+        {
+            // 入力プランの方が上位または同等なので、そのまま使用
+            return incomingState;
+        }
+
+        // プロモーションプランの方が上位なので、プランと有効期限を上書き
+        if (!string.IsNullOrEmpty(promotionSettings.PromotionExpiresAt) &&
+            DateTime.TryParse(promotionSettings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var promotionExpires))
+        {
+            _logger.LogInformation(
+                "🎁 [Issue #275] プロモーション優先適用: IncomingPlan={IncomingPlan} → PromotionPlan={PromotionPlan}, ExpiresAt={ExpiresAt}",
+                incomingState.CurrentPlan, promotionPlan, promotionExpires);
+
+            return incomingState with
+            {
+                CurrentPlan = promotionPlan,
+                ExpirationDate = promotionExpires
+            };
+        }
+
+        return incomingState;
+    }
+
+    /// <summary>
+    /// UserIdをマスクするヘルパー（ログ用）
+    /// </summary>
+    private static string MaskUserId(string? userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return "(empty)";
+        if (userId.Length <= 4) return "****";
+        return userId[..2] + "****" + userId[^2..];
+    }
+
     #endregion
 
     #region Promotion Support (Issue #243)
@@ -818,14 +1016,27 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     /// </summary>
     private void ApplyPromotionToState(PlanType plan, DateTime expiresAt, string source)
     {
+        // [Issue #275] トークン使用量も永続化設定から読み込む
+        long tokenUsage = 0;
+        if (_unifiedSettingsService is not null)
+        {
+            var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
+            tokenUsage = promotionSettings.MockTokenUsage;
+        }
+        if (tokenUsage == 0)
+        {
+            tokenUsage = _settings.MockTokenUsage;
+        }
+
         _currentState = _currentState with
         {
             CurrentPlan = plan,
-            ExpirationDate = expiresAt
+            ExpirationDate = expiresAt,
+            CloudAiTokensUsed = tokenUsage
         };
         _logger.LogInformation(
-            "🎁 [Issue #258] 起動時にプロモーション設定を適用 ({Source}): Plan={Plan}, ExpiresAt={ExpiresAt}",
-            source, plan, expiresAt);
+            "🎁 [Issue #258] 起動時にプロモーション設定を適用 ({Source}): Plan={Plan}, ExpiresAt={ExpiresAt}, TokenUsage={TokenUsage}",
+            source, plan, expiresAt, tokenUsage);
     }
 
     /// <summary>
