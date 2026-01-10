@@ -1546,15 +1546,50 @@ async function handleWebhook(
 
     const payload = JSON.parse(body) as PatreonWebhookPayload;
     const userId = payload.data.relationships?.user?.data?.id;
+    const pledgeId = payload.data.id;
+    const amountCents = payload.data.attributes?.currently_entitled_amount_cents ?? 0;
 
-    console.log(`Webhook received: event=${eventType}, userId=${userId}`);
+    console.log(`Webhook received: event=${eventType}, userId=${userId}, pledgeId=${pledgeId}, amountCents=${amountCents}`);
 
     if (userId) {
       // メンバーシップキャッシュを無効化（次回アクセス時に最新情報を取得）
       await invalidateMembershipCache(env, userId);
       console.log(`Webhook: Invalidated membership cache for user ${userId}`);
 
-      // イベントタイプに応じた処理
+      // [Issue #271] プラン変更を履歴に記録
+      const supabase = getSupabaseClient(env);
+      const newPlan = eventType === 'members:pledge:delete' ? 'Free' : determinePlan(amountCents);
+
+      if (supabase) {
+        // 前回のプランを取得
+        const { data: oldPlan } = await supabase.rpc('get_latest_plan_by_patreon', {
+          p_patreon_user_id: userId
+        });
+
+        // プラン変更があれば記録
+        if (oldPlan !== newPlan) {
+          const { data: recordId, error: recordError } = await supabase.rpc('record_plan_change_by_patreon', {
+            p_patreon_user_id: userId,
+            p_old_plan: oldPlan || null,
+            p_new_plan: newPlan,
+            p_source: 'patreon_webhook',
+            p_patreon_pledge_id: pledgeId,
+            p_metadata: { event: eventType, amount_cents: amountCents }
+          });
+
+          if (recordError) {
+            console.error(`Webhook: Failed to record plan change: ${recordError.message}`);
+          } else {
+            console.log(`Webhook: Recorded plan change ${oldPlan || 'NULL'} -> ${newPlan} (recordId=${recordId})`);
+          }
+        } else {
+          console.log(`Webhook: No plan change detected (current=${newPlan})`);
+        }
+      } else {
+        console.warn('Webhook: Supabase client not available, skipping plan change recording');
+      }
+
+      // イベントタイプに応じた追加処理
       switch (eventType) {
         case 'members:pledge:delete':
           // 支援停止時はユーザーの全セッションを無効化
@@ -1577,6 +1612,7 @@ async function handleWebhook(
       success: true,
       event: eventType,
       processed: true,
+      planChangeRecorded: !!userId,
     }, origin, allowedOrigins);
 
   } catch (error) {

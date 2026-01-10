@@ -209,8 +209,42 @@ Baketaには2つの認証システムがあります：
 
 ---
 
+## セキュリティ運用
+
+### Webhookシークレットのローテーション
+
+[Gemini Review] セキュリティ強化のため、Patreon Webhookシークレットは定期的にローテーションを推奨します。
+
+**ローテーション手順:**
+
+1. **新しいシークレットを生成**
+   ```bash
+   openssl rand -hex 32
+   ```
+
+2. **Patreon Developer Portalで更新**
+   - https://www.patreon.com/portal/registration/register-webhooks
+   - 対象Webhookを選択
+   - 新しいシークレットを設定
+
+3. **Cloudflare Workers環境変数を更新**
+   ```bash
+   cd relay-server
+   wrangler secret put PATREON_WEBHOOK_SECRET
+   # 新しいシークレットを入力
+   ```
+
+4. **動作確認**
+   - Patreon側でテストWebhookを送信
+   - Cloudflare Logsで署名検証成功を確認
+
+**ローテーション推奨頻度**: 年1回、またはセキュリティインシデント発生時
+
+---
+
 ## 更新履歴
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-10 | [Gemini Review] セキュリティ運用セクション追加 |
 | 2024-12-26 | 初版作成 |
