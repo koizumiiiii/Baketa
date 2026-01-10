@@ -652,12 +652,17 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 cancellationToken).ConfigureAwait(false);
 
             // イベント発行
+            // AppliedAtがnullの場合はフォールバック値を使用
+            var appliedAt = !string.IsNullOrEmpty(result.Promotion.AppliedAt)
+                ? DateTime.Parse(result.Promotion.AppliedAt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
+                : DateTime.UtcNow;
+
             var promotionInfo = new PromotionInfo
             {
                 Code = result.Promotion.CodeMasked ?? "****-****",
                 Plan = planType,
                 ExpiresAt = expiresAt,
-                AppliedAt = DateTime.Parse(result.Promotion.AppliedAt!, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
+                AppliedAt = appliedAt
             };
 
             PromotionStateChanged?.Invoke(this, new PromotionStateChangedEventArgs

@@ -133,6 +133,21 @@ public sealed class LicenseModule : ServiceModuleBase
         });
 #endif
 
+        // Issue #280+#281: ボーナストークンサービス
+        // Pollyリトライポリシー付きHttpClient
+        services.AddHttpClient<License.BonusTokenService>(client =>
+        {
+            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        })
+        .AddPolicyHandler(GetRetryPolicy());
+        services.AddSingleton<IBonusTokenService>(provider =>
+            provider.GetRequiredService<License.BonusTokenService>());
+        services.AddSingleton<IDisposable>(provider =>
+            provider.GetRequiredService<License.BonusTokenService>());
+
         // Disposable登録（アプリケーション終了時の適切なクリーンアップ）
         services.AddSingleton<IDisposable>(provider =>
             provider.GetRequiredService<LicenseCacheService>());

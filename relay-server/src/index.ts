@@ -13,6 +13,7 @@
  * - Cloud AI翻訳（Gemini API経由）
  * - クラッシュレポート受信（Issue #252）
  * - 同意記録（GDPR/CCPA監査ログ）（Issue #261）
+ * - ボーナストークン管理（Issue #280+#281）
  *
  * セキュリティ:
  * - タイミング攻撃対策（timingSafeCompare）
@@ -133,6 +134,23 @@ interface UsageEvent {
   schema_version: number;
   app_version: string;
   occurred_at: string;  // ISO 8601
+}
+
+/** Issue #280+#281: ボーナストークン同期リクエスト */
+interface BonusSyncItem {
+  id: string;  // UUID
+  used_tokens: number;
+}
+
+/** Issue #280+#281: ボーナストークン情報 */
+interface BonusTokenInfo {
+  id: string;
+  source_type: string;
+  granted_tokens: number;
+  used_tokens: number;
+  remaining_tokens: number;
+  expires_at: string;
+  is_expired: boolean;
 }
 
 /** Patreon OAuth トークンレスポンス */
@@ -1391,6 +1409,195 @@ async function handleAnalyticsEvents(
 }
 
 // ============================================
+// Issue #280+#281: ボーナストークンAPI
+// ============================================
+
+/**
+ * [Issue #280+#281] ボーナストークン状態取得
+ * GET /api/bonus-tokens/status
+ *
+ * 認証済みユーザーのボーナストークン一覧を取得
+ * - 有効期限順にソート
+ * - 残高と有効期限情報を含む
+ */
+async function handleBonusTokensStatus(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #280] Supabase not configured for bonus tokens');
+      return errorResponse('Bonus token service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'BONUS_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'BONUS_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（10回/分）
+    const rateLimit = await checkRateLimit(env, `bonus-status:${user.id}`, 10);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. RPC関数を使用してボーナストークン状態を取得
+    // サービスキーでは auth.uid() が機能しないため、専用関数を使用
+    const { data, error } = await supabase.rpc('get_bonus_tokens_for_user', {
+      p_user_id: user.id
+    });
+
+    if (error) {
+      console.error('[Issue #280] RPC error:', error);
+      return errorResponse('Database error', 500, origin, allowedOrigins, 'BONUS_DB_ERROR');
+    }
+
+    // 5. レスポンス構築
+    const bonuses: BonusTokenInfo[] = Array.isArray(data) ? data : [];
+
+    // 有効なボーナス（未期限切れで残高あり）の合計を計算
+    const totalRemaining = bonuses
+      .filter(b => !b.is_expired && b.remaining_tokens > 0)
+      .reduce((sum, b) => sum + b.remaining_tokens, 0);
+
+    console.log(JSON.stringify({
+      event: 'bonus_tokens_status',
+      user_id: user.id.substring(0, 8) + '...',
+      bonus_count: bonuses.length,
+      total_remaining: totalRemaining,
+      timestamp: new Date().toISOString()
+    }));
+
+    return successResponse({
+      bonuses,
+      total_remaining: totalRemaining,
+      active_count: bonuses.filter(b => !b.is_expired && b.remaining_tokens > 0).length
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #280] Bonus tokens status error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * [Issue #280+#281] ボーナストークン使用量同期
+ * POST /api/bonus-tokens/sync
+ *
+ * CRDT G-Counterパターンで使用量を同期
+ * - 各ボーナスIDごとに大きい方を採用
+ * - オフライン時のローカル消費もサーバーに反映可能
+ */
+async function handleBonusTokensSync(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #281] Supabase not configured for bonus tokens sync');
+      return errorResponse('Bonus token service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'BONUS_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'BONUS_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（30回/分 - 同期は頻繁に呼ばれる可能性あり）
+    const rateLimit = await checkRateLimit(env, `bonus-sync:${user.id}`, 30);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. リクエストボディ取得
+    const body = await request.json() as { bonuses?: BonusSyncItem[] };
+
+    if (!body.bonuses || !Array.isArray(body.bonuses)) {
+      return errorResponse('Missing or invalid bonuses array', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+    }
+
+    // 空配列の場合は同期不要
+    if (body.bonuses.length === 0) {
+      return successResponse({
+        synced: [],
+        synced_count: 0
+      }, origin, allowedOrigins);
+    }
+
+    // 各項目のバリデーション
+    for (const item of body.bonuses) {
+      if (!item.id || typeof item.used_tokens !== 'number') {
+        return errorResponse('Invalid bonus sync item', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+      }
+      if (item.used_tokens < 0) {
+        return errorResponse('used_tokens must be non-negative', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+      }
+    }
+
+    // 5. RPC関数を使用してボーナストークンを同期
+    const { data, error } = await supabase.rpc('sync_bonus_tokens_for_user', {
+      p_user_id: user.id,
+      p_bonuses: body.bonuses
+    });
+
+    if (error) {
+      console.error('[Issue #281] RPC error:', error);
+      return errorResponse('Sync failed', 500, origin, allowedOrigins, 'BONUS_SYNC_ERROR');
+    }
+
+    // 6. 同期結果をレスポンス
+    const synced = Array.isArray(data) ? data : [];
+
+    console.log(JSON.stringify({
+      event: 'bonus_tokens_sync',
+      user_id: user.id.substring(0, 8) + '...',
+      requested_count: body.bonuses.length,
+      synced_count: synced.length,
+      timestamp: new Date().toISOString()
+    }));
+
+    return successResponse({
+      synced,
+      synced_count: synced.length
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #281] Bonus tokens sync error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+// ============================================
 // メインハンドラ
 // ============================================
 
@@ -1482,6 +1689,10 @@ export default {
           return handleConsentRecord(request, env, origin, allowedOrigins);
         case '/api/consent/status':
           return handleConsentStatus(request, env, origin, allowedOrigins);
+        case '/api/bonus-tokens/status':
+          return handleBonusTokensStatus(request, env, origin, allowedOrigins);
+        case '/api/bonus-tokens/sync':
+          return handleBonusTokensSync(request, env, origin, allowedOrigins);
         // Note: /api/crash-report is handled earlier (before API key validation)
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');
