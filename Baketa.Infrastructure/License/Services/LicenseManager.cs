@@ -29,6 +29,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private readonly LicenseSettings _settings;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
     private readonly IUsageAnalyticsService? _analyticsService;
+    private readonly IBonusTokenService? _bonusTokenService;
 
     // 現在のライセンス状態
     private LicenseState _currentState;
@@ -89,7 +90,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         IEventAggregator eventAggregator,
         IOptions<LicenseSettings> settings,
         IUnifiedSettingsService? unifiedSettingsService = null,
-        IUsageAnalyticsService? analyticsService = null)
+        IUsageAnalyticsService? analyticsService = null,
+        IBonusTokenService? bonusTokenService = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
@@ -98,6 +100,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _unifiedSettingsService = unifiedSettingsService;
         _analyticsService = analyticsService;
+        _bonusTokenService = bonusTokenService;
 
         // 初期状態はFreeプラン
         _currentState = LicenseState.Default;
@@ -318,30 +321,79 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 TokenConsumptionFailureReason.PlanNotSupported);
         }
 
-        // ローカルでクォータチェック（楽観的）
-        if (_currentState.IsQuotaExceeded)
+        // [Gemini Review] スレッドセーフのため状態をスナップショット
+        var currentStateSnapshot = CurrentState;
+
+        // [Issue #280+#281] ボーナストークン優先消費
+        // [Gemini Review] 消費前にシミュレーション/チェックを行う（ロールバック不要な設計）
+        long bonusTokensToConsume = 0;
+        var remainingForPlanQuota = tokenCount;
+
+        // Step 1: ボーナストークンでカバーできる量を確認（まだ消費しない）
+        if (_bonusTokenService != null)
         {
-            return TokenConsumptionResult.CreateFailure(
-                TokenConsumptionFailureReason.QuotaExceeded,
-                currentUsage: _currentState.CloudAiTokensUsed,
-                remainingTokens: 0);
+            bonusTokensToConsume = _bonusTokenService.GetConsumeableAmount(tokenCount);
+            remainingForPlanQuota = tokenCount - (int)bonusTokensToConsume;
         }
+
+        // Step 2: 残り分がプランクォータでカバーできるかチェック
+        if (remainingForPlanQuota > 0)
+        {
+            var projectedUsage = currentStateSnapshot.CloudAiTokensUsed + remainingForPlanQuota;
+            if (projectedUsage > currentStateSnapshot.MonthlyTokenLimit)
+            {
+                _logger.LogWarning(
+                    "[Issue #280] クォータ超過（消費前にチェック）: Used={Used}, Remaining={Remaining}, Limit={Limit}",
+                    currentStateSnapshot.CloudAiTokensUsed, remainingForPlanQuota, currentStateSnapshot.MonthlyTokenLimit);
+
+                return TokenConsumptionResult.CreateFailure(
+                    TokenConsumptionFailureReason.QuotaExceeded,
+                    currentUsage: currentStateSnapshot.CloudAiTokensUsed,
+                    remainingTokens: 0);
+            }
+        }
+
+        // Step 3: チェック通過後、実際にボーナストークンを消費
+        long bonusTokensConsumed = 0;
+        if (bonusTokensToConsume > 0 && _bonusTokenService != null)
+        {
+            bonusTokensConsumed = _bonusTokenService.ConsumeTokens(bonusTokensToConsume);
+
+            _logger.LogDebug(
+                "[Issue #280] ボーナストークン消費: {Consumed}/{Total} (残り: {Remaining})",
+                bonusTokensConsumed, tokenCount, _bonusTokenService.GetTotalRemainingTokens());
+
+            // ボーナストークンで全額カバーできた場合
+            if (remainingForPlanQuota <= 0)
+            {
+                _logger.LogInformation(
+                    "[Issue #280] ボーナストークンのみで消費完了: {TokenCount} tokens",
+                    tokenCount);
+
+                return TokenConsumptionResult.CreateSuccess(
+                    currentStateSnapshot.CloudAiTokensUsed,  // プランクォータは変更なし
+                    currentStateSnapshot.RemainingTokens);
+            }
+        }
+
+        var remainingToConsume = remainingForPlanQuota;
 
         // APIが利用不可（オフライン）の場合
         if (!_apiClient.IsAvailable)
         {
-            return await HandleOfflineConsumptionAsync(tokenCount, idempotencyKey, cancellationToken)
+            // [Issue #280] ボーナス消費後の残りをオフライン消費
+            return await HandleOfflineConsumptionAsync(remainingToConsume, idempotencyKey, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        // サーバーに消費を記録
+        // サーバーに消費を記録（ボーナス消費後の残り分のみ）
         try
         {
             var request = new TokenConsumptionRequest
             {
                 UserId = _userId,
                 SessionToken = _sessionToken,
-                TokenCount = tokenCount,
+                TokenCount = remainingToConsume,  // [Issue #280] ボーナス消費後の残り
                 IdempotencyKey = idempotencyKey
             };
 
@@ -378,8 +430,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         {
             _logger.LogWarning(ex, "トークン消費APIエラー、オフラインフォールバック");
 
-            // オフラインフォールバック
-            return await HandleOfflineConsumptionAsync(tokenCount, idempotencyKey, cancellationToken)
+            // [Issue #280] ボーナス消費後の残りをオフラインフォールバック
+            return await HandleOfflineConsumptionAsync(remainingToConsume, idempotencyKey, cancellationToken)
                 .ConfigureAwait(false);
         }
     }

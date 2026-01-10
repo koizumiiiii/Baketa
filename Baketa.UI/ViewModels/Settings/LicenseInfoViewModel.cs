@@ -28,6 +28,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private readonly ILicenseManager _licenseManager;
     private readonly IPromotionCodeService _promotionCodeService;
     private readonly ITokenConsumptionTracker _tokenTracker;
+    private readonly IBonusTokenService? _bonusTokenService;
     private readonly ILogger<LicenseInfoViewModel>? _logger;
 
     private PlanType _currentPlan;
@@ -50,6 +51,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private bool _hasActivePromotion;
     private PromotionInfo? _activePromotion;
 
+    // Issue #280+#281: ボーナストークン関連
+    private long _bonusTokensRemaining;
+
     /// <summary>
     /// LicenseInfoViewModelを初期化します
     /// </summary>
@@ -58,11 +62,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         IPromotionCodeService promotionCodeService,
         IEventAggregator eventAggregator,
         ITokenConsumptionTracker tokenTracker,
+        IBonusTokenService? bonusTokenService = null,
         ILogger<LicenseInfoViewModel>? logger = null) : base(eventAggregator)
     {
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _promotionCodeService = promotionCodeService ?? throw new ArgumentNullException(nameof(promotionCodeService));
         _tokenTracker = tokenTracker ?? throw new ArgumentNullException(nameof(tokenTracker));
+        _bonusTokenService = bonusTokenService;
         _logger = logger;
 
         // ライセンス状態変更イベントの購読
@@ -70,6 +76,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
         // プロモーション状態変更イベントの購読
         _promotionCodeService.PromotionStateChanged += OnPromotionStateChanged;
+
+        // [Issue #280+#281] ボーナストークン状態変更イベントの購読
+        if (_bonusTokenService != null)
+        {
+            _bonusTokenService.BonusTokensChanged += OnBonusTokensChanged;
+            BonusTokensRemaining = _bonusTokenService.GetTotalRemainingTokens();
+        }
 
         // コマンドの初期化
         RefreshCommand = ReactiveCommand.CreateFromTask(RefreshLicenseStateAsync);
@@ -189,6 +202,27 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     public string TokenUsageDisplay => HasCloudAccess
         ? $"{TokensUsed:N0} / {TokenLimit:N0}"
         : Strings.License_LocalOnly;
+
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークン残高
+    /// </summary>
+    public long BonusTokensRemaining
+    {
+        get => _bonusTokensRemaining;
+        private set => this.RaiseAndSetIfChanged(ref _bonusTokensRemaining, value);
+    }
+
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークン残高の表示文字列
+    /// </summary>
+    public string BonusTokensDisplay => BonusTokensRemaining > 0
+        ? $"+{BonusTokensRemaining:N0} ボーナス"
+        : string.Empty;
+
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークンがあるかどうか
+    /// </summary>
+    public bool HasBonusTokens => BonusTokensRemaining > 0;
 
     /// <summary>
     /// クラウドアクセス状態の表示文字列
@@ -683,6 +717,21 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         });
     }
 
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークン状態変更イベントハンドラ
+    /// </summary>
+    private void OnBonusTokensChanged(object? sender, BonusTokensChangedEventArgs e)
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            BonusTokensRemaining = e.TotalRemaining;
+            this.RaisePropertyChanged(nameof(BonusTokensDisplay));
+            this.RaisePropertyChanged(nameof(HasBonusTokens));
+            _logger?.LogDebug("ボーナストークン状態が変更されました: {Reason}, 残高: {Remaining}",
+                e.Reason, e.TotalRemaining);
+        });
+    }
+
     #endregion
 
     /// <summary>
@@ -694,6 +743,12 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         {
             _licenseManager.StateChanged -= OnLicenseStateChanged;
             _promotionCodeService.PromotionStateChanged -= OnPromotionStateChanged;
+
+            // [Issue #280+#281] ボーナストークンイベントの購読解除
+            if (_bonusTokenService != null)
+            {
+                _bonusTokenService.BonusTokensChanged -= OnBonusTokensChanged;
+            }
         }
         base.Dispose(disposing);
     }
