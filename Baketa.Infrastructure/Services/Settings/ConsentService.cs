@@ -411,6 +411,12 @@ public sealed class ConsentService : IConsentService, IDisposable
                 var settings = await LoadSettingsInternalAsync(cancellationToken).ConfigureAwait(false);
                 var updated = false;
 
+                // [Issue #277] デバッグ: サーバーレスポンスの内容をログ出力
+                _logger.LogDebug(
+                    "[Issue #277] Server response - PrivacyPolicy: {PP}, TermsOfService: {TOS}",
+                    result.PrivacyPolicy != null ? $"Status={result.PrivacyPolicy.Status}, Version={result.PrivacyPolicy.Version}" : "null",
+                    result.TermsOfService != null ? $"Status={result.TermsOfService.Status}, Version={result.TermsOfService.Version}" : "null");
+
                 // プライバシーポリシー
                 if (result.PrivacyPolicy != null)
                 {
@@ -426,7 +432,20 @@ public sealed class ConsentService : IConsentService, IDisposable
                         settings.HasAcceptedPrivacyPolicy = true;
                         settings.PrivacyPolicyVersion = result.PrivacyPolicy.Version;
                         updated = true;
+                        _logger.LogInformation(
+                            "[Issue #277] Privacy policy consent granted by server (Version: {Version})",
+                            result.PrivacyPolicy.Version);
                     }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "[Issue #277] Unknown privacy policy status: {Status}",
+                            result.PrivacyPolicy.Status);
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("[Issue #277] Server returned no privacy policy data");
                 }
 
                 // 利用規約
@@ -444,7 +463,20 @@ public sealed class ConsentService : IConsentService, IDisposable
                         settings.HasAcceptedTermsOfService = true;
                         settings.TermsOfServiceVersion = result.TermsOfService.Version;
                         updated = true;
+                        _logger.LogInformation(
+                            "[Issue #277] Terms of service consent granted by server (Version: {Version})",
+                            result.TermsOfService.Version);
                     }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "[Issue #277] Unknown terms of service status: {Status}",
+                            result.TermsOfService.Status);
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("[Issue #277] Server returned no terms of service data");
                 }
 
                 if (updated)
@@ -453,6 +485,17 @@ public sealed class ConsentService : IConsentService, IDisposable
                     await SaveSettingsAsync(settings, cancellationToken).ConfigureAwait(false);
                     _logger.LogInformation("[Issue #277] Consent state synced from server");
                 }
+                else
+                {
+                    _logger.LogDebug("[Issue #277] No consent updates from server (updated=false)");
+                }
+
+                // [Issue #277] デバッグ: 同期後の設定状態
+                _logger.LogDebug(
+                    "[Issue #277] After sync - HasAcceptedPrivacyPolicy={PP}, PrivacyPolicyVersion={PPV}, NeedsInitialConsent={NIC}",
+                    settings.HasAcceptedPrivacyPolicy,
+                    settings.PrivacyPolicyVersion ?? "null",
+                    settings.NeedsInitialConsent);
 
                 return ServerSyncResult.Success;
             }

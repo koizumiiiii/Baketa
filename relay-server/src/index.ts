@@ -1041,8 +1041,11 @@ async function handlePromotionStatus(
     }
 
     // 4. RPC関数を使用してプロモーション状態を取得
-    // [Gemini Review] 日付計算をDB側で行い、タイムゾーン問題を回避
-    const { data, error } = await supabase.rpc('get_promotion_status');
+    // [Issue #276] サービスキーでは auth.uid() が機能しないため、
+    // user_idをパラメータとして渡す専用関数を使用
+    const { data, error } = await supabase.rpc('get_promotion_status_for_user', {
+      p_user_id: user.id
+    });
 
     if (error) {
       console.error('[Promotion] RPC error:', error);
@@ -1241,8 +1244,11 @@ async function handleConsentStatus(
     }
 
     // 4. RPC関数を使用して同意状態を取得
-    // [Gemini Review] ビュー直接アクセスからRPC関数に移行
-    const { data, error } = await supabase.rpc('get_consent_status');
+    // [Issue #277] サービスキーでは auth.uid() が機能しないため、
+    // user_idをパラメータとして渡す専用関数を使用
+    const { data, error } = await supabase.rpc('get_consent_status_for_user', {
+      p_user_id: user.id
+    });
 
     if (error) {
       console.error('[Consent] RPC error:', error);

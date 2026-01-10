@@ -108,3 +108,46 @@ $$;
 
 -- RPC関数の実行権限をauthenticated roleに付与
 GRANT EXECUTE ON FUNCTION get_consent_status() TO authenticated;
+
+-- ============================================================
+-- Issue #277: サービスロール用の同意状態取得RPC関数
+-- ============================================================
+-- Relay Server（サービスロール）からユーザーIDを指定して呼び出す
+-- auth.uid()を使わず、明示的にuser_idを受け取る
+--
+-- 使用例（Relay Server経由）:
+-- SELECT * FROM get_consent_status_for_user('user-uuid-here');
+-- ============================================================
+CREATE OR REPLACE FUNCTION get_consent_status_for_user(p_user_id UUID)
+RETURNS TABLE (
+    consent_type VARCHAR(50),
+    status VARCHAR(20),
+    version VARCHAR(20),
+    recorded_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- 入力検証
+    IF p_user_id IS NULL THEN
+        RAISE EXCEPTION 'user_id is required';
+    END IF;
+
+    -- latest_consent_statusビューから取得
+    RETURN QUERY
+    SELECT
+        lcs.consent_type,
+        lcs.status,
+        lcs.version,
+        lcs.recorded_at
+    FROM latest_consent_status lcs
+    WHERE lcs.user_id = p_user_id;
+END;
+$$;
+
+-- サービスロール（Relay Server）のみ実行可能
+-- authenticated roleには付与しない（直接呼び出し防止）
+REVOKE ALL ON FUNCTION get_consent_status_for_user(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_consent_status_for_user(UUID) TO service_role;

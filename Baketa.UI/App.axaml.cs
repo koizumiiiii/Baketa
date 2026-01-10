@@ -1111,6 +1111,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     /// <summary>
     /// [Issue #261] プライバシーポリシー同意確認・ダイアログ表示
     /// 初回起動時にプライバシーポリシーへの同意を確認し、同意しない場合はアプリを終了
+    /// [Issue #277] 認証済みの場合は先にサーバーから同期してから判定
     /// </summary>
     /// <returns>同意された場合はtrue、拒否された場合はfalse（アプリ終了が必要）</returns>
     private async Task<bool> CheckAndShowConsentDialogAsync(IServiceProvider serviceProvider)
@@ -1130,6 +1131,11 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 _logger?.LogWarning("[Issue #261] ILocalizationServiceが登録されていません");
                 return true; // サービスがない場合は続行
             }
+
+            // [Issue #277] 認証済みの場合、サーバーから同期してからローカル状態をチェック
+            // AuthInitializationService.StartAsync()はIHostedServiceとして非同期で実行されるため、
+            // ここで明示的に同期を待つ必要がある
+            await TrySyncConsentFromServerAsync(serviceProvider, consentService).ConfigureAwait(true);
 
             // [Gemini Review] 非同期化: UIスレッドブロック回避
             // 初回起動時の同意が必要か確認
@@ -1173,6 +1179,10 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 // 両方の同意を記録
                 await consentService.AcceptAllAsync().ConfigureAwait(true);
 
+                // [Issue #277] 認証済みの場合、同意をサーバーに即時同期
+                // これによりPC移行時にDBから同意状態を復元可能になる
+                await TrySyncConsentToServerAsync(serviceProvider, consentService).ConfigureAwait(true);
+
                 return true;
             }
             else
@@ -1186,6 +1196,103 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             // 同意確認処理の失敗はアプリ起動をブロックしない（セキュリティ考慮で要検討）
             _logger?.LogWarning(ex, "[Issue #261] 同意確認処理中にエラー（継続）");
             return true;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #277] 認証済みの場合、サーバーから同意状態を同期
+    /// ローカル設定ファイル削除時にDBから復元するために必要
+    /// </summary>
+    private async Task TrySyncConsentFromServerAsync(
+        IServiceProvider serviceProvider,
+        Baketa.Core.Abstractions.Settings.IConsentService consentService)
+    {
+        try
+        {
+            var tokenStorage = serviceProvider.GetService<Baketa.Core.Abstractions.Auth.ITokenStorage>();
+            var authService = serviceProvider.GetService<Baketa.Core.Abstractions.Auth.IAuthService>();
+
+            if (tokenStorage == null || authService == null)
+            {
+                _logger?.LogDebug("[Issue #277] Auth services not available, skipping server sync");
+                return;
+            }
+
+            // 保存されたトークンがあるか確認
+            var hasTokens = await tokenStorage.HasStoredTokensAsync().ConfigureAwait(true);
+            if (!hasTokens)
+            {
+                _logger?.LogDebug("[Issue #277] No stored tokens, skipping server sync");
+                return;
+            }
+
+            // セッション復元を試みる
+            await authService.RestoreSessionAsync().ConfigureAwait(true);
+            var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
+
+            if (session?.AccessToken == null)
+            {
+                _logger?.LogDebug("[Issue #277] No valid session, skipping server sync");
+                return;
+            }
+
+            // サーバーから同期
+            _logger?.LogInformation("[Issue #277] 認証済み - サーバーから同意状態を同期中...");
+            var syncResult = await consentService.SyncFromServerAsync(session.AccessToken).ConfigureAwait(true);
+            _logger?.LogInformation("[Issue #277] 同意状態の同期完了: {Result}", syncResult);
+        }
+        catch (Exception ex)
+        {
+            // 同期失敗はアプリ起動をブロックしない
+            _logger?.LogWarning(ex, "[Issue #277] サーバーからの同意状態同期に失敗（ローカル設定を使用）");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #277] 認証済みの場合、ローカルの同意状態をサーバーに同期
+    /// 同意ダイアログで承認後に呼び出され、DBに同意を記録する
+    /// </summary>
+    private async Task TrySyncConsentToServerAsync(
+        IServiceProvider serviceProvider,
+        Baketa.Core.Abstractions.Settings.IConsentService consentService)
+    {
+        try
+        {
+            var tokenStorage = serviceProvider.GetService<Baketa.Core.Abstractions.Auth.ITokenStorage>();
+            var authService = serviceProvider.GetService<Baketa.Core.Abstractions.Auth.IAuthService>();
+
+            if (tokenStorage == null || authService == null)
+            {
+                _logger?.LogDebug("[Issue #277] Auth services not available, skipping server sync");
+                return;
+            }
+
+            // 保存されたトークンがあるか確認
+            var hasTokens = await tokenStorage.HasStoredTokensAsync().ConfigureAwait(true);
+            if (!hasTokens)
+            {
+                _logger?.LogDebug("[Issue #277] No stored tokens, skipping server sync (consent saved locally only)");
+                return;
+            }
+
+            // セッションを取得
+            var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
+
+            if (session?.AccessToken == null || session.User?.Id == null)
+            {
+                _logger?.LogDebug("[Issue #277] No valid session, skipping server sync (consent saved locally only)");
+                return;
+            }
+
+            // ローカル同意をサーバーに同期
+            _logger?.LogInformation("[Issue #277] 認証済み - 同意状態をサーバーに同期中...");
+            await consentService.SyncLocalConsentToServerAsync(session.User.Id, session.AccessToken).ConfigureAwait(true);
+            _logger?.LogInformation("[Issue #277] 同意状態のサーバー同期完了");
+        }
+        catch (Exception ex)
+        {
+            // 同期失敗はアプリ起動をブロックしない（ローカルには保存済み）
+            _logger?.LogWarning(ex, "[Issue #277] サーバーへの同意状態同期に失敗（ローカル設定は保存済み）");
         }
     }
 

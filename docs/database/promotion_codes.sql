@@ -355,3 +355,88 @@ $$;
 
 -- RPC関数の実行権限をauthenticated roleに付与
 GRANT EXECUTE ON FUNCTION get_promotion_status() TO authenticated;
+
+-- ============================================================
+-- Issue #276: サービスロール用のプロモーション状態取得RPC関数
+-- ============================================================
+-- Relay Server（サービスロール）からユーザーIDを指定して呼び出す
+-- auth.uid()を使わず、明示的にp_user_idを受け取る
+--
+-- 使用例（Relay Server経由）:
+-- SELECT * FROM get_promotion_status_for_user('user-uuid-here');
+-- ============================================================
+CREATE OR REPLACE FUNCTION get_promotion_status_for_user(p_user_id UUID)
+RETURNS TABLE (
+    has_promotion BOOLEAN,
+    promotion_code TEXT,
+    plan_type INT,
+    plan_name TEXT,
+    redeemed_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    is_expired BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_redemption RECORD;
+    v_expires_at TIMESTAMPTZ;
+BEGIN
+    -- 入力検証
+    IF p_user_id IS NULL THEN
+        RAISE EXCEPTION 'user_id is required';
+    END IF;
+
+    -- 最新の成功したredemptionを取得
+    SELECT
+        r.redeemed_at,
+        pc.code,
+        pc.plan_type,
+        pc.duration_days
+    INTO v_redemption
+    FROM promotion_code_redemptions r
+    JOIN promotion_codes pc ON r.promotion_code_id = pc.id
+    WHERE r.user_id = p_user_id
+      AND r.status = 'success'
+    ORDER BY r.redeemed_at DESC
+    LIMIT 1;
+
+    -- プロモーションなし
+    IF v_redemption IS NULL THEN
+        RETURN QUERY SELECT
+            FALSE::BOOLEAN,
+            NULL::TEXT,
+            NULL::INT,
+            NULL::TEXT,
+            NULL::TIMESTAMPTZ,
+            NULL::TIMESTAMPTZ,
+            NULL::BOOLEAN;
+        RETURN;
+    END IF;
+
+    -- 有効期限をDB側で計算（日の終わり 23:59:59 UTC）
+    v_expires_at := (v_redemption.redeemed_at::DATE + v_redemption.duration_days * INTERVAL '1 day')::TIMESTAMPTZ
+                    + INTERVAL '23 hours 59 minutes 59 seconds';
+
+    -- 結果を返す
+    RETURN QUERY SELECT
+        TRUE::BOOLEAN,
+        LEFT(v_redemption.code, 10) || '****',  -- マスク処理
+        v_redemption.plan_type,
+        CASE v_redemption.plan_type
+            WHEN 0 THEN 'Free'
+            WHEN 1 THEN 'Pro'
+            WHEN 2 THEN 'Premium'
+            WHEN 3 THEN 'Ultimate'
+            ELSE 'Unknown'
+        END,
+        v_redemption.redeemed_at,
+        v_expires_at,
+        (v_expires_at < NOW())::BOOLEAN;  -- 有効期限切れかどうか
+END;
+$$;
+
+-- サービスロール（Relay Server）のみ実行可能
+REVOKE ALL ON FUNCTION get_promotion_status_for_user(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_promotion_status_for_user(UUID) TO service_role;

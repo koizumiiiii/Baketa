@@ -109,8 +109,10 @@ public sealed class LicenseModule : ServiceModuleBase
         // [Gemini Review] Pollyリトライポリシー追加（Issue #276）
         services.AddHttpClient<License.PromotionCodeService>(client =>
         {
+            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
         })
         .AddPolicyHandler(GetRetryPolicy());
         services.AddSingleton<License.MockPromotionCodeService>();
