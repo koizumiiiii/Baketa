@@ -1211,11 +1211,17 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     }
 
     /// <summary>
-    /// 有効なプランを決定（プロモーション優先）
+    /// 有効なプランを決定
+    /// [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない
     /// </summary>
     private PlanType DetermineEffectivePlan()
     {
-        // [Issue #237 C案] IUnifiedSettingsService経由でプロモーション設定を読み込む
+        // [Issue #280+#281] プロモーション設定からプランを読み込まない
+        // プロモーションはボーナストークン付与のみで、プランは変更しない
+        // 常にMockPlanType（デフォルト: Free）を返す
+        var plan = (PlanType)_settings.MockPlanType;
+
+        // プロモーション設定がある場合はログのみ出力（参考情報）
         if (_unifiedSettingsService is not null)
         {
             var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
@@ -1223,27 +1229,12 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             {
                 var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
                 _logger.LogInformation(
-                    "🎁 [Issue #237] 有効なプロモーション検出（promotion-settings.json）: Plan={Plan}, ExpiresAt={ExpiresAt}",
-                    promotionPlan, promotionSettings.PromotionExpiresAt);
-                return promotionPlan;
+                    "🎁 [Issue #280+#281] プロモーション設定検出（プラン変更なし）: PromoPlan={PromoPlan}, ActualPlan={ActualPlan}, ExpiresAt={ExpiresAt}",
+                    promotionPlan, plan, promotionSettings.PromotionExpiresAt);
             }
         }
 
-        // レガシー: LicenseSettings経由のプロモーションチェック（後方互換性）
-        if (_settings.PromotionPlanType.HasValue &&
-            !string.IsNullOrEmpty(_settings.PromotionExpiresAt) &&
-            DateTime.TryParse(_settings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expiresAt) &&
-            expiresAt > DateTime.UtcNow)
-        {
-            var promotionPlan = (PlanType)_settings.PromotionPlanType.Value;
-            _logger.LogInformation(
-                "🎁 有効なプロモーション検出（appsettings）: Plan={Plan}, ExpiresAt={ExpiresAt}",
-                promotionPlan, expiresAt);
-            return promotionPlan;
-        }
-
-        // プロモーションなしの場合はMockPlanTypeを使用
-        return (PlanType)_settings.MockPlanType;
+        return plan;
     }
 
     /// <summary>
