@@ -320,19 +320,24 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
     /// バッチスクリプトがプロセス終了を待機してから更新処理を行うため、
     /// ここで待機する必要はありません。
     /// </summary>
-    private Task OnCloseApplicationAsync()
+    private async Task OnCloseApplicationAsync()
     {
         _logger?.LogInformation("[Issue #249] 更新適用のためアプリケーション即時終了");
 
         // 即座にアプリケーションを終了
         // Pythonサーバーはプロセス終了時に自動的に終了される（PythonServerManagerのDisposeで処理）
         // バッチスクリプトがプロセス終了を30秒まで待機するため、ここで待つ必要なし
-        if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            desktop.Shutdown();
-        }
 
-        return Task.CompletedTask;
+        // [Fix] Shutdown()はUIスレッドから呼び出す必要がある
+        // NetSparkleはバックグラウンドスレッドからこのコールバックを呼ぶ場合があるため
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _logger?.LogInformation("[Issue #249] UIスレッドでShutdown()呼び出し");
+            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
+            }
+        });
     }
 
     /// <summary>
