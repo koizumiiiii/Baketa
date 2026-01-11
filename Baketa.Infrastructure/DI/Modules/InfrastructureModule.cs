@@ -60,9 +60,26 @@ namespace Baketa.Infrastructure.DI.Modules;
 public class InfrastructureModule : ServiceModuleBase
 {
     /// <summary>
-    /// インフラストラクチャサービスを登録します。
+    /// インフラストラクチャサービスを登録します（基本版）。
     /// </summary>
     /// <param name="services">サービスコレクション</param>
+    /// <remarks>
+    /// ⚠️ [Gemini Review v0.2.17] 登録ロジック統一に関する注意:
+    /// このメソッドと RegisterServices(services, configuration) の2つのオーバーロードが存在します。
+    ///
+    /// 【重要】新しいサービスを追加する場合は、必ず両方のメソッドに追加してください。
+    /// 片方のみに追加すると、呼び出し元によって動作が異なる問題が発生します。
+    /// （例: Issue #78 Cloud AI翻訳が1パラメータ版で動作しなかった問題）
+    ///
+    /// 【差分一覧】
+    /// - 2パラメータ版のみ: RegisterNllb200TranslationServices, RegisterTranslationSettings
+    /// - 1パラメータ版のみ: RegisterMemoryServices
+    /// - configuration依存: RegisterStagedFilteringServices, RegisterComponentDownloadServices
+    ///
+    /// 【将来のリファクタリング候補】
+    /// 共通ロジックを RegisterCoreServices(services) に抽出し、
+    /// configuration依存部分のみをオーバーロードで分岐させることを検討。
+    /// </remarks>
     public override void RegisterServices(IServiceCollection services)
     {
         Console.WriteLine("🔍🔍🔍 [DIAGNOSTIC] InfrastructureModule.RegisterServices(1-parameter) 開始");

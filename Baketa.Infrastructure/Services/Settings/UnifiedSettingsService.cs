@@ -29,6 +29,21 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     private UnifiedOcrSettings? _cachedOcrSettings;
     private UnifiedAppSettings? _cachedAppSettings;
     private UnifiedPromotionSettings? _cachedPromotionSettings;
+
+    /// <summary>
+    /// FileSystemWatcherによる設定ファイル監視が有効かどうかを示すフラグ。
+    /// </summary>
+    /// <remarks>
+    /// [Gemini Review v0.2.17] このフラグの目的:
+    /// - 設定ファイルへの書き込み中に、FileSystemWatcherが変更イベントを発火しないよう
+    ///   一時的に監視を停止するために使用
+    /// - StartWatching()/StopWatching()メソッドで制御
+    /// - 自己書き込みによる無限ループ（書き込み→イベント発火→再読み込み→書き込み...）を防止
+    ///
+    /// ⚠️ デッドロック注意:
+    /// StopWatching()/StartWatching()は他のロック機構を使用していないため、
+    /// _settingsLock内から呼び出しても安全です。
+    /// </remarks>
     private bool _isWatching;
     private bool _disposed;
 
