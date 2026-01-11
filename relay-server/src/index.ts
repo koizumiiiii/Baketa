@@ -997,7 +997,45 @@ async function handlePromotionRedeem(
       0: 'Free', 1: 'Pro', 2: 'Premium', 3: 'Ultimate'
     };
 
-    console.log(`Promotion code redeemed: code=${normalizedCode.substring(0, 10)}****, plan=${result.plan_type}, user=${userId?.substring(0, 8) || 'anonymous'}`);
+    // Issue #280+#281: プラン相当のボーナストークンを付与（プラン変更なし）
+    const PLAN_TOKEN_AMOUNTS: Record<number, number> = {
+      1: 10_000_000,   // Pro: 1000万トークン
+      2: 20_000_000,   // Premium: 2000万トークン
+      3: 50_000_000    // Ultimate: 5000万トークン
+    };
+
+    const tokenAmount = PLAN_TOKEN_AMOUNTS[result.plan_type ?? 0] ?? 0;
+    let bonusTokenId: string | null = null;
+
+    // ユーザーがログイン済みで、トークン付与対象の場合のみボーナス付与
+    if (userId && tokenAmount > 0) {
+      console.log(`Granting bonus tokens: user=${userId.substring(0, 8)}..., tokens=${tokenAmount.toLocaleString()}`);
+
+      const { data: bonusData, error: bonusError } = await supabase.rpc('grant_bonus_tokens', {
+        p_user_id: userId,
+        p_source_type: 'promotion',
+        p_source_id: result.redemption_id,
+        p_granted_tokens: tokenAmount,
+        p_expires_at: result.expires_at
+      });
+
+      if (bonusError) {
+        // [Gemini Review] ボーナス付与失敗はエラーとして扱う（トランザクション整合性）
+        console.error('Failed to grant bonus tokens:', bonusError);
+        // TODO: 将来的にはredemptionをpending状態にする補償処理を検討
+        return errorResponse(
+          'ボーナストークンの付与に失敗しました。再度お試しください。',
+          500,
+          origin,
+          allowedOrigins,
+          'BONUS_GRANT_FAILED'
+        );
+      }
+      bonusTokenId = bonusData as string;
+      console.log(`Bonus tokens granted: id=${bonusTokenId}`);
+    }
+
+    console.log(`Promotion code redeemed: code=${normalizedCode.substring(0, 10)}****, plan=${result.plan_type}, tokens=${tokenAmount.toLocaleString()}, user=${userId?.substring(0, 8) || 'anonymous'}`);
 
     // DBスキーマ上 plan_type は NOT NULL だが、万が一のフォールバックとして 'Pro' を使用
     const plan = planTypeMap[result.plan_type ?? 2] ?? 'Pro';
@@ -1006,7 +1044,10 @@ async function handlePromotionRedeem(
       success: true,
       plan_type: plan,
       expires_at: result.expires_at,
-      message: 'プロモーションコードが適用されました。'
+      bonus_tokens_granted: tokenAmount,  // Issue #280+#281: 付与トークン数
+      message: tokenAmount > 0
+        ? `プロモーションコードが適用されました。${tokenAmount.toLocaleString()}トークンが付与されました。`
+        : 'プロモーションコードが適用されました。'
     }, origin, allowedOrigins);
 
   } catch (error) {

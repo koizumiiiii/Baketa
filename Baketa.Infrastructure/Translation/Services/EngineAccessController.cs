@@ -8,11 +8,13 @@ namespace Baketa.Infrastructure.Translation.Services;
 
 /// <summary>
 /// ユーザープランに基づいて翻訳エンジンへのアクセスを制御する実装
+/// Issue #280+#281: ボーナストークン残高によるCloud AIアクセス制御を追加
 /// </summary>
 public sealed class EngineAccessController : IEngineAccessController
 {
     private readonly ILicenseManager _licenseManager;
     private readonly IEngineStatusManager _engineStatusManager;
+    private readonly IBonusTokenService? _bonusTokenService;
     private readonly ILogger<EngineAccessController> _logger;
 
     // エンジン定義（静的設定）
@@ -54,13 +56,19 @@ public sealed class EngineAccessController : IEngineAccessController
     /// <summary>
     /// EngineAccessControllerを初期化
     /// </summary>
+    /// <param name="licenseManager">ライセンス管理</param>
+    /// <param name="engineStatusManager">エンジン状態管理</param>
+    /// <param name="bonusTokenService">ボーナストークンサービス（オプション）</param>
+    /// <param name="logger">ロガー</param>
     public EngineAccessController(
         ILicenseManager licenseManager,
         IEngineStatusManager engineStatusManager,
+        IBonusTokenService? bonusTokenService,
         ILogger<EngineAccessController> logger)
     {
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _engineStatusManager = engineStatusManager ?? throw new ArgumentNullException(nameof(engineStatusManager));
+        _bonusTokenService = bonusTokenService; // オプショナル（Issue #280+#281）
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -85,8 +93,11 @@ public sealed class EngineAccessController : IEngineAccessController
         var state = await _licenseManager.GetCurrentStateAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        // プラン・サブスクリプション・クォータ確認 (Issue #257: HasCloudAiAccessに一本化)
-        if (!state.HasCloudAiAccess)
+        // Issue #280+#281: プランによるアクセス OR ボーナストークン残高あり
+        var bonusRemaining = GetBonusTokensRemaining();
+        var hasCloudAccess = state.HasCloudAiAccess || bonusRemaining > 0;
+
+        if (!hasCloudAccess)
         {
             return false;
         }
@@ -160,20 +171,24 @@ public sealed class EngineAccessController : IEngineAccessController
         var state = await _licenseManager.GetCurrentStateAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        // Issue #280+#281: ボーナストークン残高チェック
+        var bonusRemaining = GetBonusTokensRemaining();
+
         // プラン確認 (Issue #257: HasCloudAiAccess拡張メソッドを使用)
-        if (!state.CurrentPlan.HasCloudAiAccess())
+        // Issue #280+#281: ボーナストークンがあればプラン不問でアクセス可
+        if (!state.CurrentPlan.HasCloudAiAccess() && bonusRemaining <= 0)
         {
-            return $"Cloud AI翻訳は{PlanType.Pro}以上のプランが必要です";
+            return $"Cloud AI翻訳は{PlanType.Pro}以上のプラン、またはボーナストークンが必要です";
         }
 
-        // サブスクリプション有効性
-        if (!state.IsSubscriptionActive)
+        // サブスクリプション有効性（ボーナストークンがあれば無視）
+        if (!state.IsSubscriptionActive && bonusRemaining <= 0)
         {
             return "サブスクリプションが有効ではありません";
         }
 
-        // トークンクォータ
-        if (state.IsQuotaExceeded)
+        // トークンクォータ（ボーナストークンがあれば無視）
+        if (state.IsQuotaExceeded && bonusRemaining <= 0)
         {
             return "今月のクラウドAI翻訳上限に達しました";
         }
@@ -197,12 +212,19 @@ public sealed class EngineAccessController : IEngineAccessController
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Issue #280+#281: プランによるアクセス OR ボーナストークン残高ありでCloud AI利用可能
+    /// </remarks>
     public async Task<bool> CanUseCloudAIAsync(CancellationToken cancellationToken = default)
     {
         var state = await _licenseManager.GetCurrentStateAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return state.HasCloudAiAccess;
+        // Issue #280+#281: ボーナストークン残高チェック
+        var bonusRemaining = GetBonusTokensRemaining();
+
+        // プランによるアクセス OR ボーナストークン残高あり
+        return state.HasCloudAiAccess || bonusRemaining > 0;
     }
 
     /// <inheritdoc/>
@@ -219,6 +241,15 @@ public sealed class EngineAccessController : IEngineAccessController
     {
         // Issue #257: PlanTypeExtensions に一本化
         return planType.GetMonthlyTokenLimit();
+    }
+
+    /// <summary>
+    /// [Gemini Review] ボーナストークン残高取得のヘルパーメソッド
+    /// </summary>
+    /// <returns>ボーナストークン残高（サービスがnullの場合は0）</returns>
+    private long GetBonusTokensRemaining()
+    {
+        return _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
     }
 
     /// <summary>

@@ -1,34 +1,86 @@
-# プロモーションユーザーのトークン消費量サーバー同期
+# プロモーションコードシステム設計（Issue #280 + #281）
 
-## 背景
+## 設計変更履歴
 
-Freeプラン + プロモーションコード適用ユーザーがPC買い替え時に、トークン消費量がリセットされる問題。
+| 日付 | 変更内容 |
+|------|---------|
+| 2025-01-11 | **重大な設計変更**: プロモコード適用を「プラン昇格」から「ボーナストークン付与のみ」に変更 |
 
-### 現状の問題
+---
 
-1. **PromotionSettings.MockTokenUsage**: ローカルのみ保存
-2. **TokenUsageRepository**: ローカルのみ保存（月間詳細記録）
-3. PC移行時にこれらのデータが失われ、消費量が0にリセット
+## 新設計: ボーナストークン専用モデル
 
-## 提案: ボーナストークンモデルによる同期
+### 設計方針
 
-> **Note**: Issue #281「プロモーションコードシステムのUX改善」と統合実装
+**プロモーションコード = ボーナストークン付与のみ**
 
-### 設計変更の経緯
+| 項目 | 旧設計 | 新設計 |
+|------|--------|--------|
+| プロモ適用 | Free → Pro/Premium/Ultimate に昇格 | プラン変更なし（Freeのまま） |
+| トークン | プラン枠が変更 | bonus_tokens テーブルに付与 |
+| AI翻訳可否 | `Plan.HasCloudAiAccess()` | `Plan.HasCloudAiAccess() OR BonusTokens > 0` |
+| 期限切れ | プランダウングレード | 該当ボーナスのみ失効 |
+| PC買い替え | プラン状態 + 消費量同期 | ボーナス残高のみ同期 |
 
-当初は `promotion_code_redemptions.tokens_used` に総消費量を保存する設計だったが、
-Issue #281 でボーナストークンモデルを導入することになり、以下の理由で設計を変更:
+### メリット
 
-- **複数プロモ対応**: 各ボーナスを個別に管理する必要がある
-- **有効期限管理**: ボーナスごとに異なる有効期限を持つ
-- **消費順序制御**: 期限が近いボーナスから消費する
+1. **状態管理がシンプル**: プラン変更処理が不要
+2. **PC買い替え対応が容易**: `bonus_tokens` テーブルだけ同期すればOK
+3. **有料プラン購入者もボーナス継続**: プラン購入後もボーナス残高を引き継げる
+4. **複数プロモコード対応**: 自然に複数のボーナスを管理可能
+5. **月次リセット問題なし**: ボーナスは独自の有効期限を持つ
 
-### データベース設計
+### トークン付与量マッピング
+
+| plan_type | 付与トークン数 |
+|-----------|---------------|
+| `'pro'` | 10,000,000（1000万） |
+| `'premium'` | 20,000,000（2000万） |
+| `'ultimate'` | 50,000,000（5000万） |
+
+---
+
+## AI翻訳アクセス制御の変更
+
+### 変更前
+```csharp
+// LicenseState.cs
+public bool HasCloudAiAccess =>
+    CurrentPlan.HasCloudAiAccess() && !IsQuotaExceeded && IsSubscriptionActive;
+```
+
+### 変更後
+```csharp
+// EngineAccessController.cs
+public async Task<bool> CanUseCloudAIAsync(CancellationToken cancellationToken = default)
+{
+    var state = await _licenseManager.GetCurrentStateAsync(cancellationToken);
+    var bonusRemaining = _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
+
+    // プランによるアクセス OR ボーナストークン残高あり
+    return state.HasCloudAiAccess || bonusRemaining > 0;
+}
+```
+
+### トークン消費順序
+
+```
+Cloud AI翻訳実行 (N トークン消費)
+    ↓
+1. ボーナストークンから優先消費（期限が近い順）
+    ↓
+2. ボーナス残高 = 0 になったら
+    ↓
+3. プラン枠から消費
+```
+
+---
+
+## データベース設計
+
+### bonus_tokens テーブル（既存・変更なし）
 
 ```sql
--- ============================================================
--- Issue #280 + #281: ボーナストークンテーブル
--- ============================================================
 CREATE TABLE IF NOT EXISTS bonus_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -48,436 +100,147 @@ CREATE TABLE IF NOT EXISTS bonus_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    -- 制約
     CONSTRAINT positive_granted CHECK (granted_tokens > 0),
     CONSTRAINT valid_usage CHECK (used_tokens >= 0 AND used_tokens <= granted_tokens)
 );
-
--- インデックス: ユーザーのボーナスを有効期限順に取得
-CREATE INDEX idx_bonus_tokens_user_expires
-ON bonus_tokens(user_id, expires_at ASC);
-
--- インデックス: 有効なボーナスのみ取得
-CREATE INDEX idx_bonus_tokens_active
-ON bonus_tokens(user_id, expires_at)
-WHERE used_tokens < granted_tokens;
-
--- RLS有効化
-ALTER TABLE bonus_tokens ENABLE ROW LEVEL SECURITY;
-
--- ユーザーは自分のボーナスのみ参照可能
-CREATE POLICY "Users can view own bonus tokens"
-    ON bonus_tokens FOR SELECT
-    USING (auth.uid() = user_id);
-
--- ============================================================
--- RPC関数: ボーナストークン状態取得
--- ============================================================
-CREATE OR REPLACE FUNCTION get_bonus_tokens()
-RETURNS TABLE (
-    id UUID,
-    source_type VARCHAR(50),
-    granted_tokens BIGINT,
-    used_tokens BIGINT,
-    remaining_tokens BIGINT,
-    expires_at TIMESTAMPTZ,
-    is_expired BOOLEAN
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    v_user_id UUID;
-BEGIN
-    v_user_id := auth.uid();
-    IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'Not authenticated';
-    END IF;
-
-    RETURN QUERY
-    SELECT
-        bt.id,
-        bt.source_type,
-        bt.granted_tokens,
-        bt.used_tokens,
-        (bt.granted_tokens - bt.used_tokens)::BIGINT AS remaining_tokens,
-        bt.expires_at,
-        (bt.expires_at < NOW())::BOOLEAN AS is_expired
-    FROM bonus_tokens bt
-    WHERE bt.user_id = v_user_id
-    ORDER BY bt.expires_at ASC;
-END;
-$$;
-
--- ============================================================
--- RPC関数: ボーナストークン同期（複数ボーナス対応）
--- ============================================================
--- [Gemini Review] CRDT G-Counterパターン: 各ボーナスで大きい方を採用
-CREATE OR REPLACE FUNCTION sync_bonus_tokens(p_bonuses JSONB)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    v_user_id UUID;
-    v_bonus RECORD;
-    v_result JSONB := '[]'::JSONB;
-    v_synced_bonus JSONB;
-BEGIN
-    -- 認証チェック
-    v_user_id := auth.uid();
-    IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'Not authenticated';
-    END IF;
-
-    -- 入力検証
-    IF p_bonuses IS NULL OR jsonb_array_length(p_bonuses) = 0 THEN
-        RETURN v_result;
-    END IF;
-
-    -- 各ボーナスを同期
-    FOR v_bonus IN SELECT * FROM jsonb_to_recordset(p_bonuses) AS x(id UUID, used_tokens BIGINT)
-    LOOP
-        -- 入力値検証
-        IF v_bonus.used_tokens < 0 THEN
-            RAISE EXCEPTION 'used_tokens must be non-negative';
-        END IF;
-
-        -- CRDT G-Counter: 大きい方を採用
-        UPDATE bonus_tokens bt
-        SET
-            used_tokens = GREATEST(bt.used_tokens, v_bonus.used_tokens),
-            updated_at = NOW()
-        WHERE bt.id = v_bonus.id
-          AND bt.user_id = v_user_id
-        RETURNING jsonb_build_object(
-            'id', bt.id,
-            'used_tokens', bt.used_tokens,
-            'remaining_tokens', bt.granted_tokens - bt.used_tokens
-        ) INTO v_synced_bonus;
-
-        IF v_synced_bonus IS NOT NULL THEN
-            v_result := v_result || v_synced_bonus;
-        END IF;
-    END LOOP;
-
-    RETURN v_result;
-END;
-$$;
-
--- ============================================================
--- RPC関数: サービスロール用（Relay Server経由）
--- ============================================================
-CREATE OR REPLACE FUNCTION get_bonus_tokens_for_user(p_user_id UUID)
-RETURNS TABLE (
-    id UUID,
-    source_type VARCHAR(50),
-    granted_tokens BIGINT,
-    used_tokens BIGINT,
-    remaining_tokens BIGINT,
-    expires_at TIMESTAMPTZ,
-    is_expired BOOLEAN
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-    IF p_user_id IS NULL THEN
-        RAISE EXCEPTION 'user_id is required';
-    END IF;
-
-    RETURN QUERY
-    SELECT
-        bt.id,
-        bt.source_type,
-        bt.granted_tokens,
-        bt.used_tokens,
-        (bt.granted_tokens - bt.used_tokens)::BIGINT AS remaining_tokens,
-        bt.expires_at,
-        (bt.expires_at < NOW())::BOOLEAN AS is_expired
-    FROM bonus_tokens bt
-    WHERE bt.user_id = p_user_id
-    ORDER BY bt.expires_at ASC;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION sync_bonus_tokens_for_user(p_user_id UUID, p_bonuses JSONB)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    v_bonus RECORD;
-    v_result JSONB := '[]'::JSONB;
-    v_synced_bonus JSONB;
-BEGIN
-    IF p_user_id IS NULL THEN
-        RAISE EXCEPTION 'user_id is required';
-    END IF;
-
-    IF p_bonuses IS NULL OR jsonb_array_length(p_bonuses) = 0 THEN
-        RETURN v_result;
-    END IF;
-
-    FOR v_bonus IN SELECT * FROM jsonb_to_recordset(p_bonuses) AS x(id UUID, used_tokens BIGINT)
-    LOOP
-        IF v_bonus.used_tokens < 0 THEN
-            RAISE EXCEPTION 'used_tokens must be non-negative';
-        END IF;
-
-        UPDATE bonus_tokens bt
-        SET
-            used_tokens = GREATEST(bt.used_tokens, v_bonus.used_tokens),
-            updated_at = NOW()
-        WHERE bt.id = v_bonus.id
-          AND bt.user_id = p_user_id
-        RETURNING jsonb_build_object(
-            'id', bt.id,
-            'used_tokens', bt.used_tokens,
-            'remaining_tokens', bt.granted_tokens - bt.used_tokens
-        ) INTO v_synced_bonus;
-
-        IF v_synced_bonus IS NOT NULL THEN
-            v_result := v_result || v_synced_bonus;
-        END IF;
-    END LOOP;
-
-    RETURN v_result;
-END;
-$$;
-
--- 権限設定
-GRANT EXECUTE ON FUNCTION get_bonus_tokens() TO authenticated;
-GRANT EXECUTE ON FUNCTION sync_bonus_tokens(JSONB) TO authenticated;
-
-REVOKE ALL ON FUNCTION get_bonus_tokens_for_user(UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION get_bonus_tokens_for_user(UUID) TO service_role;
-
-REVOKE ALL ON FUNCTION sync_bonus_tokens_for_user(UUID, JSONB) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION sync_bonus_tokens_for_user(UUID, JSONB) TO service_role;
 ```
 
-### Relay Server変更
+### promotion_codes テーブル（変更なし）
+
+既存の `plan_type` カラムを「付与トークン量の参照キー」として再解釈。
+スキーマ変更は不要。
+
+---
+
+## Relay Server 変更
+
+### プロモーション適用ロジック変更
 
 ```typescript
-// GET /api/bonus-tokens/status - ボーナストークン状態取得
-app.get('/api/bonus-tokens/status', authMiddleware, async (c) => {
+// POST /api/promotion/redeem
+app.post('/api/promotion/redeem', authMiddleware, async (c) => {
+  const { code } = await c.req.json();
   const user = c.get('user');
 
-  const { data, error } = await supabase.rpc('get_bonus_tokens_for_user', {
-    p_user_id: user.id
-  });
+  // プロモーションコード検証（既存ロジック）
+  const { data: promotion, error } = await supabase
+    .from('promotion_codes')
+    .select('*')
+    .eq('code', code)
+    .single();
 
-  if (error) {
-    return c.json({ error: error.message }, 500);
+  if (error || !promotion) {
+    return c.json({ error: 'Invalid code' }, 400);
   }
+
+  // 有効期限計算
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + promotion.valid_days);
+
+  // 使用記録（既存ロジック）
+  const { data: redemption } = await supabase
+    .from('promotion_code_redemptions')
+    .insert({
+      code_id: promotion.id,
+      user_id: user.id,
+      redeemed_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  // ★ 新ロジック: プラン変更せずボーナストークン付与 ★
+  const PLAN_TOKEN_AMOUNTS = {
+    'pro': 10_000_000,      // 1000万
+    'premium': 20_000_000,  // 2000万
+    'ultimate': 50_000_000  // 5000万
+  };
+
+  const tokenAmount = PLAN_TOKEN_AMOUNTS[promotion.plan_type] || 0;
+
+  if (tokenAmount > 0) {
+    await supabase.from('bonus_tokens').insert({
+      user_id: user.id,
+      source_type: 'promotion',
+      source_id: redemption.id,
+      granted_tokens: tokenAmount,
+      expires_at: expiresAt.toISOString()
+    });
+  }
+
+  // ★ プラン変更処理は削除 ★
+  // await updateUserPlan(user.id, promotion.plan_type, expiresAt); // 削除
 
   return c.json({
-    bonuses: data,
-    total_remaining: data.reduce((sum, b) => sum + b.remaining_tokens, 0)
+    success: true,
+    bonus_tokens_granted: tokenAmount,
+    expires_at: expiresAt.toISOString()
   });
 });
-
-// POST /api/bonus-tokens/sync - ボーナストークン同期
-app.post('/api/bonus-tokens/sync', authMiddleware, async (c) => {
-  const { bonuses } = await c.req.json();
-  const user = c.get('user');
-
-  // 入力検証
-  if (!Array.isArray(bonuses)) {
-    return c.json({ error: 'bonuses must be an array' }, 400);
-  }
-
-  const { data, error } = await supabase.rpc('sync_bonus_tokens_for_user', {
-    p_user_id: user.id,
-    p_bonuses: bonuses
-  });
-
-  if (error) {
-    return c.json({ error: error.message }, 500);
-  }
-
-  return c.json({ synced_bonuses: data });
-});
 ```
 
-### クライアント側変更
+---
 
-#### 1. インターフェース定義
+## 実装フェーズ（更新版）
 
-```csharp
-// Baketa.Core/Abstractions/License/IBonusTokenService.cs
-public interface IBonusTokenService
-{
-    /// <summary>ローカルのボーナストークン一覧を取得</summary>
-    IReadOnlyList<BonusToken> GetBonusTokens();
+### Phase 1: DB & Relay Server ✅ 完了
+- [x] `bonus_tokens` テーブル作成
+- [x] RPC関数作成
+- [x] Relay Server `/api/bonus-tokens/*` エンドポイント
 
-    /// <summary>サーバーからボーナストークンを同期</summary>
-    Task<SyncResult> SyncFromServerAsync(string accessToken, CancellationToken ct = default);
+### Phase 2: クライアント基盤 ✅ 完了
+- [x] `IBonusTokenService` インターフェース
+- [x] `BonusTokenService` 実装
+- [x] `LicenseManager` 統合（ボーナス優先消費）
+- [x] `BonusSyncHostedService`（自動同期）
+- [x] UI表示（ライセンス情報画面）
 
-    /// <summary>ローカルの消費量をサーバーに同期</summary>
-    Task<SyncResult> SyncToServerAsync(string accessToken, CancellationToken ct = default);
+### Phase 3: プロモーション適用ロジック変更 🔄 未実装
+- [ ] Relay Server: `/api/promotion/redeem` 変更
+  - プラン変更処理を削除
+  - ボーナストークン付与処理を追加
+- [ ] クライアント: `EngineAccessController.CanUseCloudAIAsync` 変更
+  - ボーナストークン残高チェックを追加
 
-    /// <summary>トークンを消費（有効期限が近い順）</summary>
-    Task<ConsumeResult> ConsumeTokensAsync(long amount, CancellationToken ct = default);
+### Phase 4: 既存ユーザー移行 📋 検討中
+- [ ] 移行方針決定（満額 or 日割り）
+- [ ] マイグレーションスクリプト作成
+- [ ] ユーザー通知
 
-    /// <summary>残りトークン合計</summary>
-    long TotalRemainingTokens { get; }
-}
+### Phase 5: UX改善 📋 検討中
+- [ ] トークン残量警告（残り20%で通知）
+- [ ] トークン枯渇時のアップグレード導線
+- [ ] トークン内訳詳細表示
 
-public record BonusToken
-{
-    public required Guid Id { get; init; }
-    public required string SourceType { get; init; }
-    public required long GrantedTokens { get; init; }
-    public required long UsedTokens { get; init; }
-    public long RemainingTokens => GrantedTokens - UsedTokens;
-    public required DateTime ExpiresAt { get; init; }
-    public bool IsExpired => ExpiresAt < DateTime.UtcNow;
-    public bool IsValid => !IsExpired && RemainingTokens > 0;
-}
-```
+---
 
-#### 2. 消費ロジック
+## Gemini レビュー結果（2025-01-11）
 
-```csharp
-// 有効期限が近い順に消費
-public async Task<ConsumeResult> ConsumeTokensAsync(long amount, CancellationToken ct)
-{
-    var remaining = amount;
-    var consumed = new List<(Guid BonusId, long Amount)>();
+### ✅ 評価ポイント
+- プラン昇格を排除しボーナストークン専用にする設計は**状態管理を大幅に簡素化**
+- **将来の拡張性**が高い（複数プロモ、キャンペーン、紹介等）
+- PC買い替え時のデータ同期が**シンプル**になる
 
-    // 有効期限が近い順にソート
-    var validBonuses = _bonusTokens
-        .Where(b => b.IsValid)
-        .OrderBy(b => b.ExpiresAt)
-        .ToList();
+### ⚠️ 追加考慮事項
+| 項目 | 対応状況 |
+|------|---------|
+| 有効期限管理 | ✅ `expires_at` 実装済み |
+| 消費順序（期限が近い順） | ✅ 実装済み |
+| オフライン同期（CRDT） | ✅ 実装済み |
+| ボーナス vs プラン枠の消費順序 | ✅ ボーナス優先で実装済み |
+| トークン枯渇時のUX | 📋 Phase 5で対応 |
+| 既存ユーザー移行 | 📋 Phase 4で対応 |
 
-    foreach (var bonus in validBonuses)
-    {
-        if (remaining <= 0) break;
+### 🔴 既存ユーザー移行の注意点
+1. **ロールバック計画**: DBバックアップ必須
+2. **移行データの正確性**: 満額付与 or 残存期間に応じた日割り計算
+3. **ユーザー通知**: 仕様変更の事前告知
+4. **段階的移行**: 一部ユーザーから順次展開
 
-        var toConsume = Math.Min(remaining, bonus.RemainingTokens);
-        bonus.UsedTokens += toConsume;
-        remaining -= toConsume;
-        consumed.Add((bonus.Id, toConsume));
-    }
+---
 
-    // ボーナスで足りない場合はプラン枠から消費
-    if (remaining > 0)
-    {
-        await _licenseManager.ConsumeFromPlanQuotaAsync(remaining, ct);
-    }
+## 関連Issue
 
-    // 非同期で同期キューに追加（デバウンス付き）
-    _syncQueue.Enqueue(consumed);
-
-    return new ConsumeResult { Success = true, ConsumedFromBonus = amount - remaining };
-}
-```
-
-#### 3. 同期タイミング
-
-- **アプリ起動時**: サーバーから最新状態を取得
-- **トークン消費時**: 動的デバウンス付きでサーバーに同期
-  ```csharp
-  // 上限接近時は頻繁に同期
-  var debounceInterval = TotalRemainingTokens < (totalLimit * 0.1)
-      ? TimeSpan.FromMinutes(1)  // 残り10%未満は1分
-      : TimeSpan.FromMinutes(5); // 通常は5分
-  ```
-- **アプリ終了時**: タイムアウト付きベストエフォート（5秒）
-
-#### 4. 競合解決
-
-- **CRDT G-Counterパターン**: 各ボーナスの `used_tokens` で大きい方を採用
-- トークン消費は単調増加のため、この方式が最適
-- 複数PC同時使用時も正しく動作
-
-#### 5. ローカル永続化
-
-```csharp
-// BonusTokenSettings.cs
-public class BonusTokenSettings
-{
-    public List<LocalBonusToken> Bonuses { get; set; } = new();
-    public bool HasPendingSync { get; set; }
-    public DateTime LastSyncedAt { get; set; }
-}
-
-public class LocalBonusToken
-{
-    public Guid Id { get; set; }
-    public string SourceType { get; set; }
-    public long GrantedTokens { get; set; }
-    public long UsedTokens { get; set; }
-    public DateTime ExpiresAt { get; set; }
-    public long LastSyncedUsedTokens { get; set; }  // 差分計算用
-}
-```
-
-### UI表示
-
-```
-トークン使用状況
-├── プラン枠: 350,000 / 500,000
-├── ボーナス: + 150,000
-└── 詳細:
-    ├── プロモA: 50,000 (1/31まで)
-    └── プロモB: 100,000 (2/28まで)
-```
-
-## 実装フェーズ
-
-### Phase 1: DB & Relay Server
-- [ ] `bonus_tokens` テーブル作成
-- [ ] RPC関数作成（`get_bonus_tokens`, `sync_bonus_tokens` + `_for_user` 版）
-- [ ] RLS ポリシー設定
-- [ ] Relay Server エンドポイント追加（`/api/bonus-tokens/status`, `/api/bonus-tokens/sync`）
-
-### Phase 2: クライアント実装
-- [ ] `IBonusTokenService` インターフェース定義
-- [ ] `BonusTokenService` 実装
-- [ ] `BonusTokenSettings` ローカル永続化
-- [ ] `LicenseManager` 統合（消費ロジック変更）
-- [ ] 起動時/終了時の同期処理
-
-### Phase 3: プロモーション適用時のボーナス作成
-- [ ] `PromotionCodeService.ApplyCodeAsync` でボーナス作成
-- [ ] Patreon購入時のボーナス変換ロジック
-
-### Phase 4: UI実装
-- [ ] ライセンス情報画面にボーナストークン表示追加
-- [ ] トークン内訳の詳細表示
-
-### Phase 5: テスト
-- [ ] 新規PCでのログイン後、ボーナス状態が復元されることを確認
-- [ ] 複数PC同時使用時の競合解決テスト
-- [ ] 有効期限切れボーナスの処理確認
-- [ ] 消費順序（期限が近い順）の確認
-
-## Gemini Review結果サマリー
-
-### ✅ 評価良好
-- **競合解決ポリシー**: CRDT G-Counterパターンは各ボーナスに適用可能
-- **複数ボーナス対応**: 将来の拡張性を確保
-
-### 🔴 実装上の注意点
-- トランザクション管理の徹底（データ整合性）
-- UIでの透明性確保（内訳と期限を明確表示）
-- 有効期限が近い順の消費順序
-
-### 🆕 追加で検討すべきエッジケース
-- プランのダウングレード時のボーナス扱い
-- 月末プロモ適用 → 翌日月次リセット
-- 同日複数回プラン変更
-
-## 関連
-
-- Issue #281: プロモーションコードシステムのUX改善（ボーナストークンモデル導入）
+- Issue #280: トークン消費量サーバー同期
+- Issue #281: プロモーションコードシステムのUX改善
 - Issue #276: プロモーション状態のDB同期
 - Issue #277: 同意設定のDB同期
