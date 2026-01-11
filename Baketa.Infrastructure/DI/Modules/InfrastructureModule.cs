@@ -98,6 +98,10 @@ public class InfrastructureModule : ServiceModuleBase
         // 翻訳サービス（エンジン登録後）
         RegisterTranslationServices(services);
 
+        // Issue #78: Cloud AI翻訳サービス（Pro/Premia向け）
+        // [Fix v0.2.17] 1パラメータ版にも追加 - Cloud AI翻訳が動作しない問題を修正
+        RegisterCloudAIServices(services);
+
         // Phase 5: ポート競合防止機構サービス
         RegisterPortManagementServices(services);
 
