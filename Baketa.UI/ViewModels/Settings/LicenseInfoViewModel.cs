@@ -495,7 +495,8 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
         TokenLimit = state.MonthlyTokenLimit;
         UsagePercentage = TokenLimit > 0 ? (double)TokensUsed / TokenLimit * 100 : 0;
-        HasCloudAccess = state.CurrentPlan.HasCloudAiAccess();
+        // [Issue #280+#281] プランまたはボーナストークンでCloud AIアクセス可能
+        HasCloudAccess = state.CurrentPlan.HasCloudAiAccess() || HasBonusTokens;
         IsQuotaExceeded = state.IsQuotaExceeded;
         ExpirationDate = state.ExpirationDate;
 

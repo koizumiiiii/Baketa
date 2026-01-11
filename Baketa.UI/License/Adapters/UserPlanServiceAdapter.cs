@@ -15,6 +15,7 @@ namespace Baketa.UI.License.Adapters;
 public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
 {
     private readonly ILicenseManager _licenseManager;
+    private readonly IBonusTokenService? _bonusTokenService;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
     private readonly ILogger<UserPlanServiceAdapter> _logger;
     private bool _disposed;
@@ -23,9 +24,13 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     public UserPlanType CurrentPlan => MapToUserPlanType(_licenseManager.CurrentState.CurrentPlan);
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
+    /// </remarks>
     public bool CanUseCloudOnlyEngine =>
-        _licenseManager.CurrentState.CurrentPlan.HasCloudAiAccess() &&
-        !_licenseManager.CurrentState.IsQuotaExceeded;
+        (_licenseManager.CurrentState.CurrentPlan.HasCloudAiAccess() &&
+         !_licenseManager.CurrentState.IsQuotaExceeded) ||
+        (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
 
     /// <inheritdoc/>
     public bool IsMonthlyLimitExceeded => _licenseManager.CurrentState.IsQuotaExceeded;
@@ -45,10 +50,12 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     public UserPlanServiceAdapter(
         ILicenseManager licenseManager,
         ILogger<UserPlanServiceAdapter> logger,
+        IBonusTokenService? bonusTokenService = null,
         IUnifiedSettingsService? unifiedSettingsService = null)
     {
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _bonusTokenService = bonusTokenService;
         _unifiedSettingsService = unifiedSettingsService;
 
         // イベント購読のセットアップ
