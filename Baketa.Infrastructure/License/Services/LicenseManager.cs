@@ -1063,11 +1063,14 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
     /// <summary>
     /// [Issue #275] 有効なプロモーションがある場合、状態にプロモーション設定をマージ
-    /// プロモーションのプランがより上位であれば優先する
+    /// [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない
     /// </summary>
     private LicenseState ApplyPromotionOverride(LicenseState incomingState)
     {
-        // IUnifiedSettingsService経由でプロモーション設定を確認
+        // [Issue #280+#281] プロモーションでプランを上書きしない
+        // プロモーションはボーナストークン付与のみで、プランは変更しない
+        // 有効期限情報のみ参考としてログ出力
+
         if (_unifiedSettingsService is null)
         {
             return incomingState;
@@ -1081,28 +1084,16 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
         var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
 
-        // プロモーションのプランが入力されたプランより上位かチェック
-        if ((int)promotionPlan <= (int)incomingState.CurrentPlan)
-        {
-            // 入力プランの方が上位または同等なので、そのまま使用
-            return incomingState;
-        }
-
-        // プロモーションプランの方が上位なので、プランと有効期限を上書き
+        // ログのみ出力（プラン上書きはしない）
         if (!string.IsNullOrEmpty(promotionSettings.PromotionExpiresAt) &&
             DateTime.TryParse(promotionSettings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var promotionExpires))
         {
-            _logger.LogInformation(
-                "🎁 [Issue #275] プロモーション優先適用: IncomingPlan={IncomingPlan} → PromotionPlan={PromotionPlan}, ExpiresAt={ExpiresAt}",
+            _logger.LogDebug(
+                "🎁 [Issue #280+#281] プロモーション設定あり（プラン変更なし）: IncomingPlan={IncomingPlan}, PromoPlan={PromoPlan}, ExpiresAt={ExpiresAt}",
                 incomingState.CurrentPlan, promotionPlan, promotionExpires);
-
-            return incomingState with
-            {
-                CurrentPlan = promotionPlan,
-                ExpirationDate = promotionExpires
-            };
         }
 
+        // [Issue #280+#281] プランは変更せず、そのまま返す
         return incomingState;
     }
 
