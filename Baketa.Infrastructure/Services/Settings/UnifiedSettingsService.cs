@@ -270,22 +270,23 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
 
         var json = JsonSerializer.Serialize(promotionData, new JsonSerializerOptions { WriteIndented = true });
 
-        // [Issue #237] FileSystemWatcher競合状態回避: 自己書き込み中は監視を一時停止
-        var wasWatching = _isWatching;
-        if (wasWatching) StopWatching();
-        try
-        {
-            await File.WriteAllTextAsync(BaketaSettingsPaths.PromotionSettingsPath, json, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            if (wasWatching) StartWatching();
-        }
-
-        // キャッシュをクリア
+        // [Fix v0.2.17] ファイル書き込み全体をセマフォで保護（ファイルロック競合回避）
         await _settingsLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // [Issue #237] FileSystemWatcher競合状態回避: 自己書き込み中は監視を一時停止
+            var wasWatching = _isWatching;
+            if (wasWatching) StopWatching();
+            try
+            {
+                await File.WriteAllTextAsync(BaketaSettingsPaths.PromotionSettingsPath, json, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (wasWatching) StartWatching();
+            }
+
+            // キャッシュをクリア
             _cachedPromotionSettings = null;
         }
         finally
