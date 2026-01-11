@@ -78,9 +78,7 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
         lock (_lockObject)
         {
             // 有効期限順にソートして返す
-            return _bonusTokens
-                .OrderBy(b => b.ExpiresAt)
-                .ToList();
+            return [.. _bonusTokens.OrderBy(b => b.ExpiresAt)];
         }
     }
 

@@ -1123,6 +1123,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     /// <summary>
     /// [Issue #258] プロモーション設定を_currentStateに適用するヘルパー
     /// [Gemini Review] DRY原則に従い共通ロジックを抽出
+    /// [Issue #280+#281] プランは変更せず、有効期限とトークン使用量のみ適用
     /// </summary>
     private void ApplyPromotionToState(PlanType plan, DateTime expiresAt, string source)
     {
@@ -1138,15 +1139,17 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             tokenUsage = _settings.MockTokenUsage;
         }
 
+        // [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない
+        // CurrentPlanは変更せず、有効期限（参考情報）とトークン使用量のみ適用
         _currentState = _currentState with
         {
-            CurrentPlan = plan,
+            // CurrentPlan = plan,  // 削除: プランはボーナストークンに移行
             ExpirationDate = expiresAt,
             CloudAiTokensUsed = tokenUsage
         };
         _logger.LogInformation(
-            "🎁 [Issue #258] 起動時にプロモーション設定を適用 ({Source}): Plan={Plan}, ExpiresAt={ExpiresAt}, TokenUsage={TokenUsage}",
-            source, plan, expiresAt, tokenUsage);
+            "🎁 [Issue #280+#281] プロモーション設定を適用（プラン変更なし）({Source}): PromoPlan={PromoPlan}, CurrentPlan={CurrentPlan}, ExpiresAt={ExpiresAt}, TokenUsage={TokenUsage}",
+            source, plan, _currentState.CurrentPlan, expiresAt, tokenUsage);
     }
 
     /// <summary>
