@@ -52,6 +52,7 @@
 - **Patreon OAuth プロキシ**: クライアントとPatreon API間の認証仲介
 - **セッション管理**: Cloudflare KV を使用したセッショントークン保存
 - **Webhook受信**: Patreonからのプラン変更通知を受信
+- **ボーナストークン管理** (Issue #280+#281): プロモーション→トークン付与、消費同期
 - **Cloud AI翻訳** (Phase 2予定): Gemini/OpenAI APIへのプロキシ
 
 #### 提供エンドポイント
@@ -66,6 +67,9 @@
 | `/api/patreon/revoke` | POST | ログアウト |
 | `/api/session/validate` | POST | セッション検証 |
 | `/api/translate` | POST | Cloud AI翻訳 (Phase 2予定) |
+| `/api/promotion/redeem` | POST | プロモーションコード適用 (Issue #280+#281) |
+| `/api/bonus-tokens/status` | GET | ボーナストークン状態取得 (Issue #280+#281) |
+| `/api/bonus-tokens/sync` | POST | ボーナストークン消費同期 (Issue #280+#281) |
 
 #### 環境変数（wrangler secret）
 ```bash
@@ -113,8 +117,11 @@ OPENAI_API_KEY         # OpenAI API Key (Phase 2で追加)
 
 ##### Supabase Database (PostgreSQL)
 - **subscriptions テーブル**: サブスクリプション情報
+- **bonus_tokens テーブル**: ボーナストークン残高 (Issue #280+#281)
+- **promotion_codes テーブル**: プロモーションコードマスタ
+- **promotion_code_redemptions テーブル**: コード使用履歴
 - **ライセンス管理**: プラン状態の永続化
-- **トークン消費記録**: Cloud AI使用量追跡 (Phase 2予定)
+- **トークン消費記録**: Cloud AI使用量追跡
 
 ##### Supabase Analytics（予定）
 - データ分析基盤として活用予定
@@ -246,5 +253,6 @@ Baketaには2つの認証システムがあります：
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-12 | [Issue #280+#281] ボーナストークンAPI追加 |
 | 2026-01-10 | [Gemini Review] セキュリティ運用セクション追加 |
 | 2024-12-26 | 初版作成 |

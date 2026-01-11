@@ -2,33 +2,49 @@
 
 ## 概要
 
-プロモーションコード機能は、特定のコードを入力することでProプランと同等の機能を無料で利用できるようにする仕組みです。マーケティングキャンペーン、パートナーシップ、ベータテスター向けの特典として使用されます。
+プロモーションコード機能は、特定のコードを入力することで**ボーナストークン**を付与する仕組みです。マーケティングキャンペーン、パートナーシップ、ベータテスター向けの特典として使用されます。
+
+> **Issue #280+#281 変更点**: プロモーションコード適用時の動作が「プラン昇格」から「ボーナストークン付与」に変更されました。
+
+### Cloud AI利用判定
+
+```
+Cloud AI利用可能 = Plan.HasCloudAiAccess() OR BonusTokensRemaining > 0
+```
+
+- **Freeプラン**でもボーナストークンがあればCloud AI翻訳を利用可能
+- ボーナストークンは有効期限が近い順に消費（FIFO）
+- オフライン時もローカルで消費を記録し、オンライン復帰時に同期
 
 ## アーキテクチャ
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Baketa UI     │────▶│  Relay Server    │────▶│   コード検証DB   │
-│ (LicenseInfoView)│     │ (Cloudflare)     │     │   (Supabase)    │
+│   Baketa UI     │────▶│  Relay Server    │────▶│   Supabase DB   │
+│ (LicenseInfoView)│     │ (Cloudflare)     │     │ (bonus_tokens)  │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
-        │                        │
-        ▼                        ▼
-┌─────────────────┐     ┌──────────────────┐
-│ ローカル設定保存 │     │   レスポンス     │
-│ (LicenseSettings)│     │  (成功/失敗)     │
-└─────────────────┘     └──────────────────┘
+        │                        │                        │
+        ▼                        ▼                        ▼
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ BonusTokenService│     │ ボーナストークン  │     │ CRDT G-Counter  │
+│ (ローカル消費管理)│     │ 付与レスポンス   │     │ 同期パターン    │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
 ### コンポーネント構成
 
 | レイヤー | コンポーネント | 役割 |
 |---------|---------------|------|
-| Core | `IPromotionCodeService` | サービスインターフェース |
+| Core | `IPromotionCodeService` | プロモーション適用インターフェース |
+| Core | `IBonusTokenService` | ボーナストークン管理インターフェース |
+| Core | `BonusToken` | ボーナストークンモデル |
 | Core | `PromotionCodeResult` | 結果モデル・エラーコード定義 |
-| Core | `LicenseSettings` | プロモーション状態保存 |
-| Infrastructure | `PromotionCodeService` | Relay Server API連携・モックモード |
+| Infrastructure | `PromotionCodeService` | Relay Server API連携 |
+| Infrastructure | `BonusTokenService` | トークン消費・CRDT同期 |
+| Infrastructure | `BonusSyncHostedService` | 自動同期バックグラウンドサービス |
+| Infrastructure | `LicenseManager` | `IsFeatureAvailable`でボーナストークンチェック |
 | UI | `LicenseInfoViewModel` | UI状態管理・コマンド |
-| UI | `LicenseInfoView.axaml` | プロモーションコード入力UI |
+| UI | `LicenseInfoView.axaml` | プロモーションコード入力UI・ボーナス表示 |
 
 ### PromotionCodeResult モデル詳細
 
@@ -122,11 +138,13 @@ POST https://baketa-relay.suke009.workers.dev/api/promotion/redeem
 ```json
 {
   "success": true,
-  "plan_type": "pro",
+  "bonus_tokens_granted": 50000000,
   "expires_at": "2025-03-29T00:00:00Z",
-  "message": "プロモーションコードが適用されました。"
+  "message": "プロモーションコードが適用されました。50,000,000トークンが付与されました。"
 }
 ```
+
+> **Issue #280+#281**: `plan_type` から `bonus_tokens_granted` に変更。プラン昇格ではなくトークン付与。
 
 ### レスポンス（失敗）
 
@@ -217,6 +235,61 @@ $$;
 ```
 
 詳細なSQL定義: `docs/database/promotion_codes.sql`
+
+### bonus_tokens テーブル（Issue #280+#281）
+
+ユーザーごとのボーナストークン残高を管理:
+
+```sql
+CREATE TABLE bonus_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  source_type TEXT NOT NULL,           -- 'promotion', 'campaign', 'referral'
+  source_id UUID,                       -- promotion_codes.id など
+  granted_tokens BIGINT NOT NULL,       -- 付与トークン数
+  used_tokens BIGINT NOT NULL DEFAULT 0, -- 使用済みトークン数
+  expires_at TIMESTAMPTZ NOT NULL,      -- 有効期限
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT positive_tokens CHECK (granted_tokens > 0),
+  CONSTRAINT valid_usage CHECK (used_tokens >= 0 AND used_tokens <= granted_tokens)
+);
+```
+
+詳細なSQL定義: `docs/database/bonus_tokens.sql`
+
+## ボーナストークン同期（CRDT G-Counter）
+
+### 同期パターン
+
+オフライン時もトークン消費を継続できるよう、CRDT G-Counter パターンを採用:
+
+```
+ローカル消費記録:
+  _pendingConsumption[bonusId] = max(既存値, 新しい累積消費量)
+
+サーバー同期時:
+  used_tokens = max(サーバー値, ローカル値)  -- 大きい方を採用
+```
+
+### 同期タイミング
+
+| タイミング | 処理 |
+|-----------|------|
+| ログイン時 | `FetchFromServerAsync` - サーバーから最新状態を取得 |
+| 翻訳実行時 | `ConsumeTokens` - ローカルで消費記録 |
+| 翻訳完了後 | `SyncToServerAsync` - サーバーへ消費量を同期 |
+| 定期同期 | 5分間隔で `SyncToServerAsync` |
+
+### BonusSyncHostedService
+
+バックグラウンドで自動同期を行うホステッドサービス:
+
+```csharp
+// 主な責務
+- ログイン検知 → FetchFromServerAsync
+- 定期同期（5分間隔） → SyncToServerAsync
+- オフライン時は次回オンライン時に同期
+```
 
 ## ローカル設定保存
 
@@ -336,17 +409,26 @@ ApplyPromotionCommand = ReactiveCommand.CreateFromTask(
 ### 状態遷移
 
 ```
-[初期状態 (HasActivePromotion = false)]
+[初期状態 (ボーナストークンなし)]
   └─▶ プロモーションコード入力欄表示
        └─▶ コード入力 → [適用]ボタン押下
             └─▶ IsApplyingPromotion = true
-                 ├─▶ 成功 → HasActivePromotion = true
+                 ├─▶ 成功 → ボーナストークン付与、UI更新
                  └─▶ 失敗 → IsPromotionError = true, PromotionStatusMessage = エラー内容
 
-[アクティブ状態 (HasActivePromotion = true)]
-  └─▶ 「Proプランが適用されています」表示
+[ボーナストークンあり]
+  └─▶ 「ボーナストークン: XX,XXX,XXX」表示
        └─▶ 有効期限: PromotionExpiresDisplay
+       └─▶ Cloud AI翻訳が利用可能（Freeプランでも）
 ```
+
+### Issue #280+#281 変更点
+
+| 変更前 | 変更後 |
+|--------|--------|
+| プラン昇格（Pro等） | ボーナストークン付与 |
+| `HasActivePromotion` | `BonusTokensRemaining > 0` |
+| 「Proプラン適用中」表示 | 「ボーナストークン残高」表示 |
 
 ### UI要素
 
@@ -580,3 +662,5 @@ Scenario: 無効なプロモーションコードを入力する
 - [認証システム](./authentication-system.md)
 - [ライセンス管理](../core/license-management.md)
 - [外部サービス連携](../external-services.md)
+- [ボーナストークンDB設計](../../database/bonus_tokens.sql)
+- [マイグレーションスクリプト](../../database/migrate_promotions_to_bonus_tokens.sql)
