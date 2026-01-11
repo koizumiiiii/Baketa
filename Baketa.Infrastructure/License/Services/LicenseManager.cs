@@ -296,7 +296,19 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         lock (_stateLock)
         {
-            return _currentState.CurrentPlan.IsFeatureAvailable(feature);
+            // プランで利用可能かチェック
+            if (_currentState.CurrentPlan.IsFeatureAvailable(feature))
+            {
+                return true;
+            }
+
+            // [Issue #280+#281] CloudAiTranslationはボーナストークンでも利用可能
+            if (feature == FeatureType.CloudAiTranslation)
+            {
+                return (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+            }
+
+            return false;
         }
     }
 

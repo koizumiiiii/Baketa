@@ -288,6 +288,52 @@ public class LicenseManagerTests : IDisposable
         Assert.False(result);
     }
 
+    [Fact]
+    public void IsFeatureAvailable_CloudAiTranslation_FreePlanWithBonusTokens_ReturnsTrue()
+    {
+        // Arrange - ボーナストークンサービスをモック
+        var mockBonusTokenService = new Mock<IBonusTokenService>();
+        mockBonusTokenService.Setup(x => x.GetTotalRemainingTokens()).Returns(50_000_000);
+
+        var options = Options.Create(_settings);
+        using var managerWithBonus = new LicenseManager(
+            _mockLogger.Object,
+            _mockApiClient.Object,
+            _mockCacheService.Object,
+            _mockEventAggregator.Object,
+            options,
+            bonusTokenService: mockBonusTokenService.Object);
+
+        // Act - Freeプランだがボーナストークンあり
+        var result = managerWithBonus.IsFeatureAvailable(FeatureType.CloudAiTranslation);
+
+        // Assert - ボーナストークンがあるのでCloud AI利用可能
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsFeatureAvailable_CloudAiTranslation_FreePlanWithZeroBonusTokens_ReturnsFalse()
+    {
+        // Arrange - ボーナストークンが0
+        var mockBonusTokenService = new Mock<IBonusTokenService>();
+        mockBonusTokenService.Setup(x => x.GetTotalRemainingTokens()).Returns(0);
+
+        var options = Options.Create(_settings);
+        using var managerWithBonus = new LicenseManager(
+            _mockLogger.Object,
+            _mockApiClient.Object,
+            _mockCacheService.Object,
+            _mockEventAggregator.Object,
+            options,
+            bonusTokenService: mockBonusTokenService.Object);
+
+        // Act
+        var result = managerWithBonus.IsFeatureAvailable(FeatureType.CloudAiTranslation);
+
+        // Assert - ボーナストークンも0なのでCloud AI利用不可
+        Assert.False(result);
+    }
+
     #endregion
 
     #region ConsumeCloudAiTokensAsync Tests

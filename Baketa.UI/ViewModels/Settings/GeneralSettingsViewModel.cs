@@ -285,11 +285,10 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// AI翻訳が有効かどうか（Pro/Premiaプランまたはボーナストークンで利用可能）
     /// </summary>
     /// <remarks>
-    /// [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
+    /// [Issue #280+#281] LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
     /// </remarks>
     public bool IsCloudTranslationEnabled =>
-        (_licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false) ||
-        (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+        _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
 
     /// <summary>
     /// クラウド翻訳の注記テキスト（プランに応じて表示）
@@ -560,12 +559,10 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _targetLanguage = settings.DefaultTargetLanguage == "ja" ? "Japanese" : "English";
         _fontSize = settings.OverlayFontSize;
 
-        // [Issue #78 Phase 5] + [Issue #280+#281] Cloud AI翻訳設定の復元
-        // プランまたはボーナストークンでCloud AIが利用可能か判定
-        var isCloudAvailable = (_licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false) ||
-                               (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+        // [Issue #78 Phase 5] Cloud AI翻訳設定の復元
+        // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
+        var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
 
-        // [Issue #280+#281] 保存された設定を優先的に使用
         // Cloud利用不可なら強制的にローカル翻訳
         _useLocalEngine = !isCloudAvailable || settings.UseLocalEngine;
     }
@@ -1098,8 +1095,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             this.RaisePropertyChanged(nameof(CloudUsageDisplay));
 
             // ボーナストークンが0になった場合、Cloud AIが使えなくなる可能性
-            var isCloudAvailable = (_licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false) ||
-                                   e.TotalRemaining > 0;
+            // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
+            var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
 
             if (!isCloudAvailable && !UseLocalEngine)
             {

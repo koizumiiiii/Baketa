@@ -37,9 +37,8 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
         _bonusTokenService = bonusTokenService;
 
         // 初期状態を設定
-        // [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
-        _isEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation) ||
-                      (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+        // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
+        _isEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation);
         var currentSettings = _unifiedSettingsService.GetTranslationSettings();
         _isPreferred = !currentSettings.UseLocalEngine;
         _wasEnabled = IsEffectivelyEnabled;
@@ -75,9 +74,8 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
         // ライセンス状態を強制更新
         await _licenseManager.RefreshStateAsync(cancellationToken).ConfigureAwait(false);
 
-        // [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
-        var newEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation) ||
-                          (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+        // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
+        var newEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation);
         var currentSettings = _unifiedSettingsService.GetTranslationSettings();
         var newPreferred = !currentSettings.UseLocalEngine;
 
@@ -141,9 +139,8 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
             currentPreferred = _isPreferred;
         }
 
-        // [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
-        var newEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation) ||
-                          (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+        // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
+        var newEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation);
         var reason = MapLicenseChangeReason(e.Reason);
 
         _logger.LogInformation(
