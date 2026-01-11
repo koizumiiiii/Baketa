@@ -13,6 +13,7 @@
  * - Cloud AI翻訳（Gemini API経由）
  * - クラッシュレポート受信（Issue #252）
  * - 同意記録（GDPR/CCPA監査ログ）（Issue #261）
+ * - ボーナストークン管理（Issue #280+#281）
  *
  * セキュリティ:
  * - タイミング攻撃対策（timingSafeCompare）
@@ -133,6 +134,23 @@ interface UsageEvent {
   schema_version: number;
   app_version: string;
   occurred_at: string;  // ISO 8601
+}
+
+/** Issue #280+#281: ボーナストークン同期リクエスト */
+interface BonusSyncItem {
+  id: string;  // UUID
+  used_tokens: number;
+}
+
+/** Issue #280+#281: ボーナストークン情報 */
+interface BonusTokenInfo {
+  id: string;
+  source_type: string;
+  granted_tokens: number;
+  used_tokens: number;
+  remaining_tokens: number;
+  expires_at: string;
+  is_expired: boolean;
 }
 
 /** Patreon OAuth トークンレスポンス */
@@ -979,7 +997,59 @@ async function handlePromotionRedeem(
       0: 'Free', 1: 'Pro', 2: 'Premium', 3: 'Ultimate'
     };
 
-    console.log(`Promotion code redeemed: code=${normalizedCode.substring(0, 10)}****, plan=${result.plan_type}, user=${userId?.substring(0, 8) || 'anonymous'}`);
+    // Issue #280+#281: プラン相当のボーナストークンを付与（プラン変更なし）
+    const PLAN_TOKEN_AMOUNTS: Record<number, number> = {
+      1: 10_000_000,   // Pro: 1000万トークン
+      2: 20_000_000,   // Premium: 2000万トークン
+      3: 50_000_000    // Ultimate: 5000万トークン
+    };
+
+    const tokenAmount = PLAN_TOKEN_AMOUNTS[result.plan_type ?? 0] ?? 0;
+    let bonusTokenId: string | null = null;
+
+    // ユーザーがログイン済みで、トークン付与対象の場合のみボーナス付与
+    if (userId && tokenAmount > 0) {
+      console.log(`Granting bonus tokens: user=${userId.substring(0, 8)}..., tokens=${tokenAmount.toLocaleString()}`);
+
+      const { data: bonusData, error: bonusError } = await supabase.rpc('grant_bonus_tokens', {
+        p_user_id: userId,
+        p_source_type: 'promotion',
+        p_source_id: result.redemption_id,
+        p_granted_tokens: tokenAmount,
+        p_expires_at: result.expires_at
+      });
+
+      if (bonusError) {
+        // [Gemini Review] ボーナス付与失敗 → redemptionをfailed状態に更新（監査ログ保持）
+        console.error('Failed to grant bonus tokens:', bonusError);
+
+        // 補償処理: redemptionのstatusをfailed_bonusに更新
+        // これにより監査ログは保持しつつ、管理者が手動で対応可能
+        const { error: updateError } = await supabase
+          .from('promotion_code_redemptions')
+          .update({
+            status: 'failed_bonus',
+            error_message: `Bonus grant failed: ${bonusError.message || 'Unknown error'}`
+          })
+          .eq('id', result.redemption_id);
+
+        if (updateError) {
+          console.error('Failed to update redemption status:', updateError);
+        }
+
+        return errorResponse(
+          'ボーナストークンの付与に失敗しました。サポートにお問い合わせください。',
+          500,
+          origin,
+          allowedOrigins,
+          'BONUS_GRANT_FAILED'
+        );
+      }
+      bonusTokenId = bonusData as string;
+      console.log(`Bonus tokens granted: id=${bonusTokenId}`);
+    }
+
+    console.log(`Promotion code redeemed: code=${normalizedCode.substring(0, 10)}****, plan=${result.plan_type}, tokens=${tokenAmount.toLocaleString()}, user=${userId?.substring(0, 8) || 'anonymous'}`);
 
     // DBスキーマ上 plan_type は NOT NULL だが、万が一のフォールバックとして 'Pro' を使用
     const plan = planTypeMap[result.plan_type ?? 2] ?? 'Pro';
@@ -988,11 +1058,131 @@ async function handlePromotionRedeem(
       success: true,
       plan_type: plan,
       expires_at: result.expires_at,
-      message: 'プロモーションコードが適用されました。'
+      bonus_tokens_granted: tokenAmount,  // Issue #280+#281: 付与トークン数
+      message: tokenAmount > 0
+        ? `プロモーションコードが適用されました。${tokenAmount.toLocaleString()}トークンが付与されました。`
+        : 'プロモーションコードが適用されました。'
     }, origin, allowedOrigins);
 
   } catch (error) {
     console.error('Promotion redeem error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * [Issue #276] プロモーション状態取得
+ * GET /api/promotion/status
+ *
+ * 認証済みユーザーのプロモーション適用状態をDBから取得
+ * ローカルファイル依存からの脱却
+ */
+async function handlePromotionStatus(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('Supabase not configured for promotion status');
+      return errorResponse('Promotion service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）- サーバーサイド検証
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'PROMO_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'PROMO_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（10回/分）
+    const rateLimit = await checkRateLimit(env, `promotion-status:${user.id}`, 10);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. RPC関数を使用してプロモーション状態を取得
+    // [Issue #276] サービスキーでは auth.uid() が機能しないため、
+    // user_idをパラメータとして渡す専用関数を使用
+    const { data, error } = await supabase.rpc('get_promotion_status_for_user', {
+      p_user_id: user.id
+    });
+
+    if (error) {
+      console.error('[Promotion] RPC error:', error);
+      return errorResponse('Database error', 500, origin, allowedOrigins, 'PROMO_DB_ERROR');
+    }
+
+    // RPC関数は常に1行を返す（プロモーションなしの場合はhas_promotion=false）
+    const result = Array.isArray(data) ? data[0] : data;
+
+    if (!result || !result.has_promotion) {
+      // プロモーションなし（正常系）
+      console.log(JSON.stringify({
+        event: 'promotion_status_check',
+        user_id: user.id.substring(0, 8) + '...',
+        has_promotion: false,
+        expired: result?.is_expired ?? false,
+        timestamp: new Date().toISOString()
+      }));
+
+      return successResponse({
+        has_promotion: false,
+        promotion: null,
+        expired: result?.is_expired ?? false
+      }, origin, allowedOrigins);
+    }
+
+    // 5. 有効期限チェック（DB側で計算済み）
+    if (result.is_expired) {
+      console.log(JSON.stringify({
+        event: 'promotion_status_check',
+        user_id: user.id.substring(0, 8) + '...',
+        has_promotion: false,
+        expired: true,
+        timestamp: new Date().toISOString()
+      }));
+
+      return successResponse({
+        has_promotion: false,
+        promotion: null,
+        expired: true
+      }, origin, allowedOrigins);
+    }
+
+    // 6. 成功レスポンス
+    console.log(JSON.stringify({
+      event: 'promotion_status_check',
+      user_id: user.id.substring(0, 8) + '...',
+      has_promotion: true,
+      plan_type: result.plan_name,
+      timestamp: new Date().toISOString()
+    }));
+
+    return successResponse({
+      has_promotion: true,
+      promotion: {
+        code_masked: result.code_masked,
+        plan_type: result.plan_name,
+        applied_at: result.applied_at,
+        expires_at: result.expires_at
+      }
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('Promotion status error:', error);
     return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
   }
 }
@@ -1079,6 +1269,94 @@ async function handleConsentRecord(
 
   } catch (error) {
     console.error('[Issue #261] Consent record error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * [Issue #277] 同意状態取得
+ * GET /api/consent/status
+ *
+ * 認証済みユーザーの同意状態をDBから取得
+ * ローカルファイル依存からの脱却
+ */
+async function handleConsentStatus(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('Supabase not configured for consent status');
+      return errorResponse('Consent service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）- サーバーサイド検証
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'CONSENT_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'CONSENT_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（10回/分）
+    const rateLimit = await checkRateLimit(env, `consent-status:${user.id}`, 10);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. RPC関数を使用して同意状態を取得
+    // [Issue #277] サービスキーでは auth.uid() が機能しないため、
+    // user_idをパラメータとして渡す専用関数を使用
+    const { data, error } = await supabase.rpc('get_consent_status_for_user', {
+      p_user_id: user.id
+    });
+
+    if (error) {
+      console.error('[Consent] RPC error:', error);
+      return errorResponse('Database error', 500, origin, allowedOrigins, 'CONSENT_DB_ERROR');
+    }
+
+    // 5. レスポンス構築
+    const results = Array.isArray(data) ? data : [];
+    const privacyPolicy = results.find((r: { consent_type: string }) => r.consent_type === 'privacy_policy');
+    const termsOfService = results.find((r: { consent_type: string }) => r.consent_type === 'terms_of_service');
+
+    // 6. 監査ログ記録
+    console.log(JSON.stringify({
+      event: 'consent_status_retrieved',
+      user_id: user.id.substring(0, 8) + '...',
+      has_privacy_policy: !!privacyPolicy,
+      has_terms: !!termsOfService,
+      timestamp: new Date().toISOString()
+    }));
+
+    return successResponse({
+      privacy_policy: privacyPolicy ? {
+        status: privacyPolicy.status,
+        version: privacyPolicy.version,
+        recorded_at: privacyPolicy.recorded_at
+      } : null,
+      terms_of_service: termsOfService ? {
+        status: termsOfService.status,
+        version: termsOfService.version,
+        recorded_at: termsOfService.recorded_at
+      } : null
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #277] Consent status error:', error);
     return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
   }
 }
@@ -1186,6 +1464,195 @@ async function handleAnalyticsEvents(
 }
 
 // ============================================
+// Issue #280+#281: ボーナストークンAPI
+// ============================================
+
+/**
+ * [Issue #280+#281] ボーナストークン状態取得
+ * GET /api/bonus-tokens/status
+ *
+ * 認証済みユーザーのボーナストークン一覧を取得
+ * - 有効期限順にソート
+ * - 残高と有効期限情報を含む
+ */
+async function handleBonusTokensStatus(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #280] Supabase not configured for bonus tokens');
+      return errorResponse('Bonus token service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'BONUS_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'BONUS_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（10回/分）
+    const rateLimit = await checkRateLimit(env, `bonus-status:${user.id}`, 10);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. RPC関数を使用してボーナストークン状態を取得
+    // サービスキーでは auth.uid() が機能しないため、専用関数を使用
+    const { data, error } = await supabase.rpc('get_bonus_tokens_for_user', {
+      p_user_id: user.id
+    });
+
+    if (error) {
+      console.error('[Issue #280] RPC error:', error);
+      return errorResponse('Database error', 500, origin, allowedOrigins, 'BONUS_DB_ERROR');
+    }
+
+    // 5. レスポンス構築
+    const bonuses: BonusTokenInfo[] = Array.isArray(data) ? data : [];
+
+    // 有効なボーナス（未期限切れで残高あり）の合計を計算
+    const totalRemaining = bonuses
+      .filter(b => !b.is_expired && b.remaining_tokens > 0)
+      .reduce((sum, b) => sum + b.remaining_tokens, 0);
+
+    console.log(JSON.stringify({
+      event: 'bonus_tokens_status',
+      user_id: user.id.substring(0, 8) + '...',
+      bonus_count: bonuses.length,
+      total_remaining: totalRemaining,
+      timestamp: new Date().toISOString()
+    }));
+
+    return successResponse({
+      bonuses,
+      total_remaining: totalRemaining,
+      active_count: bonuses.filter(b => !b.is_expired && b.remaining_tokens > 0).length
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #280] Bonus tokens status error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * [Issue #280+#281] ボーナストークン使用量同期
+ * POST /api/bonus-tokens/sync
+ *
+ * CRDT G-Counterパターンで使用量を同期
+ * - 各ボーナスIDごとに大きい方を採用
+ * - オフライン時のローカル消費もサーバーに反映可能
+ */
+async function handleBonusTokensSync(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #281] Supabase not configured for bonus tokens sync');
+      return errorResponse('Bonus token service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'BONUS_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'BONUS_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（30回/分 - 同期は頻繁に呼ばれる可能性あり）
+    const rateLimit = await checkRateLimit(env, `bonus-sync:${user.id}`, 30);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. リクエストボディ取得
+    const body = await request.json() as { bonuses?: BonusSyncItem[] };
+
+    if (!body.bonuses || !Array.isArray(body.bonuses)) {
+      return errorResponse('Missing or invalid bonuses array', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+    }
+
+    // 空配列の場合は同期不要
+    if (body.bonuses.length === 0) {
+      return successResponse({
+        synced: [],
+        synced_count: 0
+      }, origin, allowedOrigins);
+    }
+
+    // 各項目のバリデーション
+    for (const item of body.bonuses) {
+      if (!item.id || typeof item.used_tokens !== 'number') {
+        return errorResponse('Invalid bonus sync item', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+      }
+      if (item.used_tokens < 0) {
+        return errorResponse('used_tokens must be non-negative', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
+      }
+    }
+
+    // 5. RPC関数を使用してボーナストークンを同期
+    const { data, error } = await supabase.rpc('sync_bonus_tokens_for_user', {
+      p_user_id: user.id,
+      p_bonuses: body.bonuses
+    });
+
+    if (error) {
+      console.error('[Issue #281] RPC error:', error);
+      return errorResponse('Sync failed', 500, origin, allowedOrigins, 'BONUS_SYNC_ERROR');
+    }
+
+    // 6. 同期結果をレスポンス
+    const synced = Array.isArray(data) ? data : [];
+
+    console.log(JSON.stringify({
+      event: 'bonus_tokens_sync',
+      user_id: user.id.substring(0, 8) + '...',
+      requested_count: body.bonuses.length,
+      synced_count: synced.length,
+      timestamp: new Date().toISOString()
+    }));
+
+    return successResponse({
+      synced,
+      synced_count: synced.length
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #281] Bonus tokens sync error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+// ============================================
 // メインハンドラ
 // ============================================
 
@@ -1271,8 +1738,16 @@ export default {
           return handleTranslate(request, env as TranslateEnv, origin, allowedOrigins);
         case '/api/promotion/redeem':
           return handlePromotionRedeem(request, env, origin, allowedOrigins);
+        case '/api/promotion/status':
+          return handlePromotionStatus(request, env, origin, allowedOrigins);
         case '/api/consent/record':
           return handleConsentRecord(request, env, origin, allowedOrigins);
+        case '/api/consent/status':
+          return handleConsentStatus(request, env, origin, allowedOrigins);
+        case '/api/bonus-tokens/status':
+          return handleBonusTokensStatus(request, env, origin, allowedOrigins);
+        case '/api/bonus-tokens/sync':
+          return handleBonusTokensSync(request, env, origin, allowedOrigins);
         // Note: /api/crash-report is handled earlier (before API key validation)
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');
@@ -1337,15 +1812,50 @@ async function handleWebhook(
 
     const payload = JSON.parse(body) as PatreonWebhookPayload;
     const userId = payload.data.relationships?.user?.data?.id;
+    const pledgeId = payload.data.id;
+    const amountCents = payload.data.attributes?.currently_entitled_amount_cents ?? 0;
 
-    console.log(`Webhook received: event=${eventType}, userId=${userId}`);
+    console.log(`Webhook received: event=${eventType}, userId=${userId}, pledgeId=${pledgeId}, amountCents=${amountCents}`);
 
     if (userId) {
       // メンバーシップキャッシュを無効化（次回アクセス時に最新情報を取得）
       await invalidateMembershipCache(env, userId);
       console.log(`Webhook: Invalidated membership cache for user ${userId}`);
 
-      // イベントタイプに応じた処理
+      // [Issue #271] プラン変更を履歴に記録
+      const supabase = getSupabaseClient(env);
+      const newPlan = eventType === 'members:pledge:delete' ? 'Free' : determinePlan(amountCents);
+
+      if (supabase) {
+        // 前回のプランを取得
+        const { data: oldPlan } = await supabase.rpc('get_latest_plan_by_patreon', {
+          p_patreon_user_id: userId
+        });
+
+        // プラン変更があれば記録
+        if (oldPlan !== newPlan) {
+          const { data: recordId, error: recordError } = await supabase.rpc('record_plan_change_by_patreon', {
+            p_patreon_user_id: userId,
+            p_old_plan: oldPlan || null,
+            p_new_plan: newPlan,
+            p_source: 'patreon_webhook',
+            p_patreon_pledge_id: pledgeId,
+            p_metadata: { event: eventType, amount_cents: amountCents }
+          });
+
+          if (recordError) {
+            console.error(`Webhook: Failed to record plan change: ${recordError.message}`);
+          } else {
+            console.log(`Webhook: Recorded plan change ${oldPlan || 'NULL'} -> ${newPlan} (recordId=${recordId})`);
+          }
+        } else {
+          console.log(`Webhook: No plan change detected (current=${newPlan})`);
+        }
+      } else {
+        console.warn('Webhook: Supabase client not available, skipping plan change recording');
+      }
+
+      // イベントタイプに応じた追加処理
       switch (eventType) {
         case 'members:pledge:delete':
           // 支援停止時はユーザーの全セッションを無効化
@@ -1368,6 +1878,7 @@ async function handleWebhook(
       success: true,
       event: eventType,
       processed: true,
+      planChangeRecorded: !!userId,
     }, origin, allowedOrigins);
 
   } catch (error) {

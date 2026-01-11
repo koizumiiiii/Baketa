@@ -12,6 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Polly;
+using Polly.Extensions.Http;
 
 namespace Baketa.Infrastructure.DI.Modules;
 
@@ -56,6 +58,12 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddSingleton<PatreonSyncHostedService>();
         services.AddSingleton<IHostedService>(provider =>
             provider.GetRequiredService<PatreonSyncHostedService>());
+
+        // Issue #280+#281: ボーナストークン自動同期サービス
+        // ログイン時にサーバーから取得、定期的に消費量をサーバーへ同期
+        services.AddSingleton<BonusSyncHostedService>();
+        services.AddSingleton<IHostedService>(provider =>
+            provider.GetRequiredService<BonusSyncHostedService>());
     }
 
     /// <summary>
@@ -104,11 +112,15 @@ public sealed class LicenseModule : ServiceModuleBase
         // Issue #237 Phase 2: プロモーションコードサービス
         // DEBUGビルド: HybridPromotionCodeService（モック＋本番両対応）
         // RELEASEビルド: PromotionCodeService（本番のみ、モックコード拒否）
+        // [Gemini Review] Pollyリトライポリシー追加（Issue #276）
         services.AddHttpClient<License.PromotionCodeService>(client =>
         {
+            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
-        });
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        })
+        .AddPolicyHandler(GetRetryPolicy());
         services.AddSingleton<License.MockPromotionCodeService>();
 #if DEBUG
         services.AddSingleton<License.HybridPromotionCodeService>();
@@ -126,6 +138,21 @@ public sealed class LicenseModule : ServiceModuleBase
             return provider.GetRequiredService<License.PromotionCodeService>();
         });
 #endif
+
+        // Issue #280+#281: ボーナストークンサービス
+        // Pollyリトライポリシー付きHttpClient
+        services.AddHttpClient<License.BonusTokenService>(client =>
+        {
+            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        })
+        .AddPolicyHandler(GetRetryPolicy());
+        services.AddSingleton<IBonusTokenService>(provider =>
+            provider.GetRequiredService<License.BonusTokenService>());
+        services.AddSingleton<IDisposable>(provider =>
+            provider.GetRequiredService<License.BonusTokenService>());
 
         // Disposable登録（アプリケーション終了時の適切なクリーンアップ）
         services.AddSingleton<IDisposable>(provider =>
@@ -234,6 +261,26 @@ public sealed class LicenseModule : ServiceModuleBase
     public override IEnumerable<Type> GetDependentModules()
     {
         yield return typeof(CoreModule);
+    }
+
+    /// <summary>
+    /// [Gemini Review] HTTPリトライポリシーを取得
+    /// Issue #276: 一時的なネットワーク障害に対する回復性向上
+    /// </summary>
+    /// <returns>指数バックオフ付きリトライポリシー</returns>
+    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()  // 5xx, 408, ネットワークエラー
+            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)  // 429
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),  // 2, 4, 8秒
+                onRetry: (outcome, timespan, retryAttempt, context) =>
+                {
+                    // リトライログ出力（デバッグ用）
+                    Console.WriteLine($"[Polly] Retry {retryAttempt} after {timespan.TotalSeconds}s due to {outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()}");
+                });
     }
 }
 

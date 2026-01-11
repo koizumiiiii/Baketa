@@ -435,6 +435,22 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 - `appsettings.Development.json`: Development overrides
 - `appsettings.SentencePiece.json`: Legacy OPUS-MT model configuration (deprecated)
 
+### User Settings File Locations
+
+User settings are stored in `%USERPROFILE%\.baketa\` (e.g., `C:\Users\<username>\.baketa\`):
+
+| ファイル | パス | 説明 |
+|----------|------|------|
+| 同意設定 | `.baketa/settings/consent-settings.json` | プライバシーポリシー・利用規約同意状態 |
+| 翻訳設定 | `.baketa/settings/translation-settings.json` | 翻訳エンジン・言語ペア設定 |
+| ユーザー設定 | `.baketa/settings/user-settings.json` | 一般ユーザー設定 |
+| ライセンスキャッシュ | `.baketa/license/license-cache.json` | ライセンス情報キャッシュ |
+| Patreon認証情報 | `.baketa/license/patreon-credentials.json` | Patreon OAuth トークン |
+| トークン使用量 | `.baketa/token-usage/monthly-summary.json` | Cloud AI トークン消費量 |
+
+**注意**: `%APPDATA%` ではなく `%USERPROFILE%` 直下の `.baketa` ディレクトリを使用。
+パス定義: `Baketa.Core/Settings/BaketaSettingsPaths.cs`
+
 ## Code Style and Standards
 
 ### C#/.NET Compliance Requirements

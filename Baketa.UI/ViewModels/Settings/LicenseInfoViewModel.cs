@@ -28,6 +28,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private readonly ILicenseManager _licenseManager;
     private readonly IPromotionCodeService _promotionCodeService;
     private readonly ITokenConsumptionTracker _tokenTracker;
+    private readonly IBonusTokenService? _bonusTokenService;
     private readonly ILogger<LicenseInfoViewModel>? _logger;
 
     private PlanType _currentPlan;
@@ -50,6 +51,14 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private bool _hasActivePromotion;
     private PromotionInfo? _activePromotion;
 
+    // Issue #280+#281: ボーナストークン関連
+    private long _bonusTokensRemaining;
+
+    // Issue #280+#281 Phase 5: UX改善
+    private const double LowTokenWarningThreshold = 20.0; // 残り20%で警告
+    private bool _isLowTokenWarning;
+    private bool _shouldShowUpgradePrompt;
+
     /// <summary>
     /// LicenseInfoViewModelを初期化します
     /// </summary>
@@ -58,11 +67,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         IPromotionCodeService promotionCodeService,
         IEventAggregator eventAggregator,
         ITokenConsumptionTracker tokenTracker,
+        IBonusTokenService? bonusTokenService = null,
         ILogger<LicenseInfoViewModel>? logger = null) : base(eventAggregator)
     {
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _promotionCodeService = promotionCodeService ?? throw new ArgumentNullException(nameof(promotionCodeService));
         _tokenTracker = tokenTracker ?? throw new ArgumentNullException(nameof(tokenTracker));
+        _bonusTokenService = bonusTokenService;
         _logger = logger;
 
         // ライセンス状態変更イベントの購読
@@ -70,6 +81,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
         // プロモーション状態変更イベントの購読
         _promotionCodeService.PromotionStateChanged += OnPromotionStateChanged;
+
+        // [Issue #280+#281] ボーナストークン状態変更イベントの購読
+        if (_bonusTokenService != null)
+        {
+            _bonusTokenService.BonusTokensChanged += OnBonusTokensChanged;
+            BonusTokensRemaining = _bonusTokenService.GetTotalRemainingTokens();
+        }
 
         // コマンドの初期化
         RefreshCommand = ReactiveCommand.CreateFromTask(RefreshLicenseStateAsync);
@@ -185,10 +203,103 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
     /// <summary>
     /// トークン使用量の表示文字列
+    /// [Issue #280+#281] プラン枠がある場合は「使用量 / 上限」、
+    /// ボーナストークンのみの場合は「残り X」を表示
     /// </summary>
-    public string TokenUsageDisplay => HasCloudAccess
-        ? $"{TokensUsed:N0} / {TokenLimit:N0}"
-        : Strings.License_LocalOnly;
+    public string TokenUsageDisplay
+    {
+        get
+        {
+            if (TokenLimit > 0)
+            {
+                // プラン枠がある場合: "1,234,567 / 4,000,000"
+                return $"{TokensUsed:N0} / {TokenLimit:N0}";
+            }
+            else if (BonusTokensRemaining > 0)
+            {
+                // ボーナストークンのみの場合: "残り 50,000,000"
+                return $"残り {BonusTokensRemaining:N0}";
+            }
+            else
+            {
+                return Strings.License_LocalOnly;
+            }
+        }
+    }
+
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークン残高
+    /// </summary>
+    public long BonusTokensRemaining
+    {
+        get => _bonusTokensRemaining;
+        private set => this.RaiseAndSetIfChanged(ref _bonusTokensRemaining, value);
+    }
+
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークン残高の表示文字列
+    /// </summary>
+    public string BonusTokensDisplay => BonusTokensRemaining > 0
+        ? $"+{BonusTokensRemaining:N0} ボーナス"
+        : string.Empty;
+
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークンがあるかどうか
+    /// </summary>
+    public bool HasBonusTokens => BonusTokensRemaining > 0;
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] トークン残量警告を表示すべきか
+    /// 利用可能なトークン全体（プラン枠 + ボーナス）の残り20%以下で警告
+    /// </summary>
+    public bool IsLowTokenWarning
+    {
+        get => _isLowTokenWarning;
+        private set => this.RaiseAndSetIfChanged(ref _isLowTokenWarning, value);
+    }
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] アップグレード導線を表示すべきか
+    /// ボーナストークン枯渇 かつ Freeプランの場合に表示
+    /// </summary>
+    public bool ShouldShowUpgradePrompt
+    {
+        get => _shouldShowUpgradePrompt;
+        private set => this.RaiseAndSetIfChanged(ref _shouldShowUpgradePrompt, value);
+    }
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] 利用可能なトークン合計（プラン枠残 + ボーナス）
+    /// </summary>
+    public long TotalAvailableTokens => Math.Max(0, TokenLimit - TokensUsed) + BonusTokensRemaining;
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] トークン残量の表示文字列
+    /// プラン枠とボーナスの内訳を表示
+    /// </summary>
+    public string TokenBreakdownDisplay
+    {
+        get
+        {
+            if (!HasCloudAccess && !HasBonusTokens)
+                return Strings.License_LocalOnly;
+
+            var planRemaining = Math.Max(0, TokenLimit - TokensUsed);
+            var parts = new System.Collections.Generic.List<string>();
+
+            if (TokenLimit > 0)
+            {
+                parts.Add($"プラン: {planRemaining:N0} / {TokenLimit:N0}");
+            }
+
+            if (BonusTokensRemaining > 0)
+            {
+                parts.Add($"ボーナス: {BonusTokensRemaining:N0}");
+            }
+
+            return parts.Count > 0 ? string.Join(" + ", parts) : Strings.License_LocalOnly;
+        }
+    }
 
     /// <summary>
     /// クラウドアクセス状態の表示文字列
@@ -273,6 +384,38 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             if (promotion == null || !promotion.IsValid)
                 return string.Empty;
             return promotion.ExpiresAt.ToString("yyyy/MM/dd");
+        }
+    }
+
+    /// <summary>
+    /// アクティブなプロモーションのコード表示（マスク済み）
+    /// </summary>
+    public string PromotionCodeDisplay
+    {
+        get
+        {
+            var promotion = _promotionCodeService.GetCurrentPromotion();
+            if (promotion == null || !promotion.IsValid)
+                return string.Empty;
+
+            var code = promotion.Code;
+
+            // 既にマスクされている場合はそのまま返す
+            if (code.Contains('*'))
+                return code;
+
+            // 下4桁以外をマスク
+            // 例: BAKETA-15D12788 → ************2788
+            // 例: BAKETA-VIP1-ABCD → ************ABCD
+            if (code.Length > 4)
+            {
+                var lastFour = code[^4..];
+                var maskLength = code.Length - 4;
+                return new string('*', maskLength) + lastFour;
+            }
+
+            // 4文字以下の場合はそのまま（通常ありえない）
+            return code;
         }
     }
 
@@ -371,7 +514,8 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
         TokenLimit = state.MonthlyTokenLimit;
         UsagePercentage = TokenLimit > 0 ? (double)TokensUsed / TokenLimit * 100 : 0;
-        HasCloudAccess = state.CurrentPlan.HasCloudAiAccess();
+        // [Issue #280+#281] プランまたはボーナストークンでCloud AIアクセス可能
+        HasCloudAccess = state.CurrentPlan.HasCloudAiAccess() || HasBonusTokens;
         IsQuotaExceeded = state.IsQuotaExceeded;
         ExpirationDate = state.ExpirationDate;
 
@@ -379,6 +523,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(ExpirationDateDisplay));
         this.RaisePropertyChanged(nameof(TokenUsageDisplay));
         this.RaisePropertyChanged(nameof(CloudAccessDisplay));
+
+        // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
+        UpdateTokenWarningState();
     }
 
     /// <summary>
@@ -488,6 +635,47 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             PlanType.Ultimate => Strings.License_Desc_Ultimate,
             _ => string.Empty
         };
+    }
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] トークン残量警告とアップグレード導線の状態を更新
+    /// </summary>
+    private void UpdateTokenWarningState()
+    {
+        // 利用可能なトークン総量を計算
+        var planRemaining = Math.Max(0, TokenLimit - TokensUsed);
+        var totalAvailable = planRemaining + BonusTokensRemaining;
+
+        // [Gemini Review] 警告判定ロジック修正
+        // プラン枠の使用率に基づいて警告を判定（ボーナスは別枠として扱う）
+        // - プラン枠がある場合: プラン枠の残量が20%以下で警告
+        // - ボーナスのみの場合: ボーナスが存在し、かつ閾値（100万トークン）未満で警告
+        const long BonusLowThreshold = 1_000_000; // ボーナス用の絶対値閾値
+
+        if (TokenLimit > 0)
+        {
+            // プラン枠がある場合: プラン使用率で判定
+            var planUsagePercentage = (double)planRemaining / TokenLimit * 100.0;
+            IsLowTokenWarning = HasCloudAccess && planUsagePercentage <= LowTokenWarningThreshold;
+        }
+        else if (BonusTokensRemaining > 0)
+        {
+            // ボーナスのみの場合: 絶対値で判定
+            IsLowTokenWarning = BonusTokensRemaining < BonusLowThreshold;
+        }
+        else
+        {
+            IsLowTokenWarning = false;
+        }
+
+        // アップグレード導線判定: Freeプラン かつ ボーナス枯渇 かつ プラン枠も枯渇
+        ShouldShowUpgradePrompt = CurrentPlan == PlanType.Free
+            && BonusTokensRemaining == 0
+            && (TokenLimit == 0 || TokensUsed >= TokenLimit);
+
+        // 派生プロパティの更新通知
+        this.RaisePropertyChanged(nameof(TotalAvailableTokens));
+        this.RaisePropertyChanged(nameof(TokenBreakdownDisplay));
     }
 
     #region Issue #237 Phase 2: プロモーションコード関連メソッド
@@ -651,6 +839,28 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         });
     }
 
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークン状態変更イベントハンドラ
+    /// </summary>
+    private void OnBonusTokensChanged(object? sender, BonusTokensChangedEventArgs e)
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            BonusTokensRemaining = e.TotalRemaining;
+            this.RaisePropertyChanged(nameof(BonusTokensDisplay));
+            this.RaisePropertyChanged(nameof(HasBonusTokens));
+            this.RaisePropertyChanged(nameof(TokenUsageDisplay));
+            this.RaisePropertyChanged(nameof(HasCloudAccess));
+            this.RaisePropertyChanged(nameof(CloudAccessDisplay));
+
+            // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
+            UpdateTokenWarningState();
+
+            _logger?.LogDebug("ボーナストークン状態が変更されました: {Reason}, 残高: {Remaining}",
+                e.Reason, e.TotalRemaining);
+        });
+    }
+
     #endregion
 
     /// <summary>
@@ -662,6 +872,12 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         {
             _licenseManager.StateChanged -= OnLicenseStateChanged;
             _promotionCodeService.PromotionStateChanged -= OnPromotionStateChanged;
+
+            // [Issue #280+#281] ボーナストークンイベントの購読解除
+            if (_bonusTokenService != null)
+            {
+                _bonusTokenService.BonusTokensChanged -= OnBonusTokensChanged;
+            }
         }
         base.Dispose(disposing);
     }

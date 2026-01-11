@@ -71,6 +71,40 @@ public sealed class ConsentSettings
 
     #endregion
 
+    #region サーバー同期（Issue #277）
+
+    /// <summary>
+    /// サーバーから最後に同期した日時（UTC）
+    /// Issue #277: DB同期によるローカルファイル依存からの脱却
+    /// </summary>
+    [SettingMetadata(SettingLevel.Debug, "Consent", "Last Synced At",
+        Description = "サーバーから最後に同期した日時（ISO 8601形式）")]
+    public string? LastSyncedAt { get; set; }
+
+    /// <summary>
+    /// サーバーから同期済みか
+    /// </summary>
+    public bool HasSyncedFromServer => !string.IsNullOrEmpty(LastSyncedAt);
+
+    /// <summary>
+    /// 再同期が必要か（24時間以上経過）
+    /// </summary>
+    public bool NeedsResync
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(LastSyncedAt))
+                return true;
+
+            if (!DateTime.TryParse(LastSyncedAt, out var lastSync))
+                return true;
+
+            return DateTime.UtcNow - lastSync > TimeSpan.FromHours(24);
+        }
+    }
+
+    #endregion
+
     #region 検証メソッド
 
     /// <summary>

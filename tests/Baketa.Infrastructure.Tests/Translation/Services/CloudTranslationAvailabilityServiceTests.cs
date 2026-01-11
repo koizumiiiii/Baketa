@@ -32,6 +32,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         _translationSettings = new TranslationSettings
         {
             EnableCloudAiTranslation = false,
+            UseLocalEngine = true,  // [Issue #280+#281] ローカル翻訳がデフォルト
             DefaultEngine = TranslationEngine.NLLB200
         };
 
@@ -76,6 +77,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Arrange
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(false);
         _translationSettings.EnableCloudAiTranslation = false;
+        _translationSettings.UseLocalEngine = true;  // [Issue #280+#281]
 
         // Act
         var service = CreateService();
@@ -92,6 +94,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Arrange
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(true);
         _translationSettings.EnableCloudAiTranslation = true;
+        _translationSettings.UseLocalEngine = false;  // [Issue #280+#281]
 
         // Act
         var service = CreateService();
@@ -108,6 +111,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Arrange
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(true);
         _translationSettings.EnableCloudAiTranslation = false;
+        _translationSettings.UseLocalEngine = true;  // [Issue #280+#281]
 
         // Act
         var service = CreateService();
@@ -124,6 +128,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Arrange
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(false);
         _translationSettings.EnableCloudAiTranslation = true;
+        _translationSettings.UseLocalEngine = false;  // [Issue #280+#281]
 
         // Act
         var service = CreateService();
@@ -200,6 +205,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
 
         // シミュレート: RefreshStateAsync後にEntitledがtrueになる
         _translationSettings.EnableCloudAiTranslation = true;
+        _translationSettings.UseLocalEngine = false;  // [Issue #280+#281]
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(true);
 
         // Act
@@ -227,11 +233,12 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Act
         await service.SetPreferredAsync(true);
 
-        // Assert
+        // Assert - [Issue #280+#281] UseLocalEngine も確認
         _mockUnifiedSettingsService.Verify(
             x => x.UpdateTranslationSettingsAsync(
                 It.Is<TranslationSettings>(s =>
                     s.EnableCloudAiTranslation == true &&
+                    s.UseLocalEngine == false &&
                     s.DefaultEngine == TranslationEngine.Gemini),
                 It.IsAny<CancellationToken>()),
             Times.Once);
@@ -243,16 +250,18 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Arrange
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(true);
         _translationSettings.EnableCloudAiTranslation = true;
+        _translationSettings.UseLocalEngine = false;  // [Issue #280+#281]
         var service = CreateService();
 
         // Act
         await service.SetPreferredAsync(false);
 
-        // Assert
+        // Assert - [Issue #280+#281] UseLocalEngine も確認
         _mockUnifiedSettingsService.Verify(
             x => x.UpdateTranslationSettingsAsync(
                 It.Is<TranslationSettings>(s =>
                     s.EnableCloudAiTranslation == false &&
+                    s.UseLocalEngine == true &&
                     s.DefaultEngine == TranslationEngine.NLLB200),
                 It.IsAny<CancellationToken>()),
             Times.Once);
@@ -333,6 +342,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Arrange
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(true);
         _translationSettings.EnableCloudAiTranslation = true;
+        _translationSettings.UseLocalEngine = false;  // [Issue #280+#281]
         var service = CreateService();
 
         var oldState = new LicenseState { CurrentPlan = PlanType.Pro };
@@ -404,8 +414,8 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         CloudTranslationAvailabilityChangedEventArgs? receivedArgs = null;
         service.AvailabilityChanged += (sender, args) => receivedArgs = args;
 
-        // Act: 設定変更をシミュレート
-        var newSettings = new TranslationSettings { EnableCloudAiTranslation = true };
+        // Act: 設定変更をシミュレート - [Issue #280+#281] UseLocalEngineで判定
+        var newSettings = new TranslationSettings { EnableCloudAiTranslation = true, UseLocalEngine = false };
         RaiseSettingsChanged(newSettings);
 
         // Assert
@@ -424,8 +434,8 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         var eventFired = false;
         service.AvailabilityChanged += (sender, args) => eventFired = true;
 
-        // Act: 同じ設定値で変更通知
-        var sameSettings = new TranslationSettings { EnableCloudAiTranslation = false };
+        // Act: 同じ設定値で変更通知 - [Issue #280+#281] UseLocalEngine = true (デフォルト)
+        var sameSettings = new TranslationSettings { EnableCloudAiTranslation = false, UseLocalEngine = true };
         RaiseSettingsChanged(sameSettings);
 
         // Assert
@@ -438,6 +448,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Arrange
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(true);
         _translationSettings.EnableCloudAiTranslation = true;
+        _translationSettings.UseLocalEngine = false;  // [Issue #280+#281]
         var service = CreateService();
 
         var eventFired = false;
@@ -516,6 +527,7 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Arrange: Proユーザーとして開始（Cloud有効）
         _mockLicenseManager.Setup(x => x.IsFeatureAvailable(FeatureType.CloudAiTranslation)).Returns(true);
         _translationSettings.EnableCloudAiTranslation = true;
+        _translationSettings.UseLocalEngine = false;  // [Issue #280+#281]
         var service = CreateService();
         Assert.True(service.IsEffectivelyEnabled);
 
@@ -526,10 +538,10 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         // Act 2: Cloud翻訳を再有効化
         await service.SetPreferredAsync(true);
 
-        // Assert
+        // Assert - [Issue #280+#281] UseLocalEngine も確認
         _mockUnifiedSettingsService.Verify(
             x => x.UpdateTranslationSettingsAsync(
-                It.Is<TranslationSettings>(s => s.EnableCloudAiTranslation == true && s.DefaultEngine == TranslationEngine.Gemini),
+                It.Is<TranslationSettings>(s => s.EnableCloudAiTranslation == true && s.UseLocalEngine == false && s.DefaultEngine == TranslationEngine.Gemini),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -545,7 +557,8 @@ public class CloudTranslationAvailabilityServiceTests : IDisposable
         service.AvailabilityChanged += (sender, args) => receivedArgs = args;
 
         // Act: UIでローカルエンジンからAIエンジンに切り替え（SettingsChangedイベント経由）
-        var newSettings = new TranslationSettings { EnableCloudAiTranslation = true };
+        // [Issue #280+#281] UseLocalEngineで判定されるようになった
+        var newSettings = new TranslationSettings { EnableCloudAiTranslation = true, UseLocalEngine = false };
         RaiseSettingsChanged(newSettings);
 
         // Assert: 設定変更が検出され、イベントが発火

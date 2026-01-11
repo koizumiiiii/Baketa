@@ -34,6 +34,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     private readonly ILocalizationService? _localizationService;
     private readonly ISettingsChangeTracker? _changeTracker;
     private readonly ILicenseManager? _licenseManager;
+    private readonly IBonusTokenService? _bonusTokenService;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
     private readonly ITokenConsumptionTracker? _tokenTracker;
 
@@ -63,6 +64,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     private long _cloudTokenLimit;
     private double _cloudUsagePercentage;
 
+    // [Issue #280+#281] ボーナストークン残高
+    private long _bonusTokensRemaining;
+
     // テーマ設定用バッキングフィールド
     private UiTheme _selectedTheme = UiTheme.Auto;
 
@@ -79,6 +83,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// <param name="logger">ロガー（オプション）</param>
     /// <param name="translationSettings">翻訳設定データ（オプション）</param>
     /// <param name="licenseManager">ライセンスマネージャー（オプション）</param>
+    /// <param name="bonusTokenService">ボーナストークンサービス（オプション）</param>
     /// <param name="unifiedSettingsService">統一設定サービス（オプション）</param>
     /// <param name="tokenTracker">トークン消費トラッカー（オプション）</param>
     public GeneralSettingsViewModel(
@@ -89,6 +94,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         ILogger<GeneralSettingsViewModel>? logger = null,
         TranslationSettings? translationSettings = null,
         ILicenseManager? licenseManager = null,
+        IBonusTokenService? bonusTokenService = null,
         IUnifiedSettingsService? unifiedSettingsService = null,
         ITokenConsumptionTracker? tokenTracker = null) : base(eventAggregator)
     {
@@ -98,6 +104,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _localizationService = localizationService;
         _changeTracker = changeTracker;
         _licenseManager = licenseManager;
+        _bonusTokenService = bonusTokenService;
         _unifiedSettingsService = unifiedSettingsService;
         _tokenTracker = tokenTracker;
 
@@ -108,6 +115,18 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             Disposables.Add(Disposable.Create(() =>
             {
                 _licenseManager.StateChanged -= OnLicenseStateChanged;
+            }));
+        }
+
+        // [Issue #280+#281] ボーナストークン変更時のUI更新を購読
+        // ボーナストークンのみで消費が完了した場合、StateChangedイベントは発火しないため
+        if (_bonusTokenService != null)
+        {
+            _bonusTokenService.BonusTokensChanged += OnBonusTokensChanged;
+            _bonusTokensRemaining = _bonusTokenService.GetTotalRemainingTokens();
+            Disposables.Add(Disposable.Create(() =>
+            {
+                _bonusTokenService.BonusTokensChanged -= OnBonusTokensChanged;
             }));
         }
 
@@ -263,8 +282,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// AI翻訳が有効かどうか（Pro/Premiaプランで利用可能）
+    /// AI翻訳が有効かどうか（Pro/Premiaプランまたはボーナストークンで利用可能）
     /// </summary>
+    /// <remarks>
+    /// [Issue #280+#281] LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
+    /// </remarks>
     public bool IsCloudTranslationEnabled =>
         _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
 
@@ -360,11 +382,30 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// Cloud AI使用量表示文字列（例: "1,234,567 / 4,000,000"）
+    /// Cloud AI使用量表示文字列
+    /// [Issue #280+#281] プラン枠がある場合は「使用量 / 上限」、
+    /// ボーナストークンのみの場合は「残り X ボーナス」を表示
     /// </summary>
-    public string CloudUsageDisplay => CloudTokenLimit > 0
-        ? $"{CloudTokensUsed:N0} / {CloudTokenLimit:N0}"
-        : string.Empty;
+    public string CloudUsageDisplay
+    {
+        get
+        {
+            if (CloudTokenLimit > 0)
+            {
+                // プラン枠がある場合: "1,234,567 / 4,000,000"
+                return $"{CloudTokensUsed:N0} / {CloudTokenLimit:N0}";
+            }
+            else if (_bonusTokensRemaining > 0)
+            {
+                // ボーナストークンのみの場合: "残り 50,000,000"
+                return $"残り {_bonusTokensRemaining:N0}";
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
+    }
 
     /// <summary>
     /// Cloud AI使用量情報を表示するかどうか
@@ -519,14 +560,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         _fontSize = settings.OverlayFontSize;
 
         // [Issue #78 Phase 5] Cloud AI翻訳設定の復元
-        // Pro/Premiaプランでトークン上限未達の場合はAI翻訳をデフォルトにする
-        // Free/Standardプランまたはトークン上限超過の場合はローカル翻訳をデフォルトにする
+        // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
         var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
 
-        // Cloud AI翻訳が利用可能ならデフォルトでAI翻訳を選択
-        // ユーザーが明示的にローカル翻訳を選択した場合（EnableCloudAiTranslation=false）は
-        // その設定を尊重するが、Cloud利用不可なら強制的にローカル翻訳
-        _useLocalEngine = !isCloudAvailable || !settings.EnableCloudAiTranslation;
+        // Cloud利用不可なら強制的にローカル翻訳
+        _useLocalEngine = !isCloudAvailable || settings.UseLocalEngine;
     }
 
     /// <summary>
@@ -841,10 +879,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             settings.DefaultSourceLanguage = SourceLanguage == "Japanese" ? "ja" : "en";
             settings.DefaultTargetLanguage = TargetLanguage == "Japanese" ? "ja" : "en";
             settings.OverlayFontSize = FontSize;
-            // [Issue #78 Phase 5] Cloud AI翻訳設定を反映
+            // [Issue #78 Phase 5] + [Issue #280+#281] Cloud AI翻訳設定を反映
             // UseLocalEngine=true(ローカル翻訳) → EnableCloudAiTranslation=false
             // UseLocalEngine=false(AI翻訳) → EnableCloudAiTranslation=true
             settings.EnableCloudAiTranslation = !UseLocalEngine;
+            settings.UseLocalEngine = UseLocalEngine;
             return settings;
         }
     }
@@ -1029,6 +1068,41 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
                     newUseLocalEngine);
 
                 UseLocalEngine = newUseLocalEngine;
+            }
+        });
+    }
+
+    /// <summary>
+    /// [Issue #280+#281] ボーナストークン変更時のハンドラ
+    /// ボーナストークンが消費された場合にCloud AI利用可能状態を更新
+    /// </summary>
+    private void OnBonusTokensChanged(object? sender, BonusTokensChangedEventArgs e)
+    {
+        _logger?.LogDebug(
+            "[Issue #280+#281] ボーナストークン変更を検出: TotalRemaining={TotalRemaining}, Reason={Reason}",
+            e.TotalRemaining, e.Reason);
+
+        // UIスレッドでプロパティ変更通知を発行
+        Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            // ボーナストークン残高を更新
+            _bonusTokensRemaining = e.TotalRemaining;
+
+            // Cloud AI利用可否が変わった可能性があるため更新
+            this.RaisePropertyChanged(nameof(IsCloudTranslationEnabled));
+            this.RaisePropertyChanged(nameof(CloudTranslationNote));
+            this.RaisePropertyChanged(nameof(ShowCloudUsageInfo));
+            this.RaisePropertyChanged(nameof(CloudUsageDisplay));
+
+            // ボーナストークンが0になった場合、Cloud AIが使えなくなる可能性
+            // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック
+            var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
+
+            if (!isCloudAvailable && !UseLocalEngine)
+            {
+                // Cloud AIが使えなくなった場合はローカル翻訳に切り替え
+                _logger?.LogInformation("[Issue #280+#281] ボーナストークン枯渇によりローカル翻訳に切り替え");
+                UseLocalEngine = true;
             }
         });
     }

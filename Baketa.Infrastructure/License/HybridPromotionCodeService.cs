@@ -113,6 +113,16 @@ public sealed class HybridPromotionCodeService : IPromotionCodeService, IDisposa
         PromotionStateChanged?.Invoke(this, e);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>Issue #276: サーバー同期は本番サービスに委譲</remarks>
+    public Task<ServerSyncResult> SyncFromServerAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        // サーバー同期は常に本番サービスを使用
+        return _productionService.SyncFromServerAsync(accessToken, cancellationToken);
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

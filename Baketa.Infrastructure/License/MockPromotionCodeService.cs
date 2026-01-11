@@ -197,6 +197,32 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
             RegexOptions.IgnoreCase);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Issue #276: モックモードではローカル設定をそのまま返す
+    /// 実際のサーバー同期は行わない
+    /// </remarks>
+    public Task<ServerSyncResult> SyncFromServerAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("[MockMode] SyncFromServerAsync called - returning local promotion state");
+
+        // モックモードではローカルの状態を返す
+        var currentPromotion = GetCurrentPromotion();
+        if (currentPromotion == null)
+        {
+            return Task.FromResult(ServerSyncResult.NoDataFound);
+        }
+
+        if (!currentPromotion.IsValid)
+        {
+            return Task.FromResult(ServerSyncResult.Expired);
+        }
+
+        return Task.FromResult(ServerSyncResult.Success);
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

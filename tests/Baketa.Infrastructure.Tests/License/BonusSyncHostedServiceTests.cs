@@ -1,0 +1,218 @@
+using Baketa.Core.Abstractions.Auth;
+using Baketa.Core.Abstractions.License;
+using Baketa.Core.License.Models;
+using Baketa.Infrastructure.License.Services;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
+
+namespace Baketa.Infrastructure.Tests.License;
+
+/// <summary>
+/// BonusSyncHostedService のユニットテスト
+/// Issue #280+#281: ボーナストークン同期ホステッドサービス
+/// [Gemini Review] Task.Delay排除、using文追加、リソース管理改善
+/// </summary>
+public sealed class BonusSyncHostedServiceTests
+{
+    private readonly Mock<IAuthService> _authServiceMock;
+    private readonly Mock<IBonusTokenService> _bonusTokenServiceMock;
+    private readonly Mock<ILogger<BonusSyncHostedService>> _loggerMock;
+
+    public BonusSyncHostedServiceTests()
+    {
+        _authServiceMock = new Mock<IAuthService>();
+        _bonusTokenServiceMock = new Mock<IBonusTokenService>();
+        _loggerMock = new Mock<ILogger<BonusSyncHostedService>>();
+    }
+
+    [Fact]
+    public void Constructor_WithNullAuthService_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new BonusSyncHostedService(null!, _bonusTokenServiceMock.Object, _loggerMock.Object));
+    }
+
+    [Fact]
+    public void Constructor_WithNullBonusTokenService_DoesNotThrow()
+    {
+        // Act - nullは許容（オプショナル依存）
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            null,
+            _loggerMock.Object);
+
+        // Assert
+        Assert.NotNull(service);
+    }
+
+    [Fact]
+    public void Constructor_WithNullLogger_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new BonusSyncHostedService(
+                _authServiceMock.Object,
+                _bonusTokenServiceMock.Object,
+                null!));
+    }
+
+    [Fact]
+    public void Constructor_SubscribesToAuthStatusChanged()
+    {
+        // Act
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            _bonusTokenServiceMock.Object,
+            _loggerMock.Object);
+
+        // Assert - イベント購読確認
+        _authServiceMock.VerifyAdd(a => a.AuthStatusChanged += It.IsAny<EventHandler<AuthStatusChangedEventArgs>>(), Times.Once);
+    }
+
+    [Fact]
+    public void Dispose_UnsubscribesFromAuthStatusChanged()
+    {
+        // Arrange
+        var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            _bonusTokenServiceMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        service.Dispose();
+
+        // Assert - イベント購読解除確認
+        _authServiceMock.VerifyRemove(a => a.AuthStatusChanged -= It.IsAny<EventHandler<AuthStatusChangedEventArgs>>(), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnAuthStatusChanged_WhenLoggedIn_FetchesBonusTokens()
+    {
+        // Arrange
+        var session = new AuthSession(
+            AccessToken: "test-token",
+            RefreshToken: "refresh-token",
+            ExpiresAt: DateTime.UtcNow.AddHours(1),
+            User: new UserInfo("user-id", "test@example.com", "Test User"));
+
+        // [Gemini Review] ManualResetEventSlimで非同期完了を待機
+        var mre = new ManualResetEventSlim(false);
+
+        _authServiceMock.Setup(a => a.GetCurrentSessionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+
+        _bonusTokenServiceMock.Setup(b => b.FetchFromServerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BonusSyncResult { Success = true, TotalRemaining = 1000 })
+            .Callback(() => mre.Set());
+
+        EventHandler<AuthStatusChangedEventArgs>? capturedHandler = null;
+        _authServiceMock.SetupAdd(a => a.AuthStatusChanged += It.IsAny<EventHandler<AuthStatusChangedEventArgs>>())
+            .Callback<EventHandler<AuthStatusChangedEventArgs>>(h => capturedHandler = h);
+
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            _bonusTokenServiceMock.Object,
+            _loggerMock.Object);
+
+        // Act - ログインイベント発火
+        capturedHandler?.Invoke(this, new AuthStatusChangedEventArgs(true, session.User));
+
+        // Assert - [Gemini Review] Task.Delayを排除、ManualResetEventSlimで確実に待機
+        Assert.True(mre.Wait(TimeSpan.FromSeconds(5)), "FetchFromServerAsync was not called within the timeout.");
+        _bonusTokenServiceMock.Verify(b => b.FetchFromServerAsync("test-token", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnAuthStatusChanged_WhenLoggedOut_SyncsConsumption()
+    {
+        // Arrange
+        var session = new AuthSession(
+            AccessToken: "test-token",
+            RefreshToken: "refresh-token",
+            ExpiresAt: DateTime.UtcNow.AddHours(1),
+            User: new UserInfo("user-id", "test@example.com", "Test User"));
+
+        // [Gemini Review] ManualResetEventSlimで非同期完了を待機
+        var mre = new ManualResetEventSlim(false);
+
+        _authServiceMock.Setup(a => a.GetCurrentSessionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+
+        _bonusTokenServiceMock.Setup(b => b.HasPendingSync).Returns(true);
+        _bonusTokenServiceMock.Setup(b => b.SyncToServerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BonusSyncResult { Success = true, TotalRemaining = 500 })
+            .Callback(() => mre.Set());
+
+        EventHandler<AuthStatusChangedEventArgs>? capturedHandler = null;
+        _authServiceMock.SetupAdd(a => a.AuthStatusChanged += It.IsAny<EventHandler<AuthStatusChangedEventArgs>>())
+            .Callback<EventHandler<AuthStatusChangedEventArgs>>(h => capturedHandler = h);
+
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            _bonusTokenServiceMock.Object,
+            _loggerMock.Object);
+
+        // Act - ログアウトイベント発火
+        capturedHandler?.Invoke(this, new AuthStatusChangedEventArgs(false, null));
+
+        // Assert - [Gemini Review] Task.Delayを排除、ManualResetEventSlimで確実に待機
+        Assert.True(mre.Wait(TimeSpan.FromSeconds(5)), "SyncToServerAsync was not called within the timeout.");
+        _bonusTokenServiceMock.Verify(b => b.SyncToServerAsync("test-token", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnAuthStatusChanged_WhenNoBonusTokenService_DoesNotThrow()
+    {
+        // Arrange - IBonusTokenServiceがnullの場合
+        EventHandler<AuthStatusChangedEventArgs>? capturedHandler = null;
+        _authServiceMock.SetupAdd(a => a.AuthStatusChanged += It.IsAny<EventHandler<AuthStatusChangedEventArgs>>())
+            .Callback<EventHandler<AuthStatusChangedEventArgs>>(h => capturedHandler = h);
+
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            null,  // IBonusTokenServiceがnull
+            _loggerMock.Object);
+
+        var session = new AuthSession(
+            AccessToken: "test-token",
+            RefreshToken: "refresh-token",
+            ExpiresAt: DateTime.UtcNow.AddHours(1),
+            User: new UserInfo("user-id", "test@example.com", "Test User"));
+
+        // Act - ログインイベント発火（例外が発生しないことを確認）
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            capturedHandler?.Invoke(this, new AuthStatusChangedEventArgs(true, session.User));
+            await Task.Delay(100); // 短い待機
+        });
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task OnAuthStatusChanged_WhenNotLoggedIn_DoesNotFetch()
+    {
+        // Arrange - 未認証の場合
+        _authServiceMock.Setup(a => a.GetCurrentSessionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AuthSession?)null);
+
+        EventHandler<AuthStatusChangedEventArgs>? capturedHandler = null;
+        _authServiceMock.SetupAdd(a => a.AuthStatusChanged += It.IsAny<EventHandler<AuthStatusChangedEventArgs>>())
+            .Callback<EventHandler<AuthStatusChangedEventArgs>>(h => capturedHandler = h);
+
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            _bonusTokenServiceMock.Object,
+            _loggerMock.Object);
+
+        // Act - ログインイベント発火（セッションがnullを返す）
+        capturedHandler?.Invoke(this, new AuthStatusChangedEventArgs(true, new UserInfo("id", "email", "name")));
+        await Task.Delay(3000); // LoginFetchDelay + α
+
+        // Assert - FetchFromServerAsyncは呼ばれない
+        _bonusTokenServiceMock.Verify(b => b.FetchFromServerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+}

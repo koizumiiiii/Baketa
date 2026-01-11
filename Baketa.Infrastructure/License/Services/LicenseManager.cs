@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Net.Http;
 using System.Threading;
+using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Events;
 using Baketa.Core.Extensions;
@@ -27,6 +29,9 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private readonly IEventAggregator _eventAggregator;
     private readonly LicenseSettings _settings;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
+    private readonly IUsageAnalyticsService? _analyticsService;
+    private readonly IBonusTokenService? _bonusTokenService;
+    private readonly IAuthService? _authService;
 
     // 現在のライセンス状態
     private LicenseState _currentState;
@@ -86,7 +91,10 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         ILicenseCacheService cacheService,
         IEventAggregator eventAggregator,
         IOptions<LicenseSettings> settings,
-        IUnifiedSettingsService? unifiedSettingsService = null)
+        IUnifiedSettingsService? unifiedSettingsService = null,
+        IUsageAnalyticsService? analyticsService = null,
+        IBonusTokenService? bonusTokenService = null,
+        IAuthService? authService = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
@@ -94,6 +102,9 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _unifiedSettingsService = unifiedSettingsService;
+        _analyticsService = analyticsService;
+        _bonusTokenService = bonusTokenService;
+        _authService = authService;
 
         // 初期状態はFreeプラン
         _currentState = LicenseState.Default;
@@ -285,7 +296,19 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         lock (_stateLock)
         {
-            return _currentState.CurrentPlan.IsFeatureAvailable(feature);
+            // プランで利用可能かチェック
+            if (_currentState.CurrentPlan.IsFeatureAvailable(feature))
+            {
+                return true;
+            }
+
+            // [Issue #280+#281] CloudAiTranslationはボーナストークンでも利用可能
+            if (feature == FeatureType.CloudAiTranslation)
+            {
+                return (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+            }
+
+            return false;
         }
     }
 
@@ -308,36 +331,106 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         }
 
         // プランがクラウドAI対応かチェック
-        if (!_currentState.CurrentPlan.HasCloudAiAccess())
+        // [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
+        if (!_currentState.CurrentPlan.HasCloudAiAccess() &&
+            (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) <= 0)
         {
             return TokenConsumptionResult.CreateFailure(
                 TokenConsumptionFailureReason.PlanNotSupported);
         }
 
-        // ローカルでクォータチェック（楽観的）
-        if (_currentState.IsQuotaExceeded)
+        // [Gemini Review] スレッドセーフのため状態をスナップショット
+        var currentStateSnapshot = CurrentState;
+
+        // [Issue #280+#281] ボーナストークン優先消費
+        // [Gemini Review] 消費前にシミュレーション/チェックを行う（ロールバック不要な設計）
+        long bonusTokensToConsume = 0;
+        var remainingForPlanQuota = tokenCount;
+
+        // Step 1: ボーナストークンでカバーできる量を確認（まだ消費しない）
+        if (_bonusTokenService != null)
         {
-            return TokenConsumptionResult.CreateFailure(
-                TokenConsumptionFailureReason.QuotaExceeded,
-                currentUsage: _currentState.CloudAiTokensUsed,
-                remainingTokens: 0);
+            bonusTokensToConsume = _bonusTokenService.GetConsumeableAmount(tokenCount);
+            remainingForPlanQuota = tokenCount - (int)bonusTokensToConsume;
         }
+
+        // Step 2: 残り分がプランクォータでカバーできるかチェック
+        if (remainingForPlanQuota > 0)
+        {
+            var projectedUsage = currentStateSnapshot.CloudAiTokensUsed + remainingForPlanQuota;
+            if (projectedUsage > currentStateSnapshot.MonthlyTokenLimit)
+            {
+                _logger.LogWarning(
+                    "クォータ超過: Used={Used}, Requested={Requested}, Limit={Limit}",
+                    currentStateSnapshot.CloudAiTokensUsed, remainingForPlanQuota, currentStateSnapshot.MonthlyTokenLimit);
+
+                return TokenConsumptionResult.CreateFailure(
+                    TokenConsumptionFailureReason.QuotaExceeded,
+                    currentUsage: currentStateSnapshot.CloudAiTokensUsed,
+                    remainingTokens: 0);
+            }
+        }
+
+        // Step 3: チェック通過後、実際にボーナストークンを消費
+        long bonusTokensConsumed = 0;
+        if (bonusTokensToConsume > 0 && _bonusTokenService != null)
+        {
+            bonusTokensConsumed = _bonusTokenService.ConsumeTokens(bonusTokensToConsume);
+
+            // [Issue #280+#281] ボーナストークン消費をサーバーに同期
+            if (bonusTokensConsumed > 0 && _authService != null)
+            {
+                try
+                {
+                    var session = await _authService.GetCurrentSessionAsync(cancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (session?.IsValid == true)
+                    {
+                        var syncResult = await _bonusTokenService.SyncToServerAsync(session.AccessToken, cancellationToken)
+                            .ConfigureAwait(false);
+
+                        if (!syncResult.Success)
+                        {
+                            _logger.LogWarning(
+                                "ボーナストークン同期失敗（後で再試行）: {Error}",
+                                syncResult.ErrorMessage);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "ボーナストークン同期中に例外発生（後で再試行）");
+                }
+            }
+
+            // ボーナストークンで全額カバーできた場合
+            if (remainingForPlanQuota <= 0)
+            {
+                return TokenConsumptionResult.CreateSuccess(
+                    currentStateSnapshot.CloudAiTokensUsed,
+                    currentStateSnapshot.RemainingTokens);
+            }
+        }
+
+        var remainingToConsume = remainingForPlanQuota;
 
         // APIが利用不可（オフライン）の場合
         if (!_apiClient.IsAvailable)
         {
-            return await HandleOfflineConsumptionAsync(tokenCount, idempotencyKey, cancellationToken)
+            // [Issue #280] ボーナス消費後の残りをオフライン消費
+            return await HandleOfflineConsumptionAsync(remainingToConsume, idempotencyKey, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        // サーバーに消費を記録
+        // サーバーに消費を記録（ボーナス消費後の残り分のみ）
         try
         {
             var request = new TokenConsumptionRequest
             {
                 UserId = _userId,
                 SessionToken = _sessionToken,
-                TokenCount = tokenCount,
+                TokenCount = remainingToConsume,  // [Issue #280] ボーナス消費後の残り
                 IdempotencyKey = idempotencyKey
             };
 
@@ -374,8 +467,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         {
             _logger.LogWarning(ex, "トークン消費APIエラー、オフラインフォールバック");
 
-            // オフラインフォールバック
-            return await HandleOfflineConsumptionAsync(tokenCount, idempotencyKey, cancellationToken)
+            // [Issue #280] ボーナス消費後の残りをオフラインフォールバック
+            return await HandleOfflineConsumptionAsync(remainingToConsume, idempotencyKey, cancellationToken)
                 .ConfigureAwait(false);
         }
     }
@@ -581,6 +674,18 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                     CurrentPlan = oldState.CurrentPlan,
                     ExpirationDate = oldState.ExpirationDate
                 };
+            }
+
+            // [Issue #275] CloudAiTokensUsedを保持
+            // Patreon同期時など外部ソースがCloudAiTokensUsed=0を返す場合、
+            // 現在の値（プロモーション設定から読み込んだ値）を維持
+            if (newState.CloudAiTokensUsed == 0 && oldState.CloudAiTokensUsed > 0)
+            {
+                _logger.LogDebug(
+                    "💰 [Issue #275] CloudAiTokensUsedを保持: {OldValue} (外部ソース: {NewValue})",
+                    oldState.CloudAiTokensUsed, newState.CloudAiTokensUsed);
+
+                stateToApply = stateToApply with { CloudAiTokensUsed = oldState.CloudAiTokensUsed };
             }
 
             _currentState = stateToApply;
@@ -791,6 +896,21 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // EventAggregatorにも発行
         _ = _eventAggregator.PublishAsync(new LicenseStateChangedEvent(oldState, newState, reason));
 
+        // [Issue #271] プラン変更を使用統計に記録
+        if (oldState.CurrentPlan != newState.CurrentPlan && _analyticsService != null)
+        {
+            _analyticsService.TrackEvent("plan_changed", new Dictionary<string, object>
+            {
+                ["old_plan"] = oldState.CurrentPlan.ToString(),
+                ["new_plan"] = newState.CurrentPlan.ToString(),
+                ["change_reason"] = reason.ToString()
+            });
+
+            _logger.LogInformation(
+                "[Issue #271] プラン変更をUsageAnalyticsに記録: {OldPlan} -> {NewPlan}, Reason={Reason}",
+                oldState.CurrentPlan, newState.CurrentPlan, reason);
+        }
+
         if (_settings.EnableDebugMode)
         {
             _logger.LogDebug(
@@ -902,15 +1022,16 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             "🔄 外部ソースからライセンス状態を設定: Source={Source}, Plan={Plan}, Reason={Reason}",
             source, state.CurrentPlan, reason);
 
-        // Patreon連携の場合、userIdを設定しておく（キャッシュ用）
-        // スレッドセーフティのためlockで保護 (Gemini Review指摘)
-        if (!string.IsNullOrEmpty(state.PatreonUserId))
+        // [Issue #279] スレッドセーフにuserIdを取得・設定 (Gemini Review指摘対応)
+        string? userIdForCache;
+        lock (_stateLock)
         {
-            lock (_stateLock)
+            if (!string.IsNullOrEmpty(state.PatreonUserId))
             {
                 _userId = state.PatreonUserId;
+                _logger.LogDebug("PatreonUserIdをuserIdに設定: {UserId}", MaskUserId(_userId));
             }
-            _logger.LogDebug("PatreonUserIdをuserIdに設定: {UserId}", MaskUserId(_userId));
+            userIdForCache = _userId;
         }
 
         // [Issue #275] プロモーションが有効な場合、プロモーションのプランと有効期限を優先
@@ -919,6 +1040,32 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // 状態を更新（イベントも発火）
         // [Issue #275] SessionIdの保持はUpdateCurrentState内でアトミックに実行される（Gemini Review対応）
         UpdateCurrentState(stateToApply, reason);
+
+        // [Issue #279] キャッシュも更新（同期済み状態をキャッシュに反映）
+        // これにより「ライセンス情報を更新」ボタンでキャッシュの古い値に戻る問題を解消
+        if (!string.IsNullOrEmpty(userIdForCache))
+        {
+            _ = UpdateCacheWithLoggingAsync(userIdForCache, stateToApply);
+        }
+    }
+
+    /// <summary>
+    /// キャッシュを更新し、エラーをログに記録する (Issue #279 Gemini Review対応)
+    /// </summary>
+    private async Task UpdateCacheWithLoggingAsync(string userId, LicenseState state)
+    {
+        try
+        {
+            await _cacheService.SetCachedStateAsync(userId, state, CancellationToken.None)
+                .ConfigureAwait(false);
+            _logger.LogDebug("キャッシュ更新成功: UserId={UserId}", MaskUserId(userId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "キャッシュ更新に失敗しましたが、メモリ上の状態は正常に更新されています: UserId={UserId}",
+                MaskUserId(userId));
+        }
     }
 
     /// <inheritdoc/>
@@ -953,11 +1100,14 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
     /// <summary>
     /// [Issue #275] 有効なプロモーションがある場合、状態にプロモーション設定をマージ
-    /// プロモーションのプランがより上位であれば優先する
+    /// [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない
     /// </summary>
     private LicenseState ApplyPromotionOverride(LicenseState incomingState)
     {
-        // IUnifiedSettingsService経由でプロモーション設定を確認
+        // [Issue #280+#281] プロモーションでプランを上書きしない
+        // プロモーションはボーナストークン付与のみで、プランは変更しない
+        // 有効期限情報のみ参考としてログ出力
+
         if (_unifiedSettingsService is null)
         {
             return incomingState;
@@ -971,28 +1121,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
         var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
 
-        // プロモーションのプランが入力されたプランより上位かチェック
-        if ((int)promotionPlan <= (int)incomingState.CurrentPlan)
-        {
-            // 入力プランの方が上位または同等なので、そのまま使用
-            return incomingState;
-        }
-
-        // プロモーションプランの方が上位なので、プランと有効期限を上書き
-        if (!string.IsNullOrEmpty(promotionSettings.PromotionExpiresAt) &&
-            DateTime.TryParse(promotionSettings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var promotionExpires))
-        {
-            _logger.LogInformation(
-                "🎁 [Issue #275] プロモーション優先適用: IncomingPlan={IncomingPlan} → PromotionPlan={PromotionPlan}, ExpiresAt={ExpiresAt}",
-                incomingState.CurrentPlan, promotionPlan, promotionExpires);
-
-            return incomingState with
-            {
-                CurrentPlan = promotionPlan,
-                ExpirationDate = promotionExpires
-            };
-        }
-
+        // ログのみ出力（プラン上書きはしない）
+        // プランは変更せず、そのまま返す
         return incomingState;
     }
 
@@ -1013,6 +1143,7 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     /// <summary>
     /// [Issue #258] プロモーション設定を_currentStateに適用するヘルパー
     /// [Gemini Review] DRY原則に従い共通ロジックを抽出
+    /// [Issue #280+#281] プランは変更せず、有効期限とトークン使用量のみ適用
     /// </summary>
     private void ApplyPromotionToState(PlanType plan, DateTime expiresAt, string source)
     {
@@ -1028,15 +1159,14 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             tokenUsage = _settings.MockTokenUsage;
         }
 
+        // [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない
+        // CurrentPlanは変更せず、有効期限（参考情報）とトークン使用量のみ適用
         _currentState = _currentState with
         {
-            CurrentPlan = plan,
+            // CurrentPlan = plan,  // 削除: プランはボーナストークンに移行
             ExpirationDate = expiresAt,
             CloudAiTokensUsed = tokenUsage
         };
-        _logger.LogInformation(
-            "🎁 [Issue #258] 起動時にプロモーション設定を適用 ({Source}): Plan={Plan}, ExpiresAt={ExpiresAt}, TokenUsage={TokenUsage}",
-            source, plan, expiresAt, tokenUsage);
     }
 
     /// <summary>
@@ -1045,22 +1175,10 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     /// </summary>
     private void ApplyPersistedPromotionIfValid()
     {
-        // [Issue #258] デバッグ: IUnifiedSettingsServiceの状態を確認
-        _logger.LogDebug(
-            "[Issue #258] ApplyPersistedPromotionIfValid開始: IUnifiedSettingsService={HasService}",
-            _unifiedSettingsService is not null);
-
         // IUnifiedSettingsService経由でプロモーション設定を読み込む
         if (_unifiedSettingsService is not null)
         {
             var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
-
-            // [Issue #258] デバッグ: プロモーション設定の詳細
-            _logger.LogDebug(
-                "[Issue #258] プロモーション設定確認: IsActive={IsActive}, PlanType={PlanType}, ExpiresAt={ExpiresAt}",
-                promotionSettings.IsCurrentlyActive(),
-                promotionSettings.PromotionPlanType,
-                promotionSettings.PromotionExpiresAt ?? "(null)");
 
             if (promotionSettings.IsCurrentlyActive() &&
                 promotionSettings.PromotionPlanType.HasValue &&
@@ -1071,18 +1189,9 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
                 ApplyPromotionToState(promotionPlan, expiresAtUnified, "Unified");
                 return;
             }
-            else
-            {
-                _logger.LogDebug("[Issue #258] Unified設定は無効または期限切れ");
-            }
         }
 
         // レガシー: LicenseSettings経由のプロモーションチェック（後方互換性）
-        _logger.LogDebug(
-            "[Issue #258] レガシー設定確認: PlanType={PlanType}, ExpiresAt={ExpiresAt}",
-            _settings.PromotionPlanType,
-            _settings.PromotionExpiresAt ?? "(null)");
-
         if (_settings.PromotionPlanType.HasValue &&
             !string.IsNullOrEmpty(_settings.PromotionExpiresAt) &&
             DateTime.TryParse(_settings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expiresAt) &&
@@ -1091,45 +1200,15 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
             var promotionPlan = (PlanType)_settings.PromotionPlanType.Value;
             ApplyPromotionToState(promotionPlan, expiresAt, "Legacy");
         }
-        else
-        {
-            _logger.LogDebug("[Issue #258] プロモーション設定なし、または期限切れ - Freeプランのまま");
-        }
     }
 
     /// <summary>
-    /// 有効なプランを決定（プロモーション優先）
+    /// 有効なプランを決定
+    /// [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない
     /// </summary>
     private PlanType DetermineEffectivePlan()
     {
-        // [Issue #237 C案] IUnifiedSettingsService経由でプロモーション設定を読み込む
-        if (_unifiedSettingsService is not null)
-        {
-            var promotionSettings = _unifiedSettingsService.GetPromotionSettings();
-            if (promotionSettings.IsCurrentlyActive() && promotionSettings.PromotionPlanType.HasValue)
-            {
-                var promotionPlan = (PlanType)promotionSettings.PromotionPlanType.Value;
-                _logger.LogInformation(
-                    "🎁 [Issue #237] 有効なプロモーション検出（promotion-settings.json）: Plan={Plan}, ExpiresAt={ExpiresAt}",
-                    promotionPlan, promotionSettings.PromotionExpiresAt);
-                return promotionPlan;
-            }
-        }
-
-        // レガシー: LicenseSettings経由のプロモーションチェック（後方互換性）
-        if (_settings.PromotionPlanType.HasValue &&
-            !string.IsNullOrEmpty(_settings.PromotionExpiresAt) &&
-            DateTime.TryParse(_settings.PromotionExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var expiresAt) &&
-            expiresAt > DateTime.UtcNow)
-        {
-            var promotionPlan = (PlanType)_settings.PromotionPlanType.Value;
-            _logger.LogInformation(
-                "🎁 有効なプロモーション検出（appsettings）: Plan={Plan}, ExpiresAt={ExpiresAt}",
-                promotionPlan, expiresAt);
-            return promotionPlan;
-        }
-
-        // プロモーションなしの場合はMockPlanTypeを使用
+        // プロモーションはボーナストークン付与のみ、プランは変更しない
         return (PlanType)_settings.MockPlanType;
     }
 

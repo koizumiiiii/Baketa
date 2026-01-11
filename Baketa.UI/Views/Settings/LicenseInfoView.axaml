@@ -95,6 +95,21 @@
                                          CornerRadius="4"/>
                         </StackPanel>
 
+                        <!-- Issue #280+#281: Bonus Tokens Display -->
+                        <Border IsVisible="{Binding HasBonusTokens}"
+                                Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
+                                CornerRadius="6"
+                                Padding="12">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z"
+                                          Width="16" Height="16"
+                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock Text="{Binding BonusTokensDisplay}"
+                                           FontWeight="Medium"
+                                           Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Quota Warning -->
                         <Border IsVisible="{Binding IsQuotaExceeded}"
                                 Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}"
@@ -204,13 +219,26 @@
                                        FontWeight="Medium"
                                        Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="4">
+                        <!-- プロモーションコード表示 -->
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,0,0">
+                            <TextBlock Text="{local:Localize Settings_License_PromotionCodeLabel}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding PromotionCodeDisplay}"
+                                       FontSize="12"
+                                       FontWeight="Medium"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,0,0">
                             <TextBlock Text="{local:Localize Settings_License_PromotionExpires}"
                                        FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding PromotionExpiresDisplay}"
                                        FontSize="12"
-                                       FontWeight="Medium"/>
+                                       FontWeight="Medium"
+                                       VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
