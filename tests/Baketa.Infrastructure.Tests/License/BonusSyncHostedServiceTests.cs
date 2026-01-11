@@ -17,12 +17,14 @@ public sealed class BonusSyncHostedServiceTests
 {
     private readonly Mock<IAuthService> _authServiceMock;
     private readonly Mock<IBonusTokenService> _bonusTokenServiceMock;
+    private readonly Mock<ILicenseManager> _licenseManagerMock;
     private readonly Mock<ILogger<BonusSyncHostedService>> _loggerMock;
 
     public BonusSyncHostedServiceTests()
     {
         _authServiceMock = new Mock<IAuthService>();
         _bonusTokenServiceMock = new Mock<IBonusTokenService>();
+        _licenseManagerMock = new Mock<ILicenseManager>();
         _loggerMock = new Mock<ILogger<BonusSyncHostedService>>();
     }
 
@@ -31,7 +33,7 @@ public sealed class BonusSyncHostedServiceTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new BonusSyncHostedService(null!, _bonusTokenServiceMock.Object, _loggerMock.Object));
+            new BonusSyncHostedService(null!, _bonusTokenServiceMock.Object, _licenseManagerMock.Object, _loggerMock.Object));
     }
 
     [Fact]
@@ -41,10 +43,23 @@ public sealed class BonusSyncHostedServiceTests
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
             null,
+            _licenseManagerMock.Object,
             _loggerMock.Object);
 
         // Assert
         Assert.NotNull(service);
+    }
+
+    [Fact]
+    public void Constructor_WithNullLicenseManager_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new BonusSyncHostedService(
+                _authServiceMock.Object,
+                _bonusTokenServiceMock.Object,
+                null!,
+                _loggerMock.Object));
     }
 
     [Fact]
@@ -55,6 +70,7 @@ public sealed class BonusSyncHostedServiceTests
             new BonusSyncHostedService(
                 _authServiceMock.Object,
                 _bonusTokenServiceMock.Object,
+                _licenseManagerMock.Object,
                 null!));
     }
 
@@ -65,6 +81,7 @@ public sealed class BonusSyncHostedServiceTests
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
+            _licenseManagerMock.Object,
             _loggerMock.Object);
 
         // Assert - イベント購読確認
@@ -78,6 +95,7 @@ public sealed class BonusSyncHostedServiceTests
         var service = new BonusSyncHostedService(
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
+            _licenseManagerMock.Object,
             _loggerMock.Object);
 
         // Act
@@ -98,13 +116,17 @@ public sealed class BonusSyncHostedServiceTests
             User: new UserInfo("user-id", "test@example.com", "Test User"));
 
         // [Gemini Review] ManualResetEventSlimで非同期完了を待機
+        // [Issue #280+#281] NotifyBonusTokensLoaded呼び出しで待機完了
         var mre = new ManualResetEventSlim(false);
 
         _authServiceMock.Setup(a => a.GetCurrentSessionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
 
         _bonusTokenServiceMock.Setup(b => b.FetchFromServerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new BonusSyncResult { Success = true, TotalRemaining = 1000 })
+            .ReturnsAsync(new BonusSyncResult { Success = true, TotalRemaining = 1000 });
+
+        // NotifyBonusTokensLoaded呼び出しで待機完了（FetchFromServerAsyncの後に呼ばれる）
+        _licenseManagerMock.Setup(l => l.NotifyBonusTokensLoaded())
             .Callback(() => mre.Set());
 
         EventHandler<AuthStatusChangedEventArgs>? capturedHandler = null;
@@ -114,14 +136,17 @@ public sealed class BonusSyncHostedServiceTests
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
+            _licenseManagerMock.Object,
             _loggerMock.Object);
 
         // Act - ログインイベント発火
         capturedHandler?.Invoke(this, new AuthStatusChangedEventArgs(true, session.User));
 
         // Assert - [Gemini Review] Task.Delayを排除、ManualResetEventSlimで確実に待機
-        Assert.True(mre.Wait(TimeSpan.FromSeconds(5)), "FetchFromServerAsync was not called within the timeout.");
+        Assert.True(mre.Wait(TimeSpan.FromSeconds(5)), "NotifyBonusTokensLoaded was not called within the timeout.");
         _bonusTokenServiceMock.Verify(b => b.FetchFromServerAsync("test-token", It.IsAny<CancellationToken>()), Times.Once);
+        // [Issue #280+#281] NotifyBonusTokensLoadedが呼ばれたことを確認
+        _licenseManagerMock.Verify(l => l.NotifyBonusTokensLoaded(), Times.Once);
     }
 
     [Fact]
@@ -152,6 +177,7 @@ public sealed class BonusSyncHostedServiceTests
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
+            _licenseManagerMock.Object,
             _loggerMock.Object);
 
         // Act - ログアウトイベント発火
@@ -173,6 +199,7 @@ public sealed class BonusSyncHostedServiceTests
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
             null,  // IBonusTokenServiceがnull
+            _licenseManagerMock.Object,
             _loggerMock.Object);
 
         var session = new AuthSession(
@@ -206,6 +233,7 @@ public sealed class BonusSyncHostedServiceTests
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
+            _licenseManagerMock.Object,
             _loggerMock.Object);
 
         // Act - ログインイベント発火（セッションがnullを返す）
@@ -214,5 +242,7 @@ public sealed class BonusSyncHostedServiceTests
 
         // Assert - FetchFromServerAsyncは呼ばれない
         _bonusTokenServiceMock.Verify(b => b.FetchFromServerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        // NotifyBonusTokensLoadedも呼ばれない
+        _licenseManagerMock.Verify(l => l.NotifyBonusTokensLoaded(), Times.Never);
     }
 }

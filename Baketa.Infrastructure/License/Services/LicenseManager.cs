@@ -1098,6 +1098,27 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         OnStateChanged(oldState, newState, LicenseChangeReason.TokenUsageUpdated);
     }
 
+    /// <inheritdoc/>
+    public void NotifyBonusTokensLoaded()
+    {
+        // [Issue #280+#281] ボーナストークンがロードされた後に呼び出される
+        // 状態自体は変更しないが、StateChangedイベントを発火して
+        // CloudTranslationAvailabilityServiceなどのリスナーが
+        // IsFeatureAvailable(CloudAiTranslation)を再評価できるようにする
+        LicenseState currentState;
+        lock (_stateLock)
+        {
+            currentState = _currentState;
+        }
+
+        _logger.LogInformation(
+            "[Issue #280+#281] ボーナストークンロード完了 - StateChangedイベントを発火 (Plan={Plan})",
+            currentState.CurrentPlan);
+
+        // 同じ状態で発火（リスナーがIsFeatureAvailableを再チェックするトリガー）
+        OnStateChanged(currentState, currentState, LicenseChangeReason.PromotionApplied);
+    }
+
     /// <summary>
     /// [Issue #275] 有効なプロモーションがある場合、状態にプロモーション設定をマージ
     /// [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない

@@ -106,6 +106,17 @@ public interface ILicenseManager
     /// UI層がリポジトリから正確な使用量を取得した後に呼び出すことを想定。
     /// </remarks>
     void SyncTokenUsage(long tokensUsed);
+
+    /// <summary>
+    /// ボーナストークンがロードされたことを通知（Issue #280+#281）
+    /// BonusSyncHostedServiceがサーバーからボーナストークンを取得した後に呼び出す
+    /// </summary>
+    /// <remarks>
+    /// このメソッドは StateChanged イベントを発火して、
+    /// CloudTranslationAvailabilityService などのリスナーが
+    /// IsFeatureAvailable(CloudAiTranslation) を再評価できるようにします。
+    /// </remarks>
+    void NotifyBonusTokensLoaded();
 }
 
 /// <summary>

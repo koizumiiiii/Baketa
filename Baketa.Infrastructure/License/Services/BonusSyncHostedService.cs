@@ -13,6 +13,7 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 {
     private readonly IAuthService _authService;
     private readonly IBonusTokenService? _bonusTokenService;
+    private readonly ILicenseManager _licenseManager;
     private readonly ILogger<BonusSyncHostedService> _logger;
 
     /// <summary>
@@ -35,10 +36,12 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
     public BonusSyncHostedService(
         IAuthService authService,
         IBonusTokenService? bonusTokenService,
+        ILicenseManager licenseManager,
         ILogger<BonusSyncHostedService> logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _bonusTokenService = bonusTokenService;
+        _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // ログイン/ログアウトイベントを購読
@@ -145,6 +148,10 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
                 _logger.LogInformation(
                     "[Issue #280] ボーナストークン取得成功: 合計={TotalRemaining}, アイテム数={ItemCount}",
                     result.TotalRemaining, result.Bonuses.Count);
+
+                // [Issue #280+#281] ボーナストークン取得後にLicenseManagerへ通知
+                // CloudTranslationAvailabilityServiceがIsEntitledを再評価できるようにする
+                _licenseManager.NotifyBonusTokensLoaded();
             }
             else
             {
