@@ -203,10 +203,29 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
     /// <summary>
     /// トークン使用量の表示文字列
+    /// [Issue #280+#281] プラン枠がある場合は「使用量 / 上限」、
+    /// ボーナストークンのみの場合は「残り X」を表示
     /// </summary>
-    public string TokenUsageDisplay => HasCloudAccess
-        ? $"{TokensUsed:N0} / {TokenLimit:N0}"
-        : Strings.License_LocalOnly;
+    public string TokenUsageDisplay
+    {
+        get
+        {
+            if (TokenLimit > 0)
+            {
+                // プラン枠がある場合: "1,234,567 / 4,000,000"
+                return $"{TokensUsed:N0} / {TokenLimit:N0}";
+            }
+            else if (BonusTokensRemaining > 0)
+            {
+                // ボーナストークンのみの場合: "残り 50,000,000"
+                return $"残り {BonusTokensRemaining:N0}";
+            }
+            else
+            {
+                return Strings.License_LocalOnly;
+            }
+        }
+    }
 
     /// <summary>
     /// [Issue #280+#281] ボーナストークン残高
@@ -830,6 +849,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             BonusTokensRemaining = e.TotalRemaining;
             this.RaisePropertyChanged(nameof(BonusTokensDisplay));
             this.RaisePropertyChanged(nameof(HasBonusTokens));
+            this.RaisePropertyChanged(nameof(TokenUsageDisplay));
+            this.RaisePropertyChanged(nameof(HasCloudAccess));
+            this.RaisePropertyChanged(nameof(CloudAccessDisplay));
 
             // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
             UpdateTokenWarningState();

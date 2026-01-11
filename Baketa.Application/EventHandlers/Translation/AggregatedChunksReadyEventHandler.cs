@@ -882,11 +882,11 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 return false;
             }
 
-            // [Issue #78 Phase 5] ユーザー設定でCloud AI翻訳が有効か
+            // [Issue #280+#281] ユーザー設定でCloud AI翻訳が有効か（UseLocalEngineで判定）
             var translationSettings = _unifiedSettingsService.GetTranslationSettings();
-            if (!translationSettings.EnableCloudAiTranslation)
+            if (translationSettings.UseLocalEngine)
             {
-                _logger?.LogDebug("🔍 [Phase5] 並列翻訳スキップ: Cloud AI翻訳が設定で無効");
+                _logger?.LogDebug("🔍 [Issue #280] 並列翻訳スキップ: ローカル翻訳が選択されている");
                 return false;
             }
         }

@@ -25,8 +25,26 @@ public static class SettingsModule
         // 設定変更追跡サービス
         services.AddSingleton<ISettingsChangeTracker, SettingsChangeTracker>();
 
-        // 設定ウィンドウViewModel
-        services.AddTransient<SettingsWindowViewModel>();
+        // 設定ウィンドウViewModel（明示的ファクトリ登録でIUnifiedSettingsService注入を保証）
+        services.AddTransient<SettingsWindowViewModel>(provider =>
+        {
+            var serviceProvider = provider;
+            var changeTracker = provider.GetRequiredService<ISettingsChangeTracker>();
+            var eventAggregator = provider.GetRequiredService<Core.Abstractions.Events.IEventAggregator>();
+            var settingsService = provider.GetRequiredService<ISettingsService>();
+            var localizationService = provider.GetService<ILocalizationService>();
+            var unifiedSettingsService = provider.GetService<IUnifiedSettingsService>();
+            var logger = provider.GetService<ILogger<SettingsWindowViewModel>>();
+
+            return new SettingsWindowViewModel(
+                serviceProvider,
+                changeTracker,
+                eventAggregator,
+                settingsService,
+                localizationService,
+                unifiedSettingsService,
+                logger);
+        });
 
         // 一般設定ViewModel（ランタイム設定を読み込むファクトリ登録）
         services.AddTransient<GeneralSettingsViewModel>(provider =>
@@ -39,6 +57,7 @@ public static class SettingsModule
             var licenseManager = provider.GetService<ILicenseManager>();
             var unifiedSettingsService = provider.GetService<IUnifiedSettingsService>();
             var tokenTracker = provider.GetService<Core.Translation.Abstractions.ITokenConsumptionTracker>();
+            var bonusTokenService = provider.GetService<Core.Abstractions.License.IBonusTokenService>();
 
             // ランタイムで設定を読み込む
             var generalSettings = settingsService.GetCategorySettings<GeneralSettings>() ?? new GeneralSettings();
@@ -56,7 +75,9 @@ public static class SettingsModule
                     AutoDetectSourceLanguage = unifiedSettings.AutoDetectSourceLanguage,
                     TimeoutSeconds = unifiedSettings.TimeoutMs / 1000,
                     OverlayFontSize = unifiedSettings.OverlayFontSize,
-                    EnableCloudAiTranslation = unifiedSettings.EnableCloudAiTranslation
+                    EnableCloudAiTranslation = unifiedSettings.EnableCloudAiTranslation,
+                    // [Issue #280+#281] UseLocalEngineも反映
+                    UseLocalEngine = unifiedSettings.UseLocalEngine
                 };
             }
             else
@@ -72,6 +93,7 @@ public static class SettingsModule
                 logger,
                 translationSettings,
                 licenseManager,
+                bonusTokenService,
                 unifiedSettingsService,
                 tokenTracker);
         });

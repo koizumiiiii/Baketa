@@ -139,6 +139,14 @@ public sealed class TranslationSettings : ITranslationSettings
     public bool EnableCloudAiTranslation { get; set; } = true;
 
     /// <summary>
+    /// [Issue #280+#281] ローカル翻訳エンジンを使用するかどうか
+    /// EnableCloudAiTranslation と連動して設定される
+    /// </summary>
+    [SettingMetadata(SettingLevel.Basic, "Translation", "ローカル翻訳",
+        Description = "ローカル翻訳エンジンを使用します")]
+    public bool UseLocalEngine { get; set; } = true;
+
+    /// <summary>
     /// 最大並列翻訳数
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Translation", "最大並列数",
@@ -451,6 +459,8 @@ public sealed class TranslationSettings : ITranslationSettings
             MaxParallelTranslations = MaxParallelTranslations,
             // [Issue #78 Phase 5] Cloud AI翻訳設定
             EnableCloudAiTranslation = EnableCloudAiTranslation,
+            // [Issue #280+#281] ローカル翻訳エンジン設定
+            UseLocalEngine = UseLocalEngine,
             CacheRetentionHours = CacheRetentionHours,
             MaxCacheEntries = MaxCacheEntries,
             EncryptApiKeys = EncryptApiKeys,
@@ -496,11 +506,8 @@ public sealed class TranslationSettings : ITranslationSettings
     /// </summary>
     string ITranslationSettings.DefaultEngine => DefaultEngine.ToString();
 
-    /// <summary>
-    /// ITranslationSettings.UseLocalEngine - ローカルエンジン使用フラグ
-    /// NLLB200またはLlamaLocalの場合はローカルエンジンとみなす
-    /// </summary>
-    bool ITranslationSettings.UseLocalEngine => DefaultEngine is TranslationEngine.NLLB200 or TranslationEngine.LlamaLocal;
+    // [Issue #280+#281] UseLocalEngine は明示的パブリックプロパティとして定義済み
+    // 明示的インターフェース実装は不要
 
     /// <summary>
     /// ITranslationSettings.ConfidenceThreshold - 翻訳信頼度閾値（デフォルト: 0.0）

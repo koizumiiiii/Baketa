@@ -144,12 +144,19 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
 
         var json = JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true });
 
+        // [Issue #280+#281] ディレクトリが存在することを確認（ファイル書き込み前）
+        BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+
+        _logger?.LogDebug("[Issue #280+#281] 翻訳設定を保存: UseLocalEngine={UseLocal}, EnableCloudAi={EnableCloud}, Path={Path}",
+            settings.UseLocalEngine, settings.EnableCloudAiTranslation, BaketaSettingsPaths.TranslationSettingsPath);
+
         // [Issue #237] FileSystemWatcher競合状態回避: 自己書き込み中は監視を一時停止
         var wasWatching = _isWatching;
         if (wasWatching) StopWatching();
         try
         {
             await File.WriteAllTextAsync(BaketaSettingsPaths.TranslationSettingsPath, json, cancellationToken).ConfigureAwait(false);
+            _logger?.LogInformation("[Issue #280+#281] 翻訳設定ファイルを保存しました: {Path}", BaketaSettingsPaths.TranslationSettingsPath);
         }
         finally
         {

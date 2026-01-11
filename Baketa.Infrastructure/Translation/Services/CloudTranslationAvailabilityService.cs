@@ -15,6 +15,7 @@ namespace Baketa.Infrastructure.Translation.Services;
 public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvailabilityService, IDisposable
 {
     private readonly ILicenseManager _licenseManager;
+    private readonly IBonusTokenService? _bonusTokenService;
     private readonly IUnifiedSettingsService _unifiedSettingsService;
     private readonly ILogger<CloudTranslationAvailabilityService> _logger;
     private readonly object _stateLock = new();
@@ -27,16 +28,20 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
     public CloudTranslationAvailabilityService(
         ILicenseManager licenseManager,
         IUnifiedSettingsService unifiedSettingsService,
-        ILogger<CloudTranslationAvailabilityService> logger)
+        ILogger<CloudTranslationAvailabilityService> logger,
+        IBonusTokenService? bonusTokenService = null)
     {
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _bonusTokenService = bonusTokenService;
 
         // 初期状態を設定
-        _isEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation);
+        // [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
+        _isEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation) ||
+                      (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
         var currentSettings = _unifiedSettingsService.GetTranslationSettings();
-        _isPreferred = currentSettings.EnableCloudAiTranslation;
+        _isPreferred = !currentSettings.UseLocalEngine;
         _wasEnabled = IsEffectivelyEnabled;
 
         // ライセンス状態変更の監視
@@ -70,9 +75,11 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
         // ライセンス状態を強制更新
         await _licenseManager.RefreshStateAsync(cancellationToken).ConfigureAwait(false);
 
-        var newEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation);
+        // [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
+        var newEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation) ||
+                          (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
         var currentSettings = _unifiedSettingsService.GetTranslationSettings();
-        var newPreferred = currentSettings.EnableCloudAiTranslation;
+        var newPreferred = !currentSettings.UseLocalEngine;
 
         UpdateState(newEntitled, newPreferred, CloudTranslationChangeReason.Initialization);
     }
@@ -105,6 +112,8 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
         }
         var settings = concreteSettings.Clone();
 
+        // [Issue #280+#281] UseLocalEngine と EnableCloudAiTranslation を両方更新
+        settings.UseLocalEngine = !preferred;
         settings.EnableCloudAiTranslation = preferred;
         settings.DefaultEngine = (preferred && currentIsEntitled) ? TranslationEngine.Gemini : TranslationEngine.NLLB200;
 
@@ -132,7 +141,9 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
             currentPreferred = _isPreferred;
         }
 
-        var newEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation);
+        // [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
+        var newEntitled = _licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation) ||
+                          (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
         var reason = MapLicenseChangeReason(e.Reason);
 
         _logger.LogInformation(
@@ -181,7 +192,8 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
         }
 
         var currentSettings = _unifiedSettingsService.GetTranslationSettings();
-        var newPreferred = currentSettings.EnableCloudAiTranslation;
+        // [Issue #280+#281] UseLocalEngineで判定
+        var newPreferred = !currentSettings.UseLocalEngine;
 
         if (currentIsPreferred != newPreferred)
         {
