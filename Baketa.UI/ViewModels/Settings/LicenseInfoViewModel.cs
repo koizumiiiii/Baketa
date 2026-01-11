@@ -54,6 +54,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     // Issue #280+#281: ボーナストークン関連
     private long _bonusTokensRemaining;
 
+    // Issue #280+#281 Phase 5: UX改善
+    private const double LowTokenWarningThreshold = 20.0; // 残り20%で警告
+    private bool _isLowTokenWarning;
+    private bool _shouldShowUpgradePrompt;
+
     /// <summary>
     /// LicenseInfoViewModelを初期化します
     /// </summary>
@@ -223,6 +228,59 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// [Issue #280+#281] ボーナストークンがあるかどうか
     /// </summary>
     public bool HasBonusTokens => BonusTokensRemaining > 0;
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] トークン残量警告を表示すべきか
+    /// 利用可能なトークン全体（プラン枠 + ボーナス）の残り20%以下で警告
+    /// </summary>
+    public bool IsLowTokenWarning
+    {
+        get => _isLowTokenWarning;
+        private set => this.RaiseAndSetIfChanged(ref _isLowTokenWarning, value);
+    }
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] アップグレード導線を表示すべきか
+    /// ボーナストークン枯渇 かつ Freeプランの場合に表示
+    /// </summary>
+    public bool ShouldShowUpgradePrompt
+    {
+        get => _shouldShowUpgradePrompt;
+        private set => this.RaiseAndSetIfChanged(ref _shouldShowUpgradePrompt, value);
+    }
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] 利用可能なトークン合計（プラン枠残 + ボーナス）
+    /// </summary>
+    public long TotalAvailableTokens => Math.Max(0, TokenLimit - TokensUsed) + BonusTokensRemaining;
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] トークン残量の表示文字列
+    /// プラン枠とボーナスの内訳を表示
+    /// </summary>
+    public string TokenBreakdownDisplay
+    {
+        get
+        {
+            if (!HasCloudAccess && !HasBonusTokens)
+                return Strings.License_LocalOnly;
+
+            var planRemaining = Math.Max(0, TokenLimit - TokensUsed);
+            var parts = new System.Collections.Generic.List<string>();
+
+            if (TokenLimit > 0)
+            {
+                parts.Add($"プラン: {planRemaining:N0} / {TokenLimit:N0}");
+            }
+
+            if (BonusTokensRemaining > 0)
+            {
+                parts.Add($"ボーナス: {BonusTokensRemaining:N0}");
+            }
+
+            return parts.Count > 0 ? string.Join(" + ", parts) : Strings.License_LocalOnly;
+        }
+    }
 
     /// <summary>
     /// クラウドアクセス状態の表示文字列
@@ -445,6 +503,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(ExpirationDateDisplay));
         this.RaisePropertyChanged(nameof(TokenUsageDisplay));
         this.RaisePropertyChanged(nameof(CloudAccessDisplay));
+
+        // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
+        UpdateTokenWarningState();
     }
 
     /// <summary>
@@ -554,6 +615,47 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             PlanType.Ultimate => Strings.License_Desc_Ultimate,
             _ => string.Empty
         };
+    }
+
+    /// <summary>
+    /// [Issue #280+#281 Phase 5] トークン残量警告とアップグレード導線の状態を更新
+    /// </summary>
+    private void UpdateTokenWarningState()
+    {
+        // 利用可能なトークン総量を計算
+        var planRemaining = Math.Max(0, TokenLimit - TokensUsed);
+        var totalAvailable = planRemaining + BonusTokensRemaining;
+
+        // [Gemini Review] 警告判定ロジック修正
+        // プラン枠の使用率に基づいて警告を判定（ボーナスは別枠として扱う）
+        // - プラン枠がある場合: プラン枠の残量が20%以下で警告
+        // - ボーナスのみの場合: ボーナスが存在し、かつ閾値（100万トークン）未満で警告
+        const long BonusLowThreshold = 1_000_000; // ボーナス用の絶対値閾値
+
+        if (TokenLimit > 0)
+        {
+            // プラン枠がある場合: プラン使用率で判定
+            var planUsagePercentage = (double)planRemaining / TokenLimit * 100.0;
+            IsLowTokenWarning = HasCloudAccess && planUsagePercentage <= LowTokenWarningThreshold;
+        }
+        else if (BonusTokensRemaining > 0)
+        {
+            // ボーナスのみの場合: 絶対値で判定
+            IsLowTokenWarning = BonusTokensRemaining < BonusLowThreshold;
+        }
+        else
+        {
+            IsLowTokenWarning = false;
+        }
+
+        // アップグレード導線判定: Freeプラン かつ ボーナス枯渇 かつ プラン枠も枯渇
+        ShouldShowUpgradePrompt = CurrentPlan == PlanType.Free
+            && BonusTokensRemaining == 0
+            && (TokenLimit == 0 || TokensUsed >= TokenLimit);
+
+        // 派生プロパティの更新通知
+        this.RaisePropertyChanged(nameof(TotalAvailableTokens));
+        this.RaisePropertyChanged(nameof(TokenBreakdownDisplay));
     }
 
     #region Issue #237 Phase 2: プロモーションコード関連メソッド
@@ -727,6 +829,10 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             BonusTokensRemaining = e.TotalRemaining;
             this.RaisePropertyChanged(nameof(BonusTokensDisplay));
             this.RaisePropertyChanged(nameof(HasBonusTokens));
+
+            // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
+            UpdateTokenWarningState();
+
             _logger?.LogDebug("ボーナストークン状態が変更されました: {Reason}, 残高: {Remaining}",
                 e.Reason, e.TotalRemaining);
         });
