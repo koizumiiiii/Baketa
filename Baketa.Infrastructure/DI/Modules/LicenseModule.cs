@@ -58,6 +58,12 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddSingleton<PatreonSyncHostedService>();
         services.AddSingleton<IHostedService>(provider =>
             provider.GetRequiredService<PatreonSyncHostedService>());
+
+        // Issue #280+#281: ボーナストークン自動同期サービス
+        // ログイン時にサーバーから取得、定期的に消費量をサーバーへ同期
+        services.AddSingleton<BonusSyncHostedService>();
+        services.AddSingleton<IHostedService>(provider =>
+            provider.GetRequiredService<BonusSyncHostedService>());
     }
 
     /// <summary>
