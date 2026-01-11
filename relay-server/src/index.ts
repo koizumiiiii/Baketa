@@ -1020,11 +1020,25 @@ async function handlePromotionRedeem(
       });
 
       if (bonusError) {
-        // [Gemini Review] ボーナス付与失敗はエラーとして扱う（トランザクション整合性）
+        // [Gemini Review] ボーナス付与失敗 → redemptionをfailed状態に更新（監査ログ保持）
         console.error('Failed to grant bonus tokens:', bonusError);
-        // TODO: 将来的にはredemptionをpending状態にする補償処理を検討
+
+        // 補償処理: redemptionのstatusをfailed_bonusに更新
+        // これにより監査ログは保持しつつ、管理者が手動で対応可能
+        const { error: updateError } = await supabase
+          .from('promotion_code_redemptions')
+          .update({
+            status: 'failed_bonus',
+            error_message: `Bonus grant failed: ${bonusError.message || 'Unknown error'}`
+          })
+          .eq('id', result.redemption_id);
+
+        if (updateError) {
+          console.error('Failed to update redemption status:', updateError);
+        }
+
         return errorResponse(
-          'ボーナストークンの付与に失敗しました。再度お試しください。',
+          'ボーナストークンの付与に失敗しました。サポートにお問い合わせください。',
           500,
           origin,
           allowedOrigins,
