@@ -1261,20 +1261,69 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         }
 
         _logger.LogInformation(
-            "🎁 プロモーション適用イベント受信: Plan={Plan}, ExpiresAt={ExpiresAt}",
+            "🎁 プロモーション適用イベント受信: BonusEquivalent={Plan}, ExpiresAt={ExpiresAt}",
             evt.AppliedPlan, evt.ExpiresAt);
 
+        // [Issue #283] プロモーションコードはボーナストークン付与のみ
+        // CurrentPlanはPatreonプランのまま維持（変更しない）
+        // ボーナストークンはサーバー側で付与済み（grant_bonus_tokens RPC）
+        // クライアント側でボーナストークンを再取得する
+
+        _logger.LogInformation(
+            "🎁 プロモーション適用: CurrentPlan維持={CurrentPlan}, ボーナストークン付与",
+            _currentState.CurrentPlan);
+
+        // ボーナストークンをサーバーから再取得（Fire-and-forget）
+        _ = RefreshBonusTokensAsync();
+
+        // 状態変更イベントを発火（UIに通知）
         lock (_stateLock)
         {
-            var oldState = _currentState;
-            var newState = _currentState with
-            {
-                CurrentPlan = evt.AppliedPlan,
-                ExpirationDate = evt.ExpiresAt
-            };
+            var currentState = _currentState;
+            OnStateChanged(currentState, currentState, LicenseChangeReason.PromotionApplied);
+        }
+    }
 
-            _currentState = newState;
-            OnStateChanged(oldState, newState, LicenseChangeReason.PromotionApplied);
+    /// <summary>
+    /// ボーナストークンをサーバーから再取得
+    /// [Issue #283] プロモーションコード適用後のトークン反映用
+    /// </summary>
+    private async Task RefreshBonusTokensAsync()
+    {
+        if (_bonusTokenService == null)
+        {
+            _logger.LogDebug("BonusTokenService is not available, skipping refresh");
+            return;
+        }
+
+        try
+        {
+            var session = await _authService.GetCurrentSessionAsync(default).ConfigureAwait(false);
+            if (session?.IsValid != true || string.IsNullOrEmpty(session.AccessToken))
+            {
+                _logger.LogDebug("No valid session for bonus token refresh");
+                return;
+            }
+
+            _logger.LogInformation("🎁 ボーナストークン再取得開始...");
+            var result = await _bonusTokenService.FetchFromServerAsync(session.AccessToken, default)
+                .ConfigureAwait(false);
+
+            if (result.Success)
+            {
+                _logger.LogInformation("🎁 ボーナストークン再取得成功: Total={Total}", result.TotalRemaining);
+
+                // UIに通知
+                NotifyBonusTokensLoaded();
+            }
+            else
+            {
+                _logger.LogWarning("🎁 ボーナストークン再取得失敗: Error={Error}", result.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "🎁 ボーナストークン再取得中にエラー");
         }
     }
 

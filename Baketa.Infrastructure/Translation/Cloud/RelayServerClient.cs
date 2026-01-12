@@ -249,6 +249,42 @@ public sealed class RelayServerClient : IAsyncDisposable
         // 成功レスポンス
         if (responseBody.Success)
         {
+            // [Issue #275] 複数テキスト対応
+            if (responseBody.Texts is { Count: > 0 })
+            {
+                var texts = responseBody.Texts
+                    .Select(t => new TranslatedTextItem
+                    {
+                        Original = t.Original ?? string.Empty,
+                        Translation = t.Translation ?? string.Empty,
+                        // BoundingBox座標変換: [y_min, x_min, y_max, x_max] (0-1000スケール) → Int32Rect (同スケール)
+                        // Note: この時点では画像サイズが不明なため、0-1000スケールのままInt32Rectに格納する。
+                        //       後続の処理（CrossValidator等）で実際のピクセル座標へスケール変換される。
+                        BoundingBox = t.BoundingBox is { Length: 4 }
+                            ? new Baketa.Core.Models.Int32Rect(
+                                t.BoundingBox[1], // x = x_min
+                                t.BoundingBox[0], // y = y_min
+                                t.BoundingBox[3] - t.BoundingBox[1], // width = x_max - x_min
+                                t.BoundingBox[2] - t.BoundingBox[0]) // height = y_max - y_min
+                            : null
+                    })
+                    .ToList();
+
+                return ImageTranslationResponse.SuccessWithMultipleTexts(
+                    responseBody.RequestId ?? request.RequestId,
+                    texts,
+                    responseBody.ProviderId ?? _settings.PrimaryProviderId,
+                    new TokenUsageDetail
+                    {
+                        InputTokens = responseBody.TokenUsage?.InputTokens ?? 0,
+                        OutputTokens = responseBody.TokenUsage?.OutputTokens ?? 0,
+                        ImageTokens = responseBody.TokenUsage?.ImageTokens ?? 0
+                    },
+                    TimeSpan.FromMilliseconds(responseBody.ProcessingTimeMs ?? processingTime.TotalMilliseconds),
+                    responseBody.DetectedLanguage);
+            }
+
+            // 旧形式（単一テキスト）の場合
             return ImageTranslationResponse.Success(
                 responseBody.RequestId ?? request.RequestId,
                 responseBody.DetectedText ?? string.Empty,
@@ -340,6 +376,30 @@ public sealed class RelayServerClient : IAsyncDisposable
 
         [JsonPropertyName("error")]
         public RelayError? Error { get; set; }
+
+        /// <summary>
+        /// [Issue #275] 複数テキスト対応 - BoundingBox付きテキスト配列
+        /// </summary>
+        [JsonPropertyName("texts")]
+        public List<RelayTextItem>? Texts { get; set; }
+    }
+
+    /// <summary>
+    /// [Issue #275] 翻訳されたテキストアイテム
+    /// </summary>
+    private sealed class RelayTextItem
+    {
+        [JsonPropertyName("original")]
+        public string? Original { get; set; }
+
+        [JsonPropertyName("translation")]
+        public string? Translation { get; set; }
+
+        /// <summary>
+        /// BoundingBox座標 [y_min, x_min, y_max, x_max] (0-1000スケール)
+        /// </summary>
+        [JsonPropertyName("bounding_box")]
+        public int[]? BoundingBox { get; set; }
     }
 
     private sealed class RelayTokenUsage

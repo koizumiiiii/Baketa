@@ -171,6 +171,16 @@ interface TranslateResponse {
     message: string;
     is_retryable: boolean;
   };
+  /** [Issue #275] 複数テキスト対応 - BoundingBox付きテキスト配列 */
+  texts?: TranslatedTextItem[];
+}
+
+/** [Issue #275] 翻訳されたテキストアイテム */
+interface TranslatedTextItem {
+  original: string;
+  translation: string;
+  /** BoundingBox座標 [y_min, x_min, y_max, x_max] (0-1000スケール) */
+  bounding_box?: [number, number, number, number];
 }
 
 // ============================================
@@ -483,11 +493,25 @@ function estimateImageTokens(base64Length: number): number {
   return Math.max(258, Math.min(1032, Math.floor(estimatedBytes / 2000)));
 }
 
+/** [Issue #275] AIレスポンスのパース結果型 */
+interface ParsedAiResponse {
+  detected_text?: string;
+  translated_text?: string;
+  detected_language?: string;
+  /** [Issue #275] 複数テキスト対応 */
+  texts?: Array<{
+    original: string;
+    translation: string;
+    bounding_box?: [number, number, number, number];
+  }>;
+}
+
 /**
  * AIレスポンスからJSONをパース
  * マークダウンコードブロック（```json...```）を除去してパース
+ * [Issue #275] 複数テキスト形式にも対応
  */
-function parseAiJsonResponse(textContent: string): { detected_text?: string; translated_text?: string; detected_language?: string } | null {
+function parseAiJsonResponse(textContent: string): ParsedAiResponse | null {
   let jsonText = textContent.trim();
 
   // マークダウンコードブロックを除去
@@ -502,7 +526,21 @@ function parseAiJsonResponse(textContent: string): { detected_text?: string; tra
   jsonText = jsonText.trim();
 
   try {
-    return JSON.parse(jsonText);
+    const parsed = JSON.parse(jsonText);
+
+    // [Issue #275] 新形式（texts配列）の場合、後方互換性のためdetected_text/translated_textも設定
+    if (parsed.texts && Array.isArray(parsed.texts) && parsed.texts.length > 0) {
+      const firstText = parsed.texts[0];
+      return {
+        detected_text: firstText.original || '',
+        translated_text: firstText.translation || '',
+        detected_language: parsed.detected_language,
+        texts: parsed.texts,
+      };
+    }
+
+    // 旧形式の場合はそのまま返す
+    return parsed;
   } catch {
     return null;
   }
@@ -521,6 +559,8 @@ async function translateWithGemini(
   detectedText?: string;
   translatedText?: string;
   detectedLanguage?: string;
+  /** [Issue #275] 複数テキスト対応 */
+  texts?: Array<{ original: string; translation: string; bounding_box?: [number, number, number, number] }>;
   tokenUsage?: { input: number; output: number; image: number };
   error?: { code: string; message: string; isRetryable: boolean };
 }> {
@@ -529,22 +569,40 @@ async function translateWithGemini(
     ? `The source language is ${request.source_language}.`
     : 'Detect the source language.';
 
-  const prompt = `You are a translation assistant for game UI text.${contextHint}
+  // [Issue #275] 複数テキスト+BoundingBox形式のプロンプト（DirectGeminiImageTranslatorと同等）
+  const prompt = `You are a game localization expert. Detect ALL visible text in this image and translate it to ${request.target_language}.${contextHint}
 
-Task: Extract all visible text from this image and translate it to ${request.target_language}.
-${sourceHint}
+## Translation Guidelines
+- Use natural, fluent expressions in ${request.target_language}, not literal translations
+- Maintain appropriate tone for game UI and dialog
+- Keep proper nouns (character names, place names) as-is or use standard transliteration
+- Choose appropriate formality level based on context
+- ${sourceHint}
+
+## Output Format
+Include ALL detected text items with their bounding box coordinates.
+Bounding boxes use normalized 0-1000 scale coordinates in [y_min, x_min, y_max, x_max] order.
 
 Response format (JSON only, no markdown):
 {
-  "detected_text": "original text from image",
-  "translated_text": "translation in ${request.target_language}",
-  "detected_language": "ISO 639-1 code of source language"
+  "texts": [
+    {
+      "original": "original text 1",
+      "translation": "translated text 1",
+      "bounding_box": [y_min, x_min, y_max, x_max]
+    },
+    {
+      "original": "original text 2",
+      "translation": "translated text 2",
+      "bounding_box": [y_min, x_min, y_max, x_max]
+    }
+  ],
+  "detected_language": "ISO 639-1 code (e.g., ja, en, ko)"
 }
 
 If no text is visible, respond with:
 {
-  "detected_text": "",
-  "translated_text": "",
+  "texts": [],
   "detected_language": ""
 }`;
 
@@ -562,7 +620,7 @@ If no text is visible, respond with:
     }],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 2048, // [Issue #275] 複数テキスト対応のため増加
     },
   };
 
@@ -634,6 +692,8 @@ If no text is visible, respond with:
       detectedText: parsed.detected_text || '',
       translatedText: parsed.translated_text || '',
       detectedLanguage: parsed.detected_language,
+      // [Issue #275] 複数テキスト対応
+      texts: parsed.texts,
       tokenUsage: {
         input: usage?.promptTokenCount || 0,
         output: usage?.candidatesTokenCount || 0,
@@ -671,6 +731,8 @@ async function translateWithOpenAI(
   detectedText?: string;
   translatedText?: string;
   detectedLanguage?: string;
+  /** [Issue #275] 複数テキスト対応 */
+  texts?: Array<{ original: string; translation: string; bounding_box?: [number, number, number, number] }>;
   tokenUsage?: { input: number; output: number; image: number };
   error?: { code: string; message: string; isRetryable: boolean };
 }> {
@@ -679,24 +741,39 @@ async function translateWithOpenAI(
     ? `The source language is ${request.source_language}.`
     : 'Detect the source language.';
 
-  const systemPrompt = `You are a translation assistant for game UI text. Always respond with valid JSON only, no markdown formatting.`;
+  // [Issue #275] 複数テキスト+BoundingBox形式のプロンプト
+  const systemPrompt = `You are a game localization expert. Always respond with valid JSON only, no markdown formatting.`;
 
   const userPrompt = `${contextHint}
 
-Task: Extract all visible text from this image and translate it to ${request.target_language}.
+Task: Detect ALL visible text in this image and translate it to ${request.target_language}.
 ${sourceHint}
+
+## Translation Guidelines
+- Use natural, fluent expressions in ${request.target_language}, not literal translations
+- Maintain appropriate tone for game UI and dialog
+- Keep proper nouns (character names, place names) as-is or use standard transliteration
+- Choose appropriate formality level based on context
+
+## Output Format
+Include ALL detected text items with their bounding box coordinates.
+Bounding boxes use normalized 0-1000 scale coordinates in [y_min, x_min, y_max, x_max] order.
 
 Response format (JSON only, no markdown):
 {
-  "detected_text": "original text from image",
-  "translated_text": "translation in ${request.target_language}",
-  "detected_language": "ISO 639-1 code of source language"
+  "texts": [
+    {
+      "original": "original text 1",
+      "translation": "translated text 1",
+      "bounding_box": [y_min, x_min, y_max, x_max]
+    }
+  ],
+  "detected_language": "ISO 639-1 code (e.g., ja, en, ko)"
 }
 
 If no text is visible, respond with:
 {
-  "detected_text": "",
-  "translated_text": "",
+  "texts": [],
   "detected_language": ""
 }`;
 
@@ -718,7 +795,7 @@ If no text is visible, respond with:
         ],
       },
     ],
-    max_tokens: 1024,
+    max_tokens: 2048, // [Issue #275] 複数テキスト対応のため増加
     temperature: 0.1,
   };
 
@@ -800,6 +877,8 @@ If no text is visible, respond with:
       detectedText: parsed.detected_text || '',
       translatedText: parsed.translated_text || '',
       detectedLanguage: parsed.detected_language,
+      // [Issue #275] 複数テキスト対応
+      texts: parsed.texts,
       tokenUsage: {
         input: usage?.prompt_tokens || 0,
         output: usage?.completion_tokens || 0,
@@ -924,9 +1003,11 @@ export async function handleTranslate(
         image_tokens: result.tokenUsage.image,
       } : undefined,
       processing_time_ms: processingTimeMs,
+      // [Issue #275] 複数テキスト対応
+      texts: result.texts,
     };
 
-    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=gemini, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
+    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=gemini, texts=${result.texts?.length || 0}, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
 
     return successResponse(response, origin, allowedOrigins);
   }
@@ -966,9 +1047,11 @@ export async function handleTranslate(
         image_tokens: result.tokenUsage.image,
       } : undefined,
       processing_time_ms: processingTimeMs,
+      // [Issue #275] 複数テキスト対応
+      texts: result.texts,
     };
 
-    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=openai, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
+    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=openai, texts=${result.texts?.length || 0}, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
 
     return successResponse(response, origin, allowedOrigins);
   }
