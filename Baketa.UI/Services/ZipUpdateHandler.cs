@@ -134,10 +134,15 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             // Baketa-X.X.X/ というサブディレクトリがある場合はその中を使用
             var sourceDir = extractDir;
             var subDirs = Directory.GetDirectories(extractDir);
-            if (subDirs.Length == 1 && subDirs[0].Contains("Baketa", StringComparison.OrdinalIgnoreCase))
+            if (subDirs.Length == 1)
             {
-                sourceDir = subDirs[0];
-                _logger?.LogInformation("[Updater] サブディレクトリを使用: {Path}", sourceDir);
+                // [Fix] フルパスではなくディレクトリ名のみで判定
+                var subDirName = Path.GetFileName(subDirs[0]);
+                if (subDirName.Contains("Baketa", StringComparison.OrdinalIgnoreCase))
+                {
+                    sourceDir = subDirs[0];
+                    _logger?.LogInformation("[Updater] サブディレクトリを使用: {Path}", sourceDir);
+                }
             }
 
             // 新しい実行ファイルのパスを確認
