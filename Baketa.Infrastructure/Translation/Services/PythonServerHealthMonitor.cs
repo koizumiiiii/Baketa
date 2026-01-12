@@ -276,8 +276,13 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             var connectTask = client.ConnectAsync("127.0.0.1", _currentServerPort);
 
             // 接続タイムアウト（設定の1/3、最低5秒）
-            if (await Task.WhenAny(connectTask, Task.Delay(connectionTimeout)) == connectTask)
+            var completedTask = await Task.WhenAny(connectTask, Task.Delay(connectionTimeout));
+
+            if (completedTask == connectTask)
             {
+                // [Issue #280+#281] connectTaskが完了した場合、例外があれば観測する
+                await connectTask.ConfigureAwait(false);
+
                 if (client.Connected)
                 {
                     // 簡単なping翻訳リクエスト
@@ -293,7 +298,8 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                     var buffer = new byte[1024];
                     var readTask = stream.ReadAsync(buffer, 0, buffer.Length);
 
-                    if (await Task.WhenAny(readTask, Task.Delay(responseTimeout)) == readTask)
+                    var readCompletedTask = await Task.WhenAny(readTask, Task.Delay(responseTimeout));
+                    if (readCompletedTask == readTask)
                     {
                         var bytesRead = await readTask;
                         if (bytesRead > 0)
@@ -304,6 +310,14 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                         }
                     }
                 }
+            }
+            else
+            {
+                // [Issue #280+#281] タイムアウト時はconnectTaskの例外を観測して無視
+                // これによりUnobservedTaskExceptionを防止
+                _ = connectTask.ContinueWith(
+                    t => _logger.LogDebug("ヘルスチェック接続タイムアウト（例外観測）: {Error}", t.Exception?.Message),
+                    TaskContinuationOptions.OnlyOnFaulted);
             }
         }
         catch (Exception ex)

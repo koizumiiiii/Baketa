@@ -112,14 +112,45 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
             // 少し待機してセッション安定化を待つ
             await Task.Delay(LoginFetchDelay).ConfigureAwait(false);
 
+            // [Issue #280+#281] ログイン時にセッショントークンを設定
+            await UpdateSessionTokenAsync().ConfigureAwait(false);
+
             await TryFetchBonusTokensAsync(CancellationToken.None).ConfigureAwait(false);
         }
         else if (!e.IsLoggedIn && e.User == null)
         {
             _logger.LogInformation("[Issue #280] ログアウト検知 - 同期して終了");
 
+            // [Issue #280+#281] ログアウト時にセッショントークンをクリア
+            _licenseManager.SetSessionToken(null);
+
             // ログアウト前に未同期の消費量を同期
             await FinalSyncAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// セッショントークンをLicenseManagerに設定（共通化: Issue #280+#281）
+    /// </summary>
+    private async Task UpdateSessionTokenAsync()
+    {
+        try
+        {
+            var session = await _authService.GetCurrentSessionAsync(CancellationToken.None).ConfigureAwait(false);
+            if (session?.IsValid == true)
+            {
+                _licenseManager.SetSessionToken(session.AccessToken);
+                _logger.LogInformation("[Issue #280+#281] セッショントークンをLicenseManagerに設定しました");
+            }
+            else
+            {
+                // ログインしているはずがセッション無効の場合はクリア
+                _licenseManager.SetSessionToken(null);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #280+#281] セッショントークン設定中にエラー");
         }
     }
 
@@ -132,6 +163,10 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 
         try
         {
+            // [Issue #280+#281] 起動時にも（既にログイン済みなら）セッショントークンを設定
+            // OnAuthStatusChangedは起動時には呼ばれないため、ここでも設定する
+            await UpdateSessionTokenAsync().ConfigureAwait(false);
+
             var session = await _authService.GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
             if (session == null || !session.IsValid)
             {

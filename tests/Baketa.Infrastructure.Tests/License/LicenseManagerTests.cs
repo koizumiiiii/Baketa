@@ -470,6 +470,61 @@ public class LicenseManagerTests : IDisposable
 
     #endregion
 
+    #region SetSessionToken Tests (Issue #280+#281)
+
+    [Fact]
+    public void SetSessionToken_ValidToken_UpdatesCurrentState()
+    {
+        // Arrange
+        var token = "test-session-token-abc123";
+
+        // Act
+        _licenseManager.SetSessionToken(token);
+
+        // Assert
+        Assert.Equal(token, _licenseManager.CurrentState.SessionId);
+    }
+
+    [Fact]
+    public void SetSessionToken_NullToken_ClearsSessionId()
+    {
+        // Arrange - first set a token
+        _licenseManager.SetSessionToken("initial-token");
+        Assert.Equal("initial-token", _licenseManager.CurrentState.SessionId);
+
+        // Act - clear with null
+        _licenseManager.SetSessionToken(null);
+
+        // Assert
+        Assert.Null(_licenseManager.CurrentState.SessionId);
+    }
+
+    [Fact]
+    public void SetSessionToken_EmptyString_SetsEmptySessionId()
+    {
+        // Arrange
+        _licenseManager.SetSessionToken("initial-token");
+
+        // Act
+        _licenseManager.SetSessionToken(string.Empty);
+
+        // Assert
+        Assert.Equal(string.Empty, _licenseManager.CurrentState.SessionId);
+    }
+
+    [Fact]
+    public void SetSessionToken_AfterDispose_ThrowsObjectDisposedException()
+    {
+        // Arrange
+        _licenseManager.Dispose();
+
+        // Act & Assert
+        Assert.Throws<ObjectDisposedException>(() =>
+            _licenseManager.SetSessionToken("token"));
+    }
+
+    #endregion
+
     #region StateChanged Event Tests
 
     [Fact]
