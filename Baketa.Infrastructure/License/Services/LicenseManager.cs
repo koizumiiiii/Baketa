@@ -1119,6 +1119,22 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         OnStateChanged(currentState, currentState, LicenseChangeReason.PromotionApplied);
     }
 
+    /// <inheritdoc/>
+    public void SetSessionToken(string? sessionToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        lock (_stateLock)
+        {
+            _sessionToken = sessionToken;
+            _currentState = _currentState with { SessionId = sessionToken };
+        }
+
+        _logger.LogInformation(
+            "[Issue #280+#281] セッショントークン設定: HasToken={HasToken}",
+            !string.IsNullOrEmpty(sessionToken));
+    }
+
     /// <summary>
     /// [Issue #275] 有効なプロモーションがある場合、状態にプロモーション設定をマージ
     /// [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない

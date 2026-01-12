@@ -117,6 +117,18 @@ public interface ILicenseManager
     /// IsFeatureAvailable(CloudAiTranslation) を再評価できるようにします。
     /// </remarks>
     void NotifyBonusTokensLoaded();
+
+    /// <summary>
+    /// セッショントークンを設定（Issue #280+#281）
+    /// 認証成功時にAccessTokenをLicenseState.SessionIdに反映する
+    /// </summary>
+    /// <param name="sessionToken">認証セッションのAccessToken（nullでクリア）</param>
+    /// <remarks>
+    /// このメソッドはAuthStatusChangedイベントでログイン検知時に呼び出されます。
+    /// Cloud AI翻訳APIの認証に使用するセッショントークンを設定します。
+    /// ログアウト時はnullを渡してクリアします。
+    /// </remarks>
+    void SetSessionToken(string? sessionToken);
 }
 
 /// <summary>
