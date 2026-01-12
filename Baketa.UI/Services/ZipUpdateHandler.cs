@@ -23,6 +23,15 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
     private readonly string _appExecutablePath;
     private static int _isUpdating;
 
+    /// <summary>アプリケーション名（ディレクトリ/ファイル名検索用）</summary>
+    private const string AppName = "Baketa";
+
+    /// <summary>実行ファイル名（優先）</summary>
+    private const string AppExecutableNamePrimary = "Baketa.UI.exe";
+
+    /// <summary>実行ファイル名（リネーム後）</summary>
+    private const string AppExecutableNameSecondary = "Baketa.exe";
+
     public ZipSparkleUpdater(
         string appcastUrl,
         ISignatureVerifier signatureVerifier,
@@ -132,27 +141,31 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
 
             // 展開されたディレクトリ構造を確認
             // Baketa-X.X.X/ というサブディレクトリがある場合はその中を使用
+            // [Gemini Review] LINQで複数サブディレクトリにも対応、StartsWith で厳密判定
             var sourceDir = extractDir;
-            var subDirs = Directory.GetDirectories(extractDir);
-            if (subDirs.Length == 1)
+            var baketaSourceDir = Directory
+                .GetDirectories(extractDir)
+                .FirstOrDefault(d => Path.GetFileName(d).StartsWith(AppName, StringComparison.OrdinalIgnoreCase));
+
+            if (baketaSourceDir != null)
             {
-                // [Fix] フルパスではなくディレクトリ名のみで判定
-                var subDirName = Path.GetFileName(subDirs[0]);
-                if (subDirName.Contains("Baketa", StringComparison.OrdinalIgnoreCase))
-                {
-                    sourceDir = subDirs[0];
-                    _logger?.LogInformation("[Updater] サブディレクトリを使用: {Path}", sourceDir);
-                }
+                sourceDir = baketaSourceDir;
+                _logger?.LogInformation("[Updater] サブディレクトリをソースとして使用: {Path}", sourceDir);
             }
 
             // 新しい実行ファイルのパスを確認
-            var newExePath = Path.Combine(sourceDir, "Baketa.UI.exe");
+            // [Gemini Review] 定数を使用してマジックストリングを排除
+            var newExePath = Path.Combine(sourceDir, AppExecutableNamePrimary);
             if (!File.Exists(newExePath))
             {
                 // Baketa.exeを探す（リネームされている可能性）
-                newExePath = Directory.GetFiles(sourceDir, "*.exe")
-                    .FirstOrDefault(f => f.Contains("Baketa", StringComparison.OrdinalIgnoreCase))
-                    ?? throw new FileNotFoundException("Baketa executable not found in update package");
+                newExePath = Path.Combine(sourceDir, AppExecutableNameSecondary);
+                if (!File.Exists(newExePath))
+                {
+                    // [Gemini Review] エラーメッセージに検索パスを含める
+                    throw new FileNotFoundException(
+                        $"{AppName} executable not found in update package. Searched directory: '{sourceDir}'");
+                }
             }
 
             _logger?.LogInformation("[Updater] 新しい実行ファイル: {Path}", newExePath);
