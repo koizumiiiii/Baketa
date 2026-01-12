@@ -7,10 +7,12 @@
  * - OpenAI (gpt-4.1-nano)
  *
  * セキュリティ:
- * - セッショントークン検証（Patreon認証済みユーザーのみ）
- * - プランチェック（Pro/Premium/Ultimateのみ利用可能）
+ * - [Issue #280+#281] Supabase JWT認証（Patreonセッション or Supabase JWT）
+ * - プランチェック（Pro/Premium/Ultimate または ボーナストークン所有者）
  * - レートリミット
  */
+
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================
 // 型定義
@@ -25,6 +27,9 @@ export interface TranslateEnv {
   API_KEY: string;
   ALLOWED_ORIGINS: string;
   ENVIRONMENT?: string;
+  // [Issue #280+#281] Supabase認証用
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_KEY?: string;
 }
 
 /** セッションデータ（index.tsと共有） */
@@ -46,7 +51,7 @@ interface ParsedMembership {
   userId: string;
   email: string;
   fullName: string;
-  plan: 'Free' | 'Pro' | 'Premium' | 'Ultimate';  // Issue #257
+  plan: PlanType;  // Issue #257
   tierId: string;
   patronStatus: string;
   nextChargeDate: string | null;
@@ -178,14 +183,180 @@ const OPENAI_API_BASE = 'https://api.openai.com/v1';
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-nano';
 const IDENTITY_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 const API_TIMEOUT_MS = 30000; // 30秒タイムアウト
+/** [Issue #280+#281] 認証結果キャッシュTTL（60秒） */
+const AUTH_CACHE_TTL_SECONDS = 60;
+
+/** [Issue #257] プラン名定義 */
+const PLAN = {
+  FREE: 'Free',
+  PRO: 'Pro',
+  PREMIUM: 'Premium',
+  ULTIMATE: 'Ultimate',
+} as const;
+
+/** プラン型 */
+type PlanType = typeof PLAN[keyof typeof PLAN];
 
 /** Cloud AI翻訳が利用可能なプラン */
 // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
-const ALLOWED_PLANS = ['Pro', 'Premium', 'Ultimate'] as const;
+const ALLOWED_PLANS: readonly PlanType[] = [PLAN.PRO, PLAN.PREMIUM, PLAN.ULTIMATE];
+
+// ============================================
+// [Issue #280+#281] 認証結果型
+// ============================================
+
+/** 認証済みユーザー情報 */
+interface AuthenticatedUser {
+  userId: string;
+  plan: PlanType;
+  hasBonusTokens: boolean;
+  authMethod: 'patreon' | 'supabase';
+}
 
 // ============================================
 // ヘルパー関数
 // ============================================
+
+// --------------------------------------------
+// [Issue #280+#281] Supabase認証ヘルパー
+// --------------------------------------------
+
+/** Supabaseクライアント取得 */
+function getSupabaseClient(env: TranslateEnv): SupabaseClient | null {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
+    return null;
+  }
+  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY, {
+    auth: { persistSession: false }
+  });
+}
+
+/** ユーザーのボーナストークン残高を取得 */
+async function getBonusTokensRemaining(supabase: SupabaseClient, userId: string): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc('get_bonus_tokens_for_user', {
+      p_user_id: userId
+    });
+
+    if (error || !Array.isArray(data)) {
+      console.error('[Issue #280+#281] Bonus tokens RPC error:', error);
+      return 0;
+    }
+
+    // 有効なボーナス（未期限切れで残高あり）の合計を計算
+    return data
+      .filter((b: { is_expired: boolean; remaining_tokens: number }) =>
+        !b.is_expired && b.remaining_tokens > 0)
+      .reduce((sum: number, b: { remaining_tokens: number }) => sum + b.remaining_tokens, 0);
+  } catch (error) {
+    console.error('[Issue #280+#281] Bonus tokens check failed:', error);
+    return 0;
+  }
+}
+
+/**
+ * [Issue #280+#281] 統合認証
+ * 1. まずキャッシュを確認
+ * 2. Patreonセッション（KV）を試行
+ * 3. 失敗したらSupabase JWT認証を試行
+ * 4. ボーナストークンの有無も確認
+ * 5. 結果をキャッシュに保存
+ */
+async function authenticateUser(
+  env: TranslateEnv,
+  sessionToken: string
+): Promise<AuthenticatedUser | null> {
+  // トークンのハッシュをキーに使用（セキュリティ対策）
+  const tokenHash = await hashToken(sessionToken);
+  const cacheKey = `auth:${tokenHash}`;
+
+  // 1. キャッシュを確認
+  try {
+    const cachedAuth = await env.SESSIONS.get<AuthenticatedUser>(cacheKey, 'json');
+    if (cachedAuth) {
+      console.log(`[Issue #280+#281] Auth cache hit: userId=${cachedAuth.userId.substring(0, 8)}...`);
+      return cachedAuth;
+    }
+  } catch {
+    // キャッシュ読み取りエラーは無視して認証を続行
+  }
+
+  // 2. Patreonセッション（KV）を試行
+  const patreonSession = await getSession(env, sessionToken);
+  if (patreonSession && Date.now() <= patreonSession.expiresAt) {
+    const cachedMembership = await getCachedMembership(env, patreonSession.userId);
+    if (cachedMembership) {
+      const result: AuthenticatedUser = {
+        userId: patreonSession.userId,
+        plan: cachedMembership.membership.plan,
+        hasBonusTokens: false, // Patreonユーザーはボーナス不要（プランで判定）
+        authMethod: 'patreon'
+      };
+      // キャッシュに保存（Patreonは既にメンバーシップキャッシュがあるので短めに）
+      await saveAuthCache(env, cacheKey, result);
+      return result;
+    }
+  }
+
+  // 3. Supabase JWT認証を試行
+  const supabase = getSupabaseClient(env);
+  if (!supabase) {
+    console.log('[Issue #280+#281] Supabase not configured, skipping JWT auth');
+    return null;
+  }
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(sessionToken);
+    if (error || !user) {
+      console.log('[Issue #280+#281] Supabase JWT validation failed:', error?.message);
+      return null;
+    }
+
+    // 4. ボーナストークン残高を確認
+    const bonusRemaining = await getBonusTokensRemaining(supabase, user.id);
+    const hasBonusTokens = bonusRemaining > 0;
+
+    console.log(`[Issue #280+#281] Supabase auth success: userId=${user.id.substring(0, 8)}..., bonusTokens=${bonusRemaining}`);
+
+    const result: AuthenticatedUser = {
+      userId: user.id,
+      plan: PLAN.FREE, // SupabaseユーザーはFreeプラン（ボーナストークンで利用）
+      hasBonusTokens,
+      authMethod: 'supabase'
+    };
+
+    // 5. キャッシュに保存
+    await saveAuthCache(env, cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('[Issue #280+#281] Supabase auth error:', error);
+    return null;
+  }
+}
+
+/** [Issue #280+#281] トークンをハッシュ化（キャッシュキー用） */
+async function hashToken(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** [Issue #280+#281] 認証結果をキャッシュに保存 */
+async function saveAuthCache(env: TranslateEnv, cacheKey: string, auth: AuthenticatedUser): Promise<void> {
+  try {
+    await env.SESSIONS.put(cacheKey, JSON.stringify(auth), { expirationTtl: AUTH_CACHE_TTL_SECONDS });
+    console.log(`[Issue #280+#281] Auth cached: key=${cacheKey.substring(0, 12)}...`);
+  } catch (error) {
+    // キャッシュ保存エラーは無視（翻訳処理を続行）
+    console.warn('[Issue #280+#281] Auth cache save failed:', error);
+  }
+}
+
+// --------------------------------------------
+// 既存ヘルパー関数
+// --------------------------------------------
 
 function corsHeaders(origin: string, allowedOrigins: string): Record<string, string> {
   const allowed = allowedOrigins.split(',').map(o => o.trim());
@@ -678,34 +849,28 @@ export async function handleTranslate(
 
   const sessionToken = authHeader.substring(7);
 
-  // セッション検証
-  const session = await getSession(env, sessionToken);
-  if (!session) {
+  // [Issue #280+#281] 統合認証（Patreonセッション or Supabase JWT）
+  const authenticatedUser = await authenticateUser(env, sessionToken);
+  if (!authenticatedUser) {
     return errorResponse(defaultRequestId, 'SESSION_INVALID', 'Invalid or expired session', false, 401, origin, allowedOrigins);
   }
 
-  if (Date.now() > session.expiresAt) {
-    return errorResponse(defaultRequestId, 'SESSION_INVALID', 'Session expired', false, 401, origin, allowedOrigins);
-  }
-
-  // プランチェック
-  const cachedMembership = await getCachedMembership(env, session.userId);
-  if (!cachedMembership) {
-    return errorResponse(defaultRequestId, 'SESSION_INVALID', 'Membership information not found', false, 401, origin, allowedOrigins);
-  }
-
-  const plan = cachedMembership.membership.plan;
-  if (!ALLOWED_PLANS.includes(plan as typeof ALLOWED_PLANS[number])) {
+  // [Issue #280+#281] 利用権限チェック: 有料プラン or ボーナストークン所有者
+  const isPaidPlan = ALLOWED_PLANS.includes(authenticatedUser.plan);
+  if (!isPaidPlan && !authenticatedUser.hasBonusTokens) {
     return errorResponse(
       defaultRequestId,
       'PLAN_NOT_SUPPORTED',
-      `Cloud AI translation requires Pro, Premium, or Ultimate plan. Current plan: ${plan}`,
+      `Cloud AI translation requires a paid plan (Pro/Premium/Ultimate) or bonus tokens. Current plan: ${authenticatedUser.plan}`,
       false,
       403,
       origin,
       allowedOrigins
     );
   }
+
+  const userId = authenticatedUser.userId;
+  const plan = authenticatedUser.plan;
 
   // リクエストボディ検証
   let body: unknown;
@@ -761,7 +926,7 @@ export async function handleTranslate(
       processing_time_ms: processingTimeMs,
     };
 
-    console.log(`Translate success: requestId=${requestId}, userId=${session.userId}, plan=${plan}, provider=gemini, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
+    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=gemini, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
 
     return successResponse(response, origin, allowedOrigins);
   }
@@ -803,7 +968,7 @@ export async function handleTranslate(
       processing_time_ms: processingTimeMs,
     };
 
-    console.log(`Translate success: requestId=${requestId}, userId=${session.userId}, plan=${plan}, provider=openai, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
+    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=openai, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
 
     return successResponse(response, origin, allowedOrigins);
   }
