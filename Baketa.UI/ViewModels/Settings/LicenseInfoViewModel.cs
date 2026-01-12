@@ -578,7 +578,8 @@ public sealed class LicenseInfoViewModel : ViewModelBase
                 FileName = planChangeUrl,
                 UseShellExecute = true
             });
-            StatusMessage = Strings.License_OpeningPlanPage;
+            // [Issue #283] ブラウザが開くのでステータスメッセージは不要
+            StatusMessage = string.Empty;
             IsStatusError = false;
             _logger?.LogInformation("プラン変更ページを開きました: {Url}", planChangeUrl);
         }
