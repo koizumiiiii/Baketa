@@ -842,17 +842,25 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     /// <returns>並列翻訳を使用すべき場合true</returns>
     private bool ShouldUseParallelTranslation(AggregatedChunksReadyEvent eventData)
     {
+        // [Issue #280+#281] 診断ログ: 各条件をInfo レベルで出力
+        _logger?.LogInformation(
+            "🔍 [Phase4診断] 並列翻訳判定開始 - Orchestrator={Orchestrator}, LicenseManager={LicenseManager}, CloudAvailability={CloudAvailability}, HasImageData={HasImageData}",
+            _parallelTranslationOrchestrator != null,
+            _licenseManager != null,
+            _cloudTranslationAvailabilityService?.IsEffectivelyEnabled,
+            eventData.HasImageData);
+
         // 並列翻訳オーケストレーターが利用可能か
         if (_parallelTranslationOrchestrator == null)
         {
-            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: オーケストレーター未登録");
+            _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: オーケストレーター未登録");
             return false;
         }
 
         // ライセンスマネージャーが利用可能か
         if (_licenseManager == null)
         {
-            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: ライセンスマネージャー未登録");
+            _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: ライセンスマネージャー未登録");
             return false;
         }
 
@@ -862,7 +870,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         {
             if (!_cloudTranslationAvailabilityService.IsEffectivelyEnabled)
             {
-                _logger?.LogDebug(
+                _logger?.LogInformation(
                     "🔍 [Issue #273] 並列翻訳スキップ: Cloud翻訳無効 (Entitled={Entitled}, Preferred={Preferred})",
                     _cloudTranslationAvailabilityService.IsEntitled,
                     _cloudTranslationAvailabilityService.IsPreferred);
@@ -878,7 +886,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             // Cloud AI翻訳機能が利用可能か（Pro/Premiaプラン）
             if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
             {
-                _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: Cloud AI翻訳機能が無効（Free/Standardプラン）");
+                _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: Cloud AI翻訳機能が無効（Free/Standardプラン）");
                 return false;
             }
 
@@ -886,7 +894,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             var translationSettings = _unifiedSettingsService.GetTranslationSettings();
             if (translationSettings.UseLocalEngine)
             {
-                _logger?.LogDebug("🔍 [Issue #280] 並列翻訳スキップ: ローカル翻訳が選択されている");
+                _logger?.LogInformation("🔍 [Issue #280] 並列翻訳スキップ: ローカル翻訳が選択されている");
                 return false;
             }
         }
@@ -894,7 +902,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         // 画像データが利用可能か
         if (!eventData.HasImageData)
         {
-            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: 画像データなし");
+            _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: 画像データなし");
             return false;
         }
 
@@ -902,11 +910,11 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         var sessionId = _licenseManager.CurrentState.SessionId;
         if (string.IsNullOrEmpty(sessionId))
         {
-            _logger?.LogDebug("🔍 [Phase4] 並列翻訳スキップ: セッショントークンなし");
+            _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: セッショントークンなし");
             return false;
         }
 
-        _logger?.LogDebug("✅ [Issue #273] 並列翻訳使用: 全条件クリア");
+        _logger?.LogInformation("✅ [Issue #273] 並列翻訳使用: 全条件クリア");
         return true;
     }
 
