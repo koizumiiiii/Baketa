@@ -674,10 +674,284 @@ C#クライアント（`PatreonOAuthService`）は以下の設定を使用：
 - **設定**: `relay-server/wrangler.toml`
 - **C#クライアント**: `Baketa.Infrastructure/License/Services/PatreonOAuthService.cs`
 
-## 10. 関連ドキュメント
+## 10. JWT短期トークン認証システム
+
+*追加日: 2026年1月14日 (Issue #287)*
+
+### 10.1 概要
+
+Relay Server（Cloudflare Workers）へのAPI認証を、静的API Keyから短期JWTトークン方式に移行しました。
+
+#### 移行の背景
+
+| 問題 | 影響 |
+|------|------|
+| API Key を `appsettings.json` に記載してアプリと配布 | 容易に抽出可能 |
+| API Key漏洩リスク | 不正リクエスト、コスト増大、Rate Limit消費 |
+
+#### 解決策
+
+- **短期JWT**: 15分TTL、漏洩しても被害が限定的
+- **自動リフレッシュ**: DelegatingHandlerで透過的に更新
+- **セッション連携**: Patreon OAuth認証後にJWT発行
+
+### 10.2 アーキテクチャ
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              UI Layer (Baketa.UI)                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                      JwtTokenAuthHandler                            │    │
+│  │  - DelegatingHandler実装                                            │    │
+│  │  - 自動Bearerヘッダー付与                                           │    │
+│  │  - 401応答時の自動リフレッシュ                                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Infrastructure Layer (Baketa.Infrastructure)           │
+│  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐   │
+│  │   JwtTokenService    │  │ PatreonOAuthService  │  │ BonusTokenService│   │
+│  │                      │  │                      │  │                  │   │
+│  │ - ExchangeSession    │  │ - JWT交換統合        │  │ - JWT認証利用    │   │
+│  │   TokenAsync()       │  │ - HandleCallback     │  │                  │   │
+│  │ - RefreshAsync()     │  │   でJWT取得          │  │                  │   │
+│  │ - IsNearExpiry()     │  │                      │  │                  │   │
+│  │ - SemaphoreSlim      │  │                      │  │                  │   │
+│  │   (排他制御)         │  │                      │  │                  │   │
+│  └──────────┬───────────┘  └──────────┬───────────┘  └────────┬─────────┘   │
+│             │                         │                       │             │
+│             ▼                         ▼                       ▼             │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                        JwtTokenPair                                │    │
+│  │  - AccessToken: JWT (15分TTL)                                      │    │
+│  │  - RefreshToken: リフレッシュトークン (30日TTL)                    │    │
+│  │  - ExpiresAt: 有効期限                                             │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       Cloudflare Workers (Relay Server)                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                         JWT認証エンドポイント                       │    │
+│  │  POST /api/auth/token    - SessionToken → JWT交換                  │    │
+│  │  POST /api/auth/refresh  - RefreshToken → 新JWT発行                │    │
+│  │                                                                     │    │
+│  │  validateJwtToken()      - JWT署名・有効期限検証                    │    │
+│  │  authenticateUser()      - JWT優先、SessionTokenフォールバック     │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                         Cloudflare KV                              │    │
+│  │  - RefreshToken保存 (1回使用で無効化)                              │    │
+│  │  - セッション情報                                                   │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 10.3 認証フロー
+
+```
+┌─────────┐   ┌─────────────┐   ┌───────────────┐   ┌───────────────┐
+│  User   │   │  Baketa.UI  │   │ JwtTokenService│   │ Relay Server │
+└────┬────┘   └──────┬──────┘   └───────┬───────┘   └───────┬───────┘
+     │               │                  │                   │
+     │ Patreon認証完了                  │                   │
+     │ (SessionToken取得)               │                   │
+     │──────────────>│                  │                   │
+     │               │                  │                   │
+     │               │ ExchangeSession  │                   │
+     │               │ TokenAsync()     │                   │
+     │               │─────────────────>│                   │
+     │               │                  │                   │
+     │               │                  │ POST /api/auth/token
+     │               │                  │ Bearer: SessionToken
+     │               │                  │──────────────────>│
+     │               │                  │                   │
+     │               │                  │                   │ SessionToken検証
+     │               │                  │                   │ JWT生成 (HS256)
+     │               │                  │                   │ RefreshToken生成
+     │               │                  │                   │ KV保存
+     │               │                  │                   │
+     │               │                  │ JWT + RefreshToken│
+     │               │                  │<──────────────────│
+     │               │                  │                   │
+     │               │ メモリに保持      │                   │
+     │               │<─────────────────│                   │
+     │               │                  │                   │
+     │ Cloud AI翻訳   │                  │                   │
+     │──────────────>│                  │                   │
+     │               │                  │                   │
+     │               │ GetAccessToken   │                   │
+     │               │ Async()          │                   │
+     │               │─────────────────>│                   │
+     │               │                  │                   │
+     │               │                  │ 有効期限チェック   │
+     │               │                  │ (期限切れ間近なら │
+     │               │                  │  自動リフレッシュ) │
+     │               │                  │                   │
+     │               │ JWT              │                   │
+     │               │<─────────────────│                   │
+     │               │                  │                   │
+     │               │ POST /api/translate                  │
+     │               │ Authorization: Bearer {JWT}          │
+     │               │─────────────────────────────────────>│
+     │               │                  │                   │
+     │               │                  │                   │ JWT検証
+     │               │                  │                   │ 翻訳実行
+     │               │                  │                   │
+     │               │ 翻訳結果         │                   │
+     │               │<─────────────────────────────────────│
+```
+
+### 10.4 コンポーネント詳細
+
+#### JwtTokenService
+- **ファイル**: `Baketa.Infrastructure/Auth/JwtTokenService.cs`
+- **責務**: JWT取得・リフレッシュ・有効期限管理
+- **機能**:
+  - SessionToken → JWT交換
+  - RefreshToken → 新JWT発行
+  - 有効期限前（1分前）の自動リフレッシュ
+  - **SemaphoreSlim**: 並行リフレッシュ要求の排他制御（レースコンディション対策）
+  - **Double-checked locking**: パフォーマンスとスレッドセーフの両立
+
+```csharp
+// レースコンディション対策の実装例
+public async Task<string?> GetAccessTokenAsync(CancellationToken cancellationToken = default)
+{
+    // Fast path: 有効なトークンがあればすぐに返す
+    lock (_tokenLock)
+    {
+        if (_currentTokenPair != null && _currentTokenPair.ExpiresAt > DateTime.UtcNow)
+            return _currentTokenPair.AccessToken;
+    }
+
+    // SemaphoreSlimで排他制御
+    await _refreshSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+    try
+    {
+        // Double-check: セマフォ取得後に再度チェック
+        lock (_tokenLock)
+        {
+            if (_currentTokenPair != null && _currentTokenPair.ExpiresAt > DateTime.UtcNow)
+                return _currentTokenPair.AccessToken;
+        }
+        // リフレッシュ実行
+        var refreshed = await RefreshAsyncCore(cancellationToken).ConfigureAwait(false);
+        return refreshed?.AccessToken;
+    }
+    finally
+    {
+        _refreshSemaphore.Release();
+    }
+}
+```
+
+#### JwtTokenAuthHandler
+- **ファイル**: `Baketa.Infrastructure/Http/JwtTokenAuthHandler.cs`
+- **責務**: HTTP要求への自動JWT付与
+- **機能**:
+  - DelegatingHandler実装
+  - Bearerヘッダー自動付与
+  - 401応答時の自動リフレッシュ＆リトライ
+  - 期限切れ間近の事前リフレッシュ
+
+#### Relay Server JWT機能
+- **ファイル**: `relay-server/src/index.ts`
+- **エンドポイント**:
+
+| エンドポイント | メソッド | 説明 |
+|---------------|----------|------|
+| `/api/auth/token` | POST | SessionToken → JWT交換 |
+| `/api/auth/refresh` | POST | RefreshToken → 新JWT発行 |
+
+### 10.5 JWTペイロード仕様
+
+```json
+{
+  "iss": "https://baketa-relay.suke009.workers.dev",
+  "sub": "patreon_user_id",
+  "aud": "baketa-client",
+  "exp": 1234571490,
+  "iat": 1234567890,
+  "jti": "unique-jwt-id",
+  "plan": "Pro",
+  "hasBonusTokens": true,
+  "authMethod": "patreon"
+}
+```
+
+| クレーム | 説明 |
+|---------|------|
+| `iss` | 発行者（Relay Server URL） |
+| `sub` | ユーザー識別子（Patreon User ID） |
+| `aud` | 対象アプリケーション |
+| `exp` | 有効期限（15分後） |
+| `iat` | 発行時刻 |
+| `jti` | JWT ID（一意識別子） |
+| `plan` | ライセンスプラン |
+| `hasBonusTokens` | ボーナストークン保有フラグ |
+| `authMethod` | 認証方式 |
+
+### 10.6 セキュリティ考慮事項
+
+| 項目 | 対策 |
+|------|------|
+| JWT署名 | HS256 + 環境変数シークレット (`JWT_SECRET`) |
+| 有効期限 | 15分（短期）- 漏洩時の被害を限定 |
+| リフレッシュ | 30日TTL、1回使用で無効化 |
+| 保存 | メモリ保持（永続化時はDPAPI暗号化） |
+| レースコンディション | SemaphoreSlim + Double-checked locking |
+| 後方互換 | SessionToken認証をフォールバックとして維持 |
+
+### 10.7 DI設定
+
+```csharp
+// LicenseModule.cs
+services.AddSingleton<IJwtTokenService, JwtTokenService>();
+services.AddTransient<JwtTokenAuthHandler>();
+
+// HttpClient統合
+services.AddHttpClient<BonusTokenService>()
+    .AddHttpMessageHandler<JwtTokenAuthHandler>()
+    .AddPolicyHandler(GetRetryPolicy());
+
+services.AddHttpClient<PromotionCodeService>()
+    .AddHttpMessageHandler<JwtTokenAuthHandler>()
+    .AddPolicyHandler(GetRetryPolicy());
+```
+
+### 10.8 環境変数（Relay Server）
+
+| 変数名 | 必須 | 説明 |
+|--------|------|------|
+| `JWT_SECRET` | ✅ | JWT署名用シークレット（HS256） |
+| `ALLOWED_REDIRECT_URIS` | 本番のみ | OAuth許可リダイレクトURI |
+
+### 10.9 テスト
+
+- **JwtTokenServiceTests**: 18テストケース
+  - トークン交換成功・失敗
+  - リフレッシュ成功・失敗
+  - 有効期限チェック
+  - 並行リクエストの排他制御
+- **JwtTokenAuthHandlerTests**: 14テストケース
+  - Bearerヘッダー付与
+  - 401応答時のリフレッシュ
+  - トークンなし時の動作
+
+### 10.10 関連Issue・PR
+
+- [Issue #287: JWT短期トークン認証システムの実装](https://github.com/koizumiiiii/Baketa/issues/287)
+- [PR #288: feat(auth): Issue #287 JWT短期トークン認証システムの実装](https://github.com/koizumiiiii/Baketa/pull/288)
+
+## 11. 関連ドキュメント
 
 - [Issue #167: ログインUI実装](../../issues/issue-167-login-ui.md)
 - [Issue #168: トークン管理](../../issues/issue-168-token-management.md)
 - [Issue #233: Patreon OAuth統合](../../issues/issue-233-patreon-integration.md)
 - [Issue #234: Patreonリレーサーバー実装](https://github.com/koizumiiiii/Baketa/issues/234)
+- [Issue #287: JWT短期トークン認証システム](https://github.com/koizumiiiii/Baketa/issues/287)
 - [ReactiveUI Guide](../ui-system/reactiveui-guide.md)
