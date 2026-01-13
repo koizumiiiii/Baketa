@@ -11,7 +11,6 @@ using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
 using Baketa.Core.Abstractions.License;
-using Baketa.Core.Abstractions.Payment;
 using Baketa.UI.Framework;
 using Baketa.UI.Models.Settings;
 using Baketa.UI.Resources;
