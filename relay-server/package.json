@@ -8,7 +8,8 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "jose": "^5.2.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240117.0",

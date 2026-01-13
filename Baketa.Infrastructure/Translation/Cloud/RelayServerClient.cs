@@ -43,11 +43,8 @@ public sealed class RelayServerClient : IAsyncDisposable
         _httpClient.BaseAddress = new Uri(_settings.RelayServerUrl);
         _httpClient.Timeout = TimeSpan.FromSeconds(_settings.TimeoutSeconds);
 
-        // APIキーヘッダー設定
-        if (!string.IsNullOrEmpty(_settings.ApiKey))
-        {
-            _httpClient.DefaultRequestHeaders.Add("X-API-Key", _settings.ApiKey);
-        }
+        // [Issue #287] 静的API Key削除 - JWT認証またはSessionToken認証を使用
+        // X-API-Key ヘッダーは不要（セッショントークンがリクエスト毎に設定される）
 
         _jsonOptions = new JsonSerializerOptions
         {

@@ -13,6 +13,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { jwtVerify, JWTPayload } from 'jose';
 
 // ============================================
 // 型定義
@@ -30,6 +31,8 @@ export interface TranslateEnv {
   // [Issue #280+#281] Supabase認証用
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_KEY?: string;
+  // [Issue #287] JWT認証用
+  JWT_SECRET?: string;
 }
 
 /** セッションデータ（index.tsと共有） */
@@ -191,10 +194,15 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const OPENAI_API_BASE = 'https://api.openai.com/v1';
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-nano';
-const IDENTITY_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
+/** [Issue #286] メンバーシップキャッシュTTL（1時間）- 手動同期で即時反映可能 */
+const IDENTITY_CACHE_TTL_SECONDS = 60 * 60; // 1 hour (was 5 minutes)
 const API_TIMEOUT_MS = 30000; // 30秒タイムアウト
-/** [Issue #280+#281] 認証結果キャッシュTTL（60秒） */
-const AUTH_CACHE_TTL_SECONDS = 60;
+/** [Issue #286] 認証結果キャッシュTTL（1時間）- KV Write削減のため延長 */
+const AUTH_CACHE_TTL_SECONDS = 60 * 60; // 1 hour (was 60 seconds)
+
+// [Issue #287] JWT認証設定
+const JWT_ISSUER = 'https://baketa-relay.suke009.workers.dev';
+const JWT_AUDIENCE = 'baketa-client';
 
 /** [Issue #257] プラン名定義 */
 const PLAN = {
@@ -220,12 +228,60 @@ interface AuthenticatedUser {
   userId: string;
   plan: PlanType;
   hasBonusTokens: boolean;
-  authMethod: 'patreon' | 'supabase';
+  authMethod: 'patreon' | 'supabase' | 'jwt';  // [Issue #287] JWT認証追加
+}
+
+/** [Issue #287] JWTカスタムクレーム */
+interface BaketaJwtClaims extends JWTPayload {
+  sub: string;           // Patreon user ID
+  plan: PlanType;        // 現在のプラン
+  hasBonusTokens: boolean; // ボーナストークン有無
+  authMethod: 'patreon'; // 元の認証方法
 }
 
 // ============================================
 // ヘルパー関数
 // ============================================
+
+// --------------------------------------------
+// [Issue #287] JWT認証ヘルパー
+// --------------------------------------------
+
+/**
+ * [Issue #287] JWTアクセストークンを検証
+ * @param env 環境変数
+ * @param token JWTトークン
+ * @returns 検証結果（成功時はペイロード、失敗時はnull）
+ */
+async function validateJwtToken(
+  env: TranslateEnv,
+  token: string
+): Promise<BaketaJwtClaims | null> {
+  if (!env.JWT_SECRET) {
+    // JWT_SECRETが未設定の場合はJWT認証をスキップ
+    return null;
+  }
+
+  try {
+    const secret = new TextEncoder().encode(env.JWT_SECRET);
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+
+    // 必須クレームの検証
+    if (!payload.sub || typeof payload.plan !== 'string') {
+      console.warn('[Issue #287] JWT missing required claims');
+      return null;
+    }
+
+    return payload as BaketaJwtClaims;
+  } catch (error) {
+    // JWTとして無効な場合は他の認証方式にフォールバック
+    // エラーログは出力しない（SessionTokenの可能性があるため）
+    return null;
+  }
+}
 
 // --------------------------------------------
 // [Issue #280+#281] Supabase認証ヘルパー
@@ -266,32 +322,42 @@ async function getBonusTokensRemaining(supabase: SupabaseClient, userId: string)
 
 /**
  * [Issue #280+#281] 統合認証
- * 1. まずキャッシュを確認
- * 2. Patreonセッション（KV）を試行
- * 3. 失敗したらSupabase JWT認証を試行
- * 4. ボーナストークンの有無も確認
- * 5. 結果をキャッシュに保存
+ * [Issue #287] JWT認証を最優先に追加
+ * 1. Baketa JWT認証を試行（最優先）
+ * 2. キャッシュを確認
+ * 3. Patreonセッション（KV）を試行
+ * 4. 失敗したらSupabase JWT認証を試行
+ * 5. ボーナストークンの有無も確認
+ * 6. 結果をキャッシュに保存
  */
 async function authenticateUser(
   env: TranslateEnv,
   sessionToken: string
 ): Promise<AuthenticatedUser | null> {
+  // [Issue #287] 1. Baketa JWT認証を試行（最優先）
+  const jwtClaims = await validateJwtToken(env, sessionToken);
+  if (jwtClaims && jwtClaims.sub) {
+    console.log(`[Issue #287] JWT auth success: userId=${jwtClaims.sub.substring(0, 8)}..., plan=${jwtClaims.plan}`);
+    return {
+      userId: jwtClaims.sub,
+      plan: jwtClaims.plan,
+      hasBonusTokens: jwtClaims.hasBonusTokens,
+      authMethod: 'jwt',
+    };
+  }
+
   // トークンのハッシュをキーに使用（セキュリティ対策）
   const tokenHash = await hashToken(sessionToken);
   const cacheKey = `auth:${tokenHash}`;
 
-  // 1. キャッシュを確認
-  try {
-    const cachedAuth = await env.SESSIONS.get<AuthenticatedUser>(cacheKey, 'json');
-    if (cachedAuth) {
-      console.log(`[Issue #280+#281] Auth cache hit: userId=${cachedAuth.userId.substring(0, 8)}...`);
-      return cachedAuth;
-    }
-  } catch {
-    // キャッシュ読み取りエラーは無視して認証を続行
+  // 2. キャッシュを確認（[Issue #286] Cache APIを使用 - KV制限回避）
+  const cachedAuth = await getAuthCache(cacheKey);
+  if (cachedAuth) {
+    console.log(`[Issue #286] Auth cache hit (Cache API): userId=${cachedAuth.userId.substring(0, 8)}...`);
+    return cachedAuth;
   }
 
-  // 2. Patreonセッション（KV）を試行
+  // 3. Patreonセッション（KV）を試行
   const patreonSession = await getSession(env, sessionToken);
   if (patreonSession && Date.now() <= patreonSession.expiresAt) {
     const cachedMembership = await getCachedMembership(env, patreonSession.userId);
@@ -302,13 +368,13 @@ async function authenticateUser(
         hasBonusTokens: false, // Patreonユーザーはボーナス不要（プランで判定）
         authMethod: 'patreon'
       };
-      // キャッシュに保存（Patreonは既にメンバーシップキャッシュがあるので短めに）
-      await saveAuthCache(env, cacheKey, result);
+      // キャッシュに保存（[Issue #286] Cache API使用）
+      await saveAuthCache(cacheKey, result);
       return result;
     }
   }
 
-  // 3. Supabase JWT認証を試行
+  // 4. Supabase JWT認証を試行
   const supabase = getSupabaseClient(env);
   if (!supabase) {
     console.log('[Issue #280+#281] Supabase not configured, skipping JWT auth');
@@ -335,8 +401,8 @@ async function authenticateUser(
       authMethod: 'supabase'
     };
 
-    // 5. キャッシュに保存
-    await saveAuthCache(env, cacheKey, result);
+    // 5. キャッシュに保存（[Issue #286] Cache API使用）
+    await saveAuthCache(cacheKey, result);
     return result;
   } catch (error) {
     console.error('[Issue #280+#281] Supabase auth error:', error);
@@ -353,14 +419,50 @@ async function hashToken(token: string): Promise<string> {
   return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** [Issue #280+#281] 認証結果をキャッシュに保存 */
-async function saveAuthCache(env: TranslateEnv, cacheKey: string, auth: AuthenticatedUser): Promise<void> {
+// ============================================
+// [Issue #286] Cache API ヘルパー関数
+// KV制限を回避するためCache APIを使用（無制限）
+// ============================================
+
+/** Cache APIのキーとなるURLを生成 */
+function getCacheUrl(cacheKey: string): string {
+  return `https://baketa-auth-cache.internal/${cacheKey}`;
+}
+
+/** [Issue #286] 認証キャッシュを読み取り（Cache API） */
+async function getAuthCache(cacheKey: string): Promise<AuthenticatedUser | null> {
   try {
-    await env.SESSIONS.put(cacheKey, JSON.stringify(auth), { expirationTtl: AUTH_CACHE_TTL_SECONDS });
-    console.log(`[Issue #280+#281] Auth cached: key=${cacheKey.substring(0, 12)}...`);
+    const cache = caches.default;
+    const cacheRequest = new Request(getCacheUrl(cacheKey));
+    const cachedResponse = await cache.match(cacheRequest);
+
+    if (cachedResponse) {
+      const data = await cachedResponse.json<AuthenticatedUser>();
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** [Issue #286] 認証結果をキャッシュに保存（Cache API） */
+async function saveAuthCache(cacheKey: string, auth: AuthenticatedUser): Promise<void> {
+  try {
+    const cache = caches.default;
+    const cacheRequest = new Request(getCacheUrl(cacheKey));
+    const cacheResponse = new Response(JSON.stringify(auth), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `max-age=${AUTH_CACHE_TTL_SECONDS}`,
+      },
+    });
+
+    await cache.put(cacheRequest, cacheResponse);
+    console.log(`[Issue #286] Auth cached (Cache API): key=${cacheKey.substring(0, 12)}...`);
   } catch (error) {
     // キャッシュ保存エラーは無視（翻訳処理を続行）
-    console.warn('[Issue #280+#281] Auth cache save failed:', error);
+    console.warn('[Issue #286] Auth cache save failed:', error);
   }
 }
 

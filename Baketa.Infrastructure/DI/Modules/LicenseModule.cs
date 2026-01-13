@@ -1,13 +1,15 @@
 using System.Net.Http;
+using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.License;
-using Baketa.Core.Abstractions.Payment;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Baketa.Core.DI.Modules;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Auth;
+using Baketa.Infrastructure.Http;
 using Baketa.Infrastructure.License.Clients;
 using Baketa.Infrastructure.License.Services;
-using Baketa.Infrastructure.Payment.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -38,9 +40,6 @@ public sealed class LicenseModule : ServiceModuleBase
 
         // APIクライアントの登録（モックモード対応）
         RegisterApiClient(services);
-
-        // 決済サービスの登録
-        RegisterPaymentService(services);
 
         // 自動同期サービスの登録
         RegisterAutoSyncService(services);
@@ -75,17 +74,12 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddOptions<LicenseSettings>()
             .BindConfiguration(LicenseSettings.SectionName);
 
-        // PaymentSettings をオプションとして登録
-        services.AddOptions<PaymentSettings>()
-            .BindConfiguration(PaymentSettings.SectionName);
-
         // PatreonSettings をオプションとして登録
         services.AddOptions<PatreonSettings>()
             .BindConfiguration(PatreonSettings.SectionName);
 
         // 設定バリデータの登録
         services.AddSingleton<IValidateOptions<LicenseSettings>, LicenseSettingsValidator>();
-        services.AddSingleton<IValidateOptions<PaymentSettings>, PaymentSettingsValidator>();
         services.AddSingleton<IValidateOptions<PatreonSettings>, PatreonSettingsValidator>();
     }
 
@@ -113,14 +107,16 @@ public sealed class LicenseModule : ServiceModuleBase
         // DEBUGビルド: HybridPromotionCodeService（モック＋本番両対応）
         // RELEASEビルド: PromotionCodeService（本番のみ、モックコード拒否）
         // [Gemini Review] Pollyリトライポリシー追加（Issue #276）
-        services.AddHttpClient<License.PromotionCodeService>(client =>
-        {
-            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
-            client.Timeout = TimeSpan.FromSeconds(30);
-            client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-        })
-        .AddPolicyHandler(GetRetryPolicy());
+        services.AddHttpClient<License.PromotionCodeService>()
+            .ConfigureHttpClient((sp, client) =>
+            {
+                client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+                client.Timeout = TimeSpan.FromSeconds(30);
+                client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                // [Issue #287] JWT認証へ移行（静的API Key削除）
+            })
+            .AddPolicyHandler(GetRetryPolicy());
         services.AddSingleton<License.MockPromotionCodeService>();
 #if DEBUG
         services.AddSingleton<License.HybridPromotionCodeService>();
@@ -141,18 +137,45 @@ public sealed class LicenseModule : ServiceModuleBase
 
         // Issue #280+#281: ボーナストークンサービス
         // Pollyリトライポリシー付きHttpClient
-        services.AddHttpClient<License.BonusTokenService>(client =>
-        {
-            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
-            client.Timeout = TimeSpan.FromSeconds(30);
-            client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-        })
-        .AddPolicyHandler(GetRetryPolicy());
+        services.AddHttpClient<License.BonusTokenService>()
+            .ConfigureHttpClient((sp, client) =>
+            {
+                client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+                client.Timeout = TimeSpan.FromSeconds(30);
+                client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                // [Issue #287] JWT認証へ移行（静的API Key削除）
+            })
+            .AddPolicyHandler(GetRetryPolicy());
         services.AddSingleton<IBonusTokenService>(provider =>
             provider.GetRequiredService<License.BonusTokenService>());
         services.AddSingleton<IDisposable>(provider =>
             provider.GetRequiredService<License.BonusTokenService>());
+
+        // Issue #287: JWT認証サービス
+        // JwtTokenAuthHandler（DelegatingHandler）をTransientで登録
+        services.AddTransient<JwtTokenAuthHandler>();
+
+        // JwtTokenService用のHttpClient
+        services.AddHttpClient<JwtTokenService>()
+            .ConfigureHttpClient((sp, client) =>
+            {
+                var config = sp.GetRequiredService<IConfiguration>();
+                client.BaseAddress = new Uri(
+                    config["CloudTranslation:RelayServerUrl"]
+                    ?? "https://baketa-relay.suke009.workers.dev");
+                client.Timeout = TimeSpan.FromSeconds(30);
+                client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                // Note: JWT認証はSessionTokenで行うためX-API-Keyは不要
+            })
+            .AddPolicyHandler(GetRetryPolicy());
+
+        services.AddSingleton<JwtTokenService>();
+        services.AddSingleton<IJwtTokenService>(provider =>
+            provider.GetRequiredService<JwtTokenService>());
+        services.AddSingleton<IDisposable>(provider =>
+            provider.GetRequiredService<JwtTokenService>());
 
         // Disposable登録（アプリケーション終了時の適切なクリーンアップ）
         services.AddSingleton<IDisposable>(provider =>
@@ -168,11 +191,13 @@ public sealed class LicenseModule : ServiceModuleBase
     private static void RegisterApiClient(IServiceCollection services)
     {
         // HttpClient登録（Patreon用）- IHttpClientFactory経由でソケット枯渇を防止
-        services.AddHttpClient(PatreonOAuthService.HttpClientName, client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(30);
-            client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
-        });
+        services.AddHttpClient(PatreonOAuthService.HttpClientName)
+            .ConfigureHttpClient((sp, client) =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+                client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+                // [Issue #287] JWT認証へ移行（静的API Key削除）
+            });
 
         // PatreonOAuthService登録（IHttpClientFactory経由でHttpClientを取得）
         services.AddSingleton<PatreonOAuthService>();
@@ -212,46 +237,6 @@ public sealed class LicenseModule : ServiceModuleBase
             // どちらも設定されていない場合はモッククライアントにフォールバック
             logger.LogWarning("⚠️ ライセンス設定が不完全です。モッククライアントを使用します。");
             return provider.GetRequiredService<MockLicenseApiClient>();
-        });
-    }
-
-    /// <summary>
-    /// 決済サービスを登録
-    /// </summary>
-    private static void RegisterPaymentService(IServiceCollection services)
-    {
-        // HttpClientファクトリ登録
-        services.AddHttpClient<SupabasePaymentService>();
-
-        // 決済サービス登録（設定に基づく）
-        services.AddSingleton<IPaymentService>(provider =>
-        {
-            var paymentSettings = provider.GetRequiredService<IOptions<PaymentSettings>>().Value;
-            var licenseSettings = provider.GetRequiredService<IOptions<LicenseSettings>>().Value;
-
-            if (paymentSettings.EnableMockMode)
-            {
-                // モックモードの場合はモック実装を返す
-                // LicenseSettings.EnableMockModeも有効な場合はILicenseManagerを渡して
-                // テストモード（決済スキップ＆プラン即時変更）を有効化
-                var licenseManager = licenseSettings.EnableMockMode
-                    ? provider.GetRequiredService<ILicenseManager>()
-                    : null;
-
-                return new MockPaymentService(
-                    provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MockPaymentService>>(),
-                    licenseManager);
-            }
-
-            // HttpClientをファクトリから取得
-            var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
-            var httpClient = httpClientFactory.CreateClient(nameof(SupabasePaymentService));
-
-            return new SupabasePaymentService(
-                provider.GetRequiredService<Supabase.Client>(),
-                httpClient,
-                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<SupabasePaymentService>>(),
-                provider.GetRequiredService<IOptions<PaymentSettings>>());
         });
     }
 
@@ -300,28 +285,6 @@ public sealed class LicenseSettingsValidator : IValidateOptions<LicenseSettings>
         {
             var errors = validationResult.GetErrorMessages();
             return ValidateOptionsResult.Fail($"ライセンス設定の検証に失敗しました: {errors}");
-        }
-
-        return ValidateOptionsResult.Success;
-    }
-}
-
-/// <summary>
-/// 決済設定バリデータ
-/// </summary>
-public sealed class PaymentSettingsValidator : IValidateOptions<PaymentSettings>
-{
-    /// <summary>
-    /// 決済設定を検証
-    /// </summary>
-    public ValidateOptionsResult Validate(string? name, PaymentSettings options)
-    {
-        var validationResult = options.ValidateSettings();
-
-        if (!validationResult.IsValid)
-        {
-            var errors = validationResult.GetErrorMessages();
-            return ValidateOptionsResult.Fail($"決済設定の検証に失敗しました: {errors}");
         }
 
         return ValidateOptionsResult.Success;

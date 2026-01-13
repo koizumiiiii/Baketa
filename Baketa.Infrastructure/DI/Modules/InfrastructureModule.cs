@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Baketa.Core.Abstractions.CrashReporting;
 using Baketa.Core.Abstractions.DI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Logging;
@@ -156,6 +157,9 @@ public class InfrastructureModule : ServiceModuleBase
 
         // データ永続化
         RegisterPersistenceServices(services, environment);
+
+        // [Issue #287] クラッシュレポート送信サービス（JWT認証付き）
+        RegisterCrashReportingInfrastructure(services);
     }
 
     /// <summary>
@@ -234,6 +238,9 @@ public class InfrastructureModule : ServiceModuleBase
 
         // データ永続化
         RegisterPersistenceServices(services, environment);
+
+        // [Issue #287] クラッシュレポート送信サービス（JWT認証付き）
+        RegisterCrashReportingInfrastructure(services);
     }
 
     /// <summary>
@@ -1496,5 +1503,33 @@ public class InfrastructureModule : ServiceModuleBase
             logger.LogError(ex, "💥 [PHASE3.1_FIX] translation_ports_global.json 読み込みエラー");
             return DefaultPort;
         }
+    }
+
+    /// <summary>
+    /// [Issue #287] クラッシュレポート送信インフラストラクチャを登録
+    /// IHttpClientFactory + JwtTokenAuthHandler経由でJWT認証付き送信を実現
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterCrashReportingInfrastructure(IServiceCollection services)
+    {
+        Console.WriteLine("🚀 [Issue #287] クラッシュレポート送信インフラストラクチャ登録開始");
+
+        // HttpClient登録（JwtTokenAuthHandler付き）
+        services.AddHttpClient<CrashReporting.CrashReportSender>(
+                CrashReporting.CrashReportSender.HttpClientName)
+            .ConfigureHttpClient(client =>
+            {
+                client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+                client.Timeout = TimeSpan.FromSeconds(30);
+                client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+            })
+            .AddHttpMessageHandler<Http.JwtTokenAuthHandler>();
+
+        // ICrashReportSenderインターフェース登録
+        services.AddSingleton<ICrashReportSender>(provider =>
+            provider.GetRequiredService<CrashReporting.CrashReportSender>());
+
+        Console.WriteLine("✅ [Issue #287] CrashReportSender登録完了 - JWT認証付き送信");
     }
 }

@@ -22,6 +22,7 @@ using Baketa.UI.ViewModels;
 using Baketa.UI.ViewModels.Auth;
 using Baketa.UI.Views;
 using Baketa.UI.Views.Auth;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -176,6 +177,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             Console.WriteLine("[INIT_DEBUG] ServiceProvider利用可能 - サービス取得中");
             _logger = Program.ServiceProvider.GetService<ILogger<App>>();
             _eventAggregator = Program.ServiceProvider.GetService<IEventAggregator>();
+
+            // [Issue #287] 静的API Key削除 - Phase 8でJWT認証へ完全移行予定
 
             if (_logger != null)
             {
@@ -839,73 +842,43 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     private const string TestModeEnvVar = "BAKETA_ALLOW_TEST_MODE";
 
     /// <summary>
-    /// テストモード警告表示 (Issue #110: 決済統合)
-    /// License.EnableMockMode と Payment.EnableMockMode が両方有効な場合に警告を表示
+    /// テストモード警告表示
+    /// License.EnableMockMode が有効な場合に警告を表示
     /// </summary>
     private async Task ShowTestModeWarningIfNeededAsync(IServiceProvider serviceProvider, Avalonia.Controls.Window parentWindow)
     {
         try
         {
             var licenseSettings = serviceProvider.GetService<IOptions<LicenseSettings>>()?.Value;
-            var paymentSettings = serviceProvider.GetService<IOptions<PaymentSettings>>()?.Value;
 
-            // 両方のモックモードが有効かチェック
+            // ライセンスモックモードが有効かチェック
             bool isLicenseMockEnabled = licenseSettings?.EnableMockMode ?? false;
-            bool isPaymentMockEnabled = paymentSettings?.EnableMockMode ?? false;
 
-            if (!isLicenseMockEnabled || !isPaymentMockEnabled)
+            if (!isLicenseMockEnabled)
             {
                 // テストモードではない
                 return;
             }
 
-            // 環境変数チェック
-            var envValue = Environment.GetEnvironmentVariable(TestModeEnvVar);
-            bool isEnvVarSet = string.Equals(envValue, "true", StringComparison.OrdinalIgnoreCase);
-
             _logger?.LogWarning(
-                "🧪 テストモード設定検出: License.EnableMockMode={LicenseMock}, Payment.EnableMockMode={PaymentMock}, EnvVar={EnvVar}={EnvValue}",
-                isLicenseMockEnabled, isPaymentMockEnabled, TestModeEnvVar, envValue ?? "(未設定)");
+                "🧪 テストモード設定検出: License.EnableMockMode={LicenseMock}",
+                isLicenseMockEnabled);
 
             // コンソールに警告出力（開発者向け）
             Console.WriteLine("⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️");
-            Console.WriteLine("🧪 [TEST_MODE] 決済テストモード設定が検出されました");
+            Console.WriteLine("🧪 [TEST_MODE] ライセンステストモードが有効です");
             Console.WriteLine($"   License.EnableMockMode = {isLicenseMockEnabled}");
-            Console.WriteLine($"   Payment.EnableMockMode = {isPaymentMockEnabled}");
-            Console.WriteLine($"   {TestModeEnvVar} = {envValue ?? "(未設定)"}");
-
-            // 警告メッセージを構築
-            string warningTitle;
-            string warningMessage;
-
-            if (isEnvVarSet)
-            {
-                // 環境変数が設定されている場合：テストモードが完全に有効
-                warningTitle = "🧪 テストモード有効";
-                warningMessage = "決済処理をスキップし、プラン変更を即座に反映するテストモードが有効です。" +
-                                "本番環境ではappsettings.jsonのEnableMockModeをfalseに設定してください。";
-
-                Console.WriteLine("   ✅ テストモード完全有効（プラン即時変更可能）");
-            }
-            else
-            {
-                // 環境変数が設定されていない場合：設定は有効だがテストモードは無効
-                warningTitle = "⚠️ 設定不整合";
-                warningMessage = "モック設定が有効ですが環境変数が未設定のため、決済処理もプラン変更の反映も機能しません。" +
-                                $"テストするには環境変数 {TestModeEnvVar}=true を設定してください。";
-
-                Console.WriteLine("   ⚠️ 設定不整合（決済・プラン変更ともに機能しない状態）");
-                Console.WriteLine($"   → 有効化するには: set {TestModeEnvVar}=true");
-            }
-
+            Console.WriteLine("   本番環境では appsettings.json の EnableMockMode を false に設定してください");
             Console.WriteLine("⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️");
 
             // INotificationServiceを使用して警告を表示
             var notificationService = serviceProvider.GetService<INotificationService>();
             if (notificationService != null)
             {
-                // 10秒間表示（重要な警告なので長めに）
-                await notificationService.ShowWarningAsync(warningTitle, warningMessage, duration: 10000);
+                await notificationService.ShowWarningAsync(
+                    "🧪 テストモード有効",
+                    "ライセンスモックモードが有効です。本番環境では appsettings.json の License.EnableMockMode を false に設定してください。",
+                    duration: 10000);
             }
 
             _logger?.LogInformation("テストモード警告表示完了");
