@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -11,15 +12,18 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.License.Models;
 using Baketa.Core.Logging;
 using Baketa.Core.Performance;
 using Baketa.Core.Services;
 using Baketa.Core.Settings;
+using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Common;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
@@ -49,8 +53,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly TranslationService _translationService;
     private readonly IOptionsMonitor<Baketa.Core.Settings.OcrSettings> _ocrSettings;
     private readonly ITranslationDictionaryService? _translationDictionaryService;
-    private readonly IParallelOcrExecutor? _parallelOcrExecutor; // [Issue #290] 並列OCR実行
     private readonly ILogger<TranslationOrchestrationService>? _logger;
+
+    // Issue #290: Fork-Join並列実行用（OCR || Cloud AI翻訳）
+    private readonly IFallbackOrchestrator? _fallbackOrchestrator;
+    private readonly ILicenseManager? _licenseManager;
 
     // 状態管理
     private volatile bool _isAutomaticTranslationActive;
@@ -96,41 +103,43 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="captureService">キャプチャサービス</param>
     /// <param name="settingsService">設定サービス</param>
     /// <param name="ocrEngine">OCRエンジン</param>
-    /// <param name="translationEngineFactory">翻訳エンジンファクトリー</param>
     /// <param name="coordinateBasedTranslation">座標ベース翻訳サービス</param>
     /// <param name="eventAggregator">イベント集約サービス</param>
+    /// <param name="ocrSettings">OCR設定</param>
+    /// <param name="translationService">翻訳サービス</param>
     /// <param name="translationDictionaryService">翻訳辞書サービス（オプショナル）</param>
+    /// <param name="fallbackOrchestrator">フォールバックオーケストレーター（Issue #290: Fork-Join用）</param>
+    /// <param name="licenseManager">ライセンスマネージャー（Issue #290: Cloud AI利用可否判定用）</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
         ISettingsService settingsService,
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
-        // [REMOVED] ITranslationEngineFactory translationEngineFactory,
         CoordinateBasedTranslationService? coordinateBasedTranslation,
         IEventAggregator eventAggregator,
         IOptionsMonitor<Baketa.Core.Settings.OcrSettings> ocrSettings,
         TranslationService translationService,
         ITranslationDictionaryService? translationDictionaryService = null,
-        IParallelOcrExecutor? parallelOcrExecutor = null, // [Issue #290] 並列OCR実行
+        IFallbackOrchestrator? fallbackOrchestrator = null,
+        ILicenseManager? licenseManager = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(ocrEngine);
-        // [REMOVED] ArgumentNullException.ThrowIfNull(translationEngineFactory);
         ArgumentNullException.ThrowIfNull(eventAggregator);
         ArgumentNullException.ThrowIfNull(ocrSettings);
 
         _captureService = captureService;
         _settingsService = settingsService;
         _ocrEngine = ocrEngine;
-        // [REMOVED] _translationEngineFactory = translationEngineFactory;
         _coordinateBasedTranslation = coordinateBasedTranslation;
         _eventAggregator = eventAggregator;
         _ocrSettings = ocrSettings;
         _translationService = translationService;
         _translationDictionaryService = translationDictionaryService;
-        _parallelOcrExecutor = parallelOcrExecutor; // [Issue #290] 並列OCR実行
+        _fallbackOrchestrator = fallbackOrchestrator;
+        _licenseManager = licenseManager;
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -1764,6 +1773,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             _logger?.LogDebug($"   🌐 現在の言語: {_ocrEngine?.CurrentLanguage ?? "(null)"}");
 
             OcrResults ocrResults;
+            FallbackTranslationResult? cloudTranslationResult = null;
+
+            // 🚀 [Issue #290] Fork-Join並列実行: OCR || Cloud AI翻訳
+            // Pro/Premiaプランの場合、OCRとCloud AI翻訳を並列実行して待ち時間を短縮
+            var isCloudAiAvailable = IsCloudAiParallelExecutionAvailable();
 
             // OCR処理の排他制御
             await _ocrExecutionSemaphore.WaitAsync(currentRequestToken).ConfigureAwait(false);
@@ -1778,15 +1792,23 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 _logger?.LogDebug($"🔒 OCR処理を排他実行開始: ID={translationId}");
 
-                // [Issue #290] 並列OCR実行が利用可能な場合は使用
-                if (_parallelOcrExecutor != null)
+                if (isCloudAiAvailable)
                 {
-                    _logger?.LogDebug($"🚀 [Issue #290] 並列OCR実行モード: ID={translationId}");
-                    ocrResults = await _parallelOcrExecutor.ExecuteParallelOcrAsync(image, null, currentRequestToken).ConfigureAwait(false);
+                    // 🚀 Fork-Join: OCR + Cloud AI翻訳を並列実行
+                    var parallelResult = await ExecuteForkJoinOcrAndCloudAsync(
+                        image, translationId, currentRequestToken).ConfigureAwait(false);
+
+                    ocrResults = parallelResult.OcrResults;
+                    cloudTranslationResult = parallelResult.CloudResult;
+
+                    _logger?.LogInformation(
+                        "🚀 [Issue #290] Fork-Join完了: OCR={OcrMs}ms, Cloud={CloudMs}ms (並列実行)",
+                        parallelResult.OcrDuration.TotalMilliseconds,
+                        parallelResult.CloudDuration?.TotalMilliseconds ?? 0);
                 }
                 else
                 {
-                    _logger?.LogDebug($"📝 通常OCR実行モード: ID={translationId}");
+                    // 従来のOCRのみ実行（Free/Standardプラン）
                     ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: currentRequestToken).ConfigureAwait(false);
                 }
 
@@ -2324,6 +2346,181 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     }
 
     // 🗑️ [REMOVED] 辞書翻訳メソッドを削除 - NLLB-200 AI翻訳エンジンに統合完了
+
+    #endregion
+
+    #region Issue #290: Fork-Join並列実行（OCR || Cloud AI翻訳）
+
+    /// <summary>
+    /// Fork-Join並列実行の結果
+    /// </summary>
+    private sealed record ForkJoinResult(
+        OcrResults OcrResults,
+        FallbackTranslationResult? CloudResult,
+        TimeSpan OcrDuration,
+        TimeSpan? CloudDuration);
+
+    /// <summary>
+    /// Cloud AI並列実行が利用可能かどうかを判定
+    /// </summary>
+    /// <returns>Pro/Premiaプランでセッションが有効な場合はtrue</returns>
+    private bool IsCloudAiParallelExecutionAvailable()
+    {
+        // FallbackOrchestratorが登録されていない場合は並列実行不可
+        if (_fallbackOrchestrator == null)
+        {
+            _logger?.LogInformation("[Issue #290] FallbackOrchestrator未登録 - 並列実行無効");
+            return false;
+        }
+
+        // LicenseManagerが登録されていない場合は並列実行不可
+        if (_licenseManager == null)
+        {
+            _logger?.LogInformation("[Issue #290] LicenseManager未登録 - 並列実行無効");
+            return false;
+        }
+
+        // Cloud AI翻訳機能が利用可能かチェック
+        if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
+        {
+            _logger?.LogInformation("[Issue #290] CloudAiTranslation機能が無効 - 並列実行無効");
+            return false;
+        }
+
+        // セッションが有効かチェック
+        var sessionId = _licenseManager.CurrentState.SessionId;
+        if (string.IsNullOrEmpty(sessionId))
+        {
+            _logger?.LogInformation("[Issue #290] セッションID未設定 - 並列実行無効");
+            return false;
+        }
+
+        // FallbackOrchestratorの状態をチェック
+        var fallbackStatus = _fallbackOrchestrator.GetCurrentStatus();
+        if (!fallbackStatus.PrimaryAvailable && !fallbackStatus.SecondaryAvailable)
+        {
+            _logger?.LogInformation("[Issue #290] Cloud AI翻訳サービス利用不可 - 並列実行無効");
+            return false;
+        }
+
+        _logger?.LogInformation("[Issue #290] Cloud AI並列実行が利用可能");
+        return true;
+    }
+
+    /// <summary>
+    /// OCRとCloud AI翻訳をFork-Join方式で並列実行
+    /// </summary>
+    /// <param name="image">キャプチャ画像</param>
+    /// <param name="translationId">翻訳ID</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>Fork-Join実行結果</returns>
+    private async Task<ForkJoinResult> ExecuteForkJoinOcrAndCloudAsync(
+        IImage image,
+        string translationId,
+        CancellationToken cancellationToken)
+    {
+        var ocrStopwatch = new Stopwatch();
+        var cloudStopwatch = new Stopwatch();
+
+        _logger?.LogInformation("🚀 [Issue #290] Fork-Join並列実行開始: ID={TranslationId}", translationId);
+
+        // OCRタスク定義
+        async Task<OcrResults> ExecuteOcrAsync()
+        {
+            ocrStopwatch.Start();
+            try
+            {
+                return await _ocrEngine!.RecognizeAsync(image, cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                ocrStopwatch.Stop();
+            }
+        }
+
+        // Cloud AI翻訳タスク定義
+        async Task<FallbackTranslationResult?> ExecuteCloudTranslationAsync()
+        {
+            cloudStopwatch.Start();
+            try
+            {
+                // 画像データをBase64エンコード
+                var imageMemory = image.GetImageMemory();
+                var imageBase64 = Convert.ToBase64String(imageMemory.Span);
+
+                // 翻訳設定を取得
+                var translationSettings = await _settingsService.GetAsync<CoreTranslationSettings>()
+                    .ConfigureAwait(false);
+                var targetLanguage = translationSettings?.DefaultTargetLanguage ?? "ja";
+
+                // セッショントークンを取得
+                var sessionToken = _licenseManager!.CurrentState.SessionId;
+                if (string.IsNullOrEmpty(sessionToken))
+                {
+                    _logger?.LogWarning("[Issue #290] セッショントークンが空 - Cloud翻訳スキップ");
+                    return null;
+                }
+
+                // ImageTranslationRequestを作成
+                var request = new ImageTranslationRequest
+                {
+                    RequestId = translationId,
+                    ImageBase64 = imageBase64,
+                    MimeType = "image/png",
+                    TargetLanguage = targetLanguage,
+                    Width = image.Width,
+                    Height = image.Height,
+                    SessionToken = sessionToken
+                };
+
+                // タイムアウト付きでCloud翻訳を実行
+                using var cloudCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cloudCts.CancelAfter(TimeSpan.FromSeconds(30));
+
+                return await _fallbackOrchestrator!.TranslateWithFallbackAsync(request, cloudCts.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger?.LogDebug("[Issue #290] Cloud翻訳がキャンセルされました");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[Issue #290] Cloud翻訳でエラー発生（OCR結果のみ使用）");
+                return null;
+            }
+            finally
+            {
+                cloudStopwatch.Stop();
+            }
+        }
+
+        // 🚀 Fork: 両タスクを同時に開始（awaitせずに即座に開始）
+        var ocrTask = ExecuteOcrAsync();
+        var cloudTask = ExecuteCloudTranslationAsync();
+
+        // Join: 両タスクの完了を待機
+        await Task.WhenAll(ocrTask, cloudTask).ConfigureAwait(false);
+
+        // 結果を取得
+        var ocrResults = await ocrTask.ConfigureAwait(false);
+        var cloudResult = await cloudTask.ConfigureAwait(false);
+
+        _logger?.LogInformation(
+            "🚀 [Issue #290] Fork-Join完了: OCR={OcrMs}ms ({OcrCount}テキスト), Cloud={CloudMs}ms (成功={CloudSuccess})",
+            ocrStopwatch.ElapsedMilliseconds,
+            ocrResults.TextRegions.Count,
+            cloudStopwatch.ElapsedMilliseconds,
+            cloudResult?.IsSuccess ?? false);
+
+        return new ForkJoinResult(
+            ocrResults,
+            cloudResult,
+            ocrStopwatch.Elapsed,
+            cloudStopwatch.Elapsed);
+    }
 
     #endregion
 

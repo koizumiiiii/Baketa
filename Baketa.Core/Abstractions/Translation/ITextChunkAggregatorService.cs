@@ -1,4 +1,5 @@
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Translation.Abstractions; // [Issue #290] FallbackTranslationResult用
 
 namespace Baketa.Core.Abstractions.Translation;
 
@@ -52,4 +53,11 @@ public interface ITextChunkAggregatorService
     /// [Issue #78 Phase 4] 画像コンテキストをクリア
     /// </summary>
     void ClearImageContext();
+
+    /// <summary>
+    /// [Issue #290] Fork-Join並列実行で事前計算されたCloud AI翻訳結果を設定
+    /// 次回のAggregatedChunksReadyEvent発行時に結果が含まれます
+    /// </summary>
+    /// <param name="result">事前計算されたCloud AI翻訳結果</param>
+    void SetPreComputedCloudResult(FallbackTranslationResult? result);
 }

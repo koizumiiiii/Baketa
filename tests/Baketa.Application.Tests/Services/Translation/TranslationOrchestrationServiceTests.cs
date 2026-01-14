@@ -82,13 +82,13 @@ public class TranslationOrchestrationServiceTests : IDisposable
             _captureServiceMock.Object,
             _settingsServiceMock.Object,
             _ocrEngineMock.Object,
-            // [REMOVED] _translationEngineFactoryMock.Object,
             _coordinateBasedTranslationService, // 座標ベース翻訳サービス（テスト用にnull）
             _eventAggregatorMock.Object,
             ocrSettingsMock.Object,
             Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>(), // translationService（テスト用）
             null, // translationDictionaryService（テスト用にnull）
-            null, // [Issue #290] parallelOcrExecutor（テスト用にnull - 通常OCRモード）
+            null, // fallbackOrchestrator（Issue #290: テスト用にnull）
+            null, // licenseManager（Issue #290: テスト用にnull）
             _loggerMock.Object);
     }
 

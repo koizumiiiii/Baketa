@@ -16,6 +16,7 @@ using Baketa.Core.Models.Translation;
 using Baketa.Core.Models.Validation; // [Issue #78 Phase 4] ValidatedTextChunk用
 using Baketa.Core.Translation.Abstractions; // [Issue #78 Phase 4] IParallelTranslationOrchestrator用
 using Baketa.Core.Translation.Models;
+using Baketa.Application.Services.Translation; // [Issue #291] ITranslationControlService用
 using Microsoft.Extensions.Logging;
 using Language = Baketa.Core.Translation.Models.Language;
 
@@ -48,6 +49,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly ILicenseManager? _licenseManager;
     // [Issue #273] Cloud翻訳可用性統合サービス
     private readonly Core.Abstractions.Translation.ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService;
+    // [Issue #291] 翻訳状態確認用サービス（キャンセル状態チェック）
+    private readonly ITranslationControlService? _translationControlService;
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
@@ -63,7 +66,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         IParallelTranslationOrchestrator? parallelTranslationOrchestrator = null,
         ILicenseManager? licenseManager = null,
         // [Issue #273] Cloud翻訳可用性統合サービス（オプショナル）
-        Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null)
+        Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null,
+        // [Issue #291] 翻訳状態確認用サービス（オプショナル）
+        ITranslationControlService? translationControlService = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -78,6 +83,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _licenseManager = licenseManager;
         // [Issue #273] Cloud翻訳可用性統合サービス
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
+        // [Issue #291] 翻訳状態確認用サービス
+        _translationControlService = translationControlService;
     }
 
     /// <inheritdoc />
@@ -265,12 +272,53 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 return;
             }
 
-            // [Issue #78 Phase 4] Cloud AI翻訳が利用可能かチェック
-            var useParallelTranslation = ShouldUseParallelTranslation(eventData);
-
+            // ============================================================
+            // [Issue #290] Fork-Join: 事前計算されたCloud AI翻訳結果を優先使用
+            // ============================================================
             List<string> translationResults;
 
-            if (useParallelTranslation)
+            if (eventData.HasPreComputedCloudResult)
+            {
+                // 事前計算されたCloud AI翻訳結果が利用可能
+                _logger?.LogInformation(
+                    "🚀 [Issue #290] Fork-Join: 事前計算されたCloud AI翻訳結果を使用 (Engine={Engine})",
+                    eventData.PreComputedCloudResult!.UsedEngine);
+#if DEBUG
+                Console.WriteLine($"🚀 [Issue #290] Fork-Join: 事前計算Cloud AI結果を使用 - Engine: {eventData.PreComputedCloudResult!.UsedEngine}");
+#endif
+
+                var cloudResponse = eventData.PreComputedCloudResult!.Response;
+
+                // Cloud AI翻訳結果からテキストを抽出
+                if (cloudResponse?.Texts is { Count: > 0 } cloudTexts)
+                {
+                    // 複数テキスト結果がある場合
+                    // TODO: 座標マッチングによりOCRチャンクとCloud AI結果を対応付け
+                    // 現時点では最初のテキストを全チャンクに適用（暫定実装）
+                    translationResults = cloudTexts
+                        .Select(t => t.Translation ?? string.Empty)
+                        .ToList();
+
+                    _logger?.LogDebug(
+                        "✅ [Issue #290] Fork-Join Cloud AI翻訳結果: {Count}個のテキスト取得",
+                        translationResults.Count);
+                }
+                else if (!string.IsNullOrEmpty(cloudResponse?.TranslatedText))
+                {
+                    // 単一テキスト結果
+                    translationResults = [cloudResponse.TranslatedText];
+                    _logger?.LogDebug("✅ [Issue #290] Fork-Join Cloud AI翻訳結果: 単一テキスト取得");
+                }
+                else
+                {
+                    // Cloud AI結果が空 → ローカル翻訳にフォールバック
+                    _logger?.LogWarning("⚠️ [Issue #290] Fork-Join Cloud AI翻訳結果が空 - ローカル翻訳にフォールバック");
+                    translationResults = await ExecuteBatchTranslationAsync(
+                        nonEmptyChunks,
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+            }
+            else if (ShouldUseParallelTranslation(eventData))
             {
                 // [Issue #78 Phase 4] 並列翻訳（ローカル + Cloud AI）を実行
                 _logger?.LogDebug("🌐 [Phase4] 並列翻訳モード開始 - ChunkCount: {Count}", nonEmptyChunks.Count);
@@ -376,6 +424,16 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                 $"[{timestamp2}][T{threadId2:D2}] 🚨 [ULTRATHINK_TRACE2] 翻訳結果設定完了 - チャンク数: {nonEmptyChunks.Count}\r\n");
 #endif
+
+            // 🛑 [Issue #291] オーバーレイ表示前にキャンセル状態をチェック
+            // NOTE: TranslationControlServiceはMainOverlayViewModelと状態同期されていないため、
+            // 現時点ではこのチェックを無効化。将来的にTranslationControlServiceの統合が完了したら有効化する。
+            // TODO: [Issue #291] MainOverlayViewModelがTranslationControlServiceを使用するようになったら再有効化
+            // if (_translationControlService != null && !_translationControlService.IsTranslationActive)
+            // {
+            //     _logger?.LogInformation("🛑 [Issue #291] 翻訳が停止されたため、オーバーレイ表示をスキップします");
+            //     return;
+            // }
 
             // 🧹 [OVERLAY_CLEANUP] 新しいオーバーレイ表示前に古いオーバーレイをクリア
             try

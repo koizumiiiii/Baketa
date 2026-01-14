@@ -98,11 +98,6 @@ public sealed class ApplicationModule : ServiceModuleBase
     /// <param name="services">サービスコレクション</param>
     private static void RegisterOcrApplicationServices(IServiceCollection services)
     {
-        // [Issue #290] 並列OCR実行サービス登録
-        Console.WriteLine("🚀 [Issue #290] ParallelOcrExecutor DI登録開始");
-        services.AddSingleton<Baketa.Core.Abstractions.OCR.IParallelOcrExecutor, Services.OCR.ParallelOcrExecutor>();
-        Console.WriteLine("✅ [Issue #290] ParallelOcrExecutor DI登録完了");
-
         // OCR関連のアプリケーションサービス
         // 例: services.AddSingleton<IOcrService, OcrService>();
         // 例: services.AddSingleton<IOcrProfileService, OcrProfileService>();
@@ -199,9 +194,13 @@ public sealed class ApplicationModule : ServiceModuleBase
                 var textChangeDetectionService = provider.GetService<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
                 Console.WriteLine($"✅ [Issue #230] ITextChangeDetectionService取得: {(textChangeDetectionService != null ? "成功" : "null (オプショナル)")}");
 
-                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（8パラメータ）");
+                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（11パラメータ）");
                 var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
                 var translationModeService = provider.GetService<Baketa.Core.Abstractions.Services.ITranslationModeService>(); // 🔧 [SINGLESHOT_FIX]
+                // [Issue #290] Fork-Join並列実行用の依存関係
+                var fallbackOrchestrator = provider.GetService<Baketa.Core.Translation.Abstractions.IFallbackOrchestrator>();
+                var licenseManager = provider.GetService<Baketa.Core.Abstractions.License.ILicenseManager>();
+                var cloudTranslationAvailabilityService = provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService>();
                 var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                     processingFacade,
                     configurationFacade,
@@ -210,8 +209,11 @@ public sealed class ApplicationModule : ServiceModuleBase
                     pipelineService, // 🎯 [OPTION_A] 追加パラメータ - SmartProcessingPipelineService統合
                     textChangeDetectionService, // [Issue #230] テキストベース変化検知
                     translationModeService, // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
+                    fallbackOrchestrator, // [Issue #290] Fork-Join Cloud AI翻訳
+                    licenseManager, // [Issue #290] ライセンスチェック
+                    cloudTranslationAvailabilityService, // [Issue #290] Cloud翻訳可用性チェック
                     logger);
-                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス統合済み");
+                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join統合済み");
                 return instance;
             }
             catch (Exception ex)
@@ -240,7 +242,6 @@ public sealed class ApplicationModule : ServiceModuleBase
                 var captureService = provider.GetRequiredService<ICaptureService>();
                 var settingsService = provider.GetRequiredService<ISettingsService>();
                 var ocrEngine = provider.GetRequiredService<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-                // [REMOVED] var translationEngineFactory = provider.GetRequiredService<ITranslationEngineFactory>();
                 var eventAggregator = provider.GetRequiredService<Baketa.Core.Abstractions.Events.IEventAggregator>();
                 var translationService = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationService>();
                 var translationDictionaryService = (Baketa.Core.Abstractions.Services.ITranslationDictionaryService?)null; // REMOVED: 辞書翻訳削除済み
@@ -253,22 +254,23 @@ public sealed class ApplicationModule : ServiceModuleBase
                 Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
                 Console.WriteLine($"🚫 [DI_DEBUG] TranslationDictionaryService削除済み: {translationDictionaryService?.GetType().Name ?? "null - REMOVED"}");
 
-                // [Issue #290] 並列OCR実行サービス取得
-                var parallelOcrExecutor = provider.GetService<Baketa.Core.Abstractions.OCR.IParallelOcrExecutor>();
-                Console.WriteLine($"🚀 [Issue #290] ParallelOcrExecutor取得: {(parallelOcrExecutor != null ? "成功" : "null (通常OCRモード)")}");
+                // 🚀 [Issue #290] Fork-Join並列実行用サービス取得（オプショナル）
+                var fallbackOrchestrator = provider.GetService<Baketa.Core.Translation.Abstractions.IFallbackOrchestrator>();
+                var licenseManager = provider.GetService<Baketa.Core.Abstractions.License.ILicenseManager>();
+                Console.WriteLine($"🚀 [Issue #290] Fork-Join: FallbackOrchestrator={fallbackOrchestrator != null}, LicenseManager={licenseManager != null}");
 
                 var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                     captureService,
                     settingsService,
                     ocrEngine,
-                    // [REMOVED] translationEngineFactory,
                     coordinateBasedTranslation,
                     eventAggregator,
                     ocrSettings,
                     translationService,
                     translationDictionaryService,
-                    parallelOcrExecutor, // [Issue #290] 並列OCR実行
+                    fallbackOrchestrator,
+                    licenseManager,
                     logger);
             }
             catch (Exception ex)

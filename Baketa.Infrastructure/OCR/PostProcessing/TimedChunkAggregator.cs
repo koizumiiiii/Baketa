@@ -4,6 +4,7 @@ using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.Translation;
 using Baketa.Core.Settings;
+using Baketa.Core.Translation.Abstractions; // [Issue #290] FallbackTranslationResult用
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -43,6 +44,9 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     private int _currentImageWidth;
     private int _currentImageHeight;
     private readonly object _imageContextLock = new();
+
+    // [Issue #290] Fork-Join並列実行で事前計算されたCloud AI翻訳結果
+    private FallbackTranslationResult? _preComputedCloudResult;
 
     public TimedChunkAggregator(
         IOptionsMonitor<TimedAggregatorSettings> settings,
@@ -420,13 +424,15 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                     };
 
                     // [Issue #78 Phase 4] 画像コンテキストを含めてイベント発行
+                    // [Issue #290] 事前計算されたCloud AI翻訳結果も含める
                     var imageContext = GetAndClearImageContext();
                     var aggregatedEvent = new AggregatedChunksReadyEvent(
                         new List<TextChunk> { fallbackChunk }.AsReadOnly(),
                         fallbackChunk.SourceWindowHandle,
                         imageContext.ImageBase64,
                         imageContext.Width,
-                        imageContext.Height
+                        imageContext.Height,
+                        imageContext.PreComputedCloudResult
                     );
 
                     await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
@@ -495,13 +501,15 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                 var windowHandle = allAggregatedChunks.FirstOrDefault()?.SourceWindowHandle ?? IntPtr.Zero;
 
                 // [Issue #78 Phase 4] 画像コンテキストを含めてイベント発行
+                // [Issue #290] 事前計算されたCloud AI翻訳結果も含める
                 var imageContext = GetAndClearImageContext();
                 var aggregatedEvent = new AggregatedChunksReadyEvent(
                     allAggregatedChunks.AsReadOnly(),
                     windowHandle,
                     imageContext.ImageBase64,
                     imageContext.Width,
-                    imageContext.Height
+                    imageContext.Height,
+                    imageContext.PreComputedCloudResult
                 );
 
                 await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
@@ -729,24 +737,45 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             _currentImageBase64 = null;
             _currentImageWidth = 0;
             _currentImageHeight = 0;
+            _preComputedCloudResult = null; // [Issue #290] Cloud結果もクリア
 
             _logger.LogDebug("[Issue #78] 画像コンテキストクリア");
+        }
+    }
+
+    /// <inheritdoc />
+    public void SetPreComputedCloudResult(FallbackTranslationResult? result)
+    {
+        lock (_imageContextLock)
+        {
+            _preComputedCloudResult = result;
+
+            if (result != null)
+            {
+                _logger.LogInformation("[Issue #290] 事前計算されたCloud AI翻訳結果を設定: Success={Success}, Engine={Engine}",
+                    result.IsSuccess, result.UsedEngine);
+            }
+            else
+            {
+                _logger.LogDebug("[Issue #290] Cloud AI翻訳結果をクリア");
+            }
         }
     }
 
     /// <summary>
     /// [Issue #78 Phase 4] 現在の画像コンテキストを取得
     /// </summary>
-    private (string? ImageBase64, int Width, int Height) GetAndClearImageContext()
+    private (string? ImageBase64, int Width, int Height, FallbackTranslationResult? PreComputedCloudResult) GetAndClearImageContext()
     {
         lock (_imageContextLock)
         {
-            var result = (_currentImageBase64, _currentImageWidth, _currentImageHeight);
+            var result = (_currentImageBase64, _currentImageWidth, _currentImageHeight, _preComputedCloudResult);
 
             // 使用後にクリア（次回のイベント発行で再利用されないように）
             _currentImageBase64 = null;
             _currentImageWidth = 0;
             _currentImageHeight = 0;
+            _preComputedCloudResult = null; // [Issue #290] Cloud結果もクリア
 
             return result;
         }
