@@ -128,7 +128,8 @@ public interface IOverlayWindowManager
     /// <summary>
     /// すべてのオーバーレイウィンドウを閉じます
     /// </summary>
-    Task CloseAllOverlaysAsync();
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    Task CloseAllOverlaysAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// アクティブなオーバーレイウィンドウの数

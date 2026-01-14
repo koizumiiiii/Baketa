@@ -49,6 +49,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly TranslationService _translationService;
     private readonly IOptionsMonitor<Baketa.Core.Settings.OcrSettings> _ocrSettings;
     private readonly ITranslationDictionaryService? _translationDictionaryService;
+    private readonly IParallelOcrExecutor? _parallelOcrExecutor; // [Issue #290] 並列OCR実行
     private readonly ILogger<TranslationOrchestrationService>? _logger;
 
     // 状態管理
@@ -110,6 +111,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         IOptionsMonitor<Baketa.Core.Settings.OcrSettings> ocrSettings,
         TranslationService translationService,
         ITranslationDictionaryService? translationDictionaryService = null,
+        IParallelOcrExecutor? parallelOcrExecutor = null, // [Issue #290] 並列OCR実行
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -128,6 +130,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _ocrSettings = ocrSettings;
         _translationService = translationService;
         _translationDictionaryService = translationDictionaryService;
+        _parallelOcrExecutor = parallelOcrExecutor; // [Issue #290] 並列OCR実行
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -1774,7 +1777,19 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 }
 
                 _logger?.LogDebug($"🔒 OCR処理を排他実行開始: ID={translationId}");
-                ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: currentRequestToken).ConfigureAwait(false);
+
+                // [Issue #290] 並列OCR実行が利用可能な場合は使用
+                if (_parallelOcrExecutor != null)
+                {
+                    _logger?.LogDebug($"🚀 [Issue #290] 並列OCR実行モード: ID={translationId}");
+                    ocrResults = await _parallelOcrExecutor.ExecuteParallelOcrAsync(image, null, currentRequestToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    _logger?.LogDebug($"📝 通常OCR実行モード: ID={translationId}");
+                    ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: currentRequestToken).ConfigureAwait(false);
+                }
+
                 _logger?.LogDebug($"🔓 OCR処理を排他実行完了: ID={translationId}");
             }
             finally

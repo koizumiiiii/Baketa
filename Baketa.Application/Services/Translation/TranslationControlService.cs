@@ -29,7 +29,7 @@ public sealed class TranslationControlService : ITranslationControlService, IDis
     private readonly SemaphoreSlim _stateLock = new(1, 1);
 
     private TranslationStatus _currentStatus = TranslationStatus.Idle;
-    private bool _isTranslationActive;
+    private volatile bool _isTranslationActive;  // [Issue #291] スレッドセーフ化
     private bool _isTranslationResultVisible;
     private bool _isLoading;
     private bool _disposed;

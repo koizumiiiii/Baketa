@@ -798,10 +798,11 @@ internal sealed class TestOverlayWindowManagerMock : IOverlayWindowManager
 
     public int ActiveOverlayCount => _overlays.Count;
 
-    public Task CloseAllOverlaysAsync()
+    public Task CloseAllOverlaysAsync(CancellationToken cancellationToken = default)
     {
         foreach (var overlay in _overlays.Values)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             overlay.Dispose();
         }
         _overlays.Clear();

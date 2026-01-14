@@ -88,6 +88,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             ocrSettingsMock.Object,
             Mock.Of<Baketa.Core.Abstractions.Translation.ITranslationService>(), // translationService（テスト用）
             null, // translationDictionaryService（テスト用にnull）
+            null, // [Issue #290] parallelOcrExecutor（テスト用にnull - 通常OCRモード）
             _loggerMock.Object);
     }
 

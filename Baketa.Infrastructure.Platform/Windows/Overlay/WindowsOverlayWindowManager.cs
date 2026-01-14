@@ -151,7 +151,7 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager, IDispos
     }
 
     /// <inheritdoc/>
-    public async Task CloseAllOverlaysAsync()
+    public async Task CloseAllOverlaysAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Closing {Count} active overlays", _activeOverlays.Count);
 
@@ -163,9 +163,15 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager, IDispos
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     overlay.Dispose();
                     _activeOverlays.TryRemove(handle, out _);
                     _logger.LogDebug("Overlay {Handle} closed successfully", handle);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogDebug("Overlay {Handle} close cancelled", handle);
+                    throw;
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -175,12 +181,19 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager, IDispos
                 {
                     _logger.LogError(ex, "External error while closing overlay {Handle}", handle);
                 }
-            }));
+            }, cancellationToken));
         }
 
-        await Task.WhenAll(tasks).ConfigureAwait(false);
-
-        _logger.LogInformation("All overlays closed");
+        try
+        {
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+            _logger.LogInformation("All overlays closed");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("CloseAllOverlaysAsync was cancelled");
+            throw;
+        }
     }
 
     /// <inheritdoc/>

@@ -95,9 +95,14 @@ public sealed class ApplicationModule : ServiceModuleBase
     /// <summary>
     /// OCRアプリケーションサービスを登録します。
     /// </summary>
-    /// <param name="_">サービスコレクション</param>
-    private static void RegisterOcrApplicationServices(IServiceCollection _)
+    /// <param name="services">サービスコレクション</param>
+    private static void RegisterOcrApplicationServices(IServiceCollection services)
     {
+        // [Issue #290] 並列OCR実行サービス登録
+        Console.WriteLine("🚀 [Issue #290] ParallelOcrExecutor DI登録開始");
+        services.AddSingleton<Baketa.Core.Abstractions.OCR.IParallelOcrExecutor, Services.OCR.ParallelOcrExecutor>();
+        Console.WriteLine("✅ [Issue #290] ParallelOcrExecutor DI登録完了");
+
         // OCR関連のアプリケーションサービス
         // 例: services.AddSingleton<IOcrService, OcrService>();
         // 例: services.AddSingleton<IOcrProfileService, OcrProfileService>();
@@ -248,6 +253,10 @@ public sealed class ApplicationModule : ServiceModuleBase
                 Console.WriteLine($"✅ [DI_DEBUG] EventAggregator取得成功: {eventAggregator.GetType().Name}");
                 Console.WriteLine($"🚫 [DI_DEBUG] TranslationDictionaryService削除済み: {translationDictionaryService?.GetType().Name ?? "null - REMOVED"}");
 
+                // [Issue #290] 並列OCR実行サービス取得
+                var parallelOcrExecutor = provider.GetService<Baketa.Core.Abstractions.OCR.IParallelOcrExecutor>();
+                Console.WriteLine($"🚀 [Issue #290] ParallelOcrExecutor取得: {(parallelOcrExecutor != null ? "成功" : "null (通常OCRモード)")}");
+
                 var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                     captureService,
@@ -259,6 +268,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     ocrSettings,
                     translationService,
                     translationDictionaryService,
+                    parallelOcrExecutor, // [Issue #290] 並列OCR実行
                     logger);
             }
             catch (Exception ex)

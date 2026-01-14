@@ -127,21 +127,28 @@ public sealed class Win32OverlayManager : IOverlayManager
     }
 
     /// <inheritdoc/>
-    public async Task HideAllAsync()
+    public async Task HideAllAsync(CancellationToken cancellationToken = default)
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var overlayCount = _activeOverlays.Count;
             _logger.LogInformation("全Win32オーバーレイ非表示開始: Count={Count}", overlayCount);
 
             // WindowsOverlayWindowManagerで全オーバーレイを閉じる
-            await _windowsOverlayWindowManager.CloseAllOverlaysAsync().ConfigureAwait(false);
+            await _windowsOverlayWindowManager.CloseAllOverlaysAsync(cancellationToken).ConfigureAwait(false);
 
             // アクティブオーバーレイディクショナリをクリア
             // (WindowsOverlayWindowManagerが既に破棄しているため、Disposeは不要)
             _activeOverlays.Clear();
 
             _logger.LogInformation("全Win32オーバーレイ非表示完了: {Count}個のオーバーレイを閉じました", overlayCount);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("全Win32オーバーレイ非表示がキャンセルされました");
+            throw;
         }
         catch (Exception ex)
         {
@@ -151,10 +158,12 @@ public sealed class Win32OverlayManager : IOverlayManager
     }
 
     /// <inheritdoc/>
-    public async Task SetAllVisibilityAsync(bool isVisible)
+    public async Task SetAllVisibilityAsync(bool isVisible, CancellationToken cancellationToken = default)
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var overlayCount = _activeOverlays.Count;
             _logger.LogInformation("全Win32オーバーレイ可視性変更開始: IsVisible={IsVisible}, Count={Count}",
                 isVisible, overlayCount);
@@ -163,6 +172,7 @@ public sealed class Win32OverlayManager : IOverlayManager
             var tasks = new List<Task>();
             foreach (var overlay in _activeOverlays.Values)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var task = isVisible ? overlay.ShowAsync() : overlay.HideAsync();
                 tasks.Add(task);
             }
@@ -172,6 +182,11 @@ public sealed class Win32OverlayManager : IOverlayManager
 
             _logger.LogInformation("全Win32オーバーレイ可視性変更完了: IsVisible={IsVisible}, {Count}個のオーバーレイ",
                 isVisible, overlayCount);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("全Win32オーバーレイ可視性変更がキャンセルされました: IsVisible={IsVisible}", isVisible);
+            throw;
         }
         catch (Exception ex)
         {
