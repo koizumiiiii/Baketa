@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
@@ -21,6 +22,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     private readonly ILogger<PatreonOAuthService> _logger;
     private readonly PatreonSettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IJwtTokenService? _jwtTokenService;  // [Issue #287] JWT認証サービス（オプショナル）
     private readonly string _credentialsFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
@@ -69,11 +71,13 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     public PatreonOAuthService(
         ILogger<PatreonOAuthService> logger,
         IOptions<PatreonSettings> settings,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IJwtTokenService? jwtTokenService = null)  // [Issue #287] オプショナル依存
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _jwtTokenService = jwtTokenService;  // null可（JWT未設定時）
 
         // 資格情報保存パス
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -271,6 +275,32 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
 
             await SaveCredentialsAsync(credentials, cancellationToken).ConfigureAwait(false);
             _cachedCredentials = credentials;
+
+            // [Issue #287] SessionTokenをJWTに交換（利用可能な場合）
+            if (_jwtTokenService != null)
+            {
+                try
+                {
+                    var jwtResult = await _jwtTokenService.ExchangeSessionTokenAsync(
+                        sessionResponse.SessionToken, cancellationToken).ConfigureAwait(false);
+
+                    if (jwtResult != null)
+                    {
+                        _logger.LogInformation(
+                            "[Issue #287] JWT取得成功: ExpiresAt={ExpiresAt:u}",
+                            jwtResult.ExpiresAt);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("[Issue #287] JWT取得失敗（SessionToken認証にフォールバック）");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // JWT取得失敗はエラーにしない（SessionToken認証は有効）
+                    _logger.LogWarning(ex, "[Issue #287] JWT交換中にエラー（SessionToken認証にフォールバック）");
+                }
+            }
 
             // ステータス更新
             UpdateSyncStatus(PatreonSyncStatus.Synced);

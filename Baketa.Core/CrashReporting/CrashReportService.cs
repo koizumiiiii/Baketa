@@ -21,6 +21,7 @@ public sealed partial class CrashReportService : ICrashReportService
 {
     private readonly ILogger<CrashReportService>? _logger;
     private readonly RingBufferLogger _ringBuffer;
+    private readonly ICrashReportSender? _sender;
     private readonly DateTime _startTime;
     private readonly string _reportsDirectory;
     private readonly string _crashPendingFlagPath;
@@ -33,9 +34,10 @@ public sealed partial class CrashReportService : ICrashReportService
     };
 
     /// <summary>
-    /// 静的HttpClient（Socket Exhaustion対策）
-    /// クラッシュレポート送信は低頻度のため、静的インスタンスで十分
+    /// [Issue #287] 静的HttpClientは非推奨
+    /// ICrashReportSenderが注入されていない場合のフォールバック用に残す
     /// </summary>
+    [Obsolete("ICrashReportSender経由でのJWT認証付き送信を使用してください")]
     private static readonly HttpClient SharedHttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(30)
@@ -46,12 +48,15 @@ public sealed partial class CrashReportService : ICrashReportService
     /// </summary>
     /// <param name="logger">ロガー（オプション）</param>
     /// <param name="ringBuffer">リングバッファロガー（nullの場合はシングルトンを使用）</param>
+    /// <param name="sender">[Issue #287] クラッシュレポート送信サービス（JWT認証付き）</param>
     public CrashReportService(
         ILogger<CrashReportService>? logger = null,
-        RingBufferLogger? ringBuffer = null)
+        RingBufferLogger? ringBuffer = null,
+        ICrashReportSender? sender = null)
     {
         _logger = logger;
         _ringBuffer = ringBuffer ?? RingBufferLogger.Instance;
+        _sender = sender;
         _startTime = DateTime.UtcNow;
 
         // [Issue #252] BaketaSettingsPathsを使用してパスを一元管理
@@ -59,6 +64,11 @@ public sealed partial class CrashReportService : ICrashReportService
         _crashPendingFlagPath = Settings.BaketaSettingsPaths.CrashPendingFlagPath;
 
         EnsureDirectoryExists();
+
+        if (_sender != null)
+        {
+            _logger?.LogInformation("[Issue #287] CrashReportSender injected - using JWT authentication");
+        }
     }
 
     /// <inheritdoc />
@@ -270,18 +280,38 @@ public sealed partial class CrashReportService : ICrashReportService
         bool includeLogs,
         CancellationToken cancellationToken = default)
     {
+        // [Issue #287] ICrashReportSenderが注入されている場合はそちらを使用（JWT認証付き）
+        if (_sender != null)
+        {
+            _logger?.LogDebug("[Issue #287] Using ICrashReportSender for crash report submission");
+            return await _sender.SendAsync(report, includeSystemInfo, includeLogs, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        // フォールバック: 静的HttpClient使用（JWT認証なし）
+        _logger?.LogWarning("[Issue #287] ICrashReportSender not available, using legacy HttpClient");
+        return await SendCrashReportLegacyAsync(report, includeSystemInfo, includeLogs, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// [Issue #287] レガシー送信メソッド（後方互換性のため維持）
+    /// ICrashReportSenderが注入されていない場合に使用
+    /// </summary>
+    [Obsolete("ICrashReportSender経由でのJWT認証付き送信を使用してください")]
+    private async Task<bool> SendCrashReportLegacyAsync(
+        CrashReport report,
+        bool includeSystemInfo,
+        bool includeLogs,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            // 静的HttpClientを使用（Socket Exhaustion対策）
-            // リクエストボディ作成
-            // AggregateException（UnobservedTaskException等）の場合、
-            // 親のStackTraceはnullになるため、InnerExceptionのスタックトレースを使用
             var exception = report.Exception;
             var stackTrace = exception.StackTrace;
 
             if (string.IsNullOrEmpty(stackTrace))
             {
-                // ExceptionInfoはデータ構造のため、InnerExceptionチェーンを走査してスタックトレースを収集
                 var innerTraces = new List<string>();
                 var currentException = exception.InnerException;
 
@@ -304,7 +334,7 @@ public sealed partial class CrashReportService : ICrashReportService
 
             var requestBody = new Dictionary<string, object?>
             {
-                ["report_id"] = report.ReportId, // UUID形式で生成済み
+                ["report_id"] = report.ReportId,
                 ["crash_timestamp"] = report.CrashedAt.ToString("O"),
                 ["error_message"] = report.Exception.Message,
                 ["stack_trace"] = stackTrace,
@@ -314,7 +344,6 @@ public sealed partial class CrashReportService : ICrashReportService
                 ["include_logs"] = includeLogs
             };
 
-            // システム情報を含める場合
             if (includeSystemInfo)
             {
                 requestBody["system_info"] = new Dictionary<string, object?>
@@ -326,7 +355,6 @@ public sealed partial class CrashReportService : ICrashReportService
                 };
             }
 
-            // ログを含める場合
             if (includeLogs && report.RecentLogs.Count > 0)
             {
                 requestBody["logs"] = string.Join(Environment.NewLine, report.RecentLogs);
@@ -335,11 +363,14 @@ public sealed partial class CrashReportService : ICrashReportService
             var json = JsonSerializer.Serialize(requestBody, JsonOptions);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            // Relay ServerへPOST（静的HttpClient使用）
-            var response = await SharedHttpClient.PostAsync(
-                CrashReportEndpointUrl,
-                content,
-                cancellationToken).ConfigureAwait(false);
+#pragma warning disable CS0618 // Obsolete
+            using var request = new HttpRequestMessage(HttpMethod.Post, CrashReportEndpointUrl)
+            {
+                Content = content
+            };
+
+            var response = await SharedHttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+#pragma warning restore CS0618
 
             if (response.IsSuccessStatusCode)
             {
@@ -366,7 +397,7 @@ public sealed partial class CrashReportService : ICrashReportService
     }
 
     /// <summary>
-    /// クラッシュレポート送信先エンドポイント
+    /// クラッシュレポート送信先エンドポイント（レガシー用）
     /// </summary>
     private const string CrashReportEndpointUrl = "https://baketa-relay.suke009.workers.dev/api/crash-report";
 

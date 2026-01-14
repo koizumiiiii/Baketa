@@ -29,6 +29,7 @@
 import { handleTranslate, TranslateEnv } from './translate';
 import { handleCrashReport, CrashReportEnv } from './crash-report';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SignJWT, jwtVerify, JWTPayload } from 'jose';
 
 // ============================================
 // 定数
@@ -40,7 +41,8 @@ const PATREON_IDENTITY_URL = `${PATREON_API_BASE}/v2/identity`;
 const PATREON_IDENTITY_PARAMS = 'include=memberships.currently_entitled_tiers,memberships.campaign&fields[user]=email,full_name&fields[member]=patron_status,currently_entitled_amount_cents,next_charge_date,campaign_lifetime_support_cents&fields[tier]=title,amount_cents';
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
-const IDENTITY_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
+/** [Issue #286] メンバーシップキャッシュTTL（1時間）- 手動同期で即時反映可能 */
+const IDENTITY_CACHE_TTL_SECONDS = 60 * 60; // 1 hour (was 5 minutes)
 const USER_TOKEN_TTL_SECONDS = 31 * 24 * 60 * 60; // 31 days (トークン集約用)
 
 // レートリミット設定
@@ -74,6 +76,19 @@ const PATRON_STATUS = {
 } as const;
 
 // ============================================
+// Issue #287: JWT認証設定
+// ============================================
+
+/** JWTアクセストークンTTL（15分） */
+const JWT_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
+/** JWTリフレッシュトークンTTL（30日） */
+const JWT_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
+/** JWT発行者 */
+const JWT_ISSUER = 'https://baketa-relay.suke009.workers.dev';
+/** JWTオーディエンス */
+const JWT_AUDIENCE = 'baketa-client';
+
+// ============================================
 // 型定義
 // ============================================
 
@@ -93,6 +108,7 @@ export interface Env {
   SUPABASE_URL?: string;     // プロモーションコード検証用
   SUPABASE_SERVICE_KEY?: string;  // プロモーションコード検証用
   ANALYTICS_API_KEY?: string;  // Issue #269: 使用統計収集用APIキー
+  JWT_SECRET?: string;       // Issue #287: JWT署名用シークレット
 }
 
 interface SessionData {
@@ -151,6 +167,52 @@ interface BonusTokenInfo {
   remaining_tokens: number;
   expires_at: string;
   is_expired: boolean;
+}
+
+// ============================================
+// Issue #287: JWT認証型定義
+// ============================================
+
+/** JWTカスタムクレーム */
+interface BaketaJwtClaims extends JWTPayload {
+  sub: string;           // Patreon user ID
+  plan: PlanType;        // 現在のプラン
+  hasBonusTokens: boolean; // ボーナストークン有無
+  authMethod: 'patreon'; // 認証方法
+}
+
+/** JWTトークンペア */
+interface JwtTokenPair {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;     // Unix timestamp
+}
+
+/** リフレッシュトークンデータ（KV保存用） */
+interface RefreshTokenData {
+  userId: string;
+  sessionToken: string;  // 元のセッショントークン
+  createdAt: number;
+  expiresAt: number;
+  isUsed: boolean;       // 1回使用で無効化
+}
+
+/** JWT認証リクエスト */
+interface AuthTokenRequest {
+  sessionToken?: string; // Bearerヘッダーから取得することも可
+}
+
+/** JWT認証レスポンス */
+interface AuthTokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;     // 秒
+  tokenType: 'Bearer';
+}
+
+/** JWTリフレッシュリクエスト */
+interface AuthRefreshRequest {
+  refreshToken: string;
 }
 
 /** Patreon OAuth トークンレスポンス */
@@ -756,6 +818,197 @@ function validateApiKey(request: Request, env: Env): boolean {
   if (!apiKey) return false;
 
   return timingSafeCompare(apiKey, env.API_KEY);
+}
+
+// ============================================
+// Issue #287: JWT認証関数
+// ============================================
+
+/**
+ * JWTアクセストークンを生成
+ * @param env 環境変数
+ * @param userId Patreonユーザー ID
+ * @param plan 現在のプラン
+ * @param hasBonusTokens ボーナストークンの有無
+ * @returns JWTアクセストークン
+ */
+async function generateAccessToken(
+  env: Env,
+  userId: string,
+  plan: PlanType,
+  hasBonusTokens: boolean
+): Promise<string> {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+  }
+
+  const secret = new TextEncoder().encode(env.JWT_SECRET);
+  const now = Math.floor(Date.now() / 1000);
+
+  const jwt = await new SignJWT({
+    plan,
+    hasBonusTokens,
+    authMethod: 'patreon',
+  } as BaketaJwtClaims)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(userId)
+    .setIssuer(JWT_ISSUER)
+    .setAudience(JWT_AUDIENCE)
+    .setIssuedAt(now)
+    .setExpirationTime(now + JWT_ACCESS_TOKEN_TTL_SECONDS)
+    .setJti(crypto.randomUUID())
+    .sign(secret);
+
+  return jwt;
+}
+
+/**
+ * リフレッシュトークンを生成し、KVに保存
+ * @param env 環境変数
+ * @param userId Patreonユーザー ID
+ * @param sessionToken 元のセッショントークン
+ * @returns リフレッシュトークン
+ */
+async function generateRefreshToken(
+  env: Env,
+  userId: string,
+  sessionToken: string
+): Promise<string> {
+  const refreshToken = crypto.randomUUID();
+  const now = Date.now();
+
+  const refreshData: RefreshTokenData = {
+    userId,
+    sessionToken,
+    createdAt: now,
+    expiresAt: now + JWT_REFRESH_TOKEN_TTL_SECONDS * 1000,
+    isUsed: false,
+  };
+
+  // KVにリフレッシュトークンを保存
+  await env.SESSIONS.put(
+    `refresh:${refreshToken}`,
+    JSON.stringify(refreshData),
+    { expirationTtl: JWT_REFRESH_TOKEN_TTL_SECONDS }
+  );
+
+  return refreshToken;
+}
+
+/**
+ * JWTアクセストークンを検証
+ * @param env 環境変数
+ * @param token JWTトークン
+ * @returns 検証結果（成功時はペイロード、失敗時はnull）
+ */
+async function validateJwtToken(
+  env: Env,
+  token: string
+): Promise<BaketaJwtClaims | null> {
+  if (!env.JWT_SECRET) {
+    console.error('JWT_SECRET is not configured');
+    return null;
+  }
+
+  try {
+    const secret = new TextEncoder().encode(env.JWT_SECRET);
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+
+    return payload as BaketaJwtClaims;
+  } catch (error) {
+    console.warn('JWT validation failed:', error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+/**
+ * リフレッシュトークンを検証し、使用済みにマーク
+ * @param env 環境変数
+ * @param refreshToken リフレッシュトークン
+ * @returns 検証結果（成功時はリフレッシュトークンデータ、失敗時はnull）
+ */
+async function validateAndConsumeRefreshToken(
+  env: Env,
+  refreshToken: string
+): Promise<RefreshTokenData | null> {
+  const key = `refresh:${refreshToken}`;
+  const data = await env.SESSIONS.get(key);
+
+  if (!data) {
+    console.warn('Refresh token not found');
+    return null;
+  }
+
+  const refreshData: RefreshTokenData = JSON.parse(data);
+
+  // 有効期限チェック
+  if (Date.now() > refreshData.expiresAt) {
+    console.warn('Refresh token expired');
+    await env.SESSIONS.delete(key);
+    return null;
+  }
+
+  // 使用済みチェック（1回使用で無効化）
+  if (refreshData.isUsed) {
+    console.warn('Refresh token already used - possible token theft');
+    // セキュリティ: 使用済みトークンが再利用された場合は削除
+    await env.SESSIONS.delete(key);
+    return null;
+  }
+
+  // 使用済みにマーク
+  refreshData.isUsed = true;
+  await env.SESSIONS.put(key, JSON.stringify(refreshData), {
+    expirationTtl: 60, // 1分後に自動削除（短い猶予）
+  });
+
+  return refreshData;
+}
+
+/**
+ * リクエストからJWTまたはSessionTokenを抽出して認証
+ * JWT優先、フォールバックとしてSessionToken
+ * @param request リクエスト
+ * @param env 環境変数
+ * @returns 認証結果（成功時はユーザー情報、失敗時はnull）
+ */
+async function authenticateRequest(
+  request: Request,
+  env: Env
+): Promise<{ userId: string; plan: PlanType; sessionToken?: string } | null> {
+  const authHeader = request.headers.get('Authorization');
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+
+    // 1. JWTとして検証を試みる
+    const jwtClaims = await validateJwtToken(env, token);
+    if (jwtClaims && jwtClaims.sub) {
+      console.log(`JWT auth successful: userId=${jwtClaims.sub}, plan=${jwtClaims.plan}`);
+      return {
+        userId: jwtClaims.sub,
+        plan: jwtClaims.plan,
+      };
+    }
+
+    // 2. SessionTokenとして検証（後方互換）
+    const sessionData = await env.SESSIONS.get(token);
+    if (sessionData) {
+      const session: SessionData = JSON.parse(sessionData);
+      console.log(`SessionToken auth successful: userId=${session.userId}`);
+      // プラン情報はセッションに含まれないため、後で取得が必要
+      return {
+        userId: session.userId,
+        plan: 'Free', // デフォルト、実際のプランは別途取得
+        sessionToken: token,
+      };
+    }
+  }
+
+  return null;
 }
 
 // ============================================
@@ -1702,18 +1955,16 @@ export default {
       return errorResponse('Server configuration error', 500, origin, allowedOrigins, 'CONFIG_ERROR');
     }
 
-    // APIキー検証
-    if (!validateApiKey(request, env)) {
-      return errorResponse('Unauthorized: Invalid API Key', 401, origin, allowedOrigins, 'INVALID_API_KEY');
-    }
+    // [Issue #287] 認証検証（JWT → SessionToken → API Key の順で検証）
+    // 各エンドポイントで個別に認証を行うため、ここではグローバルチェックを削除
+    // 認証が必要なエンドポイントは authenticateUser() を使用
 
-    // レートリミット（IPベース）
+    // [Issue #286] グローバルIPレートリミットを削除（KV Write削減）
+    // グローバルなDoS対策はCloudflare WAF Rate Limiting Rulesで設定推奨:
+    // - Dashboard → Security → WAF → Rate limiting rules
+    // - Rule: If IP address equals, then Block for 1 minute (60 requests/minute)
+    // エンドポイント単位のレートリミットは各ハンドラ内で継続
     const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
-    const rateLimit = await checkRateLimit(env, `ip:${clientIP}`);
-    if (rateLimit.limited) {
-      console.warn(`Rate limited: IP=${clientIP}`);
-      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
-    }
 
     // ルーティング
     try {
@@ -1748,6 +1999,11 @@ export default {
           return handleBonusTokensStatus(request, env, origin, allowedOrigins);
         case '/api/bonus-tokens/sync':
           return handleBonusTokensSync(request, env, origin, allowedOrigins);
+        // Issue #287: JWT認証エンドポイント
+        case '/api/auth/token':
+          return handleAuthToken(request, env, origin, allowedOrigins);
+        case '/api/auth/refresh':
+          return handleAuthRefresh(request, env, origin, allowedOrigins);
         // Note: /api/crash-report is handled earlier (before API key validation)
         default:
           return errorResponse('Not Found', 404, origin, allowedOrigins, 'NOT_FOUND');
@@ -2366,6 +2622,177 @@ async function handlePatreonRevokeAll(
 
   } catch (error) {
     console.error('Revoke-all error:', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+// ============================================
+// Issue #287: JWT認証エンドポイント
+// ============================================
+
+/**
+ * SessionTokenをJWTアクセストークンに交換
+ * POST /api/auth/token
+ *
+ * リクエスト:
+ * - Authorization: Bearer {sessionToken}
+ *
+ * レスポンス:
+ * - accessToken: JWTアクセストークン（15分TTL）
+ * - refreshToken: リフレッシュトークン（30日TTL、1回使用で無効化）
+ * - expiresIn: アクセストークン有効期限（秒）
+ * - tokenType: "Bearer"
+ */
+async function handleAuthToken(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  // JWT_SECRET設定チェック
+  if (!env.JWT_SECRET) {
+    console.error('JWT_SECRET is not configured');
+    return errorResponse('JWT authentication not available', 503, origin, allowedOrigins, 'JWT_NOT_CONFIGURED');
+  }
+
+  try {
+    // SessionTokenを取得
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return errorResponse('Missing or invalid Authorization header', 401, origin, allowedOrigins, 'MISSING_AUTH');
+    }
+
+    const sessionToken = authHeader.substring(7);
+
+    // SessionToken検証
+    const session = await getSession(env, sessionToken);
+    if (!session) {
+      return errorResponse('Invalid or expired session', 401, origin, allowedOrigins, 'SESSION_INVALID');
+    }
+
+    // ユーザーのプラン情報を取得
+    const membership = await getMembershipFromSession(env, session);
+    const plan = membership?.plan || 'Free';
+
+    // ボーナストークン有無をチェック
+    const supabase = getSupabaseClient(env);
+    let hasBonusTokens = false;
+    if (supabase) {
+      const { data: bonusStatus } = await supabase.rpc('get_bonus_status_by_patreon', {
+        p_patreon_user_id: session.userId,
+      });
+      hasBonusTokens = bonusStatus?.has_active_bonus || false;
+    }
+
+    // JWTアクセストークン生成
+    const accessToken = await generateAccessToken(env, session.userId, plan, hasBonusTokens);
+
+    // リフレッシュトークン生成
+    const refreshToken = await generateRefreshToken(env, session.userId, sessionToken);
+
+    console.log(`JWT issued: userId=${session.userId}, plan=${plan}, hasBonusTokens=${hasBonusTokens}`);
+
+    const response: AuthTokenResponse = {
+      accessToken,
+      refreshToken,
+      expiresIn: JWT_ACCESS_TOKEN_TTL_SECONDS,
+      tokenType: 'Bearer',
+    };
+
+    return successResponse(response, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('Auth token error:', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * リフレッシュトークンを使用して新しいJWTを発行
+ * POST /api/auth/refresh
+ *
+ * リクエスト（JSON body）:
+ * - refreshToken: リフレッシュトークン
+ *
+ * レスポンス:
+ * - accessToken: 新しいJWTアクセストークン
+ * - refreshToken: 新しいリフレッシュトークン
+ * - expiresIn: アクセストークン有効期限（秒）
+ * - tokenType: "Bearer"
+ */
+async function handleAuthRefresh(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  // JWT_SECRET設定チェック
+  if (!env.JWT_SECRET) {
+    console.error('JWT_SECRET is not configured');
+    return errorResponse('JWT authentication not available', 503, origin, allowedOrigins, 'JWT_NOT_CONFIGURED');
+  }
+
+  try {
+    // リクエストボディからリフレッシュトークンを取得
+    const body = await request.json() as AuthRefreshRequest;
+    if (!body.refreshToken) {
+      return errorResponse('Missing refreshToken', 400, origin, allowedOrigins, 'MISSING_REFRESH_TOKEN');
+    }
+
+    // リフレッシュトークン検証（1回使用で無効化）
+    const refreshData = await validateAndConsumeRefreshToken(env, body.refreshToken);
+    if (!refreshData) {
+      return errorResponse('Invalid or expired refresh token', 401, origin, allowedOrigins, 'INVALID_REFRESH_TOKEN');
+    }
+
+    // 元のSessionTokenがまだ有効か確認
+    const session = await getSession(env, refreshData.sessionToken);
+    if (!session) {
+      console.warn(`Session no longer valid for refresh: userId=${refreshData.userId}`);
+      return errorResponse('Session expired, please login again', 401, origin, allowedOrigins, 'SESSION_EXPIRED');
+    }
+
+    // ユーザーのプラン情報を取得（最新の状態を反映）
+    const membership = await getMembershipFromSession(env, session);
+    const plan = membership?.plan || 'Free';
+
+    // ボーナストークン有無をチェック
+    const supabase = getSupabaseClient(env);
+    let hasBonusTokens = false;
+    if (supabase) {
+      const { data: bonusStatus } = await supabase.rpc('get_bonus_status_by_patreon', {
+        p_patreon_user_id: session.userId,
+      });
+      hasBonusTokens = bonusStatus?.has_active_bonus || false;
+    }
+
+    // 新しいJWTアクセストークン生成
+    const newAccessToken = await generateAccessToken(env, session.userId, plan, hasBonusTokens);
+
+    // 新しいリフレッシュトークン生成
+    const newRefreshToken = await generateRefreshToken(env, session.userId, refreshData.sessionToken);
+
+    console.log(`JWT refreshed: userId=${session.userId}, plan=${plan}`);
+
+    const response: AuthTokenResponse = {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: JWT_ACCESS_TOKEN_TTL_SECONDS,
+      tokenType: 'Bearer',
+    };
+
+    return successResponse(response, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('Auth refresh error:', error instanceof Error ? `${error.name}: ${error.message}` : String(error));
     return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
   }
 }

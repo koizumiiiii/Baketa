@@ -30,3 +30,6 @@ ALLOWED_ORIGINS = "*"
 # Supabase (プロモーションコード検証用)
 # wrangler secret put SUPABASE_URL        # https://xxxxx.supabase.co
 # wrangler secret put SUPABASE_SERVICE_KEY # service_roleキー（Supabase Console → Settings → API）
+
+# [Issue #287] JWT認証
+# wrangler secret put JWT_SECRET          # JWT署名用シークレット（32バイト以上推奨）

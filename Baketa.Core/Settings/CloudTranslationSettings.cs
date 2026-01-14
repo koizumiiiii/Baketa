@@ -21,13 +21,16 @@ public sealed class CloudTranslationSettings
     public string RelayServerUrl { get; set; } = "https://baketa-relay.suke009.workers.dev";
 
     /// <summary>
-    /// API Key（クライアント認証用）
+    /// API Key（クライアント認証用）- 非推奨
     /// </summary>
     /// <remarks>
-    /// appsettings.jsonから読み込まれる。セキュリティのためSecrets管理を推奨。
+    /// [Issue #287] JWT認証への移行に伴い、静的API Keyは廃止されました。
+    /// Patreon認証後のSessionTokenから取得したJWTで認証を行います。
+    /// この設定は後方互換性のために残されていますが、使用されません。
     /// </remarks>
-    [SettingMetadata(SettingLevel.Advanced, "Cloud Translation", "API Key",
-        Description = "Relay Server認証用のAPIキー")]
+    [Obsolete("Issue #287: 静的API Keyは廃止されました。JWT認証を使用してください。")]
+    [SettingMetadata(SettingLevel.Debug, "Cloud Translation", "API Key (Deprecated)",
+        Description = "【非推奨】Relay Server認証用のAPIキー - JWT認証へ移行")]
     public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>
