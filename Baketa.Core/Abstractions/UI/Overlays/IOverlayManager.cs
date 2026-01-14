@@ -23,13 +23,15 @@ public interface IOverlayManager
     /// <summary>
     /// 管理下の全オーバーレイを非表示にして破棄
     /// </summary>
-    Task HideAllAsync();
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    Task HideAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 管理下の全オーバーレイの可視性を設定（破棄せずに表示/非表示を切り替え）
     /// </summary>
     /// <param name="isVisible">true: 表示, false: 非表示</param>
-    Task SetAllVisibilityAsync(bool isVisible);
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    Task SetAllVisibilityAsync(bool isVisible, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 現在表示中のオーバーレイ数を取得

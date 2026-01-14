@@ -500,12 +500,13 @@ internal sealed class MockOverlayWindowManager : IOverlayWindowManager
         return _overlays.TryGetValue(handle, out var overlay) ? overlay : null;
     }
 
-    public async Task CloseAllOverlaysAsync()
+    public async Task CloseAllOverlaysAsync(CancellationToken cancellationToken = default)
     {
         await Task.Yield();
 
         foreach (var overlay in _overlays.Values)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             overlay.Close();
         }
         _overlays.Clear();

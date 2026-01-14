@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Baketa.Core.Abstractions.Events;
@@ -12,7 +13,8 @@ public interface IEventProcessor<in TEvent> where TEvent : IEvent
     /// イベント処理
     /// </summary>
     /// <param name="eventData">イベントデータ</param>
-    Task HandleAsync(TEvent eventData);
+    /// <param name="cancellationToken">キャンセレーショントークン（Issue #291: 翻訳停止時のキャンセル伝播用）</param>
+    Task HandleAsync(TEvent eventData, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// このハンドラーの優先度

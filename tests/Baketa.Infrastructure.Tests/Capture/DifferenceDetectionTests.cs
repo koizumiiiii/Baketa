@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Events;
@@ -219,7 +220,8 @@ public class DifferenceDetectionTests
         await detector.DetectTextDisappearanceAsync(_mockImage1.Object, _mockImage2.Object).ConfigureAwait(true);
 
         // Assert - PublishAsyncの引数型はIEvent
-        _mockEventAggregator.Verify(ea => ea.PublishAsync(It.IsAny<IEvent>()), Times.Once);
+        // [Issue #291] CancellationTokenパラメータを明示的に指定（式ツリーではオプション引数を使用不可）
+        _mockEventAggregator.Verify(ea => ea.PublishAsync(It.IsAny<IEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

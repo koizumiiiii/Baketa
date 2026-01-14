@@ -77,7 +77,7 @@ public class AutoOverlayCleanupServiceTests : IDisposable
 
         // Assert
         // 🔧 [OVERLAY_UNIFICATION] HideOverlaysInAreaAsync → HideAllAsync に変更
-        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Never);
+        _overlayManagerMock.Verify(om => om.HideAllAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         statistics.OverlaysCleanedUp.Should().Be(0);
 
         // 🔧 [OVERLAY_UNIFICATION] HideOverlaysInAreaAsync → HideAllAsync に変更
-        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Never);
+        _overlayManagerMock.Verify(om => om.HideAllAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class AutoOverlayCleanupServiceTests : IDisposable
 
         // 🔧 [OVERLAY_UNIFICATION] TODO: Phase 4で領域指定削除実装後はループに戻す
         // 暫定: HideAllAsync が1回呼ばれることを確認
-        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Once);
+        _overlayManagerMock.Verify(om => om.HideAllAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         // Assert
         result.Should().Be(0);
         // 🔧 [OVERLAY_UNIFICATION] HideOverlaysInAreaAsync → HideAllAsync に変更
-        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Never);
+        _overlayManagerMock.Verify(om => om.HideAllAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -235,7 +235,7 @@ public class AutoOverlayCleanupServiceTests : IDisposable
 
         // 🔧 [OVERLAY_UNIFICATION] TODO: Phase 4で領域指定削除実装後はループに戻す
         // 暫定: HideAllAsync が1回呼ばれることを確認
-        _overlayManagerMock.Verify(om => om.HideAllAsync(), Times.Once);
+        _overlayManagerMock.Verify(om => om.HideAllAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

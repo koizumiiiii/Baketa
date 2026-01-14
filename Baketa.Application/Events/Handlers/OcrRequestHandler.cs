@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
@@ -27,7 +28,7 @@ public sealed class OcrRequestHandler(
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public async Task HandleAsync(OcrRequestEvent eventData)
+    public async Task HandleAsync(OcrRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);

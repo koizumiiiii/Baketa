@@ -23,8 +23,12 @@ using Baketa.Core.Logging;
 using Baketa.Core.Models.OCR;
 using Baketa.Core.Performance;
 using Baketa.Core.Settings;
+using Baketa.Core.Translation.Abstractions; // [Issue #290] IFallbackOrchestrator, ImageTranslationRequest
 using Baketa.Core.Translation.Models;
+using Baketa.Core.Abstractions.License; // [Issue #290] ILicenseManager
+using Baketa.Core.License.Models; // [Issue #290] FeatureType
 using Baketa.Core.Utilities;
+using System.Diagnostics; // [Issue #290] Fork-Join計測用
 // NOTE: [PP-OCRv5削除] BatchProcessing参照削除
 using Baketa.Infrastructure.Translation.Local;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +53,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly ISmartProcessingPipelineService _pipelineService; // 🎯 [OPTION_A] 段階的フィルタリングパイプライン統合
     private readonly ITextChangeDetectionService? _textChangeDetectionService; // [Issue #230] テキストベース変化検知
     private readonly ITranslationModeService? _translationModeService; // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
+    // [Issue #290] Fork-Join並列実行用の依存関係
+    private readonly IFallbackOrchestrator? _fallbackOrchestrator;
+    private readonly ILicenseManager? _licenseManager;
+    private readonly ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService; // [Issue #290] Cloud翻訳可用性チェック
     private bool _disposed;
 
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
@@ -62,6 +70,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         ISmartProcessingPipelineService pipelineService, // 🎯 [OPTION_A] 段階的フィルタリングパイプライン
         ITextChangeDetectionService? textChangeDetectionService = null, // [Issue #230] テキストベース変化検知
         ITranslationModeService? translationModeService = null, // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
+        // [Issue #290] Fork-Join並列実行用の依存関係（オプショナル）
+        IFallbackOrchestrator? fallbackOrchestrator = null,
+        ILicenseManager? licenseManager = null,
+        ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null, // [Issue #290] Cloud翻訳可用性チェック
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -71,6 +83,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _pipelineService = pipelineService ?? throw new ArgumentNullException(nameof(pipelineService)); // 🎯 [OPTION_A] パイプラインサービス注入
         _textChangeDetectionService = textChangeDetectionService; // [Issue #230] オプショナル（nullでも機能する）
         _translationModeService = translationModeService; // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
+        // [Issue #290] Fork-Join並列実行用の依存関係
+        _fallbackOrchestrator = fallbackOrchestrator;
+        _licenseManager = licenseManager;
+        _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -200,6 +216,48 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             // NOTE: [PP-OCRv5削除] BatchOcrProcessor参照削除
             // Surya OCRではgRPCベースのため、PaddleOCR失敗カウンターリセットは不要
+
+            // ============================================================
+            // [Issue #290] Fork-Join並列実行: OCRとCloud AI翻訳を同時に開始
+            // ============================================================
+            Task<FallbackTranslationResult?>? forkJoinCloudTask = null;
+            string? forkJoinImageBase64 = null;
+            int forkJoinContextWidth = 0;
+            int forkJoinContextHeight = 0;
+
+            // Fork-Join用の画像データを事前に抽出
+            try
+            {
+                var imageMemory = image.GetImageMemory();
+                forkJoinImageBase64 = Convert.ToBase64String(imageMemory.Span);
+                // [Issue #275] OriginalWidth/OriginalHeightを使用
+                (forkJoinContextWidth, forkJoinContextHeight) = image switch
+                {
+                    IWindowsImage windowsImage => (windowsImage.OriginalWidth, windowsImage.OriginalHeight),
+                    WindowsImageAdapter adapter => (adapter.OriginalWidth, adapter.OriginalHeight),
+                    _ => (image.Width, image.Height)
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "[Issue #290] Fork-Join用画像データ抽出失敗");
+            }
+
+            // Fork-Join条件チェック＆Cloud AI翻訳タスク開始（OCRと並列実行）
+            if (ShouldUseForkJoinParallelExecution(forkJoinImageBase64, forkJoinContextWidth, forkJoinContextHeight))
+            {
+                _logger?.LogInformation("🚀 [Issue #290] Fork-Join開始: OCR || Cloud AI を並列実行");
+                var forkJoinStopwatch = Stopwatch.StartNew();
+
+                // Cloud AI翻訳を非同期で開始（awaitしない）
+                forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
+                    forkJoinImageBase64!,
+                    forkJoinContextWidth,
+                    forkJoinContextHeight,
+                    cancellationToken);
+
+                _logger?.LogDebug("[Issue #290] Cloud AI翻訳タスク開始（OCRと並列実行中）");
+            }
 
             // 🎯 [OPTION_A] SmartProcessingPipelineServiceで段階的フィルタリング実行
             _logger?.LogDebug($"🎯 [OPTION_A] 段階的フィルタリングパイプライン開始 - ImageChangeDetection → OCR");
@@ -389,6 +447,37 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "[Issue #78] 画像コンテキスト設定失敗 - Cloud AI翻訳は利用不可");
+            }
+
+            // ============================================================
+            // [Issue #290] Fork-Join完了: Cloud AI翻訳結果を待機してセット
+            // ============================================================
+            if (forkJoinCloudTask != null)
+            {
+                try
+                {
+                    var forkJoinStopwatch = Stopwatch.StartNew();
+                    _logger?.LogDebug("[Issue #290] Fork-Join: Cloud AI翻訳結果を待機中...");
+
+                    var cloudResult = await forkJoinCloudTask.ConfigureAwait(false);
+                    forkJoinStopwatch.Stop();
+
+                    if (cloudResult != null)
+                    {
+                        _textChunkAggregatorService.SetPreComputedCloudResult(cloudResult);
+                        _logger?.LogInformation(
+                            "✅ [Issue #290] Fork-Join完了: Cloud AI翻訳結果をセット (Success={Success}, Engine={Engine}, WaitTime={WaitTime}ms)",
+                            cloudResult.IsSuccess, cloudResult.UsedEngine, forkJoinStopwatch.ElapsedMilliseconds);
+                    }
+                    else
+                    {
+                        _logger?.LogDebug("[Issue #290] Fork-Join: Cloud AI翻訳結果がnull（キャンセルまたはエラー）");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "[Issue #290] Fork-Join: Cloud AI翻訳結果の待機中にエラー");
+                }
             }
 
             // [Issue #227] TimedChunkAggregatorにバッチ追加
@@ -1504,7 +1593,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     /// 🔥 [FALLBACK] 個別翻訳失敗時のフォールバックハンドラー
     /// AggregatedChunksFailedEventを受信し、全画面一括翻訳を実行
     /// </summary>
-    public async Task HandleAsync(Baketa.Core.Events.Translation.AggregatedChunksFailedEvent eventData)
+    public async Task HandleAsync(Baketa.Core.Events.Translation.AggregatedChunksFailedEvent eventData, CancellationToken cancellationToken = default)
     {
         _logger?.LogWarning("🔄 [FALLBACK] 個別翻訳失敗 - 全画面一括翻訳にフォールバック - SessionId: {SessionId}, エラー: {Error}",
             eventData.SessionId, eventData.ErrorMessage);
@@ -1585,6 +1674,145 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
         return new System.Drawing.Rectangle(minX, minY, maxX - minX, maxY - minY);
     }
+
+    #region [Issue #290] Fork-Join並列実行
+
+    /// <summary>
+    /// [Issue #290] Fork-Join並列実行（OCR || Cloud AI）が利用可能かチェック
+    /// </summary>
+    /// <param name="imageBase64">画像データ（Base64エンコード）</param>
+    /// <param name="contextWidth">画像幅</param>
+    /// <param name="contextHeight">画像高さ</param>
+    /// <returns>Fork-Joinが利用可能な場合true</returns>
+    private bool ShouldUseForkJoinParallelExecution(string? imageBase64, int contextWidth, int contextHeight)
+    {
+        // フォールバックオーケストレーターが必要
+        if (_fallbackOrchestrator == null)
+        {
+            _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: FallbackOrchestrator未登録");
+            return false;
+        }
+
+        // ライセンスマネージャーが必要
+        if (_licenseManager == null)
+        {
+            _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: LicenseManager未登録");
+            return false;
+        }
+
+        // Cloud翻訳可用性サービスでの判定（優先）
+        if (_cloudTranslationAvailabilityService != null)
+        {
+            if (!_cloudTranslationAvailabilityService.IsEffectivelyEnabled)
+            {
+                _logger?.LogDebug(
+                    "[Issue #290] Fork-Joinスキップ: Cloud翻訳無効 (Entitled={Entitled}, Preferred={Preferred})",
+                    _cloudTranslationAvailabilityService.IsEntitled,
+                    _cloudTranslationAvailabilityService.IsPreferred);
+                return false;
+            }
+        }
+        else
+        {
+            // フォールバック: 旧ロジック（ICloudTranslationAvailabilityService未登録時）
+            if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
+            {
+                _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: CloudAiTranslation機能が無効");
+                return false;
+            }
+
+            // ユーザー設定でCloud AI翻訳が有効か確認
+            var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
+            if (translationSettings.UseLocalEngine)
+            {
+                _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: UseLocalEngine=true");
+                return false;
+            }
+        }
+
+        // 画像データが必要
+        if (string.IsNullOrEmpty(imageBase64) || contextWidth <= 0 || contextHeight <= 0)
+        {
+            _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: 画像データなし");
+            return false;
+        }
+
+        // セッショントークンが必要
+        var sessionId = _licenseManager.CurrentState.SessionId;
+        if (string.IsNullOrEmpty(sessionId))
+        {
+            _logger?.LogDebug("[Issue #290] Fork-Joinスキップ: セッショントークンなし");
+            return false;
+        }
+
+        _logger?.LogInformation("✅ [Issue #290] Fork-Join並列実行: 全条件クリア");
+        return true;
+    }
+
+    /// <summary>
+    /// [Issue #290] Cloud AI翻訳を非同期実行（Fork-Join用）
+    /// </summary>
+    /// <param name="imageBase64">画像データ（Base64エンコード）</param>
+    /// <param name="contextWidth">画像幅</param>
+    /// <param name="contextHeight">画像高さ</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>フォールバック翻訳結果</returns>
+    private async Task<FallbackTranslationResult?> ExecuteForkJoinCloudTranslationAsync(
+        string imageBase64,
+        int contextWidth,
+        int contextHeight,
+        CancellationToken cancellationToken)
+    {
+        if (_fallbackOrchestrator == null || _licenseManager == null)
+            return null;
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            _logger?.LogInformation("🚀 [Issue #290] Fork-Join Cloud AI翻訳開始");
+
+            // 言語ペアを取得
+            var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
+            var targetLanguage = translationSettings.DefaultTargetLanguage ?? "ja";
+
+            // セッショントークンを取得
+            var sessionToken = _licenseManager.CurrentState.SessionId ?? string.Empty;
+
+            // リクエストを作成
+            var request = new ImageTranslationRequest
+            {
+                ImageBase64 = imageBase64,
+                Width = contextWidth,
+                Height = contextHeight,
+                TargetLanguage = targetLanguage,
+                SessionToken = sessionToken,
+                MimeType = "image/png"
+            };
+
+            // Cloud AI翻訳を実行（フォールバック付き）
+            var result = await _fallbackOrchestrator.TranslateWithFallbackAsync(request, cancellationToken)
+                .ConfigureAwait(false);
+
+            stopwatch.Stop();
+            _logger?.LogInformation(
+                "✅ [Issue #290] Fork-Join Cloud AI翻訳完了: Success={Success}, Engine={Engine}, Duration={Duration}ms",
+                result.IsSuccess, result.UsedEngine, stopwatch.ElapsedMilliseconds);
+
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogDebug("[Issue #290] Fork-Join Cloud AI翻訳がキャンセルされました");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "[Issue #290] Fork-Join Cloud AI翻訳でエラー発生");
+            return null;
+        }
+    }
+
+    #endregion
 
     private void ThrowIfDisposed()
     {

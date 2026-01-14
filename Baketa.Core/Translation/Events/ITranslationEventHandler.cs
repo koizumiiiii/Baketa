@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 
@@ -14,8 +15,9 @@ public interface ITranslationEventHandler<in TEvent> where TEvent : IEvent
     /// イベントを処理します
     /// </summary>
     /// <param name="eventData">イベント</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>完了タスク</returns>
-    Task HandleAsync(TEvent eventData);
+    Task HandleAsync(TEvent eventData, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -44,9 +46,10 @@ public class EventHandlerAdapter<TEvent>(ITranslationEventHandler<TEvent> handle
     /// イベント処理
     /// </summary>
     /// <param name="eventData">イベントデータ</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>完了タスク</returns>
-    public Task HandleAsync(TEvent eventData)
+    public Task HandleAsync(TEvent eventData, CancellationToken cancellationToken = default)
     {
-        return _handler.HandleAsync(eventData);
+        return _handler.HandleAsync(eventData, cancellationToken);
     }
 }

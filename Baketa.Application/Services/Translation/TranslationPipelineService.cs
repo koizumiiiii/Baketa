@@ -138,7 +138,7 @@ public sealed class TranslationPipelineService : IEventProcessor<OcrCompletedEve
     }
 
     /// <inheritdoc />
-    public async Task HandleAsync(OcrCompletedEvent eventData)
+    public async Task HandleAsync(OcrCompletedEvent eventData, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("TranslationPipelineService.HandleAsync開始: Results={ResultCount}",
             eventData?.Results?.Count ?? 0);

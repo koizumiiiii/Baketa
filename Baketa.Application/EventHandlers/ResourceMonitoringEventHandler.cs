@@ -1,3 +1,4 @@
+using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Microsoft.Extensions.Logging;
 
@@ -31,7 +32,7 @@ public sealed class ResourceMonitoringEventHandler : IEventProcessor<ResourceMon
     /// イベント処理
     /// 現時点ではログ出力のみ（将来的に拡張可能）
     /// </summary>
-    public Task HandleAsync(ResourceMonitoringEvent eventData)
+    public Task HandleAsync(ResourceMonitoringEvent eventData, CancellationToken cancellationToken = default)
     {
         // Issue #195: 過剰ログを防ぐため、Warning以上のイベントのみログ出力
         if (eventData.EventType == ResourceMonitoringEventType.WarningRaised ||

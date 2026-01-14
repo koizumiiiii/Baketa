@@ -16,6 +16,7 @@ using Baketa.Core.Models.Translation;
 using Baketa.Core.Models.Validation; // [Issue #78 Phase 4] ValidatedTextChunk用
 using Baketa.Core.Translation.Abstractions; // [Issue #78 Phase 4] IParallelTranslationOrchestrator用
 using Baketa.Core.Translation.Models;
+using Baketa.Application.Services.Translation; // [Issue #291] ITranslationControlService用
 using Microsoft.Extensions.Logging;
 using Language = Baketa.Core.Translation.Models.Language;
 
@@ -48,6 +49,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly ILicenseManager? _licenseManager;
     // [Issue #273] Cloud翻訳可用性統合サービス
     private readonly Core.Abstractions.Translation.ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService;
+    // [Issue #291] 翻訳状態確認用サービス（キャンセル状態チェック）
+    // NOTE: CancellationToken伝播により不要になったが、将来の拡張用に保持
+    private readonly ITranslationControlService? _translationControlService;
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
@@ -63,7 +67,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         IParallelTranslationOrchestrator? parallelTranslationOrchestrator = null,
         ILicenseManager? licenseManager = null,
         // [Issue #273] Cloud翻訳可用性統合サービス（オプショナル）
-        Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null)
+        Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null,
+        // [Issue #291] 翻訳状態確認用サービス（オプショナル）
+        ITranslationControlService? translationControlService = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -78,6 +84,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _licenseManager = licenseManager;
         // [Issue #273] Cloud翻訳可用性統合サービス
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
+        // [Issue #291] 翻訳状態確認用サービス
+        _translationControlService = translationControlService;
     }
 
     /// <inheritdoc />
@@ -123,9 +131,19 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     }
 
     /// <inheritdoc />
-    public async Task HandleAsync(AggregatedChunksReadyEvent eventData)
+    /// <summary>
+    /// [Issue #291] CancellationToken対応のイベント処理
+    /// </summary>
+    public async Task HandleAsync(AggregatedChunksReadyEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
+
+        // [Issue #291] キャンセルチェック（早期リターン）
+        if (cancellationToken.IsCancellationRequested)
+        {
+            _logger?.LogInformation("🛑 [Issue #291] 翻訳が停止されたため、イベント処理をスキップします (SessionId: {SessionId})", eventData.SessionId);
+            return;
+        }
 
         // 🔥 [PHASE1_SEMAPHORE] セマフォ取得（並行実行防止）
         // WaitAsync(0) = 即座に判定、ブロッキングなし
@@ -265,12 +283,54 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 return;
             }
 
-            // [Issue #78 Phase 4] Cloud AI翻訳が利用可能かチェック
-            var useParallelTranslation = ShouldUseParallelTranslation(eventData);
-
+            // ============================================================
+            // [Issue #290] Fork-Join: 事前計算されたCloud AI翻訳結果を優先使用
+            // ============================================================
             List<string> translationResults;
 
-            if (useParallelTranslation)
+            if (eventData.HasPreComputedCloudResult)
+            {
+                // 事前計算されたCloud AI翻訳結果が利用可能
+                _logger?.LogInformation(
+                    "🚀 [Issue #290] Fork-Join: 事前計算されたCloud AI翻訳結果を使用 (Engine={Engine})",
+                    eventData.PreComputedCloudResult!.UsedEngine);
+#if DEBUG
+                Console.WriteLine($"🚀 [Issue #290] Fork-Join: 事前計算Cloud AI結果を使用 - Engine: {eventData.PreComputedCloudResult!.UsedEngine}");
+#endif
+
+                var cloudResponse = eventData.PreComputedCloudResult!.Response;
+
+                // Cloud AI翻訳結果からテキストを抽出
+                if (cloudResponse?.Texts is { Count: > 0 } cloudTexts)
+                {
+                    // 複数テキスト結果がある場合
+                    // TODO: 座標マッチングによりOCRチャンクとCloud AI結果を対応付け
+                    // 現時点では最初のテキストを全チャンクに適用（暫定実装）
+                    translationResults = cloudTexts
+                        .Select(t => t.Translation ?? string.Empty)
+                        .ToList();
+
+                    _logger?.LogDebug(
+                        "✅ [Issue #290] Fork-Join Cloud AI翻訳結果: {Count}個のテキスト取得",
+                        translationResults.Count);
+                }
+                else if (!string.IsNullOrEmpty(cloudResponse?.TranslatedText))
+                {
+                    // 単一テキスト結果
+                    translationResults = [cloudResponse.TranslatedText];
+                    _logger?.LogDebug("✅ [Issue #290] Fork-Join Cloud AI翻訳結果: 単一テキスト取得");
+                }
+                else
+                {
+                    // Cloud AI結果が空 → ローカル翻訳にフォールバック
+                    _logger?.LogWarning("⚠️ [Issue #290] Fork-Join Cloud AI翻訳結果が空 - ローカル翻訳にフォールバック");
+                    // [Issue #291] CancellationTokenを伝播
+                    translationResults = await ExecuteBatchTranslationAsync(
+                        nonEmptyChunks,
+                        cancellationToken).ConfigureAwait(false);
+                }
+            }
+            else if (ShouldUseParallelTranslation(eventData))
             {
                 // [Issue #78 Phase 4] 並列翻訳（ローカル + Cloud AI）を実行
                 _logger?.LogDebug("🌐 [Phase4] 並列翻訳モード開始 - ChunkCount: {Count}", nonEmptyChunks.Count);
@@ -278,13 +338,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 Console.WriteLine($"🌐 [Phase4] 並列翻訳モード開始 - ChunkCount: {nonEmptyChunks.Count}");
 #endif
 
-                // [Code Review] タイムアウト付きキャンセルトークン（Cloud AI翻訳は最大60秒）
-                using var parallelCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                // [Issue #291] CreateLinkedTokenSourceで外部キャンセルとタイムアウトを連携
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
                 var parallelResult = await ExecuteParallelTranslationAsync(
                     nonEmptyChunks,
                     eventData,
-                    parallelCts.Token).ConfigureAwait(false);
+                    linkedCts.Token).ConfigureAwait(false);
 
                 if (parallelResult.IsSuccess && parallelResult.ValidatedChunks.Count > 0)
                 {
@@ -334,9 +395,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     Console.WriteLine($"⚠️ [Phase4] 並列翻訳失敗 - ローカル翻訳にフォールバック");
 #endif
 
+                    // [Issue #291] CancellationTokenを伝播
                     translationResults = await ExecuteBatchTranslationAsync(
                         nonEmptyChunks,
-                        CancellationToken.None).ConfigureAwait(false);
+                        cancellationToken).ConfigureAwait(false);
                 }
             }
             else
@@ -345,9 +407,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 _logger?.LogDebug($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
                 Console.WriteLine($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
 
+                // [Issue #291] CancellationTokenを伝播
                 translationResults = await ExecuteBatchTranslationAsync(
                     nonEmptyChunks,
-                    CancellationToken.None).ConfigureAwait(false);
+                    cancellationToken).ConfigureAwait(false);
             }
 
             _logger?.LogDebug($"✅✅✅ [PHASE12.2_HANDLER] 翻訳完了 - 結果数: {translationResults.Count}");
@@ -376,6 +439,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
                 $"[{timestamp2}][T{threadId2:D2}] 🚨 [ULTRATHINK_TRACE2] 翻訳結果設定完了 - チャンク数: {nonEmptyChunks.Count}\r\n");
 #endif
+
+            // 🛑 [Issue #291] オーバーレイ表示前にCancellationTokenをチェック
+            // Gemini推奨: CancellationTokenを使用した堅牢なキャンセル検知
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogInformation("🛑 [Issue #291] 翻訳が停止されたため、オーバーレイ表示をスキップします (SessionId: {SessionId})", eventData.SessionId);
+                return;
+            }
 
             // 🧹 [OVERLAY_CLEANUP] 新しいオーバーレイ表示前に古いオーバーレイをクリア
             try
@@ -407,6 +478,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
             for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
             {
+                // [Issue #291] ループ内でもキャンセルチェック（早期終了）
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    _logger?.LogInformation("🛑 [Issue #291] 翻訳が停止されたため、残りのオーバーレイ表示をスキップします ({Completed}/{Total})", i, nonEmptyChunks.Count);
+                    break;
+                }
+
                 var chunk = nonEmptyChunks[i];
                 // chunk.TranslatedTextは既にLine 176で設定済み
 

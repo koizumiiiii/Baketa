@@ -1397,6 +1397,6 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
         public int Priority => 100;
         public bool SynchronousExecution => false;
-        public Task HandleAsync(TEvent eventData) => _handler(eventData);
+        public Task HandleAsync(TEvent eventData, CancellationToken cancellationToken = default) => _handler(eventData);
     }
 }

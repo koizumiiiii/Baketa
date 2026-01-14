@@ -1,3 +1,4 @@
+using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Events.Diagnostics;
@@ -25,7 +26,7 @@ public sealed class DiagnosticEventProcessor : IEventProcessor<PipelineDiagnosti
     public int Priority => 100;
     public bool SynchronousExecution => false;
 
-    public async Task HandleAsync(PipelineDiagnosticEvent eventData)
+    public async Task HandleAsync(PipelineDiagnosticEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -35,7 +36,7 @@ public sealed class DiagnosticEventProcessor : IEventProcessor<PipelineDiagnosti
             if (_diagnosticCollectionService.IsCollecting)
             {
                 Console.WriteLine($"🩺 [DIAGNOSTIC_PROCESSOR] 診断収集サービスが動作中 - 処理開始");
-                await _diagnosticCollectionService.CollectDiagnosticAsync(eventData, CancellationToken.None)
+                await _diagnosticCollectionService.CollectDiagnosticAsync(eventData, cancellationToken)
                     .ConfigureAwait(false);
 
                 Console.WriteLine($"🩺 [DIAGNOSTIC_PROCESSOR] 診断イベント収集完了: {eventData.Stage}");

@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
@@ -39,7 +40,7 @@ public class TranslationRequestHandler(
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public async Task HandleAsync(TranslationRequestEvent eventData)
+    public async Task HandleAsync(TranslationRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         Console.WriteLine($"🎯 [DEBUG] ⭐⭐⭐ TranslationRequestHandler.HandleAsync 呼び出された！ ⭐⭐⭐");
         // System.IO.File.AppendAllText("E:\\dev\\Baketa\\debug_app_logs.txt", 

@@ -197,7 +197,7 @@ public class TestEventProcessor(Action onEventReceived) : IEventProcessor<StartT
     public int Priority => 100;
     public bool SynchronousExecution => false;
 
-    public Task HandleAsync(StartTranslationRequestEvent eventData)
+    public Task HandleAsync(StartTranslationRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         _onEventReceived();
         return Task.CompletedTask;
@@ -215,7 +215,7 @@ public class TestTranslationFlowEventProcessor(
     public int Priority => 100;
     public bool SynchronousExecution => false;
 
-    public async Task HandleAsync(StartTranslationRequestEvent eventData)
+    public async Task HandleAsync(StartTranslationRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Processing translation start request for window: {WindowTitle} (Handle={Handle})",
             eventData.TargetWindow.Title, eventData.TargetWindow.Handle);

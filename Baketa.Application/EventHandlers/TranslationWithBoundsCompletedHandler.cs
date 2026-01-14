@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
@@ -55,7 +56,7 @@ public class TranslationWithBoundsCompletedHandler(
     public bool SynchronousExecution => true; // 🔥 [PHASE4.5_FIX] Task.Runのfire-and-forget問題を回避
 
     /// <inheritdoc />
-    public async Task HandleAsync(TranslationWithBoundsCompletedEvent eventData)
+    public async Task HandleAsync(TranslationWithBoundsCompletedEvent eventData, CancellationToken cancellationToken = default)
     {
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);

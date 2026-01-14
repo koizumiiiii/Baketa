@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
@@ -28,7 +29,7 @@ public class BatchTranslationRequestHandler(
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public async Task HandleAsync(BatchTranslationRequestEvent eventData)
+    public async Task HandleAsync(BatchTranslationRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("BatchTranslationRequestHandler.HandleAsync開始: BatchSize={BatchSize}, Summary={Summary}",
             eventData.BatchSize, eventData.BatchSummary);

@@ -41,7 +41,7 @@ namespace Baketa.UI.ViewModels;
 public class MainOverlayViewModel : ViewModelBase
 {
     private bool _isCollapsed;
-    private bool _isTranslationActive;
+    private volatile bool _isTranslationActive;  // [Issue #291] スレッドセーフ化
     private TranslationStatus _currentStatus;
     private bool _isTranslationResultVisible; // 初期状態は非表示
     private bool _isWindowSelected;

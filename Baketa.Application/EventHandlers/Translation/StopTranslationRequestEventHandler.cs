@@ -37,7 +37,7 @@ public sealed class StopTranslationRequestEventHandler : IEventProcessor<StopTra
     /// <summary>
     /// StopTranslationRequestEventを処理
     /// </summary>
-    public async Task HandleAsync(StopTranslationRequestEvent eventData)
+    public async Task HandleAsync(StopTranslationRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("🛑 [STOP_HANDLER] Stop translation request received - EventId: {EventId}", eventData.Id);
 

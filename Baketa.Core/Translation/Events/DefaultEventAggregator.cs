@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Microsoft.Extensions.Logging;
@@ -30,8 +31,9 @@ public class DefaultEventAggregator(ILogger<DefaultEventAggregator> logger) : IE
     /// </summary>
     /// <typeparam name="TEvent">イベントの型</typeparam>
     /// <param name="eventData">発行するイベント</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>完了タスク</returns>
-    public async Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent
+    public async Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken = default) where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(eventData);
 
@@ -48,11 +50,19 @@ public class DefaultEventAggregator(ILogger<DefaultEventAggregator> logger) : IE
 
         foreach (var handler in handlers)
         {
+            // [Issue #291] キャンセルチェック
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogDebug("イベント {EventType} の処理がキャンセルされました", eventType.Name);
+                break;
+            }
+
             if (handler is ITranslationEventHandler<TEvent> typedHandler)
             {
                 try
                 {
-                    handlerTasks.Add(typedHandler.HandleAsync(eventData));
+                    // [Issue #291] CancellationTokenをハンドラに伝播
+                    handlerTasks.Add(typedHandler.HandleAsync(eventData, cancellationToken));
                 }
                 catch (InvalidOperationException ex)
                 {

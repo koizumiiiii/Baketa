@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events;
+using Baketa.Core.Translation.Abstractions; // [Issue #290] FallbackTranslationResult用
 
 namespace Baketa.Core.Events.Translation;
 
@@ -14,6 +15,9 @@ namespace Baketa.Core.Events.Translation;
 /// Issue #78 Phase 4: Cloud AI翻訳統合
 /// - ImageBase64, ImageWidth, ImageHeight を追加（並列翻訳用）
 /// - 既存の引数2つのコンストラクタは後方互換性のため維持
+///
+/// Issue #290: Fork-Join並列実行
+/// - PreComputedCloudResult を追加（OCRと並列実行されたCloud AI翻訳結果）
 /// </remarks>
 public sealed class AggregatedChunksReadyEvent : EventBase
 {
@@ -45,6 +49,27 @@ public sealed class AggregatedChunksReadyEvent : EventBase
         string? imageBase64,
         int imageWidth,
         int imageHeight)
+        : this(aggregatedChunks, sourceWindowHandle, imageBase64, imageWidth, imageHeight, null)
+    {
+    }
+
+    /// <summary>
+    /// コンストラクタ（Fork-Join結果付き）
+    /// </summary>
+    /// <param name="aggregatedChunks">集約されたテキストチャンクのリスト</param>
+    /// <param name="sourceWindowHandle">ソースウィンドウハンドル</param>
+    /// <param name="imageBase64">画像データ（Base64エンコード、Cloud AI翻訳用）</param>
+    /// <param name="imageWidth">画像幅</param>
+    /// <param name="imageHeight">画像高さ</param>
+    /// <param name="preComputedCloudResult">事前計算されたCloud AI翻訳結果（OCRと並列実行、Issue #290）</param>
+    /// <exception cref="ArgumentNullException">aggregatedChunksがnullの場合</exception>
+    public AggregatedChunksReadyEvent(
+        IReadOnlyList<TextChunk> aggregatedChunks,
+        IntPtr sourceWindowHandle,
+        string? imageBase64,
+        int imageWidth,
+        int imageHeight,
+        FallbackTranslationResult? preComputedCloudResult)
     {
         ArgumentNullException.ThrowIfNull(aggregatedChunks, nameof(aggregatedChunks));
 
@@ -53,6 +78,7 @@ public sealed class AggregatedChunksReadyEvent : EventBase
         ImageBase64 = imageBase64;
         ImageWidth = imageWidth;
         ImageHeight = imageHeight;
+        PreComputedCloudResult = preComputedCloudResult;
         AggregationCompletedAt = DateTime.UtcNow;
         SessionId = Guid.NewGuid().ToString("N")[..8];
     }
@@ -90,6 +116,20 @@ public sealed class AggregatedChunksReadyEvent : EventBase
     /// Cloud AI翻訳用の画像データが利用可能かどうか
     /// </summary>
     public bool HasImageData => !string.IsNullOrEmpty(ImageBase64) && ImageWidth > 0 && ImageHeight > 0;
+
+    /// <summary>
+    /// 事前計算されたCloud AI翻訳結果（OCRと並列実行済み、Issue #290）
+    /// </summary>
+    /// <remarks>
+    /// この結果が設定されている場合、AggregatedChunksReadyEventHandlerは
+    /// Cloud AI翻訳を再実行する必要がない
+    /// </remarks>
+    public FallbackTranslationResult? PreComputedCloudResult { get; }
+
+    /// <summary>
+    /// 事前計算されたCloud AI翻訳結果が利用可能かどうか
+    /// </summary>
+    public bool HasPreComputedCloudResult => PreComputedCloudResult?.IsSuccess == true;
 
     /// <summary>
     /// 集約完了タイムスタンプ

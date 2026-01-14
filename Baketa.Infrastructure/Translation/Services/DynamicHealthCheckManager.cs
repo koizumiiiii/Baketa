@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
@@ -109,7 +110,7 @@ public sealed class DynamicHealthCheckManager : IEventProcessor<PythonServerStat
     /// <summary>
     /// サーバー状態変更イベントの処理
     /// </summary>
-    public async Task HandleAsync(PythonServerStatusChangedEvent eventData)
+    public async Task HandleAsync(PythonServerStatusChangedEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {

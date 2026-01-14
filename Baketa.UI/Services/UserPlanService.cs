@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.Settings;
@@ -288,6 +289,6 @@ public class UserPlanService : IUserPlanService, IDisposable
 
         public int Priority => 100;
         public bool SynchronousExecution => false;
-        public Task HandleAsync(TEvent eventData) => _handler(eventData);
+        public Task HandleAsync(TEvent eventData, CancellationToken cancellationToken = default) => _handler(eventData);
     }
 }

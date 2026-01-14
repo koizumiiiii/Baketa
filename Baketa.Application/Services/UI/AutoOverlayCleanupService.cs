@@ -104,7 +104,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     /// TextDisappearanceEventハンドラー（IEventProcessorとして実装）
     /// Circuit Breaker パターンによる安全な自動削除処理
     /// </summary>
-    public async Task HandleAsync(TextDisappearanceEvent eventData)
+    public async Task HandleAsync(TextDisappearanceEvent eventData, CancellationToken cancellationToken = default)
     {
         if (_disposed || eventData == null)
             return;

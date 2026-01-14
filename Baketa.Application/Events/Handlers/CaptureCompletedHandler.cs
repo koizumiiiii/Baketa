@@ -60,7 +60,7 @@ public class CaptureCompletedHandler : IEventProcessor<CaptureCompletedEvent>
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public async Task HandleAsync(CaptureCompletedEvent eventData)
+    public async Task HandleAsync(CaptureCompletedEvent eventData, CancellationToken cancellationToken = default)
     {
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);

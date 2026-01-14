@@ -1,3 +1,4 @@
+using System.Threading;
 using Baketa.Core.Abstractions.Events;
 
 namespace Baketa.Core.Tests.Events;
@@ -26,13 +27,13 @@ public class TestEventProcessor : IEventProcessor<TestEvent>
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public async Task HandleAsync(TestEvent eventData)
+    public async Task HandleAsync(TestEvent eventData, CancellationToken cancellationToken = default)
     {
         if (eventData == null)
             throw new ArgumentNullException(nameof(eventData));
 
         // 非同期処理のシミュレーション
-        await Task.Delay(10);
+        await Task.Delay(10, cancellationToken);
 
         CallCount++;
         _processedEvents.Add(eventData.Data);
@@ -75,13 +76,13 @@ public class ErrorTestEventProcessor : IEventProcessor<ErrorTestEvent>
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public async Task HandleAsync(ErrorTestEvent eventData)
+    public async Task HandleAsync(ErrorTestEvent eventData, CancellationToken cancellationToken = default)
     {
         if (eventData == null)
             throw new ArgumentNullException(nameof(eventData));
 
         // 非同期処理のシミュレーション
-        await Task.Delay(10);
+        await Task.Delay(10, cancellationToken);
 
         if (eventData.ShouldThrowError)
         {
@@ -126,7 +127,7 @@ public class CancellationTestProcessor : IEventProcessor<TestEvent>
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public async Task HandleAsync(TestEvent eventData)
+    public async Task HandleAsync(TestEvent eventData, CancellationToken cancellationToken = default)
     {
         // キャンセルトークンは外部からEventAggregatorにPublishAsyncに渡されたもので、
         // プロセッサ内では必要ならプロパゲートされるものであり、
@@ -141,7 +142,7 @@ public class CancellationTestProcessor : IEventProcessor<TestEvent>
         CompletionCount++;
 
         // 処理のシミュレーション
-        await Task.Delay(10);
+        await Task.Delay(10, cancellationToken);
     }
 
     /// <summary>

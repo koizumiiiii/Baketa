@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
@@ -41,7 +42,7 @@ public class SingleshotEventProcessor : IEventProcessor<ExecuteSingleshotRequest
     /// シングルショット翻訳実行要求イベントの処理
     /// TranslationOrchestrationService.TriggerSingleTranslationAsyncに委譲
     /// </summary>
-    public async Task HandleAsync(ExecuteSingleshotRequestEvent eventData)
+    public async Task HandleAsync(ExecuteSingleshotRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         var processorId = Guid.NewGuid().ToString("N")[..8];
         _logger.LogInformation("📸 [PROCESSOR] シングルショット翻訳イベント受信: EventId={EventId}, ProcessorId={ProcessorId}",
