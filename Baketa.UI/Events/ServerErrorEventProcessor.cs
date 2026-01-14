@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Threading;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events;
@@ -46,7 +47,7 @@ public sealed class ServerErrorEventProcessor : IEventProcessor<ServerErrorEvent
     /// <summary>
     /// サーバーエラーイベントを処理
     /// </summary>
-    public async Task HandleAsync(ServerErrorEvent eventData)
+    public async Task HandleAsync(ServerErrorEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
 

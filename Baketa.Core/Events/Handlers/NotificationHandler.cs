@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
@@ -21,7 +22,7 @@ public class NotificationHandler : IEventProcessor<NotificationEvent>
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public Task HandleAsync(NotificationEvent eventData)
+    public Task HandleAsync(NotificationEvent eventData, CancellationToken cancellationToken = default)
     {
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);

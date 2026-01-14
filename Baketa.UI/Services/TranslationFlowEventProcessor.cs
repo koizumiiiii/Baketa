@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Services.Translation;
 using Baketa.Core.Abstractions.Events;
@@ -97,7 +98,7 @@ public class TranslationFlowEventProcessor :
     /// <summary>
     /// 翻訳開始要求イベントの処理
     /// </summary>
-    public async Task HandleAsync(StartTranslationRequestEvent eventData)
+    public async Task HandleAsync(StartTranslationRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         // 確実にログを記録するため、ファイル直接書き込みを最優先で実行
         try
@@ -314,7 +315,7 @@ public class TranslationFlowEventProcessor :
     /// <summary>
     /// UI開始要求イベントの処理（StartCaptureRequestedEvent → StartTranslationRequestEventに変換）
     /// </summary>
-    public async Task HandleAsync(Baketa.UI.Framework.Events.StartCaptureRequestedEvent eventData)
+    public async Task HandleAsync(Baketa.UI.Framework.Events.StartCaptureRequestedEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -356,7 +357,7 @@ public class TranslationFlowEventProcessor :
     /// <summary>
     /// UI停止要求イベントの処理（StopCaptureRequestedEvent → StopTranslationRequestEventに変換）
     /// </summary>
-    public async Task HandleAsync(Baketa.UI.Framework.Events.StopCaptureRequestedEvent eventData)
+    public async Task HandleAsync(Baketa.UI.Framework.Events.StopCaptureRequestedEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -380,7 +381,7 @@ public class TranslationFlowEventProcessor :
     /// <summary>
     /// 翻訳停止要求イベントの処理
     /// </summary>
-    public async Task HandleAsync(StopTranslationRequestEvent eventData)
+    public async Task HandleAsync(StopTranslationRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -504,7 +505,7 @@ public class TranslationFlowEventProcessor :
     /// <summary>
     /// 翻訳表示切り替え要求イベントの処理
     /// </summary>
-    public async Task HandleAsync(ToggleTranslationDisplayRequestEvent eventData)
+    public async Task HandleAsync(ToggleTranslationDisplayRequestEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -528,7 +529,7 @@ public class TranslationFlowEventProcessor :
     /// <summary>
     /// 設定変更イベントの処理
     /// </summary>
-    public async Task HandleAsync(SettingsChangedEvent eventData)
+    public async Task HandleAsync(SettingsChangedEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {

@@ -1,3 +1,4 @@
+using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,7 @@ public sealed class DiagnosticReportGeneratedEventProcessor : IEventProcessor<Di
     public int Priority => 100;
     public bool SynchronousExecution => false;
 
-    public Task HandleAsync(DiagnosticReportGeneratedEvent eventData)
+    public Task HandleAsync(DiagnosticReportGeneratedEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {

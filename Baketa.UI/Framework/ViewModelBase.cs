@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reactive.Disposables;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Microsoft.Extensions.Logging;
@@ -278,7 +279,7 @@ public abstract class ViewModelBase : ReactiveObject, IActivatableViewModel, IDi
         public int Priority => 100;
         public bool SynchronousExecution => false;
 
-        public Task HandleAsync(TEvent eventData)
+        public Task HandleAsync(TEvent eventData, CancellationToken cancellationToken = default)
         {
             try
             {

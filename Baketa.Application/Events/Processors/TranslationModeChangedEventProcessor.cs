@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Events;
 using Baketa.Core.Abstractions.Events;
@@ -23,7 +24,7 @@ public sealed class TranslationModeChangedEventProcessor(ILogger<TranslationMode
     public bool SynchronousExecution => false; // 非同期実行
 
     /// <inheritdoc />
-    public async Task HandleAsync(TranslationModeChangedEvent eventData)
+    public async Task HandleAsync(TranslationModeChangedEvent eventData, CancellationToken cancellationToken = default)
     {
         // CA1062: 引数のnullチェックを実施
         ArgumentNullException.ThrowIfNull(eventData);

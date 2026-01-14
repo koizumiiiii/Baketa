@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
@@ -38,7 +39,7 @@ public sealed class AnalyticsEventProcessor : IEventProcessor<TranslationComplet
     /// <summary>
     /// 翻訳完了イベントを処理
     /// </summary>
-    public Task HandleAsync(TranslationCompletedEvent eventData)
+    public Task HandleAsync(TranslationCompletedEvent eventData, CancellationToken cancellationToken = default)
     {
         if (!_analyticsService.IsEnabled)
         {

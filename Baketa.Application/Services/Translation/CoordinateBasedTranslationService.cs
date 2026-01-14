@@ -1593,7 +1593,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     /// 🔥 [FALLBACK] 個別翻訳失敗時のフォールバックハンドラー
     /// AggregatedChunksFailedEventを受信し、全画面一括翻訳を実行
     /// </summary>
-    public async Task HandleAsync(Baketa.Core.Events.Translation.AggregatedChunksFailedEvent eventData)
+    public async Task HandleAsync(Baketa.Core.Events.Translation.AggregatedChunksFailedEvent eventData, CancellationToken cancellationToken = default)
     {
         _logger?.LogWarning("🔄 [FALLBACK] 個別翻訳失敗 - 全画面一括翻訳にフォールバック - SessionId: {SessionId}, エラー: {Error}",
             eventData.SessionId, eventData.ErrorMessage);

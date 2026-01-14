@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Translation.Common;
@@ -38,8 +39,9 @@ public class LoggingTranslationEventHandler(ILogger<LoggingTranslationEventHandl
     /// 翻訳開始イベントを処理します
     /// </summary>
     /// <param name="eventData">イベント</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>完了タスク</returns>
-    public Task HandleAsync(TranslationStartedEvent eventData)
+    public Task HandleAsync(TranslationStartedEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
 
@@ -58,8 +60,9 @@ public class LoggingTranslationEventHandler(ILogger<LoggingTranslationEventHandl
     /// 翻訳完了イベントを処理します
     /// </summary>
     /// <param name="eventData">イベント</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>完了タスク</returns>
-    public Task HandleAsync(TranslationCompletedEvent eventData)
+    public Task HandleAsync(TranslationCompletedEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
 
@@ -79,8 +82,9 @@ public class LoggingTranslationEventHandler(ILogger<LoggingTranslationEventHandl
     /// 翻訳エラーイベントを処理します
     /// </summary>
     /// <param name="eventData">イベント</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>完了タスク</returns>
-    public Task HandleAsync(TranslationErrorEvent eventData)
+    public Task HandleAsync(TranslationErrorEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
 

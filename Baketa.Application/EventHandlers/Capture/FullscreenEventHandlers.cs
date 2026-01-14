@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
@@ -19,7 +20,8 @@ public sealed class FullscreenStateChangedEventHandler(ILogger<FullscreenStateCh
     /// フルスクリーン状態変更イベントを処理します
     /// </summary>
     /// <param name="eventData">イベントデータ</param>
-    public async Task HandleAsync(FullscreenStateChangedEvent eventData)
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    public async Task HandleAsync(FullscreenStateChangedEvent eventData, CancellationToken cancellationToken = default)
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
@@ -67,7 +69,8 @@ public sealed class FullscreenOptimizationAppliedEventHandler(ILogger<Fullscreen
     /// フルスクリーン最適化適用イベントを処理します
     /// </summary>
     /// <param name="eventData">イベントデータ</param>
-    public async Task HandleAsync(FullscreenOptimizationAppliedEvent eventData)
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    public async Task HandleAsync(FullscreenOptimizationAppliedEvent eventData, CancellationToken cancellationToken = default)
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
@@ -112,7 +115,8 @@ public sealed class FullscreenOptimizationRemovedEventHandler(ILogger<Fullscreen
     /// フルスクリーン最適化解除イベントを処理します
     /// </summary>
     /// <param name="eventData">イベントデータ</param>
-    public async Task HandleAsync(FullscreenOptimizationRemovedEvent eventData)
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    public async Task HandleAsync(FullscreenOptimizationRemovedEvent eventData, CancellationToken cancellationToken = default)
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
@@ -148,7 +152,8 @@ public sealed class FullscreenOptimizationErrorEventHandler(ILogger<FullscreenOp
     /// フルスクリーン最適化エラーイベントを処理します
     /// </summary>
     /// <param name="eventData">イベントデータ</param>
-    public async Task HandleAsync(FullscreenOptimizationErrorEvent eventData)
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    public async Task HandleAsync(FullscreenOptimizationErrorEvent eventData, CancellationToken cancellationToken = default)
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
@@ -177,7 +182,7 @@ public sealed class FullscreenDetectionStartedEventHandler(ILogger<FullscreenDet
 {
     private readonly ILogger<FullscreenDetectionStartedEventHandler>? _logger = logger;
 
-    public async Task HandleAsync(FullscreenDetectionStartedEvent eventData)
+    public async Task HandleAsync(FullscreenDetectionStartedEvent eventData, CancellationToken cancellationToken = default)
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }
@@ -203,7 +208,7 @@ public sealed class FullscreenDetectionStoppedEventHandler(ILogger<FullscreenDet
 {
     private readonly ILogger<FullscreenDetectionStoppedEventHandler>? _logger = logger;
 
-    public async Task HandleAsync(FullscreenDetectionStoppedEvent eventData)
+    public async Task HandleAsync(FullscreenDetectionStoppedEvent eventData, CancellationToken cancellationToken = default)
     {
         await HandleInternal(eventData).ConfigureAwait(false);
     }

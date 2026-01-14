@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Translation;
@@ -34,7 +35,7 @@ public class TranslationCompletedHandler(
     /// <summary>
     /// TranslationCompletedEventを受信してTranslationWithBoundsCompletedEventに変換
     /// </summary>
-    public async Task HandleAsync(TranslationCompletedEvent eventData)
+    public async Task HandleAsync(TranslationCompletedEvent eventData, CancellationToken cancellationToken = default)
     {
         try
         {

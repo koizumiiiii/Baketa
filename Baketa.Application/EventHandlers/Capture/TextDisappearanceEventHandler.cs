@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Capture;
@@ -21,8 +22,9 @@ public sealed class TextDisappearanceEventHandler(ILogger<TextDisappearanceEvent
     /// <summary>
     /// イベントを処理します
     /// </summary>
-    /// <param name="event">テキスト消失イベント</param>
-    public async Task HandleAsync(IEvent eventData)
+    /// <param name="eventData">テキスト消失イベント</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    public async Task HandleAsync(IEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData, nameof(eventData));
 

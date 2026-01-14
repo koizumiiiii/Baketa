@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Baketa.Core.Abstractions.Events;
@@ -13,7 +14,8 @@ public interface IEventAggregator
     /// </summary>
     /// <typeparam name="TEvent">イベント型</typeparam>
     /// <param name="eventData">イベントデータ</param>
-    Task PublishAsync<TEvent>(TEvent eventData) where TEvent : IEvent;
+    /// <param name="cancellationToken">キャンセレーショントークン（Issue #291: 翻訳停止時のキャンセル伝播用）</param>
+    Task PublishAsync<TEvent>(TEvent eventData, CancellationToken cancellationToken = default) where TEvent : IEvent;
 
     /// <summary>
     /// イベントプロセッサの登録

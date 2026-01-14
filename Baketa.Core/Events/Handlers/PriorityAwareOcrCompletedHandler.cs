@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Settings;
@@ -61,7 +62,7 @@ public class PriorityAwareOcrCompletedHandler : IEventProcessor<OcrCompletedEven
     }
 
     /// <inheritdoc />
-    public async Task HandleAsync(OcrCompletedEvent eventData)
+    public async Task HandleAsync(OcrCompletedEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
 

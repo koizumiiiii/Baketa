@@ -1,3 +1,4 @@
+using System.Threading;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events;
@@ -38,7 +39,7 @@ public sealed class MemoryErrorEventProcessor : IEventProcessor<MemoryErrorEvent
     /// <summary>
     /// メモリエラーイベントを処理
     /// </summary>
-    public async Task HandleAsync(MemoryErrorEvent eventData)
+    public async Task HandleAsync(MemoryErrorEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
 

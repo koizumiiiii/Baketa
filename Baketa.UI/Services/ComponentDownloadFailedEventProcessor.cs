@@ -1,3 +1,4 @@
+using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Setup;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,7 @@ public sealed class ComponentDownloadFailedEventProcessor : IEventProcessor<Comp
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
     }
 
-    public async Task HandleAsync(ComponentDownloadFailedEvent eventData)
+    public async Task HandleAsync(ComponentDownloadFailedEvent eventData, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[Gemini Review] コンポーネントダウンロード失敗イベント受信: Required={HasRequired}, Failed={FailedCount}",
             eventData.HasRequiredFailures, eventData.FailedComponentIds.Count);

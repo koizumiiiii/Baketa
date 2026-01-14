@@ -73,7 +73,8 @@ public class FullscreenManagerServiceTests : IDisposable
         // Assert
         _mockOptimizationService.Verify(x => x.StartOptimizationAsync(cancellationToken), Times.Once);
         _mockDetectionService.Verify(x => x.StartMonitoringAsync(cancellationToken), Times.Once);
-        _mockEventAggregator.Verify(x => x.PublishAsync(It.IsAny<FullscreenDetectionStartedEvent>()), Times.Once);
+        // [Issue #291] CancellationTokenパラメータを明示的に指定（式ツリーではオプション引数を使用不可）
+        _mockEventAggregator.Verify(x => x.PublishAsync(It.IsAny<FullscreenDetectionStartedEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -88,7 +89,8 @@ public class FullscreenManagerServiceTests : IDisposable
         // Assert
         _mockOptimizationService.Verify(x => x.StopOptimizationAsync(), Times.Once);
         _mockDetectionService.Verify(x => x.StopMonitoringAsync(), Times.Once);
-        _mockEventAggregator.Verify(x => x.PublishAsync(It.IsAny<FullscreenDetectionStoppedEvent>()), Times.Once);
+        // [Issue #291] CancellationTokenパラメータを明示的に指定（式ツリーではオプション引数を使用不可）
+        _mockEventAggregator.Verify(x => x.PublishAsync(It.IsAny<FullscreenDetectionStoppedEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -234,8 +236,9 @@ public class FullscreenManagerServiceTests : IDisposable
         // Act & Assert
         var thrownException = await Assert.ThrowsAsync<InvalidOperationException>(() => _managerService.StartAsync()).ConfigureAwait(true);
 
+        // [Issue #291] CancellationTokenパラメータを明示的に指定（式ツリーではオプション引数を使用不可）
         _mockEventAggregator.Verify(x =>
-            x.PublishAsync(It.Is<FullscreenOptimizationErrorEvent>(e => e.Exception == exception)),
+            x.PublishAsync(It.Is<FullscreenOptimizationErrorEvent>(e => e.Exception == exception), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -253,8 +256,9 @@ public class FullscreenManagerServiceTests : IDisposable
         var thrownException = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _managerService.ApplyOptimizationAsync(fullscreenInfo)).ConfigureAwait(true);
 
+        // [Issue #291] CancellationTokenパラメータを明示的に指定（式ツリーではオプション引数を使用不可）
         _mockEventAggregator.Verify(x =>
-            x.PublishAsync(It.Is<FullscreenOptimizationErrorEvent>(e => e.Exception == exception)),
+            x.PublishAsync(It.Is<FullscreenOptimizationErrorEvent>(e => e.Exception == exception), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

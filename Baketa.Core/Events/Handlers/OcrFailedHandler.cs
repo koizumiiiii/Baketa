@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.EventTypes;
@@ -19,7 +20,7 @@ public class OcrFailedHandler(IEventAggregator eventAggregator) : IEventProcesso
     public bool SynchronousExecution => false;
 
     /// <inheritdoc />
-    public async Task HandleAsync(OcrFailedEvent eventData)
+    public async Task HandleAsync(OcrFailedEvent eventData, CancellationToken cancellationToken = default)
     {
         // NULLチェック
         ArgumentNullException.ThrowIfNull(eventData);
