@@ -532,9 +532,6 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         // --- 4.5 Patreon認証結果の通知表示（Issue #233） ---
                         await ShowPendingPatreonNotificationAsync(serviceProvider);
 
-                        // --- 4.6 テストモード警告表示（Issue #110: 決済統合） ---
-                        await ShowTestModeWarningIfNeededAsync(serviceProvider, mainOverlayView);
-
                         // 未認証の場合はSignupViewをダイアログとして表示（初回起動時はサインアップを推奨）
                         if (!isAuthenticated)
                         {
