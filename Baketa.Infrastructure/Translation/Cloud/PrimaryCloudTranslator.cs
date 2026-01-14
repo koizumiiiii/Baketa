@@ -16,6 +16,7 @@ namespace Baketa.Infrastructure.Translation.Cloud;
 public sealed class PrimaryCloudTranslator : ICloudImageTranslator
 {
     private readonly RelayServerClient _relayClient;
+    private readonly ITokenConsumptionTracker _tokenTracker;
     private readonly ILogger<PrimaryCloudTranslator> _logger;
     private readonly CloudTranslationSettings _settings;
 
@@ -33,10 +34,12 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
     /// </summary>
     public PrimaryCloudTranslator(
         RelayServerClient relayClient,
+        ITokenConsumptionTracker tokenTracker,
         IOptions<CloudTranslationSettings> settings,
         ILogger<PrimaryCloudTranslator> logger)
     {
         _relayClient = relayClient ?? throw new ArgumentNullException(nameof(relayClient));
+        _tokenTracker = tokenTracker ?? throw new ArgumentNullException(nameof(tokenTracker));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -109,6 +112,29 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
                     "Primary翻訳成功: RequestId={RequestId}, Tokens={Tokens}",
                     request.RequestId,
                     response.TokenUsage?.TotalTokens ?? 0);
+
+                // [Issue #296] トークン消費をローカルに記録
+                var totalTokens = response.TokenUsage?.TotalTokens ?? 0;
+                if (totalTokens > 0)
+                {
+                    try
+                    {
+                        await _tokenTracker.RecordUsageAsync(
+                            totalTokens,
+                            ProviderId,
+                            TokenUsageType.Total,
+                            cancellationToken).ConfigureAwait(false);
+
+                        _logger.LogDebug(
+                            "[Issue #296] トークン消費記録: Provider={Provider}, Tokens={Tokens}",
+                            ProviderId, totalTokens);
+                    }
+                    catch (Exception ex)
+                    {
+                        // トークン記録の失敗は翻訳結果に影響させない
+                        _logger.LogWarning(ex, "[Issue #296] トークン消費記録に失敗（翻訳は成功）");
+                    }
+                }
             }
             else
             {
