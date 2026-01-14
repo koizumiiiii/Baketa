@@ -23,8 +23,10 @@ public sealed class ParallelOcrExecutor : IParallelOcrExecutor, IDisposable
     private readonly IOcrEngine _ocrEngine;
     private readonly IImageProcessingService _imageProcessingService;
     private readonly ILogger<ParallelOcrExecutor> _logger;
-    private readonly SemaphoreSlim _parallelSemaphore;
+    private readonly object _settingsLock = new(); // [Gemini Review] スレッドセーフティ対策
+    private SemaphoreSlim _parallelSemaphore;
     private ParallelOcrSettings _settings;
+    private bool _disposed;
 
     public ParallelOcrExecutor(
         IOcrEngine ocrEngine,
@@ -45,27 +47,37 @@ public sealed class ParallelOcrExecutor : IParallelOcrExecutor, IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // [Gemini Review] スレッドセーフティ: 設定とセマフォのスナップショットを取得
+        ParallelOcrSettings currentSettings;
+        SemaphoreSlim currentSemaphore;
+        lock (_settingsLock)
+        {
+            currentSettings = _settings;
+            currentSemaphore = _parallelSemaphore;
+        }
 
         var stopwatch = Stopwatch.StartNew();
         var imageSize = image.Width * image.Height;
 
         // 並列OCRが無効または画像が小さすぎる場合は通常のOCRを実行
-        if (!_settings.EnableParallelOcr || imageSize < _settings.MinImageSizeForParallel)
+        if (!currentSettings.EnableParallelOcr || imageSize < currentSettings.MinImageSizeForParallel)
         {
             _logger.LogDebug("[ParallelOcr] 通常OCR実行: Size={Width}x{Height}, Parallel={Enabled}, MinSize={MinSize}",
-                image.Width, image.Height, _settings.EnableParallelOcr, _settings.MinImageSizeForParallel);
+                image.Width, image.Height, currentSettings.EnableParallelOcr, currentSettings.MinImageSizeForParallel);
             return await _ocrEngine.RecognizeAsync(image, progressCallback, cancellationToken).ConfigureAwait(false);
         }
 
         _logger.LogInformation("[ParallelOcr] 並列OCR開始: Size={Width}x{Height}, Tiles={Cols}x{Rows}",
-            image.Width, image.Height, _settings.TileColumnsCount, _settings.TileRowsCount);
+            image.Width, image.Height, currentSettings.TileColumnsCount, currentSettings.TileRowsCount);
 
         progressCallback?.Report(new OcrProgress(0.0, "並列OCR開始") { Phase = OcrPhase.Initializing });
 
         try
         {
-            // タイル領域を計算
-            var tileRegions = CalculateTileRegions(image.Width, image.Height);
+            // タイル領域を計算（スナップショット設定を使用）
+            var tileRegions = CalculateTileRegions(image.Width, image.Height, currentSettings);
             _logger.LogDebug("[ParallelOcr] タイル数: {Count}", tileRegions.Count);
 
             // 各タイルをクロップして並列OCR実行
@@ -75,7 +87,8 @@ public sealed class ParallelOcrExecutor : IParallelOcrExecutor, IDisposable
 
             var tasks = tileRegions.Select(async region =>
             {
-                await _parallelSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                // [Gemini Review] スナップショットしたセマフォを使用
+                await currentSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -100,7 +113,7 @@ public sealed class ParallelOcrExecutor : IParallelOcrExecutor, IDisposable
                 }
                 finally
                 {
-                    _parallelSemaphore.Release();
+                    currentSemaphore.Release();
                 }
             }).ToList();
 
@@ -133,13 +146,35 @@ public sealed class ParallelOcrExecutor : IParallelOcrExecutor, IDisposable
     }
 
     /// <inheritdoc/>
-    public ParallelOcrSettings GetSettings() => _settings;
+    public ParallelOcrSettings GetSettings()
+    {
+        lock (_settingsLock)
+        {
+            return _settings;
+        }
+    }
 
     /// <inheritdoc/>
     public void UpdateSettings(ParallelOcrSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        _settings = settings;
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // [Gemini Review] スレッドセーフティ: ロック内で設定とセマフォを更新
+        lock (_settingsLock)
+        {
+            var oldParallelism = _settings.MaxParallelism;
+            _settings = settings;
+
+            // MaxParallelismが変更された場合はセマフォを再作成
+            if (oldParallelism != settings.MaxParallelism)
+            {
+                var oldSemaphore = _parallelSemaphore;
+                _parallelSemaphore = new SemaphoreSlim(settings.MaxParallelism, settings.MaxParallelism);
+                oldSemaphore.Dispose();
+            }
+        }
+
         _logger.LogInformation("[ParallelOcr] 設定更新: MaxParallelism={Max}, Tiles={Cols}x{Rows}",
             settings.MaxParallelism, settings.TileColumnsCount, settings.TileRowsCount);
     }
@@ -147,12 +182,12 @@ public sealed class ParallelOcrExecutor : IParallelOcrExecutor, IDisposable
     /// <summary>
     /// タイル領域を計算
     /// </summary>
-    private List<Rectangle> CalculateTileRegions(int imageWidth, int imageHeight)
+    private static List<Rectangle> CalculateTileRegions(int imageWidth, int imageHeight, ParallelOcrSettings settings)
     {
         var regions = new List<Rectangle>();
-        var cols = _settings.TileColumnsCount;
-        var rows = _settings.TileRowsCount;
-        var overlap = _settings.TileOverlapPixels;
+        var cols = settings.TileColumnsCount;
+        var rows = settings.TileRowsCount;
+        var overlap = settings.TileOverlapPixels;
 
         // 基本タイルサイズ
         var baseTileWidth = imageWidth / cols;
@@ -354,6 +389,16 @@ public sealed class ParallelOcrExecutor : IParallelOcrExecutor, IDisposable
     /// </summary>
     public void Dispose()
     {
-        _parallelSemaphore.Dispose();
+        if (_disposed)
+            return;
+
+        lock (_settingsLock)
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            _parallelSemaphore.Dispose();
+        }
     }
 }
