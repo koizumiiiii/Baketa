@@ -176,6 +176,12 @@ interface TranslateResponse {
   };
   /** [Issue #275] 複数テキスト対応 - BoundingBox付きテキスト配列 */
   texts?: TranslatedTextItem[];
+  /** [Issue #296] 月間トークン使用状況 */
+  monthly_usage?: {
+    year_month: string;
+    tokens_used: number;
+    tokens_limit: number;
+  };
 }
 
 /** [Issue #275] 翻訳されたテキストアイテム */
@@ -295,6 +301,99 @@ function getSupabaseClient(env: TranslateEnv): SupabaseClient | null {
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY, {
     auth: { persistSession: false }
   });
+}
+
+// ============================================
+// [Issue #296] トークン消費記録ヘルパー
+// ============================================
+
+/** [Issue #296] トークン消費記録結果 */
+interface TokenConsumptionResult {
+  year_month: string;
+  tokens_used: number;
+}
+
+/** プラン別月間トークン上限 */
+const PLAN_TOKEN_LIMITS: Record<PlanType, number> = {
+  [PLAN.FREE]: 0,
+  [PLAN.PRO]: 10_000_000,      // 1,000万トークン
+  [PLAN.PREMIUM]: 20_000_000,  // 2,000万トークン
+  [PLAN.ULTIMATE]: 50_000_000, // 5,000万トークン
+};
+
+/**
+ * [Issue #296] トークン消費をサーバーサイドで記録
+ * @param env 環境変数
+ * @param user 認証済みユーザー
+ * @param totalTokens 消費トークン数
+ * @returns 更新後の月間使用状況（失敗時はnull）
+ */
+async function recordTokenConsumption(
+  env: TranslateEnv,
+  user: AuthenticatedUser,
+  totalTokens: number
+): Promise<TokenConsumptionResult | null> {
+  if (totalTokens <= 0) {
+    return null;
+  }
+
+  const supabase = getSupabaseClient(env);
+  if (!supabase) {
+    console.warn('[Issue #296] Supabase not configured, skipping token recording');
+    return null;
+  }
+
+  try {
+    let result: TokenConsumptionResult | null = null;
+
+    if (user.authMethod === 'supabase') {
+      // Supabaseユーザー: UUIDで記録
+      const { data, error } = await supabase.rpc('record_token_consumption', {
+        p_user_id: user.userId,
+        p_tokens: totalTokens
+      });
+
+      if (error) {
+        console.error('[Issue #296] Token recording RPC error:', error);
+        return null;
+      }
+
+      if (data && Array.isArray(data) && data.length > 0) {
+        result = {
+          year_month: data[0].year_month,
+          tokens_used: Number(data[0].tokens_used)
+        };
+      }
+    } else {
+      // Patreon/JWTユーザー: Patreon IDで記録
+      const { data, error } = await supabase.rpc('record_token_consumption_by_patreon', {
+        p_patreon_user_id: user.userId,
+        p_tokens: totalTokens
+      });
+
+      if (error) {
+        console.error('[Issue #296] Token recording (Patreon) RPC error:', error);
+        return null;
+      }
+
+      if (data && Array.isArray(data) && data.length > 0) {
+        result = {
+          year_month: data[0].year_month,
+          tokens_used: Number(data[0].tokens_used)
+        };
+      }
+    }
+
+    if (result) {
+      console.log(`[Issue #296] Token recorded: userId=${user.userId.substring(0, 8)}..., month=${result.year_month}, used=${result.tokens_used}, added=${totalTokens}`);
+    }
+
+    return result;
+  } catch (error) {
+    // 記録失敗は翻訳結果に影響させない
+    console.error('[Issue #296] Token recording failed:', error);
+    return null;
+  }
 }
 
 /** ユーザーのボーナストークン残高を取得 */
@@ -1092,6 +1191,10 @@ export async function handleTranslate(
       );
     }
 
+    // [Issue #296] トークン消費を記録（翻訳結果に影響させない）
+    const totalTokens = (result.tokenUsage?.input || 0) + (result.tokenUsage?.output || 0);
+    const tokenRecord = await recordTokenConsumption(env, authenticatedUser, totalTokens);
+
     const response: TranslateResponse = {
       success: true,
       request_id: requestId,
@@ -1107,9 +1210,15 @@ export async function handleTranslate(
       processing_time_ms: processingTimeMs,
       // [Issue #275] 複数テキスト対応
       texts: result.texts,
+      // [Issue #296] 月間使用状況
+      monthly_usage: tokenRecord ? {
+        year_month: tokenRecord.year_month,
+        tokens_used: tokenRecord.tokens_used,
+        tokens_limit: PLAN_TOKEN_LIMITS[authenticatedUser.plan] || 0,
+      } : undefined,
     };
 
-    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=gemini, texts=${result.texts?.length || 0}, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
+    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=gemini, texts=${result.texts?.length || 0}, tokens=${totalTokens}, monthly=${tokenRecord?.tokens_used || 'N/A'}`);
 
     return successResponse(response, origin, allowedOrigins);
   }
@@ -1136,6 +1245,10 @@ export async function handleTranslate(
       );
     }
 
+    // [Issue #296] トークン消費を記録（翻訳結果に影響させない）
+    const totalTokens = (result.tokenUsage?.input || 0) + (result.tokenUsage?.output || 0);
+    const tokenRecord = await recordTokenConsumption(env, authenticatedUser, totalTokens);
+
     const response: TranslateResponse = {
       success: true,
       request_id: requestId,
@@ -1151,9 +1264,15 @@ export async function handleTranslate(
       processing_time_ms: processingTimeMs,
       // [Issue #275] 複数テキスト対応
       texts: result.texts,
+      // [Issue #296] 月間使用状況
+      monthly_usage: tokenRecord ? {
+        year_month: tokenRecord.year_month,
+        tokens_used: tokenRecord.tokens_used,
+        tokens_limit: PLAN_TOKEN_LIMITS[authenticatedUser.plan] || 0,
+      } : undefined,
     };
 
-    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=openai, texts=${result.texts?.length || 0}, tokens=${result.tokenUsage?.input || 0}+${result.tokenUsage?.output || 0}`);
+    console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=openai, texts=${result.texts?.length || 0}, tokens=${totalTokens}, monthly=${tokenRecord?.tokens_used || 'N/A'}`);
 
     return successResponse(response, origin, allowedOrigins);
   }
