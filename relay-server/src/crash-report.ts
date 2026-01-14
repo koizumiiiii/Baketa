@@ -36,7 +36,6 @@ export interface CrashReportEnv {
   API_KEY: string;
   ALLOWED_ORIGINS: string;
   ENVIRONMENT?: string;
-  SLACK_WEBHOOK_URL?: string;
   DISCORD_WEBHOOK_URL?: string;
 }
 
@@ -257,52 +256,6 @@ function getSupabaseClient(env: CrashReportEnv): SupabaseClient | null {
 // ============================================
 
 /**
- * Slackに通知を送信
- */
-async function sendSlackNotification(
-  env: CrashReportEnv,
-  report: CrashReportRequest
-): Promise<void> {
-  if (!env.SLACK_WEBHOOK_URL) return;
-
-  try {
-    const message = {
-      blocks: [
-        {
-          type: 'header',
-          text: { type: 'plain_text', text: '🚨 クラッシュレポート受信', emoji: true }
-        },
-        {
-          type: 'section',
-          fields: [
-            { type: 'mrkdwn', text: `*Version:*\n${report.app_version}` },
-            { type: 'mrkdwn', text: `*OS:*\n${report.os_version}` },
-          ]
-        },
-        {
-          type: 'section',
-          text: { type: 'mrkdwn', text: `*Error:*\n\`\`\`${report.error_message.substring(0, 500)}\`\`\`` }
-        },
-        {
-          type: 'context',
-          elements: [
-            { type: 'mrkdwn', text: `Report ID: \`${report.report_id}\`` }
-          ]
-        }
-      ]
-    };
-
-    await fetch(env.SLACK_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(message),
-    });
-  } catch (error) {
-    console.error('Slack notification failed:', error);
-  }
-}
-
-/**
  * Discordに通知を送信
  */
 async function sendDiscordNotification(
@@ -337,16 +290,13 @@ async function sendDiscordNotification(
 }
 
 /**
- * 全通知チャンネルに送信
+ * Discordに通知を送信
  */
 async function sendCrashNotifications(
   env: CrashReportEnv,
   report: CrashReportRequest
 ): Promise<void> {
-  await Promise.allSettled([
-    sendSlackNotification(env, report),
-    sendDiscordNotification(env, report),
-  ]);
+  await sendDiscordNotification(env, report);
 }
 
 // ============================================
@@ -438,7 +388,7 @@ export async function handleCrashReport(
 
     console.log(`Crash report saved: id=${report.report_id}, version=${report.app_version}`);
 
-    // 5. Slack/Discord通知（非同期、失敗しても処理は継続）
+    // 5. Discord通知（非同期、失敗しても処理は継続）
     await sendCrashNotifications(env, report);
 
     return successResponse({
