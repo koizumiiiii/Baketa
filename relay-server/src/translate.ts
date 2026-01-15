@@ -641,6 +641,20 @@ async function authenticateUser(
   // 2. キャッシュを確認（[Issue #286] Cache APIを使用 - KV制限回避）
   const cachedAuth = await getAuthCache(cacheKey);
   if (cachedAuth) {
+    // [Issue #296] Patreonユーザーの場合、メンバーシップKVから最新プランを確認
+    // handleLicenseStatusで更新されたプランがAuth Cacheに反映されていない場合がある
+    if (cachedAuth.authMethod === 'patreon') {
+      const latestMembership = await getCachedMembership(env, cachedAuth.userId);
+      if (latestMembership && latestMembership.membership.plan !== cachedAuth.plan) {
+        console.log(`[Issue #296] Plan mismatch detected: cached=${cachedAuth.plan}, latest=${latestMembership.membership.plan}`);
+        const updatedAuth: AuthenticatedUser = {
+          ...cachedAuth,
+          plan: latestMembership.membership.plan,
+        };
+        await saveAuthCache(cacheKey, updatedAuth);
+        return updatedAuth;
+      }
+    }
     console.log(`[Issue #286] Auth cache hit (Cache API): userId=${cachedAuth.userId.substring(0, 8)}...`);
     return cachedAuth;
   }
