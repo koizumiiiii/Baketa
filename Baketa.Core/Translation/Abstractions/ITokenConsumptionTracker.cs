@@ -69,6 +69,16 @@ public interface ITokenConsumptionTracker
     /// </summary>
     /// <param name="cancellationToken">キャンセルトークン</param>
     Task ResetMonthlyUsageAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// [Issue #296] サーバーサイドの月間使用状況でローカルを同期する
+    /// </summary>
+    /// <param name="serverUsage">サーバーから取得した月間使用状況</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <remarks>
+    /// サーバーの値が正（authoritative）として、ローカルのトークン使用量を上書きします。
+    /// </remarks>
+    Task SyncFromServerAsync(ServerMonthlyUsage serverUsage, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

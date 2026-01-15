@@ -113,26 +113,49 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
                     request.RequestId,
                     response.TokenUsage?.TotalTokens ?? 0);
 
-                // [Issue #296] トークン消費をローカルに記録
-                var totalTokens = response.TokenUsage?.TotalTokens ?? 0;
-                if (totalTokens > 0)
+                // [Issue #296] サーバーの月間使用量でローカルを同期（優先）
+                if (response.MonthlyUsage is not null)
                 {
                     try
                     {
-                        await _tokenTracker.RecordUsageAsync(
-                            totalTokens,
-                            ProviderId,
-                            TokenUsageType.Total,
+                        await _tokenTracker.SyncFromServerAsync(
+                            response.MonthlyUsage,
                             cancellationToken).ConfigureAwait(false);
 
                         _logger.LogDebug(
-                            "[Issue #296] トークン消費記録: Provider={Provider}, Tokens={Tokens}",
-                            ProviderId, totalTokens);
+                            "[Issue #296] サーバーからローカルにトークン使用量を同期: YearMonth={YearMonth}, TokensUsed={TokensUsed}",
+                            response.MonthlyUsage.YearMonth,
+                            response.MonthlyUsage.TokensUsed);
                     }
                     catch (Exception ex)
                     {
-                        // トークン記録の失敗は翻訳結果に影響させない
-                        _logger.LogWarning(ex, "[Issue #296] トークン消費記録に失敗（翻訳は成功）");
+                        // 同期失敗は翻訳結果に影響させない
+                        _logger.LogWarning(ex, "[Issue #296] サーバー同期に失敗（翻訳は成功）");
+                    }
+                }
+                else
+                {
+                    // サーバーから月間使用量が返されなかった場合はローカルに加算記録
+                    var totalTokens = response.TokenUsage?.TotalTokens ?? 0;
+                    if (totalTokens > 0)
+                    {
+                        try
+                        {
+                            await _tokenTracker.RecordUsageAsync(
+                                totalTokens,
+                                ProviderId,
+                                TokenUsageType.Total,
+                                cancellationToken).ConfigureAwait(false);
+
+                            _logger.LogDebug(
+                                "[Issue #296] トークン消費記録（フォールバック）: Provider={Provider}, Tokens={Tokens}",
+                                ProviderId, totalTokens);
+                        }
+                        catch (Exception ex)
+                        {
+                            // トークン記録の失敗は翻訳結果に影響させない
+                            _logger.LogWarning(ex, "[Issue #296] トークン消費記録に失敗（翻訳は成功）");
+                        }
                     }
                 }
             }

@@ -246,6 +246,18 @@ public sealed class RelayServerClient : IAsyncDisposable
         // 成功レスポンス
         if (responseBody.Success)
         {
+            // [Issue #296] サーバーサイドの月間使用状況
+            ServerMonthlyUsage? monthlyUsage = null;
+            if (responseBody.MonthlyUsage is not null && !string.IsNullOrEmpty(responseBody.MonthlyUsage.YearMonth))
+            {
+                monthlyUsage = new ServerMonthlyUsage
+                {
+                    YearMonth = responseBody.MonthlyUsage.YearMonth,
+                    TokensUsed = responseBody.MonthlyUsage.TokensUsed,
+                    TokensLimit = responseBody.MonthlyUsage.TokensLimit
+                };
+            }
+
             // [Issue #275] 複数テキスト対応
             if (responseBody.Texts is { Count: > 0 })
             {
@@ -267,34 +279,44 @@ public sealed class RelayServerClient : IAsyncDisposable
                     })
                     .ToList();
 
-                return ImageTranslationResponse.SuccessWithMultipleTexts(
-                    responseBody.RequestId ?? request.RequestId,
-                    texts,
-                    responseBody.ProviderId ?? _settings.PrimaryProviderId,
-                    new TokenUsageDetail
+                return new ImageTranslationResponse
+                {
+                    RequestId = responseBody.RequestId ?? request.RequestId,
+                    IsSuccess = true,
+                    DetectedText = texts.Count > 0 ? texts[0].Original : string.Empty,
+                    TranslatedText = texts.Count > 0 ? texts[0].Translation : string.Empty,
+                    DetectedLanguage = responseBody.DetectedLanguage,
+                    ProviderId = responseBody.ProviderId ?? _settings.PrimaryProviderId,
+                    TokenUsage = new TokenUsageDetail
                     {
                         InputTokens = responseBody.TokenUsage?.InputTokens ?? 0,
                         OutputTokens = responseBody.TokenUsage?.OutputTokens ?? 0,
                         ImageTokens = responseBody.TokenUsage?.ImageTokens ?? 0
                     },
-                    TimeSpan.FromMilliseconds(responseBody.ProcessingTimeMs ?? processingTime.TotalMilliseconds),
-                    responseBody.DetectedLanguage);
+                    ProcessingTime = TimeSpan.FromMilliseconds(responseBody.ProcessingTimeMs ?? processingTime.TotalMilliseconds),
+                    Texts = texts,
+                    MonthlyUsage = monthlyUsage  // [Issue #296]
+                };
             }
 
             // 旧形式（単一テキスト）の場合
-            return ImageTranslationResponse.Success(
-                responseBody.RequestId ?? request.RequestId,
-                responseBody.DetectedText ?? string.Empty,
-                responseBody.TranslatedText ?? string.Empty,
-                responseBody.ProviderId ?? _settings.PrimaryProviderId,
-                new TokenUsageDetail
+            return new ImageTranslationResponse
+            {
+                RequestId = responseBody.RequestId ?? request.RequestId,
+                IsSuccess = true,
+                DetectedText = responseBody.DetectedText ?? string.Empty,
+                TranslatedText = responseBody.TranslatedText ?? string.Empty,
+                DetectedLanguage = responseBody.DetectedLanguage,
+                ProviderId = responseBody.ProviderId ?? _settings.PrimaryProviderId,
+                TokenUsage = new TokenUsageDetail
                 {
                     InputTokens = responseBody.TokenUsage?.InputTokens ?? 0,
                     OutputTokens = responseBody.TokenUsage?.OutputTokens ?? 0,
                     ImageTokens = responseBody.TokenUsage?.ImageTokens ?? 0
                 },
-                TimeSpan.FromMilliseconds(responseBody.ProcessingTimeMs ?? processingTime.TotalMilliseconds),
-                responseBody.DetectedLanguage);
+                ProcessingTime = TimeSpan.FromMilliseconds(responseBody.ProcessingTimeMs ?? processingTime.TotalMilliseconds),
+                MonthlyUsage = monthlyUsage  // [Issue #296]
+            };
         }
 
         // API応答内のエラー
@@ -379,6 +401,27 @@ public sealed class RelayServerClient : IAsyncDisposable
         /// </summary>
         [JsonPropertyName("texts")]
         public List<RelayTextItem>? Texts { get; set; }
+
+        /// <summary>
+        /// [Issue #296] サーバーサイドの月間トークン使用状況
+        /// </summary>
+        [JsonPropertyName("monthly_usage")]
+        public RelayMonthlyUsage? MonthlyUsage { get; set; }
+    }
+
+    /// <summary>
+    /// [Issue #296] サーバーサイドの月間トークン使用状況
+    /// </summary>
+    private sealed class RelayMonthlyUsage
+    {
+        [JsonPropertyName("year_month")]
+        public string? YearMonth { get; set; }
+
+        [JsonPropertyName("tokens_used")]
+        public long TokensUsed { get; set; }
+
+        [JsonPropertyName("tokens_limit")]
+        public long TokensLimit { get; set; }
     }
 
     /// <summary>

@@ -62,6 +62,15 @@ public sealed class ImageTranslationResponse
     public IReadOnlyList<TranslatedTextItem>? Texts { get; init; }
 
     /// <summary>
+    /// [Issue #296] サーバーサイドの月間トークン使用状況
+    /// </summary>
+    /// <remarks>
+    /// Relay Serverから返される月間トークン消費量。
+    /// クライアントのローカル追跡をサーバー値と同期するために使用。
+    /// </remarks>
+    public ServerMonthlyUsage? MonthlyUsage { get; init; }
+
+    /// <summary>
     /// 複数テキストが含まれるかどうか
     /// </summary>
     public bool HasMultipleTexts => Texts is { Count: > 1 };
@@ -228,4 +237,35 @@ public sealed class TranslationErrorDetail
         public const string NotImplemented = "NOT_IMPLEMENTED";
         public const string InternalError = "INTERNAL_ERROR";
     }
+}
+
+/// <summary>
+/// [Issue #296] サーバーサイドの月間トークン使用状況
+/// </summary>
+public sealed class ServerMonthlyUsage
+{
+    /// <summary>
+    /// 対象年月（YYYY-MM形式）
+    /// </summary>
+    public required string YearMonth { get; init; }
+
+    /// <summary>
+    /// 使用済みトークン数
+    /// </summary>
+    public long TokensUsed { get; init; }
+
+    /// <summary>
+    /// 月間上限トークン数
+    /// </summary>
+    public long TokensLimit { get; init; }
+
+    /// <summary>
+    /// 残りトークン数
+    /// </summary>
+    public long RemainingTokens => Math.Max(0, TokensLimit - TokensUsed);
+
+    /// <summary>
+    /// 使用率（0.0〜1.0）
+    /// </summary>
+    public double UsagePercentage => TokensLimit > 0 ? (double)TokensUsed / TokensLimit : 0.0;
 }
