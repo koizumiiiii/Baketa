@@ -26,7 +26,7 @@
  *     リレーサーバーはstateを透過的に転送するのみ。
  */
 
-import { handleTranslate, TranslateEnv } from './translate';
+import { handleTranslate, handleQuotaStatus, TranslateEnv } from './translate';
 import { handleCrashReport, CrashReportEnv } from './crash-report';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SignJWT, jwtVerify, JWTPayload } from 'jose';
@@ -2152,6 +2152,9 @@ export default {
           return handleBonusTokensStatus(request, env, origin, allowedOrigins);
         case '/api/bonus-tokens/sync':
           return handleBonusTokensSync(request, env, origin, allowedOrigins);
+        // Issue #296: クォータ状態取得
+        case '/api/quota/status':
+          return handleQuotaStatus(request, env as TranslateEnv, origin, allowedOrigins);
         // Issue #287: JWT認証エンドポイント
         case '/api/auth/token':
           return handleAuthToken(request, env, origin, allowedOrigins);

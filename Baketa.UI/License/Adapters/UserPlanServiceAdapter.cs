@@ -27,10 +27,27 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     /// <remarks>
     /// [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
     /// </remarks>
-    public bool CanUseCloudOnlyEngine =>
-        (_licenseManager.CurrentState.CurrentPlan.HasCloudAiAccess() &&
-         !_licenseManager.CurrentState.IsQuotaExceeded) ||
-        (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+    public bool CanUseCloudOnlyEngine
+    {
+        get
+        {
+            var state = _licenseManager.CurrentState;
+            var hasCloudAccess = state.CurrentPlan.HasCloudAiAccess();
+            var isQuotaExceeded = state.IsQuotaExceeded;
+            var bonusTokens = _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
+            var result = (hasCloudAccess && !isQuotaExceeded) || bonusTokens > 0;
+
+            _logger.LogInformation(
+                "[Issue #296] CanUseCloudOnlyEngine評価: Result={Result}, Plan={Plan}, HasCloudAccess={HasCloudAccess}, " +
+                "IsQuotaExceeded={IsQuotaExceeded}, BonusTokens={BonusTokens}, " +
+                "CloudAiTokensUsed={Used}, MonthlyTokenLimit={Limit}, ServerMonthlyTokenLimit={ServerLimit}",
+                result, state.CurrentPlan, hasCloudAccess,
+                isQuotaExceeded, bonusTokens,
+                state.CloudAiTokensUsed, state.MonthlyTokenLimit, state.ServerMonthlyTokenLimit);
+
+            return result;
+        }
+    }
 
     /// <inheritdoc/>
     public bool IsMonthlyLimitExceeded => _licenseManager.CurrentState.IsQuotaExceeded;

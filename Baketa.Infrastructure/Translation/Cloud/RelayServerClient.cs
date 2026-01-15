@@ -232,15 +232,35 @@ public sealed class RelayServerClient : IAsyncDisposable
                 _ => TranslationErrorDetail.Codes.ApiError
             };
 
-            return ImageTranslationResponse.Failure(
+            // [Issue #296] サーバーからのエラーコードを使用（QUOTA_EXCEEDED対応）
+            var actualErrorCode = responseBody.Error?.Code ?? errorCode;
+
+            // [Issue #296] エラーレスポンスでもmonthly_usageが含まれている場合がある（QUOTA_EXCEEDED時）
+            ServerMonthlyUsage? monthlyUsage = null;
+            if (responseBody.MonthlyUsage is not null && !string.IsNullOrEmpty(responseBody.MonthlyUsage.YearMonth))
+            {
+                monthlyUsage = new ServerMonthlyUsage
+                {
+                    YearMonth = responseBody.MonthlyUsage.YearMonth,
+                    TokensUsed = responseBody.MonthlyUsage.TokensUsed,
+                    TokensLimit = responseBody.MonthlyUsage.TokensLimit
+                };
+
+                _logger.LogWarning(
+                    "[Issue #296] エラーレスポンスにmonthly_usage含む: Code={Code}, Used={Used}, Limit={Limit}",
+                    actualErrorCode, monthlyUsage.TokensUsed, monthlyUsage.TokensLimit);
+            }
+
+            return ImageTranslationResponse.FailureWithMonthlyUsage(
                 request.RequestId,
                 new TranslationErrorDetail
                 {
-                    Code = responseBody.Error?.Code ?? errorCode,
+                    Code = actualErrorCode,
                     Message = responseBody.Error?.Message ?? $"HTTPエラー: {(int)httpResponse.StatusCode}",
                     IsRetryable = responseBody.Error?.IsRetryable ?? (int)httpResponse.StatusCode >= 500
                 },
-                processingTime);
+                processingTime,
+                monthlyUsage);
         }
 
         // 成功レスポンス
@@ -329,6 +349,79 @@ public sealed class RelayServerClient : IAsyncDisposable
                 IsRetryable = responseBody.Error?.IsRetryable ?? false
             },
             processingTime);
+    }
+
+    /// <summary>
+    /// [Issue #296] サーバーからクォータ状態を取得
+    /// </summary>
+    /// <param name="sessionToken">セッショントークン</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>クォータ状態（取得失敗時はnull）</returns>
+    public async Task<QuotaStatusResponse?> GetQuotaStatusAsync(
+        string sessionToken,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sessionToken);
+
+        try
+        {
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Get, "/api/quota/status");
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
+
+            using var httpResponse = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
+
+            if (!httpResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "[Issue #296] クォータ状態取得失敗: StatusCode={StatusCode}",
+                    httpResponse.StatusCode);
+                return null;
+            }
+
+            var response = await httpResponse.Content.ReadFromJsonAsync<RelayQuotaStatusResponse>(
+                _jsonOptions, cancellationToken).ConfigureAwait(false);
+
+            if (response?.Success != true || response.MonthlyUsage == null)
+            {
+                _logger.LogWarning("[Issue #296] クォータ状態レスポンスが不正");
+                return null;
+            }
+
+            _logger.LogInformation(
+                "[Issue #296] クォータ状態取得成功: YearMonth={YearMonth}, Used={Used}, Limit={Limit}",
+                response.MonthlyUsage.YearMonth,
+                response.MonthlyUsage.TokensUsed,
+                response.MonthlyUsage.TokensLimit);
+
+            return new QuotaStatusResponse
+            {
+                YearMonth = response.MonthlyUsage.YearMonth ?? string.Empty,
+                TokensUsed = response.MonthlyUsage.TokensUsed,
+                TokensLimit = response.MonthlyUsage.TokensLimit,
+                IsExceeded = response.MonthlyUsage.IsExceeded,
+                Plan = response.Plan ?? string.Empty,
+                HasBonusTokens = response.HasBonusTokens
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "[Issue #296] クォータ状態取得中に通信エラー");
+            return null;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("[Issue #296] クォータ状態取得がタイムアウト");
+            return null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #296] クォータ状態取得中に予期せぬエラー");
+            return null;
+        }
     }
 
     /// <inheritdoc />
@@ -466,5 +559,65 @@ public sealed class RelayServerClient : IAsyncDisposable
         public bool IsRetryable { get; set; }
     }
 
+    /// <summary>
+    /// [Issue #296] クォータ状態レスポンス（サーバーからのJSON）
+    /// </summary>
+    private sealed class RelayQuotaStatusResponse
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("monthly_usage")]
+        public RelayQuotaMonthlyUsage? MonthlyUsage { get; set; }
+
+        [JsonPropertyName("plan")]
+        public string? Plan { get; set; }
+
+        [JsonPropertyName("has_bonus_tokens")]
+        public bool HasBonusTokens { get; set; }
+    }
+
+    /// <summary>
+    /// [Issue #296] クォータ状態の月間使用量（サーバーからのJSON）
+    /// </summary>
+    private sealed class RelayQuotaMonthlyUsage
+    {
+        [JsonPropertyName("year_month")]
+        public string? YearMonth { get; set; }
+
+        [JsonPropertyName("tokens_used")]
+        public long TokensUsed { get; set; }
+
+        [JsonPropertyName("tokens_limit")]
+        public long TokensLimit { get; set; }
+
+        [JsonPropertyName("is_exceeded")]
+        public bool IsExceeded { get; set; }
+    }
+
     #endregion
+}
+
+/// <summary>
+/// [Issue #296] クォータ状態レスポンス（公開DTO）
+/// </summary>
+public sealed record QuotaStatusResponse
+{
+    /// <summary>年月（YYYY-MM形式）</summary>
+    public required string YearMonth { get; init; }
+
+    /// <summary>使用済みトークン数</summary>
+    public required long TokensUsed { get; init; }
+
+    /// <summary>月間トークン上限</summary>
+    public required long TokensLimit { get; init; }
+
+    /// <summary>クォータ超過しているか</summary>
+    public required bool IsExceeded { get; init; }
+
+    /// <summary>プラン名</summary>
+    public required string Plan { get; init; }
+
+    /// <summary>ボーナストークンを所有しているか</summary>
+    public required bool HasBonusTokens { get; init; }
 }

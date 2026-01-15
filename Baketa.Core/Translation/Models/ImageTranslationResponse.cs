@@ -112,6 +112,23 @@ public sealed class ImageTranslationResponse
     };
 
     /// <summary>
+    /// [Issue #296] 失敗レスポンス作成（月間使用量情報付き）
+    /// QUOTA_EXCEEDEDなどサーバーから月間使用量が返される失敗時に使用
+    /// </summary>
+    public static ImageTranslationResponse FailureWithMonthlyUsage(
+        string requestId,
+        TranslationErrorDetail error,
+        TimeSpan processingTime,
+        ServerMonthlyUsage? monthlyUsage) => new()
+    {
+        RequestId = requestId,
+        IsSuccess = false,
+        Error = error,
+        ProcessingTime = processingTime,
+        MonthlyUsage = monthlyUsage
+    };
+
+    /// <summary>
     /// 複数テキスト成功レスポンス作成（Issue #242）
     /// </summary>
     public static ImageTranslationResponse SuccessWithMultipleTexts(
@@ -236,6 +253,10 @@ public sealed class TranslationErrorDetail
         public const string Timeout = "TIMEOUT";
         public const string NotImplemented = "NOT_IMPLEMENTED";
         public const string InternalError = "INTERNAL_ERROR";
+        /// <summary>
+        /// [Issue #296] 月間クォータ超過
+        /// </summary>
+        public const string QuotaExceeded = "QUOTA_EXCEEDED";
     }
 }
 

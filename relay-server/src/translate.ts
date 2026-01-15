@@ -205,6 +205,8 @@ const IDENTITY_CACHE_TTL_SECONDS = 60 * 60; // 1 hour (was 5 minutes)
 const API_TIMEOUT_MS = 30000; // 30秒タイムアウト
 /** [Issue #286] 認証結果キャッシュTTL（1時間）- KV Write削減のため延長 */
 const AUTH_CACHE_TTL_SECONDS = 60 * 60; // 1 hour (was 60 seconds)
+/** [Issue #296] クォータキャッシュTTL（5分）- Geminiフィードバック反映 */
+const QUOTA_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 
 // [Issue #287] JWT認証設定
 const JWT_ISSUER = 'https://baketa-relay.suke009.workers.dev';
@@ -358,10 +360,11 @@ async function recordTokenConsumption(
         return null;
       }
 
+      // カラム名は out_* プレフィックス付き（SQL関数の曖昧さ回避のため）
       if (data && Array.isArray(data) && data.length > 0) {
         result = {
-          year_month: data[0].year_month,
-          tokens_used: Number(data[0].tokens_used)
+          year_month: data[0].out_year_month,
+          tokens_used: Number(data[0].out_tokens_used)
         };
       }
     } else {
@@ -394,6 +397,190 @@ async function recordTokenConsumption(
     // 記録失敗は翻訳結果に影響させない
     console.error('[Issue #296] Token recording failed:', error);
     return null;
+  }
+}
+
+// ============================================
+// [Issue #296] クォータ超過チェック
+// ============================================
+
+/** クォータチェック結果 */
+interface QuotaCheckResult {
+  exceeded: boolean;
+  tokensUsed: number;
+  tokensLimit: number;
+  yearMonth: string;
+}
+
+/** キャッシュされたクォータ状態 */
+interface CachedQuotaState {
+  tokensUsed: number;
+  cachedAt: number;
+}
+
+/**
+ * [Issue #296] クォータ超過をチェック（Cache API活用）
+ * @param env 環境変数
+ * @param user 認証済みユーザー
+ * @returns クォータチェック結果
+ */
+async function checkQuotaExceeded(
+  env: TranslateEnv,
+  user: AuthenticatedUser
+): Promise<QuotaCheckResult> {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const tokensLimit = PLAN_TOKEN_LIMITS[user.plan] || 0;
+
+  // Freeプランは上限0（ボーナストークンのみで利用）
+  if (tokensLimit === 0) {
+    return {
+      exceeded: true,
+      tokensUsed: 0,
+      tokensLimit: 0,
+      yearMonth,
+    };
+  }
+
+  // 1. キャッシュを確認（Cache API使用）
+  const cacheKey = `quota:${user.userId}:${yearMonth}`;
+  const cachedQuota = await getQuotaCache(cacheKey);
+  if (cachedQuota !== null) {
+    console.log(`[Issue #296] Quota cache hit: userId=${user.userId.substring(0, 8)}..., used=${cachedQuota}`);
+    return {
+      exceeded: cachedQuota >= tokensLimit,
+      tokensUsed: cachedQuota,
+      tokensLimit,
+      yearMonth,
+    };
+  }
+
+  // 2. Supabaseから現在の使用量を取得
+  const supabase = getSupabaseClient(env);
+  if (!supabase) {
+    console.warn('[Issue #296] Supabase not configured, allowing request');
+    return {
+      exceeded: false,
+      tokensUsed: 0,
+      tokensLimit,
+      yearMonth,
+    };
+  }
+
+  try {
+    let tokensUsed = 0;
+
+    if (user.authMethod === 'supabase') {
+      // Supabaseユーザー: UUIDで検索
+      const { data, error } = await supabase
+        .from('token_usage')
+        .select('tokens_used')
+        .eq('user_id', user.userId)
+        .eq('year_month', yearMonth)
+        .single();
+
+      if (!error && data) {
+        tokensUsed = Number(data.tokens_used);
+      }
+    } else {
+      // Patreon/JWTユーザー: profiles経由でuser_idを取得
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('patreon_user_id', user.userId)
+        .single();
+
+      if (!profileError && profile) {
+        const { data, error } = await supabase
+          .from('token_usage')
+          .select('tokens_used')
+          .eq('user_id', profile.id)
+          .eq('year_month', yearMonth)
+          .single();
+
+        if (!error && data) {
+          tokensUsed = Number(data.tokens_used);
+        }
+      }
+    }
+
+    // 3. 結果をキャッシュに保存（5分TTL）
+    await saveQuotaCache(cacheKey, tokensUsed);
+
+    console.log(`[Issue #296] Quota check: userId=${user.userId.substring(0, 8)}..., used=${tokensUsed}, limit=${tokensLimit}, exceeded=${tokensUsed >= tokensLimit}`);
+
+    return {
+      exceeded: tokensUsed >= tokensLimit,
+      tokensUsed,
+      tokensLimit,
+      yearMonth,
+    };
+  } catch (error) {
+    console.error('[Issue #296] Quota check failed:', error);
+    // エラー時は翻訳を許可（可用性優先）
+    return {
+      exceeded: false,
+      tokensUsed: 0,
+      tokensLimit,
+      yearMonth,
+    };
+  }
+}
+
+/** [Issue #296] クォータキャッシュを読み取り（Cache API） */
+async function getQuotaCache(cacheKey: string): Promise<number | null> {
+  try {
+    const cache = caches.default;
+    const cacheRequest = new Request(getCacheUrl(cacheKey));
+    const cachedResponse = await cache.match(cacheRequest);
+
+    if (cachedResponse) {
+      const data = await cachedResponse.json<CachedQuotaState>();
+      return data.tokensUsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** [Issue #296] クォータ状態をキャッシュに保存（Cache API） */
+async function saveQuotaCache(cacheKey: string, tokensUsed: number): Promise<void> {
+  try {
+    const cache = caches.default;
+    const cacheRequest = new Request(getCacheUrl(cacheKey));
+    const state: CachedQuotaState = {
+      tokensUsed,
+      cachedAt: Date.now(),
+    };
+    const cacheResponse = new Response(JSON.stringify(state), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `max-age=${QUOTA_CACHE_TTL_SECONDS}`,
+      },
+    });
+
+    await cache.put(cacheRequest, cacheResponse);
+    console.log(`[Issue #296] Quota cached: key=${cacheKey.substring(0, 16)}..., used=${tokensUsed}`);
+  } catch (error) {
+    console.warn('[Issue #296] Quota cache save failed:', error);
+  }
+}
+
+/** [Issue #296] クォータキャッシュを無効化（トークン消費後） */
+async function invalidateQuotaCache(userId: string): Promise<void> {
+  try {
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const cacheKey = `quota:${userId}:${yearMonth}`;
+
+    const cache = caches.default;
+    const cacheRequest = new Request(getCacheUrl(cacheKey));
+    await cache.delete(cacheRequest);
+
+    console.log(`[Issue #296] Quota cache invalidated: userId=${userId.substring(0, 8)}...`);
+  } catch {
+    // キャッシュ削除失敗は無視
   }
 }
 
@@ -635,12 +822,78 @@ function errorResponse(
 function successResponse(
   data: TranslateResponse,
   origin: string,
-  allowedOrigins: string
+  allowedOrigins: string,
+  rateLimitHeaders?: Record<string, string>
 ): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders(origin, allowedOrigins) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...corsHeaders(origin, allowedOrigins),
+      ...rateLimitHeaders,
+    },
   });
+}
+
+/**
+ * [Issue #296] クォータ超過エラーレスポンス
+ * Geminiフィードバック: 既存のerrorResponseと同じJSON構造を使用
+ */
+function quotaExceededResponse(
+  requestId: string,
+  quotaCheck: QuotaCheckResult,
+  origin: string,
+  allowedOrigins: string
+): Response {
+  const response: TranslateResponse = {
+    success: false,
+    request_id: requestId,
+    error: {
+      code: 'QUOTA_EXCEEDED',
+      message: `Monthly token limit exceeded: ${quotaCheck.tokensUsed.toLocaleString()} / ${quotaCheck.tokensLimit.toLocaleString()} tokens used`,
+      is_retryable: false,
+    },
+    // [Issue #296] クォータ情報も含める
+    monthly_usage: {
+      year_month: quotaCheck.yearMonth,
+      tokens_used: quotaCheck.tokensUsed,
+      tokens_limit: quotaCheck.tokensLimit,
+    },
+  };
+
+  // 月末リセット日時を計算（翌月1日 00:00:00 UTC）
+  const now = new Date();
+  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0));
+  const resetTimestamp = Math.floor(nextMonth.getTime() / 1000);
+
+  return new Response(JSON.stringify(response), {
+    status: 429, // Too Many Requests（クォータ超過に適切）
+    headers: {
+      'Content-Type': 'application/json',
+      ...corsHeaders(origin, allowedOrigins),
+      ...rateLimitHeaders(quotaCheck, resetTimestamp),
+    },
+  });
+}
+
+/**
+ * [Issue #296] X-RateLimit-* ヘッダーを生成
+ * Geminiフィードバック: クライアント側でクォータ状況を明示
+ */
+function rateLimitHeaders(
+  quotaCheck: QuotaCheckResult,
+  resetTimestamp?: number
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    'X-RateLimit-Limit': quotaCheck.tokensLimit.toString(),
+    'X-RateLimit-Remaining': Math.max(0, quotaCheck.tokensLimit - quotaCheck.tokensUsed).toString(),
+  };
+
+  if (resetTimestamp) {
+    headers['X-RateLimit-Reset'] = resetTimestamp.toString();
+  }
+
+  return headers;
 }
 
 async function getSession(env: TranslateEnv, sessionToken: string): Promise<SessionData | null> {
@@ -1178,6 +1431,18 @@ export async function handleTranslate(
     );
   }
 
+  // [Issue #296] クォータ超過チェック（翻訳前に実行）
+  const quotaCheck = await checkQuotaExceeded(env, authenticatedUser);
+  if (quotaCheck.exceeded && !authenticatedUser.hasBonusTokens) {
+    console.log(`[Issue #296] Quota exceeded: userId=${authenticatedUser.userId.substring(0, 8)}..., used=${quotaCheck.tokensUsed}, limit=${quotaCheck.tokensLimit}`);
+    return quotaExceededResponse(
+      defaultRequestId,
+      quotaCheck,
+      origin,
+      allowedOrigins
+    );
+  }
+
   const userId = authenticatedUser.userId;
   const plan = authenticatedUser.plan;
 
@@ -1224,6 +1489,19 @@ export async function handleTranslate(
     const totalTokens = (result.tokenUsage?.input || 0) + (result.tokenUsage?.output || 0);
     const tokenRecord = await recordTokenConsumption(env, authenticatedUser, totalTokens);
 
+    // [Issue #296] トークン消費後にクォータキャッシュを無効化
+    if (tokenRecord) {
+      await invalidateQuotaCache(authenticatedUser.userId);
+    }
+
+    // [Issue #296] 更新後のクォータ情報でX-RateLimitヘッダーを生成
+    const updatedQuota: QuotaCheckResult = {
+      exceeded: tokenRecord ? tokenRecord.tokens_used >= quotaCheck.tokensLimit : quotaCheck.exceeded,
+      tokensUsed: tokenRecord?.tokens_used ?? quotaCheck.tokensUsed,
+      tokensLimit: quotaCheck.tokensLimit,
+      yearMonth: tokenRecord?.year_month ?? quotaCheck.yearMonth,
+    };
+
     const response: TranslateResponse = {
       success: true,
       request_id: requestId,
@@ -1249,7 +1527,7 @@ export async function handleTranslate(
 
     console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=gemini, texts=${result.texts?.length || 0}, tokens=${totalTokens}, monthly=${tokenRecord?.tokens_used || 'N/A'}`);
 
-    return successResponse(response, origin, allowedOrigins);
+    return successResponse(response, origin, allowedOrigins, rateLimitHeaders(updatedQuota));
   }
 
   if (translateRequest.provider === 'openai') {
@@ -1278,6 +1556,19 @@ export async function handleTranslate(
     const totalTokens = (result.tokenUsage?.input || 0) + (result.tokenUsage?.output || 0);
     const tokenRecord = await recordTokenConsumption(env, authenticatedUser, totalTokens);
 
+    // [Issue #296] トークン消費後にクォータキャッシュを無効化
+    if (tokenRecord) {
+      await invalidateQuotaCache(authenticatedUser.userId);
+    }
+
+    // [Issue #296] 更新後のクォータ情報でX-RateLimitヘッダーを生成
+    const updatedQuota: QuotaCheckResult = {
+      exceeded: tokenRecord ? tokenRecord.tokens_used >= quotaCheck.tokensLimit : quotaCheck.exceeded,
+      tokensUsed: tokenRecord?.tokens_used ?? quotaCheck.tokensUsed,
+      tokensLimit: quotaCheck.tokensLimit,
+      yearMonth: tokenRecord?.year_month ?? quotaCheck.yearMonth,
+    };
+
     const response: TranslateResponse = {
       success: true,
       request_id: requestId,
@@ -1303,8 +1594,140 @@ export async function handleTranslate(
 
     console.log(`Translate success: requestId=${requestId}, userId=${userId}, plan=${plan}, authMethod=${authenticatedUser.authMethod}, provider=openai, texts=${result.texts?.length || 0}, tokens=${totalTokens}, monthly=${tokenRecord?.tokens_used || 'N/A'}`);
 
-    return successResponse(response, origin, allowedOrigins);
+    return successResponse(response, origin, allowedOrigins, rateLimitHeaders(updatedQuota));
   }
 
   return errorResponse(requestId, 'VALIDATION_ERROR', 'Invalid provider', false, 400, origin, allowedOrigins);
+}
+
+// ============================================
+// [Issue #296] クォータ状態取得エンドポイント
+// ============================================
+
+/**
+ * [Issue #296] クォータ状態を取得
+ * GET /api/quota/status
+ *
+ * 認証済みユーザーの現在の月間トークン使用状況を取得
+ * 起動時にクライアントがサーバーと同期するために使用
+ */
+export async function handleQuotaStatus(
+  request: Request,
+  env: TranslateEnv,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return new Response(JSON.stringify({
+      success: false,
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed', is_retryable: false }
+    }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(origin, allowedOrigins) }
+    });
+  }
+
+  // セッショントークン取得
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: { code: 'SESSION_INVALID', message: 'Missing or invalid Authorization header', is_retryable: false }
+    }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(origin, allowedOrigins) }
+    });
+  }
+
+  const sessionToken = authHeader.substring(7);
+
+  // 統合認証
+  const authenticatedUser = await authenticateUser(env, sessionToken);
+  if (!authenticatedUser) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: { code: 'SESSION_INVALID', message: 'Invalid or expired session', is_retryable: false }
+    }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(origin, allowedOrigins) }
+    });
+  }
+
+  // クォータ状態を取得（キャッシュをスキップして最新状態を取得）
+  // 起動時の同期はキャッシュを使わない方が良い
+  const supabase = getSupabaseClient(env);
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const tokensLimit = PLAN_TOKEN_LIMITS[authenticatedUser.plan] || 0;
+
+  let tokensUsed = 0;
+
+  if (supabase) {
+    try {
+      if (authenticatedUser.authMethod === 'supabase') {
+        // Supabaseユーザー: UUIDで検索
+        const { data, error } = await supabase
+          .from('token_usage')
+          .select('tokens_used')
+          .eq('user_id', authenticatedUser.userId)
+          .eq('year_month', yearMonth)
+          .single();
+
+        if (!error && data) {
+          tokensUsed = Number(data.tokens_used);
+        }
+      } else {
+        // Patreon/JWTユーザー: profiles経由でuser_idを取得
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('patreon_user_id', authenticatedUser.userId)
+          .single();
+
+        if (!profileError && profile) {
+          const { data, error } = await supabase
+            .from('token_usage')
+            .select('tokens_used')
+            .eq('user_id', profile.id)
+            .eq('year_month', yearMonth)
+            .single();
+
+          if (!error && data) {
+            tokensUsed = Number(data.tokens_used);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[Issue #296] Quota status query failed:', error);
+    }
+  }
+
+  const isExceeded = tokensLimit > 0 && tokensUsed >= tokensLimit;
+
+  console.log(`[Issue #296] Quota status: userId=${authenticatedUser.userId.substring(0, 8)}..., plan=${authenticatedUser.plan}, used=${tokensUsed}, limit=${tokensLimit}, exceeded=${isExceeded}`);
+
+  // 月末リセット日時を計算
+  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0));
+  const resetTimestamp = Math.floor(nextMonth.getTime() / 1000);
+
+  return new Response(JSON.stringify({
+    success: true,
+    monthly_usage: {
+      year_month: yearMonth,
+      tokens_used: tokensUsed,
+      tokens_limit: tokensLimit,
+      is_exceeded: isExceeded,
+    },
+    plan: authenticatedUser.plan,
+    has_bonus_tokens: authenticatedUser.hasBonusTokens,
+  }), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      ...corsHeaders(origin, allowedOrigins),
+      'X-RateLimit-Limit': tokensLimit.toString(),
+      'X-RateLimit-Remaining': Math.max(0, tokensLimit - tokensUsed).toString(),
+      'X-RateLimit-Reset': resetTimestamp.toString(),
+    }
+  });
 }

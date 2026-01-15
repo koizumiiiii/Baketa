@@ -127,12 +127,14 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
                             cancellationToken).ConfigureAwait(false);
 
                         // [Issue #296] LicenseManagerの状態も同期（警告通知トリガー）
-                        _licenseManager.SyncTokenUsage(response.MonthlyUsage.TokensUsed);
+                        // MonthlyTokenLimitも同期することで警告が正しく動作
+                        _licenseManager.SyncMonthlyUsageFromServer(response.MonthlyUsage);
 
                         _logger.LogDebug(
-                            "[Issue #296] サーバーからローカルにトークン使用量を同期: YearMonth={YearMonth}, TokensUsed={TokensUsed}",
+                            "[Issue #296] サーバーからローカルにトークン使用量を同期: YearMonth={YearMonth}, Used={TokensUsed}, Limit={TokensLimit}",
                             response.MonthlyUsage.YearMonth,
-                            response.MonthlyUsage.TokensUsed);
+                            response.MonthlyUsage.TokensUsed,
+                            response.MonthlyUsage.TokensLimit);
                     }
                     catch (Exception ex)
                     {
@@ -172,6 +174,27 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
                     "Primary翻訳失敗: RequestId={RequestId}, Error={Error}",
                     request.RequestId,
                     response.Error?.Message);
+
+                // [Issue #296] QUOTA_EXCEEDEDエラーの場合、LicenseManagerを更新して UI に通知
+                if (response.Error?.Code == TranslationErrorDetail.Codes.QuotaExceeded &&
+                    response.MonthlyUsage is not null)
+                {
+                    try
+                    {
+                        // サーバーから返された月間使用量でローカルを同期
+                        // MonthlyTokenLimitも同期することで警告ダイアログが表示される
+                        _licenseManager.SyncMonthlyUsageFromServer(response.MonthlyUsage);
+
+                        _logger.LogInformation(
+                            "[Issue #296] QUOTA_EXCEEDED: LicenseManagerを更新 - Used={Used}, Limit={Limit}",
+                            response.MonthlyUsage.TokensUsed,
+                            response.MonthlyUsage.TokensLimit);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "[Issue #296] QUOTA_EXCEEDED時のLicenseManager更新に失敗");
+                    }
+                }
             }
 
             return response;

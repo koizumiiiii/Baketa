@@ -660,7 +660,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
             "【翻訳設定ヘルプ】\n\n" +
             "🔧 エンジン選択:\n" +
             "• LocalOnly: 高速・無料・オフライン対応\n" +
-            "• CloudOnly: 高品質・プレミアムプラン必須\n\n" +
+            "• CloudOnly: 高品質・有料プラン必須\n\n" +
             "🌐 言語ペア:\n" +
             "• 日本語⇔英語: 最高品質\n" +
             "• 中国語関連: 簡体字・繁体字対応\n" +
@@ -752,7 +752,7 @@ public sealed class TranslationSettingsViewModel : Framework.ViewModelBase, IAct
         if (EngineSelection.SelectedEngine == TranslationEngine.CloudOnly &&
             !EngineSelection.IsCloudOnlyEnabled)
         {
-            return new SettingsValidationResult(false, "CloudOnlyエンジンが選択されていますが、プレミアムプランが必要です。");
+            return new SettingsValidationResult(false, "CloudOnlyエンジンが選択されていますが、Pro/Premium/Ultimateプランが必要です。");
         }
 
         if (TranslationStrategy.SelectedStrategy == Models.TranslationStrategy.TwoStage &&

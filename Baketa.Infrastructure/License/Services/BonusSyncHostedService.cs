@@ -1,5 +1,7 @@
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Translation.Abstractions;
+using Baketa.Infrastructure.Translation.Cloud;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -8,12 +10,14 @@ namespace Baketa.Infrastructure.License.Services;
 /// <summary>
 /// ボーナストークンをサーバーと同期するバックグラウンドサービス
 /// ログイン時にサーバーから取得し、定期的にローカル消費量をサーバーへ同期
+/// [Issue #296] 起動時にクォータ状態もサーバーと同期
 /// </summary>
 public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 {
     private readonly IAuthService _authService;
     private readonly IBonusTokenService? _bonusTokenService;
     private readonly ILicenseManager _licenseManager;
+    private readonly RelayServerClient? _relayServerClient;
     private readonly ILogger<BonusSyncHostedService> _logger;
 
     /// <summary>
@@ -37,11 +41,13 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
         IAuthService authService,
         IBonusTokenService? bonusTokenService,
         ILicenseManager licenseManager,
+        RelayServerClient? relayServerClient,
         ILogger<BonusSyncHostedService> logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _bonusTokenService = bonusTokenService;
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
+        _relayServerClient = relayServerClient;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // ログイン/ログアウトイベントを購読
@@ -64,6 +70,9 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 
         // 起動時に既にログイン済みならフェッチ
         await TryFetchBonusTokensAsync(stoppingToken).ConfigureAwait(false);
+
+        // [Issue #296] 起動時にクォータ状態をサーバーと同期
+        await SyncQuotaStatusAsync(stoppingToken).ConfigureAwait(false);
 
         // 定期同期ループ
         while (!stoppingToken.IsCancellationRequested)
@@ -116,6 +125,9 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
             await UpdateSessionTokenAsync().ConfigureAwait(false);
 
             await TryFetchBonusTokensAsync(CancellationToken.None).ConfigureAwait(false);
+
+            // [Issue #296] ログイン時にクォータ状態もサーバーと同期
+            await SyncQuotaStatusAsync(CancellationToken.None).ConfigureAwait(false);
         }
         else if (!e.IsLoggedIn && e.User == null)
         {
@@ -196,6 +208,63 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "[Issue #280] ボーナストークン取得中にエラー");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #296] サーバーからクォータ状態を取得してLicenseManagerに同期
+    /// </summary>
+    private async Task SyncQuotaStatusAsync(CancellationToken cancellationToken)
+    {
+        if (_relayServerClient == null)
+        {
+            _logger.LogDebug("[Issue #296] RelayServerClientが未登録のためクォータ同期スキップ");
+            return;
+        }
+
+        try
+        {
+            var session = await _authService.GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+            if (session == null || !session.IsValid)
+            {
+                _logger.LogDebug("[Issue #296] 未認証のためクォータ同期スキップ");
+                return;
+            }
+
+            _logger.LogInformation("[Issue #296] サーバーからクォータ状態取得中...");
+
+            var quotaStatus = await _relayServerClient.GetQuotaStatusAsync(session.AccessToken, cancellationToken).ConfigureAwait(false);
+
+            if (quotaStatus == null)
+            {
+                _logger.LogWarning("[Issue #296] クォータ状態取得失敗");
+                return;
+            }
+
+            // ServerMonthlyUsageに変換してLicenseManagerに同期
+            var monthlyUsage = new ServerMonthlyUsage
+            {
+                YearMonth = quotaStatus.YearMonth,
+                TokensUsed = quotaStatus.TokensUsed,
+                TokensLimit = quotaStatus.TokensLimit
+            };
+
+            _licenseManager.SyncMonthlyUsageFromServer(monthlyUsage);
+
+            _logger.LogInformation(
+                "[Issue #296] クォータ状態同期成功: YearMonth={YearMonth}, Used={Used}, Limit={Limit}, Exceeded={Exceeded}",
+                quotaStatus.YearMonth,
+                quotaStatus.TokensUsed,
+                quotaStatus.TokensLimit,
+                quotaStatus.IsExceeded);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #296] クォータ状態同期中にエラー（翻訳機能への影響なし）");
         }
     }
 

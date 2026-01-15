@@ -421,10 +421,23 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// Cloud AI使用量情報を表示するかどうか
-    /// Pro/Premiaプランでのみ表示
+    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）かどうか
+    /// クォータ超過に関係なくプランタイプのみで判定
     /// </summary>
-    public bool ShowCloudUsageInfo => IsCloudTranslationEnabled;
+    public bool HasPaidPlan
+    {
+        get
+        {
+            var plan = _licenseManager?.CurrentState?.CurrentPlan ?? PlanType.Free;
+            return plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
+        }
+    }
+
+    /// <summary>
+    /// Cloud AI使用量情報を表示するかどうか
+    /// [Issue #296] クォータ超過時もゲージを表示するためHasPaidPlanを使用
+    /// </summary>
+    public bool ShowCloudUsageInfo => HasPaidPlan;
 
     #endregion
 
@@ -932,6 +945,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             {
                 this.RaisePropertyChanged(nameof(IsCloudTranslationEnabled));
                 this.RaisePropertyChanged(nameof(CloudTranslationNote));
+                this.RaisePropertyChanged(nameof(HasPaidPlan));
                 this.RaisePropertyChanged(nameof(ShowCloudUsageInfo));
 
                 // Cloud AI翻訳が利用可能になった/なくなった場合、UseLocalEngineも更新

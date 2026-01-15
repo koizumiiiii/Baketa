@@ -296,19 +296,17 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         lock (_stateLock)
         {
-            // プランで利用可能かチェック
-            if (_currentState.CurrentPlan.IsFeatureAvailable(feature))
-            {
-                return true;
-            }
-
-            // [Issue #280+#281] CloudAiTranslationはボーナストークンでも利用可能
+            // [Issue #296] CloudAiTranslationは特別処理（クォータ超過チェックが必要）
             if (feature == FeatureType.CloudAiTranslation)
             {
-                return (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+                // プランでCloud AIアクセス可能 かつ クォータ未超過 かつ サブスクリプション有効
+                // または ボーナストークンが残っている
+                return _currentState.HasCloudAiAccess ||
+                       (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
             }
 
-            return false;
+            // その他の機能はプランのみでチェック
+            return _currentState.CurrentPlan.IsFeatureAvailable(feature);
         }
     }
 
@@ -1099,6 +1097,93 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
 
         // [Issue #296] トークン使用量警告をチェック
         CheckTokenUsageThresholds(newState);
+    }
+
+    /// <inheritdoc/>
+    public void SyncMonthlyUsageFromServer(Baketa.Core.Translation.Abstractions.ServerMonthlyUsage monthlyUsage)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(monthlyUsage);
+
+        LicenseState oldState;
+        LicenseState newState;
+
+        lock (_stateLock)
+        {
+            // 変更がない場合は早期リターン（使用量と上限の両方をチェック）
+            if (_currentState.CloudAiTokensUsed == monthlyUsage.TokensUsed &&
+                _currentState.ServerMonthlyTokenLimit == monthlyUsage.TokensLimit)
+            {
+                return;
+            }
+
+            oldState = _currentState;
+            // [Issue #296] CloudAiTokensUsedとServerMonthlyTokenLimitの両方を更新
+            // ServerMonthlyTokenLimitを設定することで、MonthlyTokenLimitとIsQuotaExceededが
+            // サーバーの値を使用して正しく計算される
+            _currentState = _currentState with
+            {
+                CloudAiTokensUsed = monthlyUsage.TokensUsed,
+                ServerMonthlyTokenLimit = monthlyUsage.TokensLimit
+            };
+            newState = _currentState;
+
+            _logger.LogInformation(
+                "[Issue #296] サーバーから月間使用状況を同期: Used={OldUsed}→{NewUsed}, Limit={OldLimit}→{NewLimit}, IsQuotaExceeded={IsExceeded}",
+                oldState.CloudAiTokensUsed, newState.CloudAiTokensUsed,
+                oldState.MonthlyTokenLimit, newState.MonthlyTokenLimit,
+                newState.IsQuotaExceeded);
+        }
+
+        // StateChangedイベントを発火
+        OnStateChanged(oldState, newState, LicenseChangeReason.TokenUsageUpdated);
+
+        // [Issue #296] サーバーから返されたTokensLimitを使って警告を発火
+        // クライアントのMonthlyTokenLimitはCurrentPlanから計算されるため、
+        // プランが同期されていない場合は0になる可能性がある
+        // サーバーの値を優先して使用することで、正しい警告が発火される
+        CheckTokenUsageThresholdsWithServerLimit(monthlyUsage.TokensUsed, monthlyUsage.TokensLimit);
+    }
+
+    /// <summary>
+    /// [Issue #296] サーバーから返されたトークン上限を使って警告をチェック
+    /// </summary>
+    private void CheckTokenUsageThresholdsWithServerLimit(long tokensUsed, long serverLimit)
+    {
+        if (serverLimit <= 0)
+        {
+            _logger.LogDebug("[Issue #296] サーバーのTokensLimitが0以下のため警告スキップ: {Limit}", serverLimit);
+            return;
+        }
+
+        var usagePercent = (double)tokensUsed / serverLimit * 100;
+
+        TokenWarningLevel? warningLevel = null;
+        if (usagePercent >= 100)
+        {
+            warningLevel = TokenWarningLevel.Exceeded;
+        }
+        else if (usagePercent >= _settings.TokenCriticalThresholdPercent)
+        {
+            warningLevel = TokenWarningLevel.Critical;
+        }
+        else if (usagePercent >= _settings.TokenWarningThresholdPercent)
+        {
+            warningLevel = TokenWarningLevel.Warning;
+        }
+
+        if (warningLevel.HasValue)
+        {
+            _logger.LogInformation(
+                "[Issue #296] サーバー値でトークン警告発火: Level={Level}, Usage={Usage}%, Used={Used}, Limit={Limit}",
+                warningLevel.Value, usagePercent, tokensUsed, serverLimit);
+
+            OnTokenUsageWarning(
+                tokensUsed,
+                serverLimit,
+                (int)usagePercent,
+                warningLevel.Value);
+        }
     }
 
     /// <inheritdoc/>

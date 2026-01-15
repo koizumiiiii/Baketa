@@ -33,7 +33,7 @@ public sealed class BonusSyncHostedServiceTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new BonusSyncHostedService(null!, _bonusTokenServiceMock.Object, _licenseManagerMock.Object, _loggerMock.Object));
+            new BonusSyncHostedService(null!, _bonusTokenServiceMock.Object, _licenseManagerMock.Object, null, _loggerMock.Object));
     }
 
     [Fact]
@@ -44,6 +44,7 @@ public sealed class BonusSyncHostedServiceTests
             _authServiceMock.Object,
             null,
             _licenseManagerMock.Object,
+            null,
             _loggerMock.Object);
 
         // Assert
@@ -59,6 +60,7 @@ public sealed class BonusSyncHostedServiceTests
                 _authServiceMock.Object,
                 _bonusTokenServiceMock.Object,
                 null!,
+                null,
                 _loggerMock.Object));
     }
 
@@ -71,6 +73,7 @@ public sealed class BonusSyncHostedServiceTests
                 _authServiceMock.Object,
                 _bonusTokenServiceMock.Object,
                 _licenseManagerMock.Object,
+                null,
                 null!));
     }
 
@@ -82,6 +85,7 @@ public sealed class BonusSyncHostedServiceTests
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
+            null,
             _loggerMock.Object);
 
         // Assert - イベント購読確認
@@ -96,6 +100,7 @@ public sealed class BonusSyncHostedServiceTests
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
+            null,
             _loggerMock.Object);
 
         // Act
@@ -137,6 +142,7 @@ public sealed class BonusSyncHostedServiceTests
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
+            null,
             _loggerMock.Object);
 
         // Act - ログインイベント発火
@@ -178,6 +184,7 @@ public sealed class BonusSyncHostedServiceTests
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
+            null,
             _loggerMock.Object);
 
         // Act - ログアウトイベント発火
@@ -200,6 +207,7 @@ public sealed class BonusSyncHostedServiceTests
             _authServiceMock.Object,
             null,  // IBonusTokenServiceがnull
             _licenseManagerMock.Object,
+            null,
             _loggerMock.Object);
 
         var session = new AuthSession(
@@ -234,6 +242,7 @@ public sealed class BonusSyncHostedServiceTests
             _authServiceMock.Object,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
+            null,
             _loggerMock.Object);
 
         // Act - ログインイベント発火（セッションがnullを返す）

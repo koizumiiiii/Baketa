@@ -108,6 +108,18 @@ public interface ILicenseManager
     void SyncTokenUsage(long tokensUsed);
 
     /// <summary>
+    /// [Issue #296] サーバーから返された月間使用状況でローカル状態を同期
+    /// CloudAiTokensUsedとMonthlyTokenLimitの両方を更新
+    /// </summary>
+    /// <param name="monthlyUsage">サーバーから返された月間使用状況</param>
+    /// <remarks>
+    /// QUOTA_EXCEEDEDレスポンスや翻訳成功時など、サーバーから使用状況が返される場合に使用。
+    /// MonthlyTokenLimitも更新することで、CheckTokenUsageThresholdsが正しく動作し、
+    /// 警告ダイアログが適切に表示されます。
+    /// </remarks>
+    void SyncMonthlyUsageFromServer(Core.Translation.Abstractions.ServerMonthlyUsage monthlyUsage);
+
+    /// <summary>
     /// ボーナストークンがロードされたことを通知（Issue #280+#281）
     /// BonusSyncHostedServiceがサーバーからボーナストークンを取得した後に呼び出す
     /// </summary>

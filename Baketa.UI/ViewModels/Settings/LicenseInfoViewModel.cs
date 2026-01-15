@@ -190,6 +190,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）かどうか
+    /// クォータ超過やサブスクリプション状態に関係なく、プランタイプのみで判定
+    /// トークン使用量ゲージの表示判定に使用
+    /// </summary>
+    public bool HasPaidPlan => CurrentPlan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
+
+    /// <summary>
     /// クォータを超過しているか
     /// </summary>
     public bool IsQuotaExceeded
@@ -537,6 +544,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(TokenUsageDisplay));
         this.RaisePropertyChanged(nameof(CloudAccessDisplay));
         this.RaisePropertyChanged(nameof(UsageGaugeBrush));
+        this.RaisePropertyChanged(nameof(HasPaidPlan));
 
         // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
         UpdateTokenWarningState();
