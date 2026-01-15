@@ -618,6 +618,44 @@ async function invalidateMembershipCache(env: Env, userId: string): Promise<void
 }
 
 // ============================================
+// [Issue #296] 認証キャッシュ無効化
+// translate.tsのCache APIと同じ形式でキャッシュを削除
+// ============================================
+
+/** トークンをSHA-256でハッシュ（translate.tsと同じ実装） */
+async function hashTokenForAuthCache(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** 認証キャッシュ用のURLを生成 */
+function getAuthCacheUrl(cacheKey: string): string {
+  return `https://baketa-auth-cache.internal/${cacheKey}`;
+}
+
+/**
+ * [Issue #296] 認証キャッシュを無効化
+ * Patreon紐づけ後に古いplan=Freeキャッシュが残らないようにする
+ */
+async function invalidateAuthCache(token: string): Promise<void> {
+  const tokenHash = await hashTokenForAuthCache(token);
+  const cacheKey = `auth:v2:${tokenHash}`;
+  const cacheUrl = getAuthCacheUrl(cacheKey);
+
+  const cache = caches.default;
+  const deleted = await cache.delete(new Request(cacheUrl));
+
+  if (deleted) {
+    console.log(`[Issue #296] Auth cache deleted: ${cacheKey.substring(0, 20)}...`);
+  } else {
+    console.log(`[Issue #296] Auth cache not found (already expired or never cached): ${cacheKey.substring(0, 20)}...`);
+  }
+}
+
+// ============================================
 // レスポンスヘルパー
 // ============================================
 
@@ -1196,6 +1234,16 @@ async function linkPatreonToSupabaseAccount(
     if (linkError) {
       console.error('[Issue #295] link_patreon_user RPC error:', linkError);
       return false;
+    }
+
+    // [Issue #296] 紐づけ成功時に認証キャッシュを無効化
+    // これにより、次回の翻訳リクエストで新しいプラン情報が取得される
+    try {
+      await invalidateAuthCache(supabaseJwt);
+      console.log(`[Issue #296] Auth cache invalidated for supabase user`);
+    } catch (cacheError) {
+      // キャッシュ削除失敗は紐づけ成功に影響させない
+      console.warn('[Issue #296] Failed to invalidate auth cache:', cacheError);
     }
 
     console.log(`[Issue #295] Account linked successfully: supabase=${supabaseUserId.substring(0, 8)}... ↔ patreon=${patreonUserId}`);
