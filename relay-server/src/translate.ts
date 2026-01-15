@@ -446,8 +446,9 @@ async function authenticateUser(
   }
 
   // トークンのハッシュをキーに使用（セキュリティ対策）
+  // [Issue #295] v2: Patreonプラン紐づけ対応によりキャッシュ形式変更
   const tokenHash = await hashToken(sessionToken);
-  const cacheKey = `auth:${tokenHash}`;
+  const cacheKey = `auth:v2:${tokenHash}`;
 
   // 2. キャッシュを確認（[Issue #286] Cache APIを使用 - KV制限回避）
   const cachedAuth = await getAuthCache(cacheKey);
