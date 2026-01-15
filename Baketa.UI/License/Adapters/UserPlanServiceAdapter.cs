@@ -162,6 +162,18 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
             PlanChanged?.Invoke(this, new UserPlanChangedEventArgs(oldUserPlanType, newUserPlanType));
         }
 
+        // [Issue #296] クォータ超過状態が変化した場合もイベントを発行
+        // EngineSelectionViewModelがIsCloudOnlyEnabledを更新できるようにする
+        if (e.OldState.IsQuotaExceeded != e.NewState.IsQuotaExceeded)
+        {
+            _logger.LogInformation(
+                "[Issue #296] クォータ超過状態変更（エンジン選択更新のためイベント発行）: IsQuotaExceeded={IsQuotaExceeded}",
+                e.NewState.IsQuotaExceeded);
+
+            // 同じUserPlanTypeでもCanUseCloudOnlyEngineが変化するため通知
+            PlanChanged?.Invoke(this, new UserPlanChangedEventArgs(newUserPlanType, newUserPlanType));
+        }
+
         // [Issue #243] プロモーション適用時にCloud AI翻訳を自動有効化
         if (newUserPlanType == UserPlanType.Premium && e.Reason == LicenseChangeReason.PromotionApplied)
         {

@@ -100,15 +100,15 @@
         </Border>
       </StackPanel>
 
-      <!-- プレミアムプラン案内 -->
+      <!-- プレミアムプラン案内 / クォータ超過案内 -->
       <Border Classes="PremiumInfo" IsVisible="{Binding !IsCloudOnlyEnabled}">
         <Grid ColumnDefinitions="Auto,*,Auto">
-          <TextBlock Grid.Column="0" 
-                     Text="ℹ️" 
-                     FontSize="16" 
+          <TextBlock Grid.Column="0"
+                     Text="ℹ️"
+                     FontSize="16"
                      VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" 
-                     Text="CloudOnlyエンジンはプレミアムプランで利用可能です"
+          <TextBlock Grid.Column="1"
+                     Text="{Binding CloudOnlyDisabledMessage}"
                      FontSize="12"
                      VerticalAlignment="Center"
                      Margin="8,0,0,0" />

@@ -71,6 +71,13 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     }
 
     /// <summary>
+    /// [Issue #296] CloudOnlyエンジンが無効な理由メッセージ
+    /// </summary>
+    public string CloudOnlyDisabledMessage => _planService.IsMonthlyLimitExceeded
+        ? "今月のトークン上限に達しました"
+        : "CloudOnlyエンジンはプレミアムプランで利用可能です";
+
+    /// <summary>
     /// 状態警告があるかどうか
     /// </summary>
     public bool HasStatusWarning
@@ -400,11 +407,14 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
         var wasCloudOnlyEnabled = IsCloudOnlyEnabled;
         IsCloudOnlyEnabled = _planService.CanUseCloudOnlyEngine;
 
+        // [Issue #296] 無効理由メッセージも更新
+        this.RaisePropertyChanged(nameof(CloudOnlyDisabledMessage));
+
         if (!IsCloudOnlyEnabled && SelectedEngine == TranslationEngine.CloudOnly)
         {
-            // プランダウングレード時のフォールバック
+            // プランダウングレードまたはクォータ超過時のフォールバック
             SelectedEngine = TranslationEngine.LocalOnly;
-            _logger.LogInformation("Fallback to LocalOnly due to plan limitation");
+            _logger.LogInformation("[Issue #296] Fallback to LocalOnly due to plan limitation or quota exceeded");
         }
         else if (IsCloudOnlyEnabled && !wasCloudOnlyEnabled && SelectedEngine == TranslationEngine.LocalOnly)
         {
@@ -412,6 +422,9 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             SelectedEngine = TranslationEngine.CloudOnly;
             _logger.LogInformation("🎉 Auto-switched to CloudOnly due to plan upgrade to Premium");
         }
+
+        // 説明文も更新
+        UpdateEngineDescription();
     }
 
     /// <summary>
@@ -450,6 +463,11 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     {
         if (!IsCloudOnlyEnabled)
         {
+            // [Issue #296] クォータ超過とプラン不足を区別
+            if (_planService.IsMonthlyLimitExceeded)
+            {
+                return "Gemini APIを使用した高品質クラウド翻訳。\n❌ 今月のトークン上限に達しました。来月リセットされます。";
+            }
             return "Gemini APIを使用した高品質クラウド翻訳。\n❌ プレミアムプランが必要です。";
         }
 
