@@ -2230,10 +2230,6 @@ async function handleWebhook(
     console.log(`Webhook received: event=${eventType}, userId=${userId}, pledgeId=${pledgeId}, amountCents=${amountCents}`);
 
     if (userId) {
-      // メンバーシップキャッシュを無効化（次回アクセス時に最新情報を取得）
-      await invalidateMembershipCache(env, userId);
-      console.log(`Webhook: Invalidated membership cache for user ${userId}`);
-
       // [Issue #271] プラン変更を履歴に記録
       const supabase = getSupabaseClient(env);
       const newPlan = eventType === 'members:pledge:delete' ? 'Free' : determinePlan(amountCents);
@@ -2270,15 +2266,18 @@ async function handleWebhook(
       // イベントタイプに応じた追加処理
       switch (eventType) {
         case 'members:pledge:delete':
-          // 支援停止時はユーザーの全セッションを無効化
-          const revokedCount = await revokeAllUserSessions(env, userId);
-          console.log(`Webhook: Revoked ${revokedCount} sessions for user ${userId} (pledge deleted)`);
+          // [Issue #296] キャンセル時はキャッシュ/セッションを無効化しない
+          // Patreonでは課金期間終了までアクセス権が維持されるため、
+          // Patreon APIが現在のプランを返す（課金期間中はまだ有料プラン）
+          // プラン変更は履歴に記録済み、実際のアクセス終了は課金期間終了時
+          console.log(`Webhook: Pledge delete recorded for user ${userId} (access continues until billing period ends)`);
           break;
 
         case 'members:pledge:create':
         case 'members:pledge:update':
-          // 新規支援・更新時はキャッシュ無効化のみ（次回API呼び出しで最新情報取得）
-          console.log(`Webhook: Processed ${eventType} for user ${userId}`);
+          // 新規支援・更新時はキャッシュ無効化（次回API呼び出しで最新情報取得）
+          await invalidateMembershipCache(env, userId);
+          console.log(`Webhook: Invalidated membership cache for user ${userId} (${eventType})`);
           break;
 
         default:
