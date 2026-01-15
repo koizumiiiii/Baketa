@@ -1096,6 +1096,9 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // [Issue #275] StateChangedイベントを発火して他のViewModelにも通知
         // GeneralSettingsViewModelなどが更新された値を取得できるようにする
         OnStateChanged(oldState, newState, LicenseChangeReason.TokenUsageUpdated);
+
+        // [Issue #296] トークン使用量警告をチェック
+        CheckTokenUsageThresholds(newState);
     }
 
     /// <inheritdoc/>

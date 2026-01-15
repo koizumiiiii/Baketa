@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Settings;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
 {
     private readonly RelayServerClient _relayClient;
     private readonly ITokenConsumptionTracker _tokenTracker;
+    private readonly ILicenseManager _licenseManager;
     private readonly ILogger<PrimaryCloudTranslator> _logger;
     private readonly CloudTranslationSettings _settings;
 
@@ -35,11 +37,13 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
     public PrimaryCloudTranslator(
         RelayServerClient relayClient,
         ITokenConsumptionTracker tokenTracker,
+        ILicenseManager licenseManager,
         IOptions<CloudTranslationSettings> settings,
         ILogger<PrimaryCloudTranslator> logger)
     {
         _relayClient = relayClient ?? throw new ArgumentNullException(nameof(relayClient));
         _tokenTracker = tokenTracker ?? throw new ArgumentNullException(nameof(tokenTracker));
+        _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -121,6 +125,9 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
                         await _tokenTracker.SyncFromServerAsync(
                             response.MonthlyUsage,
                             cancellationToken).ConfigureAwait(false);
+
+                        // [Issue #296] LicenseManagerの状態も同期（警告通知トリガー）
+                        _licenseManager.SyncTokenUsage(response.MonthlyUsage.TokensUsed);
 
                         _logger.LogDebug(
                             "[Issue #296] サーバーからローカルにトークン使用量を同期: YearMonth={YearMonth}, TokensUsed={TokensUsed}",
