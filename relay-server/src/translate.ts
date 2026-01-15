@@ -655,8 +655,16 @@ async function authenticateUser(
         return updatedAuth;
       }
     }
-    console.log(`[Issue #286] Auth cache hit (Cache API): userId=${cachedAuth.userId.substring(0, 8)}...`);
-    return cachedAuth;
+    // [Issue #296] Freeプランのキャッシュはスキップして再認証
+    // Patreon連携後にキャッシュが古いままの場合があるため
+    if (cachedAuth.plan === PLAN.FREE) {
+      console.log(`[Issue #296] Skipping Free plan cache, re-authenticating: userId=${cachedAuth.userId.substring(0, 8)}...`);
+      // キャッシュを削除して再認証へ
+      await deleteAuthCache(cacheKey);
+    } else {
+      console.log(`[Issue #286] Auth cache hit (Cache API): userId=${cachedAuth.userId.substring(0, 8)}..., plan=${cachedAuth.plan}`);
+      return cachedAuth;
+    }
   }
 
   // 3. Patreonセッション（KV）を試行
@@ -792,6 +800,18 @@ async function saveAuthCache(cacheKey: string, auth: AuthenticatedUser): Promise
   } catch (error) {
     // キャッシュ保存エラーは無視（翻訳処理を続行）
     console.warn('[Issue #286] Auth cache save failed:', error);
+  }
+}
+
+/** [Issue #296] 認証キャッシュを削除（Cache API） */
+async function deleteAuthCache(cacheKey: string): Promise<void> {
+  try {
+    const cache = caches.default;
+    const cacheRequest = new Request(getCacheUrl(cacheKey));
+    await cache.delete(cacheRequest);
+    console.log(`[Issue #296] Auth cache deleted: key=${cacheKey.substring(0, 12)}...`);
+  } catch (error) {
+    console.warn('[Issue #296] Auth cache delete failed:', error);
   }
 }
 
