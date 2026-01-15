@@ -487,17 +487,44 @@ async function authenticateUser(
       return null;
     }
 
-    // 4. ボーナストークン残高を確認
+    // 4a. ボーナストークン残高を確認
     const bonusRemaining = await getBonusTokensRemaining(supabase, user.id);
     const hasBonusTokens = bonusRemaining > 0;
 
-    console.log(`[Issue #280+#281] Supabase auth success: userId=${user.id.substring(0, 8)}..., bonusTokens=${bonusRemaining}`);
+    // [Issue #295] 4b. profiles.patreon_user_id から紐づけられたPatreonプランを取得
+    let plan: PlanType = PLAN.FREE;
+    let resolvedUserId = user.id;
+    let authMethod: 'supabase' | 'patreon' = 'supabase';
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('patreon_user_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!profileError && profile?.patreon_user_id) {
+      // Patreon紐づけあり → KVからメンバーシップ情報を取得
+      const patreonUserId = profile.patreon_user_id;
+      console.log(`[Issue #295] Supabase user linked to Patreon: supabaseId=${user.id.substring(0, 8)}..., patreonId=${patreonUserId}`);
+
+      const cachedMembership = await getCachedMembership(env, patreonUserId);
+      if (cachedMembership) {
+        plan = cachedMembership.membership.plan;
+        resolvedUserId = patreonUserId; // トークン記録用にPatreon IDを使用
+        authMethod = 'patreon'; // 認証方法をpatreonに変更（トークン記録のため）
+        console.log(`[Issue #295] Patreon plan resolved: userId=${patreonUserId}, plan=${plan}`);
+      } else {
+        console.log(`[Issue #295] Patreon membership not cached: patreonId=${patreonUserId}`);
+      }
+    }
+
+    console.log(`[Issue #280+#281] Supabase auth success: userId=${user.id.substring(0, 8)}..., plan=${plan}, bonusTokens=${bonusRemaining}`);
 
     const result: AuthenticatedUser = {
-      userId: user.id,
-      plan: PLAN.FREE, // SupabaseユーザーはFreeプラン（ボーナストークンで利用）
+      userId: resolvedUserId,
+      plan,
       hasBonusTokens,
-      authMethod: 'supabase'
+      authMethod
     };
 
     // 5. キャッシュに保存（[Issue #286] Cache API使用）
