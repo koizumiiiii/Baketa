@@ -92,7 +92,8 @@
                             <ProgressBar Value="{Binding UsagePercentage}"
                                          Maximum="100"
                                          Height="8"
-                                         CornerRadius="4"/>
+                                         CornerRadius="4"
+                                         Foreground="{Binding UsageGaugeBrush}"/>
                         </StackPanel>
 
                         <!-- Issue #280+#281: Bonus Tokens Display -->

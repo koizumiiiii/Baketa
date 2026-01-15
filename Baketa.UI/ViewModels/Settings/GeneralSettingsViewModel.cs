@@ -7,6 +7,7 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
@@ -380,6 +381,18 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         get => _cloudUsagePercentage;
         private set => this.RaiseAndSetIfChanged(ref _cloudUsagePercentage, value);
     }
+
+    /// <summary>
+    /// [Issue #296] 使用率に応じたゲージ色
+    /// 0-79%: 青（デフォルト）、80-89%: 黄、90-99%: オレンジ、100%+: 赤
+    /// </summary>
+    public IBrush CloudUsageGaugeBrush => CloudUsagePercentage switch
+    {
+        >= 100 => new SolidColorBrush(Color.FromRgb(220, 53, 69)),   // Red (#DC3545)
+        >= 90 => new SolidColorBrush(Color.FromRgb(253, 126, 20)),   // Orange (#FD7E14)
+        >= 80 => new SolidColorBrush(Color.FromRgb(255, 193, 7)),    // Yellow (#FFC107)
+        _ => new SolidColorBrush(Color.FromRgb(13, 110, 253))        // Blue (#0D6EFD)
+    };
 
     /// <summary>
     /// Cloud AI使用量表示文字列
@@ -1009,6 +1022,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
                     : 0;
 
                 this.RaisePropertyChanged(nameof(CloudUsageDisplay));
+                this.RaisePropertyChanged(nameof(CloudUsageGaugeBrush));
             });
         }
         catch (Exception ex)
@@ -1030,6 +1044,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
         // 派生プロパティの更新通知
         this.RaisePropertyChanged(nameof(CloudUsageDisplay));
+        this.RaisePropertyChanged(nameof(CloudUsageGaugeBrush));
     }
 
     /// <summary>
