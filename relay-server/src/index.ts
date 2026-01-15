@@ -2656,7 +2656,9 @@ async function handleLicenseStatus(
     }
 
     try {
-      const membership = await getMembershipFromSession(env, sessionResult.session, true);
+      // [Issue #296] 手動同期時はキャッシュをバイパスしてPatreon APIから最新情報を取得
+      // KVの結果整合性により、Webhook後のキャッシュ無効化が即座に反映されない場合があるため
+      const membership = await getMembershipFromSession(env, sessionResult.session, false);
 
       return successResponse({
         success: true,
