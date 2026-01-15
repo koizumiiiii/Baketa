@@ -1006,6 +1006,10 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddHttpClient<Translation.Cloud.DirectOpenAIImageTranslator>();
         Console.WriteLine("✅ DirectOpenAIImageTranslator登録完了 - HttpClientFactory使用（フォールバック用）");
 
+        // SecondaryCloudTranslator登録（スタブ実装 - Relay Server未対応時のフォールバック用）
+        services.AddSingleton<Translation.Cloud.SecondaryCloudTranslator>();
+        Console.WriteLine("✅ SecondaryCloudTranslator登録完了 - スタブ実装（Relay Server未対応時用）");
+
         // Primary Cloud翻訳エンジン登録
         // UseDirectApiMode=true の場合は DirectGeminiImageTranslator を使用
         // UseDirectApiMode=false の場合は PrimaryCloudTranslator（Relay Server経由）を使用
