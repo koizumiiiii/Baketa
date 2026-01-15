@@ -645,7 +645,12 @@ async function authenticateUser(
     // handleLicenseStatusで更新されたプランがAuth Cacheに反映されていない場合がある
     if (cachedAuth.authMethod === 'patreon') {
       const latestMembership = await getCachedMembership(env, cachedAuth.userId);
-      if (latestMembership && latestMembership.membership.plan !== cachedAuth.plan) {
+      // メンバーシップKVが無効化されている場合（Webhook後）、Auth Cacheを削除して再認証
+      if (!latestMembership) {
+        console.log(`[Issue #296] Membership KV invalidated, re-authenticating: userId=${cachedAuth.userId.substring(0, 8)}...`);
+        await deleteAuthCache(cacheKey);
+        // 再認証へフォールスルー
+      } else if (latestMembership.membership.plan !== cachedAuth.plan) {
         console.log(`[Issue #296] Plan mismatch detected: cached=${cachedAuth.plan}, latest=${latestMembership.membership.plan}`);
         const updatedAuth: AuthenticatedUser = {
           ...cachedAuth,
@@ -653,6 +658,10 @@ async function authenticateUser(
         };
         await saveAuthCache(cacheKey, updatedAuth);
         return updatedAuth;
+      } else {
+        // プランが一致 → キャッシュを使用
+        console.log(`[Issue #286] Auth cache hit (Cache API): userId=${cachedAuth.userId.substring(0, 8)}..., plan=${cachedAuth.plan}`);
+        return cachedAuth;
       }
     }
     // [Issue #296] Freeプランのキャッシュはスキップして再認証
