@@ -100,8 +100,30 @@
         </Border>
       </StackPanel>
 
-      <!-- プレミアムプラン案内 / クォータ超過案内 -->
-      <Border Classes="PremiumInfo" IsVisible="{Binding !IsCloudOnlyEnabled}">
+      <!-- [Issue #296] クォータ超過時のステータス表示（ボーナストークン利用可能時も表示） -->
+      <Border Classes="settings-card-warning" IsVisible="{Binding IsQuotaExceeded}">
+        <Grid ColumnDefinitions="Auto,*">
+          <TextBlock Grid.Column="0"
+                     Text="⚠️"
+                     FontSize="16"
+                     VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1"
+                     Text="{Binding QuotaExceededMessage}"
+                     FontSize="12"
+                     VerticalAlignment="Center"
+                     Margin="8,0,0,0"
+                     TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+
+      <!-- プレミアムプラン案内（CloudOnly無効 かつ クォータ超過でない場合のみ表示） -->
+      <Border Classes="PremiumInfo">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="!IsCloudOnlyEnabled" />
+            <Binding Path="!IsQuotaExceeded" />
+          </MultiBinding>
+        </Border.IsVisible>
         <Grid ColumnDefinitions="Auto,*,Auto">
           <TextBlock Grid.Column="0"
                      Text="ℹ️"
