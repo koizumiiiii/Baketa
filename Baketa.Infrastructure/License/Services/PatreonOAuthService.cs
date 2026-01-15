@@ -23,6 +23,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     private readonly PatreonSettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IJwtTokenService? _jwtTokenService;  // [Issue #287] JWT認証サービス（オプショナル）
+    private readonly IAuthService? _authService;  // [Issue #295] Supabase認証サービス（アカウント紐づけ用）
     private readonly string _credentialsFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
@@ -72,12 +73,14 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         ILogger<PatreonOAuthService> logger,
         IOptions<PatreonSettings> settings,
         IHttpClientFactory httpClientFactory,
-        IJwtTokenService? jwtTokenService = null)  // [Issue #287] オプショナル依存
+        IJwtTokenService? jwtTokenService = null,  // [Issue #287] オプショナル依存
+        IAuthService? authService = null)  // [Issue #295] Supabase認証（アカウント紐づけ用、オプショナル）
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _jwtTokenService = jwtTokenService;  // null可（JWT未設定時）
+        _authService = authService;  // [Issue #295] null可（Supabase未ログイン時）
 
         // 資格情報保存パス
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -570,6 +573,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     /// </summary>
     /// <remarks>
     /// 中継サーバーがPatreonトークンを保持し、クライアントにはセッショントークン（JWT）を返します。
+    /// [Issue #295] Supabaseにログイン中の場合、JWTを送信してアカウント紐づけを行います。
     /// </remarks>
     private async Task<SessionTokenResponse?> ExchangeCodeForSessionAsync(
         string code,
@@ -578,15 +582,42 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     {
         using var httpClient = _httpClientFactory.CreateClient(HttpClientName);
 
+        // [Issue #295] Supabaseにログイン中であればJWTを取得
+        string? supabaseJwt = null;
+        if (_authService != null)
+        {
+            try
+            {
+                var supabaseSession = await _authService.GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+                if (supabaseSession?.IsValid == true)
+                {
+                    supabaseJwt = supabaseSession.AccessToken;
+                    _logger.LogInformation(
+                        "[Issue #295] Supabaseセッション検出、アカウント紐づけを試行: UserId={UserId}",
+                        supabaseSession.User.Id[..8] + "...");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Supabase JWT取得失敗はエラーにしない（紐づけなしでPatreon認証は続行）
+                _logger.LogWarning(ex, "[Issue #295] Supabaseセッション取得に失敗（アカウント紐づけをスキップ）");
+            }
+        }
+
         var requestBody = new
         {
             code,
             state,
-            redirect_uri = _settings.RedirectUri
+            redirect_uri = _settings.RedirectUri,
+            supabase_jwt = supabaseJwt  // [Issue #295] nullの場合はJSONから除外される
         };
 
         try
         {
+            _logger.LogDebug(
+                "Patreon exchange request: hasSupabaseJwt={HasSupabaseJwt}",
+                supabaseJwt != null);
+
             var response = await httpClient.PostAsJsonAsync(
                 $"{_settings.RelayServerUrl}/api/patreon/exchange",
                 requestBody,

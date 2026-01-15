@@ -448,6 +448,8 @@ interface PatreonExchangeBody {
   code: string;
   redirect_uri: string;
   state?: string;
+  /** [Issue #295] Supabase JWT（アカウント紐づけ用、オプション） */
+  supabase_jwt?: string;
 }
 
 interface SessionValidateBody {
@@ -491,7 +493,9 @@ function validatePatreonExchangeBody(body: unknown): ValidationResult<PatreonExc
     return { success: false, error: 'Missing or invalid field: redirect_uri' };
   }
   const state = typeof obj.state === 'string' ? obj.state : undefined;
-  return { success: true, data: { code: obj.code, redirect_uri: obj.redirect_uri, state } };
+  // [Issue #295] Supabase JWT（オプション）
+  const supabase_jwt = typeof obj.supabase_jwt === 'string' ? obj.supabase_jwt : undefined;
+  return { success: true, data: { code: obj.code, redirect_uri: obj.redirect_uri, state, supabase_jwt } };
 }
 
 function validateSessionValidateBody(body: unknown): ValidationResult<SessionValidateBody> {
@@ -1098,6 +1102,107 @@ async function extractUserIdFromJwt(
   } catch (error) {
     console.error('JWT extraction error:', error);
     return null;
+  }
+}
+
+// ============================================
+// [Issue #295] Patreon-Supabase アカウントリンク
+// ============================================
+
+/**
+ * [Issue #295] Supabase JWTを検証してユーザーIDを抽出
+ * @param supabase Supabaseクライアント
+ * @param jwt JWT文字列
+ * @returns user_id (UUID) or null if invalid
+ */
+async function validateSupabaseJwtAndGetUserId(
+  supabase: SupabaseClient,
+  jwt: string
+): Promise<string | null> {
+  if (!jwt) {
+    return null;
+  }
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(jwt);
+
+    if (error || !user) {
+      console.log(`[Issue #295] Supabase JWT validation failed: ${error?.message || 'No user found'}`);
+      return null;
+    }
+
+    return user.id;
+  } catch (error) {
+    console.error('[Issue #295] Supabase JWT validation error:', error);
+    return null;
+  }
+}
+
+/**
+ * [Issue #295] PatreonアカウントをSupabaseユーザーに紐づけ
+ * @param env 環境変数
+ * @param supabaseJwt Supabase JWT
+ * @param patreonUserId Patreon ユーザーID
+ * @returns 成功時true、失敗時false
+ */
+async function linkPatreonToSupabaseAccount(
+  env: Env,
+  supabaseJwt: string,
+  patreonUserId: string
+): Promise<boolean> {
+  const supabase = getSupabaseClient(env);
+  if (!supabase) {
+    console.warn('[Issue #295] Supabase not configured, skipping account linking');
+    return false;
+  }
+
+  // Step 1: JWT検証してSupabase user_idを取得
+  const supabaseUserId = await validateSupabaseJwtAndGetUserId(supabase, supabaseJwt);
+  if (!supabaseUserId) {
+    console.log('[Issue #295] Invalid Supabase JWT, skipping account linking');
+    return false;
+  }
+
+  // Step 2: 既存の紐づけをチェック
+  try {
+    const { data: existingProfile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('patreon_user_id')
+      .eq('id', supabaseUserId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('[Issue #295] Profile fetch error:', fetchError);
+      return false;
+    }
+
+    // 既に同じPatreon IDで紐づけ済みならスキップ（冪等性）
+    if (existingProfile?.patreon_user_id === patreonUserId) {
+      console.log(`[Issue #295] Already linked: supabase=${supabaseUserId.substring(0, 8)}... ↔ patreon=${patreonUserId}`);
+      return true;
+    }
+
+    // 別のPatreon IDと紐づけ済みの場合は上書き（1 Supabase : 1 Patreon）
+    if (existingProfile?.patreon_user_id && existingProfile.patreon_user_id !== patreonUserId) {
+      console.log(`[Issue #295] Re-linking: old_patreon=${existingProfile.patreon_user_id} → new_patreon=${patreonUserId}`);
+    }
+
+    // Step 3: link_patreon_user RPC呼び出し
+    const { error: linkError } = await supabase.rpc('link_patreon_user', {
+      p_user_id: supabaseUserId,
+      p_patreon_user_id: patreonUserId
+    });
+
+    if (linkError) {
+      console.error('[Issue #295] link_patreon_user RPC error:', linkError);
+      return false;
+    }
+
+    console.log(`[Issue #295] Account linked successfully: supabase=${supabaseUserId.substring(0, 8)}... ↔ patreon=${patreonUserId}`);
+    return true;
+  } catch (error) {
+    console.error('[Issue #295] Account linking failed:', error);
+    return false;
   }
 }
 
@@ -2300,14 +2405,14 @@ async function handlePatreonExchange(
       return errorResponse(validation.error || 'Invalid request', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
     }
 
-    const { code, redirect_uri } = validation.data;
+    const { code, redirect_uri, supabase_jwt } = validation.data;
 
     if (!validateRedirectUri(redirect_uri, env)) {
       console.error(`Invalid redirect_uri: ${redirect_uri}`);
       return errorResponse('Invalid redirect_uri', 400, origin, allowedOrigins, 'INVALID_REDIRECT_URI');
     }
 
-    console.log(`Patreon exchange request received: redirect_uri=${redirect_uri}`);
+    console.log(`Patreon exchange request received: redirect_uri=${redirect_uri}, hasSupabaseJwt=${!!supabase_jwt}`);
 
     // Step 1: トークン交換
     const tokenData = await fetchPatreonToken(env, new URLSearchParams({
@@ -2363,6 +2468,12 @@ async function handlePatreonExchange(
     // メンバーシップをキャッシュに保存
     await setCachedMembership(env, membership.userId, membership);
 
+    // [Issue #295] Supabase JWTがあればアカウントを紐づけ
+    let accountLinked = false;
+    if (supabase_jwt) {
+      accountLinked = await linkPatreonToSupabaseAccount(env, supabase_jwt, membership.userId);
+    }
+
     const sessionResponse = {
       session_token: sessionToken,
       patreon_user_id: membership.userId,
@@ -2376,7 +2487,7 @@ async function handlePatreonExchange(
       entitled_amount_cents: membership.entitledAmountCents,
     };
 
-    console.log(`Exchange successful: UserId=${membership.userId}, Plan=${membership.plan}, RevokedSessions=${revokedCount}`);
+    console.log(`Exchange successful: UserId=${membership.userId}, Plan=${membership.plan}, RevokedSessions=${revokedCount}, AccountLinked=${accountLinked}`);
 
     return successResponse(sessionResponse, origin, allowedOrigins);
 
