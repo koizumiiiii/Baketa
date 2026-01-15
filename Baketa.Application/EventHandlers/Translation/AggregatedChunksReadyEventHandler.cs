@@ -303,16 +303,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 // Cloud AI翻訳結果からテキストを抽出
                 if (cloudResponse?.Texts is { Count: > 0 } cloudTexts)
                 {
-                    // 複数テキスト結果がある場合
-                    // TODO: 座標マッチングによりOCRチャンクとCloud AI結果を対応付け
-                    // 現時点では最初のテキストを全チャンクに適用（暫定実装）
-                    translationResults = cloudTexts
-                        .Select(t => t.Translation ?? string.Empty)
-                        .ToList();
+                    // [Issue #296] Originalテキストでマッチング
+                    // Cloud AI（Gemini）は画像から再OCRするため、順序がローカルOCRと異なる場合がある
+                    translationResults = MatchCloudTranslationsToChunks(nonEmptyChunks, cloudTexts);
 
                     _logger?.LogDebug(
-                        "✅ [Issue #290] Fork-Join Cloud AI翻訳結果: {Count}個のテキスト取得",
-                        translationResults.Count);
+                        "✅ [Issue #296] Fork-Join Cloud AI翻訳結果: {CloudCount}個 → {MatchedCount}個マッチ",
+                        cloudTexts.Count, translationResults.Count(r => !string.IsNullOrEmpty(r)));
                 }
                 else if (!string.IsNullOrEmpty(cloudResponse?.TranslatedText))
                 {
@@ -1063,5 +1060,137 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     IsRetryable = true
                 });
         }
+    }
+
+    /// <summary>
+    /// [Issue #296] Cloud AI翻訳結果をOCRチャンクにマッチング
+    /// </summary>
+    /// <remarks>
+    /// Cloud AI（Gemini）は画像から独自にOCRを実行するため、
+    /// ローカルOCR（Surya）とは検出順序が異なる場合がある。
+    /// Originalテキストを使用してマッチングし、正しい翻訳を対応付ける。
+    ///
+    /// マッチング戦略:
+    /// 1. 完全一致: chunk.CombinedText == cloudText.Original
+    /// 2. 正規化一致: 空白・改行を除去して比較
+    /// 3. 部分一致: cloudText.Originalがchunk.CombinedTextを含む（または逆）
+    /// 4. フォールバック: インデックスベースマッピング
+    /// </remarks>
+    private List<string> MatchCloudTranslationsToChunks(
+        List<TextChunk> chunks,
+        IReadOnlyList<TranslatedTextItem> cloudTexts)
+    {
+        var results = new List<string>(chunks.Count);
+
+        // Cloud AI結果をOriginalテキストでルックアップ可能にする
+        var exactMatchMap = cloudTexts
+            .Where(t => !string.IsNullOrEmpty(t.Original))
+            .GroupBy(t => t.Original)
+            .ToDictionary(
+                g => g.Key,
+                g => g.First().Translation ?? string.Empty,
+                StringComparer.Ordinal);
+
+        // 正規化マップ（空白・改行除去）
+        var normalizedMap = cloudTexts
+            .Where(t => !string.IsNullOrEmpty(t.Original))
+            .GroupBy(t => NormalizeText(t.Original))
+            .ToDictionary(
+                g => g.Key,
+                g => g.First().Translation ?? string.Empty,
+                StringComparer.Ordinal);
+
+        var matchedCount = 0;
+        var normalizedMatchCount = 0;
+        var partialMatchCount = 0;
+        var fallbackCount = 0;
+
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            var chunkText = chunks[i].CombinedText ?? string.Empty;
+            string translation;
+
+            // 1. 完全一致
+            if (exactMatchMap.TryGetValue(chunkText, out translation!))
+            {
+                results.Add(translation);
+                matchedCount++;
+                continue;
+            }
+
+            // 2. 正規化一致
+            var normalizedChunkText = NormalizeText(chunkText);
+            if (!string.IsNullOrEmpty(normalizedChunkText) &&
+                normalizedMap.TryGetValue(normalizedChunkText, out translation!))
+            {
+                results.Add(translation);
+                normalizedMatchCount++;
+                _logger?.LogDebug(
+                    "🔍 [Issue #296] 正規化マッチ: Chunk[{Index}] '{ChunkText}' → '{Translation}'",
+                    i, chunkText.Length > 30 ? chunkText[..30] + "..." : chunkText,
+                    translation.Length > 30 ? translation[..30] + "..." : translation);
+                continue;
+            }
+
+            // 3. 部分一致（CloudのOriginalがChunkを含む、または逆）
+            var partialMatch = cloudTexts.FirstOrDefault(t =>
+                !string.IsNullOrEmpty(t.Original) &&
+                (t.Original.Contains(chunkText, StringComparison.OrdinalIgnoreCase) ||
+                 chunkText.Contains(t.Original, StringComparison.OrdinalIgnoreCase)));
+
+            if (partialMatch != null)
+            {
+                results.Add(partialMatch.Translation ?? string.Empty);
+                partialMatchCount++;
+                _logger?.LogDebug(
+                    "🔍 [Issue #296] 部分マッチ: Chunk[{Index}] '{ChunkText}' ⊂⊃ '{CloudOriginal}' → '{Translation}'",
+                    i,
+                    chunkText.Length > 20 ? chunkText[..20] + "..." : chunkText,
+                    partialMatch.Original?.Length > 20 ? partialMatch.Original[..20] + "..." : partialMatch.Original,
+                    partialMatch.Translation?.Length > 20 ? partialMatch.Translation[..20] + "..." : partialMatch.Translation);
+                continue;
+            }
+
+            // 4. フォールバック: インデックスベース（最終手段）
+            if (i < cloudTexts.Count)
+            {
+                results.Add(cloudTexts[i].Translation ?? string.Empty);
+                fallbackCount++;
+                _logger?.LogWarning(
+                    "⚠️ [Issue #296] フォールバック（インデックス）: Chunk[{Index}] '{ChunkText}' → CloudTexts[{Index}]",
+                    i, chunkText.Length > 30 ? chunkText[..30] + "..." : chunkText, i);
+            }
+            else
+            {
+                results.Add(string.Empty);
+                _logger?.LogWarning(
+                    "⚠️ [Issue #296] マッチなし: Chunk[{Index}] '{ChunkText}' - Cloud AI結果に対応なし",
+                    i, chunkText.Length > 50 ? chunkText[..50] + "..." : chunkText);
+            }
+        }
+
+        _logger?.LogInformation(
+            "📊 [Issue #296] マッチング統計: 完全一致={Exact}, 正規化={Normalized}, 部分={Partial}, フォールバック={Fallback}, 合計={Total}",
+            matchedCount, normalizedMatchCount, partialMatchCount, fallbackCount, chunks.Count);
+
+#if DEBUG
+        Console.WriteLine($"📊 [Issue #296] マッチング統計: 完全={matchedCount}, 正規化={normalizedMatchCount}, 部分={partialMatchCount}, FB={fallbackCount}");
+#endif
+
+        return results;
+    }
+
+    /// <summary>
+    /// [Issue #296] テキスト正規化（マッチング用）
+    /// </summary>
+    private static string NormalizeText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        // 空白・改行・制御文字を除去
+        return new string(text
+            .Where(c => !char.IsWhiteSpace(c) && !char.IsControl(c))
+            .ToArray());
     }
 }
