@@ -1103,7 +1103,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         var matchedCount = 0;
         var normalizedMatchCount = 0;
         var partialMatchCount = 0;
-        var fallbackCount = 0;
+        var notDetectedCount = 0;
 
         for (int i = 0; i < chunks.Count; i++)
         {
@@ -1151,30 +1151,22 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 continue;
             }
 
-            // 4. フォールバック: インデックスベース（最終手段）
-            if (i < cloudTexts.Count)
-            {
-                results.Add(cloudTexts[i].Translation ?? string.Empty);
-                fallbackCount++;
-                _logger?.LogWarning(
-                    "⚠️ [Issue #296] フォールバック（インデックス）: Chunk[{Index}] '{ChunkText}' → CloudTexts[{Index}]",
-                    i, chunkText.Length > 30 ? chunkText[..30] + "..." : chunkText, i);
-            }
-            else
-            {
-                results.Add(string.Empty);
-                _logger?.LogWarning(
-                    "⚠️ [Issue #296] マッチなし: Chunk[{Index}] '{ChunkText}' - Cloud AI結果に対応なし",
-                    i, chunkText.Length > 50 ? chunkText[..50] + "..." : chunkText);
-            }
+            // 4. マッチなし: Cloud AIが検出しなかった → 翻訳不要と判断
+            // Cloud AI (Gemini) は視覚的に理解し「意味のあるテキスト」のみ検出・翻訳する
+            // ローカルOCRが検出してもCloud AIが検出しなかったものは装飾・ノイズの可能性が高い
+            results.Add(string.Empty);
+            notDetectedCount++;
+            _logger?.LogDebug(
+                "🔍 [Issue #296] Cloud AI未検出: Chunk[{Index}] '{ChunkText}' - オーバーレイ非表示",
+                i, chunkText.Length > 50 ? chunkText[..50] + "..." : chunkText);
         }
 
         _logger?.LogInformation(
-            "📊 [Issue #296] マッチング統計: 完全一致={Exact}, 正規化={Normalized}, 部分={Partial}, フォールバック={Fallback}, 合計={Total}",
-            matchedCount, normalizedMatchCount, partialMatchCount, fallbackCount, chunks.Count);
+            "📊 [Issue #296] マッチング統計: 完全一致={Exact}, 正規化={Normalized}, 部分={Partial}, 未検出={NotDetected}, 合計={Total}",
+            matchedCount, normalizedMatchCount, partialMatchCount, notDetectedCount, chunks.Count);
 
 #if DEBUG
-        Console.WriteLine($"📊 [Issue #296] マッチング統計: 完全={matchedCount}, 正規化={normalizedMatchCount}, 部分={partialMatchCount}, FB={fallbackCount}");
+        Console.WriteLine($"📊 [Issue #296] マッチング統計: 完全={matchedCount}, 正規化={normalizedMatchCount}, 部分={partialMatchCount}, 未検出={notDetectedCount}");
 #endif
 
         return results;
