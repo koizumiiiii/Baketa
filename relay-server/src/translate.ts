@@ -376,10 +376,11 @@ async function recordTokenConsumption(
         return null;
       }
 
+      // カラム名は out_* プレフィックス付き（SQL関数の曖昧さ回避のため）
       if (data && Array.isArray(data) && data.length > 0) {
         result = {
-          year_month: data[0].year_month,
-          tokens_used: Number(data[0].tokens_used)
+          year_month: data[0].out_year_month,
+          tokens_used: Number(data[0].out_tokens_used)
         };
       }
     }

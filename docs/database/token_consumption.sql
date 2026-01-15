@@ -191,9 +191,9 @@ CREATE OR REPLACE FUNCTION record_token_consumption_by_patreon(
     p_tokens BIGINT
 )
 RETURNS TABLE (
-    year_month TEXT,
-    tokens_used BIGINT,
-    updated_at TIMESTAMPTZ
+    out_year_month TEXT,
+    out_tokens_used BIGINT,
+    out_updated_at TIMESTAMPTZ
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -212,9 +212,10 @@ BEGIN
         RETURN;
     END IF;
 
-    -- 既存の関数を呼び出し
+    -- 既存の関数を呼び出し（カラム名を明示的に指定して曖昧さを回避）
     RETURN QUERY
-    SELECT * FROM record_token_consumption(v_user_id, p_tokens);
+    SELECT r.year_month, r.tokens_used, r.updated_at
+    FROM record_token_consumption(v_user_id, p_tokens) AS r;
 END;
 $$;
 
