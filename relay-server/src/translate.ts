@@ -967,6 +967,14 @@ async function authenticateUser(
     return null;
   }
 
+  // [Issue #299] JWTフォーマットチェック: 3セグメント（header.payload.signature）が必要
+  // Patreonセッショントークン等、JWT以外のトークンでSupabase検証を試行しない
+  const tokenSegments = sessionToken.split('.');
+  if (tokenSegments.length !== 3) {
+    console.log(`[Issue #299] Token is not JWT format (segments=${tokenSegments.length}), skipping Supabase auth`);
+    return null;
+  }
+
   try {
     const { data: { user }, error } = await supabase.auth.getUser(sessionToken);
     if (error || !user) {
