@@ -18,6 +18,7 @@ public sealed class BonusSyncHostedServiceTests
     private readonly Mock<IAuthService> _authServiceMock;
     private readonly Mock<IBonusTokenService> _bonusTokenServiceMock;
     private readonly Mock<ILicenseManager> _licenseManagerMock;
+    private readonly Mock<IJwtTokenService> _jwtTokenServiceMock;
     private readonly Mock<ILogger<BonusSyncHostedService>> _loggerMock;
 
     public BonusSyncHostedServiceTests()
@@ -25,6 +26,7 @@ public sealed class BonusSyncHostedServiceTests
         _authServiceMock = new Mock<IAuthService>();
         _bonusTokenServiceMock = new Mock<IBonusTokenService>();
         _licenseManagerMock = new Mock<ILicenseManager>();
+        _jwtTokenServiceMock = new Mock<IJwtTokenService>();
         _loggerMock = new Mock<ILogger<BonusSyncHostedService>>();
     }
 
@@ -272,4 +274,165 @@ public sealed class BonusSyncHostedServiceTests
         // NotifyBonusTokensLoadedも呼ばれない
         _licenseManagerMock.Verify(l => l.NotifyBonusTokensLoaded(), Times.Never);
     }
+
+    #region [Issue #299] JWT Priority Tests
+
+    /// <summary>
+    /// [Issue #299] JWTが有効な場合、JWTが最優先で使用されることを確認
+    /// </summary>
+    [Fact]
+    public async Task OnAuthStatusChanged_WhenJwtValid_UsesJwtToken()
+    {
+        // Arrange
+        const string jwtToken = "valid.jwt.token";
+        var session = new AuthSession(
+            AccessToken: "supabase-token",
+            RefreshToken: "refresh-token",
+            ExpiresAt: DateTime.UtcNow.AddHours(1),
+            User: new UserInfo("user-id", "test@example.com", "Test User"));
+
+        var mre = new ManualResetEventSlim(false);
+
+        // JWT有効
+        _jwtTokenServiceMock.Setup(j => j.HasValidToken).Returns(true);
+        _jwtTokenServiceMock.Setup(j => j.GetAccessTokenAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(jwtToken);
+
+        _authServiceMock.Setup(a => a.GetCurrentSessionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+
+        _bonusTokenServiceMock.Setup(b => b.FetchFromServerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BonusSyncResult { Success = true, TotalRemaining = 1000 });
+
+        _licenseManagerMock.Setup(l => l.NotifyBonusTokensLoaded())
+            .Callback(() => mre.Set());
+
+        EventHandler<AuthStatusChangedEventArgs>? capturedHandler = null;
+        _authServiceMock.SetupAdd(a => a.AuthStatusChanged += It.IsAny<EventHandler<AuthStatusChangedEventArgs>>())
+            .Callback<EventHandler<AuthStatusChangedEventArgs>>(h => capturedHandler = h);
+
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            null,
+            _bonusTokenServiceMock.Object,
+            _licenseManagerMock.Object,
+            null,
+            _jwtTokenServiceMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        capturedHandler?.Invoke(this, new AuthStatusChangedEventArgs(true, session.User));
+
+        // Assert
+        Assert.True(mre.Wait(TimeSpan.FromSeconds(5)), "NotifyBonusTokensLoaded was not called within the timeout.");
+        // JWTがLicenseManagerに設定されたことを確認
+        _licenseManagerMock.Verify(l => l.SetSessionToken(jwtToken), Times.AtLeastOnce);
+        _jwtTokenServiceMock.Verify(j => j.GetAccessTokenAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+    }
+
+    /// <summary>
+    /// [Issue #299] JWTが無効な場合、Supabaseトークンにフォールバックすることを確認
+    /// </summary>
+    [Fact]
+    public async Task OnAuthStatusChanged_WhenJwtInvalid_FallsBackToSupabaseToken()
+    {
+        // Arrange
+        const string supabaseToken = "supabase-access-token";
+        var session = new AuthSession(
+            AccessToken: supabaseToken,
+            RefreshToken: "refresh-token",
+            ExpiresAt: DateTime.UtcNow.AddHours(1),
+            User: new UserInfo("user-id", "test@example.com", "Test User"));
+
+        var mre = new ManualResetEventSlim(false);
+
+        // JWT無効
+        _jwtTokenServiceMock.Setup(j => j.HasValidToken).Returns(false);
+
+        _authServiceMock.Setup(a => a.GetCurrentSessionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+
+        _bonusTokenServiceMock.Setup(b => b.FetchFromServerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BonusSyncResult { Success = true, TotalRemaining = 1000 });
+
+        _licenseManagerMock.Setup(l => l.NotifyBonusTokensLoaded())
+            .Callback(() => mre.Set());
+
+        EventHandler<AuthStatusChangedEventArgs>? capturedHandler = null;
+        _authServiceMock.SetupAdd(a => a.AuthStatusChanged += It.IsAny<EventHandler<AuthStatusChangedEventArgs>>())
+            .Callback<EventHandler<AuthStatusChangedEventArgs>>(h => capturedHandler = h);
+
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            null,
+            _bonusTokenServiceMock.Object,
+            _licenseManagerMock.Object,
+            null,
+            _jwtTokenServiceMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        capturedHandler?.Invoke(this, new AuthStatusChangedEventArgs(true, session.User));
+
+        // Assert
+        Assert.True(mre.Wait(TimeSpan.FromSeconds(5)), "NotifyBonusTokensLoaded was not called within the timeout.");
+        // SupabaseトークンがLicenseManagerに設定されたことを確認
+        _licenseManagerMock.Verify(l => l.SetSessionToken(supabaseToken), Times.AtLeastOnce);
+        // JWTのGetAccessTokenAsyncは呼ばれない
+        _jwtTokenServiceMock.Verify(j => j.GetAccessTokenAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// [Issue #299] JWT取得が例外をスローした場合、フォールバックすることを確認
+    /// </summary>
+    [Fact]
+    public async Task OnAuthStatusChanged_WhenJwtThrows_FallsBackToSupabaseToken()
+    {
+        // Arrange
+        const string supabaseToken = "supabase-access-token";
+        var session = new AuthSession(
+            AccessToken: supabaseToken,
+            RefreshToken: "refresh-token",
+            ExpiresAt: DateTime.UtcNow.AddHours(1),
+            User: new UserInfo("user-id", "test@example.com", "Test User"));
+
+        var mre = new ManualResetEventSlim(false);
+
+        // JWT有効だが取得時に例外
+        _jwtTokenServiceMock.Setup(j => j.HasValidToken).Returns(true);
+        _jwtTokenServiceMock.Setup(j => j.GetAccessTokenAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("JWT refresh failed"));
+
+        _authServiceMock.Setup(a => a.GetCurrentSessionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+
+        _bonusTokenServiceMock.Setup(b => b.FetchFromServerAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BonusSyncResult { Success = true, TotalRemaining = 1000 });
+
+        _licenseManagerMock.Setup(l => l.NotifyBonusTokensLoaded())
+            .Callback(() => mre.Set());
+
+        EventHandler<AuthStatusChangedEventArgs>? capturedHandler = null;
+        _authServiceMock.SetupAdd(a => a.AuthStatusChanged += It.IsAny<EventHandler<AuthStatusChangedEventArgs>>())
+            .Callback<EventHandler<AuthStatusChangedEventArgs>>(h => capturedHandler = h);
+
+        using var service = new BonusSyncHostedService(
+            _authServiceMock.Object,
+            null,
+            _bonusTokenServiceMock.Object,
+            _licenseManagerMock.Object,
+            null,
+            _jwtTokenServiceMock.Object,
+            _loggerMock.Object);
+
+        // Act
+        capturedHandler?.Invoke(this, new AuthStatusChangedEventArgs(true, session.User));
+
+        // Assert
+        Assert.True(mre.Wait(TimeSpan.FromSeconds(5)), "NotifyBonusTokensLoaded was not called within the timeout.");
+        // SupabaseトークンがLicenseManagerに設定されたことを確認（フォールバック）
+        _licenseManagerMock.Verify(l => l.SetSessionToken(supabaseToken), Times.AtLeastOnce);
+    }
+
+    #endregion
 }
