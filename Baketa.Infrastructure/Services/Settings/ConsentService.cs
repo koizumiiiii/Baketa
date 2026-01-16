@@ -25,6 +25,16 @@ public sealed class ConsentService : IConsentService, IDisposable
     private ConsentSettings? _cachedSettings;
     private bool _disposed;
 
+    /// <summary>
+    /// [Issue #299] サーバー同期デバウンス用: 最後に同期した時刻
+    /// </summary>
+    private DateTime _lastSyncToServerAt = DateTime.MinValue;
+
+    /// <summary>
+    /// [Issue #299] サーバー同期デバウンス間隔（連続呼び出し対策）
+    /// </summary>
+    private static readonly TimeSpan SyncDebounceInterval = TimeSpan.FromSeconds(5);
+
     /// <inheritdoc/>
     public event EventHandler<LegalConsentChangedEventArgs>? ConsentChanged;
 
@@ -259,6 +269,18 @@ public sealed class ConsentService : IConsentService, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(accessToken);
+
+        // [Issue #299] デバウンス: 短時間内の再呼び出しはスキップ
+        var now = DateTime.UtcNow;
+        if (now - _lastSyncToServerAt < SyncDebounceInterval)
+        {
+            _logger.LogDebug(
+                "[Issue #299] SyncLocalConsentToServerAsync skipped (debounce, last sync: {LastSync}ms ago)",
+                (now - _lastSyncToServerAt).TotalMilliseconds);
+            return;
+        }
+
+        _lastSyncToServerAt = now;
 
         try
         {
