@@ -207,6 +207,8 @@ const API_TIMEOUT_MS = 30000; // 30秒タイムアウト
 const AUTH_CACHE_TTL_SECONDS = 60 * 60; // 1 hour (was 60 seconds)
 /** [Issue #296] クォータキャッシュTTL（5分）- Geminiフィードバック反映 */
 const QUOTA_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
+/** [Issue #299] Patreon連携確認間隔（30分）- 再認証ループ防止 */
+const PATREON_VERIFY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 // [Issue #296] Patreon API定数（メンバーシップKV null時のフォールバック用）
 const PATREON_API_BASE = 'https://www.patreon.com/api/oauth2';
@@ -325,6 +327,8 @@ interface AuthenticatedUser {
   plan: PlanType;
   hasBonusTokens: boolean;
   authMethod: 'patreon' | 'supabase' | 'jwt';  // [Issue #287] JWT認証追加
+  /** [Issue #299] Patreon連携確認タイムスタンプ（ループ防止用） */
+  patreonVerifiedAt?: number;
 }
 
 /** [Issue #287] JWTカスタムクレーム */
@@ -872,6 +876,7 @@ async function authenticateUser(
     }
     // [Issue #299] Freeプランのキャッシュ最適化
     // Patreon連携ユーザーのみ再認証、純粋なFreeユーザーはキャッシュを信用
+    // patreonVerifiedAtによる再認証ループ防止
     if (cachedAuth.plan === PLAN.FREE) {
       // Supabase認証の場合のみPatreon連携をチェック
       if (cachedAuth.authMethod === 'supabase') {
@@ -890,9 +895,16 @@ async function authenticateUser(
               return cachedAuth;
             }
 
-            // Patreon連携あり → 再認証でプラン確認
+            // Patreon連携あり → patreonVerifiedAtをチェックして再認証ループを防止
             if (!profileError && profile?.patreon_user_id) {
-              console.log(`[Issue #299] Free plan with Patreon link, re-authenticating: userId=${cachedAuth.userId.substring(0, 8)}...`);
+              const now = Date.now();
+              // patreonVerifiedAtが30分以内なら再認証スキップ（ループ防止）
+              if (cachedAuth.patreonVerifiedAt && (now - cachedAuth.patreonVerifiedAt) < PATREON_VERIFY_INTERVAL_MS) {
+                console.log(`[Issue #299] Free plan cache hit (Patreon verified recently): userId=${cachedAuth.userId.substring(0, 8)}..., verifiedAt=${new Date(cachedAuth.patreonVerifiedAt).toISOString()}`);
+                return cachedAuth;
+              }
+              // 30分経過 or 初回 → 再認証でプラン確認
+              console.log(`[Issue #299] Free plan with Patreon link, re-authenticating: userId=${cachedAuth.userId.substring(0, 8)}..., patreonId=${profile.patreon_user_id}`);
               await deleteAuthCache(cacheKey);
               // 再認証へフォールスルー
             } else {
@@ -1010,7 +1022,10 @@ async function authenticateUser(
       userId: resolvedUserId,
       plan,
       hasBonusTokens,
-      authMethod
+      authMethod,
+      // [Issue #299] Patreon連携ユーザーがFreeプランの場合、patreonVerifiedAtを設定
+      // （再認証ループ防止用）
+      ...(profile?.patreon_user_id && plan === PLAN.FREE ? { patreonVerifiedAt: Date.now() } : {}),
     };
 
     // 5. キャッシュに保存（[Issue #286] Cache API使用）
