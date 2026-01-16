@@ -1132,11 +1132,15 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 continue;
             }
 
-            // 3. 部分一致（CloudのOriginalがChunkを含む、または逆）
+            // 3. 部分一致（正規化テキストで比較 - 空白・改行・句読点の差異を無視）
             var partialMatch = cloudTexts.FirstOrDefault(t =>
-                !string.IsNullOrEmpty(t.Original) &&
-                (t.Original.Contains(chunkText, StringComparison.OrdinalIgnoreCase) ||
-                 chunkText.Contains(t.Original, StringComparison.OrdinalIgnoreCase)));
+            {
+                if (string.IsNullOrEmpty(t.Original)) return false;
+                var normalizedCloudOriginal = NormalizeText(t.Original);
+                // 正規化後のテキストで部分一致チェック
+                return normalizedCloudOriginal.Contains(normalizedChunkText, StringComparison.OrdinalIgnoreCase) ||
+                       normalizedChunkText.Contains(normalizedCloudOriginal, StringComparison.OrdinalIgnoreCase);
+            });
 
             if (partialMatch != null)
             {
@@ -1175,14 +1179,24 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     /// <summary>
     /// [Issue #296] テキスト正規化（マッチング用）
     /// </summary>
+    /// <remarks>
+    /// 空白、改行、制御文字、および一般的な句読点を除去して
+    /// テキストの実質的な内容のみを比較できるようにする。
+    /// これにより、OCRの改行位置の違いやCloud AIの句読点の違いを吸収できる。
+    /// </remarks>
     private static string NormalizeText(string text)
     {
         if (string.IsNullOrEmpty(text))
             return string.Empty;
 
-        // 空白・改行・制御文字を除去
+        // 空白・改行・制御文字・句読点を除去
+        // 日本語句読点: 。、！？・
+        // 英語句読点: .!?,;:
+        // 括弧類は意味があるので残す（「」『』など）
+        var punctuationToRemove = new HashSet<char> { '。', '、', '！', '？', '・', '.', '!', '?', ',', ';', ':' };
+
         return new string(text
-            .Where(c => !char.IsWhiteSpace(c) && !char.IsControl(c))
+            .Where(c => !char.IsWhiteSpace(c) && !char.IsControl(c) && !punctuationToRemove.Contains(c))
             .ToArray());
     }
 }

@@ -1556,10 +1556,22 @@ async function translateWithOpenAI(
     ? `The source language is ${request.source_language}.`
     : 'Detect the source language.';
 
-  // [Issue #275] 複数テキスト+BoundingBox形式のプロンプト
-  const systemPrompt = `You are a game localization expert. Always respond with valid JSON only, no markdown formatting.`;
+  // [Issue #299] 改善されたプロンプト - 全テキスト検出を強調
+  const systemPrompt = `You are a game localization expert specialized in comprehensive text detection. Always respond with valid JSON only, no markdown formatting.`;
 
   const userPrompt = `${contextHint}
+
+## CRITICAL INSTRUCTION
+You MUST detect and include EVERY SINGLE piece of visible text in this image. This includes:
+- Main dialog/dialogue text
+- UI buttons (OK, Cancel, Yes, No, Save, Load, Skip, Menu, Auto, etc.)
+- Menu items and navigation text
+- Labels, headers, and titles
+- Status text, counters, numbers
+- Single words or characters
+- ANY other readable text, no matter how small
+
+Do NOT skip any text. Even single characters or numbers should be included.
 
 Task: Detect ALL visible text in this image and translate it to ${request.target_language}.
 ${sourceHint}
@@ -1571,17 +1583,19 @@ ${sourceHint}
 - Choose appropriate formality level based on context
 
 ## Output Format
-Include ALL detected text items with their bounding box coordinates.
+Include EVERY detected text item with bounding box coordinates.
 Bounding boxes use normalized 0-1000 scale coordinates in [y_min, x_min, y_max, x_max] order.
+
+IMPORTANT: The number of items in "texts" array should match the TOTAL number of distinct text regions visible in the image. If you see 10+ text regions, return 10+ items.
 
 Response format (JSON only, no markdown):
 {
   "texts": [
-    {
-      "original": "original text 1",
-      "translation": "translated text 1",
-      "bounding_box": [y_min, x_min, y_max, x_max]
-    }
+    {"original": "Dialog text here", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
+    {"original": "Button1", "translation": "ボタン1", "bounding_box": [50, 100, 80, 200]},
+    {"original": "Button2", "translation": "ボタン2", "bounding_box": [50, 250, 80, 350]},
+    {"original": "Menu", "translation": "メニュー", "bounding_box": [10, 900, 40, 980]},
+    {"original": "Status", "translation": "ステータス", "bounding_box": [950, 50, 990, 150]}
   ],
   "detected_language": "ISO 639-1 code (e.g., ja, en, ko)"
 }
@@ -1610,7 +1624,7 @@ If no text is visible, respond with:
         ],
       },
     ],
-    max_tokens: 2048, // [Issue #275] 複数テキスト対応のため増加
+    max_tokens: 4096, // [Issue #299] 全テキスト検出のため増加
     temperature: 0.1,
   };
 
