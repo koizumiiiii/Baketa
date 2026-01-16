@@ -19,6 +19,7 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
     private readonly IBonusTokenService? _bonusTokenService;
     private readonly ILicenseManager _licenseManager;
     private readonly RelayServerClient? _relayServerClient;
+    private readonly IJwtTokenService? _jwtTokenService;
     private readonly ILogger<BonusSyncHostedService> _logger;
 
     /// <summary>
@@ -44,6 +45,7 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
         IBonusTokenService? bonusTokenService,
         ILicenseManager licenseManager,
         RelayServerClient? relayServerClient,
+        IJwtTokenService? jwtTokenService,
         ILogger<BonusSyncHostedService> logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
@@ -51,6 +53,7 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
         _bonusTokenService = bonusTokenService;
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _relayServerClient = relayServerClient;
+        _jwtTokenService = jwtTokenService;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // ログイン/ログアウトイベントを購読
@@ -146,13 +149,35 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 
     /// <summary>
     /// セッショントークンをLicenseManagerに設定（共通化: Issue #280+#281）
-    /// [Issue #296] Patreonセッショントークンを優先的に使用
+    /// [Issue #299] JWTを最優先で使用（Patreon再認証後の翻訳失敗を修正）
     /// </summary>
     private async Task UpdateSessionTokenAsync()
     {
         try
         {
-            // [Issue #296] Patreonセッショントークンがある場合は優先的に使用
+            // [Issue #299] JWTが有効な場合は最優先で使用
+            // Patreon再認証後、/api/auth/tokenで取得したJWTはJwtTokenServiceに格納される
+            // このJWTを使用しないと、古いPatreonセッショントークンが使われて翻訳が失敗する
+            if (_jwtTokenService?.HasValidToken == true)
+            {
+                try
+                {
+                    var jwt = await _jwtTokenService.GetAccessTokenAsync(CancellationToken.None)
+                        .ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(jwt))
+                    {
+                        _licenseManager.SetSessionToken(jwt);
+                        _logger.LogInformation("[Issue #299] JWTをLicenseManagerに設定しました");
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "[Issue #299] JWT取得失敗（フォールバックへ）");
+                }
+            }
+
+            // [Issue #296] JWTがない場合はPatreonセッショントークンを使用
             // これにより、Relay ServerのPatreonセッション認証パスを通り、
             // MEMBERSHIPS KVのキャッシュが正しく参照される
             if (_patreonOAuthService != null)
@@ -174,7 +199,7 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
                 }
             }
 
-            // Patreonトークンがない場合はSupabase JWTを使用
+            // Patreonトークンもない場合はSupabase JWTを使用
             var session = await _authService.GetCurrentSessionAsync(CancellationToken.None).ConfigureAwait(false);
             if (session?.IsValid == true)
             {
