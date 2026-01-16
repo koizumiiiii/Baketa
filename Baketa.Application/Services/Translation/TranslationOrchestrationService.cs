@@ -95,6 +95,20 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly CancellationTokenSource _disposeCts = new();
     private bool _disposed;
 
+    // [Issue #299] アダプティブ間隔: 画像変化なし時の間隔延長
+    /// <summary>連続「変化なし」カウント</summary>
+    private int _consecutiveNoChangeCount;
+    /// <summary>アダプティブ間隔用ロック</summary>
+    private readonly object _adaptiveIntervalLock = new();
+
+    /// <summary>アダプティブ間隔設定（連続無変化回数 → 待機時間、降順で定義）</summary>
+    private static readonly (int threshold, TimeSpan interval)[] AdaptiveIntervals =
+    [
+        (6, TimeSpan.FromSeconds(60)),   // 6回以上: 60秒
+        (3, TimeSpan.FromSeconds(20)),   // 3-5回: 20秒
+        (0, TimeSpan.FromSeconds(10)),   // 0-2回: 10秒（デフォルト）
+    ];
+
     #region コンストラクタ
 
     /// <summary>
@@ -345,6 +359,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             _isAutomaticTranslationActive = true;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
+
+            // [Issue #299] アダプティブ間隔カウンタをリセット
+            lock (_adaptiveIntervalLock)
+            {
+                _consecutiveNoChangeCount = 0;
+            }
 
             // TODO: モード変更イベントの発行はViewModelで実行
             // await _eventAggregator.PublishAsync(
@@ -913,7 +933,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     }
                     catch { }
 
-                    await ExecuteAutomaticTranslationStepAsync(cancellationToken).ConfigureAwait(false);
+                    var imageChanged = await ExecuteAutomaticTranslationStepAsync(cancellationToken).ConfigureAwait(false);
 
                     try
                     {
@@ -921,10 +941,41 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     }
                     catch { }
 
+                    // [Issue #299] アダプティブ間隔の計算
+                    var actualInterval = interval;
+                    lock (_adaptiveIntervalLock)
+                    {
+                        if (imageChanged)
+                        {
+                            // 画像変化あり → カウンタリセット、通常間隔
+                            _consecutiveNoChangeCount = 0;
+                        }
+                        else
+                        {
+                            // 画像変化なし → カウンタ増加、アダプティブ間隔を適用
+                            _consecutiveNoChangeCount++;
+
+                            // 閾値に基づいてアダプティブ間隔を選択（降順定義のため最初のマッチを使用）
+                            foreach (var (threshold, adaptiveInterval) in AdaptiveIntervals)
+                            {
+                                if (_consecutiveNoChangeCount >= threshold)
+                                {
+                                    actualInterval = adaptiveInterval;
+                                    break;
+                                }
+                            }
+
+                            _logger?.LogDebug(
+                                "[Issue #299] Adaptive interval: NoChangeCount={Count}, Interval={Interval}s",
+                                _consecutiveNoChangeCount,
+                                actualInterval.TotalSeconds);
+                        }
+                    }
+
                     // 次の実行まで待機
                     try
                     {
-                        await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+                        await Task.Delay(actualInterval, cancellationToken).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -966,7 +1017,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <summary>
     /// 自動翻訳の1ステップを実行
     /// </summary>
-    private async Task ExecuteAutomaticTranslationStepAsync(CancellationToken cancellationToken)
+    /// <returns>[Issue #299] true: 画像変化あり（翻訳実行）、false: 変化なし（スキップ）</returns>
+    private async Task<bool> ExecuteAutomaticTranslationStepAsync(CancellationToken cancellationToken)
     {
         // 緊急デバッグ: ExecuteAutomaticTranslationStepAsync開始確認
         try
@@ -1002,7 +1054,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             catch { }
 
             _logger?.LogDebug($"⏳ 翻訳完了後のクールダウン中: ID={translationId}, 残り{remainingCooldown:F1}秒");
-            return; // クールダウン中はスキップ
+            return false; // クールダウン中はスキップ（変化なし扱い）
         }
 
         // 緊急デバッグ: クールダウン通過確認
@@ -1088,7 +1140,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         _logger?.LogTrace("画面に変化がないため翻訳をスキップします");
                         currentImage?.Dispose();
                         previousImageForComparison?.Dispose();
-                        return;
+                        return false; // [Issue #299] 画像変化なし
                     }
                     _logger?.LogDebug($"📸 画面変化を検出、翻訳処理を継続: ID={translationId}");
                 }
@@ -1145,7 +1197,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 // 現在の画像を破棄して早期リターン
                 currentImage?.Dispose();
-                return;
+                return false; // [Issue #299] エラー時も変化なし扱い
             }
 
             // 🔥 [ISSUE#163_REFACTOR] 翻訳結果が発行された場合のみ前回画像を更新
@@ -1177,6 +1229,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             // 🚀 [FUNDAMENTAL_FIX] 現在の画像のDisposeは行わない - CaptureCompletedEventハンドラーが責任を持つ
             // currentImage?.Dispose(); // CaptureCompletedEventで使用するため削除
+
+            // [Issue #299] 翻訳実行成功 = 画像変化あり
+            return publishedResult != null;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1192,6 +1247,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             currentImage?.Dispose(); // エラー時のリソース破棄
             _logger?.LogError(ex, "自動翻訳ステップでエラーが発生しました");
             PublishProgress(translationId, TranslationStatus.Error, 1.0f, $"エラー: {ex.Message}");
+            return false; // [Issue #299] エラー時も変化なし扱い
         }
 #pragma warning restore CA1031
     }

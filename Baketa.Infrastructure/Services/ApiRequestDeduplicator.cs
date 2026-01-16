@@ -37,6 +37,17 @@ public interface IApiRequestDeduplicator
     /// 全キャッシュを無効化（ログイン/ログアウト時に使用）
     /// </summary>
     void InvalidateAll();
+
+    /// <summary>
+    /// [Issue #299] レート制限状態を取得
+    /// </summary>
+    /// <returns>true: レート制限中、false: 正常</returns>
+    bool IsRateLimited { get; }
+
+    /// <summary>
+    /// [Issue #299] レート制限解除までの残り時間
+    /// </summary>
+    TimeSpan? RateLimitRemainingTime { get; }
 }
 
 /// <summary>
@@ -64,6 +75,11 @@ public static class ApiCacheDurations
 /// <summary>
 /// API重複呼び出し削減マネージャー実装
 /// </summary>
+/// <remarks>
+/// [Issue #299] キルスイッチ機能追加:
+/// 1分間に30回以上のAPIリクエストを検出すると、1分間すべてのリクエストをブロック。
+/// これにより、無限ループやバグによる過剰なAPI呼び出しを防止。
+/// </remarks>
 public sealed class ApiRequestDeduplicator : IApiRequestDeduplicator, IDisposable
 {
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
@@ -73,12 +89,54 @@ public sealed class ApiRequestDeduplicator : IApiRequestDeduplicator, IDisposabl
     private DateTime _lastCleanup = DateTime.UtcNow;
     private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(5);
 
+    // [Issue #299] キルスイッチ（レート制限）関連フィールド
+    /// <summary>1分間の最大リクエスト数</summary>
+    private const int MaxRequestsPerMinute = 30;
+
+    /// <summary>レート制限発動時のブロック期間</summary>
+    private static readonly TimeSpan BlockDuration = TimeSpan.FromMinutes(1);
+
+    /// <summary>リクエストタイムスタンプ（スライディングウィンドウ）</summary>
+    private readonly ConcurrentQueue<DateTime> _requestTimestamps = new();
+
+    /// <summary>ブロック解除時刻（nullの場合はブロックなし）</summary>
+    private DateTime? _blockedUntil;
+
+    /// <summary>レート制限チェック用ロック</summary>
+    private readonly object _rateLimitLock = new();
+
     private bool _disposed;
 
     public ApiRequestDeduplicator(ILogger<ApiRequestDeduplicator> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _logger.LogDebug("[Issue #299] ApiRequestDeduplicator initialized");
+        _logger.LogDebug("[Issue #299] ApiRequestDeduplicator initialized (KillSwitch: {MaxRequests}/min)", MaxRequestsPerMinute);
+    }
+
+    /// <inheritdoc/>
+    public bool IsRateLimited
+    {
+        get
+        {
+            lock (_rateLimitLock)
+            {
+                return _blockedUntil.HasValue && DateTime.UtcNow < _blockedUntil.Value;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public TimeSpan? RateLimitRemainingTime
+    {
+        get
+        {
+            lock (_rateLimitLock)
+            {
+                if (!_blockedUntil.HasValue) return null;
+                var remaining = _blockedUntil.Value - DateTime.UtcNow;
+                return remaining > TimeSpan.Zero ? remaining : null;
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -89,6 +147,12 @@ public sealed class ApiRequestDeduplicator : IApiRequestDeduplicator, IDisposabl
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(factory);
+
+        // [Issue #299] キルスイッチ: レート制限中はリクエストをブロック
+        if (CheckAndUpdateRateLimit(key, isActualRequest: false))
+        {
+            return null;
+        }
 
         var now = DateTime.UtcNow;
         var duration = cacheDuration ?? ApiCacheDurations.Default;
@@ -137,6 +201,14 @@ public sealed class ApiRequestDeduplicator : IApiRequestDeduplicator, IDisposabl
             if (ReferenceEquals(actualEntry.Task, tcs.Task))
             {
                 // このスレッドが実行者
+                // [Issue #299] 実際のAPI呼び出し時のみリクエストを記録
+                if (CheckAndUpdateRateLimit(key, isActualRequest: true))
+                {
+                    _cache.TryRemove(key, out _);
+                    tcs.SetCanceled();
+                    return null;
+                }
+
                 _logger.LogDebug("[Issue #299] Executing: Key={Key}", key);
                 try
                 {
@@ -259,6 +331,80 @@ public sealed class ApiRequestDeduplicator : IApiRequestDeduplicator, IDisposabl
         finally
         {
             _cleanupLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// [Issue #299] レート制限チェックと更新
+    /// </summary>
+    /// <param name="key">リクエストキー（ログ用）</param>
+    /// <param name="isActualRequest">true: 実際のAPI呼び出し（カウント対象）、false: ブロックチェックのみ</param>
+    /// <returns>true: ブロック中（リクエスト禁止）、false: 許可</returns>
+    private bool CheckAndUpdateRateLimit(string key, bool isActualRequest)
+    {
+        var now = DateTime.UtcNow;
+
+        lock (_rateLimitLock)
+        {
+            // ブロック中かチェック
+            if (_blockedUntil.HasValue)
+            {
+                if (now < _blockedUntil.Value)
+                {
+                    var remaining = _blockedUntil.Value - now;
+                    _logger.LogWarning(
+                        "[Issue #299] RATE LIMITED - Request blocked: Key={Key}, RemainingBlock={RemainingSeconds}s",
+                        key,
+                        remaining.TotalSeconds);
+                    return true;
+                }
+
+                // ブロック期間終了 → 解除
+                _blockedUntil = null;
+                _logger.LogInformation("[Issue #299] Rate limit block expired, resuming normal operation");
+            }
+
+            // 実際のAPI呼び出し時のみカウント
+            if (!isActualRequest)
+            {
+                return false;
+            }
+
+            // 古いタイムスタンプを削除（1分以上前）
+            var windowStart = now.AddMinutes(-1);
+            while (_requestTimestamps.TryPeek(out var oldest) && oldest < windowStart)
+            {
+                _requestTimestamps.TryDequeue(out _);
+            }
+
+            // リクエストを記録
+            _requestTimestamps.Enqueue(now);
+
+            // レート制限チェック
+            var requestCount = _requestTimestamps.Count;
+            if (requestCount > MaxRequestsPerMinute)
+            {
+                _blockedUntil = now.Add(BlockDuration);
+                _logger.LogError(
+                    "[Issue #299] KILL SWITCH ACTIVATED - Rate limit exceeded: {Count}/{Max} requests/min. " +
+                    "All API requests blocked for {BlockDuration}s. Key={Key}",
+                    requestCount,
+                    MaxRequestsPerMinute,
+                    BlockDuration.TotalSeconds,
+                    key);
+                return true;
+            }
+
+            // 警告閾値（80%）に達した場合は警告
+            if (requestCount >= MaxRequestsPerMinute * 0.8)
+            {
+                _logger.LogWarning(
+                    "[Issue #299] Rate limit warning: {Count}/{Max} requests/min (80% threshold)",
+                    requestCount,
+                    MaxRequestsPerMinute);
+            }
+
+            return false;
         }
     }
 

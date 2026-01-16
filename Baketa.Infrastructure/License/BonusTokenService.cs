@@ -425,6 +425,41 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
         });
     }
 
+    /// <inheritdoc/>
+    public void ApplySyncedData(IReadOnlyList<BonusTokenInfo> bonuses, long totalRemaining)
+    {
+        lock (_lockObject)
+        {
+            _bonusTokens.Clear();
+
+            foreach (var info in bonuses.Where(b => !b.IsExpired && b.RemainingTokens > 0))
+            {
+                // BonusTokenInfoからBonusTokenに変換
+                // 注意: BonusTokenInfoは軽量DTOのため、一部の情報（SourceType, GrantedTokens）は設定しない
+                if (Guid.TryParse(info.BonusId, out var id))
+                {
+                    _bonusTokens.Add(new BonusToken
+                    {
+                        Id = id,
+                        SourceType = "synced", // 統合エンドポイントからの同期
+                        GrantedTokens = info.RemainingTokens, // 残りトークン = 付与トークン（使用済み=0）
+                        UsedTokens = 0,
+                        ExpiresAt = DateTime.TryParse(info.ExpiresAt, null, DateTimeStyles.RoundtripKind, out var expiresAt)
+                            ? expiresAt
+                            : DateTime.UtcNow.AddDays(30) // デフォルト30日
+                    });
+                }
+            }
+
+            _logger.LogInformation(
+                "[Issue #299] ApplySyncedData: Applied {Count} bonuses, TotalRemaining={Total}",
+                _bonusTokens.Count,
+                totalRemaining);
+        }
+
+        RaiseBonusTokensChanged("Applied from sync/init endpoint");
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

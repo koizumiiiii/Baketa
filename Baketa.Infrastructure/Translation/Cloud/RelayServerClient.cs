@@ -461,6 +461,146 @@ public sealed class RelayServerClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// [Issue #299] 統合初期化エンドポイントから全ステータスを一括取得
+    /// </summary>
+    /// <param name="sessionToken">セッショントークン（Supabase JWT）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>統合レスポンス（取得失敗時はnull）</returns>
+    public async Task<SyncInitResponse?> SyncInitAsync(
+        string sessionToken,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sessionToken);
+
+        // [Issue #299] 起動時に1回だけ呼ばれるため、キャッシュは短め（60秒）
+        return await _deduplicator.ExecuteOnceAsync(
+            "sync-init",
+            () => SyncInitCoreAsync(sessionToken, cancellationToken),
+            TimeSpan.FromSeconds(60)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// [Issue #299] 統合初期化エンドポイントの実装
+    /// </summary>
+    private async Task<SyncInitResponse?> SyncInitCoreAsync(
+        string sessionToken,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("[Issue #299] 統合初期化エンドポイント呼び出し開始");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Get, "/api/sync/init");
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
+
+            using var httpResponse = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
+
+            sw.Stop();
+
+            if (!httpResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "[Issue #299] 統合初期化失敗: StatusCode={StatusCode}, Duration={Duration}ms",
+                    httpResponse.StatusCode,
+                    sw.ElapsedMilliseconds);
+                return null;
+            }
+
+            var response = await httpResponse.Content.ReadFromJsonAsync<RelaySyncInitResponse>(
+                _jsonOptions, cancellationToken).ConfigureAwait(false);
+
+            if (response?.Success != true)
+            {
+                _logger.LogWarning("[Issue #299] 統合初期化レスポンスが不正");
+                return null;
+            }
+
+            // 部分的失敗をログ
+            if (response.PartialFailure)
+            {
+                _logger.LogWarning(
+                    "[Issue #299] 統合初期化で部分的失敗: FailedComponents={Components}",
+                    response.FailedComponents != null ? string.Join(", ", response.FailedComponents) : "unknown");
+            }
+
+            _logger.LogInformation(
+                "[Issue #299] 統合初期化成功: Duration={Duration}ms, HasPromotion={HasPromo}, BonusCount={BonusCount}, PartialFailure={PartialFailure}",
+                sw.ElapsedMilliseconds,
+                response.Promotion?.HasPromotion ?? false,
+                response.BonusTokens?.ActiveCount ?? 0,
+                response.PartialFailure);
+
+            // 公開DTOに変換
+            return new SyncInitResponse
+            {
+                Promotion = response.Promotion != null
+                    ? new SyncPromotionStatus
+                    {
+                        HasPromotion = response.Promotion.HasPromotion,
+                        Expired = response.Promotion.Expired,
+                        PromotionCode = response.Promotion.Promotion?.Code,
+                        PromotionTier = response.Promotion.Promotion?.Tier,
+                        ExpiresAt = response.Promotion.Promotion?.ExpiresAt
+                    }
+                    : null,
+                Consent = response.Consent != null
+                    ? new SyncConsentStatus
+                    {
+                        HasPrivacyPolicy = response.Consent.PrivacyPolicy != null,
+                        PrivacyPolicyVersion = response.Consent.PrivacyPolicy?.Version,
+                        HasTermsOfService = response.Consent.TermsOfService != null,
+                        TermsOfServiceVersion = response.Consent.TermsOfService?.Version
+                    }
+                    : null,
+                BonusTokens = response.BonusTokens != null
+                    ? new SyncBonusTokensStatus
+                    {
+                        TotalRemaining = response.BonusTokens.TotalRemaining,
+                        ActiveCount = response.BonusTokens.ActiveCount,
+                        Bonuses = response.BonusTokens.Bonuses?.Select(b => new SyncBonusTokenInfo
+                        {
+                            BonusId = b.BonusId ?? string.Empty,
+                            RemainingTokens = b.RemainingTokens,
+                            IsExpired = b.IsExpired,
+                            ExpiresAt = b.ExpiresAt
+                        }).ToList() ?? []
+                    }
+                    : null,
+                Quota = response.Quota != null
+                    ? new SyncQuotaStatus
+                    {
+                        YearMonth = response.Quota.YearMonth ?? string.Empty,
+                        TokensUsed = response.Quota.TokensUsed,
+                        TokensLimit = response.Quota.TokensLimit
+                    }
+                    : null,
+                PartialFailure = response.PartialFailure,
+                FailedComponents = response.FailedComponents?.AsReadOnly()
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "[Issue #299] 統合初期化中に通信エラー");
+            return null;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("[Issue #299] 統合初期化がタイムアウト");
+            return null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #299] 統合初期化中に予期せぬエラー");
+            return null;
+        }
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -632,6 +772,120 @@ public sealed class RelayServerClient : IAsyncDisposable
         public bool IsExceeded { get; set; }
     }
 
+    // ============================================
+    // [Issue #299] 統合初期化エンドポイント用DTO
+    // ============================================
+
+    private sealed class RelaySyncInitResponse
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("promotion")]
+        public RelaySyncPromotion? Promotion { get; set; }
+
+        [JsonPropertyName("consent")]
+        public RelaySyncConsent? Consent { get; set; }
+
+        [JsonPropertyName("bonus_tokens")]
+        public RelaySyncBonusTokens? BonusTokens { get; set; }
+
+        [JsonPropertyName("quota")]
+        public RelaySyncQuota? Quota { get; set; }
+
+        /// <summary>部分的失敗があったかどうか</summary>
+        [JsonPropertyName("partial_failure")]
+        public bool PartialFailure { get; set; }
+
+        /// <summary>失敗したコンポーネント名リスト</summary>
+        [JsonPropertyName("failed_components")]
+        public List<string>? FailedComponents { get; set; }
+    }
+
+    private sealed class RelaySyncPromotion
+    {
+        [JsonPropertyName("has_promotion")]
+        public bool HasPromotion { get; set; }
+
+        [JsonPropertyName("promotion")]
+        public RelaySyncPromotionDetail? Promotion { get; set; }
+
+        [JsonPropertyName("expired")]
+        public bool Expired { get; set; }
+    }
+
+    private sealed class RelaySyncPromotionDetail
+    {
+        [JsonPropertyName("code")]
+        public string? Code { get; set; }
+
+        [JsonPropertyName("tier")]
+        public string? Tier { get; set; }
+
+        [JsonPropertyName("expires_at")]
+        public string? ExpiresAt { get; set; }
+    }
+
+    private sealed class RelaySyncConsent
+    {
+        [JsonPropertyName("privacy_policy")]
+        public RelaySyncConsentItem? PrivacyPolicy { get; set; }
+
+        [JsonPropertyName("terms_of_service")]
+        public RelaySyncConsentItem? TermsOfService { get; set; }
+    }
+
+    private sealed class RelaySyncConsentItem
+    {
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [JsonPropertyName("version")]
+        public string? Version { get; set; }
+
+        [JsonPropertyName("recorded_at")]
+        public string? RecordedAt { get; set; }
+    }
+
+    private sealed class RelaySyncBonusTokens
+    {
+        [JsonPropertyName("bonuses")]
+        public List<RelaySyncBonusItem>? Bonuses { get; set; }
+
+        [JsonPropertyName("total_remaining")]
+        public long TotalRemaining { get; set; }
+
+        [JsonPropertyName("active_count")]
+        public int ActiveCount { get; set; }
+    }
+
+    private sealed class RelaySyncBonusItem
+    {
+        [JsonPropertyName("bonus_id")]
+        public string? BonusId { get; set; }
+
+        [JsonPropertyName("remaining_tokens")]
+        public long RemainingTokens { get; set; }
+
+        [JsonPropertyName("is_expired")]
+        public bool IsExpired { get; set; }
+
+        [JsonPropertyName("expires_at")]
+        public string? ExpiresAt { get; set; }
+    }
+
+    private sealed class RelaySyncQuota
+    {
+        [JsonPropertyName("year_month")]
+        public string? YearMonth { get; set; }
+
+        [JsonPropertyName("tokens_used")]
+        public long TokensUsed { get; set; }
+
+        [JsonPropertyName("tokens_limit")]
+        public long TokensLimit { get; set; }
+    }
+
     #endregion
 }
 
@@ -657,4 +911,119 @@ public sealed record QuotaStatusResponse
 
     /// <summary>ボーナストークンを所有しているか</summary>
     public required bool HasBonusTokens { get; init; }
+}
+
+// ============================================
+// [Issue #299] 統合初期化レスポンス（公開DTO）
+// ============================================
+
+/// <summary>
+/// [Issue #299] 統合初期化レスポンス
+/// </summary>
+public sealed record SyncInitResponse
+{
+    /// <summary>プロモーション状態</summary>
+    public SyncPromotionStatus? Promotion { get; init; }
+
+    /// <summary>同意状態</summary>
+    public SyncConsentStatus? Consent { get; init; }
+
+    /// <summary>ボーナストークン状態</summary>
+    public SyncBonusTokensStatus? BonusTokens { get; init; }
+
+    /// <summary>クォータ状態</summary>
+    public SyncQuotaStatus? Quota { get; init; }
+
+    /// <summary>部分的失敗があったかどうか</summary>
+    public bool PartialFailure { get; init; }
+
+    /// <summary>失敗したコンポーネント名リスト</summary>
+    public IReadOnlyList<string>? FailedComponents { get; init; }
+}
+
+/// <summary>
+/// [Issue #299] プロモーション状態
+/// </summary>
+public sealed record SyncPromotionStatus
+{
+    /// <summary>プロモーション適用中か</summary>
+    public bool HasPromotion { get; init; }
+
+    /// <summary>期限切れか</summary>
+    public bool Expired { get; init; }
+
+    /// <summary>プロモーションコード</summary>
+    public string? PromotionCode { get; init; }
+
+    /// <summary>プロモーションTier</summary>
+    public string? PromotionTier { get; init; }
+
+    /// <summary>有効期限</summary>
+    public string? ExpiresAt { get; init; }
+}
+
+/// <summary>
+/// [Issue #299] 同意状態
+/// </summary>
+public sealed record SyncConsentStatus
+{
+    /// <summary>プライバシーポリシー同意済みか</summary>
+    public bool HasPrivacyPolicy { get; init; }
+
+    /// <summary>プライバシーポリシーバージョン</summary>
+    public string? PrivacyPolicyVersion { get; init; }
+
+    /// <summary>利用規約同意済みか</summary>
+    public bool HasTermsOfService { get; init; }
+
+    /// <summary>利用規約バージョン</summary>
+    public string? TermsOfServiceVersion { get; init; }
+}
+
+/// <summary>
+/// [Issue #299] ボーナストークン状態
+/// </summary>
+public sealed record SyncBonusTokensStatus
+{
+    /// <summary>残りトークン合計</summary>
+    public long TotalRemaining { get; init; }
+
+    /// <summary>有効なボーナス数</summary>
+    public int ActiveCount { get; init; }
+
+    /// <summary>ボーナス一覧</summary>
+    public List<SyncBonusTokenInfo> Bonuses { get; init; } = [];
+}
+
+/// <summary>
+/// [Issue #299] ボーナストークン情報
+/// </summary>
+public sealed record SyncBonusTokenInfo
+{
+    /// <summary>ボーナスID</summary>
+    public required string BonusId { get; init; }
+
+    /// <summary>残りトークン数</summary>
+    public long RemainingTokens { get; init; }
+
+    /// <summary>期限切れか</summary>
+    public bool IsExpired { get; init; }
+
+    /// <summary>有効期限</summary>
+    public string? ExpiresAt { get; init; }
+}
+
+/// <summary>
+/// [Issue #299] クォータ状態
+/// </summary>
+public sealed record SyncQuotaStatus
+{
+    /// <summary>年月（YYYY-MM形式）</summary>
+    public required string YearMonth { get; init; }
+
+    /// <summary>使用済みトークン数</summary>
+    public long TokensUsed { get; init; }
+
+    /// <summary>月間トークン上限</summary>
+    public long TokensLimit { get; init; }
 }

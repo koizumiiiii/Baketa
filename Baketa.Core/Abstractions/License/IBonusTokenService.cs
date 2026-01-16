@@ -90,4 +90,15 @@ public interface IBonusTokenService
     /// 未同期の消費があるかどうか
     /// </summary>
     bool HasPendingSync { get; }
+
+    /// <summary>
+    /// [Issue #299] 統合エンドポイントから取得したデータを適用
+    /// </summary>
+    /// <param name="bonuses">ボーナストークン一覧</param>
+    /// <param name="totalRemaining">合計残りトークン数</param>
+    /// <remarks>
+    /// 統合エンドポイント `/api/sync/init` から取得したデータを直接適用。
+    /// 個別の FetchFromServerAsync を呼び出すよりもAPI呼び出し回数を削減できる。
+    /// </remarks>
+    void ApplySyncedData(IReadOnlyList<BonusTokenInfo> bonuses, long totalRemaining);
 }

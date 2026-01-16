@@ -1887,6 +1887,209 @@ async function handleAnalyticsEvents(
 }
 
 // ============================================
+// Issue #299: 統合初期化エンドポイント
+// ============================================
+
+/**
+ * [Issue #299] 統合初期化エンドポイント
+ * GET /api/sync/init
+ *
+ * 起動時に必要な全ステータスを1回のリクエストで取得
+ * - プロモーション状態
+ * - 同意状態
+ * - ボーナストークン状態
+ * - クォータ状態（トークン使用量）
+ *
+ * 効果: 起動時API呼び出し 4回 → 1回
+ */
+async function handleSyncInit(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  const startTime = Date.now();
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #299] Supabase not configured for sync/init');
+      return errorResponse('Sync service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'SYNC_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'SYNC_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（5回/分 - 起動時のみ使用のため厳しめ）
+    const rateLimit = await checkRateLimit(env, `sync-init:${user.id}`, 5);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. 全ステータスを並列取得（Promise.allSettledで部分的失敗を許容）
+    const [promotionSettled, consentSettled, bonusSettled, quotaSettled] = await Promise.allSettled([
+      // プロモーション状態
+      supabase.rpc('get_promotion_status_for_user', { p_user_id: user.id }),
+      // 同意状態
+      supabase.rpc('get_consent_status_for_user', { p_user_id: user.id }),
+      // ボーナストークン状態
+      supabase.rpc('get_bonus_tokens_for_user', { p_user_id: user.id }),
+      // クォータ状態（トークン使用量）
+      getQuotaStatusForUser(supabase, user.id),
+    ]);
+
+    // 部分的失敗を追跡
+    const failures: string[] = [];
+
+    // 5. プロモーション状態の整形
+    let promotion = { has_promotion: false, promotion: null as { code: string; tier: string; expires_at: string } | null, expired: false };
+    if (promotionSettled.status === 'fulfilled') {
+      const promotionResult = promotionSettled.value;
+      const promotionData = Array.isArray(promotionResult.data) ? promotionResult.data[0] : promotionResult.data;
+      promotion = {
+        has_promotion: promotionData?.has_promotion ?? false,
+        promotion: promotionData?.has_promotion && !promotionData?.is_expired ? {
+          code: promotionData.promotion_code,
+          tier: promotionData.promotion_tier,
+          expires_at: promotionData.expires_at,
+        } : null,
+        expired: promotionData?.is_expired ?? false,
+      };
+    } else {
+      failures.push('promotion');
+      console.error('[Issue #299] Promotion query failed:', promotionSettled.reason);
+    }
+
+    // 6. 同意状態の整形
+    let consent = { privacy_policy: null as { status: string; version: string; recorded_at: string } | null, terms_of_service: null as { status: string; version: string; recorded_at: string } | null };
+    if (consentSettled.status === 'fulfilled') {
+      const consentResult = consentSettled.value;
+      const consentData = Array.isArray(consentResult.data) ? consentResult.data : [];
+      const privacyPolicy = consentData.find((r: { consent_type: string }) => r.consent_type === 'privacy_policy');
+      const termsOfService = consentData.find((r: { consent_type: string }) => r.consent_type === 'terms_of_service');
+      consent = {
+        privacy_policy: privacyPolicy ? {
+          status: privacyPolicy.status,
+          version: privacyPolicy.version,
+          recorded_at: privacyPolicy.recorded_at,
+        } : null,
+        terms_of_service: termsOfService ? {
+          status: termsOfService.status,
+          version: termsOfService.version,
+          recorded_at: termsOfService.recorded_at,
+        } : null,
+      };
+    } else {
+      failures.push('consent');
+      console.error('[Issue #299] Consent query failed:', consentSettled.reason);
+    }
+
+    // 7. ボーナストークン状態の整形
+    let bonusTokens = { bonuses: [] as BonusTokenInfo[], total_remaining: 0, active_count: 0 };
+    if (bonusSettled.status === 'fulfilled') {
+      const bonusResult = bonusSettled.value;
+      const bonusData: BonusTokenInfo[] = Array.isArray(bonusResult.data) ? bonusResult.data : [];
+      bonusTokens = {
+        bonuses: bonusData,
+        total_remaining: bonusData
+          .filter(b => !b.is_expired && b.remaining_tokens > 0)
+          .reduce((sum, b) => sum + b.remaining_tokens, 0),
+        active_count: bonusData.filter(b => !b.is_expired && b.remaining_tokens > 0).length,
+      };
+    } else {
+      failures.push('bonus_tokens');
+      console.error('[Issue #299] Bonus tokens query failed:', bonusSettled.reason);
+    }
+
+    // 8. クォータ状態の整形
+    let quota = { tokens_used: 0, tokens_limit: 50000, year_month: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` };
+    if (quotaSettled.status === 'fulfilled') {
+      quota = quotaSettled.value;
+    } else {
+      failures.push('quota');
+      console.error('[Issue #299] Quota query failed:', quotaSettled.reason);
+    }
+
+    // 9. 監査ログ
+    const duration = Date.now() - startTime;
+    console.log(JSON.stringify({
+      event: 'sync_init',
+      user_id: user.id.substring(0, 8) + '...',
+      has_promotion: promotion.has_promotion,
+      has_consent: !!(consent.privacy_policy && consent.terms_of_service),
+      bonus_count: bonusTokens.active_count,
+      tokens_used: quota.tokens_used,
+      duration_ms: duration,
+      partial_failures: failures.length > 0 ? failures : undefined,
+      timestamp: new Date().toISOString(),
+    }));
+
+    // 10. 統合レスポンス（部分的失敗情報を含む）
+    return successResponse({
+      success: true,
+      promotion,
+      consent,
+      bonus_tokens: bonusTokens,
+      quota,
+      partial_failure: failures.length > 0,
+      failed_components: failures.length > 0 ? failures : undefined,
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #299] Sync init error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * [Issue #299] ユーザーのクォータ状態を取得
+ */
+async function getQuotaStatusForUser(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{ tokens_used: number; tokens_limit: number; year_month: string }> {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  let tokensUsed = 0;
+
+  try {
+    const { data, error } = await supabase
+      .from('token_usage')
+      .select('tokens_used')
+      .eq('user_id', userId)
+      .eq('year_month', yearMonth)
+      .single();
+
+    if (!error && data) {
+      tokensUsed = Number(data.tokens_used);
+    }
+  } catch {
+    // エラー時は0として続行
+  }
+
+  return {
+    tokens_used: tokensUsed,
+    tokens_limit: 0, // プランはクライアント側で判定
+    year_month: yearMonth,
+  };
+}
+
+// ============================================
 // Issue #280+#281: ボーナストークンAPI
 // ============================================
 
@@ -2172,6 +2375,9 @@ export default {
         // Issue #296: クォータ状態取得
         case '/api/quota/status':
           return handleQuotaStatus(request, env as TranslateEnv, origin, allowedOrigins);
+        // Issue #299: 統合初期化エンドポイント
+        case '/api/sync/init':
+          return handleSyncInit(request, env, origin, allowedOrigins);
         // Issue #287: JWT認証エンドポイント
         case '/api/auth/token':
           return handleAuthToken(request, env, origin, allowedOrigins);

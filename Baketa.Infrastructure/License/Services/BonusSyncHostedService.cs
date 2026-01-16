@@ -74,11 +74,8 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
         // 起動直後は少し待機（他のサービスの初期化完了を待つ）
         await Task.Delay(StartupDelay, stoppingToken).ConfigureAwait(false);
 
-        // 起動時に既にログイン済みならフェッチ
-        await TryFetchBonusTokensAsync(stoppingToken).ConfigureAwait(false);
-
-        // [Issue #296] 起動時にクォータ状態をサーバーと同期
-        await SyncQuotaStatusAsync(stoppingToken).ConfigureAwait(false);
+        // [Issue #299] 起動時に統合エンドポイントで一括取得（4回→1回に削減）
+        await TrySyncInitAsync(stoppingToken).ConfigureAwait(false);
 
         // 定期同期ループ
         while (!stoppingToken.IsCancellationRequested)
@@ -130,10 +127,8 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
             // [Issue #280+#281] ログイン時にセッショントークンを設定
             await UpdateSessionTokenAsync().ConfigureAwait(false);
 
-            await TryFetchBonusTokensAsync(CancellationToken.None).ConfigureAwait(false);
-
-            // [Issue #296] ログイン時にクォータ状態もサーバーと同期
-            await SyncQuotaStatusAsync(CancellationToken.None).ConfigureAwait(false);
+            // [Issue #299] ログイン時に統合エンドポイントで一括取得
+            await TrySyncInitAsync(CancellationToken.None).ConfigureAwait(false);
         }
         else if (!e.IsLoggedIn && e.User == null)
         {
@@ -215,6 +210,126 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "[Issue #280+#281] セッショントークン設定中にエラー");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #299] 統合エンドポイントで全ステータスを一括取得
+    /// 起動時・ログイン時に4回のAPI呼び出しを1回に削減
+    /// </summary>
+    private async Task TrySyncInitAsync(CancellationToken cancellationToken)
+    {
+        if (_relayServerClient == null)
+        {
+            _logger.LogDebug("[Issue #299] RelayServerClientが未登録のため統合同期スキップ - フォールバック実行");
+            // フォールバック: 従来の個別取得
+            await TryFetchBonusTokensAsync(cancellationToken).ConfigureAwait(false);
+            await SyncQuotaStatusAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        try
+        {
+            // [Issue #280+#281] 起動時にも（既にログイン済みなら）セッショントークンを設定
+            await UpdateSessionTokenAsync().ConfigureAwait(false);
+
+            var session = await _authService.GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+            if (session == null || !session.IsValid)
+            {
+                _logger.LogDebug("[Issue #299] 未認証のため統合同期スキップ");
+                return;
+            }
+
+            _logger.LogInformation("[Issue #299] 統合エンドポイントで全ステータス一括取得中...");
+
+            var syncResult = await _relayServerClient.SyncInitAsync(session.AccessToken, cancellationToken).ConfigureAwait(false);
+
+            if (syncResult == null)
+            {
+                _logger.LogWarning("[Issue #299] 統合同期失敗 - フォールバック実行");
+                // フォールバック: 従来の個別取得
+                await TryFetchBonusTokensAsync(cancellationToken).ConfigureAwait(false);
+                await SyncQuotaStatusAsync(cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            // 部分的失敗時のログと個別フォールバック
+            if (syncResult.PartialFailure)
+            {
+                var failedComponents = syncResult.FailedComponents ?? [];
+                _logger.LogWarning(
+                    "[Issue #299] 統合同期で部分的失敗: FailedComponents=[{Components}]",
+                    string.Join(", ", failedComponents));
+
+                // 失敗したコンポーネントは個別フォールバック
+                if (failedComponents.Contains("bonus_tokens"))
+                {
+                    _logger.LogInformation("[Issue #299] ボーナストークン取得をフォールバック");
+                    await TryFetchBonusTokensAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                if (failedComponents.Contains("quota"))
+                {
+                    _logger.LogInformation("[Issue #299] クォータ状態取得をフォールバック");
+                    await SyncQuotaStatusAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            // ボーナストークン状態を適用（成功した場合、または部分的失敗でもbonus_tokensが成功した場合）
+            var failedList = syncResult.FailedComponents ?? [];
+            if (syncResult.BonusTokens != null && _bonusTokenService != null && !failedList.Contains("bonus_tokens"))
+            {
+                _bonusTokenService.ApplySyncedData(
+                    syncResult.BonusTokens.Bonuses.Select(b => new Core.License.Models.BonusTokenInfo
+                    {
+                        BonusId = b.BonusId,
+                        RemainingTokens = b.RemainingTokens,
+                        IsExpired = b.IsExpired,
+                        ExpiresAt = b.ExpiresAt
+                    }).ToList(),
+                    syncResult.BonusTokens.TotalRemaining);
+
+                _logger.LogInformation(
+                    "[Issue #299] ボーナストークン同期成功: 合計={TotalRemaining}, アイテム数={ItemCount}",
+                    syncResult.BonusTokens.TotalRemaining,
+                    syncResult.BonusTokens.ActiveCount);
+
+                // CloudTranslationAvailabilityServiceがIsEntitledを再評価できるようにする
+                _licenseManager.NotifyBonusTokensLoaded();
+            }
+
+            // クォータ状態を適用（成功した場合、または部分的失敗でもquotaが成功した場合）
+            if (syncResult.Quota != null && !failedList.Contains("quota"))
+            {
+                var monthlyUsage = new ServerMonthlyUsage
+                {
+                    YearMonth = syncResult.Quota.YearMonth,
+                    TokensUsed = syncResult.Quota.TokensUsed,
+                    TokensLimit = syncResult.Quota.TokensLimit
+                };
+
+                _licenseManager.SyncMonthlyUsageFromServer(monthlyUsage);
+
+                _logger.LogInformation(
+                    "[Issue #299] クォータ状態同期成功: YearMonth={YearMonth}, Used={Used}",
+                    syncResult.Quota.YearMonth,
+                    syncResult.Quota.TokensUsed);
+            }
+
+            _logger.LogInformation(
+                "[Issue #299] 統合同期完了{PartialNote}",
+                syncResult.PartialFailure ? "（一部コンポーネントはフォールバック使用）" : string.Empty);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #299] 統合同期中にエラー - フォールバック実行");
+            // フォールバック: 従来の個別取得
+            await TryFetchBonusTokensAsync(cancellationToken).ConfigureAwait(false);
+            await SyncQuotaStatusAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
