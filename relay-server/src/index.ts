@@ -2226,8 +2226,9 @@ async function handleWebhook(
     const userId = payload.data.relationships?.user?.data?.id;
     const pledgeId = payload.data.id;
     const amountCents = payload.data.attributes?.currently_entitled_amount_cents ?? 0;
+    const patronStatus = payload.data.attributes?.patron_status;
 
-    console.log(`Webhook received: event=${eventType}, userId=${userId}, pledgeId=${pledgeId}, amountCents=${amountCents}`);
+    console.log(`Webhook received: event=${eventType}, userId=${userId}, pledgeId=${pledgeId}, amountCents=${amountCents}, patronStatus=${patronStatus}`);
 
     if (userId) {
       // [Issue #271] プラン変更を履歴に記録
@@ -2280,8 +2281,20 @@ async function handleWebhook(
           break;
 
         case 'members:pledge:create':
-        case 'members:pledge:update':
           console.log(`Webhook: Processed ${eventType} for user ${userId}`);
+          break;
+
+        case 'members:pledge:update':
+          // [Issue #296] patron_statusによる即時アクセス停止判定
+          // - declined_patron: 支払い失敗・カード拒否
+          // - former_patron: メンバーシップ自体をキャンセル済み
+          if (patronStatus === 'declined_patron' || patronStatus === 'former_patron') {
+            console.log(`Webhook: Immediate revocation triggered for user ${userId} (patronStatus=${patronStatus})`);
+            const revokedCount = await revokeAllUserSessions(env, userId);
+            console.log(`Webhook: Revoked ${revokedCount} sessions for user ${userId}`);
+          } else {
+            console.log(`Webhook: Processed ${eventType} for user ${userId} (patronStatus=${patronStatus})`);
+          }
           break;
 
         default:

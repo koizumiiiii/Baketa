@@ -54,19 +54,35 @@ public sealed class RelayServerClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// 画像翻訳を実行
+    /// 画像翻訳を実行（デフォルトプロバイダー使用）
     /// </summary>
     /// <param name="request">翻訳リクエスト</param>
     /// <param name="sessionToken">セッショントークン（Patreon認証）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>翻訳レスポンス</returns>
+    public Task<ImageTranslationResponse> TranslateImageAsync(
+        ImageTranslationRequest request,
+        string sessionToken,
+        CancellationToken cancellationToken = default)
+        => TranslateImageAsync(request, sessionToken, _settings.PrimaryProviderId, cancellationToken);
+
+    /// <summary>
+    /// 画像翻訳を実行（プロバイダー指定）
+    /// </summary>
+    /// <param name="request">翻訳リクエスト</param>
+    /// <param name="sessionToken">セッショントークン（Patreon認証）</param>
+    /// <param name="providerId">プロバイダーID（gemini/openai）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>翻訳レスポンス</returns>
     public async Task<ImageTranslationResponse> TranslateImageAsync(
         ImageTranslationRequest request,
         string sessionToken,
+        string providerId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrEmpty(sessionToken);
+        ArgumentException.ThrowIfNullOrEmpty(providerId);
 
         var startTime = DateTime.UtcNow;
         var lastException = default(Exception);
@@ -81,7 +97,7 @@ public sealed class RelayServerClient : IAsyncDisposable
                     await Task.Delay(_settings.RetryDelayMs, cancellationToken).ConfigureAwait(false);
                 }
 
-                var response = await SendTranslateRequestAsync(request, sessionToken, cancellationToken).ConfigureAwait(false);
+                var response = await SendTranslateRequestAsync(request, sessionToken, providerId, cancellationToken).ConfigureAwait(false);
 
                 if (response.IsSuccess)
                 {
@@ -181,6 +197,7 @@ public sealed class RelayServerClient : IAsyncDisposable
     private async Task<ImageTranslationResponse> SendTranslateRequestAsync(
         ImageTranslationRequest request,
         string sessionToken,
+        string providerId,
         CancellationToken cancellationToken)
     {
         var startTime = DateTime.UtcNow;
@@ -188,7 +205,7 @@ public sealed class RelayServerClient : IAsyncDisposable
         // リクエストボディ作成
         var requestBody = new RelayTranslateRequest
         {
-            Provider = _settings.PrimaryProviderId,
+            Provider = providerId,
             ImageBase64 = request.ImageBase64,
             MimeType = request.MimeType,
             SourceLanguage = request.SourceLanguage,

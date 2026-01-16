@@ -33,7 +33,7 @@ public sealed class BonusSyncHostedServiceTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new BonusSyncHostedService(null!, _bonusTokenServiceMock.Object, _licenseManagerMock.Object, null, _loggerMock.Object));
+            new BonusSyncHostedService(null!, null, _bonusTokenServiceMock.Object, _licenseManagerMock.Object, null, _loggerMock.Object));
     }
 
     [Fact]
@@ -42,6 +42,7 @@ public sealed class BonusSyncHostedServiceTests
         // Act - nullは許容（オプショナル依存）
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
+            null,
             null,
             _licenseManagerMock.Object,
             null,
@@ -58,6 +59,7 @@ public sealed class BonusSyncHostedServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new BonusSyncHostedService(
                 _authServiceMock.Object,
+                null,
                 _bonusTokenServiceMock.Object,
                 null!,
                 null,
@@ -71,6 +73,7 @@ public sealed class BonusSyncHostedServiceTests
         Assert.Throws<ArgumentNullException>(() =>
             new BonusSyncHostedService(
                 _authServiceMock.Object,
+                null,
                 _bonusTokenServiceMock.Object,
                 _licenseManagerMock.Object,
                 null,
@@ -83,6 +86,7 @@ public sealed class BonusSyncHostedServiceTests
         // Act
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
+            null,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
             null,
@@ -98,6 +102,7 @@ public sealed class BonusSyncHostedServiceTests
         // Arrange
         var service = new BonusSyncHostedService(
             _authServiceMock.Object,
+            null,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
             null,
@@ -140,6 +145,7 @@ public sealed class BonusSyncHostedServiceTests
 
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
+            null,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
             null,
@@ -182,6 +188,7 @@ public sealed class BonusSyncHostedServiceTests
 
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
+            null,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
             null,
@@ -205,6 +212,7 @@ public sealed class BonusSyncHostedServiceTests
 
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
+            null,
             null,  // IBonusTokenServiceがnull
             _licenseManagerMock.Object,
             null,
@@ -240,6 +248,7 @@ public sealed class BonusSyncHostedServiceTests
 
         using var service = new BonusSyncHostedService(
             _authServiceMock.Object,
+            null,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
             null,

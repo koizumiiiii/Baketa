@@ -15,6 +15,7 @@ namespace Baketa.Infrastructure.License.Services;
 public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 {
     private readonly IAuthService _authService;
+    private readonly IPatreonOAuthService? _patreonOAuthService;
     private readonly IBonusTokenService? _bonusTokenService;
     private readonly ILicenseManager _licenseManager;
     private readonly RelayServerClient? _relayServerClient;
@@ -39,12 +40,14 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 
     public BonusSyncHostedService(
         IAuthService authService,
+        IPatreonOAuthService? patreonOAuthService,
         IBonusTokenService? bonusTokenService,
         ILicenseManager licenseManager,
         RelayServerClient? relayServerClient,
         ILogger<BonusSyncHostedService> logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _patreonOAuthService = patreonOAuthService;
         _bonusTokenService = bonusTokenService;
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _relayServerClient = relayServerClient;
@@ -143,16 +146,40 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 
     /// <summary>
     /// セッショントークンをLicenseManagerに設定（共通化: Issue #280+#281）
+    /// [Issue #296] Patreonセッショントークンを優先的に使用
     /// </summary>
     private async Task UpdateSessionTokenAsync()
     {
         try
         {
+            // [Issue #296] Patreonセッショントークンがある場合は優先的に使用
+            // これにより、Relay ServerのPatreonセッション認証パスを通り、
+            // MEMBERSHIPS KVのキャッシュが正しく参照される
+            if (_patreonOAuthService != null)
+            {
+                try
+                {
+                    var patreonToken = await _patreonOAuthService.GetSessionTokenAsync(CancellationToken.None)
+                        .ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(patreonToken))
+                    {
+                        _licenseManager.SetSessionToken(patreonToken);
+                        _logger.LogInformation("[Issue #296] PatreonセッショントークンをLicenseManagerに設定しました");
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "[Issue #296] Patreonセッショントークン取得失敗（Supabase JWTにフォールバック）");
+                }
+            }
+
+            // Patreonトークンがない場合はSupabase JWTを使用
             var session = await _authService.GetCurrentSessionAsync(CancellationToken.None).ConfigureAwait(false);
             if (session?.IsValid == true)
             {
                 _licenseManager.SetSessionToken(session.AccessToken);
-                _logger.LogInformation("[Issue #280+#281] セッショントークンをLicenseManagerに設定しました");
+                _logger.LogInformation("[Issue #280+#281] Supabase JWTをLicenseManagerに設定しました");
             }
             else
             {

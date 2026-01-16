@@ -438,6 +438,46 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// [Issue #296] Cloud AI翻訳時にPatreonセッショントークンを優先的に使用するために追加。
+    /// Supabase JWTよりPatreonセッショントークンを優先することで、
+    /// Relay ServerのPatreonセッション認証パスを通り、MEMBERSHIPS KVが正しく参照される。
+    /// </remarks>
+    public async Task<string?> GetSessionTokenAsync(CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // 資格情報がない場合は読み込み
+        if (_cachedCredentials == null)
+        {
+            await LoadCredentialsAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        // セッショントークンがない場合はnull
+        if (_cachedCredentials == null || string.IsNullOrEmpty(_cachedCredentials.EncryptedSessionToken))
+        {
+            return null;
+        }
+
+        // セッショントークンの有効期限チェック
+        if (!_cachedCredentials.IsSessionTokenValid)
+        {
+            _logger.LogDebug("[Issue #296] Patreonセッショントークン期限切れ");
+            return null;
+        }
+
+        // 復号化して返す
+        var sessionToken = DecryptToken(_cachedCredentials.EncryptedSessionToken);
+        if (string.IsNullOrEmpty(sessionToken))
+        {
+            _logger.LogWarning("[Issue #296] Patreonセッショントークンの復号化に失敗");
+            return null;
+        }
+
+        return sessionToken;
+    }
+
+    /// <inheritdoc/>
     public async Task<PatreonSyncResult> SyncLicenseAsync(
         bool forceRefresh = false,
         CancellationToken cancellationToken = default)

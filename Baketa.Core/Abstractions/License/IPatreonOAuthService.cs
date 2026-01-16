@@ -77,6 +77,13 @@ public interface IPatreonOAuthService
     Task<PatreonLocalCredentials?> LoadCredentialsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// [Issue #296] 有効なPatreonセッショントークンを取得
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>セッショントークン（未設定または無効な場合はnull）</returns>
+    Task<string?> GetSessionTokenAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Patreonライセンス状態を同期
     /// </summary>
     /// <param name="forceRefresh">強制的にAPIから取得するかどうか</param>

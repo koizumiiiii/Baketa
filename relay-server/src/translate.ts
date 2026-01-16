@@ -208,6 +208,32 @@ const AUTH_CACHE_TTL_SECONDS = 60 * 60; // 1 hour (was 60 seconds)
 /** [Issue #296] クォータキャッシュTTL（5分）- Geminiフィードバック反映 */
 const QUOTA_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 
+// [Issue #296] Patreon API定数（メンバーシップKV null時のフォールバック用）
+const PATREON_API_BASE = 'https://www.patreon.com/api/oauth2';
+const PATREON_IDENTITY_URL = `${PATREON_API_BASE}/v2/identity`;
+const PATREON_IDENTITY_PARAMS = 'include=memberships.currently_entitled_tiers,memberships.campaign&fields[user]=email,full_name&fields[member]=patron_status,currently_entitled_amount_cents,next_charge_date,campaign_lifetime_support_cents&fields[tier]=title,amount_cents';
+
+/** Tier金額しきい値（円） - index.tsと同期 */
+const TIER_AMOUNTS = {
+  ULTIMATE: 900,  // $9相当
+  PREMIUM: 500,   // $5相当
+  PRO: 300,       // $3相当
+} as const;
+
+/** Patreonリソースタイプ定数 */
+const PATREON_RESOURCE_TYPES = {
+  USER: 'user',
+  MEMBER: 'member',
+  TIER: 'tier',
+} as const;
+
+/** Patron ステータス定数 */
+const PATRON_STATUS = {
+  ACTIVE: 'active_patron',
+  FORMER: 'former_patron',
+  DECLINED: 'declined_patron',
+} as const;
+
 // [Issue #287] JWT認証設定
 const JWT_ISSUER = 'https://baketa-relay.suke009.workers.dev';
 const JWT_AUDIENCE = 'baketa-client';
@@ -226,6 +252,68 @@ type PlanType = typeof PLAN[keyof typeof PLAN];
 /** Cloud AI翻訳が利用可能なプラン */
 // Issue #257: Pro/Premium/Ultimate 3段階構成に改定
 const ALLOWED_PLANS: readonly PlanType[] = [PLAN.PRO, PLAN.PREMIUM, PLAN.ULTIMATE];
+
+// ============================================
+// [Issue #296] Patreon API型定義（メンバーシップKV null時のフォールバック用）
+// ============================================
+
+/** ユーザートークン（Patreonアクセストークン保持用） */
+interface UserTokenData {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  email: string;
+  fullName: string;
+  sessionTokens: string[];
+  updatedAt: number;
+}
+
+/** Patreon ユーザー属性 */
+interface PatreonUserAttributes {
+  email: string;
+  full_name: string;
+}
+
+/** Patreon ユーザー */
+interface PatreonUser {
+  id: string;
+  type: 'user';
+  attributes: PatreonUserAttributes;
+}
+
+/** Patreon Tier属性 */
+interface PatreonTierAttributes {
+  title: string;
+  amount_cents: number;
+}
+
+/** Patreon Tier */
+interface PatreonTier {
+  id: string;
+  type: 'tier';
+  attributes: PatreonTierAttributes;
+}
+
+/** Patreon メンバー属性 */
+interface PatreonMemberAttributes {
+  patron_status: 'active_patron' | 'former_patron' | 'declined_patron' | null;
+  currently_entitled_amount_cents: number;
+  next_charge_date: string | null;
+  campaign_lifetime_support_cents?: number;
+}
+
+/** Patreon メンバー */
+interface PatreonMember {
+  id: string;
+  type: 'member';
+  attributes: PatreonMemberAttributes;
+}
+
+/** Patreon Identity APIレスポンス */
+interface PatreonIdentityResponse {
+  data: PatreonUser;
+  included?: (PatreonMember | PatreonTier)[];
+}
 
 // ============================================
 // [Issue #280+#281] 認証結果型
@@ -303,6 +391,124 @@ function getSupabaseClient(env: TranslateEnv): SupabaseClient | null {
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY, {
     auth: { persistSession: false }
   });
+}
+
+// ============================================
+// [Issue #296] Patreon APIヘルパー関数
+// メンバーシップKVがnullの場合にPatreon APIから最新情報を取得
+// ============================================
+
+/** ユーザートークンを取得（Patreonアクセストークン用） */
+async function getUserToken(env: TranslateEnv, userId: string): Promise<UserTokenData | null> {
+  try {
+    const key = `usertoken:${userId}`;
+    const data = await env.SESSIONS.get<UserTokenData>(key, 'json');
+    if (data && typeof data.accessToken === 'string') {
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** プラン判定（Tier金額から） */
+function determinePlan(amountCents: number): PlanType {
+  if (amountCents >= TIER_AMOUNTS.ULTIMATE) return 'Ultimate';
+  if (amountCents >= TIER_AMOUNTS.PREMIUM) return 'Premium';
+  if (amountCents >= TIER_AMOUNTS.PRO) return 'Pro';
+  return 'Free';
+}
+
+/** Patreon Identity APIを呼び出し */
+async function fetchPatreonIdentity(accessToken: string): Promise<PatreonIdentityResponse | null> {
+  try {
+    const response = await fetch(`${PATREON_IDENTITY_URL}?${PATREON_IDENTITY_PARAMS}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      console.error(`[Issue #296] Patreon identity fetch failed: status=${response.status}`);
+      return null;
+    }
+
+    return await response.json() as PatreonIdentityResponse;
+  } catch (error) {
+    console.error('[Issue #296] Patreon identity fetch error:', error);
+    return null;
+  }
+}
+
+/** Patreon Identity APIレスポンスをパース */
+function parsePatreonMembership(identityData: PatreonIdentityResponse): ParsedMembership {
+  const user = identityData.data;
+  const included = identityData.included || [];
+
+  const activeMembership = included.find(
+    (item): item is PatreonMember =>
+      item.type === PATREON_RESOURCE_TYPES.MEMBER && item.attributes.patron_status === PATRON_STATUS.ACTIVE
+  );
+
+  const tiers = included.filter((item): item is PatreonTier => item.type === PATREON_RESOURCE_TYPES.TIER);
+
+  const highestTier = tiers.reduce<PatreonTier | null>((max, tier) => {
+    const amount = tier.attributes.amount_cents;
+    return amount > (max?.attributes.amount_cents ?? 0) ? tier : max;
+  }, null);
+
+  const amountCents = highestTier?.attributes.amount_cents ?? 0;
+
+  return {
+    userId: user.id,
+    email: user.attributes.email,
+    fullName: user.attributes.full_name,
+    plan: determinePlan(amountCents),
+    tierId: highestTier?.id ?? '',
+    patronStatus: activeMembership?.attributes.patron_status ?? 'not_patron',
+    nextChargeDate: activeMembership?.attributes.next_charge_date ?? null,
+    entitledAmountCents: activeMembership?.attributes.currently_entitled_amount_cents ?? 0,
+  };
+}
+
+/** メンバーシップをKVにキャッシュ */
+async function setCachedMembership(env: TranslateEnv, userId: string, membership: ParsedMembership): Promise<void> {
+  const cacheKey = `membership:${userId}`;
+  const cached: CachedMembership = { membership, cachedAt: Date.now() };
+  await env.SESSIONS.put(cacheKey, JSON.stringify(cached), { expirationTtl: IDENTITY_CACHE_TTL_SECONDS });
+}
+
+/**
+ * [Issue #296] Patreon APIから最新メンバーシップを取得（KV null時のフォールバック）
+ * @param env 環境変数
+ * @param patreonUserId Patreon user ID
+ * @returns メンバーシップ情報（取得失敗時はnull）
+ */
+async function fetchAndCachePatreonMembership(
+  env: TranslateEnv,
+  patreonUserId: string
+): Promise<ParsedMembership | null> {
+  // 1. UserTokenからPatreonアクセストークンを取得
+  const userToken = await getUserToken(env, patreonUserId);
+  if (!userToken) {
+    console.log(`[Issue #296] No UserToken found for Patreon user: ${patreonUserId}`);
+    return null;
+  }
+
+  // 2. Patreon APIを呼び出し
+  const identityData = await fetchPatreonIdentity(userToken.accessToken);
+  if (!identityData) {
+    console.log(`[Issue #296] Failed to fetch Patreon identity for user: ${patreonUserId}`);
+    return null;
+  }
+
+  // 3. メンバーシップをパース
+  const membership = parsePatreonMembership(identityData);
+  console.log(`[Issue #296] Patreon API fetched: userId=${patreonUserId}, plan=${membership.plan}, patronStatus=${membership.patronStatus}`);
+
+  // 4. KVにキャッシュ
+  await setCachedMembership(env, patreonUserId, membership);
+
+  return membership;
 }
 
 // ============================================
@@ -679,7 +885,17 @@ async function authenticateUser(
   // 3. Patreonセッション（KV）を試行
   const patreonSession = await getSession(env, sessionToken);
   if (patreonSession && Date.now() <= patreonSession.expiresAt) {
-    const cachedMembership = await getCachedMembership(env, patreonSession.userId);
+    let cachedMembership = await getCachedMembership(env, patreonSession.userId);
+
+    // [Issue #296] メンバーシップKVがnullの場合、Patreon APIから最新情報を取得
+    if (!cachedMembership) {
+      console.log(`[Issue #296] Patreon session: Membership KV is null, fetching from Patreon API: userId=${patreonSession.userId}`);
+      const freshMembership = await fetchAndCachePatreonMembership(env, patreonSession.userId);
+      if (freshMembership) {
+        cachedMembership = { membership: freshMembership, cachedAt: Date.now() };
+      }
+    }
+
     if (cachedMembership) {
       const result: AuthenticatedUser = {
         userId: patreonSession.userId,
@@ -727,14 +943,25 @@ async function authenticateUser(
       const patreonUserId = profile.patreon_user_id;
       console.log(`[Issue #295] Supabase user linked to Patreon: supabaseId=${user.id.substring(0, 8)}..., patreonId=${patreonUserId}`);
 
-      const cachedMembership = await getCachedMembership(env, patreonUserId);
+      let cachedMembership = await getCachedMembership(env, patreonUserId);
+
+      // [Issue #296] メンバーシップKVがnullの場合、Patreon APIから最新情報を取得
+      if (!cachedMembership) {
+        console.log(`[Issue #296] Membership KV is null, fetching from Patreon API: patreonId=${patreonUserId}`);
+        const freshMembership = await fetchAndCachePatreonMembership(env, patreonUserId);
+        if (freshMembership) {
+          // 取得成功 → キャッシュ済みなのでCachedMembership形式に変換
+          cachedMembership = { membership: freshMembership, cachedAt: Date.now() };
+        }
+      }
+
       if (cachedMembership) {
         plan = cachedMembership.membership.plan;
         resolvedUserId = patreonUserId; // トークン記録用にPatreon IDを使用
         authMethod = 'patreon'; // 認証方法をpatreonに変更（トークン記録のため）
         console.log(`[Issue #295] Patreon plan resolved: userId=${patreonUserId}, plan=${plan}`);
       } else {
-        console.log(`[Issue #295] Patreon membership not cached: patreonId=${patreonUserId}`);
+        console.log(`[Issue #296] Patreon membership unavailable, falling back to Free: patreonId=${patreonUserId}`);
       }
     }
 
