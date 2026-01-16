@@ -870,12 +870,51 @@ async function authenticateUser(
         return cachedAuth;
       }
     }
-    // [Issue #296] Freeプランのキャッシュはスキップして再認証
-    // Patreon連携後にキャッシュが古いままの場合があるため
+    // [Issue #299] Freeプランのキャッシュ最適化
+    // Patreon連携ユーザーのみ再認証、純粋なFreeユーザーはキャッシュを信用
     if (cachedAuth.plan === PLAN.FREE) {
-      console.log(`[Issue #296] Skipping Free plan cache, re-authenticating: userId=${cachedAuth.userId.substring(0, 8)}...`);
-      // キャッシュを削除して再認証へ
-      await deleteAuthCache(cacheKey);
+      // Supabase認証の場合のみPatreon連携をチェック
+      if (cachedAuth.authMethod === 'supabase') {
+        try {
+          const supabase = getSupabaseClient(env);
+          if (supabase) {
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('patreon_user_id')
+              .eq('id', cachedAuth.userId)
+              .single();
+
+            // プロファイル取得成功 かつ Patreon未連携 → キャッシュを信用
+            if (!profileError && profile && !profile.patreon_user_id) {
+              console.log(`[Issue #299] Free plan cache hit (no Patreon link): userId=${cachedAuth.userId.substring(0, 8)}...`);
+              return cachedAuth;
+            }
+
+            // Patreon連携あり → 再認証でプラン確認
+            if (!profileError && profile?.patreon_user_id) {
+              console.log(`[Issue #299] Free plan with Patreon link, re-authenticating: userId=${cachedAuth.userId.substring(0, 8)}...`);
+              await deleteAuthCache(cacheKey);
+              // 再認証へフォールスルー
+            } else {
+              // プロファイル取得失敗 → 安全策として再認証
+              console.log(`[Issue #299] Profile fetch failed, re-authenticating: userId=${cachedAuth.userId.substring(0, 8)}...`);
+              await deleteAuthCache(cacheKey);
+            }
+          } else {
+            // Supabaseクライアント取得失敗 → 安全策として再認証
+            console.log(`[Issue #299] Supabase client unavailable, re-authenticating`);
+            await deleteAuthCache(cacheKey);
+          }
+        } catch (error) {
+          // エラー発生 → 安全策として再認証
+          console.error(`[Issue #299] Error checking Patreon link:`, error);
+          await deleteAuthCache(cacheKey);
+        }
+      } else {
+        // Patreon認証でFreeプラン → 再認証（異常ケース）
+        console.log(`[Issue #299] Patreon auth with Free plan, re-authenticating: userId=${cachedAuth.userId.substring(0, 8)}...`);
+        await deleteAuthCache(cacheKey);
+      }
     } else {
       console.log(`[Issue #286] Auth cache hit (Cache API): userId=${cachedAuth.userId.substring(0, 8)}..., plan=${cachedAuth.plan}`);
       return cachedAuth;
