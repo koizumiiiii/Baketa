@@ -1188,16 +1188,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 return;
             }
 
-            // 保存されたトークンがあるか確認
-            var hasTokens = await tokenStorage.HasStoredTokensAsync().ConfigureAwait(true);
-            if (!hasTokens)
-            {
-                _logger?.LogDebug("[Issue #277] No stored tokens, skipping server sync");
-                return;
-            }
-
-            // セッション復元を試みる
-            await authService.RestoreSessionAsync().ConfigureAwait(true);
+            // [Issue #299] 既に起動時にRestoreSessionAsyncが呼ばれているため、
+            // ここでは現在のセッションを取得するだけでよい（重複呼び出し防止）
             var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
 
             if (session?.AccessToken == null)
