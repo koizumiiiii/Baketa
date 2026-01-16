@@ -449,36 +449,27 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         var authService = serviceProvider.GetRequiredService<IAuthService>();
                         var tokenStorage = serviceProvider.GetRequiredService<ITokenStorage>();
 
-                        // セッション復元を試みる
+                        // [Issue #299] AuthInitializationService.StartAsync()で既にセッション復元済み
+                        // ここでは現在のセッションを取得するだけでよい（重複呼び出し防止）
                         bool isAuthenticated = false;
                         try
                         {
-                            // 保存されたトークンがあるか確認
-                            var hasTokens = await tokenStorage.HasStoredTokensAsync().ConfigureAwait(true);
-                            if (hasTokens)
+                            var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
+                            isAuthenticated = session != null;
+                            if (isAuthenticated && session?.User?.Id != null && !string.IsNullOrEmpty(session.AccessToken))
                             {
-                                _logger?.LogInformation("保存されたトークンを検出、セッション復元を試行中...");
-                                await authService.RestoreSessionAsync().ConfigureAwait(true);
-
-                                // セッション復元後に認証状態を確認
-                                var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
-                                isAuthenticated = session != null;
-                                _logger?.LogInformation("セッション復元結果: {IsAuthenticated}", isAuthenticated);
+                                _logger?.LogInformation("[Issue #299] 既存セッション検出（AuthInitializationServiceで復元済み）");
 
                                 // [Issue #261] 認証成功時にローカル同意をDBに同期
-                                // [Gemini Review] セキュリティ強化: JWTを渡して認証付きで同期
-                                if (isAuthenticated && session?.User?.Id != null && !string.IsNullOrEmpty(session.AccessToken))
+                                var consentService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IConsentService>();
+                                if (consentService != null)
                                 {
-                                    var consentService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IConsentService>();
-                                    if (consentService != null)
-                                    {
-                                        await consentService.SyncLocalConsentToServerAsync(session.User.Id, session.AccessToken).ConfigureAwait(true);
-                                    }
+                                    await consentService.SyncLocalConsentToServerAsync(session.User.Id, session.AccessToken).ConfigureAwait(true);
                                 }
                             }
                             else
                             {
-                                _logger?.LogInformation("保存されたトークンなし、未認証状態");
+                                _logger?.LogInformation("[Issue #299] セッションなし、未認証状態");
                             }
                         }
                         catch (Exception authEx)
