@@ -393,37 +393,54 @@ async function verifyWebhookSignature(
 
 /**
  * レートリミットをチェック
+ * [Issue #299] KVからCache APIに移行してKV Write削減（Cache APIは無料・無制限）
  * @returns true if rate limited (should reject), false if allowed
  */
 async function checkRateLimit(
-  env: Env,
+  _env: Env,
   identifier: string,
   maxRequests: number = RATE_LIMIT_MAX_REQUESTS
 ): Promise<{ limited: boolean; remaining: number; resetAt: number }> {
-  const key = `ratelimit:${identifier}`;
   const now = Date.now();
   const windowStart = Math.floor(now / (RATE_LIMIT_WINDOW_SECONDS * 1000)) * (RATE_LIMIT_WINDOW_SECONDS * 1000);
   const resetAt = windowStart + (RATE_LIMIT_WINDOW_SECONDS * 1000);
 
-  try {
-    const data = await env.SESSIONS.get<RateLimitData>(key, 'json');
+  // [Issue #299] Cache APIを使用（KV Writeを節約）
+  const cache = caches.default;
+  const cacheUrl = `https://baketa-relay.suke009.workers.dev/ratelimit/${encodeURIComponent(identifier)}/${windowStart}`;
+  const cacheRequest = new Request(cacheUrl);
 
-    if (!data || data.windowStart !== windowStart) {
+  try {
+    const cachedResponse = await cache.match(cacheRequest);
+
+    if (!cachedResponse) {
       // 新しいウィンドウを開始
-      await env.SESSIONS.put(key, JSON.stringify({ count: 1, windowStart }), {
-        expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2,
+      const newData: RateLimitData = { count: 1, windowStart };
+      const response = new Response(JSON.stringify(newData), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': `max-age=${RATE_LIMIT_WINDOW_SECONDS * 2}`,
+        },
       });
+      await cache.put(cacheRequest, response);
       return { limited: false, remaining: maxRequests - 1, resetAt };
     }
+
+    const data = await cachedResponse.json<RateLimitData>();
 
     if (data.count >= maxRequests) {
       return { limited: true, remaining: 0, resetAt };
     }
 
     // カウントをインクリメント
-    await env.SESSIONS.put(key, JSON.stringify({ count: data.count + 1, windowStart }), {
-      expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2,
+    const updatedData: RateLimitData = { count: data.count + 1, windowStart };
+    const response = new Response(JSON.stringify(updatedData), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `max-age=${RATE_LIMIT_WINDOW_SECONDS * 2}`,
+      },
     });
+    await cache.put(cacheRequest, response);
     return { limited: false, remaining: maxRequests - data.count - 1, resetAt };
   } catch {
     // エラー時は許可（フェイルオープン）
