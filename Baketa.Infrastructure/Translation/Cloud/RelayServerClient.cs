@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Baketa.Core.Settings;
 using Baketa.Core.Translation.Abstractions;
+using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -22,6 +23,7 @@ public sealed class RelayServerClient : IAsyncDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<RelayServerClient> _logger;
+    private readonly IApiRequestDeduplicator _deduplicator;
     private readonly CloudTranslationSettings _settings;
     private readonly JsonSerializerOptions _jsonOptions;
 
@@ -32,10 +34,12 @@ public sealed class RelayServerClient : IAsyncDisposable
     /// </summary>
     public RelayServerClient(
         HttpClient httpClient,
+        IApiRequestDeduplicator deduplicator,
         IOptions<CloudTranslationSettings> settings,
         ILogger<RelayServerClient> logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _deduplicator = deduplicator ?? throw new ArgumentNullException(nameof(deduplicator));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -51,6 +55,8 @@ public sealed class RelayServerClient : IAsyncDisposable
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
+
+        _logger.LogDebug("[Issue #299] RelayServerClient initialized with ApiRequestDeduplicator");
     }
 
     /// <summary>
@@ -380,6 +386,20 @@ public sealed class RelayServerClient : IAsyncDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(sessionToken);
 
+        // [Issue #299] 重複呼び出し削減 - 同一キーのリクエストは1回のみ実行
+        return await _deduplicator.ExecuteOnceAsync(
+            "quota-status",
+            () => GetQuotaStatusCoreAsync(sessionToken, cancellationToken),
+            ApiCacheDurations.QuotaStatus).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// [Issue #299] クォータ状態取得の実装
+    /// </summary>
+    private async Task<QuotaStatusResponse?> GetQuotaStatusCoreAsync(
+        string sessionToken,
+        CancellationToken cancellationToken)
+    {
         try
         {
             using var httpRequest = new HttpRequestMessage(HttpMethod.Get, "/api/quota/status");
@@ -405,7 +425,7 @@ public sealed class RelayServerClient : IAsyncDisposable
             }
 
             _logger.LogInformation(
-                "[Issue #296] クォータ状態取得成功: YearMonth={YearMonth}, Used={Used}, Limit={Limit}",
+                "[Issue #299] クォータ状態取得成功: YearMonth={YearMonth}, Used={Used}, Limit={Limit}",
                 response.MonthlyUsage.YearMonth,
                 response.MonthlyUsage.TokensUsed,
                 response.MonthlyUsage.TokensLimit);

@@ -13,6 +13,7 @@ using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Baketa.Core.Resources;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -85,6 +86,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<PromotionCodeService> _logger;
+    private readonly IApiRequestDeduplicator _deduplicator;
     private readonly IOptionsMonitor<LicenseSettings> _settingsMonitor;
     private readonly IPromotionSettingsPersistence _settingsPersistence;
     private readonly IAuthService _authService;
@@ -97,6 +99,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
 
     public PromotionCodeService(
         HttpClient httpClient,
+        IApiRequestDeduplicator deduplicator,
         IOptionsMonitor<LicenseSettings> settingsMonitor,
         IPromotionSettingsPersistence settingsPersistence,
         IAuthService authService,
@@ -104,6 +107,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         ILogger<PromotionCodeService> logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _deduplicator = deduplicator ?? throw new ArgumentNullException(nameof(deduplicator));
         _settingsMonitor = settingsMonitor ?? throw new ArgumentNullException(nameof(settingsMonitor));
         _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
@@ -116,7 +120,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
-        _logger.LogDebug("PromotionCodeService initialized");
+        _logger.LogDebug("[Issue #299] PromotionCodeService initialized with ApiRequestDeduplicator");
     }
 
     /// <inheritdoc/>
@@ -594,6 +598,31 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             return ServerSyncResult.NotAuthenticated;
         }
 
+        // [Issue #299] 重複呼び出し削減 - 同一キーのリクエストは1回のみ実行
+        // ServerSyncResultはenumなのでラッパークラスを使用
+        var wrapper = await _deduplicator.ExecuteOnceAsync(
+            "promotion-status",
+            () => SyncFromServerCoreAsync(accessToken, cancellationToken),
+            ApiCacheDurations.PromotionStatus).ConfigureAwait(false);
+
+        return wrapper?.Result ?? ServerSyncResult.ServerError;
+    }
+
+    /// <summary>
+    /// [Issue #299] ServerSyncResultのラッパー（enumはclassではないためキャッシュ用）
+    /// </summary>
+    private sealed class ServerSyncResultWrapper
+    {
+        public ServerSyncResult Result { get; init; }
+    }
+
+    /// <summary>
+    /// [Issue #299] サーバーからプロモーション状態を同期する実装
+    /// </summary>
+    private async Task<ServerSyncResultWrapper?> SyncFromServerCoreAsync(
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "/api/promotion/status");
@@ -604,19 +633,19 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
                 _logger.LogWarning("[Issue #276] SyncFromServerAsync: Rate limited");
-                return ServerSyncResult.RateLimited;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.RateLimited };
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 _logger.LogWarning("[Issue #276] SyncFromServerAsync: Unauthorized");
-                return ServerSyncResult.NotAuthenticated;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.NotAuthenticated };
             }
 
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("[Issue #276] SyncFromServerAsync: Server error {StatusCode}", response.StatusCode);
-                return ServerSyncResult.ServerError;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.ServerError };
             }
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -625,7 +654,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
             if (result == null)
             {
                 _logger.LogWarning("[Issue #276] SyncFromServerAsync: Invalid response");
-                return ServerSyncResult.InvalidResponse;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.InvalidResponse };
             }
 
             // プロモーションなし
@@ -634,11 +663,11 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 if (result.Expired == true)
                 {
                     _logger.LogInformation("[Issue #276] SyncFromServerAsync: Promotion expired");
-                    return ServerSyncResult.Expired;
+                    return new ServerSyncResultWrapper { Result = ServerSyncResult.Expired };
                 }
 
                 _logger.LogDebug("[Issue #276] SyncFromServerAsync: No promotion found");
-                return ServerSyncResult.NoDataFound;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.NoDataFound };
             }
 
             // プロモーションあり - ローカル設定を更新
@@ -671,30 +700,30 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 Reason = "Synced from server"
             });
 
-            _logger.LogInformation("[Issue #276] SyncFromServerAsync: Promotion synced successfully (Plan: {PlanType}, Expires: {ExpiresAt})",
+            _logger.LogInformation("[Issue #299] SyncFromServerAsync: Promotion synced successfully (Plan: {PlanType}, Expires: {ExpiresAt})",
                 planType, expiresAt);
 
-            return ServerSyncResult.Success;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.Success };
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("[Issue #276] SyncFromServerAsync: Timeout");
-            return ServerSyncResult.Timeout;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.Timeout };
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "[Issue #276] SyncFromServerAsync: Network error");
-            return ServerSyncResult.NetworkError;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.NetworkError };
         }
         catch (JsonException ex)
         {
             _logger.LogWarning(ex, "[Issue #276] SyncFromServerAsync: JSON parse error");
-            return ServerSyncResult.InvalidResponse;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.InvalidResponse };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[Issue #276] SyncFromServerAsync: Unexpected error");
-            return ServerSyncResult.ServerError;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.ServerError };
         }
     }
 

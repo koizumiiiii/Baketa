@@ -18,6 +18,7 @@ public sealed class ConsentService : IConsentService, IDisposable
 {
     private readonly ILogger<ConsentService> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IApiRequestDeduplicator _deduplicator;
     private readonly SemaphoreSlim _settingsLock = new(1, 1);
     private readonly JsonSerializerOptions _jsonOptions;
 
@@ -29,17 +30,19 @@ public sealed class ConsentService : IConsentService, IDisposable
 
     public ConsentService(
         ILogger<ConsentService> logger,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IApiRequestDeduplicator deduplicator)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
+        _deduplicator = deduplicator ?? throw new ArgumentNullException(nameof(deduplicator));
         _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
-        _logger.LogDebug("[Issue #261] ConsentService initialized");
+        _logger.LogDebug("[Issue #299] ConsentService initialized with ApiRequestDeduplicator");
     }
 
     /// <inheritdoc/>
@@ -359,6 +362,14 @@ public sealed class ConsentService : IConsentService, IDisposable
 
     #region Server Sync (Issue #277)
 
+    /// <summary>
+    /// [Issue #299] ServerSyncResultのラッパー（enumはclassではないためキャッシュ用）
+    /// </summary>
+    private sealed class ServerSyncResultWrapper
+    {
+        public ServerSyncResult Result { get; init; }
+    }
+
     /// <inheritdoc/>
     public async Task<ServerSyncResult> SyncFromServerAsync(
         string accessToken,
@@ -370,6 +381,22 @@ public sealed class ConsentService : IConsentService, IDisposable
             return ServerSyncResult.NotAuthenticated;
         }
 
+        // [Issue #299] 重複呼び出し削減 - 同一キーのリクエストは1回のみ実行
+        var wrapper = await _deduplicator.ExecuteOnceAsync(
+            "consent-status",
+            () => SyncFromServerCoreAsync(accessToken, cancellationToken),
+            ApiCacheDurations.ConsentStatus).ConfigureAwait(false);
+
+        return wrapper?.Result ?? ServerSyncResult.ServerError;
+    }
+
+    /// <summary>
+    /// [Issue #299] サーバーから同意状態を同期する実装
+    /// </summary>
+    private async Task<ServerSyncResultWrapper?> SyncFromServerCoreAsync(
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
         try
         {
             var client = _httpClientFactory.CreateClient("RelayServer");
@@ -381,19 +408,19 @@ public sealed class ConsentService : IConsentService, IDisposable
             if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
                 _logger.LogWarning("[Issue #277] SyncFromServerAsync: Rate limited");
-                return ServerSyncResult.RateLimited;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.RateLimited };
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 _logger.LogWarning("[Issue #277] SyncFromServerAsync: Unauthorized");
-                return ServerSyncResult.NotAuthenticated;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.NotAuthenticated };
             }
 
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("[Issue #277] SyncFromServerAsync: Server error {StatusCode}", response.StatusCode);
-                return ServerSyncResult.ServerError;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.ServerError };
             }
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -402,7 +429,7 @@ public sealed class ConsentService : IConsentService, IDisposable
             if (result == null)
             {
                 _logger.LogWarning("[Issue #277] SyncFromServerAsync: Invalid response");
-                return ServerSyncResult.InvalidResponse;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.InvalidResponse };
             }
 
             await _settingsLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -483,7 +510,7 @@ public sealed class ConsentService : IConsentService, IDisposable
                 {
                     settings.LastSyncedAt = DateTime.UtcNow.ToString("O");
                     await SaveSettingsAsync(settings, cancellationToken).ConfigureAwait(false);
-                    _logger.LogInformation("[Issue #277] Consent state synced from server");
+                    _logger.LogInformation("[Issue #299] Consent state synced from server");
                 }
                 else
                 {
@@ -497,7 +524,7 @@ public sealed class ConsentService : IConsentService, IDisposable
                     settings.PrivacyPolicyVersion ?? "null",
                     settings.NeedsInitialConsent);
 
-                return ServerSyncResult.Success;
+                return new ServerSyncResultWrapper { Result = ServerSyncResult.Success };
             }
             finally
             {
@@ -507,22 +534,22 @@ public sealed class ConsentService : IConsentService, IDisposable
         catch (OperationCanceledException)
         {
             _logger.LogWarning("[Issue #277] SyncFromServerAsync: Timeout");
-            return ServerSyncResult.Timeout;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.Timeout };
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "[Issue #277] SyncFromServerAsync: Network error");
-            return ServerSyncResult.NetworkError;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.NetworkError };
         }
         catch (JsonException ex)
         {
             _logger.LogWarning(ex, "[Issue #277] SyncFromServerAsync: JSON parse error");
-            return ServerSyncResult.InvalidResponse;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.InvalidResponse };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[Issue #277] SyncFromServerAsync: Unexpected error");
-            return ServerSyncResult.ServerError;
+            return new ServerSyncResultWrapper { Result = ServerSyncResult.ServerError };
         }
     }
 
