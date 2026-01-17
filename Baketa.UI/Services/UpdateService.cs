@@ -140,7 +140,13 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
             }
 
             // ZIPファイルの自動更新に対応したカスタムSparkleUpdaterを使用
-            _sparkle = new ZipSparkleUpdater(AppCastUrl, signatureVerifier, referenceAssemblyPath, _logger)
+            // onUpdateReadyCallback: ZIPファイル更新時にアプリ終了を実行するコールバック
+            _sparkle = new ZipSparkleUpdater(
+                AppCastUrl,
+                signatureVerifier,
+                referenceAssemblyPath,
+                _logger,
+                onUpdateReadyCallback: ShutdownApplicationAsync)
             {
                 UIFactory = new LocalizedUIFactory("Baketa"),
                 RelaunchAfterUpdate = false, // カスタム処理で再起動するのでfalse
@@ -314,30 +320,52 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
     /// <summary>
     /// 更新前の終了処理
     /// NetSparkle 3.0: CloseApplicationAsyncイベントハンドラ
+    /// 非ZIPインストーラー（MSI等）が使用された場合に呼ばれる
+    /// </summary>
+    private async Task OnCloseApplicationAsync()
+    {
+        _logger?.LogInformation("[Issue #249] OnCloseApplicationAsync: 非ZIPインストーラーからの終了要求");
+        await ShutdownApplicationAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// アプリケーションを終了する共通処理
+    /// ZIPアップデートとMSIアップデートの両方から呼ばれる
     ///
     /// 即座にアプリケーションを終了します。
     /// Pythonサーバーはプロセス終了時に自動的にクリーンアップされます。
     /// バッチスクリプトがプロセス終了を待機してから更新処理を行うため、
     /// ここで待機する必要はありません。
     /// </summary>
-    private async Task OnCloseApplicationAsync()
+    private async Task ShutdownApplicationAsync()
     {
-        _logger?.LogInformation("[Issue #249] 更新適用のためアプリケーション即時終了");
+        _logger?.LogInformation("[Issue #249] ShutdownApplicationAsync: アプリケーション即時終了開始");
 
-        // 即座にアプリケーションを終了
-        // Pythonサーバーはプロセス終了時に自動的に終了される（PythonServerManagerのDisposeで処理）
-        // バッチスクリプトがプロセス終了を30秒まで待機するため、ここで待つ必要なし
-
-        // [Fix] Shutdown()はUIスレッドから呼び出す必要がある
-        // NetSparkleはバックグラウンドスレッドからこのコールバックを呼ぶ場合があるため
-        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        try
         {
-            _logger?.LogInformation("[Issue #249] UIスレッドでShutdown()呼び出し");
-            if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            // [Fix] Shutdown()はUIスレッドから呼び出す必要がある
+            // バックグラウンドスレッドからこのメソッドが呼ばれる場合があるため
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
-                desktop.Shutdown();
-            }
-        });
+                _logger?.LogInformation("[Issue #249] UIスレッドでShutdown()呼び出し");
+                if (Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    desktop.Shutdown();
+                }
+                else
+                {
+                    // ApplicationLifetimeが取得できない場合のフォールバック
+                    _logger?.LogWarning("[Issue #249] ApplicationLifetime取得失敗 - Environment.Exit(0)使用");
+                    Environment.Exit(0);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            // 何らかの理由でShutdownが失敗した場合のフォールバック
+            _logger?.LogError(ex, "[Issue #249] Shutdown失敗 - Environment.Exit(0)にフォールバック");
+            Environment.Exit(0);
+        }
     }
 
     /// <summary>

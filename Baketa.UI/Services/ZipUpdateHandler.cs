@@ -21,6 +21,7 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
     private readonly Microsoft.Extensions.Logging.ILogger? _logger;
     private readonly string _appDirectory;
     private readonly string _appExecutablePath;
+    private readonly Func<Task>? _onUpdateReadyCallback;
     private static int _isUpdating;
 
     /// <summary>アプリケーション名（ディレクトリ/ファイル名検索用）</summary>
@@ -32,14 +33,28 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
     /// <summary>実行ファイル名（リネーム後）</summary>
     private const string AppExecutableNameSecondary = "Baketa.exe";
 
+    /// <summary>
+    /// ZipSparkleUpdaterを初期化します
+    /// </summary>
+    /// <param name="appcastUrl">AppCastのURL</param>
+    /// <param name="signatureVerifier">署名検証オブジェクト</param>
+    /// <param name="referenceAssemblyPath">参照アセンブリパス</param>
+    /// <param name="logger">ロガー</param>
+    /// <param name="onUpdateReadyCallback">
+    /// 更新準備完了時のコールバック。
+    /// バッチスクリプト起動後に呼び出され、アプリケーション終了処理を実行する。
+    /// これが呼ばれないと、バッチスクリプトがアプリ終了を待機したままタイムアウトする。
+    /// </param>
     public ZipSparkleUpdater(
         string appcastUrl,
         ISignatureVerifier signatureVerifier,
         string? referenceAssemblyPath = null,
-        Microsoft.Extensions.Logging.ILogger? logger = null)
+        Microsoft.Extensions.Logging.ILogger? logger = null,
+        Func<Task>? onUpdateReadyCallback = null)
         : base(appcastUrl, signatureVerifier, referenceAssemblyPath)
     {
         _logger = logger;
+        _onUpdateReadyCallback = onUpdateReadyCallback;
         _appExecutablePath = Process.GetCurrentProcess().MainModule?.FileName
             ?? throw new InvalidOperationException("Cannot determine application path");
         _appDirectory = Path.GetDirectoryName(_appExecutablePath)
@@ -196,7 +211,31 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
                 throw new InvalidOperationException("Failed to start update batch script");
             }
 
-            _logger?.LogInformation("[Updater] 更新スクリプト起動完了 - アプリケーション終了します");
+            _logger?.LogInformation("[Updater] 更新スクリプト起動完了");
+
+            // アプリケーション終了コールバックを呼び出し
+            // 重要: これが呼ばれないとバッチスクリプトがアプリ終了を30秒待機してタイムアウトする
+            if (_onUpdateReadyCallback != null)
+            {
+                _logger?.LogInformation("[Updater] アプリケーション終了コールバック呼び出し");
+                try
+                {
+                    await _onUpdateReadyCallback().ConfigureAwait(false);
+                }
+                catch (Exception callbackEx)
+                {
+                    // コールバック失敗時もログを出力して続行
+                    // Environment.Exit(0)をフォールバックとして使用
+                    _logger?.LogError(callbackEx, "[Updater] 終了コールバック失敗 - Environment.Exit(0)にフォールバック");
+                    Environment.Exit(0);
+                }
+            }
+            else
+            {
+                // コールバック未設定の場合は直接終了（フォールバック）
+                _logger?.LogWarning("[Updater] 終了コールバック未設定 - Environment.Exit(0)を使用");
+                Environment.Exit(0);
+            }
         }
         catch (Exception ex)
         {
