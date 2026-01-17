@@ -650,11 +650,12 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 }
 
                 // 📊 [Issue #269] AnalyticsEventProcessor登録 - 翻訳イベントの使用統計記録
+                // [Issue #297] 名前空間修正: Core.Events.TranslationEvents → Core.Translation.Events
                 try
                 {
                     var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-                    var analyticsProcessor = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.TranslationEvents.TranslationCompletedEvent>>();
-                    eventAggregator.Subscribe<Baketa.Core.Events.TranslationEvents.TranslationCompletedEvent>(analyticsProcessor);
+                    var analyticsProcessor = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>();
+                    eventAggregator.Subscribe<Baketa.Core.Translation.Events.TranslationCompletedEvent>(analyticsProcessor);
                     Console.WriteLine("✅ AnalyticsEventProcessor登録完了");
                 }
                 catch (Exception analyticsEx)

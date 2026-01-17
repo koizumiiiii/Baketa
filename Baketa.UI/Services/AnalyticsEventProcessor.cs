@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Services;
-using Baketa.Core.Events.TranslationEvents;
+using Baketa.Core.Translation.Events;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Services;
@@ -12,6 +12,7 @@ namespace Baketa.UI.Services;
 /// <summary>
 /// [Issue #269] アナリティクスイベントプロセッサ
 /// TranslationCompletedEventを購読して使用統計を記録
+/// [Issue #297] 名前空間修正: Core.Events.TranslationEvents → Core.Translation.Events
 /// </summary>
 public sealed class AnalyticsEventProcessor : IEventProcessor<TranslationCompletedEvent>
 {
@@ -54,7 +55,7 @@ public sealed class AnalyticsEventProcessor : IEventProcessor<TranslationComplet
             {
                 ["source_language"] = eventData.SourceLanguage,
                 ["target_language"] = eventData.TargetLanguage,
-                ["engine"] = eventData.Engine,
+                ["engine"] = eventData.TranslationEngine,  // [Issue #297] プロパティ名修正
                 ["processing_time_ms"] = eventData.ProcessingTimeMs
             };
 

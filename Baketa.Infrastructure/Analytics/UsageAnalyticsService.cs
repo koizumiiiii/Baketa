@@ -1,9 +1,12 @@
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
-using Baketa.Core.Abstractions.Privacy;
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Settings;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -32,10 +35,10 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
     };
 
     private readonly ILogger<UsageAnalyticsService> _logger;
-    private readonly IPrivacyConsentService _privacyConsentService;
+    private readonly IConsentService _consentService;
+    private readonly ILicenseInfoProvider _licenseInfoProvider;  // [Issue #297] 循環依存回避: 最小限のインターフェース
     private readonly HttpClient _httpClient;
     private readonly string _analyticsEndpoint;
-    private readonly string _analyticsApiKey;
     private readonly string _appVersion;
     private readonly bool _enableInDebug;
 
@@ -44,6 +47,7 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
     private readonly System.Threading.Timer _flushTimer;
     private DateTime _lastFlushTime = DateTime.UtcNow;
     private volatile bool _disposed;  // [Gemini Review] volatileでスレッドセーフ
+    private volatile bool _hasAcceptedPrivacyPolicy;  // [Issue #297] キャッシュされた同意状態
 
     public Guid SessionId { get; } = Guid.NewGuid();
 
@@ -57,30 +61,37 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
                 return false;
             }
 #endif
-            return _privacyConsentService.HasUsageStatisticsConsent;
+            // [Issue #297] プライバシーポリシー同意で使用統計収集を許可
+            return _hasAcceptedPrivacyPolicy;
         }
     }
 
     public UsageAnalyticsService(
         ILogger<UsageAnalyticsService> logger,
-        IPrivacyConsentService privacyConsentService,
+        IConsentService consentService,
+        ILicenseInfoProvider licenseInfoProvider,  // [Issue #297] 循環依存回避: 必要最小限のインターフェース
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _privacyConsentService = privacyConsentService ?? throw new ArgumentNullException(nameof(privacyConsentService));
+        _consentService = consentService ?? throw new ArgumentNullException(nameof(consentService));
+        _licenseInfoProvider = licenseInfoProvider ?? throw new ArgumentNullException(nameof(licenseInfoProvider));
 
         ArgumentNullException.ThrowIfNull(httpClientFactory);
         _httpClient = httpClientFactory.CreateClient("Analytics");
 
         // 設定読み込み
+        // [Issue #297] ApiKeyは不要に - セッショントークン認証に変更
         _analyticsEndpoint = configuration["Analytics:Endpoint"]
             ?? "https://baketa-relay.suke009.workers.dev/api/analytics/events";
-        _analyticsApiKey = configuration["Analytics:ApiKey"] ?? string.Empty;
         _enableInDebug = configuration.GetValue("Analytics:EnableInDebug", false);
 
         // アプリバージョン取得
         _appVersion = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0";
+
+        // [Issue #297] 同意状態を初期化・監視
+        _consentService.ConsentChanged += OnConsentChanged;
+        _ = InitializeConsentStateAsync();
 
         // 定期フラッシュタイマー（5分間隔）
         _flushTimer = new System.Threading.Timer(
@@ -90,15 +101,52 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
             TimeSpan.FromSeconds(MaxBatchIntervalSeconds));
 
         _logger.LogInformation(
-            "[Issue #269] UsageAnalyticsService initialized: SessionId={SessionId}, Enabled={Enabled}",
-            SessionId.ToString()[..8],
-            IsEnabled);
+            "[Issue #297] UsageAnalyticsService initialized: SessionId={SessionId}",
+            SessionId.ToString()[..8]);
+    }
+
+    /// <summary>
+    /// [Issue #297] 同意状態を非同期で初期化
+    /// </summary>
+    private async Task InitializeConsentStateAsync()
+    {
+        try
+        {
+            var consentState = await _consentService.GetConsentStateAsync().ConfigureAwait(false);
+            _hasAcceptedPrivacyPolicy = consentState.HasAcceptedPrivacyPolicy;
+            _logger.LogInformation("[Issue #297] Consent state initialized: HasAcceptedPrivacyPolicy={Value}", _hasAcceptedPrivacyPolicy);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #297] Failed to initialize consent state");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #297] 同意状態変更時のハンドラ
+    /// </summary>
+    private void OnConsentChanged(object? sender, LegalConsentChangedEventArgs e)
+    {
+        // プライバシーポリシーの同意イベントが発生した場合、同意済みとしてマーク
+        // LegalConsentChangedEventArgsは同意が「行われた」ことを通知するイベント
+        if (e.ConsentType == ConsentType.PrivacyPolicy)
+        {
+            _hasAcceptedPrivacyPolicy = true;
+            _logger.LogInformation("[Issue #297] Privacy policy consent accepted: Version={Version}", e.Version);
+        }
     }
 
     public void TrackEvent(string eventType, Dictionary<string, object>? eventData = null)
     {
-        if (_disposed || !IsEnabled)
+        if (_disposed)
         {
+            _logger.LogWarning("[Issue #297] TrackEvent skipped: disposed");
+            return;
+        }
+
+        if (!IsEnabled)
+        {
+            _logger.LogDebug("[Issue #297] TrackEvent skipped: analytics disabled");
             return;
         }
 
@@ -125,7 +173,7 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
             shouldFlush = _buffer.Count >= MaxBatchSize;
         }
 
-        _logger.LogDebug("[Issue #269] Event tracked: {EventType}, BufferCount={Count}", eventType, _buffer.Count);
+        _logger.LogDebug("[Issue #269] Event tracked: {EventType}", eventType);
 
         // バッファが満杯なら即座にフラッシュ
         if (shouldFlush)
@@ -163,14 +211,21 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
 
         try
         {
-            if (string.IsNullOrEmpty(_analyticsApiKey))
+            // [Issue #297] セッショントークン認証に変更（他のAPIと同じ方式）
+            var sessionToken = _licenseInfoProvider.CurrentSessionId;
+            if (string.IsNullOrEmpty(sessionToken))
             {
-                _logger.LogWarning("[Issue #269] Analytics API key not configured, skipping flush");
+                _logger.LogDebug("[Issue #269] No session token available, deferring {Count} events", eventsToSend.Count);
+                // セッショントークンが無い場合はバッファに戻す（次回リトライ）
+                ReturnEventsToBuffer(eventsToSend);
                 return false;
             }
 
+            _logger.LogDebug("[Issue #297] FlushAsync: Sending {Count} events to {Endpoint}",
+                eventsToSend.Count, _analyticsEndpoint);
+
             using var request = new HttpRequestMessage(HttpMethod.Post, _analyticsEndpoint);
-            request.Headers.Add("X-Analytics-Key", _analyticsApiKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
             // [Gemini Review] キャッシュされたJsonOptionsを使用
             request.Content = JsonContent.Create(eventsToSend, options: JsonOptions);
 
@@ -197,7 +252,7 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            _logger.LogWarning(ex, "[Issue #269] Network error sending analytics events");
+            _logger.LogWarning(ex, "[Issue #297] Network error sending analytics events: {Message}", ex.Message);
 
             // ネットワークエラー時はバッファに戻す
             ReturnEventsToBuffer(eventsToSend);
@@ -206,7 +261,10 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[Issue #269] Unexpected error sending analytics events");
+            _logger.LogError(ex, "[Issue #297] Unexpected error sending analytics events: {Type} - {Message}",
+                ex.GetType().Name, ex.Message);
+            // 予期しない例外時もバッファに戻す
+            ReturnEventsToBuffer(eventsToSend);
             return false;
         }
     }
@@ -241,7 +299,18 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
         if (_disposed) return;
 
         var elapsed = DateTime.UtcNow - _lastFlushTime;
-        if (elapsed.TotalSeconds >= MinBatchIntervalSeconds)
+        int bufferCount;
+        lock (_bufferLock)
+        {
+            bufferCount = _buffer.Count;
+        }
+
+        _logger.LogDebug(
+            "[Issue #269] Analytics timer: BufferCount={Count}, Elapsed={Elapsed}s",
+            bufferCount,
+            (int)elapsed.TotalSeconds);
+
+        if (elapsed.TotalSeconds >= MinBatchIntervalSeconds && bufferCount > 0)
         {
             _ = FlushAsync();
         }
@@ -255,6 +324,9 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
     {
         if (_disposed) return;
         _disposed = true;
+
+        // [Issue #297] イベント購読解除
+        _consentService.ConsentChanged -= OnConsentChanged;
 
         // [Gemini Review] タイマーを非同期で安全に停止
         await _flushTimer.DisposeAsync().ConfigureAwait(false);

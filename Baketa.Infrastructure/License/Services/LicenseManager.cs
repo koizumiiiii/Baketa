@@ -21,7 +21,7 @@ namespace Baketa.Infrastructure.License.Services;
 /// ライセンス管理の中核実装
 /// サブスクリプション状態管理、機能ゲート、トークン消費を統合的に処理
 /// </summary>
-public sealed class LicenseManager : ILicenseManager, IDisposable
+public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDisposable
 {
     private readonly ILogger<LicenseManager> _logger;
     private readonly ILicenseApiClient _apiClient;
@@ -29,7 +29,6 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private readonly IEventAggregator _eventAggregator;
     private readonly LicenseSettings _settings;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
-    private readonly IUsageAnalyticsService? _analyticsService;
     private readonly IBonusTokenService? _bonusTokenService;
     private readonly IAuthService? _authService;
 
@@ -70,6 +69,9 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         }
     }
 
+    /// <inheritdoc cref="ILicenseInfoProvider.CurrentSessionId"/>
+    public string? CurrentSessionId => CurrentState.SessionId;
+
     /// <inheritdoc/>
     public event EventHandler<LicenseStateChangedEventArgs>? StateChanged;
 
@@ -92,7 +94,6 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         IEventAggregator eventAggregator,
         IOptions<LicenseSettings> settings,
         IUnifiedSettingsService? unifiedSettingsService = null,
-        IUsageAnalyticsService? analyticsService = null,
         IBonusTokenService? bonusTokenService = null,
         IAuthService? authService = null)
     {
@@ -102,7 +103,6 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _unifiedSettingsService = unifiedSettingsService;
-        _analyticsService = analyticsService;
         _bonusTokenService = bonusTokenService;
         _authService = authService;
 
@@ -894,20 +894,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // EventAggregatorにも発行
         _ = _eventAggregator.PublishAsync(new LicenseStateChangedEvent(oldState, newState, reason));
 
-        // [Issue #271] プラン変更を使用統計に記録
-        if (oldState.CurrentPlan != newState.CurrentPlan && _analyticsService != null)
-        {
-            _analyticsService.TrackEvent("plan_changed", new Dictionary<string, object>
-            {
-                ["old_plan"] = oldState.CurrentPlan.ToString(),
-                ["new_plan"] = newState.CurrentPlan.ToString(),
-                ["change_reason"] = reason.ToString()
-            });
-
-            _logger.LogInformation(
-                "[Issue #271] プラン変更をUsageAnalyticsに記録: {OldPlan} -> {NewPlan}, Reason={Reason}",
-                oldState.CurrentPlan, newState.CurrentPlan, reason);
-        }
+        // [Issue #297] plan_changed追跡は循環依存回避のため削除
+        // 必要であればLicenseStateChangedEventを購読するEventProcessorで実装可能
 
         if (_settings.EnableDebugMode)
         {

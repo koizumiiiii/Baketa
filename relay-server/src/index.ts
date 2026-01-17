@@ -1803,19 +1803,74 @@ async function handleAnalyticsEvents(
     return errorResponse('Method not allowed', 405, origin, allowedOrigins);
   }
 
-  // 1. APIキー認証
-  const apiKey = request.headers.get('X-Analytics-Key');
-  if (!env.ANALYTICS_API_KEY) {
-    console.error('[Issue #269] ANALYTICS_API_KEY not configured');
-    return errorResponse('Analytics service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
-  }
-  if (!apiKey || apiKey !== env.ANALYTICS_API_KEY) {
-    return errorResponse('Unauthorized', 401, origin, allowedOrigins, 'INVALID_API_KEY');
+  // 1. セッション認証（他のAPIエンドポイントと同じ方式）
+  // [Issue #297] X-Analytics-Key認証からセッショントークン認証に変更
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return errorResponse('Authentication required', 401, origin, allowedOrigins, 'AUTH_REQUIRED');
   }
 
-  // 2. レートリミット（IP単位）
-  const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rateLimit = await checkRateLimit(env, `analytics:${clientIP}`, 120);  // 1分間に120リクエストまで
+  const sessionToken = authHeader.substring(7);
+  const supabase = getSupabaseClient(env);
+  if (!supabase) {
+    console.error('[Issue #297] Supabase not configured for analytics');
+    return errorResponse('Analytics service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+  }
+
+  // [Issue #297] JWT → Patreon KV → Supabase JWTのフォールバック（translate.tsと同様）
+  let userId: string;
+
+  // 1. まずRelay Server発行のJWT検証を試みる
+  const jwtClaims = await validateJwtToken(env, sessionToken);
+  if (jwtClaims) {
+    userId = jwtClaims.sub;
+    console.log(`[Issue #297] Analytics: JWT認証成功 userId=${userId.substring(0, 8)}...`);
+  } else {
+    // 2. JWT検証失敗時はPatreon KVセッションを試す
+    const patreonSession = await getSession(env, sessionToken);
+    if (patreonSession && Date.now() <= patreonSession.expiresAt) {
+      const patreonUserId = patreonSession.userId;
+      console.log(`[Issue #297] Analytics: Patreon KVセッション認証成功 patreonId=${patreonUserId}`);
+
+      // [Issue #297] PatreonユーザーIDからSupabase UUIDを取得（usage_events.user_idはUUID型）
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('patreon_user_id', patreonUserId)
+        .single();
+
+      if (profileError || !profile) {
+        console.log(`[Issue #297] Analytics: Patreon user not linked to Supabase: patreonId=${patreonUserId}`);
+        // Patreon連携がない場合は記録をスキップ（エラーではない）
+        return successResponse({
+          success: true,
+          stored_count: 0,
+          message: 'Patreon user not linked to Supabase profile'
+        }, origin, allowedOrigins);
+      }
+      userId = profile.id;
+      console.log(`[Issue #297] Analytics: Patreon→Supabase UUID変換成功 userId=${userId.substring(0, 8)}...`);
+    } else {
+      // 3. Patreon KV失敗時はSupabase JWTを試す
+      // JWTフォーマットチェック: 3セグメント（header.payload.signature）が必要
+      const tokenSegments = sessionToken.split('.');
+      if (tokenSegments.length !== 3) {
+        console.log(`[Issue #297] Analytics: Token is not JWT format (segments=${tokenSegments.length}), auth failed`);
+        return errorResponse('Invalid or expired session', 401, origin, allowedOrigins, 'INVALID_SESSION');
+      }
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser(sessionToken);
+      if (authError || !user) {
+        console.log('[Issue #297] Analytics: JWT/Patreon/Supabase全ての認証失敗');
+        return errorResponse('Invalid or expired session', 401, origin, allowedOrigins, 'INVALID_SESSION');
+      }
+      userId = user.id;
+      console.log(`[Issue #297] Analytics: Supabase JWT認証成功 userId=${userId.substring(0, 8)}...`);
+    }
+  }
+
+  // 2. レートリミット（ユーザー単位）
+  const rateLimit = await checkRateLimit(env, `analytics:${userId}`, 120);  // 1分間に120リクエストまで
   if (rateLimit.limited) {
     return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
   }
@@ -1852,10 +1907,11 @@ async function handleAnalyticsEvents(
     // 6. 国コード取得（Cloudflare自動付与）
     const countryCode = (request as Request & { cf?: { country?: string } }).cf?.country || 'UNKNOWN';
 
-    // 7. イベントにcountry_codeを付与してSupabaseに挿入
-    const eventsWithCountry = events.map(event => ({
+    // 7. イベントにuser_id（認証済み）とcountry_codeを付与してSupabaseに挿入
+    // [Issue #297] user_idは認証済みユーザーIDを使用（クライアント提供値より優先）
+    const eventsWithMetadata = events.map(event => ({
       session_id: event.session_id,
-      user_id: event.user_id || null,
+      user_id: userId,  // 認証済みユーザーID（JWT or Supabase JWT）
       event_type: event.event_type,
       event_data: event.event_data || null,
       schema_version: event.schema_version || 1,
@@ -1866,14 +1922,14 @@ async function handleAnalyticsEvents(
 
     const { error } = await supabase
       .from('usage_events')
-      .insert(eventsWithCountry);
+      .insert(eventsWithMetadata);
 
     if (error) {
-      console.error('[Issue #269] Supabase insert error:', error);
+      console.error('[Issue #297] Supabase insert error:', error);
       return errorResponse('Failed to store events', 500, origin, allowedOrigins, 'DATABASE_ERROR');
     }
 
-    console.log(`[Issue #269] Analytics events stored: count=${events.length}, country=${countryCode}, ip=${clientIP.substring(0, 8)}...`);
+    console.log(`[Issue #297] Analytics events stored: count=${events.length}, userId=${userId.substring(0, 8)}..., country=${countryCode}`);
 
     return successResponse({
       success: true,
