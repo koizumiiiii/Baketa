@@ -112,6 +112,40 @@ public sealed record ImageChangeDetectionSettings
     public float GridBlockSimilarityThreshold { get; init; } = 0.98f;
 
     // ========================================
+    // [Issue #302] 下部ゾーン高感度化設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #302] 下部ゾーンの高感度閾値を有効化
+    /// </summary>
+    /// <remarks>
+    /// 有効にすると、画面下部（テキストボックスが集中する領域）に
+    /// より高い閾値を適用し、微細なテキスト変化を検知しやすくします。
+    /// </remarks>
+    public bool EnableLowerZoneHighSensitivity { get; init; } = true;
+
+    /// <summary>
+    /// [Issue #302] 下部ゾーンの類似度閾値（高感度）
+    /// </summary>
+    /// <remarks>
+    /// 下部ゾーンに適用される閾値。通常の閾値より高く設定することで、
+    /// 語尾変化（「！」→「？」）レベルの微細な変化も検知可能に。
+    /// デフォルト: 0.995（類似度99.5%未満で変化検知）
+    /// 推奨範囲: 0.99-0.999
+    /// </remarks>
+    public float LowerZoneSimilarityThreshold { get; init; } = 0.995f;
+
+    /// <summary>
+    /// [Issue #302] 下部ゾーンの比率（0.0-1.0）
+    /// </summary>
+    /// <remarks>
+    /// 画面下部のどの範囲を「下部ゾーン」として高感度化するか。
+    /// デフォルト: 0.25（下部25%）
+    /// 推奨範囲: 0.20-0.50
+    /// </remarks>
+    public float LowerZoneRatio { get; init; } = 0.25f;
+
+    // ========================================
     // [Issue #229] テキスト安定化待機設定
     // ========================================
 
@@ -159,9 +193,33 @@ public sealed record ImageChangeDetectionSettings
             && GridRows > 0
             && GridColumns > 0
             && GridBlockSimilarityThreshold is > 0.0f and <= 1.0f
+            // [Issue #302] 下部ゾーン高感度化設定の検証
+            && LowerZoneSimilarityThreshold is > 0.0f and <= 1.0f
+            && LowerZoneRatio is > 0.0f and <= 1.0f
             // [Issue #229] テキスト安定化設定の検証
             && TextStabilizationDelayMs >= 0
             && MaxStabilizationWaitMs >= TextStabilizationDelayMs;
+    }
+
+    /// <summary>
+    /// [Issue #302] 指定行に適用する閾値を取得
+    /// </summary>
+    /// <param name="row">グリッドの行番号（0から開始）</param>
+    /// <param name="totalRows">グリッドの総行数</param>
+    /// <returns>適用すべき類似度閾値</returns>
+    public float GetThresholdForRow(int row, int totalRows)
+    {
+        if (!EnableLowerZoneHighSensitivity || totalRows <= 0)
+        {
+            return GridBlockSimilarityThreshold;
+        }
+
+        // 下部ゾーンの開始行を計算（例: 4行で25% → 行3から下部ゾーン）
+        var lowerZoneStartRow = (int)(totalRows * (1.0f - LowerZoneRatio));
+
+        return row >= lowerZoneStartRow
+            ? LowerZoneSimilarityThreshold
+            : GridBlockSimilarityThreshold;
     }
 
     /// <summary>
@@ -182,7 +240,11 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #229] テキスト安定化設定
             EnableTextStabilization = true,
             TextStabilizationDelayMs = 500,
-            MaxStabilizationWaitMs = 3000
+            MaxStabilizationWaitMs = 3000,
+            // [Issue #302] 下部ゾーン高感度化設定
+            EnableLowerZoneHighSensitivity = true,
+            LowerZoneSimilarityThreshold = 0.995f,
+            LowerZoneRatio = 0.25f
         };
     }
 
@@ -204,7 +266,11 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #229] テキスト安定化設定（高感度: 短め待機）
             EnableTextStabilization = true,
             TextStabilizationDelayMs = 300,
-            MaxStabilizationWaitMs = 2000
+            MaxStabilizationWaitMs = 2000,
+            // [Issue #302] 下部ゾーン高感度化設定（高感度: より広い範囲）
+            EnableLowerZoneHighSensitivity = true,
+            LowerZoneSimilarityThreshold = 0.998f,
+            LowerZoneRatio = 0.35f
         };
     }
 
@@ -226,7 +292,11 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #229] テキスト安定化設定（低感度: 長め待機）
             EnableTextStabilization = true,
             TextStabilizationDelayMs = 800,
-            MaxStabilizationWaitMs = 5000
+            MaxStabilizationWaitMs = 5000,
+            // [Issue #302] 下部ゾーン高感度化設定（低感度: 狭い範囲）
+            EnableLowerZoneHighSensitivity = true,
+            LowerZoneSimilarityThreshold = 0.99f,
+            LowerZoneRatio = 0.20f
         };
     }
 
@@ -248,7 +318,11 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #229] テキスト安定化設定
             EnableTextStabilization = true,
             TextStabilizationDelayMs = 500,
-            MaxStabilizationWaitMs = 3000
+            MaxStabilizationWaitMs = 3000,
+            // [Issue #302] 下部ゾーン高感度化設定
+            EnableLowerZoneHighSensitivity = true,
+            LowerZoneSimilarityThreshold = 0.995f,
+            LowerZoneRatio = 0.25f
         };
     }
 }
