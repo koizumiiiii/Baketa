@@ -513,11 +513,26 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
     /// </summary>
     private bool ShouldTerminateEarly(ProcessingStageType completedStage, ProcessingStageResult stageResult)
     {
+        // [Issue #302 DEBUG] 詳細ログ追加 - 早期終了判定の原因特定
+        if (completedStage == ProcessingStageType.ImageChangeDetection)
+        {
+            if (stageResult.Data is ImageChangeDetectionResult imageChange)
+            {
+                var shouldTerminate = !imageChange.HasChanged;
+                _logger.LogInformation("🔍 [EARLY_TERM_DEBUG] ImageChangeDetection早期終了判定: HasChanged={HasChanged}, ChangePercentage={ChangePercentage:F4}, ShouldTerminate={ShouldTerminate}",
+                    imageChange.HasChanged, imageChange.ChangePercentage, shouldTerminate);
+                return shouldTerminate;
+            }
+            else
+            {
+                _logger.LogWarning("🔍 [EARLY_TERM_DEBUG] ImageChangeDetection結果がnullまたは型不一致: DataType={DataType}",
+                    stageResult.Data?.GetType().Name ?? "null");
+                return false;
+            }
+        }
+
         return completedStage switch
         {
-            ProcessingStageType.ImageChangeDetection =>
-                stageResult.Data is ImageChangeDetectionResult imageChange && !imageChange.HasChanged,
-
             ProcessingStageType.TextChangeDetection =>
                 stageResult.Data is TextChangeDetectionResult textChange && !textChange.HasTextChanged,
 

@@ -799,14 +799,16 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         {
             if (!state.IsInStabilization)
             {
-                // 安定化モード開始
+                // [FIX] 安定化モード開始 - 最初の変化検出時はOCRを許可
+                // バグ修正: 以前は最初の変化でもOCRを抑制していたため、20秒以上の遅延が発生していた
                 state.EnterStabilization();
 
-                _logger.LogDebug("🕐 [TextStabilization] 安定化モード開始 - Context: {ContextId}, WaitMs: {WaitMs}",
+                _logger.LogDebug("🕐 [TextStabilization] 安定化モード開始 - Context: {ContextId}, WaitMs: {WaitMs}（最初の変化はOCR許可）",
                     contextId, _settings.TextStabilizationDelayMs);
 
-                // OCRを抑制（変化なしとして返す）
-                return ImageChangeResult.CreateNoChange(elapsed, detectionStage: 1);
+                // [FIX] 最初の変化検出時はOCRを許可（nullを返す）
+                // 連続した高速変化のみを抑制し、ユーザー体験を向上
+                return null;
             }
 
             // 既に安定化モード中：タイムアウトチェック
@@ -822,11 +824,27 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 return null; // OCR実行許可
             }
 
+            // 安定化モード中の連続変化：抑制するかどうかを判定
+            var sinceFirstChange = (now - state.FirstChangeTime).TotalMilliseconds;
+
+            // [FIX] 最初の変化から安定化遅延時間内の連続変化のみ抑制
+            // 遅延時間を超えたら次のOCRを許可（リセット）
+            if (sinceFirstChange >= _settings.TextStabilizationDelayMs)
+            {
+                // 安定化遅延時間経過：OCR許可してリセット
+                state.Reset();
+
+                _logger.LogDebug("✅ [TextStabilization] 安定化遅延完了 - Context: {ContextId}, WaitedMs: {Ms:F0}ms",
+                    contextId, sinceFirstChange);
+
+                return null; // OCR実行許可
+            }
+
             // 変化継続：最終変化時刻を更新してOCR抑制継続
             state.UpdateLastChange();
 
             _logger.LogDebug("🔄 [TextStabilization] 変化継続（待機中）- Context: {ContextId}, SinceFirstChange: {Ms:F0}ms",
-                contextId, (now - state.FirstChangeTime).TotalMilliseconds);
+                contextId, sinceFirstChange);
 
             return ImageChangeResult.CreateNoChange(elapsed, detectionStage: 1);
         }
