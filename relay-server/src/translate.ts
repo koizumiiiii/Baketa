@@ -87,6 +87,11 @@ interface GeminiRequest {
     temperature?: number;
     maxOutputTokens?: number;
   };
+  // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応
+  safetySettings?: Array<{
+    category: string;
+    threshold: string;
+  }>;
 }
 
 /** Gemini API レスポンス */
@@ -1384,33 +1389,63 @@ async function translateWithGemini(
     ? `The source language is ${request.source_language}.`
     : 'Detect the source language.';
 
-  // [Issue #275] 複数テキスト+BoundingBox形式のプロンプト（DirectGeminiImageTranslatorと同等）
-  const prompt = `You are a game localization expert. Detect ALL visible text in this image and translate it to ${request.target_language}.${contextHint}
+  // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
+  // 自然な翻訳のためのガイドラインを強化
+  const prompt = `You are an expert game localizer. Your goal is to produce translations that feel like they were originally written in ${request.target_language}, not translated. Always respond with valid JSON only, no markdown formatting.
+${contextHint}
 
-## Translation Guidelines
-- Use natural, fluent expressions in ${request.target_language}, not literal translations
-- Maintain appropriate tone for game UI and dialog
-- Keep proper nouns (character names, place names) as-is or use standard transliteration
-- Choose appropriate formality level based on context
-- ${sourceHint}
+## CRITICAL INSTRUCTION
+You MUST detect and include EVERY SINGLE piece of visible text in this image. This includes:
+- Main dialog/dialogue text
+- UI buttons (OK, Cancel, Yes, No, Save, Load, Skip, Menu, Auto, etc.)
+- Menu items and navigation text
+- Labels, headers, and titles
+- Status text, counters, numbers
+- Single words or characters
+- ANY other readable text, no matter how small
+
+Do NOT skip any text. Even single characters or numbers should be included.
+
+Task: Detect ALL visible text in this image and translate it to ${request.target_language}.
+${sourceHint}
+
+## Translation Guidelines - Avoiding Machine-Translation Feel
+
+### Core Principles
+- **Translate meaning and intent, not words.** Rearrange sentence structure to match ${request.target_language}'s natural flow.
+- **Avoid word-for-word translation.** If a direct translation sounds awkward, find an equivalent expression.
+- **Use common, everyday vocabulary** appropriate for the context. Avoid overly formal or stiff phrasing.
+- **Eliminate redundancy.** If something is naturally implied in ${request.target_language}, don't state it explicitly.
+
+### Game-Specific Guidelines
+- **Preserve character personality and speaking style.** A warrior speaks differently from a merchant.
+- **Match emotional intensity.** Convey anger, joy, sadness with appropriate energy and tone.
+- **Keep UI text concise.** Button labels and menu items should be short and clear.
+- **For humor, prioritize the comedic effect** over literal meaning.
+
+### Proper Nouns
+- Keep character names and place names as-is or use standard transliteration.
+
+### Japanese-Specific (if translating to Japanese)
+- Use appropriate sentence-final particles (〜ね、〜よ、〜わ、〜ぞ) to reflect character tone.
+- Omit pronouns (私、あなた) when natural. When needed, choose carefully based on character (俺/僕/私, お前/君/あなた).
+- Use onomatopoeia naturally for vividness (ドキドキ、ワクワク, etc.).
+- Avoid "translationese" (翻訳調) - don't translate every "and," "but," "because" literally.
 
 ## Output Format
-Include ALL detected text items with their bounding box coordinates.
+Include EVERY detected text item with bounding box coordinates.
 Bounding boxes use normalized 0-1000 scale coordinates in [y_min, x_min, y_max, x_max] order.
+
+IMPORTANT: The number of items in "texts" array should match the TOTAL number of distinct text regions visible in the image. If you see 10+ text regions, return 10+ items.
 
 Response format (JSON only, no markdown):
 {
   "texts": [
-    {
-      "original": "original text 1",
-      "translation": "translated text 1",
-      "bounding_box": [y_min, x_min, y_max, x_max]
-    },
-    {
-      "original": "original text 2",
-      "translation": "translated text 2",
-      "bounding_box": [y_min, x_min, y_max, x_max]
-    }
+    {"original": "Dialog text here", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
+    {"original": "Button1", "translation": "ボタン1", "bounding_box": [50, 100, 80, 200]},
+    {"original": "Button2", "translation": "ボタン2", "bounding_box": [50, 250, 80, 350]},
+    {"original": "Menu", "translation": "メニュー", "bounding_box": [10, 900, 40, 980]},
+    {"original": "Status", "translation": "ステータス", "bounding_box": [950, 50, 990, 150]}
   ],
   "detected_language": "ISO 639-1 code (e.g., ja, en, ko)"
 }
@@ -1435,8 +1470,16 @@ If no text is visible, respond with:
     }],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 2048, // [Issue #275] 複数テキスト対応のため増加
+      maxOutputTokens: 4096, // [Issue #297] OpenAIと同等に増加
     },
+    // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応 - フィルターを緩和
+    // BLOCK_NONE: ブロックしない（翻訳用途のため）
+    safetySettings: [
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    ],
   };
 
   const url = `${GEMINI_API_BASE}/models/${modelName}:generateContent?key=${apiKey}`;
@@ -1482,11 +1525,23 @@ If no text is visible, respond with:
       };
     }
 
-    const textContent = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!textContent) {
+    // [Issue #297] SAFETYフィルターでブロックされた場合のチェック
+    const finishReason = geminiResponse.candidates?.[0]?.finishReason;
+    if (finishReason === 'SAFETY') {
+      console.warn('[Issue #297] Gemini response blocked by safety filter');
       return {
         success: false,
-        error: { code: 'API_ERROR', message: 'No content in Gemini response', isRetryable: false },
+        error: { code: 'CONTENT_FILTERED', message: 'Content was filtered by safety settings', isRetryable: false },
+      };
+    }
+
+    const textContent = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textContent) {
+      // finishReasonがある場合は詳細を含める
+      const reason = finishReason ? ` (finishReason: ${finishReason})` : '';
+      return {
+        success: false,
+        error: { code: 'API_ERROR', message: `No content in Gemini response${reason}`, isRetryable: false },
       };
     }
 
@@ -1557,7 +1612,8 @@ async function translateWithOpenAI(
     : 'Detect the source language.';
 
   // [Issue #299] 改善されたプロンプト - 全テキスト検出を強調
-  const systemPrompt = `You are a game localization expert specialized in comprehensive text detection. Always respond with valid JSON only, no markdown formatting.`;
+  // [Issue #297] 自然な翻訳のためのガイドラインを強化（Geminiと同一）
+  const systemPrompt = `You are an expert game localizer. Your goal is to produce translations that feel like they were originally written in ${request.target_language}, not translated. Always respond with valid JSON only, no markdown formatting.`;
 
   const userPrompt = `${contextHint}
 
@@ -1576,11 +1632,28 @@ Do NOT skip any text. Even single characters or numbers should be included.
 Task: Detect ALL visible text in this image and translate it to ${request.target_language}.
 ${sourceHint}
 
-## Translation Guidelines
-- Use natural, fluent expressions in ${request.target_language}, not literal translations
-- Maintain appropriate tone for game UI and dialog
-- Keep proper nouns (character names, place names) as-is or use standard transliteration
-- Choose appropriate formality level based on context
+## Translation Guidelines - Avoiding Machine-Translation Feel
+
+### Core Principles
+- **Translate meaning and intent, not words.** Rearrange sentence structure to match ${request.target_language}'s natural flow.
+- **Avoid word-for-word translation.** If a direct translation sounds awkward, find an equivalent expression.
+- **Use common, everyday vocabulary** appropriate for the context. Avoid overly formal or stiff phrasing.
+- **Eliminate redundancy.** If something is naturally implied in ${request.target_language}, don't state it explicitly.
+
+### Game-Specific Guidelines
+- **Preserve character personality and speaking style.** A warrior speaks differently from a merchant.
+- **Match emotional intensity.** Convey anger, joy, sadness with appropriate energy and tone.
+- **Keep UI text concise.** Button labels and menu items should be short and clear.
+- **For humor, prioritize the comedic effect** over literal meaning.
+
+### Proper Nouns
+- Keep character names and place names as-is or use standard transliteration.
+
+### Japanese-Specific (if translating to Japanese)
+- Use appropriate sentence-final particles (〜ね、〜よ、〜わ、〜ぞ) to reflect character tone.
+- Omit pronouns (私、あなた) when natural. When needed, choose carefully based on character (俺/僕/私, お前/君/あなた).
+- Use onomatopoeia naturally for vividness (ドキドキ、ワクワク, etc.).
+- Avoid "translationese" (翻訳調) - don't translate every "and," "but," "because" literally.
 
 ## Output Format
 Include EVERY detected text item with bounding box coordinates.
