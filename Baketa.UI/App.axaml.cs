@@ -449,36 +449,27 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         var authService = serviceProvider.GetRequiredService<IAuthService>();
                         var tokenStorage = serviceProvider.GetRequiredService<ITokenStorage>();
 
-                        // セッション復元を試みる
+                        // [Issue #299] AuthInitializationService.StartAsync()で既にセッション復元済み
+                        // ここでは現在のセッションを取得するだけでよい（重複呼び出し防止）
                         bool isAuthenticated = false;
                         try
                         {
-                            // 保存されたトークンがあるか確認
-                            var hasTokens = await tokenStorage.HasStoredTokensAsync().ConfigureAwait(true);
-                            if (hasTokens)
+                            var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
+                            isAuthenticated = session != null;
+                            if (isAuthenticated && session?.User?.Id != null && !string.IsNullOrEmpty(session.AccessToken))
                             {
-                                _logger?.LogInformation("保存されたトークンを検出、セッション復元を試行中...");
-                                await authService.RestoreSessionAsync().ConfigureAwait(true);
-
-                                // セッション復元後に認証状態を確認
-                                var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
-                                isAuthenticated = session != null;
-                                _logger?.LogInformation("セッション復元結果: {IsAuthenticated}", isAuthenticated);
+                                _logger?.LogInformation("[Issue #299] 既存セッション検出（AuthInitializationServiceで復元済み）");
 
                                 // [Issue #261] 認証成功時にローカル同意をDBに同期
-                                // [Gemini Review] セキュリティ強化: JWTを渡して認証付きで同期
-                                if (isAuthenticated && session?.User?.Id != null && !string.IsNullOrEmpty(session.AccessToken))
+                                var consentService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IConsentService>();
+                                if (consentService != null)
                                 {
-                                    var consentService = serviceProvider.GetService<Baketa.Core.Abstractions.Settings.IConsentService>();
-                                    if (consentService != null)
-                                    {
-                                        await consentService.SyncLocalConsentToServerAsync(session.User.Id, session.AccessToken).ConfigureAwait(true);
-                                    }
+                                    await consentService.SyncLocalConsentToServerAsync(session.User.Id, session.AccessToken).ConfigureAwait(true);
                                 }
                             }
                             else
                             {
-                                _logger?.LogInformation("保存されたトークンなし、未認証状態");
+                                _logger?.LogInformation("[Issue #299] セッションなし、未認証状態");
                             }
                         }
                         catch (Exception authEx)
@@ -659,11 +650,12 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 }
 
                 // 📊 [Issue #269] AnalyticsEventProcessor登録 - 翻訳イベントの使用統計記録
+                // [Issue #297] 名前空間修正: Core.Events.TranslationEvents → Core.Translation.Events
                 try
                 {
                     var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-                    var analyticsProcessor = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.TranslationEvents.TranslationCompletedEvent>>();
-                    eventAggregator.Subscribe<Baketa.Core.Events.TranslationEvents.TranslationCompletedEvent>(analyticsProcessor);
+                    var analyticsProcessor = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>();
+                    eventAggregator.Subscribe<Baketa.Core.Translation.Events.TranslationCompletedEvent>(analyticsProcessor);
                     Console.WriteLine("✅ AnalyticsEventProcessor登録完了");
                 }
                 catch (Exception analyticsEx)
@@ -1188,16 +1180,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 return;
             }
 
-            // 保存されたトークンがあるか確認
-            var hasTokens = await tokenStorage.HasStoredTokensAsync().ConfigureAwait(true);
-            if (!hasTokens)
-            {
-                _logger?.LogDebug("[Issue #277] No stored tokens, skipping server sync");
-                return;
-            }
-
-            // セッション復元を試みる
-            await authService.RestoreSessionAsync().ConfigureAwait(true);
+            // [Issue #299] 既に起動時にRestoreSessionAsyncが呼ばれているため、
+            // ここでは現在のセッションを取得するだけでよい（重複呼び出し防止）
             var session = await authService.GetCurrentSessionAsync().ConfigureAwait(true);
 
             if (session?.AccessToken == null)

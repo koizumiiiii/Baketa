@@ -48,6 +48,13 @@ public sealed record LicenseState
     public long CloudAiTokensUsed { get; init; }
 
     /// <summary>
+    /// [Issue #296] サーバーから同期された月間トークン上限
+    /// CurrentPlan.GetMonthlyTokenLimit()と異なる場合（プラン同期遅延等）に使用
+    /// nullの場合はCurrentPlanから計算
+    /// </summary>
+    public long? ServerMonthlyTokenLimit { get; init; }
+
+    /// <summary>
     /// セッションID（単一デバイス制限用）
     /// </summary>
     public string? SessionId { get; init; }
@@ -111,8 +118,11 @@ public sealed record LicenseState
 
     /// <summary>
     /// プランに基づく月間トークン上限
+    /// [Issue #296] サーバーから同期された値がある場合はそちらを優先
     /// </summary>
-    public long MonthlyTokenLimit => CurrentPlan.GetMonthlyTokenLimit();
+    public long MonthlyTokenLimit => ServerMonthlyTokenLimit > 0
+        ? ServerMonthlyTokenLimit.Value
+        : CurrentPlan.GetMonthlyTokenLimit();
 
     /// <summary>
     /// 現在の課金期間での残りトークン数

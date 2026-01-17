@@ -263,7 +263,7 @@
     <value>※ αテストではオフライン翻訳のみ利用可能</value>
   </data>
   <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
-    <value>Pro/Premiaプランで利用可能</value>
+    <value>Pro/Premium/Ultimateプランで利用可能</value>
   </data>
   <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
     <value>今月の使用量:</value>

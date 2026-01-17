@@ -97,6 +97,9 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddSingleton<LicenseManager>();
         services.AddSingleton<ILicenseManager>(provider =>
             provider.GetRequiredService<LicenseManager>());
+        // [Issue #297] 循環依存回避用の軽量インターフェース
+        services.AddSingleton<ILicenseInfoProvider>(provider =>
+            provider.GetRequiredService<LicenseManager>());
 
         // Issue #237 Phase 2: プロモーション設定永続化サービス
         services.AddSingleton<License.PromotionSettingsPersistence>();

@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.License;
 using Baketa.Core.Settings;
 using Baketa.Core.Translation.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,8 @@ namespace Baketa.Infrastructure.Translation.Cloud;
 public sealed class PrimaryCloudTranslator : ICloudImageTranslator
 {
     private readonly RelayServerClient _relayClient;
+    private readonly ITokenConsumptionTracker _tokenTracker;
+    private readonly ILicenseManager _licenseManager;
     private readonly ILogger<PrimaryCloudTranslator> _logger;
     private readonly CloudTranslationSettings _settings;
 
@@ -33,10 +36,14 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
     /// </summary>
     public PrimaryCloudTranslator(
         RelayServerClient relayClient,
+        ITokenConsumptionTracker tokenTracker,
+        ILicenseManager licenseManager,
         IOptions<CloudTranslationSettings> settings,
         ILogger<PrimaryCloudTranslator> logger)
     {
         _relayClient = relayClient ?? throw new ArgumentNullException(nameof(relayClient));
+        _tokenTracker = tokenTracker ?? throw new ArgumentNullException(nameof(tokenTracker));
+        _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -109,6 +116,57 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
                     "Primary翻訳成功: RequestId={RequestId}, Tokens={Tokens}",
                     request.RequestId,
                     response.TokenUsage?.TotalTokens ?? 0);
+
+                // [Issue #296] サーバーの月間使用量でローカルを同期（優先）
+                if (response.MonthlyUsage is not null)
+                {
+                    try
+                    {
+                        await _tokenTracker.SyncFromServerAsync(
+                            response.MonthlyUsage,
+                            cancellationToken).ConfigureAwait(false);
+
+                        // [Issue #296] LicenseManagerの状態も同期（警告通知トリガー）
+                        // MonthlyTokenLimitも同期することで警告が正しく動作
+                        _licenseManager.SyncMonthlyUsageFromServer(response.MonthlyUsage);
+
+                        _logger.LogDebug(
+                            "[Issue #296] サーバーからローカルにトークン使用量を同期: YearMonth={YearMonth}, Used={TokensUsed}, Limit={TokensLimit}",
+                            response.MonthlyUsage.YearMonth,
+                            response.MonthlyUsage.TokensUsed,
+                            response.MonthlyUsage.TokensLimit);
+                    }
+                    catch (Exception ex)
+                    {
+                        // 同期失敗は翻訳結果に影響させない
+                        _logger.LogWarning(ex, "[Issue #296] サーバー同期に失敗（翻訳は成功）");
+                    }
+                }
+                else
+                {
+                    // サーバーから月間使用量が返されなかった場合はローカルに加算記録
+                    var totalTokens = response.TokenUsage?.TotalTokens ?? 0;
+                    if (totalTokens > 0)
+                    {
+                        try
+                        {
+                            await _tokenTracker.RecordUsageAsync(
+                                totalTokens,
+                                ProviderId,
+                                TokenUsageType.Total,
+                                cancellationToken).ConfigureAwait(false);
+
+                            _logger.LogDebug(
+                                "[Issue #296] トークン消費記録（フォールバック）: Provider={Provider}, Tokens={Tokens}",
+                                ProviderId, totalTokens);
+                        }
+                        catch (Exception ex)
+                        {
+                            // トークン記録の失敗は翻訳結果に影響させない
+                            _logger.LogWarning(ex, "[Issue #296] トークン消費記録に失敗（翻訳は成功）");
+                        }
+                    }
+                }
             }
             else
             {
@@ -116,6 +174,27 @@ public sealed class PrimaryCloudTranslator : ICloudImageTranslator
                     "Primary翻訳失敗: RequestId={RequestId}, Error={Error}",
                     request.RequestId,
                     response.Error?.Message);
+
+                // [Issue #296] QUOTA_EXCEEDEDエラーの場合、LicenseManagerを更新して UI に通知
+                if (response.Error?.Code == TranslationErrorDetail.Codes.QuotaExceeded &&
+                    response.MonthlyUsage is not null)
+                {
+                    try
+                    {
+                        // サーバーから返された月間使用量でローカルを同期
+                        // MonthlyTokenLimitも同期することで警告ダイアログが表示される
+                        _licenseManager.SyncMonthlyUsageFromServer(response.MonthlyUsage);
+
+                        _logger.LogInformation(
+                            "[Issue #296] QUOTA_EXCEEDED: LicenseManagerを更新 - Used={Used}, Limit={Limit}",
+                            response.MonthlyUsage.TokensUsed,
+                            response.MonthlyUsage.TokensLimit);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "[Issue #296] QUOTA_EXCEEDED時のLicenseManager更新に失敗");
+                    }
+                }
             }
 
             return response;

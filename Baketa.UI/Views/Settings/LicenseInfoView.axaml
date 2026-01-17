@@ -70,8 +70,9 @@
                 </Grid>
             </Border>
 
-            <!-- Token Usage Section (Only for Pro/Premia) -->
-            <StackPanel IsVisible="{Binding HasCloudAccess}" Spacing="12">
+            <!-- Token Usage Section (Only for Pro/Premium/Ultimate) -->
+            <!-- [Issue #296] クォータ超過時もゲージを表示するためHasPaidPlanを使用 -->
+            <StackPanel IsVisible="{Binding HasPaidPlan}" Spacing="12">
                 <TextBlock Text="{local:Localize Settings_License_TokenUsage}" FontSize="16" FontWeight="Medium"/>
 
                 <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
@@ -92,7 +93,8 @@
                             <ProgressBar Value="{Binding UsagePercentage}"
                                          Maximum="100"
                                          Height="8"
-                                         CornerRadius="4"/>
+                                         CornerRadius="4"
+                                         Foreground="{Binding UsageGaugeBrush}"/>
                         </StackPanel>
 
                         <!-- Issue #280+#281: Bonus Tokens Display -->
@@ -128,8 +130,9 @@
                 </Border>
             </StackPanel>
 
-            <!-- Local Only Message (For Free/Standard) -->
-            <Border IsVisible="{Binding !HasCloudAccess}"
+            <!-- Local Only Message (For Free plan) -->
+            <!-- [Issue #296] HasPaidPlanと対になる条件 -->
+            <Border IsVisible="{Binding !HasPaidPlan}"
                     Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                     CornerRadius="8"
                     Padding="16">
@@ -176,8 +179,8 @@
                                        VerticalAlignment="Center"/>
                         </Grid>
 
-                        <!-- Token Limit (for Pro/Premia) -->
-                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasCloudAccess}">
+                        <!-- Token Limit (for Pro/Premium/Ultimate) -->
+                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasPaidPlan}">
                             <TextBlock Grid.Column="0"
                                        Text="{local:Localize Settings_License_MonthlyLimit}"
                                        VerticalAlignment="Center"/>

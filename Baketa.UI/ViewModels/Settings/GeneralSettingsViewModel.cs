@@ -7,6 +7,7 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
@@ -382,6 +383,18 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
+    /// [Issue #296] 使用率に応じたゲージ色
+    /// 0-79%: 青（デフォルト）、80-89%: 黄、90-99%: オレンジ、100%+: 赤
+    /// </summary>
+    public IBrush CloudUsageGaugeBrush => CloudUsagePercentage switch
+    {
+        >= 100 => new SolidColorBrush(Color.FromRgb(220, 53, 69)),   // Red (#DC3545)
+        >= 90 => new SolidColorBrush(Color.FromRgb(253, 126, 20)),   // Orange (#FD7E14)
+        >= 80 => new SolidColorBrush(Color.FromRgb(255, 193, 7)),    // Yellow (#FFC107)
+        _ => new SolidColorBrush(Color.FromRgb(13, 110, 253))        // Blue (#0D6EFD)
+    };
+
+    /// <summary>
     /// Cloud AI使用量表示文字列
     /// [Issue #280+#281] プラン枠がある場合は「使用量 / 上限」、
     /// ボーナストークンのみの場合は「残り X ボーナス」を表示
@@ -408,10 +421,23 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// Cloud AI使用量情報を表示するかどうか
-    /// Pro/Premiaプランでのみ表示
+    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）かどうか
+    /// クォータ超過に関係なくプランタイプのみで判定
     /// </summary>
-    public bool ShowCloudUsageInfo => IsCloudTranslationEnabled;
+    public bool HasPaidPlan
+    {
+        get
+        {
+            var plan = _licenseManager?.CurrentState?.CurrentPlan ?? PlanType.Free;
+            return plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
+        }
+    }
+
+    /// <summary>
+    /// Cloud AI使用量情報を表示するかどうか
+    /// [Issue #296] クォータ超過時もゲージを表示するためHasPaidPlanを使用
+    /// </summary>
+    public bool ShowCloudUsageInfo => HasPaidPlan;
 
     #endregion
 
@@ -919,6 +945,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             {
                 this.RaisePropertyChanged(nameof(IsCloudTranslationEnabled));
                 this.RaisePropertyChanged(nameof(CloudTranslationNote));
+                this.RaisePropertyChanged(nameof(HasPaidPlan));
                 this.RaisePropertyChanged(nameof(ShowCloudUsageInfo));
 
                 // Cloud AI翻訳が利用可能になった/なくなった場合、UseLocalEngineも更新
@@ -1009,6 +1036,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
                     : 0;
 
                 this.RaisePropertyChanged(nameof(CloudUsageDisplay));
+                this.RaisePropertyChanged(nameof(CloudUsageGaugeBrush));
             });
         }
         catch (Exception ex)
@@ -1030,6 +1058,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
         // 派生プロパティの更新通知
         this.RaisePropertyChanged(nameof(CloudUsageDisplay));
+        this.RaisePropertyChanged(nameof(CloudUsageGaugeBrush));
     }
 
     /// <summary>

@@ -751,6 +751,14 @@ public class InfrastructureModule : ServiceModuleBase
         // 統一ログサービス（Singleton: アプリケーション全体で共有）
         services.AddSingleton<IBaketaLogger, BaketaLogger>();
 
+        // [Issue #299] API重複呼び出し削減マネージャー
+        services.AddSingleton<IApiRequestDeduplicator, ApiRequestDeduplicator>();
+        Console.WriteLine("✅ [Issue #299] ApiRequestDeduplicator登録完了 - API重複呼び出し削減");
+
+        // [Issue #299] 認証状態変更時にAPIキャッシュを無効化
+        services.AddHostedService<AuthStateCacheInvalidator>();
+        Console.WriteLine("✅ [Issue #299] AuthStateCacheInvalidator登録完了 - 認証変更時キャッシュ無効化");
+
         // 🔧 [Issue #193/#194] バックグラウンドタスクキュー（DiagnosticCollectionServiceの依存）
         services.AddSingleton<Baketa.Core.Abstractions.Services.IBackgroundTaskQueue, BackgroundTaskQueue>();
         Console.WriteLine("✅ IBackgroundTaskQueue登録完了 - バックグラウンドタスク処理");
@@ -1005,6 +1013,10 @@ public class InfrastructureModule : ServiceModuleBase
         // DirectOpenAIImageTranslator登録（HttpClientFactory使用）- フォールバック用
         services.AddHttpClient<Translation.Cloud.DirectOpenAIImageTranslator>();
         Console.WriteLine("✅ DirectOpenAIImageTranslator登録完了 - HttpClientFactory使用（フォールバック用）");
+
+        // SecondaryCloudTranslator登録（スタブ実装 - Relay Server未対応時のフォールバック用）
+        services.AddSingleton<Translation.Cloud.SecondaryCloudTranslator>();
+        Console.WriteLine("✅ SecondaryCloudTranslator登録完了 - スタブ実装（Relay Server未対応時用）");
 
         // Primary Cloud翻訳エンジン登録
         // UseDirectApiMode=true の場合は DirectGeminiImageTranslator を使用

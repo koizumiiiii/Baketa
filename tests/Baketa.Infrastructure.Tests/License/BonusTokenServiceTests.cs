@@ -4,6 +4,7 @@ using System.Text.Json;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.License.Models;
 using Baketa.Infrastructure.License;
+using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
@@ -18,6 +19,7 @@ namespace Baketa.Infrastructure.Tests.License;
 public sealed class BonusTokenServiceTests : IDisposable
 {
     private readonly Mock<ILogger<BonusTokenService>> _loggerMock;
+    private readonly Mock<IApiRequestDeduplicator> _deduplicatorMock;
     private readonly Mock<HttpMessageHandler> _httpHandlerMock;
     private readonly HttpClient _httpClient;
     private readonly BonusTokenService _service;
@@ -25,14 +27,24 @@ public sealed class BonusTokenServiceTests : IDisposable
     public BonusTokenServiceTests()
     {
         _loggerMock = new Mock<ILogger<BonusTokenService>>();
+        _deduplicatorMock = new Mock<IApiRequestDeduplicator>();
         _httpHandlerMock = new Mock<HttpMessageHandler>();
+
+        // [Issue #299] Deduplicator mockをパススルーに設定
+        _deduplicatorMock
+            .Setup(d => d.ExecuteOnceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<BonusSyncResult?>>>(),
+                It.IsAny<TimeSpan?>()))
+            .Returns<string, Func<Task<BonusSyncResult?>>, TimeSpan?>(
+                (key, factory, duration) => factory());
 
         _httpClient = new HttpClient(_httpHandlerMock.Object)
         {
             BaseAddress = new Uri("https://test.example.com")
         };
 
-        _service = new BonusTokenService(_httpClient, _loggerMock.Object);
+        _service = new BonusTokenService(_httpClient, _deduplicatorMock.Object, _loggerMock.Object);
     }
 
     public void Dispose()

@@ -290,8 +290,10 @@ public sealed partial class CrashReportService : ICrashReportService
 
         // フォールバック: 静的HttpClient使用（JWT認証なし）
         _logger?.LogWarning("[Issue #287] ICrashReportSender not available, using legacy HttpClient");
+#pragma warning disable CS0618 // 意図的なフォールバック: ICrashReportSenderが注入されていない場合のレガシー送信
         return await SendCrashReportLegacyAsync(report, includeSystemInfo, includeLogs, cancellationToken)
             .ConfigureAwait(false);
+#pragma warning restore CS0618
     }
 
     /// <summary>

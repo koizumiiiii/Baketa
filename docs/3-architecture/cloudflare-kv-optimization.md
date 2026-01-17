@@ -167,12 +167,92 @@ Rule 1: All endpoints
 - Daily Reads: 100,000未満であること
 - Peak時間帯のWrite数
 
+## Issue #296: トークン消費追跡の最適化設計
+
+### 設計方針
+
+**原則: 新規Cloudflare Workers呼び出しを追加しない**
+
+トークン消費追跡はサーバーサイドで管理するが、Cloudflare Workers への呼び出し回数は増やさない設計とする。
+
+### 実装アプローチ
+
+#### 1. トークン記録（Relay Server側）
+
+```
+翻訳リクエスト → Gemini API → 成功 → Supabase RPC呼び出し → レスポンス返却
+                                     ↑
+                           record_token_consumption
+                           (追加のWorker呼び出しなし)
+```
+
+**ポイント:**
+- 翻訳成功時に同一リクエスト内でSupabase RPCを呼び出し
+- クライアントからの追加API呼び出しは不要
+- Supabase呼び出しはCloudflare Workers制限とは別カウント
+
+#### 2. トークン使用量の取得（クライアント側）
+
+**方法A: 翻訳レスポンスに含める（推奨）**
+```json
+{
+  "translation": "...",
+  "tokenUsage": {
+    "thisRequest": 1234,
+    "monthlyUsed": 50000,
+    "monthlyLimit": 10000000
+  }
+}
+```
+- 追加API呼び出し: **0回**
+- UI更新: 翻訳ごとに最新値を表示
+
+**方法B: 起動時に1回取得**
+```
+アプリ起動 → GET /api/token-usage → ローカルキャッシュ更新
+```
+- 追加API呼び出し: **1回/起動**
+- 翻訳レスポンスの方法Aと併用
+
+#### 3. 避けるべきパターン
+
+❌ **定期ポーリング**
+```csharp
+// 絶対にやらない
+while (true) {
+    await GetTokenUsageAsync(); // 30分ごと
+    await Task.Delay(TimeSpan.FromMinutes(30));
+}
+```
+
+❌ **翻訳前の残量チェック**
+```csharp
+// やらない - サーバーが上限チェックする
+if (await GetRemainingTokensAsync() <= 0) return;
+```
+
+### Cloudflare Workers への影響
+
+| 操作 | 既存 | Issue #296後 | 増加 |
+|------|------|-------------|------|
+| 翻訳API呼び出し | 1回/翻訳 | 1回/翻訳 | **0** |
+| トークン取得 | N/A | レスポンスに含む | **0** |
+| 起動時同期 | N/A | 1回/起動（オプション） | **+1** |
+
+### 実装優先度
+
+1. **Phase 1**: Relay Server で翻訳成功時にSupabase RPC呼び出し
+2. **Phase 2**: 翻訳レスポンスに `tokenUsage` フィールド追加
+3. **Phase 3**: クライアントUI更新（レスポンスから表示）
+
 ## 関連Issue
 
 - [Issue #286](https://github.com/koizumiiiii/Baketa/issues/286): Cloudflare Workers KV操作の最適化（Free Tier制限対策）
+- [Issue #296](https://github.com/koizumiiiii/Baketa/issues/296): サーバーサイドトークン消費追跡
 
 ## 更新履歴
 
 | 日付 | 内容 |
 |------|------|
 | 2026-01-13 | 初版作成（Issue #286対応完了後） |
+| 2026-01-14 | Issue #296 トークン消費追跡の最適化設計追加 |

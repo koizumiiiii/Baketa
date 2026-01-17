@@ -169,6 +169,32 @@ public sealed class TokenConsumptionTracker : ITokenConsumptionTracker
         _logger.LogInformation("月間トークン使用量をリセット: {YearMonth}", yearMonth);
     }
 
+    /// <inheritdoc/>
+    public async Task SyncFromServerAsync(ServerMonthlyUsage serverUsage, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(serverUsage);
+
+        var localYearMonth = GetCurrentYearMonth();
+
+        // サーバーの年月とローカルの年月が一致する場合のみ同期
+        if (serverUsage.YearMonth != localYearMonth)
+        {
+            _logger.LogDebug(
+                "[Issue #296] サーバーの年月とローカルの年月が不一致のため同期をスキップ: Server={Server}, Local={Local}",
+                serverUsage.YearMonth, localYearMonth);
+            return;
+        }
+
+        await _repository.SetMonthlySummaryAsync(
+            localYearMonth,
+            serverUsage.TokensUsed,
+            cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "[Issue #296] サーバーからローカルにトークン使用量を同期: YearMonth={YearMonth}, TokensUsed={TokensUsed}",
+            localYearMonth, serverUsage.TokensUsed);
+    }
+
     private static string GetCurrentYearMonth()
     {
         var now = DateTime.UtcNow;
@@ -195,4 +221,12 @@ public interface ITokenUsageRepository
     /// 指定月のデータをクリアする
     /// </summary>
     Task ClearMonthAsync(string yearMonth, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// [Issue #296] 月間サマリーを上書き設定する（サーバー同期用）
+    /// </summary>
+    /// <param name="yearMonth">年月（YYYY-MM形式）</param>
+    /// <param name="totalTokens">サーバーから取得した合計トークン数</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    Task SetMonthlySummaryAsync(string yearMonth, long totalTokens, CancellationToken cancellationToken = default);
 }

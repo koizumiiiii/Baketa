@@ -21,7 +21,7 @@ namespace Baketa.Infrastructure.License.Services;
 /// ライセンス管理の中核実装
 /// サブスクリプション状態管理、機能ゲート、トークン消費を統合的に処理
 /// </summary>
-public sealed class LicenseManager : ILicenseManager, IDisposable
+public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDisposable
 {
     private readonly ILogger<LicenseManager> _logger;
     private readonly ILicenseApiClient _apiClient;
@@ -29,7 +29,6 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     private readonly IEventAggregator _eventAggregator;
     private readonly LicenseSettings _settings;
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
-    private readonly IUsageAnalyticsService? _analyticsService;
     private readonly IBonusTokenService? _bonusTokenService;
     private readonly IAuthService? _authService;
 
@@ -70,6 +69,9 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         }
     }
 
+    /// <inheritdoc cref="ILicenseInfoProvider.CurrentSessionId"/>
+    public string? CurrentSessionId => CurrentState.SessionId;
+
     /// <inheritdoc/>
     public event EventHandler<LicenseStateChangedEventArgs>? StateChanged;
 
@@ -92,7 +94,6 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         IEventAggregator eventAggregator,
         IOptions<LicenseSettings> settings,
         IUnifiedSettingsService? unifiedSettingsService = null,
-        IUsageAnalyticsService? analyticsService = null,
         IBonusTokenService? bonusTokenService = null,
         IAuthService? authService = null)
     {
@@ -102,7 +103,6 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _unifiedSettingsService = unifiedSettingsService;
-        _analyticsService = analyticsService;
         _bonusTokenService = bonusTokenService;
         _authService = authService;
 
@@ -296,19 +296,17 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
     {
         lock (_stateLock)
         {
-            // プランで利用可能かチェック
-            if (_currentState.CurrentPlan.IsFeatureAvailable(feature))
-            {
-                return true;
-            }
-
-            // [Issue #280+#281] CloudAiTranslationはボーナストークンでも利用可能
+            // [Issue #296] CloudAiTranslationは特別処理（クォータ超過チェックが必要）
             if (feature == FeatureType.CloudAiTranslation)
             {
-                return (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+                // プランでCloud AIアクセス可能 かつ クォータ未超過 かつ サブスクリプション有効
+                // または ボーナストークンが残っている
+                return _currentState.HasCloudAiAccess ||
+                       (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
             }
 
-            return false;
+            // その他の機能はプランのみでチェック
+            return _currentState.CurrentPlan.IsFeatureAvailable(feature);
         }
     }
 
@@ -896,20 +894,8 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // EventAggregatorにも発行
         _ = _eventAggregator.PublishAsync(new LicenseStateChangedEvent(oldState, newState, reason));
 
-        // [Issue #271] プラン変更を使用統計に記録
-        if (oldState.CurrentPlan != newState.CurrentPlan && _analyticsService != null)
-        {
-            _analyticsService.TrackEvent("plan_changed", new Dictionary<string, object>
-            {
-                ["old_plan"] = oldState.CurrentPlan.ToString(),
-                ["new_plan"] = newState.CurrentPlan.ToString(),
-                ["change_reason"] = reason.ToString()
-            });
-
-            _logger.LogInformation(
-                "[Issue #271] プラン変更をUsageAnalyticsに記録: {OldPlan} -> {NewPlan}, Reason={Reason}",
-                oldState.CurrentPlan, newState.CurrentPlan, reason);
-        }
+        // [Issue #297] plan_changed追跡は循環依存回避のため削除
+        // 必要であればLicenseStateChangedEventを購読するEventProcessorで実装可能
 
         if (_settings.EnableDebugMode)
         {
@@ -1096,6 +1082,96 @@ public sealed class LicenseManager : ILicenseManager, IDisposable
         // [Issue #275] StateChangedイベントを発火して他のViewModelにも通知
         // GeneralSettingsViewModelなどが更新された値を取得できるようにする
         OnStateChanged(oldState, newState, LicenseChangeReason.TokenUsageUpdated);
+
+        // [Issue #296] トークン使用量警告をチェック
+        CheckTokenUsageThresholds(newState);
+    }
+
+    /// <inheritdoc/>
+    public void SyncMonthlyUsageFromServer(Baketa.Core.Translation.Abstractions.ServerMonthlyUsage monthlyUsage)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(monthlyUsage);
+
+        LicenseState oldState;
+        LicenseState newState;
+
+        lock (_stateLock)
+        {
+            // 変更がない場合は早期リターン（使用量と上限の両方をチェック）
+            if (_currentState.CloudAiTokensUsed == monthlyUsage.TokensUsed &&
+                _currentState.ServerMonthlyTokenLimit == monthlyUsage.TokensLimit)
+            {
+                return;
+            }
+
+            oldState = _currentState;
+            // [Issue #296] CloudAiTokensUsedとServerMonthlyTokenLimitの両方を更新
+            // ServerMonthlyTokenLimitを設定することで、MonthlyTokenLimitとIsQuotaExceededが
+            // サーバーの値を使用して正しく計算される
+            _currentState = _currentState with
+            {
+                CloudAiTokensUsed = monthlyUsage.TokensUsed,
+                ServerMonthlyTokenLimit = monthlyUsage.TokensLimit
+            };
+            newState = _currentState;
+
+            _logger.LogInformation(
+                "[Issue #296] サーバーから月間使用状況を同期: Used={OldUsed}→{NewUsed}, Limit={OldLimit}→{NewLimit}, IsQuotaExceeded={IsExceeded}",
+                oldState.CloudAiTokensUsed, newState.CloudAiTokensUsed,
+                oldState.MonthlyTokenLimit, newState.MonthlyTokenLimit,
+                newState.IsQuotaExceeded);
+        }
+
+        // StateChangedイベントを発火
+        OnStateChanged(oldState, newState, LicenseChangeReason.TokenUsageUpdated);
+
+        // [Issue #296] サーバーから返されたTokensLimitを使って警告を発火
+        // クライアントのMonthlyTokenLimitはCurrentPlanから計算されるため、
+        // プランが同期されていない場合は0になる可能性がある
+        // サーバーの値を優先して使用することで、正しい警告が発火される
+        CheckTokenUsageThresholdsWithServerLimit(monthlyUsage.TokensUsed, monthlyUsage.TokensLimit);
+    }
+
+    /// <summary>
+    /// [Issue #296] サーバーから返されたトークン上限を使って警告をチェック
+    /// </summary>
+    private void CheckTokenUsageThresholdsWithServerLimit(long tokensUsed, long serverLimit)
+    {
+        if (serverLimit <= 0)
+        {
+            _logger.LogDebug("[Issue #296] サーバーのTokensLimitが0以下のため警告スキップ: {Limit}", serverLimit);
+            return;
+        }
+
+        var usagePercent = (double)tokensUsed / serverLimit * 100;
+
+        TokenWarningLevel? warningLevel = null;
+        if (usagePercent >= 100)
+        {
+            warningLevel = TokenWarningLevel.Exceeded;
+        }
+        else if (usagePercent >= _settings.TokenCriticalThresholdPercent)
+        {
+            warningLevel = TokenWarningLevel.Critical;
+        }
+        else if (usagePercent >= _settings.TokenWarningThresholdPercent)
+        {
+            warningLevel = TokenWarningLevel.Warning;
+        }
+
+        if (warningLevel.HasValue)
+        {
+            _logger.LogInformation(
+                "[Issue #296] サーバー値でトークン警告発火: Level={Level}, Usage={Usage}%, Used={Used}, Limit={Limit}",
+                warningLevel.Value, usagePercent, tokensUsed, serverLimit);
+
+            OnTokenUsageWarning(
+                tokensUsed,
+                serverLimit,
+                (int)usagePercent,
+                warningLevel.Value);
+        }
     }
 
     /// <inheritdoc/>

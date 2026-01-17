@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Reactive;
 using System.Reactive.Linq;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
@@ -168,6 +169,18 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// [Issue #296] 使用率に応じたゲージ色
+    /// 0-79%: 青（デフォルト）、80-89%: 黄、90-99%: オレンジ、100%+: 赤
+    /// </summary>
+    public IBrush UsageGaugeBrush => UsagePercentage switch
+    {
+        >= 100 => new SolidColorBrush(Color.FromRgb(220, 53, 69)),   // Red (#DC3545)
+        >= 90 => new SolidColorBrush(Color.FromRgb(253, 126, 20)),   // Orange (#FD7E14)
+        >= 80 => new SolidColorBrush(Color.FromRgb(255, 193, 7)),    // Yellow (#FFC107)
+        _ => new SolidColorBrush(Color.FromRgb(13, 110, 253))        // Blue (#0D6EFD)
+    };
+
+    /// <summary>
     /// クラウドAIアクセス権があるか
     /// </summary>
     public bool HasCloudAccess
@@ -175,6 +188,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         get => _hasCloudAccess;
         private set => this.RaiseAndSetIfChanged(ref _hasCloudAccess, value);
     }
+
+    /// <summary>
+    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）かどうか
+    /// クォータ超過やサブスクリプション状態に関係なく、プランタイプのみで判定
+    /// トークン使用量ゲージの表示判定に使用
+    /// </summary>
+    public bool HasPaidPlan => CurrentPlan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
 
     /// <summary>
     /// クォータを超過しているか
@@ -523,6 +543,8 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(ExpirationDateDisplay));
         this.RaisePropertyChanged(nameof(TokenUsageDisplay));
         this.RaisePropertyChanged(nameof(CloudAccessDisplay));
+        this.RaisePropertyChanged(nameof(UsageGaugeBrush));
+        this.RaisePropertyChanged(nameof(HasPaidPlan));
 
         // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
         UpdateTokenWarningState();
@@ -757,6 +779,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
                 }
                 UsagePercentage = TokenLimit > 0 ? (double)TokensUsed / TokenLimit * 100 : 0;
                 this.RaisePropertyChanged(nameof(TokenUsageDisplay));
+                this.RaisePropertyChanged(nameof(UsageGaugeBrush));
             });
         }
         catch (Exception ex)

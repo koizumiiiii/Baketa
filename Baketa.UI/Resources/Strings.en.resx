@@ -263,7 +263,7 @@
     <value>* Only offline translation is available in alpha test</value>
   </data>
   <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
-    <value>Available with Pro/Premia plan</value>
+    <value>Available with Pro/Premium/Ultimate plan</value>
   </data>
   <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
     <value>This month's usage:</value>

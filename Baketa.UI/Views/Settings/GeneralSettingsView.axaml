@@ -63,7 +63,8 @@
                                     <ProgressBar Value="{Binding CloudUsagePercentage}"
                                                  Maximum="100"
                                                  Height="6"
-                                                 CornerRadius="3"/>
+                                                 CornerRadius="3"
+                                                 Foreground="{Binding CloudUsageGaugeBrush}"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

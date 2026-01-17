@@ -6,6 +6,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.License;
 using Baketa.UI.Configuration;
 using Baketa.UI.Framework;
 using Baketa.UI.Models;
@@ -25,6 +26,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
 {
     private readonly ITranslationEngineStatusService _statusService;
     private readonly IUserPlanService _planService;
+    private readonly IBonusTokenService? _bonusTokenService;
     private readonly INotificationService _notificationService;
     private readonly ILogger<EngineSelectionViewModel> _logger;
     private readonly TranslationUIOptions _options;
@@ -68,6 +70,45 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     {
         get => _isCloudOnlyEnabled;
         private set => this.RaiseAndSetIfChanged(ref _isCloudOnlyEnabled, value);
+    }
+
+    /// <summary>
+    /// [Issue #296] CloudOnlyエンジンが無効な理由メッセージ
+    /// </summary>
+    public string CloudOnlyDisabledMessage => _planService.IsMonthlyLimitExceeded
+        ? "今月のトークン上限に達しました"
+        : "CloudOnlyエンジンはPro/Premium/Ultimateプランで利用可能です";
+
+    /// <summary>
+    /// [Issue #296] クォータ超過かどうか（ボーナストークン有無に関係なく）
+    /// </summary>
+    public bool IsQuotaExceeded => _planService.IsMonthlyLimitExceeded;
+
+    /// <summary>
+    /// [Issue #296] クォータ超過だがボーナストークンで利用可能な状態
+    /// </summary>
+    public bool IsQuotaExceededButBonusAvailable =>
+        _planService.IsMonthlyLimitExceeded &&
+        (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+
+    /// <summary>
+    /// [Issue #296] クォータ超過時のステータスメッセージ
+    /// </summary>
+    public string QuotaExceededMessage
+    {
+        get
+        {
+            if (!_planService.IsMonthlyLimitExceeded)
+                return string.Empty;
+
+            var bonusTokens = _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
+            if (bonusTokens > 0)
+            {
+                return $"月間上限に達しました。ボーナストークン（残り{bonusTokens:N0}）で利用可能です。";
+            }
+
+            return "今月のトークン上限に達しました。来月リセットされます。";
+        }
     }
 
     /// <summary>
@@ -137,7 +178,8 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
         INotificationService notificationService,
         IOptions<TranslationUIOptions> options,
         ILogger<EngineSelectionViewModel> logger,
-        IEventAggregator eventAggregator) : base(eventAggregator)
+        IEventAggregator eventAggregator,
+        IBonusTokenService? bonusTokenService = null) : base(eventAggregator)
     {
         ArgumentNullException.ThrowIfNull(statusService);
         ArgumentNullException.ThrowIfNull(planService);
@@ -147,6 +189,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
 
         _statusService = statusService;
         _planService = planService;
+        _bonusTokenService = bonusTokenService;
         _notificationService = notificationService;
         _logger = logger;
         _options = options.Value;
@@ -221,7 +264,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             {
                 await _notificationService.ShowWarningAsync(
                 "CloudOnlyエンジンの利用",
-                "CloudOnlyエンジンはプレミアムプランでのみ利用可能です。").ConfigureAwait(false);
+                "CloudOnlyエンジンはPro/Premium/Ultimateプランで利用可能です。").ConfigureAwait(false);
                 return;
             }
 
@@ -348,9 +391,9 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     private void ShowPremiumInfo()
     {
         _notificationService.ShowInfoAsync(
-            "プレミアムプラン",
-            "CloudOnlyエンジンを利用するにはプレミアムプランへのアップグレードが必要です。\n" +
-            "プレミアムプランでは無制限の高品質翻訳をご利用いただけます。");
+            "有料プランへのアップグレード",
+            "CloudOnlyエンジンを利用するにはPro/Premium/Ultimateプランへのアップグレードが必要です。\n" +
+            "有料プランでは高品質のクラウドAI翻訳をご利用いただけます。");
     }
 
     /// <summary>
@@ -400,11 +443,35 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
         var wasCloudOnlyEnabled = IsCloudOnlyEnabled;
         IsCloudOnlyEnabled = _planService.CanUseCloudOnlyEngine;
 
+        // [Issue #296] 無効理由メッセージも更新
+        this.RaisePropertyChanged(nameof(CloudOnlyDisabledMessage));
+
+        // [Issue #296] クォータ超過関連プロパティも更新
+        this.RaisePropertyChanged(nameof(IsQuotaExceeded));
+        this.RaisePropertyChanged(nameof(IsQuotaExceededButBonusAvailable));
+        this.RaisePropertyChanged(nameof(QuotaExceededMessage));
+
+        // [Issue #296] デバッグ: 実際の値を詳細ログ出力
+        var bonusTokens = _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
+        _logger.LogInformation(
+            "[Issue #296] UpdateCloudOnlyAvailability 詳細: " +
+            "CanUseCloudOnlyEngine={CanUse}, IsMonthlyLimitExceeded={LimitExceeded}, " +
+            "MonthlyUsage={Usage}/{Limit}, BonusTokens={Bonus}",
+            _planService.CanUseCloudOnlyEngine,
+            _planService.IsMonthlyLimitExceeded,
+            _planService.MonthlyUsageCount,
+            _planService.MonthlyLimit,
+            bonusTokens);
+
+        _logger.LogDebug(
+            "[Issue #296] UpdateCloudOnlyAvailability: IsCloudOnlyEnabled={IsEnabled}, IsQuotaExceeded={IsExceeded}, BonusAvailable={BonusAvailable}",
+            IsCloudOnlyEnabled, IsQuotaExceeded, IsQuotaExceededButBonusAvailable);
+
         if (!IsCloudOnlyEnabled && SelectedEngine == TranslationEngine.CloudOnly)
         {
-            // プランダウングレード時のフォールバック
+            // プランダウングレードまたはクォータ超過（ボーナスなし）時のフォールバック
             SelectedEngine = TranslationEngine.LocalOnly;
-            _logger.LogInformation("Fallback to LocalOnly due to plan limitation");
+            _logger.LogInformation("[Issue #296] Fallback to LocalOnly due to plan limitation or quota exceeded (no bonus tokens)");
         }
         else if (IsCloudOnlyEnabled && !wasCloudOnlyEnabled && SelectedEngine == TranslationEngine.LocalOnly)
         {
@@ -412,6 +479,9 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             SelectedEngine = TranslationEngine.CloudOnly;
             _logger.LogInformation("🎉 Auto-switched to CloudOnly due to plan upgrade to Premium");
         }
+
+        // 説明文も更新
+        UpdateEngineDescription();
     }
 
     /// <summary>
@@ -450,11 +520,23 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     {
         if (!IsCloudOnlyEnabled)
         {
-            return "Gemini APIを使用した高品質クラウド翻訳。\n❌ プレミアムプランが必要です。";
+            // [Issue #296] クォータ超過とプラン不足を区別
+            if (_planService.IsMonthlyLimitExceeded)
+            {
+                return "Gemini APIを使用した高品質クラウド翻訳。\n❌ 今月のトークン上限に達しました。来月リセットされます。";
+            }
+            return "Gemini APIを使用した高品質クラウド翻訳。\n❌ Pro/Premium/Ultimateプランが必要です。";
         }
 
         var status = CloudEngineStatus;
         var baseDesc = "Gemini APIを使用した高品質クラウド翻訳。";
+
+        // [Issue #296] クォータ超過だがボーナストークンで利用可能な場合
+        if (IsQuotaExceededButBonusAvailable)
+        {
+            var bonusTokens = _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
+            return $"{baseDesc}\n⚠️ 月間上限超過。ボーナストークン（残り{bonusTokens:N0}）で利用可能";
+        }
 
         if (!status.IsOnline)
         {
@@ -490,7 +572,7 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
                 TranslationEngine.CloudOnly,
                 "CloudOnly",
                 "クラウド翻訳",
-                "Gemini API使用、高品質・プレミアムプラン必須")
+                "Gemini API使用、高品質・有料プラン必須")
         ];
     }
 

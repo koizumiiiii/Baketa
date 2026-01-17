@@ -190,6 +190,76 @@ public sealed class TokenUsageRepository : ITokenUsageRepository, IDisposable
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// [Issue #296] サーバーのトークン使用量でローカルを同期するためのメソッド。
+    /// サーバーの値を正（authoritative）として、ローカルの合計トークン数を上書きします。
+    /// 入力/出力トークンの内訳は保持されず、合計のみが更新されます。
+    /// </remarks>
+    public async Task SetMonthlySummaryAsync(string yearMonth, long totalTokens, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(yearMonth);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // 既存のサマリーを読み込む（入力/出力比率を保持するため）
+            var existingSummary = await LoadSummaryFromFileInternalAsync(yearMonth, cancellationToken)
+                .ConfigureAwait(false);
+
+            MonthlyUsageSummary updatedSummary;
+
+            if (existingSummary is not null)
+            {
+                // 既存の入出力比率を維持しつつ合計を更新
+                var ratio = existingSummary.TotalTokens > 0
+                    ? (double)existingSummary.InputTokens / existingSummary.TotalTokens
+                    : InputTokenRatio;
+
+                updatedSummary = new MonthlyUsageSummary
+                {
+                    YearMonth = existingSummary.YearMonth,
+                    TotalTokens = totalTokens,
+                    InputTokens = (long)(totalTokens * ratio),
+                    OutputTokens = totalTokens - (long)(totalTokens * ratio),
+                    ByProvider = existingSummary.ByProvider,
+                    LastUpdated = DateTime.UtcNow
+                };
+            }
+            else
+            {
+                // 新規作成（デフォルト比率を使用）
+                updatedSummary = new MonthlyUsageSummary
+                {
+                    YearMonth = yearMonth,
+                    TotalTokens = totalTokens,
+                    InputTokens = (long)(totalTokens * InputTokenRatio),
+                    OutputTokens = (long)(totalTokens * OutputTokenRatio),
+                    ByProvider = new Dictionary<string, long> { ["primary"] = totalTokens },
+                    LastUpdated = DateTime.UtcNow
+                };
+            }
+
+            // メモリキャッシュを更新
+            lock (_memoryLock)
+            {
+                _cachedSummary = updatedSummary;
+            }
+
+            // 即座にファイルに保存（同期処理なのでデバウンスなし）
+            await SaveSummaryToFileAsync(updatedSummary, cancellationToken).ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "[Issue #296] サーバーからローカルにトークン使用量を同期: YearMonth={YearMonth}, TotalTokens={TotalTokens}",
+                yearMonth, totalTokens);
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
     /// <summary>
     /// 起動時のサマリー読み込み
     /// </summary>

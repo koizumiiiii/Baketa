@@ -27,10 +27,27 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
     /// <remarks>
     /// [Issue #280+#281] プランまたはボーナストークンでCloud AI利用可能
     /// </remarks>
-    public bool CanUseCloudOnlyEngine =>
-        (_licenseManager.CurrentState.CurrentPlan.HasCloudAiAccess() &&
-         !_licenseManager.CurrentState.IsQuotaExceeded) ||
-        (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+    public bool CanUseCloudOnlyEngine
+    {
+        get
+        {
+            var state = _licenseManager.CurrentState;
+            var hasCloudAccess = state.CurrentPlan.HasCloudAiAccess();
+            var isQuotaExceeded = state.IsQuotaExceeded;
+            var bonusTokens = _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
+            var result = (hasCloudAccess && !isQuotaExceeded) || bonusTokens > 0;
+
+            _logger.LogInformation(
+                "[Issue #296] CanUseCloudOnlyEngine評価: Result={Result}, Plan={Plan}, HasCloudAccess={HasCloudAccess}, " +
+                "IsQuotaExceeded={IsQuotaExceeded}, BonusTokens={BonusTokens}, " +
+                "CloudAiTokensUsed={Used}, MonthlyTokenLimit={Limit}, ServerMonthlyTokenLimit={ServerLimit}",
+                result, state.CurrentPlan, hasCloudAccess,
+                isQuotaExceeded, bonusTokens,
+                state.CloudAiTokensUsed, state.MonthlyTokenLimit, state.ServerMonthlyTokenLimit);
+
+            return result;
+        }
+    }
 
     /// <inheritdoc/>
     public bool IsMonthlyLimitExceeded => _licenseManager.CurrentState.IsQuotaExceeded;
@@ -160,6 +177,18 @@ public sealed class UserPlanServiceAdapter : IUserPlanService, IDisposable
                 oldUserPlanType, newUserPlanType);
 
             PlanChanged?.Invoke(this, new UserPlanChangedEventArgs(oldUserPlanType, newUserPlanType));
+        }
+
+        // [Issue #296] クォータ超過状態が変化した場合もイベントを発行
+        // EngineSelectionViewModelがIsCloudOnlyEnabledを更新できるようにする
+        if (e.OldState.IsQuotaExceeded != e.NewState.IsQuotaExceeded)
+        {
+            _logger.LogInformation(
+                "[Issue #296] クォータ超過状態変更（エンジン選択更新のためイベント発行）: IsQuotaExceeded={IsQuotaExceeded}",
+                e.NewState.IsQuotaExceeded);
+
+            // 同じUserPlanTypeでもCanUseCloudOnlyEngineが変化するため通知
+            PlanChanged?.Invoke(this, new UserPlanChangedEventArgs(newUserPlanType, newUserPlanType));
         }
 
         // [Issue #243] プロモーション適用時にCloud AI翻訳を自動有効化

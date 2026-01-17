@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.License.Models;
+using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -26,6 +27,7 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<BonusTokenService> _logger;
+    private readonly IApiRequestDeduplicator _deduplicator;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly object _lockObject = new();
     private bool _disposed;
@@ -58,9 +60,11 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
 
     public BonusTokenService(
         HttpClient httpClient,
+        IApiRequestDeduplicator deduplicator,
         ILogger<BonusTokenService> logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _deduplicator = deduplicator ?? throw new ArgumentNullException(nameof(deduplicator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _jsonOptions = new JsonSerializerOptions
@@ -69,7 +73,7 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
-        _logger.LogDebug("BonusTokenService initialized");
+        _logger.LogDebug("[Issue #299] BonusTokenService initialized with ApiRequestDeduplicator");
     }
 
     /// <inheritdoc/>
@@ -187,6 +191,22 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
             };
         }
 
+        // [Issue #299] 重複呼び出し削減 - 同一キーのリクエストは1回のみ実行
+        var result = await _deduplicator.ExecuteOnceAsync(
+            "bonus-tokens-status",
+            () => FetchFromServerCoreAsync(accessToken, cancellationToken),
+            ApiCacheDurations.BonusTokens).ConfigureAwait(false);
+
+        return result ?? new BonusSyncResult { Success = false, ErrorMessage = "Deduplication failed" };
+    }
+
+    /// <summary>
+    /// [Issue #299] サーバーからボーナストークン状態を取得する実装
+    /// </summary>
+    private async Task<BonusSyncResult?> FetchFromServerCoreAsync(
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "/api/bonus-tokens/status");
@@ -240,7 +260,7 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
             RaiseBonusTokensChanged("Fetched from server");
 
             _logger.LogInformation(
-                "[Issue #280] FetchFromServerAsync: Fetched {Count} bonuses (Total: {Total})",
+                "[Issue #299] FetchFromServerAsync: Fetched {Count} bonuses (Total: {Total})",
                 result.Bonuses?.Count ?? 0, result.TotalRemaining);
 
             return new BonusSyncResult
@@ -403,6 +423,41 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
             TotalRemaining = GetTotalRemainingTokens(),
             Reason = reason
         });
+    }
+
+    /// <inheritdoc/>
+    public void ApplySyncedData(IReadOnlyList<BonusTokenInfo> bonuses, long totalRemaining)
+    {
+        lock (_lockObject)
+        {
+            _bonusTokens.Clear();
+
+            foreach (var info in bonuses.Where(b => !b.IsExpired && b.RemainingTokens > 0))
+            {
+                // BonusTokenInfoからBonusTokenに変換
+                // 注意: BonusTokenInfoは軽量DTOのため、一部の情報（SourceType, GrantedTokens）は設定しない
+                if (Guid.TryParse(info.BonusId, out var id))
+                {
+                    _bonusTokens.Add(new BonusToken
+                    {
+                        Id = id,
+                        SourceType = "synced", // 統合エンドポイントからの同期
+                        GrantedTokens = info.RemainingTokens, // 残りトークン = 付与トークン（使用済み=0）
+                        UsedTokens = 0,
+                        ExpiresAt = DateTime.TryParse(info.ExpiresAt, null, DateTimeStyles.RoundtripKind, out var expiresAt)
+                            ? expiresAt
+                            : DateTime.UtcNow.AddDays(30) // デフォルト30日
+                    });
+                }
+            }
+
+            _logger.LogInformation(
+                "[Issue #299] ApplySyncedData: Applied {Count} bonuses, TotalRemaining={Total}",
+                _bonusTokens.Count,
+                totalRemaining);
+        }
+
+        RaiseBonusTokensChanged("Applied from sync/init endpoint");
     }
 
     public void Dispose()

@@ -234,7 +234,9 @@ public class MainOverlayViewModel : ViewModelBase
         get => _isTranslationActive;
         set
         {
+#pragma warning disable CS0420 // volatile ref: SetPropertySafeはUIスレッド制御付きで安全に値を設定
             var changed = SetPropertySafe(ref _isTranslationActive, value);
+#pragma warning restore CS0420
             if (changed)
             {
                 // 依存プロパティの変更通知を安全に送信

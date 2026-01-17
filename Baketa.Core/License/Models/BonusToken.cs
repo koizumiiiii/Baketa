@@ -93,3 +93,25 @@ public sealed class BonusTokensChangedEventArgs : EventArgs
     /// </summary>
     public required string Reason { get; init; }
 }
+
+/// <summary>
+/// [Issue #299] ボーナストークン情報（統合エンドポイント用DTO）
+/// </summary>
+/// <remarks>
+/// 統合エンドポイント `/api/sync/init` から取得したデータを受け渡すための軽量DTO。
+/// 完全な <see cref="BonusToken"/> に変換せずに、必要最小限の情報のみを持つ。
+/// </remarks>
+public sealed record BonusTokenInfo
+{
+    /// <summary>ボーナスID</summary>
+    public required string BonusId { get; init; }
+
+    /// <summary>残りトークン数</summary>
+    public long RemainingTokens { get; init; }
+
+    /// <summary>期限切れか</summary>
+    public bool IsExpired { get; init; }
+
+    /// <summary>有効期限（ISO 8601形式）</summary>
+    public string? ExpiresAt { get; init; }
+}

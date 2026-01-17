@@ -26,7 +26,7 @@
  *     リレーサーバーはstateを透過的に転送するのみ。
  */
 
-import { handleTranslate, TranslateEnv } from './translate';
+import { handleTranslate, handleQuotaStatus, TranslateEnv } from './translate';
 import { handleCrashReport, CrashReportEnv } from './crash-report';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SignJWT, jwtVerify, JWTPayload } from 'jose';
@@ -393,37 +393,54 @@ async function verifyWebhookSignature(
 
 /**
  * レートリミットをチェック
+ * [Issue #299] KVからCache APIに移行してKV Write削減（Cache APIは無料・無制限）
  * @returns true if rate limited (should reject), false if allowed
  */
 async function checkRateLimit(
-  env: Env,
+  _env: Env,
   identifier: string,
   maxRequests: number = RATE_LIMIT_MAX_REQUESTS
 ): Promise<{ limited: boolean; remaining: number; resetAt: number }> {
-  const key = `ratelimit:${identifier}`;
   const now = Date.now();
   const windowStart = Math.floor(now / (RATE_LIMIT_WINDOW_SECONDS * 1000)) * (RATE_LIMIT_WINDOW_SECONDS * 1000);
   const resetAt = windowStart + (RATE_LIMIT_WINDOW_SECONDS * 1000);
 
-  try {
-    const data = await env.SESSIONS.get<RateLimitData>(key, 'json');
+  // [Issue #299] Cache APIを使用（KV Writeを節約）
+  const cache = caches.default;
+  const cacheUrl = `https://baketa-relay.suke009.workers.dev/ratelimit/${encodeURIComponent(identifier)}/${windowStart}`;
+  const cacheRequest = new Request(cacheUrl);
 
-    if (!data || data.windowStart !== windowStart) {
+  try {
+    const cachedResponse = await cache.match(cacheRequest);
+
+    if (!cachedResponse) {
       // 新しいウィンドウを開始
-      await env.SESSIONS.put(key, JSON.stringify({ count: 1, windowStart }), {
-        expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2,
+      const newData: RateLimitData = { count: 1, windowStart };
+      const response = new Response(JSON.stringify(newData), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': `max-age=${RATE_LIMIT_WINDOW_SECONDS * 2}`,
+        },
       });
+      await cache.put(cacheRequest, response);
       return { limited: false, remaining: maxRequests - 1, resetAt };
     }
+
+    const data = await cachedResponse.json<RateLimitData>();
 
     if (data.count >= maxRequests) {
       return { limited: true, remaining: 0, resetAt };
     }
 
     // カウントをインクリメント
-    await env.SESSIONS.put(key, JSON.stringify({ count: data.count + 1, windowStart }), {
-      expirationTtl: RATE_LIMIT_WINDOW_SECONDS * 2,
+    const updatedData: RateLimitData = { count: data.count + 1, windowStart };
+    const response = new Response(JSON.stringify(updatedData), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `max-age=${RATE_LIMIT_WINDOW_SECONDS * 2}`,
+      },
     });
+    await cache.put(cacheRequest, response);
     return { limited: false, remaining: maxRequests - data.count - 1, resetAt };
   } catch {
     // エラー時は許可（フェイルオープン）
@@ -448,6 +465,8 @@ interface PatreonExchangeBody {
   code: string;
   redirect_uri: string;
   state?: string;
+  /** [Issue #295] Supabase JWT（アカウント紐づけ用、オプション） */
+  supabase_jwt?: string;
 }
 
 interface SessionValidateBody {
@@ -491,7 +510,9 @@ function validatePatreonExchangeBody(body: unknown): ValidationResult<PatreonExc
     return { success: false, error: 'Missing or invalid field: redirect_uri' };
   }
   const state = typeof obj.state === 'string' ? obj.state : undefined;
-  return { success: true, data: { code: obj.code, redirect_uri: obj.redirect_uri, state } };
+  // [Issue #295] Supabase JWT（オプション）
+  const supabase_jwt = typeof obj.supabase_jwt === 'string' ? obj.supabase_jwt : undefined;
+  return { success: true, data: { code: obj.code, redirect_uri: obj.redirect_uri, state, supabase_jwt } };
 }
 
 function validateSessionValidateBody(body: unknown): ValidationResult<SessionValidateBody> {
@@ -611,6 +632,44 @@ async function setCachedMembership(env: Env, userId: string, membership: ParsedM
 async function invalidateMembershipCache(env: Env, userId: string): Promise<void> {
   const cacheKey = `membership:${userId}`;
   await env.SESSIONS.delete(cacheKey);
+}
+
+// ============================================
+// [Issue #296] 認証キャッシュ無効化
+// translate.tsのCache APIと同じ形式でキャッシュを削除
+// ============================================
+
+/** トークンをSHA-256でハッシュ（translate.tsと同じ実装） */
+async function hashTokenForAuthCache(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** 認証キャッシュ用のURLを生成 */
+function getAuthCacheUrl(cacheKey: string): string {
+  return `https://baketa-auth-cache.internal/${cacheKey}`;
+}
+
+/**
+ * [Issue #296] 認証キャッシュを無効化
+ * Patreon紐づけ後に古いplan=Freeキャッシュが残らないようにする
+ */
+async function invalidateAuthCache(token: string): Promise<void> {
+  const tokenHash = await hashTokenForAuthCache(token);
+  const cacheKey = `auth:v2:${tokenHash}`;
+  const cacheUrl = getAuthCacheUrl(cacheKey);
+
+  const cache = caches.default;
+  const deleted = await cache.delete(new Request(cacheUrl));
+
+  if (deleted) {
+    console.log(`[Issue #296] Auth cache deleted: ${cacheKey.substring(0, 20)}...`);
+  } else {
+    console.log(`[Issue #296] Auth cache not found (already expired or never cached): ${cacheKey.substring(0, 20)}...`);
+  }
 }
 
 // ============================================
@@ -1098,6 +1157,117 @@ async function extractUserIdFromJwt(
   } catch (error) {
     console.error('JWT extraction error:', error);
     return null;
+  }
+}
+
+// ============================================
+// [Issue #295] Patreon-Supabase アカウントリンク
+// ============================================
+
+/**
+ * [Issue #295] Supabase JWTを検証してユーザーIDを抽出
+ * @param supabase Supabaseクライアント
+ * @param jwt JWT文字列
+ * @returns user_id (UUID) or null if invalid
+ */
+async function validateSupabaseJwtAndGetUserId(
+  supabase: SupabaseClient,
+  jwt: string
+): Promise<string | null> {
+  if (!jwt) {
+    return null;
+  }
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(jwt);
+
+    if (error || !user) {
+      console.log(`[Issue #295] Supabase JWT validation failed: ${error?.message || 'No user found'}`);
+      return null;
+    }
+
+    return user.id;
+  } catch (error) {
+    console.error('[Issue #295] Supabase JWT validation error:', error);
+    return null;
+  }
+}
+
+/**
+ * [Issue #295] PatreonアカウントをSupabaseユーザーに紐づけ
+ * @param env 環境変数
+ * @param supabaseJwt Supabase JWT
+ * @param patreonUserId Patreon ユーザーID
+ * @returns 成功時true、失敗時false
+ */
+async function linkPatreonToSupabaseAccount(
+  env: Env,
+  supabaseJwt: string,
+  patreonUserId: string
+): Promise<boolean> {
+  const supabase = getSupabaseClient(env);
+  if (!supabase) {
+    console.warn('[Issue #295] Supabase not configured, skipping account linking');
+    return false;
+  }
+
+  // Step 1: JWT検証してSupabase user_idを取得
+  const supabaseUserId = await validateSupabaseJwtAndGetUserId(supabase, supabaseJwt);
+  if (!supabaseUserId) {
+    console.log('[Issue #295] Invalid Supabase JWT, skipping account linking');
+    return false;
+  }
+
+  // Step 2: 既存の紐づけをチェック
+  try {
+    const { data: existingProfile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('patreon_user_id')
+      .eq('id', supabaseUserId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('[Issue #295] Profile fetch error:', fetchError);
+      return false;
+    }
+
+    // 既に同じPatreon IDで紐づけ済みならスキップ（冪等性）
+    if (existingProfile?.patreon_user_id === patreonUserId) {
+      console.log(`[Issue #295] Already linked: supabase=${supabaseUserId.substring(0, 8)}... ↔ patreon=${patreonUserId}`);
+      return true;
+    }
+
+    // 別のPatreon IDと紐づけ済みの場合は上書き（1 Supabase : 1 Patreon）
+    if (existingProfile?.patreon_user_id && existingProfile.patreon_user_id !== patreonUserId) {
+      console.log(`[Issue #295] Re-linking: old_patreon=${existingProfile.patreon_user_id} → new_patreon=${patreonUserId}`);
+    }
+
+    // Step 3: link_patreon_user RPC呼び出し
+    const { error: linkError } = await supabase.rpc('link_patreon_user', {
+      p_user_id: supabaseUserId,
+      p_patreon_user_id: patreonUserId
+    });
+
+    if (linkError) {
+      console.error('[Issue #295] link_patreon_user RPC error:', linkError);
+      return false;
+    }
+
+    // [Issue #296] 紐づけ成功時に認証キャッシュを無効化
+    // これにより、次回の翻訳リクエストで新しいプラン情報が取得される
+    try {
+      await invalidateAuthCache(supabaseJwt);
+      console.log(`[Issue #296] Auth cache invalidated for supabase user`);
+    } catch (cacheError) {
+      // キャッシュ削除失敗は紐づけ成功に影響させない
+      console.warn('[Issue #296] Failed to invalidate auth cache:', cacheError);
+    }
+
+    console.log(`[Issue #295] Account linked successfully: supabase=${supabaseUserId.substring(0, 8)}... ↔ patreon=${patreonUserId}`);
+    return true;
+  } catch (error) {
+    console.error('[Issue #295] Account linking failed:', error);
+    return false;
   }
 }
 
@@ -1633,19 +1803,74 @@ async function handleAnalyticsEvents(
     return errorResponse('Method not allowed', 405, origin, allowedOrigins);
   }
 
-  // 1. APIキー認証
-  const apiKey = request.headers.get('X-Analytics-Key');
-  if (!env.ANALYTICS_API_KEY) {
-    console.error('[Issue #269] ANALYTICS_API_KEY not configured');
-    return errorResponse('Analytics service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
-  }
-  if (!apiKey || apiKey !== env.ANALYTICS_API_KEY) {
-    return errorResponse('Unauthorized', 401, origin, allowedOrigins, 'INVALID_API_KEY');
+  // 1. セッション認証（他のAPIエンドポイントと同じ方式）
+  // [Issue #297] X-Analytics-Key認証からセッショントークン認証に変更
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return errorResponse('Authentication required', 401, origin, allowedOrigins, 'AUTH_REQUIRED');
   }
 
-  // 2. レートリミット（IP単位）
-  const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rateLimit = await checkRateLimit(env, `analytics:${clientIP}`, 120);  // 1分間に120リクエストまで
+  const sessionToken = authHeader.substring(7);
+  const supabase = getSupabaseClient(env);
+  if (!supabase) {
+    console.error('[Issue #297] Supabase not configured for analytics');
+    return errorResponse('Analytics service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+  }
+
+  // [Issue #297] JWT → Patreon KV → Supabase JWTのフォールバック（translate.tsと同様）
+  let userId: string;
+
+  // 1. まずRelay Server発行のJWT検証を試みる
+  const jwtClaims = await validateJwtToken(env, sessionToken);
+  if (jwtClaims) {
+    userId = jwtClaims.sub;
+    console.log(`[Issue #297] Analytics: JWT認証成功 userId=${userId.substring(0, 8)}...`);
+  } else {
+    // 2. JWT検証失敗時はPatreon KVセッションを試す
+    const patreonSession = await getSession(env, sessionToken);
+    if (patreonSession && Date.now() <= patreonSession.expiresAt) {
+      const patreonUserId = patreonSession.userId;
+      console.log(`[Issue #297] Analytics: Patreon KVセッション認証成功 patreonId=${patreonUserId}`);
+
+      // [Issue #297] PatreonユーザーIDからSupabase UUIDを取得（usage_events.user_idはUUID型）
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('patreon_user_id', patreonUserId)
+        .single();
+
+      if (profileError || !profile) {
+        console.log(`[Issue #297] Analytics: Patreon user not linked to Supabase: patreonId=${patreonUserId}`);
+        // Patreon連携がない場合は記録をスキップ（エラーではない）
+        return successResponse({
+          success: true,
+          stored_count: 0,
+          message: 'Patreon user not linked to Supabase profile'
+        }, origin, allowedOrigins);
+      }
+      userId = profile.id;
+      console.log(`[Issue #297] Analytics: Patreon→Supabase UUID変換成功 userId=${userId.substring(0, 8)}...`);
+    } else {
+      // 3. Patreon KV失敗時はSupabase JWTを試す
+      // JWTフォーマットチェック: 3セグメント（header.payload.signature）が必要
+      const tokenSegments = sessionToken.split('.');
+      if (tokenSegments.length !== 3) {
+        console.log(`[Issue #297] Analytics: Token is not JWT format (segments=${tokenSegments.length}), auth failed`);
+        return errorResponse('Invalid or expired session', 401, origin, allowedOrigins, 'INVALID_SESSION');
+      }
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser(sessionToken);
+      if (authError || !user) {
+        console.log('[Issue #297] Analytics: JWT/Patreon/Supabase全ての認証失敗');
+        return errorResponse('Invalid or expired session', 401, origin, allowedOrigins, 'INVALID_SESSION');
+      }
+      userId = user.id;
+      console.log(`[Issue #297] Analytics: Supabase JWT認証成功 userId=${userId.substring(0, 8)}...`);
+    }
+  }
+
+  // 2. レートリミット（ユーザー単位）
+  const rateLimit = await checkRateLimit(env, `analytics:${userId}`, 120);  // 1分間に120リクエストまで
   if (rateLimit.limited) {
     return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
   }
@@ -1682,10 +1907,11 @@ async function handleAnalyticsEvents(
     // 6. 国コード取得（Cloudflare自動付与）
     const countryCode = (request as Request & { cf?: { country?: string } }).cf?.country || 'UNKNOWN';
 
-    // 7. イベントにcountry_codeを付与してSupabaseに挿入
-    const eventsWithCountry = events.map(event => ({
+    // 7. イベントにuser_id（認証済み）とcountry_codeを付与してSupabaseに挿入
+    // [Issue #297] user_idは認証済みユーザーIDを使用（クライアント提供値より優先）
+    const eventsWithMetadata = events.map(event => ({
       session_id: event.session_id,
-      user_id: event.user_id || null,
+      user_id: userId,  // 認証済みユーザーID（JWT or Supabase JWT）
       event_type: event.event_type,
       event_data: event.event_data || null,
       schema_version: event.schema_version || 1,
@@ -1696,14 +1922,14 @@ async function handleAnalyticsEvents(
 
     const { error } = await supabase
       .from('usage_events')
-      .insert(eventsWithCountry);
+      .insert(eventsWithMetadata);
 
     if (error) {
-      console.error('[Issue #269] Supabase insert error:', error);
+      console.error('[Issue #297] Supabase insert error:', error);
       return errorResponse('Failed to store events', 500, origin, allowedOrigins, 'DATABASE_ERROR');
     }
 
-    console.log(`[Issue #269] Analytics events stored: count=${events.length}, country=${countryCode}, ip=${clientIP.substring(0, 8)}...`);
+    console.log(`[Issue #297] Analytics events stored: count=${events.length}, userId=${userId.substring(0, 8)}..., country=${countryCode}`);
 
     return successResponse({
       success: true,
@@ -1714,6 +1940,209 @@ async function handleAnalyticsEvents(
     console.error('[Issue #269] Analytics error:', error);
     return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
   }
+}
+
+// ============================================
+// Issue #299: 統合初期化エンドポイント
+// ============================================
+
+/**
+ * [Issue #299] 統合初期化エンドポイント
+ * GET /api/sync/init
+ *
+ * 起動時に必要な全ステータスを1回のリクエストで取得
+ * - プロモーション状態
+ * - 同意状態
+ * - ボーナストークン状態
+ * - クォータ状態（トークン使用量）
+ *
+ * 効果: 起動時API呼び出し 4回 → 1回
+ */
+async function handleSyncInit(
+  request: Request,
+  env: Env,
+  origin: string,
+  allowedOrigins: string
+): Promise<Response> {
+  if (request.method !== 'GET') {
+    return errorResponse('Method not allowed', 405, origin, allowedOrigins);
+  }
+
+  const startTime = Date.now();
+
+  try {
+    // 1. Supabaseクライアント確認
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #299] Supabase not configured for sync/init');
+      return errorResponse('Sync service not available', 503, origin, allowedOrigins, 'SERVICE_UNAVAILABLE');
+    }
+
+    // 2. JWT認証（必須）
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return errorResponse('Authentication required', 401, origin, allowedOrigins, 'SYNC_AUTH_REQUIRED');
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return errorResponse('Invalid token', 401, origin, allowedOrigins, 'SYNC_INVALID_TOKEN');
+    }
+
+    // 3. レート制限チェック（5回/分 - 起動時のみ使用のため厳しめ）
+    const rateLimit = await checkRateLimit(env, `sync-init:${user.id}`, 5);
+    if (rateLimit.limited) {
+      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
+    }
+
+    // 4. 全ステータスを並列取得（Promise.allSettledで部分的失敗を許容）
+    const [promotionSettled, consentSettled, bonusSettled, quotaSettled] = await Promise.allSettled([
+      // プロモーション状態
+      supabase.rpc('get_promotion_status_for_user', { p_user_id: user.id }),
+      // 同意状態
+      supabase.rpc('get_consent_status_for_user', { p_user_id: user.id }),
+      // ボーナストークン状態
+      supabase.rpc('get_bonus_tokens_for_user', { p_user_id: user.id }),
+      // クォータ状態（トークン使用量）
+      getQuotaStatusForUser(supabase, user.id),
+    ]);
+
+    // 部分的失敗を追跡
+    const failures: string[] = [];
+
+    // 5. プロモーション状態の整形
+    let promotion = { has_promotion: false, promotion: null as { code: string; tier: string; expires_at: string } | null, expired: false };
+    if (promotionSettled.status === 'fulfilled') {
+      const promotionResult = promotionSettled.value;
+      const promotionData = Array.isArray(promotionResult.data) ? promotionResult.data[0] : promotionResult.data;
+      promotion = {
+        has_promotion: promotionData?.has_promotion ?? false,
+        promotion: promotionData?.has_promotion && !promotionData?.is_expired ? {
+          code: promotionData.promotion_code,
+          tier: promotionData.promotion_tier,
+          expires_at: promotionData.expires_at,
+        } : null,
+        expired: promotionData?.is_expired ?? false,
+      };
+    } else {
+      failures.push('promotion');
+      console.error('[Issue #299] Promotion query failed:', promotionSettled.reason);
+    }
+
+    // 6. 同意状態の整形
+    let consent = { privacy_policy: null as { status: string; version: string; recorded_at: string } | null, terms_of_service: null as { status: string; version: string; recorded_at: string } | null };
+    if (consentSettled.status === 'fulfilled') {
+      const consentResult = consentSettled.value;
+      const consentData = Array.isArray(consentResult.data) ? consentResult.data : [];
+      const privacyPolicy = consentData.find((r: { consent_type: string }) => r.consent_type === 'privacy_policy');
+      const termsOfService = consentData.find((r: { consent_type: string }) => r.consent_type === 'terms_of_service');
+      consent = {
+        privacy_policy: privacyPolicy ? {
+          status: privacyPolicy.status,
+          version: privacyPolicy.version,
+          recorded_at: privacyPolicy.recorded_at,
+        } : null,
+        terms_of_service: termsOfService ? {
+          status: termsOfService.status,
+          version: termsOfService.version,
+          recorded_at: termsOfService.recorded_at,
+        } : null,
+      };
+    } else {
+      failures.push('consent');
+      console.error('[Issue #299] Consent query failed:', consentSettled.reason);
+    }
+
+    // 7. ボーナストークン状態の整形
+    let bonusTokens = { bonuses: [] as BonusTokenInfo[], total_remaining: 0, active_count: 0 };
+    if (bonusSettled.status === 'fulfilled') {
+      const bonusResult = bonusSettled.value;
+      const bonusData: BonusTokenInfo[] = Array.isArray(bonusResult.data) ? bonusResult.data : [];
+      bonusTokens = {
+        bonuses: bonusData,
+        total_remaining: bonusData
+          .filter(b => !b.is_expired && b.remaining_tokens > 0)
+          .reduce((sum, b) => sum + b.remaining_tokens, 0),
+        active_count: bonusData.filter(b => !b.is_expired && b.remaining_tokens > 0).length,
+      };
+    } else {
+      failures.push('bonus_tokens');
+      console.error('[Issue #299] Bonus tokens query failed:', bonusSettled.reason);
+    }
+
+    // 8. クォータ状態の整形
+    let quota = { tokens_used: 0, tokens_limit: 50000, year_month: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` };
+    if (quotaSettled.status === 'fulfilled') {
+      quota = quotaSettled.value;
+    } else {
+      failures.push('quota');
+      console.error('[Issue #299] Quota query failed:', quotaSettled.reason);
+    }
+
+    // 9. 監査ログ
+    const duration = Date.now() - startTime;
+    console.log(JSON.stringify({
+      event: 'sync_init',
+      user_id: user.id.substring(0, 8) + '...',
+      has_promotion: promotion.has_promotion,
+      has_consent: !!(consent.privacy_policy && consent.terms_of_service),
+      bonus_count: bonusTokens.active_count,
+      tokens_used: quota.tokens_used,
+      duration_ms: duration,
+      partial_failures: failures.length > 0 ? failures : undefined,
+      timestamp: new Date().toISOString(),
+    }));
+
+    // 10. 統合レスポンス（部分的失敗情報を含む）
+    return successResponse({
+      success: true,
+      promotion,
+      consent,
+      bonus_tokens: bonusTokens,
+      quota,
+      partial_failure: failures.length > 0,
+      failed_components: failures.length > 0 ? failures : undefined,
+    }, origin, allowedOrigins);
+
+  } catch (error) {
+    console.error('[Issue #299] Sync init error:', error);
+    return errorResponse('Internal server error', 500, origin, allowedOrigins, 'INTERNAL_ERROR');
+  }
+}
+
+/**
+ * [Issue #299] ユーザーのクォータ状態を取得
+ */
+async function getQuotaStatusForUser(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{ tokens_used: number; tokens_limit: number; year_month: string }> {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  let tokensUsed = 0;
+
+  try {
+    const { data, error } = await supabase
+      .from('token_usage')
+      .select('tokens_used')
+      .eq('user_id', userId)
+      .eq('year_month', yearMonth)
+      .single();
+
+    if (!error && data) {
+      tokensUsed = Number(data.tokens_used);
+    }
+  } catch {
+    // エラー時は0として続行
+  }
+
+  return {
+    tokens_used: tokensUsed,
+    tokens_limit: 0, // プランはクライアント側で判定
+    year_month: yearMonth,
+  };
 }
 
 // ============================================
@@ -1999,6 +2428,12 @@ export default {
           return handleBonusTokensStatus(request, env, origin, allowedOrigins);
         case '/api/bonus-tokens/sync':
           return handleBonusTokensSync(request, env, origin, allowedOrigins);
+        // Issue #296: クォータ状態取得
+        case '/api/quota/status':
+          return handleQuotaStatus(request, env as TranslateEnv, origin, allowedOrigins);
+        // Issue #299: 統合初期化エンドポイント
+        case '/api/sync/init':
+          return handleSyncInit(request, env, origin, allowedOrigins);
         // Issue #287: JWT認証エンドポイント
         case '/api/auth/token':
           return handleAuthToken(request, env, origin, allowedOrigins);
@@ -2070,14 +2505,11 @@ async function handleWebhook(
     const userId = payload.data.relationships?.user?.data?.id;
     const pledgeId = payload.data.id;
     const amountCents = payload.data.attributes?.currently_entitled_amount_cents ?? 0;
+    const patronStatus = payload.data.attributes?.patron_status;
 
-    console.log(`Webhook received: event=${eventType}, userId=${userId}, pledgeId=${pledgeId}, amountCents=${amountCents}`);
+    console.log(`Webhook received: event=${eventType}, userId=${userId}, pledgeId=${pledgeId}, amountCents=${amountCents}, patronStatus=${patronStatus}`);
 
     if (userId) {
-      // メンバーシップキャッシュを無効化（次回アクセス時に最新情報を取得）
-      await invalidateMembershipCache(env, userId);
-      console.log(`Webhook: Invalidated membership cache for user ${userId}`);
-
       // [Issue #271] プラン変更を履歴に記録
       const supabase = getSupabaseClient(env);
       const newPlan = eventType === 'members:pledge:delete' ? 'Free' : determinePlan(amountCents);
@@ -2111,18 +2543,37 @@ async function handleWebhook(
         console.warn('Webhook: Supabase client not available, skipping plan change recording');
       }
 
+      // 全イベントでメンバーシップキャッシュを無効化
+      // 次回API呼び出し時にPatreon APIから最新状態を取得する
+      // Patreon APIが「真実の情報源」- 課金期間中はまだ有料プラン、期間終了後はFreeを返す
+      await invalidateMembershipCache(env, userId);
+      console.log(`Webhook: Invalidated membership cache for user ${userId} (${eventType})`);
+
       // イベントタイプに応じた追加処理
       switch (eventType) {
         case 'members:pledge:delete':
-          // 支援停止時はユーザーの全セッションを無効化
-          const revokedCount = await revokeAllUserSessions(env, userId);
-          console.log(`Webhook: Revoked ${revokedCount} sessions for user ${userId} (pledge deleted)`);
+          // [Issue #296] セッションは無効化しない
+          // Patreon APIがアクセス状態を正確に返すため、セッション無効化は不要
+          // - 課金期間中: Patreon APIはまだ有料プランを返す
+          // - 支払い失敗等で即時停止: Patreon APIはFreeを返す
+          console.log(`Webhook: Pledge delete processed for user ${userId}`);
           break;
 
         case 'members:pledge:create':
-        case 'members:pledge:update':
-          // 新規支援・更新時はキャッシュ無効化のみ（次回API呼び出しで最新情報取得）
           console.log(`Webhook: Processed ${eventType} for user ${userId}`);
+          break;
+
+        case 'members:pledge:update':
+          // [Issue #296] patron_statusによる即時アクセス停止判定
+          // - declined_patron: 支払い失敗・カード拒否
+          // - former_patron: メンバーシップ自体をキャンセル済み
+          if (patronStatus === 'declined_patron' || patronStatus === 'former_patron') {
+            console.log(`Webhook: Immediate revocation triggered for user ${userId} (patronStatus=${patronStatus})`);
+            const revokedCount = await revokeAllUserSessions(env, userId);
+            console.log(`Webhook: Revoked ${revokedCount} sessions for user ${userId}`);
+          } else {
+            console.log(`Webhook: Processed ${eventType} for user ${userId} (patronStatus=${patronStatus})`);
+          }
           break;
 
         default:
@@ -2300,14 +2751,14 @@ async function handlePatreonExchange(
       return errorResponse(validation.error || 'Invalid request', 400, origin, allowedOrigins, 'VALIDATION_ERROR');
     }
 
-    const { code, redirect_uri } = validation.data;
+    const { code, redirect_uri, supabase_jwt } = validation.data;
 
     if (!validateRedirectUri(redirect_uri, env)) {
       console.error(`Invalid redirect_uri: ${redirect_uri}`);
       return errorResponse('Invalid redirect_uri', 400, origin, allowedOrigins, 'INVALID_REDIRECT_URI');
     }
 
-    console.log(`Patreon exchange request received: redirect_uri=${redirect_uri}`);
+    console.log(`Patreon exchange request received: redirect_uri=${redirect_uri}, hasSupabaseJwt=${!!supabase_jwt}`);
 
     // Step 1: トークン交換
     const tokenData = await fetchPatreonToken(env, new URLSearchParams({
@@ -2363,6 +2814,12 @@ async function handlePatreonExchange(
     // メンバーシップをキャッシュに保存
     await setCachedMembership(env, membership.userId, membership);
 
+    // [Issue #295] Supabase JWTがあればアカウントを紐づけ
+    let accountLinked = false;
+    if (supabase_jwt) {
+      accountLinked = await linkPatreonToSupabaseAccount(env, supabase_jwt, membership.userId);
+    }
+
     const sessionResponse = {
       session_token: sessionToken,
       patreon_user_id: membership.userId,
@@ -2376,7 +2833,7 @@ async function handlePatreonExchange(
       entitled_amount_cents: membership.entitledAmountCents,
     };
 
-    console.log(`Exchange successful: UserId=${membership.userId}, Plan=${membership.plan}, RevokedSessions=${revokedCount}`);
+    console.log(`Exchange successful: UserId=${membership.userId}, Plan=${membership.plan}, RevokedSessions=${revokedCount}, AccountLinked=${accountLinked}`);
 
     return successResponse(sessionResponse, origin, allowedOrigins);
 
@@ -2494,7 +2951,9 @@ async function handleLicenseStatus(
     }
 
     try {
-      const membership = await getMembershipFromSession(env, sessionResult.session, true);
+      // [Issue #296] 手動同期時はキャッシュをバイパスしてPatreon APIから最新情報を取得
+      // KVの結果整合性により、Webhook後のキャッシュ無効化が即座に反映されない場合があるため
+      const membership = await getMembershipFromSession(env, sessionResult.session, false);
 
       return successResponse({
         success: true,
