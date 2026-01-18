@@ -618,4 +618,13 @@ public static class Strings
     public static string ComponentUpdate_InsufficientDiskSpace => GetString("ComponentUpdate_InsufficientDiskSpace");
     public static string ComponentUpdate_NoUpdatesAvailable => GetString("ComponentUpdate_NoUpdatesAvailable");
     public static string ComponentUpdate_CheckingForUpdates => GetString("ComponentUpdate_CheckingForUpdates");
+
+    // ========== [Issue #300] OCR Recovery & Memory Warning ==========
+    public static string OcrRecovery_Title => GetString("OcrRecovery_Title");
+    public static string OcrRecovery_Started => GetString("OcrRecovery_Started");
+    public static string OcrRecovery_Completed => GetString("OcrRecovery_Completed");
+    public static string OcrRecovery_Failed => GetString("OcrRecovery_Failed");
+    public static string MemoryWarning_Title => GetString("MemoryWarning_Title");
+    public static string MemoryWarning_SystemMemory => GetString("MemoryWarning_SystemMemory");
+    public static string GpuMemoryWarning_Title => GetString("GpuMemoryWarning_Title");
 }

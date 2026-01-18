@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Events;
 using Baketa.Core.Models.OCR;
 using Baketa.Infrastructure.OCR.Clients;
 using Baketa.Infrastructure.OCR.Services;
@@ -14,20 +16,24 @@ namespace Baketa.Infrastructure.OCR.Engines;
 /// <summary>
 /// Surya OCR エンジン実装
 /// Issue #189: gRPCベースのSurya OCR統合
+/// Issue #300: 連続失敗時の自動復旧機能
 ///
 /// 特徴:
 /// - Python gRPCサーバー経由でSurya OCRを呼び出し
 /// - 90+言語対応（日本語/英語高精度）
 /// - ビジュアルノベルのダイアログテキスト検出に最適化
+/// - 連続失敗時の自動サーバー再起動
 /// </summary>
 public sealed class SuryaOcrEngine : IOcrEngine
 {
     private readonly GrpcOcrClient _client;
     private readonly SuryaServerManager? _serverManager;
+    private readonly IEventAggregator? _eventAggregator;
     private readonly ILogger<SuryaOcrEngine> _logger;
     private readonly OcrEngineSettings _settings;
     private readonly ConcurrentDictionary<string, long> _performanceStats = new();
     private readonly SemaphoreSlim _initLock = new(1, 1);
+    private readonly SemaphoreSlim _recoveryLock = new(1, 1);
     private readonly DateTime _startTime = DateTime.UtcNow;
 
     private bool _isInitialized;
@@ -38,6 +44,15 @@ public sealed class SuryaOcrEngine : IOcrEngine
     private double _minTimeMs = double.MaxValue;
     private double _maxTimeMs;
     private CancellationTokenSource? _currentTimeoutCts;
+    private bool _isRecovering;
+    private int _recoveryAttempts;
+    private DateTime _lastRecoveryTime = DateTime.MinValue;
+
+    // Issue #300: 復旧設定
+    // リトライ使い切り後に即座に再起動（閾値1）
+    private const int ConsecutiveFailuresThreshold = 1;
+    private const int MaxRecoveryAttempts = 3;
+    private static readonly TimeSpan RecoveryCooldown = TimeSpan.FromMinutes(5);
 
     private static readonly IReadOnlyList<string> SupportedLanguages =
     [
@@ -46,15 +61,21 @@ public sealed class SuryaOcrEngine : IOcrEngine
     ];
 
     /// <summary>
-    /// コンストラクタ（サーバー自動起動対応）
+    /// コンストラクタ（サーバー自動起動対応 + イベント発行対応）
+    /// Issue #300: IEventAggregator追加
     /// </summary>
-    public SuryaOcrEngine(GrpcOcrClient client, SuryaServerManager serverManager, ILogger<SuryaOcrEngine> logger)
+    public SuryaOcrEngine(
+        GrpcOcrClient client,
+        SuryaServerManager serverManager,
+        IEventAggregator? eventAggregator,
+        ILogger<SuryaOcrEngine> logger)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(logger);
 
         _client = client;
         _serverManager = serverManager;
+        _eventAggregator = eventAggregator;
         _logger = logger;
         _settings = new OcrEngineSettings
         {
@@ -63,14 +84,32 @@ public sealed class SuryaOcrEngine : IOcrEngine
             DetectionThreshold = 0.5
         };
 
-        _logger.LogInformation("SuryaOcrEngine created (with auto-start support)");
+        _logger.LogInformation("SuryaOcrEngine created (with auto-start and recovery support)");
+
+        // Issue #300: デバッグログ追加
+        if (_eventAggregator != null)
+        {
+            _logger.LogInformation("[Issue #300] EventAggregator is available - recovery notifications enabled");
+        }
+        else
+        {
+            _logger.LogWarning("[Issue #300] EventAggregator is NULL - recovery notifications will NOT work");
+        }
+    }
+
+    /// <summary>
+    /// コンストラクタ（サーバー自動起動対応）
+    /// </summary>
+    public SuryaOcrEngine(GrpcOcrClient client, SuryaServerManager serverManager, ILogger<SuryaOcrEngine> logger)
+        : this(client, serverManager, null, logger)
+    {
     }
 
     /// <summary>
     /// コンストラクタ（後方互換性用）
     /// </summary>
     public SuryaOcrEngine(GrpcOcrClient client, ILogger<SuryaOcrEngine> logger)
-        : this(client, null!, logger)
+        : this(client, null!, null, logger)
     {
     }
 
@@ -212,10 +251,16 @@ public sealed class SuryaOcrEngine : IOcrEngine
 
             if (!response.IsSuccess)
             {
-                Interlocked.Increment(ref _consecutiveFailures);
+                var failures = Interlocked.Increment(ref _consecutiveFailures);
                 Interlocked.Increment(ref _errorCount);
                 var errorMessage = response.Error?.Message ?? "Unknown error";
-                _logger.LogWarning("Surya OCR failed: {Error}", errorMessage);
+                _logger.LogWarning("Surya OCR failed: {Error} (consecutive failures: {Failures})", errorMessage, failures);
+
+                // Issue #300: 連続失敗時の自動復旧
+                if (ShouldTriggerRecovery(failures))
+                {
+                    _ = TriggerServerRecoveryAsync(failures, cancellationToken);
+                }
 
                 progressCallback?.Report(new OcrProgress(1.0, $"Error: {errorMessage}") { Phase = OcrPhase.Completed });
 
@@ -274,10 +319,16 @@ public sealed class SuryaOcrEngine : IOcrEngine
         }
         catch (Exception ex)
         {
-            Interlocked.Increment(ref _consecutiveFailures);
+            var failures = Interlocked.Increment(ref _consecutiveFailures);
             Interlocked.Increment(ref _errorCount);
-            _logger.LogError(ex, "Surya OCR error");
+            _logger.LogError(ex, "Surya OCR error (consecutive failures: {Failures})", failures);
             progressCallback?.Report(new OcrProgress(1.0, $"Error: {ex.Message}") { Phase = OcrPhase.Completed });
+
+            // Issue #300: 連続失敗時の自動復旧
+            if (ShouldTriggerRecovery(failures))
+            {
+                _ = TriggerServerRecoveryAsync(failures, cancellationToken);
+            }
 
             return new OcrResults(
                 [],
@@ -459,4 +510,154 @@ public sealed class SuryaOcrEngine : IOcrEngine
         if (elapsedMs < _minTimeMs) _minTimeMs = elapsedMs;
         if (elapsedMs > _maxTimeMs) _maxTimeMs = elapsedMs;
     }
+
+    #region Issue #300: 自動復旧機能
+
+    /// <summary>
+    /// 復旧をトリガーすべきかどうかを判定
+    /// </summary>
+    private bool ShouldTriggerRecovery(int consecutiveFailures)
+    {
+        _logger.LogDebug("[Issue #300] ShouldTriggerRecovery check: failures={Failures}, threshold={Threshold}, recovering={Recovering}, attempts={Attempts}/{Max}",
+            consecutiveFailures, ConsecutiveFailuresThreshold, _isRecovering, _recoveryAttempts, MaxRecoveryAttempts);
+
+        // サーバーマネージャーがない場合は復旧不可
+        if (_serverManager == null)
+        {
+            _logger.LogDebug("[Issue #300] Recovery skipped: ServerManager is null");
+            return false;
+        }
+
+        // 既に復旧中の場合はスキップ
+        if (_isRecovering)
+        {
+            _logger.LogDebug("[Issue #300] Recovery skipped: Already recovering");
+            return false;
+        }
+
+        // 連続失敗が閾値未満の場合はスキップ
+        if (consecutiveFailures < ConsecutiveFailuresThreshold)
+        {
+            _logger.LogDebug("[Issue #300] Recovery skipped: Failures below threshold");
+            return false;
+        }
+
+        // 復旧試行回数が上限に達している場合はスキップ
+        if (_recoveryAttempts >= MaxRecoveryAttempts)
+        {
+            _logger.LogDebug("[Issue #300] Recovery skipped: Max attempts reached");
+            return false;
+        }
+
+        // クールダウン期間中の場合はスキップ
+        if (DateTime.UtcNow - _lastRecoveryTime < RecoveryCooldown)
+        {
+            _logger.LogDebug("[Issue #300] Recovery skipped: In cooldown period");
+            return false;
+        }
+
+        _logger.LogInformation("[Issue #300] Recovery WILL be triggered!");
+        return true;
+    }
+
+    /// <summary>
+    /// サーバー復旧を非同期でトリガー
+    /// Issue #300: ユーザーに通知しながら自動再起動
+    /// </summary>
+    private async Task TriggerServerRecoveryAsync(int consecutiveFailures, CancellationToken cancellationToken)
+    {
+        // 復旧ロックを取得（二重復旧防止）
+        if (!await _recoveryLock.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogDebug("[Issue #300] Recovery already in progress, skipping");
+            return;
+        }
+
+        try
+        {
+            _isRecovering = true;
+            _recoveryAttempts++;
+            _lastRecoveryTime = DateTime.UtcNow;
+
+            _logger.LogWarning(
+                "[Issue #300] Triggering OCR server recovery (failures: {Failures}, attempt: {Attempt}/{MaxAttempts})",
+                consecutiveFailures, _recoveryAttempts, MaxRecoveryAttempts);
+
+            // 復旧開始イベントを発行
+            if (_eventAggregator != null)
+            {
+                var startEvent = OcrServerRecoveryEvent.CreateRestartStarted(consecutiveFailures, _recoveryAttempts);
+                await _eventAggregator.PublishAsync(startEvent, cancellationToken).ConfigureAwait(false);
+            }
+
+            // サーバー停止
+            _logger.LogInformation("[Issue #300] Stopping OCR server...");
+            await _serverManager!.StopServerAsync().ConfigureAwait(false);
+
+            // 少し待機（ソケット解放のため）
+            await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
+
+            // サーバー再起動
+            _logger.LogInformation("[Issue #300] Restarting OCR server...");
+            var restarted = await _serverManager.StartServerAsync(cancellationToken).ConfigureAwait(false);
+
+            if (restarted)
+            {
+                _logger.LogInformation("[Issue #300] OCR server recovery successful");
+                Interlocked.Exchange(ref _consecutiveFailures, 0);
+                _isInitialized = true;
+
+                // 復旧成功イベントを発行
+                if (_eventAggregator != null)
+                {
+                    var completeEvent = OcrServerRecoveryEvent.CreateRestartCompleted(_recoveryAttempts);
+                    await _eventAggregator.PublishAsync(completeEvent, cancellationToken).ConfigureAwait(false);
+                }
+
+                // 復旧成功したら試行回数をリセット
+                _recoveryAttempts = 0;
+            }
+            else
+            {
+                _logger.LogError("[Issue #300] OCR server recovery failed");
+                _isInitialized = false;
+
+                // 復旧失敗イベントを発行
+                if (_eventAggregator != null)
+                {
+                    var failEvent = OcrServerRecoveryEvent.CreateRestartFailed(_recoveryAttempts);
+                    await _eventAggregator.PublishAsync(failEvent, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("[Issue #300] Recovery cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #300] Error during OCR server recovery");
+
+            // 復旧失敗イベントを発行
+            if (_eventAggregator != null)
+            {
+                try
+                {
+                    var failEvent = OcrServerRecoveryEvent.CreateRestartFailed(_recoveryAttempts);
+                    await _eventAggregator.PublishAsync(failEvent, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // イベント発行失敗は無視
+                }
+            }
+        }
+        finally
+        {
+            _isRecovering = false;
+            _recoveryLock.Release();
+        }
+    }
+
+    #endregion
 }

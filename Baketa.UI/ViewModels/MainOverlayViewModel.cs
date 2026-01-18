@@ -18,7 +18,9 @@ using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager統一インターフェース用
+using Baketa.Core.Events;
 using Baketa.Core.Events.EventTypes;
+using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Core.Utilities;
 using Baketa.UI.Framework;
 using Baketa.UI.Framework.Events;
@@ -65,6 +67,10 @@ public class MainOverlayViewModel : ViewModelBase
     // 🔥 [ISSUE#176] ログイン状態（ログアウト時はTargetを非活性にする）
     private bool _isLoggedIn;
 
+    // 🔥 [Issue #300] VRAM警告状態（メモリ不足警告表示用）
+    private bool _hasMemoryWarning;
+    private bool _memoryWarningNotificationShown; // 一度だけ通知するためのフラグ
+
     private WindowInfo? _selectedWindow;
 
     public MainOverlayViewModel(
@@ -83,6 +89,7 @@ public class MainOverlayViewModel : ViewModelBase
         ITranslationModeService translationModeService, // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス依存追加
         IErrorNotificationService errorNotificationService, // 🔥 [ISSUE#171_PHASE2] エラー通知サービス依存追加
         IAuthService authService, // 🔥 [ISSUE#176] 認証状態監視用
+        Services.INotificationService notificationService, // 🔥 [Issue #300] トースト通知サービス
         IConsentService? consentService = null) // [Issue #261] 同意同期用（オプショナル）
         : base(eventAggregator, logger)
     {
@@ -111,6 +118,9 @@ public class MainOverlayViewModel : ViewModelBase
         // 🔥 [ISSUE#176] 認証サービス設定とイベント購読（ログアウト時のUI状態リセット用）
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _authService.AuthStatusChanged += OnAuthStatusChanged;
+
+        // 🔥 [Issue #300] トースト通知サービス設定
+        _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
 
         // [Issue #261] 同意サービス（オプショナル - 同期に使用）
         _consentService = consentService;
@@ -164,6 +174,7 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly ITranslationModeService _translationModeService; // 🔥 [ISSUE#163_PHASE4] 翻訳モードサービス
     private readonly IErrorNotificationService _errorNotificationService; // 🔥 [ISSUE#171_PHASE2] エラー通知サービス
     private readonly IAuthService _authService; // 🔥 [ISSUE#176] 認証状態監視用
+    private readonly Services.INotificationService _notificationService; // 🔥 [Issue #300] トースト通知サービス
     private readonly IConsentService? _consentService; // [Issue #261] 同意同期用
 
     #region Properties
@@ -179,6 +190,23 @@ public class MainOverlayViewModel : ViewModelBase
     /// TranslationModeServiceから取得
     /// </summary>
     public Baketa.Core.Abstractions.Services.TranslationMode CurrentTranslationMode => _translationModeService.CurrentMode;
+
+    /// <summary>
+    /// 🔥 [Issue #300] VRAM/メモリ警告状態
+    /// true: VRAM使用率がCritical(75-90%)またはEmergency(>90%)の場合
+    /// UI表示: 警告アイコンや枠線の色変更に使用
+    /// </summary>
+    public bool HasMemoryWarning
+    {
+        get => _hasMemoryWarning;
+        private set
+        {
+            if (SetPropertySafe(ref _hasMemoryWarning, value))
+            {
+                Logger?.LogDebug("[Issue #300] HasMemoryWarning changed to {Value}", value);
+            }
+        }
+    }
 
     /// <summary>
     /// 🔥 [ISSUE#163_TOGGLE] シングルショットオーバーレイ表示状態
@@ -901,6 +929,12 @@ public class MainOverlayViewModel : ViewModelBase
         Logger?.LogWarning("🔔 [SUBSCRIBE] FirstTranslationResultReceivedEvent購読開始 - 型: {EventType}", typeof(FirstTranslationResultReceivedEvent).FullName);
         SubscribeToEvent<FirstTranslationResultReceivedEvent>(OnFirstTranslationResultReceived);
         Logger?.LogWarning("🔔 [SUBSCRIBE] FirstTranslationResultReceivedEvent購読完了");
+
+        // 🔥 [Issue #300] VRAM警告イベントの購読（メモリ不足時のUI表示用）
+        SubscribeToEvent<VramWarningEvent>(OnVramWarning);
+
+        // 🔥 [Issue #300] リソース監視イベントの購読（システムRAM警告も対応）
+        SubscribeToEvent<ResourceMonitoringEvent>(OnResourceMonitoringWarning);
     }
 
     private void InitializePropertyChangeHandlers()
@@ -1769,6 +1803,93 @@ public class MainOverlayViewModel : ViewModelBase
             else
             {
                 Logger?.LogWarning("⚠️ [LOADING_END] 既にIsLoading=false のため変更なし");
+            }
+        });
+    }
+
+    /// <summary>
+    /// 🔥 [Issue #300] VRAM警告イベントハンドラー
+    /// VRAM使用率がCritical/Emergency状態の場合にUI警告を表示
+    /// </summary>
+    private async Task OnVramWarning(VramWarningEvent evt)
+    {
+        Logger?.LogDebug("[Issue #300] VramWarningEvent received: Level={Level}, Usage={Usage:F1}%",
+            evt.Level, evt.VramUsagePercent);
+
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            switch (evt.Level)
+            {
+                case VramWarningLevel.Emergency:
+                case VramWarningLevel.Critical:
+                    HasMemoryWarning = true;
+
+                    // 一度だけトースト通知を表示
+                    if (!_memoryWarningNotificationShown)
+                    {
+                        _memoryWarningNotificationShown = true;
+                        Logger?.LogWarning("[Issue #300] Showing VRAM warning toast: {Message}", evt.Message);
+                        await _notificationService.ShowWarningAsync(Strings.GpuMemoryWarning_Title, evt.Message, 8000).ConfigureAwait(false);
+                    }
+                    break;
+
+                case VramWarningLevel.Normal:
+                    HasMemoryWarning = false;
+                    // 回復時は通知フラグをリセット（次回また警告可能に）
+                    _memoryWarningNotificationShown = false;
+                    Logger?.LogInformation("[Issue #300] VRAM warning cleared");
+                    break;
+            }
+        });
+    }
+
+    /// <summary>
+    /// 🔥 [Issue #300] リソース監視イベントハンドラー
+    /// システムRAM警告（WarningRaised）の場合にUI警告を表示
+    /// メモリ使用率が回復した場合は警告を解除
+    /// </summary>
+    private async Task OnResourceMonitoringWarning(ResourceMonitoringEvent evt)
+    {
+        // 警告発生またはメトリクス変更イベントのみ処理
+        if (evt.EventType != ResourceMonitoringEventType.WarningRaised &&
+            evt.EventType != ResourceMonitoringEventType.MetricsChanged)
+            return;
+
+        Logger?.LogDebug("[Issue #300] ResourceMonitoringEvent received: Type={Type}, MemoryUsage={Usage:F1}%",
+            evt.EventType, evt.CurrentMetrics.MemoryUsagePercent);
+
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            // メモリ使用率の閾値（90%以上で警告）
+            const double MemoryWarningThreshold = 90.0;
+            const double MemoryRecoveryThreshold = 85.0; // ヒステリシス：85%以下で回復
+
+            var memoryUsage = evt.CurrentMetrics.MemoryUsagePercent;
+
+            // 警告発生時
+            if (evt.EventType == ResourceMonitoringEventType.WarningRaised ||
+                memoryUsage >= MemoryWarningThreshold)
+            {
+                if (evt.Warning != null && evt.Warning.Severity >= ResourceWarningSeverity.Warning)
+                {
+                    HasMemoryWarning = true;
+
+                    // 一度だけトースト通知を表示
+                    if (!_memoryWarningNotificationShown)
+                    {
+                        _memoryWarningNotificationShown = true;
+                        var message = string.Format(Strings.MemoryWarning_SystemMemory, memoryUsage.ToString("F0"));
+                        Logger?.LogWarning("[Issue #300] Showing memory warning toast: {Message}", message);
+                        await _notificationService.ShowWarningAsync(Strings.MemoryWarning_Title, message, 8000).ConfigureAwait(false);
+                    }
+                }
+            }
+            // メモリ回復時（ヒステリシス付き）
+            else if (HasMemoryWarning && memoryUsage < MemoryRecoveryThreshold)
+            {
+                HasMemoryWarning = false;
+                _memoryWarningNotificationShown = false;
+                Logger?.LogInformation("[Issue #300] Memory warning cleared (usage: {Usage:F1}%)", memoryUsage);
             }
         });
     }

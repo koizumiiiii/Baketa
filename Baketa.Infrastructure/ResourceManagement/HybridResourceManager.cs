@@ -1,9 +1,11 @@
 using System.Threading.Channels;
 using Baketa.Core.Abstractions.Common;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Events;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -115,6 +117,10 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
     // === Phase 4.1: パフォーマンスメトリクス収集統合 ===
     private readonly IPerformanceMetricsCollector? _metricsCollector;
 
+    // === Issue #300: VRAM警告イベント発行 ===
+    private readonly IEventAggregator? _eventAggregator;
+    private VramPressureLevel _lastPublishedPressureLevel = VramPressureLevel.Low;
+
     // === Phase 3: 高度なヒステリシス制御 ===
     private DateTime _lastThresholdCrossTime = DateTime.UtcNow;
     private readonly Queue<ResourceStatusSnapshot> _recentStatusHistory = [];
@@ -144,7 +150,8 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         IOptionsMonitor<HybridResourceSettings> optionsMonitor,
         ILogger<HybridResourceManager> logger,
         IGpuEnvironmentDetector? gpuEnvironmentDetector = null,
-        IPerformanceMetricsCollector? metricsCollector = null)
+        IPerformanceMetricsCollector? metricsCollector = null,
+        IEventAggregator? eventAggregator = null)
     {
 #if DEBUG
         // 🔥🔥🔥 [DEBUG] ログファイルに直接書き込み
@@ -170,6 +177,7 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         _logger = logger;
         _gpuEnvironmentDetector = gpuEnvironmentDetector;
         _metricsCollector = metricsCollector;
+        _eventAggregator = eventAggregator;
 
         _logger.LogInformation("🔥🔥🔥 [CTOR_ENTRY_CHECK_20250930_2200] CONSTRUCTOR HAS BEEN ENTERED! 🔥🔥🔥");
         _logger.LogInformation("🔥🔥🔥 [PHASE12.1_CTOR] HybridResourceManagerコンストラクタ完了");
@@ -809,6 +817,9 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
                     vramUsagePercent, vramPressure);
             }
 
+            // Issue #300: VRAM警告イベント発行（レベル変化時のみ）
+            PublishVramWarningEventIfNeeded(vramPressure, vramUsagePercent, vramUsageMB);
+
             return result;
         }
         catch (Exception ex)
@@ -854,6 +865,51 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
             VramPressureLevel.Emergency => VramAction.EmergencyFallback,
             _ => VramAction.Maintain
         };
+    }
+
+    /// <summary>
+    /// Issue #300: VRAM警告イベント発行（レベル変化時のみ）
+    /// </summary>
+    private void PublishVramWarningEventIfNeeded(VramPressureLevel currentLevel, double usagePercent, long usedMB)
+    {
+        if (_eventAggregator == null)
+            return;
+
+        // レベル変化がない場合はスキップ
+        if (currentLevel == _lastPublishedPressureLevel)
+            return;
+
+        var previousLevel = _lastPublishedPressureLevel;
+        _lastPublishedPressureLevel = currentLevel;
+
+        VramWarningEvent? warningEvent = null;
+
+        // 危険レベルに移行した場合のみイベント発行
+        if (currentLevel == VramPressureLevel.Emergency)
+        {
+            warningEvent = VramWarningEvent.CreateEmergency(usagePercent, usedMB, _actualTotalVramMB);
+            _logger.LogWarning("🚨 [Issue #300] VRAM緊急警告: {UsagePercent:F1}% ({UsedMB}MB/{TotalMB}MB)",
+                usagePercent, usedMB, _actualTotalVramMB);
+        }
+        else if (currentLevel == VramPressureLevel.Critical)
+        {
+            warningEvent = VramWarningEvent.CreateCritical(usagePercent, usedMB, _actualTotalVramMB);
+            _logger.LogWarning("⚠️ [Issue #300] VRAMクリティカル警告: {UsagePercent:F1}% ({UsedMB}MB/{TotalMB}MB)",
+                usagePercent, usedMB, _actualTotalVramMB);
+        }
+        else if (previousLevel is VramPressureLevel.Critical or VramPressureLevel.Emergency
+                 && currentLevel is VramPressureLevel.Low or VramPressureLevel.Moderate or VramPressureLevel.High)
+        {
+            // 危険レベルから回復した場合
+            warningEvent = VramWarningEvent.CreateRecovered(usagePercent, usedMB, _actualTotalVramMB);
+            _logger.LogInformation("✅ [Issue #300] VRAM警告解除: {UsagePercent:F1}%", usagePercent);
+        }
+
+        if (warningEvent != null)
+        {
+            // Fire-and-forget: VRAM警告イベントは非同期で発行
+            _ = _eventAggregator.PublishAsync(warningEvent);
+        }
     }
 
     /// <summary>

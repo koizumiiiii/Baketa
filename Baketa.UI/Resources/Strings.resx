@@ -1500,4 +1500,27 @@
     <value>更新を確認中...</value>
   </data>
 
+  <!-- ========== Issue #300: OCR Recovery & Memory Warning ========== -->
+  <data name="OcrRecovery_Title" xml:space="preserve">
+    <value>文字認識</value>
+  </data>
+  <data name="OcrRecovery_Started" xml:space="preserve">
+    <value>文字認識エンジンを復旧中です。しばらくお待ちください...</value>
+  </data>
+  <data name="OcrRecovery_Completed" xml:space="preserve">
+    <value>文字認識エンジンが復旧しました</value>
+  </data>
+  <data name="OcrRecovery_Failed" xml:space="preserve">
+    <value>文字認識エンジンの復旧に失敗しました。Baketaを再起動してください。</value>
+  </data>
+  <data name="MemoryWarning_Title" xml:space="preserve">
+    <value>メモリ警告</value>
+  </data>
+  <data name="MemoryWarning_SystemMemory" xml:space="preserve">
+    <value>メモリ使用率が高くなっています ({0}%)。他のアプリを閉じてください。</value>
+  </data>
+  <data name="GpuMemoryWarning_Title" xml:space="preserve">
+    <value>GPUメモリ警告</value>
+  </data>
+
 </root>
