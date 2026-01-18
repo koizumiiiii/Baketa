@@ -304,13 +304,12 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             :: 読み取り専用属性を解除
             attrib -R "{{escapedTargetDir}}\*" /S /D 2>nul
 
-            :: [Issue #306] robocopyで高速コピー（差分のみ、4スレッド並列）
-            :: /MIR: ミラーリング（差分のみコピー）
+            :: [Issue #306] robocopyで高速コピー（4スレッド並列）
+            :: /E: サブディレクトリ含む全コピー（/MIRと異なり既存ファイルを削除しない）
             :: /MT:4: 4スレッド並列処理
             :: /NP /NFL /NDL: 進捗・ファイル名・ディレクトリ名表示抑制
             :: /R:3 /W:1: リトライ3回、待機1秒
-            :: /XD: 除外ディレクトリ（grpc_serverディレクトリ内の既存ファイルを保護）
-            robocopy "{{escapedSourceDir}}" "{{escapedTargetDir}}" /MIR /MT:4 /NP /NFL /NDL /R:3 /W:1 /XD "grpc_server\dist" "grpc_server\venv*"
+            robocopy "{{escapedSourceDir}}" "{{escapedTargetDir}}" /E /MT:4 /NP /NFL /NDL /R:3 /W:1
 
             :: robocopyの終了コード: 0-7は成功、8以上はエラー
             if errorlevel 8 (
