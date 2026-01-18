@@ -35,12 +35,16 @@ export interface TranslateEnv {
   JWT_SECRET?: string;
 }
 
-/** セッションデータ（index.tsと共有） */
+/** [Issue #312] セッションデータ（index.tsと共有）
+ * - userId: Patreon User ID（課金管理用）
+ * - supabaseUuid: Supabase UUID（SSoT、Optional）
+ */
 interface SessionData {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
-  userId: string;
+  userId: string;          // Patreon User ID
+  supabaseUuid?: string;   // [Issue #312] Supabase UUID (SSoT、Optional)
 }
 
 /** キャッシュ済みメンバーシップ情報 */
@@ -825,12 +829,20 @@ async function getBonusTokensRemaining(supabase: SupabaseClient, userId: string)
 /**
  * [Issue #280+#281] 統合認証
  * [Issue #287] JWT認証を最優先に追加
- * 1. Baketa JWT認証を試行（最優先）
+ * [Issue #312] 認証フォールバック段階的廃止
+ *
+ * 認証優先順位:
+ * 1. Baketa JWT認証（推奨・最優先）
  * 2. キャッシュを確認
- * 3. Patreonセッション（KV）を試行
- * 4. 失敗したらSupabase JWT認証を試行
+ * 3. Patreonセッション（KV）を試行 ← 非推奨、移行期間後に削除
+ * 4. Supabase JWT認証を試行 ← 非推奨、移行期間後に削除
  * 5. ボーナストークンの有無も確認
  * 6. 結果をキャッシュに保存
+ *
+ * 移行計画:
+ * - v0.3.x: 非推奨警告をログ出力
+ * - v0.4.x: Patreon KVセッション認証を削除
+ * - v0.5.x: Supabase JWT認証をBaketa JWT内部処理に統合
  */
 async function authenticateUser(
   env: TranslateEnv,
@@ -938,9 +950,13 @@ async function authenticateUser(
     }
   }
 
-  // 3. Patreonセッション（KV）を試行
+  // [Issue #312] 3. Patreonセッション（KV）を試行
+  // 非推奨: 新規クライアントはJWT認証を使用すべき
+  // 移行期間後に削除予定
   const patreonSession = await getSession(env, sessionToken);
   if (patreonSession && Date.now() <= patreonSession.expiresAt) {
+    // [Issue #312] 非推奨警告: Patreon KVセッション認証
+    console.warn(`[Issue #312] DEPRECATED: Using Patreon KV session auth for userId=${patreonSession.userId}. Client should migrate to JWT auth.`);
     let cachedMembership = await getCachedMembership(env, patreonSession.userId);
 
     // [Issue #296] メンバーシップKVがnullの場合、Patreon APIから最新情報を取得
@@ -965,7 +981,9 @@ async function authenticateUser(
     }
   }
 
-  // 4. Supabase JWT認証を試行
+  // [Issue #312] 4. Supabase JWT認証を試行
+  // 非推奨: 新規クライアントはBaketa JWT認証を使用すべき
+  // Supabase JWTは後方互換性のために維持
   const supabase = getSupabaseClient(env);
   if (!supabase) {
     console.log('[Issue #280+#281] Supabase not configured, skipping JWT auth');
@@ -986,6 +1004,8 @@ async function authenticateUser(
       console.log('[Issue #280+#281] Supabase JWT validation failed:', error?.message);
       return null;
     }
+    // [Issue #312] 非推奨警告: Supabase JWT認証
+    console.warn(`[Issue #312] DEPRECATED: Using Supabase JWT auth for userId=${user.id.substring(0, 8)}.... Client should migrate to Baketa JWT auth.`);
 
     // 4a. ボーナストークン残高を確認
     const bonusRemaining = await getBonusTokensRemaining(supabase, user.id);
