@@ -309,15 +309,33 @@ public class ParallelOcrExecutorTests : IDisposable
             .ReturnsAsync(tileResult);
 
         var progressReports = new List<OcrProgress>();
-        var progress = new Progress<OcrProgress>(p => progressReports.Add(p));
+        // [CI Fix] Progress<T>は非同期でコールバックを実行するため、CIでタイミング問題が発生
+        // 同期的にリストに追加するIProgress<T>実装を使用
+        var progress = new SynchronousProgress<OcrProgress>(p => progressReports.Add(p));
 
         // Act
         await _executor.ExecuteParallelOcrAsync(mockImage.Object, progress);
 
-        // Assert - Wait for progress reports to be captured
-        await Task.Delay(100);
+        // Assert - 同期的な実装により即座に結果が確認可能
         progressReports.Should().NotBeEmpty();
         progressReports.Should().Contain(p => p.Phase == OcrPhase.Initializing);
+    }
+
+    /// <summary>
+    /// 同期的にコールバックを実行するIProgress実装
+    /// Progress&lt;T&gt;はSynchronizationContext/ThreadPool経由で非同期実行するため、
+    /// テストではタイミング問題が発生する。この実装は即座に同期的にコールバックを実行する。
+    /// </summary>
+    private sealed class SynchronousProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+
+        public SynchronousProgress(Action<T> handler)
+        {
+            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+        }
+
+        public void Report(T value) => _handler(value);
     }
 
     #endregion
