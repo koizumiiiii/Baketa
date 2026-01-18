@@ -86,8 +86,19 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
             ?? "https://baketa-relay.suke009.workers.dev/api/analytics/events";
         _enableInDebug = configuration.GetValue("Analytics:EnableInDebug", false);
 
-        // アプリバージョン取得
-        _appVersion = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0";
+        // [Issue #307] アプリバージョン取得 - MinVerはAssemblyInformationalVersionAttributeに設定
+        var appAssembly = Assembly.GetEntryAssembly();
+        var infoVersion = appAssembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrEmpty(infoVersion))
+        {
+            // "0.2.24+abc123" 形式から "0.2.24" を抽出（ビルドメタデータを除去）
+            _appVersion = infoVersion.Split(['-', '+'])[0];
+        }
+        else
+        {
+            // フォールバック: 通常のバージョン属性
+            _appVersion = appAssembly?.GetName().Version?.ToString(3) ?? "0.0.0";
+        }
 
         // [Issue #297] 同意状態を初期化・監視
         _consentService.ConsentChanged += OnConsentChanged;
