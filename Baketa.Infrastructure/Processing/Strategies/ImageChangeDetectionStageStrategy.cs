@@ -97,6 +97,10 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                 _logger.LogWarning(disposeEx, "前回画像の破棄でエラー: {Message}", disposeEx.Message);
             }
 
+            // [Issue #302 DEBUG] EnhancedImageChangeDetectionServiceからの結果を詳細ログ
+            _logger.LogInformation("🔍 [STAGE_RESULT_DEBUG] EnhancedImageChangeDetectionService結果: HasChanged={HasChanged}, ChangePercentage={ChangePercentage:F4}, DetectionStage={DetectionStage}",
+                changeResult.HasChanged, changeResult.ChangePercentage, changeResult.DetectionStage);
+
             var processingResult = CreateLegacyResult(changeResult);
 
             // 🎯 UltraThink Phase 1: テキスト消失イベント発行（オーバーレイ自動削除システム統合）

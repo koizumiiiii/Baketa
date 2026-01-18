@@ -184,6 +184,11 @@ internal sealed class UIModule : ServiceModuleBase
         services.AddSingleton<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>(
             provider => provider.GetRequiredService<AnalyticsEventProcessor>());
 
+        // Issue #300: OcrRecoveryEventProcessor登録 - OCRサーバー復旧時のユーザー通知
+        services.AddSingleton<OcrRecoveryEventProcessor>();
+        services.AddSingleton<IEventProcessor<Baketa.Core.Events.OcrServerRecoveryEvent>>(
+            provider => provider.GetRequiredService<OcrRecoveryEventProcessor>());
+
         // 🔐 [Issue #168] TokenExpirationHandler - トークン失効時の処理ハンドラー
         services.AddSingleton<TokenExpirationHandler>();
 

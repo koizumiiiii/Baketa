@@ -78,6 +78,13 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         {
             _logger.LogInformation("🔧 [Issue #229] グリッド分割ハッシュ有効: {Rows}x{Cols}={TotalBlocks}ブロック, 閾値={Threshold:F4}",
                 _settings.GridRows, _settings.GridColumns, _settings.GridRows * _settings.GridColumns, _settings.GridBlockSimilarityThreshold);
+
+            // [Issue #302] 下部ゾーン高感度化設定ログ
+            if (_settings.EnableLowerZoneHighSensitivity)
+            {
+                _logger.LogInformation("🔧 [Issue #302] 下部ゾーン高感度化有効: 下部{Ratio:P0}に閾値={Threshold:F4}を適用",
+                    _settings.LowerZoneRatio, _settings.LowerZoneSimilarityThreshold);
+            }
         }
 
         // [Issue #229] テキスト安定化設定ログ
@@ -109,6 +116,10 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     GridRows = configuration.GetValue<int>("ImageChangeDetection:GridRows", 4),
                     GridColumns = configuration.GetValue<int>("ImageChangeDetection:GridColumns", 4),
                     GridBlockSimilarityThreshold = configuration.GetValue<float>("ImageChangeDetection:GridBlockSimilarityThreshold", 0.98f),
+                    // [Issue #302] 下部ゾーン高感度化設定
+                    EnableLowerZoneHighSensitivity = configuration.GetValue<bool>("ImageChangeDetection:EnableLowerZoneHighSensitivity", true),
+                    LowerZoneSimilarityThreshold = configuration.GetValue<float>("ImageChangeDetection:LowerZoneSimilarityThreshold", 0.995f),
+                    LowerZoneRatio = configuration.GetValue<float>("ImageChangeDetection:LowerZoneRatio", 0.25f),
                     // [Issue #229] テキスト安定化待機設定
                     EnableTextStabilization = configuration.GetValue<bool>("ImageChangeDetection:EnableTextStabilization", true),
                     TextStabilizationDelayMs = configuration.GetValue<int>("ImageChangeDetection:TextStabilizationDelayMs", 500),
@@ -651,9 +662,23 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             // 全ブロック比較 - いずれか1ブロックでも閾値未満なら変化あり
             var minSimilarity = 1.0f;
             var changedBlockIndex = -1;
+            var hasPotentialChange = false;
+
+            // [Issue #302] ゾーン別類似度追跡
+            var lowerZoneStartRow = (int)(rows * (1.0f - _settings.LowerZoneRatio));
+            var upperZoneMin = 1.0f;
+            var upperZoneMax = 0.0f;
+            var lowerZoneMin = 1.0f;
+            var lowerZoneMax = 0.0f;
+            var detectedRow = -1;
+            var detectedCol = -1;
+            var detectedSimilarity = 0.0f;
+            var detectedThreshold = 0.0f;
 
             for (int i = 0; i < totalBlocks; i++)
             {
+                var row = i / cols;
+                var col = i % cols;
                 var similarity = _perceptualHashService.CompareHashes(
                     cachedGrid.BlockHashes[i],
                     currentBlockHashes[i],
@@ -665,16 +690,59 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     changedBlockIndex = i;
                 }
 
-                // 早期終了: 閾値を下回ったブロックを発見
-                if (similarity < _settings.GridBlockSimilarityThreshold)
+                // [Issue #302] ゾーン別min/max更新
+                var isLowerZone = row >= lowerZoneStartRow;
+                if (isLowerZone)
                 {
-                    _logger.LogDebug("🔲 [Issue #229] グリッドブロック変化検出 - Block[{Row},{Col}], Similarity: {Similarity:F4}, Threshold: {Threshold:F4}",
-                        i / cols, i % cols, similarity, _settings.GridBlockSimilarityThreshold);
+                    if (similarity < lowerZoneMin) lowerZoneMin = similarity;
+                    if (similarity > lowerZoneMax) lowerZoneMax = similarity;
+                }
+                else
+                {
+                    if (similarity < upperZoneMin) upperZoneMin = similarity;
+                    if (similarity > upperZoneMax) upperZoneMax = similarity;
+                }
+
+                // [Issue #302] 行ごとに閾値を動的に決定（下部ゾーン高感度化）
+                var threshold = _settings.GetThresholdForRow(row, rows);
+
+                // 早期終了: 閾値を下回ったブロックを発見
+                if (similarity < threshold)
+                {
+                    detectedRow = row;
+                    detectedCol = col;
+                    detectedSimilarity = similarity;
+                    detectedThreshold = threshold;
+                    hasPotentialChange = true;
                     break;
                 }
             }
 
-            var hasPotentialChange = minSimilarity < _settings.GridBlockSimilarityThreshold;
+            // [Issue #302] 早期終了しなかった場合、全ブロックの最小類似度と対応する閾値で判定
+            if (!hasPotentialChange && changedBlockIndex >= 0)
+            {
+                var changedRow = changedBlockIndex / cols;
+                var threshold = _settings.GetThresholdForRow(changedRow, rows);
+                hasPotentialChange = minSimilarity < threshold;
+            }
+
+            // [Issue #302] ゾーン別類似度サマリーログ（Information レベル）
+            // 初回比較時（max=0）はスキップ
+            if (upperZoneMax > 0 || lowerZoneMax > 0)
+            {
+                _logger.LogInformation(
+                    "📊 [Issue #302] グリッド類似度: 上部(行0-{UpperEnd})=[{UpperMin:F4}~{UpperMax:F4}]/閾値{UpperThreshold:F4}, 下部(行{LowerStart}-{LowerEnd})=[{LowerMin:F4}~{LowerMax:F4}]/閾値{LowerThreshold:F4} → {Result}",
+                    lowerZoneStartRow - 1,
+                    upperZoneMin,
+                    upperZoneMax,
+                    _settings.GridBlockSimilarityThreshold,
+                    lowerZoneStartRow,
+                    rows - 1,
+                    lowerZoneMin,
+                    lowerZoneMax,
+                    _settings.LowerZoneSimilarityThreshold,
+                    hasPotentialChange ? $"変化検出 Block[{detectedRow},{detectedCol}] {detectedSimilarity:F4}<{detectedThreshold:F4}" : "変化なし");
+            }
 
             // キャッシュ更新
             var updatedCache = new GridHashCache(currentBlockHashes, rows, cols, DateTime.UtcNow);
@@ -731,14 +799,16 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         {
             if (!state.IsInStabilization)
             {
-                // 安定化モード開始
+                // [FIX] 安定化モード開始 - 最初の変化検出時はOCRを許可
+                // バグ修正: 以前は最初の変化でもOCRを抑制していたため、20秒以上の遅延が発生していた
                 state.EnterStabilization();
 
-                _logger.LogDebug("🕐 [TextStabilization] 安定化モード開始 - Context: {ContextId}, WaitMs: {WaitMs}",
+                _logger.LogDebug("🕐 [TextStabilization] 安定化モード開始 - Context: {ContextId}, WaitMs: {WaitMs}（最初の変化はOCR許可）",
                     contextId, _settings.TextStabilizationDelayMs);
 
-                // OCRを抑制（変化なしとして返す）
-                return ImageChangeResult.CreateNoChange(elapsed, detectionStage: 1);
+                // [FIX] 最初の変化検出時はOCRを許可（nullを返す）
+                // 連続した高速変化のみを抑制し、ユーザー体験を向上
+                return null;
             }
 
             // 既に安定化モード中：タイムアウトチェック
@@ -754,11 +824,27 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 return null; // OCR実行許可
             }
 
+            // 安定化モード中の連続変化：抑制するかどうかを判定
+            var sinceFirstChange = (now - state.FirstChangeTime).TotalMilliseconds;
+
+            // [FIX] 最初の変化から安定化遅延時間内の連続変化のみ抑制
+            // 遅延時間を超えたら次のOCRを許可（リセット）
+            if (sinceFirstChange >= _settings.TextStabilizationDelayMs)
+            {
+                // 安定化遅延時間経過：OCR許可してリセット
+                state.Reset();
+
+                _logger.LogDebug("✅ [TextStabilization] 安定化遅延完了 - Context: {ContextId}, WaitedMs: {Ms:F0}ms",
+                    contextId, sinceFirstChange);
+
+                return null; // OCR実行許可
+            }
+
             // 変化継続：最終変化時刻を更新してOCR抑制継続
             state.UpdateLastChange();
 
             _logger.LogDebug("🔄 [TextStabilization] 変化継続（待機中）- Context: {ContextId}, SinceFirstChange: {Ms:F0}ms",
-                contextId, (now - state.FirstChangeTime).TotalMilliseconds);
+                contextId, sinceFirstChange);
 
             return ImageChangeResult.CreateNoChange(elapsed, detectionStage: 1);
         }
@@ -887,6 +973,13 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             var minSimilarity = 1.0f;
             var mostChangedIndex = -1;
 
+            // [Issue #302] ゾーン別類似度追跡
+            var lowerZoneStartRow = (int)(rows * (1.0f - _settings.LowerZoneRatio));
+            var upperZoneMin = 1.0f;
+            var upperZoneMax = 0.0f;
+            var lowerZoneMin = 1.0f;
+            var lowerZoneMax = 0.0f;
+
             foreach (var block in blockResults)
             {
                 var similarity = _perceptualHashService.CompareHashes(
@@ -900,10 +993,44 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     mostChangedIndex = block.Index;
                 }
 
-                if (similarity < _settings.GridBlockSimilarityThreshold)
+                // [Issue #302] ゾーン別min/max更新
+                var isLowerZone = block.Row >= lowerZoneStartRow;
+                if (isLowerZone)
+                {
+                    if (similarity < lowerZoneMin) lowerZoneMin = similarity;
+                    if (similarity > lowerZoneMax) lowerZoneMax = similarity;
+                }
+                else
+                {
+                    if (similarity < upperZoneMin) upperZoneMin = similarity;
+                    if (similarity > upperZoneMax) upperZoneMax = similarity;
+                }
+
+                // [Issue #302] 行ごとに閾値を動的に決定（下部ゾーン高感度化）
+                var threshold = _settings.GetThresholdForRow(block.Row, rows);
+                if (similarity < threshold)
                 {
                     changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, similarity, block.Region));
                 }
+            }
+
+            // [Issue #302] ゾーン別類似度サマリーログ
+            // 初回比較時（max=0）はスキップ
+            if (upperZoneMax > 0 || lowerZoneMax > 0)
+            {
+                var firstChanged = changedBlocks.FirstOrDefault();
+                _logger.LogInformation(
+                    "📊 [Issue #302] グリッド類似度: 上部(行0-{UpperEnd})=[{UpperMin:F4}~{UpperMax:F4}]/閾値{UpperThreshold:F4}, 下部(行{LowerStart}-{LowerEnd})=[{LowerMin:F4}~{LowerMax:F4}]/閾値{LowerThreshold:F4} → {Result}",
+                    lowerZoneStartRow - 1,
+                    upperZoneMin,
+                    upperZoneMax,
+                    _settings.GridBlockSimilarityThreshold,
+                    lowerZoneStartRow,
+                    rows - 1,
+                    lowerZoneMin,
+                    lowerZoneMax,
+                    _settings.LowerZoneSimilarityThreshold,
+                    changedBlocks.Count > 0 ? $"変化検出 {changedBlocks.Count}ブロック (Block[{firstChanged.Row},{firstChanged.Col}] {firstChanged.Similarity:F4})" : "変化なし");
             }
 
             // [Issue #229][Gemini Review] チェックサムフォールバック検出

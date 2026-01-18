@@ -99,13 +99,15 @@ public sealed class SuryaOcrModule : ServiceModuleBase
     private static void RegisterSuryaOcrEngine(IServiceCollection services)
     {
         // SuryaOcrEngineをSingletonとして登録（サーバー自動起動対応）
+        // Issue #300: IEventAggregator追加で自動復旧機能対応
         services.AddSingleton<SuryaOcrEngine>(serviceProvider =>
         {
             var client = serviceProvider.GetRequiredService<GrpcOcrClient>();
             var serverManager = serviceProvider.GetRequiredService<SuryaServerManager>();
+            var eventAggregator = serviceProvider.GetService<IEventAggregator>();
             var logger = serviceProvider.GetRequiredService<ILogger<SuryaOcrEngine>>();
 
-            return new SuryaOcrEngine(client, serverManager, logger);
+            return new SuryaOcrEngine(client, serverManager, eventAggregator, logger);
         });
 
         // SuryaOcrEngineをKeyed Serviceとしても登録

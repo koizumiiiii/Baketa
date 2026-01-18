@@ -147,6 +147,21 @@
         </Grid>
       </Border>
 
+      <!-- 🔥 [Issue #300] VRAM警告インジケーター -->
+      <Border IsVisible="{Binding HasMemoryWarning}"
+              Background="#FFFFA500"
+              CornerRadius="4"
+              Padding="4,2"
+              Margin="4,2"
+              HorizontalAlignment="Center"
+              ToolTip.Tip="GPUメモリ使用率が高くなっています">
+        <TextBlock Text="⚠️ メモリ警告"
+                   FontSize="9"
+                   Foreground="Black"
+                   HorizontalAlignment="Center"
+                   FontWeight="Bold"/>
+      </Border>
+
       <!-- 最小化ボタン - ウィンドウ選択後のみ表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Minテキスト削除、アイコンサイズをexpandと統一（16px） -->
       <!-- [Issue #245] PNG→PathIcon変換（テーマ対応） -->
@@ -365,6 +380,20 @@
             </StackPanel>
           </StackPanel>
         </Grid>
+      </Border>
+
+      <!-- 🔥 [Issue #300] VRAM警告インジケーター（縮小時） -->
+      <Border IsVisible="{Binding HasMemoryWarning}"
+              Background="#FFFFA500"
+              CornerRadius="4"
+              Width="36"
+              Height="20"
+              Margin="2,2"
+              ToolTip.Tip="GPUメモリ使用率が高くなっています">
+        <TextBlock Text="⚠️"
+                   FontSize="12"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
       </Border>
 
       <!-- 展開ボタン -->

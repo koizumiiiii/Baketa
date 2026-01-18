@@ -663,6 +663,19 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                     _logger?.LogWarning(analyticsEx, "[Issue #269] AnalyticsEventProcessor登録失敗（継続）");
                 }
 
+                // 🔧 [Issue #300] OcrRecoveryEventProcessor登録 - OCRサーバー復旧時のユーザー通知
+                try
+                {
+                    var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
+                    var ocrRecoveryProcessor = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.OcrServerRecoveryEvent>>();
+                    eventAggregator.Subscribe<Baketa.Core.Events.OcrServerRecoveryEvent>(ocrRecoveryProcessor);
+                    Console.WriteLine("✅ OcrRecoveryEventProcessor登録完了");
+                }
+                catch (Exception ocrRecoveryEx)
+                {
+                    _logger?.LogWarning(ocrRecoveryEx, "[Issue #300] OcrRecoveryEventProcessor登録失敗（継続）");
+                }
+
                 // 🔔 [Issue #78 Phase 5] TokenUsageAlertService初期化
                 // トークン使用量80%/90%/100%到達時のトースト通知サービス
                 try
