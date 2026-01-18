@@ -371,6 +371,35 @@ public sealed class EventHandlerInitializationService(
                 Console.WriteLine($"🔥 [ERROR] ResourceMonitoringEventHandler登録失敗: {ex.Message}");
             }
 
+            // 📊 [Issue #307] AnalyticsEventProcessorの登録 - 翻訳完了イベントの使用統計記録
+            // 両方の名前空間のTranslationCompletedEventに対応
+            try
+            {
+                // Baketa.Core.Translation.Events.TranslationCompletedEvent (StandardTranslationPipelineから発行)
+                var analyticsProcessor1 = _serviceProvider.GetService<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>();
+                if (analyticsProcessor1 != null)
+                {
+                    eventAggregator.Subscribe<Baketa.Core.Translation.Events.TranslationCompletedEvent>(analyticsProcessor1);
+                    _logger.LogInformation("📊 [Issue #307] AnalyticsEventProcessor登録完了 (Translation.Events)");
+                    Console.WriteLine("📊 [Issue #307] AnalyticsEventProcessor登録完了 (Translation.Events)");
+                }
+
+                // Baketa.Core.Events.EventTypes.TranslationCompletedEvent (TranslationPipelineServiceから発行)
+                var analyticsProcessor2 = _serviceProvider.GetService<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>();
+                if (analyticsProcessor2 != null)
+                {
+                    eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>(analyticsProcessor2);
+                    _logger.LogInformation("📊 [Issue #307] AnalyticsEventProcessor登録完了 (Events.EventTypes)");
+                    Console.WriteLine("📊 [Issue #307] AnalyticsEventProcessor登録完了 (Events.EventTypes)");
+                }
+            }
+            catch (Exception ex)
+            {
+                // AnalyticsEventProcessorはオプショナル（UI層で登録されるため、Application層単体テストでは存在しない）
+                _logger.LogDebug(ex, "AnalyticsEventProcessorの登録をスキップ（UI層で未登録の可能性）");
+                Console.WriteLine($"📊 [Issue #307] AnalyticsEventProcessor登録スキップ: {ex.Message}");
+            }
+
             // 🔥 [ISSUE#163] SingleshotEventProcessorの登録はUIModule/TranslationFlowModuleで実施
             // (UI層イベントのためApplication層では登録できない)
 
