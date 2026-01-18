@@ -18,9 +18,9 @@ public sealed class PatreonSyncHostedService : BackgroundService
     private readonly ILogger<PatreonSyncHostedService> _logger;
 
     /// <summary>
-    /// 同期間隔（デフォルト: 30分）
+    /// [Issue #305] 同期間隔（1時間）- KV消費削減のため30分から延長
     /// </summary>
-    private static readonly TimeSpan SyncInterval = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan SyncInterval = TimeSpan.FromHours(1);
 
     /// <summary>
     /// 起動時の同期遅延（DI完了待ち）
