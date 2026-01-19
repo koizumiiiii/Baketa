@@ -700,7 +700,12 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 Reason = "Synced from server"
             });
 
-            _logger.LogInformation("[Issue #299] SyncFromServerAsync: Promotion synced successfully (Plan: {PlanType}, Expires: {ExpiresAt})",
+            // [Issue #298] EventAggregator経由でLicenseManagerに通知
+            // RedeemAsyncと同様にPromotionAppliedEventを発行してLicenseManagerを更新
+            await _eventAggregator.PublishAsync(new PromotionAppliedEvent(promotionInfo))
+                .ConfigureAwait(false);
+
+            _logger.LogInformation("[Issue #298] SyncFromServerAsync: Promotion synced successfully (Plan: {PlanType}, Expires: {ExpiresAt})",
                 planType, expiresAt);
 
             return new ServerSyncResultWrapper { Result = ServerSyncResult.Success };
