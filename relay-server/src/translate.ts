@@ -219,6 +219,12 @@ const QUOTA_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 /** [Issue #299] Patreon連携確認間隔（30分）- 再認証ループ防止 */
 const PATREON_VERIFY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
+/** [Issue #312] 非推奨警告フラグ（ワーカーインスタンスごとに初回のみ出力） */
+const deprecationWarningShown = {
+  patreonKvSession: false,
+  supabaseJwt: false,
+};
+
 // [Issue #296] Patreon API定数（メンバーシップKV null時のフォールバック用）
 const PATREON_API_BASE = 'https://www.patreon.com/api/oauth2';
 const PATREON_IDENTITY_URL = `${PATREON_API_BASE}/v2/identity`;
@@ -955,8 +961,11 @@ async function authenticateUser(
   // 移行期間後に削除予定
   const patreonSession = await getSession(env, sessionToken);
   if (patreonSession && Date.now() <= patreonSession.expiresAt) {
-    // [Issue #312] 非推奨警告: Patreon KVセッション認証
-    console.warn(`[Issue #312] DEPRECATED: Using Patreon KV session auth for userId=${patreonSession.userId}. Client should migrate to JWT auth.`);
+    // [Issue #312] 非推奨警告: Patreon KVセッション認証（初回のみ出力）
+    if (!deprecationWarningShown.patreonKvSession) {
+      console.warn(`[Issue #312] DEPRECATED: Using Patreon KV session auth. Client should migrate to JWT auth.`);
+      deprecationWarningShown.patreonKvSession = true;
+    }
     let cachedMembership = await getCachedMembership(env, patreonSession.userId);
 
     // [Issue #296] メンバーシップKVがnullの場合、Patreon APIから最新情報を取得
@@ -1004,8 +1013,11 @@ async function authenticateUser(
       console.log('[Issue #280+#281] Supabase JWT validation failed:', error?.message);
       return null;
     }
-    // [Issue #312] 非推奨警告: Supabase JWT認証
-    console.warn(`[Issue #312] DEPRECATED: Using Supabase JWT auth for userId=${user.id.substring(0, 8)}.... Client should migrate to Baketa JWT auth.`);
+    // [Issue #312] 非推奨警告: Supabase JWT認証（初回のみ出力）
+    if (!deprecationWarningShown.supabaseJwt) {
+      console.warn(`[Issue #312] DEPRECATED: Using Supabase JWT auth. Client should migrate to Baketa JWT auth.`);
+      deprecationWarningShown.supabaseJwt = true;
+    }
 
     // 4a. ボーナストークン残高を確認
     const bonusRemaining = await getBonusTokensRemaining(supabase, user.id);
