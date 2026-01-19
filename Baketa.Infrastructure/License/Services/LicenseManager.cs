@@ -1441,15 +1441,18 @@ public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDis
         {
             _logger.LogInformation("[Issue #298] ログアウト検出: ライセンスキャッシュをクリアします");
 
+            // [レビュー対応] ローカル変数にコピーしてレースコンディションを回避
+            var userIdToClean = _userId;
+
             // 非同期でキャッシュをクリア（fire-and-forget）
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    if (!string.IsNullOrEmpty(_userId))
+                    if (!string.IsNullOrEmpty(userIdToClean))
                     {
-                        await _cacheService.ClearCacheAsync(_userId, CancellationToken.None).ConfigureAwait(false);
-                        _logger.LogInformation("[Issue #298] ライセンスキャッシュクリア完了: UserId={UserId}", _userId[..Math.Min(8, _userId.Length)]);
+                        await _cacheService.ClearCacheAsync(userIdToClean, CancellationToken.None).ConfigureAwait(false);
+                        _logger.LogInformation("[Issue #298] ライセンスキャッシュクリア完了: UserId={UserId}", userIdToClean[..Math.Min(8, userIdToClean.Length)]);
                     }
 
                     // 状態をデフォルトにリセット
