@@ -4,6 +4,7 @@ using Baketa.Application.Services.OCR;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
+using Baketa.TestCommon;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -319,23 +320,6 @@ public class ParallelOcrExecutorTests : IDisposable
         // Assert - 同期的な実装により即座に結果が確認可能
         progressReports.Should().NotBeEmpty();
         progressReports.Should().Contain(p => p.Phase == OcrPhase.Initializing);
-    }
-
-    /// <summary>
-    /// 同期的にコールバックを実行するIProgress実装
-    /// Progress&lt;T&gt;はSynchronizationContext/ThreadPool経由で非同期実行するため、
-    /// テストではタイミング問題が発生する。この実装は即座に同期的にコールバックを実行する。
-    /// </summary>
-    private sealed class SynchronousProgress<T> : IProgress<T>
-    {
-        private readonly Action<T> _handler;
-
-        public SynchronousProgress(Action<T> handler)
-        {
-            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
-        }
-
-        public void Report(T value) => _handler(value);
     }
 
     #endregion
