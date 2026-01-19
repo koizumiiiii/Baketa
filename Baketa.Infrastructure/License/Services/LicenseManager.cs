@@ -127,6 +127,12 @@ public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDis
                 interval);
         }
 
+        // [Issue #298] 認証状態変更イベントを購読（ログアウト時のキャッシュクリア）
+        if (_authService != null)
+        {
+            _authService.AuthStatusChanged += OnAuthStatusChanged;
+        }
+
         // Issue #243: PromotionAppliedEventを購読（循環依存回避）
         _promotionAppliedProcessor = new InlineEventProcessor<PromotionAppliedEvent>(evt =>
         {
@@ -1424,6 +1430,46 @@ public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDis
         }
     }
 
+    /// <summary>
+    /// [Issue #298] 認証状態変更イベントハンドラ
+    /// ログアウト時にライセンスキャッシュをクリア
+    /// </summary>
+    private void OnAuthStatusChanged(object? sender, AuthStatusChangedEventArgs e)
+    {
+        // ログアウト時（以前ログイン中→現在ログアウト）にキャッシュをクリア
+        if (!e.IsLoggedIn && e.WasLoggedIn)
+        {
+            _logger.LogInformation("[Issue #298] ログアウト検出: ライセンスキャッシュをクリアします");
+
+            // 非同期でキャッシュをクリア（fire-and-forget）
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(_userId))
+                    {
+                        await _cacheService.ClearCacheAsync(_userId, CancellationToken.None).ConfigureAwait(false);
+                        _logger.LogInformation("[Issue #298] ライセンスキャッシュクリア完了: UserId={UserId}", _userId[..Math.Min(8, _userId.Length)]);
+                    }
+
+                    // 状態をデフォルトにリセット
+                    lock (_stateLock)
+                    {
+                        var oldState = _currentState;
+                        _currentState = LicenseState.Default;
+                        _userId = null;
+                        _sessionToken = null;
+                        OnStateChanged(oldState, _currentState, LicenseChangeReason.Logout);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[Issue #298] ライセンスキャッシュクリア中にエラー");
+                }
+            });
+        }
+    }
+
     #endregion
 
     /// <inheritdoc/>
@@ -1450,6 +1496,12 @@ public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDis
         // 5. Issue #243: イベント購読を解除
         _eventAggregator.Unsubscribe(_promotionAppliedProcessor);
         _eventAggregator.Unsubscribe(_promotionRemovedProcessor);
+
+        // 6. [Issue #298] 認証状態変更イベントの購読を解除
+        if (_authService != null)
+        {
+            _authService.AuthStatusChanged -= OnAuthStatusChanged;
+        }
 
         _logger.LogDebug("LicenseManager disposed");
     }
