@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Events;
 using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
@@ -12,8 +13,9 @@ namespace Baketa.Infrastructure.OCR.Services;
 /// Surya OCR gRPCサーバー管理
 /// Issue #189: PythonServerManagerパターンを参考に実装
 /// Issue #189: ゾンビプロセス対策 - Job Object統合
+/// Issue #292: IOcrServerManager実装で統合サーバーとの互換性確保
 /// </summary>
-public sealed class SuryaServerManager : IAsyncDisposable
+public sealed class SuryaServerManager : IOcrServerManager
 {
     private readonly ILogger<SuryaServerManager> _logger;
     private readonly IEventAggregator? _eventAggregator;

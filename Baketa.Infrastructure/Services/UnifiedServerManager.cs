@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Server;
 using Baketa.Core.Events;
 using Baketa.Translation.V1;
 using Grpc.Net.Client;
@@ -13,7 +14,7 @@ namespace Baketa.Infrastructure.Services;
 /// Issue #292: OCR+翻訳統合AIサーバー管理
 /// OCRと翻訳を単一プロセスで実行することでVRAMを削減
 /// </summary>
-public sealed class UnifiedServerManager : IAsyncDisposable
+public sealed class UnifiedServerManager : IUnifiedAIServerManager
 {
     // [Gemini Review Fix] 設定の外部化 - マジックナンバーを定数化
     /// <summary>サーバー起動タイムアウト（秒）- OCR+翻訳両方のモデルロード時間</summary>
