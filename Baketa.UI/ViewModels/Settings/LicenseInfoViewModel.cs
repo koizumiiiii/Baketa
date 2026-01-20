@@ -190,11 +190,12 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）かどうか
-    /// クォータ超過やサブスクリプション状態に関係なく、プランタイプのみで判定
+    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）またはボーナストークン保有者
+    /// クォータ超過やサブスクリプション状態に関係なく判定
     /// トークン使用量ゲージの表示判定に使用
+    /// [Issue #298] ボーナストークン保有者もゲージ表示対象に追加
     /// </summary>
-    public bool HasPaidPlan => CurrentPlan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
+    public bool HasPaidPlan => CurrentPlan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate || HasBonusTokens;
 
     /// <summary>
     /// クォータを超過しているか
@@ -292,6 +293,64 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// [Issue #280+#281 Phase 5] 利用可能なトークン合計（プラン枠残 + ボーナス）
     /// </summary>
     public long TotalAvailableTokens => Math.Max(0, TokenLimit - TokensUsed) + BonusTokensRemaining;
+
+    /// <summary>
+    /// [Issue #307] トークンプール合計（プラン上限 + ボーナス残高）
+    /// ゲージの最大値として使用
+    /// </summary>
+    public long TotalTokenPool => TokenLimit + BonusTokensRemaining;
+
+    /// <summary>
+    /// [Issue #307] 使用済みトークンの全体に対するパーセンテージ
+    /// </summary>
+    public double UsedPercentageOfTotal => TotalTokenPool > 0
+        ? Math.Min(100, (double)TokensUsed / TotalTokenPool * 100)
+        : 0;
+
+    /// <summary>
+    /// [Issue #307] プラン残量の全体に対するパーセンテージ
+    /// </summary>
+    public double PlanRemainingPercentageOfTotal => TotalTokenPool > 0
+        ? Math.Max(0, (double)(TokenLimit - TokensUsed) / TotalTokenPool * 100)
+        : 0;
+
+    /// <summary>
+    /// [Issue #307] ボーナストークンの全体に対するパーセンテージ
+    /// </summary>
+    public double BonusPercentageOfTotal => TotalTokenPool > 0
+        ? (double)BonusTokensRemaining / TotalTokenPool * 100
+        : 0;
+
+    /// <summary>
+    /// [Issue #307] プラン枠全体の全体に対するパーセンテージ（使用済み+残量）
+    /// ゲージのプラン部分（グレー背景）の幅計算に使用
+    /// </summary>
+    public double PlanPortionPercentage => TotalTokenPool > 0
+        ? (double)TokenLimit / TotalTokenPool * 100
+        : 0;
+
+    /// <summary>
+    /// [Issue #307] 合計表示用のトークン使用量文字列
+    /// "20,143,195 / 89,992,314" 形式
+    /// </summary>
+    public string CombinedTokenUsageDisplay
+    {
+        get
+        {
+            if (TotalTokenPool > 0)
+            {
+                return $"{TokensUsed:N0} / {TotalTokenPool:N0}";
+            }
+            else if (BonusTokensRemaining > 0)
+            {
+                return $"残り {BonusTokensRemaining:N0}";
+            }
+            else
+            {
+                return Strings.License_LocalOnly;
+            }
+        }
+    }
 
     /// <summary>
     /// [Issue #280+#281 Phase 5] トークン残量の表示文字列
@@ -516,9 +575,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private void UpdateFromState(LicenseState state)
     {
         CurrentPlan = state.CurrentPlan;
-        // プロモーション適用中の場合はサフィックスを追加
+        // [Issue #298] プロモーション適用中の場合はサフィックスを追加（Freeプランでも表示）
         var basePlanName = GetPlanDisplayName(state.CurrentPlan);
-        PlanDisplayName = HasActivePromotion && state.CurrentPlan != PlanType.Free
+        PlanDisplayName = HasActivePromotion
             ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
             : basePlanName;
         PlanDescription = GetPlanDescription(state.CurrentPlan);
@@ -545,6 +604,14 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(CloudAccessDisplay));
         this.RaisePropertyChanged(nameof(UsageGaugeBrush));
         this.RaisePropertyChanged(nameof(HasPaidPlan));
+
+        // [Issue #307] 合計ゲージ用プロパティの更新通知
+        this.RaisePropertyChanged(nameof(TotalTokenPool));
+        this.RaisePropertyChanged(nameof(UsedPercentageOfTotal));
+        this.RaisePropertyChanged(nameof(PlanRemainingPercentageOfTotal));
+        this.RaisePropertyChanged(nameof(BonusPercentageOfTotal));
+        this.RaisePropertyChanged(nameof(PlanPortionPercentage));
+        this.RaisePropertyChanged(nameof(CombinedTokenUsageDisplay));
 
         // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
         UpdateTokenWarningState();
@@ -850,9 +917,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             _activePromotion = e.NewPromotion;
             HasActivePromotion = e.NewPromotion?.IsValid == true;
 
-            // [Issue #275] プラン表示名を再計算（プロモーションサフィックスの更新）
+            // [Issue #298] プラン表示名を再計算（プロモーションサフィックスの更新、Freeプランでも表示）
             var basePlanName = GetPlanDisplayName(CurrentPlan);
-            PlanDisplayName = HasActivePromotion && CurrentPlan != PlanType.Free
+            PlanDisplayName = HasActivePromotion
                 ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
                 : basePlanName;
 
@@ -876,6 +943,14 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             this.RaisePropertyChanged(nameof(TokenUsageDisplay));
             this.RaisePropertyChanged(nameof(HasCloudAccess));
             this.RaisePropertyChanged(nameof(CloudAccessDisplay));
+
+            // [Issue #307] 合計ゲージ用プロパティの更新通知
+            this.RaisePropertyChanged(nameof(TotalTokenPool));
+            this.RaisePropertyChanged(nameof(UsedPercentageOfTotal));
+            this.RaisePropertyChanged(nameof(PlanRemainingPercentageOfTotal));
+            this.RaisePropertyChanged(nameof(BonusPercentageOfTotal));
+            this.RaisePropertyChanged(nameof(PlanPortionPercentage));
+            this.RaisePropertyChanged(nameof(CombinedTokenUsageDisplay));
 
             // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
             UpdateTokenWarningState();

@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Constants;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
@@ -88,6 +89,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     private readonly ILogger<PromotionCodeService> _logger;
     private readonly IApiRequestDeduplicator _deduplicator;
     private readonly IOptionsMonitor<LicenseSettings> _settingsMonitor;
+    private readonly IUnifiedSettingsService _unifiedSettingsService;
     private readonly IPromotionSettingsPersistence _settingsPersistence;
     private readonly IAuthService _authService;
     private readonly IEventAggregator _eventAggregator;
@@ -101,6 +103,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         HttpClient httpClient,
         IApiRequestDeduplicator deduplicator,
         IOptionsMonitor<LicenseSettings> settingsMonitor,
+        IUnifiedSettingsService unifiedSettingsService,
         IPromotionSettingsPersistence settingsPersistence,
         IAuthService authService,
         IEventAggregator eventAggregator,
@@ -109,6 +112,7 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _deduplicator = deduplicator ?? throw new ArgumentNullException(nameof(deduplicator));
         _settingsMonitor = settingsMonitor ?? throw new ArgumentNullException(nameof(settingsMonitor));
+        _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
@@ -238,7 +242,9 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
     /// <inheritdoc/>
     public PromotionInfo? GetCurrentPromotion()
     {
-        var settings = _settingsMonitor.CurrentValue;
+        // [Issue #298] IUnifiedSettingsServiceから読み取る（promotion-settings.jsonに保存されている）
+        // RELEASEビルドでもプロモーション情報が正しく取得できるように修正
+        var settings = _unifiedSettingsService.GetPromotionSettings();
 
         if (string.IsNullOrEmpty(settings.AppliedPromotionCode) ||
             !settings.PromotionPlanType.HasValue ||
@@ -700,7 +706,12 @@ public sealed class PromotionCodeService : IPromotionCodeService, IDisposable
                 Reason = "Synced from server"
             });
 
-            _logger.LogInformation("[Issue #299] SyncFromServerAsync: Promotion synced successfully (Plan: {PlanType}, Expires: {ExpiresAt})",
+            // [Issue #298] EventAggregator経由でLicenseManagerに通知
+            // RedeemAsyncと同様にPromotionAppliedEventを発行してLicenseManagerを更新
+            await _eventAggregator.PublishAsync(new PromotionAppliedEvent(promotionInfo))
+                .ConfigureAwait(false);
+
+            _logger.LogInformation("[Issue #298] SyncFromServerAsync: Promotion synced successfully (Plan: {PlanType}, Expires: {ExpiresAt})",
                 planType, expiresAt);
 
             return new ServerSyncResultWrapper { Result = ServerSyncResult.Success };

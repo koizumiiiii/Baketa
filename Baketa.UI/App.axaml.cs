@@ -566,11 +566,11 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                             _usageAnalyticsService = serviceProvider.GetService<IUsageAnalyticsService>();
                             if (_usageAnalyticsService?.IsEnabled == true)
                             {
+                                // app_versionはUsageAnalyticsService.TrackEvent()が自動付与
                                 var sessionData = new Dictionary<string, object>
                                 {
                                     ["os_version"] = Environment.OSVersion.VersionString,
-                                    ["runtime_version"] = Environment.Version.ToString(),
-                                    ["app_version"] = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0"
+                                    ["runtime_version"] = Environment.Version.ToString()
                                 };
                                 _usageAnalyticsService.TrackEvent("session_start", sessionData);
                                 _logger?.LogDebug("[Issue #269] session_start イベント記録完了");
@@ -651,16 +651,24 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
                 // 📊 [Issue #269] AnalyticsEventProcessor登録 - 翻訳イベントの使用統計記録
                 // [Issue #297] 名前空間修正: Core.Events.TranslationEvents → Core.Translation.Events
+                // [Issue #307] 両方の名前空間のTranslationCompletedEventに対応
                 try
                 {
                     var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-                    var analyticsProcessor = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>();
-                    eventAggregator.Subscribe<Baketa.Core.Translation.Events.TranslationCompletedEvent>(analyticsProcessor);
-                    Console.WriteLine("✅ AnalyticsEventProcessor登録完了");
+
+                    // Core.Translation.Events.TranslationCompletedEvent 購読（StandardTranslationPipeline用）
+                    var analyticsProcessor1 = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>();
+                    eventAggregator.Subscribe<Baketa.Core.Translation.Events.TranslationCompletedEvent>(analyticsProcessor1);
+
+                    // Core.Events.EventTypes.TranslationCompletedEvent 購読（TranslationPipelineService用）
+                    var analyticsProcessor2 = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>();
+                    eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>(analyticsProcessor2);
+
+                    Console.WriteLine("✅ AnalyticsEventProcessor登録完了（両イベントタイプ対応）");
                 }
                 catch (Exception analyticsEx)
                 {
-                    _logger?.LogWarning(analyticsEx, "[Issue #269] AnalyticsEventProcessor登録失敗（継続）");
+                    _logger?.LogWarning(analyticsEx, "[Issue #307] AnalyticsEventProcessor登録失敗（継続）");
                 }
 
                 // 🔧 [Issue #300] OcrRecoveryEventProcessor登録 - OCRサーバー復旧時のユーザー通知
@@ -1324,6 +1332,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     /// [Issue #275] 起動時のトークン使用量同期
     /// TokenUsageRepositoryから実際の使用量を読み込み、LicenseManagerに同期する
     /// これにより、設定画面を最初に開いた時から正しい値が表示される
+    /// [Issue #298] サーバーから既に同期済みの場合はローカルファイルで上書きしない
     /// </summary>
     private async Task SyncTokenUsageAtStartupAsync(IServiceProvider serviceProvider)
     {
@@ -1335,6 +1344,17 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             if (tokenTracker == null || licenseManager == null)
             {
                 _logger?.LogDebug("[Issue #275] トークン同期スキップ: サービスが利用不可");
+                return;
+            }
+
+            // [Issue #298] サーバーから既にトークン使用量が同期されている場合はスキップ
+            // サーバーの値（token_usage DB）が正しい値であり、ローカルファイルは
+            // 前ユーザーのデータが残っている可能性がある
+            var serverTokensUsed = licenseManager.CurrentState.CloudAiTokensUsed;
+            if (serverTokensUsed > 0)
+            {
+                _logger?.LogDebug("[Issue #298] サーバー同期済みのためローカル同期スキップ: ServerTokens={ServerTokens}", serverTokensUsed);
+                Console.WriteLine($"✅ [Issue #298] サーバー同期済み({serverTokensUsed})、ローカル同期スキップ");
                 return;
             }
 

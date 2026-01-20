@@ -101,14 +101,25 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
 
         _logger.LogInformation("Cloud翻訳希望設定を変更: {OldValue} → {NewValue}", currentIsPreferred, preferred);
 
-        // 現在の設定をクローンして更新
+        // 現在の設定を取得
         var currentSettings = _unifiedSettingsService.GetTranslationSettings();
-        if (currentSettings is not TranslationSettings concreteSettings)
+
+        // [Issue #298] ITranslationSettingsから新しいTranslationSettingsを作成
+        // UnifiedTranslationSettings（Infrastructure層）とTranslationSettings（Core層）は異なる具象型のため
+        // インターフェースのプロパティを使用して新しい設定オブジェクトを作成する
+        var settings = new TranslationSettings
         {
-            _logger.LogWarning("設定のクローンに失敗しました: 具象型TranslationSettingsへのキャストに失敗");
-            return;
-        }
-        var settings = concreteSettings.Clone();
+            AutoDetectSourceLanguage = currentSettings.AutoDetectSourceLanguage,
+            DefaultSourceLanguage = currentSettings.DefaultSourceLanguage,
+            DefaultTargetLanguage = currentSettings.DefaultTargetLanguage,
+            DefaultEngine = Enum.TryParse<TranslationEngine>(currentSettings.DefaultEngine, out var engine)
+                ? engine
+                : TranslationEngine.NLLB200,
+            UseLocalEngine = currentSettings.UseLocalEngine,
+            OverlayFontSize = currentSettings.OverlayFontSize,
+            EnableCloudAiTranslation = currentSettings.EnableCloudAiTranslation,
+            TimeoutSeconds = currentSettings.TimeoutMs / 1000
+        };
 
         // [Issue #280+#281] UseLocalEngine と EnableCloudAiTranslation を両方更新
         settings.UseLocalEngine = !preferred;

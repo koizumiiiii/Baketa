@@ -41,6 +41,7 @@
       <Private>True</Private>
       <CopyLocalSatelliteAssemblies>True</CopyLocalSatelliteAssemblies>
     </ProjectReference>
+    <ProjectReference Include="..\Baketa.TestCommon\Baketa.TestCommon.csproj" />
   </ItemGroup>
 
 </Project>
