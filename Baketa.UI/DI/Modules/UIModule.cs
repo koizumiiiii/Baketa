@@ -180,8 +180,20 @@ internal sealed class UIModule : ServiceModuleBase
 
         // Issue #269: AnalyticsEventProcessor登録 - 翻訳完了時の使用統計記録
         // [Issue #297] 名前空間修正: Core.Events.TranslationEvents → Core.Translation.Events
-        services.AddSingleton<AnalyticsEventProcessor>();
+        // [Issue #307] 両方の名前空間のTranslationCompletedEventに対応 + ゲーム名収集
+        services.AddSingleton<AnalyticsEventProcessor>(provider =>
+        {
+            var analyticsService = provider.GetRequiredService<Baketa.Core.Abstractions.Services.IUsageAnalyticsService>();
+            var fullscreenService = provider.GetService<Baketa.Core.UI.Fullscreen.IFullscreenModeService>();
+            var windowManager = provider.GetService<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter>();
+            // [Issue #307] IWindowManagementServiceから選択されたウィンドウのタイトルを取得
+            var windowManagementService = provider.GetService<Baketa.Application.Services.UI.IWindowManagementService>();
+            var logger = provider.GetService<Microsoft.Extensions.Logging.ILogger<AnalyticsEventProcessor>>();
+            return new AnalyticsEventProcessor(analyticsService, fullscreenService, windowManager, windowManagementService, logger);
+        });
         services.AddSingleton<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>(
+            provider => provider.GetRequiredService<AnalyticsEventProcessor>());
+        services.AddSingleton<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>(
             provider => provider.GetRequiredService<AnalyticsEventProcessor>());
 
         // Issue #300: OcrRecoveryEventProcessor登録 - OCRサーバー復旧時のユーザー通知
