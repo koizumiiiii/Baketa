@@ -77,6 +77,8 @@ public sealed class AnalyticsEventProcessor :
     /// </summary>
     public Task HandleAsync(EventTypesCompleted eventData, CancellationToken cancellationToken = default)
     {
+        _logger?.LogInformation("[Issue #307] EventTypesCompleted received: {Source}->{Target}, Engine={Engine}",
+            eventData.SourceLanguage, eventData.TargetLanguage, eventData.EngineName);
         return TrackTranslationEvent(
             eventData.SourceLanguage,
             eventData.TargetLanguage,
@@ -89,8 +91,10 @@ public sealed class AnalyticsEventProcessor :
     /// </summary>
     private Task TrackTranslationEvent(string sourceLanguage, string targetLanguage, string engine, long processingTimeMs)
     {
+        _logger?.LogInformation("[Issue #307] TrackTranslationEvent: IsEnabled={IsEnabled}", _analyticsService.IsEnabled);
         if (!_analyticsService.IsEnabled)
         {
+            _logger?.LogInformation("[Issue #307] Analytics disabled, skipping translation event");
             return Task.CompletedTask;
         }
 

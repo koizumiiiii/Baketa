@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -10,6 +11,7 @@ using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTra
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager統一インターフェース用
+using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Translation;
 using Baketa.Core.License.Models; // [Issue #78 Phase 4] FeatureType用
 using Baketa.Core.Models.Translation;
@@ -288,14 +290,20 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             // ============================================================
             List<string> translationResults;
 
+            // [Issue #307] 翻訳処理時間計測とエンジン追跡
+            var translationStopwatch = Stopwatch.StartNew();
+            var engineUsed = "Default";
+
             if (eventData.HasPreComputedCloudResult)
             {
                 // 事前計算されたCloud AI翻訳結果が利用可能
+                // [Issue #307] エンジン名を記録（FallbackLevel enumを文字列に変換）
+                engineUsed = eventData.PreComputedCloudResult!.UsedEngine.ToString();
                 _logger?.LogInformation(
                     "🚀 [Issue #290] Fork-Join: 事前計算されたCloud AI翻訳結果を使用 (Engine={Engine})",
-                    eventData.PreComputedCloudResult!.UsedEngine);
+                    engineUsed);
 #if DEBUG
-                Console.WriteLine($"🚀 [Issue #290] Fork-Join: 事前計算Cloud AI結果を使用 - Engine: {eventData.PreComputedCloudResult!.UsedEngine}");
+                Console.WriteLine($"🚀 [Issue #290] Fork-Join: 事前計算Cloud AI結果を使用 - Engine: {engineUsed}");
 #endif
 
                 var cloudResponse = eventData.PreComputedCloudResult!.Response;
@@ -351,6 +359,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                         .Select(v => v.TranslatedText)
                         .ToList();
 
+                    // [Issue #307] エンジン名を記録（TranslationEngineUsed enumを文字列に変換）
+                    engineUsed = parallelResult.EngineUsed.ToString();
+
                     // [Code Review] 相互検証でチャンク数が変化した場合は警告
                     var originalChunkCount = nonEmptyChunks.Count;
 
@@ -367,9 +378,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     }
 
                     _logger?.LogDebug("✅ [Phase4] 並列翻訳完了 - Engine: {Engine}, 結果数: {Count}",
-                        parallelResult.EngineUsed, translationResults.Count);
+                        engineUsed, translationResults.Count);
 #if DEBUG
-                    Console.WriteLine($"✅ [Phase4] 並列翻訳完了 - Engine: {parallelResult.EngineUsed}, 結果数: {translationResults.Count}");
+                    Console.WriteLine($"✅ [Phase4] 並列翻訳完了 - Engine: {engineUsed}, 結果数: {translationResults.Count}");
 #endif
 
                     // 統計ログ
@@ -386,6 +397,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 else
                 {
                     // 並列翻訳失敗 → ローカル翻訳にフォールバック
+                    // [Issue #307] エンジン名を記録
+                    engineUsed = "Local";
                     _logger?.LogWarning("⚠️ [Phase4] 並列翻訳失敗 - ローカル翻訳にフォールバック: {Error}",
                         parallelResult.Error?.Message ?? "不明");
 #if DEBUG
@@ -401,6 +414,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             else
             {
                 // 従来のローカル翻訳のみ
+                // [Issue #307] エンジン名を記録
+                engineUsed = "Local";
                 _logger?.LogDebug($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
                 Console.WriteLine($"🚀🚀🚀 [PHASE12.2_HANDLER] ExecuteBatchTranslationAsync呼び出し直前 - ChunkCount: {nonEmptyChunks.Count}");
 
@@ -410,8 +425,36 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     cancellationToken).ConfigureAwait(false);
             }
 
+            // [Issue #307] 翻訳処理時間を記録
+            translationStopwatch.Stop();
+            var processingTime = translationStopwatch.Elapsed;
+
             _logger?.LogDebug($"✅✅✅ [PHASE12.2_HANDLER] 翻訳完了 - 結果数: {translationResults.Count}");
             Console.WriteLine($"✅✅✅ [PHASE12.2_HANDLER] 翻訳完了 - 結果数: {translationResults.Count}");
+
+            // [Issue #307] TranslationCompletedEventを発行（Analytics用）
+            // AnalyticsEventProcessorがこのイベントを購読して使用統計を記録
+            try
+            {
+                var languagePair = _languageConfig.GetCurrentLanguagePair();
+                var translationCompletedEvent = new TranslationCompletedEvent(
+                    sourceText: "[batch]",  // プライバシー考慮: 実際のテキストは送信しない
+                    translatedText: "[batch]",
+                    sourceLanguage: languagePair.SourceCode,
+                    targetLanguage: languagePair.TargetCode,
+                    processingTime: processingTime,
+                    engineName: engineUsed);
+
+                await _eventAggregator.PublishAsync(translationCompletedEvent, cancellationToken).ConfigureAwait(false);
+                _logger?.LogInformation(
+                    "[Issue #307] TranslationCompletedEvent発行: Engine={Engine}, ProcessingTime={Time}ms, Lang={Source}→{Target}",
+                    engineUsed, (long)processingTime.TotalMilliseconds, languagePair.SourceCode, languagePair.TargetCode);
+            }
+            catch (Exception eventEx)
+            {
+                // イベント発行失敗はアプリ動作に影響しない
+                _logger?.LogWarning(eventEx, "[Issue #307] TranslationCompletedEvent発行失敗（継続）");
+            }
 
 #if DEBUG
             // 🚨 [ULTRATHINK_TRACE1] 翻訳完了直後トレースログ
