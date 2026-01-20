@@ -22,6 +22,8 @@ namespace Baketa.Infrastructure.DI;
 /// </summary>
 public sealed class UnifiedServerModule : ServiceModuleBase
 {
+    private static ILogger? _moduleLogger;
+
     public override void RegisterServices(IServiceCollection services)
     {
         // 統合サーバー設定登録
@@ -33,7 +35,8 @@ public sealed class UnifiedServerModule : ServiceModuleBase
         // アダプター登録（設定に応じて有効化）
         RegisterAdapters(services);
 
-        Console.WriteLine("✅ [Issue #292] UnifiedServerModule登録完了");
+        // 登録完了ログ（モジュールロガーが初期化されている場合のみ）
+        _moduleLogger?.LogInformation("[Issue #292] UnifiedServerModule登録完了");
     }
 
     private static void RegisterSettings(IServiceCollection services)
@@ -41,6 +44,10 @@ public sealed class UnifiedServerModule : ServiceModuleBase
         services.AddSingleton<UnifiedServerSettings>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var logger = loggerFactory.CreateLogger<UnifiedServerModule>();
+            _moduleLogger = logger;
+
             var settings = configuration.GetSection(UnifiedServerSettings.SectionName).Get<UnifiedServerSettings>();
 
             if (settings == null)
@@ -58,15 +65,16 @@ public sealed class UnifiedServerModule : ServiceModuleBase
             {
                 foreach (var error in validationResult.Errors)
                 {
-                    Console.WriteLine($"❌ [Issue #292] UnifiedServer設定エラー: {error}");
+                    logger.LogError("[Issue #292] UnifiedServer設定エラー: {Error}", error);
                 }
             }
             foreach (var warning in validationResult.Warnings)
             {
-                Console.WriteLine($"⚠️ [Issue #292] UnifiedServer設定警告: {warning}");
+                logger.LogWarning("[Issue #292] UnifiedServer設定警告: {Warning}", warning);
             }
 
-            Console.WriteLine($"🔧 [Issue #292] UnifiedServer設定: Enabled={settings.Enabled}, Port={settings.Port}, StartupTimeout={settings.StartupTimeoutSeconds}s");
+            logger.LogInformation("[Issue #292] UnifiedServer設定: Enabled={Enabled}, Port={Port}, StartupTimeout={StartupTimeoutSeconds}s",
+                settings.Enabled, settings.Port, settings.StartupTimeoutSeconds);
             return settings;
         });
     }
@@ -81,7 +89,8 @@ public sealed class UnifiedServerModule : ServiceModuleBase
             var logger = serviceProvider.GetRequiredService<ILogger<UnifiedServerManager>>();
             var eventAggregator = serviceProvider.GetService<IEventAggregator>();
 
-            Console.WriteLine($"🔧 [Issue #292] UnifiedServerManager初期化: Port={settings.Port}, StartupTimeout={settings.StartupTimeoutSeconds}s");
+            logger.LogInformation("[Issue #292] UnifiedServerManager初期化: Port={Port}, StartupTimeout={StartupTimeoutSeconds}s",
+                settings.Port, settings.StartupTimeoutSeconds);
             return new UnifiedServerManager(settings, logger, eventAggregator);
         });
 
@@ -127,7 +136,7 @@ public sealed class UnifiedServerModule : ServiceModuleBase
             "unified",
             (serviceProvider, _) => serviceProvider.GetRequiredService<UnifiedServerOcrAdapter>());
 
-        Console.WriteLine("✅ [Issue #292] 統合サーバーアダプター登録完了（Keyed Service: 'unified'）");
+        _moduleLogger?.LogInformation("[Issue #292] 統合サーバーアダプター登録完了（Keyed Service: 'unified'）");
     }
 
     /// <summary>
@@ -144,7 +153,8 @@ public sealed class UnifiedServerModule : ServiceModuleBase
         services.AddSingleton<IPythonServerManager>(serviceProvider =>
         {
             var adapter = serviceProvider.GetRequiredService<UnifiedServerPythonAdapter>();
-            Console.WriteLine("🔀 [Issue #292] IPythonServerManager → UnifiedServerPythonAdapter");
+            var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<UnifiedServerModule>();
+            logger.LogInformation("[Issue #292] IPythonServerManager → UnifiedServerPythonAdapter");
             return adapter;
         });
 
@@ -152,10 +162,11 @@ public sealed class UnifiedServerModule : ServiceModuleBase
         services.AddSingleton<IOcrServerManager>(serviceProvider =>
         {
             var adapter = serviceProvider.GetRequiredService<UnifiedServerOcrAdapter>();
-            Console.WriteLine("🔀 [Issue #292] IOcrServerManager → UnifiedServerOcrAdapter");
+            var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<UnifiedServerModule>();
+            logger.LogInformation("[Issue #292] IOcrServerManager → UnifiedServerOcrAdapter");
             return adapter;
         });
 
-        Console.WriteLine("✅ [Issue #292] 統合サーバーアダプターを有効化しました");
+        _moduleLogger?.LogInformation("[Issue #292] 統合サーバーアダプターを有効化しました");
     }
 }
