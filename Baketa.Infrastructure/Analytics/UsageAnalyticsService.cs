@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
+using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Settings;
@@ -37,6 +38,7 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
     private readonly ILogger<UsageAnalyticsService> _logger;
     private readonly IConsentService _consentService;
     private readonly ILicenseInfoProvider _licenseInfoProvider;  // [Issue #297] 循環依存回避: 最小限のインターフェース
+    private readonly IAuthService _authService;  // [Issue #312] Supabase JWT優先取得用
     private readonly HttpClient _httpClient;
     private readonly string _analyticsEndpoint;
     private readonly string _appVersion;
@@ -70,12 +72,14 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
         ILogger<UsageAnalyticsService> logger,
         IConsentService consentService,
         ILicenseInfoProvider licenseInfoProvider,  // [Issue #297] 循環依存回避: 必要最小限のインターフェース
+        IAuthService authService,  // [Issue #312] Supabase JWT優先取得用
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consentService = consentService ?? throw new ArgumentNullException(nameof(consentService));
         _licenseInfoProvider = licenseInfoProvider ?? throw new ArgumentNullException(nameof(licenseInfoProvider));
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
 
         ArgumentNullException.ThrowIfNull(httpClientFactory);
         _httpClient = httpClientFactory.CreateClient("Analytics");
@@ -86,19 +90,10 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
             ?? "https://baketa-relay.suke009.workers.dev/api/analytics/events";
         _enableInDebug = configuration.GetValue("Analytics:EnableInDebug", false);
 
-        // [Issue #307] アプリバージョン取得 - MinVerはAssemblyInformationalVersionAttributeに設定
-        var appAssembly = Assembly.GetEntryAssembly();
-        var infoVersion = appAssembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (!string.IsNullOrEmpty(infoVersion))
-        {
-            // "0.2.24+abc123" 形式から "0.2.24" を抽出（ビルドメタデータを除去）
-            _appVersion = infoVersion.Split(['-', '+'])[0];
-        }
-        else
-        {
-            // フォールバック: 通常のバージョン属性
-            _appVersion = appAssembly?.GetName().Version?.ToString(3) ?? "0.0.0";
-        }
+        // [Issue #307] アプリバージョン取得
+        // MinVerはAssemblyInformationalVersionAttributeにバージョンを設定する
+        // AssemblyName.Versionは常に0.0.0を返すため、InformationalVersionを使用
+        _appVersion = GetAppVersion();
 
         // [Issue #297] 同意状態を初期化・監視
         _consentService.ConsentChanged += OnConsentChanged;
@@ -222,8 +217,39 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
 
         try
         {
-            // [Issue #297] セッショントークン認証に変更（他のAPIと同じ方式）
-            var sessionToken = _licenseInfoProvider.CurrentSessionId;
+            // [Issue #312] Supabase JWT を優先的に使用（UUID形式トークンのKV依存を回避）
+            // Supabase JWT認証により、サーバー側でuser_id (UUID) が直接取得できる
+            string? sessionToken = null;
+
+            try
+            {
+                var supabaseSession = await _authService.GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+                if (supabaseSession?.IsValid == true && !string.IsNullOrEmpty(supabaseSession.AccessToken))
+                {
+                    sessionToken = supabaseSession.AccessToken;
+                    _logger.LogDebug("[Issue #312] Using Supabase JWT for analytics auth");
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw; // キャンセルは再スロー
+            }
+            catch (Exception ex)
+            {
+                // [Gemini Review] DebugではなくWarningでログ出力（本番環境でのトラブルシューティング用）
+                _logger.LogWarning(ex, "[Issue #312] Failed to get Supabase JWT, falling back to CurrentSessionId");
+            }
+
+            // Supabase JWTが取得できない場合は既存のCurrentSessionIdにフォールバック
+            if (string.IsNullOrEmpty(sessionToken))
+            {
+                sessionToken = _licenseInfoProvider.CurrentSessionId;
+                if (!string.IsNullOrEmpty(sessionToken))
+                {
+                    _logger.LogDebug("[Issue #312] Fallback to CurrentSessionId for analytics auth");
+                }
+            }
+
             if (string.IsNullOrEmpty(sessionToken))
             {
                 _logger.LogDebug("[Issue #269] No session token available, deferring {Count} events", eventsToSend.Count);
@@ -278,6 +304,32 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
             ReturnEventsToBuffer(eventsToSend);
             return false;
         }
+    }
+
+    /// <summary>
+    /// [Issue #307] MinVerからアプリバージョンを取得
+    /// MinVerはAssemblyInformationalVersionAttributeにセマンティックバージョンを設定
+    /// </summary>
+    private static string GetAppVersion()
+    {
+        var assembly = Assembly.GetEntryAssembly();
+        if (assembly == null)
+        {
+            return "0.0.0";
+        }
+
+        // MinVerが設定するAssemblyInformationalVersionAttributeを優先
+        var infoVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrEmpty(infoVersion))
+        {
+            // InformationalVersionには "+metadata" が含まれる場合があるので除去
+            // 例: "0.2.26+abc123" → "0.2.26"
+            var plusIndex = infoVersion.IndexOf('+');
+            return plusIndex > 0 ? infoVersion[..plusIndex] : infoVersion;
+        }
+
+        // フォールバック: AssemblyName.Version（常に0.0.0の可能性）
+        return assembly.GetName().Version?.ToString(3) ?? "0.0.0";
     }
 
     /// <summary>

@@ -421,15 +421,17 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）かどうか
-    /// クォータ超過に関係なくプランタイプのみで判定
+    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）またはボーナストークン保有者
+    /// クォータ超過に関係なく判定
+    /// [Issue #298] ボーナストークン保有者もゲージ表示対象に追加
     /// </summary>
     public bool HasPaidPlan
     {
         get
         {
             var plan = _licenseManager?.CurrentState?.CurrentPlan ?? PlanType.Free;
-            return plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
+            var hasBonusTokens = (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+            return plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate || hasBonusTokens;
         }
     }
 

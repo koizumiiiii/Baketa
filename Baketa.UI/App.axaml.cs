@@ -1339,6 +1339,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     /// [Issue #275] 起動時のトークン使用量同期
     /// TokenUsageRepositoryから実際の使用量を読み込み、LicenseManagerに同期する
     /// これにより、設定画面を最初に開いた時から正しい値が表示される
+    /// [Issue #298] サーバーから既に同期済みの場合はローカルファイルで上書きしない
     /// </summary>
     private async Task SyncTokenUsageAtStartupAsync(IServiceProvider serviceProvider)
     {
@@ -1350,6 +1351,17 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             if (tokenTracker == null || licenseManager == null)
             {
                 _logger?.LogDebug("[Issue #275] トークン同期スキップ: サービスが利用不可");
+                return;
+            }
+
+            // [Issue #298] サーバーから既にトークン使用量が同期されている場合はスキップ
+            // サーバーの値（token_usage DB）が正しい値であり、ローカルファイルは
+            // 前ユーザーのデータが残っている可能性がある
+            var serverTokensUsed = licenseManager.CurrentState.CloudAiTokensUsed;
+            if (serverTokensUsed > 0)
+            {
+                _logger?.LogDebug("[Issue #298] サーバー同期済みのためローカル同期スキップ: ServerTokens={ServerTokens}", serverTokensUsed);
+                Console.WriteLine($"✅ [Issue #298] サーバー同期済み({serverTokensUsed})、ローカル同期スキップ");
                 return;
             }
 

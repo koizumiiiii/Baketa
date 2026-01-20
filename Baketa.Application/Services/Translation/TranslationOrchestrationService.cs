@@ -2121,6 +2121,28 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                     var translationElapsed = DateTime.UtcNow - translationStartTime;
 
+                    // 📊 [Issue #307] 翻訳完了イベントを発行（Analytics用）
+                    // AnalyticsEventProcessorがこのイベントを購読して使用統計を記録
+                    // [Gemini Review] Analyticsは副次的処理なので、失敗しても翻訳は継続
+                    if (!string.IsNullOrEmpty(originalText) && !string.IsNullOrEmpty(translatedText))
+                    {
+                        try
+                        {
+                            await _eventAggregator.PublishAsync(new TranslationCompletedEvent(
+                                sourceText: originalText,
+                                translatedText: translatedText,
+                                sourceLanguage: sourceCode,
+                                targetLanguage: targetCode,
+                                processingTime: translationElapsed,
+                                engineName: "NLLB-200"
+                            )).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "[Issue #307] Failed to publish TranslationCompletedEvent");
+                        }
+                    }
+
                     // 🔥 [DIAGNOSTIC] 翻訳品質評価診断イベント
                     var isSameLanguage = originalText == translatedText;
                     var textSimilarity = isSameLanguage ? 1.0 : 0.0;

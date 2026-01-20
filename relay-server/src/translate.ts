@@ -35,12 +35,16 @@ export interface TranslateEnv {
   JWT_SECRET?: string;
 }
 
-/** セッションデータ（index.tsと共有） */
+/** [Issue #312] セッションデータ（index.tsと共有）
+ * - userId: Patreon User ID（課金管理用）
+ * - supabaseUuid: Supabase UUID（SSoT、Optional）
+ */
 interface SessionData {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
-  userId: string;
+  userId: string;          // Patreon User ID
+  supabaseUuid?: string;   // [Issue #312] Supabase UUID (SSoT、Optional)
 }
 
 /** キャッシュ済みメンバーシップ情報 */
@@ -214,6 +218,12 @@ const AUTH_CACHE_TTL_SECONDS = 60 * 60; // 1 hour (was 60 seconds)
 const QUOTA_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 /** [Issue #299] Patreon連携確認間隔（30分）- 再認証ループ防止 */
 const PATREON_VERIFY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+/** [Issue #312] 非推奨警告フラグ（ワーカーインスタンスごとに初回のみ出力） */
+const deprecationWarningShown = {
+  patreonKvSession: false,
+  supabaseJwt: false,
+};
 
 // [Issue #296] Patreon API定数（メンバーシップKV null時のフォールバック用）
 const PATREON_API_BASE = 'https://www.patreon.com/api/oauth2';
@@ -825,12 +835,20 @@ async function getBonusTokensRemaining(supabase: SupabaseClient, userId: string)
 /**
  * [Issue #280+#281] 統合認証
  * [Issue #287] JWT認証を最優先に追加
- * 1. Baketa JWT認証を試行（最優先）
+ * [Issue #312] 認証フォールバック段階的廃止
+ *
+ * 認証優先順位:
+ * 1. Baketa JWT認証（推奨・最優先）
  * 2. キャッシュを確認
- * 3. Patreonセッション（KV）を試行
- * 4. 失敗したらSupabase JWT認証を試行
+ * 3. Patreonセッション（KV）を試行 ← 非推奨、移行期間後に削除
+ * 4. Supabase JWT認証を試行 ← 非推奨、移行期間後に削除
  * 5. ボーナストークンの有無も確認
  * 6. 結果をキャッシュに保存
+ *
+ * 移行計画:
+ * - v0.3.x: 非推奨警告をログ出力
+ * - v0.4.x: Patreon KVセッション認証を削除
+ * - v0.5.x: Supabase JWT認証をBaketa JWT内部処理に統合
  */
 async function authenticateUser(
   env: TranslateEnv,
@@ -874,7 +892,42 @@ async function authenticateUser(
         await saveAuthCache(cacheKey, updatedAuth);
         return updatedAuth;
       } else {
-        // プランが一致 → キャッシュを使用
+        // プランが一致 → キャッシュを使用（ただしFreeプランの場合はボーナストークンを再確認）
+        if (cachedAuth.plan === PLAN.FREE) {
+          // [Issue #298] PatreonユーザーでもFreeプランの場合はボーナストークンを確認
+          // Patreon IDからSupabase UUIDを逆引きしてボーナストークンをチェック
+          const supabase = getSupabaseClient(env);
+          if (supabase) {
+            try {
+              // profiles.patreon_user_id からSupabase UUIDを取得
+              const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('patreon_user_id', cachedAuth.userId)
+                .single();
+
+              if (!profileError && profile?.id) {
+                const bonusRemaining = await getBonusTokensRemaining(supabase, profile.id);
+                const currentHasBonusTokens = bonusRemaining > 0;
+
+                if (currentHasBonusTokens !== cachedAuth.hasBonusTokens) {
+                  console.log(`[Issue #298] Patreon Free user bonus status changed: ${cachedAuth.hasBonusTokens} → ${currentHasBonusTokens}, updating cache`);
+                  const updatedAuth: AuthenticatedUser = {
+                    ...cachedAuth,
+                    hasBonusTokens: currentHasBonusTokens,
+                  };
+                  await saveAuthCache(cacheKey, updatedAuth);
+                  return updatedAuth;
+                }
+
+                console.log(`[Issue #298] Patreon Free plan cache hit: userId=${cachedAuth.userId.substring(0, 8)}..., bonusTokens=${currentHasBonusTokens}`);
+                return cachedAuth;
+              }
+            } catch (error) {
+              console.error(`[Issue #298] Error checking bonus tokens for Patreon user:`, error);
+            }
+          }
+        }
         console.log(`[Issue #286] Auth cache hit (Cache API): userId=${cachedAuth.userId.substring(0, 8)}..., plan=${cachedAuth.plan}`);
         return cachedAuth;
       }
@@ -894,9 +947,24 @@ async function authenticateUser(
               .eq('id', cachedAuth.userId)
               .single();
 
-            // プロファイル取得成功 かつ Patreon未連携 → キャッシュを信用
+            // プロファイル取得成功 かつ Patreon未連携
             if (!profileError && profile && !profile.patreon_user_id) {
-              console.log(`[Issue #299] Free plan cache hit (no Patreon link): userId=${cachedAuth.userId.substring(0, 8)}...`);
+              // [Issue #298] ボーナストークン状態を常に再確認（プロモーション適用後の反映）
+              const bonusRemaining = await getBonusTokensRemaining(supabase, cachedAuth.userId);
+              const currentHasBonusTokens = bonusRemaining > 0;
+
+              // ボーナストークン状態が変わった場合はキャッシュを更新
+              if (currentHasBonusTokens !== cachedAuth.hasBonusTokens) {
+                console.log(`[Issue #298] Bonus token status changed: ${cachedAuth.hasBonusTokens} → ${currentHasBonusTokens}, updating cache`);
+                const updatedAuth: AuthenticatedUser = {
+                  ...cachedAuth,
+                  hasBonusTokens: currentHasBonusTokens,
+                };
+                await saveAuthCache(cacheKey, updatedAuth);
+                return updatedAuth;
+              }
+
+              console.log(`[Issue #299] Free plan cache hit (no Patreon link): userId=${cachedAuth.userId.substring(0, 8)}..., bonusTokens=${currentHasBonusTokens}`);
               return cachedAuth;
             }
 
@@ -938,9 +1006,16 @@ async function authenticateUser(
     }
   }
 
-  // 3. Patreonセッション（KV）を試行
+  // [Issue #312] 3. Patreonセッション（KV）を試行
+  // 非推奨: 新規クライアントはJWT認証を使用すべき
+  // 移行期間後に削除予定
   const patreonSession = await getSession(env, sessionToken);
   if (patreonSession && Date.now() <= patreonSession.expiresAt) {
+    // [Issue #312] 非推奨警告: Patreon KVセッション認証（初回のみ出力）
+    if (!deprecationWarningShown.patreonKvSession) {
+      console.warn(`[Issue #312] DEPRECATED: Using Patreon KV session auth. Client should migrate to JWT auth.`);
+      deprecationWarningShown.patreonKvSession = true;
+    }
     let cachedMembership = await getCachedMembership(env, patreonSession.userId);
 
     // [Issue #296] メンバーシップKVがnullの場合、Patreon APIから最新情報を取得
@@ -965,7 +1040,9 @@ async function authenticateUser(
     }
   }
 
-  // 4. Supabase JWT認証を試行
+  // [Issue #312] 4. Supabase JWT認証を試行
+  // 非推奨: 新規クライアントはBaketa JWT認証を使用すべき
+  // Supabase JWTは後方互換性のために維持
   const supabase = getSupabaseClient(env);
   if (!supabase) {
     console.log('[Issue #280+#281] Supabase not configured, skipping JWT auth');
@@ -985,6 +1062,11 @@ async function authenticateUser(
     if (error || !user) {
       console.log('[Issue #280+#281] Supabase JWT validation failed:', error?.message);
       return null;
+    }
+    // [Issue #312] 非推奨警告: Supabase JWT認証（初回のみ出力）
+    if (!deprecationWarningShown.supabaseJwt) {
+      console.warn(`[Issue #312] DEPRECATED: Using Supabase JWT auth. Client should migrate to Baketa JWT auth.`);
+      deprecationWarningShown.supabaseJwt = true;
     }
 
     // 4a. ボーナストークン残高を確認

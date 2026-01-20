@@ -24,6 +24,8 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IJwtTokenService? _jwtTokenService;  // [Issue #287] JWT認証サービス（オプショナル）
     private readonly IAuthService? _authService;  // [Issue #295] Supabase認証サービス（アカウント紐づけ用）
+    private readonly IPromotionSettingsPersistence? _promotionSettingsPersistence;  // [Issue #298] プロモーション設定永続化
+    private readonly IPromotionCodeService? _promotionCodeService;  // [Issue #298] プロモーションコードサービス
     private readonly string _credentialsFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
@@ -74,13 +76,17 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         IOptions<PatreonSettings> settings,
         IHttpClientFactory httpClientFactory,
         IJwtTokenService? jwtTokenService = null,  // [Issue #287] オプショナル依存
-        IAuthService? authService = null)  // [Issue #295] Supabase認証（アカウント紐づけ用、オプショナル）
+        IAuthService? authService = null,  // [Issue #295] Supabase認証（アカウント紐づけ用、オプショナル）
+        IPromotionSettingsPersistence? promotionSettingsPersistence = null,  // [Issue #298] プロモーション設定永続化
+        IPromotionCodeService? promotionCodeService = null)  // [Issue #298] プロモーションコードサービス
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _jwtTokenService = jwtTokenService;  // null可（JWT未設定時）
         _authService = authService;  // [Issue #295] null可（Supabase未ログイン時）
+        _promotionSettingsPersistence = promotionSettingsPersistence;  // [Issue #298] null可
+        _promotionCodeService = promotionCodeService;  // [Issue #298] null可
 
         // 資格情報保存パス
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -280,6 +286,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
             _cachedCredentials = credentials;
 
             // [Issue #287] SessionTokenをJWTに交換（利用可能な場合）
+            string? accessToken = null;
             if (_jwtTokenService != null)
             {
                 try
@@ -289,6 +296,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
 
                     if (jwtResult != null)
                     {
+                        accessToken = jwtResult.AccessToken;
                         _logger.LogInformation(
                             "[Issue #287] JWT取得成功: ExpiresAt={ExpiresAt:u}",
                             jwtResult.ExpiresAt);
@@ -302,6 +310,48 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
                 {
                     // JWT取得失敗はエラーにしない（SessionToken認証は有効）
                     _logger.LogWarning(ex, "[Issue #287] JWT交換中にエラー（SessionToken認証にフォールバック）");
+                }
+            }
+
+            // [Issue #298] ログイン成功時にプロモーション状態を同期（ユーザー間混在防止）
+            // [レビュー対応] JWT未取得時はSupabaseセッションからアクセストークンを取得
+            if (_promotionCodeService != null)
+            {
+                var tokenForSync = accessToken;
+
+                // JWTが取得できなかった場合、Supabaseセッションからアクセストークンを取得
+                if (string.IsNullOrEmpty(tokenForSync) && _authService != null)
+                {
+                    try
+                    {
+                        var session = await _authService.GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+                        if (session?.IsValid == true)
+                        {
+                            tokenForSync = session.AccessToken;
+                            _logger.LogDebug("[Issue #298] Supabaseセッションからアクセストークンを取得");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "[Issue #298] Supabaseセッション取得中にエラー（プロモーション同期をスキップ）");
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(tokenForSync))
+                {
+                    try
+                    {
+                        var syncResult = await _promotionCodeService.SyncFromServerAsync(tokenForSync, cancellationToken)
+                            .ConfigureAwait(false);
+                        _logger.LogInformation(
+                            "[Issue #298] プロモーション状態を同期しました: Result={Result}",
+                            syncResult);
+                    }
+                    catch (Exception ex)
+                    {
+                        // プロモーション同期失敗はエラーにしない（次回同期で再試行される）
+                        _logger.LogWarning(ex, "[Issue #298] プロモーション状態の同期に失敗しました（後で再試行されます）");
+                    }
                 }
             }
 
@@ -355,6 +405,20 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
                 {
                     // セッション無効化の失敗はログに記録するが、ローカル切断は続行
                     _logger.LogWarning(ex, "サーバー側セッション無効化に失敗しましたが、ローカル切断を続行します");
+                }
+            }
+
+            // [Issue #298] プロモーション設定をクリア（ユーザー間混在防止）
+            if (_promotionSettingsPersistence != null)
+            {
+                try
+                {
+                    await _promotionSettingsPersistence.ClearPromotionAsync(cancellationToken).ConfigureAwait(false);
+                    _logger.LogInformation("[Issue #298] プロモーション設定をクリアしました");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[Issue #298] プロモーション設定のクリアに失敗しましたが、切断処理を続行します");
                 }
             }
 
