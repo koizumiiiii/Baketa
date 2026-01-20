@@ -1593,13 +1593,10 @@ async function handlePromotionStatus(
       return errorResponse('Invalid token', 401, origin, allowedOrigins, 'PROMO_INVALID_TOKEN');
     }
 
-    // 3. レート制限チェック（10回/分）
-    const rateLimit = await checkRateLimit(env, `promotion-status:${user.id}`, 10);
-    if (rateLimit.limited) {
-      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
-    }
+    // [Issue #305] レートリミット削除: read-onlyエンドポイントのためKV消費を削減
+    // WAF Rate Limiting Rulesで代替保護を推奨
 
-    // 4. RPC関数を使用してプロモーション状態を取得
+    // 3. RPC関数を使用してプロモーション状態を取得
     // [Issue #276] サービスキーでは auth.uid() が機能しないため、
     // user_idをパラメータとして渡す専用関数を使用
     const { data, error } = await supabase.rpc('get_promotion_status_for_user', {
@@ -1796,13 +1793,10 @@ async function handleConsentStatus(
       return errorResponse('Invalid token', 401, origin, allowedOrigins, 'CONSENT_INVALID_TOKEN');
     }
 
-    // 3. レート制限チェック（10回/分）
-    const rateLimit = await checkRateLimit(env, `consent-status:${user.id}`, 10);
-    if (rateLimit.limited) {
-      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
-    }
+    // [Issue #305] レートリミット削除: read-onlyエンドポイントのためKV消費を削減
+    // WAF Rate Limiting Rulesで代替保護を推奨
 
-    // 4. RPC関数を使用して同意状態を取得
+    // 3. RPC関数を使用して同意状態を取得
     // [Issue #277] サービスキーでは auth.uid() が機能しないため、
     // user_idをパラメータとして渡す専用関数を使用
     const { data, error } = await supabase.rpc('get_consent_status_for_user', {
@@ -2250,13 +2244,10 @@ async function handleBonusTokensStatus(
       return errorResponse('Invalid token', 401, origin, allowedOrigins, 'BONUS_INVALID_TOKEN');
     }
 
-    // 3. レート制限チェック（10回/分）
-    const rateLimit = await checkRateLimit(env, `bonus-status:${user.id}`, 10);
-    if (rateLimit.limited) {
-      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
-    }
+    // [Issue #305] レートリミット削除: read-onlyエンドポイントのためKV消費を削減
+    // WAF Rate Limiting Rulesで代替保護を推奨
 
-    // 4. RPC関数を使用してボーナストークン状態を取得
+    // 3. RPC関数を使用してボーナストークン状態を取得
     // サービスキーでは auth.uid() が機能しないため、専用関数を使用
     const { data, error } = await supabase.rpc('get_bonus_tokens_for_user', {
       p_user_id: user.id
