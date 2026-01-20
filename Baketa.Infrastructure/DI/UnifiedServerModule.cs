@@ -3,6 +3,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Server;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.DI;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,11 +22,6 @@ namespace Baketa.Infrastructure.DI;
 /// </summary>
 public sealed class UnifiedServerModule : ServiceModuleBase
 {
-    /// <summary>
-    /// デフォルトの統合サーバーポート
-    /// </summary>
-    private const int DefaultPort = 50053;
-
     public override void RegisterServices(IServiceCollection services)
     {
         // 統合サーバー設定登録
@@ -45,18 +41,32 @@ public sealed class UnifiedServerModule : ServiceModuleBase
         services.AddSingleton<UnifiedServerSettings>(serviceProvider =>
         {
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            var settings = configuration.GetSection("UnifiedServer").Get<UnifiedServerSettings>();
+            var settings = configuration.GetSection(UnifiedServerSettings.SectionName).Get<UnifiedServerSettings>();
 
             if (settings == null)
             {
                 settings = new UnifiedServerSettings
                 {
                     Enabled = false, // デフォルトは無効（既存の分離サーバーを使用）
-                    Port = DefaultPort
+                    Port = UnifiedServerSettings.DefaultPort
                 };
             }
 
-            Console.WriteLine($"🔧 [Issue #292] UnifiedServer設定: Enabled={settings.Enabled}, Port={settings.Port}");
+            // 設定検証
+            var validationResult = settings.ValidateSettings();
+            if (!validationResult.IsValid)
+            {
+                foreach (var error in validationResult.Errors)
+                {
+                    Console.WriteLine($"❌ [Issue #292] UnifiedServer設定エラー: {error}");
+                }
+            }
+            foreach (var warning in validationResult.Warnings)
+            {
+                Console.WriteLine($"⚠️ [Issue #292] UnifiedServer設定警告: {warning}");
+            }
+
+            Console.WriteLine($"🔧 [Issue #292] UnifiedServer設定: Enabled={settings.Enabled}, Port={settings.Port}, StartupTimeout={settings.StartupTimeoutSeconds}s");
             return settings;
         });
     }
@@ -71,8 +81,8 @@ public sealed class UnifiedServerModule : ServiceModuleBase
             var logger = serviceProvider.GetRequiredService<ILogger<UnifiedServerManager>>();
             var eventAggregator = serviceProvider.GetService<IEventAggregator>();
 
-            Console.WriteLine($"🔧 [Issue #292] UnifiedServerManager初期化: Port={settings.Port}");
-            return new UnifiedServerManager(settings.Port, logger, eventAggregator);
+            Console.WriteLine($"🔧 [Issue #292] UnifiedServerManager初期化: Port={settings.Port}, StartupTimeout={settings.StartupTimeoutSeconds}s");
+            return new UnifiedServerManager(settings, logger, eventAggregator);
         });
 
         // IUnifiedAIServerManager インターフェースとして登録
@@ -82,7 +92,14 @@ public sealed class UnifiedServerModule : ServiceModuleBase
 
     private static void RegisterAdapters(IServiceCollection services)
     {
-        // 統合サーバー用のPythonアダプター登録
+        // =====================================================================
+        // 二重登録パターンの説明:
+        // 1. 具象型としての直接登録 - テストやデバッグ時に直接参照したい場合に使用
+        // 2. Keyed Service登録 - EnableUnifiedServerAdapters()による動的切り替え用
+        // =====================================================================
+
+        // [直接参照用] 統合サーバー用のPythonアダプター登録
+        // 用途: テスト時やデバッグ時に具象型を直接DIで取得したい場合
         services.AddSingleton<UnifiedServerPythonAdapter>(serviceProvider =>
         {
             var unifiedServer = serviceProvider.GetRequiredService<IUnifiedAIServerManager>();
@@ -90,7 +107,8 @@ public sealed class UnifiedServerModule : ServiceModuleBase
             return new UnifiedServerPythonAdapter(unifiedServer, logger);
         });
 
-        // 統合サーバー用のOCRアダプター登録
+        // [直接参照用] 統合サーバー用のOCRアダプター登録
+        // 用途: テスト時やデバッグ時に具象型を直接DIで取得したい場合
         services.AddSingleton<UnifiedServerOcrAdapter>(serviceProvider =>
         {
             var unifiedServer = serviceProvider.GetRequiredService<IUnifiedAIServerManager>();
@@ -98,8 +116,9 @@ public sealed class UnifiedServerModule : ServiceModuleBase
             return new UnifiedServerOcrAdapter(unifiedServer, logger);
         });
 
-        // 設定に応じてIPythonServerManagerとIOcrServerManagerの実装を切り替え
-        // Keyed Serviceとして登録（"unified"キー）
+        // [Keyed Service登録] インターフェース経由での動的切り替え用
+        // 用途: EnableUnifiedServerAdapters()で既存の分離サーバーから統合サーバーに切り替える際に使用
+        // キー "unified" で取得可能: serviceProvider.GetKeyedService<IPythonServerManager>("unified")
         services.AddKeyedSingleton<IPythonServerManager, UnifiedServerPythonAdapter>(
             "unified",
             (serviceProvider, _) => serviceProvider.GetRequiredService<UnifiedServerPythonAdapter>());
@@ -139,32 +158,4 @@ public sealed class UnifiedServerModule : ServiceModuleBase
 
         Console.WriteLine("✅ [Issue #292] 統合サーバーアダプターを有効化しました");
     }
-}
-
-/// <summary>
-/// 統合サーバー設定
-/// </summary>
-public sealed class UnifiedServerSettings
-{
-    /// <summary>
-    /// 統合サーバーを有効にするか
-    /// true: OCRと翻訳を単一プロセスで実行
-    /// false: 既存の分離サーバー（SuryaOcrServer + TranslationServer）を使用
-    /// </summary>
-    public bool Enabled { get; set; } = false;
-
-    /// <summary>
-    /// 統合サーバーのポート番号
-    /// </summary>
-    public int Port { get; set; } = 50053;
-
-    /// <summary>
-    /// サーバー起動タイムアウト（秒）
-    /// </summary>
-    public int StartupTimeoutSeconds { get; set; } = 300;
-
-    /// <summary>
-    /// ヘルスチェック間隔（秒）
-    /// </summary>
-    public int HealthCheckIntervalSeconds { get; set; } = 30;
 }

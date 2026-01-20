@@ -4,6 +4,7 @@ using System.Text;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Server;
 using Baketa.Core.Events;
+using Baketa.Core.Settings;
 using Baketa.Translation.V1;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
@@ -16,22 +17,13 @@ namespace Baketa.Infrastructure.Services;
 /// </summary>
 public sealed class UnifiedServerManager : IUnifiedAIServerManager
 {
-    // [Gemini Review Fix] 設定の外部化 - マジックナンバーを定数化
-    /// <summary>サーバー起動タイムアウト（秒）- OCR+翻訳両方のモデルロード時間</summary>
-    private const int StartupTimeoutSeconds = 300;
-
-    /// <summary>サーバー停止タイムアウト（秒）</summary>
-    private const int StopTimeoutSeconds = 10;
-
-    /// <summary>gRPCヘルスチェックタイムアウト（秒）</summary>
-    private const int HealthCheckTimeoutSeconds = 5;
-
-    /// <summary>孤立プロセスKillタイムアウト（秒）</summary>
+    // [Phase 3 Review Fix] 定数を削除し、UnifiedServerSettingsからの設定値を使用
+    /// <summary>孤立プロセスKillタイムアウト（秒） - 設定に含めるほど重要でないため定数として残す</summary>
     private const int ProcessKillTimeoutSeconds = 5;
 
+    private readonly UnifiedServerSettings _settings;
     private readonly ILogger<UnifiedServerManager> _logger;
     private readonly IEventAggregator? _eventAggregator;
-    private readonly int _port;
     private Process? _serverProcess;
     private ProcessJobObject? _jobObject;
     private bool _isReady;
@@ -46,25 +38,35 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
     /// <summary>
     /// サーバーポート
     /// </summary>
-    public int Port => _port;
+    public int Port => _settings.Port;
 
     /// <summary>
     /// 統合サーバーが利用可能かどうか（exe/Pythonスクリプトが存在するか）
     /// </summary>
     public bool IsAvailable => ResolveServerExecutable().executablePath != null;
 
+    /// <summary>
+    /// 統合サーバーマネージャーを初期化
+    /// </summary>
+    /// <param name="settings">統合サーバー設定</param>
+    /// <param name="logger">ロガー</param>
+    /// <param name="eventAggregator">イベントアグリゲーター（任意）</param>
     public UnifiedServerManager(
-        int port,
+        UnifiedServerSettings settings,
         ILogger<UnifiedServerManager> logger,
         IEventAggregator? eventAggregator = null)
     {
-        _port = port;
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        _settings = settings;
         _logger = logger;
         _eventAggregator = eventAggregator;
 
         // Issue #189: Job Object初期化 - ゾンビプロセス対策
         _jobObject = new ProcessJobObject(logger);
-        _logger.LogDebug("[UnifiedServer] Job Object初期化: IsValid={IsValid}", _jobObject.IsValid);
+        _logger.LogDebug("[UnifiedServer] Job Object初期化: IsValid={IsValid}, Port={Port}, StartupTimeout={StartupTimeout}s",
+            _jobObject.IsValid, _settings.Port, _settings.StartupTimeoutSeconds);
     }
 
     /// <summary>
@@ -77,7 +79,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         {
             if (_isReady && _serverProcess is { HasExited: false })
             {
-                _logger.LogInformation("♻️ [UnifiedServer] 既存サーバー再利用: Port {Port}", _port);
+                _logger.LogInformation("♻️ [UnifiedServer] 既存サーバー再利用: Port {Port}", _settings.Port);
                 return true;
             }
 
@@ -179,9 +181,9 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
                 _logger.LogInformation("✅ [UnifiedServer] Job Object関連付け成功: PID={PID}", _serverProcess.Id);
             }
 
-            // 準備完了を待機（タイムアウト: 300秒 - OCR+翻訳両方のモデルロード）
+            // 準備完了を待機（タイムアウト: 設定値秒 - OCR+翻訳両方のモデルロード）
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(StartupTimeoutSeconds));
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(_settings.StartupTimeoutSeconds));
 
             try
             {
@@ -194,13 +196,13 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
                 if (completedTask == readyTask && await readyTask.ConfigureAwait(false))
                 {
                     _isReady = true;
-                    _logger.LogInformation("✅ [UnifiedServer] 統合AIサーバー準備完了: Port {Port}", _port);
+                    _logger.LogInformation("✅ [UnifiedServer] 統合AIサーバー準備完了: Port {Port}", _settings.Port);
                     return true;
                 }
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                _logger.LogError("❌ [UnifiedServer] サーバー起動タイムアウト（{Timeout}秒）", StartupTimeoutSeconds);
+                _logger.LogError("❌ [UnifiedServer] サーバー起動タイムアウト（{Timeout}秒）", _settings.StartupTimeoutSeconds);
             }
 
             // タイムアウトまたは失敗
@@ -234,7 +236,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         try
         {
             _serverProcess.Kill(entireProcessTree: true);
-            await _serverProcess.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(StopTimeoutSeconds)).ConfigureAwait(false);
+            await _serverProcess.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(_settings.StopTimeoutSeconds)).ConfigureAwait(false);
             _logger.LogInformation("✅ [UnifiedServer] サーバー停止完了");
         }
         catch (Exception ex)
@@ -265,13 +267,13 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
 
         try
         {
-            var serverAddress = $"http://127.0.0.1:{_port}";
+            var serverAddress = $"http://127.0.0.1:{_settings.Port}";
 
             using var channel = GrpcChannel.ForAddress(serverAddress, new GrpcChannelOptions
             {
                 HttpHandler = new System.Net.Http.SocketsHttpHandler
                 {
-                    ConnectTimeout = TimeSpan.FromSeconds(HealthCheckTimeoutSeconds)
+                    ConnectTimeout = TimeSpan.FromSeconds(_settings.HealthCheckTimeoutSeconds)
                 }
             });
 
@@ -280,7 +282,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
             // gRPC IsReady RPCを呼び出し
             var response = await client.IsReadyAsync(
                 new IsReadyRequest(),
-                deadline: DateTime.UtcNow.AddSeconds(HealthCheckTimeoutSeconds),
+                deadline: DateTime.UtcNow.AddSeconds(_settings.HealthCheckTimeoutSeconds),
                 cancellationToken: cancellationToken
             ).ConfigureAwait(false);
 
@@ -330,7 +332,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         if (File.Exists(exePath))
         {
             _logger.LogInformation("✅ [UnifiedServer] exe版使用: {Path}", exePath);
-            return (exePath, $"--port {_port}", Path.GetDirectoryName(exePath)!, true);
+            return (exePath, $"--port {_settings.Port}", Path.GetDirectoryName(exePath)!, true);
         }
 
         // Python版チェック（開発時）
@@ -355,7 +357,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
             if (pythonPath != null)
             {
                 _logger.LogInformation("✅ [UnifiedServer] Python版使用: {Script} (Python: {Python})", scriptPath, pythonPath);
-                return (pythonPath, $"\"{scriptPath}\" --port {_port}", grpcServerDir, false);
+                return (pythonPath, $"\"{scriptPath}\" --port {_settings.Port}", grpcServerDir, false);
             }
         }
 
@@ -442,7 +444,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
     {
         try
         {
-            _logger.LogDebug("[UnifiedServer] 孤立プロセスチェック: Port {Port}", _port);
+            _logger.LogDebug("[UnifiedServer] 孤立プロセスチェック: Port {Port}", _settings.Port);
 
             var netstatProcess = new Process
             {
@@ -463,7 +465,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
             var lines = output.Split('\n');
             foreach (var line in lines)
             {
-                if (line.Contains($":{_port}") && line.Contains("LISTENING"))
+                if (line.Contains($":{_settings.Port}") && line.Contains("LISTENING"))
                 {
                     var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length > 0 && int.TryParse(parts[^1], out var pid))
@@ -571,7 +573,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         ServerErrorDetector.DetectAndPublish(
             line,
             ServerErrorSources.UnifiedServer,
-            $"Port:{_port}",
+            $"Port:{_settings.Port}",
             _eventAggregator,
             _logger);
     }

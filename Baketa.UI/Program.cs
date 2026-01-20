@@ -1391,9 +1391,19 @@ internal sealed class Program
         // Issue #292: 統合AIサーバーモジュールの登録
         // OCR + 翻訳を単一プロセスで実行（VRAM削減）
         Console.WriteLine("🚀 UnifiedServerModule登録開始");
-        var unifiedServerModule = new Baketa.Infrastructure.DI.UnifiedServerModule();
-        unifiedServerModule.RegisterServices(services);
-        Console.WriteLine("✅ UnifiedServerModule登録完了");
+        try
+        {
+            var unifiedServerModule = new Baketa.Infrastructure.DI.UnifiedServerModule();
+            unifiedServerModule.RegisterServices(services);
+            Console.WriteLine("✅ UnifiedServerModule登録完了");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ [Issue #292] UnifiedServerModule登録失敗: {ex.GetType().Name}");
+            Console.WriteLine($"❌ [Issue #292] Exception Message: {ex.Message}");
+            // 統合サーバーモジュールは任意機能のため、失敗しても起動継続
+            Console.WriteLine("⚠️ [Issue #292] 統合サーバー機能は無効化されますが、アプリケーションは起動を継続します");
+        }
     }
 
     /// <summary>
