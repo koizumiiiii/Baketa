@@ -18,14 +18,19 @@ public sealed class PatreonSyncHostedService : BackgroundService
     private readonly ILogger<PatreonSyncHostedService> _logger;
 
     /// <summary>
-    /// 同期間隔（デフォルト: 30分）
+    /// [Issue #305] 同期間隔（1時間）- KV消費削減のため30分から延長
     /// </summary>
-    private static readonly TimeSpan SyncInterval = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan SyncInterval = TimeSpan.FromHours(1);
 
     /// <summary>
     /// 起動時の同期遅延（DI完了待ち）
     /// </summary>
     private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// [Issue #298] 初回同期フラグ（起動時はサーバーから必ず取得）
+    /// </summary>
+    private bool _isFirstSync = true;
 
     public PatreonSyncHostedService(
         IPatreonOAuthService patreonService,
@@ -89,14 +94,32 @@ public sealed class PatreonSyncHostedService : BackgroundService
             return;
         }
 
-        _logger.LogInformation("🔄 Patreon自動同期開始: UserId={UserId}", MaskId(credentials.PatreonUserId));
+        // [Issue #298] 初回同期はサーバーから必ず取得（キャッシュ無効化）
+        var forceRefresh = _isFirstSync;
+        if (_isFirstSync)
+        {
+            _isFirstSync = false;
+            _logger.LogInformation("🔄 Patreon初回同期開始（キャッシュ無視）: UserId={UserId}", MaskId(credentials.PatreonUserId));
+        }
+        else
+        {
+            _logger.LogInformation("🔄 Patreon定期同期開始: UserId={UserId}", MaskId(credentials.PatreonUserId));
+        }
 
-        var result = await _patreonService.SyncLicenseAsync(forceRefresh: false, cancellationToken).ConfigureAwait(false);
+        var result = await _patreonService.SyncLicenseAsync(forceRefresh, cancellationToken).ConfigureAwait(false);
 
         if (result.Success)
         {
-            _logger.LogInformation("✅ Patreon自動同期成功: Plan={Plan}, FromCache={FromCache}",
+            _logger.LogInformation("✅ Patreon同期成功: Plan={Plan}, FromCache={FromCache}",
                 result.Plan, result.FromCache);
+
+            // [Issue #298] キャッシュからの結果でLicenseManagerを更新すると、
+            // サーバーの最新値が上書きされてしまう問題を防止
+            if (result.FromCache)
+            {
+                _logger.LogDebug("[Issue #298] キャッシュからの結果のため、LicenseManager更新をスキップ");
+                return;
+            }
 
             // LicenseStateを構築してLicenseManagerに伝播 (DRY: PatreonLicenseMapper使用)
             var state = PatreonLicenseMapper.ToLicenseState(result, credentials);
@@ -105,10 +128,18 @@ public sealed class PatreonSyncHostedService : BackgroundService
                 state,
                 "PatreonSyncHostedService",
                 LicenseChangeReason.ServerRefresh);
+
+            // [Issue #298] セッショントークンを設定（Cloud AI翻訳で使用）
+            var sessionToken = await _patreonService.GetSessionTokenAsync(cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(sessionToken))
+            {
+                _licenseManager.SetSessionToken(sessionToken);
+                _logger.LogDebug("[Issue #298] Patreonセッショントークンを設定");
+            }
         }
         else
         {
-            _logger.LogWarning("⚠️ Patreon自動同期失敗: Status={Status}, Error={Error}",
+            _logger.LogWarning("⚠️ Patreon同期失敗: Status={Status}, Error={Error}",
                 result.Status, result.ErrorMessage);
         }
     }

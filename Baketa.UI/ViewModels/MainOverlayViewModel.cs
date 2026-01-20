@@ -1878,7 +1878,10 @@ public class MainOverlayViewModel : ViewModelBase
                     if (!_memoryWarningNotificationShown)
                     {
                         _memoryWarningNotificationShown = true;
+                        // CA1863: CompositeFormatキャッシュ不要（1回のみ実行）
+#pragma warning disable CA1863
                         var message = string.Format(Strings.MemoryWarning_SystemMemory, memoryUsage.ToString("F0"));
+#pragma warning restore CA1863
                         Logger?.LogWarning("[Issue #300] Showing memory warning toast: {Message}", message);
                         await _notificationService.ShowWarningAsync(Strings.MemoryWarning_Title, message, 8000).ConfigureAwait(false);
                     }

@@ -375,3 +375,52 @@ internal sealed class BoolToChangesConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
+
+/// <summary>
+/// [Issue #307] パーセンテージ（double）からGridLength（Star単位）への変換コンバーター
+/// トークンゲージの3セグメント表示に使用
+/// </summary>
+internal sealed class PercentToGridLengthConverter : IValueConverter
+{
+    public static readonly PercentToGridLengthConverter Instance = new();
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is double percent && percent >= 0)
+        {
+            // 0の場合は最小値を設定（ゼロ幅だと見えない）
+            var starValue = Math.Max(0.001, percent);
+            return new GridLength(starValue, GridUnitType.Star);
+        }
+        return new GridLength(0.001, GridUnitType.Star);
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? _, CultureInfo _1)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// [Issue #307] 親要素の幅とパーセンテージから実際のピクセル幅を計算するコンバーター
+/// トークンゲージの3セグメント表示に使用
+/// values[0]: 親要素の幅（double）
+/// values[1]: パーセンテージ（double, 0-100）
+/// </summary>
+internal sealed class PercentToWidthConverter : IMultiValueConverter
+{
+    public static readonly PercentToWidthConverter Instance = new();
+
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values.Count >= 2 &&
+            values[0] is double parentWidth &&
+            values[1] is double percent &&
+            parentWidth > 0)
+        {
+            var width = parentWidth * percent / 100.0;
+            return Math.Max(0, width);
+        }
+        return 0.0;
+    }
+}

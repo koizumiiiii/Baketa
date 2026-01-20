@@ -810,6 +810,32 @@ public sealed class AccountSettingsViewModel : ViewModelBase
             // コールバックを待機
             var result = await callbackTask.ConfigureAwait(false);
 
+            if (result.Success)
+            {
+                // [Issue #298] LicenseManagerに同期結果を伝播（ExecuteSyncPatreonAsyncと同様）
+                var credentials = await _patreonService.LoadCredentialsAsync().ConfigureAwait(false);
+                var sessionToken = await _patreonService.GetSessionTokenAsync().ConfigureAwait(false);
+
+                if (_licenseManager != null && credentials != null)
+                {
+                    // PatreonLicenseMapperでLicenseStateを構築
+                    var syncResult = PatreonSyncResult.CreateSuccess(result.Plan, null);
+                    var licenseState = PatreonLicenseMapper.ToLicenseState(syncResult, credentials);
+
+                    _licenseManager.SetResolvedLicenseState(
+                        licenseState,
+                        "AccountSettingsViewModel",
+                        LicenseChangeReason.ServerRefresh);
+
+                    // [Issue #298] セッショントークンを設定（Cloud AI翻訳で使用）
+                    if (!string.IsNullOrEmpty(sessionToken))
+                    {
+                        _licenseManager.SetSessionToken(sessionToken);
+                        _logger?.LogInformation("[Issue #298] Patreonセッショントークンを設定");
+                    }
+                }
+            }
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (result.Success)
@@ -860,6 +886,26 @@ public sealed class AccountSettingsViewModel : ViewModelBase
 
             // 資格情報を取得（LicenseState構築に必要）
             var credentials = await _patreonService.LoadCredentialsAsync().ConfigureAwait(false);
+            // [Issue #298] セッショントークンを取得
+            var sessionToken = await _patreonService.GetSessionTokenAsync().ConfigureAwait(false);
+
+            // [Issue #298] LicenseManagerの更新はUIスレッド外で実行（スレッドセーフ）
+            if (result.Success && _licenseManager != null && credentials != null)
+            {
+                var state = PatreonLicenseMapper.ToLicenseState(result, credentials);
+
+                _licenseManager.SetResolvedLicenseState(
+                    state,
+                    "AccountSettingsViewModel",
+                    LicenseChangeReason.ServerRefresh);
+
+                // [Issue #298] セッショントークンを設定（Cloud AI翻訳で使用）
+                if (!string.IsNullOrEmpty(sessionToken))
+                {
+                    _licenseManager.SetSessionToken(sessionToken);
+                    _logger?.LogDebug("[Issue #298] Patreonセッショントークンを更新");
+                }
+            }
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -870,17 +916,6 @@ public sealed class AccountSettingsViewModel : ViewModelBase
                     PatreonSyncStatus = PatreonSyncStatus.Synced;
                     SetStatusMessage($"同期完了: {GetPlanName(CurrentPlan)}プラン", false);
                     _logger?.LogInformation("Patreon同期成功: Plan={Plan}", result.Plan);
-
-                    // LicenseManagerに同期結果を伝播 (DRY: PatreonLicenseMapper使用)
-                    if (_licenseManager != null && credentials != null)
-                    {
-                        var state = PatreonLicenseMapper.ToLicenseState(result, credentials);
-
-                        _licenseManager.SetResolvedLicenseState(
-                            state,
-                            "AccountSettingsViewModel",
-                            LicenseChangeReason.ServerRefresh);
-                    }
                 }
                 else
                 {

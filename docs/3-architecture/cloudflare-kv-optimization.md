@@ -245,10 +245,60 @@ if (await GetRemainingTokensAsync() <= 0) return;
 2. **Phase 2**: 翻訳レスポンスに `tokenUsage` フィールド追加
 3. **Phase 3**: クライアントUI更新（レスポンスから表示）
 
+## Issue #305: 実施済み最適化
+
+### 1. read-onlyエンドポイントのレートリミット削除
+
+以下のエンドポイントからレートリミットを削除：
+
+| エンドポイント | 旧制限 | 変更後 |
+|--------------|-------|--------|
+| `/api/promotion/status` | 10/分 | 削除 |
+| `/api/consent/status` | 10/分 | 削除 |
+| `/api/bonus-tokens/status` | 10/分 | 削除 |
+
+**効果:** 各リクエストで2 KV操作を削減
+
+### 2. バックグラウンド同期間隔の延長
+
+| サービス | 旧間隔 | 新間隔 |
+|---------|-------|--------|
+| PatreonSyncHostedService | 30分 | 1時間 |
+| BonusSyncHostedService | 30分 | 1時間 |
+
+**効果:** KV消費を約50%削減
+
+**注意:** 手動同期機能があるため、ユーザー体験への影響は最小限
+
+### 3. WAF Rate Limiting Rules（必須設定）
+
+レートリミットをKVからWAFに移行したため、以下の設定が必要：
+
+**設定場所:** Cloudflare Dashboard → Security → WAF → Rate limiting rules
+
+**推奨ルール:**
+```
+Rule Name: Baketa API Rate Limit
+Expression: (http.host eq "baketa-relay.suke009.workers.dev")
+Characteristics: IP
+Period: 1 minute
+Requests: 60
+Action: Block
+Duration: 1 minute
+```
+
+**設定手順:**
+1. Cloudflare Dashboard にログイン
+2. baketa-relay.suke009.workers.dev のゾーンを選択
+3. Security → WAF → Rate limiting rules
+4. "Create rule" をクリック
+5. 上記ルールを設定して保存
+
 ## 関連Issue
 
 - [Issue #286](https://github.com/koizumiiiii/Baketa/issues/286): Cloudflare Workers KV操作の最適化（Free Tier制限対策）
 - [Issue #296](https://github.com/koizumiiiii/Baketa/issues/296): サーバーサイドトークン消費追跡
+- [Issue #305](https://github.com/koizumiiiii/Baketa/issues/305): エンドポイント単位レートリミットのKV消費最適化
 
 ## 更新履歴
 
@@ -256,3 +306,4 @@ if (await GetRemainingTokensAsync() <= 0) return;
 |------|------|
 | 2026-01-13 | 初版作成（Issue #286対応完了後） |
 | 2026-01-14 | Issue #296 トークン消費追跡の最適化設計追加 |
+| 2026-01-18 | Issue #305 レートリミット削除・同期間隔延長・WAF設定手順追加 |

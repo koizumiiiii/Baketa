@@ -14,6 +14,40 @@
  * - クラッシュレポート受信（Issue #252）
  * - 同意記録（GDPR/CCPA監査ログ）（Issue #261）
  * - ボーナストークン管理（Issue #280+#281）
+ * - JWT短期トークン認証（Issue #287, #312）
+ *
+ * [Issue #312] データアーキテクチャ:
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │                    SSoT (Single Source of Truth)               │
+ * │                        Supabase PostgreSQL                      │
+ * │  - profiles (id=UUID, patreon_user_id)                         │
+ * │  - license_history (プラン変更履歴)                            │
+ * │  - token_usage (トークン消費量)                                │
+ * └─────────────────────────────────────────────────────────────────┘
+ *                              ↓ Read-through Cache
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │                     Cloudflare KV Cache                         │
+ * │  - session:{token} → SessionData (supabaseUuid cached)         │
+ * │  - membership:{patreonId} → CachedMembership                   │
+ * │  - refresh:{token} → RefreshTokenData                          │
+ * └─────────────────────────────────────────────────────────────────┘
+ *                              ↓ Stateless
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │                     JWT (1時間TTL)                              │
+ * │  - sub: Supabase UUID (SSoT)                                   │
+ * │  - pid: Patreon User ID (Optional)                             │
+ * │  - plan: Pro/Lite/Free                                         │
+ * │  - ver: Schema version                                         │
+ * └─────────────────────────────────────────────────────────────────┘
+ *
+ * データフロー単方向化:
+ * Patreon Webhook → Supabase更新 → KVキャッシュ無効化 → 次回参照時に再取得
+ *
+ * [Gemini Review] キャッシュTTL:
+ * - session:{token}: 30日（SESSION_TTL_SECONDS）
+ * - membership:{patreonId}: 12時間（IDENTITY_CACHE_TTL_SECONDS）
+ * - refresh:{token}: 30日（JWT_REFRESH_TOKEN_TTL_SECONDS）
+ * - JWT: 1時間（JWT_ACCESS_TOKEN_TTL_SECONDS、stateless）
  *
  * セキュリティ:
  * - タイミング攻撃対策（timingSafeCompare）
@@ -79,8 +113,11 @@ const PATRON_STATUS = {
 // Issue #287: JWT認証設定
 // ============================================
 
-/** JWTアクセストークンTTL（15分） */
-const JWT_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
+/** [Issue #312] JWTアクセストークンTTL（1時間）
+ * - ステートレスAPI呼び出しとプラン変更追従の両立
+ * - 翻訳セッション中はKV/DB問い合わせなしで動作
+ */
+const JWT_ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 /** JWTリフレッシュトークンTTL（30日） */
 const JWT_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 /** JWT発行者 */
@@ -111,11 +148,16 @@ export interface Env {
   JWT_SECRET?: string;       // Issue #287: JWT署名用シークレット
 }
 
+/** [Issue #312] セッションデータ（KV保存用）
+ * - userId: Patreon User ID（課金管理用）
+ * - supabaseUuid: Supabase UUID（SSoT、Optional）
+ */
 interface SessionData {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
-  userId: string;
+  userId: string;          // Patreon User ID
+  supabaseUuid?: string;   // [Issue #312] Supabase UUID (SSoT、Optional)
 }
 
 /** ユーザートークン（シングルデバイス強制用） */
@@ -173,12 +215,20 @@ interface BonusTokenInfo {
 // Issue #287: JWT認証型定義
 // ============================================
 
-/** JWTカスタムクレーム */
+/** [Issue #312] JWTカスタムクレーム
+ * - sub: Supabase UUID（認証・認可の主キー）
+ * - sid: アプリセッションID（usage_events紐付け用）
+ * - pid: Patreon User ID（課金管理用、Optional）
+ * - plan: プラン階層
+ * - ver: スキーマバージョン
+ */
 interface BaketaJwtClaims extends JWTPayload {
-  sub: string;           // Patreon user ID
+  sub: string;           // Supabase UUID (SSoT)
+  sid?: string;          // App Session ID (クライアント提供)
+  pid?: string;          // Patreon User ID (Optional)
   plan: PlanType;        // 現在のプラン
   hasBonusTokens: boolean; // ボーナストークン有無
-  authMethod: 'patreon'; // 認証方法
+  ver: number;           // スキーマバージョン
 }
 
 /** JWTトークンペア */
@@ -188,10 +238,10 @@ interface JwtTokenPair {
   expiresAt: number;     // Unix timestamp
 }
 
-/** リフレッシュトークンデータ（KV保存用） */
+/** [Issue #312] リフレッシュトークンデータ（KV保存用） */
 interface RefreshTokenData {
-  userId: string;
-  sessionToken: string;  // 元のセッショントークン
+  userId: string;        // Supabase UUID (SSoT)
+  sessionToken: string;  // 元のセッショントークン（Patreon KV session）
   createdAt: number;
   expiresAt: number;
   isUsed: boolean;       // 1回使用で無効化
@@ -883,17 +933,19 @@ function validateApiKey(request: Request, env: Env): boolean {
 // Issue #287: JWT認証関数
 // ============================================
 
-/**
- * JWTアクセストークンを生成
+/** [Issue #312] JWTアクセストークン生成
  * @param env 環境変数
- * @param userId Patreonユーザー ID
- * @param plan 現在のプラン
- * @param hasBonusTokens ボーナストークンの有無
- * @returns JWTアクセストークン
+ * @param supabaseUuid Supabase UUID (sub claim - SSoT)
+ * @param patreonUserId Patreon User ID (pid claim - Optional)
+ * @param appSessionId アプリセッションID (sid claim - Optional)
+ * @param plan プラン階層
+ * @param hasBonusTokens ボーナストークン有無
  */
 async function generateAccessToken(
   env: Env,
-  userId: string,
+  supabaseUuid: string,
+  patreonUserId: string | undefined,
+  appSessionId: string | undefined,
   plan: PlanType,
   hasBonusTokens: boolean
 ): Promise<string> {
@@ -904,13 +956,24 @@ async function generateAccessToken(
   const secret = new TextEncoder().encode(env.JWT_SECRET);
   const now = Math.floor(Date.now() / 1000);
 
-  const jwt = await new SignJWT({
+  // [Issue #312] 新しいJWTペイロード構造
+  const claims: Partial<BaketaJwtClaims> = {
     plan,
     hasBonusTokens,
-    authMethod: 'patreon',
-  } as BaketaJwtClaims)
+    ver: 1,  // スキーマバージョン
+  };
+
+  // Optional claims
+  if (patreonUserId) {
+    claims.pid = patreonUserId;
+  }
+  if (appSessionId) {
+    claims.sid = appSessionId;
+  }
+
+  const jwt = await new SignJWT(claims as BaketaJwtClaims)
     .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(userId)
+    .setSubject(supabaseUuid)  // [Issue #312] sub = Supabase UUID
     .setIssuer(JWT_ISSUER)
     .setAudience(JWT_AUDIENCE)
     .setIssuedAt(now)
@@ -1530,13 +1593,10 @@ async function handlePromotionStatus(
       return errorResponse('Invalid token', 401, origin, allowedOrigins, 'PROMO_INVALID_TOKEN');
     }
 
-    // 3. レート制限チェック（10回/分）
-    const rateLimit = await checkRateLimit(env, `promotion-status:${user.id}`, 10);
-    if (rateLimit.limited) {
-      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
-    }
+    // [Issue #305] レートリミット削除: read-onlyエンドポイントのためKV消費を削減
+    // WAF Rate Limiting Rulesで代替保護を推奨
 
-    // 4. RPC関数を使用してプロモーション状態を取得
+    // 3. RPC関数を使用してプロモーション状態を取得
     // [Issue #276] サービスキーでは auth.uid() が機能しないため、
     // user_idをパラメータとして渡す専用関数を使用
     const { data, error } = await supabase.rpc('get_promotion_status_for_user', {
@@ -1733,13 +1793,10 @@ async function handleConsentStatus(
       return errorResponse('Invalid token', 401, origin, allowedOrigins, 'CONSENT_INVALID_TOKEN');
     }
 
-    // 3. レート制限チェック（10回/分）
-    const rateLimit = await checkRateLimit(env, `consent-status:${user.id}`, 10);
-    if (rateLimit.limited) {
-      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
-    }
+    // [Issue #305] レートリミット削除: read-onlyエンドポイントのためKV消費を削減
+    // WAF Rate Limiting Rulesで代替保護を推奨
 
-    // 4. RPC関数を使用して同意状態を取得
+    // 3. RPC関数を使用して同意状態を取得
     // [Issue #277] サービスキーでは auth.uid() が機能しないため、
     // user_idをパラメータとして渡す専用関数を使用
     const { data, error } = await supabase.rpc('get_consent_status_for_user', {
@@ -2187,13 +2244,10 @@ async function handleBonusTokensStatus(
       return errorResponse('Invalid token', 401, origin, allowedOrigins, 'BONUS_INVALID_TOKEN');
     }
 
-    // 3. レート制限チェック（10回/分）
-    const rateLimit = await checkRateLimit(env, `bonus-status:${user.id}`, 10);
-    if (rateLimit.limited) {
-      return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
-    }
+    // [Issue #305] レートリミット削除: read-onlyエンドポイントのためKV消費を削減
+    // WAF Rate Limiting Rulesで代替保護を推奨
 
-    // 4. RPC関数を使用してボーナストークン状態を取得
+    // 3. RPC関数を使用してボーナストークン状態を取得
     // サービスキーでは auth.uid() が機能しないため、専用関数を使用
     const { data, error } = await supabase.rpc('get_bonus_tokens_for_user', {
       p_user_id: user.id
@@ -2455,13 +2509,23 @@ export default {
 // ============================================
 
 /**
- * Patreon Webhook受信
+ * [Issue #312] Patreon Webhook受信
  * POST /webhook
  *
  * Patreonからのリアルタイム通知を処理:
  * - members:pledge:create - 新規支援
  * - members:pledge:update - Tier変更
  * - members:pledge:delete - 支援停止
+ *
+ * データフロー単方向化パターン:
+ * 1. Patreon Webhook受信
+ * 2. Supabaseにプラン変更を記録 (license_history)
+ * 3. KVキャッシュを無効化 (membership)
+ * 4. 次回API呼び出し時に最新データがDBからKVへ再ロード
+ *
+ * セキュリティ:
+ * - declined_patron / former_patron 時はセッションを即時無効化
+ * - リフレッシュトークンはセッションに依存するため、セッション無効化で自動失効
  */
 async function handleWebhook(
   request: Request,
@@ -2790,7 +2854,26 @@ async function handlePatreonExchange(
       console.log(`Single-device enforcement: Revoked ${revokedCount} existing sessions for user ${membership.userId}`);
     }
 
-    // Step 5: 新しいセッション作成（唯一の有効セッション）
+    // [Issue #312] Step 5a: Supabase UUIDを取得（既存の紐付けがあれば）
+    let supabaseUuid: string | undefined;
+    const supabase = getSupabaseClient(env);
+    if (supabase) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('patreon_user_id', membership.userId)
+        .single();
+      // [Gemini Review] エラーログ追加（PGRST116=No rows returnedは正常）
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.warn(`[Issue #312] Failed to fetch Supabase UUID: ${profileError.message}`);
+      }
+      if (profile?.id) {
+        supabaseUuid = profile.id;
+        console.log(`[Issue #312] Found existing Supabase UUID: ${profile.id.substring(0, 8)}...`);
+      }
+    }
+
+    // Step 5b: 新しいセッション作成（唯一の有効セッション）
     const sessionToken = generateSessionToken();
 
     await setSession(env, sessionToken, {
@@ -2798,6 +2881,7 @@ async function handlePatreonExchange(
       refreshToken: tokenData.refresh_token,
       expiresAt: Date.now() + (tokenData.expires_in * 1000),
       userId: membership.userId,
+      supabaseUuid,  // [Issue #312] Supabase UUID（Optional）
     });
 
     // Step 6: ユーザートークン保存（単一セッションのみ）
@@ -2818,6 +2902,28 @@ async function handlePatreonExchange(
     let accountLinked = false;
     if (supabase_jwt) {
       accountLinked = await linkPatreonToSupabaseAccount(env, supabase_jwt, membership.userId);
+
+      // [Issue #312] 紐付け成功時、セッションにSupabase UUIDを追加
+      if (accountLinked && !supabaseUuid && supabase) {
+        const { data: linkedProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('patreon_user_id', membership.userId)
+          .single();
+        if (linkedProfile?.id) {
+          const linkedUuid = linkedProfile.id;
+          supabaseUuid = linkedUuid;
+          // セッションを更新
+          await setSession(env, sessionToken, {
+            accessToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token,
+            expiresAt: Date.now() + (tokenData.expires_in * 1000),
+            userId: membership.userId,
+            supabaseUuid: linkedUuid,
+          });
+          console.log(`[Issue #312] Session updated with newly linked UUID: ${linkedUuid.substring(0, 8)}...`);
+        }
+      }
     }
 
     const sessionResponse = {
@@ -3090,14 +3196,15 @@ async function handlePatreonRevokeAll(
 // ============================================
 
 /**
- * SessionTokenをJWTアクセストークンに交換
+ * [Issue #312] SessionTokenをJWTアクセストークンに交換
  * POST /api/auth/token
  *
  * リクエスト:
  * - Authorization: Bearer {sessionToken}
+ * - X-App-Session-Id: (optional) アプリセッションID
  *
  * レスポンス:
- * - accessToken: JWTアクセストークン（15分TTL）
+ * - accessToken: JWTアクセストークン（1時間TTL）
  * - refreshToken: リフレッシュトークン（30日TTL、1回使用で無効化）
  * - expiresIn: アクセストークン有効期限（秒）
  * - tokenType: "Bearer"
@@ -3127,10 +3234,52 @@ async function handleAuthToken(
 
     const sessionToken = authHeader.substring(7);
 
+    // [Issue #312] アプリセッションIDを取得（Optional）
+    const appSessionId = request.headers.get('X-App-Session-Id') || undefined;
+
     // SessionToken検証
     const session = await getSession(env, sessionToken);
     if (!session) {
       return errorResponse('Invalid or expired session', 401, origin, allowedOrigins, 'SESSION_INVALID');
+    }
+
+    const patreonUserId = session.userId;
+
+    // [Issue #312] Supabase クライアント取得
+    const supabase = getSupabaseClient(env);
+    if (!supabase) {
+      console.error('[Issue #312] Supabase client not available');
+      return errorResponse('Database connection not available', 503, origin, allowedOrigins, 'DB_NOT_CONFIGURED');
+    }
+
+    // [Issue #312] Supabase UUIDを取得（SSoT）
+    // Phase 2: セッションにキャッシュされたUUIDを優先使用
+    let supabaseUuid = session.supabaseUuid;
+
+    if (!supabaseUuid) {
+      // セッションにUUIDがない場合はDBから取得
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('patreon_user_id', patreonUserId)
+        .single();
+
+      if (profileError || !profile) {
+        // [Gemini Review] profileErrorの詳細をログ出力
+        console.warn(`[Issue #312] Patreon user not linked to Supabase: patreonId=${patreonUserId}, error=${profileError?.message || 'profile not found'}`);
+        return errorResponse('Patreon account not linked to Baketa profile', 401, origin, allowedOrigins, 'PATREON_NOT_LINKED');
+      }
+
+      // [Gemini Review] UUIDの明示的なnullチェック
+      supabaseUuid = profile.id;
+      if (!supabaseUuid) {
+        console.error(`[Issue #312] Profile UUID is missing: patreonId=${patreonUserId}`);
+        return errorResponse('Internal server error', 500, origin, allowedOrigins, 'PROFILE_UUID_MISSING');
+      }
+
+      console.log(`[Issue #312] UUID fetched from DB: ${supabaseUuid.substring(0, 8)}...`);
+    } else {
+      console.log(`[Issue #312] UUID from session cache: ${supabaseUuid.substring(0, 8)}...`);
     }
 
     // ユーザーのプラン情報を取得
@@ -3138,22 +3287,26 @@ async function handleAuthToken(
     const plan = membership?.plan || 'Free';
 
     // ボーナストークン有無をチェック
-    const supabase = getSupabaseClient(env);
     let hasBonusTokens = false;
-    if (supabase) {
-      const { data: bonusStatus } = await supabase.rpc('get_bonus_status_by_patreon', {
-        p_patreon_user_id: session.userId,
-      });
-      hasBonusTokens = bonusStatus?.has_active_bonus || false;
-    }
+    const { data: bonusStatus } = await supabase.rpc('get_bonus_status_by_patreon', {
+      p_patreon_user_id: patreonUserId,
+    });
+    hasBonusTokens = bonusStatus?.has_active_bonus || false;
 
-    // JWTアクセストークン生成
-    const accessToken = await generateAccessToken(env, session.userId, plan, hasBonusTokens);
+    // [Issue #312] JWTアクセストークン生成（sub=UUID, pid=PatreonID）
+    const accessToken = await generateAccessToken(
+      env,
+      supabaseUuid,
+      patreonUserId,
+      appSessionId,
+      plan,
+      hasBonusTokens
+    );
 
     // リフレッシュトークン生成
-    const refreshToken = await generateRefreshToken(env, session.userId, sessionToken);
+    const refreshToken = await generateRefreshToken(env, supabaseUuid, sessionToken);
 
-    console.log(`JWT issued: userId=${session.userId}, plan=${plan}, hasBonusTokens=${hasBonusTokens}`);
+    console.log(`[Issue #312] JWT issued: uuid=${supabaseUuid.substring(0, 8)}..., patreonId=${patreonUserId}, plan=${plan}, hasBonusTokens=${hasBonusTokens}`);
 
     const response: AuthTokenResponse = {
       accessToken,
@@ -3171,17 +3324,24 @@ async function handleAuthToken(
 }
 
 /**
- * リフレッシュトークンを使用して新しいJWTを発行
+ * [Issue #312] リフレッシュトークンを使用して新しいJWTを発行
  * POST /api/auth/refresh
  *
  * リクエスト（JSON body）:
  * - refreshToken: リフレッシュトークン
  *
+ * ヘッダー（Optional）:
+ * - X-App-Session-Id: アプリセッションID
+ *
  * レスポンス:
- * - accessToken: 新しいJWTアクセストークン
+ * - accessToken: 新しいJWTアクセストークン（1時間TTL）
  * - refreshToken: 新しいリフレッシュトークン
  * - expiresIn: アクセストークン有効期限（秒）
  * - tokenType: "Bearer"
+ *
+ * プラン変更の即時反映:
+ * - リフレッシュ時に最新のプラン情報をDBから取得
+ * - JWTに最新のplanを埋め込んで再発行
  */
 async function handleAuthRefresh(
   request: Request,
@@ -3206,18 +3366,28 @@ async function handleAuthRefresh(
       return errorResponse('Missing refreshToken', 400, origin, allowedOrigins, 'MISSING_REFRESH_TOKEN');
     }
 
+    // [Issue #312] アプリセッションIDを取得（Optional）
+    const appSessionId = request.headers.get('X-App-Session-Id') || undefined;
+
     // リフレッシュトークン検証（1回使用で無効化）
     const refreshData = await validateAndConsumeRefreshToken(env, body.refreshToken);
     if (!refreshData) {
       return errorResponse('Invalid or expired refresh token', 401, origin, allowedOrigins, 'INVALID_REFRESH_TOKEN');
     }
 
+    // [Issue #312] [Gemini Review] 変数名を明確化
+    // refreshData.userId は Supabase UUID（JWT発行時に保存）
+    const supabaseUuidFromRefreshToken = refreshData.userId;
+
     // 元のSessionTokenがまだ有効か確認
     const session = await getSession(env, refreshData.sessionToken);
     if (!session) {
-      console.warn(`Session no longer valid for refresh: userId=${refreshData.userId}`);
+      console.warn(`[Issue #312] Session no longer valid for refresh: uuid=${supabaseUuidFromRefreshToken.substring(0, 8)}...`);
       return errorResponse('Session expired, please login again', 401, origin, allowedOrigins, 'SESSION_EXPIRED');
     }
+
+    // session.userId は Patreon User ID（KVセッションから取得）
+    const patreonUserIdFromSession = session.userId;
 
     // ユーザーのプラン情報を取得（最新の状態を反映）
     const membership = await getMembershipFromSession(env, session);
@@ -3228,18 +3398,25 @@ async function handleAuthRefresh(
     let hasBonusTokens = false;
     if (supabase) {
       const { data: bonusStatus } = await supabase.rpc('get_bonus_status_by_patreon', {
-        p_patreon_user_id: session.userId,
+        p_patreon_user_id: patreonUserIdFromSession,
       });
       hasBonusTokens = bonusStatus?.has_active_bonus || false;
     }
 
-    // 新しいJWTアクセストークン生成
-    const newAccessToken = await generateAccessToken(env, session.userId, plan, hasBonusTokens);
+    // [Issue #312] 新しいJWTアクセストークン生成（sub=UUID, pid=PatreonID）
+    const newAccessToken = await generateAccessToken(
+      env,
+      supabaseUuidFromRefreshToken,
+      patreonUserIdFromSession,
+      appSessionId,
+      plan,
+      hasBonusTokens
+    );
 
     // 新しいリフレッシュトークン生成
-    const newRefreshToken = await generateRefreshToken(env, session.userId, refreshData.sessionToken);
+    const newRefreshToken = await generateRefreshToken(env, supabaseUuidFromRefreshToken, refreshData.sessionToken);
 
-    console.log(`JWT refreshed: userId=${session.userId}, plan=${plan}`);
+    console.log(`[Issue #312] JWT refreshed: uuid=${supabaseUuidFromRefreshToken.substring(0, 8)}..., patreonId=${patreonUserIdFromSession}, plan=${plan}`);
 
     const response: AuthTokenResponse = {
       accessToken: newAccessToken,

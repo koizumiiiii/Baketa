@@ -20,12 +20,13 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
     private readonly ILicenseManager _licenseManager;
     private readonly RelayServerClient? _relayServerClient;
     private readonly IJwtTokenService? _jwtTokenService;
+    private readonly ITokenConsumptionTracker? _tokenConsumptionTracker;
     private readonly ILogger<BonusSyncHostedService> _logger;
 
     /// <summary>
-    /// 同期間隔（デフォルト: 30分）
+    /// [Issue #305] 同期間隔（1時間）- KV消費削減のため30分から延長
     /// </summary>
-    private static readonly TimeSpan SyncInterval = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan SyncInterval = TimeSpan.FromHours(1);
 
     /// <summary>
     /// 起動時の初期遅延（DI完了待ち）
@@ -46,6 +47,7 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
         ILicenseManager licenseManager,
         RelayServerClient? relayServerClient,
         IJwtTokenService? jwtTokenService,
+        ITokenConsumptionTracker? tokenConsumptionTracker,
         ILogger<BonusSyncHostedService> logger)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
@@ -54,6 +56,7 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
         _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
         _relayServerClient = relayServerClient;
         _jwtTokenService = jwtTokenService;
+        _tokenConsumptionTracker = tokenConsumptionTracker;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // ログイン/ログアウトイベントを購読
@@ -310,6 +313,22 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 
                 _licenseManager.SyncMonthlyUsageFromServer(monthlyUsage);
 
+                // [Issue #298] ローカルファイル（monthly-summary.json）も同期
+                // これにより、ユーザー切り替え時に前ユーザーのデータで上書きされることを防止
+                if (_tokenConsumptionTracker != null)
+                {
+                    try
+                    {
+                        await _tokenConsumptionTracker.SyncFromServerAsync(monthlyUsage, cancellationToken)
+                            .ConfigureAwait(false);
+                        _logger.LogDebug("[Issue #298] ローカルトークン使用量ファイルも同期");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "[Issue #298] ローカルファイル同期失敗（LicenseManager同期は成功）");
+                    }
+                }
+
                 _logger.LogInformation(
                     "[Issue #299] クォータ状態同期成功: YearMonth={YearMonth}, Used={Used}",
                     syncResult.Quota.YearMonth,
@@ -417,6 +436,21 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
             };
 
             _licenseManager.SyncMonthlyUsageFromServer(monthlyUsage);
+
+            // [Issue #298] ローカルファイル（monthly-summary.json）も同期
+            if (_tokenConsumptionTracker != null)
+            {
+                try
+                {
+                    await _tokenConsumptionTracker.SyncFromServerAsync(monthlyUsage, cancellationToken)
+                        .ConfigureAwait(false);
+                    _logger.LogDebug("[Issue #298] ローカルトークン使用量ファイルも同期");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[Issue #298] ローカルファイル同期失敗（LicenseManager同期は成功）");
+                }
+            }
 
             _logger.LogInformation(
                 "[Issue #296] クォータ状態同期成功: YearMonth={YearMonth}, Used={Used}, Limit={Limit}, Exceeded={Exceeded}",

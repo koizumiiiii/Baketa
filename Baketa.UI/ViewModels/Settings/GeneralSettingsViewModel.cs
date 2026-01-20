@@ -396,22 +396,18 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
     /// <summary>
     /// Cloud AI使用量表示文字列
-    /// [Issue #280+#281] プラン枠がある場合は「使用量 / 上限」、
-    /// ボーナストークンのみの場合は「残り X ボーナス」を表示
+    /// [Issue #307] プラン+ボーナスの合計を表示
+    /// 詳細な内訳はライセンスページで確認
     /// </summary>
     public string CloudUsageDisplay
     {
         get
         {
-            if (CloudTokenLimit > 0)
+            var totalPool = CloudTokenLimit + _bonusTokensRemaining;
+            if (totalPool > 0)
             {
-                // プラン枠がある場合: "1,234,567 / 4,000,000"
-                return $"{CloudTokensUsed:N0} / {CloudTokenLimit:N0}";
-            }
-            else if (_bonusTokensRemaining > 0)
-            {
-                // ボーナストークンのみの場合: "残り 50,000,000"
-                return $"残り {_bonusTokensRemaining:N0}";
+                // 合計表示: "1,234,567 / 54,000,000"
+                return $"{CloudTokensUsed:N0} / {totalPool:N0}";
             }
             else
             {
@@ -421,15 +417,22 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）かどうか
-    /// クォータ超過に関係なくプランタイプのみで判定
+    /// [Issue #307] トークンプール合計（プラン上限 + ボーナス残高）
+    /// </summary>
+    private long TotalTokenPool => CloudTokenLimit + _bonusTokensRemaining;
+
+    /// <summary>
+    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）またはボーナストークン保有者
+    /// クォータ超過に関係なく判定
+    /// [Issue #298] ボーナストークン保有者もゲージ表示対象に追加
     /// </summary>
     public bool HasPaidPlan
     {
         get
         {
             var plan = _licenseManager?.CurrentState?.CurrentPlan ?? PlanType.Free;
-            return plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
+            var hasBonusTokens = (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+            return plan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate || hasBonusTokens;
         }
     }
 
@@ -1031,8 +1034,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
                     CloudTokenLimit = repositoryLimit;
                 }
 
-                CloudUsagePercentage = CloudTokenLimit > 0
-                    ? (double)CloudTokensUsed / CloudTokenLimit * 100
+                // [Issue #307] プラン+ボーナスの合計でパーセンテージを計算
+                CloudUsagePercentage = TotalTokenPool > 0
+                    ? (double)CloudTokensUsed / TotalTokenPool * 100
                     : 0;
 
                 this.RaisePropertyChanged(nameof(CloudUsageDisplay));
@@ -1052,8 +1056,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     {
         CloudTokensUsed = state.CloudAiTokensUsed;
         CloudTokenLimit = state.MonthlyTokenLimit;
-        CloudUsagePercentage = CloudTokenLimit > 0
-            ? (double)CloudTokensUsed / CloudTokenLimit * 100
+        // [Issue #307] プラン+ボーナスの合計でパーセンテージを計算
+        CloudUsagePercentage = TotalTokenPool > 0
+            ? (double)CloudTokensUsed / TotalTokenPool * 100
             : 0;
 
         // 派生プロパティの更新通知
@@ -1117,11 +1122,17 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             // ボーナストークン残高を更新
             _bonusTokensRemaining = e.TotalRemaining;
 
+            // [Issue #307] プラン+ボーナスの合計でパーセンテージを再計算
+            CloudUsagePercentage = TotalTokenPool > 0
+                ? (double)CloudTokensUsed / TotalTokenPool * 100
+                : 0;
+
             // Cloud AI利用可否が変わった可能性があるため更新
             this.RaisePropertyChanged(nameof(IsCloudTranslationEnabled));
             this.RaisePropertyChanged(nameof(CloudTranslationNote));
             this.RaisePropertyChanged(nameof(ShowCloudUsageInfo));
             this.RaisePropertyChanged(nameof(CloudUsageDisplay));
+            this.RaisePropertyChanged(nameof(CloudUsageGaugeBrush));
 
             // ボーナストークンが0になった場合、Cloud AIが使えなくなる可能性
             // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック

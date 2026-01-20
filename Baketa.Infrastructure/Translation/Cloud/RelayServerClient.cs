@@ -861,7 +861,8 @@ public sealed class RelayServerClient : IAsyncDisposable
 
     private sealed class RelaySyncBonusItem
     {
-        [JsonPropertyName("bonus_id")]
+        // [Issue #298] サーバーは "id" を返す（"bonus_id" ではない）
+        [JsonPropertyName("id")]
         public string? BonusId { get; set; }
 
         [JsonPropertyName("remaining_tokens")]

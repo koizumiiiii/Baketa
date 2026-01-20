@@ -314,20 +314,44 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
             }
 
             // [Issue #298] ログイン成功時にプロモーション状態を同期（ユーザー間混在防止）
-            if (_promotionCodeService != null && !string.IsNullOrEmpty(accessToken))
+            // [レビュー対応] JWT未取得時はSupabaseセッションからアクセストークンを取得
+            if (_promotionCodeService != null)
             {
-                try
+                var tokenForSync = accessToken;
+
+                // JWTが取得できなかった場合、Supabaseセッションからアクセストークンを取得
+                if (string.IsNullOrEmpty(tokenForSync) && _authService != null)
                 {
-                    var syncResult = await _promotionCodeService.SyncFromServerAsync(accessToken, cancellationToken)
-                        .ConfigureAwait(false);
-                    _logger.LogInformation(
-                        "[Issue #298] プロモーション状態を同期しました: Result={Result}",
-                        syncResult);
+                    try
+                    {
+                        var session = await _authService.GetCurrentSessionAsync(cancellationToken).ConfigureAwait(false);
+                        if (session?.IsValid == true)
+                        {
+                            tokenForSync = session.AccessToken;
+                            _logger.LogDebug("[Issue #298] Supabaseセッションからアクセストークンを取得");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "[Issue #298] Supabaseセッション取得中にエラー（プロモーション同期をスキップ）");
+                    }
                 }
-                catch (Exception ex)
+
+                if (!string.IsNullOrEmpty(tokenForSync))
                 {
-                    // プロモーション同期失敗はエラーにしない（次回同期で再試行される）
-                    _logger.LogWarning(ex, "[Issue #298] プロモーション状態の同期に失敗しました（後で再試行されます）");
+                    try
+                    {
+                        var syncResult = await _promotionCodeService.SyncFromServerAsync(tokenForSync, cancellationToken)
+                            .ConfigureAwait(false);
+                        _logger.LogInformation(
+                            "[Issue #298] プロモーション状態を同期しました: Result={Result}",
+                            syncResult);
+                    }
+                    catch (Exception ex)
+                    {
+                        // プロモーション同期失敗はエラーにしない（次回同期で再試行される）
+                        _logger.LogWarning(ex, "[Issue #298] プロモーション状態の同期に失敗しました（後で再試行されます）");
+                    }
                 }
             }
 

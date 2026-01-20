@@ -35,7 +35,7 @@ public sealed class BonusSyncHostedServiceTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new BonusSyncHostedService(null!, null, _bonusTokenServiceMock.Object, _licenseManagerMock.Object, null, null, _loggerMock.Object));
+            new BonusSyncHostedService(null!, null, _bonusTokenServiceMock.Object, _licenseManagerMock.Object, null, null, null, _loggerMock.Object));
     }
 
     [Fact]
@@ -47,6 +47,7 @@ public sealed class BonusSyncHostedServiceTests
             null,
             null,
             _licenseManagerMock.Object,
+            null,
             null,
             null,
             _loggerMock.Object);
@@ -67,6 +68,7 @@ public sealed class BonusSyncHostedServiceTests
                 null!,
                 null,
                 null,
+                null,
                 _loggerMock.Object));
     }
 
@@ -82,6 +84,7 @@ public sealed class BonusSyncHostedServiceTests
                 _licenseManagerMock.Object,
                 null,
                 null,
+                null,
                 null!));
     }
 
@@ -94,6 +97,7 @@ public sealed class BonusSyncHostedServiceTests
             null,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
+            null,
             null,
             null,
             _loggerMock.Object);
@@ -111,6 +115,7 @@ public sealed class BonusSyncHostedServiceTests
             null,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
+            null,
             null,
             null,
             _loggerMock.Object);
@@ -157,6 +162,7 @@ public sealed class BonusSyncHostedServiceTests
             _licenseManagerMock.Object,
             null,
             null,
+            null,
             _loggerMock.Object);
 
         // Act - ログインイベント発火
@@ -201,6 +207,7 @@ public sealed class BonusSyncHostedServiceTests
             _licenseManagerMock.Object,
             null,
             null,
+            null,
             _loggerMock.Object);
 
         // Act - ログアウトイベント発火
@@ -224,6 +231,7 @@ public sealed class BonusSyncHostedServiceTests
             null,
             null,  // IBonusTokenServiceがnull
             _licenseManagerMock.Object,
+            null,
             null,
             null,
             _loggerMock.Object);
@@ -261,6 +269,7 @@ public sealed class BonusSyncHostedServiceTests
             null,
             _bonusTokenServiceMock.Object,
             _licenseManagerMock.Object,
+            null,
             null,
             null,
             _loggerMock.Object);
@@ -318,6 +327,7 @@ public sealed class BonusSyncHostedServiceTests
             _licenseManagerMock.Object,
             null,
             _jwtTokenServiceMock.Object,
+            null,
             _loggerMock.Object);
 
         // Act
@@ -369,6 +379,7 @@ public sealed class BonusSyncHostedServiceTests
             _licenseManagerMock.Object,
             null,
             _jwtTokenServiceMock.Object,
+            null,
             _loggerMock.Object);
 
         // Act
@@ -423,6 +434,7 @@ public sealed class BonusSyncHostedServiceTests
             _licenseManagerMock.Object,
             null,
             _jwtTokenServiceMock.Object,
+            null,
             _loggerMock.Object);
 
         // Act
