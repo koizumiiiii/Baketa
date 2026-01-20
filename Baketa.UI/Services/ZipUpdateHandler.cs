@@ -286,40 +286,34 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
         // 3. アプリを再起動
         // 4. 一時ファイルを削除（extractDirとbatchDir）
 
-        return $"""
+        // [Issue #306] Phase 1: robocopy + 100ms待機間隔で高速化
+        // $$"""を使用: 補間には {{...}} を使い、単一の { } はリテラルとして扱われる
+        return $$"""
             @echo off
             chcp 65001 > nul
 
             echo Baketa Update Script
             echo Waiting for application to close...
 
-            :: 現在のプロセスが終了するまで待機（最大30秒）
-            set /a count=0
-            :wait_loop
-            tasklist /fi "PID eq {processId}" /fi "IMAGENAME eq {appExeName}" 2>nul | find /i "{processId}" >nul
-            if not errorlevel 1 (
-                timeout /t 1 /nobreak > nul
-                set /a count+=1
-                if %count% lss 30 goto wait_loop
-            )
+            :: [Issue #306] 現在のプロセスが終了するまで待機（100ms間隔、最大30秒）
+            :: PowerShellを使用して高速なプロセス終了検知を実現
+            powershell -NoProfile -Command "$p={{processId}}; 1..300 | ForEach-Object -Process { if (-not (Get-Process -Id $p -EA 0)) { exit 0 }; Start-Sleep -Milliseconds 100 }"
 
             echo Application closed. Starting update...
 
             :: 読み取り専用属性を解除
-            attrib -R "{escapedTargetDir}\*" /S /D 2>nul
+            attrib -R "{{escapedTargetDir}}\*" /S /D 2>nul
 
-            :: 新しいファイルをコピー（リトライ機能付き）
-            set /a retry=0
-            :copy_retry
-            xcopy "{escapedSourceDir}\*" "{escapedTargetDir}\" /E /Y /Q /R
-            if errorlevel 1 (
-                set /a retry+=1
-                if %retry% lss 3 (
-                    echo Retry %retry%/3...
-                    timeout /t 2 /nobreak > nul
-                    goto copy_retry
-                )
-                echo Update failed after 3 retries!
+            :: [Issue #306] robocopyで高速コピー（4スレッド並列）
+            :: /E: サブディレクトリ含む全コピー（/MIRと異なり既存ファイルを削除しない）
+            :: /MT:4: 4スレッド並列処理
+            :: /NP /NFL /NDL: 進捗・ファイル名・ディレクトリ名表示抑制
+            :: /R:3 /W:3: リトライ3回、待機3秒（AV対策）
+            robocopy "{{escapedSourceDir}}" "{{escapedTargetDir}}" /E /MT:4 /NP /NFL /NDL /R:3 /W:3
+
+            :: robocopyの終了コード: 0-7は成功、8以上はエラー
+            if errorlevel 8 (
+                echo Update failed! Error code: %%errorlevel%%
                 pause
                 exit /b 1
             )
@@ -327,14 +321,14 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             echo Update complete. Restarting application...
 
             :: アプリを再起動（startコマンドは非同期で実行されるため、後続のクリーンアップに影響しない）
-            start "" "{escapedAppExePath}"
+            start "" "{{escapedAppExePath}}"
 
             :: 展開先ディレクトリを削除
-            rd /s /q "{escapedExtractDir}" 2>nul
+            rd /s /q "{{escapedExtractDir}}" 2>nul
 
             :: バッチスクリプト自身のディレクトリを削除（自己削除）
             :: cmd.exeはバッチファイルを読み込んで実行するため、ファイル削除後も実行継続可能
-            rd /s /q "{escapedBatchDir}" 2>nul
+            rd /s /q "{{escapedBatchDir}}" 2>nul
 
             exit /b 0
             """;
