@@ -128,6 +128,14 @@ public sealed class PatreonSyncHostedService : BackgroundService
                 state,
                 "PatreonSyncHostedService",
                 LicenseChangeReason.ServerRefresh);
+
+            // [Issue #298] セッショントークンを設定（Cloud AI翻訳で使用）
+            var sessionToken = await _patreonService.GetSessionTokenAsync(cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(sessionToken))
+            {
+                _licenseManager.SetSessionToken(sessionToken);
+                _logger.LogDebug("[Issue #298] Patreonセッショントークンを設定");
+            }
         }
         else
         {

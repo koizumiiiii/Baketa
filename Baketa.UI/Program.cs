@@ -1432,6 +1432,26 @@ internal sealed class Program
                     IsSuccess: true,
                     PlanName: result.Plan.ToString(),
                     ErrorMessage: null);
+
+                // [Issue #298] LicenseManagerにセッショントークンを設定（Cloud AI翻訳で使用）
+                try
+                {
+                    var patreonService = ServiceProvider?.GetService<Baketa.Core.Abstractions.License.IPatreonOAuthService>();
+                    var licenseManager = ServiceProvider?.GetService<Baketa.Core.Abstractions.License.ILicenseManager>();
+                    if (patreonService != null && licenseManager != null)
+                    {
+                        var sessionToken = await patreonService.GetSessionTokenAsync(CancellationToken.None).ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(sessionToken))
+                        {
+                            licenseManager.SetSessionToken(sessionToken);
+                            Console.WriteLine("🔗 [Issue #298] Patreonセッショントークンを設定");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ [Issue #298] セッショントークン設定エラー: {ex.Message}");
+                }
             }
             else
             {

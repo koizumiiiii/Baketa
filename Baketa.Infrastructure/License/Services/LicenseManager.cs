@@ -290,8 +290,11 @@ public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDis
             return _currentState;
         }
 
-        // キャッシュをクリア
-        await _cacheService.ClearCacheAsync(_userId, cancellationToken).ConfigureAwait(false);
+        // [Issue #298] キャッシュをクリア（userIdがある場合のみ）
+        if (!string.IsNullOrEmpty(_userId))
+        {
+            await _cacheService.ClearCacheAsync(_userId, cancellationToken).ConfigureAwait(false);
+        }
 
         // サーバーから取得
         return await FetchFromServerAsync(cancellationToken).ConfigureAwait(false);
@@ -491,9 +494,12 @@ public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDis
             {
                 var state = response.LicenseState;
 
-                // キャッシュに保存
-                await _cacheService.SetCachedStateAsync(_userId!, state, cancellationToken)
-                    .ConfigureAwait(false);
+                // [Issue #298] キャッシュに保存（userIdがある場合のみ）
+                if (!string.IsNullOrEmpty(_userId))
+                {
+                    await _cacheService.SetCachedStateAsync(_userId, state, cancellationToken)
+                        .ConfigureAwait(false);
+                }
 
                 // 状態を更新
                 UpdateCurrentState(state, LicenseChangeReason.ServerRefresh);
@@ -518,19 +524,27 @@ public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDis
                 "ライセンス状態取得失敗: ErrorCode={ErrorCode}, Message={Message}",
                 response?.ErrorCode, response?.ErrorMessage);
 
-            // キャッシュにフォールバック
-            var cachedState = await _cacheService.GetCachedStateAsync(_userId!, cancellationToken)
-                .ConfigureAwait(false);
-            return cachedState ?? _currentState;
+            // [Issue #298] キャッシュにフォールバック（userIdがある場合のみ）
+            if (!string.IsNullOrEmpty(_userId))
+            {
+                var cachedState = await _cacheService.GetCachedStateAsync(_userId, cancellationToken)
+                    .ConfigureAwait(false);
+                return cachedState ?? _currentState;
+            }
+            return _currentState;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             _logger.LogWarning(ex, "ライセンスサーバーに接続できません。キャッシュを使用します");
 
-            // キャッシュにフォールバック
-            var cachedState = await _cacheService.GetCachedStateAsync(_userId!, cancellationToken)
-                .ConfigureAwait(false);
-            return cachedState ?? _currentState;
+            // [Issue #298] キャッシュにフォールバック（userIdがある場合のみ）
+            if (!string.IsNullOrEmpty(_userId))
+            {
+                var cachedState = await _cacheService.GetCachedStateAsync(_userId, cancellationToken)
+                    .ConfigureAwait(false);
+                return cachedState ?? _currentState;
+            }
+            return _currentState;
         }
     }
 
