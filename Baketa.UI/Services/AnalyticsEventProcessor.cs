@@ -139,12 +139,15 @@ public sealed class AnalyticsEventProcessor :
         {
             if (_fullscreenModeService == null || _windowManagerAdapter == null)
             {
+                _logger?.LogDebug("[Issue #307] GetSanitizedGameTitle: サービス未登録 (FullscreenService={Fullscreen}, WindowManager={WindowManager})",
+                    _fullscreenModeService != null, _windowManagerAdapter != null);
                 return null;
             }
 
             var windowHandle = _fullscreenModeService.TargetWindowHandle;
             if (windowHandle == nint.Zero)
             {
+                _logger?.LogDebug("[Issue #307] GetSanitizedGameTitle: TargetWindowHandle が Zero");
                 return null;
             }
 
