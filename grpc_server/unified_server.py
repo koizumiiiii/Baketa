@@ -413,28 +413,60 @@ class GracefulShutdown:
 
 
 # ============================================================================
-# VRAM Check
+# Device Detection (Gemini Review: torch.cuda.is_available()推奨)
 # ============================================================================
+
+def detect_device() -> tuple[str, str | None]:
+    """デバイス検出（CUDA_VISIBLE_DEVICES環境変数を尊重）
+
+    Returns:
+        tuple: (device, gpu_name)
+            - device: "cuda" or "cpu"
+            - gpu_name: GPU名（CPUモード時はNone）
+    """
+    import torch
+
+    # torch.cuda.is_available() は CUDA_VISIBLE_DEVICES="" を自動的に解釈
+    if not torch.cuda.is_available():
+        cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+        if cuda_visible == "" or cuda_visible == "-1":
+            logger.info(f"CUDA_VISIBLE_DEVICES='{cuda_visible}' - CPUモードで実行")
+        else:
+            logger.info("CUDA利用不可 - CPUモードで実行")
+        return "cpu", None
+
+    # GPU情報取得
+    gpu_name = torch.cuda.get_device_name(0)
+    logger.info(f"CUDA利用可能: {gpu_name}")
+    return "cuda", gpu_name
+
 
 def get_available_vram_mb() -> float:
     """利用可能なVRAM量を取得 (MB)"""
     try:
-        import pynvml
-        pynvml.nvmlInit()
-        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-        mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-        pynvml.nvmlShutdown()
-        return mem_info.total / 1024 / 1024  # MB
+        import torch
+        if torch.cuda.is_available():
+            props = torch.cuda.get_device_properties(0)
+            return props.total_memory / 1024 / 1024  # MB
     except Exception:
-        return 0.0
+        pass
+    return 0.0
 
 
-def should_use_parallel_loading() -> bool:
+def should_use_parallel_loading(device: str) -> bool:
     """並列ロードを使用するかどうかを判定
 
-    VRAM 8GB以上: 並列ロード (OCRと翻訳を同時にロード)
-    VRAM 8GB未満: 逐次ロード (VRAMピーク抑制)
+    Args:
+        device: "cuda" or "cpu"
+
+    Returns:
+        True: 並列ロード（VRAM 8GB以上のGPU）
+        False: 逐次ロード（VRAM不足またはCPUモード）
     """
+    if device == "cpu":
+        logger.info("CPUモード - 逐次モデルロードを使用")
+        return False
+
     vram_mb = get_available_vram_mb()
     if vram_mb >= 8192:  # 8GB
         logger.info(f"VRAM: {vram_mb:.0f}MB - 並列モデルロードを使用")
@@ -443,7 +475,7 @@ def should_use_parallel_loading() -> bool:
         logger.info(f"VRAM: {vram_mb:.0f}MB - 逐次モデルロードを使用 (VRAM節約)")
         return False
     else:
-        logger.info("VRAM検出失敗 - CPUモードで逐次ロード")
+        logger.info("VRAM検出失敗 - 逐次モデルロードを使用")
         return False
 
 
@@ -458,28 +490,10 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     logger.info("Issue #292: OCR + Translation in single process")
     logger.info("=" * 80)
 
-    # GPU検出
-    is_cuda_available = False
-    nvml_initialized = False
-    try:
-        import pynvml
-        pynvml.nvmlInit()
-        nvml_initialized = True
-        device_count = pynvml.nvmlDeviceGetCount()
-        is_cuda_available = device_count > 0
-        if is_cuda_available:
-            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-            gpu_name = pynvml.nvmlDeviceGetName(handle)
-            if isinstance(gpu_name, bytes):
-                gpu_name = gpu_name.decode('utf-8')
-            logger.info(f"GPU detection: {device_count} CUDA device(s) found - {gpu_name}")
-    except Exception as e:
-        logger.warning(f"GPU detection failed: {e}")
-    finally:
-        if nvml_initialized:
-            pynvml.nvmlShutdown()
-
-    device = "cuda" if is_cuda_available else "cpu"
+    # デバイス検出（CUDA_VISIBLE_DEVICES環境変数を尊重）
+    device, gpu_name = detect_device()
+    if gpu_name:
+        logger.info(f"GPU: {gpu_name}")
 
     # モデルパス決定 (翻訳用)
     if model_path_arg:
@@ -501,7 +515,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     ocr_engine = SuryaOcrEngine(device=device)
 
     # モデルロード (並列 or 逐次)
-    use_parallel = should_use_parallel_loading()
+    use_parallel = should_use_parallel_loading(device)
 
     logger.info("=" * 80)
     logger.info("Loading AI Models...")
@@ -512,26 +526,35 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     # [Gemini Review Fix] 初期化失敗時はプロセスを終了してC#側に通知
     try:
         if use_parallel:
-            # 並列ロード (VRAM 8GB以上)
-            logger.info("Parallel model loading started...")
+            # 並列ロード (VRAM 8GB以上) - ThreadPoolExecutorで真の並列実行
+            # Gemini Review: PyTorch/CUDAの初期化はスレッドセーフ
+            logger.info("Parallel model loading started (ThreadPoolExecutor)...")
 
-            async def load_translation():
+            loop = asyncio.get_running_loop()
+
+            def load_translation_sync():
                 logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
-                await translation_engine.load_model()
+                # CTranslate2Engine.load_model() は内部で run_in_executor を使用
+                # ここでは同期版を直接呼び出す
+                import asyncio as _asyncio
+                _asyncio.run(translation_engine.load_model())
                 logger.info("[Translation] Model loaded successfully")
 
-            async def load_ocr():
+            def load_ocr_sync():
                 logger.info("[OCR] Loading Surya OCR...")
-                await ocr_engine.load_model()
+                ocr_engine._load_model_sync()
                 logger.info("[OCR] Model loaded successfully")
 
-            # [Gemini Review Fix] return_exceptions=True で両方の結果を取得
-            # 片方が失敗しても、もう片方の例外情報も取得できる
-            results = await asyncio.gather(
-                load_translation(),
-                load_ocr(),
-                return_exceptions=True
-            )
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                trans_future = loop.run_in_executor(executor, load_translation_sync)
+                ocr_future = loop.run_in_executor(executor, load_ocr_sync)
+
+                # 両方の完了を待機
+                results = await asyncio.gather(
+                    trans_future,
+                    ocr_future,
+                    return_exceptions=True
+                )
 
             # 例外チェック
             errors = [r for r in results if isinstance(r, Exception)]
@@ -540,8 +563,8 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
                     logger.critical(f"Model loading error [{i}]: {err}")
                 raise errors[0]  # 最初のエラーを再送出
         else:
-            # 逐次ロード (VRAM節約)
-            logger.info("Sequential model loading started (VRAM saving mode)...")
+            # 逐次ロード (VRAM節約 or CPUモード)
+            logger.info("Sequential model loading started...")
 
             logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
             await translation_engine.load_model()
@@ -619,7 +642,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     logger.info("Press Ctrl+C to stop the server")
 
     # リソース監視開始
-    resource_monitor = ResourceMonitor(enable_gpu_monitoring=is_cuda_available)
+    resource_monitor = ResourceMonitor(enable_gpu_monitoring=(device == "cuda"))
     await resource_monitor.start_monitoring(interval_seconds=300)
     logger.info("[Resource Monitor] Started (5-minute interval)")
 

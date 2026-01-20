@@ -152,10 +152,11 @@ class CTranslate2Engine(TranslationEngine):
             load_time = time.time() - start_time
             self.logger.info(f"CTranslate2モデルロード完了 - 所要時間: {load_time:.2f}秒")
 
+            # is_loaded を先に設定（ウォームアップでtranslate()を呼ぶため）
+            self.is_loaded = True
+
             # ウォームアップ
             await self._warmup_model()
-
-            self.is_loaded = True
             total_time = time.time() - start_time
             self.logger.info(f"CTranslate2 engine ready - Total time: {total_time:.2f}秒")
             self.logger.info("NLLB-200-distilled-1.3B (int8) loaded - ~5.5GB memory")
