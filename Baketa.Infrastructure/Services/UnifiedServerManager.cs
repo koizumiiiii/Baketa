@@ -3,6 +3,8 @@ using System.IO;
 using System.Text;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events;
+using Baketa.Translation.V1;
+using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Services;
@@ -13,6 +15,19 @@ namespace Baketa.Infrastructure.Services;
 /// </summary>
 public sealed class UnifiedServerManager : IAsyncDisposable
 {
+    // [Gemini Review Fix] 設定の外部化 - マジックナンバーを定数化
+    /// <summary>サーバー起動タイムアウト（秒）- OCR+翻訳両方のモデルロード時間</summary>
+    private const int StartupTimeoutSeconds = 300;
+
+    /// <summary>サーバー停止タイムアウト（秒）</summary>
+    private const int StopTimeoutSeconds = 10;
+
+    /// <summary>gRPCヘルスチェックタイムアウト（秒）</summary>
+    private const int HealthCheckTimeoutSeconds = 5;
+
+    /// <summary>孤立プロセスKillタイムアウト（秒）</summary>
+    private const int ProcessKillTimeoutSeconds = 5;
+
     private readonly ILogger<UnifiedServerManager> _logger;
     private readonly IEventAggregator? _eventAggregator;
     private readonly int _port;
@@ -165,7 +180,7 @@ public sealed class UnifiedServerManager : IAsyncDisposable
 
             // 準備完了を待機（タイムアウト: 300秒 - OCR+翻訳両方のモデルロード）
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(300));
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(StartupTimeoutSeconds));
 
             try
             {
@@ -184,7 +199,7 @@ public sealed class UnifiedServerManager : IAsyncDisposable
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                _logger.LogError("❌ [UnifiedServer] サーバー起動タイムアウト（300秒）");
+                _logger.LogError("❌ [UnifiedServer] サーバー起動タイムアウト（{Timeout}秒）", StartupTimeoutSeconds);
             }
 
             // タイムアウトまたは失敗
@@ -218,7 +233,7 @@ public sealed class UnifiedServerManager : IAsyncDisposable
         try
         {
             _serverProcess.Kill(entireProcessTree: true);
-            await _serverProcess.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+            await _serverProcess.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(StopTimeoutSeconds)).ConfigureAwait(false);
             _logger.LogInformation("✅ [UnifiedServer] サーバー停止完了");
         }
         catch (Exception ex)
@@ -230,6 +245,60 @@ public sealed class UnifiedServerManager : IAsyncDisposable
             _serverProcess?.Dispose();
             _serverProcess = null;
             _isReady = false;
+        }
+    }
+
+    /// <summary>
+    /// [Gemini Review Fix] gRPCでサーバーの準備状態を確認
+    /// TCP接続チェックではなく、実際のgRPC IsReady RPCを使用
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>サーバーが準備完了の場合true</returns>
+    public async Task<bool> CheckServerHealthAsync(CancellationToken cancellationToken = default)
+    {
+        if (_serverProcess == null || _serverProcess.HasExited)
+        {
+            _logger.LogDebug("[UnifiedServer] ヘルスチェック: プロセスが存在しません");
+            return false;
+        }
+
+        try
+        {
+            var serverAddress = $"http://127.0.0.1:{_port}";
+
+            using var channel = GrpcChannel.ForAddress(serverAddress, new GrpcChannelOptions
+            {
+                HttpHandler = new System.Net.Http.SocketsHttpHandler
+                {
+                    ConnectTimeout = TimeSpan.FromSeconds(HealthCheckTimeoutSeconds)
+                }
+            });
+
+            var client = new TranslationService.TranslationServiceClient(channel);
+
+            // gRPC IsReady RPCを呼び出し
+            var response = await client.IsReadyAsync(
+                new IsReadyRequest(),
+                deadline: DateTime.UtcNow.AddSeconds(HealthCheckTimeoutSeconds),
+                cancellationToken: cancellationToken
+            ).ConfigureAwait(false);
+
+            _logger.LogDebug(
+                "[UnifiedServer] gRPCヘルスチェック結果: IsReady={IsReady}, Status={Status}",
+                response.IsReady,
+                response.Status);
+
+            return response.IsReady;
+        }
+        catch (Grpc.Core.RpcException ex)
+        {
+            _logger.LogWarning(ex, "[UnifiedServer] gRPCヘルスチェック失敗: StatusCode={StatusCode}", ex.StatusCode);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[UnifiedServer] ヘルスチェックエラー");
+            return false;
         }
     }
 
@@ -366,6 +435,7 @@ public sealed class UnifiedServerManager : IAsyncDisposable
 
     /// <summary>
     /// 孤立プロセスを強制終了
+    /// [Gemini Review Fix] 競合状態対策: プロセス取得とKillの間でプロセスが終了する可能性に対応
     /// </summary>
     private async Task KillOrphanedProcessAsync()
     {
@@ -398,31 +468,7 @@ public sealed class UnifiedServerManager : IAsyncDisposable
                     if (parts.Length > 0 && int.TryParse(parts[^1], out var pid))
                     {
                         _logger.LogWarning("⚠️ [UnifiedServer] 孤立プロセス検出: PID {Pid}", pid);
-
-                        try
-                        {
-                            var orphanProcess = Process.GetProcessById(pid);
-                            var processName = orphanProcess.ProcessName;
-
-                            // Python/BaketaUnifiedServer のみ終了
-                            if (processName.Contains("python", StringComparison.OrdinalIgnoreCase) ||
-                                processName.Contains("BaketaUnifiedServer", StringComparison.OrdinalIgnoreCase) ||
-                                processName.Contains("BaketaTranslationServer", StringComparison.OrdinalIgnoreCase) ||
-                                processName.Contains("BaketaSuryaOcrServer", StringComparison.OrdinalIgnoreCase))
-                            {
-                                _logger.LogInformation("🔥 [UnifiedServer] 孤立プロセス強制終了: PID {Pid}, Name {Name}", pid, processName);
-                                orphanProcess.Kill(entireProcessTree: true);
-                                await orphanProcess.WaitForExitAsync().ConfigureAwait(false);
-                            }
-                        }
-                        catch (ArgumentException)
-                        {
-                            // プロセスが既に終了
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "⚠️ [UnifiedServer] プロセス終了失敗: PID {Pid}", pid);
-                        }
+                        await TryKillProcessAsync(pid).ConfigureAwait(false);
                         break;
                     }
                 }
@@ -431,6 +477,88 @@ public sealed class UnifiedServerManager : IAsyncDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "⚠️ [UnifiedServer] 孤立プロセスチェックエラー");
+        }
+    }
+
+    /// <summary>
+    /// [Gemini Review Fix] プロセス終了を安全に試行
+    /// 競合状態に対応: プロセス取得からKillまでの間に終了する可能性を考慮
+    /// </summary>
+    private async Task TryKillProcessAsync(int pid)
+    {
+        // 許可されたプロセス名リスト
+        string[] allowedProcessNames =
+        [
+            "python",
+            "BaketaUnifiedServer",
+            "BaketaTranslationServer",
+            "BaketaSuryaOcrServer"
+        ];
+
+        try
+        {
+            // プロセス取得
+            Process orphanProcess;
+            try
+            {
+                orphanProcess = Process.GetProcessById(pid);
+            }
+            catch (ArgumentException)
+            {
+                // プロセスが既に終了している
+                _logger.LogDebug("[UnifiedServer] PID {Pid} は既に終了しています", pid);
+                return;
+            }
+
+            // プロセス名を取得（HasExitedチェック付き）
+            string processName;
+            try
+            {
+                if (orphanProcess.HasExited)
+                {
+                    _logger.LogDebug("[UnifiedServer] PID {Pid} は既に終了しています", pid);
+                    return;
+                }
+                processName = orphanProcess.ProcessName;
+            }
+            catch (InvalidOperationException)
+            {
+                // プロセスが終了した
+                _logger.LogDebug("[UnifiedServer] PID {Pid} は取得中に終了しました", pid);
+                return;
+            }
+
+            // 許可されたプロセスのみ終了
+            var isAllowed = allowedProcessNames.Any(name =>
+                processName.Contains(name, StringComparison.OrdinalIgnoreCase));
+
+            if (!isAllowed)
+            {
+                _logger.LogDebug("[UnifiedServer] PID {Pid} ({Name}) は許可リスト外のためスキップ", pid, processName);
+                return;
+            }
+
+            _logger.LogInformation("🔥 [UnifiedServer] 孤立プロセス強制終了: PID {Pid}, Name {Name}", pid, processName);
+
+            try
+            {
+                orphanProcess.Kill(entireProcessTree: true);
+                await orphanProcess.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(ProcessKillTimeoutSeconds)).ConfigureAwait(false);
+                _logger.LogInformation("✅ [UnifiedServer] 孤立プロセス終了完了: PID {Pid}", pid);
+            }
+            catch (InvalidOperationException)
+            {
+                // プロセスが既に終了
+                _logger.LogDebug("[UnifiedServer] PID {Pid} はKill中に終了しました", pid);
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogWarning("[UnifiedServer] PID {Pid} の終了待機がタイムアウト", pid);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "⚠️ [UnifiedServer] プロセス終了失敗: PID {Pid}", pid);
         }
     }
 

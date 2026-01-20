@@ -87,14 +87,28 @@ try:
 except (AttributeError, OSError):
     pass
 
-# ロギング設定
+# [Gemini Review Fix] ログローテーション設定
+# ログファイルは10MB x 5世代でローテーション
+from logging.handlers import RotatingFileHandler
+
+_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+_console_handler = logging.StreamHandler(sys.stdout)
+_console_handler.setFormatter(_log_formatter)
+_console_handler.setLevel(logging.INFO)
+
+_file_handler = RotatingFileHandler(
+    'unified_server.log',
+    maxBytes=10 * 1024 * 1024,  # 10MB
+    backupCount=5,
+    encoding='utf-8'
+)
+_file_handler.setFormatter(_log_formatter)
+_file_handler.setLevel(logging.DEBUG)  # ファイルには詳細ログ
+
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('unified_server.log', encoding='utf-8')
-    ]
+    level=logging.DEBUG,
+    handlers=[_console_handler, _file_handler]
 )
 logger = logging.getLogger(__name__)
 
@@ -495,35 +509,59 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
 
     load_start = time.time()
 
-    if use_parallel:
-        # 並列ロード (VRAM 8GB以上)
-        logger.info("Parallel model loading started...")
+    # [Gemini Review Fix] 初期化失敗時はプロセスを終了してC#側に通知
+    try:
+        if use_parallel:
+            # 並列ロード (VRAM 8GB以上)
+            logger.info("Parallel model loading started...")
 
-        async def load_translation():
+            async def load_translation():
+                logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
+                await translation_engine.load_model()
+                logger.info("[Translation] Model loaded successfully")
+
+            async def load_ocr():
+                logger.info("[OCR] Loading Surya OCR...")
+                await ocr_engine.load_model()
+                logger.info("[OCR] Model loaded successfully")
+
+            # [Gemini Review Fix] return_exceptions=True で両方の結果を取得
+            # 片方が失敗しても、もう片方の例外情報も取得できる
+            results = await asyncio.gather(
+                load_translation(),
+                load_ocr(),
+                return_exceptions=True
+            )
+
+            # 例外チェック
+            errors = [r for r in results if isinstance(r, Exception)]
+            if errors:
+                for i, err in enumerate(errors):
+                    logger.critical(f"Model loading error [{i}]: {err}")
+                raise errors[0]  # 最初のエラーを再送出
+        else:
+            # 逐次ロード (VRAM節約)
+            logger.info("Sequential model loading started (VRAM saving mode)...")
+
             logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
             await translation_engine.load_model()
             logger.info("[Translation] Model loaded successfully")
 
-        async def load_ocr():
             logger.info("[OCR] Loading Surya OCR...")
             await ocr_engine.load_model()
             logger.info("[OCR] Model loaded successfully")
 
-        await asyncio.gather(load_translation(), load_ocr())
-    else:
-        # 逐次ロード (VRAM節約)
-        logger.info("Sequential model loading started (VRAM saving mode)...")
+        load_elapsed = time.time() - load_start
+        logger.info(f"All models loaded in {load_elapsed:.2f} seconds")
 
-        logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
-        await translation_engine.load_model()
-        logger.info("[Translation] Model loaded successfully")
-
-        logger.info("[OCR] Loading Surya OCR...")
-        await ocr_engine.load_model()
-        logger.info("[OCR] Model loaded successfully")
-
-    load_elapsed = time.time() - load_start
-    logger.info(f"All models loaded in {load_elapsed:.2f} seconds")
+    except Exception as e:
+        logger.critical("=" * 80)
+        logger.critical("INITIALIZATION FAILED - CRITICAL ERROR")
+        logger.critical("=" * 80)
+        logger.critical(f"Failed to load AI models: {e}")
+        logger.critical(traceback.format_exc())
+        logger.critical("Server cannot start without models. Exiting...")
+        sys.exit(1)
 
     # gRPCサーバー作成
     logger.info("Creating unified gRPC server...")
@@ -585,22 +623,30 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     await resource_monitor.start_monitoring(interval_seconds=300)
     logger.info("[Resource Monitor] Started (5-minute interval)")
 
-    # グレースフルシャットダウン待機
-    with GracefulShutdown() as shutdown_handler:
+    # [Gemini Review Fix] try-finallyでリソースクリーンアップを保証
+    try:
+        # グレースフルシャットダウン待機
+        with GracefulShutdown() as shutdown_handler:
+            try:
+                await shutdown_handler.wait_for_shutdown()
+            except KeyboardInterrupt:
+                logger.info("Received KeyboardInterrupt, shutting down...")
+    finally:
+        # サーバー停止（例外発生時も必ず実行）
+        logger.info("Stopping unified gRPC server...")
         try:
-            await shutdown_handler.wait_for_shutdown()
-        except KeyboardInterrupt:
-            logger.info("Received KeyboardInterrupt, shutting down...")
+            await server.stop(grace=5.0)
+            logger.info("gRPC server stopped")
+        except Exception as e:
+            logger.warning(f"Error stopping gRPC server: {e}")
 
-    # サーバー停止
-    logger.info("Stopping unified gRPC server...")
-    await server.stop(grace=5.0)
-    logger.info("gRPC server stopped")
-
-    # リソース監視クリーンアップ
-    await resource_monitor.stop_monitoring()
-    resource_monitor.cleanup()
-    logger.info("Resource monitoring cleanup completed")
+        # リソース監視クリーンアップ（例外発生時も必ず実行）
+        try:
+            await resource_monitor.stop_monitoring()
+            resource_monitor.cleanup()
+            logger.info("Resource monitoring cleanup completed")
+        except Exception as e:
+            logger.warning(f"Error cleaning up resource monitor: {e}")
 
 
 def global_exception_handler(exc_type, exc_value, exc_traceback):

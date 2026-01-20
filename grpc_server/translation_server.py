@@ -41,6 +41,9 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
     - IsReady: 準備状態確認
     """
 
+    # [Gemini Review Fix] 入力検証: ソーステキスト最大長
+    MAX_SOURCE_TEXT_LENGTH = 10000  # 10,000文字（約30KB UTF-8）
+
     def __init__(self, engine: TranslationEngine):
         """
         Args:
@@ -84,9 +87,21 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
         start_time = time.time()
         self.logger.info(f"Translate RPC called - request_id: {request.request_id}")
 
+        # [Gemini Review Fix] 入力検証: ソーステキスト長
+        source_text_len = len(request.source_text)
+        if source_text_len > self.MAX_SOURCE_TEXT_LENGTH:
+            self.logger.warning(f"Source text too long: {source_text_len} > {self.MAX_SOURCE_TEXT_LENGTH}")
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(f"source_text exceeds maximum length ({source_text_len} > {self.MAX_SOURCE_TEXT_LENGTH})")
+            return translation_pb2.TranslateResponse(
+                request_id=request.request_id,
+                is_success=False,
+                timestamp=self._current_timestamp()
+            )
+
         # 🔧 [TRANSLATION_DEBUG] 入力情報ログ
         self.logger.info(f"[TRANSLATE_INPUT] SourceLang: {request.source_language.code}, TargetLang: {request.target_language.code}")
-        self.logger.info(f"[TRANSLATE_INPUT] Length: {len(request.source_text)}, Text: {request.source_text[:200]}...")
+        self.logger.info(f"[TRANSLATE_INPUT] Length: {source_text_len}, Text: {request.source_text[:200]}...")
 
         try:
             # 翻訳実行
@@ -180,6 +195,15 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
             # バッチサイズチェック
             if batch_size > 32:  # MAX_BATCH_SIZE
                 raise BatchSizeExceededError(f"Batch size {batch_size} exceeds maximum 32")
+
+            # [Gemini Review Fix] 入力検証: 各テキストの長さチェック
+            for i, req in enumerate(request.requests):
+                text_len = len(req.source_text)
+                if text_len > self.MAX_SOURCE_TEXT_LENGTH:
+                    self.logger.warning(f"Batch item {i}: source text too long: {text_len} > {self.MAX_SOURCE_TEXT_LENGTH}")
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    context.set_details(f"Batch item {i}: source_text exceeds maximum length ({text_len} > {self.MAX_SOURCE_TEXT_LENGTH})")
+                    return
 
             # 翻訳元テキスト抽出
             texts = [req.source_text for req in request.requests]
