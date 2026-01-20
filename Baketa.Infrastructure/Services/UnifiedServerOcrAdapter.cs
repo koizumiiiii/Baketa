@@ -46,14 +46,16 @@ public sealed class UnifiedServerOcrAdapter : IOcrServerManager
         }
         else
         {
-            _logger.LogError("[UnifiedOcrAdapter] Failed to start unified server for OCR");
+            // [Review Fix] エラーメッセージにポート番号を含める
+            _logger.LogError("[UnifiedOcrAdapter] Failed to start unified server for OCR on port {Port}", Port);
         }
 
         return success;
     }
 
     /// <inheritdoc/>
-    public async Task StopServerAsync()
+    // [Review Fix] async/awaitを削除して最適化
+    public Task StopServerAsync()
     {
         _logger.LogInformation("[UnifiedOcrAdapter] StopServerAsync called");
 
@@ -62,15 +64,16 @@ public sealed class UnifiedServerOcrAdapter : IOcrServerManager
         // 実際の停止はIUnifiedAIServerManager.DisposeAsync()で行われる
         _logger.LogDebug("[UnifiedOcrAdapter] Unified server stop deferred (may be in use by translation service)");
 
-        await Task.CompletedTask.ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
-    public async ValueTask DisposeAsync()
+    // [Review Fix] async/awaitを削除して最適化
+    public ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        if (_disposed) return ValueTask.CompletedTask;
         _disposed = true;
 
         _logger.LogDebug("[UnifiedOcrAdapter] Adapter disposed (server lifecycle managed by IUnifiedAIServerManager)");
-        await Task.CompletedTask.ConfigureAwait(false);
+        return ValueTask.CompletedTask;
     }
 }

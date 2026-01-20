@@ -39,10 +39,14 @@ public sealed class UnifiedServerPythonAdapter : IPythonServerManager
 
         if (!success)
         {
-            _logger.LogError("[UnifiedAdapter] Failed to start unified server");
-            throw new InvalidOperationException("Failed to start unified AI server");
+            // [Review Fix] エラーメッセージにポート番号を含める
+            var errorMessage = $"Failed to start unified AI server on port {_unifiedServer.Port}";
+            _logger.LogError("[UnifiedAdapter] {ErrorMessage}", errorMessage);
+            throw new InvalidOperationException(errorMessage);
         }
 
+        // [Review Fix] lock内で作成したインスタンスをローカル変数に保持して返す
+        UnifiedServerInfo result;
         lock (_lock)
         {
             _serverInfo = new UnifiedServerInfo(
@@ -50,10 +54,11 @@ public sealed class UnifiedServerPythonAdapter : IPythonServerManager
                 LanguagePair: languagePair,
                 StartedAt: DateTime.UtcNow,
                 IsHealthy: _unifiedServer.IsReady);
+            result = _serverInfo;
         }
 
         _logger.LogInformation("[UnifiedAdapter] Unified server started on port {Port}", _unifiedServer.Port);
-        return _serverInfo;
+        return result;
     }
 
     /// <inheritdoc/>
@@ -78,7 +83,8 @@ public sealed class UnifiedServerPythonAdapter : IPythonServerManager
     }
 
     /// <inheritdoc/>
-    public async Task StopServerAsync(string languagePair)
+    // [Review Fix] async/awaitを削除して最適化
+    public Task StopServerAsync(string languagePair)
     {
         _logger.LogInformation("[UnifiedAdapter] StopServerAsync called for languagePair: {LanguagePair}", languagePair);
 
@@ -87,7 +93,7 @@ public sealed class UnifiedServerPythonAdapter : IPythonServerManager
         // 翻訳側からの停止は実際には行わない（OCR側も使用中の可能性があるため）
         _logger.LogDebug("[UnifiedAdapter] Unified server stop deferred (may be in use by OCR service)");
 
-        await Task.CompletedTask.ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -183,17 +189,29 @@ public sealed class UnifiedServerPythonAdapter : IPythonServerManager
         if (_disposed) return;
         _disposed = true;
 
+        // [Review Fix] 参照をクリア
+        lock (_lock)
+        {
+            _serverInfo = null;
+        }
+
         // 統合サーバーの破棄はIUnifiedAIServerManager側の責任
         _logger.LogDebug("[UnifiedAdapter] Adapter disposed (server lifecycle managed by IUnifiedAIServerManager)");
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        if (_disposed) return ValueTask.CompletedTask;
         _disposed = true;
 
+        // [Review Fix] 参照をクリア
+        lock (_lock)
+        {
+            _serverInfo = null;
+        }
+
         _logger.LogDebug("[UnifiedAdapter] Adapter disposed async");
-        await Task.CompletedTask.ConfigureAwait(false);
+        return ValueTask.CompletedTask;
     }
 
     /// <summary>
