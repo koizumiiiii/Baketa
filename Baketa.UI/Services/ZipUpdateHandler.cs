@@ -308,8 +308,8 @@ public sealed class ZipSparkleUpdater : SparkleUpdater
             :: /E: サブディレクトリ含む全コピー（/MIRと異なり既存ファイルを削除しない）
             :: /MT:4: 4スレッド並列処理
             :: /NP /NFL /NDL: 進捗・ファイル名・ディレクトリ名表示抑制
-            :: /R:3 /W:1: リトライ3回、待機1秒
-            robocopy "{{escapedSourceDir}}" "{{escapedTargetDir}}" /E /MT:4 /NP /NFL /NDL /R:3 /W:1
+            :: /R:3 /W:3: リトライ3回、待機3秒（AV対策）
+            robocopy "{{escapedSourceDir}}" "{{escapedTargetDir}}" /E /MT:4 /NP /NFL /NDL /R:3 /W:3
 
             :: robocopyの終了コード: 0-7は成功、8以上はエラー
             if errorlevel 8 (
