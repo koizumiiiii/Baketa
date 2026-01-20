@@ -892,7 +892,42 @@ async function authenticateUser(
         await saveAuthCache(cacheKey, updatedAuth);
         return updatedAuth;
       } else {
-        // プランが一致 → キャッシュを使用
+        // プランが一致 → キャッシュを使用（ただしFreeプランの場合はボーナストークンを再確認）
+        if (cachedAuth.plan === PLAN.FREE) {
+          // [Issue #298] PatreonユーザーでもFreeプランの場合はボーナストークンを確認
+          // Patreon IDからSupabase UUIDを逆引きしてボーナストークンをチェック
+          const supabase = getSupabaseClient(env);
+          if (supabase) {
+            try {
+              // profiles.patreon_user_id からSupabase UUIDを取得
+              const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('patreon_user_id', cachedAuth.userId)
+                .single();
+
+              if (!profileError && profile?.id) {
+                const bonusRemaining = await getBonusTokensRemaining(supabase, profile.id);
+                const currentHasBonusTokens = bonusRemaining > 0;
+
+                if (currentHasBonusTokens !== cachedAuth.hasBonusTokens) {
+                  console.log(`[Issue #298] Patreon Free user bonus status changed: ${cachedAuth.hasBonusTokens} → ${currentHasBonusTokens}, updating cache`);
+                  const updatedAuth: AuthenticatedUser = {
+                    ...cachedAuth,
+                    hasBonusTokens: currentHasBonusTokens,
+                  };
+                  await saveAuthCache(cacheKey, updatedAuth);
+                  return updatedAuth;
+                }
+
+                console.log(`[Issue #298] Patreon Free plan cache hit: userId=${cachedAuth.userId.substring(0, 8)}..., bonusTokens=${currentHasBonusTokens}`);
+                return cachedAuth;
+              }
+            } catch (error) {
+              console.error(`[Issue #298] Error checking bonus tokens for Patreon user:`, error);
+            }
+          }
+        }
         console.log(`[Issue #286] Auth cache hit (Cache API): userId=${cachedAuth.userId.substring(0, 8)}..., plan=${cachedAuth.plan}`);
         return cachedAuth;
       }
@@ -912,9 +947,24 @@ async function authenticateUser(
               .eq('id', cachedAuth.userId)
               .single();
 
-            // プロファイル取得成功 かつ Patreon未連携 → キャッシュを信用
+            // プロファイル取得成功 かつ Patreon未連携
             if (!profileError && profile && !profile.patreon_user_id) {
-              console.log(`[Issue #299] Free plan cache hit (no Patreon link): userId=${cachedAuth.userId.substring(0, 8)}...`);
+              // [Issue #298] ボーナストークン状態を常に再確認（プロモーション適用後の反映）
+              const bonusRemaining = await getBonusTokensRemaining(supabase, cachedAuth.userId);
+              const currentHasBonusTokens = bonusRemaining > 0;
+
+              // ボーナストークン状態が変わった場合はキャッシュを更新
+              if (currentHasBonusTokens !== cachedAuth.hasBonusTokens) {
+                console.log(`[Issue #298] Bonus token status changed: ${cachedAuth.hasBonusTokens} → ${currentHasBonusTokens}, updating cache`);
+                const updatedAuth: AuthenticatedUser = {
+                  ...cachedAuth,
+                  hasBonusTokens: currentHasBonusTokens,
+                };
+                await saveAuthCache(cacheKey, updatedAuth);
+                return updatedAuth;
+              }
+
+              console.log(`[Issue #299] Free plan cache hit (no Patreon link): userId=${cachedAuth.userId.substring(0, 8)}..., bonusTokens=${currentHasBonusTokens}`);
               return cachedAuth;
             }
 

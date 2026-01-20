@@ -190,11 +190,12 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）かどうか
-    /// クォータ超過やサブスクリプション状態に関係なく、プランタイプのみで判定
+    /// [Issue #296] 有料プラン（Pro/Premium/Ultimate）またはボーナストークン保有者
+    /// クォータ超過やサブスクリプション状態に関係なく判定
     /// トークン使用量ゲージの表示判定に使用
+    /// [Issue #298] ボーナストークン保有者もゲージ表示対象に追加
     /// </summary>
-    public bool HasPaidPlan => CurrentPlan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
+    public bool HasPaidPlan => CurrentPlan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate || HasBonusTokens;
 
     /// <summary>
     /// クォータを超過しているか
@@ -516,9 +517,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private void UpdateFromState(LicenseState state)
     {
         CurrentPlan = state.CurrentPlan;
-        // プロモーション適用中の場合はサフィックスを追加
+        // [Issue #298] プロモーション適用中の場合はサフィックスを追加（Freeプランでも表示）
         var basePlanName = GetPlanDisplayName(state.CurrentPlan);
-        PlanDisplayName = HasActivePromotion && state.CurrentPlan != PlanType.Free
+        PlanDisplayName = HasActivePromotion
             ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
             : basePlanName;
         PlanDescription = GetPlanDescription(state.CurrentPlan);
@@ -850,9 +851,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             _activePromotion = e.NewPromotion;
             HasActivePromotion = e.NewPromotion?.IsValid == true;
 
-            // [Issue #275] プラン表示名を再計算（プロモーションサフィックスの更新）
+            // [Issue #298] プラン表示名を再計算（プロモーションサフィックスの更新、Freeプランでも表示）
             var basePlanName = GetPlanDisplayName(CurrentPlan);
-            PlanDisplayName = HasActivePromotion && CurrentPlan != PlanType.Free
+            PlanDisplayName = HasActivePromotion
                 ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
                 : basePlanName;
 
