@@ -566,21 +566,14 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                             _usageAnalyticsService = serviceProvider.GetService<IUsageAnalyticsService>();
                             if (_usageAnalyticsService?.IsEnabled == true)
                             {
-                                // [Issue #307] MinVerはAssemblyInformationalVersionAttributeに設定
-                                var appAssembly = Assembly.GetEntryAssembly();
-                                var infoVersion = appAssembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-                                var appVersion = !string.IsNullOrEmpty(infoVersion)
-                                    ? infoVersion.Split(['-', '+'])[0]  // "0.2.26-alpha.0.2+hash" → "0.2.26"
-                                    : appAssembly?.GetName().Version?.ToString(3) ?? "0.0.0";
-
+                                // app_versionはUsageAnalyticsService.TrackEvent()が自動付与
                                 var sessionData = new Dictionary<string, object>
                                 {
                                     ["os_version"] = Environment.OSVersion.VersionString,
-                                    ["runtime_version"] = Environment.Version.ToString(),
-                                    ["app_version"] = appVersion
+                                    ["runtime_version"] = Environment.Version.ToString()
                                 };
                                 _usageAnalyticsService.TrackEvent("session_start", sessionData);
-                                _logger?.LogDebug("[Issue #307] session_start イベント記録完了: app_version={AppVersion}", appVersion);
+                                _logger?.LogDebug("[Issue #269] session_start イベント記録完了");
                             }
                         }
                         catch (Exception analyticsEx)
