@@ -1387,6 +1387,13 @@ internal sealed class Program
         var suryaOcrModule = new Baketa.Infrastructure.DI.SuryaOcrModule();
         suryaOcrModule.RegisterServices(services);
         Console.WriteLine("✅ SuryaOcrModule登録完了");
+
+        // Issue #292: 統合AIサーバーモジュールの登録
+        // OCR + 翻訳を単一プロセスで実行（VRAM削減）
+        Console.WriteLine("🚀 UnifiedServerModule登録開始");
+        var unifiedServerModule = new Baketa.Infrastructure.DI.UnifiedServerModule();
+        unifiedServerModule.RegisterServices(services);
+        Console.WriteLine("✅ UnifiedServerModule登録完了");
     }
 
     /// <summary>
