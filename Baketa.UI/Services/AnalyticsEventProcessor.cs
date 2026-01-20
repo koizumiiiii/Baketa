@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Application.Services.UI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Platform.Windows.Adapters;
 using Baketa.Core.Abstractions.Services;
@@ -29,6 +30,7 @@ public sealed class AnalyticsEventProcessor :
     private readonly IUsageAnalyticsService _analyticsService;
     private readonly IFullscreenModeService? _fullscreenModeService;
     private readonly IWindowManagerAdapter? _windowManagerAdapter;
+    private readonly IWindowManagementService? _windowManagementService;
     private readonly ILogger<AnalyticsEventProcessor>? _logger;
 
     // [Issue #307] ユーザー名等の個人情報を除去するための正規表現
@@ -40,11 +42,13 @@ public sealed class AnalyticsEventProcessor :
         IUsageAnalyticsService analyticsService,
         IFullscreenModeService? fullscreenModeService = null,
         IWindowManagerAdapter? windowManagerAdapter = null,
+        IWindowManagementService? windowManagementService = null,
         ILogger<AnalyticsEventProcessor>? logger = null)
     {
         _analyticsService = analyticsService ?? throw new ArgumentNullException(nameof(analyticsService));
         _fullscreenModeService = fullscreenModeService;
         _windowManagerAdapter = windowManagerAdapter;
+        _windowManagementService = windowManagementService;
         _logger = logger;
     }
 
@@ -137,29 +141,37 @@ public sealed class AnalyticsEventProcessor :
     {
         try
         {
-            if (_fullscreenModeService == null || _windowManagerAdapter == null)
+            // [Issue #307] 優先順位1: IWindowManagementService.SelectedWindow から取得
+            // WindowManagementServiceで選択されたウィンドウのタイトルを直接取得
+            if (_windowManagementService?.SelectedWindow != null)
             {
-                _logger?.LogDebug("[Issue #307] GetSanitizedGameTitle: サービス未登録 (FullscreenService={Fullscreen}, WindowManager={WindowManager})",
-                    _fullscreenModeService != null, _windowManagerAdapter != null);
-                return null;
+                var selectedTitle = _windowManagementService.SelectedWindow.Title;
+                if (!string.IsNullOrWhiteSpace(selectedTitle))
+                {
+                    _logger?.LogDebug("[Issue #307] GetSanitizedGameTitle: IWindowManagementService から取得: '{Title}'", selectedTitle);
+                    return SanitizeWindowTitle(selectedTitle);
+                }
             }
 
-            var windowHandle = _fullscreenModeService.TargetWindowHandle;
-            if (windowHandle == nint.Zero)
+            // [Issue #307] 優先順位2: IFullscreenModeService.TargetWindowHandle から取得（フォールバック）
+            if (_fullscreenModeService != null && _windowManagerAdapter != null)
             {
-                _logger?.LogDebug("[Issue #307] GetSanitizedGameTitle: TargetWindowHandle が Zero");
-                return null;
+                var windowHandle = _fullscreenModeService.TargetWindowHandle;
+                if (windowHandle != nint.Zero)
+                {
+                    var title = _windowManagerAdapter.GetWindowTitle(windowHandle);
+                    if (!string.IsNullOrWhiteSpace(title))
+                    {
+                        _logger?.LogDebug("[Issue #307] GetSanitizedGameTitle: IFullscreenModeService から取得: '{Title}'", title);
+                        return SanitizeWindowTitle(title);
+                    }
+                }
             }
 
-            var title = _windowManagerAdapter.GetWindowTitle(windowHandle);
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                return null;
-            }
-
-            // プライバシー保護: ユーザーパスを除去
-            var sanitized = SanitizeWindowTitle(title);
-            return sanitized;
+            _logger?.LogDebug("[Issue #307] GetSanitizedGameTitle: ウィンドウタイトル取得不可 (WindowManagement={WM}, Fullscreen={FS})",
+                _windowManagementService?.SelectedWindow != null,
+                _fullscreenModeService?.TargetWindowHandle != nint.Zero);
+            return null;
         }
         catch (Exception ex)
         {

@@ -186,8 +186,10 @@ internal sealed class UIModule : ServiceModuleBase
             var analyticsService = provider.GetRequiredService<Baketa.Core.Abstractions.Services.IUsageAnalyticsService>();
             var fullscreenService = provider.GetService<Baketa.Core.UI.Fullscreen.IFullscreenModeService>();
             var windowManager = provider.GetService<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter>();
+            // [Issue #307] IWindowManagementServiceから選択されたウィンドウのタイトルを取得
+            var windowManagementService = provider.GetService<Baketa.Application.Services.UI.IWindowManagementService>();
             var logger = provider.GetService<Microsoft.Extensions.Logging.ILogger<AnalyticsEventProcessor>>();
-            return new AnalyticsEventProcessor(analyticsService, fullscreenService, windowManager, logger);
+            return new AnalyticsEventProcessor(analyticsService, fullscreenService, windowManager, windowManagementService, logger);
         });
         services.AddSingleton<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>(
             provider => provider.GetRequiredService<AnalyticsEventProcessor>());
