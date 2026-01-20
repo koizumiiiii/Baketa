@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Text;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Server;
@@ -388,11 +391,9 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
             return vendorPython;
         }
 
-        // pyenv Python
-        var pyenvPython = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".pyenv", "pyenv-win", "versions", "3.10.9", "python.exe");
-        if (File.Exists(pyenvPython))
+        // pyenv Python（.python-versionから動的にバージョンを取得）
+        var pyenvPython = FindPyenvPython(projectRoot);
+        if (pyenvPython != null)
         {
             return pyenvPython;
         }
@@ -424,6 +425,50 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
     }
 
     /// <summary>
+    /// pyenv Python実行ファイルを.python-versionから動的に探索
+    /// [Gemini Review Fix] バージョン番号のハードコードを排除
+    /// </summary>
+    private static string? FindPyenvPython(string? projectRoot)
+    {
+        // .python-versionファイルからバージョンを読み取り
+        string? pythonVersion = null;
+
+        // プロジェクトルートの.python-versionを優先
+        if (projectRoot != null)
+        {
+            var projectVersionFile = Path.Combine(projectRoot, ".python-version");
+            if (File.Exists(projectVersionFile))
+            {
+                pythonVersion = File.ReadAllText(projectVersionFile).Trim();
+            }
+        }
+
+        // ユーザーホームの.python-versionをフォールバック
+        if (string.IsNullOrEmpty(pythonVersion))
+        {
+            var userVersionFile = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".python-version");
+            if (File.Exists(userVersionFile))
+            {
+                pythonVersion = File.ReadAllText(userVersionFile).Trim();
+            }
+        }
+
+        if (string.IsNullOrEmpty(pythonVersion))
+        {
+            return null;
+        }
+
+        // pyenvパスを構築
+        var pyenvPython = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".pyenv", "pyenv-win", "versions", pythonVersion, "python.exe");
+
+        return File.Exists(pyenvPython) ? pyenvPython : null;
+    }
+
+    /// <summary>
     /// プロジェクトルートディレクトリを.slnファイルを基点に探索
     /// </summary>
     private static string? FindProjectRoot(string startPath)
@@ -439,6 +484,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
     /// <summary>
     /// 孤立プロセスを強制終了
     /// [Gemini Review Fix] 競合状態対策: プロセス取得とKillの間でプロセスが終了する可能性に対応
+    /// [Gemini Review Fix] netstatコマンドからWindows API (GetExtendedTcpTable)に置換
     /// </summary>
     private async Task KillOrphanedProcessAsync()
     {
@@ -446,35 +492,13 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         {
             _logger.LogDebug("[UnifiedServer] 孤立プロセスチェック: Port {Port}", _settings.Port);
 
-            var netstatProcess = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "netstat",
-                    Arguments = "-ano",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
+            // Windows APIを使用してTCP接続テーブルを取得
+            var pid = GetListeningProcessId(_settings.Port);
 
-            netstatProcess.Start();
-            var output = await netstatProcess.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
-            await netstatProcess.WaitForExitAsync().ConfigureAwait(false);
-
-            var lines = output.Split('\n');
-            foreach (var line in lines)
+            if (pid > 0)
             {
-                if (line.Contains($":{_settings.Port}") && line.Contains("LISTENING"))
-                {
-                    var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 0 && int.TryParse(parts[^1], out var pid))
-                    {
-                        _logger.LogWarning("⚠️ [UnifiedServer] 孤立プロセス検出: PID {Pid}", pid);
-                        await TryKillProcessAsync(pid).ConfigureAwait(false);
-                        break;
-                    }
-                }
+                _logger.LogWarning("⚠️ [UnifiedServer] 孤立プロセス検出: PID {Pid}", pid);
+                await TryKillProcessAsync(pid).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -482,6 +506,101 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
             _logger.LogWarning(ex, "⚠️ [UnifiedServer] 孤立プロセスチェックエラー");
         }
     }
+
+    #region Windows API P/Invoke for TCP Table
+
+    /// <summary>
+    /// 指定ポートでLISTEN中のプロセスIDを取得
+    /// [Gemini Review Fix] netstatコマンドを廃止し、Windows API直接呼び出しに置換
+    /// </summary>
+    private static int GetListeningProcessId(int port)
+    {
+        // .NET の IPGlobalProperties を使用（内部でGetExtendedTcpTableを呼び出す）
+        // これによりP/Invoke宣言を最小限に抑えつつ、netstat依存を排除
+        try
+        {
+            var properties = IPGlobalProperties.GetIPGlobalProperties();
+            var connections = properties.GetActiveTcpListeners();
+
+            // GetActiveTcpListeners はプロセスIDを返さないため、
+            // GetExtendedTcpTable を直接使用する必要がある
+            return GetListeningProcessIdFromExtendedTable(port);
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// GetExtendedTcpTable APIを使用してLISTEN中のプロセスIDを取得
+    /// </summary>
+    private static int GetListeningProcessIdFromExtendedTable(int port)
+    {
+        const int AF_INET = 2; // IPv4
+        const int TCP_TABLE_OWNER_PID_LISTENER = 3;
+        const int MIB_TCP_STATE_LISTEN = 2;
+
+        var bufferSize = 0;
+        var result = GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, true, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0);
+
+        var tcpTablePtr = Marshal.AllocHGlobal(bufferSize);
+        try
+        {
+            result = GetExtendedTcpTable(tcpTablePtr, ref bufferSize, true, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0);
+            if (result != 0)
+            {
+                return -1;
+            }
+
+            // テーブルのエントリ数を取得
+            var numEntries = Marshal.ReadInt32(tcpTablePtr);
+            var rowPtr = IntPtr.Add(tcpTablePtr, 4); // dwNumEntries(4バイト)をスキップ
+
+            for (var i = 0; i < numEntries; i++)
+            {
+                var row = Marshal.PtrToStructure<MIB_TCPROW_OWNER_PID>(rowPtr);
+
+                // ローカルポートはネットワークバイトオーダー（ビッグエンディアン）
+                var localPort = ((row.dwLocalPort & 0xFF) << 8) | ((row.dwLocalPort >> 8) & 0xFF);
+
+                if (row.dwState == MIB_TCP_STATE_LISTEN && localPort == port)
+                {
+                    return (int)row.dwOwningPid;
+                }
+
+                rowPtr = IntPtr.Add(rowPtr, Marshal.SizeOf<MIB_TCPROW_OWNER_PID>());
+            }
+
+            return -1;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(tcpTablePtr);
+        }
+    }
+
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern int GetExtendedTcpTable(
+        IntPtr pTcpTable,
+        ref int dwOutBufLen,
+        bool sort,
+        int ipVersion,
+        int tblClass,
+        int reserved);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MIB_TCPROW_OWNER_PID
+    {
+        public uint dwState;
+        public uint dwLocalAddr;
+        public uint dwLocalPort;
+        public uint dwRemoteAddr;
+        public uint dwRemotePort;
+        public uint dwOwningPid;
+    }
+
+    #endregion
 
     /// <summary>
     /// [Gemini Review Fix] プロセス終了を安全に試行

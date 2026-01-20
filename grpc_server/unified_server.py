@@ -534,10 +534,9 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
 
             def load_translation_sync():
                 logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
-                # CTranslate2Engine.load_model() は内部で run_in_executor を使用
-                # ここでは同期版を直接呼び出す
-                import asyncio as _asyncio
-                _asyncio.run(translation_engine.load_model())
+                # [Gemini Review Fix] asyncio.run()を廃止し、同期版メソッドを直接呼び出し
+                # これにより、Executor内で新しいイベントループを作成する複雑さを回避
+                translation_engine._load_model_sync()
                 logger.info("[Translation] Model loaded successfully")
 
             def load_ocr_sync():

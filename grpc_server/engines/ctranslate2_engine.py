@@ -171,6 +171,77 @@ class CTranslate2Engine(TranslationEngine):
             self.logger.error(f"CTranslate2モデルのロード失敗: {e}")
             raise ModelNotLoadedError(f"CTranslate2 model load failed: {e}")
 
+    def _load_model_sync(self) -> None:
+        """CTranslate2モデルを同期的にロード
+
+        [Gemini Review Fix] ThreadPoolExecutor内でasyncio.run()を使わずに
+        直接呼び出すための同期版メソッド
+        """
+        import os
+        self.logger.info(f"CTranslate2モデルロード開始 (sync): {self.model_path}")
+        self.logger.info(f"  Current Working Directory: {os.getcwd()}")
+        self.logger.info(f"  Model Path (absolute): {self.model_path.absolute()}")
+        self.logger.info(f"  Model Path exists: {self.model_path.exists()}")
+        start_time = time.time()
+
+        try:
+            # モデルパス確認
+            if not self.model_path.exists():
+                raise ModelNotLoadedError(
+                    f"モデルが見つかりません: {self.model_path}\n"
+                    f"WorkingDirectory: {os.getcwd()}\n"
+                    f"Absolute path: {self.model_path.absolute()}\n"
+                    f"convert_nllb_to_ctranslate2.pyで変換してください"
+                )
+
+            # Translatorロード
+            self.logger.info("Translator初期化中...")
+            self.translator = ctranslate2.Translator(
+                str(self.model_path),
+                device=self.device,
+                compute_type=self.compute_type,
+                inter_threads=self.max_workers,
+                intra_threads=1,
+                max_queued_batches=2
+            )
+            self.logger.info("Translatorロード完了")
+            self.logger.info(f"  Device: {self.translator.device}")
+            self.logger.info(f"  Compute Type: {self.translator.compute_type}")
+
+            # tokenizersライブラリでtokenizer.jsonを直接ロード
+            tokenizer_path = self.model_path / "tokenizer.json"
+            self.logger.info(f"Tokenizer ロード中: {tokenizer_path}")
+            if not tokenizer_path.exists():
+                raise ModelNotLoadedError(
+                    f"tokenizer.json が見つかりません: {tokenizer_path}\n"
+                    f"モデルディレクトリに tokenizer.json が含まれていることを確認してください"
+                )
+            self.tokenizer = Tokenizer.from_file(str(tokenizer_path))
+            self.logger.info("Tokenizer ロード成功 (tokenizers library)")
+            self.logger.info(f"  Vocabulary size: {self.tokenizer.get_vocab_size()}")
+
+            load_time = time.time() - start_time
+            self.logger.info(f"CTranslate2モデルロード完了 - 所要時間: {load_time:.2f}秒")
+
+            # is_loaded を先に設定（ウォームアップでtranslate()を呼ぶため）
+            self.is_loaded = True
+
+            # ウォームアップ（同期版）
+            self._warmup_model_sync()
+            total_time = time.time() - start_time
+            self.logger.info(f"CTranslate2 engine ready - Total time: {total_time:.2f}秒")
+            self.logger.info("NLLB-200-distilled-1.3B (int8) loaded - ~5.5GB memory")
+
+        except ImportError as e:
+            self.logger.error(f"必要なライブラリが見つかりません: {e}")
+            raise ModelNotLoadedError(f"Required library missing: {e}")
+        except OSError as e:
+            self.logger.error(f"モデルファイルの読み込み失敗: {e}")
+            raise ModelNotLoadedError(f"Model file load failed: {e}")
+        except Exception as e:
+            self.logger.error(f"CTranslate2モデルのロード失敗: {e}")
+            raise ModelNotLoadedError(f"CTranslate2 model load failed: {e}")
+
     async def _warmup_model(self) -> None:
         """モデルのウォームアップ（初回推論の遅延回避）"""
         self.logger.info("CTranslate2モデルウォームアップ開始...")
@@ -186,6 +257,79 @@ class CTranslate2Engine(TranslationEngine):
 
         except Exception as e:
             self.logger.warning(f"ウォームアップ失敗（無視）: {e}")
+
+    def _warmup_model_sync(self) -> None:
+        """モデルのウォームアップ（同期版）
+
+        [Gemini Review Fix] ThreadPoolExecutor内でasyncio.run()を使わずに
+        直接呼び出すための同期版メソッド
+        """
+        self.logger.info("CTranslate2モデルウォームアップ開始 (sync)...")
+
+        try:
+            # 英語→日本語
+            self._translate_sync("Hello", "en", "ja")
+            self.logger.info("英語→日本語ウォームアップ完了")
+
+            # 日本語→英語
+            self._translate_sync("こんにちは", "ja", "en")
+            self.logger.info("日本語→英語ウォームアップ完了")
+
+        except Exception as e:
+            self.logger.warning(f"ウォームアップ失敗（無視）: {e}")
+
+    def _translate_sync(
+        self,
+        text: str,
+        source_lang: str,
+        target_lang: str
+    ) -> Tuple[str, float]:
+        """単一テキストを同期的に翻訳（ウォームアップ用）
+
+        [Gemini Review Fix] asyncio不要の同期版翻訳メソッド
+        """
+        if not self.is_loaded or not self.translator or not self.tokenizer:
+            raise ModelNotLoadedError("Model not loaded")
+
+        if not text or not isinstance(text, str):
+            raise ValueError(f"Invalid text: {text}")
+
+        if len(text.strip()) == 0:
+            return ("", 0.0)
+
+        # 言語コード変換
+        src_code = self._get_nllb_lang_code(source_lang)
+        tgt_code = self._get_nllb_lang_code(target_lang)
+
+        self.logger.info(f"[ENGINE_TRANSLATE_INPUT] src_code: {src_code}, tgt_code: {tgt_code}")
+        self.logger.info(f"[ENGINE_TRANSLATE_INPUT] Text length: {len(text)}, Text: {text[:100]}...")
+
+        # トークナイズ
+        source_tokens = self._encode_text(text, source_lang)
+        self.logger.info(f"[ENGINE_TOKENIZE] Token count: {len(source_tokens)}, Tokens: {source_tokens[:20]}...")
+
+        # 翻訳実行（同期）
+        results = self.translator.translate_batch(
+            source=[source_tokens],
+            target_prefix=[[tgt_code]],
+            beam_size=4,
+            max_decoding_length=256,
+            repetition_penalty=1.2,
+            no_repeat_ngram_size=3,
+            length_penalty=1.0,
+            return_scores=True
+        )
+
+        # デトークナイズ
+        output_tokens = results[0].hypotheses[0]
+        self.logger.info(f"[ENGINE_DETOKENIZE] Output token count: {len(output_tokens)}, Tokens: {output_tokens[:20]}...")
+
+        translated_text = self._decode_tokens(output_tokens)
+        self.logger.info(f"[ENGINE_TRANSLATE_OUTPUT] Translated text length: {len(translated_text)}, Text: {translated_text[:100]}...")
+
+        confidence = results[0].scores[0] if results[0].scores else -1.0
+
+        return (translated_text, confidence)
 
     def _get_nllb_lang_code(self, lang_code: str) -> str:
         """言語コードをNLLB-200形式に変換
