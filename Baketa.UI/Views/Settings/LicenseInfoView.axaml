@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Baketa.UI.ViewModels.Settings"
              xmlns:controls="using:Baketa.UI.Controls"
+             xmlns:converters="using:Baketa.UI.Converters"
              xmlns:local="using:Baketa.UI.Extensions"
              x:Class="Baketa.UI.Views.Settings.LicenseInfoView"
              x:DataType="vm:LicenseInfoViewModel">
@@ -79,38 +80,72 @@
                         CornerRadius="8"
                         Padding="16">
                     <StackPanel Spacing="12">
-                        <!-- Usage Bar -->
+                        <!-- [Issue #307] Combined Token Usage Gauge (Plan + Bonus) -->
                         <StackPanel Spacing="4">
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Grid.Column="0"
                                            Text="{local:Localize Settings_License_MonthlyUsage}"
                                            FontSize="12"/>
                                 <TextBlock Grid.Column="1"
-                                           Text="{Binding TokenUsageDisplay}"
+                                           Text="{Binding CombinedTokenUsageDisplay}"
                                            FontSize="12"
                                            FontWeight="Medium"/>
                             </Grid>
-                            <ProgressBar Value="{Binding UsagePercentage}"
-                                         Maximum="100"
-                                         Height="8"
-                                         CornerRadius="4"
-                                         Foreground="{Binding UsageGaugeBrush}"/>
-                        </StackPanel>
 
-                        <!-- Issue #280+#281: Bonus Tokens Display -->
-                        <Border IsVisible="{Binding HasBonusTokens}"
-                                Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
-                                CornerRadius="6"
-                                Padding="12">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <PathIcon Data="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z"
-                                          Width="16" Height="16"
-                                          Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
-                                <TextBlock Text="{Binding BonusTokensDisplay}"
-                                           FontWeight="Medium"
-                                           Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
+                            <!-- 3セグメントゲージ: 使用済み(青) | プラン残(グレー) | ボーナス(緑) -->
+                            <Grid x:Name="GaugeContainer" Height="8" ClipToBounds="True">
+                                <!-- 背景（ボーナス部分: 緑） -->
+                                <Border Background="#28A745" CornerRadius="4"
+                                        IsVisible="{Binding HasBonusTokens}"/>
+                                <Border Background="#E9ECEF" CornerRadius="4"
+                                        IsVisible="{Binding !HasBonusTokens}"/>
+
+                                <!-- プラン枠全体（グレー、左寄せ） -->
+                                <Border Background="#ADB5BD"
+                                        HorizontalAlignment="Left"
+                                        CornerRadius="4,0,0,4"
+                                        IsVisible="{Binding HasBonusTokens}">
+                                    <Border.Width>
+                                        <MultiBinding Converter="{x:Static converters:PercentToWidthConverter.Instance}">
+                                            <Binding Path="Bounds.Width" ElementName="GaugeContainer"/>
+                                            <Binding Path="PlanPortionPercentage"/>
+                                        </MultiBinding>
+                                    </Border.Width>
+                                </Border>
+
+                                <!-- 使用済み部分（青、左寄せ） -->
+                                <Border Background="{Binding UsageGaugeBrush}"
+                                        HorizontalAlignment="Left"
+                                        CornerRadius="4,0,0,4">
+                                    <Border.Width>
+                                        <MultiBinding Converter="{x:Static converters:PercentToWidthConverter.Instance}">
+                                            <Binding Path="Bounds.Width" ElementName="GaugeContainer"/>
+                                            <Binding Path="UsedPercentageOfTotal"/>
+                                        </MultiBinding>
+                                    </Border.Width>
+                                </Border>
+                            </Grid>
+
+                            <!-- ゲージ凡例（ボーナストークンがある場合のみ表示） -->
+                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0"
+                                        IsVisible="{Binding HasBonusTokens}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Border Width="12" Height="12" CornerRadius="2" Background="{Binding UsageGaugeBrush}"/>
+                                    <TextBlock Text="使用済み" FontSize="10" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Border Width="12" Height="12" CornerRadius="2" Background="#ADB5BD"/>
+                                    <TextBlock Text="プラン残" FontSize="10" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Border Width="12" Height="12" CornerRadius="2" Background="#28A745"/>
+                                    <TextBlock Text="ボーナス" FontSize="10" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                </StackPanel>
                             </StackPanel>
-                        </Border>
+                        </StackPanel>
 
                         <!-- Quota Warning -->
                         <Border IsVisible="{Binding IsQuotaExceeded}"
@@ -187,6 +222,30 @@
                             <TextBlock Grid.Column="1"
                                        Text="{Binding TokenLimit, StringFormat='{}{0:N0}'}"
                                        FontWeight="Medium"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- [Issue #307] Bonus Tokens (if available) -->
+                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBonusTokens}">
+                            <TextBlock Grid.Column="0"
+                                       Text="ボーナストークン"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding BonusTokensRemaining, StringFormat='{}{0:N0}'}"
+                                       FontWeight="Medium"
+                                       Foreground="#28A745"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- [Issue #307] Total Token Pool (if has bonus) -->
+                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBonusTokens}">
+                            <TextBlock Grid.Column="0"
+                                       Text="合計利用可能"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Medium"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding TotalTokenPool, StringFormat='{}{0:N0}'}"
+                                       FontWeight="Bold"
                                        VerticalAlignment="Center"/>
                         </Grid>
                     </StackPanel>
