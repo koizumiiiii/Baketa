@@ -100,9 +100,8 @@ Use the automated build script for reliable release package creation:
 **Script performs these steps automatically:**
 1. Git sync with origin/main (optional)
 2. .NET Release build
-3. PyInstaller build for BaketaTranslationServer.exe (optional)
-4. Run tests (optional)
-5. Package assembly to `release/` directory
+3. Run tests (optional)
+4. Package assembly to `release/` directory
 
 **First-time venv_build setup (required for PyInstaller):**
 ```cmd
@@ -119,30 +118,34 @@ py -3.10 -m venv venv_build_cuda
 .\venv_build_cuda\Scripts\pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cu126
 ```
 
-### models-v1 リリース（OCRサーバー配布）
+### models-v2 リリース（統合AIサーバー配布）
 
-OCRサーバー（BaketaSuryaOcrServer.exe）は `models-v1` リリースで配布されます。
+Issue #292: 統合AIサーバー（BaketaUnifiedServer.exe）は `models-v2` リリースで配布されます。
+OCRと翻訳を単一プロセスで実行し、VRAMを効率的に使用します。
 
-**リリースURL:** https://github.com/koizumiiiii/Baketa/releases/tag/models-v1
+**リリースURL:** https://github.com/koizumiiiii/Baketa/releases/tag/models-v2
 
 **アセット構成:**
 | ファイル | 説明 | サイズ |
 |----------|------|--------|
-| BaketaSuryaOcrServer-cpu.zip | CPU版OCRサーバー | ~225MB |
-| BaketaSuryaOcrServer-cuda.zip.001/.002 | CUDA版OCRサーバー（分割） | ~2.5GB |
-| BaketaTranslationServer.zip | 翻訳サーバー | - |
-| surya-*.zip | Surya OCRモデル | - |
-| nllb-*.zip | NLLB翻訳モデル | - |
+| BaketaUnifiedServer-cpu.zip | CPU版統合AIサーバー | ~300MB |
+| BaketaUnifiedServer-cuda.zip.001/.002 | CUDA版統合AIサーバー（分割） | ~2.7GB |
+| surya-detection-onnx.zip | OCR検出モデル (ONNX INT8) | ~31MB |
+| surya-recognition-quantized.zip | OCR認識モデル (PyTorch量子化) | ~665MB |
+| nllb-200-distilled-600M-ct2.zip | NLLB翻訳モデル | ~1.1GB |
 
 **CUDA版の結合方法:**
 ```cmd
-copy /b BaketaSuryaOcrServer-cuda.zip.001+BaketaSuryaOcrServer-cuda.zip.002 BaketaSuryaOcrServer-cuda.zip
+copy /b BaketaUnifiedServer-cuda.zip.001+BaketaUnifiedServer-cuda.zip.002 BaketaUnifiedServer-cuda.zip
 ```
 
-**OCRサーバー再ビルド手順:**
-1. CPU版: `.\venv_build\Scripts\pyinstaller BaketaSuryaOcrServer.spec`
-2. CUDA版: `.\venv_build_cuda\Scripts\pyinstaller BaketaSuryaOcrServer.spec`
+**統合AIサーバー再ビルド手順:**
+1. CPU版: `.\venv_build\Scripts\pyinstaller BaketaUnifiedServer.spec`
+2. CUDA版: `.\venv_build_cuda\Scripts\pyinstaller BaketaUnifiedServer.spec`
 3. GitHub 2GB制限のため、CUDA版は分割してアップロード
+
+**旧バージョン (models-v1):**
+models-v1 は後方互換性のために残されていますが、新規インストールでは使用されません。
 
 ### 自動バージョニング (MinVer)
 
@@ -171,38 +174,32 @@ git push origin v0.2.1
 release/
 ├── Baketa.exe
 ├── grpc_server/
-│   └── BaketaTranslationServer/  # PyInstallerでexe化した翻訳・OCRサーバー
+│   └── BaketaUnifiedServer/      # 初回起動時にmodels-v2から自動ダウンロード
 └── Models/
-    └── surya/                    # Surya OCRモデル（GitHub Releasesから自動ダウンロード）
-        ├── detection/            # ONNX INT8量子化済み
-        └── recognition/          # PyTorch量子化済み (Issue #197)
+    ├── nllb-200-distilled-600M-ct2/  # NLLB翻訳モデル（自動ダウンロード）
+    └── surya-quantized/              # Surya OCRモデル（自動ダウンロード）
 ```
-
-**PyInstallerビルドが必要なケース:**
-| 変更内容 | PyInstallerビルド |
-|----------|------------------|
-| C#コードのみ変更 | ❌ 不要（既存exeを再利用） |
-| grpc_server/のPythonコード変更 | ✅ 必要 |
-| requirements.txt変更 | ✅ 必要 |
-| venv_buildの依存関係更新（pip upgrade等） | ✅ 必要 |
 
 **開発時にexeが古くてエラーが出る場合:**
 
-開発中に`dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe`が古い依存関係でビルドされていると、以下のようなエラーが発生することがあります：
+開発中に`dist/BaketaUnifiedServer/BaketaUnifiedServer.exe`が古い依存関係でビルドされていると、以下のようなエラーが発生することがあります：
 - `No module named 'cv2'`
 - `Protobuf Gencode/Runtime major versions mismatch`
 
 **対処法:**
 1. exeをリネームまたは削除してPython版にフォールバック：
    ```cmd
-   mv grpc_server/dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe grpc_server/dist/BaketaSuryaOcrServer/BaketaSuryaOcrServer.exe.bak
+   mv grpc_server/dist/BaketaUnifiedServer/BaketaUnifiedServer.exe grpc_server/dist/BaketaUnifiedServer/BaketaUnifiedServer.exe.bak
    ```
 2. venv_buildの依存関係を更新：
    ```cmd
    cd grpc_server
    .\venv_build\Scripts\pip install --upgrade protobuf opencv-python-headless grpcio-tools
    ```
-3. リリース時にPyInstallerで再ビルド（`build-release.ps1`実行）
+3. PyInstallerで再ビルド：
+   ```cmd
+   .\venv_build\Scripts\pyinstaller BaketaUnifiedServer.spec
+   ```
 
 ### NLLB-200 Model Setup
 Before running translation features, ensure Python environment and models are ready:

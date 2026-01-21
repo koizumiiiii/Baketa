@@ -24,8 +24,9 @@ public class ComponentDownloadService : IComponentDownloader
     private readonly string _appDataPath;
     private readonly string _appBasePath;
 
-    // [Issue #210] Surya OCR Server component ID for GPU-aware download
-    private const string SuryaOcrServerComponentId = "surya_ocr_server";
+    // [Issue #292] Unified AI Server component ID for GPU-aware download
+    // (Replaces surya_ocr_server from models-v1)
+    private const string UnifiedServerComponentId = "unified_server";
 
     // [Issue #185] HuggingFace NLLB tokenizer constants
     private const string HuggingFaceTokenizerUrl = "https://huggingface.co/facebook/nllb-200-distilled-600M/resolve/main/tokenizer.json";
@@ -67,7 +68,7 @@ public class ComponentDownloadService : IComponentDownloader
     /// <inheritdoc/>
     public async Task<IReadOnlyList<ComponentInfo>> GetRequiredComponentsAsync(CancellationToken cancellationToken = default)
     {
-        // [Issue #210] Detect GPU capabilities for Surya OCR Server selection
+        // [Issue #292] Detect GPU capabilities for Unified AI Server selection
         var supportsCuda = await DetectCudaSupportAsync(cancellationToken).ConfigureAwait(false);
 
         var components = _settings.Components
@@ -89,8 +90,8 @@ public class ComponentDownloadService : IComponentDownloader
         IReadOnlyList<string>? partChecksums = null;
         var splitPartSuffixFormat = config.SplitPartSuffixFormat;
 
-        // [Issue #210] For Surya OCR Server, select CUDA or CPU version based on GPU detection
-        if (config.Id == SuryaOcrServerComponentId && supportsCuda && !string.IsNullOrEmpty(config.CudaFileName))
+        // [Issue #292] For Unified AI Server, select CUDA or CPU version based on GPU detection
+        if (config.Id == UnifiedServerComponentId && supportsCuda && !string.IsNullOrEmpty(config.CudaFileName))
         {
             fileName = config.CudaFileName;
             expectedSize = config.CudaExpectedSizeBytes ?? config.ExpectedSizeBytes;
@@ -102,7 +103,7 @@ public class ComponentDownloadService : IComponentDownloader
                 "[Issue #210] GPU detected with CUDA support - selecting CUDA version: {FileName} ({SizeMB:N0} MB, {SplitParts} parts)",
                 fileName, expectedSize / (1024 * 1024), splitParts);
         }
-        else if (config.Id == SuryaOcrServerComponentId)
+        else if (config.Id == UnifiedServerComponentId)
         {
             _logger.LogInformation(
                 "[Issue #210] No CUDA support detected - selecting CPU version: {FileName} ({SizeMB:N0} MB)",

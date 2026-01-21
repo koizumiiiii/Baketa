@@ -71,38 +71,8 @@ jobs:
         }
       shell: pwsh
 
-    - name: Setup Python for PyInstaller
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-
-    - name: Build Translation Server with PyInstaller
-      run: |
-        Write-Host "📦 Building BaketaTranslationServer with PyInstaller..."
-
-        cd grpc_server
-
-        # Install dependencies
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-
-        # Build with PyInstaller
-        pyinstaller BaketaTranslationServer.spec --clean
-
-        # Verify build
-        $exePath = "dist\BaketaTranslationServer\BaketaTranslationServer.exe"
-        if (Test-Path $exePath) {
-          Write-Host "✅ BaketaTranslationServer.exe built successfully"
-          $size = [math]::Round((Get-Item $exePath).Length / 1MB, 2)
-          Write-Host "   Size: $size MB"
-        } else {
-          Write-Host "❌ BaketaTranslationServer.exe not found!"
-          exit 1
-        }
-
-        cd ..
-      shell: pwsh
+    # [Issue #292] BaketaTranslationServer is no longer built here
+    # It's replaced by BaketaUnifiedServer which is distributed via models-v2 release
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
@@ -151,30 +121,8 @@ jobs:
         }
       shell: pwsh
 
-    - name: Copy Translation Server to publish directory
-      run: |
-        $version = "${{ steps.version.outputs.version }}"
-        $publishDir = "./publish/Baketa-$version"
-        $serverSource = "grpc_server\dist\BaketaTranslationServer"
-        $serverDest = "$publishDir\grpc_server\BaketaTranslationServer"
-
-        Write-Host "📦 Copying BaketaTranslationServer to publish directory..."
-
-        # Create destination directory
-        New-Item -ItemType Directory -Path $serverDest -Force | Out-Null
-
-        # Copy entire PyInstaller output
-        Copy-Item "$serverSource\*" $serverDest -Recurse -Force
-
-        if (Test-Path "$serverDest\BaketaTranslationServer.exe") {
-          Write-Host "✅ Translation Server copied successfully"
-          $totalSize = (Get-ChildItem $serverDest -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
-          Write-Host "   Total size: $([math]::Round($totalSize, 2)) MB"
-        } else {
-          Write-Host "❌ Failed to copy Translation Server!"
-          exit 1
-        }
-      shell: pwsh
+    # [Issue #292] Translation Server is no longer copied here
+    # BaketaUnifiedServer is auto-downloaded from models-v2 on first run
 
     - name: Optimize package size
       run: |
@@ -348,20 +296,19 @@ jobs:
         1. Download ``Baketa-$version.zip``
         2. Extract to desired location
         3. Run ``Baketa.UI.exe``
-        4. On first run, required components will be downloaded automatically from [Model Assets v1](https://github.com/koizumiiiii/Baketa/releases/tag/models-v1)
+        4. On first run, required components will be downloaded automatically from [Model Assets v2](https://github.com/koizumiiiii/Baketa/releases/tag/models-v2)
 
-        ### Auto-Update (New in this release!)
+        ### Auto-Update
 
-        Baketa now supports automatic updates. When a new version is available:
+        Baketa supports automatic updates. When a new version is available:
         - You'll see an update notification on startup
         - Click to download and install the update automatically
         - The application will restart with the new version
 
-        ### Auto-Downloaded Components (from models-v1)
+        ### Auto-Downloaded Components (from models-v2)
 
         The following components are downloaded automatically on first run:
-        - **BaketaTranslationServer.zip** (~50MB) - NLLB-200 translation server
-        - **BaketaSuryaOcrServer.zip** (~174MB) - Surya OCR server
+        - **BaketaUnifiedServer.zip** (~300MB CPU / ~2.7GB CUDA) - Unified AI Server (OCR + Translation)
         - **surya-detection-onnx.zip** (~31MB) - Detection model (ONNX INT8)
         - **surya-recognition-quantized.zip** (~665MB) - Recognition model (Quantized PyTorch)
         - **nllb-200-distilled-600M-ct2.zip** (~1.1GB) - Translation model
@@ -370,7 +317,7 @@ jobs:
 
         - Windows 10/11 (x64)
         - Internet connection (for first-time setup and auto-updates)
-        - ~4GB disk space (including auto-downloaded components)
+        - ~3GB disk space (including auto-downloaded components)
         "@ | Out-File -FilePath "release_notes.md" -Encoding utf8
 
     - name: Create Release
