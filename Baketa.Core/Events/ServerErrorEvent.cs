@@ -53,6 +53,8 @@ public static class ServerErrorSources
     public const string TranslationClient = "TranslationClient";
     public const string OcrClient = "OcrClient";
     public const string CloudApi = "CloudApi";
+    /// <summary>Issue #292: OCR+翻訳統合サーバー</summary>
+    public const string UnifiedServer = "UnifiedServer";
 }
 
 /// <summary>

@@ -1,9 +1,11 @@
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.DI;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.Clients;
 using Baketa.Infrastructure.OCR.Engines;
 using Baketa.Infrastructure.OCR.Services;
+using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -14,13 +16,13 @@ namespace Baketa.Infrastructure.DI;
 /// Surya OCR エンジン DIモジュール
 /// Issue #189: Surya OCR gRPCクライアント統合
 /// PP-OCRv5で検出できなかったビジュアルノベルの日本語ダイアログを高精度検出
+///
+/// [Issue #292] 統合サーバーモード対応:
+/// - 統合サーバー有効時はSuryaServerManagerのサーバー起動をスキップ
+/// - GrpcOcrClientは統合サーバーのポートを使用
 /// </summary>
 public sealed class SuryaOcrModule : ServiceModuleBase
 {
-    /// <summary>
-    /// デフォルトのgRPCサーバーアドレス
-    /// </summary>
-    private const string DefaultServerAddress = "http://localhost:50052";
 
     public override void RegisterServices(IServiceCollection services)
     {
@@ -45,17 +47,42 @@ public sealed class SuryaOcrModule : ServiceModuleBase
             var logger = serviceProvider.GetRequiredService<ILogger<SuryaServerManager>>();
             // [Issue #264] IEventAggregatorを取得（存在しない場合はnull）
             var eventAggregator = serviceProvider.GetService<IEventAggregator>();
+            // [Issue #292] GrpcPortProviderを取得（統合サーバー待機用）
+            var grpcPortProvider = serviceProvider.GetService<GrpcPortProvider>();
+
+            // [Issue #292] 統合サーバー設定を取得
+            var unifiedSettings = serviceProvider.GetService<UnifiedServerSettings>();
+            var isUnifiedMode = unifiedSettings?.Enabled ?? false;
 
             // ポート番号をアドレスから抽出
-            var port = 50052; // デフォルト
-            if (!string.IsNullOrEmpty(settings.ServerAddress))
+            // [Issue #292] 統合サーバーモードでは統合ポートを使用
+            int port;
+            if (isUnifiedMode)
             {
-                var uri = new Uri(settings.ServerAddress);
-                port = uri.Port;
+                port = unifiedSettings?.Port ?? ServerPortConstants.UnifiedServerPort;
+                logger.LogInformation("[Issue #292] SuryaServerManager初期化: 統合サーバーモード - Port {Port}", port);
+            }
+            else
+            {
+                port = ServerPortConstants.OcrServerPort;
+                if (!string.IsNullOrEmpty(settings.ServerAddress))
+                {
+                    var uri = new Uri(settings.ServerAddress);
+                    port = uri.Port;
+                }
+                logger.LogInformation("[Issue #189] SuryaServerManager初期化: 分離サーバーモード - Port {Port}", port);
             }
 
-            Console.WriteLine($"🔧 [Issue #189] SuryaServerManager初期化: Port {port}");
-            return new SuryaServerManager(port, logger, eventAggregator);
+            var manager = new SuryaServerManager(port, logger, eventAggregator, grpcPortProvider, unifiedSettings);
+
+            // [Issue #292] 統合サーバーモードではサーバー起動をスキップするフラグを設定
+            if (isUnifiedMode)
+            {
+                manager.SetUnifiedMode(true);
+                logger.LogInformation("[Issue #292] SuryaServerManager: 統合サーバーモード有効 - サーバー起動スキップ");
+            }
+
+            return manager;
         });
     }
 
@@ -71,7 +98,7 @@ public sealed class SuryaOcrModule : ServiceModuleBase
                 settings = new SuryaOcrSettings
                 {
                     Enabled = true,
-                    ServerAddress = DefaultServerAddress
+                    ServerAddress = ServerPortConstants.OcrServerAddress
                 };
             }
 
@@ -86,11 +113,26 @@ public sealed class SuryaOcrModule : ServiceModuleBase
             var settings = serviceProvider.GetRequiredService<SuryaOcrSettings>();
             var logger = serviceProvider.GetRequiredService<ILogger<GrpcOcrClient>>();
 
-            var serverAddress = string.IsNullOrWhiteSpace(settings.ServerAddress)
-                ? DefaultServerAddress
-                : settings.ServerAddress;
+            // [Issue #292] 統合サーバー設定を取得
+            var unifiedSettings = serviceProvider.GetService<UnifiedServerSettings>();
+            var isUnifiedMode = unifiedSettings?.Enabled ?? false;
 
-            Console.WriteLine($"🔌 [Issue #189] GrpcOcrClient初期化: {serverAddress}");
+            string serverAddress;
+            if (isUnifiedMode)
+            {
+                // 統合サーバーモード: 統合ポートを使用
+                var port = unifiedSettings?.Port ?? ServerPortConstants.UnifiedServerPort;
+                serverAddress = $"http://127.0.0.1:{port}";
+                logger.LogInformation("[Issue #292] GrpcOcrClient初期化: 統合サーバーモード - {ServerAddress}", serverAddress);
+            }
+            else
+            {
+                // 分離サーバーモード: 既存の設定を使用
+                serverAddress = string.IsNullOrWhiteSpace(settings.ServerAddress)
+                    ? ServerPortConstants.OcrServerAddress
+                    : settings.ServerAddress;
+                logger.LogInformation("[Issue #189] GrpcOcrClient初期化: 分離サーバーモード - {ServerAddress}", serverAddress);
+            }
 
             return new GrpcOcrClient(serverAddress, logger);
         });
@@ -153,7 +195,7 @@ public sealed class SuryaOcrSettings
     /// <summary>
     /// gRPCサーバーアドレス
     /// </summary>
-    public string ServerAddress { get; set; } = "http://localhost:50052";
+    public string ServerAddress { get; set; } = ServerPortConstants.OcrServerAddress;
 
     /// <summary>
     /// デフォルト言語

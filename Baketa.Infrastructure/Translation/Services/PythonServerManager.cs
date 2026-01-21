@@ -397,11 +397,10 @@ public class PythonServerManager(
             // 開発者向け: pyenv-winでPython 3.10をインストールしている場合、minicondaより優先して使用
             // リリース版ではvendor/python/を使用するため、この分岐は開発環境でのみ有効
             // pyenvのPythonはCUDA DLL問題がない（正常なCUDAインストールを使用）
-            var pyenvPythonPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".pyenv", "pyenv-win", "versions", "3.10.9", "python.exe");
+            // [Gemini Review Fix] .python-versionから動的にバージョンを取得
+            var pyenvPythonPath = FindPyenvPythonExecutable();
 
-            if (File.Exists(pyenvPythonPath))
+            if (pyenvPythonPath != null && File.Exists(pyenvPythonPath))
             {
                 pythonExecutable = pyenvPythonPath;
                 logger.LogInformation("✅ pyenv Python使用（miniconda競合回避）: {PythonPath}", pythonExecutable);
@@ -1053,6 +1052,52 @@ public class PythonServerManager(
         }
 
         return directory?.FullName;
+    }
+
+    /// <summary>
+    /// pyenv Python実行ファイルを.python-versionから動的に探索
+    /// [Gemini Review Fix] バージョン番号のハードコードを排除
+    /// </summary>
+    /// <returns>pyenv Python実行ファイルのパス、見つからない場合はnull</returns>
+    private static string? FindPyenvPythonExecutable()
+    {
+        // .python-versionファイルからバージョンを読み取り
+        string? pythonVersion = null;
+
+        // プロジェクトルートの.python-versionを優先
+        var projectRoot = FindProjectRoot(AppContext.BaseDirectory);
+        if (projectRoot != null)
+        {
+            var projectVersionFile = Path.Combine(projectRoot, ".python-version");
+            if (File.Exists(projectVersionFile))
+            {
+                pythonVersion = File.ReadAllText(projectVersionFile).Trim();
+            }
+        }
+
+        // ユーザーホームの.python-versionをフォールバック
+        if (string.IsNullOrEmpty(pythonVersion))
+        {
+            var userVersionFile = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".python-version");
+            if (File.Exists(userVersionFile))
+            {
+                pythonVersion = File.ReadAllText(userVersionFile).Trim();
+            }
+        }
+
+        if (string.IsNullOrEmpty(pythonVersion))
+        {
+            return null;
+        }
+
+        // pyenvパスを構築
+        var pyenvPython = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".pyenv", "pyenv-win", "versions", pythonVersion, "python.exe");
+
+        return File.Exists(pyenvPython) ? pyenvPython : null;
     }
 
     /// <summary>

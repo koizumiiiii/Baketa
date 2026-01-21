@@ -104,6 +104,13 @@ public class ApplicationInitializer : ILoadingScreenInitializer
                 ResolveDependenciesAsync,
                 cancellationToken).ConfigureAwait(false);
 
+            // [Issue #292] 初期化完了シグナルをPhase 3の前に発行
+            // ServerManagerHostedServiceが統合サーバーを起動できるようにする
+            // これにより、OCR初期化時に統合サーバーが利用可能になる
+            // 注意: 元々はPhase 4の後に呼び出していたが、循環依存回避のため前倒し
+            _completionSignal?.SignalCompletion();
+            _logger.LogInformation("[Issue #292] 初期化完了シグナルを発行（Phase 3の前）- 統合サーバー起動を許可");
+
             // [Issue #213] Phase 3: OCRと翻訳エンジンを並列初期化
             // これらは独立しており、並列化することで初期化時間を短縮
             _logger.LogInformation("[Issue #213] Phase 3: OCRと翻訳エンジンを並列初期化");
@@ -136,10 +143,8 @@ public class ApplicationInitializer : ILoadingScreenInitializer
                 "アプリケーション初期化完了: {ElapsedMs}ms（並列化により最適化済み）",
                 _stopwatch.ElapsedMilliseconds);
 
-            // [Issue #198] 初期化完了を通知
-            // ServerManagerHostedServiceがこのシグナルを待ってから翻訳サーバーを起動する
-            _completionSignal?.SignalCompletion();
-            _logger.LogInformation("[Issue #198] 初期化完了シグナルを発行しました");
+            // [Issue #292] SignalCompletion()はPhase 2の後（Phase 3の前）に移動済み
+            // 循環依存回避のため、OCR初期化前に統合サーバーを起動可能にする必要がある
         }
         catch (Exception ex)
         {
