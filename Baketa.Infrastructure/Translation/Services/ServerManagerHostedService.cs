@@ -87,20 +87,25 @@ public sealed class ServerManagerHostedService : IHostedService
                         _logger.LogWarning("⚠️ [HOSTED_SERVICE] 初期化完了待機がタイムアウト（{Timeout}分）しました",
                             timeout.TotalMinutes);
 
-                        if (!File.Exists(_translationServerExePath))
+                        // [Issue #292] 統合サーバーモードの場合はexe確認をスキップ
+                        var isUnifiedModeForTimeout = _unifiedServerSettings?.Enabled ?? false;
+                        if (!isUnifiedModeForTimeout && !File.Exists(_translationServerExePath))
                         {
                             _logger.LogWarning("⚠️ [HOSTED_SERVICE] 翻訳サーバーexeが見つかりません - ダウンロード未完了の可能性があります: {Path}", _translationServerExePath);
                             _logger.LogInformation("ℹ️ [HOSTED_SERVICE] サーバー起動をスキップします。ダウンロード完了後にアプリを再起動してください。");
                             return; // サーバー起動をスキップ
                         }
 
-                        _logger.LogInformation("✅ [HOSTED_SERVICE] 翻訳サーバーexe確認済み - サーバー起動を続行します");
+                        _logger.LogInformation("✅ [HOSTED_SERVICE] {Mode} - サーバー起動を続行します",
+                            isUnifiedModeForTimeout ? "統合サーバーモード" : "翻訳サーバーexe確認済み");
                     }
                 }
 
                 // 🔧 [Issue #228] サーバー起動前に必須コンポーネントの存在確認
                 // ダウンロード失敗や中断後もアプリが続行した場合の早期検出
-                if (!File.Exists(_translationServerExePath))
+                // [Issue #292] 統合サーバーモードの場合はBaketaUnifiedServerを確認
+                var isUnifiedMode = _unifiedServerSettings?.Enabled ?? false;
+                if (!isUnifiedMode && !File.Exists(_translationServerExePath))
                 {
                     _logger.LogWarning("⚠️ [HOSTED_SERVICE] 翻訳サーバーexeが見つかりません: {Path}", _translationServerExePath);
                     _logger.LogWarning("⚠️ [HOSTED_SERVICE] コンポーネントのダウンロードが完了していない可能性があります");
@@ -108,6 +113,10 @@ public sealed class ServerManagerHostedService : IHostedService
                     _portProvider.SetException(new InvalidOperationException(
                         "翻訳サーバーが見つかりません。コンポーネントのダウンロードが完了していない可能性があります。アプリを再起動してください。"));
                     return;
+                }
+                else if (isUnifiedMode)
+                {
+                    _logger.LogInformation("✅ [HOSTED_SERVICE] 統合サーバーモード - BaketaTranslationServer.exeの確認をスキップ");
                 }
 
                 _logger.LogInformation("🔄 [HOSTED_SERVICE] Python翻訳サーバー起動開始");
@@ -118,9 +127,7 @@ public sealed class ServerManagerHostedService : IHostedService
 
                 var serverInfo = await _serverManager.StartServerAsync(defaultLanguagePair).ConfigureAwait(false);
 
-                // [Issue #292] 統合サーバーモードの判定
-                var isUnifiedMode = _unifiedServerSettings?.Enabled ?? false;
-
+                // [Issue #292] 統合サーバーモードの判定 (isUnifiedModeは104行目で既に定義済み)
                 _logger.LogInformation("✅ [HOSTED_SERVICE] Python翻訳サーバー起動完了: Port {Port}, UnifiedMode={UnifiedMode}",
                     serverInfo.Port, isUnifiedMode);
 
