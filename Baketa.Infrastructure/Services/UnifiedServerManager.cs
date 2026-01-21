@@ -89,11 +89,12 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
             // 孤立プロセスの強制終了
             await KillOrphanedProcessAsync().ConfigureAwait(false);
 
-            var (executablePath, arguments, workingDir, isExeMode) = ResolveServerExecutable();
+            // 実行ファイルを解決（初回ダウンロード中は待機）
+            var (executablePath, arguments, workingDir, isExeMode) = await ResolveServerExecutableWithRetryAsync(cancellationToken).ConfigureAwait(false);
 
             if (string.IsNullOrEmpty(executablePath))
             {
-                _logger.LogError("❌ [UnifiedServer] サーバー実行ファイルが見つかりません");
+                _logger.LogError("❌ [UnifiedServer] サーバー実行ファイルが見つかりません（待機タイムアウト）");
                 return false;
             }
 
@@ -321,6 +322,85 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
             _logger.LogDebug("[UnifiedServer] 準備完了メッセージ検出: {Line}", line);
             tcs.TrySetResult(true);
         }
+    }
+
+    /// <summary>
+    /// サーバー実行ファイルを解決（初回ダウンロード中はリトライ待機）
+    /// [Issue #292] 初回ダウンロード時のタイミング問題対策
+    /// [Gemini Review] 例外処理・CancellationTokenチェック追加
+    /// </summary>
+    private async Task<(string? executablePath, string arguments, string workingDir, bool isExeMode)> ResolveServerExecutableWithRetryAsync(CancellationToken cancellationToken)
+    {
+        // まず即座に解決を試みる
+        var result = ResolveServerExecutable();
+        if (!string.IsNullOrEmpty(result.executablePath))
+        {
+            return result;
+        }
+
+        // exe版のパスを取得（待機対象）
+        var exePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaUnifiedServer", "BaketaUnifiedServer.exe");
+        var exeDir = Path.GetDirectoryName(exePath)!;
+        var parentDir = Path.GetDirectoryName(exeDir);
+
+        // [Gemini Review] ダウンロード中の判定を堅牢に（try-catch追加）
+        var isDownloadInProgress = false;
+        try
+        {
+            if (parentDir != null && Directory.Exists(parentDir))
+            {
+                // BaketaUnifiedServer関連のファイルを具体的に検索
+                isDownloadInProgress = Directory.Exists(exeDir) ||
+                    Directory.GetFiles(parentDir, "BaketaUnifiedServer*.zip", SearchOption.TopDirectoryOnly).Length > 0 ||
+                    Directory.GetFiles(parentDir, "*.tmp", SearchOption.TopDirectoryOnly).Length > 0;
+            }
+        }
+        catch (Exception ex) when (ex is DirectoryNotFoundException or UnauthorizedAccessException or IOException)
+        {
+            _logger.LogWarning(ex, "[UnifiedServer] ダウンロード状況の確認中に例外が発生しました。待機せずに続行します。");
+            return (null, "", "", false);
+        }
+
+        if (!isDownloadInProgress)
+        {
+            _logger.LogDebug("[UnifiedServer] ダウンロード中の兆候なし - 即座にnullを返す");
+            return result;
+        }
+
+        // 初回ダウンロード待機（最大10分、5秒間隔でポーリング）
+        const int maxWaitMinutes = 10;
+        const int pollIntervalSeconds = 5;
+        var maxAttempts = (maxWaitMinutes * 60) / pollIntervalSeconds;
+
+        _logger.LogInformation("⏳ [UnifiedServer] 初回ダウンロード待機開始（最大{MaxWait}分）", maxWaitMinutes);
+        _logger.LogInformation("  待機対象: {Path}", exePath);
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            // [Gemini Review] ループ先頭でキャンセルチェック
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await Task.Delay(TimeSpan.FromSeconds(pollIntervalSeconds), cancellationToken).ConfigureAwait(false);
+
+            result = ResolveServerExecutable();
+            if (!string.IsNullOrEmpty(result.executablePath))
+            {
+                _logger.LogInformation("✅ [UnifiedServer] 実行ファイル検出（{Attempt}回目のチェック、{Elapsed}秒後）",
+                    attempt, attempt * pollIntervalSeconds);
+                return result;
+            }
+
+            // 進捗ログ（30秒ごと）
+            if (attempt % 6 == 0)
+            {
+                var elapsed = attempt * pollIntervalSeconds;
+                _logger.LogInformation("⏳ [UnifiedServer] ダウンロード待機中... {Elapsed}秒経過（最大{MaxWait}分）",
+                    elapsed, maxWaitMinutes);
+            }
+        }
+
+        _logger.LogWarning("⚠️ [UnifiedServer] ダウンロード待機タイムアウト（{MaxWait}分）", maxWaitMinutes);
+        return (null, "", "", false);
     }
 
     /// <summary>
