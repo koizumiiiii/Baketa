@@ -4,7 +4,11 @@ using System.Text;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Events;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Services;
+using Baketa.Infrastructure.Translation.Services;
+using Baketa.Ocr.V1;
+using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.OCR.Services;
@@ -19,12 +23,20 @@ public sealed class SuryaServerManager : IOcrServerManager
 {
     private readonly ILogger<SuryaServerManager> _logger;
     private readonly IEventAggregator? _eventAggregator;
+    private readonly GrpcPortProvider? _grpcPortProvider; // [Issue #292] 統合サーバーポート待機用
+    private readonly UnifiedServerSettings? _unifiedServerSettings; // [Issue #292] 統合サーバー設定
     private readonly int _port;
     private Process? _serverProcess;
     private ProcessJobObject? _jobObject;
     private bool _isReady;
     private bool _disposed;
     private readonly SemaphoreSlim _startLock = new(1, 1);
+
+    /// <summary>
+    /// [Issue #292] 統合サーバーモードフラグ
+    /// trueの場合、StartServerAsyncはサーバー起動をスキップし、統合サーバーの準備完了を待機
+    /// </summary>
+    private bool _isUnifiedMode;
 
     /// <summary>
     /// サーバーが準備完了かどうか
@@ -36,11 +48,23 @@ public sealed class SuryaServerManager : IOcrServerManager
     /// </summary>
     public int Port => _port;
 
-    public SuryaServerManager(int port, ILogger<SuryaServerManager> logger, IEventAggregator? eventAggregator = null)
+    /// <summary>
+    /// [Issue #292] 統合サーバーモードかどうか
+    /// </summary>
+    public bool IsUnifiedMode => _isUnifiedMode;
+
+    public SuryaServerManager(
+        int port,
+        ILogger<SuryaServerManager> logger,
+        IEventAggregator? eventAggregator = null,
+        GrpcPortProvider? grpcPortProvider = null,
+        UnifiedServerSettings? unifiedServerSettings = null)
     {
         _port = port;
         _logger = logger;
         _eventAggregator = eventAggregator;
+        _grpcPortProvider = grpcPortProvider;
+        _unifiedServerSettings = unifiedServerSettings;
 
         // Issue #189: Job Object初期化 - ゾンビプロセス対策
         _jobObject = new ProcessJobObject(logger);
@@ -48,11 +72,58 @@ public sealed class SuryaServerManager : IOcrServerManager
     }
 
     /// <summary>
+    /// [Issue #292] 統合サーバーモードを設定
+    /// </summary>
+    /// <param name="isUnifiedMode">統合サーバーモードかどうか</param>
+    /// <remarks>
+    /// [Fix] _isReady = true は StartServerAsync() 内で統合サーバーの準備完了を確認後に設定
+    /// 即座に設定するとサーバー起動前に IsReady=true となりエラーが発生する
+    /// </remarks>
+    public void SetUnifiedMode(bool isUnifiedMode)
+    {
+        _isUnifiedMode = isUnifiedMode;
+        if (isUnifiedMode)
+        {
+            // [Fix] _isReady は StartServerAsync() で統合サーバーの準備完了後に設定
+            // ここでは _isReady = true を設定しない（統合サーバーがまだ起動していない可能性があるため）
+            _logger.LogInformation("[Issue #292] [Surya] 統合サーバーモード設定 - StartServerAsync()で準備完了を待機します, Port {Port}", _port);
+        }
+    }
+
+    /// <summary>
     /// Suryaサーバーを起動し、準備完了まで待機
     /// Issue #197: モデルダウンロード完了待機ロジック追加
+    /// [Issue #292] 統合サーバーモードではサーバー起動をスキップ
     /// </summary>
     public async Task<bool> StartServerAsync(CancellationToken cancellationToken = default)
     {
+        // [Issue #292] 統合サーバーモードではサーバー起動をスキップし、gRPCで直接サーバーの準備完了を確認
+        // [Fix] GrpcPortProvider.GetPortAsync()は使用しない（循環依存によるデッドロック回避）
+        // ApplicationInitializer → SuryaOcrEngine → SuryaServerManager → GetPortAsync() → SetPort() →
+        // ServerManagerHostedService → SignalCompletion() → ApplicationInitializer の循環を防止
+        if (_isUnifiedMode)
+        {
+            var timeoutSeconds = _unifiedServerSettings?.StartupTimeoutSeconds ?? 300;
+            _logger.LogInformation("🔄 [Issue #292] [Surya] 統合サーバーモード - gRPCポーリングで準備完了を待機中... Port {Port}, Timeout {Timeout}秒",
+                _port, timeoutSeconds);
+
+            // gRPCで直接サーバーの準備完了をポーリング（循環依存回避）
+            var isReady = await WaitForUnifiedServerReadyAsync(_port, timeoutSeconds, cancellationToken).ConfigureAwait(false);
+
+            if (isReady)
+            {
+                _logger.LogInformation("✅ [Issue #292] [Surya] 統合サーバー準備完了: Port {Port}", _port);
+                _isReady = true;
+                return true;
+            }
+            else
+            {
+                _logger.LogError("❌ [Issue #292] [Surya] 統合サーバー待機タイムアウト（{Timeout}秒）- サーバーが起動していません", timeoutSeconds);
+                _isReady = false;
+                return false;
+            }
+        }
+
         await _startLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -625,6 +696,82 @@ public sealed class SuryaServerManager : IOcrServerManager
             context,
             _eventAggregator,
             _logger);
+    }
+
+    /// <summary>
+    /// [Issue #292] 統合サーバーの準備完了をgRPCで直接ポーリング
+    /// GrpcPortProviderを使用せず、循環依存によるデッドロックを回避
+    /// </summary>
+    /// <param name="port">統合サーバーのポート番号</param>
+    /// <param name="timeoutSeconds">タイムアウト秒数</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>サーバーが準備完了の場合true</returns>
+    private async Task<bool> WaitForUnifiedServerReadyAsync(int port, int timeoutSeconds, CancellationToken cancellationToken)
+    {
+        var serverAddress = $"http://127.0.0.1:{port}";
+        var stopwatch = Stopwatch.StartNew();
+        var retryInterval = TimeSpan.FromSeconds(2);
+        var timeout = TimeSpan.FromSeconds(timeoutSeconds);
+
+        _logger.LogDebug("[Issue #292] [Surya] 統合サーバー準備完了ポーリング開始: {Address}", serverAddress);
+
+        while (stopwatch.Elapsed < timeout && !cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var channel = GrpcChannel.ForAddress(serverAddress, new GrpcChannelOptions
+                {
+                    HttpHandler = new System.Net.Http.SocketsHttpHandler
+                    {
+                        ConnectTimeout = TimeSpan.FromSeconds(5)
+                    }
+                });
+
+                var client = new OcrService.OcrServiceClient(channel);
+
+                // IsReady RPCを呼び出し
+                var response = await client.IsReadyAsync(
+                    new OcrIsReadyRequest(),
+                    deadline: DateTime.UtcNow.AddSeconds(10),
+                    cancellationToken: cancellationToken
+                ).ConfigureAwait(false);
+
+                if (response.IsReady)
+                {
+                    _logger.LogDebug("[Issue #292] [Surya] 統合サーバー準備完了確認: {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+                    return true;
+                }
+
+                _logger.LogDebug("[Issue #292] [Surya] 統合サーバー未準備: Status={Status}, 再試行中...", response.Status);
+            }
+            catch (Grpc.Core.RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.Unavailable)
+            {
+                // サーバーが起動していない - 再試行
+                _logger.LogDebug("[Issue #292] [Surya] 統合サーバー未起動 ({ElapsedSec}秒経過) - 再試行中...",
+                    stopwatch.Elapsed.TotalSeconds.ToString("F1"));
+            }
+            catch (Grpc.Core.RpcException ex)
+            {
+                _logger.LogWarning("[Issue #292] [Surya] gRPCエラー: {StatusCode} - 再試行中...", ex.StatusCode);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "[Issue #292] [Surya] 統合サーバー接続エラー - 再試行中...");
+            }
+
+            // 再試行間隔
+            try
+            {
+                await Task.Delay(retryInterval, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        _logger.LogWarning("[Issue #292] [Surya] 統合サーバー準備完了待機タイムアウト: {ElapsedSec}秒", stopwatch.Elapsed.TotalSeconds);
+        return false;
     }
 
     public async ValueTask DisposeAsync()

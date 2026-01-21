@@ -10,6 +10,7 @@ using Baketa.Core.Abstractions.Patterns;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Services;
+using Baketa.Core.Settings;
 using Baketa.Core.Translation.Models;
 using TranslationSettings = Baketa.Core.Settings.TranslationSettings;
 using TranslationEngine = Baketa.Core.Settings.TranslationEngine;
@@ -22,6 +23,7 @@ namespace Baketa.Infrastructure.Translation.Services;
 /// Python翻訳サーバーのヘルスチェック・自動再起動サービス
 /// Geminiフィードバック反映: C#側でPythonプロセスを監視・管理
 /// 🔧 [GEMINI_REVIEW] IAsyncDisposableパターン適用によるデッドロック防止
+/// [Issue #292] 統合サーバーモード対応: GrpcPortProviderから動的にポートを取得
 /// </summary>
 public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 {
@@ -30,6 +32,8 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private readonly IPythonServerManager? _pythonServerManager; // 🔧 [DELEGATE_RESTART] サーバー再起動委譲用
     private readonly ICircuitBreaker<TranslationResponse>? _circuitBreaker; // Phase2: サーキットブレーカー連携
     private readonly IInitializationCompletionSignal? _initializationSignal; // 初期化完了待機用
+    private readonly GrpcPortProvider? _grpcPortProvider; // [Issue #292] 動的ポート取得用
+    private readonly UnifiedServerSettings? _unifiedServerSettings; // [Issue #292] 統合サーバー設定
     private System.Threading.Timer? _healthCheckTimer;
     private readonly SemaphoreSlim _restartLock = new(1, 1);
 
@@ -37,7 +41,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private bool _isRestartInProgress = false;
     private bool _disposed = false;
     private Process? _managedServerProcess;
-    private int _currentServerPort = 50051; // gRPC標準ポート（PythonServerManagerと統一）
+    private int _currentServerPort = ServerPortConstants.TranslationServerPort; // gRPC標準ポート（PythonServerManagerと統一）、統合モード時は動的に上書き
 
     // 🔧 [PROCESS_DUPLICATION_PREVENTION] プロセス重複防止システム
     private static readonly string PidFilePath = Path.Combine(Path.GetTempPath(), "baketa_translation_server.pid");
@@ -57,23 +61,27 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         ISettingsService settingsService,
         IPythonServerManager? pythonServerManager = null,
         ICircuitBreaker<TranslationResponse>? circuitBreaker = null,
-        IInitializationCompletionSignal? initializationSignal = null)
+        IInitializationCompletionSignal? initializationSignal = null,
+        GrpcPortProvider? grpcPortProvider = null,
+        UnifiedServerSettings? unifiedServerSettings = null)
     {
-        Console.WriteLine("🔍 [HEALTH_MONITOR] コンストラクタ開始");
-
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _pythonServerManager = pythonServerManager; // 🔧 [DELEGATE_RESTART] サーバー再起動委譲用
         _circuitBreaker = circuitBreaker; // Phase2: サーキットブレーカー連携（オプション）
         _initializationSignal = initializationSignal; // 初期化完了待機用
+        _grpcPortProvider = grpcPortProvider; // [Issue #292] 動的ポート取得用
+        _unifiedServerSettings = unifiedServerSettings; // [Issue #292] 統合サーバー設定
 
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] settingsService パラメータ: {settingsService?.GetType().Name ?? "null"}");
-        Console.WriteLine($"🔧 [DELEGATE_RESTART] PythonServerManager連携: {(_pythonServerManager != null ? "有効" : "無効")}");
-        Console.WriteLine($"🔧 [PHASE2] サーキットブレーカー連携: {(_circuitBreaker != null ? "有効" : "無効")}");
-        Console.WriteLine($"🔧 [Issue198] 初期化シグナル連携: {(_initializationSignal != null ? "有効" : "無効")}");
+        _logger.LogDebug("[HEALTH_MONITOR] コンストラクタ開始 - settingsService: {SettingsServiceType}", settingsService?.GetType().Name ?? "null");
+        _logger.LogDebug("[DELEGATE_RESTART] PythonServerManager連携: {Status}", _pythonServerManager != null ? "有効" : "無効");
+        _logger.LogDebug("[PHASE2] サーキットブレーカー連携: {Status}", _circuitBreaker != null ? "有効" : "無効");
+        _logger.LogDebug("[Issue198] 初期化シグナル連携: {Status}", _initializationSignal != null ? "有効" : "無効");
+        _logger.LogDebug("[Issue292] GrpcPortProvider連携: {Status}", _grpcPortProvider != null ? "有効" : "無効");
+        _logger.LogDebug("[Issue292] 統合サーバーモード: {Status}", _unifiedServerSettings?.Enabled ?? false ? "有効" : "無効");
 
         // 設定の遅延取得（StartAsync時に実際に取得）
-        Console.WriteLine("✅ [HEALTH_MONITOR] コンストラクタ完了 - 設定は StartAsync で取得");
+        _logger.LogDebug("[HEALTH_MONITOR] コンストラクタ完了 - 設定は StartAsync で取得");
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -113,9 +121,8 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 ? TimeSpan.FromMinutes(10)  // 初回: 10分（~2.4GBダウンロード対応）
                 : TimeSpan.FromMinutes(5);   // 通常: 5分
 
-            _logger.LogInformation("⏳ [HEALTH_MONITOR] 初期化完了シグナルを待機中... (Mode: {Mode}, Timeout: {Timeout}分)",
+            _logger.LogInformation("[HEALTH_MONITOR] 初期化完了シグナルを待機中... (Mode: {Mode}, Timeout: {Timeout}分)",
                 isFirstTimeSetup ? "初回セットアップ" : "通常起動", timeout.TotalMinutes);
-            Console.WriteLine($"⏳ [HEALTH_MONITOR] 初期化完了シグナルを待機中... (Mode: {(isFirstTimeSetup ? "初回" : "通常")}, Timeout: {timeout.TotalMinutes}分)");
 
             try
             {
@@ -124,15 +131,13 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
                 await _initializationSignal.WaitForCompletionAsync(linkedCts.Token).ConfigureAwait(false);
 
-                _logger.LogInformation("✅ [HEALTH_MONITOR] 初期化完了シグナル受信 - ヘルスチェック開始");
-                Console.WriteLine("✅ [HEALTH_MONITOR] 初期化完了シグナル受信");
+                _logger.LogInformation("[HEALTH_MONITOR] 初期化完了シグナル受信 - ヘルスチェック開始");
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 // タイムアウト時は警告ログを出力して続行
-                _logger.LogWarning("⚠️ [HEALTH_MONITOR] 初期化完了待機がタイムアウト（{Timeout}分）- ヘルスチェックを開始します",
+                _logger.LogWarning("[HEALTH_MONITOR] 初期化完了待機がタイムアウト（{Timeout}分）- ヘルスチェックを開始します",
                     timeout.TotalMinutes);
-                Console.WriteLine($"⚠️ [HEALTH_MONITOR] 初期化完了待機タイムアウト（{timeout.TotalMinutes}分）- 続行");
             }
         }
 
@@ -140,19 +145,19 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         var settings = await _settingsService.GetAsync<TranslationSettings>().ConfigureAwait(false);
         if (settings == null)
         {
-            _logger.LogWarning("⚠️ TranslationSettings が取得できません - デフォルト設定で動作");
-            Console.WriteLine("⚠️ [HEALTH_MONITOR] TranslationSettings が取得できません");
+            _logger.LogWarning("[HEALTH_MONITOR] TranslationSettings が取得できません - デフォルト設定で動作");
             return;
         }
 
         // 設定をキャッシュ
         _cachedSettings = settings;
 
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] 取得した設定: EnableServerAutoRestart={settings.EnableServerAutoRestart}");
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckIntervalMs: {settings.HealthCheckIntervalMs}ms");
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] HealthCheckTimeoutMs: {settings.HealthCheckTimeoutMs}ms");
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] MaxConsecutiveFailures: {settings.MaxConsecutiveFailures}");
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] ServerStartupTimeoutMs: {settings.ServerStartupTimeoutMs}ms");
+        // [Issue #292] 統合サーバーモード時はGrpcPortProviderからポートを取得
+        await UpdatePortFromProviderAsync().ConfigureAwait(false);
+
+        _logger.LogDebug("[HEALTH_MONITOR] 取得した設定: EnableServerAutoRestart={EnableServerAutoRestart}, HealthCheckIntervalMs={HealthCheckIntervalMs}, HealthCheckTimeoutMs={HealthCheckTimeoutMs}, MaxConsecutiveFailures={MaxConsecutiveFailures}, ServerStartupTimeoutMs={ServerStartupTimeoutMs}, CurrentPort={CurrentPort}",
+            settings.EnableServerAutoRestart, settings.HealthCheckIntervalMs, settings.HealthCheckTimeoutMs,
+            settings.MaxConsecutiveFailures, settings.ServerStartupTimeoutMs, _currentServerPort);
 
         if (settings.EnableServerAutoRestart)
         {
@@ -160,13 +165,12 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
             var interval = TimeSpan.FromMilliseconds(settings.HealthCheckIntervalMs);
             _healthCheckTimer = new System.Threading.Timer(PerformHealthCheckCallback, null, interval, interval);
 
-            _logger.LogInformation("🔍 ヘルスチェック開始 - 間隔: {IntervalMs}ms", settings.HealthCheckIntervalMs);
-            Console.WriteLine("✅ [HEALTH_MONITOR] ヘルスチェック有効 - 自動監視開始");
+            _logger.LogInformation("[HEALTH_MONITOR] ヘルスチェック開始 - 間隔: {IntervalMs}ms, Port: {Port}",
+                settings.HealthCheckIntervalMs, _currentServerPort);
         }
         else
         {
-            _logger.LogWarning("⚠️ サーバー自動再起動は無効化されています");
-            Console.WriteLine("⚠️ [HEALTH_MONITOR] サーバー自動再起動は無効化されています");
+            _logger.LogWarning("[HEALTH_MONITOR] サーバー自動再起動は無効化されています");
         }
     }
 
@@ -199,11 +203,12 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     /// </summary>
     private async void PerformHealthCheckCallback(object? state)
     {
-        Console.WriteLine($"🔍 [HEALTH_MONITOR] ヘルスチェック実行開始 - {DateTime.Now:HH:mm:ss.fff}");
+        _logger.LogTrace("[HEALTH_MONITOR] ヘルスチェック実行開始 - {Time}", DateTime.Now.ToString("HH:mm:ss.fff"));
 
         if (_disposed || _cachedSettings == null || !_cachedSettings.EnableServerAutoRestart)
         {
-            Console.WriteLine($"⚠️ [HEALTH_MONITOR] スキップ - disposed:{_disposed}, enabled:{_cachedSettings?.EnableServerAutoRestart ?? false}");
+            _logger.LogDebug("[HEALTH_MONITOR] スキップ - Disposed={Disposed}, Enabled={Enabled}",
+                _disposed, _cachedSettings?.EnableServerAutoRestart ?? false);
             return;
         }
 
@@ -213,16 +218,16 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
             Interlocked.Increment(ref _totalHealthChecks);
 
-            Console.WriteLine($"🔍 [HEALTH_MONITOR] ヘルスチェック結果: {(isHealthy ? "✅ 正常" : "❌ 異常")} - Port: {_currentServerPort}");
+            _logger.LogTrace("[HEALTH_MONITOR] ヘルスチェック結果: {Result} - Port: {Port}",
+                isHealthy ? "正常" : "異常", _currentServerPort);
 
             if (isHealthy)
             {
                 // 成功時はカウンターリセット
                 if (_consecutiveFailures > 0)
                 {
-                    _logger.LogInformation("✅ サーバー復旧確認 - 連続失敗回数リセット ({PrevFailures} → 0)",
+                    _logger.LogInformation("[HEALTH_MONITOR] サーバー復旧確認 - 連続失敗回数リセット ({PrevFailures} → 0)",
                         _consecutiveFailures);
-                    Console.WriteLine($"✅ [HEALTH_MONITOR] サーバー復旧確認 - 連続失敗回数リセット ({_consecutiveFailures} → 0)");
                 }
 
                 _consecutiveFailures = 0;
@@ -241,22 +246,20 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 _consecutiveFailures++;
                 Interlocked.Increment(ref _totalFailures);
 
-                _logger.LogWarning("🚨 サーバーヘルスチェック失敗 ({Current}/{Max}) - Port: {Port}",
+                _logger.LogWarning("[HEALTH_MONITOR] サーバーヘルスチェック失敗 ({Current}/{Max}) - Port: {Port}",
                     _consecutiveFailures, _cachedSettings.MaxConsecutiveFailures, _currentServerPort);
-                Console.WriteLine($"🚨 [HEALTH_MONITOR] サーバーヘルスチェック失敗 ({_consecutiveFailures}/{_cachedSettings.MaxConsecutiveFailures}) - Port: {_currentServerPort}");
 
                 // 最大失敗回数に達したら再起動
                 if (_consecutiveFailures >= _cachedSettings.MaxConsecutiveFailures)
                 {
-                    Console.WriteLine($"🔄 [HEALTH_MONITOR] 最大失敗回数到達 - 自動再起動開始");
+                    _logger.LogWarning("[HEALTH_MONITOR] 最大失敗回数到達 - 自動再起動開始");
                     _ = Task.Run(async () => await HandleServerFailureAsync());
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ ヘルスチェック実行エラー");
-            Console.WriteLine($"❌ [HEALTH_MONITOR] ヘルスチェック実行エラー: {ex.Message}");
+            _logger.LogError(ex, "[HEALTH_MONITOR] ヘルスチェック実行エラー");
         }
     }
 
@@ -678,7 +681,7 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 }
 
                 // NLLB-200用のポート設定（PythonServerManagerと統一）
-                _currentServerPort = 50051;
+                _currentServerPort = ServerPortConstants.TranslationServerPort;
 
                 _logger.LogInformation("🎯 [NLLB-200] NLLB-200高品質翻訳サーバーを起動: {ScriptPath} Port:{Port}", serverScriptPath, _currentServerPort);
             }
@@ -881,6 +884,60 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// [Issue #292] GrpcPortProviderから動的にポートを取得して更新
+    /// 統合サーバーモード時は50053、分離モード時は50051を使用
+    /// </summary>
+    private async Task UpdatePortFromProviderAsync()
+    {
+        var isUnifiedMode = _unifiedServerSettings?.Enabled ?? false;
+
+        if (_grpcPortProvider != null)
+        {
+            // GrpcPortProviderからポートを取得
+            if (_grpcPortProvider.TryGetPort(out var port))
+            {
+                _currentServerPort = port;
+                _logger.LogInformation("[Issue #292] GrpcPortProviderからポート取得: Port={Port}, UnifiedMode={UnifiedMode}",
+                    port, isUnifiedMode);
+            }
+            else
+            {
+                // ポートがまだ設定されていない場合は少し待って再試行
+                _logger.LogDebug("[Issue #292] ポートが未設定、ServerManagerHostedService完了を待機中...");
+
+                try
+                {
+                    // 最大10秒間待機（サーバー起動待ち）
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    var dynamicPort = await _grpcPortProvider.GetPortAsync().WaitAsync(cts.Token).ConfigureAwait(false);
+                    _currentServerPort = dynamicPort;
+                    _logger.LogInformation("[Issue #292] 非同期でポート取得: Port={Port}, UnifiedMode={UnifiedMode}",
+                        dynamicPort, isUnifiedMode);
+                }
+                catch (OperationCanceledException)
+                {
+                    // タイムアウト時はデフォルトポートを使用
+                    _currentServerPort = isUnifiedMode
+                        ? (_unifiedServerSettings?.Port ?? ServerPortConstants.UnifiedServerPort)
+                        : ServerPortConstants.TranslationServerPort;
+                    _logger.LogWarning("[Issue #292] ポート取得タイムアウト、デフォルト使用: Port={Port}", _currentServerPort);
+                }
+            }
+        }
+        else if (isUnifiedMode)
+        {
+            // GrpcPortProviderがない場合でも統合モードならデフォルトの統合ポートを使用
+            _currentServerPort = _unifiedServerSettings?.Port ?? ServerPortConstants.UnifiedServerPort;
+            _logger.LogInformation("[Issue #292] 統合サーバーモード、デフォルトポート使用: Port={Port}", _currentServerPort);
+        }
+        else
+        {
+            // 分離モードでGrpcPortProviderがない場合はデフォルト50051
+            _logger.LogDebug("[Issue #292] 分離サーバーモード、デフォルトポート使用: {Port}", _currentServerPort);
+        }
     }
 
     /// <summary>

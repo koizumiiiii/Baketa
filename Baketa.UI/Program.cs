@@ -1396,6 +1396,22 @@ internal sealed class Program
             var unifiedServerModule = new Baketa.Infrastructure.DI.UnifiedServerModule();
             unifiedServerModule.RegisterServices(services);
             Console.WriteLine("✅ UnifiedServerModule登録完了");
+
+            // [Issue #292 FIX] 設定を読み込み、有効な場合にアダプターを有効化
+            var configurationForUnifiedServer = services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+            var unifiedServerEnabled = configurationForUnifiedServer.GetValue<bool>("UnifiedServer:Enabled", false);
+            Console.WriteLine($"🔧 [Issue #292] UnifiedServer設定: Enabled={unifiedServerEnabled}");
+
+            if (unifiedServerEnabled)
+            {
+                Console.WriteLine("🔄 [Issue #292] 統合サーバーアダプター有効化開始...");
+                Baketa.Infrastructure.DI.UnifiedServerModule.EnableUnifiedServerAdapters(services);
+                Console.WriteLine("✅ [Issue #292] 統合サーバーアダプター有効化完了 - IPythonServerManager/IOcrServerManager上書き");
+            }
+            else
+            {
+                Console.WriteLine("ℹ️ [Issue #292] 統合サーバー無効 - 既存の分離サーバー(50051/50052)を使用");
+            }
         }
         catch (Exception ex)
         {

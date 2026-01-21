@@ -547,11 +547,27 @@ public class InfrastructureModule : ServiceModuleBase
 
         // ✅ [UltraThink Fix] GrpcTranslationClient - appsettings.json固定ポート優先使用
         // appsettings.jsonに設定がある場合は即座に使用し、DIブロックを回避
+        // [Issue #292] 統合サーバーモードでは統合ポートを優先使用
         services.AddSingleton<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>(provider =>
         {
             Console.WriteLine("🚨🚨🚨 [ULTRA_DEBUG] GrpcTranslationClientファクトリー実行開始！");
             var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>>();
             Console.WriteLine("🚨🚨🚨 [ULTRA_DEBUG] ILogger取得完了");
+
+            // [Issue #292] 統合サーバー設定を取得
+            var unifiedSettings = provider.GetService<UnifiedServerSettings>();
+            var isUnifiedMode = unifiedSettings?.Enabled ?? false;
+            logger.LogDebug("[Issue #292] 統合サーバーモード: {IsUnifiedMode}", isUnifiedMode);
+
+            // [Issue #292] 統合サーバーモードでは統合ポートを使用
+            if (isUnifiedMode)
+            {
+                var unifiedPort = unifiedSettings?.Port ?? 50053;
+                var unifiedAddress = $"http://127.0.0.1:{unifiedPort}";
+                logger.LogInformation("✅ [Issue #292] 統合サーバーモード: {Address}", unifiedAddress);
+                return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(unifiedAddress, logger);
+            }
+
             var translationSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranslationSettings>>().Value;
             Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] TranslationSettings取得完了 - GrpcServerAddress: '{translationSettings.GrpcServerAddress}'");
 

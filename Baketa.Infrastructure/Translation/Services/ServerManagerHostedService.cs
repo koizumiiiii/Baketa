@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,7 @@ namespace Baketa.Infrastructure.Translation.Services;
 /// IHostedService + Providerパターンの実装
 /// 最高優先度でアプリケーション起動時に実行され、GrpcTranslationClientの初期化前にサーバーを準備する
 /// [Issue #198] IInitializationCompletionSignalを待機してから起動（ディスクI/O競合防止）
+/// [Issue #292] 統合サーバーモード対応: ポート設定時にisUnifiedModeフラグを渡す
 /// </summary>
 public sealed class ServerManagerHostedService : IHostedService
 {
@@ -19,6 +21,7 @@ public sealed class ServerManagerHostedService : IHostedService
     private readonly GrpcPortProvider _portProvider;
     private readonly ILogger<ServerManagerHostedService> _logger;
     private readonly IInitializationCompletionSignal? _initializationSignal;
+    private readonly UnifiedServerSettings? _unifiedServerSettings;
 
     /// <summary>
     /// [Gemini Review] 翻訳サーバーexeのパス - 複数箇所で使用するため定数化
@@ -29,12 +32,14 @@ public sealed class ServerManagerHostedService : IHostedService
         IPythonServerManager serverManager,
         GrpcPortProvider portProvider,
         ILogger<ServerManagerHostedService> logger,
-        IInitializationCompletionSignal? initializationSignal = null)
+        IInitializationCompletionSignal? initializationSignal = null,
+        UnifiedServerSettings? unifiedServerSettings = null)
     {
         _serverManager = serverManager;
         _portProvider = portProvider;
         _logger = logger;
         _initializationSignal = initializationSignal;
+        _unifiedServerSettings = unifiedServerSettings;
 
         // [Gemini Review] パスをコンストラクタで一度だけ生成（DRY原則）
         _translationServerExePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaTranslationServer", "BaketaTranslationServer.exe");
@@ -113,12 +118,18 @@ public sealed class ServerManagerHostedService : IHostedService
 
                 var serverInfo = await _serverManager.StartServerAsync(defaultLanguagePair).ConfigureAwait(false);
 
-                _logger.LogInformation("✅ [HOSTED_SERVICE] Python翻訳サーバー起動完了: Port {Port}", serverInfo.Port);
+                // [Issue #292] 統合サーバーモードの判定
+                var isUnifiedMode = _unifiedServerSettings?.Enabled ?? false;
+
+                _logger.LogInformation("✅ [HOSTED_SERVICE] Python翻訳サーバー起動完了: Port {Port}, UnifiedMode={UnifiedMode}",
+                    serverInfo.Port, isUnifiedMode);
 
                 // GrpcPortProviderにポート番号を設定（動的ポート管理用）
-                _portProvider.SetPort(serverInfo.Port);
+                // [Issue #292] 統合サーバーモードフラグも渡す
+                _portProvider.SetPort(serverInfo.Port, isUnifiedMode);
 
-                _logger.LogInformation("🎯 [HOSTED_SERVICE] GrpcPortProvider設定完了: Port {Port}", serverInfo.Port);
+                _logger.LogInformation("🎯 [HOSTED_SERVICE] GrpcPortProvider設定完了: Port {Port}, UnifiedMode={UnifiedMode}",
+                    serverInfo.Port, isUnifiedMode);
 
                 // ヘルスチェックタイマー初期化
                 _serverManager.InitializeHealthCheckTimer();
