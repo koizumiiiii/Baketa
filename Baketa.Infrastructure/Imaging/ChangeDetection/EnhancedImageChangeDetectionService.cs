@@ -28,7 +28,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     private readonly IImageChangeMetricsService _metricsService;
     private readonly ImageChangeDetectionSettings _settings;
     private readonly LoggingSettings _loggingSettings;
-    private readonly IRoiThresholdProvider? _roiThresholdProvider; // [Issue #293] ROI動的閾値
+    private readonly IRoiThresholdProvider _roiThresholdProvider; // [Issue #293] ROI動的閾値
 
     // スレッドセーフキャッシュ（コンテキスト別）
     private readonly ConcurrentDictionary<string, QuickHashCache> _quickHashCache = new();
@@ -62,12 +62,12 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         IPerceptualHashService perceptualHashService,
         IImageChangeMetricsService metricsService,
         IConfiguration configuration,
-        IRoiThresholdProvider? roiThresholdProvider = null) // [Issue #293] ROI動的閾値（オプショナル）
+        IRoiThresholdProvider roiThresholdProvider) // [Issue #293] ROI動的閾値（必須に変更）
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _perceptualHashService = perceptualHashService ?? throw new ArgumentNullException(nameof(perceptualHashService));
         _metricsService = metricsService ?? throw new ArgumentNullException(nameof(metricsService));
-        _roiThresholdProvider = roiThresholdProvider; // [Issue #293]
+        _roiThresholdProvider = roiThresholdProvider ?? throw new ArgumentNullException(nameof(roiThresholdProvider)); // [Issue #293]
 
         // 設定外部化対応: ImageChangeDetection設定セクションから読み込み
         _settings = InitializeImageChangeDetectionSettings(configuration);
@@ -99,7 +99,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         }
 
         // [Issue #293] ROI動的閾値設定ログ
-        if (_settings.EnableRoiBasedThreshold && _roiThresholdProvider != null)
+        if (_settings.EnableRoiBasedThreshold)
         {
             _logger.LogInformation("🔧 [Issue #293] ROI動的閾値有効: ProviderEnabled={ProviderEnabled}",
                 _roiThresholdProvider.IsEnabled);
@@ -1589,7 +1589,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         var baseThreshold = _settings.GetThresholdForRow(row, totalRows);
 
         // [Issue #293] ROI動的閾値が無効な場合はベース閾値を返す
-        if (!_settings.EnableRoiBasedThreshold || _roiThresholdProvider == null || !_roiThresholdProvider.IsEnabled)
+        if (!_settings.EnableRoiBasedThreshold || !_roiThresholdProvider.IsEnabled)
         {
             return baseThreshold;
         }
