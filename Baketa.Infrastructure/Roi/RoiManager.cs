@@ -317,8 +317,15 @@ public sealed class RoiManager : IRoiManager, IDisposable
             return;
         }
 
-        // [Issue #293] プロファイルがない場合は自動作成（デフォルトプロファイル）
-        EnsureDefaultProfileExists();
+        // プロファイルがない場合は記録しない（ReportTextDetectionsAsyncを使用すべき）
+        lock (_lock)
+        {
+            if (_currentProfile == null)
+            {
+                _logger.LogDebug("[Issue #293] ReportTextDetections: プロファイルがないためスキップ（ReportTextDetectionsAsyncを使用してください）");
+                return;
+            }
+        }
 
         // 除外ゾーン内の検出を除外
         var filteredDetections = detections
@@ -334,46 +341,45 @@ public sealed class RoiManager : IRoiManager, IDisposable
         }
     }
 
-    /// <summary>
-    /// [Issue #293] デフォルトプロファイルが存在しない場合に作成
-    /// </summary>
-    private void EnsureDefaultProfileExists()
+    /// <inheritdoc />
+    public async Task ReportTextDetectionsAsync(
+        IEnumerable<(NormalizedRect bounds, float confidence)> detections,
+        IntPtr windowHandle,
+        string windowTitle,
+        string executablePath,
+        CancellationToken cancellationToken = default)
     {
-        lock (_lock)
+        if (!_settings.Enabled || !_settings.AutoLearningEnabled)
         {
-            if (_currentProfile != null)
-            {
-                return;
-            }
+            _logger.LogDebug(
+                "[Issue #293] ReportTextDetectionsAsync skipped: Enabled={Enabled}, AutoLearningEnabled={AutoLearning}",
+                _settings.Enabled, _settings.AutoLearningEnabled);
+            return;
         }
 
-        // デフォルトプロファイルを作成
-        var defaultProfileId = "default";
-        var defaultProfile = RoiProfile.Create(
-            defaultProfileId,
-            "Default Profile",
-            string.Empty,
-            string.Empty);
+        // ウィンドウ情報からプロファイルを取得または作成
+        var profile = await GetOrCreateProfileAsync(executablePath, windowTitle, cancellationToken).ConfigureAwait(false);
 
-        SetCurrentProfile(defaultProfile, RoiProfileChangeType.Created);
-        _logger.LogInformation("[Issue #293] デフォルトROIプロファイルを作成しました");
+        _logger.LogInformation(
+            "[Issue #293] ROI学習: Profile={ProfileName} (Id={ProfileId}), Window='{WindowTitle}', Exe={ExePath}",
+            profile.Name, profile.Id, windowTitle, executablePath);
 
-        // 非同期で保存（fire-and-forget）
-        if (_profileService != null)
+        // 除外ゾーン内の検出を除外
+        var detectionsList = detections.ToList();
+        var filteredDetections = detectionsList
+            .Where(d => !IsInExclusionZone(d.bounds.CenterX, d.bounds.CenterY))
+            .ToList();
+
+        if (filteredDetections.Count > 0)
         {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await _profileService.SaveProfileAsync(defaultProfile).ConfigureAwait(false);
-                    _logger.LogDebug("[Issue #293] デフォルトROIプロファイルを保存しました");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "[Issue #293] デフォルトROIプロファイルの保存に失敗");
-                }
-            });
+            _learningEngine.RecordDetections(filteredDetections);
+            _logger.LogInformation(
+                "[Issue #293] ROI学習記録完了: {Count}個の検出をヒートマップに記録 (Profile={ProfileName})",
+                filteredDetections.Count, profile.Name);
         }
+
+        // 学習後にプロファイルを保存（学習データを永続化）
+        await SaveCurrentProfileAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

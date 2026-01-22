@@ -101,6 +101,22 @@ public interface IRoiManager
     void ReportTextDetections(IEnumerable<(NormalizedRect bounds, float confidence)> detections);
 
     /// <summary>
+    /// [Issue #293] ウィンドウ情報付きで複数のテキスト検出結果を一括報告（学習用）
+    /// </summary>
+    /// <param name="detections">検出結果のコレクション</param>
+    /// <param name="windowHandle">対象ウィンドウのハンドル</param>
+    /// <param name="windowTitle">ウィンドウタイトル</param>
+    /// <param name="executablePath">実行ファイルのパス</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>Task</returns>
+    Task ReportTextDetectionsAsync(
+        IEnumerable<(NormalizedRect bounds, float confidence)> detections,
+        IntPtr windowHandle,
+        string windowTitle,
+        string executablePath,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 指定した座標が除外ゾーン内かどうかを判定
     /// </summary>
     /// <param name="normalizedX">正規化X座標（0.0-1.0）</param>

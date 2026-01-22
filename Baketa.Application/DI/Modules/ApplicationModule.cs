@@ -214,6 +214,9 @@ public sealed class ApplicationModule : ServiceModuleBase
                 // [Issue #293] ROI学習マネージャー
                 var roiManager = provider.GetService<Baketa.Core.Abstractions.Roi.IRoiManager>();
                 Console.WriteLine($"✅ [Issue #293] IRoiManager取得: {(roiManager != null ? $"成功 (Enabled={roiManager.IsEnabled})" : "null (オプショナル)")}");
+                // [Issue #293] ウィンドウ情報取得用
+                var windowManager = provider.GetService<Baketa.Core.Abstractions.Platform.IWindowManager>();
+                Console.WriteLine($"✅ [Issue #293] IWindowManager取得: {(windowManager != null ? "成功" : "null (オプショナル)")}");
                 var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                     processingFacade,
                     configurationFacade,
@@ -227,6 +230,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     cloudTranslationAvailabilityService, // [Issue #290] Cloud翻訳可用性チェック
                     gatekeeperService, // [Issue #293] Gatekeeper
                     roiManager, // [Issue #293] ROI学習マネージャー
+                    windowManager, // [Issue #293] ウィンドウ情報取得用
                     logger);
                 Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join＋Gatekeeper統合済み");
                 return instance;

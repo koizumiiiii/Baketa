@@ -29,6 +29,7 @@ using Baketa.Core.Abstractions.License; // [Issue #290] ILicenseManager
 using Baketa.Core.License.Models; // [Issue #290] FeatureType
 using Baketa.Core.Abstractions.Roi; // [Issue #293] ITranslationGatekeeperService
 using Baketa.Core.Models.Roi; // [Issue #293] NormalizedRect
+using IWindowManager = Baketa.Core.Abstractions.Platform.IWindowManager; // [Issue #293] ウィンドウ情報取得用
 using Baketa.Core.Utilities;
 using System.Diagnostics; // [Issue #290] Fork-Join計測用
 // NOTE: [PP-OCRv5削除] BatchProcessing参照削除
@@ -61,6 +62,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService; // [Issue #290] Cloud翻訳可用性チェック
     private readonly ITranslationGatekeeperService? _gatekeeperService; // [Issue #293] Gatekeeper
     private readonly IRoiManager? _roiManager; // [Issue #293] ROI学習マネージャー
+    private readonly IWindowManager? _windowManager; // [Issue #293] ウィンドウ情報取得用
     private bool _disposed;
 
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
@@ -80,6 +82,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null, // [Issue #290] Cloud翻訳可用性チェック
         ITranslationGatekeeperService? gatekeeperService = null, // [Issue #293] Gatekeeper
         IRoiManager? roiManager = null, // [Issue #293] ROI学習マネージャー
+        IWindowManager? windowManager = null, // [Issue #293] ウィンドウ情報取得用
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -95,6 +98,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
         _gatekeeperService = gatekeeperService; // [Issue #293] Gatekeeper
         _roiManager = roiManager; // [Issue #293] ROI学習マネージャー
+        _windowManager = windowManager; // [Issue #293] ウィンドウ情報取得用
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -505,6 +509,95 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // TimedChunkAggregatorが集約完了時にAggregatedChunksReadyEventを発行
             // AggregatedChunksReadyEventHandlerで翻訳・オーバーレイ表示を実行
 
+            // [Issue #293] ROI学習: テキスト検出位置をヒートマップに記録
+            // 🔥 [Issue #293 FIX] CombinedBoundsは元ウィンドウサイズ基準（OcrExecutionStageStrategyでスケーリング済み）
+            // そのため、正規化にはOriginalWidth/OriginalHeight（元ウィンドウサイズ）を使用する必要がある
+            // image.Width/Heightはキャプチャ画像サイズ（例: 1280x720）であり、座標系が異なる
+            var (normalizeWidth, normalizeHeight) = image switch
+            {
+                IWindowsImage windowsImage => (windowsImage.OriginalWidth, windowsImage.OriginalHeight),
+                WindowsImageAdapter adapter => (adapter.OriginalWidth, adapter.OriginalHeight),
+                _ => (image.Width, image.Height) // フォールバック: リサイズなしの場合
+            };
+
+            // [Gemini Feedback] ゼロ除算防止のガード
+            if (_roiManager != null && textChunks.Count > 0 && normalizeWidth > 0 && normalizeHeight > 0)
+            {
+                _logger?.LogInformation(
+                    "[Issue #293] ROI学習チェック: RoiManager.IsEnabled={IsEnabled}, ChunkCount={ChunkCount}, NormalizeSize={Width}x{Height} (CaptureSize={CaptureWidth}x{CaptureHeight})",
+                    _roiManager.IsEnabled, textChunks.Count, normalizeWidth, normalizeHeight, image.Width, image.Height);
+
+                if (_roiManager.IsEnabled)
+                {
+                    try
+                    {
+                        var detections = textChunks
+                            .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
+                            .Select(chunk => (
+                                bounds: new NormalizedRect
+                                {
+                                    // 🔥 [Issue #293 FIX] 元ウィンドウサイズで正規化（CombinedBoundsと同じ座標系）
+                                    X = (float)chunk.CombinedBounds.X / normalizeWidth,
+                                    Y = (float)chunk.CombinedBounds.Y / normalizeHeight,
+                                    Width = (float)chunk.CombinedBounds.Width / normalizeWidth,
+                                    Height = (float)chunk.CombinedBounds.Height / normalizeHeight
+                                },
+                                confidence: chunk.TextResults.FirstOrDefault()?.Confidence ?? 0.8f
+                            ))
+                            .ToList();
+
+                        if (detections.Count > 0)
+                        {
+                            // [Issue #293 FIX] 正規化座標の検証ログ
+                            var firstDetection = detections[0];
+                            _logger?.LogInformation(
+                                "[Issue #293 FIX] 正規化座標確認: First region at ({X:F3}, {Y:F3}), 範囲内={InRange}",
+                                firstDetection.bounds.X, firstDetection.bounds.Y,
+                                firstDetection.bounds.X >= 0 && firstDetection.bounds.X <= 1 &&
+                                firstDetection.bounds.Y >= 0 && firstDetection.bounds.Y <= 1);
+
+                            // [Issue #293] ウィンドウ情報を取得してプロファイルに紐づけ
+                            var windowTitle = _windowManager?.GetWindowTitle(windowHandle) ?? string.Empty;
+                            var executablePath = GetExecutablePathFromWindow(windowHandle);
+
+                            _logger?.LogDebug(
+                                "[Issue #293] ROI学習ウィンドウ情報: Handle=0x{Handle:X}, Title='{Title}', ExePath='{ExePath}'",
+                                windowHandle.ToInt64(), windowTitle, executablePath);
+
+                            // 非同期でROI学習を実行（fire-and-forget、エラーは内部でログ）
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await _roiManager.ReportTextDetectionsAsync(
+                                        detections,
+                                        windowHandle,
+                                        windowTitle,
+                                        executablePath,
+                                        cancellationToken).ConfigureAwait(false);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger?.LogWarning(ex, "[Issue #293] ROI学習非同期処理でエラー");
+                                }
+                            });
+
+                            _logger?.LogInformation(
+                                "[Issue #293] ROI学習: {Count}個のテキスト領域を記録開始 (Window='{Title}')",
+                                detections.Count, windowTitle);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "[Issue #293] ROI学習記録でエラーが発生（処理は継続）");
+                    }
+                }
+            }
+            else if (_roiManager == null)
+            {
+                _logger?.LogDebug("[Issue #293] IRoiManager is null - ROI learning skipped");
+            }
+
             // Phase 12.2完全移行により、この先の処理（2回目翻訳 + オーバーレイ表示）は不要
             // TimedChunkAggregatorがAggregatedChunksReadyEventを発行 → AggregatedChunksReadyEventHandlerで翻訳 + オーバーレイ表示
             return;
@@ -567,56 +660,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     // この段階ではログ出力のみで警告
                     _logger?.LogDebug($"⚠️ このテキストは画面外のため表示されません: '{chunk.CombinedText}'");
                 }
-            }
-
-            // [Issue #293] ROI学習: テキスト検出位置をヒートマップに記録
-            if (_roiManager != null && textChunks.Count > 0 && screenWidth > 0 && screenHeight > 0)
-            {
-                _logger?.LogInformation(
-                    "[Issue #293] ROI学習チェック: RoiManager.IsEnabled={IsEnabled}, ChunkCount={ChunkCount}",
-                    _roiManager.IsEnabled, textChunks.Count);
-
-                if (_roiManager.IsEnabled)
-                {
-                    try
-                    {
-                        var detections = textChunks
-                            .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
-                            .Select(chunk => (
-                                bounds: new NormalizedRect
-                                {
-                                    X = (float)chunk.CombinedBounds.X / screenWidth,
-                                    Y = (float)chunk.CombinedBounds.Y / screenHeight,
-                                    Width = (float)chunk.CombinedBounds.Width / screenWidth,
-                                    Height = (float)chunk.CombinedBounds.Height / screenHeight
-                                },
-                                confidence: chunk.TextResults.FirstOrDefault()?.Confidence ?? 0.8f
-                            ))
-                            .ToList();
-
-                        if (detections.Count > 0)
-                        {
-                            _roiManager.ReportTextDetections(detections);
-                            _logger?.LogInformation(
-                                "[Issue #293] ROI学習: {Count}個のテキスト領域を記録 (ScreenSize={Width}x{Height})",
-                                detections.Count, screenWidth, screenHeight);
-
-                            // デバッグ用: 最初の検出領域の座標を出力
-                            var first = detections.First();
-                            _logger?.LogDebug(
-                                "[Issue #293] ROI学習詳細: First region at ({X:F3},{Y:F3}) size ({W:F3}x{H:F3}) confidence={C:F2}",
-                                first.bounds.X, first.bounds.Y, first.bounds.Width, first.bounds.Height, first.confidence);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogWarning(ex, "[Issue #293] ROI学習記録でエラーが発生（処理は継続）");
-                    }
-                }
-            }
-            else if (_roiManager == null)
-            {
-                _logger?.LogDebug("[Issue #293] IRoiManager is null - ROI learning skipped");
             }
 
             if (textChunks.Count == 0)
@@ -1935,6 +1978,58 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
+
+    /// <summary>
+    /// [Issue #293] ウィンドウハンドルから実行ファイルパスを取得
+    /// </summary>
+    /// <param name="windowHandle">ウィンドウハンドル</param>
+    /// <returns>実行ファイルパス、取得失敗時は空文字列</returns>
+    private string GetExecutablePathFromWindow(IntPtr windowHandle)
+    {
+        if (windowHandle == IntPtr.Zero)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            // Win32 API: GetWindowThreadProcessId でプロセスIDを取得
+            _ = GetWindowThreadProcessId(windowHandle, out uint processId);
+            if (processId == 0)
+            {
+                _logger?.LogDebug("[Issue #293] GetWindowThreadProcessId failed for handle 0x{Handle:X}", windowHandle.ToInt64());
+                return string.Empty;
+            }
+
+            // プロセスIDからプロセス情報を取得
+            using var process = System.Diagnostics.Process.GetProcessById((int)processId);
+            var exePath = process.MainModule?.FileName ?? string.Empty;
+
+            _logger?.LogDebug("[Issue #293] GetExecutablePathFromWindow: PID={ProcessId}, ExePath='{ExePath}'", processId, exePath);
+            return exePath;
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            // アクセス権限不足など
+            _logger?.LogDebug(ex, "[Issue #293] GetExecutablePathFromWindow: Win32 error for handle 0x{Handle:X}", windowHandle.ToInt64());
+            return string.Empty;
+        }
+        catch (InvalidOperationException ex)
+        {
+            // プロセスが既に終了している
+            _logger?.LogDebug(ex, "[Issue #293] GetExecutablePathFromWindow: Process already exited for handle 0x{Handle:X}", windowHandle.ToInt64());
+            return string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "[Issue #293] GetExecutablePathFromWindow: Unexpected error for handle 0x{Handle:X}", windowHandle.ToInt64());
+            return string.Empty;
+        }
+    }
+
+    // [Issue #293] Win32 API declaration for GetWindowThreadProcessId
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     public void Dispose()
     {
