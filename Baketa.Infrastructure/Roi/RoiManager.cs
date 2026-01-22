@@ -238,6 +238,10 @@ public sealed class RoiManager : IRoiManager, IDisposable
         }
     }
 
+    // [Issue #293] 動的閾値ログのサンプリングカウンター
+    private int _thresholdLogCounter = 0;
+    private const int ThresholdLogSampleRate = 16; // 16セルに1回ログ出力
+
     /// <inheritdoc />
     public float GetThresholdAt(float normalizedX, float normalizedY, float defaultThreshold)
     {
@@ -250,10 +254,12 @@ public sealed class RoiManager : IRoiManager, IDisposable
 
         // ヒートマップ値に基づいて閾値を調整
         float multiplier;
+        string zone;
         if (heatmapValue >= _settings.HighConfidenceThreshold)
         {
             // 高ヒートマップ領域: より厳しい閾値
             multiplier = _settings.HighHeatmapThresholdMultiplier;
+            zone = "HIGH";
         }
         else if (heatmapValue >= _settings.MinConfidenceForRegion)
         {
@@ -262,14 +268,28 @@ public sealed class RoiManager : IRoiManager, IDisposable
                        (_settings.HighConfidenceThreshold - _settings.MinConfidenceForRegion);
             multiplier = _settings.LowHeatmapThresholdMultiplier +
                         ratio * (_settings.HighHeatmapThresholdMultiplier - _settings.LowHeatmapThresholdMultiplier);
+            zone = "MID";
         }
         else
         {
             // 低ヒートマップ領域: より緩い閾値
             multiplier = _settings.LowHeatmapThresholdMultiplier;
+            zone = "LOW";
         }
 
-        return Math.Clamp(defaultThreshold * multiplier, 0.0f, 1.0f);
+        var adjustedThreshold = Math.Clamp(defaultThreshold * multiplier, 0.0f, 1.0f);
+
+        // [Issue #293] サンプリングログ: 16セルに1回、または閾値が調整された場合にログ出力
+        _thresholdLogCounter++;
+        if (_thresholdLogCounter >= ThresholdLogSampleRate)
+        {
+            _thresholdLogCounter = 0;
+            _logger.LogDebug(
+                "[Issue #293] 動的閾値: Pos=({X:F2},{Y:F2}), Heatmap={Heatmap:F2}, Zone={Zone}, Threshold={Default:F3}→{Adjusted:F3} (×{Mult:F2})",
+                normalizedX, normalizedY, heatmapValue, zone, defaultThreshold, adjustedThreshold, multiplier);
+        }
+
+        return adjustedThreshold;
     }
 
     /// <inheritdoc />
