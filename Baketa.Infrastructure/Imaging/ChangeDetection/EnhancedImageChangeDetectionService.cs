@@ -134,7 +134,11 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     // [Issue #229] テキスト安定化待機設定
                     EnableTextStabilization = configuration.GetValue<bool>("ImageChangeDetection:EnableTextStabilization", true),
                     TextStabilizationDelayMs = configuration.GetValue<int>("ImageChangeDetection:TextStabilizationDelayMs", 500),
-                    MaxStabilizationWaitMs = configuration.GetValue<int>("ImageChangeDetection:MaxStabilizationWaitMs", 3000)
+                    MaxStabilizationWaitMs = configuration.GetValue<int>("ImageChangeDetection:MaxStabilizationWaitMs", 3000),
+                    // [Issue #293] ROI動的閾値設定
+                    EnableRoiBasedThreshold = configuration.GetValue<bool>("ImageChangeDetection:EnableRoiBasedThreshold", false),
+                    RoiHighPriorityThresholdMultiplier = configuration.GetValue<float>("ImageChangeDetection:RoiHighPriorityThresholdMultiplier", 1.02f),
+                    RoiLowPriorityThresholdMultiplier = configuration.GetValue<float>("ImageChangeDetection:RoiLowPriorityThresholdMultiplier", 0.98f)
                 };
             }
         }
