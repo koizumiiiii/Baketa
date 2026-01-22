@@ -191,6 +191,18 @@ public sealed class GameProfileSettings
     public GameProfileStatistics Statistics { get; set; } = new();
 
     /// <summary>
+    /// [Issue #293] ROIプロファイルID
+    /// </summary>
+    /// <remarks>
+    /// このゲームプロファイルに関連付けられたROIプロファイルのID。
+    /// ROI学習データの永続化と復元に使用されます。
+    /// 通常は実行ファイルパスのハッシュ値から自動生成されます。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "GameProfile", "ROIプロファイルID",
+        Description = "ROI学習データの永続化に使用するプロファイルID")]
+    public string? RoiProfileId { get; set; }
+
+    /// <summary>
     /// 特定の設定がオーバーライドされているかを確認
     /// </summary>
     /// <param name="settingType">設定の型</param>

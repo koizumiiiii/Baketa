@@ -14,6 +14,7 @@ using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Roi;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.Diagnostics;
@@ -58,6 +59,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // Issue #290: Fork-Join並列実行用（OCR || Cloud AI翻訳）
     private readonly IFallbackOrchestrator? _fallbackOrchestrator;
     private readonly ILicenseManager? _licenseManager;
+
+    // [Issue #293] Gatekeeper: テキスト変化検出による翻訳最適化
+    private readonly ITranslationGatekeeperService? _gatekeeperService;
 
     // 状態管理
     private volatile bool _isAutomaticTranslationActive;
@@ -124,6 +128,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="translationDictionaryService">翻訳辞書サービス（オプショナル）</param>
     /// <param name="fallbackOrchestrator">フォールバックオーケストレーター（Issue #290: Fork-Join用）</param>
     /// <param name="licenseManager">ライセンスマネージャー（Issue #290: Cloud AI利用可否判定用）</param>
+    /// <param name="gatekeeperService">翻訳Gatekeeperサービス（Issue #293: テキスト変化検出用）</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
@@ -136,6 +141,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ITranslationDictionaryService? translationDictionaryService = null,
         IFallbackOrchestrator? fallbackOrchestrator = null,
         ILicenseManager? licenseManager = null,
+        ITranslationGatekeeperService? gatekeeperService = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -154,6 +160,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _translationDictionaryService = translationDictionaryService;
         _fallbackOrchestrator = fallbackOrchestrator;
         _licenseManager = licenseManager;
+        _gatekeeperService = gatekeeperService;
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -2049,7 +2056,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
             catch { }
 
-            string translatedText;
+            string translatedText = string.Empty;
             if (!string.IsNullOrWhiteSpace(originalText))
             {
                 try
@@ -2115,9 +2122,61 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // 🤖 NLLB-200 AI翻訳エンジンを使用
                     var translationStartTime = DateTime.UtcNow;
 
-                    // すべての言語ペアでNLLB-200を使用
-                    translatedText = await TranslateWithNLLBEngineAsync(originalText, sourceCode, targetCode);
-                    _logger?.LogDebug($"🤖 NLLB-200翻訳結果: '{translatedText}'");
+                    // [Issue #293] Gatekeeper: テキスト変化チェック
+                    GatekeeperDecision? gatekeeperDecision = null;
+                    var gatekeeperSourceId = _targetWindowHandle.HasValue
+                        ? $"window_{_targetWindowHandle.Value:X}"
+                        : "default_source";
+                    var translationSkippedByGatekeeper = false;
+
+                    _logger?.LogInformation(
+                        "[Issue #293] Gatekeeper check: ServiceExists={ServiceExists}, IsEnabled={IsEnabled}, SourceId={SourceId}",
+                        _gatekeeperService != null, _gatekeeperService?.IsEnabled, gatekeeperSourceId);
+
+                    if (_gatekeeperService?.IsEnabled == true)
+                    {
+                        gatekeeperDecision = _gatekeeperService.ShouldTranslate(gatekeeperSourceId, originalText);
+
+                        if (!gatekeeperDecision.ShouldTranslate)
+                        {
+                            _logger?.LogInformation(
+                                "[Issue #293] Gatekeeper denied translation: Reason={Reason}, ChangeRatio={Ratio:F3}",
+                                gatekeeperDecision.Reason, gatekeeperDecision.ChangeRatio);
+
+                            // 翻訳をスキップし、元のテキストを返す（または空の翻訳結果）
+                            translatedText = string.Empty;
+                            translationSkippedByGatekeeper = true;
+
+                            // Gatekeeper統計を更新（翻訳スキップ）
+                            _gatekeeperService.ReportTranslationResult(gatekeeperDecision, wasSuccessful: true, tokensUsed: 0);
+                        }
+                        else
+                        {
+                            _logger?.LogInformation(
+                                "[Issue #293] Gatekeeper allowed translation: Reason={Reason}, ChangeRatio={Ratio:F3}",
+                                gatekeeperDecision.Reason, gatekeeperDecision.ChangeRatio);
+                        }
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("[Issue #293] Gatekeeper is disabled or not injected");
+                    }
+
+                    // Gatekeeperが翻訳を許可した場合のみ実行
+                    if (!translationSkippedByGatekeeper)
+                    {
+                        // すべての言語ペアでNLLB-200を使用
+                        translatedText = await TranslateWithNLLBEngineAsync(originalText, sourceCode, targetCode);
+                        _logger?.LogDebug($"🤖 NLLB-200翻訳結果: '{translatedText}'");
+
+                        // [Issue #293] Gatekeeper: 翻訳結果を報告
+                        if (_gatekeeperService?.IsEnabled == true && gatekeeperDecision != null)
+                        {
+                            var wasSuccessful = !string.IsNullOrEmpty(translatedText) && translatedText != originalText;
+                            // NLLB-200はローカルなのでトークン使用量は0（クラウドAIの場合は実際のトークン数を渡す）
+                            _gatekeeperService.ReportTranslationResult(gatekeeperDecision, wasSuccessful, tokensUsed: 0);
+                        }
+                    }
 
                     var translationElapsed = DateTime.UtcNow - translationStartTime;
 

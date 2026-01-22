@@ -27,6 +27,8 @@ using Baketa.Core.Translation.Abstractions; // [Issue #290] IFallbackOrchestrato
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Abstractions.License; // [Issue #290] ILicenseManager
 using Baketa.Core.License.Models; // [Issue #290] FeatureType
+using Baketa.Core.Abstractions.Roi; // [Issue #293] ITranslationGatekeeperService
+using Baketa.Core.Models.Roi; // [Issue #293] NormalizedRect
 using Baketa.Core.Utilities;
 using System.Diagnostics; // [Issue #290] Fork-Join計測用
 // NOTE: [PP-OCRv5削除] BatchProcessing参照削除
@@ -57,6 +59,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly IFallbackOrchestrator? _fallbackOrchestrator;
     private readonly ILicenseManager? _licenseManager;
     private readonly ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService; // [Issue #290] Cloud翻訳可用性チェック
+    private readonly ITranslationGatekeeperService? _gatekeeperService; // [Issue #293] Gatekeeper
+    private readonly IRoiManager? _roiManager; // [Issue #293] ROI学習マネージャー
     private bool _disposed;
 
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
@@ -74,6 +78,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         IFallbackOrchestrator? fallbackOrchestrator = null,
         ILicenseManager? licenseManager = null,
         ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null, // [Issue #290] Cloud翻訳可用性チェック
+        ITranslationGatekeeperService? gatekeeperService = null, // [Issue #293] Gatekeeper
+        IRoiManager? roiManager = null, // [Issue #293] ROI学習マネージャー
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -87,6 +93,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _fallbackOrchestrator = fallbackOrchestrator;
         _licenseManager = licenseManager;
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
+        _gatekeeperService = gatekeeperService; // [Issue #293] Gatekeeper
+        _roiManager = roiManager; // [Issue #293] ROI学習マネージャー
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -561,6 +569,56 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 }
             }
 
+            // [Issue #293] ROI学習: テキスト検出位置をヒートマップに記録
+            if (_roiManager != null && textChunks.Count > 0 && screenWidth > 0 && screenHeight > 0)
+            {
+                _logger?.LogInformation(
+                    "[Issue #293] ROI学習チェック: RoiManager.IsEnabled={IsEnabled}, ChunkCount={ChunkCount}",
+                    _roiManager.IsEnabled, textChunks.Count);
+
+                if (_roiManager.IsEnabled)
+                {
+                    try
+                    {
+                        var detections = textChunks
+                            .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
+                            .Select(chunk => (
+                                bounds: new NormalizedRect
+                                {
+                                    X = (float)chunk.CombinedBounds.X / screenWidth,
+                                    Y = (float)chunk.CombinedBounds.Y / screenHeight,
+                                    Width = (float)chunk.CombinedBounds.Width / screenWidth,
+                                    Height = (float)chunk.CombinedBounds.Height / screenHeight
+                                },
+                                confidence: chunk.TextResults.FirstOrDefault()?.Confidence ?? 0.8f
+                            ))
+                            .ToList();
+
+                        if (detections.Count > 0)
+                        {
+                            _roiManager.ReportTextDetections(detections);
+                            _logger?.LogInformation(
+                                "[Issue #293] ROI学習: {Count}個のテキスト領域を記録 (ScreenSize={Width}x{Height})",
+                                detections.Count, screenWidth, screenHeight);
+
+                            // デバッグ用: 最初の検出領域の座標を出力
+                            var first = detections.First();
+                            _logger?.LogDebug(
+                                "[Issue #293] ROI学習詳細: First region at ({X:F3},{Y:F3}) size ({W:F3}x{H:F3}) confidence={C:F2}",
+                                first.bounds.X, first.bounds.Y, first.bounds.Width, first.bounds.Height, first.confidence);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "[Issue #293] ROI学習記録でエラーが発生（処理は継続）");
+                    }
+                }
+            }
+            else if (_roiManager == null)
+            {
+                _logger?.LogDebug("[Issue #293] IRoiManager is null - ROI learning skipped");
+            }
+
             if (textChunks.Count == 0)
             {
                 _logger?.LogWarning("📝 テキストチャンクが0個のため、オーバーレイ表示をスキップ");
@@ -615,13 +673,67 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             if (nonEmptyChunks.Count > 0)
             {
+                // [Issue #293] Gatekeeper: バッチ翻訳前にチャンクをフィルタリング
+                // ROI学習ヒートマップを活用した動的閾値で判定
+                var chunksToTranslate = nonEmptyChunks;
+                if (_gatekeeperService?.IsEnabled == true)
+                {
+                    var filteredChunks = new List<Baketa.Core.Abstractions.Translation.TextChunk>();
+                    foreach (var chunk in nonEmptyChunks)
+                    {
+                        var gatekeeperSourceId = $"chunk_{chunk.ChunkId}";
+
+                        // [Issue #293] チャンクの正規化座標を計算してRegionInfoを構築
+                        // screenWidth/screenHeightは画面サイズ（このメソッドのスコープで利用可能）
+                        var regionInfo = new GatekeeperRegionInfo
+                        {
+                            NormalizedX = screenWidth > 0 ? (float)chunk.CombinedBounds.X / screenWidth : 0f,
+                            NormalizedY = screenHeight > 0 ? (float)chunk.CombinedBounds.Y / screenHeight : 0f,
+                            NormalizedWidth = screenWidth > 0 ? (float)chunk.CombinedBounds.Width / screenWidth : 0f,
+                            NormalizedHeight = screenHeight > 0 ? (float)chunk.CombinedBounds.Height / screenHeight : 0f,
+                            HeatmapValue = null, // TranslationGatekeeperServiceがIRoiManager経由で設定
+                            ConfidenceScore = null,
+                            IsInExclusionZone = false
+                        };
+
+                        var gatekeeperDecision = _gatekeeperService.ShouldTranslate(gatekeeperSourceId, chunk.CombinedText, regionInfo);
+
+                        if (gatekeeperDecision.ShouldTranslate)
+                        {
+                            _logger?.LogInformation(
+                                "[Issue #293] Gatekeeper allowed (Batch): ChunkId={ChunkId}, Reason={Reason}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}",
+                                chunk.ChunkId, gatekeeperDecision.Reason, gatekeeperDecision.ChangeRatio, gatekeeperDecision.AppliedThreshold);
+                            filteredChunks.Add(chunk);
+                        }
+                        else
+                        {
+                            _logger?.LogInformation(
+                                "[Issue #293] Gatekeeper denied (Batch): ChunkId={ChunkId}, Reason={Reason}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}",
+                                chunk.ChunkId, gatekeeperDecision.Reason, gatekeeperDecision.ChangeRatio, gatekeeperDecision.AppliedThreshold);
+                            chunk.TranslatedText = ""; // Gatekeeperによるスキップ
+                            _gatekeeperService.ReportTranslationResult(gatekeeperDecision, wasSuccessful: true, tokensUsed: 0);
+                        }
+                    }
+                    chunksToTranslate = filteredChunks;
+                    _logger?.LogInformation(
+                        "[Issue #293] Gatekeeper filter result: Original={Original}, ToTranslate={ToTranslate}, Skipped={Skipped}",
+                        nonEmptyChunks.Count, chunksToTranslate.Count, nonEmptyChunks.Count - chunksToTranslate.Count);
+                }
+
+                // Gatekeeper後に翻訳対象がない場合はスキップ
+                if (chunksToTranslate.Count == 0)
+                {
+                    _logger?.LogInformation("[Issue #293] All chunks skipped by Gatekeeper - no translation needed");
+                    return;
+                }
+
                 using var batchTranslationMeasurement = new PerformanceMeasurement(
                     MeasurementType.TranslationProcessing,
-                    $"バッチ翻訳処理 - {nonEmptyChunks.Count}チャンク")
+                    $"バッチ翻訳処理 - {chunksToTranslate.Count}チャンク")
                     .WithAdditionalInfo($"Service:{serviceType}");
 
                 // バッチ翻訳リクエストを作成
-                var batchTexts = nonEmptyChunks.Select(c => c.CombinedText).ToList();
+                var batchTexts = chunksToTranslate.Select(c => c.CombinedText).ToList();
 
                 try
                 {
@@ -629,7 +741,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
                     // 🔥 [STREAMING] ストリーミング翻訳を試行（段階的結果表示）
                     // 🚀 [DYNAMIC_LANGUAGE_FIX] 最初のテキストチャンクから言語を動的検出
-                    var firstText = nonEmptyChunks.FirstOrDefault()?.CombinedText ?? "";
+                    var firstText = chunksToTranslate.FirstOrDefault()?.CombinedText ?? "";
                     var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings(firstText);
 
                     List<string> batchResults;
@@ -646,14 +758,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         _logger?.LogDebug("🔥 [STREAMING] ストリーミング翻訳サービス使用 - 段階的表示開始");
 
                         // 段階的結果表示のコールバック関数を定義
+                        // [Issue #293] Gatekeeper適用後のchunksToTranslateを参照
                         void OnChunkCompleted(int index, string translatedText)
                         {
-                            if (index < nonEmptyChunks.Count)
+                            if (index < chunksToTranslate.Count)
                             {
-                                var chunk = nonEmptyChunks[index];
+                                var chunk = chunksToTranslate[index];
                                 chunk.TranslatedText = translatedText;
 
-                                Console.WriteLine($"✨ [STREAMING] チャンク完了 [{index + 1}/{nonEmptyChunks.Count}] - " +
+                                Console.WriteLine($"✨ [STREAMING] チャンク完了 [{index + 1}/{chunksToTranslate.Count}] - " +
                                                 $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText[..30] + "..." : chunk.CombinedText)}'");
 
                                 // 🚀 [STREAMING_OVERLAY_FIX] 翻訳完了時に即座にオーバーレイ表示
@@ -743,23 +856,24 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             cancellationToken).ConfigureAwait(false);
                     }
 
-                    // 結果をチャンクに反映
-                    for (int i = 0; i < nonEmptyChunks.Count && i < batchResults.Count; i++)
+                    // 結果をチャンクに反映 [Issue #293] Gatekeeper適用後のchunksToTranslateを参照
+                    for (int i = 0; i < chunksToTranslate.Count && i < batchResults.Count; i++)
                     {
-                        nonEmptyChunks[i].TranslatedText = batchResults[i];
-                        _logger?.LogDebug($"   [{nonEmptyChunks[i].ChunkId}] '{nonEmptyChunks[i].CombinedText}' → '{batchResults[i]}'");
+                        chunksToTranslate[i].TranslatedText = batchResults[i];
+                        _logger?.LogDebug($"   [{chunksToTranslate[i].ChunkId}] '{chunksToTranslate[i].CombinedText}' → '{batchResults[i]}'");
                     }
 
                     var batchResult = batchTranslationMeasurement.Complete();
                     _logger?.LogInformation("✅ バッチ翻訳完了: {Count}チャンク, {Duration}ms",
-                        nonEmptyChunks.Count, batchResult.Duration.TotalMilliseconds);
+                        chunksToTranslate.Count, batchResult.Duration.TotalMilliseconds);
                 }
                 catch (NotImplementedException)
                 {
                     // バッチ翻訳が未実装の場合は個別処理にフォールバック
+                    // [Issue #293] Gatekeeper適用後のchunksToTranslateを使用（フィルタリング済み）
                     _logger?.LogWarning("⚠️ バッチ翻訳未実装のため個別処理にフォールバック");
 
-                    foreach (var chunk in nonEmptyChunks)
+                    foreach (var chunk in chunksToTranslate)
                     {
                         try
                         {
@@ -770,6 +884,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
                             // 🚀 [DYNAMIC_LANGUAGE_FIX] チャンクごとに動的言語検出を実行
                             var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings(chunk.CombinedText);
+
+                            // [Issue #293] Note: Gatekeeperチェックはバッチ翻訳前に実行済み（chunksToTranslateはフィルタリング済み）
+
                             var translationResult = await _processingFacade.TranslationService.TranslateAsync(
                                 chunk.CombinedText,
                                 sourceLanguage,

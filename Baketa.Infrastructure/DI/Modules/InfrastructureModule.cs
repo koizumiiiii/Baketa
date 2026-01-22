@@ -109,6 +109,9 @@ public class InfrastructureModule : ServiceModuleBase
 
         // [ROI_DELETION] スティッキーROIシステム登録削除 - レガシー機能除去
 
+        // [Issue #293] ROI Manager サービス登録
+        RegisterRoiManagerServices(services);
+
         // 🔥 [PHASE12.5.3_FIX] NLLB-200翻訳サービス登録を削除
         // 理由: RegisterServices(services, config)メソッドで既に登録されるため重複を回避
         // RegisterNllb200TranslationServices(services);
@@ -188,6 +191,9 @@ public class InfrastructureModule : ServiceModuleBase
         RegisterStagedFilteringServices(services, configuration);
 
         // [ROI_DELETION] スティッキーROIシステム登録削除 - レガシー機能除去
+
+        // [Issue #293] ROI Manager サービス登録（configuration付き）
+        RegisterRoiManagerServices(services, configuration);
 
         // 🔥 [PHASE12.5.4_FIX] RegisterPortManagementServicesを最優先実行
         // 理由: RegisterNllb200TranslationServicesがIPythonServerManager登録状況を確認するため、
@@ -867,6 +873,79 @@ public class InfrastructureModule : ServiceModuleBase
         Console.WriteLine("✅ IPerceptualHashService登録完了 - OpenCV SIMD最適化実装");
 
         Console.WriteLine("🎉 [PHASE1] 画像変化検知システム登録完了");
+    }
+
+    /// <summary>
+    /// [Issue #293] ROI Manager サービスを登録します
+    /// </summary>
+    /// <param name="services">サービスコレクション</param>
+    /// <param name="configuration">設定オブジェクト（nullの場合はデフォルト設定を使用）</param>
+    private static void RegisterRoiManagerServices(IServiceCollection services, IConfiguration? configuration = null)
+    {
+        Console.WriteLine("🔄 [Issue #293] ROI Manager サービス登録開始");
+
+        // ROI Manager 設定 - appsettings.jsonからバインド
+        if (configuration != null)
+        {
+            var roiManagerSection = configuration.GetSection("RoiManager");
+            if (roiManagerSection.Exists())
+            {
+                services.Configure<RoiManagerSettings>(roiManagerSection);
+                Console.WriteLine($"✅ RoiManagerSettings: appsettings.jsonからバインド (Enabled={roiManagerSection["Enabled"]})");
+            }
+            else
+            {
+                services.Configure<RoiManagerSettings>(options => { });
+                Console.WriteLine("⚠️ RoiManagerSettings: セクションなし - デフォルト設定を使用");
+            }
+
+            // ROI Gatekeeper 設定 - appsettings.jsonからバインド
+            var roiGatekeeperSection = configuration.GetSection("RoiGatekeeper");
+            if (roiGatekeeperSection.Exists())
+            {
+                services.Configure<RoiGatekeeperSettings>(roiGatekeeperSection);
+                Console.WriteLine($"✅ RoiGatekeeperSettings: appsettings.jsonからバインド (Enabled={roiGatekeeperSection["Enabled"]})");
+            }
+            else
+            {
+                services.Configure<RoiGatekeeperSettings>(options => { });
+                Console.WriteLine("⚠️ RoiGatekeeperSettings: セクションなし - デフォルト設定を使用");
+            }
+        }
+        else
+        {
+            // configurationがnullの場合はデフォルト設定
+            services.Configure<RoiManagerSettings>(options => { });
+            services.Configure<RoiGatekeeperSettings>(options => { });
+            Console.WriteLine("⚠️ ROI設定: IConfiguration未指定 - デフォルト設定を使用");
+        }
+
+        // ROI学習エンジン
+        services.AddSingleton<Baketa.Core.Abstractions.Roi.IRoiLearningEngine,
+            Baketa.Infrastructure.Roi.Services.RoiLearningEngine>();
+        Console.WriteLine("✅ IRoiLearningEngine登録完了 - ヒートマップ学習エンジン");
+
+        // ROI Manager
+        services.AddSingleton<Baketa.Core.Abstractions.Roi.IRoiManager,
+            Baketa.Infrastructure.Roi.RoiManager>();
+        Console.WriteLine("✅ IRoiManager登録完了 - ROI管理サービス");
+
+        // ROI閾値プロバイダー（動的閾値統合用）
+        services.AddSingleton<Baketa.Core.Abstractions.Roi.IRoiThresholdProvider,
+            Baketa.Infrastructure.Roi.Services.RoiThresholdProvider>();
+        Console.WriteLine("✅ IRoiThresholdProvider登録完了 - 動的閾値プロバイダー");
+
+        // ROI Gatekeeper（翻訳Gate機能）
+        services.AddSingleton<Baketa.Core.Abstractions.Roi.IRoiGatekeeper,
+            Baketa.Infrastructure.Roi.Services.RoiGatekeeper>();
+        Console.WriteLine("✅ IRoiGatekeeper登録完了 - 翻訳Gatekeeper");
+
+        // [Issue #293 Phase 5] ROI Profile Service（永続化）
+        services.AddSingleton<Baketa.Core.Abstractions.Roi.IRoiProfileService,
+            Baketa.Infrastructure.Roi.Persistence.RoiProfileRepository>();
+        Console.WriteLine("✅ IRoiProfileService登録完了 - プロファイル永続化");
+
+        Console.WriteLine("🎉 [Issue #293] ROI Manager サービス登録完了");
     }
 
     /// <summary>

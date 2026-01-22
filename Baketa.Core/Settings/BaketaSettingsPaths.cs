@@ -100,6 +100,14 @@ public static class BaketaSettingsPaths
         "logs");
 
     /// <summary>
+    /// [Issue #293] ROIプロファイルディレクトリのパス
+    /// ゲーム/アプリケーション別のROI学習データを保存
+    /// </summary>
+    public static string RoiProfilesDirectory { get; } = Path.Combine(
+        UserSettingsDirectory,
+        "roi-profiles");
+
+    /// <summary>
     /// ユーザー設定ディレクトリが存在しない場合は作成する
     /// </summary>
     public static void EnsureUserSettingsDirectoryExists()
@@ -117,6 +125,12 @@ public static class BaketaSettingsPaths
         if (!Directory.Exists(LogDirectory))
         {
             Directory.CreateDirectory(LogDirectory);
+        }
+
+        // [Issue #293] ROIプロファイルディレクトリ
+        if (!Directory.Exists(RoiProfilesDirectory))
+        {
+            Directory.CreateDirectory(RoiProfilesDirectory);
         }
     }
 

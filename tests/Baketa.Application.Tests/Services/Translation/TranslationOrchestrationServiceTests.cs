@@ -89,6 +89,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             null, // translationDictionaryService（テスト用にnull）
             null, // fallbackOrchestrator（Issue #290: テスト用にnull）
             null, // licenseManager（Issue #290: テスト用にnull）
+            null, // gatekeeperService（Issue #293: テスト用にnull）
             _loggerMock.Object);
     }
 

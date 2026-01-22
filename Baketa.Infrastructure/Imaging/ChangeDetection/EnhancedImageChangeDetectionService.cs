@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Hashing;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Roi;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Models.ImageProcessing;
 using Baketa.Core.Settings;
@@ -27,6 +28,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     private readonly IImageChangeMetricsService _metricsService;
     private readonly ImageChangeDetectionSettings _settings;
     private readonly LoggingSettings _loggingSettings;
+    private readonly IRoiThresholdProvider? _roiThresholdProvider; // [Issue #293] ROI動的閾値
 
     // スレッドセーフキャッシュ（コンテキスト別）
     private readonly ConcurrentDictionary<string, QuickHashCache> _quickHashCache = new();
@@ -59,11 +61,13 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         ILogger<EnhancedImageChangeDetectionService> logger,
         IPerceptualHashService perceptualHashService,
         IImageChangeMetricsService metricsService,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IRoiThresholdProvider? roiThresholdProvider = null) // [Issue #293] ROI動的閾値（オプショナル）
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _perceptualHashService = perceptualHashService ?? throw new ArgumentNullException(nameof(perceptualHashService));
         _metricsService = metricsService ?? throw new ArgumentNullException(nameof(metricsService));
+        _roiThresholdProvider = roiThresholdProvider; // [Issue #293]
 
         // 設定外部化対応: ImageChangeDetection設定セクションから読み込み
         _settings = InitializeImageChangeDetectionSettings(configuration);
@@ -92,6 +96,13 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         {
             _logger.LogInformation("🔧 [Issue #229] テキスト安定化待機有効: DelayMs={DelayMs}, MaxWaitMs={MaxWaitMs}",
                 _settings.TextStabilizationDelayMs, _settings.MaxStabilizationWaitMs);
+        }
+
+        // [Issue #293] ROI動的閾値設定ログ
+        if (_settings.EnableRoiBasedThreshold && _roiThresholdProvider != null)
+        {
+            _logger.LogInformation("🔧 [Issue #293] ROI動的閾値有効: ProviderEnabled={ProviderEnabled}",
+                _roiThresholdProvider.IsEnabled);
         }
     }
 
@@ -703,8 +714,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     if (similarity > upperZoneMax) upperZoneMax = similarity;
                 }
 
-                // [Issue #302] 行ごとに閾値を動的に決定（下部ゾーン高感度化）
-                var threshold = _settings.GetThresholdForRow(row, rows);
+                // [Issue #293] ROI動的閾値を適用（下部ゾーン高感度化 + ROI学習）
+                var threshold = GetDynamicThreshold(row, col, rows, cols);
 
                 // 早期終了: 閾値を下回ったブロックを発見
                 if (similarity < threshold)
@@ -722,7 +733,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             if (!hasPotentialChange && changedBlockIndex >= 0)
             {
                 var changedRow = changedBlockIndex / cols;
-                var threshold = _settings.GetThresholdForRow(changedRow, rows);
+                var changedCol = changedBlockIndex % cols; // [Issue #293] 列情報も必要
+                var threshold = GetDynamicThreshold(changedRow, changedCol, rows, cols); // [Issue #293] ROI動的閾値
                 hasPotentialChange = minSimilarity < threshold;
             }
 
@@ -1006,8 +1018,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     if (similarity > upperZoneMax) upperZoneMax = similarity;
                 }
 
-                // [Issue #302] 行ごとに閾値を動的に決定（下部ゾーン高感度化）
-                var threshold = _settings.GetThresholdForRow(block.Row, rows);
+                // [Issue #293] ROI動的閾値を適用（下部ゾーン高感度化 + ROI学習）
+                var threshold = GetDynamicThreshold(block.Row, block.Col, rows, cols);
                 if (similarity < threshold)
                 {
                     changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, similarity, block.Region));
@@ -1558,6 +1570,33 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     // [Issue #229][Gemini Review] チェックサム計算用定数
     private const int ChecksumSampleSize = 2000;
     private const float FallbackSimilarityThreshold = 0.95f;
+
+    /// <summary>
+    /// [Issue #293] ROI統合動的閾値を取得
+    /// </summary>
+    /// <param name="row">グリッド行インデックス</param>
+    /// <param name="col">グリッド列インデックス</param>
+    /// <param name="totalRows">グリッド総行数</param>
+    /// <param name="totalCols">グリッド総列数</param>
+    /// <returns>適用すべき閾値</returns>
+    /// <remarks>
+    /// ROI動的閾値が有効な場合はIRoiThresholdProviderから閾値を取得。
+    /// 無効な場合は従来のGetThresholdForRow()を使用。
+    /// </remarks>
+    private float GetDynamicThreshold(int row, int col, int totalRows, int totalCols)
+    {
+        // ベース閾値（下部ゾーン高感度化を含む）
+        var baseThreshold = _settings.GetThresholdForRow(row, totalRows);
+
+        // [Issue #293] ROI動的閾値が無効な場合はベース閾値を返す
+        if (!_settings.EnableRoiBasedThreshold || _roiThresholdProvider == null || !_roiThresholdProvider.IsEnabled)
+        {
+            return baseThreshold;
+        }
+
+        // [Issue #293] IRoiThresholdProviderから動的閾値を取得
+        return _roiThresholdProvider.GetThresholdForCell(row, col, totalRows, totalCols, baseThreshold);
+    }
 
     /// <summary>
     /// [Issue #229][Gemini Review] 画像のチェックサムを計算
