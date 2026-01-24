@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License; // [Issue #78 Phase 4] ILicenseManager用
+using Baketa.Core.Abstractions.Processing; // [Issue #293] ITextChangeDetectionService用
+using Baketa.Core.Abstractions.Roi; // [Issue #293] IRoiManager用
 using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
@@ -14,6 +16,7 @@ using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverl
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Translation;
 using Baketa.Core.License.Models; // [Issue #78 Phase 4] FeatureType用
+using Baketa.Core.Models.Text; // [Issue #293] GateRegionInfo用
 using Baketa.Core.Models.Translation;
 using Baketa.Core.Models.Validation; // [Issue #78 Phase 4] ValidatedTextChunk用
 using Baketa.Core.Translation.Abstractions; // [Issue #78 Phase 4] IParallelTranslationOrchestrator用
@@ -54,6 +57,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     // [Issue #291] 翻訳状態確認用サービス（キャンセル状態チェック）
     // NOTE: CancellationToken伝播により不要になったが、将来の拡張用に保持
     private readonly ITranslationControlService? _translationControlService;
+    // [Issue #293] テキスト変化検知サービス（Gate判定用）
+    private readonly ITextChangeDetectionService? _textChangeDetectionService;
+    // [Issue #293] ROI管理サービス（ヒートマップ値取得用）
+    private readonly IRoiManager? _roiManager;
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
@@ -71,7 +78,11 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         // [Issue #273] Cloud翻訳可用性統合サービス（オプショナル）
         Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null,
         // [Issue #291] 翻訳状態確認用サービス（オプショナル）
-        ITranslationControlService? translationControlService = null)
+        ITranslationControlService? translationControlService = null,
+        // [Issue #293] テキスト変化検知サービス（オプショナル）
+        ITextChangeDetectionService? textChangeDetectionService = null,
+        // [Issue #293] ROI管理サービス（オプショナル）
+        IRoiManager? roiManager = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -88,6 +99,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
         // [Issue #291] 翻訳状態確認用サービス
         _translationControlService = translationControlService;
+        // [Issue #293] テキスト変化検知サービス
+        _textChangeDetectionService = textChangeDetectionService;
+        // [Issue #293] ROI管理サービス
+        _roiManager = roiManager;
     }
 
     /// <inheritdoc />
@@ -309,6 +324,21 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             if (nonEmptyChunks.Count == 0)
             {
                 _logger.LogWarning("⚠️ [PHASE12.2] 翻訳可能なチャンクが0個 - 処理スキップ");
+                return;
+            }
+
+            // ============================================================
+            // [Issue #293] Gate判定: テキスト変化検知によるフィルタリング
+            // ============================================================
+            nonEmptyChunks = await ApplyGateFilteringAsync(
+                nonEmptyChunks,
+                eventData.ImageWidth,
+                eventData.ImageHeight,
+                cancellationToken).ConfigureAwait(false);
+
+            if (nonEmptyChunks.Count == 0)
+            {
+                _logger.LogInformation("🚪 [Issue #293] Gate判定: 全チャンクが変化なしと判定されスキップ");
                 return;
             }
 
@@ -1268,5 +1298,121 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         return new string(text
             .Where(c => !char.IsWhiteSpace(c) && !char.IsControl(c) && !punctuationToRemove.Contains(c))
             .ToArray());
+    }
+
+    /// <summary>
+    /// [Issue #293] Gate判定を適用してテキスト変化のないチャンクをフィルタリング
+    /// </summary>
+    /// <remarks>
+    /// 各チャンクに対してテキスト変化検知を実行し、前回と同じテキストのチャンクをスキップします。
+    /// ROIヒートマップ値を取得して動的閾値調整に活用します。
+    /// </remarks>
+    private async Task<List<TextChunk>> ApplyGateFilteringAsync(
+        List<TextChunk> chunks,
+        int imageWidth,
+        int imageHeight,
+        CancellationToken cancellationToken)
+    {
+        // サービスが利用不可能な場合はフィルタリングをスキップ
+        if (_textChangeDetectionService == null)
+        {
+            _logger?.LogDebug("🚪 [Issue #293] Gate判定スキップ: ITextChangeDetectionService未登録");
+            return chunks;
+        }
+
+        var gatedChunks = new List<TextChunk>();
+        var gateBlockedCount = 0;
+        var gatePassedCount = 0;
+
+        // ROIマネージャーの状態をログ出力
+        var roiEnabled = _roiManager?.IsEnabled ?? false;
+        _logger?.LogInformation(
+            "🚪 [Issue #293] Gate判定開始: ChunkCount={Count}, RoiManager={RoiEnabled}, ImageSize={Width}x{Height}",
+            chunks.Count, roiEnabled, imageWidth, imageHeight);
+
+        foreach (var chunk in chunks)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                break;
+
+            var text = chunk.CombinedText ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                gatedChunks.Add(chunk);
+                continue;
+            }
+
+            // ソースIDを生成（座標ベース）
+            var sourceId = $"chunk_{chunk.CombinedBounds.X}_{chunk.CombinedBounds.Y}_{chunk.CombinedBounds.Width}_{chunk.CombinedBounds.Height}";
+
+            // 正規化座標を計算
+            GateRegionInfo? regionInfo = null;
+            if (imageWidth > 0 && imageHeight > 0)
+            {
+                var normalizedX = (float)chunk.CombinedBounds.X / imageWidth;
+                var normalizedY = (float)chunk.CombinedBounds.Y / imageHeight;
+                var normalizedWidth = (float)chunk.CombinedBounds.Width / imageWidth;
+                var normalizedHeight = (float)chunk.CombinedBounds.Height / imageHeight;
+
+                // ヒートマップ値を取得
+                float? heatmapValue = null;
+                if (_roiManager?.IsEnabled == true)
+                {
+                    // チャンクの中心座標でヒートマップ値を取得
+                    var centerX = normalizedX + normalizedWidth / 2f;
+                    var centerY = normalizedY + normalizedHeight / 2f;
+                    heatmapValue = _roiManager.GetHeatmapValueAt(centerX, centerY);
+
+                    _logger?.LogDebug(
+                        "🗺️ [Issue #293] HeatmapValue取得: Center=({CenterX:F3},{CenterY:F3}), Value={Value:F3}",
+                        centerX, centerY, heatmapValue);
+                }
+
+                regionInfo = heatmapValue.HasValue
+                    ? GateRegionInfo.WithHeatmap(normalizedX, normalizedY, normalizedWidth, normalizedHeight, heatmapValue.Value)
+                    : GateRegionInfo.FromCoordinates(normalizedX, normalizedY, normalizedWidth, normalizedHeight);
+            }
+
+            // Gate判定を実行
+            var gateResult = await _textChangeDetectionService.DetectChangeWithGateAsync(
+                text,
+                sourceId,
+                regionInfo,
+                cancellationToken).ConfigureAwait(false);
+
+            if (gateResult.ShouldTranslate)
+            {
+                gatedChunks.Add(chunk);
+                gatePassedCount++;
+                _logger?.LogDebug(
+                    "🚪 [Issue #293] Gate PASS: Decision={Decision}, ChangeRate={Change:P1}, Threshold={Threshold:P1}, HeatmapValue={Heatmap}, Text='{Text}'",
+                    gateResult.Decision,
+                    gateResult.ChangePercentage,
+                    gateResult.AppliedThreshold,
+                    regionInfo?.HeatmapValue?.ToString("F3") ?? "(null)",
+                    text.Length > 30 ? text[..30] + "..." : text);
+            }
+            else
+            {
+                gateBlockedCount++;
+                _logger?.LogInformation(
+                    "🚪 [Issue #293] Gate BLOCK: Decision={Decision}, ChangeRate={Change:P1}, Threshold={Threshold:P1}, HeatmapValue={Heatmap}, Text='{Text}'",
+                    gateResult.Decision,
+                    gateResult.ChangePercentage,
+                    gateResult.AppliedThreshold,
+                    regionInfo?.HeatmapValue?.ToString("F3") ?? "(null)",
+                    text.Length > 30 ? text[..30] + "..." : text);
+            }
+        }
+
+        if (gateBlockedCount > 0 || gatePassedCount > 0)
+        {
+            Console.WriteLine($"🚪 [Issue #293] Gate判定完了: {gatePassedCount}件通過, {gateBlockedCount}件ブロック");
+            _logger?.LogInformation(
+                "🚪 [Issue #293] Gate判定完了: Passed={Passed}, Blocked={Blocked}, RoiEnabled={RoiEnabled}",
+                gatePassedCount, gateBlockedCount, roiEnabled);
+        }
+
+        return gatedChunks;
     }
 }
