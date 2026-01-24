@@ -195,6 +195,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             // [Issue #293] ROI信頼度緩和設定の取得
             var enableRoiRelaxation = ocrSettings?.EnableRoiConfidenceRelaxation ?? true;
             var roiConfidenceThreshold = ocrSettings?.RoiConfidenceThreshold ?? 0.40;
+            var roiMinTextLength = ocrSettings?.RoiMinTextLength ?? 3;
 
             // 🔍 [DIAGNOSTIC] 各チャンクの信頼度をログ出力
             var passedChunks = new List<TextChunk>();
@@ -248,7 +249,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 if (enableRoiRelaxation &&
                     confidence >= roiConfidenceThreshold &&
                     confidence < confidenceThreshold &&
-                    textLength >= 3 &&  // 最小3文字（短すぎるノイズを除外）
+                    textLength >= roiMinTextLength &&
                     !IsNoisePattern(chunk.CombinedText))
                 {
                     // ROI緩和条件を満たす → 採用

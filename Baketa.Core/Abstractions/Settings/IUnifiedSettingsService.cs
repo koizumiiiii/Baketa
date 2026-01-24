@@ -157,6 +157,7 @@ public interface IOcrSettings
     // [Issue #293] ROI学習済み領域の信頼度緩和設定
     bool EnableRoiConfidenceRelaxation { get; }
     double RoiConfidenceThreshold { get; }
+    int RoiMinTextLength { get; }
 }
 
 /// <summary>

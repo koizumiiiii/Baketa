@@ -595,7 +595,8 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             GetDoubleValue(userSettings, "borderlineMinAspectRatio", 2.0),
             // [Issue #293] ROI学習済み領域の信頼度緩和設定
             GetBoolValue(userSettings, "enableRoiConfidenceRelaxation", true),
-            GetDoubleValue(userSettings, "roiConfidenceThreshold", 0.40));
+            GetDoubleValue(userSettings, "roiConfidenceThreshold", 0.40),
+            GetIntValue(userSettings, "roiMinTextLength", 3));
     }
 
     private static bool GetBoolValue(Dictionary<string, object> settings, string key, bool defaultValue)
@@ -736,7 +737,8 @@ internal sealed record UnifiedOcrSettings(
     double BorderlineMinAspectRatio = 2.0,
     // [Issue #293] ROI学習済み領域の信頼度緩和設定
     bool EnableRoiConfidenceRelaxation = true,
-    double RoiConfidenceThreshold = 0.40) : IOcrSettings;
+    double RoiConfidenceThreshold = 0.40,
+    int RoiMinTextLength = 3) : IOcrSettings;
 
 /// <summary>
 /// 統一アプリケーション設定実装

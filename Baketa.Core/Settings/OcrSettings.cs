@@ -189,6 +189,20 @@ public sealed class OcrSettings
     public double RoiConfidenceThreshold { get; set; } = 0.40;
 
     /// <summary>
+    /// [Issue #293] ROI緩和適用時の最小テキスト長
+    /// </summary>
+    /// <remarks>
+    /// ROI信頼度緩和を適用する際の最小文字数。
+    /// 短すぎるテキスト（ノイズの可能性が高い）を除外するためのフィルタ。
+    /// デフォルト: 3文字
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ROI最小文字長",
+        Description = "ROI緩和適用の最小文字数（3推奨）",
+        MinValue = 1,
+        MaxValue = 20)]
+    public int RoiMinTextLength { get; set; } = 3;
+
+    /// <summary>
     /// テキスト検出の閾値（0.0-1.0）
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "検出感度閾値",
@@ -459,6 +473,7 @@ public sealed class OcrSettings
             // [Issue #293] ROI学習済み領域の信頼度緩和設定
             EnableRoiConfidenceRelaxation = EnableRoiConfidenceRelaxation,
             RoiConfidenceThreshold = RoiConfidenceThreshold,
+            RoiMinTextLength = RoiMinTextLength,
             DetectionThreshold = DetectionThreshold,
             EnableImagePreprocessing = EnableImagePreprocessing,
             ConvertToGrayscale = ConvertToGrayscale,
