@@ -153,6 +153,10 @@ public interface IOcrSettings
     int BorderlineMinTextLength { get; }
     int BorderlineMinBoundsHeight { get; }
     double BorderlineMinAspectRatio { get; }
+
+    // [Issue #293] ROI学習済み領域の信頼度緩和設定
+    bool EnableRoiConfidenceRelaxation { get; }
+    double RoiConfidenceThreshold { get; }
 }
 
 /// <summary>

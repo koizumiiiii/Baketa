@@ -442,7 +442,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             }
         }
 
-        // デフォルト設定を使用
+        // デフォルト設定を使用（Issue #229, #293 の緩和設定はデフォルト値を使用）
         return new UnifiedOcrSettings(
             "ja", // デフォルト言語
             appSettings.ConfidenceThreshold,
@@ -585,7 +585,17 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
             userSettings.GetValueOrDefault("defaultLanguage")?.ToString() ?? "ja",
             GetDoubleValue(userSettings, "confidenceThreshold", appSettings.ConfidenceThreshold),
             GetIntValue(userSettings, "timeoutMs", 30000),
-            GetBoolValue(userSettings, "enablePreprocessing", appSettings.AutoOptimizationEnabled));
+            GetBoolValue(userSettings, "enablePreprocessing", appSettings.AutoOptimizationEnabled),
+            // [Issue #229] ボーダーライン信頼度緩和設定
+            GetBoolValue(userSettings, "enableBorderlineConfidenceRelaxation", true),
+            GetDoubleValue(userSettings, "borderlineMinConfidence", 0.60),
+            GetDoubleValue(userSettings, "borderlineRelaxedThreshold", 0.65),
+            GetIntValue(userSettings, "borderlineMinTextLength", 5),
+            GetIntValue(userSettings, "borderlineMinBoundsHeight", 25),
+            GetDoubleValue(userSettings, "borderlineMinAspectRatio", 2.0),
+            // [Issue #293] ROI学習済み領域の信頼度緩和設定
+            GetBoolValue(userSettings, "enableRoiConfidenceRelaxation", true),
+            GetDoubleValue(userSettings, "roiConfidenceThreshold", 0.40));
     }
 
     private static bool GetBoolValue(Dictionary<string, object> settings, string key, bool defaultValue)
@@ -723,7 +733,10 @@ internal sealed record UnifiedOcrSettings(
     double BorderlineRelaxedThreshold = 0.65,
     int BorderlineMinTextLength = 5,
     int BorderlineMinBoundsHeight = 25,
-    double BorderlineMinAspectRatio = 2.0) : IOcrSettings;
+    double BorderlineMinAspectRatio = 2.0,
+    // [Issue #293] ROI学習済み領域の信頼度緩和設定
+    bool EnableRoiConfidenceRelaxation = true,
+    double RoiConfidenceThreshold = 0.40) : IOcrSettings;
 
 /// <summary>
 /// 統一アプリケーション設定実装

@@ -1580,7 +1580,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     private const float FallbackSimilarityThreshold = 0.95f;
 
     /// <summary>
-    /// [Issue #293] ROI統合動的閾値を取得
+    /// [Issue #293/#302統合] ROI統合動的閾値を取得
     /// </summary>
     /// <param name="row">グリッド行インデックス</param>
     /// <param name="col">グリッド列インデックス</param>
@@ -1588,22 +1588,26 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     /// <param name="totalCols">グリッド総列数</param>
     /// <returns>適用すべき閾値</returns>
     /// <remarks>
-    /// ROI動的閾値が有効な場合はIRoiThresholdProviderから閾値を取得。
-    /// 無効な場合は従来のGetThresholdForRow()を使用。
+    /// [Issue #302統合] ROI動的閾値が有効な場合:
+    /// - 静的ゾーン閾値（EnableLowerZoneHighSensitivity）をバイパス
+    /// - 一律のGridBlockSimilarityThresholdをベースにROI乗数を適用
+    /// - ROI学習結果のみに基づいて閾値を決定
+    ///
+    /// ROI動的閾値が無効な場合:
+    /// - 従来のGetThresholdForRow()（静的ゾーン閾値）を使用
     /// </remarks>
     private float GetDynamicThreshold(int row, int col, int totalRows, int totalCols)
     {
-        // ベース閾値（下部ゾーン高感度化を含む）
-        var baseThreshold = _settings.GetThresholdForRow(row, totalRows);
-
-        // [Issue #293] ROI動的閾値が無効な場合はベース閾値を返す
-        if (!_settings.EnableRoiBasedThreshold || !_roiThresholdProvider.IsEnabled)
+        // [Issue #302統合] ROI動的閾値が有効な場合は静的ゾーンロジックをバイパス
+        if (_settings.EnableRoiBasedThreshold && _roiThresholdProvider.IsEnabled)
         {
-            return baseThreshold;
+            // ROI動的閾値: 一律のGridBlockSimilarityThresholdをベースにROI乗数を適用
+            return _roiThresholdProvider.GetThresholdForCell(
+                row, col, totalRows, totalCols, _settings.GridBlockSimilarityThreshold);
         }
 
-        // [Issue #293] IRoiThresholdProviderから動的閾値を取得
-        return _roiThresholdProvider.GetThresholdForCell(row, col, totalRows, totalCols, baseThreshold);
+        // [フォールバック] 従来の静的ゾーン閾値（ROI動的閾値が無効な場合）
+        return _settings.GetThresholdForRow(row, totalRows);
     }
 
     /// <summary>

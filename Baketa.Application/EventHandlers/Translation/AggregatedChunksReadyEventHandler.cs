@@ -192,9 +192,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             var borderlineMinBoundsHeight = ocrSettings?.BorderlineMinBoundsHeight ?? 25;
             var borderlineMinAspectRatio = ocrSettings?.BorderlineMinAspectRatio ?? 2.0;
 
+            // [Issue #293] ROI信頼度緩和設定の取得
+            var enableRoiRelaxation = ocrSettings?.EnableRoiConfidenceRelaxation ?? true;
+            var roiConfidenceThreshold = ocrSettings?.RoiConfidenceThreshold ?? 0.40;
+
             // 🔍 [DIAGNOSTIC] 各チャンクの信頼度をログ出力
             var passedChunks = new List<TextChunk>();
             var borderlineAcceptedCount = 0;
+            var roiRelaxedAcceptedCount = 0;
 
             foreach (var chunk in aggregatedChunks)
             {
@@ -237,7 +242,28 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     continue;
                 }
 
-                // ケース3: 閾値未満 → 却下
+                // ケース3: [Issue #293] ROI信頼度緩和を試行
+                // ROI学習済み領域で検出されたテキストには低い閾値を適用
+                // 条件: ROI緩和有効 + 信頼度がROI閾値以上 + ノイズパターンでない + 最小テキスト長を満たす
+                if (enableRoiRelaxation &&
+                    confidence >= roiConfidenceThreshold &&
+                    confidence < confidenceThreshold &&
+                    textLength >= 3 &&  // 最小3文字（短すぎるノイズを除外）
+                    !IsNoisePattern(chunk.CombinedText))
+                {
+                    // ROI緩和条件を満たす → 採用
+                    passedChunks.Add(chunk);
+                    roiRelaxedAcceptedCount++;
+                    _logger.LogInformation(
+                        "🔍 [OCR_CHUNK] ✅ROI_RELAXED Conf={Confidence:F3} RoiThreshold={RoiThreshold:F2} " +
+                        "TextLen={TextLen} Text='{Text}'",
+                        confidence, roiConfidenceThreshold, textLength,
+                        chunk.CombinedText!.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
+                    Console.WriteLine($"🎯 [ROI_RELAXED_ACCEPTED] Conf={confidence:F3} Text='{chunk.CombinedText}'");
+                    continue;
+                }
+
+                // ケース4: 閾値未満 → 却下
                 _logger.LogInformation("🔍 [OCR_CHUNK] ❌FAIL Conf={Confidence:F3} Threshold={Threshold:F2} Text='{Text}'",
                     confidence, confidenceThreshold,
                     chunk.CombinedText?.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
@@ -246,12 +272,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             var highConfidenceChunks = passedChunks;
             var filteredByConfidenceCount = aggregatedChunks.Count - highConfidenceChunks.Count;
 
-            if (filteredByConfidenceCount > 0 || borderlineAcceptedCount > 0)
+            if (filteredByConfidenceCount > 0 || borderlineAcceptedCount > 0 || roiRelaxedAcceptedCount > 0)
             {
-                Console.WriteLine($"🔍 [CONFIDENCE_FILTER] 信頼度フィルタリング: {filteredByConfidenceCount}件除外, {borderlineAcceptedCount}件ボーダーライン採用（閾値={confidenceThreshold:F2}）");
+                Console.WriteLine($"🔍 [CONFIDENCE_FILTER] 信頼度フィルタリング: {filteredByConfidenceCount}件除外, {borderlineAcceptedCount}件ボーダーライン採用, {roiRelaxedAcceptedCount}件ROI緩和採用（閾値={confidenceThreshold:F2}）");
                 _logger.LogInformation(
-                    "🔍 [CONFIDENCE_FILTER] 信頼度{Threshold:F2}未満の{FilteredCount}件をフィルタリング, {BorderlineCount}件ボーダーライン採用（残り{RemainingCount}件）",
-                    confidenceThreshold, filteredByConfidenceCount, borderlineAcceptedCount, highConfidenceChunks.Count);
+                    "🔍 [CONFIDENCE_FILTER] 信頼度{Threshold:F2}未満の{FilteredCount}件をフィルタリング, {BorderlineCount}件ボーダーライン採用, {RoiRelaxedCount}件ROI緩和採用（残り{RemainingCount}件）",
+                    confidenceThreshold, filteredByConfidenceCount, borderlineAcceptedCount, roiRelaxedAcceptedCount, highConfidenceChunks.Count);
             }
 
             // 🔥 [HALLUCINATION_FILTER] 繰り返しフレーズ検出 - OCRハルシネーション除外
