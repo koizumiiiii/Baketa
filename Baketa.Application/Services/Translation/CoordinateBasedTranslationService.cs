@@ -715,64 +715,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             if (nonEmptyChunks.Count > 0)
             {
-                // [Issue #293] TextChangeDetection統合版Gate: バッチ翻訳前にチャンクをフィルタリング
-                // ROI学習ヒートマップを活用した動的閾値で判定
+                // NOTE: Gate判定はAggregatedChunksReadyEventHandlerに移行済み（Issue #293）
                 var chunksToTranslate = nonEmptyChunks;
-                if (_textChangeDetectionService != null)
-                {
-                    var filteredChunks = new List<Baketa.Core.Abstractions.Translation.TextChunk>();
-                    foreach (var chunk in nonEmptyChunks)
-                    {
-                        var gateSourceId = $"chunk_{chunk.ChunkId}";
-
-                        // [Issue #293] チャンクの正規化座標を計算してGateRegionInfoを構築
-                        // Geminiフィードバック反映: RegionInfoに事前にヒートマップ値を設定
-                        var normalizedX = screenWidth > 0 ? (float)chunk.CombinedBounds.X / screenWidth : 0f;
-                        var normalizedY = screenHeight > 0 ? (float)chunk.CombinedBounds.Y / screenHeight : 0f;
-                        var normalizedWidth = screenWidth > 0 ? (float)chunk.CombinedBounds.Width / screenWidth : 0f;
-                        var normalizedHeight = screenHeight > 0 ? (float)chunk.CombinedBounds.Height / screenHeight : 0f;
-
-                        // ヒートマップ値を事前に取得（呼び出し側で設定）
-                        var centerX = normalizedX + normalizedWidth / 2f;
-                        var centerY = normalizedY + normalizedHeight / 2f;
-                        var heatmapValue = _roiManager?.GetHeatmapValueAt(centerX, centerY) ?? 0f;
-
-                        var regionInfo = GateRegionInfo.WithHeatmap(
-                            normalizedX, normalizedY, normalizedWidth, normalizedHeight, heatmapValue);
-
-                        var gateResult = await _textChangeDetectionService.DetectChangeWithGateAsync(
-                            chunk.CombinedText,
-                            gateSourceId,
-                            regionInfo,
-                            cancellationToken).ConfigureAwait(false);
-
-                        if (gateResult.ShouldTranslate)
-                        {
-                            _logger?.LogInformation(
-                                "[Issue #293] Gate allowed (Batch): ChunkId={ChunkId}, Decision={Decision}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}",
-                                chunk.ChunkId, gateResult.Decision, gateResult.ChangePercentage, gateResult.AppliedThreshold);
-                            filteredChunks.Add(chunk);
-                        }
-                        else
-                        {
-                            _logger?.LogInformation(
-                                "[Issue #293] Gate denied (Batch): ChunkId={ChunkId}, Decision={Decision}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}",
-                                chunk.ChunkId, gateResult.Decision, gateResult.ChangePercentage, gateResult.AppliedThreshold);
-                            chunk.TranslatedText = ""; // Gateによるスキップ
-                        }
-                    }
-                    chunksToTranslate = filteredChunks;
-                    _logger?.LogInformation(
-                        "[Issue #293] Gate filter result: Original={Original}, ToTranslate={ToTranslate}, Skipped={Skipped}",
-                        nonEmptyChunks.Count, chunksToTranslate.Count, nonEmptyChunks.Count - chunksToTranslate.Count);
-                }
-
-                // Gate判定後に翻訳対象がない場合はスキップ
-                if (chunksToTranslate.Count == 0)
-                {
-                    _logger?.LogInformation("[Issue #293] All chunks skipped by Gate - no translation needed");
-                    return;
-                }
 
                 using var batchTranslationMeasurement = new PerformanceMeasurement(
                     MeasurementType.TranslationProcessing,

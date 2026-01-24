@@ -269,11 +269,6 @@ public sealed class ApplicationModule : ServiceModuleBase
                 var licenseManager = provider.GetService<Baketa.Core.Abstractions.License.ILicenseManager>();
                 Console.WriteLine($"🚀 [Issue #290] Fork-Join: FallbackOrchestrator={fallbackOrchestrator != null}, LicenseManager={licenseManager != null}");
 
-                // [Issue #293] TextChangeDetection統合版Gate
-                var textChangeDetectionService = provider.GetService<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
-                var roiManager = provider.GetService<Baketa.Core.Abstractions.Roi.IRoiManager>();
-                Console.WriteLine($"🎯 [Issue #293] Gate: TextChangeDetectionService={textChangeDetectionService != null}, RoiManager={roiManager != null}");
-
                 var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                     captureService,
@@ -286,8 +281,6 @@ public sealed class ApplicationModule : ServiceModuleBase
                     translationDictionaryService,
                     fallbackOrchestrator,
                     licenseManager,
-                    textChangeDetectionService,
-                    roiManager,
                     logger);
             }
             catch (Exception ex)
