@@ -11,13 +11,18 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.OCR.Results; // 🔧 [TRANSLATION_FIX] PositionedTextResult用
 using Baketa.Core.Abstractions.Platform.Windows; // 🎯 UltraThink: IWindowsImage用
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Roi; // [Issue #293 Phase 7] IRoiManager用
 using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
 using Baketa.Core.Abstractions.Translation; // 🔧 [TRANSLATION_FIX] ITextChunkAggregatorService, TextChunk用
+using Baketa.Core.Models.Roi; // [Issue #293 Phase 7] RoiRegion, NormalizedRect用
 using Baketa.Core.Extensions; // 🔥 [PHASE5.2C] ToPooledByteArrayWithLengthAsync拡張メソッド用
 using Baketa.Core.Models.OCR;
 using Baketa.Core.Models.Processing;
+using Baketa.Core.Settings; // [Issue #293] RoiManagerSettings用
 using Baketa.Core.Utilities; // 🎯 [OCR_DEBUG_LOG] DebugLogUtility用
+using Baketa.Infrastructure.Roi.Services; // [Issue #293] RoiRegionMerger用
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options; // [Issue #293] IOptions<T>用
 using IImageFactoryInterface = Baketa.Core.Abstractions.Factories.IImageFactory; // 🔧 [PHASE3.2_FIX] 名前空間競合回避
 using Rectangle = System.Drawing.Rectangle; // 🎯 UltraThink Phase 75: 名前空間競合回避
 
@@ -36,20 +41,52 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     private readonly IImageFactoryInterface _imageFactory; // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
     private readonly ITextChunkAggregatorService? _textChunkAggregator; // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
     private readonly ICoordinateTransformationService _coordinateTransformationService; // 🔥 [COORDINATE_FIX] ROI→スクリーン座標変換
+    private readonly IRoiRegionMerger? _regionMerger; // [Issue #293] 隣接領域結合サービス
+    private readonly IRoiManager? _roiManager; // [Issue #293 Phase 7] 学習済みROI管理
     private readonly int _nextChunkId = 1; // 🔧 [TRANSLATION_FIX] チャンクID生成用
 
     // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出結果のMetadataキー
     private const string METADATA_KEY_BORDERLESS = "IsBorderlessOrFullscreen";
 
+    // [Issue #293] 部分OCRの設定（設定ファイルから取得）
+    private readonly bool _enablePartialOcr;
+    private readonly int _minPartialOcrWidth;
+    private readonly int _minPartialOcrHeight;
+    private readonly float _maxPartialOcrCoverageRatio;
+    private readonly int _maxMergedRegions;
+
+    // [Issue #293 Phase 7] 学習済みROI設定
+    private const int RoiPaddingPixels = 5; // ROI領域のパディング（5px）
+
+    // [Issue #293 Phase 7.2] テキスト欠落防止: 水平方向拡張（Gemini推奨）
+    // 理由: テキストは通常水平方向に伸びるため、ROIの左右を相対的に拡張
+    // 例: 元の幅640pxに対して左右各15% → 640 + 96×2 = 832px
+    private const float RoiHorizontalExpansionRatio = 0.15f; // 水平方向15%拡張
+
+    // [Issue #293 Phase 7.1] 探索モード時のテキスト欠落防止
+    // ヒートマップ値がこの閾値以上のブロックもOCR対象に追加（MinConfidenceForRegion=0.3より低く設定）
+    private const float HeatmapTextLikelihoodThreshold = 0.05f;
+    private const int GridSize = 4; // 4x4グリッド（変化検知と同じ）
+
     public ProcessingStageType StageType => ProcessingStageType.OcrExecution;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(80);
 
+    /// <summary>
+    /// コンストラクタ
+    /// </summary>
+    /// <remarks>
+    /// [コードレビュー対応] IOptions&lt;RoiManagerSettings&gt;を追加して部分OCR設定を注入可能に
+    /// [Issue #293 Phase 7] IRoiManagerを追加して学習済みROI優先OCRを実現
+    /// </remarks>
     public OcrExecutionStageStrategy(
         ILogger<OcrExecutionStageStrategy> logger,
         Baketa.Core.Abstractions.OCR.IOcrEngine ocrEngine,
         IImageLifecycleManager imageLifecycleManager, // 🎯 UltraThink Phase 75: 必須依存関係として追加
         IImageFactoryInterface imageFactory, // 🎯 UltraThink Phase 76: SafeImage→IImage変換用
         ICoordinateTransformationService coordinateTransformationService, // 🔥 [COORDINATE_FIX] ROI→スクリーン座標変換サービス注入
+        IOptions<RoiManagerSettings>? roiSettings = null, // [Issue #293] 部分OCR設定（オプショナル）
+        IRoiRegionMerger? regionMerger = null, // [Issue #293] 隣接領域結合（オプショナル）
+        IRoiManager? roiManager = null, // [Issue #293 Phase 7] 学習済みROI管理（オプショナル）
         ITextChunkAggregatorService? textChunkAggregator = null) // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -57,7 +94,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         _imageLifecycleManager = imageLifecycleManager ?? throw new ArgumentNullException(nameof(imageLifecycleManager));
         _imageFactory = imageFactory ?? throw new ArgumentNullException(nameof(imageFactory));
         _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService)); // 🔥 [COORDINATE_FIX]
+        _regionMerger = regionMerger; // null許容（後方互換性）
+        _roiManager = roiManager; // [Issue #293 Phase 7] null許容（後方互換性）
         _textChunkAggregator = textChunkAggregator; // null許容（翻訳無効時対応）
+
+        // [Issue #293] 部分OCR設定の読み込み（設定がない場合はデフォルト値）
+        var settings = roiSettings?.Value ?? new RoiManagerSettings();
+        _enablePartialOcr = settings.EnablePartialOcr;
+        _minPartialOcrWidth = settings.MinPartialOcrWidth;
+        _minPartialOcrHeight = settings.MinPartialOcrHeight;
+        _maxPartialOcrCoverageRatio = settings.MaxPartialOcrCoverageRatio;
+        _maxMergedRegions = settings.MaxMergedRegions;
     }
 
     public async Task<ProcessingStageResult> ExecuteAsync(ProcessingContext context, CancellationToken cancellationToken = default)
@@ -177,7 +224,34 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
             // ✅ [PHASE5_COMPLETE] ROI検出と2回目OCRループを完全削除 - シンプルな1回OCR実行のみ
 
-            // 実際のOCRサービス統合
+            // [Issue #293 Phase 7.3] 「記憶優先 + 変化領域併用」判定
+            // 学習済みROIを優先しつつ、ROI外で大きな変化がある領域もOCR対象に追加
+            // これにより、新出現テキスト（2行目に折り返したテキストなど）を検出できる
+            var changeResult = context.GetStageResult<ImageChangeDetectionResult>(ProcessingStageType.ImageChangeDetection);
+
+            if (TryGetLearnedRoiRegions(ocrImage.Width, ocrImage.Height, out var learnedRegions))
+            {
+                // [Issue #293 Phase 7.3] 学習済みROI + 変化領域を併用
+                var combinedRegions = CombineLearnedRoiWithChangedRegions(
+                    learnedRegions,
+                    changeResult);
+
+                _logger.LogInformation("🎯 [Issue #293 Phase 7.3] 学習済みROI + 変化領域併用OCR: 学習済み{LearnedCount}領域 + 変化{ChangedCount}領域 = 合計{TotalCount}領域",
+                    learnedRegions.Count, combinedRegions.Count - learnedRegions.Count, combinedRegions.Count);
+
+                return await ExecutePartialOcrAsync(context, combinedRegions, ocrImage, stopwatch, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            // [Issue #293] 部分OCR実行の判定（結合済み領域を取得）- 学習済みROIがない場合のフォールバック
+            if (TryGetPartialOcrRegions(changeResult, ocrImage.Width, ocrImage.Height, out var mergedRegions))
+            {
+                _logger.LogInformation("🎯 [Issue #293] 変化領域ベース部分OCR実行: {RegionCount}結合領域を処理（探索モード）", mergedRegions.Count);
+                return await ExecutePartialOcrAsync(context, mergedRegions, ocrImage, stopwatch, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            // 実際のOCRサービス統合（全画面OCR）
             string detectedText;
             List<object> textChunks = [];
 
@@ -463,6 +537,822 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
         return !hasImageChangeResult;
     }
+
+    #region [Issue #293 Phase 7] 学習済みROI優先OCR
+
+    /// <summary>
+    /// [Issue #293 Phase 7] 学習済みROIに基づいて部分OCR領域を取得
+    /// </summary>
+    /// <param name="imageWidth">画像幅（ピクセル）</param>
+    /// <param name="imageHeight">画像高さ（ピクセル）</param>
+    /// <param name="learnedRegions">学習済みROI領域（ピクセル座標、パディング適用済み）</param>
+    /// <returns>学習済みROIが有効な場合true</returns>
+    /// <remarks>
+    /// 「記憶優先」アルゴリズム:
+    /// - 画像変化に関わらず、学習済みのテキスト出現位置を優先
+    /// - シーンチェンジ時でも8.3秒の全画面OCRを回避し、約900msを維持
+    /// - 正規化座標（0.0-1.0）からピクセル座標への変換 + 5pxパディング
+    /// </remarks>
+    private bool TryGetLearnedRoiRegions(
+        int imageWidth,
+        int imageHeight,
+        out List<Rectangle> learnedRegions)
+    {
+        learnedRegions = [];
+
+        // IRoiManagerが未注入の場合はスキップ
+        if (_roiManager == null)
+        {
+            _logger.LogDebug("[Issue #293 Phase 7] 学習済みROIスキップ: IRoiManager未注入");
+            return false;
+        }
+
+        // ROI管理が無効の場合はスキップ
+        if (!_roiManager.IsEnabled)
+        {
+            _logger.LogDebug("[Issue #293 Phase 7] 学習済みROIスキップ: ROI管理無効");
+            return false;
+        }
+
+        // 学習済みROI領域を取得
+        var roiRegions = _roiManager.GetAllRegions();
+        if (roiRegions.Count == 0)
+        {
+            _logger.LogDebug("[Issue #293 Phase 7] 学習済みROIスキップ: 学習済み領域なし（探索モードへ）");
+            return false;
+        }
+
+        // 正規化座標 → ピクセル座標へ変換（5pxパディング付き）
+        foreach (var region in roiRegions)
+        {
+            // 除外領域はスキップ
+            if (region.RegionType == RoiRegionType.Exclusion)
+            {
+                continue;
+            }
+
+            // 信頼度が低すぎる領域はスキップ
+            if (region.ConfidenceLevel == RoiConfidenceLevel.Low && region.DetectionCount < 3)
+            {
+                _logger.LogDebug("[Issue #293 Phase 7] 低信頼度領域スキップ: {Id}, DetectionCount={Count}",
+                    region.Id, region.DetectionCount);
+                continue;
+            }
+
+            var pixelRect = ConvertRoiToPixelRect(region.NormalizedBounds, imageWidth, imageHeight);
+
+            _logger.LogDebug("[Issue #293 Phase 7] ROI変換: Id={Id}, Norm=({NX:F3},{NY:F3},{NW:F3},{NH:F3}), Image=({IW}x{IH}) → Pixel={Rect}",
+                region.Id,
+                region.NormalizedBounds.X, region.NormalizedBounds.Y,
+                region.NormalizedBounds.Width, region.NormalizedBounds.Height,
+                imageWidth, imageHeight, pixelRect);
+
+            // 最小サイズチェック
+            if (pixelRect.Width < _minPartialOcrWidth || pixelRect.Height < _minPartialOcrHeight)
+            {
+                _logger.LogDebug("[Issue #293 Phase 7] 小さすぎる領域スキップ: {Size}", pixelRect);
+                continue;
+            }
+
+            learnedRegions.Add(pixelRect);
+        }
+
+        if (learnedRegions.Count == 0)
+        {
+            _logger.LogDebug("[Issue #293 Phase 7] 学習済みROIスキップ: 有効な領域なし");
+            return false;
+        }
+
+        // [Issue #293 Phase 7.4] Y座標範囲が重なるROIを統合（学習による分割を防止）
+        // ヒートマップ学習で同一テキスト領域が複数ROIに分割されることがあるため、
+        // Y範囲が重複する領域は1つのバウンディングボックスにマージする
+        learnedRegions = MergeVerticallyOverlappingRegions(learnedRegions, imageHeight);
+
+        // 領域数が多すぎる場合は統合
+        if (learnedRegions.Count > _maxMergedRegions && _regionMerger != null)
+        {
+            learnedRegions = _regionMerger.MergeAdjacentRegions([.. learnedRegions]);
+            _logger.LogDebug("[Issue #293 Phase 7] 領域統合: {OriginalCount}→{MergedCount}",
+                roiRegions.Count, learnedRegions.Count);
+        }
+
+        // 統合後も多すぎる場合は全画面OCRにフォールバック
+        if (learnedRegions.Count > _maxMergedRegions)
+        {
+            _logger.LogDebug("[Issue #293 Phase 7] 学習済みROIスキップ: 統合後も領域数が多すぎる ({Count} > {Max})",
+                learnedRegions.Count, _maxMergedRegions);
+            learnedRegions = [];
+            return false;
+        }
+
+        // カバー率チェック
+        var totalImageArea = imageWidth * imageHeight;
+        var totalRoiArea = learnedRegions.Sum(r => r.Width * r.Height);
+        var coverageRatio = (float)totalRoiArea / totalImageArea;
+
+        if (coverageRatio > _maxPartialOcrCoverageRatio)
+        {
+            _logger.LogDebug("[Issue #293 Phase 7] 学習済みROIスキップ: カバー率が高すぎる ({Ratio:P1} > {Max:P1})",
+                coverageRatio, _maxPartialOcrCoverageRatio);
+            learnedRegions = [];
+            return false;
+        }
+
+        _logger.LogInformation("[Issue #293 Phase 7] 学習済みROI判定: 有効 - {Count}領域, カバー率{Ratio:P1}",
+            learnedRegions.Count, coverageRatio);
+
+        return true;
+    }
+
+    /// <summary>
+    /// [Issue #293 Phase 7] 正規化座標をピクセル座標に変換（パディング + 水平拡張付き）
+    /// </summary>
+    /// <param name="normalizedBounds">正規化座標（0.0-1.0）</param>
+    /// <param name="imageWidth">画像幅</param>
+    /// <param name="imageHeight">画像高さ</param>
+    /// <returns>ピクセル座標の矩形（5pxパディング + 水平15%拡張適用済み、境界クランプ済み）</returns>
+    /// <remarks>
+    /// [Issue #293 Phase 7.2] Gemini推奨: テキスト欠落防止のため水平方向に15%拡張
+    /// - 垂直方向: 従来通り5pxパディング
+    /// - 水平方向: 元の幅の15%を左右に追加（テキストは水平方向に伸びやすいため）
+    /// </remarks>
+    private static Rectangle ConvertRoiToPixelRect(NormalizedRect normalizedBounds, int imageWidth, int imageHeight)
+    {
+        // 正規化座標 → ピクセル座標
+        var x = (int)(normalizedBounds.X * imageWidth);
+        var y = (int)(normalizedBounds.Y * imageHeight);
+        var width = (int)(normalizedBounds.Width * imageWidth);
+        var height = (int)(normalizedBounds.Height * imageHeight);
+
+        // [Issue #293 Phase 7.2] 水平方向15%拡張（テキスト欠落防止）
+        var horizontalExpansion = (int)(width * RoiHorizontalExpansionRatio);
+
+        // パディング適用（垂直: 5px、水平: 15%拡張 + 5px）
+        x = Math.Max(0, x - RoiPaddingPixels - horizontalExpansion);
+        y = Math.Max(0, y - RoiPaddingPixels);
+        width = Math.Min(imageWidth - x, width + (RoiPaddingPixels + horizontalExpansion) * 2);
+        height = Math.Min(imageHeight - y, height + RoiPaddingPixels * 2);
+
+        return new Rectangle(x, y, width, height);
+    }
+
+    /// <summary>
+    /// [Issue #293 Phase 7.4] Y座標範囲が重なり、かつ水平方向で隣接するROI領域を統合
+    /// </summary>
+    /// <remarks>
+    /// ヒートマップ学習により同一テキスト領域が複数ROIに分割されることがある。
+    /// Y範囲（縦方向の位置）が大きく重複し、かつ水平方向で隣接/重複している領域は、
+    /// 同じテキストエリアに属すると判断し、1つのバウンディングボックスに統合する。
+    ///
+    /// 水平方向の隣接チェックにより、離れたUI要素（例: 左右に分かれたメニューボタン）が
+    /// 誤って統合されることを防止。
+    /// </remarks>
+    private List<Rectangle> MergeVerticallyOverlappingRegions(List<Rectangle> regions, int imageHeight)
+    {
+        if (regions.Count <= 1)
+        {
+            return regions;
+        }
+
+        // Y範囲の重複閾値: 高さの50%以上が重複していれば同一領域とみなす
+        const float VerticalOverlapThreshold = 0.5f;
+        // 水平方向の隣接判定: この距離以内なら隣接とみなす（重複またはギャップ50px以内）
+        const int HorizontalAdjacencyMargin = 50;
+
+        var merged = new List<Rectangle>();
+        var used = new bool[regions.Count];
+
+        for (int i = 0; i < regions.Count; i++)
+        {
+            if (used[i]) continue;
+
+            var current = regions[i];
+            var mergeGroup = new List<Rectangle> { current };
+            used[i] = true;
+
+            // 他の領域とのY重複 + 水平隣接をチェック
+            for (int j = i + 1; j < regions.Count; j++)
+            {
+                if (used[j]) continue;
+
+                var other = regions[j];
+
+                // Y範囲の重複を計算
+                var overlapTop = Math.Max(current.Top, other.Top);
+                var overlapBottom = Math.Min(current.Bottom, other.Bottom);
+                var overlapHeight = Math.Max(0, overlapBottom - overlapTop);
+
+                // 小さい方の高さに対する重複率
+                var minHeight = Math.Min(current.Height, other.Height);
+                var verticalOverlapRatio = minHeight > 0 ? (float)overlapHeight / minHeight : 0;
+
+                // 水平方向の隣接チェック: 重複しているか、ギャップがマージン以内か
+                var horizontalGap = Math.Max(0, Math.Max(current.Left, other.Left) - Math.Min(current.Right, other.Right));
+                var isHorizontallyAdjacent = current.IntersectsWith(other) || horizontalGap <= HorizontalAdjacencyMargin;
+
+                // Y重複かつ水平隣接の場合のみ統合
+                if (verticalOverlapRatio >= VerticalOverlapThreshold && isHorizontallyAdjacent)
+                {
+                    mergeGroup.Add(other);
+                    used[j] = true;
+
+                    // currentを更新して次の比較に使用
+                    current = CalculateBoundingBox(mergeGroup);
+                }
+            }
+
+            // グループのバウンディングボックスを追加
+            merged.Add(CalculateBoundingBox(mergeGroup));
+        }
+
+        if (merged.Count < regions.Count)
+        {
+            _logger.LogDebug("[Issue #293 Phase 7.4] Y重複+水平隣接ROI統合: {Original}領域 → {Merged}領域",
+                regions.Count, merged.Count);
+        }
+
+        return merged;
+    }
+
+    /// <summary>
+    /// 複数のRectangleを包含するバウンディングボックスを計算
+    /// </summary>
+    private static Rectangle CalculateBoundingBox(List<Rectangle> rectangles)
+    {
+        if (rectangles.Count == 0) return Rectangle.Empty;
+        if (rectangles.Count == 1) return rectangles[0];
+
+        var minX = rectangles.Min(r => r.X);
+        var minY = rectangles.Min(r => r.Y);
+        var maxX = rectangles.Max(r => r.Right);
+        var maxY = rectangles.Max(r => r.Bottom);
+
+        return new Rectangle(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    /// <summary>
+    /// [Issue #293 Phase 7.3] 学習済みROI領域と変化領域を併用
+    /// </summary>
+    /// <remarks>
+    /// 学習済みROIだけでは検出できない新出現テキスト（2行目に折り返したテキストなど）に対応。
+    /// 変化領域のうち、学習済みROIとオーバーラップしない領域を追加でOCR対象にする。
+    /// [コードレビュー対応] 未使用パラメータ削除、オーバーラップ判定をRectangle.Inflateでシンプル化
+    /// </remarks>
+    private List<Rectangle> CombineLearnedRoiWithChangedRegions(
+        List<Rectangle> learnedRegions,
+        ImageChangeDetectionResult? changeResult)
+    {
+        // 学習済みROI領域を基本として使用
+        var combinedRegions = new List<Rectangle>(learnedRegions);
+
+        // 変化領域がない場合はそのまま返す
+        if (changeResult?.ChangedRegions == null || changeResult.ChangedRegions.Length == 0)
+        {
+            _logger.LogDebug("[Issue #293 Phase 7.3] 変化領域なし - 学習済みROIのみ使用");
+            return combinedRegions;
+        }
+
+        // 変化領域のうち、学習済みROI（パディング含む）とオーバーラップしない領域を追加
+        var additionalRegions = new List<Rectangle>();
+        foreach (var changedRegion in changeResult.ChangedRegions)
+        {
+            // 最小サイズチェック
+            if (changedRegion.Width < _minPartialOcrWidth || changedRegion.Height < _minPartialOcrHeight)
+            {
+                continue;
+            }
+
+            // [コードレビュー対応] 学習済みROIの影響範囲（パディング付き）とのオーバーラップをチェック
+            var isWithinLearnedArea = learnedRegions.Any(learned =>
+            {
+                var expandedLearned = Rectangle.Inflate(learned, RoiPaddingPixels, RoiPaddingPixels);
+                return expandedLearned.IntersectsWith(changedRegion);
+            });
+
+            if (!isWithinLearnedArea)
+            {
+                additionalRegions.Add(changedRegion);
+                _logger.LogDebug("[Issue #293 Phase 7.3] 変化領域追加（ROI外）: {Region}", changedRegion);
+            }
+        }
+
+        var additionalCount = additionalRegions.Count;
+        if (additionalCount > 0)
+        {
+            // 追加領域を統合して追加
+            if (_regionMerger != null)
+            {
+                var mergedAdditional = _regionMerger.MergeAdjacentRegions([.. additionalRegions]);
+                combinedRegions.AddRange(mergedAdditional);
+                _logger.LogInformation("[Issue #293 Phase 7.3] ROI外変化領域を追加: {Count}領域（マージ後）", mergedAdditional.Count);
+            }
+            else
+            {
+                combinedRegions.AddRange(additionalRegions);
+                _logger.LogInformation("[Issue #293 Phase 7.3] ROI外変化領域を追加: {Count}領域", additionalCount);
+            }
+        }
+
+        // 領域数チェック（多すぎる場合は統合）
+        if (combinedRegions.Count > _maxMergedRegions && _regionMerger != null)
+        {
+            combinedRegions = _regionMerger.MergeAdjacentRegions([.. combinedRegions]);
+        }
+
+        return combinedRegions;
+    }
+
+    #endregion
+
+    #region [Issue #293] 部分OCR実行
+
+    /// <summary>
+    /// [Issue #293] 部分OCRを使用すべきかどうかを判定し、使用する場合は結合済み領域を返す
+    /// </summary>
+    /// <param name="changeResult">変化検知結果</param>
+    /// <param name="imageWidth">画像幅</param>
+    /// <param name="imageHeight">画像高さ</param>
+    /// <param name="mergedRegions">結合済み領域（部分OCR使用時のみ有効）</param>
+    /// <returns>部分OCRを使用すべき場合true</returns>
+    /// <remarks>
+    /// [コードレビュー対応] MergeAdjacentRegionsの重複呼び出しを解消
+    /// 判定と領域取得を1回の呼び出しで行い、結果をoutパラメータで返す
+    /// </remarks>
+    private bool TryGetPartialOcrRegions(
+        ImageChangeDetectionResult? changeResult,
+        int imageWidth,
+        int imageHeight,
+        out List<Rectangle> mergedRegions)
+    {
+        mergedRegions = [];
+
+        // 部分OCR機能が無効の場合は全画面OCR
+        if (!_enablePartialOcr)
+        {
+            _logger.LogDebug("[Issue #293] 部分OCRスキップ: 機能無効（設定: EnablePartialOcr=false）");
+            return false;
+        }
+
+        // RoiRegionMergerが利用できない場合は全画面OCR
+        if (_regionMerger == null)
+        {
+            _logger.LogDebug("[Issue #293] 部分OCRスキップ: RoiRegionMerger未注入");
+            return false;
+        }
+
+        // [Issue #293 Phase 7.1] 変化領域 + ヒートマップ高値ブロックを収集
+        var allRegions = new List<Rectangle>();
+
+        // 1. 変化領域を追加（従来ロジック）
+        if (changeResult?.ChangedRegions != null && changeResult.ChangedRegions.Length > 0)
+        {
+            allRegions.AddRange(changeResult.ChangedRegions);
+            _logger.LogDebug("[Issue #293 Phase 7.1] 変化領域追加: {Count}ブロック", changeResult.ChangedRegions.Length);
+        }
+
+        // 2. ヒートマップで「テキストがありそう」なブロックを追加（テキスト欠落防止）
+        var heatmapBlocks = GetHeatmapHighValueBlocks(imageWidth, imageHeight);
+        if (heatmapBlocks.Count > 0)
+        {
+            allRegions.AddRange(heatmapBlocks);
+            _logger.LogDebug("[Issue #293 Phase 7.1] ヒートマップ高値ブロック追加: {Count}ブロック（閾値>={Threshold:F2}）",
+                heatmapBlocks.Count, HeatmapTextLikelihoodThreshold);
+        }
+
+        // 変化領域もヒートマップ高値ブロックもない場合は全画面OCR
+        if (allRegions.Count == 0)
+        {
+            _logger.LogDebug("[Issue #293] 部分OCRスキップ: 変化領域・ヒートマップ高値ブロックなし");
+            return false;
+        }
+
+        // 隣接領域を結合（変化領域 + ヒートマップブロックをマージ）
+        mergedRegions = _regionMerger.MergeAdjacentRegions([.. allRegions]);
+        _logger.LogDebug("[Issue #293 Phase 7.1] 領域結合: {InputCount}→{OutputCount}",
+            allRegions.Count, mergedRegions.Count);
+
+        // 結合後の領域数が多すぎる場合は全画面OCR
+        if (mergedRegions.Count > _maxMergedRegions)
+        {
+            _logger.LogDebug("[Issue #293] 部分OCRスキップ: 結合後領域数が多すぎる ({Count} > {Max})",
+                mergedRegions.Count, _maxMergedRegions);
+            mergedRegions = [];
+            return false;
+        }
+
+        // 変化領域の総面積を計算
+        var totalImageArea = imageWidth * imageHeight;
+        var totalChangedArea = mergedRegions.Sum(r => r.Width * r.Height);
+        var coverageRatio = (float)totalChangedArea / totalImageArea;
+
+        // 変化領域が画面の大部分を占める場合は全画面OCR
+        if (coverageRatio > _maxPartialOcrCoverageRatio)
+        {
+            _logger.LogDebug("[Issue #293] 部分OCRスキップ: 変化領域が広すぎる ({Ratio:P1} > {Max:P1})",
+                coverageRatio, _maxPartialOcrCoverageRatio);
+            mergedRegions = [];
+            return false;
+        }
+
+        // 各領域が最小サイズを満たすかチェック（フィルタリングして上書き）
+        mergedRegions = mergedRegions.Where(r =>
+            r.Width >= _minPartialOcrWidth && r.Height >= _minPartialOcrHeight).ToList();
+
+        if (mergedRegions.Count == 0)
+        {
+            _logger.LogDebug("[Issue #293] 部分OCRスキップ: 有効な領域なし（最小サイズ未満）");
+            return false;
+        }
+
+        _logger.LogInformation("[Issue #293] 部分OCR判定: 有効 - {ValidCount}領域, カバー率{Ratio:P1}",
+            mergedRegions.Count, coverageRatio);
+
+        return true;
+    }
+
+    /// <summary>
+    /// [Issue #293 Phase 7.1] ヒートマップで「テキストがありそう」なブロックを取得
+    /// </summary>
+    /// <remarks>
+    /// 4x4グリッドの各セルのヒートマップ値をチェックし、閾値以上のブロックを返す。
+    /// これにより、変化検知が見逃したがテキストが存在する可能性のある領域もOCR対象に含める。
+    /// [コードレビュー対応] 整数除算による端の領域漏れを修正、小さい画像のエッジケース処理を追加
+    /// </remarks>
+    private List<Rectangle> GetHeatmapHighValueBlocks(int imageWidth, int imageHeight)
+    {
+        // [コードレビュー対応] 容量を事前に指定
+        var blocks = new List<Rectangle>(GridSize * GridSize);
+
+        // IRoiManagerが未注入または無効の場合はスキップ
+        if (_roiManager == null || !_roiManager.IsEnabled)
+        {
+            return blocks;
+        }
+
+        // [コードレビュー対応] 非常に小さい画像のエッジケース処理
+        if (imageWidth < GridSize || imageHeight < GridSize)
+        {
+            // 画像が小さすぎる場合は全体を1つのブロックとして判定
+            if (_roiManager.GetHeatmapValueAt(0.5f, 0.5f) >= HeatmapTextLikelihoodThreshold)
+            {
+                blocks.Add(new Rectangle(0, 0, imageWidth, imageHeight));
+                _logger.LogDebug("[Issue #293 Phase 7.1] 小さい画像: 全体をOCR対象に追加 ({Width}x{Height})",
+                    imageWidth, imageHeight);
+            }
+            return blocks;
+        }
+
+        // 4x4グリッドの各セルをチェック
+        for (int row = 0; row < GridSize; row++)
+        {
+            for (int col = 0; col < GridSize; col++)
+            {
+                // [コードレビュー対応] 整数除算による端の領域漏れを修正
+                // 各セルの開始位置と終了位置を正確に計算
+                var x = imageWidth * col / GridSize;
+                var y = imageHeight * row / GridSize;
+                var nextX = imageWidth * (col + 1) / GridSize;
+                var nextY = imageHeight * (row + 1) / GridSize;
+
+                // セルの中心座標を正規化（0.0-1.0）
+                var normalizedX = (col + 0.5f) / GridSize;
+                var normalizedY = (row + 0.5f) / GridSize;
+
+                // ヒートマップ値を取得
+                var heatmapValue = _roiManager.GetHeatmapValueAt(normalizedX, normalizedY);
+
+                // 閾値以上ならOCR対象に追加
+                if (heatmapValue >= HeatmapTextLikelihoodThreshold)
+                {
+                    blocks.Add(new Rectangle(x, y, nextX - x, nextY - y));
+
+                    _logger.LogDebug("[Issue #293 Phase 7.1] ヒートマップブロック追加: ({Row},{Col}) 値={Value:F3}",
+                        row, col, heatmapValue);
+                }
+            }
+        }
+
+        return blocks;
+    }
+
+    /// <summary>
+    /// [Issue #293] 部分OCRを実行
+    /// 変化領域のみを切り出してOCRを実行し、座標を元画像の絶対座標に変換
+    /// </summary>
+    /// <param name="context">処理コンテキスト</param>
+    /// <param name="validRegions">結合・フィルタリング済みの有効領域リスト（TryGetPartialOcrRegionsから取得）</param>
+    /// <param name="fullImage">全画面画像</param>
+    /// <param name="stopwatch">処理時間計測用</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <remarks>
+    /// [コードレビュー対応] TryGetPartialOcrRegionsで既に結合・フィルタリング済みの領域を受け取る
+    /// MergeAdjacentRegionsの重複呼び出しを解消
+    /// </remarks>
+    private async Task<ProcessingStageResult> ExecutePartialOcrAsync(
+        ProcessingContext context,
+        List<Rectangle> validRegions,
+        IImage fullImage,
+        Stopwatch stopwatch,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // validRegionsは既にTryGetPartialOcrRegionsで結合・フィルタリング済み
+            if (validRegions.Count == 0)
+            {
+                _logger.LogWarning("[Issue #293] 部分OCR: 有効な領域なし、全画面OCRにフォールバック");
+                return ProcessingStageResult.CreateError(StageType, "No valid regions for partial OCR", stopwatch.Elapsed);
+            }
+
+            var allTextChunks = new List<object>();
+            var allDetectedText = new System.Text.StringBuilder();
+
+            _logger.LogInformation("[Issue #293] 部分OCR開始: {Count}領域を処理", validRegions.Count);
+
+            foreach (var region in validRegions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    // 領域を切り出し
+                    using var croppedImage = await CropImageAsync(fullImage, region, cancellationToken).ConfigureAwait(false);
+
+                    if (croppedImage == null)
+                    {
+                        _logger.LogWarning("[Issue #293] 部分OCR: 領域切り出し失敗 {Region}", region);
+                        continue;
+                    }
+
+                    // 部分OCR実行
+                    var ocrContext = new OcrContext(
+                        croppedImage,
+                        context.Input.SourceWindowHandle,
+                        null,
+                        cancellationToken);
+
+                    var ocrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
+
+                    // 座標変換: ROI相対座標 → 元画像絶対座標
+                    var transformedRegions = TransformOcrResultsToAbsoluteCoordinates(ocrResults, region, context.Input);
+
+                    allTextChunks.AddRange(transformedRegions.Cast<object>());
+                    allDetectedText.Append(string.Join(" ", ocrResults.TextRegions.Select(r => r.Text)));
+                    allDetectedText.Append(' ');
+
+                    _logger.LogDebug("[Issue #293] 部分OCR完了: 領域{Region}, 検出テキスト{Count}個",
+                        region, ocrResults.TextRegions.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[Issue #293] 部分OCR: 領域処理エラー {Region}", region);
+                }
+            }
+
+            stopwatch.Stop();
+
+            var detectedText = allDetectedText.ToString().Trim();
+
+            _logger.LogInformation("✅ [Issue #293] 部分OCR完了 - 処理時間: {ElapsedMs}ms, テキスト長: {TextLength}文字, 領域数: {RegionCount}",
+                stopwatch.ElapsedMilliseconds, detectedText.Length, allTextChunks.Count);
+
+            // 成功結果を作成
+            var ocrResult = new OcrExecutionResult
+            {
+                Success = true,
+                DetectedText = detectedText,
+                TextChunks = allTextChunks,
+                ProcessingTime = stopwatch.Elapsed
+            };
+
+            return ProcessingStageResult.CreateSuccess(StageType, ocrResult, stopwatch.Elapsed);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #293] 部分OCRエラー");
+            return ProcessingStageResult.CreateError(StageType, $"Partial OCR error: {ex.Message}", stopwatch.Elapsed);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #293] 画像から指定領域を切り出す
+    /// </summary>
+    /// <remarks>
+    /// [Geminiレビュー対応] コメント修正: 「ゼロコピー」→「直接ピクセルアクセス」
+    /// LockPixelData()を使用して、ToByteArrayAsync()のPNG変換を回避し、
+    /// より直接的なピクセルデータアクセスで最適化。
+    /// 従来: ToByteArrayAsync() → Bitmap → Crop → PNG → CreateFromBytesAsync()
+    /// 最適化: LockPixelData() → 直接Bitmap作成 → Crop → PNG → CreateFromBytesAsync()
+    /// ※ Marshal.CopyとToArray()によるコピーは発生する
+    /// </remarks>
+    private async Task<IImage?> CropImageAsync(IImage sourceImage, Rectangle region, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // 境界チェック
+            var clampedRegion = ClampRegionToBounds(region, sourceImage.Width, sourceImage.Height);
+
+            if (clampedRegion.Width < _minPartialOcrWidth || clampedRegion.Height < _minPartialOcrHeight)
+            {
+                _logger.LogDebug("[Issue #293] CropImage: クランプ後のサイズが小さすぎる {Region}", clampedRegion);
+                return null;
+            }
+
+            Bitmap? sourceBitmap = null;
+            try
+            {
+                // [コードレビュー対応] LockPixelData()を使用した最適化を試行
+                var (success, bitmap) = TryCreateBitmapFromPixelData(sourceImage);
+                if (success && bitmap != null)
+                {
+                    sourceBitmap = bitmap;
+                    _logger.LogDebug("[Issue #293] CropImage: LockPixelData()による最適化成功");
+                }
+                else
+                {
+                    // LockPixelData()が失敗した場合は従来方式にフォールバック
+                    _logger.LogDebug("[Issue #293] CropImage: 従来方式にフォールバック");
+                    var imageBytes = await sourceImage.ToByteArrayAsync().ConfigureAwait(false);
+                    using var memoryStream = new MemoryStream(imageBytes);
+                    sourceBitmap = new Bitmap(memoryStream);
+                }
+
+                // 指定領域をCrop
+                using var croppedBitmap = new Bitmap(clampedRegion.Width, clampedRegion.Height);
+                using (var graphics = Graphics.FromImage(croppedBitmap))
+                {
+                    graphics.DrawImage(sourceBitmap,
+                        new Rectangle(0, 0, clampedRegion.Width, clampedRegion.Height),
+                        clampedRegion.X, clampedRegion.Y, clampedRegion.Width, clampedRegion.Height,
+                        GraphicsUnit.Pixel);
+                }
+
+                // Crop画像 → byte[] → IImage
+                using var outputStream = new MemoryStream();
+                croppedBitmap.Save(outputStream, System.Drawing.Imaging.ImageFormat.Png);
+                var croppedBytes = outputStream.ToArray();
+
+                var croppedImage = await _imageFactory.CreateFromBytesAsync(croppedBytes).ConfigureAwait(false);
+
+                _logger.LogDebug("[Issue #293] CropImage成功: 元サイズ={SourceWidth}x{SourceHeight}, 切り出し領域={Region}, 出力サイズ={Width}x{Height}",
+                    sourceImage.Width, sourceImage.Height, clampedRegion, croppedImage.Width, croppedImage.Height);
+
+                return croppedImage;
+            }
+            finally
+            {
+                sourceBitmap?.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #293] CropImage: エラー {Region}", region);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #293] 領域を画像境界内にクランプ
+    /// </summary>
+    private static Rectangle ClampRegionToBounds(Rectangle region, int imageWidth, int imageHeight)
+    {
+        var x = Math.Max(0, region.X);
+        var y = Math.Max(0, region.Y);
+        var right = Math.Min(imageWidth, region.Right);
+        var bottom = Math.Min(imageHeight, region.Bottom);
+
+        return new Rectangle(x, y, right - x, bottom - y);
+    }
+
+    /// <summary>
+    /// [Issue #293] LockPixelData()を使用してIImageからBitmapを作成（non-async）
+    /// </summary>
+    /// <remarks>
+    /// unsafe コードは async メソッド内で直接使用できないため、別メソッドとして分離。
+    /// Marshal.Copy を使用してマネージドコードでピクセルデータをコピーします。
+    /// </remarks>
+    private static (bool Success, Bitmap? Bitmap) TryCreateBitmapFromPixelData(IImage sourceImage)
+    {
+        try
+        {
+            using var pixelLock = sourceImage.LockPixelData();
+            var bitmap = new Bitmap(sourceImage.Width, sourceImage.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            var bitmapData = bitmap.LockBits(
+                new Rectangle(0, 0, sourceImage.Width, sourceImage.Height),
+                System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            try
+            {
+                // マネージドコードでピクセルデータをコピー（unsafeを回避）
+                var srcData = pixelLock.Data.ToArray();
+                var srcStride = pixelLock.Stride;
+                var dstStride = bitmapData.Stride;
+
+                for (int y = 0; y < sourceImage.Height; y++)
+                {
+                    System.Runtime.InteropServices.Marshal.Copy(
+                        srcData,
+                        y * srcStride,
+                        bitmapData.Scan0 + y * dstStride,
+                        sourceImage.Width * 4);
+                }
+            }
+            finally
+            {
+                bitmap.UnlockBits(bitmapData);
+            }
+
+            return (true, bitmap);
+        }
+        catch
+        {
+            // LockPixelData()がサポートされていない場合など
+            return (false, null);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #293] OCR結果の座標をROI相対座標から元画像絶対座標に変換
+    /// </summary>
+    /// <remarks>
+    /// [Geminiレビュー対応] 可読性向上: Contour変換を2ステップに分離
+    /// Step 1: ROI相対座標 → 元画像絶対座標
+    /// Step 2: スケーリング適用（GPU Shaderリサイズ対応）
+    /// </remarks>
+    private List<Baketa.Core.Abstractions.OCR.OcrTextRegion> TransformOcrResultsToAbsoluteCoordinates(
+        OcrResults ocrResults,
+        Rectangle roiRegion,
+        ProcessingPipelineInput input)
+    {
+        var transformedRegions = new List<Baketa.Core.Abstractions.OCR.OcrTextRegion>();
+
+        // スケーリング係数を事前計算
+        var originalSize = input.OriginalWindowSize;
+        var capturedSize = new Size(input.CapturedImage.Width, input.CapturedImage.Height);
+
+        var needsScaling = originalSize != Size.Empty &&
+            capturedSize.Width > 0 && capturedSize.Height > 0 &&
+            (originalSize.Width != capturedSize.Width || originalSize.Height != capturedSize.Height);
+
+        double scaleX = needsScaling ? (double)originalSize.Width / capturedSize.Width : 1.0;
+        double scaleY = needsScaling ? (double)originalSize.Height / capturedSize.Height : 1.0;
+
+        foreach (var textRegion in ocrResults.TextRegions)
+        {
+            // Step 1: ROI相対座標 → 元画像絶対座標
+            var absoluteBounds = new Rectangle(
+                roiRegion.X + textRegion.Bounds.X,
+                roiRegion.Y + textRegion.Bounds.Y,
+                textRegion.Bounds.Width,
+                textRegion.Bounds.Height);
+
+            // Step 2: スケーリング適用（Bounds）
+            if (needsScaling)
+            {
+                absoluteBounds = new Rectangle(
+                    (int)(absoluteBounds.X * scaleX),
+                    (int)(absoluteBounds.Y * scaleY),
+                    (int)(absoluteBounds.Width * scaleX),
+                    (int)(absoluteBounds.Height * scaleY));
+            }
+
+            // Contour変換（2ステップ分離で可読性向上）
+            Point[]? transformedContour = null;
+            if (textRegion.Contour != null)
+            {
+                transformedContour = textRegion.Contour.Select(p =>
+                {
+                    // Step 1: ROI相対座標 → 元画像絶対座標
+                    var absoluteX = roiRegion.X + p.X;
+                    var absoluteY = roiRegion.Y + p.Y;
+
+                    // Step 2: スケーリング適用
+                    return new Point(
+                        (int)(absoluteX * scaleX),
+                        (int)(absoluteY * scaleY));
+                }).ToArray();
+            }
+
+            // 変換後のOcrTextRegionを作成
+            var transformedRegion = new Baketa.Core.Abstractions.OCR.OcrTextRegion(
+                text: textRegion.Text,
+                bounds: absoluteBounds,
+                confidence: textRegion.Confidence,
+                contour: transformedContour,
+                direction: textRegion.Direction);
+
+            transformedRegions.Add(transformedRegion);
+        }
+
+        _logger.LogDebug("[Issue #293] 座標変換完了: {Count}テキスト領域, ROI={RoiRegion}",
+            transformedRegions.Count, roiRegion);
+
+        return transformedRegions;
+    }
+
+    #endregion
 
 #if DEBUG
     /// <summary>

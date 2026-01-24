@@ -489,6 +489,11 @@ public sealed class RoiManager : IRoiManager, IDisposable
     /// <summary>
     /// 現在のプロファイルを設定
     /// </summary>
+    /// <remarks>
+    /// [Hotfix #293] スレッドセーフティ: イベント発火をロック外に移動し、
+    /// UIスレッドとのデッドロックを防止。イベント引数はロック内で準備し、
+    /// 発火はロック解放後に行う。
+    /// </remarks>
     private void SetCurrentProfile(RoiProfile profile, RoiProfileChangeType changeType)
     {
         RoiProfileChangedEventArgs? eventArgs = null;
@@ -526,10 +531,11 @@ public sealed class RoiManager : IRoiManager, IDisposable
             _logger.LogInformation(
                 "Profile changed: {ChangeType}, Id={ProfileId}, Name={ProfileName}",
                 changeType, profile.Id, profile.Name);
-
-            // イベントをロック内で発火（一貫性保証）
-            ProfileChanged?.Invoke(this, eventArgs);
         }
+
+        // [Hotfix #293] イベントをロック外で発火（デッドロック防止）
+        // イベントハンドラが他のRoiManagerメソッドを呼び出してもデッドロックしない
+        ProfileChanged?.Invoke(this, eventArgs);
     }
 
     /// <summary>

@@ -945,6 +945,11 @@ public class InfrastructureModule : ServiceModuleBase
             Baketa.Infrastructure.Roi.Persistence.RoiProfileRepository>();
         Console.WriteLine("✅ IRoiProfileService登録完了 - プロファイル永続化");
 
+        // [Issue #293 Phase 6] ROI Region Merger（隣接領域結合）
+        services.AddSingleton<Baketa.Infrastructure.Roi.Services.IRoiRegionMerger,
+            Baketa.Infrastructure.Roi.Services.RoiRegionMerger>();
+        Console.WriteLine("✅ IRoiRegionMerger登録完了 - 隣接領域結合サービス");
+
         Console.WriteLine("🎉 [Issue #293] ROI Manager サービス登録完了");
     }
 

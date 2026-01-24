@@ -158,6 +158,69 @@ public sealed record RoiManagerSettings
     /// </remarks>
     public float LowHeatmapThresholdMultiplier { get; init; } = 0.95f;
 
+    #region [Issue #293] 部分OCR設定
+
+    /// <summary>
+    /// 部分OCR機能を有効化
+    /// </summary>
+    /// <remarks>
+    /// 変化領域のみOCRを実行し、処理時間を短縮します。
+    /// デフォルト: true（有効）
+    /// </remarks>
+    public bool EnablePartialOcr { get; init; } = true;
+
+    /// <summary>
+    /// 隣接領域結合のマージン（ピクセル）
+    /// </summary>
+    /// <remarks>
+    /// 2つの変化領域がこのマージン内で接している場合、1つに結合します。
+    /// デフォルト: 5ピクセル
+    /// 推奨範囲: 0-20
+    /// </remarks>
+    public int AdjacencyMargin { get; init; } = 5;
+
+    /// <summary>
+    /// 部分OCRの最小幅（ピクセル）
+    /// </summary>
+    /// <remarks>
+    /// これより小さい領域はOCR対象外となります。
+    /// デフォルト: 100ピクセル
+    /// 推奨範囲: 50-200
+    /// </remarks>
+    public int MinPartialOcrWidth { get; init; } = 100;
+
+    /// <summary>
+    /// 部分OCRの最小高さ（ピクセル）
+    /// </summary>
+    /// <remarks>
+    /// これより小さい領域はOCR対象外となります。
+    /// デフォルト: 50ピクセル
+    /// 推奨範囲: 30-100
+    /// </remarks>
+    public int MinPartialOcrHeight { get; init; } = 50;
+
+    /// <summary>
+    /// 部分OCRフォールバック閾値（カバー率）
+    /// </summary>
+    /// <remarks>
+    /// 変化領域が画面のこの割合以上を占める場合、全画面OCRにフォールバック。
+    /// デフォルト: 0.7（70%）
+    /// 推奨範囲: 0.5-0.9
+    /// </remarks>
+    public float MaxPartialOcrCoverageRatio { get; init; } = 0.7f;
+
+    /// <summary>
+    /// 部分OCRの最大結合領域数
+    /// </summary>
+    /// <remarks>
+    /// 結合後の領域数がこの値を超える場合、全画面OCRにフォールバック。
+    /// デフォルト: 5
+    /// 推奨範囲: 3-10
+    /// </remarks>
+    public int MaxMergedRegions { get; init; } = 5;
+
+    #endregion
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -176,7 +239,13 @@ public sealed record RoiManagerSettings
             && ProfileMaxAgeDays > 0
             && AutoSaveIntervalSeconds > 0
             && HighHeatmapThresholdMultiplier > 0.0f
-            && LowHeatmapThresholdMultiplier > 0.0f;
+            && LowHeatmapThresholdMultiplier > 0.0f
+            // [Issue #293] 部分OCR設定の検証
+            && AdjacencyMargin >= 0
+            && MinPartialOcrWidth > 0
+            && MinPartialOcrHeight > 0
+            && MaxPartialOcrCoverageRatio is > 0.0f and <= 1.0f
+            && MaxMergedRegions > 0;
     }
 
     /// <summary>
