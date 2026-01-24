@@ -14,8 +14,11 @@ using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Roi;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Text;
+using Baketa.Core.Models.Text;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Events.EventTypes;
@@ -60,8 +63,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly IFallbackOrchestrator? _fallbackOrchestrator;
     private readonly ILicenseManager? _licenseManager;
 
-    // [Issue #293] Gatekeeper: テキスト変化検出による翻訳最適化
-    private readonly ITranslationGatekeeperService? _gatekeeperService;
+    // [Issue #293] Gatekeeper統合: テキスト変化検出による翻訳最適化
+    private readonly ITextChangeDetectionService? _textChangeDetectionService;
+    private readonly IRoiManager? _roiManager;
 
     // 状態管理
     private volatile bool _isAutomaticTranslationActive;
@@ -128,7 +132,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="translationDictionaryService">翻訳辞書サービス（オプショナル）</param>
     /// <param name="fallbackOrchestrator">フォールバックオーケストレーター（Issue #290: Fork-Join用）</param>
     /// <param name="licenseManager">ライセンスマネージャー（Issue #290: Cloud AI利用可否判定用）</param>
-    /// <param name="gatekeeperService">翻訳Gatekeeperサービス（Issue #293: テキスト変化検出用）</param>
+    /// <param name="textChangeDetectionService">テキスト変化検知サービス（Issue #293: Gatekeeper統合）</param>
+    /// <param name="roiManager">ROIマネージャー（Issue #293: ヒートマップ値取得用）</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
@@ -141,7 +146,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ITranslationDictionaryService? translationDictionaryService = null,
         IFallbackOrchestrator? fallbackOrchestrator = null,
         ILicenseManager? licenseManager = null,
-        ITranslationGatekeeperService? gatekeeperService = null,
+        ITextChangeDetectionService? textChangeDetectionService = null,
+        IRoiManager? roiManager = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -160,7 +166,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _translationDictionaryService = translationDictionaryService;
         _fallbackOrchestrator = fallbackOrchestrator;
         _licenseManager = licenseManager;
-        _gatekeeperService = gatekeeperService;
+        _textChangeDetectionService = textChangeDetectionService;
+        _roiManager = roiManager;
         _logger = logger;
 
         // キャプチャオプションの初期設定
@@ -2122,60 +2129,60 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     // 🤖 NLLB-200 AI翻訳エンジンを使用
                     var translationStartTime = DateTime.UtcNow;
 
-                    // [Issue #293] Gatekeeper: テキスト変化チェック
-                    GatekeeperDecision? gatekeeperDecision = null;
-                    var gatekeeperSourceId = _targetWindowHandle.HasValue
+                    // [Issue #293] TextChangeDetection統合版Gatekeeper: テキスト変化チェック
+                    var gateSourceId = _targetWindowHandle.HasValue
                         ? $"window_{_targetWindowHandle.Value:X}"
                         : "default_source";
-                    var translationSkippedByGatekeeper = false;
+                    var translationSkippedByGate = false;
+                    TextChangeWithGateResult? gateResult = null;
 
-                    _logger?.LogInformation(
-                        "[Issue #293] Gatekeeper check: ServiceExists={ServiceExists}, IsEnabled={IsEnabled}, SourceId={SourceId}",
-                        _gatekeeperService != null, _gatekeeperService?.IsEnabled, gatekeeperSourceId);
-
-                    if (_gatekeeperService?.IsEnabled == true)
+                    if (_textChangeDetectionService != null)
                     {
-                        gatekeeperDecision = _gatekeeperService.ShouldTranslate(gatekeeperSourceId, originalText);
-
-                        if (!gatekeeperDecision.ShouldTranslate)
+                        // Geminiフィードバック反映: RegionInfoに事前にヒートマップ値を設定
+                        GateRegionInfo? regionInfo = null;
+                        if (_roiManager?.IsEnabled == true)
                         {
-                            _logger?.LogInformation(
-                                "[Issue #293] Gatekeeper denied translation: Reason={Reason}, ChangeRatio={Ratio:F3}",
-                                gatekeeperDecision.Reason, gatekeeperDecision.ChangeRatio);
-
-                            // 翻訳をスキップし、元のテキストを返す（または空の翻訳結果）
-                            translatedText = string.Empty;
-                            translationSkippedByGatekeeper = true;
-
-                            // Gatekeeper統計を更新（翻訳スキップ）
-                            _gatekeeperService.ReportTranslationResult(gatekeeperDecision, wasSuccessful: true, tokensUsed: 0);
+                            // デフォルト領域（全画面の中心）
+                            var heatmapValue = _roiManager.GetHeatmapValueAt(0.5f, 0.5f);
+                            regionInfo = GateRegionInfo.WithHeatmap(0f, 0f, 1f, 1f, heatmapValue);
+                            _logger?.LogDebug(
+                                "[Issue #293] RoiManager enabled, HeatmapValue at center: {Heatmap:F3}",
+                                heatmapValue);
                         }
                         else
                         {
-                            _logger?.LogInformation(
-                                "[Issue #293] Gatekeeper allowed translation: Reason={Reason}, ChangeRatio={Ratio:F3}",
-                                gatekeeperDecision.Reason, gatekeeperDecision.ChangeRatio);
+                            _logger?.LogDebug(
+                                "[Issue #293] RoiManager not available: IsNull={IsNull}, IsEnabled={IsEnabled}",
+                                _roiManager == null, _roiManager?.IsEnabled);
+                        }
+
+                        gateResult = await _textChangeDetectionService.DetectChangeWithGateAsync(
+                            originalText,
+                            gateSourceId,
+                            regionInfo,
+                            CancellationToken.None).ConfigureAwait(false);
+
+                        _logger?.LogInformation(
+                            "[Issue #293] Gate decision: {Decision}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}, SourceId={SourceId}",
+                            gateResult.Decision, gateResult.ChangePercentage, gateResult.AppliedThreshold, gateSourceId);
+
+                        if (!gateResult.ShouldTranslate)
+                        {
+                            translatedText = string.Empty;
+                            translationSkippedByGate = true;
                         }
                     }
                     else
                     {
-                        _logger?.LogWarning("[Issue #293] Gatekeeper is disabled or not injected");
+                        _logger?.LogDebug("[Issue #293] TextChangeDetectionService not available, proceeding with translation");
                     }
 
-                    // Gatekeeperが翻訳を許可した場合のみ実行
-                    if (!translationSkippedByGatekeeper)
+                    // Gate判定が翻訳を許可した場合のみ実行
+                    if (!translationSkippedByGate)
                     {
                         // すべての言語ペアでNLLB-200を使用
                         translatedText = await TranslateWithNLLBEngineAsync(originalText, sourceCode, targetCode);
                         _logger?.LogDebug($"🤖 NLLB-200翻訳結果: '{translatedText}'");
-
-                        // [Issue #293] Gatekeeper: 翻訳結果を報告
-                        if (_gatekeeperService?.IsEnabled == true && gatekeeperDecision != null)
-                        {
-                            var wasSuccessful = !string.IsNullOrEmpty(translatedText) && translatedText != originalText;
-                            // NLLB-200はローカルなのでトークン使用量は0（クラウドAIの場合は実際のトークン数を渡す）
-                            _gatekeeperService.ReportTranslationResult(gatekeeperDecision, wasSuccessful, tokensUsed: 0);
-                        }
                     }
 
                     var translationElapsed = DateTime.UtcNow - translationStartTime;

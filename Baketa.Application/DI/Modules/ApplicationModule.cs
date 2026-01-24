@@ -120,12 +120,7 @@ public sealed class ApplicationModule : ServiceModuleBase
             services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
         }
 
-        // [Issue #293] TranslationGatekeeperService登録 - ROI Gatekeeper機能
-        Console.WriteLine("🎯 [Issue #293] TranslationGatekeeperService DI登録開始");
-        services.AddSingleton<Baketa.Application.Services.Roi.TranslationGatekeeperService>();
-        services.AddSingleton<Baketa.Core.Abstractions.Roi.ITranslationGatekeeperService>(
-            provider => provider.GetRequiredService<Baketa.Application.Services.Roi.TranslationGatekeeperService>());
-        Console.WriteLine("✅ [Issue #293] TranslationGatekeeperService DI登録完了");
+        // [Issue #293 Phase 8] TranslationGatekeeperService廃止 - TextChangeDetectionServiceに統合済み
 
         // 🚀 翻訳モデル事前ロード戦略 - Clean Architecture準拠実装
         // UltraPhase 10.5: TranslationModelLoaderが DI初期化時にハングを引き起こすため一時的に無効化
@@ -208,10 +203,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                 var fallbackOrchestrator = provider.GetService<Baketa.Core.Translation.Abstractions.IFallbackOrchestrator>();
                 var licenseManager = provider.GetService<Baketa.Core.Abstractions.License.ILicenseManager>();
                 var cloudTranslationAvailabilityService = provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService>();
-                // [Issue #293] Gatekeeper
-                var gatekeeperService = provider.GetService<Baketa.Core.Abstractions.Roi.ITranslationGatekeeperService>();
-                Console.WriteLine($"✅ [Issue #293] ITranslationGatekeeperService取得: {(gatekeeperService != null ? $"成功 (Enabled={gatekeeperService.IsEnabled})" : "null (オプショナル)")}");
-                // [Issue #293] ROI学習マネージャー
+                // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
                 var roiManager = provider.GetService<Baketa.Core.Abstractions.Roi.IRoiManager>();
                 Console.WriteLine($"✅ [Issue #293] IRoiManager取得: {(roiManager != null ? $"成功 (Enabled={roiManager.IsEnabled})" : "null (オプショナル)")}");
                 // [Issue #293] ウィンドウ情報取得用
@@ -223,16 +215,15 @@ public sealed class ApplicationModule : ServiceModuleBase
                     streamingService,
                     textChunkAggregatorService, // 🎯 [OPTION_A] 追加パラメータ
                     pipelineService, // 🎯 [OPTION_A] 追加パラメータ - SmartProcessingPipelineService統合
-                    textChangeDetectionService, // [Issue #230] テキストベース変化検知
+                    textChangeDetectionService, // [Issue #230/#293] テキスト変化検知（Gatekeeper統合）
                     translationModeService, // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
                     fallbackOrchestrator, // [Issue #290] Fork-Join Cloud AI翻訳
                     licenseManager, // [Issue #290] ライセンスチェック
                     cloudTranslationAvailabilityService, // [Issue #290] Cloud翻訳可用性チェック
-                    gatekeeperService, // [Issue #293] Gatekeeper
-                    roiManager, // [Issue #293] ROI学習マネージャー
+                    roiManager, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
                     windowManager, // [Issue #293] ウィンドウ情報取得用
                     logger);
-                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join＋Gatekeeper統合済み");
+                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join＋Gate統合済み");
                 return instance;
             }
             catch (Exception ex)
@@ -278,9 +269,10 @@ public sealed class ApplicationModule : ServiceModuleBase
                 var licenseManager = provider.GetService<Baketa.Core.Abstractions.License.ILicenseManager>();
                 Console.WriteLine($"🚀 [Issue #290] Fork-Join: FallbackOrchestrator={fallbackOrchestrator != null}, LicenseManager={licenseManager != null}");
 
-                // [Issue #293] Gatekeeper: テキスト変化検出サービス
-                var gatekeeperService = provider.GetService<Baketa.Core.Abstractions.Roi.ITranslationGatekeeperService>();
-                Console.WriteLine($"🎯 [Issue #293] Gatekeeper: GatekeeperService={gatekeeperService != null}");
+                // [Issue #293] TextChangeDetection統合版Gate
+                var textChangeDetectionService = provider.GetService<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
+                var roiManager = provider.GetService<Baketa.Core.Abstractions.Roi.IRoiManager>();
+                Console.WriteLine($"🎯 [Issue #293] Gate: TextChangeDetectionService={textChangeDetectionService != null}, RoiManager={roiManager != null}");
 
                 var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
@@ -294,7 +286,8 @@ public sealed class ApplicationModule : ServiceModuleBase
                     translationDictionaryService,
                     fallbackOrchestrator,
                     licenseManager,
-                    gatekeeperService,
+                    textChangeDetectionService,
+                    roiManager,
                     logger);
             }
             catch (Exception ex)

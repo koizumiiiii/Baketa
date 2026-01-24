@@ -935,10 +935,7 @@ public class InfrastructureModule : ServiceModuleBase
             Baketa.Infrastructure.Roi.Services.RoiThresholdProvider>();
         Console.WriteLine("✅ IRoiThresholdProvider登録完了 - 動的閾値プロバイダー");
 
-        // ROI Gatekeeper（翻訳Gate機能）
-        services.AddSingleton<Baketa.Core.Abstractions.Roi.IRoiGatekeeper,
-            Baketa.Infrastructure.Roi.Services.RoiGatekeeper>();
-        Console.WriteLine("✅ IRoiGatekeeper登録完了 - 翻訳Gatekeeper");
+        // [Issue #293 Phase 8] IRoiGatekeeper廃止 - TextChangeDetectionServiceに統合済み
 
         // [Issue #293 Phase 5] ROI Profile Service（永続化）
         services.AddSingleton<Baketa.Core.Abstractions.Roi.IRoiProfileService,

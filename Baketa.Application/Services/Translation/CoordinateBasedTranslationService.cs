@@ -27,8 +27,10 @@ using Baketa.Core.Translation.Abstractions; // [Issue #290] IFallbackOrchestrato
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Abstractions.License; // [Issue #290] ILicenseManager
 using Baketa.Core.License.Models; // [Issue #290] FeatureType
-using Baketa.Core.Abstractions.Roi; // [Issue #293] ITranslationGatekeeperService
+using Baketa.Core.Abstractions.Roi; // [Issue #293] IRoiManager
+using Baketa.Core.Abstractions.Text; // [Issue #293] IGateStrategy
 using Baketa.Core.Models.Roi; // [Issue #293] NormalizedRect
+using Baketa.Core.Models.Text; // [Issue #293] TextChangeWithGateResult, GateRegionInfo
 using IWindowManager = Baketa.Core.Abstractions.Platform.IWindowManager; // [Issue #293] ウィンドウ情報取得用
 using Baketa.Core.Utilities;
 using System.Diagnostics; // [Issue #290] Fork-Join計測用
@@ -60,8 +62,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly IFallbackOrchestrator? _fallbackOrchestrator;
     private readonly ILicenseManager? _licenseManager;
     private readonly ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService; // [Issue #290] Cloud翻訳可用性チェック
-    private readonly ITranslationGatekeeperService? _gatekeeperService; // [Issue #293] Gatekeeper
-    private readonly IRoiManager? _roiManager; // [Issue #293] ROI学習マネージャー
+    private readonly IRoiManager? _roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
     private readonly IWindowManager? _windowManager; // [Issue #293] ウィンドウ情報取得用
     private bool _disposed;
 
@@ -80,8 +81,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         IFallbackOrchestrator? fallbackOrchestrator = null,
         ILicenseManager? licenseManager = null,
         ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null, // [Issue #290] Cloud翻訳可用性チェック
-        ITranslationGatekeeperService? gatekeeperService = null, // [Issue #293] Gatekeeper
-        IRoiManager? roiManager = null, // [Issue #293] ROI学習マネージャー
+        IRoiManager? roiManager = null, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
         IWindowManager? windowManager = null, // [Issue #293] ウィンドウ情報取得用
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
@@ -96,8 +96,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _fallbackOrchestrator = fallbackOrchestrator;
         _licenseManager = licenseManager;
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
-        _gatekeeperService = gatekeeperService; // [Issue #293] Gatekeeper
-        _roiManager = roiManager; // [Issue #293] ROI学習マネージャー
+        _roiManager = roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
         _windowManager = windowManager; // [Issue #293] ウィンドウ情報取得用
         _logger = logger;
 
@@ -716,57 +715,62 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             if (nonEmptyChunks.Count > 0)
             {
-                // [Issue #293] Gatekeeper: バッチ翻訳前にチャンクをフィルタリング
+                // [Issue #293] TextChangeDetection統合版Gate: バッチ翻訳前にチャンクをフィルタリング
                 // ROI学習ヒートマップを活用した動的閾値で判定
                 var chunksToTranslate = nonEmptyChunks;
-                if (_gatekeeperService?.IsEnabled == true)
+                if (_textChangeDetectionService != null)
                 {
                     var filteredChunks = new List<Baketa.Core.Abstractions.Translation.TextChunk>();
                     foreach (var chunk in nonEmptyChunks)
                     {
-                        var gatekeeperSourceId = $"chunk_{chunk.ChunkId}";
+                        var gateSourceId = $"chunk_{chunk.ChunkId}";
 
-                        // [Issue #293] チャンクの正規化座標を計算してRegionInfoを構築
-                        // screenWidth/screenHeightは画面サイズ（このメソッドのスコープで利用可能）
-                        var regionInfo = new GatekeeperRegionInfo
-                        {
-                            NormalizedX = screenWidth > 0 ? (float)chunk.CombinedBounds.X / screenWidth : 0f,
-                            NormalizedY = screenHeight > 0 ? (float)chunk.CombinedBounds.Y / screenHeight : 0f,
-                            NormalizedWidth = screenWidth > 0 ? (float)chunk.CombinedBounds.Width / screenWidth : 0f,
-                            NormalizedHeight = screenHeight > 0 ? (float)chunk.CombinedBounds.Height / screenHeight : 0f,
-                            HeatmapValue = null, // TranslationGatekeeperServiceがIRoiManager経由で設定
-                            ConfidenceScore = null,
-                            IsInExclusionZone = false
-                        };
+                        // [Issue #293] チャンクの正規化座標を計算してGateRegionInfoを構築
+                        // Geminiフィードバック反映: RegionInfoに事前にヒートマップ値を設定
+                        var normalizedX = screenWidth > 0 ? (float)chunk.CombinedBounds.X / screenWidth : 0f;
+                        var normalizedY = screenHeight > 0 ? (float)chunk.CombinedBounds.Y / screenHeight : 0f;
+                        var normalizedWidth = screenWidth > 0 ? (float)chunk.CombinedBounds.Width / screenWidth : 0f;
+                        var normalizedHeight = screenHeight > 0 ? (float)chunk.CombinedBounds.Height / screenHeight : 0f;
 
-                        var gatekeeperDecision = _gatekeeperService.ShouldTranslate(gatekeeperSourceId, chunk.CombinedText, regionInfo);
+                        // ヒートマップ値を事前に取得（呼び出し側で設定）
+                        var centerX = normalizedX + normalizedWidth / 2f;
+                        var centerY = normalizedY + normalizedHeight / 2f;
+                        var heatmapValue = _roiManager?.GetHeatmapValueAt(centerX, centerY) ?? 0f;
 
-                        if (gatekeeperDecision.ShouldTranslate)
+                        var regionInfo = GateRegionInfo.WithHeatmap(
+                            normalizedX, normalizedY, normalizedWidth, normalizedHeight, heatmapValue);
+
+                        var gateResult = await _textChangeDetectionService.DetectChangeWithGateAsync(
+                            chunk.CombinedText,
+                            gateSourceId,
+                            regionInfo,
+                            cancellationToken).ConfigureAwait(false);
+
+                        if (gateResult.ShouldTranslate)
                         {
                             _logger?.LogInformation(
-                                "[Issue #293] Gatekeeper allowed (Batch): ChunkId={ChunkId}, Reason={Reason}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}",
-                                chunk.ChunkId, gatekeeperDecision.Reason, gatekeeperDecision.ChangeRatio, gatekeeperDecision.AppliedThreshold);
+                                "[Issue #293] Gate allowed (Batch): ChunkId={ChunkId}, Decision={Decision}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}",
+                                chunk.ChunkId, gateResult.Decision, gateResult.ChangePercentage, gateResult.AppliedThreshold);
                             filteredChunks.Add(chunk);
                         }
                         else
                         {
                             _logger?.LogInformation(
-                                "[Issue #293] Gatekeeper denied (Batch): ChunkId={ChunkId}, Reason={Reason}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}",
-                                chunk.ChunkId, gatekeeperDecision.Reason, gatekeeperDecision.ChangeRatio, gatekeeperDecision.AppliedThreshold);
-                            chunk.TranslatedText = ""; // Gatekeeperによるスキップ
-                            _gatekeeperService.ReportTranslationResult(gatekeeperDecision, wasSuccessful: true, tokensUsed: 0);
+                                "[Issue #293] Gate denied (Batch): ChunkId={ChunkId}, Decision={Decision}, ChangeRatio={Ratio:F3}, Threshold={Threshold:F3}",
+                                chunk.ChunkId, gateResult.Decision, gateResult.ChangePercentage, gateResult.AppliedThreshold);
+                            chunk.TranslatedText = ""; // Gateによるスキップ
                         }
                     }
                     chunksToTranslate = filteredChunks;
                     _logger?.LogInformation(
-                        "[Issue #293] Gatekeeper filter result: Original={Original}, ToTranslate={ToTranslate}, Skipped={Skipped}",
+                        "[Issue #293] Gate filter result: Original={Original}, ToTranslate={ToTranslate}, Skipped={Skipped}",
                         nonEmptyChunks.Count, chunksToTranslate.Count, nonEmptyChunks.Count - chunksToTranslate.Count);
                 }
 
-                // Gatekeeper後に翻訳対象がない場合はスキップ
+                // Gate判定後に翻訳対象がない場合はスキップ
                 if (chunksToTranslate.Count == 0)
                 {
-                    _logger?.LogInformation("[Issue #293] All chunks skipped by Gatekeeper - no translation needed");
+                    _logger?.LogInformation("[Issue #293] All chunks skipped by Gate - no translation needed");
                     return;
                 }
 

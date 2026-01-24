@@ -236,6 +236,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                     learnedRegions,
                     changeResult);
 
+                // [Issue #293 Phase 8] テキスト欠落防止: 学習済みROIにも垂直・水平拡張を適用
+                combinedRegions = ExpandRegionsHorizontally(combinedRegions, ocrImage.Width, ocrImage.Height);
+                _logger.LogDebug("[Issue #293 Phase 8] 学習済みROI拡張適用: 水平15%+垂直30%");
+
                 _logger.LogInformation("🎯 [Issue #293 Phase 7.3] 学習済みROI + 変化領域併用OCR: 学習済み{LearnedCount}領域 + 変化{ChangedCount}領域 = 合計{TotalCount}領域",
                     learnedRegions.Count, combinedRegions.Count - learnedRegions.Count, combinedRegions.Count);
 
@@ -931,6 +935,11 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         _logger.LogDebug("[Issue #293 Phase 7.1] 領域結合: {InputCount}→{OutputCount}",
             allRegions.Count, mergedRegions.Count);
 
+        // [Issue #293 Phase 8] テキスト欠落防止: 変化領域にも水平拡張を適用
+        // 学習済みROIと同様に、テキストが領域境界で切れないように水平方向15%拡張
+        mergedRegions = ExpandRegionsHorizontally(mergedRegions, imageWidth, imageHeight);
+        _logger.LogDebug("[Issue #293 Phase 8] 水平拡張適用: 15%拡張 + 境界クランプ");
+
         // 結合後の領域数が多すぎる場合は全画面OCR
         if (mergedRegions.Count > _maxMergedRegions)
         {
@@ -968,6 +977,54 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             mergedRegions.Count, coverageRatio);
 
         return true;
+    }
+
+    // [Issue #293 Phase 8] テキスト欠落防止: 垂直方向拡張率
+    // 複数行テキスト（3行以上）が切れないように垂直方向にも拡張
+    private const float RoiVerticalExpansionRatio = 0.30f; // 垂直方向30%拡張（上下各15%）
+
+    /// <summary>
+    /// [Issue #293 Phase 8] 領域を水平・垂直両方向に拡張（テキスト欠落防止）
+    /// </summary>
+    /// <param name="regions">結合済み領域リスト</param>
+    /// <param name="imageWidth">画像幅</param>
+    /// <param name="imageHeight">画像高さ</param>
+    /// <returns>拡張適用済みの領域リスト</returns>
+    /// <remarks>
+    /// 変化領域ベースの部分OCRでテキストが境界で切れる問題を解決。
+    /// - 水平方向: 15%拡張（テキストは横に伸びやすい）
+    /// - 垂直方向: 30%拡張（複数行テキスト対応、上下に行が追加される場合）
+    /// </remarks>
+    private static List<Rectangle> ExpandRegionsHorizontally(
+        List<Rectangle> regions,
+        int imageWidth,
+        int imageHeight)
+    {
+        if (regions.Count == 0)
+        {
+            return regions;
+        }
+
+        var expandedRegions = new List<Rectangle>(regions.Count);
+
+        foreach (var region in regions)
+        {
+            // 水平方向15%拡張（学習済みROIと同じ）
+            var horizontalExpansion = (int)(region.Width * RoiHorizontalExpansionRatio);
+
+            // 垂直方向30%拡張（複数行テキスト対応）
+            var verticalExpansion = (int)(region.Height * RoiVerticalExpansionRatio);
+
+            // パディング適用（水平: 15%拡張 + 5px、垂直: 30%拡張 + 5px）
+            var x = Math.Max(0, region.X - horizontalExpansion - RoiPaddingPixels);
+            var y = Math.Max(0, region.Y - verticalExpansion - RoiPaddingPixels);
+            var width = Math.Min(imageWidth - x, region.Width + (horizontalExpansion + RoiPaddingPixels) * 2);
+            var height = Math.Min(imageHeight - y, region.Height + (verticalExpansion + RoiPaddingPixels) * 2);
+
+            expandedRegions.Add(new Rectangle(x, y, width, height));
+        }
+
+        return expandedRegions;
     }
 
     /// <summary>
