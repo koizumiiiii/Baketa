@@ -817,25 +817,29 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             {
                 // [FIX] 安定化モード開始 - 最初の変化検出時はOCRを許可
                 // バグ修正: 以前は最初の変化でもOCRを抑制していたため、20秒以上の遅延が発生していた
-                state.EnterStabilization();
+                // [FIX] OCR許可後はstateをリセットして次回は新規サイクルとして開始
+                // これによりOCR処理時間がタイムアウト計測に含まれる問題を解消
 
-                _logger.LogDebug("🕐 [TextStabilization] 安定化モード開始 - Context: {ContextId}, WaitMs: {WaitMs}（最初の変化はOCR許可）",
-                    contextId, _settings.TextStabilizationDelayMs);
+                _logger.LogDebug("🕐 [TextStabilization] 変化検出 - Context: {ContextId}（OCR許可、安定化サイクル開始せず）",
+                    contextId);
 
                 // [FIX] 最初の変化検出時はOCRを許可（nullを返す）
-                // 連続した高速変化のみを抑制し、ユーザー体験を向上
+                // 安定化モードには入らない = 次回の変化検出時も「最初の変化」として扱う
+                // これによりOCR処理時間がタイムアウト計測に含まれることを防止
                 return null;
             }
 
             // 既に安定化モード中：タイムアウトチェック
+            // 注: このブランチは連続した高速変化（タイプライターエフェクト）時のみ到達
             if (state.HasTimedOut(now, _settings.MaxStabilizationWaitMs))
             {
                 // タイムアウト：強制的にOCR実行許可
-                var waitedMs = (now - state.FirstChangeTime).TotalMilliseconds;
+                var totalMs = (now - state.FirstChangeTime).TotalMilliseconds;
+                var actualWaitMs = (now - state.LastChangeTime).TotalMilliseconds;
                 state.Reset();
 
-                _logger.LogWarning("⏰ [TextStabilization] タイムアウト - Context: {ContextId}, WaitedMs: {WaitedMs:F0}ms",
-                    contextId, waitedMs);
+                _logger.LogDebug("⏰ [TextStabilization] 安定化タイムアウト - Context: {ContextId}, 総経過: {TotalMs:F0}ms, 最終変化から: {ActualWaitMs:F0}ms",
+                    contextId, totalMs, actualWaitMs);
 
                 return null; // OCR実行許可
             }
