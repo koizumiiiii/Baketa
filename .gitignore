@@ -775,3 +775,12 @@ temp_review_*.txt
 # Translation server logs
 translation_server.log
 publish-temp/
+
+# ===== ANALYTICS DATA =====
+
+# Raw data files (analysis results and scripts are tracked)
+analytics/data/*
+!analytics/data/.gitkeep
+*.csv
+*.parquet
+*.xlsx
