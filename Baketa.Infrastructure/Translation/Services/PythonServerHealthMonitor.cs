@@ -275,8 +275,8 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         var connectionTimeout = Math.Max(totalTimeout / 3, 5000);  // 最低5秒
         var responseTimeout = totalTimeout - connectionTimeout;     // 残りを応答用に
 
-        // [Issue #327] 統合サーバーモードかどうかを判定
-        var isUnifiedServerMode = _unifiedServerSettings?.Enabled == true;
+        // [Issue #327] 統合サーバーモードかどうかを判定（パターンマッチングでNull安全性強化）
+        var isUnifiedServerMode = _unifiedServerSettings is { Enabled: true };
 
         try
         {
