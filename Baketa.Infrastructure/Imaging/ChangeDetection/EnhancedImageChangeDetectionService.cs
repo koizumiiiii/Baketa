@@ -1203,6 +1203,13 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 // 将来のオプションE/F判断のための専用CSVログ
                 WriteTelemetryLog(position, block.Row, block.Col, block.Similarity, rows, cols);
             }
+            else if (isBottomRow && IsEdgeBlock(block.Row, block.Col, rows, cols) && block.Similarity > 0.90f)
+            {
+                // [Code Review] 下端ブロックはノイズ判定から除外されたことをログ
+                _logger.LogDebug(
+                    "[Issue #319] 下端ブロックはノイズ判定から除外: Row={Row}, Col={Col}, Similarity={Similarity:F4}",
+                    block.Row, block.Col, block.Similarity);
+            }
         }
 
         // 有意な変化判定

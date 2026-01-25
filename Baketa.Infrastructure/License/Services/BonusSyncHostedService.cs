@@ -212,6 +212,12 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
                     _licenseManager.SetUserId(session.User.Id);
                     _logger.LogInformation("[Issue #321] SupabaseユーザーIDをLicenseManagerに設定しました");
                 }
+                else
+                {
+                    // [Code Review] User.Idが空の場合は明示的にクリア
+                    _licenseManager.SetUserId(null);
+                    _logger.LogDebug("[Issue #321] SupabaseセッションにUser.Idがないためクリア");
+                }
                 _logger.LogInformation("[Issue #280+#281] Supabase JWTをLicenseManagerに設定しました");
             }
             else
