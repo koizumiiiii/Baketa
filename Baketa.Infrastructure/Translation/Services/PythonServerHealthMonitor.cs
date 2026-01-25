@@ -246,7 +246,9 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
                 _consecutiveFailures++;
                 Interlocked.Increment(ref _totalFailures);
 
-                _logger.LogWarning("[HEALTH_MONITOR] サーバーヘルスチェック失敗 ({Current}/{Max}) - Port: {Port}",
+                // [Issue #293] 一時的な失敗は頻発するためDebugレベルに変更
+                // 最大失敗回数到達時はWarningで出力される
+                _logger.LogDebug("[HEALTH_MONITOR] サーバーヘルスチェック失敗 ({Current}/{Max}) - Port: {Port}",
                     _consecutiveFailures, _cachedSettings.MaxConsecutiveFailures, _currentServerPort);
 
                 // 最大失敗回数に達したら再起動

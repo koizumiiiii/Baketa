@@ -156,6 +156,52 @@ public sealed class OcrSettings
         MaxValue = 20.0)]
     public double BorderlineMinAspectRatio { get; set; } = 2.0;
 
+    // ========================================
+    // [Issue #293] ROI学習済み領域の信頼度緩和設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #293] ROI学習済み領域の信頼度緩和を有効化
+    /// </summary>
+    /// <remarks>
+    /// 学習済みROI領域で検出されたテキストには、通常より低い信頼度閾値を適用します。
+    /// ROI学習済み領域は「過去にテキストが出現した実績がある場所」なので、
+    /// その領域で検出されたテキストは信頼性が高いと判断できます。
+    /// Geminiフィードバック: 方針は正しい、暫定値として0.40を導入し、
+    /// データに基づく検証を行うことを推奨。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ROI信頼度緩和",
+        Description = "学習済みROI領域のテキストに緩和閾値を適用します")]
+    public bool EnableRoiConfidenceRelaxation { get; set; } = true;
+
+    /// <summary>
+    /// [Issue #293] ROI学習済み領域用の緩和信頼度閾値
+    /// </summary>
+    /// <remarks>
+    /// 学習済みROI領域で検出されたテキストに適用する信頼度閾値。
+    /// デフォルト: 0.40（通常閾値0.70より大幅に低い）
+    /// 注: この値は暫定値であり、実際のデータに基づいて最適化される可能性があります。
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ROI信頼度閾値",
+        Description = "ROI領域用の緩和閾値（0.40推奨）",
+        MinValue = 0.0,
+        MaxValue = 1.0)]
+    public double RoiConfidenceThreshold { get; set; } = 0.40;
+
+    /// <summary>
+    /// [Issue #293] ROI緩和適用時の最小テキスト長
+    /// </summary>
+    /// <remarks>
+    /// ROI信頼度緩和を適用する際の最小文字数。
+    /// 短すぎるテキスト（ノイズの可能性が高い）を除外するためのフィルタ。
+    /// デフォルト: 3文字
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "ROI最小文字長",
+        Description = "ROI緩和適用の最小文字数（3推奨）",
+        MinValue = 1,
+        MaxValue = 20)]
+    public int RoiMinTextLength { get; set; } = 3;
+
     /// <summary>
     /// テキスト検出の閾値（0.0-1.0）
     /// </summary>
@@ -424,6 +470,10 @@ public sealed class OcrSettings
             BorderlineMinTextLength = BorderlineMinTextLength,
             BorderlineMinBoundsHeight = BorderlineMinBoundsHeight,
             BorderlineMinAspectRatio = BorderlineMinAspectRatio,
+            // [Issue #293] ROI学習済み領域の信頼度緩和設定
+            EnableRoiConfidenceRelaxation = EnableRoiConfidenceRelaxation,
+            RoiConfidenceThreshold = RoiConfidenceThreshold,
+            RoiMinTextLength = RoiMinTextLength,
             DetectionThreshold = DetectionThreshold,
             EnableImagePreprocessing = EnableImagePreprocessing,
             ConvertToGrayscale = ConvertToGrayscale,

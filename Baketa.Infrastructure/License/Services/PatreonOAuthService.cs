@@ -25,7 +25,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     private readonly IJwtTokenService? _jwtTokenService;  // [Issue #287] JWT認証サービス（オプショナル）
     private readonly IAuthService? _authService;  // [Issue #295] Supabase認証サービス（アカウント紐づけ用）
     private readonly IPromotionSettingsPersistence? _promotionSettingsPersistence;  // [Issue #298] プロモーション設定永続化
-    private readonly IPromotionCodeService? _promotionCodeService;  // [Issue #298] プロモーションコードサービス
+    private readonly Lazy<IPromotionCodeService>? _lazyPromotionCodeService;  // [Issue #293] 循環依存回避のためLazy化
     private readonly string _credentialsFilePath;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
@@ -78,7 +78,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         IJwtTokenService? jwtTokenService = null,  // [Issue #287] オプショナル依存
         IAuthService? authService = null,  // [Issue #295] Supabase認証（アカウント紐づけ用、オプショナル）
         IPromotionSettingsPersistence? promotionSettingsPersistence = null,  // [Issue #298] プロモーション設定永続化
-        IPromotionCodeService? promotionCodeService = null)  // [Issue #298] プロモーションコードサービス
+        Lazy<IPromotionCodeService>? lazyPromotionCodeService = null)  // [Issue #293] 循環依存回避のためLazy化
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
@@ -86,7 +86,7 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         _jwtTokenService = jwtTokenService;  // null可（JWT未設定時）
         _authService = authService;  // [Issue #295] null可（Supabase未ログイン時）
         _promotionSettingsPersistence = promotionSettingsPersistence;  // [Issue #298] null可
-        _promotionCodeService = promotionCodeService;  // [Issue #298] null可
+        _lazyPromotionCodeService = lazyPromotionCodeService;  // [Issue #293] 循環依存回避のためLazy化
 
         // 資格情報保存パス
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -315,7 +315,8 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
 
             // [Issue #298] ログイン成功時にプロモーション状態を同期（ユーザー間混在防止）
             // [レビュー対応] JWT未取得時はSupabaseセッションからアクセストークンを取得
-            if (_promotionCodeService != null)
+            // [Issue #293] 循環依存回避のためLazy<T>経由でアクセス
+            if (_lazyPromotionCodeService != null)
             {
                 var tokenForSync = accessToken;
 
@@ -341,7 +342,8 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
                 {
                     try
                     {
-                        var syncResult = await _promotionCodeService.SyncFromServerAsync(tokenForSync, cancellationToken)
+                        // [Issue #293] Lazy<T>.Valueで初めて解決（循環依存を回避）
+                        var syncResult = await _lazyPromotionCodeService.Value.SyncFromServerAsync(tokenForSync, cancellationToken)
                             .ConfigureAwait(false);
                         _logger.LogInformation(
                             "[Issue #298] プロモーション状態を同期しました: Result={Result}",

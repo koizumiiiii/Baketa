@@ -1,5 +1,7 @@
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Monitoring;
 using Baketa.Core.Abstractions.OCR;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.DI;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.OCR.Clients;
@@ -9,6 +11,7 @@ using Baketa.Infrastructure.Translation.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.DI;
 
@@ -37,6 +40,9 @@ public sealed class SuryaOcrModule : ServiceModuleBase
 
         // Surya OCRエンジン登録
         RegisterSuryaOcrEngine(services);
+
+        // Issue #293: 投機的OCRサービス登録
+        RegisterSpeculativeOcrService(services);
     }
 
     private static void RegisterServerManager(IServiceCollection services)
@@ -179,6 +185,51 @@ public sealed class SuryaOcrModule : ServiceModuleBase
         });
 
         Console.WriteLine("✅ [Issue #189] SuryaOcrModule登録完了");
+    }
+
+    /// <summary>
+    /// Issue #293: 投機的OCRサービス登録
+    /// GPU余裕時にOCRを先行実行し、Shot翻訳の応答時間を短縮
+    /// </summary>
+    private static void RegisterSpeculativeOcrService(IServiceCollection services)
+    {
+        // 投機的OCR設定をIOptionsMonitorで登録
+        services.Configure<SpeculativeOcrSettings>(options =>
+        {
+            // デフォルト設定（appsettings.jsonで上書き可能）
+            options = new SpeculativeOcrSettings();
+        });
+
+        // 設定をappsettings.jsonから読み込み
+        services.AddSingleton<IConfigureOptions<SpeculativeOcrSettings>>(serviceProvider =>
+        {
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            return new ConfigureFromConfigurationOptions<SpeculativeOcrSettings>(
+                configuration.GetSection("SpeculativeOcr"));
+        });
+
+        // 投機的OCRサービス登録
+        services.AddSingleton<ISpeculativeOcrService>(serviceProvider =>
+        {
+            var ocrEngine = serviceProvider.GetRequiredService<IOcrEngine>();
+            var resourceMonitor = serviceProvider.GetRequiredService<IResourceMonitor>();
+            var translationModeService = serviceProvider.GetRequiredService<ITranslationModeService>();
+            var settingsMonitor = serviceProvider.GetRequiredService<IOptionsMonitor<SpeculativeOcrSettings>>();
+            var logger = serviceProvider.GetRequiredService<ILogger<SpeculativeOcrService>>();
+
+            Console.WriteLine("✅ [Issue #293] ISpeculativeOcrService → SpeculativeOcrService 登録完了");
+            Console.WriteLine("   → GPU余裕時に投機的OCR実行");
+            Console.WriteLine("   → Shot翻訳応答時間短縮機能");
+
+            return new SpeculativeOcrService(
+                ocrEngine,
+                resourceMonitor,
+                translationModeService,
+                settingsMonitor,
+                logger);
+        });
+
+        Console.WriteLine("✅ [Issue #293] SpeculativeOcrService登録完了");
     }
 }
 

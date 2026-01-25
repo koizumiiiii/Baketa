@@ -1,4 +1,5 @@
 using Baketa.Core.Models.Processing;
+using Baketa.Core.Models.Text;
 
 namespace Baketa.Core.Abstractions.Processing;
 
@@ -60,6 +61,25 @@ public interface ITextChangeDetectionService
     /// <param name="contextId">処理コンテキストID（ウィンドウハンドル等）</param>
     /// <param name="text">保存するテキスト</param>
     void SetPreviousText(string contextId, string text);
+
+    /// <summary>
+    /// [Issue #293] Gate判定を含むテキスト変化検知
+    /// </summary>
+    /// <remarks>
+    /// Geminiフィードバック反映: 既存Gatekeeperの機能を統合。
+    /// テキスト変化率に基づいて翻訳を実行すべきかどうかを判定します。
+    /// 前回テキストはsourceId別にキャッシュ管理されます。
+    /// </remarks>
+    /// <param name="currentText">現在のテキスト</param>
+    /// <param name="sourceId">テキストソースID（ウィンドウハンドル、ROI ID等）</param>
+    /// <param name="regionInfo">領域情報（ヒートマップ値含む）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>Gate判定を含む変化検知結果</returns>
+    Task<TextChangeWithGateResult> DetectChangeWithGateAsync(
+        string currentText,
+        string sourceId,
+        GateRegionInfo? regionInfo = null,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Abstractions.Roi;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Models.ImageProcessing;
 using Baketa.Infrastructure.Imaging.ChangeDetection;
@@ -18,6 +19,7 @@ public class EnhancedImageChangeDetectionServiceTests
     private readonly Mock<IPerceptualHashService> _mockPerceptualHashService;
     private readonly Mock<IImageChangeMetricsService> _mockMetricsService;
     private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<IRoiThresholdProvider> _mockRoiThresholdProvider;
     private readonly Mock<IImage> _mockCurrentImage;
     private readonly Mock<IImage> _mockPreviousImage;
     private readonly EnhancedImageChangeDetectionService _service;
@@ -28,6 +30,8 @@ public class EnhancedImageChangeDetectionServiceTests
         _mockPerceptualHashService = new Mock<IPerceptualHashService>();
         _mockMetricsService = new Mock<IImageChangeMetricsService>();
         _mockConfiguration = new Mock<IConfiguration>();
+        _mockRoiThresholdProvider = new Mock<IRoiThresholdProvider>();
+        _mockRoiThresholdProvider.Setup(x => x.IsEnabled).Returns(false); // デフォルトは無効
 
         // Setup mock configuration with default values
         _mockConfiguration.Setup(x => x["ImageChangeDetection:Stage1SimilarityThreshold"]).Returns("0.92");
@@ -51,7 +55,8 @@ public class EnhancedImageChangeDetectionServiceTests
             _mockLogger.Object,
             _mockPerceptualHashService.Object,
             _mockMetricsService.Object,
-            _mockConfiguration.Object);
+            _mockConfiguration.Object,
+            _mockRoiThresholdProvider.Object);
     }
 
     [Fact]

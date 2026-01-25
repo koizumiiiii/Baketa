@@ -27,6 +27,11 @@ using Baketa.Core.Translation.Abstractions; // [Issue #290] IFallbackOrchestrato
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Abstractions.License; // [Issue #290] ILicenseManager
 using Baketa.Core.License.Models; // [Issue #290] FeatureType
+using Baketa.Core.Abstractions.Roi; // [Issue #293] IRoiManager
+using Baketa.Core.Abstractions.Text; // [Issue #293] IGateStrategy
+using Baketa.Core.Models.Roi; // [Issue #293] NormalizedRect
+using Baketa.Core.Models.Text; // [Issue #293] TextChangeWithGateResult, GateRegionInfo
+using IWindowManager = Baketa.Core.Abstractions.Platform.IWindowManager; // [Issue #293] ウィンドウ情報取得用
 using Baketa.Core.Utilities;
 using System.Diagnostics; // [Issue #290] Fork-Join計測用
 // NOTE: [PP-OCRv5削除] BatchProcessing参照削除
@@ -57,6 +62,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly IFallbackOrchestrator? _fallbackOrchestrator;
     private readonly ILicenseManager? _licenseManager;
     private readonly ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService; // [Issue #290] Cloud翻訳可用性チェック
+    private readonly IRoiManager? _roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
+    private readonly IWindowManager? _windowManager; // [Issue #293] ウィンドウ情報取得用
     private bool _disposed;
 
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
@@ -74,6 +81,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         IFallbackOrchestrator? fallbackOrchestrator = null,
         ILicenseManager? licenseManager = null,
         ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null, // [Issue #290] Cloud翻訳可用性チェック
+        IRoiManager? roiManager = null, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
+        IWindowManager? windowManager = null, // [Issue #293] ウィンドウ情報取得用
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -87,6 +96,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _fallbackOrchestrator = fallbackOrchestrator;
         _licenseManager = licenseManager;
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
+        _roiManager = roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
+        _windowManager = windowManager; // [Issue #293] ウィンドウ情報取得用
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -497,6 +508,95 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // TimedChunkAggregatorが集約完了時にAggregatedChunksReadyEventを発行
             // AggregatedChunksReadyEventHandlerで翻訳・オーバーレイ表示を実行
 
+            // [Issue #293] ROI学習: テキスト検出位置をヒートマップに記録
+            // 🔥 [Issue #293 FIX] CombinedBoundsは元ウィンドウサイズ基準（OcrExecutionStageStrategyでスケーリング済み）
+            // そのため、正規化にはOriginalWidth/OriginalHeight（元ウィンドウサイズ）を使用する必要がある
+            // image.Width/Heightはキャプチャ画像サイズ（例: 1280x720）であり、座標系が異なる
+            var (normalizeWidth, normalizeHeight) = image switch
+            {
+                IWindowsImage windowsImage => (windowsImage.OriginalWidth, windowsImage.OriginalHeight),
+                WindowsImageAdapter adapter => (adapter.OriginalWidth, adapter.OriginalHeight),
+                _ => (image.Width, image.Height) // フォールバック: リサイズなしの場合
+            };
+
+            // [Gemini Feedback] ゼロ除算防止のガード
+            if (_roiManager != null && textChunks.Count > 0 && normalizeWidth > 0 && normalizeHeight > 0)
+            {
+                _logger?.LogInformation(
+                    "[Issue #293] ROI学習チェック: RoiManager.IsEnabled={IsEnabled}, ChunkCount={ChunkCount}, NormalizeSize={Width}x{Height} (CaptureSize={CaptureWidth}x{CaptureHeight})",
+                    _roiManager.IsEnabled, textChunks.Count, normalizeWidth, normalizeHeight, image.Width, image.Height);
+
+                if (_roiManager.IsEnabled)
+                {
+                    try
+                    {
+                        var detections = textChunks
+                            .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
+                            .Select(chunk => (
+                                bounds: new NormalizedRect
+                                {
+                                    // 🔥 [Issue #293 FIX] 元ウィンドウサイズで正規化（CombinedBoundsと同じ座標系）
+                                    X = (float)chunk.CombinedBounds.X / normalizeWidth,
+                                    Y = (float)chunk.CombinedBounds.Y / normalizeHeight,
+                                    Width = (float)chunk.CombinedBounds.Width / normalizeWidth,
+                                    Height = (float)chunk.CombinedBounds.Height / normalizeHeight
+                                },
+                                confidence: chunk.TextResults.FirstOrDefault()?.Confidence ?? 0.8f
+                            ))
+                            .ToList();
+
+                        if (detections.Count > 0)
+                        {
+                            // [Issue #293 FIX] 正規化座標の検証ログ
+                            var firstDetection = detections[0];
+                            _logger?.LogInformation(
+                                "[Issue #293 FIX] 正規化座標確認: First region at ({X:F3}, {Y:F3}), 範囲内={InRange}",
+                                firstDetection.bounds.X, firstDetection.bounds.Y,
+                                firstDetection.bounds.X >= 0 && firstDetection.bounds.X <= 1 &&
+                                firstDetection.bounds.Y >= 0 && firstDetection.bounds.Y <= 1);
+
+                            // [Issue #293] ウィンドウ情報を取得してプロファイルに紐づけ
+                            var windowTitle = _windowManager?.GetWindowTitle(windowHandle) ?? string.Empty;
+                            var executablePath = GetExecutablePathFromWindow(windowHandle);
+
+                            _logger?.LogDebug(
+                                "[Issue #293] ROI学習ウィンドウ情報: Handle=0x{Handle:X}, Title='{Title}', ExePath='{ExePath}'",
+                                windowHandle.ToInt64(), windowTitle, executablePath);
+
+                            // 非同期でROI学習を実行（fire-and-forget、エラーは内部でログ）
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await _roiManager.ReportTextDetectionsAsync(
+                                        detections,
+                                        windowHandle,
+                                        windowTitle,
+                                        executablePath,
+                                        cancellationToken).ConfigureAwait(false);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger?.LogWarning(ex, "[Issue #293] ROI学習非同期処理でエラー");
+                                }
+                            });
+
+                            _logger?.LogInformation(
+                                "[Issue #293] ROI学習: {Count}個のテキスト領域を記録開始 (Window='{Title}')",
+                                detections.Count, windowTitle);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "[Issue #293] ROI学習記録でエラーが発生（処理は継続）");
+                    }
+                }
+            }
+            else if (_roiManager == null)
+            {
+                _logger?.LogDebug("[Issue #293] IRoiManager is null - ROI learning skipped");
+            }
+
             // Phase 12.2完全移行により、この先の処理（2回目翻訳 + オーバーレイ表示）は不要
             // TimedChunkAggregatorがAggregatedChunksReadyEventを発行 → AggregatedChunksReadyEventHandlerで翻訳 + オーバーレイ表示
             return;
@@ -615,13 +715,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             if (nonEmptyChunks.Count > 0)
             {
+                // NOTE: Gate判定はAggregatedChunksReadyEventHandlerに移行済み（Issue #293）
+                var chunksToTranslate = nonEmptyChunks;
+
                 using var batchTranslationMeasurement = new PerformanceMeasurement(
                     MeasurementType.TranslationProcessing,
-                    $"バッチ翻訳処理 - {nonEmptyChunks.Count}チャンク")
+                    $"バッチ翻訳処理 - {chunksToTranslate.Count}チャンク")
                     .WithAdditionalInfo($"Service:{serviceType}");
 
                 // バッチ翻訳リクエストを作成
-                var batchTexts = nonEmptyChunks.Select(c => c.CombinedText).ToList();
+                var batchTexts = chunksToTranslate.Select(c => c.CombinedText).ToList();
 
                 try
                 {
@@ -629,7 +732,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
                     // 🔥 [STREAMING] ストリーミング翻訳を試行（段階的結果表示）
                     // 🚀 [DYNAMIC_LANGUAGE_FIX] 最初のテキストチャンクから言語を動的検出
-                    var firstText = nonEmptyChunks.FirstOrDefault()?.CombinedText ?? "";
+                    var firstText = chunksToTranslate.FirstOrDefault()?.CombinedText ?? "";
                     var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings(firstText);
 
                     List<string> batchResults;
@@ -646,14 +749,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         _logger?.LogDebug("🔥 [STREAMING] ストリーミング翻訳サービス使用 - 段階的表示開始");
 
                         // 段階的結果表示のコールバック関数を定義
+                        // [Issue #293] Gatekeeper適用後のchunksToTranslateを参照
                         void OnChunkCompleted(int index, string translatedText)
                         {
-                            if (index < nonEmptyChunks.Count)
+                            if (index < chunksToTranslate.Count)
                             {
-                                var chunk = nonEmptyChunks[index];
+                                var chunk = chunksToTranslate[index];
                                 chunk.TranslatedText = translatedText;
 
-                                Console.WriteLine($"✨ [STREAMING] チャンク完了 [{index + 1}/{nonEmptyChunks.Count}] - " +
+                                Console.WriteLine($"✨ [STREAMING] チャンク完了 [{index + 1}/{chunksToTranslate.Count}] - " +
                                                 $"テキスト: '{(chunk.CombinedText.Length > 30 ? chunk.CombinedText[..30] + "..." : chunk.CombinedText)}'");
 
                                 // 🚀 [STREAMING_OVERLAY_FIX] 翻訳完了時に即座にオーバーレイ表示
@@ -743,23 +847,24 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             cancellationToken).ConfigureAwait(false);
                     }
 
-                    // 結果をチャンクに反映
-                    for (int i = 0; i < nonEmptyChunks.Count && i < batchResults.Count; i++)
+                    // 結果をチャンクに反映 [Issue #293] Gatekeeper適用後のchunksToTranslateを参照
+                    for (int i = 0; i < chunksToTranslate.Count && i < batchResults.Count; i++)
                     {
-                        nonEmptyChunks[i].TranslatedText = batchResults[i];
-                        _logger?.LogDebug($"   [{nonEmptyChunks[i].ChunkId}] '{nonEmptyChunks[i].CombinedText}' → '{batchResults[i]}'");
+                        chunksToTranslate[i].TranslatedText = batchResults[i];
+                        _logger?.LogDebug($"   [{chunksToTranslate[i].ChunkId}] '{chunksToTranslate[i].CombinedText}' → '{batchResults[i]}'");
                     }
 
                     var batchResult = batchTranslationMeasurement.Complete();
                     _logger?.LogInformation("✅ バッチ翻訳完了: {Count}チャンク, {Duration}ms",
-                        nonEmptyChunks.Count, batchResult.Duration.TotalMilliseconds);
+                        chunksToTranslate.Count, batchResult.Duration.TotalMilliseconds);
                 }
                 catch (NotImplementedException)
                 {
                     // バッチ翻訳が未実装の場合は個別処理にフォールバック
+                    // [Issue #293] Gatekeeper適用後のchunksToTranslateを使用（フィルタリング済み）
                     _logger?.LogWarning("⚠️ バッチ翻訳未実装のため個別処理にフォールバック");
 
-                    foreach (var chunk in nonEmptyChunks)
+                    foreach (var chunk in chunksToTranslate)
                     {
                         try
                         {
@@ -770,6 +875,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
                             // 🚀 [DYNAMIC_LANGUAGE_FIX] チャンクごとに動的言語検出を実行
                             var (sourceLanguage, targetLanguage) = GetLanguagesFromSettings(chunk.CombinedText);
+
+                            // [Issue #293] Note: Gatekeeperチェックはバッチ翻訳前に実行済み（chunksToTranslateはフィルタリング済み）
+
                             var translationResult = await _processingFacade.TranslationService.TranslateAsync(
                                 chunk.CombinedText,
                                 sourceLanguage,
@@ -1818,6 +1926,58 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
+
+    /// <summary>
+    /// [Issue #293] ウィンドウハンドルから実行ファイルパスを取得
+    /// </summary>
+    /// <param name="windowHandle">ウィンドウハンドル</param>
+    /// <returns>実行ファイルパス、取得失敗時は空文字列</returns>
+    private string GetExecutablePathFromWindow(IntPtr windowHandle)
+    {
+        if (windowHandle == IntPtr.Zero)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            // Win32 API: GetWindowThreadProcessId でプロセスIDを取得
+            _ = GetWindowThreadProcessId(windowHandle, out uint processId);
+            if (processId == 0)
+            {
+                _logger?.LogDebug("[Issue #293] GetWindowThreadProcessId failed for handle 0x{Handle:X}", windowHandle.ToInt64());
+                return string.Empty;
+            }
+
+            // プロセスIDからプロセス情報を取得
+            using var process = System.Diagnostics.Process.GetProcessById((int)processId);
+            var exePath = process.MainModule?.FileName ?? string.Empty;
+
+            _logger?.LogDebug("[Issue #293] GetExecutablePathFromWindow: PID={ProcessId}, ExePath='{ExePath}'", processId, exePath);
+            return exePath;
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            // アクセス権限不足など
+            _logger?.LogDebug(ex, "[Issue #293] GetExecutablePathFromWindow: Win32 error for handle 0x{Handle:X}", windowHandle.ToInt64());
+            return string.Empty;
+        }
+        catch (InvalidOperationException ex)
+        {
+            // プロセスが既に終了している
+            _logger?.LogDebug(ex, "[Issue #293] GetExecutablePathFromWindow: Process already exited for handle 0x{Handle:X}", windowHandle.ToInt64());
+            return string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "[Issue #293] GetExecutablePathFromWindow: Unexpected error for handle 0x{Handle:X}", windowHandle.ToInt64());
+            return string.Empty;
+        }
+    }
+
+    // [Issue #293] Win32 API declaration for GetWindowThreadProcessId
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     public void Dispose()
     {

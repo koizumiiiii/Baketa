@@ -120,6 +120,8 @@ public sealed class ApplicationModule : ServiceModuleBase
             services.AddSingleton<TranslationAbstractions.ITranslationService, DefaultTranslationService>();
         }
 
+        // [Issue #293 Phase 8] TranslationGatekeeperService廃止 - TextChangeDetectionServiceに統合済み
+
         // 🚀 翻訳モデル事前ロード戦略 - Clean Architecture準拠実装
         // UltraPhase 10.5: TranslationModelLoaderが DI初期化時にハングを引き起こすため一時的に無効化
         // services.AddSingleton<Baketa.Application.Services.IApplicationInitializer,
@@ -194,26 +196,34 @@ public sealed class ApplicationModule : ServiceModuleBase
                 var textChangeDetectionService = provider.GetService<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
                 Console.WriteLine($"✅ [Issue #230] ITextChangeDetectionService取得: {(textChangeDetectionService != null ? "成功" : "null (オプショナル)")}");
 
-                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（11パラメータ）");
+                Console.WriteLine("🎯 [OPTION_A] CoordinateBasedTranslationService インスタンス作成開始（12パラメータ）");
                 var logger = provider.GetService<ILogger<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>>();
                 var translationModeService = provider.GetService<Baketa.Core.Abstractions.Services.ITranslationModeService>(); // 🔧 [SINGLESHOT_FIX]
                 // [Issue #290] Fork-Join並列実行用の依存関係
                 var fallbackOrchestrator = provider.GetService<Baketa.Core.Translation.Abstractions.IFallbackOrchestrator>();
                 var licenseManager = provider.GetService<Baketa.Core.Abstractions.License.ILicenseManager>();
                 var cloudTranslationAvailabilityService = provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationAvailabilityService>();
+                // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
+                var roiManager = provider.GetService<Baketa.Core.Abstractions.Roi.IRoiManager>();
+                Console.WriteLine($"✅ [Issue #293] IRoiManager取得: {(roiManager != null ? $"成功 (Enabled={roiManager.IsEnabled})" : "null (オプショナル)")}");
+                // [Issue #293] ウィンドウ情報取得用
+                var windowManager = provider.GetService<Baketa.Core.Abstractions.Platform.IWindowManager>();
+                Console.WriteLine($"✅ [Issue #293] IWindowManager取得: {(windowManager != null ? "成功" : "null (オプショナル)")}");
                 var instance = new Baketa.Application.Services.Translation.CoordinateBasedTranslationService(
                     processingFacade,
                     configurationFacade,
                     streamingService,
                     textChunkAggregatorService, // 🎯 [OPTION_A] 追加パラメータ
                     pipelineService, // 🎯 [OPTION_A] 追加パラメータ - SmartProcessingPipelineService統合
-                    textChangeDetectionService, // [Issue #230] テキストベース変化検知
+                    textChangeDetectionService, // [Issue #230/#293] テキスト変化検知（Gatekeeper統合）
                     translationModeService, // 🔧 [SINGLESHOT_FIX] Singleshotモード判定用
                     fallbackOrchestrator, // [Issue #290] Fork-Join Cloud AI翻訳
                     licenseManager, // [Issue #290] ライセンスチェック
                     cloudTranslationAvailabilityService, // [Issue #290] Cloud翻訳可用性チェック
+                    roiManager, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
+                    windowManager, // [Issue #293] ウィンドウ情報取得用
                     logger);
-                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join統合済み");
+                Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join＋Gate統合済み");
                 return instance;
             }
             catch (Exception ex)
@@ -260,6 +270,10 @@ public sealed class ApplicationModule : ServiceModuleBase
                 Console.WriteLine($"🚀 [Issue #290] Fork-Join: FallbackOrchestrator={fallbackOrchestrator != null}, LicenseManager={licenseManager != null}");
 
                 var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
+
+                // Issue #293: 投機的OCRサービス（オプショナル）
+                var speculativeOcrService = provider.GetService<Baketa.Core.Abstractions.OCR.ISpeculativeOcrService>();
+
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                     captureService,
                     settingsService,
@@ -271,6 +285,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     translationDictionaryService,
                     fallbackOrchestrator,
                     licenseManager,
+                    speculativeOcrService,
                     logger);
             }
             catch (Exception ex)
@@ -397,6 +412,32 @@ public sealed class ApplicationModule : ServiceModuleBase
         Console.WriteLine("🔐 [Issue #168] TokenRefreshService DI登録");
         services.AddSingleton<Services.Auth.TokenRefreshService>();
         services.AddSingleton<ITokenRefreshService>(provider => provider.GetRequiredService<Services.Auth.TokenRefreshService>());
+
+        // 🎓 [Issue #293 Phase 10] 学習駆動型投機的OCRサービス
+        Console.WriteLine("🎓 [Issue #293 Phase 10] LearningScheduler DI登録");
+        services.AddSingleton<Services.Learning.LearningScheduler>();
+        services.AddSingleton<Baketa.Core.Abstractions.Roi.ILearningScheduler>(
+            provider => provider.GetRequiredService<Services.Learning.LearningScheduler>());
+
+        // 🎓 [Issue #293 Phase 10] バックグラウンド学習サービス（IHostedService）
+        // [Issue #293 Fix] IWindowManagerがオプショナル依存のため、ファクトリで明示的にnull許容
+        Console.WriteLine("🎓 [Issue #293 Phase 10] BackgroundLearningService DI登録");
+        services.AddSingleton<Services.Learning.BackgroundLearningService>(provider =>
+        {
+            return new Services.Learning.BackgroundLearningService(
+                provider.GetRequiredService<Baketa.Core.Abstractions.Roi.ILearningScheduler>(),
+                provider.GetService<Baketa.Core.Abstractions.OCR.ISpeculativeOcrService>(),
+                provider.GetService<Baketa.Core.Abstractions.Roi.IRoiManager>(),
+                provider.GetService<Baketa.Core.Abstractions.Services.ICaptureService>(),
+                provider.GetService<Baketa.Core.Abstractions.Platform.IWindowManager>(),  // Optional - may be null
+                provider.GetService<Services.UI.IWindowManagementService>(),
+                provider.GetRequiredService<Baketa.Core.Abstractions.Monitoring.IResourceMonitor>(),
+                provider.GetRequiredService<Baketa.Core.Abstractions.Services.ITranslationModeService>(),
+                provider.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.SpeculativeOcrSettings>>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Services.Learning.BackgroundLearningService>>()
+            );
+        });
+        services.AddHostedService(provider => provider.GetRequiredService<Services.Learning.BackgroundLearningService>());
 
         // 統合サービス
         // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();

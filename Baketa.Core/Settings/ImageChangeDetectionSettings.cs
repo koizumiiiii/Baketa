@@ -146,6 +146,40 @@ public sealed record ImageChangeDetectionSettings
     public float LowerZoneRatio { get; init; } = 0.25f;
 
     // ========================================
+    // [Issue #293] ROIベース閾値設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #293] ROIベースの動的閾値を有効化
+    /// </summary>
+    /// <remarks>
+    /// 有効にすると、ROI学習エンジンのヒートマップに基づいて
+    /// グリッドセルごとに閾値を動的に調整します。
+    /// デフォルトはfalse（既存動作との互換性維持）。
+    /// </remarks>
+    public bool EnableRoiBasedThreshold { get; init; } = false;
+
+    /// <summary>
+    /// [Issue #293] ROI高優先度領域の閾値乗数
+    /// </summary>
+    /// <remarks>
+    /// テキスト頻出領域（高ヒートマップ値）に適用される閾値乗数。
+    /// デフォルト: 1.02（2%厳しい閾値でノイズ除去）
+    /// 推奨範囲: 1.00-1.05
+    /// </remarks>
+    public float RoiHighPriorityThresholdMultiplier { get; init; } = 1.02f;
+
+    /// <summary>
+    /// [Issue #293] ROI低優先度領域の閾値乗数
+    /// </summary>
+    /// <remarks>
+    /// テキスト非頻出領域（低ヒートマップ値）に適用される閾値乗数。
+    /// デフォルト: 0.98（2%緩い閾値で処理効率化）
+    /// 推奨範囲: 0.95-1.00
+    /// </remarks>
+    public float RoiLowPriorityThresholdMultiplier { get; init; } = 0.98f;
+
+    // ========================================
     // [Issue #229] テキスト安定化待機設定
     // ========================================
 
@@ -198,7 +232,10 @@ public sealed record ImageChangeDetectionSettings
             && LowerZoneRatio is > 0.0f and <= 1.0f
             // [Issue #229] テキスト安定化設定の検証
             && TextStabilizationDelayMs >= 0
-            && MaxStabilizationWaitMs >= TextStabilizationDelayMs;
+            && MaxStabilizationWaitMs >= TextStabilizationDelayMs
+            // [Issue #293] ROIベース閾値設定の検証
+            && RoiHighPriorityThresholdMultiplier > 0.0f
+            && RoiLowPriorityThresholdMultiplier > 0.0f;
     }
 
     /// <summary>
@@ -223,6 +260,34 @@ public sealed record ImageChangeDetectionSettings
     }
 
     /// <summary>
+    /// [Issue #293] 指定セルに適用する閾値を取得（ROI統合版）
+    /// </summary>
+    /// <param name="row">グリッドの行番号（0から開始）</param>
+    /// <param name="column">グリッドの列番号（0から開始）</param>
+    /// <param name="totalRows">グリッドの総行数</param>
+    /// <param name="totalColumns">グリッドの総列数</param>
+    /// <param name="roiMultiplier">ROI閾値乗数（1.0 = 変更なし）</param>
+    /// <returns>ROI調整済みの類似度閾値</returns>
+    /// <remarks>
+    /// 下部ゾーン閾値にROI学習に基づく乗数を適用します。
+    /// roiMultiplier &gt; 1.0: 高優先度領域（より厳しい閾値）
+    /// roiMultiplier &lt; 1.0: 低優先度領域（より緩い閾値）
+    /// </remarks>
+    public float GetThresholdForCell(int row, int column, int totalRows, int totalColumns, float roiMultiplier = 1.0f)
+    {
+        var baseThreshold = GetThresholdForRow(row, totalRows);
+
+        if (!EnableRoiBasedThreshold || Math.Abs(roiMultiplier - 1.0f) < 0.001f)
+        {
+            return baseThreshold;
+        }
+
+        // ROI乗数を適用（範囲制限付き）
+        var adjustedThreshold = baseThreshold * roiMultiplier;
+        return Math.Clamp(adjustedThreshold, 0.0f, 1.0f);
+    }
+
+    /// <summary>
     /// 開発/テスト用設定を作成
     /// </summary>
     public static ImageChangeDetectionSettings CreateDevelopmentSettings()
@@ -244,7 +309,11 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #302] 下部ゾーン高感度化設定
             EnableLowerZoneHighSensitivity = true,
             LowerZoneSimilarityThreshold = 0.995f,
-            LowerZoneRatio = 0.25f
+            LowerZoneRatio = 0.25f,
+            // [Issue #293] ROIベース閾値設定（デフォルトは無効）
+            EnableRoiBasedThreshold = false,
+            RoiHighPriorityThresholdMultiplier = 1.02f,
+            RoiLowPriorityThresholdMultiplier = 0.98f
         };
     }
 
@@ -270,7 +339,11 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #302] 下部ゾーン高感度化設定（高感度: より広い範囲）
             EnableLowerZoneHighSensitivity = true,
             LowerZoneSimilarityThreshold = 0.998f,
-            LowerZoneRatio = 0.35f
+            LowerZoneRatio = 0.35f,
+            // [Issue #293] ROIベース閾値設定
+            EnableRoiBasedThreshold = false,
+            RoiHighPriorityThresholdMultiplier = 1.03f, // 高感度: より厳しい
+            RoiLowPriorityThresholdMultiplier = 0.97f
         };
     }
 
@@ -296,7 +369,11 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #302] 下部ゾーン高感度化設定（低感度: 狭い範囲）
             EnableLowerZoneHighSensitivity = true,
             LowerZoneSimilarityThreshold = 0.99f,
-            LowerZoneRatio = 0.20f
+            LowerZoneRatio = 0.20f,
+            // [Issue #293] ROIベース閾値設定
+            EnableRoiBasedThreshold = false,
+            RoiHighPriorityThresholdMultiplier = 1.01f, // 低感度: 穏やか
+            RoiLowPriorityThresholdMultiplier = 0.99f
         };
     }
 
@@ -322,7 +399,11 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #302] 下部ゾーン高感度化設定
             EnableLowerZoneHighSensitivity = true,
             LowerZoneSimilarityThreshold = 0.995f,
-            LowerZoneRatio = 0.25f
+            LowerZoneRatio = 0.25f,
+            // [Issue #293] ROIベース閾値設定（本番は無効）
+            EnableRoiBasedThreshold = false,
+            RoiHighPriorityThresholdMultiplier = 1.02f,
+            RoiLowPriorityThresholdMultiplier = 0.98f
         };
     }
 }

@@ -1,87 +1,256 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Text;
+using Baketa.Core.Models.Text;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.Text.ChangeDetection;
 
 /// <summary>
-/// テキスト変化検知サービス
-/// OCR結果テキストの効率的な変化検知を提供
-/// Geminiフィードバック反映: ConcurrentDictionaryによるスレッドセーフ実装
+/// [Issue #293] テキスト変化検知サービス（Gatekeeper機能統合版）
 /// </summary>
+/// <remarks>
+/// OCR結果テキストの効率的な変化検知を提供。
+/// Geminiフィードバック反映:
+/// - ConcurrentDictionaryによるスレッドセーフ実装
+/// - 既存Gatekeeperの機能を統合
+/// - 最適化されたLevenshtein距離計算（stackalloc/ArrayPool）
+/// - Strategyパターンによる責務分離
+/// </remarks>
 public class TextChangeDetectionService : ITextChangeDetectionService
 {
     private readonly ILogger<TextChangeDetectionService> _logger;
+    private readonly RoiGatekeeperSettings _settings;
+    private readonly IGateStrategy _gateStrategy;
     private readonly ConcurrentDictionary<string, string> _previousTextCache = new();
 
-    public TextChangeDetectionService(ILogger<TextChangeDetectionService> logger)
+    /// <summary>
+    /// スタック割り当ての閾値（512要素 = 約2KB）
+    /// </summary>
+    private const int StackAllocThreshold = 512;
+
+    /// <summary>
+    /// コンストラクタ
+    /// </summary>
+    public TextChangeDetectionService(
+        ILogger<TextChangeDetectionService> logger,
+        IOptions<RoiGatekeeperSettings> settings,
+        IGateStrategy? gateStrategy = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings?.Value ?? RoiGatekeeperSettings.CreateDefault();
+        _gateStrategy = gateStrategy ?? new DefaultGateStrategy(_settings);
+
+        _logger.LogInformation(
+            "[Issue #293] TextChangeDetectionService initialized with Gatekeeper: " +
+            "ShortThreshold={Short}, MediumThreshold={Medium}, LongThreshold={Long}",
+            _settings.ShortTextChangeThreshold,
+            _settings.MediumTextChangeThreshold,
+            _settings.LongTextChangeThreshold);
     }
 
-    public async Task<TextChangeResult> DetectTextChangeAsync(string previousText, string currentText, string contextId)
+    /// <inheritdoc />
+    /// <remarks>
+    /// [Issue #293] 後方互換性のために維持。
+    /// 注意: previousText パラメータは無視され、内部キャッシュが使用されます。
+    /// 新規コードでは DetectChangeWithGateAsync の使用を推奨。
+    /// </remarks>
+    [Obsolete("Use DetectChangeWithGateAsync instead. The previousText parameter is ignored and internal cache is used.")]
+    public async Task<TextChangeResult> DetectTextChangeAsync(
+        string previousText,
+        string currentText,
+        string contextId)
+    {
+        // Gate判定版を呼び出して結果を変換（後方互換性維持）
+        var gateResult = await DetectChangeWithGateAsync(
+            currentText,
+            contextId,
+            regionInfo: null,
+            CancellationToken.None).ConfigureAwait(false);
+
+        return new TextChangeResult
+        {
+            HasChanged = gateResult.ShouldTranslate,
+            ChangePercentage = gateResult.ChangePercentage,
+            EditDistance = gateResult.EditDistance,
+            PreviousLength = previousText?.Length ?? 0,
+            CurrentLength = currentText?.Length ?? 0,
+            ProcessingTime = gateResult.ProcessingTime,
+            AlgorithmUsed = TextChangeAlgorithmType.EditDistance,
+            PreviousText = gateResult.PreviousText,
+            CurrentText = gateResult.CurrentText
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<TextChangeWithGateResult> DetectChangeWithGateAsync(
+        string currentText,
+        string sourceId,
+        GateRegionInfo? regionInfo = null,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
-            // 入力検証
+            // キャンセルチェック（長時間処理前）
+            cancellationToken.ThrowIfCancellationRequested();
+
             currentText ??= string.Empty;
-            previousText ??= string.Empty;
 
-            // 完全一致チェック（最も高速）
-            if (string.Equals(previousText, currentText, StringComparison.Ordinal))
+            // 除外ゾーンチェック
+            if (_settings.EnableExclusionZoneCheck && regionInfo?.IsInExclusionZone == true)
             {
-                _logger.LogDebug("テキスト変化なし (完全一致) - Context: {ContextId}", contextId);
-                return TextChangeResult.CreateNoChange(previousText, stopwatch.Elapsed);
+                _logger.LogDebug(
+                    "[Issue #293] Text in exclusion zone, skipping - SourceId: {SourceId}",
+                    sourceId);
+
+                return TextChangeWithGateResult.CreateEmptyText(
+                    GetPreviousText(sourceId),
+                    0f,
+                    stopwatch.Elapsed);
             }
 
-            // 両方空文字列の場合
-            if (string.IsNullOrEmpty(previousText) && string.IsNullOrEmpty(currentText))
+            // 空テキストチェック
+            if (_settings.SkipEmptyText && string.IsNullOrWhiteSpace(currentText))
             {
-                return TextChangeResult.CreateNoChange(string.Empty, stopwatch.Elapsed);
+                _logger.LogDebug(
+                    "[Issue #293] Empty text, skipping - SourceId: {SourceId}",
+                    sourceId);
+
+                return TextChangeWithGateResult.CreateEmptyText(
+                    GetPreviousText(sourceId),
+                    GetAppliedThreshold(0, regionInfo),
+                    stopwatch.Elapsed);
             }
 
-            // どちらか一方が空文字列の場合
-            if (string.IsNullOrEmpty(previousText) || string.IsNullOrEmpty(currentText))
+            // 最小文字数チェック
+            if (currentText.Length < _settings.MinTextLength)
             {
-                _logger.LogDebug("テキスト変化検知 (一方が空) - Context: {ContextId}, Previous: {PrevLen}, Current: {CurrLen}",
-                    contextId, previousText?.Length ?? 0, currentText.Length);
-                return TextChangeResult.CreateSignificantChange(previousText, currentText, 1.0f, stopwatch.Elapsed);
+                _logger.LogDebug(
+                    "[Issue #293] Text too short ({Length} < {Min}), skipping - SourceId: {SourceId}",
+                    currentText.Length, _settings.MinTextLength, sourceId);
+
+                return TextChangeWithGateResult.CreateTextTooShort(
+                    GetPreviousText(sourceId),
+                    currentText,
+                    GetAppliedThreshold(currentText.Length, regionInfo),
+                    stopwatch.Elapsed);
             }
 
-            // Edit Distance（Levenshtein Distance）による類似度計算
-            var editDistance = CalculateEditDistance(previousText, currentText);
-            var maxLength = Math.Max(previousText.Length, currentText.Length);
-            var changePercentage = maxLength > 0 ? editDistance / maxLength : 0f;
+            // 前回テキストを取得
+            var previousText = GetPreviousText(sourceId);
 
-            var hasChanged = IsSignificantTextChange(changePercentage);
-
-            _logger.LogDebug("テキスト変化検知完了 - Context: {ContextId}, 変化: {HasChanged}, 変化率: {ChangePercentage:F3}, 編集距離: {EditDistance}",
-                contextId, hasChanged, changePercentage, editDistance);
-
-            // キャッシュ更新（スレッドセーフ）
-            _previousTextCache.AddOrUpdate(contextId, currentText, (key, oldValue) => currentText);
-
-            return new TextChangeResult
+            // 初回テキスト
+            if (string.IsNullOrEmpty(previousText))
             {
-                HasChanged = hasChanged,
-                ChangePercentage = changePercentage,
-                EditDistance = editDistance,
-                PreviousLength = previousText.Length,
-                CurrentLength = currentText.Length,
-                ProcessingTime = stopwatch.Elapsed,
-                AlgorithmUsed = TextChangeAlgorithmType.EditDistance,
-                PreviousText = previousText,
-                CurrentText = currentText
-            };
+                if (_settings.AlwaysTranslateFirstText)
+                {
+                    _logger.LogDebug(
+                        "[Issue #293] First text detected - SourceId: {SourceId}, Length: {Length}",
+                        sourceId, currentText.Length);
+
+                    // キャッシュ更新
+                    UpdatePreviousText(sourceId, currentText);
+
+                    return TextChangeWithGateResult.CreateFirstText(
+                        currentText,
+                        GetAppliedThreshold(currentText.Length, regionInfo),
+                        stopwatch.Elapsed);
+                }
+            }
+
+            // 同一テキストチェック
+            if (_settings.SkipIdenticalText && previousText == currentText)
+            {
+                _logger.LogDebug(
+                    "[Issue #293] Identical text, skipping - SourceId: {SourceId}",
+                    sourceId);
+
+                return TextChangeWithGateResult.CreateSameText(
+                    currentText,
+                    GetAppliedThreshold(currentText.Length, regionInfo),
+                    stopwatch.Elapsed);
+            }
+
+            // 長さ変化による強制翻訳チェック
+            if (_settings.EnableLengthChangeForceTranslate && previousText != null)
+            {
+                var lengthChangeRatio = CalculateLengthChangeRatio(previousText.Length, currentText.Length);
+                if (lengthChangeRatio >= _settings.LengthChangeForceThreshold)
+                {
+                    _logger.LogDebug(
+                        "[Issue #293] Significant length change ({Ratio:F3} >= {Threshold:F3}) - SourceId: {SourceId}",
+                        lengthChangeRatio, _settings.LengthChangeForceThreshold, sourceId);
+
+                    // キャッシュ更新
+                    UpdatePreviousText(sourceId, currentText);
+
+                    return TextChangeWithGateResult.CreateSignificantLengthChange(
+                        previousText,
+                        currentText,
+                        lengthChangeRatio,
+                        GetAppliedThreshold(currentText.Length, regionInfo),
+                        stopwatch.Elapsed);
+                }
+            }
+
+            // Levenshtein距離計算（最適化版）
+            var editDistance = CalculateLevenshteinDistanceOptimized(previousText ?? "", currentText);
+            var maxLength = Math.Max(previousText?.Length ?? 0, currentText.Length);
+            var changePercentage = maxLength > 0 ? (float)editDistance / maxLength : 0f;
+
+            // 適用する閾値を決定
+            var threshold = GetAppliedThreshold(currentText.Length, regionInfo);
+
+            // Gate判定（Strategyに委譲）
+            var decision = _gateStrategy.Evaluate(changePercentage, threshold, currentText, previousText);
+            var shouldTranslate = decision is GateDecision.SufficientChange or GateDecision.FirstText or GateDecision.SignificantLengthChange;
+
+            _logger.LogDebug(
+                "[Issue #293] Gate decision: {Decision} - SourceId: {SourceId}, ChangeRatio: {Ratio:F3}, Threshold: {Threshold:F3}, HeatmapValue: {Heatmap}",
+                decision, sourceId, changePercentage, threshold, regionInfo?.HeatmapValue);
+
+            // キャッシュ更新（翻訳実行時のみ）
+            if (shouldTranslate)
+            {
+                UpdatePreviousText(sourceId, currentText);
+            }
+
+            if (shouldTranslate)
+            {
+                return TextChangeWithGateResult.CreateSufficientChange(
+                    previousText,
+                    currentText,
+                    changePercentage,
+                    threshold,
+                    editDistance,
+                    stopwatch.Elapsed);
+            }
+            else
+            {
+                return TextChangeWithGateResult.CreateInsufficientChange(
+                    previousText,
+                    currentText,
+                    changePercentage,
+                    threshold,
+                    editDistance,
+                    stopwatch.Elapsed);
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "テキスト変化検知エラー - Context: {ContextId}", contextId);
-            // エラー時は変化ありとして安全側に処理
-            return TextChangeResult.CreateSignificantChange(previousText, currentText, 1.0f, stopwatch.Elapsed);
+            _logger.LogError(ex, "[Issue #293] Error in DetectChangeWithGateAsync - SourceId: {SourceId}", sourceId);
+
+            // エラー時は安全側で許可
+            return TextChangeWithGateResult.CreateFirstText(
+                currentText ?? string.Empty,
+                0f,
+                stopwatch.Elapsed);
         }
         finally
         {
@@ -89,53 +258,26 @@ public class TextChangeDetectionService : ITextChangeDetectionService
         }
     }
 
+    /// <inheritdoc />
     public float CalculateEditDistance(string text1, string text2)
     {
-        if (string.IsNullOrEmpty(text1)) return text2?.Length ?? 0;
-        if (string.IsNullOrEmpty(text2)) return text1.Length;
-
-        var len1 = text1.Length;
-        var len2 = text2.Length;
-
-        // 効率化: 片方が著しく長い場合は早期リターン
-        if (Math.Abs(len1 - len2) > Math.Max(len1, len2) * 0.8)
-        {
-            return Math.Max(len1, len2);
-        }
-
-        // DP行列による編集距離計算
-        var matrix = new int[len1 + 1, len2 + 1];
-
-        // 初期化
-        for (int i = 0; i <= len1; i++) matrix[i, 0] = i;
-        for (int j = 0; j <= len2; j++) matrix[0, j] = j;
-
-        // DP計算
-        for (int i = 1; i <= len1; i++)
-        {
-            for (int j = 1; j <= len2; j++)
-            {
-                var cost = text1[i - 1] == text2[j - 1] ? 0 : 1;
-                matrix[i, j] = Math.Min(
-                    Math.Min(matrix[i - 1, j] + 1, matrix[i, j - 1] + 1),
-                    matrix[i - 1, j - 1] + cost);
-            }
-        }
-
-        return matrix[len1, len2];
+        return CalculateLevenshteinDistanceOptimized(text1 ?? "", text2 ?? "");
     }
 
+    /// <inheritdoc />
     public bool IsSignificantTextChange(float changePercentage, float threshold = 0.1f)
     {
         return changePercentage >= threshold;
     }
 
+    /// <inheritdoc />
     public void ClearPreviousText(string contextId)
     {
         _previousTextCache.TryRemove(contextId, out _);
         _logger.LogDebug("前回テキストキャッシュクリア - Context: {ContextId}", contextId);
     }
 
+    /// <inheritdoc />
     public void ClearAllPreviousTexts()
     {
         var clearedCount = _previousTextCache.Count;
@@ -143,33 +285,226 @@ public class TextChangeDetectionService : ITextChangeDetectionService
         _logger.LogInformation("全前回テキストキャッシュクリア - クリア件数: {Count}", clearedCount);
     }
 
-    /// <summary>
-    /// キャッシュから前回テキストを取得
-    /// [Issue #230] OCR完了後のテキスト変化検知に使用
-    /// </summary>
+    /// <inheritdoc />
     public string? GetPreviousText(string contextId)
     {
         _previousTextCache.TryGetValue(contextId, out var previousText);
         return previousText;
     }
 
-    /// <summary>
-    /// 前回テキストをキャッシュに保存
-    /// [Issue #230] OCR完了後のテキスト変化検知に使用
-    /// </summary>
-    /// <param name="contextId">処理コンテキストID（ウィンドウハンドル等）</param>
-    /// <param name="text">保存するテキスト</param>
+    /// <inheritdoc />
     public void SetPreviousText(string contextId, string text)
     {
-        _previousTextCache.AddOrUpdate(contextId, text, (_, _) => text);
-        _logger.LogDebug("前回テキストキャッシュ更新 - Context: {ContextId}, TextLength: {Length}", contextId, text.Length);
+        UpdatePreviousText(contextId, text);
     }
 
     /// <summary>
     /// 現在のキャッシュサイズを取得
     /// </summary>
-    public int GetCacheSize()
+    public int GetCacheSize() => _previousTextCache.Count;
+
+    #region Private Methods
+
+    /// <summary>
+    /// 前回テキストを更新（スレッドセーフ）
+    /// </summary>
+    private void UpdatePreviousText(string sourceId, string text)
     {
-        return _previousTextCache.Count;
+        _previousTextCache.AddOrUpdate(sourceId, text, (_, _) => text);
+        _logger.LogDebug(
+            "[Issue #293] Previous text updated - SourceId: {SourceId}, Length: {Length}",
+            sourceId, text.Length);
+    }
+
+    /// <summary>
+    /// 適用する閾値を取得（ヒートマップ調整含む）
+    /// </summary>
+    private float GetAppliedThreshold(int textLength, GateRegionInfo? regionInfo)
+    {
+        var baseThreshold = _settings.GetThresholdForTextLength(textLength);
+
+        // OCR信頼度による閾値調整
+        if (_settings.EnableConfidenceBasedThresholdAdjustment && regionInfo?.ConfidenceScore is { } confidence)
+        {
+            if (confidence >= 0.7f)
+            {
+                baseThreshold *= _settings.HighConfidenceThresholdMultiplier;
+            }
+        }
+
+        // [Issue #293] ヒートマップベース閾値調整
+        if (_settings.EnableHeatmapBasedThresholdAdjustment && regionInfo?.HeatmapValue is { } heatmapValue)
+        {
+            if (heatmapValue >= _settings.HighHeatmapThreshold)
+            {
+                // 高ヒートマップ領域：閾値を下げる（小さな変化でも翻訳トリガー）
+                baseThreshold *= _settings.HighHeatmapThresholdMultiplier;
+                _logger.LogDebug(
+                    "[Issue #293] High heatmap region: {Heatmap:F3}, threshold multiplier: {Multiplier:F2}",
+                    heatmapValue, _settings.HighHeatmapThresholdMultiplier);
+            }
+            else if (heatmapValue <= _settings.LowHeatmapThreshold)
+            {
+                // 低ヒートマップ領域：閾値を上げる（大きな変化のみ翻訳トリガー）
+                baseThreshold *= _settings.LowHeatmapThresholdMultiplier;
+                _logger.LogDebug(
+                    "[Issue #293] Low heatmap region: {Heatmap:F3}, threshold multiplier: {Multiplier:F2}",
+                    heatmapValue, _settings.LowHeatmapThresholdMultiplier);
+            }
+        }
+
+        return Math.Clamp(baseThreshold, 0.0f, 1.0f);
+    }
+
+    /// <summary>
+    /// テキスト長変化率を計算
+    /// </summary>
+    private static float CalculateLengthChangeRatio(int previousLength, int currentLength)
+    {
+        if (previousLength == 0 && currentLength == 0)
+        {
+            return 0.0f;
+        }
+
+        var maxLength = Math.Max(previousLength, currentLength);
+        var lengthDiff = Math.Abs(previousLength - currentLength);
+
+        return (float)lengthDiff / maxLength;
+    }
+
+    /// <summary>
+    /// [Issue #293] 最適化版Levenshtein距離計算
+    /// </summary>
+    /// <remarks>
+    /// RoiGatekeeperから移植:
+    /// - 同一文字列の早期終了
+    /// - stackallocによる短い文字列のスタック割り当て
+    /// - ArrayPoolによる長い文字列のヒープ効率化
+    /// </remarks>
+    private static int CalculateLevenshteinDistanceOptimized(string source, string target)
+    {
+        if (string.IsNullOrEmpty(source))
+        {
+            return target?.Length ?? 0;
+        }
+
+        if (string.IsNullOrEmpty(target))
+        {
+            return source.Length;
+        }
+
+        // 最適化: 同一文字列の早期終了
+        if (string.Equals(source, target, StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        var sourceLength = source.Length;
+        var targetLength = target.Length;
+
+        // 最適化: 短い文字列がtargetになるように入れ替え（メモリ使用量削減）
+        if (sourceLength < targetLength)
+        {
+            (source, target) = (target, source);
+            (sourceLength, targetLength) = (targetLength, sourceLength);
+        }
+
+        var bufferSize = (targetLength + 1) * 2;
+
+        int[]? rentedArray = null;
+        Span<int> buffer = bufferSize <= StackAllocThreshold
+            ? stackalloc int[bufferSize]
+            : (rentedArray = ArrayPool<int>.Shared.Rent(bufferSize));
+
+        try
+        {
+            var previousRow = buffer[..(targetLength + 1)];
+            var currentRow = buffer[(targetLength + 1)..];
+
+            // 初期化
+            for (var j = 0; j <= targetLength; j++)
+            {
+                previousRow[j] = j;
+            }
+
+            for (var i = 1; i <= sourceLength; i++)
+            {
+                currentRow[0] = i;
+
+                for (var j = 1; j <= targetLength; j++)
+                {
+                    var cost = source[i - 1] == target[j - 1] ? 0 : 1;
+
+                    currentRow[j] = Math.Min(
+                        Math.Min(
+                            currentRow[j - 1] + 1,      // 挿入
+                            previousRow[j] + 1),        // 削除
+                        previousRow[j - 1] + cost);     // 置換
+                }
+
+                // 行をスワップ
+                var temp = previousRow;
+                previousRow = currentRow;
+                currentRow = temp;
+            }
+
+            return previousRow[targetLength];
+        }
+        finally
+        {
+            if (rentedArray is not null)
+            {
+                ArrayPool<int>.Shared.Return(rentedArray);
+            }
+        }
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// [Issue #293] デフォルトのGate判定戦略
+/// </summary>
+/// <remarks>
+/// Geminiフィードバック反映: Strategy パターンによる責務分離。
+/// </remarks>
+internal sealed class DefaultGateStrategy : IGateStrategy
+{
+    private readonly RoiGatekeeperSettings _settings;
+
+    public DefaultGateStrategy(RoiGatekeeperSettings settings)
+    {
+        _settings = settings ?? RoiGatekeeperSettings.CreateDefault();
+    }
+
+    public GateDecision Evaluate(
+        float changePercentage,
+        float threshold,
+        string currentText,
+        string? previousText)
+    {
+        if (string.IsNullOrWhiteSpace(currentText))
+        {
+            return GateDecision.EmptyText;
+        }
+
+        if (currentText.Length < _settings.MinTextLength)
+        {
+            return GateDecision.TextTooShort;
+        }
+
+        if (previousText is null)
+        {
+            return GateDecision.FirstText;
+        }
+
+        if (string.Equals(currentText, previousText, StringComparison.Ordinal))
+        {
+            return GateDecision.SameText;
+        }
+
+        return changePercentage >= threshold
+            ? GateDecision.SufficientChange
+            : GateDecision.InsufficientChange;
     }
 }

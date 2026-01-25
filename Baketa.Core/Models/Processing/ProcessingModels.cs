@@ -479,6 +479,13 @@ public sealed record ImageChangeDetectionResult
     public TimeSpan ProcessingTime { get; init; }
     public string AlgorithmUsed { get; init; } = "DifferenceHash";
 
+    /// <summary>
+    /// [Issue #293] 変化が検知された領域の配列
+    /// グリッド分割検知で特定された変化ブロックの座標
+    /// 部分OCR実行時にこの領域のみを処理対象とする
+    /// </summary>
+    public Rectangle[] ChangedRegions { get; init; } = [];
+
     public static ImageChangeDetectionResult CreateFirstTime()
     {
         return new ImageChangeDetectionResult

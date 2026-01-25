@@ -243,7 +243,9 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
 
                         if (!consumeResult.Success)
                         {
-                            _logger.LogWarning(
+                            // [Issue #293] SessionInvalidは未ログイン時の期待動作のためDebugレベルに
+                            // 翻訳自体は成功しているため、警告は不要
+                            _logger.LogDebug(
                                 "[Issue #258] トークン消費記録に失敗: RequestId={RequestId}, Reason={Reason}",
                                 request.RequestId,
                                 consumeResult.FailureReason);

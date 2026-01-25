@@ -459,8 +459,8 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             CurrentHash = changeResult.CurrentHash,
             ProcessingTime = changeResult.ProcessingTime,
             AlgorithmUsed = changeResult.AlgorithmUsed.ToString(),
-            // 拡張情報は現在のImageChangeDetectionResultでは未対応
-            // 将来的に拡張予定
+            // [Issue #293] 変化領域を転送（部分OCR実行用）
+            ChangedRegions = changeResult.ChangedRegions ?? []
         };
     }
 
