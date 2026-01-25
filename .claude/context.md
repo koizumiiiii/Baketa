@@ -40,17 +40,17 @@
 - `Baketa.sln` - Solution definition
 - `*/Baketa.*.csproj` - Project definitions
 - `appsettings.json` - Application configuration
-- `appsettings.SentencePiece.json` - Translation model configuration
+- `appsettings.Development.json` - Development overrides
 - `Directory.Build.props` - Global build properties
 - `.github/workflows/ci.yml` - CI/CD pipeline configuration
 
 ### Scripts
-- `scripts/download_opus_mt_models.ps1` - Model download
-- `scripts/verify_opus_mt_models.ps1` - Model verification
-- `scripts/run_sentencepiece_tests.ps1` - Test execution
-- `scripts/run_build.ps1` - Build automation
-- `scripts/run_tests.ps1` - Test execution automation
+- `scripts/build-release.ps1` - Release package build
 - `scripts/run_app.ps1` - Application execution
+- `scripts/run_tests.ps1` - Test execution automation
+- `scripts/check-environment.ps1` - Environment check
+- `scripts/code-review-simple.ps1` - Static code review
+- `scripts/download-ppocrv5-models.ps1` - OCR model download
 
 ## Excluded Files & Directories
 
@@ -103,15 +103,19 @@
 - Check existing examples in corresponding test projects when implementing tests
 - Reference ViewModel patterns and ReactiveUI usage examples when implementing UI
 
-## Current Implementation Status (v0.1.0)
+## Current Implementation Status (v0.2.x)
 
 ### Recently Implemented Features
 - **Privacy Management**: GDPR-compliant consent system in `Baketa.Core/Services/PrivacyConsentService.cs`
 - **Feedback System**: GitHub Issues API integration in `Baketa.Core/Services/FeedbackService.cs`
-- **Update System**: GitHub Releases API integration in `Baketa.Core/Services/UpdateCheckService.cs`
+- **Update System**: GitHub Releases API with SparkleUpdater (Ed25519 signatures)
+- **Surya OCR Integration**: gRPC-based Python server with ONNX INT8 detection and PyTorch recognition
+- **NLLB-200 Translation**: CTranslate2-optimized multilingual translation (80% memory reduction)
+- **Cloud AI Translation**: Gemini API integration via Cloudflare Workers relay
+- **ROI Manager**: Learning-based text detection optimization (Issue #293)
 - **Security Enhancements**: CodeQL-compliant exception handling patterns
 - **CI/CD Pipeline**: GitHub Actions with Windows Server 2022, sequential test execution
-- **Comprehensive Testing**: 1,300+ test cases with extensive coverage
+- **Comprehensive Testing**: 2,100+ test cases with extensive coverage
 
 ### Key Implementation Patterns
 - **Exception Handling**: Specific exception types instead of generic `catch (Exception)`

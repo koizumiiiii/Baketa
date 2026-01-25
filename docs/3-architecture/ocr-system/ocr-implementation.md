@@ -1,8 +1,15 @@
 # OCR実装ガイド
 
+> **Note**: このドキュメントは歴史的な参考資料として一部PaddleOCR関連の記述を含んでいます。
+> **現在のOCRシステム**: Surya OCR (gRPC-based Python server)
+> - **Detection**: ONNX INT8量子化モデル
+> - **Recognition**: PyTorch量子化モデル
+> - **通信**: gRPC (HTTP/2)、ポート50051
+> - **詳細**: `CLAUDE.md` のOCR/Translation Pipelineセクション参照
+
 ## 1. OCRシステム概要
 
-Baketaプロジェクトの OCRシステムは、ゲーム画面からテキストを抽出し、翻訳システムへ渡すための中核コンポーネントです。このシステムでは、OpenCVを活用した画像処理アプローチを採用し、ユーザーが手動設定せずとも高品質なOCRを実現します。
+Baketaプロジェクトの OCRシステムは、ゲーム画面からテキストを抽出し、翻訳システムへ渡すための中核コンポーネントです。現在は**Surya OCR**をgRPC経由で使用し、OpenCVを活用した画像前処理と組み合わせて高品質なOCRを実現します。
 
 ### 1.1 OCRパイプライン
 

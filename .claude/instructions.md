@@ -2,15 +2,17 @@
 
 ## Core Principles
 
-### **Project Status: v0.1.0 Alpha**
+### **Project Status: v0.2.x**
 **CURRENT IMPLEMENTATION STATUS**
 
-- **Test Coverage**: 1,300+ test cases with comprehensive coverage
+- **Test Coverage**: 2,100+ test cases with comprehensive coverage
 - **Security**: CodeQL-compliant implementation with security-first design
 - **CI/CD**: GitHub Actions with Windows Server 2022, sequential test execution
 - **Architecture**: Clean Architecture with modular DI and event aggregation
-- **Recent Features**: Privacy consent, feedback system, update checking
-- **AI Integration**: OpenAI o3 MCP for autonomous technical problem-solving
+- **OCR Engine**: Surya OCR (gRPC-based, ONNX INT8 detection, PyTorch recognition)
+- **Translation**: NLLB-200 (CTranslate2) + Google Gemini (Cloud)
+- **Recent Features**: Privacy consent, feedback system, update checking, ROI Manager
+- **AI Integration**: Gemini for code review and technical consultation
 
 ### **Editor Behavior Settings**
 **AUTO-APPROVE ALL EDITS AND OPERATIONS**
@@ -582,9 +584,10 @@ mockService.Setup(x => x.GetDataAsync()).ReturnsAsync(testData);
 ## デバッグとトラブルシューティング / Debugging and Troubleshooting
 
 ### 一般的な問題 / Common Issues
-1. **PaddleOCRモデル不足**: `OPUS_MT_SETUP_GUIDE.md`を参照
+1. **Surya OCRモデル不足**: `CLAUDE.md`のモデルセットアップセクション参照
 2. **アーキテクチャ警告**: x64プラットフォーム指定を確認
 3. **DI循環参照**: モジュール依存関係を確認
+4. **gRPCサーバー起動失敗**: Python 3.10+ と依存関係をチェック
 
 ### 根本原因デバッグプロセス / Root Cause Debugging Process
 1. **問題を再現**: 問題を引き起こす正確な条件を理解

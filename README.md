@@ -108,7 +108,7 @@ Baketa/
 ├── Baketa.UI/                   # Avalonia UI
 ├── BaketaCaptureNative/         # C++/WinRT ネイティブDLL
 ├── grpc_server/                 # Python翻訳サーバー
-├── tests/                       # テスト (1,500+ケース)
+├── tests/                       # テスト (2,100+ケース)
 └── docs/                        # ドキュメント
 ```
 

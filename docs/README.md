@@ -44,7 +44,6 @@
 | ドキュメント | 内容 |
 |-------------|------|
 | [依存性注入ガイドライン](2-development/guidelines/dependency-injection.md) | DIパターン・モジュール設計 |
-| [名前空間構成ガイド](2-development/guidelines/namespace-migration.md) | 名前空間統一方針 |
 | [イベント集約機構](2-development/guidelines/event-aggregator-usage.md) | IEventAggregator使用法 |
 
 #### コーディング規約
@@ -69,7 +68,7 @@
 
 | システム | ドキュメント |
 |---------|-------------|
-| **OCR** | [Surya OCR統合](3-architecture/ocr-system/surya-ocr-integration.md) |
+| **OCR** | [OCR実装ガイド](3-architecture/ocr-system/ocr-implementation.md) |
 | **翻訳** | [gRPC翻訳システム](3-architecture/translation/grpc-system.md) |
 | **キャプチャ** | [Windows Graphics Capture](3-architecture/capture-system/windows-graphics-capture.md) |
 | **認証** | [認証システム](3-architecture/auth/authentication-system.md) |
@@ -103,4 +102,4 @@
 
 ## ライセンス
 
-Copyright (c) 2024-2025 Baketa Project
+Copyright (c) 2024-2026 Baketa Project

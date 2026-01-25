@@ -430,7 +430,6 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 ### Configuration Files
 - `appsettings.json`: Main application configuration
 - `appsettings.Development.json`: Development overrides
-- `appsettings.SentencePiece.json`: Legacy OPUS-MT model configuration (deprecated)
 
 ### User Settings File Locations
 
@@ -900,7 +899,7 @@ rg "TODO|FIXME" -t cs --glob="!*Test*"
 
 ### **🎯 Serena MCP優先戦略 (MCP-First Strategy)**
 
-**基本方針**: 大規模コードベース（1,300+テストケース）での効率化のため、Serena MCPを主要ツールとして活用し、サブエージェントと連携する。
+**基本方針**: 大規模コードベース（2,100+テストケース）での効率化のため、Serena MCPを主要ツールとして活用し、サブエージェントと連携する。
 
 #### **推奨ワークフロー**:
 ```
@@ -919,7 +918,7 @@ rg "TODO|FIXME" -t cs --glob="!*Test*"
 - **`@Architecture-Guardian`**: クリーンアーキテクチャ違反の修正指針
 - **`@Native-Bridge`**: C++/WinRTとC#連携の技術課題解決
 - **`@UI-Maestro`**: ReactiveUI実装パターンとパフォーマンス最適化
-- **`@Test-Generator`**: 1,300+テストケース拡張と品質向上
+- **`@Test-Generator`**: 2,100+テストケース拡張と品質向上
 - **`@Researcher`**: 未知技術の調査と最新ベストプラクティス
 
 #### **サブエージェント不要となるケース**:
@@ -991,7 +990,7 @@ When Gemini API is unavailable, follow this protocol:
 /mcp__serena__find_symbol "TranslationService" --include_body false --depth 1
 
 # 2. 包括的テスト戦略の策定を専門家に委任
-@Test-Generator "Serena MCPで分析されたTranslationServiceクラスの全メソッド（15個）について、xUnitとMoqを使用した包括的な単体テストスイートを作成してください。現在の1,300+テストケースとの統合も考慮してください。"
+@Test-Generator "Serena MCPで分析されたTranslationServiceクラスの全メソッド（15個）について、xUnitとMoqを使用した包括的な単体テストスイートを作成してください。現在の2,100+テストケースとの統合も考慮してください。"
 ```
 
 #### **ベストプラクティス:**

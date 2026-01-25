@@ -1,7 +1,7 @@
 {
   "name": "Baketa Real-time Game Translation",
   "description": "Windows-specific real-time text translation overlay application for games. Uses OCR technology and AI translation to provide high-performance game translation tools.",
-  "version": "0.1.0",
+  "version": "0.2.x",
   "language": "csharp",
   "framework": "dotnet8",
   "platform": "windows",
@@ -77,12 +77,13 @@
   
   "key_technologies": [
     "C# 12",
+    ".NET 8.0",
     "Avalonia UI 11.2.7",
     "ReactiveUI",
-    "PaddleOCR",
-    "OpenCV",
-    "OPUS-MT Translation",
+    "Surya OCR (ONNX INT8 Detection, PyTorch Recognition)",
+    "NLLB-200 Translation (CTranslate2)",
     "Google Gemini API",
+    "gRPC (HTTP/2)",
     "Microsoft.Extensions.DependencyInjection",
     "xUnit Testing",
     "GitHub Actions CI/CD",
@@ -99,7 +100,7 @@
     "Root cause solution implementation",
     "GDPR-compliant privacy management",
     "Security-first design",
-    "Comprehensive testing (1,300+ test cases)"
+    "Comprehensive testing (2,100+ test cases)"
   ],
   
   "quality_standards": {
@@ -107,7 +108,7 @@
     "async_programming": "ConfigureAwait(false) required in library code",
     "null_safety": "Nullable reference types enabled",
     "architecture_compliance": "Clean Architecture principles",
-    "test_coverage": "Unit + Integration + UI tests (1,300+ test cases)",
+    "test_coverage": "Unit + Integration + UI tests (2,100+ test cases)",
     "solution_approach": "Root cause solutions, not surface-level fixes",
     "security_analysis": "CodeQL static analysis + GitHub Security scanning",
     "ci_cd": "GitHub Actions with Windows Server 2022, sequential test execution"

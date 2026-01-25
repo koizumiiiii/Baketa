@@ -53,7 +53,7 @@
 - **セッション管理**: Cloudflare KV を使用したセッショントークン保存
 - **Webhook受信**: Patreonからのプラン変更通知を受信
 - **ボーナストークン管理** (Issue #280+#281): プロモーション→トークン付与、消費同期
-- **Cloud AI翻訳** (Phase 2予定): Gemini/OpenAI APIへのプロキシ
+- **Cloud AI翻訳**: Gemini APIへのプロキシ（実装済み）
 
 #### 提供エンドポイント
 | パス | メソッド | 機能 |
@@ -181,7 +181,7 @@ Baketaには2つの認証システムがあります：
 
 ---
 
-## Cloud AI翻訳のデータフロー（Phase 2予定）
+## Cloud AI翻訳のデータフロー（実装済み）
 
 ```
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
@@ -211,8 +211,7 @@ Baketaには2つの認証システムがあります：
 ## 関連ドキュメント
 
 - [認証システム設計](./auth/authentication-system.md)
-- [Cloud AI翻訳要件](../requirements/issue-78-cloud-ai-translation.md)
-- [Patreon連携設計](../requirements/issue-233-patreon-integration.md)
+- [プロモーションコードシステム](./auth/promotion-code-system.md)
 
 ---
 
