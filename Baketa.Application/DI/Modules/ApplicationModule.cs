@@ -270,6 +270,10 @@ public sealed class ApplicationModule : ServiceModuleBase
                 Console.WriteLine($"🚀 [Issue #290] Fork-Join: FallbackOrchestrator={fallbackOrchestrator != null}, LicenseManager={licenseManager != null}");
 
                 var ocrSettings = provider.GetRequiredService<IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
+
+                // Issue #293: 投機的OCRサービス（オプショナル）
+                var speculativeOcrService = provider.GetService<Baketa.Core.Abstractions.OCR.ISpeculativeOcrService>();
+
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                     captureService,
                     settingsService,
@@ -281,6 +285,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     translationDictionaryService,
                     fallbackOrchestrator,
                     licenseManager,
+                    speculativeOcrService,
                     logger);
             }
             catch (Exception ex)
@@ -407,6 +412,32 @@ public sealed class ApplicationModule : ServiceModuleBase
         Console.WriteLine("🔐 [Issue #168] TokenRefreshService DI登録");
         services.AddSingleton<Services.Auth.TokenRefreshService>();
         services.AddSingleton<ITokenRefreshService>(provider => provider.GetRequiredService<Services.Auth.TokenRefreshService>());
+
+        // 🎓 [Issue #293 Phase 10] 学習駆動型投機的OCRサービス
+        Console.WriteLine("🎓 [Issue #293 Phase 10] LearningScheduler DI登録");
+        services.AddSingleton<Services.Learning.LearningScheduler>();
+        services.AddSingleton<Baketa.Core.Abstractions.Roi.ILearningScheduler>(
+            provider => provider.GetRequiredService<Services.Learning.LearningScheduler>());
+
+        // 🎓 [Issue #293 Phase 10] バックグラウンド学習サービス（IHostedService）
+        // [Issue #293 Fix] IWindowManagerがオプショナル依存のため、ファクトリで明示的にnull許容
+        Console.WriteLine("🎓 [Issue #293 Phase 10] BackgroundLearningService DI登録");
+        services.AddSingleton<Services.Learning.BackgroundLearningService>(provider =>
+        {
+            return new Services.Learning.BackgroundLearningService(
+                provider.GetRequiredService<Baketa.Core.Abstractions.Roi.ILearningScheduler>(),
+                provider.GetService<Baketa.Core.Abstractions.OCR.ISpeculativeOcrService>(),
+                provider.GetService<Baketa.Core.Abstractions.Roi.IRoiManager>(),
+                provider.GetService<Baketa.Core.Abstractions.Services.ICaptureService>(),
+                provider.GetService<Baketa.Core.Abstractions.Platform.IWindowManager>(),  // Optional - may be null
+                provider.GetService<Services.UI.IWindowManagementService>(),
+                provider.GetRequiredService<Baketa.Core.Abstractions.Monitoring.IResourceMonitor>(),
+                provider.GetRequiredService<Baketa.Core.Abstractions.Services.ITranslationModeService>(),
+                provider.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.SpeculativeOcrSettings>>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Services.Learning.BackgroundLearningService>>()
+            );
+        });
+        services.AddHostedService(provider => provider.GetRequiredService<Services.Learning.BackgroundLearningService>());
 
         // 統合サービス
         // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();

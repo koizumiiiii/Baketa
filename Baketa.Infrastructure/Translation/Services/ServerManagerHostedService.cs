@@ -59,6 +59,8 @@ public sealed class ServerManagerHostedService : IHostedService
         {
             try
             {
+                Console.WriteLine("🔧 [DEBUG] ServerManagerHostedService Task.Run開始");
+
                 // [Issue #198] 初期化完了を待機（コンポーネントダウンロード・解凍完了まで待つ）
                 // これにより、ディスクI/O高負荷時のサーバー起動を防止
                 // [Gemini Review] 初回インストール時は長いタイムアウトを使用
@@ -120,12 +122,15 @@ public sealed class ServerManagerHostedService : IHostedService
                 }
 
                 _logger.LogInformation("🔄 [HOSTED_SERVICE] Python翻訳サーバー起動開始");
+                Console.WriteLine("🔧 [DEBUG] ServerManagerHostedService: サーバー起動開始");
 
                 // gRPCサーバーは単一サーバーがすべての言語ペアを処理するため、固定の識別子を使用
                 // GrpcTranslationEngineAdapterと同じキーを使用して、Dictionary での重複登録を防ぐ
                 const string defaultLanguagePair = "grpc-all";
 
+                Console.WriteLine($"🔧 [DEBUG] ServerManagerHostedService: _serverManager.StartServerAsync呼び出し開始 (type={_serverManager.GetType().Name})");
                 var serverInfo = await _serverManager.StartServerAsync(defaultLanguagePair).ConfigureAwait(false);
+                Console.WriteLine($"🔧 [DEBUG] ServerManagerHostedService: _serverManager.StartServerAsync完了 Port={serverInfo.Port}");
 
                 // [Issue #292] 統合サーバーモードの判定 (isUnifiedModeは104行目で既に定義済み)
                 _logger.LogInformation("✅ [HOSTED_SERVICE] Python翻訳サーバー起動完了: Port {Port}, UnifiedMode={UnifiedMode}",

@@ -63,6 +63,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly IFallbackOrchestrator? _fallbackOrchestrator;
     private readonly ILicenseManager? _licenseManager;
 
+    // Issue #293: 投機的OCRサービス（Shot翻訳応答時間短縮）
+    private readonly ISpeculativeOcrService? _speculativeOcrService;
+
     // 状態管理
     private volatile bool _isAutomaticTranslationActive;
     private volatile bool _isSingleTranslationActive;
@@ -128,6 +131,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     /// <param name="translationDictionaryService">翻訳辞書サービス（オプショナル）</param>
     /// <param name="fallbackOrchestrator">フォールバックオーケストレーター（Issue #290: Fork-Join用）</param>
     /// <param name="licenseManager">ライセンスマネージャー（Issue #290: Cloud AI利用可否判定用）</param>
+    /// <param name="speculativeOcrService">投機的OCRサービス（Issue #293: Shot翻訳応答時間短縮）</param>
     /// <param name="logger">ロガー</param>
     public TranslationOrchestrationService(
         ICaptureService captureService,
@@ -140,6 +144,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ITranslationDictionaryService? translationDictionaryService = null,
         IFallbackOrchestrator? fallbackOrchestrator = null,
         ILicenseManager? licenseManager = null,
+        ISpeculativeOcrService? speculativeOcrService = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -158,7 +163,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _translationDictionaryService = translationDictionaryService;
         _fallbackOrchestrator = fallbackOrchestrator;
         _licenseManager = licenseManager;
+        _speculativeOcrService = speculativeOcrService;
         _logger = logger;
+
+        // Issue #293: 投機的OCRサービスが利用可能かログ出力
+        if (_speculativeOcrService?.IsEnabled == true)
+        {
+            _logger?.LogInformation("🚀 [Issue #293] 投機的OCRサービスが有効です - Shot翻訳応答時間短縮機能が利用可能");
+        }
 
         // キャプチャオプションの初期設定
         InitializeCaptureOptions();
@@ -1832,13 +1844,37 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             _logger?.LogDebug($"   ✅ 初期化状態: {_ocrEngine?.IsInitialized ?? false}");
             _logger?.LogDebug($"   🌐 現在の言語: {_ocrEngine?.CurrentLanguage ?? "(null)"}");
 
-            OcrResults ocrResults;
+            OcrResults? ocrResults = null;
             FallbackTranslationResult? cloudTranslationResult = null;
+            var speculativeOcrUsed = false;
+
+            // 🚀 [Issue #293] 投機的OCRキャッシュチェック
+            // Shot翻訳時にキャッシュがあればOCRをスキップして応答時間を短縮
+            if (_speculativeOcrService?.IsCacheValid == true && mode == TranslationMode.Singleshot)
+            {
+                // 画像ハッシュを計算してキャッシュと照合
+                var imageHash = await ComputeImageHashForCacheAsync(image, currentRequestToken).ConfigureAwait(false);
+                var cachedResult = _speculativeOcrService.ConsumeCache(imageHash);
+
+                if (cachedResult != null)
+                {
+                    _logger?.LogInformation("🎯 [Issue #293] 投機的OCRキャッシュヒット！ OCR処理をスキップ (ExecutionTime={ExecutionTime}ms, Regions={Regions})",
+                        cachedResult.ExecutionTime.TotalMilliseconds,
+                        cachedResult.DetectedRegionCount);
+                    Console.WriteLine($"🎯 [Issue #293] 投機的OCRキャッシュヒット！ OCR処理をスキップ");
+
+                    ocrResults = cachedResult.OcrResults;
+                    speculativeOcrUsed = true;
+                }
+            }
 
             // 🚀 [Issue #290] Fork-Join並列実行: OCR || Cloud AI翻訳
             // Pro/Premiaプランの場合、OCRとCloud AI翻訳を並列実行して待ち時間を短縮
             var isCloudAiAvailable = IsCloudAiParallelExecutionAvailable();
 
+            // 投機的OCRキャッシュがヒットしなかった場合のみOCR処理を実行
+            if (!speculativeOcrUsed)
+            {
             // OCR処理の排他制御
             await _ocrExecutionSemaphore.WaitAsync(currentRequestToken).ConfigureAwait(false);
             try
@@ -1880,6 +1916,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             }
 
             _logger?.LogDebug($"🤖 OCRエンジン呼び出し完了");
+            } // end if (!speculativeOcrUsed)
 
             // 🚀 [OCR_TRANSLATION_BRIDGE_FIX] OCR完了イベントを発行して翻訳フローを開始
             try
@@ -2725,6 +2762,48 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             _logger?.LogDebug($"❌ 画像バイト変換中にエラー: {ex.Message}");
             var errorInfo = $"Image Conversion Error: {ex.Message}, Type={image.GetType().Name}";
             return System.Text.Encoding.UTF8.GetBytes(errorInfo);
+        }
+    }
+
+    /// <summary>
+    /// 🔥 [Issue #293] 投機的OCRキャッシュ照合用の画像ハッシュを計算
+    /// </summary>
+    /// <param name="image">画像</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>画像ハッシュ（16文字）</returns>
+    private static async Task<string> ComputeImageHashForCacheAsync(IImage image, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // 画像をバイト配列に変換してサンプリングハッシュ
+            var data = await image.ToByteArrayAsync().ConfigureAwait(false);
+
+            if (data == null || data.Length == 0)
+                return Guid.NewGuid().ToString("N")[..16];
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // サンプリング（1024バイトを等間隔で取得）
+            var sampleSize = Math.Min(1024, data.Length);
+            var sample = new byte[sampleSize];
+            var step = Math.Max(1, data.Length / sampleSize);
+
+            for (int i = 0, j = 0; i < sampleSize && j < data.Length; i++, j += step)
+            {
+                sample[i] = data[j];
+            }
+
+            // SHA256ハッシュ（先頭16文字のみ使用）
+            var hash = System.Security.Cryptography.SHA256.HashData(sample);
+            return Convert.ToHexString(hash)[..16];
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return Guid.NewGuid().ToString("N")[..16];
         }
     }
 

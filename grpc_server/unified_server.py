@@ -40,6 +40,15 @@ from datetime import datetime
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 
+# Issue #293: stdout/stderrのバッファリング無効化（サブプロセスからのログ即時出力用）
+# Windowsではreconfigure()でline_bufferingを設定
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except AttributeError:
+    # Python 3.6以前 or 特殊環境では無視
+    pass
+
 # miniconda CUDA DLL競合防止
 def _sanitize_path_for_cuda():
     """minicondaのCUDA DLLパスをPATHから除外"""
@@ -93,7 +102,14 @@ from logging.handlers import RotatingFileHandler
 
 _log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-_console_handler = logging.StreamHandler(sys.stdout)
+# Issue #293: ログを即座にフラッシュするためのカスタムハンドラ
+class FlushingStreamHandler(logging.StreamHandler):
+    """ログ出力後に即座にフラッシュするStreamHandler"""
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
+_console_handler = FlushingStreamHandler(sys.stdout)
 _console_handler.setFormatter(_log_formatter)
 _console_handler.setLevel(logging.INFO)
 
@@ -167,26 +183,40 @@ class SuryaOcrEngine:
                 self.device = "cpu"
 
             # Surya OCR v0.17.0+ APIのインポート
+            self.logger.info("[OCR] Importing Surya modules...")
+            sys.stdout.flush()
             from surya.foundation import FoundationPredictor
             from surya.recognition import RecognitionPredictor
             from surya.detection import DetectionPredictor
+            self.logger.info("[OCR] Surya modules imported successfully")
+            sys.stdout.flush()
 
             # 検出モデル
+            self.logger.info("[OCR] Creating DetectionPredictor (may download models)...")
+            sys.stdout.flush()
             det_start = time.time()
             self.detection_predictor = DetectionPredictor()
             self.logger.info(f"[Timing] DetectionPredictor: {time.time() - det_start:.2f}秒")
+            sys.stdout.flush()
 
             # 認識モデル (FoundationPredictor経由)
+            self.logger.info("[OCR] Creating FoundationPredictor...")
+            sys.stdout.flush()
             found_start = time.time()
             self.foundation_predictor = FoundationPredictor()
             self.logger.info(f"[Timing] FoundationPredictor: {time.time() - found_start:.2f}秒")
+            sys.stdout.flush()
 
+            self.logger.info("[OCR] Creating RecognitionPredictor...")
+            sys.stdout.flush()
             rec_start = time.time()
             self.recognition_predictor = RecognitionPredictor(self.foundation_predictor)
             self.logger.info(f"[Timing] RecognitionPredictor: {time.time() - rec_start:.2f}秒")
+            sys.stdout.flush()
 
             elapsed = time.time() - total_start
             self.logger.info(f"Surya OCRモデルロード完了 (合計: {elapsed:.2f}秒)")
+            sys.stdout.flush()
             self.is_loaded = True
             return True
 
@@ -534,15 +564,19 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
 
             def load_translation_sync():
                 logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
+                sys.stdout.flush()
                 # [Gemini Review Fix] asyncio.run()を廃止し、同期版メソッドを直接呼び出し
                 # これにより、Executor内で新しいイベントループを作成する複雑さを回避
                 translation_engine._load_model_sync()
                 logger.info("[Translation] Model loaded successfully")
+                sys.stdout.flush()
 
             def load_ocr_sync():
                 logger.info("[OCR] Loading Surya OCR...")
+                sys.stdout.flush()
                 ocr_engine._load_model_sync()
                 logger.info("[OCR] Model loaded successfully")
+                sys.stdout.flush()
 
             with ThreadPoolExecutor(max_workers=2) as executor:
                 trans_future = loop.run_in_executor(executor, load_translation_sync)
@@ -575,6 +609,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
 
         load_elapsed = time.time() - load_start
         logger.info(f"All models loaded in {load_elapsed:.2f} seconds")
+        sys.stdout.flush()
 
     except Exception as e:
         logger.critical("=" * 80)
@@ -615,10 +650,12 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     server.add_insecure_port(listen_addr)
 
     logger.info(f"Starting unified gRPC server on {listen_addr}...")
+    sys.stdout.flush()
     await server.start()
 
     logger.info("=" * 80)
     logger.info(f"Baketa Unified AI Server is running on {listen_addr}")
+    sys.stdout.flush()
     logger.info(f"   Translation Engine: {translation_engine.__class__.__name__}")
     logger.info(f"   Translation Model: {translation_engine.model_name}")
     logger.info(f"   OCR Engine: Surya OCR v{ocr_engine.VERSION}")
