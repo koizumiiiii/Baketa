@@ -43,6 +43,11 @@ public sealed class BackgroundLearningService : BackgroundService
     private int _consecutiveSkipCount;
     private const int MaxConsecutiveSkips = 10;
 
+    // [Issue #293] 連続エラー時の指数バックオフ
+    private int _consecutiveErrorCount;
+    private const int MaxConsecutiveErrors = 5;
+    private static readonly TimeSpan MaxErrorRetryDelay = TimeSpan.FromSeconds(60);
+
     /// <summary>
     /// コンストラクタ
     /// </summary>
@@ -134,6 +139,7 @@ public sealed class BackgroundLearningService : BackgroundService
                 {
                     await ExecuteLearningCycleAsync(stoppingToken).ConfigureAwait(false);
                     _consecutiveSkipCount = 0;
+                    _consecutiveErrorCount = 0; // 成功時にエラーカウントをリセット
                 }
                 else
                 {
@@ -156,8 +162,29 @@ public sealed class BackgroundLearningService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "🎓 [Phase 10] 学習サイクルエラー");
-                await Task.Delay(Settings.BackgroundLearningErrorRetryDelay, stoppingToken).ConfigureAwait(false);
+                _consecutiveErrorCount++;
+
+                // [Issue #293] 指数バックオフ: 連続エラー時に待機時間を増加
+                // 1回目: 10秒, 2回目: 20秒, 3回目: 40秒, 4回目: 60秒（上限）, 5回目: 60秒（上限）
+                var backoffMultiplier = Math.Min((int)Math.Pow(2, _consecutiveErrorCount - 1), 6);
+                var retryDelay = TimeSpan.FromTicks(
+                    Math.Min(
+                        Settings.BackgroundLearningErrorRetryDelay.Ticks * backoffMultiplier,
+                        MaxErrorRetryDelay.Ticks));
+
+                _logger.LogWarning(ex,
+                    "🎓 [Phase 10] 学習サイクルエラー (連続{Count}回目, 次回リトライ: {Delay}秒後)",
+                    _consecutiveErrorCount, retryDelay.TotalSeconds);
+
+                // 連続エラーが多い場合は警告レベルを上げる
+                if (_consecutiveErrorCount >= MaxConsecutiveErrors)
+                {
+                    _logger.LogError(
+                        "🎓 [Phase 10] 連続エラー上限到達 ({Count}回) - サービス継続中だが注意が必要",
+                        _consecutiveErrorCount);
+                }
+
+                await Task.Delay(retryDelay, stoppingToken).ConfigureAwait(false);
             }
         }
 
