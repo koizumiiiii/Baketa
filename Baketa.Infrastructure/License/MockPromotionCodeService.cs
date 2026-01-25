@@ -25,24 +25,32 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
     private readonly IPromotionSettingsPersistence _settingsPersistence;
     private readonly IUnifiedSettingsService _unifiedSettingsService;
     private readonly IEventAggregator _eventAggregator;
-    private readonly ILicenseManager _licenseManager;
+    private readonly ILicenseInfoProvider _licenseInfoProvider;
     private readonly ILogger<MockPromotionCodeService> _logger;
     private bool _disposed;
 
     /// <inheritdoc/>
     public event EventHandler<PromotionStateChangedEventArgs>? PromotionStateChanged;
 
+    /// <summary>
+    /// コンストラクタ
+    /// </summary>
+    /// <remarks>
+    /// [Issue #293] 循環依存回避のため、ILicenseManagerからILicenseInfoProviderに変更。
+    /// MockPromotionCodeServiceはCurrentStateの読み取りのみ必要であり、
+    /// 完全なILicenseManagerの機能は不要。
+    /// </remarks>
     public MockPromotionCodeService(
         IPromotionSettingsPersistence settingsPersistence,
         IUnifiedSettingsService unifiedSettingsService,
         IEventAggregator eventAggregator,
-        ILicenseManager licenseManager,
+        ILicenseInfoProvider licenseInfoProvider,
         ILogger<MockPromotionCodeService> logger)
     {
         _settingsPersistence = settingsPersistence ?? throw new ArgumentNullException(nameof(settingsPersistence));
         _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _licenseManager = licenseManager ?? throw new ArgumentNullException(nameof(licenseManager));
+        _licenseInfoProvider = licenseInfoProvider ?? throw new ArgumentNullException(nameof(licenseInfoProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _logger.LogDebug("MockPromotionCodeService initialized");
@@ -71,7 +79,7 @@ public sealed class MockPromotionCodeService : IPromotionCodeService, IDisposabl
         {
             // Issue #243: 延長方式 - 既存Pro以上の場合は期限を延長
             // Issue #125: Standardプラン廃止
-            var currentState = _licenseManager.CurrentState;
+            var currentState = _licenseInfoProvider.CurrentState;
             var isAlreadyPro = currentState.CurrentPlan is PlanType.Pro or PlanType.Premium or PlanType.Ultimate;
             var currentExpiration = currentState.ExpirationDate ?? DateTime.UtcNow;
 

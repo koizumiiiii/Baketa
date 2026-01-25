@@ -138,6 +138,11 @@ public sealed class LicenseModule : ServiceModuleBase
         });
 #endif
 
+        // [Issue #293] 循環依存回避: Lazy<IPromotionCodeService>を登録
+        // PatreonOAuthServiceがコンストラクタ時ではなく、実際に使用するタイミングで解決する
+        services.AddSingleton<Lazy<IPromotionCodeService>>(provider =>
+            new Lazy<IPromotionCodeService>(() => provider.GetRequiredService<IPromotionCodeService>()));
+
         // Issue #280+#281: ボーナストークンサービス
         // Pollyリトライポリシー付きHttpClient
         services.AddHttpClient<License.BonusTokenService>()
