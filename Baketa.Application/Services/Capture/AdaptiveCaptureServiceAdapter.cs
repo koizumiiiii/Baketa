@@ -297,7 +297,8 @@ public partial class AdaptiveCaptureServiceAdapter(
 
             if (windowOffset == Point.Empty)
             {
-                _logger.LogWarning("GetWindowOffset失敗 - デフォルトROIScaleFactor=1.0を使用");
+                // [Issue #326] 動作に影響ないためDebugレベルに変更（ログノイズ削減）
+                _logger.LogDebug("GetWindowOffset失敗 - デフォルトROIScaleFactor=1.0を使用");
                 return 1.0f;
             }
 
