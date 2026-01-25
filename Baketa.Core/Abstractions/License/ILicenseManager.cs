@@ -141,6 +141,18 @@ public interface ILicenseManager
     /// ログアウト時はnullを渡してクリアします。
     /// </remarks>
     void SetSessionToken(string? sessionToken);
+
+    /// <summary>
+    /// ユーザーIDを設定（Issue #321）
+    /// Supabase認証ユーザーのIDを設定するために使用
+    /// </summary>
+    /// <param name="userId">ユーザーID（nullでクリア）</param>
+    /// <remarks>
+    /// Patreon認証ユーザーはSetResolvedLicenseStateで設定されますが、
+    /// Supabase認証のみのユーザーはこのメソッドで明示的に設定する必要があります。
+    /// Cloud AI翻訳のトークン消費記録に使用されます。
+    /// </remarks>
+    void SetUserId(string? userId);
 }
 
 /// <summary>

@@ -1231,6 +1231,22 @@ public sealed class LicenseManager : ILicenseManager, ILicenseInfoProvider, IDis
             !string.IsNullOrEmpty(sessionToken));
     }
 
+    /// <inheritdoc/>
+    public void SetUserId(string? userId)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        lock (_stateLock)
+        {
+            _userId = userId;
+            _currentState = _currentState with { UserId = userId };
+        }
+
+        _logger.LogInformation(
+            "[Issue #321] ユーザーID設定: HasUserId={HasUserId}",
+            !string.IsNullOrEmpty(userId));
+    }
+
     /// <summary>
     /// [Issue #275] 有効なプロモーションがある場合、状態にプロモーション設定をマージ
     /// [Issue #280+#281] プロモーションはボーナストークン付与のみ、プランは変更しない
