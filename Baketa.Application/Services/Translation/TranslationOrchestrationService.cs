@@ -1246,8 +1246,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             // 🚀 [FUNDAMENTAL_FIX] 現在の画像のDisposeは行わない - CaptureCompletedEventハンドラーが責任を持つ
             // currentImage?.Dispose(); // CaptureCompletedEventで使用するため削除
 
-            // [Issue #299] 翻訳実行成功 = 画像変化あり
-            return publishedResult != null;
+            // [Issue #325] 画像変化検知を通過して翻訳処理を実行した = 変化あり
+            // publishedResultはObservable発行の有無（座標ベースモードではnull）であり、
+            // Adaptive Intervalの判定には使わない。
+            // 画像変化がなければ1159行で既にreturn false;しているため、
+            // ここに到達した時点で変化があったと判定する。
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
