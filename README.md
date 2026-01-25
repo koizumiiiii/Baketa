@@ -13,9 +13,24 @@
 | カテゴリ | 機能 |
 |---------|------|
 | **OCR** | Surya OCR (ONNX Detection + PyTorch Recognition)、Windows Graphics Capture API |
-| **翻訳** | NLLB-200 (Meta製、ローカル処理)、gRPC通信、CTranslate2最適化 |
+| **翻訳** | NLLB-200 (ローカル)、Google Gemini (クラウド)、gRPC通信、CTranslate2最適化 |
+| **ROI Manager** | ゲーム別テキスト位置学習、動的閾値制御、部分OCR最適化 |
+| **統合AIサーバー** | OCR+翻訳を単一プロセスで実行、VRAM 50%削減 |
 | **UI** | Avalonia + ReactiveUI、透過オーバーレイ、ダーク/ライトテーマ |
 | **認証** | Supabase Auth (OAuth対応)、Patreon連携 |
+
+### ROI Manager（学習型最適化）
+
+ゲーム画面のテキスト出現位置を**自動学習**し、OCR処理を最適化する目玉機能です。
+
+```
+学習前: 全画面OCR (~6秒)  →  学習後: 変化領域のみOCR (<1秒)
+```
+
+- **ヒートマップ学習**: 16x16グリッドでテキスト頻出位置を記録
+- **動的閾値制御**: 頻出領域は厳格に、背景領域は緩和して検出
+- **ゲーム別プロファイル**: 実行ファイルごとに学習データを自動保存
+- **部分OCR実行**: 変化した領域のみを処理し、処理時間を大幅短縮
 
 ## クイックスタート
 
