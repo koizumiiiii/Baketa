@@ -139,6 +139,8 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
 
             // [Issue #280+#281] ログアウト時にセッショントークンをクリア
             _licenseManager.SetSessionToken(null);
+            // [Issue #321] ログアウト時にユーザーIDもクリア
+            _licenseManager.SetUserId(null);
 
             // ログアウト前に未同期の消費量を同期
             await FinalSyncAsync().ConfigureAwait(false);
@@ -202,12 +204,27 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
             if (session?.IsValid == true)
             {
                 _licenseManager.SetSessionToken(session.AccessToken);
+                // [Issue #321] Supabase認証ユーザーのUserIdも設定
+                // Patreon認証ユーザーはSetResolvedLicenseStateで設定されるが、
+                // Supabaseのみのユーザーはここで明示的に設定する必要がある
+                if (!string.IsNullOrEmpty(session.User?.Id))
+                {
+                    _licenseManager.SetUserId(session.User.Id);
+                    _logger.LogInformation("[Issue #321] SupabaseユーザーIDをLicenseManagerに設定しました");
+                }
+                else
+                {
+                    // [Code Review] User.Idが空の場合は明示的にクリア
+                    _licenseManager.SetUserId(null);
+                    _logger.LogDebug("[Issue #321] SupabaseセッションにUser.Idがないためクリア");
+                }
                 _logger.LogInformation("[Issue #280+#281] Supabase JWTをLicenseManagerに設定しました");
             }
             else
             {
                 // ログインしているはずがセッション無効の場合はクリア
                 _licenseManager.SetSessionToken(null);
+                _licenseManager.SetUserId(null);
             }
         }
         catch (Exception ex)

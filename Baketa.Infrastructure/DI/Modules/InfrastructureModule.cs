@@ -26,7 +26,6 @@ using Baketa.Infrastructure.Analytics;
 using Baketa.Infrastructure.Imaging.ChangeDetection;
 using Baketa.Infrastructure.Logging;
 using Baketa.Infrastructure.OCR;
-using Baketa.Infrastructure.OCR.Measurement;
 using Baketa.Infrastructure.Patterns;
 using Baketa.Infrastructure.Performance;
 using Baketa.Infrastructure.ResourceManagement;
@@ -264,16 +263,8 @@ public class InfrastructureModule : ServiceModuleBase
         // NOTE: [PP-OCRv5削除] AdaptiveTileStrategy, ITileStrategy, OcrRegionGenerator削除
         // Surya OCRでは異なるアプローチを使用（SuryaOcrModuleで登録）
 
-        // OCR精度測定システム
-        services.AddSingleton<IOcrAccuracyMeasurement, OcrAccuracyMeasurement>();
-        services.AddSingleton<AccuracyBenchmarkService>();
-        services.AddSingleton<TestImageGenerator>();
-        services.AddSingleton<AccuracyImprovementReporter>();
-        services.AddSingleton<RuntimeOcrAccuracyLogger>();
-        services.AddSingleton<OcrAccuracyTestRunner>();
-
-        // OCR精度測定スタートアップサービス
-        services.AddOcrAccuracyStartupService();
+        // [Issue #316] OCR精度測定システム削除
+        // 開発時ベンチマーク用であり、実際のOCRを使用せずシミュレート結果を生成していたため削除
 
         // Phase 3.4A: OCRテキスト領域グルーピング戦略（Union-Find）
         services.AddSingleton<IRegionGroupingStrategy, Baketa.Infrastructure.OCR.Clustering.UnionFindRegionGroupingStrategy>();

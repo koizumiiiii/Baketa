@@ -1187,8 +1187,13 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         if (changedBlocks.Count == 1)
         {
             var block = changedBlocks[0];
-            // 単一ブロック + 端 + 軽微な変化 → ノイズ（カーソル点滅など）
-            if (IsEdgeBlock(block.Row, block.Col, rows, cols) && block.Similarity > 0.90f)
+            // [Issue #319] 下端（row == rows - 1）はテキスト領域の可能性が高いため除外
+            // ゲームのテキストは画面下部に表示されることが多く、テキスト送りの変化を
+            // ノイズ扱いすると40秒以上の遅延が発生する
+            bool isBottomRow = block.Row == rows - 1;
+
+            // 単一ブロック + 端（下端を除く）+ 軽微な変化 → ノイズ（カーソル点滅など）
+            if (IsEdgeBlock(block.Row, block.Col, rows, cols) && block.Similarity > 0.90f && !isBottomRow)
             {
                 isNoise = true;
                 var position = IsCornerBlock(block.Row, block.Col, rows, cols) ? "Corner" : "Edge";
@@ -1197,6 +1202,13 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 // [Issue #229] テレメトリ: 潜在的false negative のデータ収集
                 // 将来のオプションE/F判断のための専用CSVログ
                 WriteTelemetryLog(position, block.Row, block.Col, block.Similarity, rows, cols);
+            }
+            else if (isBottomRow && IsEdgeBlock(block.Row, block.Col, rows, cols) && block.Similarity > 0.90f)
+            {
+                // [Code Review] 下端ブロックはノイズ判定から除外されたことをログ
+                _logger.LogDebug(
+                    "[Issue #319] 下端ブロックはノイズ判定から除外: Row={Row}, Col={Col}, Similarity={Similarity:F4}",
+                    block.Row, block.Col, block.Similarity);
             }
         }
 

@@ -275,6 +275,9 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         var connectionTimeout = Math.Max(totalTimeout / 3, 5000);  // 最低5秒
         var responseTimeout = totalTimeout - connectionTimeout;     // 残りを応答用に
 
+        // [Issue #327] 統合サーバーモードかどうかを判定（パターンマッチングでNull安全性強化）
+        var isUnifiedServerMode = _unifiedServerSettings is { Enabled: true };
+
         try
         {
             using var client = new TcpClient();
@@ -290,7 +293,15 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
                 if (client.Connected)
                 {
-                    // 簡単なping翻訳リクエスト
+                    // [Issue #327] 統合サーバーモード（gRPC）ではTCP接続確認のみで成功とする
+                    // gRPCはHTTP/2 + Protobufのため、生のJSONリクエストは受け付けない
+                    if (isUnifiedServerMode)
+                    {
+                        _logger.LogTrace("[HEALTH_MONITOR] 統合サーバーモード: TCP接続成功 - Port: {Port}", _currentServerPort);
+                        return true;
+                    }
+
+                    // 旧サーバーモード: 簡単なping翻訳リクエスト
                     var testRequest = new { text = "test", source = "en", target = "ja" };
                     var requestJson = JsonSerializer.Serialize(testRequest);
                     var requestBytes = Encoding.UTF8.GetBytes(requestJson + "\n");
