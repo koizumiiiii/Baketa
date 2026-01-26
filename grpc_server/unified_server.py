@@ -371,8 +371,10 @@ class SuryaOcrEngine:
 
                 inv_scale = 1.0 / scale if scale != 1.0 else 1.0
 
-                for idx, bbox in enumerate(bboxes):
-                    # Surya detection の bbox は [x1, y1, x2, y2] 形式
+                for idx, polygon_box in enumerate(bboxes):
+                    # Surya detection の PolygonBox.bbox は [x_min, y_min, x_max, y_max] 形式
+                    bbox = polygon_box.bbox
+                    confidence = polygon_box.confidence if polygon_box.confidence is not None else 0.5
                     if len(bbox) >= 4:
                         x1, y1, x2, y2 = bbox[:4]
                         region = {
@@ -388,9 +390,8 @@ class SuryaOcrEngine:
                                     {"x": float(x1 * inv_scale), "y": float(y2 * inv_scale)},
                                 ]
                             },
-                            # Detection confidence は "not very reliable" (公式ドキュメント)
-                            # ただし、サイズベースのフィルタリングには使える
-                            "confidence": 0.5,  # デフォルト値（信頼性が低いため固定）
+                            # Detection confidence（PolygonBoxから取得）
+                            "confidence": confidence,
                             "region_index": idx
                         }
                         regions.append(region)
