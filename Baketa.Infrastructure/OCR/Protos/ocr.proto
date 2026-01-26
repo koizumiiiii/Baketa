@@ -64,6 +64,14 @@ message TextRegion {
   int32 line_index = 5;           // 行番号（0-indexed）
 }
 
+/// [Issue #320] Detection専用の検出領域（テキスト内容なし、位置のみ）
+/// ROI学習用の高速検出に使用
+message DetectedRegion {
+  BoundingBox bounding_box = 1;   // バウンディングボックス
+  float confidence = 2;           // 検出信頼度スコア (0.0-1.0) ※Recognition信頼度より低精度
+  int32 region_index = 3;         // 領域インデックス（0-indexed）
+}
+
 /// OCRエラー情報
 message OcrError {
   OcrErrorType error_type = 1;
@@ -128,13 +136,47 @@ message OcrIsReadyResponse {
 }
 
 // ============================================================================
+// [Issue #320] Detection-Only Messages (ROI学習用高速検出)
+// ============================================================================
+
+/// Detection専用リクエスト
+/// Recognition（テキスト認識）をスキップし、位置検出のみを行う
+/// 処理時間: ~100ms（通常のRecognize: ~1000ms）
+message DetectRequest {
+  string request_id = 1;          // リクエストID (UUID)
+  bytes image_data = 2;           // 画像データ（PNG/JPEG）
+  string image_format = 3;        // 画像フォーマット ("png", "jpeg")
+  OcrEngineType engine = 4;       // 使用するエンジン
+  map<string, string> options = 5; // エンジン固有オプション
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+/// Detection専用レスポンス
+/// テキスト内容は含まず、バウンディングボックスと検出信頼度のみ返す
+message DetectResponse {
+  string request_id = 1;          // 対応するリクエストID
+  bool is_success = 2;            // 成功したかどうか
+  repeated DetectedRegion regions = 3; // 検出された領域（テキストなし）
+  int32 region_count = 4;         // 検出された領域数
+  int64 processing_time_ms = 5;   // 処理時間（ミリ秒）
+  OcrError error = 6;             // エラー情報（失敗時）
+  string engine_name = 7;         // 使用されたエンジン名
+  google.protobuf.Timestamp timestamp = 8;
+}
+
+// ============================================================================
 // Service Definition
 // ============================================================================
 
 /// Baketa OCRサービス
 service OcrService {
-  /// 画像からテキストを認識
+  /// 画像からテキストを認識（Detection + Recognition）
   rpc Recognize(OcrRequest) returns (OcrResponse);
+
+  /// [Issue #320] テキスト領域の位置のみ検出（Detection Only）
+  /// Recognition（テキスト認識）をスキップし、約10倍高速化
+  /// ROI学習用の高速検出に使用
+  rpc Detect(DetectRequest) returns (DetectResponse);
 
   /// ヘルスチェック
   rpc HealthCheck(OcrHealthCheckRequest) returns (OcrHealthCheckResponse);

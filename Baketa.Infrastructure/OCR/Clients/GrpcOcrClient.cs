@@ -323,6 +323,179 @@ public sealed class GrpcOcrClient : IDisposable
     }
 
     /// <summary>
+    /// [Issue #320] テキスト領域の位置のみを検出します（Recognition をスキップ、約10倍高速）
+    /// ROI学習用の高速検出に使用
+    /// </summary>
+    /// <param name="imageData">画像データ（PNG/JPEG）</param>
+    /// <param name="imageFormat">画像フォーマット（"png" or "jpeg"）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>Detection専用レスポンス（テキスト内容なし、バウンディングボックスのみ）</returns>
+    public async Task<DetectResponse> DetectAsync(
+        byte[] imageData,
+        string imageFormat = "png",
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(imageData);
+
+        var requestId = Guid.NewGuid().ToString();
+        DetectResponse? lastResponse = null;
+        RpcException? lastException = null;
+
+        // サイレントリトライループ（Detectionは高速なのでタイムアウト短め）
+        const int detectTimeoutSeconds = 10;
+        const int detectRetryTimeoutSeconds = 3;
+
+        for (var attempt = 0; attempt <= MaxRetryCount; attempt++)
+        {
+            var sw = Stopwatch.StartNew();
+
+            try
+            {
+                var grpcRequest = new DetectRequest
+                {
+                    RequestId = requestId,
+                    ImageData = Google.Protobuf.ByteString.CopyFrom(imageData),
+                    ImageFormat = imageFormat,
+                    Engine = OcrEngineType.Surya,
+                    Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+                };
+
+                if (attempt == 0)
+                {
+                    _logger.LogDebug(
+                        "[gRPC-OCR] Detect (Detection-Only): ImageSize={ImageSize}KB, Format={Format}",
+                        imageData.Length / 1024,
+                        imageFormat);
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "[gRPC-OCR] Detect retry attempt {Attempt}/{MaxRetry}",
+                        attempt, MaxRetryCount);
+                }
+
+                // gRPC呼び出し（Detection は高速なのでタイムアウト短め）
+                var timeoutSeconds = attempt == 0 ? detectTimeoutSeconds : detectRetryTimeoutSeconds;
+                var callOptions = new CallOptions(
+                    deadline: DateTime.UtcNow.AddSeconds(timeoutSeconds),
+                    cancellationToken: cancellationToken)
+                    .WithWaitForReady(true);
+
+                var response = await _client.DetectAsync(grpcRequest, callOptions).ConfigureAwait(false);
+
+                sw.Stop();
+
+                if (response.IsSuccess)
+                {
+                    _logger.LogInformation(
+                        "[gRPC-OCR] Detection-Only: {RegionCount} regions in {ElapsedMs}ms (Server: {ServerMs}ms)",
+                        response.RegionCount,
+                        sw.ElapsedMilliseconds,
+                        response.ProcessingTimeMs);
+                    return response;
+                }
+
+                _logger.LogWarning(
+                    "[gRPC-OCR] Detection failed: {ErrorType} - {ErrorMessage}",
+                    response.Error?.ErrorType,
+                    response.Error?.Message);
+
+                return response;
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.Unavailable)
+            {
+                sw.Stop();
+                lastException = ex;
+
+                if (attempt < MaxRetryCount)
+                {
+                    var delayMs = RetryDelaysMs[attempt];
+                    _logger.LogWarning(
+                        "[gRPC-OCR] Detect: Server unavailable (attempt {Attempt}/{MaxRetry}), retrying in {DelayMs}ms...",
+                        attempt + 1, MaxRetryCount, delayMs);
+
+                    await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                _logger.LogError(ex, "[gRPC-OCR] Detect: Server unavailable after {MaxRetry} retries",
+                    MaxRetryCount);
+
+                lastResponse = CreateDetectErrorResponse(
+                    requestId,
+                    OcrErrorType.ServiceUnavailable,
+                    $"OCR server unavailable after {MaxRetryCount} retries",
+                    ex.Message,
+                    true);
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+            {
+                sw.Stop();
+                lastException = ex;
+
+                if (attempt < MaxRetryCount)
+                {
+                    var delayMs = RetryDelaysMs[attempt];
+                    _logger.LogWarning(
+                        "[gRPC-OCR] Detect: Timeout (attempt {Attempt}/{MaxRetry}), retrying in {DelayMs}ms...",
+                        attempt + 1, MaxRetryCount, delayMs);
+
+                    await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                _logger.LogError(ex, "[gRPC-OCR] Detect: Timeout after {MaxRetry} retries",
+                    MaxRetryCount);
+
+                lastResponse = CreateDetectErrorResponse(
+                    requestId,
+                    OcrErrorType.Timeout,
+                    $"Detection request timed out after {MaxRetryCount} retries",
+                    ex.Message,
+                    true);
+            }
+            catch (RpcException ex)
+            {
+                sw.Stop();
+                _logger.LogError(ex, "[gRPC-OCR] Detect RPC error: {StatusCode}", ex.StatusCode);
+
+                return CreateDetectErrorResponse(
+                    requestId,
+                    OcrErrorType.ProcessingError,
+                    $"RPC error: {ex.StatusCode}",
+                    ex.Message,
+                    ex.StatusCode != StatusCode.InvalidArgument);
+            }
+            catch (OperationCanceledException)
+            {
+                sw.Stop();
+                _logger.LogDebug("[gRPC-OCR] Detect request cancelled after {ElapsedMs}ms", sw.ElapsedMilliseconds);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                _logger.LogError(ex, "[gRPC-OCR] Detect unexpected error");
+
+                return CreateDetectErrorResponse(
+                    requestId,
+                    OcrErrorType.Unknown,
+                    "Unexpected error during detection",
+                    ex.Message,
+                    false);
+            }
+        }
+
+        return lastResponse ?? CreateDetectErrorResponse(
+            requestId,
+            OcrErrorType.ServiceUnavailable,
+            $"Detection failed after {MaxRetryCount} retries",
+            lastException?.Message ?? "Unknown error",
+            true);
+    }
+
+    /// <summary>
     /// エラーレスポンスを生成
     /// </summary>
     private static OcrResponse CreateErrorResponse(
@@ -333,6 +506,33 @@ public sealed class GrpcOcrClient : IDisposable
         bool isRetryable)
     {
         return new OcrResponse
+        {
+            RequestId = requestId,
+            IsSuccess = false,
+            RegionCount = 0,
+            ProcessingTimeMs = 0,
+            Error = new OcrError
+            {
+                ErrorType = errorType,
+                Message = message,
+                Details = details,
+                IsRetryable = isRetryable
+            },
+            Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+        };
+    }
+
+    /// <summary>
+    /// [Issue #320] Detection用エラーレスポンスを生成
+    /// </summary>
+    private static DetectResponse CreateDetectErrorResponse(
+        string requestId,
+        OcrErrorType errorType,
+        string message,
+        string details,
+        bool isRetryable)
+    {
+        return new DetectResponse
         {
             RequestId = requestId,
             IsSuccess = false,

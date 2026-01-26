@@ -325,6 +325,97 @@ class SuryaOcrEngine:
                 "engine_version": self.VERSION
             }
 
+    def detect_only(self, image_bytes: bytes) -> dict:
+        """[Issue #320] テキスト領域の位置のみを検出（Recognitionをスキップ）
+
+        ROI学習用の高速検出メソッド。
+        通常のrecognize()が~1000msかかるのに対し、~100msで完了。
+
+        Args:
+            image_bytes: 画像データ（PNG/JPEG）
+
+        Returns:
+            dict: 検出結果
+                - success: bool
+                - regions: List[dict] (bbox, confidence, region_index のみ)
+                - processing_time_ms: int
+        """
+        if not self.is_loaded:
+            raise RuntimeError("モデルが未ロードです")
+
+        if len(image_bytes) > self.MAX_IMAGE_SIZE:
+            raise ValueError(f"画像サイズが上限を超えています: {len(image_bytes)} bytes")
+
+        try:
+            from PIL import Image
+
+            image = Image.open(io.BytesIO(image_bytes))
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+
+            image, scale = self._resize_image_if_needed(image)
+
+            self.logger.info(f"Detection-Only実行中... (サイズ: {image.size})")
+            start_time = time.time()
+
+            # Detection のみ実行（Recognition をスキップ）
+            # detection_predictor を直接使用
+            detection_results = self.detection_predictor([image])
+
+            elapsed = time.time() - start_time
+
+            regions = []
+            if detection_results and len(detection_results) > 0:
+                det_result = detection_results[0]
+                bboxes = getattr(det_result, 'bboxes', [])
+
+                inv_scale = 1.0 / scale if scale != 1.0 else 1.0
+
+                for idx, bbox in enumerate(bboxes):
+                    # Surya detection の bbox は [x1, y1, x2, y2] 形式
+                    if len(bbox) >= 4:
+                        x1, y1, x2, y2 = bbox[:4]
+                        region = {
+                            "bbox": {
+                                "x": int(x1 * inv_scale),
+                                "y": int(y1 * inv_scale),
+                                "width": int((x2 - x1) * inv_scale),
+                                "height": int((y2 - y1) * inv_scale),
+                                "points": [
+                                    {"x": float(x1 * inv_scale), "y": float(y1 * inv_scale)},
+                                    {"x": float(x2 * inv_scale), "y": float(y1 * inv_scale)},
+                                    {"x": float(x2 * inv_scale), "y": float(y2 * inv_scale)},
+                                    {"x": float(x1 * inv_scale), "y": float(y2 * inv_scale)},
+                                ]
+                            },
+                            # Detection confidence は "not very reliable" (公式ドキュメント)
+                            # ただし、サイズベースのフィルタリングには使える
+                            "confidence": 0.5,  # デフォルト値（信頼性が低いため固定）
+                            "region_index": idx
+                        }
+                        regions.append(region)
+
+            self.logger.info(f"Detection-Only完了: {len(regions)}領域検出 ({elapsed*1000:.0f}ms)")
+
+            return {
+                "success": True,
+                "regions": regions,
+                "processing_time_ms": int(elapsed * 1000),
+                "engine_name": "Surya OCR (Detection-Only)",
+                "engine_version": self.VERSION
+            }
+
+        except Exception as e:
+            self.logger.exception(f"Detection-Onlyエラー: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "regions": [],
+                "processing_time_ms": 0,
+                "engine_name": "Surya OCR (Detection-Only)",
+                "engine_version": self.VERSION
+            }
+
 
 # ============================================================================
 # OCR Servicer (非同期版)
@@ -411,6 +502,60 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
         response.details["version"] = self.engine.VERSION
         response.timestamp.FromDatetime(datetime.utcnow())
         return response
+
+    async def Detect(self, request, context):
+        """[Issue #320] Detection-Only RPC
+
+        テキスト領域の位置のみを検出（Recognitionをスキップ）。
+        ROI学習用の高速検出に使用。
+        処理時間: ~100ms（通常のRecognize: ~1000ms）
+        """
+        self.logger.info(f"Detect RPC called - request_id: {request.request_id}")
+
+        try:
+            # 同期処理をスレッドプールで実行
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                self.executor,
+                self.engine.detect_only,
+                request.image_data
+            )
+
+            response = ocr_pb2.DetectResponse()
+            response.request_id = request.request_id
+            response.is_success = result["success"]
+            response.processing_time_ms = result["processing_time_ms"]
+            response.engine_name = result["engine_name"]
+            response.region_count = len(result["regions"])
+
+            for region_data in result["regions"]:
+                region = response.regions.add()
+                region.confidence = region_data["confidence"]
+                region.region_index = region_data["region_index"]
+
+                bbox = region_data["bbox"]
+                region.bounding_box.x = bbox["x"]
+                region.bounding_box.y = bbox["y"]
+                region.bounding_box.width = bbox["width"]
+                region.bounding_box.height = bbox["height"]
+
+                for point in bbox["points"]:
+                    p = region.bounding_box.points.add()
+                    p.x = point["x"]
+                    p.y = point["y"]
+
+            response.timestamp.FromDatetime(datetime.utcnow())
+            return response
+
+        except Exception as e:
+            self.logger.error(f"Detect error: {e}")
+            response = ocr_pb2.DetectResponse()
+            response.request_id = request.request_id
+            response.is_success = False
+            response.error.error_type = ocr_pb2.OCR_ERROR_TYPE_PROCESSING_ERROR
+            response.error.message = str(e)
+            response.timestamp.FromDatetime(datetime.utcnow())
+            return response
 
 
 # ============================================================================
@@ -673,7 +818,8 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     logger.info("=" * 80)
     logger.info("Services available:")
     logger.info("   - TranslationService (Translate, TranslateBatch, HealthCheck, IsReady)")
-    logger.info("   - OcrService (Recognize, HealthCheck, IsReady)")
+    logger.info("   - OcrService (Recognize, Detect, HealthCheck, IsReady)")
+    logger.info("   [Issue #320] Detect RPC: Detection-only for ROI learning (~10x faster)")
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")
 

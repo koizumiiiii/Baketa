@@ -309,10 +309,12 @@ class CTranslate2Engine(TranslationEngine):
         self.logger.info(f"[ENGINE_TOKENIZE] Token count: {len(source_tokens)}, Tokens: {source_tokens[:20]}...")
 
         # 翻訳実行（同期）
+        # 🔥 [Issue #330] beam_size=1 (Greedy Search) で高速化
+        # ノベルゲームの口語的文章では精度低下は軽微、UX向上を優先
         results = self.translator.translate_batch(
             source=[source_tokens],
             target_prefix=[[tgt_code]],
-            beam_size=4,
+            beam_size=1,  # 🔥 [Issue #330] 4→1に変更（約2-3倍高速化）
             max_decoding_length=256,
             repetition_penalty=1.2,
             no_repeat_ngram_size=3,
@@ -478,17 +480,18 @@ class CTranslate2Engine(TranslationEngine):
                 )
 
             # 翻訳実行（asyncio.to_threadで非同期化）
-            # 🔥 [QUALITY_FIX] beam_size=1→4に変更（BLEU +1.0〜1.5向上）
-            # 参考: https://forum.opennmt.net/t/nllb-200-with-ctranslate2/5090
+            # 🔥 [Issue #330] beam_size=1 (Greedy Search) で高速化
+            # ノベルゲームの口語的文章では精度低下は軽微、UX向上を優先
+            # 参考: 300-800ms → 100-300ms の短縮が期待できる
             def _generate():
                 return self.translator.translate_batch(
                     source=[source_tokens],
                     target_prefix=[[tgt_code]],
-                    beam_size=4,  # 🔥 品質向上のため1→4に変更
+                    beam_size=1,  # 🔥 [Issue #330] 4→1に変更（約2-3倍高速化）
                     max_decoding_length=256,  # 長めに設定
                     repetition_penalty=1.2,
                     no_repeat_ngram_size=3,
-                    length_penalty=1.0,  # 🔥 追加: 適切な出力長を促進
+                    length_penalty=1.0,
                     return_scores=True
                 )
 
@@ -562,11 +565,12 @@ class CTranslate2Engine(TranslationEngine):
             ]
 
             # バッチ翻訳実行（asyncio.to_threadで非同期化）
+            # 🔥 [Issue #330] beam_size=1 (Greedy Search) で高速化
             def _generate_batch():
                 return self.translator.translate_batch(
                     source=source_tokens_batch,
                     target_prefix=[[tgt_code]] * len(valid_texts),
-                    beam_size=4,
+                    beam_size=1,  # 🔥 [Issue #330] 4→1に変更（約2-3倍高速化）
                     max_decoding_length=128,
                     repetition_penalty=1.2,  # 繰り返し防止
                     no_repeat_ngram_size=3,  # 3-gram繰り返し防止

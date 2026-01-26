@@ -938,6 +938,11 @@ public class InfrastructureModule : ServiceModuleBase
             Baketa.Infrastructure.Roi.Services.RoiRegionMerger>();
         Console.WriteLine("✅ IRoiRegionMerger登録完了 - 隣接領域結合サービス");
 
+        // [Issue #324] ROI Change Monitor Service（変化監視）
+        services.AddSingleton<Baketa.Core.Abstractions.Roi.IRoiChangeMonitorService,
+            Baketa.Infrastructure.Roi.Services.RoiChangeMonitorService>();
+        Console.WriteLine("✅ IRoiChangeMonitorService登録完了 - ROI変化監視サービス");
+
         Console.WriteLine("🎉 [Issue #293] ROI Manager サービス登録完了");
     }
 

@@ -238,6 +238,57 @@ public sealed class RoiManager : IRoiManager, IDisposable
         }
     }
 
+    /// <inheritdoc />
+    public IReadOnlyList<RoiRegion> GetHighConfidenceRegions(float minConfidence = 0.7f)
+    {
+        lock (_lock)
+        {
+            if (_currentProfile?.Regions is not { Count: > 0 } regions)
+            {
+                return [];
+            }
+
+            // [Issue #324] 高信頼度領域のみをフィルタリング
+            // - ConfidenceLevel == High または ConfidenceScore >= minConfidence
+            // - 検出回数が一定以上（安定した領域）
+            var highConfidenceRegions = regions
+                .Where(r => r.ConfidenceLevel == RoiConfidenceLevel.High ||
+                           r.ConfidenceScore >= minConfidence)
+                .Where(r => r.DetectionCount >= _settings.MinDetectionCountForHighConfidence)
+                .ToList();
+
+            _logger.LogDebug(
+                "[Issue #324] GetHighConfidenceRegions: {Count}/{Total} regions (minConfidence={MinConf})",
+                highConfidenceRegions.Count, regions.Count, minConfidence);
+
+            return highConfidenceRegions;
+        }
+    }
+
+    /// <inheritdoc />
+    public bool IsLearningComplete
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_currentProfile == null)
+                {
+                    return false;
+                }
+
+                // [Issue #324] 学習完了条件:
+                // 1. 高信頼度領域が1つ以上存在
+                // 2. 学習セッション数が閾値以上
+                var highConfidenceCount = GetHighConfidenceRegions().Count;
+                var learningComplete = highConfidenceCount >= _settings.MinHighConfidenceRegionsForComplete &&
+                                      _currentProfile.TotalLearningSessionCount >= _settings.MinLearningSessionsForComplete;
+
+                return learningComplete;
+            }
+        }
+    }
+
     // [Issue #293] 動的閾値ログのサンプリングカウンター
     private int _thresholdLogCounter = 0;
     private const int ThresholdLogSampleRate = 16; // 16セルに1回ログ出力
