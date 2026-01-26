@@ -13,15 +13,23 @@ Phase 2.2.1: CTranslate2最適化エンジン実装 (NLLB-200-distilled-1.3B)
 🔥 [Issue #185] torch/transformers依存を削除
 - tokenizersライブラリ（Rust製、軽量）を直接使用
 - パッケージサイズ ~450MB削減
+
+🔥 [Issue #330] 翻訳高速化最適化
+- beam_size=1（Greedy Search）で高速化
+- LRUキャッシュで同一テキストの再翻訳回避
+- GPU最適化設定（flash_attention, CUDA graphs）
+- バッチ処理の効率化
 """
 
 import asyncio
 import time
 import logging
 import gc  # 🔥 [PHASE1.2] 明示的GC実行用
+import hashlib  # 🔥 [Issue #330] キャッシュキー生成用
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 from threading import Lock
+from collections import OrderedDict  # 🔥 [Issue #330] LRUキャッシュ用
 from concurrent.futures import ThreadPoolExecutor
 
 import ctranslate2
@@ -37,6 +45,50 @@ from .base import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# 🔥 [Issue #330] LRUキャッシュ実装
+class LRUCache:
+    """スレッドセーフなLRUキャッシュ"""
+
+    def __init__(self, max_size: int = 1000):
+        self.max_size = max_size
+        self.cache: OrderedDict[str, Tuple[str, float]] = OrderedDict()
+        self.lock = Lock()
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, key: str) -> Optional[Tuple[str, float]]:
+        with self.lock:
+            if key in self.cache:
+                # アクセスされたら末尾に移動（LRU）
+                self.cache.move_to_end(key)
+                self.hits += 1
+                return self.cache[key]
+            self.misses += 1
+            return None
+
+    def put(self, key: str, value: Tuple[str, float]) -> None:
+        with self.lock:
+            if key in self.cache:
+                self.cache.move_to_end(key)
+            else:
+                if len(self.cache) >= self.max_size:
+                    # 最も古いエントリを削除
+                    self.cache.popitem(last=False)
+            self.cache[key] = value
+
+    def clear(self) -> None:
+        with self.lock:
+            self.cache.clear()
+
+    @property
+    def hit_rate(self) -> float:
+        total = self.hits + self.misses
+        return self.hits / total if total > 0 else 0.0
+
+    def __len__(self) -> int:
+        return len(self.cache)
 
 
 class CTranslate2Engine(TranslationEngine):
@@ -65,25 +117,33 @@ class CTranslate2Engine(TranslationEngine):
     MAX_BATCH_SIZE = 32
     MAX_TEXT_LENGTH = 512  # トークン数
 
+    # 🔥 [Issue #330] キャッシュ設定
+    DEFAULT_CACHE_SIZE = 2000  # 最大キャッシュエントリ数
+
     def __init__(
         self,
         model_path: str = "models/nllb-200-ct2",
         device: str = "cpu",
         compute_type: str = "int8",
-        max_workers: int = 4
+        max_workers: int = 4,
+        cache_size: int = DEFAULT_CACHE_SIZE,
+        enable_flash_attention: bool = True  # 🔥 [Issue #330] Flash Attention有効化
     ):
         """
         Args:
             model_path: CTranslate2変換済みモデルパス
             device: 実行デバイス（cpu, cuda, auto）
-            compute_type: 計算型（int8, int16, float16, float32）
+            compute_type: 計算型（int8, int8_float16, int16, float16, float32）
             max_workers: 並列処理ワーカー数
+            cache_size: 翻訳キャッシュサイズ
+            enable_flash_attention: Flash Attentionを有効化（CUDA時）
         """
         super().__init__()
         self.model_path = Path(model_path)
         self.device = device
         self.compute_type = compute_type
         self.max_workers = max_workers
+        self.enable_flash_attention = enable_flash_attention
         self.model_name = f"CTranslate2 ({compute_type})"
 
         self.translator: Optional[ctranslate2.Translator] = None
@@ -94,6 +154,10 @@ class CTranslate2Engine(TranslationEngine):
         # トークナイザー並列アクセス制御（Race Condition対策）
         self.tokenizer_lock = Lock()
 
+        # 🔥 [Issue #330] LRUキャッシュ初期化
+        self.translation_cache = LRUCache(max_size=cache_size)
+        self.cache_enabled = True  # キャッシュ有効/無効フラグ
+
         # 🔥 [PHASE1.2] メモリ管理最適化（Gemini推奨）
         self.translation_count = 0  # 翻訳回数カウンター
         self.max_translations_before_gc = 1000  # 1000回ごとにGC実行
@@ -102,6 +166,8 @@ class CTranslate2Engine(TranslationEngine):
         self.logger.info(f"  Model Path: {self.model_path}")
         self.logger.info(f"  Device: {self.device}")
         self.logger.info(f"  Compute Type: {self.compute_type}")
+        self.logger.info(f"  Cache Size: {cache_size}")
+        self.logger.info(f"  Flash Attention: {enable_flash_attention}")
 
     async def load_model(self) -> None:
         """CTranslate2モデルを事前ロード"""
@@ -123,14 +189,29 @@ class CTranslate2Engine(TranslationEngine):
                 )
 
             # Translatorロード
+            # 🔥 [Issue #330] GPU最適化設定
             self.logger.info("Translator初期化中...")
+            translator_kwargs = {
+                "device": self.device,
+                "compute_type": self.compute_type,
+                "inter_threads": self.max_workers,
+                "intra_threads": 1,  # 🔥 [PHASE1.2] スレッドプール制限
+                "max_queued_batches": 4,  # 🔥 [Issue #330] バッチキュー増加（GPU効率化）
+            }
+
+            # 🔥 [Issue #330] CUDA固有の最適化
+            if self.device in ("cuda", "auto"):
+                # Flash Attention有効化（サポートされている場合）
+                if self.enable_flash_attention:
+                    try:
+                        translator_kwargs["flash_attention"] = True
+                        self.logger.info("Flash Attention有効化")
+                    except Exception:
+                        self.logger.warning("Flash Attention非対応（無視）")
+
             self.translator = ctranslate2.Translator(
                 str(self.model_path),
-                device=self.device,
-                compute_type=self.compute_type,
-                inter_threads=self.max_workers,
-                intra_threads=1,  # 🔥 [PHASE1.2] スレッドプール制限
-                max_queued_batches=2  # 🔥 [PHASE1.2] バッチキュー制限（VRAM爆発防止）
+                **translator_kwargs
             )
             self.logger.info("Translatorロード完了")
             self.logger.info(f"  Device: {self.translator.device}")
@@ -195,14 +276,28 @@ class CTranslate2Engine(TranslationEngine):
                 )
 
             # Translatorロード
+            # 🔥 [Issue #330] GPU最適化設定（同期版）
             self.logger.info("Translator初期化中...")
+            translator_kwargs = {
+                "device": self.device,
+                "compute_type": self.compute_type,
+                "inter_threads": self.max_workers,
+                "intra_threads": 1,
+                "max_queued_batches": 4,  # 🔥 [Issue #330] バッチキュー増加
+            }
+
+            # 🔥 [Issue #330] CUDA固有の最適化
+            if self.device in ("cuda", "auto"):
+                if self.enable_flash_attention:
+                    try:
+                        translator_kwargs["flash_attention"] = True
+                        self.logger.info("Flash Attention有効化")
+                    except Exception:
+                        self.logger.warning("Flash Attention非対応（無視）")
+
             self.translator = ctranslate2.Translator(
                 str(self.model_path),
-                device=self.device,
-                compute_type=self.compute_type,
-                inter_threads=self.max_workers,
-                intra_threads=1,
-                max_queued_batches=2
+                **translator_kwargs
             )
             self.logger.info("Translatorロード完了")
             self.logger.info(f"  Device: {self.translator.device}")
@@ -440,6 +535,11 @@ class CTranslate2Engine(TranslationEngine):
             self.logger.error(f"デコード失敗: {e}")
             raise ModelNotLoadedError(f"Decoding error: {e}")
 
+    def _make_cache_key(self, text: str, source_lang: str, target_lang: str) -> str:
+        """🔥 [Issue #330] キャッシュキー生成"""
+        key_str = f"{source_lang}:{target_lang}:{text}"
+        return hashlib.md5(key_str.encode('utf-8')).hexdigest()
+
     async def translate(
         self,
         text: str,
@@ -456,6 +556,14 @@ class CTranslate2Engine(TranslationEngine):
 
         if len(text.strip()) == 0:
             return ("", 0.0)
+
+        # 🔥 [Issue #330] キャッシュチェック
+        if self.cache_enabled:
+            cache_key = self._make_cache_key(text, source_lang, target_lang)
+            cached_result = self.translation_cache.get(cache_key)
+            if cached_result is not None:
+                self.logger.debug(f"[CACHE_HIT] Text: {text[:50]}... (hit_rate: {self.translation_cache.hit_rate:.1%})")
+                return cached_result
 
         # 言語コード変換
         src_code = self._get_nllb_lang_code(source_lang)
@@ -514,10 +622,15 @@ class CTranslate2Engine(TranslationEngine):
             # 信頼度スコア（CTranslate2はスコア提供）
             confidence = results[0].scores[0] if results[0].scores else -1.0
 
+            # 🔥 [Issue #330] キャッシュに保存
+            if self.cache_enabled:
+                self.translation_cache.put(cache_key, (translated_text, confidence))
+
             # 🔥 [PHASE1.2] 定期的な明示的メモリ解放（1000回ごと）
             self.translation_count += 1
             if self.translation_count % self.max_translations_before_gc == 0:
                 self.logger.info(f"[GC_TRIGGER] {self.translation_count} translations, forcing GC")
+                self.logger.info(f"[CACHE_STATS] Size: {len(self.translation_cache)}, Hit rate: {self.translation_cache.hit_rate:.1%}")
                 gc.collect()
 
             return (translated_text, confidence)
@@ -625,3 +738,25 @@ class CTranslate2Engine(TranslationEngine):
     def get_supported_languages(self) -> List[str]:
         """サポートされている言語コードのリスト"""
         return list(self.LANGUAGE_MAPPING.keys())
+
+    # 🔥 [Issue #330] キャッシュ管理メソッド
+    def clear_cache(self) -> None:
+        """翻訳キャッシュをクリア"""
+        self.translation_cache.clear()
+        self.logger.info("[CACHE_CLEAR] Translation cache cleared")
+
+    def get_cache_stats(self) -> Dict[str, any]:
+        """キャッシュ統計情報を取得"""
+        return {
+            "size": len(self.translation_cache),
+            "max_size": self.translation_cache.max_size,
+            "hits": self.translation_cache.hits,
+            "misses": self.translation_cache.misses,
+            "hit_rate": self.translation_cache.hit_rate,
+            "enabled": self.cache_enabled
+        }
+
+    def set_cache_enabled(self, enabled: bool) -> None:
+        """キャッシュの有効/無効を切り替え"""
+        self.cache_enabled = enabled
+        self.logger.info(f"[CACHE_CONFIG] Cache enabled: {enabled}")
