@@ -5,6 +5,7 @@ using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Platform;
 using Baketa.Core.Abstractions.Roi;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Models.OCR;
 using Baketa.Core.Models.Roi;
 using Baketa.Core.Settings;
 using Microsoft.Extensions.Hosting;
@@ -272,22 +273,22 @@ public sealed class BackgroundLearningService : BackgroundService
 
             _lastCaptureTime = DateTime.UtcNow;
 
-            // 4. 投機的OCR実行
-            var executed = await _speculativeOcrService!.TryExecuteSpeculativeOcrAsync(
+            // 4. [Issue #320] Detection-Only OCR実行（約10倍高速）
+            // ROI学習には位置情報のみが必要なため、テキスト認識をスキップ
+            var ocrResults = await _speculativeOcrService!.TryExecuteDetectionOnlyAsync(
                 capturedImage,
-                imageHash: null,
                 cancellationToken).ConfigureAwait(false);
 
-            if (!executed)
+            if (ocrResults == null)
             {
-                _logger.LogDebug("🎓 [Phase 10] 投機的OCR実行スキップ");
+                _logger.LogDebug("🎓 [Issue #320] Detection-Only実行スキップ");
                 return;
             }
 
-            // 5. OCR結果をROI学習に送信
-            await ReportOcrResultsToRoiManagerAsync(cancellationToken).ConfigureAwait(false);
+            // 5. [Issue #320] OCR結果をROI学習に送信（Detection-Only結果を直接使用）
+            ReportDetectionResultsToRoiManager(ocrResults, capturedImage.Width, capturedImage.Height);
 
-            _logger.LogDebug("🎓 [Phase 10] 学習サイクル完了");
+            _logger.LogDebug("🎓 [Issue #320] 学習サイクル完了（Detection-Only）");
         }
         catch (OperationCanceledException)
         {
@@ -342,7 +343,87 @@ public sealed class BackgroundLearningService : BackgroundService
     }
 
     /// <summary>
-    /// OCR結果をRoiManagerに送信
+    /// [Issue #320] Detection-Only結果をRoiManagerに送信
+    /// </summary>
+    /// <remarks>
+    /// Detection-Only: テキスト認識をスキップしているため、Text は空文字列。
+    /// 位置情報と検出信頼度のみを使用してROI学習を行う。
+    /// </remarks>
+    private void ReportDetectionResultsToRoiManager(OcrResults ocrResults, int imageWidth, int imageHeight)
+    {
+        if (_roiManager == null || !_roiManager.IsEnabled)
+        {
+            _learningScheduler.OnOcrCompleted(0);
+            return;
+        }
+
+        try
+        {
+            var detections = new List<(NormalizedRect bounds, float confidence)>();
+
+            foreach (var result in ocrResults.TextRegions)
+            {
+                // [Issue #320] Detection-Only: 信頼度フィルタのみ適用
+                // テキスト長フィルタは適用しない（テキストが空なので）
+                if (result.Confidence < Settings.MinOcrConfidenceForLearning)
+                {
+                    continue;
+                }
+
+                // [Issue #293] 領域サイズフィルタ - 極小のノイズ領域を除外
+                if (result.Bounds.Width < Settings.MinRegionWidthForLearning ||
+                    result.Bounds.Height < Settings.MinRegionHeightForLearning)
+                {
+                    if (Settings.EnableDetailedLogging)
+                    {
+                        _logger.LogTrace(
+                            "🎓 [Issue #320] 領域サイズフィルタで除外: Bounds={Bounds} (Min: {MinW}x{MinH})",
+                            result.Bounds, Settings.MinRegionWidthForLearning, Settings.MinRegionHeightForLearning);
+                    }
+                    continue;
+                }
+
+                // 正規化座標に変換
+                if (imageWidth > 0 && imageHeight > 0)
+                {
+                    var normalizedRect = new NormalizedRect
+                    {
+                        X = (float)result.Bounds.X / imageWidth,
+                        Y = (float)result.Bounds.Y / imageHeight,
+                        Width = (float)result.Bounds.Width / imageWidth,
+                        Height = (float)result.Bounds.Height / imageHeight
+                    };
+
+                    detections.Add((normalizedRect, (float)result.Confidence));
+                }
+            }
+
+            // ROI学習に送信
+            if (detections.Count > 0)
+            {
+                _roiManager.ReportTextDetections(detections);
+
+                if (Settings.EnableDetailedLogging)
+                {
+                    _logger.LogDebug(
+                        "🎓 [Issue #320] Detection-Only ROI学習: {Count}個の検出領域",
+                        detections.Count);
+                }
+            }
+
+            // スケジューラに通知
+            var highConfidenceCount = detections.Count(d => d.confidence >= 0.95f);
+            _learningScheduler.OnOcrCompleted(detections.Count, highConfidenceCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "🎓 [Issue #320] Detection-Only ROI学習送信エラー");
+            _learningScheduler.OnOcrCompleted(0);
+        }
+    }
+
+    /// <summary>
+    /// OCR結果をRoiManagerに送信（フルOCR用 - 後方互換）
     /// </summary>
     private Task ReportOcrResultsToRoiManagerAsync(CancellationToken cancellationToken)
     {

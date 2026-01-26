@@ -363,12 +363,109 @@ public sealed class SuryaOcrEngine : IOcrEngine
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// [Issue #320] Detection-Only APIを使用してテキスト領域の位置のみを検出。
+    /// Recognition（テキスト認識）をスキップするため、約10倍高速（~100ms vs ~1000ms）。
+    /// ROI学習用の高速検出に最適。
+    /// 戻り値のOcrTextRegion.Textは空文字列（位置情報のみ）。
+    /// </remarks>
     public async Task<OcrResults> DetectTextRegionsAsync(
         IImage image,
         CancellationToken cancellationToken = default)
     {
-        // Suryaは検出と認識を同時に行うため、RecognizeAsyncを呼び出す
-        return await RecognizeAsync(image, null, null, cancellationToken).ConfigureAwait(false);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(image);
+
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            // 画像データ取得（PNGエンコード済み）
+            var imageMemory = image.GetImageMemory();
+
+            _logger.LogDebug(
+                "[Issue #320] Detection-Only: ImageSize={Width}x{Height}, DataSize={DataSize}KB",
+                image.Width, image.Height, imageMemory.Length / 1024);
+
+            // [Issue #320] Detection-Only gRPC呼び出し（Recognition をスキップ）
+            var response = await _client.DetectAsync(
+                imageMemory.ToArray(),
+                "png",
+                cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccess)
+            {
+                var errorMessage = response.Error?.Message ?? "Unknown error";
+                _logger.LogWarning("[Issue #320] Detection-Only failed: {Error}", errorMessage);
+
+                return new OcrResults(
+                    [],
+                    image,
+                    sw.Elapsed,
+                    _settings.Language ?? "ja",
+                    null);
+            }
+
+            // DetectedRegion → OcrTextRegion 変換（テキストは空）
+            var regions = ConvertDetectedRegionsToOcrTextRegions(response);
+
+            sw.Stop();
+
+            _logger.LogInformation(
+                "[Issue #320] Detection-Only completed: {RegionCount} regions in {ElapsedMs}ms (Server: {ServerMs}ms)",
+                regions.Count,
+                sw.ElapsedMilliseconds,
+                response.ProcessingTimeMs);
+
+            return new OcrResults(
+                regions,
+                image,
+                sw.Elapsed,
+                _settings.Language ?? "ja",
+                null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #320] Detection-Only error");
+
+            return new OcrResults(
+                [],
+                image,
+                sw.Elapsed,
+                _settings.Language ?? "ja",
+                null);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #320] DetectedRegion（Detection-Only）をOcrTextRegionリストに変換
+    /// テキスト内容は空文字列（位置情報のみ）
+    /// </summary>
+    private static List<OcrTextRegion> ConvertDetectedRegionsToOcrTextRegions(DetectResponse response)
+    {
+        var regions = new List<OcrTextRegion>();
+
+        foreach (var region in response.Regions)
+        {
+            var bbox = region.BoundingBox;
+            var bounds = new Rectangle(
+                bbox.X,
+                bbox.Y,
+                bbox.Width,
+                bbox.Height);
+
+            // Detection-Only: テキストは空、位置情報と検出信頼度のみ
+            regions.Add(new OcrTextRegion(
+                string.Empty,  // テキストなし（Detection-Only）
+                bounds,
+                region.Confidence));
+        }
+
+        return regions;
     }
 
     /// <inheritdoc/>

@@ -235,6 +235,84 @@ public sealed class SpeculativeOcrService : ISpeculativeOcrService
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// [Issue #320] Detection-Only実行: Recognition（テキスト認識）をスキップし、約10倍高速。
+    /// ROI学習用に最適化されており、キャッシュには保存されません。
+    /// </remarks>
+    public async Task<OcrResults?> TryExecuteDetectionOnlyAsync(
+        IImage image,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (!IsEnabled)
+        {
+            if (Settings.EnableDetailedLogging)
+                _logger.LogDebug("📊 [Issue #320] Detection-Only: 無効化されているためスキップ");
+            return null;
+        }
+
+        // Live翻訳中は実行しない
+        if (Settings.DisableDuringLiveTranslation &&
+            _translationModeService.CurrentMode == TranslationMode.Live)
+        {
+            if (Settings.EnableDetailedLogging)
+                _logger.LogDebug("📊 [Issue #320] Detection-Only: Live翻訳中のためスキップ");
+            return null;
+        }
+
+        // リソース状況チェック
+        if (!await CheckResourceAvailabilityAsync(cancellationToken).ConfigureAwait(false))
+        {
+            Interlocked.Increment(ref _skippedDueToResourceCount);
+            return null;
+        }
+
+        // 排他制御（既に実行中の場合はスキップ）
+        if (!await _executionSemaphore.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            if (Settings.EnableDetailedLogging)
+                _logger.LogDebug("📊 [Issue #320] Detection-Only: 既に実行中のためスキップ");
+            return null;
+        }
+
+        try
+        {
+            _isExecuting = true;
+
+            _logger.LogDebug("📊 [Issue #320] Detection-Only実行開始");
+            var stopwatch = Stopwatch.StartNew();
+
+            // Detection-Only OCR実行（テキスト認識をスキップ）
+            var ocrResults = await _ocrEngine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
+
+            stopwatch.Stop();
+
+            _logger.LogInformation(
+                "📊 [Issue #320] Detection-Only完了: {RegionCount}領域, {ExecutionTime}ms",
+                ocrResults.TextRegions.Count,
+                stopwatch.ElapsedMilliseconds);
+
+            return ocrResults;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("📊 [Issue #320] Detection-Onlyがキャンセルされました");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "📊 [Issue #320] Detection-Only実行エラー");
+            return null;
+        }
+        finally
+        {
+            _isExecuting = false;
+            _executionSemaphore.Release();
+        }
+    }
+
+    /// <inheritdoc/>
     public SpeculativeOcrResult? ConsumeCache(string? currentImageHash = null)
     {
         lock (_cacheLock)

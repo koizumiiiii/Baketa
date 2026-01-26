@@ -439,6 +439,24 @@ public sealed class ApplicationModule : ServiceModuleBase
         });
         services.AddHostedService(provider => provider.GetRequiredService<Services.Learning.BackgroundLearningService>());
 
+        // 🎯 [Issue #324] ROI監視ホステッドサービス
+        // 学習完了後にROI領域を監視し、テキスト送りを検知
+        Console.WriteLine("🎯 [Issue #324] RoiMonitoringHostedService DI登録");
+        services.AddSingleton<Services.Learning.RoiMonitoringHostedService>(provider =>
+        {
+            return new Services.Learning.RoiMonitoringHostedService(
+                provider.GetService<Baketa.Core.Abstractions.Roi.IRoiChangeMonitorService>(),
+                provider.GetService<Baketa.Core.Abstractions.Roi.IRoiManager>(),
+                provider.GetService<Baketa.Core.Abstractions.Services.ICaptureService>(),
+                provider.GetService<Services.UI.IWindowManagementService>(),
+                provider.GetRequiredService<Baketa.Core.Abstractions.Services.ITranslationModeService>(),
+                provider.GetService<Baketa.Core.Abstractions.Events.IEventAggregator>(),
+                provider.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.RoiManagerSettings>>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Services.Learning.RoiMonitoringHostedService>>()
+            );
+        });
+        services.AddHostedService(provider => provider.GetRequiredService<Services.Learning.RoiMonitoringHostedService>());
+
         // 統合サービス
         // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();
 
