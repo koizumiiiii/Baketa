@@ -26,7 +26,7 @@ public sealed class RoiChangeMonitorService : IRoiChangeMonitorService
     // 監視状態 (Note: _translationModeServiceは将来のLive翻訳連携用に保持)
     private volatile bool _isMonitoring;
     private CancellationTokenSource? _monitoringCts;
-    private Task? _monitoringTask;
+    private readonly Task? _monitoringTask;
 
     // ベースラインハッシュ（ROI領域ID → ハッシュ）
     private readonly ConcurrentDictionary<string, string> _baselineHashes = new();

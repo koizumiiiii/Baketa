@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from protos import ocr_pb2 as protos_dot_ocr__pb2
+import ocr_pb2 as ocr__pb2
 
 GRPC_GENERATED_VERSION = '1.68.1'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in protos/ocr_pb2_grpc.py depends on'
+        + f' but the generated code in ocr_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -41,18 +41,23 @@ class OcrServiceStub(object):
         """
         self.Recognize = channel.unary_unary(
                 '/baketa.ocr.v1.OcrService/Recognize',
-                request_serializer=protos_dot_ocr__pb2.OcrRequest.SerializeToString,
-                response_deserializer=protos_dot_ocr__pb2.OcrResponse.FromString,
+                request_serializer=ocr__pb2.OcrRequest.SerializeToString,
+                response_deserializer=ocr__pb2.OcrResponse.FromString,
+                _registered_method=True)
+        self.Detect = channel.unary_unary(
+                '/baketa.ocr.v1.OcrService/Detect',
+                request_serializer=ocr__pb2.DetectRequest.SerializeToString,
+                response_deserializer=ocr__pb2.DetectResponse.FromString,
                 _registered_method=True)
         self.HealthCheck = channel.unary_unary(
                 '/baketa.ocr.v1.OcrService/HealthCheck',
-                request_serializer=protos_dot_ocr__pb2.OcrHealthCheckRequest.SerializeToString,
-                response_deserializer=protos_dot_ocr__pb2.OcrHealthCheckResponse.FromString,
+                request_serializer=ocr__pb2.OcrHealthCheckRequest.SerializeToString,
+                response_deserializer=ocr__pb2.OcrHealthCheckResponse.FromString,
                 _registered_method=True)
         self.IsReady = channel.unary_unary(
                 '/baketa.ocr.v1.OcrService/IsReady',
-                request_serializer=protos_dot_ocr__pb2.OcrIsReadyRequest.SerializeToString,
-                response_deserializer=protos_dot_ocr__pb2.OcrIsReadyResponse.FromString,
+                request_serializer=ocr__pb2.OcrIsReadyRequest.SerializeToString,
+                response_deserializer=ocr__pb2.OcrIsReadyResponse.FromString,
                 _registered_method=True)
 
 
@@ -65,7 +70,16 @@ class OcrServiceServicer(object):
     """
 
     def Recognize(self, request, context):
-        """/ 画像からテキストを認識
+        """/ 画像からテキストを認識（Detection + Recognition）
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Detect(self, request, context):
+        """/ [Issue #320] テキスト領域の位置のみ検出（Detection Only）
+        / Recognition（テキスト認識）をスキップし、約10倍高速化
+        / ROI学習用の高速検出に使用
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -90,18 +104,23 @@ def add_OcrServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Recognize': grpc.unary_unary_rpc_method_handler(
                     servicer.Recognize,
-                    request_deserializer=protos_dot_ocr__pb2.OcrRequest.FromString,
-                    response_serializer=protos_dot_ocr__pb2.OcrResponse.SerializeToString,
+                    request_deserializer=ocr__pb2.OcrRequest.FromString,
+                    response_serializer=ocr__pb2.OcrResponse.SerializeToString,
+            ),
+            'Detect': grpc.unary_unary_rpc_method_handler(
+                    servicer.Detect,
+                    request_deserializer=ocr__pb2.DetectRequest.FromString,
+                    response_serializer=ocr__pb2.DetectResponse.SerializeToString,
             ),
             'HealthCheck': grpc.unary_unary_rpc_method_handler(
                     servicer.HealthCheck,
-                    request_deserializer=protos_dot_ocr__pb2.OcrHealthCheckRequest.FromString,
-                    response_serializer=protos_dot_ocr__pb2.OcrHealthCheckResponse.SerializeToString,
+                    request_deserializer=ocr__pb2.OcrHealthCheckRequest.FromString,
+                    response_serializer=ocr__pb2.OcrHealthCheckResponse.SerializeToString,
             ),
             'IsReady': grpc.unary_unary_rpc_method_handler(
                     servicer.IsReady,
-                    request_deserializer=protos_dot_ocr__pb2.OcrIsReadyRequest.FromString,
-                    response_serializer=protos_dot_ocr__pb2.OcrIsReadyResponse.SerializeToString,
+                    request_deserializer=ocr__pb2.OcrIsReadyRequest.FromString,
+                    response_serializer=ocr__pb2.OcrIsReadyResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -134,8 +153,35 @@ class OcrService(object):
             request,
             target,
             '/baketa.ocr.v1.OcrService/Recognize',
-            protos_dot_ocr__pb2.OcrRequest.SerializeToString,
-            protos_dot_ocr__pb2.OcrResponse.FromString,
+            ocr__pb2.OcrRequest.SerializeToString,
+            ocr__pb2.OcrResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Detect(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/baketa.ocr.v1.OcrService/Detect',
+            ocr__pb2.DetectRequest.SerializeToString,
+            ocr__pb2.DetectResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -161,8 +207,8 @@ class OcrService(object):
             request,
             target,
             '/baketa.ocr.v1.OcrService/HealthCheck',
-            protos_dot_ocr__pb2.OcrHealthCheckRequest.SerializeToString,
-            protos_dot_ocr__pb2.OcrHealthCheckResponse.FromString,
+            ocr__pb2.OcrHealthCheckRequest.SerializeToString,
+            ocr__pb2.OcrHealthCheckResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -188,8 +234,8 @@ class OcrService(object):
             request,
             target,
             '/baketa.ocr.v1.OcrService/IsReady',
-            protos_dot_ocr__pb2.OcrIsReadyRequest.SerializeToString,
-            protos_dot_ocr__pb2.OcrIsReadyResponse.FromString,
+            ocr__pb2.OcrIsReadyRequest.SerializeToString,
+            ocr__pb2.OcrIsReadyResponse.FromString,
             options,
             channel_credentials,
             insecure,
