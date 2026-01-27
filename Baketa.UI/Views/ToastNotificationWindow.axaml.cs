@@ -49,8 +49,8 @@ public partial class ToastNotificationWindow : Window
             if (iconText != null) iconText.Foreground = Brushes.White;
         }
 
-        // 画面左側に配置（MainOverlay近く）
-        ConfigurePosition();
+        // [Issue #344] 画面左下に配置（Openedイベントで実際の高さ取得後に位置設定）
+        this.Opened += OnWindowOpened;
 
         // 自動クローズタイマー
         if (durationMs > 0)
@@ -68,17 +68,21 @@ public partial class ToastNotificationWindow : Window
         }
     }
 
-    private void ConfigurePosition()
+    /// <summary>
+    /// [Issue #344] ウィンドウが開いた後に画面左下に配置
+    /// Openedイベントで実際の高さを取得してから位置を計算
+    /// </summary>
+    private void OnWindowOpened(object? sender, EventArgs e)
     {
-        // 画面左端、MainOverlayの下（縦方向で60%の位置）に配置
         var screen = Screens.Primary;
         if (screen != null)
         {
             var bounds = screen.WorkingArea;
-            var x = 16; // MainOverlayと同じ左マージン
-            var y = (int)(bounds.Height * 0.6); // 画面の60%位置
+            const int margin = 16;
+            var x = margin; // 左マージン
+            var y = bounds.Height - (int)Bounds.Height - margin; // 画面左下
 
-            Position = new PixelPoint(x, y);
+            Position = new PixelPoint(x, (int)y);
         }
     }
 
