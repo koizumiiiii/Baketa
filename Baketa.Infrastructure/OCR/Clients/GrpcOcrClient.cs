@@ -342,9 +342,9 @@ public sealed class GrpcOcrClient : IDisposable
         DetectResponse? lastResponse = null;
         RpcException? lastException = null;
 
-        // サイレントリトライループ（Detectionは高速なのでタイムアウト短め）
-        const int detectTimeoutSeconds = 10;
-        const int detectRetryTimeoutSeconds = 3;
+        // サイレントリトライループ（CPUモードでは3秒以上かかることがある）
+        const int detectTimeoutSeconds = 15;
+        const int detectRetryTimeoutSeconds = 10;
 
         for (var attempt = 0; attempt <= MaxRetryCount; attempt++)
         {

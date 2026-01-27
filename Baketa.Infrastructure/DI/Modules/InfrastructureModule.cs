@@ -559,7 +559,7 @@ public class InfrastructureModule : ServiceModuleBase
             // [Issue #292] 統合サーバーモードでは統合ポートを使用
             if (isUnifiedMode)
             {
-                var unifiedPort = unifiedSettings?.Port ?? 50053;
+                var unifiedPort = unifiedSettings?.Port ?? ServerPortConstants.UnifiedServerPort;
                 var unifiedAddress = $"http://127.0.0.1:{unifiedPort}";
                 logger.LogInformation("✅ [Issue #292] 統合サーバーモード: {Address}", unifiedAddress);
                 return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(unifiedAddress, logger);
@@ -1388,7 +1388,7 @@ public class InfrastructureModule : ServiceModuleBase
                 services.Configure<TranslationSettings>(options =>
                 {
                     options.UseGrpcClient = true; // [PHASE3.3] gRPCクライアントがデフォルト
-                    options.GrpcServerAddress = "http://localhost:50051";
+                    options.GrpcServerAddress = ServerPortConstants.TranslationServerAddress;
                 });
             }
         }
@@ -1401,7 +1401,7 @@ public class InfrastructureModule : ServiceModuleBase
             services.Configure<TranslationSettings>(options =>
             {
                 options.UseGrpcClient = true; // [PHASE3.3] gRPCクライアントがデフォルト
-                options.GrpcServerAddress = "http://localhost:50051";
+                options.GrpcServerAddress = ServerPortConstants.TranslationServerAddress;
             });
         }
         catch (Exception ex)
@@ -1570,10 +1570,10 @@ public class InfrastructureModule : ServiceModuleBase
     /// translation_ports_global.jsonから動的に利用可能なポート番号を検出します
     /// </summary>
     /// <param name="logger">ロガー</param>
-    /// <returns>検出されたポート番号（見つからない場合は50051）</returns>
+    /// <returns>検出されたポート番号（見つからない場合はServerPortConstants.UnifiedServerPort）</returns>
     private static int DetectDynamicPortFromGlobalRegistry(ILogger logger)
     {
-        const int DefaultPort = 50051;
+        var defaultPort = ServerPortConstants.UnifiedServerPort;
         var globalRegistryPath = Path.Combine(Environment.CurrentDirectory, "translation_ports_global.json");
 
         try
@@ -1581,7 +1581,7 @@ public class InfrastructureModule : ServiceModuleBase
             if (!File.Exists(globalRegistryPath))
             {
                 logger.LogWarning("🔍 [PHASE3.1_FIX] translation_ports_global.json が見つかりません: {Path}", globalRegistryPath);
-                return DefaultPort;
+                return defaultPort;
             }
 
             var json = File.ReadAllText(globalRegistryPath);
@@ -1601,12 +1601,12 @@ public class InfrastructureModule : ServiceModuleBase
             }
 
             logger.LogWarning("🔍 [PHASE3.1_FIX] translation_ports_global.json に有効なポートが見つかりませんでした");
-            return DefaultPort;
+            return defaultPort;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "💥 [PHASE3.1_FIX] translation_ports_global.json 読み込みエラー");
-            return DefaultPort;
+            return defaultPort;
         }
     }
 
