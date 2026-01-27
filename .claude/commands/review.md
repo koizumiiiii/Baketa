@@ -16,8 +16,12 @@ git diff --name-only main
 ```
 
 ### 2. Geminiレビュー実行
-```bash
-gemini -p "以下のコードについてレビューをお願いします。
+
+**⚠️ 重要: Git Bashからは直接実行不可。PowerShell経由で実行すること。**
+
+```powershell
+# PowerShellから直接実行（推奨）
+gemini "以下のコードについてレビューをお願いします。
 
 ## レビュー観点
 1. アーキテクチャ準拠（Clean Architecture）
@@ -31,6 +35,16 @@ gemini -p "以下のコードについてレビューをお願いします。
 
 問題点と改善提案を具体的に示してください。"
 ```
+
+```bash
+# Git Bashから実行する場合（PowerShell経由必須）
+powershell -Command "gemini '以下のコードについてレビューをお願いします。...'"
+```
+
+**注意事項**:
+- `-p` オプションは非推奨（動作しない）
+- 位置引数としてプロンプトを渡す
+- 出力が空の場合は「Geminiレビュー取得失敗」と明確に報告
 
 ### 3. 静的解析（Gemini不可時）
 ```powershell
