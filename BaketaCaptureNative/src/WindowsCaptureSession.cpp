@@ -29,15 +29,60 @@ WindowsCaptureSession::WindowsCaptureSession(int sessionId, HWND hwnd)
 
 WindowsCaptureSession::~WindowsCaptureSession()
 {
+    // [Issue #324] 安全なクローズ処理に委譲
+    Close();
+}
+
+/// <summary>
+/// [Issue #324] セッションを安全にクローズ
+/// コールバック完了を待機してからリソースを解放
+/// </summary>
+void WindowsCaptureSession::Close()
+{
+    // [Issue #324] 最初にクローズ中フラグを立てる（アトミック）
+    // これにより OnFrameArrived が新しいフレーム処理を開始しない
+    bool wasClosing = m_isClosing.exchange(true);
+    if (wasClosing)
+    {
+        // 既にクローズ処理中 - 重複呼び出しを防止
+        return;
+    }
+
+    // [Issue #324] 少し待機してコールバックが完了するのを待つ
+    // OnFrameArrived が m_isClosing をチェックして早期リターンするため
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // [Issue #324] ミューテックスを取得してフレーム処理の完了を確認
+    {
+        std::lock_guard<std::mutex> lock(m_frameMutex);
+        m_frameReady = false;
+        m_latestFrame.Reset();
+    }
+
+    // [Issue #324] リソース解放（順序重要）
+    // 1. キャプチャセッションを先に閉じる（新しいフレームの到着を停止）
     if (m_captureSession)
     {
-        m_captureSession.Close();
+        try
+        {
+            m_captureSession.Close();
+        }
+        catch (...) { /* 例外を無視 */ }
+        m_captureSession = nullptr;
     }
-    
+
+    // 2. フレームプールを閉じる
     if (m_framePool)
     {
-        m_framePool.Close();
+        try
+        {
+            m_framePool.Close();
+        }
+        catch (...) { /* 例外を無視 */ }
+        m_framePool = nullptr;
     }
+
+    m_initialized = false;
 }
 
 bool WindowsCaptureSession::Initialize()
@@ -340,10 +385,22 @@ bool WindowsCaptureSession::CreateFramePool()
 
 void WindowsCaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sender, winrt::IInspectable const& args)
 {
+    // [Issue #324] クローズ中は即リターン（重い処理をスキップ）
+    if (m_isClosing.load())
+    {
+        return;
+    }
+
     try
     {
         auto frame = sender.TryGetNextFrame();
         if (!frame)
+        {
+            return;
+        }
+
+        // [Issue #324] フレーム取得後も再度チェック（Close()が呼ばれた可能性）
+        if (m_isClosing.load())
         {
             return;
         }

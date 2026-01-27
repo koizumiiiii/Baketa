@@ -12,6 +12,7 @@ extern "C" {
 #define BAKETA_CAPTURE_ERROR_NOT_FOUND -4
 #define BAKETA_CAPTURE_ERROR_MEMORY -5
 #define BAKETA_CAPTURE_ERROR_DEVICE -6
+#define BAKETA_CAPTURE_ERROR_SEH_EXCEPTION -100  // [Issue #324] SEH例外（AccessViolation等）
 
 // フレームデータ構造体
 typedef struct {

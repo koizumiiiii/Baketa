@@ -74,6 +74,24 @@ public:
     bool IsInitialized() const { return m_initialized; }
 
     /// <summary>
+    /// [Issue #324] セッションがクローズ中かチェック
+    /// </summary>
+    /// <returns>クローズ中の場合は true</returns>
+    bool IsClosing() const { return m_isClosing.load(); }
+
+    /// <summary>
+    /// [Issue #324] セッションが有効かチェック（クローズ中でなく、初期化済み）
+    /// </summary>
+    /// <returns>有効な場合は true</returns>
+    bool IsValid() const { return m_initialized && !m_isClosing.load() && IsWindow(m_hwnd); }
+
+    /// <summary>
+    /// [Issue #324] セッションを安全にクローズ
+    /// コールバック完了を待機してからリソースを解放
+    /// </summary>
+    void Close();
+
+    /// <summary>
     /// 最後のエラーメッセージを取得
     /// </summary>
     /// <returns>エラーメッセージ</returns>
@@ -167,6 +185,9 @@ private:
     int m_sessionId;
     HWND m_hwnd;
     bool m_initialized;
+
+    // [Issue #324] クローズ中フラグ（スレッドセーフ）
+    std::atomic<bool> m_isClosing{false};
 
     // Direct3D オブジェクト
     ComPtr<ID3D11Device> m_d3dDevice;
