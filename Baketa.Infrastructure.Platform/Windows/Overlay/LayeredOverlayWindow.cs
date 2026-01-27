@@ -69,6 +69,8 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     // 🔥 [MESSAGE_QUEUE_FIX] カスタムメッセージ定義 - メッセージキュー処理をトリガー
     private const uint WM_USER = 0x0400;
     private const uint WM_PROCESS_QUEUE = WM_USER + 1;
+    private const uint WM_NCHITTEST = 0x0084;
+    private const nint HTTRANSPARENT = -1;
     private static readonly object _classLock = new();
 
     // 🔥 [P0_GC_FIX] WndProcDelegateをstaticフィールドで保持してGCから保護
@@ -265,7 +267,13 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     /// </summary>
     private static IntPtr WndProc(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
-        // 基本的なメッセージ処理（必要に応じて拡張）
+        // 🔧 [Issue #340] クリックスルー - マウスイベントを背後のウィンドウに透過
+        if (msg == WM_NCHITTEST)
+        {
+            return HTTRANSPARENT;
+        }
+
+        // 基本的なメッセージ処理
         return User32Methods.DefWindowProc(hwnd, msg, wParam, lParam);
     }
 

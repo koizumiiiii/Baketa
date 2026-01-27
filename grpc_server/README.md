@@ -124,12 +124,6 @@ python start_server.py --port 50052
 # ホスト指定（ローカルのみ）
 python start_server.py --host localhost --port 50051
 
-# CTranslate2 + カスタムポート
-python start_server.py --use-ctranslate2 --port 50052
-
-# 重いモデル使用（1.3B、約5GB、NllbEngineのみ）
-python start_server.py --heavy-model
-
 # デバッグモード
 python start_server.py --debug
 ```

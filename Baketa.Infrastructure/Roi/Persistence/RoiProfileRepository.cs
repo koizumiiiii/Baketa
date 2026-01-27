@@ -39,12 +39,22 @@ public sealed class RoiProfileRepository : IRoiProfileService, IDisposable
     };
 
     /// <summary>
-    /// コンストラクタ
+    /// コンストラクタ（本番用 - デフォルトディレクトリ使用）
     /// </summary>
     public RoiProfileRepository(ILogger<RoiProfileRepository> logger)
+        : this(logger, BaketaSettingsPaths.RoiProfilesDirectory)
+    {
+    }
+
+    /// <summary>
+    /// コンストラクタ（テスト用 - カスタムディレクトリ指定可能）
+    /// </summary>
+    /// <param name="logger">ロガー</param>
+    /// <param name="profilesDirectory">プロファイル保存ディレクトリ</param>
+    internal RoiProfileRepository(ILogger<RoiProfileRepository> logger, string profilesDirectory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _profilesDirectory = BaketaSettingsPaths.RoiProfilesDirectory;
+        _profilesDirectory = profilesDirectory ?? throw new ArgumentNullException(nameof(profilesDirectory));
 
         EnsureDirectoryExists();
 

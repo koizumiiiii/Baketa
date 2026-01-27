@@ -83,7 +83,8 @@ from protos import translation_pb2, translation_pb2_grpc
 from protos import ocr_pb2, ocr_pb2_grpc
 
 # エンジン
-from engines.ctranslate2_engine import CTranslate2Engine
+# 🔥 [Issue #337] LazyLoadingTranslator追加（遅延読み込み/自動アンロード）
+from engines.ctranslate2_engine import CTranslate2Engine, LazyLoadingTranslator
 from translation_server import TranslationServicer
 from resource_monitor import ResourceMonitor
 
@@ -763,21 +764,29 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
         translation_model_path = Path(model_path_arg)
     else:
         appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
-        translation_model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-1.3B-ct2"
+        # 🔥 [Issue #337] 600Mモデルに変更（5.5GB → 1GB）
+        translation_model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-distilled-600M-ct2"
 
     logger.info(f"Translation model path: {translation_model_path}")
     logger.info(f"Device: {device}")
 
     # エンジン初期化
-    translation_engine = CTranslate2Engine(
+    # 🔥 [Issue #337] CTranslate2EngineをLazyLoadingTranslatorでラップ
+    # 翻訳モデルは初回リクエスト時にロード、5分アイドルでアンロード
+    base_translation_engine = CTranslate2Engine(
         model_path=str(translation_model_path),
         device=device,
         compute_type="int8",
         enable_flash_attention=False  # RTX 40シリーズでFlash Attention 2非対応のため無効化
     )
+    translation_engine = LazyLoadingTranslator(
+        engine=base_translation_engine,
+        idle_timeout_seconds=300  # 5分アイドルでアンロード
+    )
 
     ocr_engine = SuryaOcrEngine(device=device)
 
+    # 🔥 [Issue #337] OCRのみ事前ロード（翻訳は遅延ロード）
     # モデルロード (並列 or 逐次)
     use_parallel = should_use_parallel_loading(device)
 
@@ -788,61 +797,21 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     load_start = time.time()
 
     # [Gemini Review Fix] 初期化失敗時はプロセスを終了してC#側に通知
+    # 🔥 [Issue #337] OCRのみ事前ロード、翻訳は遅延ロード
     try:
-        if use_parallel:
-            # 並列ロード (VRAM 8GB以上) - ThreadPoolExecutorで真の並列実行
-            # Gemini Review: PyTorch/CUDAの初期化はスレッドセーフ
-            logger.info("Parallel model loading started (ThreadPoolExecutor)...")
+        # 翻訳モデルは遅延ロード（初回リクエスト時にLazyLoadingTranslatorがロード）
+        logger.info("[Translation] Lazy loading enabled - will load on first request")
+        logger.info("[Translation] Model: NLLB-200-distilled-600M (~1GB)")
+        logger.info("[Translation] Idle timeout: 300 seconds (auto-unload)")
 
-            loop = asyncio.get_running_loop()
-
-            def load_translation_sync():
-                logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
-                sys.stdout.flush()
-                # [Gemini Review Fix] asyncio.run()を廃止し、同期版メソッドを直接呼び出し
-                # これにより、Executor内で新しいイベントループを作成する複雑さを回避
-                translation_engine._load_model_sync()
-                logger.info("[Translation] Model loaded successfully")
-                sys.stdout.flush()
-
-            def load_ocr_sync():
-                logger.info("[OCR] Loading Surya OCR...")
-                sys.stdout.flush()
-                ocr_engine._load_model_sync()
-                logger.info("[OCR] Model loaded successfully")
-                sys.stdout.flush()
-
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                trans_future = loop.run_in_executor(executor, load_translation_sync)
-                ocr_future = loop.run_in_executor(executor, load_ocr_sync)
-
-                # 両方の完了を待機
-                results = await asyncio.gather(
-                    trans_future,
-                    ocr_future,
-                    return_exceptions=True
-                )
-
-            # 例外チェック
-            errors = [r for r in results if isinstance(r, Exception)]
-            if errors:
-                for i, err in enumerate(errors):
-                    logger.critical(f"Model loading error [{i}]: {err}")
-                raise errors[0]  # 最初のエラーを再送出
-        else:
-            # 逐次ロード (VRAM節約 or CPUモード)
-            logger.info("Sequential model loading started...")
-
-            logger.info("[Translation] Loading NLLB-200-distilled-1.3B...")
-            await translation_engine.load_model()
-            logger.info("[Translation] Model loaded successfully")
-
-            logger.info("[OCR] Loading Surya OCR...")
-            await ocr_engine.load_model()
-            logger.info("[OCR] Model loaded successfully")
+        # OCRモデルのみ事前ロード
+        logger.info("[OCR] Loading Surya OCR...")
+        sys.stdout.flush()
+        await ocr_engine.load_model()
+        logger.info("[OCR] Model loaded successfully")
 
         load_elapsed = time.time() - load_start
-        logger.info(f"All models loaded in {load_elapsed:.2f} seconds")
+        logger.info(f"OCR model loaded in {load_elapsed:.2f} seconds")
         sys.stdout.flush()
 
     except Exception as e:
@@ -890,8 +859,9 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     logger.info("=" * 80)
     logger.info(f"Baketa Unified AI Server is running on {listen_addr}")
     sys.stdout.flush()
+    # 🔥 [Issue #337] LazyLoadingTranslator使用
     logger.info(f"   Translation Engine: {translation_engine.__class__.__name__}")
-    logger.info(f"   Translation Model: {translation_engine.model_name}")
+    logger.info(f"   Translation Model: {translation_engine.engine.model_name} (lazy loading)")
     logger.info(f"   OCR Engine: Surya OCR v{ocr_engine.VERSION}")
     logger.info(f"   Device: {device}")
 
@@ -910,6 +880,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     logger.info("   - OcrService (Recognize, RecognizeBatch, Detect, HealthCheck, IsReady)")
     logger.info("   [Issue #320] Detect RPC: Detection-only for ROI learning (~10x faster)")
     logger.info("   [Issue #330] RecognizeBatch RPC: Batch OCR for partial regions")
+    logger.info("   [Issue #337] Translation lazy loading: ~1GB memory saved until first use")
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")
 

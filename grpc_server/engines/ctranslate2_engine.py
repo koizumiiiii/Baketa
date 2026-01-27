@@ -1,14 +1,19 @@
 """
 CTranslate2 Translation Engine
-Phase 2.2.1: CTranslate2最適化エンジン実装 (NLLB-200-distilled-1.3B)
+Phase 2.2.1: CTranslate2最適化エンジン実装 (NLLB-200-distilled-600M)
 
 特徴:
-- NLLB-200-distilled-1.3B モデル使用（600Mから精度向上）
-- int8量子化によりメモリ効率化（約5.5GB使用）
+- NLLB-200-distilled-600M モデル使用（1.3Bから軽量化）
+- int8量子化によりメモリ効率化（約1GB使用）
 - 20-30%推論高速化
 - 多言語翻訳対応（200言語以上）
 
-モデルソース: OpenNMT/nllb-200-distilled-1.3B-ct2-int8
+モデルソース: OpenNMT/nllb-200-distilled-600M-ct2-int8
+
+🔥 [Issue #337] 1.3Bから600Mへの軽量化
+- モデルサイズ: 5.5GB → 1GB（約80%削減）
+- 精度: 多少の劣化あるが実用レベル
+- 対応言語: 200言語で変更なし
 
 🔥 [Issue #185] torch/transformers依存を削除
 - tokenizersライブラリ（Rust製、軽量）を直接使用
@@ -240,7 +245,8 @@ class CTranslate2Engine(TranslationEngine):
             await self._warmup_model()
             total_time = time.time() - start_time
             self.logger.info(f"CTranslate2 engine ready - Total time: {total_time:.2f}秒")
-            self.logger.info("NLLB-200-distilled-1.3B (int8) loaded - ~5.5GB memory")
+            # 🔥 [Issue #337] 600Mモデルに変更
+            self.logger.info("NLLB-200-distilled-600M (int8) loaded - ~1GB memory")
 
         except ImportError as e:
             self.logger.error(f"必要なライブラリが見つかりません: {e}")
@@ -325,7 +331,8 @@ class CTranslate2Engine(TranslationEngine):
             self._warmup_model_sync()
             total_time = time.time() - start_time
             self.logger.info(f"CTranslate2 engine ready - Total time: {total_time:.2f}秒")
-            self.logger.info("NLLB-200-distilled-1.3B (int8) loaded - ~5.5GB memory")
+            # 🔥 [Issue #337] 600Mモデルに変更
+            self.logger.info("NLLB-200-distilled-600M (int8) loaded - ~1GB memory")
 
         except ImportError as e:
             self.logger.error(f"必要なライブラリが見つかりません: {e}")
@@ -760,3 +767,195 @@ class CTranslate2Engine(TranslationEngine):
         """キャッシュの有効/無効を切り替え"""
         self.cache_enabled = enabled
         self.logger.info(f"[CACHE_CONFIG] Cache enabled: {enabled}")
+
+    def unload_model(self) -> None:
+        """🔥 [Issue #337] モデルをアンロードしてメモリを解放"""
+        if self.translator is not None:
+            self.logger.info("[UNLOAD] Unloading translation model...")
+            del self.translator
+            self.translator = None
+
+        if self.tokenizer is not None:
+            del self.tokenizer
+            self.tokenizer = None
+
+        self.is_loaded = False
+
+        # キャッシュはクリア（メモリ解放）
+        self.translation_cache.clear()
+
+        # GC実行でメモリ解放
+        gc.collect()
+        self.logger.info("[UNLOAD] Translation model unloaded successfully")
+
+
+# 🔥 [Issue #337] 遅延読み込み/自動アンロード対応ラッパー
+class LazyLoadingTranslator:
+    """遅延読み込みとアイドルアンロードをサポートする翻訳エンジンラッパー
+
+    機能:
+    - 初回翻訳リクエスト時にモデルをロード（遅延読み込み）
+    - アイドル状態が一定時間続くとモデルをアンロード（メモリ解放）
+    - Live翻訳モード時はアンロードを無効化可能
+
+    設定:
+    - idle_timeout_seconds: アイドルタイムアウト（デフォルト: 300秒 = 5分）
+    - keep_loaded: True時はアンロードしない（Live翻訳モード）
+    """
+
+    DEFAULT_IDLE_TIMEOUT_SECONDS = 300  # 5分
+
+    def __init__(
+        self,
+        engine: CTranslate2Engine,
+        idle_timeout_seconds: int = DEFAULT_IDLE_TIMEOUT_SECONDS
+    ):
+        """
+        Args:
+            engine: ラップするCTranslate2Engine
+            idle_timeout_seconds: アイドルタイムアウト（秒）
+        """
+        self.engine = engine
+        self.idle_timeout_seconds = idle_timeout_seconds
+        self.keep_loaded = False  # Live翻訳モード用フラグ
+
+        self._last_activity_time: Optional[float] = None
+        self._unload_task: Optional[asyncio.Task] = None
+        self._lock = asyncio.Lock()
+
+        self.logger = logging.getLogger(__name__)
+        self.logger.info(f"[LAZY_INIT] LazyLoadingTranslator initialized")
+        self.logger.info(f"  Idle timeout: {idle_timeout_seconds}s")
+
+    async def _ensure_loaded(self) -> None:
+        """モデルがロードされていることを保証"""
+        async with self._lock:
+            if not self.engine.is_loaded:
+                self.logger.info("[LAZY_LOAD] Loading model on demand...")
+                await self.engine.load_model()
+                self.logger.info("[LAZY_LOAD] Model loaded successfully")
+
+            # アクティビティ時刻を更新
+            self._last_activity_time = time.time()
+
+            # 既存のアンロードタスクをキャンセル
+            if self._unload_task is not None and not self._unload_task.done():
+                self._unload_task.cancel()
+                try:
+                    await self._unload_task
+                except asyncio.CancelledError:
+                    pass
+
+            # keep_loaded=Falseの場合のみ、アンロードタスクをスケジュール
+            if not self.keep_loaded:
+                self._unload_task = asyncio.create_task(self._schedule_unload())
+
+    async def _schedule_unload(self) -> None:
+        """アイドルタイムアウト後にモデルをアンロード"""
+        try:
+            await asyncio.sleep(self.idle_timeout_seconds)
+
+            async with self._lock:
+                # keep_loadedがTrueになっていたらスキップ
+                if self.keep_loaded:
+                    self.logger.info("[LAZY_UNLOAD] Skipped (keep_loaded=True)")
+                    return
+
+                # 最終アクティビティからの経過時間を確認
+                if self._last_activity_time is not None:
+                    elapsed = time.time() - self._last_activity_time
+                    if elapsed < self.idle_timeout_seconds:
+                        # まだアイドルタイムアウトに達していない
+                        self.logger.info(f"[LAZY_UNLOAD] Skipped (last activity: {elapsed:.1f}s ago)")
+                        return
+
+                # モデルをアンロード
+                self.logger.info(f"[LAZY_UNLOAD] Unloading model after {self.idle_timeout_seconds}s idle")
+                self.engine.unload_model()
+
+        except asyncio.CancelledError:
+            # キャンセルは正常（新しいリクエストが来た場合）
+            pass
+
+    async def translate(
+        self,
+        text: str,
+        source_lang: str,
+        target_lang: str
+    ) -> Tuple[str, float]:
+        """単一テキストを翻訳（遅延読み込み対応）"""
+        await self._ensure_loaded()
+        return await self.engine.translate(text, source_lang, target_lang)
+
+    async def translate_batch(
+        self,
+        texts: List[str],
+        source_lang: str,
+        target_lang: str
+    ) -> List[Tuple[str, float]]:
+        """バッチ翻訳（遅延読み込み対応）"""
+        await self._ensure_loaded()
+        return await self.engine.translate_batch(texts, source_lang, target_lang)
+
+    async def is_ready(self) -> bool:
+        """準備完了確認
+
+        遅延ロードのため常にTrueを返す（translate()呼び出し時に自動ロード）
+        """
+        # 🔥 [Issue #337] 遅延ロードのため常にReadyとして報告
+        # 実際のロードはtranslate()呼び出し時に行われる
+        return True
+
+    async def health_check(self) -> bool:
+        """ヘルスチェック
+
+        遅延ロードのため常にTrueを返す（translate()呼び出し時に自動ロード）
+        モデルがロード済みの場合はエンジンのヘルスチェックを実行
+        """
+        # 🔥 [Issue #337] 遅延ロードのためHealthyとして報告
+        if self.engine.is_loaded:
+            return await self.engine.health_check()
+        return True
+
+    def set_keep_loaded(self, keep_loaded: bool) -> None:
+        """Live翻訳モード設定
+
+        Args:
+            keep_loaded: Trueにするとアイドルアンロードを無効化
+        """
+        self.keep_loaded = keep_loaded
+        self.logger.info(f"[LAZY_CONFIG] keep_loaded={keep_loaded}")
+
+        if keep_loaded:
+            # アンロードタスクをキャンセル
+            if self._unload_task is not None and not self._unload_task.done():
+                self._unload_task.cancel()
+
+    async def preload(self) -> None:
+        """事前にモデルをロード（起動時のウォームアップ用）"""
+        await self._ensure_loaded()
+
+    def get_stats(self) -> Dict[str, any]:
+        """統計情報を取得"""
+        return {
+            "is_loaded": self.engine.is_loaded,
+            "keep_loaded": self.keep_loaded,
+            "idle_timeout_seconds": self.idle_timeout_seconds,
+            "last_activity_time": self._last_activity_time,
+            "cache_stats": self.engine.get_cache_stats() if self.engine.is_loaded else None
+        }
+
+    def is_model_loaded(self) -> bool:
+        """モデルが実際にロードされているか確認（デバッグ用）"""
+        return self.engine.is_loaded
+
+    # CTranslate2Engineのメソッドをデリゲート
+    def get_supported_languages(self) -> List[str]:
+        return self.engine.get_supported_languages()
+
+    def clear_cache(self) -> None:
+        if self.engine.is_loaded:
+            self.engine.clear_cache()
+
+    def set_cache_enabled(self, enabled: bool) -> None:
+        self.engine.set_cache_enabled(enabled)

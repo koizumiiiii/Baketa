@@ -24,8 +24,8 @@ public class RoiProfileRepositoryTests : IDisposable
         _testDirectory = Path.Combine(Path.GetTempPath(), $"RoiProfileTests_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_testDirectory);
 
-        // テスト用にディレクトリを上書き（リフレクション使用）
-        _repository = new RoiProfileRepository(_loggerMock.Object);
+        // テスト用ディレクトリを使用（実ユーザーデータを保護）
+        _repository = new RoiProfileRepository(_loggerMock.Object, _testDirectory);
     }
 
     public void Dispose()

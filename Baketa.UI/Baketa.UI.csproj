@@ -215,4 +215,23 @@
 	<!-- 🔥 [SIZE_OPTIMIZATION] Python gRPCサーバーはPyInstallerビルド済みexeを使用
 	     build-release.ps1がdist/BaketaTranslationServer/をコピーするため、
 	     Pythonソースのコピーは不要 -->
+
+	<!-- 🔥 [Issue #337] BaketaUnifiedServer (PyInstallerビルド済み) を自動コピー
+	     Debug/Release両方で同じdistフォルダからコピーすることで差分を防止 -->
+	<Target Name="CopyUnifiedServer" AfterTargets="Build" Condition="Exists('$(ProjectDir)..\grpc_server\dist\BaketaUnifiedServer\BaketaUnifiedServer.exe')">
+		<Message Text="🔥 [Issue #337] BaketaUnifiedServer をコピー中..." Importance="high" />
+
+		<!-- 既存フォルダを削除（古いファイルを残さない） -->
+		<RemoveDir Directories="$(OutDir)grpc_server\BaketaUnifiedServer" Condition="Exists('$(OutDir)grpc_server\BaketaUnifiedServer')" />
+
+		<!-- distフォルダから全ファイルをコピー -->
+		<ItemGroup>
+			<UnifiedServerFiles Include="$(ProjectDir)..\grpc_server\dist\BaketaUnifiedServer\**\*" />
+		</ItemGroup>
+		<Copy SourceFiles="@(UnifiedServerFiles)"
+		      DestinationFolder="$(OutDir)grpc_server\BaketaUnifiedServer\%(RecursiveDir)"
+		      SkipUnchangedFiles="true" />
+
+		<Message Text="🔥 [Issue #337] BaketaUnifiedServer コピー完了: $(OutDir)grpc_server\BaketaUnifiedServer\" Importance="high" />
+	</Target>
 </Project>

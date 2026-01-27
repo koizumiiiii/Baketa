@@ -70,12 +70,11 @@ gRPC Translation Server Startup Script
 Phase 2.2: サーバー起動エントリーポイント
 
 Usage:
-    python start_server.py [--port PORT] [--host HOST] [--heavy-model]
+    python start_server.py [--port PORT] [--host HOST]
 
 Examples:
     python start_server.py
     python start_server.py --port 50051 --host localhost
-    python start_server.py --heavy-model  # Use 1.3B model instead of 600M
 """
 
 import asyncio
@@ -169,35 +168,36 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
         model_path_arg: [Issue #185] C#から指定されたモデルパス（Noneの場合はデフォルト）
 
     Note:
-        NLLB-200-distilled-1.3B (CTranslate2 int8) を使用。
-        600Mからの精度向上により、日本語翻訳品質が大幅に改善。
+        🔥 [Issue #337] NLLB-200-distilled-600M (CTranslate2 int8) を使用。
+        1.3Bから軽量化（5.5GB → 1GB）、200言語サポートは維持。
     """
     logger.info("=" * 80)
     logger.info("Baketa gRPC Translation Server Starting...")
     logger.info("=" * 80)
 
-    # CTranslate2エンジン（NLLB-200-distilled-1.3B）を使用
+    # 🔥 [Issue #337] CTranslate2エンジン（NLLB-200-distilled-600M）を使用
     logger.info("Initializing CTranslate2 translation engine...")
 
     # [Issue #185] モデルパスの決定
-    # 優先順位: 1. コマンドライン引数 2. デフォルト（%APPDATA%\Baketa\Models\nllb-200-1.3B-ct2）
+    # 優先順位: 1. コマンドライン引数 2. デフォルト（%APPDATA%\Baketa\Models\nllb-200-distilled-600M-ct2）
     if model_path_arg:
         model_path = Path(model_path_arg)
         logger.info(f"[Issue #185] Using model path from command line: {model_path}")
     else:
         # 🔥 [ALPHA_0.1.2] HuggingFace Hub統合: モデル保存先を%APPDATA%\Baketa\Modelsに変更
         # Gemini推奨: インストール先への書き込みは管理者権限が必要なため、APPDATAを使用
-        # 🚀 [Translation Quality] NLLB-200-distilled-1.3B に移行（600Mから精度向上）
+        # 🔥 [Issue #337] NLLB-200-distilled-600M に変更（1.3Bから軽量化）
         appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
-        model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-1.3B-ct2"
+        model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-distilled-600M-ct2"
         logger.info(f"[Issue #185] Using default model path: {model_path}")
 
     # モデル存在チェック・自動ダウンロード
+    # 🔥 [Issue #337] 600Mモデルに変更
     if not model_path.exists() or not (model_path / "model.bin").exists():
         logger.info("=" * 80)
         logger.info("Model not found. Downloading from HuggingFace Hub...")
-        logger.info("Repository: OpenNMT/nllb-200-distilled-1.3B-ct2-int8")
-        logger.info("Size: ~1.3GB | This may take several minutes...")
+        logger.info("Repository: OpenNMT/nllb-200-distilled-600M-ct2-int8")
+        logger.info("Size: ~600MB | This may take a few minutes...")
         logger.info("=" * 80)
         model_path.mkdir(parents=True, exist_ok=True)
 
@@ -209,7 +209,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
             loop = asyncio.get_running_loop()
             download_func = partial(
                 snapshot_download,
-                repo_id="OpenNMT/nllb-200-distilled-1.3B-ct2-int8",
+                repo_id="OpenNMT/nllb-200-distilled-600M-ct2-int8",
                 local_dir=str(model_path),
                 revision="main"  # TODO: 特定のコミットハッシュに固定（セキュリティ向上）
             )
@@ -222,7 +222,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
             logger.error(f"Model download failed: {e}")
             logger.error("Please check:")
             logger.error("  1. Internet connection is available")
-            logger.error("  2. Disk space is sufficient (~1.3GB)")
+            logger.error("  2. Disk space is sufficient (~600MB)")
             logger.error("  3. HuggingFace Hub is accessible")
             logger.error("=" * 80)
             raise RuntimeError(f"Failed to download model from HuggingFace Hub: {e}")
@@ -261,7 +261,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
             pynvml.nvmlShutdown()
 
     engine = CTranslate2Engine(
-        model_path=str(model_path),  # %APPDATA%\Baketa\Models\nllb-200-1.3B-ct2
+        model_path=str(model_path),  # %APPDATA%\Baketa\Models\nllb-200-distilled-600M-ct2
         device="cuda" if is_cuda_available else "cpu",
         compute_type="int8"
     )
@@ -394,7 +394,7 @@ def main():
         "--model-path",
         type=str,
         default=None,
-        help="Path to CTranslate2 model directory (default: %APPDATA%/Baketa/Models/nllb-200-1.3B-ct2)"
+        help="Path to CTranslate2 model directory (default: %APPDATA%/Baketa/Models/nllb-200-distilled-600M-ct2)"
     )
 
     args = parser.parse_args()
@@ -407,7 +407,7 @@ def main():
     logger.info("Server configuration:")
     logger.info(f"  Host: {args.host}")
     logger.info(f"  Port: {args.port}")
-    logger.info(f"  Model: NLLB-200-distilled-1.3B (CTranslate2 int8)")
+    logger.info(f"  Model: NLLB-200-distilled-600M (CTranslate2 int8)")
     logger.info(f"  Model path: {args.model_path or '(default)'}")
     logger.info(f"  Debug mode: {args.debug}")
 
