@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,14 +24,8 @@ namespace Baketa.UI.Views.Overlay;
 /// </summary>
 public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
 {
-    // Windows API for click-through
-#pragma warning disable SYSLIB1054 // Use LibraryImportAttribute instead of DllImportAttribute to generate P/Invoke marshalling code at compile time
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-#pragma warning restore SYSLIB1054
+    // 🔧 [Issue #340] クリックスルー用ヘルパー（WndProcフック方式）
+    private ClickThroughHelper? _clickThroughHelper;
 
     // データプロパティ
     public int ChunkId { get; init; }
@@ -172,37 +165,10 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 // ウィンドウを表示
                 Show();
 
-                // 🎯 改善されたクリックスルー設定（透明度問題対策）
-                try
-                {
-                    var hwnd = this.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
-                    if (hwnd != IntPtr.Zero)
-                    {
-                        const int GWL_EXSTYLE = -20;
-                        const int WS_EX_TRANSPARENT = 0x00000020;
-                        const int WS_EX_LAYERED = 0x00080000;
-                        const int WS_EX_TOPMOST = 0x00000008;
-
-                        var currentStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-
-                        // 🎯 クリックスルー有効化でゲームプレイ阻害を防止
-                        var newStyle = currentStyle | WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT;
-                        var result = SetWindowLong(hwnd, GWL_EXSTYLE, newStyle);
-
-                        if (result != 0)
-                        {
-                            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] クリックスルー有効化完了（ゲームプレイ阻害防止）");
-                        }
-                        else
-                        {
-                            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "⚠️ [InPlaceTranslationOverlay] ウィンドウスタイル設定は失敗したが継続");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"⚠️ [InPlaceTranslationOverlay] ウィンドウスタイル設定失敗: {ex.Message}");
-                }
+                // 🔧 [Issue #340] WndProcフック方式でクリックスルーを有効化
+                // WS_EX_TRANSPARENTだけではAvaloniaと競合するため、WM_NCHITTEST + HTTRANSPARENTを使用
+                _clickThroughHelper?.Dispose();
+                _clickThroughHelper = ClickThroughHelper.Apply(this);
 
                 // 🔧 [OVERLAY_HEIGHT_AUTO] Show()後にウィンドウの高さと位置を調整
                 try
@@ -564,6 +530,10 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
             Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", $"🧹 [InPlaceTranslationOverlay] InPlaceTranslationOverlayWindow Dispose開始 - ChunkId: {ChunkId}");
 
             _disposed = true;
+
+            // 🔧 [Issue #340] クリックスルーヘルパーを解放
+            _clickThroughHelper?.Dispose();
+            _clickThroughHelper = null;
 
             // UIスレッドでウィンドウを閉じる
             try
