@@ -1,85 +1,63 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Threading;
+using Baketa.Core.Settings;
 
 namespace Baketa.Core.Utilities;
 
 /// <summary>
 /// デバッグログをファイルに書き込むユーティリティクラス
 /// Console.WriteLineの代替としてファイルベースのログ機能を提供
-///
-/// 🔥 UltraThink修正: 複数ログファイル同時出力対応
-/// - 従来のbaketa_debug.log（AppDomain.BaseDirectory）
-/// - 明示的パス（bin\Debug\net8.0-windows10.0.19041.0\baketa_debug.log）
-/// - appsettings.json設定パス対応
 /// </summary>
+/// <remarks>
+/// [Issue #329] ログファイルをLogs/ディレクトリに統一、重複出力を削除
+/// </remarks>
 public static class DebugLogUtility
 {
-    private static readonly string PrimaryLogFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log");
-    private static readonly string SecondaryLogFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug_app_logs.txt");
+    /// <summary>
+    /// [Issue #329] ログファイルはLogs/ディレクトリ内の baketa_system.log に統一
+    /// </summary>
+    private static readonly string LogFilePath = Path.Combine(BaketaSettingsPaths.LogDirectory, "baketa_system.log");
     private static readonly object _lock = new();
-
-    // 🔥 UltraThink修正: 複数ログファイル対応
-    private static readonly List<string> LogFilePaths = new()
-    {
-        PrimaryLogFilePath,     // baketa_debug.log
-        SecondaryLogFilePath    // debug_app_logs.txt (appsettings.json既定値)
-    };
 
     static DebugLogUtility()
     {
         // ログファイルの初期化（アプリケーション起動時に新しいログファイルを作成）
-        InitializeLogFiles();
+        InitializeLogFile();
     }
 
     /// <summary>
-    /// 複数ログファイルを初期化
-    /// 🔥 UltraThink修正: 複数ログファイル同時初期化対応
+    /// [Issue #329] ログファイルを初期化
     /// </summary>
-    private static void InitializeLogFiles()
+    private static void InitializeLogFile()
     {
         try
         {
             lock (_lock)
             {
-                var logHeader = $"=== Baketa Debug Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n" +
-                              $"Primary Log File: {PrimaryLogFilePath}\n" +
-                              $"Secondary Log File: {SecondaryLogFilePath}\n" +
+                // ディレクトリが存在しない場合は作成
+                var directory = Path.GetDirectoryName(LogFilePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var logHeader = $"=== Baketa System Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n" +
+                              $"Log File: {LogFilePath}\n" +
                               $"Process ID: {Environment.ProcessId}\n" +
                               $"==========================================\n";
 
-                foreach (var logFilePath in LogFilePaths)
-                {
-                    try
-                    {
-                        // ディレクトリが存在しない場合は作成
-                        var directory = Path.GetDirectoryName(logFilePath);
-                        if (!string.IsNullOrEmpty(directory))
-                        {
-                            Directory.CreateDirectory(directory);
-                        }
-
-                        File.WriteAllText(logFilePath, logHeader);
-                    }
-                    catch (Exception ex)
-                    {
-                        // 個別ファイルの初期化失敗は続行（他のファイルは正常に作成される）
-                        Console.WriteLine($"DebugLogUtility: ログファイル初期化失敗 ({logFilePath}): {ex.Message}");
-                    }
-                }
+                File.WriteAllText(LogFilePath, logHeader);
             }
         }
         catch (Exception ex)
         {
-            // 全体的な初期化失敗の場合は標準出力に出力
-            Console.WriteLine($"DebugLogUtility: ログファイル初期化全体失敗: {ex.Message}");
+            // 初期化失敗の場合は標準出力に出力
+            Console.WriteLine($"DebugLogUtility: ログファイル初期化失敗: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// デバッグメッセージを複数ファイルに書き込み
-    /// 🔥 UltraThink修正: 複数ログファイル同時書き込み対応
+    /// デバッグメッセージをファイルに書き込み
     /// </summary>
     /// <param name="message">ログメッセージ</param>
     public static void WriteLog(string message)
@@ -92,24 +70,12 @@ public static class DebugLogUtility
 
             lock (_lock)
             {
-                foreach (var logFilePath in LogFilePaths)
-                {
-                    try
-                    {
-                        // 個別ファイルへの書き込み試行（一つ失敗しても他は続行）
-                        File.AppendAllText(logFilePath, logEntry);
-                    }
-                    catch (Exception fileEx)
-                    {
-                        // 個別ファイル書き込み失敗は標準出力に報告（続行）
-                        Console.WriteLine($"DebugLogUtility: 個別ファイル書き込み失敗 ({logFilePath}): {fileEx.Message}");
-                    }
-                }
+                File.AppendAllText(LogFilePath, logEntry);
             }
         }
         catch (Exception ex)
         {
-            // 全体的な書き込み失敗の場合は標準出力に出力
+            // 書き込み失敗の場合は標準出力に出力
             Console.WriteLine($"DebugLogUtility: ログ書き込み失敗: {ex.Message}");
             Console.WriteLine($"DebugLogUtility: 元のメッセージ: {message}");
         }
@@ -136,28 +102,16 @@ public static class DebugLogUtility
     }
 
     /// <summary>
-    /// プライマリログファイルパスを取得
-    /// 🔥 UltraThink修正: 複数ログファイル対応のためプライマリパス返却
+    /// ログファイルパスを取得
     /// </summary>
-    /// <returns>プライマリログファイルの絶対パス</returns>
+    /// <returns>ログファイルの絶対パス</returns>
     public static string GetLogFilePath()
     {
-        return PrimaryLogFilePath;
+        return LogFilePath;
     }
 
     /// <summary>
-    /// すべてのログファイルパスを取得
-    /// 🔥 UltraThink追加: 複数ログファイルパス一覧取得
-    /// </summary>
-    /// <returns>すべてのログファイルパスのリスト</returns>
-    public static IReadOnlyList<string> GetAllLogFilePaths()
-    {
-        return LogFilePaths.AsReadOnly();
-    }
-
-    /// <summary>
-    /// 複数ログファイルをクリア
-    /// 🔥 UltraThink修正: 複数ログファイル同時クリア対応
+    /// ログファイルをクリア
     /// </summary>
     public static void ClearLog()
     {
@@ -165,19 +119,8 @@ public static class DebugLogUtility
         {
             lock (_lock)
             {
-                var clearHeader = $"=== Baketa Debug Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n";
-
-                foreach (var logFilePath in LogFilePaths)
-                {
-                    try
-                    {
-                        File.WriteAllText(logFilePath, clearHeader);
-                    }
-                    catch (Exception fileEx)
-                    {
-                        Console.WriteLine($"DebugLogUtility: 個別ファイルクリア失敗 ({logFilePath}): {fileEx.Message}");
-                    }
-                }
+                var clearHeader = $"=== Baketa System Log - {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n";
+                File.WriteAllText(LogFilePath, clearHeader);
             }
         }
         catch (Exception ex)

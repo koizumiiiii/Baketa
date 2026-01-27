@@ -56,8 +56,8 @@ Baketaは、ゲームプレイ中にリアルタイムでテキストを翻訳�
 
 #### **🏆 翻訳システムの先進性**
 - **gRPC高性能通信**: HTTP/2による低レイテンシC# ↔ Python連携
-- **NLLB-200統合**: Meta社の最先端多言語モデル（200+言語、2.4GB）
-- **CTranslate2最適化**: 80%メモリ削減（2.4GB→500MB）、高速推論
+- **NLLB-200統合**: Meta社の最先端多言語モデル（200+言語）
+- **CTranslate2最適化**: int8量子化で~1GB（Issue #337 軽量化）、高速推論
 - **ハイブリッド翻訳エンジン**: ローカル（高速・無料）とクラウド（高品質・有料）のインテリジェントフォールバック
 
 #### **🔍 高度なシステム監視機能**
@@ -200,8 +200,8 @@ Windows固有の実装を担当します：
   - 自動再接続: `WithWaitForReady(true)`
   - タイムアウト: 30秒/リクエスト
 - **Python Server**: `grpc_server/start_server.py`（port 50051）
-  - NLLB-200エンジン: facebook/nllb-200-distilled-600M（2.4GB）
-  - CTranslate2最適化: 80%メモリ削減（2.4GB→500MB）
+  - NLLB-200エンジン: CTranslate2 int8量子化（~1GB）
+  - Issue #337 軽量化: 5.5GB→1GB
   - 自動起動: PythonServerManager統合
 
 #### **📊 翻訳機能**
@@ -355,11 +355,11 @@ NLLB-200 Pythonサーバーとの高性能gRPC通信を実現：
 - **Keep-Alive対応**: 10秒間隔、112秒アイドルタイムアウト防止
 - **初回接続問題解決**: `WithWaitForReady(true)`でUNAVAILABLEエラー解消
 - **自動サーバー起動**: PythonServerManager統合
-- **CTranslate2最適化**: 80%メモリ削減（2.4GB→500MB）
+- **CTranslate2最適化**: int8量子化で~1GB（Issue #337）
 
 **技術詳細**：
 - Protocol: gRPC（port 50051）
-- Model: facebook/nllb-200-distilled-600M（200+言語）
+- Model: NLLB-200-distilled-600M CTranslate2 int8（200+言語、~1GB）
 - RPC Methods: Translate, TranslateBatch, HealthCheck, IsReady
 
 ### 8.3 Surya OCR統合完了（Issue #189 - 2025年12月完了）

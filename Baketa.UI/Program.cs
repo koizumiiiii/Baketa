@@ -664,8 +664,9 @@ internal sealed class Program
             builder.AddDebug();
 
             // 🔥 [OPTION_C] カスタムファイルロガーの追加
-            // debug_app_logs.txtにILoggerの出力を記録
-            var debugLogPath = Path.Combine(baseDirectory, "debug_app_logs.txt");
+            // [Issue #329] ログファイルはLogs/ディレクトリに統一
+            BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+            var debugLogPath = Path.Combine(BaketaSettingsPaths.LogDirectory, "baketa_app.log");
 
             try
             {

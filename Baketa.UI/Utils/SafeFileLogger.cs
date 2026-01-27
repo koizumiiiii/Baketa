@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Core.Settings;
 
 namespace Baketa.UI.Utils;
 
@@ -9,11 +10,36 @@ namespace Baketa.UI.Utils;
 /// ファイル共有を考慮した安全なログ書き込み用ユーティリティ
 /// 複数のプロセスが同時にアクセスしてもファイルロックエラーを回避
 /// </summary>
+/// <remarks>
+/// [Issue #329] ログファイルはLogs/ディレクトリに統一
+/// </remarks>
 public static class SafeFileLogger
 {
     private static readonly SemaphoreSlim _semaphore = new(1, 1);
     private const int MaxRetryAttempts = 3;
     private const int RetryDelayMs = 10;
+
+    /// <summary>
+    /// [Issue #329] ファイル名からLogs/ディレクトリ内のフルパスを取得
+    /// </summary>
+    /// <param name="fileName">ファイル名（パスなし）</param>
+    /// <returns>Logs/ディレクトリ内のフルパス</returns>
+    public static string GetLogFilePath(string fileName)
+    {
+        // ディレクトリが存在しない場合は作成
+        if (!Directory.Exists(BaketaSettingsPaths.LogDirectory))
+        {
+            Directory.CreateDirectory(BaketaSettingsPaths.LogDirectory);
+        }
+
+        // 既にフルパスの場合はそのまま返す（後方互換性）
+        if (Path.IsPathRooted(fileName))
+        {
+            return fileName;
+        }
+
+        return Path.Combine(BaketaSettingsPaths.LogDirectory, fileName);
+    }
 
     /// <summary>
     /// ファイルに安全にログを追記（同期版）
@@ -28,10 +54,13 @@ public static class SafeFileLogger
     /// <summary>
     /// ファイルに安全にログを追記（非同期版）
     /// </summary>
-    /// <param name="fileName">ファイル名</param>
+    /// <param name="fileName">ファイル名（パスなしの場合はLogs/ディレクトリに保存）</param>
     /// <param name="message">ログメッセージ</param>
     public static async Task AppendLogAsync(string fileName, string message)
     {
+        // [Issue #329] ファイル名をLogs/ディレクトリのパスに変換
+        var filePath = GetLogFilePath(fileName);
+
         await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -39,7 +68,7 @@ public static class SafeFileLogger
             {
                 try
                 {
-                    using var fileStream = new FileStream(fileName, FileMode.Append, FileAccess.Write, FileShare.Read, bufferSize: 4096, useAsync: true);
+                    using var fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read, bufferSize: 4096, useAsync: true);
                     using var writer = new StreamWriter(fileStream);
                     await writer.WriteLineAsync(message).ConfigureAwait(false);
                     await writer.FlushAsync().ConfigureAwait(false);
@@ -59,7 +88,7 @@ public static class SafeFileLogger
         catch (Exception ex)
         {
             // 最終的にログ書き込み失敗時はコンソールに出力
-            Console.WriteLine($"⚠️ ログ書き込み失敗 ({fileName}): {ex.Message}");
+            Console.WriteLine($"⚠️ ログ書き込み失敗 ({filePath}): {ex.Message}");
         }
         finally
         {

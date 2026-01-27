@@ -104,6 +104,9 @@ public partial class WindowSelectionDialogView : Window
                     // 🔥 [ISSUE#225] SelectedWindowとSelectedWindowViewModelの両方を設定
                     viewModel.SelectedWindow = windowInfoViewModel.WindowInfo;
                     viewModel.SelectedWindowViewModel = windowInfoViewModel;
+
+                    // 🔥 [ISSUE#336] クリック後も枠を表示し続ける
+                    UpdateClickedItemSelection(viewModel, windowInfoViewModel);
                 }
                 else if (e.ClickCount >= 2)
                 {
@@ -117,6 +120,25 @@ public partial class WindowSelectionDialogView : Window
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// 🔥 [ISSUE#336] クリックされたアイテムの選択状態を更新
+    /// マウスが移動しても枠が消えないようにする
+    /// </summary>
+    private static void UpdateClickedItemSelection(WindowSelectionDialogViewModel viewModel, WindowInfoViewModel clickedItem)
+    {
+        // 以前選択されていたアイテムの選択状態をクリア
+        foreach (var item in viewModel.AvailableWindows)
+        {
+            if (item != clickedItem && item.IsCurrentlySelected)
+            {
+                item.IsCurrentlySelected = false;
+            }
+        }
+
+        // クリックされたアイテムを選択状態に
+        clickedItem.IsCurrentlySelected = true;
     }
 
     /// <summary>
