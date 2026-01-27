@@ -665,8 +665,17 @@ internal sealed class Program
 
             // 🔥 [OPTION_C] カスタムファイルロガーの追加
             // [Issue #329] ログファイルはLogs/ディレクトリに統一
+            // [Issue #345] ログローテーション設定
             BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
             var debugLogPath = Path.Combine(BaketaSettingsPaths.LogDirectory, "baketa_app.log");
+
+            // [Issue #345] ログローテーション設定を読み込み
+            var loggingSettings = configuration.GetSection("Logging").Get<Baketa.Core.Settings.LoggingSettings>()
+                ?? new Baketa.Core.Settings.LoggingSettings();
+            Baketa.UI.Utils.SafeFileLogger.ConfigureRotation(
+                loggingSettings.MaxDebugLogFileSizeMB,
+                loggingSettings.DebugLogRetentionDays);
+            Console.WriteLine($"📁 [Issue #345] ログローテーション設定: MaxSize={loggingSettings.MaxDebugLogFileSizeMB}MB, Retain={loggingSettings.DebugLogRetentionDays}世代");
 
             try
             {
