@@ -36,6 +36,12 @@ public sealed class BackgroundWarmupService(
     // エンジンインスタンスキャッシュ
     private readonly ConcurrentDictionary<Type, object> _engineCache = new();
 
+    // 🔧 [Issue #337] [Geminiレビュー対応] ウォームアップ対象エンジンのAlias（完全一致判定）
+    private static readonly HashSet<string> WarmupRequiredAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "NLLB", "NLLB200", "NLLB-200", "local_nllb", "grpc"
+    };
+
     private bool _disposed;
 
     public bool IsWarmupCompleted => _isWarmupCompleted;
@@ -336,8 +342,8 @@ public sealed class BackgroundWarmupService(
 
                             // 🔥 [Issue #337] gRPC翻訳エンジンの場合、ダミー翻訳でモデルをプリロード
                             // LazyLoadingTranslatorは初回translate()呼び出し時にモデルをロードするため
-                            if (engine.Name.Contains("gRPC", StringComparison.OrdinalIgnoreCase) ||
-                                engine.Aliases.Any(a => a.Contains("NLLB", StringComparison.OrdinalIgnoreCase)))
+                            // 🔧 [Geminiレビュー対応] 部分一致から完全一致に変更して誤判定リスクを軽減
+                            if (engine.Aliases.Any(a => WarmupRequiredAliases.Contains(a)))
                             {
                                 await WarmupTranslationModelAsync(engine, cancellationToken).ConfigureAwait(false);
                             }
@@ -402,6 +408,11 @@ public sealed class BackgroundWarmupService(
                     "[Issue #337] 翻訳モデルプリロード失敗: {EngineName} - {Error}",
                     engine.Name, response.Error?.Message ?? "Unknown error");
             }
+        }
+        // 🔧 [Geminiレビュー対応] キャンセル時のログ改善
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogDebug("[Issue #337] 翻訳モデルプリロードがキャンセルされました: {EngineName}", engine.Name);
         }
         catch (Exception ex)
         {
