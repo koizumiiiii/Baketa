@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from protos import ocr_pb2 as ocr__pb2
+import ocr_pb2 as ocr__pb2
 
-GRPC_GENERATED_VERSION = '1.68.1'
+GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in ocr_pb2_grpc.py depends on'
+        + ' but the generated code in ocr_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -26,11 +26,7 @@ if _version_not_supported:
 
 
 class OcrServiceStub(object):
-    """============================================================================
-    Service Definition
-    ============================================================================
-
-    / Baketa OCRサービス
+    """/ Baketa OCRサービス
     """
 
     def __init__(self, channel):
@@ -64,14 +60,15 @@ class OcrServiceStub(object):
                 request_serializer=ocr__pb2.OcrIsReadyRequest.SerializeToString,
                 response_deserializer=ocr__pb2.OcrIsReadyResponse.FromString,
                 _registered_method=True)
+        self.SwitchDevice = channel.unary_unary(
+                '/baketa.ocr.v1.OcrService/SwitchDevice',
+                request_serializer=ocr__pb2.SwitchDeviceRequest.SerializeToString,
+                response_deserializer=ocr__pb2.SwitchDeviceResponse.FromString,
+                _registered_method=True)
 
 
 class OcrServiceServicer(object):
-    """============================================================================
-    Service Definition
-    ============================================================================
-
-    / Baketa OCRサービス
+    """/ Baketa OCRサービス
     """
 
     def Recognize(self, request, context):
@@ -114,6 +111,14 @@ class OcrServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SwitchDevice(self, request, context):
+        """/ [Issue #334] デバイス切り替え（GPU/CPU）
+        / VRAM不足時にCPUモードへ自動フォールバックするために使用
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_OcrServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -142,6 +147,11 @@ def add_OcrServiceServicer_to_server(servicer, server):
                     request_deserializer=ocr__pb2.OcrIsReadyRequest.FromString,
                     response_serializer=ocr__pb2.OcrIsReadyResponse.SerializeToString,
             ),
+            'SwitchDevice': grpc.unary_unary_rpc_method_handler(
+                    servicer.SwitchDevice,
+                    request_deserializer=ocr__pb2.SwitchDeviceRequest.FromString,
+                    response_serializer=ocr__pb2.SwitchDeviceResponse.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'baketa.ocr.v1.OcrService', rpc_method_handlers)
@@ -151,11 +161,7 @@ def add_OcrServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class OcrService(object):
-    """============================================================================
-    Service Definition
-    ============================================================================
-
-    / Baketa OCRサービス
+    """/ Baketa OCRサービス
     """
 
     @staticmethod
@@ -283,6 +289,33 @@ class OcrService(object):
             '/baketa.ocr.v1.OcrService/IsReady',
             ocr__pb2.OcrIsReadyRequest.SerializeToString,
             ocr__pb2.OcrIsReadyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SwitchDevice(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/baketa.ocr.v1.OcrService/SwitchDevice',
+            ocr__pb2.SwitchDeviceRequest.SerializeToString,
+            ocr__pb2.SwitchDeviceResponse.FromString,
             options,
             channel_credentials,
             insecure,
