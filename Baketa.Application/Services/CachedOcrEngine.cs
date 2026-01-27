@@ -396,6 +396,23 @@ public sealed class CachedOcrEngine : IOcrEngine
         return await _baseEngine.DetectTextRegionsAsync(image, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// [Issue #330] バッチOCR実装。ベースエンジンに委譲。
+    /// </remarks>
+    public async Task<IReadOnlyList<OcrResults>> RecognizeBatchAsync(
+        IReadOnlyList<IImage> images,
+        IProgress<OcrProgress>? progressCallback = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(images);
+
+        _logger.LogDebug("🔍 CachedOcrEngine: RecognizeBatchAsync - ベースエンジンに委譲 ({Count} images)", images.Count);
+
+        // バッチOCRはキャッシュ効果が低いため、直接ベースエンジンに委譲
+        return await _baseEngine.RecognizeBatchAsync(images, progressCallback, cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// キャッシュ統計情報をログ出力
     /// </summary>

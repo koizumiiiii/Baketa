@@ -496,6 +496,156 @@ public sealed class GrpcOcrClient : IDisposable
     }
 
     /// <summary>
+    /// [Issue #330] 複数画像を一括でOCR処理します（バッチ認識）
+    /// 部分OCRで複数領域を処理する際のgRPC呼び出しオーバーヘッドを削減
+    /// </summary>
+    /// <param name="imageDataList">画像データのリスト（各要素はPNG/JPEG）</param>
+    /// <param name="imageFormat">画像フォーマット（"png" or "jpeg"）</param>
+    /// <param name="languages">認識対象言語（空の場合は自動検出）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>バッチOCRレスポンス</returns>
+    public async Task<RecognizeBatchResponse> RecognizeBatchAsync(
+        IReadOnlyList<byte[]> imageDataList,
+        string imageFormat = "png",
+        IReadOnlyList<string>? languages = null,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(imageDataList);
+
+        if (imageDataList.Count == 0)
+        {
+            return new RecognizeBatchResponse
+            {
+                BatchId = Guid.NewGuid().ToString(),
+                IsSuccess = true,
+                SuccessCount = 0,
+                TotalCount = 0,
+                TotalProcessingTimeMs = 0,
+                Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+            };
+        }
+
+        var batchId = Guid.NewGuid().ToString();
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            var grpcRequest = new RecognizeBatchRequest
+            {
+                BatchId = batchId,
+                Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+            };
+
+            // 各画像のリクエストを作成
+            for (var i = 0; i < imageDataList.Count; i++)
+            {
+                var ocrRequest = new OcrRequest
+                {
+                    RequestId = $"{batchId}-{i}",
+                    ImageData = Google.Protobuf.ByteString.CopyFrom(imageDataList[i]),
+                    ImageFormat = imageFormat,
+                    Engine = OcrEngineType.Surya,
+                    Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+                };
+
+                if (languages != null && languages.Count > 0)
+                {
+                    ocrRequest.Languages.AddRange(languages);
+                }
+
+                grpcRequest.Requests.Add(ocrRequest);
+            }
+
+            var totalImageSizeKb = imageDataList.Sum(data => data.Length) / 1024;
+            _logger.LogDebug(
+                "[gRPC-OCR] RecognizeBatch: Count={Count}, TotalSize={TotalSizeKB}KB, Format={Format}",
+                imageDataList.Count,
+                totalImageSizeKb,
+                imageFormat);
+
+            // バッチOCRは時間がかかるのでタイムアウトを長めに設定
+            // 1領域あたり約1秒 + オーバーヘッド
+            var timeoutSeconds = Math.Max(60, imageDataList.Count * 2 + 30);
+            var callOptions = new CallOptions(
+                deadline: DateTime.UtcNow.AddSeconds(timeoutSeconds),
+                cancellationToken: cancellationToken)
+                .WithWaitForReady(true);
+
+            var response = await _client.RecognizeBatchAsync(grpcRequest, callOptions).ConfigureAwait(false);
+
+            sw.Stop();
+
+            _logger.LogInformation(
+                "[gRPC-OCR] RecognizeBatch completed: {SuccessCount}/{TotalCount} success in {ElapsedMs}ms (Server: {ServerMs}ms)",
+                response.SuccessCount,
+                response.TotalCount,
+                sw.ElapsedMilliseconds,
+                response.TotalProcessingTimeMs);
+
+            return response;
+        }
+        catch (RpcException ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[gRPC-OCR] RecognizeBatch RPC error: {StatusCode}", ex.StatusCode);
+
+            var errorType = ex.StatusCode switch
+            {
+                StatusCode.Unavailable => OcrErrorType.ServiceUnavailable,
+                StatusCode.DeadlineExceeded => OcrErrorType.Timeout,
+                StatusCode.ResourceExhausted => OcrErrorType.OutOfMemory,
+                _ => OcrErrorType.ProcessingError
+            };
+
+            return new RecognizeBatchResponse
+            {
+                BatchId = batchId,
+                IsSuccess = false,
+                SuccessCount = 0,
+                TotalCount = imageDataList.Count,
+                TotalProcessingTimeMs = sw.ElapsedMilliseconds,
+                Error = new OcrError
+                {
+                    ErrorType = errorType,
+                    Message = $"Batch OCR failed: {ex.StatusCode}",
+                    Details = ex.Message,
+                    IsRetryable = ex.StatusCode == StatusCode.Unavailable || ex.StatusCode == StatusCode.DeadlineExceeded
+                },
+                Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            sw.Stop();
+            _logger.LogDebug("[gRPC-OCR] RecognizeBatch cancelled after {ElapsedMs}ms", sw.ElapsedMilliseconds);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[gRPC-OCR] RecognizeBatch unexpected error");
+
+            return new RecognizeBatchResponse
+            {
+                BatchId = batchId,
+                IsSuccess = false,
+                SuccessCount = 0,
+                TotalCount = imageDataList.Count,
+                TotalProcessingTimeMs = sw.ElapsedMilliseconds,
+                Error = new OcrError
+                {
+                    ErrorType = OcrErrorType.Unknown,
+                    Message = "Unexpected error during batch OCR",
+                    Details = ex.Message,
+                    IsRetryable = false
+                },
+                Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+            };
+        }
+    }
+
+    /// <summary>
     /// エラーレスポンスを生成
     /// </summary>
     private static OcrResponse CreateErrorResponse(

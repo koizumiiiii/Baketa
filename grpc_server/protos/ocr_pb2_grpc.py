@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from . import ocr_pb2 as ocr__pb2
+import ocr_pb2 as ocr__pb2
 
-GRPC_GENERATED_VERSION = '1.68.1'
+GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in ocr_pb2_grpc.py depends on'
+        + ' but the generated code in ocr_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -43,6 +43,11 @@ class OcrServiceStub(object):
                 '/baketa.ocr.v1.OcrService/Recognize',
                 request_serializer=ocr__pb2.OcrRequest.SerializeToString,
                 response_deserializer=ocr__pb2.OcrResponse.FromString,
+                _registered_method=True)
+        self.RecognizeBatch = channel.unary_unary(
+                '/baketa.ocr.v1.OcrService/RecognizeBatch',
+                request_serializer=ocr__pb2.RecognizeBatchRequest.SerializeToString,
+                response_deserializer=ocr__pb2.RecognizeBatchResponse.FromString,
                 _registered_method=True)
         self.Detect = channel.unary_unary(
                 '/baketa.ocr.v1.OcrService/Detect',
@@ -71,6 +76,16 @@ class OcrServiceServicer(object):
 
     def Recognize(self, request, context):
         """/ 画像からテキストを認識（Detection + Recognition）
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RecognizeBatch(self, request, context):
+        """/ [Issue #330] 複数画像の一括認識（Batch Recognition）
+        / 部分OCRで複数領域を処理する際のgRPC呼び出しオーバーヘッドを削減
+        / Pythonサーバーはmax_workers=1のため、内部的には逐次処理だが
+        / gRPC呼び出し回数を15→1に削減することで大幅に高速化
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -106,6 +121,11 @@ def add_OcrServiceServicer_to_server(servicer, server):
                     servicer.Recognize,
                     request_deserializer=ocr__pb2.OcrRequest.FromString,
                     response_serializer=ocr__pb2.OcrResponse.SerializeToString,
+            ),
+            'RecognizeBatch': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecognizeBatch,
+                    request_deserializer=ocr__pb2.RecognizeBatchRequest.FromString,
+                    response_serializer=ocr__pb2.RecognizeBatchResponse.SerializeToString,
             ),
             'Detect': grpc.unary_unary_rpc_method_handler(
                     servicer.Detect,
@@ -155,6 +175,33 @@ class OcrService(object):
             '/baketa.ocr.v1.OcrService/Recognize',
             ocr__pb2.OcrRequest.SerializeToString,
             ocr__pb2.OcrResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecognizeBatch(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/baketa.ocr.v1.OcrService/RecognizeBatch',
+            ocr__pb2.RecognizeBatchRequest.SerializeToString,
+            ocr__pb2.RecognizeBatchResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -1121,10 +1121,11 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 return ProcessingStageResult.CreateError(StageType, "No valid regions for partial OCR", stopwatch.Elapsed);
             }
 
-            var allTextChunks = new List<object>();
-            var allDetectedText = new System.Text.StringBuilder();
+            _logger.LogInformation("[Issue #330] 部分OCR開始（バッチモード）: {Count}領域を処理", validRegions.Count);
 
-            _logger.LogInformation("[Issue #293] 部分OCR開始: {Count}領域を処理", validRegions.Count);
+            // Phase 1: 全領域を先に切り出し
+            var croppedImages = new List<IImage>();
+            var regionMapping = new List<Rectangle>(); // croppedImagesとvalidRegionsの対応
 
             foreach (var region in validRegions)
             {
@@ -1132,45 +1133,72 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                 try
                 {
-                    // 領域を切り出し
-                    using var croppedImage = await CropImageAsync(fullImage, region, cancellationToken).ConfigureAwait(false);
+                    var croppedImage = await CropImageAsync(fullImage, region, cancellationToken).ConfigureAwait(false);
 
-                    if (croppedImage == null)
+                    if (croppedImage != null)
                     {
-                        _logger.LogWarning("[Issue #293] 部分OCR: 領域切り出し失敗 {Region}", region);
-                        continue;
+                        croppedImages.Add(croppedImage);
+                        regionMapping.Add(region);
                     }
-
-                    // 部分OCR実行
-                    var ocrContext = new OcrContext(
-                        croppedImage,
-                        context.Input.SourceWindowHandle,
-                        null,
-                        cancellationToken);
-
-                    var ocrResults = await _ocrEngine.RecognizeAsync(ocrContext).ConfigureAwait(false);
-
-                    // 座標変換: ROI相対座標 → 元画像絶対座標
-                    var transformedRegions = TransformOcrResultsToAbsoluteCoordinates(ocrResults, region, context.Input);
-
-                    allTextChunks.AddRange(transformedRegions.Cast<object>());
-                    allDetectedText.Append(string.Join(" ", ocrResults.TextRegions.Select(r => r.Text)));
-                    allDetectedText.Append(' ');
-
-                    _logger.LogDebug("[Issue #293] 部分OCR完了: 領域{Region}, 検出テキスト{Count}個",
-                        region, ocrResults.TextRegions.Count);
+                    else
+                    {
+                        _logger.LogWarning("[Issue #330] 部分OCR: 領域切り出し失敗 {Region}", region);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "[Issue #293] 部分OCR: 領域処理エラー {Region}", region);
+                    _logger.LogWarning(ex, "[Issue #330] 部分OCR: 領域切り出しエラー {Region}", region);
                 }
+            }
+
+            if (croppedImages.Count == 0)
+            {
+                _logger.LogWarning("[Issue #330] 部分OCR: 切り出し成功領域なし");
+                return ProcessingStageResult.CreateError(StageType, "No cropped images for partial OCR", stopwatch.Elapsed);
+            }
+
+            _logger.LogInformation("[Issue #330] バッチOCR開始: {Count}画像", croppedImages.Count);
+
+            // Phase 2: バッチOCR実行（gRPC呼び出し1回）
+            IReadOnlyList<OcrResults> batchResults;
+            try
+            {
+                batchResults = await _ocrEngine.RecognizeBatchAsync(croppedImages, null, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                // 切り出した画像をDispose
+                foreach (var img in croppedImages)
+                {
+                    (img as IDisposable)?.Dispose();
+                }
+            }
+
+            // Phase 3: 結果を座標変換して集約
+            var allTextChunks = new List<object>();
+            var allDetectedText = new System.Text.StringBuilder();
+
+            for (var i = 0; i < batchResults.Count && i < regionMapping.Count; i++)
+            {
+                var ocrResults = batchResults[i];
+                var region = regionMapping[i];
+
+                // 座標変換: ROI相対座標 → 元画像絶対座標
+                var transformedRegions = TransformOcrResultsToAbsoluteCoordinates(ocrResults, region, context.Input);
+
+                allTextChunks.AddRange(transformedRegions.Cast<object>());
+                allDetectedText.Append(string.Join(" ", ocrResults.TextRegions.Select(r => r.Text)));
+                allDetectedText.Append(' ');
+
+                _logger.LogDebug("[Issue #330] バッチOCR結果: 領域{Region}, 検出テキスト{Count}個",
+                    region, ocrResults.TextRegions.Count);
             }
 
             stopwatch.Stop();
 
             var detectedText = allDetectedText.ToString().Trim();
 
-            _logger.LogInformation("✅ [Issue #293] 部分OCR完了 - 処理時間: {ElapsedMs}ms, テキスト長: {TextLength}文字, 領域数: {RegionCount}",
+            _logger.LogInformation("✅ [Issue #330] バッチ部分OCR完了 - 処理時間: {ElapsedMs}ms, テキスト長: {TextLength}文字, 領域数: {RegionCount}",
                 stopwatch.ElapsedMilliseconds, detectedText.Length, allTextChunks.Count);
 
             // 成功結果を作成
@@ -1186,8 +1214,8 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[Issue #293] 部分OCRエラー");
-            return ProcessingStageResult.CreateError(StageType, $"Partial OCR error: {ex.Message}", stopwatch.Elapsed);
+            _logger.LogError(ex, "[Issue #330] バッチ部分OCRエラー");
+            return ProcessingStageResult.CreateError(StageType, $"Batch partial OCR error: {ex.Message}", stopwatch.Elapsed);
         }
     }
 

@@ -641,6 +641,23 @@ public interface IOcrEngine : IDisposable
     /// 失敗カウンタをリセット（緊急時復旧用）
     /// </summary>
     void ResetFailureCounter();
+
+    /// <summary>
+    /// [Issue #330] 複数画像を一括でOCR処理します（バッチ認識）
+    /// 部分OCRで複数領域を処理する際のgRPC呼び出しオーバーヘッドを削減
+    /// </summary>
+    /// <param name="images">画像のリスト</param>
+    /// <param name="progressCallback">進捗通知コールバック（オプション）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>各画像のOCR結果リスト</returns>
+    /// <remarks>
+    /// gRPC呼び出し回数を N回→1回に削減することで大幅に高速化。
+    /// サポートしていないエンジンの場合は、逐次処理にフォールバック。
+    /// </remarks>
+    Task<IReadOnlyList<OcrResults>> RecognizeBatchAsync(
+        IReadOnlyList<IImage> images,
+        IProgress<OcrProgress>? progressCallback = null,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

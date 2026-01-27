@@ -441,6 +441,138 @@ public sealed class SuryaOcrEngine : IOcrEngine
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// [Issue #330] バッチOCR実装。
+    /// gRPC呼び出しを N回→1回に削減することで部分OCRを高速化。
+    /// </remarks>
+    public async Task<IReadOnlyList<OcrResults>> RecognizeBatchAsync(
+        IReadOnlyList<IImage> images,
+        IProgress<OcrProgress>? progressCallback = null,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(images);
+
+        if (images.Count == 0)
+        {
+            return [];
+        }
+
+        var sw = Stopwatch.StartNew();
+        progressCallback?.Report(new OcrProgress(0, $"Starting batch OCR ({images.Count} images)...") { Phase = OcrPhase.TextDetection });
+
+        try
+        {
+            // 画像データをバイト配列に変換
+            var imageDataList = new List<byte[]>(images.Count);
+            foreach (var image in images)
+            {
+                var imageMemory = image.GetImageMemory();
+                imageDataList.Add(imageMemory.ToArray());
+            }
+
+            progressCallback?.Report(new OcrProgress(0.2, "Sending batch to Surya OCR...") { Phase = OcrPhase.TextDetection });
+
+            _logger.LogInformation("[Issue #330] RecognizeBatchAsync: {Count} images, total size {TotalSizeKB}KB",
+                images.Count, imageDataList.Sum(d => d.Length) / 1024);
+
+            // gRPCバッチ呼び出し
+            var response = await _client.RecognizeBatchAsync(
+                imageDataList,
+                "png",
+                [_settings.Language ?? "ja"],
+                cancellationToken).ConfigureAwait(false);
+
+            progressCallback?.Report(new OcrProgress(0.8, "Processing batch results...") { Phase = OcrPhase.TextRecognition });
+
+            if (!response.IsSuccess || response.Responses.Count == 0)
+            {
+                var errorMessage = response.Error?.Message ?? "Batch OCR failed";
+                _logger.LogWarning("[Issue #330] RecognizeBatchAsync failed: {Error}", errorMessage);
+
+                // エラー時は空の結果リストを返す
+                var emptyResults = new List<OcrResults>();
+                for (var i = 0; i < images.Count; i++)
+                {
+                    emptyResults.Add(new OcrResults(
+                        [],
+                        images[i],
+                        TimeSpan.Zero,
+                        _settings.Language ?? "ja",
+                        null));
+                }
+                return emptyResults;
+            }
+
+            // 各レスポンスをOcrResultsに変換
+            var results = new List<OcrResults>();
+            for (var i = 0; i < response.Responses.Count && i < images.Count; i++)
+            {
+                var ocrResponse = response.Responses[i];
+                var image = images[i];
+
+                var regions = ocrResponse.IsSuccess
+                    ? ConvertToOcrTextRegions(ocrResponse, null)
+                    : [];
+
+                results.Add(new OcrResults(
+                    regions,
+                    image,
+                    TimeSpan.FromMilliseconds(ocrResponse.ProcessingTimeMs),
+                    _settings.Language ?? "ja",
+                    null));
+            }
+
+            // 足りない分は空の結果で埋める
+            while (results.Count < images.Count)
+            {
+                results.Add(new OcrResults(
+                    [],
+                    images[results.Count],
+                    TimeSpan.Zero,
+                    _settings.Language ?? "ja",
+                    null));
+            }
+
+            sw.Stop();
+
+            _logger.LogInformation(
+                "[Issue #330] RecognizeBatchAsync completed: {SuccessCount}/{TotalCount} success in {ElapsedMs}ms (Server: {ServerMs}ms)",
+                response.SuccessCount,
+                response.TotalCount,
+                sw.ElapsedMilliseconds,
+                response.TotalProcessingTimeMs);
+
+            progressCallback?.Report(new OcrProgress(1.0, $"Batch OCR completed: {response.SuccessCount} success") { Phase = OcrPhase.Completed });
+
+            return results;
+        }
+        catch (OperationCanceledException)
+        {
+            progressCallback?.Report(new OcrProgress(1.0, "Cancelled") { Phase = OcrPhase.Completed });
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #330] RecognizeBatchAsync error");
+            progressCallback?.Report(new OcrProgress(1.0, $"Error: {ex.Message}") { Phase = OcrPhase.Completed });
+
+            // エラー時は空の結果リストを返す
+            var emptyResults = new List<OcrResults>();
+            for (var i = 0; i < images.Count; i++)
+            {
+                emptyResults.Add(new OcrResults(
+                    [],
+                    images[i],
+                    TimeSpan.Zero,
+                    _settings.Language ?? "ja",
+                    null));
+            }
+            return emptyResults;
+        }
+    }
+
     /// <summary>
     /// [Issue #320] DetectedRegion（Detection-Only）をOcrTextRegionリストに変換
     /// テキスト内容は空文字列（位置情報のみ）

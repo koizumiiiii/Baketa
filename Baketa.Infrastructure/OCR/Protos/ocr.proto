@@ -165,6 +165,31 @@ message DetectResponse {
 }
 
 // ============================================================================
+// [Issue #330] Batch Recognition Messages (部分OCR高速化)
+// ============================================================================
+
+/// バッチ認識リクエスト
+/// 複数の画像領域を一括でOCR処理し、gRPC呼び出しオーバーヘッドを削減
+/// 推奨バッチサイズ: 16-32領域（gRPCメッセージサイズ4MB制限に注意）
+message RecognizeBatchRequest {
+  string batch_id = 1;              // バッチID (UUID)
+  repeated OcrRequest requests = 2; // 個別のOCRリクエスト（最大32件）
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+/// バッチ認識レスポンス
+message RecognizeBatchResponse {
+  string batch_id = 1;              // 対応するバッチID
+  bool is_success = 2;              // 全体として成功したかどうか
+  repeated OcrResponse responses = 3; // 個別のOCRレスポンス（リクエストと同順）
+  int32 success_count = 4;          // 成功したリクエスト数
+  int32 total_count = 5;            // 全リクエスト数
+  int64 total_processing_time_ms = 6; // バッチ全体の処理時間（ミリ秒）
+  OcrError error = 7;               // バッチ全体のエラー情報（全体失敗時）
+  google.protobuf.Timestamp timestamp = 8;
+}
+
+// ============================================================================
 // Service Definition
 // ============================================================================
 
@@ -172,6 +197,12 @@ message DetectResponse {
 service OcrService {
   /// 画像からテキストを認識（Detection + Recognition）
   rpc Recognize(OcrRequest) returns (OcrResponse);
+
+  /// [Issue #330] 複数画像の一括認識（Batch Recognition）
+  /// 部分OCRで複数領域を処理する際のgRPC呼び出しオーバーヘッドを削減
+  /// Pythonサーバーはmax_workers=1のため、内部的には逐次処理だが
+  /// gRPC呼び出し回数を15→1に削減することで大幅に高速化
+  rpc RecognizeBatch(RecognizeBatchRequest) returns (RecognizeBatchResponse);
 
   /// [Issue #320] テキスト領域の位置のみ検出（Detection Only）
   /// Recognition（テキスト認識）をスキップし、約10倍高速化
