@@ -333,6 +333,14 @@ public sealed class BackgroundWarmupService(
                                 _logger.LogInformation("翻訳エンジンウォームアップ完了: {EngineName}", engine.Name);
                                 _engineCache.TryAdd(engine.GetType(), engine);
                             }
+
+                            // 🔥 [Issue #337] gRPC翻訳エンジンの場合、ダミー翻訳でモデルをプリロード
+                            // LazyLoadingTranslatorは初回translate()呼び出し時にモデルをロードするため
+                            if (engine.Name.Contains("gRPC", StringComparison.OrdinalIgnoreCase) ||
+                                engine.Aliases.Any(a => a.Contains("NLLB", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                await WarmupTranslationModelAsync(engine, cancellationToken).ConfigureAwait(false);
+                            }
                         }
 
                         ReportProgress(currentProgress + progressIncrement,
@@ -354,6 +362,51 @@ public sealed class BackgroundWarmupService(
         {
             _logger.LogError(ex, "翻訳エンジンウォームアップ中にエラーが発生しました");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 翻訳モデルをプリロードするためにダミー翻訳を実行
+    /// </summary>
+    /// <remarks>
+    /// [Issue #337] LazyLoadingTranslatorは初回translate()呼び出し時にモデルをロードする。
+    /// 起動時にダミー翻訳を実行することで、初回Shot翻訳の5.9秒遅延を解消。
+    /// </remarks>
+    private async Task WarmupTranslationModelAsync(ITranslationEngine engine, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("[Issue #337] 翻訳モデルプリロード開始: {EngineName}", engine.Name);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            // ダミー翻訳リクエスト（英語→日本語）
+            var warmupRequest = Core.Translation.Models.TranslationRequest.Create(
+                sourceText: "Hello",
+                sourceLanguage: Core.Translation.Models.Language.English,
+                targetLanguage: Core.Translation.Models.Language.Japanese
+            );
+
+            var response = await engine.TranslateAsync(warmupRequest, cancellationToken).ConfigureAwait(false);
+
+            stopwatch.Stop();
+
+            if (response.IsSuccess)
+            {
+                _logger.LogInformation(
+                    "[Issue #337] 翻訳モデルプリロード完了: {EngineName} - {ElapsedMs}ms (結果: {Result})",
+                    engine.Name, stopwatch.ElapsedMilliseconds, response.TranslatedText);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "[Issue #337] 翻訳モデルプリロード失敗: {EngineName} - {Error}",
+                    engine.Name, response.Error?.Message ?? "Unknown error");
+            }
+        }
+        catch (Exception ex)
+        {
+            // ウォームアップ失敗は致命的ではない - 初回翻訳時にロードされる
+            _logger.LogWarning(ex, "[Issue #337] 翻訳モデルプリロード中にエラー（無視可）: {EngineName}", engine.Name);
         }
     }
 
