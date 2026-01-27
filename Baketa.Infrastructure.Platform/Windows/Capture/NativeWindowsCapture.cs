@@ -23,6 +23,7 @@ public static partial class NativeWindowsCapture
         public const int NotFound = -4;
         public const int Memory = -5;
         public const int Device = -6;
+        public const int SehException = -100;  // [Issue #324] SEH例外（AccessViolation等）
     }
 
     /// <summary>

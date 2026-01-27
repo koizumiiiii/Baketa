@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.Platform.Windows;
@@ -34,6 +36,9 @@ public class NativeWindowsCaptureWrapper : IDisposable
     // 🔒 ウィンドウ選択時の安全化: キャプチャ一時停止機能
     private static bool _isPausedForWindowSelection;
     private static readonly object _pauseLock = new();
+
+    // [Issue #324] セッションごとのセマフォ（同時アクセス防止）
+    private static readonly ConcurrentDictionary<int, SemaphoreSlim> _sessionSemaphores = new();
 
     /// <summary>
     /// ライブラリが初期化済みかどうか
@@ -222,6 +227,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
 
     /// <summary>
     /// フレームをキャプチャしてWindowsImageを作成
+    /// [Issue #324] セマフォによる同時アクセス防止追加
     /// </summary>
     /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
     /// <returns>キャプチャしたWindowsImage、失敗時はnull</returns>
@@ -233,7 +239,10 @@ public class NativeWindowsCaptureWrapper : IDisposable
             return null;
         }
 
-        return await Task.Run(() =>
+        // [Issue #324] セッションごとのセマフォを取得（同時アクセス防止）
+        var semaphore = _sessionSemaphores.GetOrAdd(_sessionId, _ => new SemaphoreSlim(1, 1));
+
+        return await Task.Run(async () =>
         {
             // 🔒 安全化: ウィンドウ選択中は一時停止
             lock (_pauseLock)
@@ -245,64 +254,91 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 }
             }
 
-            // 🚀 安全化: フレーム構造体を初期化
-            var frame = new NativeWindowsCapture.BaketaCaptureFrame();
-            bool frameValid = false;
-
+            // [Issue #324] セマフォで同一セッションへの同時アクセスを防止
+            bool semaphoreAcquired = false;
             try
             {
-                int result = NativeWindowsCapture.BaketaCapture_CaptureFrame(_sessionId, out frame, timeoutMs);
-                if (result != NativeWindowsCapture.ErrorCodes.Success)
+                semaphoreAcquired = await semaphore.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs)).ConfigureAwait(false);
+                if (!semaphoreAcquired)
                 {
-                    string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
-                    _logger?.LogError("フレームキャプチャに失敗: {ErrorCode}, {ErrorMessage}", result, errorMsg);
-                    return null; // フレーム無効なので解放不要
+                    _logger?.LogWarning("[Issue #324] セマフォ取得タイムアウト - 他のキャプチャが進行中");
+                    return null;
                 }
 
-                // フレームが有効であることをマーク
-                frameValid = true;
+                // 🚀 安全化: フレーム構造体を初期化
+                var frame = new NativeWindowsCapture.BaketaCaptureFrame();
+                bool frameValid = false;
 
                 try
                 {
-                    // 🚀 [Issue #193] Clone()廃止: ネイティブメモリから直接SafeImageを作成
-                    // 従来: tempBitmap → Clone() → SafeImage (32MB Bitmap×2 = LOH圧迫)
-                    // 新規: ネイティブポインタ → ArrayPool直接コピー → SafeImage (中間Bitmap排除)
-                    var safeImage = _safeImageFactory.CreateFromNativePointer(
-                        frame.bgraData, frame.width, frame.height, frame.stride);
+                    int result = NativeWindowsCapture.BaketaCapture_CaptureFrame(_sessionId, out frame, timeoutMs);
 
-                    // SafeImageAdapterでラップしてIWindowsImageとして返す
-                    var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory);
+                    // [Issue #324] SEH例外エラーコードのチェック
+                    if (result == NativeWindowsCapture.ErrorCodes.SehException)
+                    {
+                        string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
+                        _logger?.LogError("[Issue #324] SEH例外検出: {ErrorMessage}", errorMsg);
+                        return null;
+                    }
 
-                    _logger?.LogDebug("✅ [Issue #193] フレームキャプチャ成功（Clone廃止・直接コピー）: {Width}x{Height}, Timestamp={Timestamp}",
-                        frame.width, frame.height, frame.timestamp);
+                    if (result != NativeWindowsCapture.ErrorCodes.Success)
+                    {
+                        string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
+                        _logger?.LogError("フレームキャプチャに失敗: {ErrorCode}, {ErrorMessage}", result, errorMsg);
+                        return null; // フレーム無効なので解放不要
+                    }
 
-                    return safeImageAdapter;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "フレームからSafeImage作成中に例外が発生");
-                    return null;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "フレームキャプチャ中に例外が発生");
-                return null;
-            }
-            finally
-            {
-                // 🚀 安全化: フレームが有効な場合のみ解放
-                if (frameValid && frame.bgraData != IntPtr.Zero)
-                {
+                    // フレームが有効であることをマーク
+                    frameValid = true;
+
                     try
                     {
-                        NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref frame);
+                        // 🚀 [Issue #193] Clone()廃止: ネイティブメモリから直接SafeImageを作成
+                        var safeImage = _safeImageFactory.CreateFromNativePointer(
+                            frame.bgraData, frame.width, frame.height, frame.stride);
+
+                        // SafeImageAdapterでラップしてIWindowsImageとして返す
+                        var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory);
+
+                        _logger?.LogDebug("✅ [Issue #193] フレームキャプチャ成功（Clone廃止・直接コピー）: {Width}x{Height}, Timestamp={Timestamp}",
+                            frame.width, frame.height, frame.timestamp);
+
+                        return safeImageAdapter;
                     }
                     catch (Exception ex)
                     {
-                        // メモリ解放時の例外をログに記録（クラッシュを防ぐ）
-                        _logger?.LogError(ex, "フレーム解放中に例外が発生");
+                        _logger?.LogError(ex, "フレームからSafeImage作成中に例外が発生");
+                        return null;
                     }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "フレームキャプチャ中に例外が発生");
+                    return null;
+                }
+                finally
+                {
+                    // 🚀 安全化: フレームが有効な場合のみ解放
+                    if (frameValid && frame.bgraData != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref frame);
+                        }
+                        catch (Exception ex)
+                        {
+                            // メモリ解放時の例外をログに記録（クラッシュを防ぐ）
+                            _logger?.LogError(ex, "フレーム解放中に例外が発生");
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                // [Issue #324] セマフォを確実に解放
+                if (semaphoreAcquired)
+                {
+                    semaphore.Release();
                 }
             }
         }).ConfigureAwait(false);
@@ -310,6 +346,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
 
     /// <summary>
     /// 🚀 [Issue #193] フレームをキャプチャしてGPU側でリサイズし、WindowsImageを作成
+    /// [Issue #324] セマフォによる同時アクセス防止追加
     /// </summary>
     /// <param name="targetWidth">ターゲット幅（0の場合はリサイズなし）</param>
     /// <param name="targetHeight">ターゲット高さ（0の場合はリサイズなし）</param>
@@ -323,7 +360,10 @@ public class NativeWindowsCaptureWrapper : IDisposable
             return null;
         }
 
-        return await Task.Run(() =>
+        // [Issue #324] セッションごとのセマフォを取得（同時アクセス防止）
+        var semaphore = _sessionSemaphores.GetOrAdd(_sessionId, _ => new SemaphoreSlim(1, 1));
+
+        return await Task.Run(async () =>
         {
             // 🔒 安全化: ウィンドウ選択中は一時停止
             lock (_pauseLock)
@@ -335,67 +375,97 @@ public class NativeWindowsCaptureWrapper : IDisposable
                 }
             }
 
-            // 🚀 安全化: フレーム構造体を初期化
-            var frame = new NativeWindowsCapture.BaketaCaptureFrame();
-            bool frameValid = false;
-
+            // [Issue #324] セマフォで同一セッションへの同時アクセスを防止
+            bool semaphoreAcquired = false;
             try
             {
-                int result = NativeWindowsCapture.BaketaCapture_CaptureFrameResized(_sessionId, out frame, targetWidth, targetHeight, timeoutMs);
-                if (result != NativeWindowsCapture.ErrorCodes.Success)
+                // タイムアウト付きで待機（デッドロック防止）
+                semaphoreAcquired = await semaphore.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs)).ConfigureAwait(false);
+                if (!semaphoreAcquired)
                 {
-                    string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
-                    _logger?.LogError("リサイズフレームキャプチャに失敗: {ErrorCode}, {ErrorMessage}", result, errorMsg);
-                    return null; // フレーム無効なので解放不要
+                    _logger?.LogWarning("[Issue #324] セマフォ取得タイムアウト - 他のキャプチャが進行中");
+                    return null;
                 }
 
-                // フレームが有効であることをマーク
-                frameValid = true;
+                // 🚀 安全化: フレーム構造体を初期化
+                var frame = new NativeWindowsCapture.BaketaCaptureFrame();
+                bool frameValid = false;
 
                 try
                 {
-                    // 🚀 [Issue #193] Clone()廃止: ネイティブメモリから直接SafeImageを作成
-                    var safeImage = _safeImageFactory.CreateFromNativePointer(
-                        frame.bgraData, frame.width, frame.height, frame.stride);
+                    int result = NativeWindowsCapture.BaketaCapture_CaptureFrameResized(_sessionId, out frame, targetWidth, targetHeight, timeoutMs);
 
-                    // SafeImageAdapterでラップしてIWindowsImageとして返す
-                    // 元のキャプチャサイズを保持して、座標スケーリングに使用
-                    var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory)
+                    // [Issue #324] SEH例外エラーコードのチェック
+                    if (result == NativeWindowsCapture.ErrorCodes.SehException)
                     {
-                        OriginalWidth = frame.originalWidth,
-                        OriginalHeight = frame.originalHeight
-                    };
+                        string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
+                        _logger?.LogError("[Issue #324] SEH例外検出（AccessViolation等）: {ErrorMessage}", errorMsg);
+                        return null;
+                    }
 
-                    _logger?.LogDebug("✅ [Issue #193] リサイズフレームキャプチャ成功（Clone廃止）: {Width}x{Height} (original: {OriginalWidth}x{OriginalHeight}, target: {TargetWidth}x{TargetHeight}), Timestamp={Timestamp}",
-                        frame.width, frame.height, frame.originalWidth, frame.originalHeight, targetWidth, targetHeight, frame.timestamp);
+                    if (result != NativeWindowsCapture.ErrorCodes.Success)
+                    {
+                        string errorMsg = NativeWindowsCapture.GetLastErrorMessage();
+                        _logger?.LogError("リサイズフレームキャプチャに失敗: {ErrorCode}, {ErrorMessage}", result, errorMsg);
+                        return null; // フレーム無効なので解放不要
+                    }
 
-                    return safeImageAdapter;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "リサイズフレームからSafeImage作成中に例外が発生");
-                    return null;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "リサイズフレームキャプチャ中に例外が発生");
-                return null;
-            }
-            finally
-            {
-                // 🚀 安全化: フレームが有効な場合のみ解放
-                if (frameValid && frame.bgraData != IntPtr.Zero)
-                {
+                    // フレームが有効であることをマーク
+                    frameValid = true;
+
                     try
                     {
-                        NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref frame);
+                        // 🚀 [Issue #193] Clone()廃止: ネイティブメモリから直接SafeImageを作成
+                        var safeImage = _safeImageFactory.CreateFromNativePointer(
+                            frame.bgraData, frame.width, frame.height, frame.stride);
+
+                        // SafeImageAdapterでラップしてIWindowsImageとして返す
+                        // 元のキャプチャサイズを保持して、座標スケーリングに使用
+                        var safeImageAdapter = new SafeImageAdapter(safeImage, _safeImageFactory)
+                        {
+                            OriginalWidth = frame.originalWidth,
+                            OriginalHeight = frame.originalHeight
+                        };
+
+                        _logger?.LogDebug("✅ [Issue #193] リサイズフレームキャプチャ成功（Clone廃止）: {Width}x{Height} (original: {OriginalWidth}x{OriginalHeight}, target: {TargetWidth}x{TargetHeight}), Timestamp={Timestamp}",
+                            frame.width, frame.height, frame.originalWidth, frame.originalHeight, targetWidth, targetHeight, frame.timestamp);
+
+                        return safeImageAdapter;
                     }
                     catch (Exception ex)
                     {
-                        // メモリ解放時の例外をログに記録（クラッシュを防ぐ）
-                        _logger?.LogError(ex, "リサイズフレーム解放中に例外が発生");
+                        _logger?.LogError(ex, "リサイズフレームからSafeImage作成中に例外が発生");
+                        return null;
                     }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "リサイズフレームキャプチャ中に例外が発生");
+                    return null;
+                }
+                finally
+                {
+                    // 🚀 安全化: フレームが有効な場合のみ解放
+                    if (frameValid && frame.bgraData != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            NativeWindowsCapture.BaketaCapture_ReleaseFrame(ref frame);
+                        }
+                        catch (Exception ex)
+                        {
+                            // メモリ解放時の例外をログに記録（クラッシュを防ぐ）
+                            _logger?.LogError(ex, "リサイズフレーム解放中に例外が発生");
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                // [Issue #324] セマフォを確実に解放
+                if (semaphoreAcquired)
+                {
+                    semaphore.Release();
                 }
             }
         }).ConfigureAwait(false);
@@ -403,6 +473,7 @@ public class NativeWindowsCaptureWrapper : IDisposable
 
     /// <summary>
     /// 現在のキャプチャセッションを停止
+    /// [Issue #324] セマフォのクリーンアップ追加
     /// </summary>
     public void StopCurrentSession()
     {
@@ -411,6 +482,13 @@ public class NativeWindowsCaptureWrapper : IDisposable
             if (_sessionId >= 0)
             {
                 _logger?.LogDebug("キャプチャセッション停止: SessionId={SessionId}", _sessionId);
+
+                // [Issue #324] セマフォをクリーンアップ
+                if (_sessionSemaphores.TryRemove(_sessionId, out var semaphore))
+                {
+                    semaphore.Dispose();
+                }
+
                 NativeWindowsCapture.BaketaCapture_ReleaseSession(_sessionId);
                 _sessionId = -1;
                 _windowHandle = IntPtr.Zero;

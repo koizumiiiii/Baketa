@@ -221,6 +221,40 @@ public sealed record RoiManagerSettings
 
     #endregion
 
+    #region [Issue #324] ROI優先監視モード設定
+
+    /// <summary>
+    /// [Issue #324] 高信頼度と判定するための最小検出回数
+    /// </summary>
+    /// <remarks>
+    /// この回数以上検出された領域のみを高信頼度として扱います。
+    /// デフォルト: 5回
+    /// 推奨範囲: 3-20
+    /// </remarks>
+    public int MinDetectionCountForHighConfidence { get; init; } = 5;
+
+    /// <summary>
+    /// [Issue #324] 学習完了に必要な高信頼度領域の最小数
+    /// </summary>
+    /// <remarks>
+    /// この数以上の高信頼度領域が存在する場合、学習完了とみなします。
+    /// デフォルト: 1
+    /// 推奨範囲: 1-5
+    /// </remarks>
+    public int MinHighConfidenceRegionsForComplete { get; init; } = 1;
+
+    /// <summary>
+    /// [Issue #324] 学習完了に必要な最小学習セッション数
+    /// </summary>
+    /// <remarks>
+    /// この回数以上の学習セッションが完了した場合、学習完了とみなします。
+    /// デフォルト: 3
+    /// 推奨範囲: 2-10
+    /// </remarks>
+    public int MinLearningSessionsForComplete { get; init; } = 3;
+
+    #endregion
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -245,7 +279,11 @@ public sealed record RoiManagerSettings
             && MinPartialOcrWidth > 0
             && MinPartialOcrHeight > 0
             && MaxPartialOcrCoverageRatio is > 0.0f and <= 1.0f
-            && MaxMergedRegions > 0;
+            && MaxMergedRegions > 0
+            // [Issue #324] ROI優先監視モード設定の検証
+            && MinDetectionCountForHighConfidence > 0
+            && MinHighConfidenceRegionsForComplete > 0
+            && MinLearningSessionsForComplete > 0;
     }
 
     /// <summary>

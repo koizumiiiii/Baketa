@@ -64,6 +64,14 @@ message TextRegion {
   int32 line_index = 5;           // 行番号（0-indexed）
 }
 
+/// [Issue #320] Detection専用の検出領域（テキスト内容なし、位置のみ）
+/// ROI学習用の高速検出に使用
+message DetectedRegion {
+  BoundingBox bounding_box = 1;   // バウンディングボックス
+  float confidence = 2;           // 検出信頼度スコア (0.0-1.0) ※Recognition信頼度より低精度
+  int32 region_index = 3;         // 領域インデックス（0-indexed）
+}
+
 /// OCRエラー情報
 message OcrError {
   OcrErrorType error_type = 1;
@@ -128,13 +136,78 @@ message OcrIsReadyResponse {
 }
 
 // ============================================================================
+// [Issue #320] Detection-Only Messages (ROI学習用高速検出)
+// ============================================================================
+
+/// Detection専用リクエスト
+/// Recognition（テキスト認識）をスキップし、位置検出のみを行う
+/// 処理時間: ~100ms（通常のRecognize: ~1000ms）
+message DetectRequest {
+  string request_id = 1;          // リクエストID (UUID)
+  bytes image_data = 2;           // 画像データ（PNG/JPEG）
+  string image_format = 3;        // 画像フォーマット ("png", "jpeg")
+  OcrEngineType engine = 4;       // 使用するエンジン
+  map<string, string> options = 5; // エンジン固有オプション
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+/// Detection専用レスポンス
+/// テキスト内容は含まず、バウンディングボックスと検出信頼度のみ返す
+message DetectResponse {
+  string request_id = 1;          // 対応するリクエストID
+  bool is_success = 2;            // 成功したかどうか
+  repeated DetectedRegion regions = 3; // 検出された領域（テキストなし）
+  int32 region_count = 4;         // 検出された領域数
+  int64 processing_time_ms = 5;   // 処理時間（ミリ秒）
+  OcrError error = 6;             // エラー情報（失敗時）
+  string engine_name = 7;         // 使用されたエンジン名
+  google.protobuf.Timestamp timestamp = 8;
+}
+
+// ============================================================================
+// [Issue #330] Batch Recognition Messages (部分OCR高速化)
+// ============================================================================
+
+/// バッチ認識リクエスト
+/// 複数の画像領域を一括でOCR処理し、gRPC呼び出しオーバーヘッドを削減
+/// 推奨バッチサイズ: 16-32領域（gRPCメッセージサイズ4MB制限に注意）
+message RecognizeBatchRequest {
+  string batch_id = 1;              // バッチID (UUID)
+  repeated OcrRequest requests = 2; // 個別のOCRリクエスト（最大32件）
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+/// バッチ認識レスポンス
+message RecognizeBatchResponse {
+  string batch_id = 1;              // 対応するバッチID
+  bool is_success = 2;              // 全体として成功したかどうか
+  repeated OcrResponse responses = 3; // 個別のOCRレスポンス（リクエストと同順）
+  int32 success_count = 4;          // 成功したリクエスト数
+  int32 total_count = 5;            // 全リクエスト数
+  int64 total_processing_time_ms = 6; // バッチ全体の処理時間（ミリ秒）
+  OcrError error = 7;               // バッチ全体のエラー情報（全体失敗時）
+  google.protobuf.Timestamp timestamp = 8;
+}
+
+// ============================================================================
 // Service Definition
 // ============================================================================
 
 /// Baketa OCRサービス
 service OcrService {
-  /// 画像からテキストを認識
+  /// 画像からテキストを認識（Detection + Recognition）
   rpc Recognize(OcrRequest) returns (OcrResponse);
+
+  /// [Issue #330] 複数画像の一括認識（Batch Recognition）
+  /// 部分OCRで複数領域を処理する際のgRPC呼び出しオーバーヘッドを削減
+  /// Pythonサーバーはmax_workers=1のため、内部的には逐次処理だが
+  /// gRPC呼び出し回数を15→1に削減することで大幅に高速化
+  rpc RecognizeBatch(RecognizeBatchRequest) returns (RecognizeBatchResponse);
+
+  /// [Issue #320] テキスト領域の位置のみ検出（Detection Only）
+  /// Recognition（テキスト認識）をスキップし、約10倍高速化
+  /// ROI学習用の高速検出に使用
+  rpc Detect(DetectRequest) returns (DetectResponse);
 
   /// ヘルスチェック
   rpc HealthCheck(OcrHealthCheckRequest) returns (OcrHealthCheckResponse);

@@ -8,6 +8,9 @@ static std::unordered_map<int, std::unique_ptr<WindowsCaptureSession>> g_session
 static std::atomic<int> g_nextSessionId(1);
 static std::string g_lastError;
 
+// [Issue #324] HWND → SessionID のキャッシュ（セッション再利用）
+static std::unordered_map<HWND, int> g_hwndToSessionCache;
+
 /// <summary>
 /// エラーメッセージを設定
 /// </summary>
@@ -56,6 +59,7 @@ int BaketaCapture_Initialize()
 
 /// <summary>
 /// ライブラリの終了処理
+/// [Issue #324] HWNDキャッシュもクリア
 /// </summary>
 void BaketaCapture_Shutdown()
 {
@@ -66,6 +70,7 @@ void BaketaCapture_Shutdown()
 
     {
         std::lock_guard<std::mutex> lock(g_sessionMutex);
+        g_hwndToSessionCache.clear();  // [Issue #324]
         g_sessions.clear();
     }
 
@@ -75,6 +80,7 @@ void BaketaCapture_Shutdown()
 
 /// <summary>
 /// ウィンドウキャプチャセッションを作成
+/// [Issue #324] セッション再利用: 同一HWNDに対しては既存セッションを返す
 /// </summary>
 int BaketaCapture_CreateSession(void* hwnd, int* sessionId)
 {
@@ -91,7 +97,7 @@ int BaketaCapture_CreateSession(void* hwnd, int* sessionId)
     }
 
     HWND windowHandle = static_cast<HWND>(hwnd);
-    
+
     // ウィンドウの有効性チェック
     if (!IsWindow(windowHandle))
     {
@@ -101,27 +107,54 @@ int BaketaCapture_CreateSession(void* hwnd, int* sessionId)
 
     try
     {
+        std::lock_guard<std::mutex> lock(g_sessionMutex);
+
+        // [Issue #324] 既存セッションの再利用チェック
+        auto cacheIt = g_hwndToSessionCache.find(windowHandle);
+        if (cacheIt != g_hwndToSessionCache.end())
+        {
+            int cachedSessionId = cacheIt->second;
+            auto sessionIt = g_sessions.find(cachedSessionId);
+
+            if (sessionIt != g_sessions.end() && sessionIt->second && sessionIt->second->IsValid())
+            {
+                // 有効な既存セッションを再利用
+                *sessionId = cachedSessionId;
+                SetLastError("[Issue #324] Session reused");
+                return BAKETA_CAPTURE_SUCCESS;
+            }
+            else
+            {
+                // 無効なセッション - キャッシュから削除
+                if (sessionIt != g_sessions.end())
+                {
+                    g_sessions.erase(sessionIt);
+                }
+                g_hwndToSessionCache.erase(cacheIt);
+            }
+        }
+
+        // 新規セッション作成
         int newSessionId = g_nextSessionId.fetch_add(1);
         auto session = std::make_unique<WindowsCaptureSession>(newSessionId, windowHandle);
-        
+
         if (!session->Initialize())
         {
             // WindowsCaptureSessionの詳細エラーメッセージを取得して伝播
             SetLastError(session->GetLastError());
-            
+
             // Gemini推奨: HRESULTを直接取得して返却
             HRESULT hr = session->GetLastHResult();
             if (hr != S_OK) {
                 return hr; // 実際のHRESULTを直接返却
             }
-            
+
             return BAKETA_CAPTURE_ERROR_DEVICE;
         }
 
-        {
-            std::lock_guard<std::mutex> lock(g_sessionMutex);
-            g_sessions[newSessionId] = std::move(session);
-        }
+        // [Issue #324] セッションをキャッシュに登録
+        g_hwndToSessionCache[windowHandle] = newSessionId;
+        g_sessions[newSessionId] = std::move(session);
 
         *sessionId = newSessionId;
         SetLastError("");
@@ -141,6 +174,7 @@ int BaketaCapture_CreateSession(void* hwnd, int* sessionId)
 
 /// <summary>
 /// フレームをキャプチャ
+/// [Issue #324] セッション有効性チェック追加
 /// </summary>
 int BaketaCapture_CaptureFrame(int sessionId, BaketaCaptureFrame* frame, int timeoutMs)
 {
@@ -173,10 +207,23 @@ int BaketaCapture_CaptureFrame(int sessionId, BaketaCaptureFrame* frame, int tim
             return BAKETA_CAPTURE_ERROR_NOT_FOUND;
         }
         session = it->second.get();
+
+        if (!session || session->IsClosing())
+        {
+            SetLastError("Session is closing");
+            return BAKETA_CAPTURE_ERROR_NOT_FOUND;
+        }
     }
 
     try
     {
+        // [Issue #324] セッションが有効かチェック
+        if (!session->IsValid())
+        {
+            SetLastError("Session is invalid or closing");
+            return BAKETA_CAPTURE_ERROR_DEVICE;
+        }
+
         if (!session->CaptureFrame(&frame->bgraData, &frame->width, &frame->height, &frame->stride, &frame->timestamp, timeoutMs))
         {
             SetLastError("Failed to capture frame");
@@ -200,6 +247,7 @@ int BaketaCapture_CaptureFrame(int sessionId, BaketaCaptureFrame* frame, int tim
 
 /// <summary>
 /// 🚀 [Issue #193] フレームをキャプチャしてGPU側でリサイズ
+/// [Issue #324] セッション有効性チェック追加
 /// </summary>
 int BaketaCapture_CaptureFrameResized(int sessionId, BaketaCaptureFrame* frame, int targetWidth, int targetHeight, int timeoutMs)
 {
@@ -234,10 +282,24 @@ int BaketaCapture_CaptureFrameResized(int sessionId, BaketaCaptureFrame* frame, 
             return BAKETA_CAPTURE_ERROR_NOT_FOUND;
         }
         session = it->second.get();
+
+        // [Issue #324] セッションがクローズ中かチェック
+        if (!session || session->IsClosing())
+        {
+            SetLastError("Session is closing");
+            return BAKETA_CAPTURE_ERROR_NOT_FOUND;
+        }
     }
 
     try
     {
+        // [Issue #324] セッションが有効かチェック
+        if (!session->IsValid())
+        {
+            SetLastError("Session is invalid or closing");
+            return BAKETA_CAPTURE_ERROR_DEVICE;
+        }
+
         // 🚀 [Issue #193] 元のキャプチャサイズも取得
         if (!session->CaptureFrameResized(&frame->bgraData, &frame->width, &frame->height, &frame->stride, &frame->timestamp, &frame->originalWidth, &frame->originalHeight, targetWidth, targetHeight, timeoutMs))
         {
@@ -281,10 +343,24 @@ void BaketaCapture_ReleaseFrame(BaketaCaptureFrame* frame)
 
 /// <summary>
 /// キャプチャセッションを削除
+/// [Issue #324] HWNDキャッシュもクリーンアップ
 /// </summary>
 void BaketaCapture_ReleaseSession(int sessionId)
 {
     std::lock_guard<std::mutex> lock(g_sessionMutex);
+
+    // [Issue #324] セッションのHWNDを取得してキャッシュから削除
+    auto sessionIt = g_sessions.find(sessionId);
+    if (sessionIt != g_sessions.end() && sessionIt->second)
+    {
+        HWND hwnd = sessionIt->second->GetWindowHandle();
+        auto cacheIt = g_hwndToSessionCache.find(hwnd);
+        if (cacheIt != g_hwndToSessionCache.end() && cacheIt->second == sessionId)
+        {
+            g_hwndToSessionCache.erase(cacheIt);
+        }
+    }
+
     g_sessions.erase(sessionId);
 }
 

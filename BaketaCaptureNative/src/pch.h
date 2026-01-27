@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <atomic>
 #include <chrono>
+#include <thread>  // [Issue #324] std::this_thread::sleep_for
 #include <condition_variable>
 #include <string>
 #include <algorithm>

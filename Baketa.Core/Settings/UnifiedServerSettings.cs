@@ -13,8 +13,9 @@ public sealed class UnifiedServerSettings
 
     /// <summary>
     /// デフォルトポート番号
+    /// Issue #330: 翻訳サーバーと同じポート50051を使用（統合サーバーは両方を提供）
     /// </summary>
-    public const int DefaultPort = 50053;
+    public const int DefaultPort = 50051;
 
     /// <summary>
     /// 統合サーバーを有効にするか
@@ -31,8 +32,8 @@ public sealed class UnifiedServerSettings
     /// 統合サーバーのポート番号
     /// </summary>
     /// <remarks>
-    /// デフォルト: 50053
-    /// OCR: 50052, 翻訳: 50051 と分離して競合を避ける
+    /// デフォルト: 50051
+    /// 統合サーバーは翻訳とOCRの両方を提供するため、翻訳サーバーのポートを使用
     /// </remarks>
     [SettingMetadata(SettingLevel.Advanced, "Unified Server", "Port",
         Description = "統合サーバーのポート番号")]
@@ -97,10 +98,10 @@ public sealed class UnifiedServerSettings
             errors.Add("ポート番号は1024から65535の間で設定してください");
         }
 
-        // ポート競合警告
-        if (Port == 50051 || Port == 50052)
+        // ポート競合警告（統合サーバーモードでは50051を使用するため、50052のみ警告）
+        if (Port == 50052)
         {
-            warnings.Add($"ポート{Port}は既存のサーバー（翻訳: 50051, OCR: 50052）と競合する可能性があります");
+            warnings.Add($"ポート{Port}は分離モードのOCRサーバーと競合する可能性があります");
         }
 
         // 起動タイムアウト検証

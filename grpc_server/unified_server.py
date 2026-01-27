@@ -325,6 +325,98 @@ class SuryaOcrEngine:
                 "engine_version": self.VERSION
             }
 
+    def detect_only(self, image_bytes: bytes) -> dict:
+        """[Issue #320] テキスト領域の位置のみを検出（Recognitionをスキップ）
+
+        ROI学習用の高速検出メソッド。
+        通常のrecognize()が~1000msかかるのに対し、~100msで完了。
+
+        Args:
+            image_bytes: 画像データ（PNG/JPEG）
+
+        Returns:
+            dict: 検出結果
+                - success: bool
+                - regions: List[dict] (bbox, confidence, region_index のみ)
+                - processing_time_ms: int
+        """
+        if not self.is_loaded:
+            raise RuntimeError("モデルが未ロードです")
+
+        if len(image_bytes) > self.MAX_IMAGE_SIZE:
+            raise ValueError(f"画像サイズが上限を超えています: {len(image_bytes)} bytes")
+
+        try:
+            from PIL import Image
+
+            image = Image.open(io.BytesIO(image_bytes))
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+
+            image, scale = self._resize_image_if_needed(image)
+
+            self.logger.info(f"Detection-Only実行中... (サイズ: {image.size})")
+            start_time = time.time()
+
+            # Detection のみ実行（Recognition をスキップ）
+            # detection_predictor を直接使用
+            detection_results = self.detection_predictor([image])
+
+            elapsed = time.time() - start_time
+
+            regions = []
+            if detection_results and len(detection_results) > 0:
+                det_result = detection_results[0]
+                bboxes = getattr(det_result, 'bboxes', [])
+
+                inv_scale = 1.0 / scale if scale != 1.0 else 1.0
+
+                for idx, polygon_box in enumerate(bboxes):
+                    # Surya detection の PolygonBox.bbox は [x_min, y_min, x_max, y_max] 形式
+                    bbox = polygon_box.bbox
+                    confidence = polygon_box.confidence if polygon_box.confidence is not None else 0.5
+                    if len(bbox) >= 4:
+                        x1, y1, x2, y2 = bbox[:4]
+                        region = {
+                            "bbox": {
+                                "x": int(x1 * inv_scale),
+                                "y": int(y1 * inv_scale),
+                                "width": int((x2 - x1) * inv_scale),
+                                "height": int((y2 - y1) * inv_scale),
+                                "points": [
+                                    {"x": float(x1 * inv_scale), "y": float(y1 * inv_scale)},
+                                    {"x": float(x2 * inv_scale), "y": float(y1 * inv_scale)},
+                                    {"x": float(x2 * inv_scale), "y": float(y2 * inv_scale)},
+                                    {"x": float(x1 * inv_scale), "y": float(y2 * inv_scale)},
+                                ]
+                            },
+                            # Detection confidence（PolygonBoxから取得）
+                            "confidence": confidence,
+                            "region_index": idx
+                        }
+                        regions.append(region)
+
+            self.logger.info(f"Detection-Only完了: {len(regions)}領域検出 ({elapsed*1000:.0f}ms)")
+
+            return {
+                "success": True,
+                "regions": regions,
+                "processing_time_ms": int(elapsed * 1000),
+                "engine_name": "Surya OCR (Detection-Only)",
+                "engine_version": self.VERSION
+            }
+
+        except Exception as e:
+            self.logger.exception(f"Detection-Onlyエラー: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "regions": [],
+                "processing_time_ms": 0,
+                "engine_name": "Surya OCR (Detection-Only)",
+                "engine_version": self.VERSION
+            }
+
 
 # ============================================================================
 # OCR Servicer (非同期版)
@@ -411,6 +503,147 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
         response.details["version"] = self.engine.VERSION
         response.timestamp.FromDatetime(datetime.utcnow())
         return response
+
+    async def RecognizeBatch(self, request, context):
+        """[Issue #330] バッチ認識RPC
+
+        複数の画像領域を一括でOCR処理し、gRPC呼び出しオーバーヘッドを削減。
+        部分OCRで15領域を処理する場合: 15回→1回のgRPC呼び出しに削減。
+
+        Note: Pythonサーバーはmax_workers=1のため、内部的には逐次処理。
+        gRPC呼び出し回数削減による高速化がメリット。
+        """
+        batch_start = time.time()
+        self.logger.info(f"RecognizeBatch RPC called - batch_id: {request.batch_id}, count: {len(request.requests)}")
+
+        response = ocr_pb2.RecognizeBatchResponse()
+        response.batch_id = request.batch_id
+        response.total_count = len(request.requests)
+
+        try:
+            success_count = 0
+            loop = asyncio.get_running_loop()
+
+            for ocr_request in request.requests:
+                try:
+                    languages = list(ocr_request.languages) if ocr_request.languages else None
+
+                    # 同期処理をスレッドプールで実行（逐次）
+                    result = await loop.run_in_executor(
+                        self.executor,
+                        self.engine.recognize,
+                        ocr_request.image_data,
+                        languages
+                    )
+
+                    ocr_response = response.responses.add()
+                    ocr_response.request_id = ocr_request.request_id
+                    ocr_response.is_success = result["success"]
+                    ocr_response.processing_time_ms = result["processing_time_ms"]
+                    ocr_response.engine_name = result["engine_name"]
+                    ocr_response.engine_version = result["engine_version"]
+                    ocr_response.region_count = len(result["regions"])
+
+                    for region_data in result["regions"]:
+                        region = ocr_response.regions.add()
+                        region.text = region_data["text"]
+                        region.confidence = region_data["confidence"]
+                        region.line_index = region_data["line_index"]
+
+                        bbox = region_data["bbox"]
+                        region.bounding_box.x = bbox["x"]
+                        region.bounding_box.y = bbox["y"]
+                        region.bounding_box.width = bbox["width"]
+                        region.bounding_box.height = bbox["height"]
+
+                        for point in bbox["points"]:
+                            p = region.bounding_box.points.add()
+                            p.x = point["x"]
+                            p.y = point["y"]
+
+                    ocr_response.timestamp.FromDatetime(datetime.utcnow())
+
+                    if result["success"]:
+                        success_count += 1
+
+                except Exception as e:
+                    self.logger.error(f"RecognizeBatch item error (request_id: {ocr_request.request_id}): {e}")
+                    ocr_response = response.responses.add()
+                    ocr_response.request_id = ocr_request.request_id
+                    ocr_response.is_success = False
+                    ocr_response.error.error_type = ocr_pb2.OCR_ERROR_TYPE_PROCESSING_ERROR
+                    ocr_response.error.message = str(e)
+                    ocr_response.timestamp.FromDatetime(datetime.utcnow())
+
+            response.success_count = success_count
+            response.is_success = success_count > 0
+            response.total_processing_time_ms = int((time.time() - batch_start) * 1000)
+            response.timestamp.FromDatetime(datetime.utcnow())
+
+            self.logger.info(f"RecognizeBatch completed: {success_count}/{len(request.requests)} success, {response.total_processing_time_ms}ms total")
+            return response
+
+        except Exception as e:
+            self.logger.error(f"RecognizeBatch error: {e}")
+            response.is_success = False
+            response.error.error_type = ocr_pb2.OCR_ERROR_TYPE_PROCESSING_ERROR
+            response.error.message = str(e)
+            response.timestamp.FromDatetime(datetime.utcnow())
+            return response
+
+    async def Detect(self, request, context):
+        """[Issue #320] Detection-Only RPC
+
+        テキスト領域の位置のみを検出（Recognitionをスキップ）。
+        ROI学習用の高速検出に使用。
+        処理時間: ~100ms（通常のRecognize: ~1000ms）
+        """
+        self.logger.info(f"Detect RPC called - request_id: {request.request_id}")
+
+        try:
+            # 同期処理をスレッドプールで実行
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                self.executor,
+                self.engine.detect_only,
+                request.image_data
+            )
+
+            response = ocr_pb2.DetectResponse()
+            response.request_id = request.request_id
+            response.is_success = result["success"]
+            response.processing_time_ms = result["processing_time_ms"]
+            response.engine_name = result["engine_name"]
+            response.region_count = len(result["regions"])
+
+            for region_data in result["regions"]:
+                region = response.regions.add()
+                region.confidence = region_data["confidence"]
+                region.region_index = region_data["region_index"]
+
+                bbox = region_data["bbox"]
+                region.bounding_box.x = bbox["x"]
+                region.bounding_box.y = bbox["y"]
+                region.bounding_box.width = bbox["width"]
+                region.bounding_box.height = bbox["height"]
+
+                for point in bbox["points"]:
+                    p = region.bounding_box.points.add()
+                    p.x = point["x"]
+                    p.y = point["y"]
+
+            response.timestamp.FromDatetime(datetime.utcnow())
+            return response
+
+        except Exception as e:
+            self.logger.error(f"Detect error: {e}")
+            response = ocr_pb2.DetectResponse()
+            response.request_id = request.request_id
+            response.is_success = False
+            response.error.error_type = ocr_pb2.OCR_ERROR_TYPE_PROCESSING_ERROR
+            response.error.message = str(e)
+            response.timestamp.FromDatetime(datetime.utcnow())
+            return response
 
 
 # ============================================================================
@@ -539,7 +772,8 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     translation_engine = CTranslate2Engine(
         model_path=str(translation_model_path),
         device=device,
-        compute_type="int8"
+        compute_type="int8",
+        enable_flash_attention=False  # RTX 40シリーズでFlash Attention 2非対応のため無効化
     )
 
     ocr_engine = SuryaOcrEngine(device=device)
@@ -673,7 +907,9 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     logger.info("=" * 80)
     logger.info("Services available:")
     logger.info("   - TranslationService (Translate, TranslateBatch, HealthCheck, IsReady)")
-    logger.info("   - OcrService (Recognize, HealthCheck, IsReady)")
+    logger.info("   - OcrService (Recognize, RecognizeBatch, Detect, HealthCheck, IsReady)")
+    logger.info("   [Issue #320] Detect RPC: Detection-only for ROI learning (~10x faster)")
+    logger.info("   [Issue #330] RecognizeBatch RPC: Batch OCR for partial regions")
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")
 

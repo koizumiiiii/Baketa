@@ -55,6 +55,21 @@ public interface ISpeculativeOcrService : IDisposable
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// [Issue #320] Detection-Only投機的実行（ROI学習用高速モード）
+    /// </summary>
+    /// <param name="image">キャプチャ画像</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>検出結果（位置情報のみ、テキストなし）。失敗時はnull</returns>
+    /// <remarks>
+    /// - Recognition（テキスト認識）をスキップし、約10倍高速（~100ms vs ~1000ms）
+    /// - ROI学習用：位置情報のみが必要な場合に使用
+    /// - キャッシュには保存されない（学習専用）
+    /// </remarks>
+    Task<OcrResults?> TryExecuteDetectionOnlyAsync(
+        IImage image,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// キャッシュ結果の取得と無効化（Consume）
     /// </summary>
     /// <param name="currentImageHash">現在の画像ハッシュ（検証用）</param>

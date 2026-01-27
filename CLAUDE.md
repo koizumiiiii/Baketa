@@ -11,6 +11,25 @@ These files contain the following critical settings:
 - **PowerShell Priority**: Command execution uses PowerShell environment
 - **Auto-approval Settings**: Command and file operation permissions are configured in `.claude/settings.json`
 
+### 報告の正確性に関するルール
+
+**ツール実行結果の報告**:
+1. **出力が空の場合は明示的に報告する**
+   - ❌ 「応答がない」「APIが応答しない」
+   - ✅ 「出力が空でした。コマンドは実行されましたが結果が取得できませんでした」
+
+2. **代替手段を使った場合は明確に区別する**
+   - ❌ 「Geminiレビュー結果」（実際にはWebSearchで代替した場合）
+   - ✅ 「Gemini取得失敗のため、WebSearchで代替調査しました」
+
+3. **「〜からの結果」は実際に取得した場合のみ使用**
+   - 推測や代替手段の結果を混同しない
+   - 情報源を正確に報告する
+
+4. **失敗を隠さない**
+   - ツールが期待通り動作しなかった場合は正直に報告
+   - 問題を解決してから次に進む、または代替手段を明示的に提案
+
 ### Claude Code 拡張機能
 
 #### 条件付きルール (`.claude/rules/`)
@@ -147,6 +166,39 @@ copy /b BaketaUnifiedServer-cuda.zip.001+BaketaUnifiedServer-cuda.zip.002 Baketa
 **旧バージョン (models-v1):**
 models-v1 は後方互換性のために残されていますが、新規インストールでは使用されません。
 
+### 開発時のBaketaUnifiedServer同期 (重要)
+
+**問題:** PyInstallerでビルドしたexeは`grpc_server/dist/BaketaUnifiedServer/`に出力されるが、`dotnet run`は`Baketa.UI/bin/Debug/`または`bin/Release/`内のexeを使用する。Pythonコードやprotoファイルを変更した後、これらを同期しないと「Method not found」エラーが発生する。
+
+**解決策:** `sync-unified-server.ps1`スクリプトを使用:
+
+```powershell
+# フルビルド + Debug/Release両方に同期
+.\scripts\sync-unified-server.ps1
+
+# ビルド済みexeの同期のみ（高速）
+.\scripts\sync-unified-server.ps1 -SkipBuild
+
+# Debugのみ同期
+.\scripts\sync-unified-server.ps1 -DebugOnly
+
+# Releaseのみ同期
+.\scripts\sync-unified-server.ps1 -ReleaseOnly
+```
+
+**手動で同期する場合:**
+```powershell
+# Debug用
+Copy-Item -Path 'grpc_server\dist\BaketaUnifiedServer\*' -Destination 'Baketa.UI\bin\Debug\net8.0-windows10.0.19041.0\win-x64\grpc_server\BaketaUnifiedServer\' -Recurse -Force
+
+# Release用
+Copy-Item -Path 'grpc_server\dist\BaketaUnifiedServer\*' -Destination 'Baketa.UI\bin\Release\net8.0-windows10.0.19041.0\win-x64\grpc_server\BaketaUnifiedServer\' -Recurse -Force
+```
+
+**よくあるエラー:**
+- `StatusCode="Unimplemented", Detail="Method not found!"` → exeが古い。`sync-unified-server.ps1`を実行
+- protoファイルを変更した場合、必ず再ビルドと同期が必要
+
 ### 自動バージョニング (MinVer)
 
 Baketa は [MinVer](https://github.com/adamralph/minver) を使用して Git タグから自動的にバージョンを設定します。
@@ -270,6 +322,7 @@ Follow these rules strictly to prevent duplicate scripts.
 | Script | Purpose | When to Use |
 |--------|---------|-------------|
 | `build-release.ps1` | Create release package | Release builds only |
+| `sync-unified-server.ps1` | Sync BaketaUnifiedServer to app dirs | After Python/proto changes |
 | `run_app.ps1` | Run application | Development testing |
 | `run_tests.ps1` | Run tests | After code changes |
 | `check-environment.ps1` | Environment check | New environment setup |
@@ -810,8 +863,11 @@ dotnet build Baketa.sln --configuration Debug
 #### 3. Gemini Code Review (ビルド成功後必須)
 Once build succeeds with no errors, **MANDATORY** code review using gemini command:
 
-```cmd
-gemini -p "実装完了しました。以下のコードについてレビューをお願いします。
+**⚠️ 重要: geminiコマンドの呼び出し方法**
+
+```powershell
+# PowerShellから直接実行（推奨）
+gemini "実装完了しました。以下のコードについてレビューをお願いします。
 
 ## 実装内容
 [実装した機能の概要]
@@ -824,6 +880,17 @@ gemini -p "実装完了しました。以下のコードについてレビュー
 
 技術的な観点から問題点、改善点、潜在的なリスクについてレビューしてください。"
 ```
+
+```bash
+# Git Bashから実行する場合（PowerShell経由必須）
+powershell -Command "gemini '実装完了しました。レビューをお願いします。'"
+```
+
+**注意事項**:
+- `-p` オプションは非推奨（動作しない）。位置引数としてプロンプトを渡す
+- Git Bashから直接 `gemini "..."` を実行すると出力が空になる問題あり
+- 必ずPowerShell経由で実行すること
+- 出力が空の場合は「Geminiからのレビュー取得失敗」と明確に報告すること
 
 #### 4. Review Response Integration
 - **Gemini指摘事項**: 重大な問題は即座に修正

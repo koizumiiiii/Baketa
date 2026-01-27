@@ -20,7 +20,7 @@ public static class ServerPortConstants
     /// 統合サーバー (OCR + 翻訳) のデフォルトポート
     /// UnifiedServerSettings.DefaultPort と同値
     /// </summary>
-    public const int UnifiedServerPort = 50053;
+    public const int UnifiedServerPort = 50051;
 
     /// <summary>
     /// 翻訳サーバーのデフォルトアドレス
@@ -35,5 +35,5 @@ public static class ServerPortConstants
     /// <summary>
     /// 統合サーバーのデフォルトアドレス
     /// </summary>
-    public const string UnifiedServerAddress = "http://localhost:50053";
+    public const string UnifiedServerAddress = "http://localhost:50051";
 }

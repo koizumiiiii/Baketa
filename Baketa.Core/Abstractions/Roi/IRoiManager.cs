@@ -71,6 +71,20 @@ public interface IRoiManager
     IReadOnlyList<RoiRegion> GetAllRegions();
 
     /// <summary>
+    /// [Issue #324] 高信頼度のROI領域のみを取得
+    /// ROI優先監視モードで使用
+    /// </summary>
+    /// <param name="minConfidence">最小信頼度スコア（デフォルト: 0.7）</param>
+    /// <returns>高信頼度ROI領域のコレクション</returns>
+    IReadOnlyList<RoiRegion> GetHighConfidenceRegions(float minConfidence = 0.7f);
+
+    /// <summary>
+    /// [Issue #324] 学習が完了しているかどうかを取得
+    /// 高信頼度領域が一定数以上存在し、学習セッション数が閾値以上の場合にtrue
+    /// </summary>
+    bool IsLearningComplete { get; }
+
+    /// <summary>
     /// 指定した座標に適用する閾値を取得
     /// </summary>
     /// <param name="normalizedX">正規化X座標（0.0-1.0）</param>
