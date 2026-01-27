@@ -241,9 +241,11 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
     /// </summary>
     private void CreateWindow()
     {
-        // 🔥 [DWM_COMPOSITION] WS_EX_LAYERED を使わない（DWM Compositionと排他）
-        // WS_EX_TRANSPARENT + WS_EX_NOACTIVATE + WS_EX_TOPMOST のみ
+        // 🔧 [Issue #340] WS_EX_LAYERED追加 - クリックスルーにはWS_EX_TRANSPARENT + WS_EX_LAYEREDが必要
+        // DWM Compositionのブラー効果はSetWindowCompositionAttributeで適用するため
+        // WS_EX_LAYEREDとの併用が可能
         const uint exStyle = (uint)ExtendedWindowStyles.WS_EX_TRANSPARENT
+                           | LayeredWindowMethods.WS_EX_LAYERED
                            | LayeredWindowMethods.WS_EX_NOACTIVATE
                            | (uint)ExtendedWindowStyles.WS_EX_TOPMOST;
 
@@ -268,6 +270,11 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
             _logger.LogError("❌ [STA_THREAD] CreateWindowEx失敗 - Error Code: {ErrorCode}", error);
             throw new InvalidOperationException($"CreateWindowEx failed - Error: {error}");
         }
+
+        // 🔧 [Issue #340] SetLayeredWindowAttributesでアルファ値を設定
+        // WS_EX_LAYERED + WS_EX_TRANSPARENT でクリックスルーを有効化
+        // アルファ255（完全不透明）でDWM Compositionの描画を維持
+        LayeredWindowMethods.SetLayeredWindowAttributes(_hwnd, 0, 255, LayeredWindowAttributes.LWA_ALPHA);
     }
 
     /// <summary>
@@ -381,6 +388,13 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
     /// </summary>
     private static IntPtr StaticWndProc(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
+        // 🔧 [Issue #340] クリックスルー - インスタンス登録前でも確実に処理
+        // WM_NCHITTESTを最優先で処理してマウスイベントを背後のウィンドウに透過
+        if (msg == WM_NCHITTEST)
+        {
+            return HTTRANSPARENT;
+        }
+
         // インスタンスマップからウィンドウに対応するインスタンスを取得
         if (_instanceMap.TryGetValue(hwnd, out var instance))
         {
