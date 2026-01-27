@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Baketa.Ocr.V1;
 using Grpc.Core;
+using Grpc.Health.V1;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +23,7 @@ public sealed class GrpcOcrClient : IDisposable
 {
     private readonly GrpcChannel _channel;
     private readonly OcrService.OcrServiceClient _client;
+    private readonly Health.HealthClient _healthClient; // [Issue #328] gRPCネイティブヘルスチェック
     private readonly ILogger _logger;
     private readonly string _serverAddress;
     private bool _disposed;
@@ -72,6 +74,7 @@ public sealed class GrpcOcrClient : IDisposable
         });
 
         _client = new OcrService.OcrServiceClient(_channel);
+        _healthClient = new Health.HealthClient(_channel); // [Issue #328] gRPCネイティブヘルスチェック
         _logger.LogInformation("GrpcOcrClient initialized: {ServerAddress}", _serverAddress);
     }
 
@@ -343,6 +346,95 @@ public sealed class GrpcOcrClient : IDisposable
                 Status = $"Error: {ex.StatusCode}",
                 Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
             };
+        }
+    }
+
+    /// <summary>
+    /// [Issue #328] gRPCネイティブヘルスチェック（grpc.health.v1.Health）を実行します
+    /// Python側のgrpc_health.v1.HealthServicerと通信
+    /// </summary>
+    /// <param name="serviceName">サービス名（"" for overall, "ocr_engine", "translation_engine"）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>ヘルスチェック結果（SERVING=healthy, NOT_SERVING=unhealthy）</returns>
+    public async Task<HealthCheckResponse> NativeHealthCheckAsync(
+        string serviceName = "",
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        try
+        {
+            var request = new HealthCheckRequest { Service = serviceName };
+            var callOptions = new CallOptions(
+                deadline: DateTime.UtcNow.AddSeconds(5),
+                cancellationToken: cancellationToken);
+
+            var response = await _healthClient.CheckAsync(request, callOptions).ConfigureAwait(false);
+
+            _logger.LogDebug(
+                "[gRPC-OCR] NativeHealthCheck: Service={ServiceName}, Status={Status}",
+                string.IsNullOrEmpty(serviceName) ? "(overall)" : serviceName,
+                response.Status);
+
+            return response;
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
+        {
+            // サービス名が登録されていない場合
+            _logger.LogWarning(
+                "[gRPC-OCR] NativeHealthCheck: Service '{ServiceName}' not found",
+                serviceName);
+
+            return new HealthCheckResponse { Status = HealthCheckResponse.Types.ServingStatus.ServiceUnknown };
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
+        {
+            // gRPCネイティブヘルスチェックが実装されていない（旧バージョン）
+            _logger.LogDebug(
+                "[gRPC-OCR] NativeHealthCheck not implemented, falling back to custom health check");
+
+            // フォールバック: カスタムヘルスチェックを使用
+            var customResponse = await HealthCheckAsync(cancellationToken).ConfigureAwait(false);
+            return new HealthCheckResponse
+            {
+                Status = customResponse.IsHealthy
+                    ? HealthCheckResponse.Types.ServingStatus.Serving
+                    : HealthCheckResponse.Types.ServingStatus.NotServing
+            };
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogWarning(ex, "[gRPC-OCR] NativeHealthCheck failed: {StatusCode}", ex.StatusCode);
+            return new HealthCheckResponse { Status = HealthCheckResponse.Types.ServingStatus.NotServing };
+        }
+    }
+
+    /// <summary>
+    /// [Issue #328] gRPCネイティブヘルスチェックが利用可能かテストします
+    /// </summary>
+    /// <returns>true: ネイティブヘルスチェック利用可能、false: カスタムヘルスチェックにフォールバック</returns>
+    public async Task<bool> IsNativeHealthCheckAvailableAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new HealthCheckRequest { Service = "" };
+            var callOptions = new CallOptions(
+                deadline: DateTime.UtcNow.AddSeconds(3),
+                cancellationToken: cancellationToken);
+
+            await _healthClient.CheckAsync(request, callOptions).ConfigureAwait(false);
+            return true;
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
+        {
+            _logger.LogDebug("[gRPC-OCR] Native health check not available (Unimplemented)");
+            return false;
+        }
+        catch (RpcException ex)
+        {
+            // 接続エラー等の場合はネイティブヘルスチェック自体はサポートされている可能性がある
+            _logger.LogDebug("[gRPC-OCR] Native health check probe failed: {StatusCode}", ex.StatusCode);
+            return ex.StatusCode != StatusCode.Unimplemented;
         }
     }
 
