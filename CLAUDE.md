@@ -11,6 +11,25 @@ These files contain the following critical settings:
 - **PowerShell Priority**: Command execution uses PowerShell environment
 - **Auto-approval Settings**: Command and file operation permissions are configured in `.claude/settings.json`
 
+### 報告の正確性に関するルール
+
+**ツール実行結果の報告**:
+1. **出力が空の場合は明示的に報告する**
+   - ❌ 「応答がない」「APIが応答しない」
+   - ✅ 「出力が空でした。コマンドは実行されましたが結果が取得できませんでした」
+
+2. **代替手段を使った場合は明確に区別する**
+   - ❌ 「Geminiレビュー結果」（実際にはWebSearchで代替した場合）
+   - ✅ 「Gemini取得失敗のため、WebSearchで代替調査しました」
+
+3. **「〜からの結果」は実際に取得した場合のみ使用**
+   - 推測や代替手段の結果を混同しない
+   - 情報源を正確に報告する
+
+4. **失敗を隠さない**
+   - ツールが期待通り動作しなかった場合は正直に報告
+   - 問題を解決してから次に進む、または代替手段を明示的に提案
+
 ### Claude Code 拡張機能
 
 #### 条件付きルール (`.claude/rules/`)

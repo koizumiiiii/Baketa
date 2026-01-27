@@ -127,7 +127,7 @@ class CTranslate2Engine(TranslationEngine):
         compute_type: str = "int8",
         max_workers: int = 4,
         cache_size: int = DEFAULT_CACHE_SIZE,
-        enable_flash_attention: bool = True  # 🔥 [Issue #330] Flash Attention有効化
+        enable_flash_attention: bool = False  # Flash Attention（多くのGPUで非対応のため無効化）
     ):
         """
         Args:

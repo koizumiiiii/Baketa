@@ -38,7 +38,7 @@ public sealed class RoiMonitoringHostedService : BackgroundService
     private int _consecutiveChangeCount;
 
     // 設定
-    private const int DefaultPollingIntervalMs = 1000; // 1秒間隔
+    private const int DefaultPollingIntervalMs = 2000; // 2秒間隔（ネイティブDLL負荷軽減）
     private const int MinChangeCountForTrigger = 2; // 2回連続変化で翻訳トリガー
     private const int MaxConsecutiveChanges = 5; // 5回連続変化で一時停止（アニメーション除外）
 
