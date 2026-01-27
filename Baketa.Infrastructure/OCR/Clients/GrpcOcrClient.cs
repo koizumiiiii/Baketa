@@ -31,6 +31,15 @@ public sealed class GrpcOcrClient : IDisposable
     private static readonly int[] RetryDelaysMs = [500, 1000]; // 短いバックオフ
     private const int RetryTimeoutSeconds = 5; // リトライ時は短いタイムアウト（通常60秒→5秒）
 
+    // [Issue #334] CPUフォールバック用の連続タイムアウト検知
+    private int _consecutiveTimeouts;
+    private bool _hasSwitchedToCpu;
+
+    /// <summary>
+    /// [Issue #334] CPUフォールバックまでの連続タイムアウト閾値（デフォルト: 3）
+    /// </summary>
+    public int CpuFallbackTimeoutThreshold { get; set; } = 3;
+
     /// <summary>
     /// コンストラクタ
     /// </summary>
@@ -144,6 +153,9 @@ public sealed class GrpcOcrClient : IDisposable
 
                 if (response.IsSuccess)
                 {
+                    // [Issue #334] 成功時はタイムアウトカウンタをリセット
+                    _consecutiveTimeouts = 0;
+
                     if (attempt > 0)
                     {
                         _logger.LogInformation(
@@ -199,6 +211,18 @@ public sealed class GrpcOcrClient : IDisposable
             {
                 sw.Stop();
                 lastException = ex;
+
+                // [Issue #334] タイムアウトカウント増加とCPUフォールバック判定
+                _consecutiveTimeouts++;
+                _logger.LogWarning(
+                    "[gRPC-OCR] Timeout detected (consecutive: {Count}/{Threshold})",
+                    _consecutiveTimeouts, CpuFallbackTimeoutThreshold);
+
+                // CPUフォールバック実行（まだ切り替えていない場合のみ）
+                if (_consecutiveTimeouts >= CpuFallbackTimeoutThreshold && !_hasSwitchedToCpu)
+                {
+                    await TrySwitchToCpuAsync(cancellationToken).ConfigureAwait(false);
+                }
 
                 if (attempt < MaxRetryCount)
                 {
@@ -697,6 +721,152 @@ public sealed class GrpcOcrClient : IDisposable
             },
             Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
         };
+    }
+
+    /// <summary>
+    /// [Issue #334] デバイスを切り替えます（GPU/CPU）
+    /// </summary>
+    /// <param name="targetDevice">切り替え先デバイス ("cpu" or "cuda")</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>切り替え結果</returns>
+    public async Task<SwitchDeviceResponse> SwitchDeviceAsync(
+        string targetDevice,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetDevice);
+
+        var requestId = Guid.NewGuid().ToString();
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            var request = new SwitchDeviceRequest
+            {
+                TargetDevice = targetDevice,
+                RequestId = requestId
+            };
+
+            _logger.LogInformation("[gRPC-OCR] SwitchDevice: Switching to {TargetDevice}...", targetDevice);
+
+            var callOptions = new CallOptions(
+                deadline: DateTime.UtcNow.AddSeconds(60), // デバイス切り替えは時間がかかる可能性あり
+                cancellationToken: cancellationToken)
+                .WithWaitForReady(true);
+
+            var response = await _client.SwitchDeviceAsync(request, callOptions).ConfigureAwait(false);
+
+            sw.Stop();
+
+            if (response.IsSuccess)
+            {
+                _logger.LogInformation(
+                    "[gRPC-OCR] SwitchDevice success: {PreviousDevice} → {CurrentDevice} ({SwitchTimeMs}ms)",
+                    response.PreviousDevice,
+                    response.CurrentDevice,
+                    response.SwitchTimeMs);
+
+                // CPUに切り替えた場合はフラグを設定
+                if (targetDevice.Equals("cpu", StringComparison.OrdinalIgnoreCase))
+                {
+                    _hasSwitchedToCpu = true;
+                }
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "[gRPC-OCR] SwitchDevice failed: {ErrorType} - {Message}",
+                    response.Error?.ErrorType,
+                    response.Error?.Message);
+            }
+
+            return response;
+        }
+        catch (RpcException ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[gRPC-OCR] SwitchDevice RPC error: {StatusCode}", ex.StatusCode);
+
+            return new SwitchDeviceResponse
+            {
+                IsSuccess = false,
+                Message = $"RPC error: {ex.StatusCode}",
+                Error = new OcrError
+                {
+                    ErrorType = OcrErrorType.ProcessingError,
+                    Message = $"Failed to switch device: {ex.StatusCode}",
+                    Details = ex.Message,
+                    IsRetryable = ex.StatusCode == StatusCode.Unavailable
+                },
+                Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+            };
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[gRPC-OCR] SwitchDevice unexpected error");
+
+            return new SwitchDeviceResponse
+            {
+                IsSuccess = false,
+                Message = $"Unexpected error: {ex.Message}",
+                Error = new OcrError
+                {
+                    ErrorType = OcrErrorType.Unknown,
+                    Message = "Failed to switch device",
+                    Details = ex.Message,
+                    IsRetryable = false
+                },
+                Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+            };
+        }
+    }
+
+    /// <summary>
+    /// [Issue #334] CPUモードへのフォールバックを試行
+    /// </summary>
+    private async Task TrySwitchToCpuAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogWarning(
+            "[gRPC-OCR] [Issue #334] Consecutive timeouts reached threshold ({Threshold}), switching to CPU mode...",
+            CpuFallbackTimeoutThreshold);
+
+        try
+        {
+            var response = await SwitchDeviceAsync("cpu", cancellationToken).ConfigureAwait(false);
+
+            if (response.IsSuccess)
+            {
+                _logger.LogInformation(
+                    "[gRPC-OCR] [Issue #334] Successfully switched to CPU mode: {Message}",
+                    response.Message);
+                _consecutiveTimeouts = 0; // カウンタリセット
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "[gRPC-OCR] [Issue #334] Failed to switch to CPU mode: {Message}",
+                    response.Message ?? response.Error?.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[gRPC-OCR] [Issue #334] Error switching to CPU mode");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #334] 現在のCPUフォールバック状態を取得
+    /// </summary>
+    public bool HasSwitchedToCpu => _hasSwitchedToCpu;
+
+    /// <summary>
+    /// [Issue #334] CPUフォールバック状態をリセット（テスト用）
+    /// </summary>
+    public void ResetCpuFallbackState()
+    {
+        _consecutiveTimeouts = 0;
+        _hasSwitchedToCpu = false;
     }
 
     /// <summary>

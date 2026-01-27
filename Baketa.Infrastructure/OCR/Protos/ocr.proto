@@ -193,6 +193,23 @@ message RecognizeBatchResponse {
 // Service Definition
 // ============================================================================
 
+/// [Issue #334] デバイス切り替えリクエスト
+message SwitchDeviceRequest {
+  string target_device = 1;  // "cpu" または "cuda"
+  string request_id = 2;     // リクエストID（トレーサビリティ用）
+}
+
+/// [Issue #334] デバイス切り替えレスポンス
+message SwitchDeviceResponse {
+  bool is_success = 1;            // 切り替え成功かどうか
+  string current_device = 2;      // 切り替え後のデバイス
+  string previous_device = 3;     // 切り替え前のデバイス
+  string message = 4;             // 結果メッセージ
+  int64 switch_time_ms = 5;       // 切り替えにかかった時間（ミリ秒）
+  OcrError error = 6;             // エラー情報（失敗時）
+  google.protobuf.Timestamp timestamp = 7;
+}
+
 /// Baketa OCRサービス
 service OcrService {
   /// 画像からテキストを認識（Detection + Recognition）
@@ -214,4 +231,8 @@ service OcrService {
 
   /// 準備状態確認
   rpc IsReady(OcrIsReadyRequest) returns (OcrIsReadyResponse);
+
+  /// [Issue #334] デバイス切り替え（GPU/CPU）
+  /// VRAM不足時にCPUモードへ自動フォールバックするために使用
+  rpc SwitchDevice(SwitchDeviceRequest) returns (SwitchDeviceResponse);
 }

@@ -74,15 +74,45 @@ public partial class ToastNotificationWindow : Window
     /// </summary>
     private void OnWindowOpened(object? sender, EventArgs e)
     {
-        var screen = Screens.Primary;
-        if (screen != null)
-        {
-            var bounds = screen.WorkingArea;
-            const int margin = 16;
-            var x = margin; // 左マージン
-            var y = bounds.Height - (int)Bounds.Height - margin; // 画面左下
+        // [Issue #343] レイアウト更新後に位置を設定（SizeToContentによる高さ計算完了を待つ）
+        Dispatcher.UIThread.Post(PositionToBottomLeft, DispatcherPriority.Loaded);
+    }
 
-            Position = new PixelPoint(x, (int)y);
+    /// <summary>
+    /// [Issue #343] 画面左下に配置
+    /// </summary>
+    private void PositionToBottomLeft()
+    {
+        try
+        {
+            var screen = Screens.Primary;
+            if (screen == null) return;
+
+            var workingArea = screen.WorkingArea;
+            const int margin = 16;
+
+            // 実際のウィンドウサイズを取得（レイアウト完了後なので正確）
+            var windowHeight = (int)Bounds.Height;
+            if (windowHeight <= 0)
+            {
+                windowHeight = 100; // フォールバック値
+            }
+
+            // [Issue #343] WorkingArea.X/Y を考慮（マルチモニター対応）
+            // WorkingArea はタスクバーを除いた領域で、スクリーン座標で表される
+            var x = workingArea.X + margin;
+            var y = workingArea.Y + workingArea.Height - windowHeight - margin;
+
+            Position = new PixelPoint(x, y);
+
+            System.Diagnostics.Debug.WriteLine(
+                $"[Toast] Position set to ({x}, {y}), " +
+                $"WorkingArea: ({workingArea.X}, {workingArea.Y}, {workingArea.Width}x{workingArea.Height}), " +
+                $"WindowHeight: {windowHeight}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Toast] Position error: {ex.Message}");
         }
     }
 
