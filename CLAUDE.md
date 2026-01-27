@@ -151,7 +151,7 @@ OCRと翻訳を単一プロセスで実行し、VRAMを効率的に使用しま�
 | BaketaUnifiedServer-cuda.zip.001/.002 | CUDA版統合AIサーバー（分割） | ~2.7GB |
 | surya-detection-onnx.zip | OCR検出モデル (ONNX INT8) | ~31MB |
 | surya-recognition-quantized.zip | OCR認識モデル (PyTorch量子化) | ~665MB |
-| nllb-200-distilled-600M-ct2.zip | NLLB翻訳モデル | ~1.1GB |
+| nllb-200-distilled-600M-ct2-int8.zip | NLLB翻訳モデル (CTranslate2 int8量子化) | ~1GB |
 
 **CUDA版の結合方法:**
 ```cmd
@@ -228,7 +228,7 @@ release/
 ├── grpc_server/
 │   └── BaketaUnifiedServer/      # 初回起動時にmodels-v2から自動ダウンロード
 └── Models/
-    ├── nllb-200-distilled-600M-ct2/  # NLLB翻訳モデル（自動ダウンロード）
+    ├── nllb-200-ct2/                 # NLLB翻訳モデル（CTranslate2 int8、自動ダウンロード）
     └── surya-quantized/              # Surya OCRモデル（自動ダウンロード）
 ```
 
@@ -261,7 +261,7 @@ pyenv global 3.10.9
 pip install -r requirements.txt
 
 # Download NLLB-200 model (automatic on first run)
-# Model: facebook/nllb-200-distilled-600M (~2.4GB)
+# Model: NLLB-200-distilled-600M CTranslate2 int8 (~1GB)
 
 # Run NLLB-200 translation server tests
 py scripts/test_nllb_translation.py
@@ -632,8 +632,7 @@ Baketa uses gRPC (HTTP/2) for high-performance C# ↔ Python communication in tr
 #### Python Side (grpc_server/)
 1. **start_server.py**
    - Entry point for gRPC server
-   - Model: facebook/nllb-200-distilled-600M (2.4GB)
-   - Optional: CTranslate2 engine (80% memory reduction)
+   - Model: NLLB-200-distilled-600M CTranslate2 int8 (~1GB)
    - Port: 50051 (default)
 
 2. **translation_server.py** - `TranslationServicer`
@@ -644,9 +643,9 @@ Baketa uses gRPC (HTTP/2) for high-performance C# ↔ Python communication in tr
      - `IsReady()`: Model readiness check ✅ Available
 
 3. **engines/ctranslate2_engine.py**
-   - Optimized NLLB-200 engine
-   - Memory: 2.4GB → 500MB (80% reduction)
-   - Launch: `python start_server.py --use-ctranslate2`
+   - Optimized NLLB-200 engine (int8 quantized)
+   - Memory: ~1GB (Issue #337 軽量化)
+   - Default engine for all translation
 
 ### gRPC API Specification
 
@@ -904,7 +903,7 @@ powershell -Command "gemini '実装完了しました。レビューをお願い
 
 ## Known Issues and Considerations
 
-- NLLB-200 models are downloaded automatically on first run (~2.4GB)
+- NLLB-200 models are downloaded automatically on first run (~1GB, CTranslate2 int8)
 - Surya OCR models are downloaded automatically from GitHub Releases on first run
 - Python 3.10+ environment required for translation/OCR servers
 - OpenCV native dependencies are Windows-specific

@@ -100,8 +100,8 @@ graph LR
 ```
 
 - **プロトコル**: HTTP/2 (gRPC)、ポート 50051
-- **モデル**: facebook/nllb-200-distilled-600M (2.4GB)
-- **最適化**: CTranslate2 (メモリ80%削減)
+- **モデル**: NLLB-200-distilled-600M (CTranslate2 int8量子化、~1GB)
+- **最適化**: CTranslate2 + int8量子化 (メモリ80%削減)
 
 ## システム要件
 

@@ -92,24 +92,24 @@ cd grpc_server
 python start_server.py --use-ctranslate2
 ```
 
-**CTranslate2エンジン設定**:
+**CTranslate2エンジン設定** (Issue #337 軽量化):
 - ホスト: `127.0.0.1` (localhost only、ファイアウォールダイアログ回避)
 - ポート: `50051`
-- モデル: `../models/nllb-200-ct2` (int8量子化、610MB)
+- モデル: `models/nllb-200-ct2` (int8量子化、~1GB)
 - デバイス: GPU利用可能ならCUDA、なければCPU
-- **メモリ削減**: 74.6%（2.4GB → 610MB）
+- **メモリ削減**: 約80%（5.5GB → ~1GB）
 
-### 基本起動（NllbEngine）
+### 基本起動（CTranslate2エンジン - 推奨）
 
 ```bash
 cd grpc_server
 python start_server.py
 ```
 
-**NllbEngine設定**:
+**デフォルト設定** (Issue #337):
 - ホスト: `127.0.0.1` (localhost only、ファイアウォールダイアログ回避)
 - ポート: `50051`
-- モデル: `facebook/nllb-200-distilled-600M` (transformers、2.4GB)
+- モデル: NLLB-200-distilled-600M CTranslate2 int8 (~1GB)
 - デバイス: GPU利用可能ならCUDA、なければCPU
 
 ### オプション付き起動
