@@ -906,6 +906,17 @@ class LazyLoadingTranslator:
         # 実際のロードはtranslate()呼び出し時に行われる
         return True
 
+    async def health_check(self) -> bool:
+        """ヘルスチェック
+
+        遅延ロードのため常にTrueを返す（translate()呼び出し時に自動ロード）
+        モデルがロード済みの場合はエンジンのヘルスチェックを実行
+        """
+        # 🔥 [Issue #337] 遅延ロードのためHealthyとして報告
+        if self.engine.is_loaded:
+            return await self.engine.health_check()
+        return True
+
     def set_keep_loaded(self, keep_loaded: bool) -> None:
         """Live翻訳モード設定
 
