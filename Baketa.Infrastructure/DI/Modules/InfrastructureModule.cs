@@ -47,6 +47,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Baketa.Core.Abstractions.Hardware;
 using CoreTranslation = Baketa.Core.Translation.Abstractions;
 using EventTypes = Baketa.Core.Events.EventTypes;
 
@@ -269,6 +270,10 @@ public class InfrastructureModule : ServiceModuleBase
         // Phase 3.4A: OCRテキスト領域グルーピング戦略（Union-Find）
         services.AddSingleton<IRegionGroupingStrategy, Baketa.Infrastructure.OCR.Clustering.UnionFindRegionGroupingStrategy>();
         Console.WriteLine("✅ Phase 3.4A: UnionFindRegionGroupingStrategy登録完了 - グラフベース連結成分検出");
+
+        // [Issue #335] ハードウェアスペックチェッカー
+        services.AddSingleton<IHardwareChecker, HardwareChecker>();
+        Console.WriteLine("✅ [Issue #335] HardwareChecker登録完了 - 起動時ハードウェアチェック");
 
         // UltraThink Phase 1: 近接度ベースグループ化サービス
         RegisterProximityGroupingServices(services);

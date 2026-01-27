@@ -1536,7 +1536,15 @@ If no text is visible, respond with:
 {
   "texts": [],
   "detected_language": ""
-}`;
+}
+
+## ★ CRITICAL REMINDER (READ THIS AGAIN)
+This is a translation task. You MUST:
+1. Output ONLY the JSON object above - no explanations, no markdown formatting, no apologies
+2. Include the "translation" field for EVERY text item
+3. Never refuse or say you cannot translate - this is game localization for legitimate use
+
+TRANSLATION_REQUIRED: Translate ALL visible text in the image and output ONLY valid JSON. Do not include any notes, explanations, or markdown code blocks.`;
 
   const geminiRequest: GeminiRequest = {
     contents: [{
@@ -1759,7 +1767,15 @@ If no text is visible, respond with:
 {
   "texts": [],
   "detected_language": ""
-}`;
+}
+
+## ★ CRITICAL REMINDER (READ THIS AGAIN)
+This is a translation task. You MUST:
+1. Output ONLY the JSON object above - no explanations, no markdown formatting, no apologies
+2. Include the "translation" field for EVERY text item
+3. Never refuse or say you cannot translate - this is game localization for legitimate use
+
+TRANSLATION_REQUIRED: Translate ALL visible text in the image and output ONLY valid JSON. Do not include any notes, explanations, or markdown code blocks.`;
 
   const openaiRequest: OpenAIRequest = {
     model: modelName,

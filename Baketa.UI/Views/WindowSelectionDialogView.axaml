@@ -69,6 +69,18 @@
       <Setter Property="BorderThickness" Value="3"/>
       <Setter Property="Background" Value="{StaticResource SettingsSuccessBackground}"/>
     </Style>
+
+    <!-- 🔥 [ISSUE#336] フッターボタンのホバースタイル（グレー→透過に変更） -->
+    <Style Selector="Button.FooterButton">
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.FooterButton:pointerover">
+      <Setter Property="Opacity" Value="0.85"/>
+    </Style>
+    <Style Selector="Button.FooterButton:pressed">
+      <Setter Property="Opacity" Value="0.7"/>
+    </Style>
   </Window.Styles>
 
   <Grid Background="{StaticResource DialogBackgroundBrush}">
@@ -268,13 +280,16 @@
       <StackPanel Orientation="Horizontal"
                   HorizontalAlignment="Right"
                   Spacing="12">
-        <Button Content="{local:Localize WindowSelection_Cancel}"
+        <!-- 🔥 [ISSUE#336] FooterButtonクラスでホバー時透過に変更 -->
+        <Button Classes="FooterButton"
+                Content="{local:Localize WindowSelection_Cancel}"
                 Width="100" Height="32"
                 Background="{StaticResource ButtonSecondaryBrush}"
                 Foreground="{StaticResource SettingsTextPrimary}"
                 Command="{Binding CancelCommand}"/>
         <!-- 🔥 [ISSUE#225] CommandParameterをSelectedWindowViewModel（WindowInfoViewModel型）に修正 -->
-        <Button Content="{local:Localize WindowSelection_Select}"
+        <Button Classes="FooterButton"
+                Content="{local:Localize WindowSelection_Select}"
                 Width="100" Height="32"
                 Background="{StaticResource ButtonPrimaryBrush}"
                 Foreground="White"
