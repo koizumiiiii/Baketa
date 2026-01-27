@@ -75,8 +75,15 @@
       <Setter Property="CornerRadius" Value="6"/>
       <Setter Property="BorderThickness" Value="0"/>
     </Style>
+    <!-- ホバー時: テンプレート内部のContentPresenterの背景をボタンの背景色に維持 -->
+    <Style Selector="Button.FooterButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{TemplateBinding Background}"/>
+    </Style>
     <Style Selector="Button.FooterButton:pointerover">
       <Setter Property="Opacity" Value="0.85"/>
+    </Style>
+    <Style Selector="Button.FooterButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{TemplateBinding Background}"/>
     </Style>
     <Style Selector="Button.FooterButton:pressed">
       <Setter Property="Opacity" Value="0.7"/>
