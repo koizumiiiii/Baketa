@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -16,6 +17,9 @@ using TranslationSettings = Baketa.Core.Settings.TranslationSettings;
 using TranslationEngine = Baketa.Core.Settings.TranslationEngine;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+// [Issue #328] gRPC Native Health Check
+using Grpc.Health.V1;
+using Grpc.Net.Client;
 
 namespace Baketa.Infrastructure.Translation.Services;
 
@@ -55,6 +59,11 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
     private long _totalFailures = 0;
     private DateTime _lastSuccessfulCheck = DateTime.UtcNow;
     private DateTime _lastRestartAttempt = DateTime.MinValue;
+
+    // [Issue #328] gRPCヘルスチェック用チャネル再利用
+    private GrpcChannel? _healthCheckChannel;
+    private Health.HealthClient? _healthCheckClient;
+    private int _healthCheckChannelPort = -1;
 
     public PythonServerHealthMonitor(
         ILogger<PythonServerHealthMonitor> logger,
@@ -280,6 +289,13 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
         try
         {
+            // [Issue #328] 統合サーバーモード: gRPCネイティブヘルスチェック使用
+            if (isUnifiedServerMode)
+            {
+                return await PerformGrpcHealthCheckAsync(totalTimeout).ConfigureAwait(false);
+            }
+
+            // 旧サーバーモード: TCP接続 + JSONリクエスト
             using var client = new TcpClient();
             var connectTask = client.ConnectAsync("127.0.0.1", _currentServerPort);
 
@@ -293,14 +309,6 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
 
                 if (client.Connected)
                 {
-                    // [Issue #327] 統合サーバーモード（gRPC）ではTCP接続確認のみで成功とする
-                    // gRPCはHTTP/2 + Protobufのため、生のJSONリクエストは受け付けない
-                    if (isUnifiedServerMode)
-                    {
-                        _logger.LogTrace("[HEALTH_MONITOR] 統合サーバーモード: TCP接続成功 - Port: {Port}", _currentServerPort);
-                        return true;
-                    }
-
                     // 旧サーバーモード: 簡単なping翻訳リクエスト
                     var testRequest = new { text = "test", source = "en", target = "ja" };
                     var requestJson = JsonSerializer.Serialize(testRequest);
@@ -342,6 +350,130 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// [Issue #328] gRPCネイティブヘルスチェックの実行
+    /// grpc.health.v1.Health サービスを使用してサーバー状態を確認
+    /// </summary>
+    private async Task<bool> PerformGrpcHealthCheckAsync(int timeoutMs)
+    {
+        try
+        {
+            var client = GetOrCreateHealthClient(_currentServerPort, timeoutMs);
+
+            // gRPCヘルスチェック実行（全体サービス ""）
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+            var response = await client.CheckAsync(
+                new HealthCheckRequest { Service = "" },
+                deadline: DateTime.UtcNow.AddMilliseconds(timeoutMs),
+                cancellationToken: cts.Token).ConfigureAwait(false);
+
+            var isHealthy = response.Status == HealthCheckResponse.Types.ServingStatus.Serving;
+
+            _logger.LogTrace("[HEALTH_MONITOR] gRPCヘルスチェック: Status={Status}, Port={Port}",
+                response.Status, _currentServerPort);
+
+            return isHealthy;
+        }
+        catch (Grpc.Core.RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.Unavailable)
+        {
+            _logger.LogDebug("[HEALTH_MONITOR] gRPCサーバー接続失敗 (Port {Port}): {Status}",
+                _currentServerPort, ex.StatusCode);
+            // 接続失敗時はチャネルを破棄して次回再生成
+            DisposeHealthCheckChannel();
+            return false;
+        }
+        catch (Grpc.Core.RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.Unimplemented)
+        {
+            // ヘルスサービスが未実装の場合はTCP接続確認にフォールバック
+            _logger.LogDebug("[HEALTH_MONITOR] gRPCヘルスサービス未実装、TCP接続確認にフォールバック (Port {Port})",
+                _currentServerPort);
+            return await PerformTcpHealthCheckFallbackAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("[HEALTH_MONITOR] gRPCヘルスチェックエラー (Port {Port}): {Error}",
+                _currentServerPort, ex.Message);
+            // エラー時はチャネルを破棄して次回再生成
+            DisposeHealthCheckChannel();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #328] gRPCヘルスチェッククライアントを取得または作成
+    /// チャネルを再利用してパフォーマンスを向上
+    /// </summary>
+    private Health.HealthClient GetOrCreateHealthClient(int port, int timeoutMs)
+    {
+        // ポートが変更されたか、チャネルが未作成の場合は再作成
+        if (_healthCheckChannel == null || _healthCheckClient == null || _healthCheckChannelPort != port)
+        {
+            DisposeHealthCheckChannel();
+
+            _healthCheckChannel = GrpcChannel.ForAddress($"http://127.0.0.1:{port}", new GrpcChannelOptions
+            {
+                HttpHandler = new SocketsHttpHandler
+                {
+                    EnableMultipleHttp2Connections = true,
+                    ConnectTimeout = TimeSpan.FromMilliseconds(Math.Max(timeoutMs / 2, 5000))
+                }
+            });
+            _healthCheckClient = new Health.HealthClient(_healthCheckChannel);
+            _healthCheckChannelPort = port;
+
+            _logger.LogDebug("[HEALTH_MONITOR] gRPCヘルスチェックチャネル作成: Port={Port}", port);
+        }
+
+        return _healthCheckClient;
+    }
+
+    /// <summary>
+    /// [Issue #328] gRPCヘルスチェックチャネルを破棄
+    /// </summary>
+    private void DisposeHealthCheckChannel()
+    {
+        if (_healthCheckChannel != null)
+        {
+            try
+            {
+                _healthCheckChannel.Dispose();
+            }
+            catch
+            {
+                // Dispose時の例外は無視
+            }
+            _healthCheckChannel = null;
+            _healthCheckClient = null;
+            _healthCheckChannelPort = -1;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #328] TCP接続確認フォールバック
+    /// gRPCヘルスサービスが未実装の場合に使用
+    /// </summary>
+    private async Task<bool> PerformTcpHealthCheckFallbackAsync()
+    {
+        try
+        {
+            using var client = new TcpClient();
+            var connectTask = client.ConnectAsync("127.0.0.1", _currentServerPort);
+            var completedTask = await Task.WhenAny(connectTask, Task.Delay(5000)).ConfigureAwait(false);
+
+            if (completedTask == connectTask)
+            {
+                await connectTask.ConfigureAwait(false);
+                return client.Connected;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -1007,6 +1139,9 @@ public class PythonServerHealthMonitor : IHostedService, IAsyncDisposable
         _disposed = true;
         _healthCheckTimer?.Dispose();
         _restartLock?.Dispose();
+
+        // [Issue #328] gRPCヘルスチェックチャネルのクリーンアップ
+        DisposeHealthCheckChannel();
 
         // 🔧 [GEMINI_REVIEW] 非同期クリーンアップによるデッドロック防止
         try
