@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Avalonia.Controls;
@@ -27,9 +28,6 @@ public sealed class ClickThroughHelper : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern nint GetWindowLongPtr(nint hWnd, int nIndex);
-
     [DllImport("user32.dll")]
     private static extern nint CallWindowProc(nint lpPrevWndFunc, nint hWnd, uint msg, nint wParam, nint lParam);
 
@@ -54,17 +52,17 @@ public sealed class ClickThroughHelper : IDisposable
         nint newWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate);
         _oldWndProc = SetWindowLongPtr(_hwnd, GWL_WNDPROC, newWndProc);
 
+        // 🔧 [Geminiレビュー対応] SetWindowLongPtr失敗時は例外をスローして不正状態を防止
         if (_oldWndProc == IntPtr.Zero)
         {
             var error = Marshal.GetLastWin32Error();
             SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
-                $"⚠️ [ClickThroughHelper] SetWindowLongPtr failed - Error: {error}");
+                $"❌ [ClickThroughHelper] SetWindowLongPtr failed - Error: {error}");
+            throw new Win32Exception(error, "Failed to set new window procedure for click-through.");
         }
-        else
-        {
-            SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
-                $"✅ [ClickThroughHelper] WndProc hooked successfully - HWND: 0x{_hwnd:X}");
-        }
+
+        SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+            $"✅ [ClickThroughHelper] WndProc hooked successfully - HWND: 0x{_hwnd:X}");
     }
 
     /// <summary>
