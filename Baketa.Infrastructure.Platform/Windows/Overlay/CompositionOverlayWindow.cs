@@ -73,6 +73,8 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
     private const uint WM_PROCESS_QUEUE = WM_USER + 1;
     private const uint WM_PAINT = 0x000F;
     private const uint WM_ERASEBKGND = 0x0014;
+    private const uint WM_NCHITTEST = 0x0084;
+    private const nint HTTRANSPARENT = -1;
 
     // 🔥 [P0_GC_FIX] WndProcDelegateをstaticフィールドで保持してGCから保護
     private static NativeMethods.WndProcDelegate? _wndProcDelegate;
@@ -395,6 +397,11 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
     {
         switch (msg)
         {
+            case WM_NCHITTEST:
+                // 🔧 [Issue #340] クリックスルー - マウスイベントを背後のウィンドウに透過
+                // WS_EX_TRANSPARENTだけではDWM Compositionと干渉するため明示的に処理
+                return HTTRANSPARENT;
+
             case WM_PAINT:
                 return HandlePaint(hwnd);
 
