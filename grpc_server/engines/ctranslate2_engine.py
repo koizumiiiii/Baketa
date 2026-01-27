@@ -898,8 +898,13 @@ class LazyLoadingTranslator:
         return await self.engine.translate_batch(texts, source_lang, target_lang)
 
     async def is_ready(self) -> bool:
-        """準備完了確認（ロード済みの場合のみTrue）"""
-        return await self.engine.is_ready()
+        """準備完了確認
+
+        遅延ロードのため常にTrueを返す（translate()呼び出し時に自動ロード）
+        """
+        # 🔥 [Issue #337] 遅延ロードのため常にReadyとして報告
+        # 実際のロードはtranslate()呼び出し時に行われる
+        return True
 
     def set_keep_loaded(self, keep_loaded: bool) -> None:
         """Live翻訳モード設定
@@ -928,6 +933,10 @@ class LazyLoadingTranslator:
             "last_activity_time": self._last_activity_time,
             "cache_stats": self.engine.get_cache_stats() if self.engine.is_loaded else None
         }
+
+    def is_model_loaded(self) -> bool:
+        """モデルが実際にロードされているか確認（デバッグ用）"""
+        return self.engine.is_loaded
 
     # CTranslate2Engineのメソッドをデリゲート
     def get_supported_languages(self) -> List[str]:
