@@ -241,11 +241,12 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
     /// </summary>
     private void CreateWindow()
     {
-        // 🔧 [Issue #340] WS_EX_LAYERED追加 - クリックスルーにはWS_EX_TRANSPARENT + WS_EX_LAYEREDが必要
-        // DWM Compositionのブラー効果はSetWindowCompositionAttributeで適用するため
-        // WS_EX_LAYEREDとの併用が可能
+        // 🔧 [Issue #340 Rollback] WS_EX_LAYEREDを削除
+        // DWM CompositionではWS_EX_LAYEREDは不要（設計通り）
+        // クリックスルーはWM_NCHITTEST + HTTRANSPARENTで実現（StaticWndProc/WndProcで処理）
+        // WS_EX_LAYEREDを使用するとSetLayeredWindowAttributesが必要になり、
+        // DWM Compositionのブラー効果と競合して白背景問題が発生する
         const uint exStyle = (uint)ExtendedWindowStyles.WS_EX_TRANSPARENT
-                           | LayeredWindowMethods.WS_EX_LAYERED
                            | LayeredWindowMethods.WS_EX_NOACTIVATE
                            | (uint)ExtendedWindowStyles.WS_EX_TOPMOST;
 
@@ -271,10 +272,8 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
             throw new InvalidOperationException($"CreateWindowEx failed - Error: {error}");
         }
 
-        // 🔧 [Issue #340] SetLayeredWindowAttributesでアルファ値を設定
-        // WS_EX_LAYERED + WS_EX_TRANSPARENT でクリックスルーを有効化
-        // アルファ255（完全不透明）でDWM Compositionの描画を維持
-        LayeredWindowMethods.SetLayeredWindowAttributes(_hwnd, 0, 255, LayeredWindowAttributes.LWA_ALPHA);
+        // 🔧 [Issue #340 Rollback] SetLayeredWindowAttributesを削除
+        // DWM Compositionでは不要（WS_EX_LAYERED未使用のため）
     }
 
     /// <summary>
