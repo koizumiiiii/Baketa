@@ -740,7 +740,7 @@
   </data>
 
   <data name="License_Desc_Free" xml:space="preserve">
-    <value>無料プラン - 広告表示あり、ローカル翻訳のみ</value>
+    <value>無料プラン - ボーナストークンでCloud AI利用可能</value>
   </data>
   <data name="License_Desc_Standard" xml:space="preserve">
     <value>スタンダードプラン - 広告なし、ローカル翻訳のみ</value>
