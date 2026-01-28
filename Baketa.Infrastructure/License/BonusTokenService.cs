@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -8,7 +7,6 @@ using Baketa.Core.Abstractions.License;
 using Baketa.Core.License.Models;
 using Baketa.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Baketa.Infrastructure.License;
 
@@ -81,8 +79,8 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
     {
         lock (_lockObject)
         {
-            // 有効期限順にソートして返す
-            return [.. _bonusTokens.OrderBy(b => b.ExpiresAt)];
+            // [Issue #347] 作成日順にソートして返す（有効期限廃止）
+            return [.. _bonusTokens.OrderBy(b => b.CreatedAt)];
         }
     }
 
@@ -108,10 +106,10 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
             long totalConsumed = 0;
             var remainingToConsume = amount;
 
-            // 有効期限が近い順に消費
+            // [Issue #347] 作成日が古い順に消費（FIFO）
             var usableBonuses = _bonusTokens
                 .Where(b => b.IsUsable)
-                .OrderBy(b => b.ExpiresAt)
+                .OrderBy(b => b.CreatedAt)
                 .ToList();
 
             foreach (var bonus in usableBonuses)
@@ -244,15 +242,14 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
             // ローカル状態を更新
             lock (_lockObject)
             {
-                // [Gemini Review] ISO 8601形式の日付を常にUTCとして解釈
+                // [Issue #347] 有効期限削除 - CreatedAtは現在時刻で初期化
                 _bonusTokens = result.Bonuses?
                     .Select(b => new BonusToken
                     {
                         Id = Guid.Parse(b.Id),
                         SourceType = b.SourceType ?? "unknown",
                         GrantedTokens = b.GrantedTokens,
-                        UsedTokens = b.UsedTokens,
-                        ExpiresAt = DateTime.Parse(b.ExpiresAt, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal)
+                        UsedTokens = b.UsedTokens
                     })
                     .ToList() ?? [];
             }
@@ -432,27 +429,25 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
         {
             _bonusTokens.Clear();
 
-            foreach (var info in bonuses.Where(b => !b.IsExpired && b.RemainingTokens > 0))
+            // [Issue #347] 有効期限廃止 - 残高のみで判定
+            foreach (var info in bonuses.Where(b => b.RemainingTokens > 0))
             {
                 // BonusTokenInfoからBonusTokenに変換
-                // 注意: BonusTokenInfoは軽量DTOのため、一部の情報（SourceType, GrantedTokens）は設定しない
+                // 注意: BonusTokenInfoは軽量DTOのため、一部の情報（SourceType）は設定しない
                 if (Guid.TryParse(info.BonusId, out var id))
                 {
                     _bonusTokens.Add(new BonusToken
                     {
                         Id = id,
                         SourceType = "synced", // 統合エンドポイントからの同期
-                        GrantedTokens = info.RemainingTokens, // 残りトークン = 付与トークン（使用済み=0）
-                        UsedTokens = 0,
-                        ExpiresAt = DateTime.TryParse(info.ExpiresAt, null, DateTimeStyles.RoundtripKind, out var expiresAt)
-                            ? expiresAt
-                            : DateTime.UtcNow.AddDays(30) // デフォルト30日
+                        GrantedTokens = info.GrantedTokens > 0 ? info.GrantedTokens : info.RemainingTokens,
+                        UsedTokens = info.UsedTokens
                     });
                 }
             }
 
             _logger.LogInformation(
-                "[Issue #299] ApplySyncedData: Applied {Count} bonuses, TotalRemaining={Total}",
+                "[Issue #347] ApplySyncedData: Applied {Count} bonuses, TotalRemaining={Total}",
                 _bonusTokens.Count,
                 totalRemaining);
         }
@@ -481,6 +476,9 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
         public int ActiveCount { get; set; }
     }
 
+    /// <summary>
+    /// [Issue #347] 有効期限関連フィールド削除
+    /// </summary>
     private sealed class BonusTokenDto
     {
         [JsonPropertyName("id")]
@@ -497,12 +495,6 @@ public sealed class BonusTokenService : IBonusTokenService, IDisposable
 
         [JsonPropertyName("remaining_tokens")]
         public long RemainingTokens { get; set; }
-
-        [JsonPropertyName("expires_at")]
-        public string ExpiresAt { get; set; } = string.Empty;
-
-        [JsonPropertyName("is_expired")]
-        public bool IsExpired { get; set; }
     }
 
     private sealed class BonusSyncRequest

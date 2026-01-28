@@ -209,6 +209,7 @@ public sealed class BonusTokenServiceTests : IDisposable
     public async Task FetchFromServerAsync_Success_ReturnsBonuses()
     {
         // Arrange
+        // [Issue #347] 有効期限関連フィールド削除
         var responseJson = JsonSerializer.Serialize(new
         {
             bonuses = new[]
@@ -219,9 +220,7 @@ public sealed class BonusTokenServiceTests : IDisposable
                     source_type = "promotion",
                     granted_tokens = 1000L,
                     used_tokens = 100L,
-                    remaining_tokens = 900L,
-                    expires_at = DateTime.UtcNow.AddDays(30).ToString("O"),
-                    is_expired = false
+                    remaining_tokens = 900L
                 }
             },
             total_remaining = 900L,
@@ -270,6 +269,7 @@ public sealed class BonusTokenServiceTests : IDisposable
     {
         // Arrange
         // まずボーナスをフェッチして消費を発生させる
+        // [Issue #347] 有効期限関連フィールド削除
         var bonusId = Guid.NewGuid();
         var fetchResponseJson = JsonSerializer.Serialize(new
         {
@@ -281,9 +281,7 @@ public sealed class BonusTokenServiceTests : IDisposable
                     source_type = "promotion",
                     granted_tokens = 1000L,
                     used_tokens = 0L,
-                    remaining_tokens = 1000L,
-                    expires_at = DateTime.UtcNow.AddDays(30).ToString("O"),
-                    is_expired = false
+                    remaining_tokens = 1000L
                 }
             },
             total_remaining = 1000L,
@@ -318,6 +316,7 @@ public sealed class BonusTokenServiceTests : IDisposable
         var eventRaised = false;
         _service.BonusTokensChanged += (_, _) => eventRaised = true;
 
+        // [Issue #347] 有効期限関連フィールド削除
         var responseJson = JsonSerializer.Serialize(new
         {
             bonuses = new[]
@@ -328,9 +327,7 @@ public sealed class BonusTokenServiceTests : IDisposable
                     source_type = "promotion",
                     granted_tokens = 1000L,
                     used_tokens = 0L,
-                    remaining_tokens = 1000L,
-                    expires_at = DateTime.UtcNow.AddDays(30).ToString("O"),
-                    is_expired = false
+                    remaining_tokens = 1000L
                 }
             },
             total_remaining = 1000L,

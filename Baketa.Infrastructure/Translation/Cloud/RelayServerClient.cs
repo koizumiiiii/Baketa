@@ -554,6 +554,7 @@ public sealed class RelayServerClient : IAsyncDisposable
                         TermsOfServiceVersion = response.Consent.TermsOfService?.Version
                     }
                     : null,
+                // [Issue #347] 有効期限関連フィールド削除
                 BonusTokens = response.BonusTokens != null
                     ? new SyncBonusTokensStatus
                     {
@@ -563,8 +564,8 @@ public sealed class RelayServerClient : IAsyncDisposable
                         {
                             BonusId = b.BonusId ?? string.Empty,
                             RemainingTokens = b.RemainingTokens,
-                            IsExpired = b.IsExpired,
-                            ExpiresAt = b.ExpiresAt
+                            GrantedTokens = b.GrantedTokens,
+                            UsedTokens = b.UsedTokens
                         }).ToList() ?? []
                     }
                     : null,
@@ -859,6 +860,9 @@ public sealed class RelayServerClient : IAsyncDisposable
         public int ActiveCount { get; set; }
     }
 
+    /// <summary>
+    /// [Issue #347] 有効期限関連フィールド削除
+    /// </summary>
     private sealed class RelaySyncBonusItem
     {
         // [Issue #298] サーバーは "id" を返す（"bonus_id" ではない）
@@ -868,11 +872,11 @@ public sealed class RelayServerClient : IAsyncDisposable
         [JsonPropertyName("remaining_tokens")]
         public long RemainingTokens { get; set; }
 
-        [JsonPropertyName("is_expired")]
-        public bool IsExpired { get; set; }
+        [JsonPropertyName("granted_tokens")]
+        public long GrantedTokens { get; set; }
 
-        [JsonPropertyName("expires_at")]
-        public string? ExpiresAt { get; set; }
+        [JsonPropertyName("used_tokens")]
+        public long UsedTokens { get; set; }
     }
 
     private sealed class RelaySyncQuota
@@ -997,7 +1001,7 @@ public sealed record SyncBonusTokensStatus
 }
 
 /// <summary>
-/// [Issue #299] ボーナストークン情報
+/// [Issue #299+#347] ボーナストークン情報（有効期限削除）
 /// </summary>
 public sealed record SyncBonusTokenInfo
 {
@@ -1007,11 +1011,11 @@ public sealed record SyncBonusTokenInfo
     /// <summary>残りトークン数</summary>
     public long RemainingTokens { get; init; }
 
-    /// <summary>期限切れか</summary>
-    public bool IsExpired { get; init; }
+    /// <summary>付与されたトークン数</summary>
+    public long GrantedTokens { get; init; }
 
-    /// <summary>有効期限</summary>
-    public string? ExpiresAt { get; init; }
+    /// <summary>使用済みトークン数</summary>
+    public long UsedTokens { get; init; }
 }
 
 /// <summary>

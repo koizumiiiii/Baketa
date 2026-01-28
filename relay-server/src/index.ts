@@ -200,15 +200,13 @@ interface BonusSyncItem {
   used_tokens: number;
 }
 
-/** Issue #280+#281: ボーナストークン情報 */
+/** Issue #280+#281+#347: ボーナストークン情報（有効期限なし） */
 interface BonusTokenInfo {
   id: string;
   source_type: string;
   granted_tokens: number;
   used_tokens: number;
   remaining_tokens: number;
-  expires_at: string;
-  is_expired: boolean;
 }
 
 // ============================================
@@ -1497,12 +1495,12 @@ async function handlePromotionRedeem(
     if (userId && tokenAmount > 0) {
       console.log(`Granting bonus tokens: user=${userId.substring(0, 8)}..., tokens=${tokenAmount.toLocaleString()}`);
 
+      // [Issue #347] 有効期限削除 - p_expires_at パラメータなし
       const { data: bonusData, error: bonusError } = await supabase.rpc('grant_bonus_tokens', {
         p_user_id: userId,
         p_source_type: 'promotion',
         p_source_id: result.redemption_id,
-        p_granted_tokens: tokenAmount,
-        p_expires_at: result.expires_at
+        p_granted_tokens: tokenAmount
       });
 
       if (bonusError) {
@@ -2112,6 +2110,7 @@ async function handleSyncInit(
     }
 
     // 7. ボーナストークン状態の整形
+    // [Issue #347] 有効期限削除 - 残高のみで判定
     let bonusTokens = { bonuses: [] as BonusTokenInfo[], total_remaining: 0, active_count: 0 };
     if (bonusSettled.status === 'fulfilled') {
       const bonusResult = bonusSettled.value;
@@ -2119,9 +2118,9 @@ async function handleSyncInit(
       bonusTokens = {
         bonuses: bonusData,
         total_remaining: bonusData
-          .filter(b => !b.is_expired && b.remaining_tokens > 0)
+          .filter(b => b.remaining_tokens > 0)
           .reduce((sum, b) => sum + b.remaining_tokens, 0),
-        active_count: bonusData.filter(b => !b.is_expired && b.remaining_tokens > 0).length,
+        active_count: bonusData.filter(b => b.remaining_tokens > 0).length,
       };
     } else {
       failures.push('bonus_tokens');
@@ -2261,9 +2260,9 @@ async function handleBonusTokensStatus(
     // 5. レスポンス構築
     const bonuses: BonusTokenInfo[] = Array.isArray(data) ? data : [];
 
-    // 有効なボーナス（未期限切れで残高あり）の合計を計算
+    // [Issue #347] 有効期限削除 - 残高のみで判定
     const totalRemaining = bonuses
-      .filter(b => !b.is_expired && b.remaining_tokens > 0)
+      .filter(b => b.remaining_tokens > 0)
       .reduce((sum, b) => sum + b.remaining_tokens, 0);
 
     console.log(JSON.stringify({
@@ -2277,7 +2276,7 @@ async function handleBonusTokensStatus(
     return successResponse({
       bonuses,
       total_remaining: totalRemaining,
-      active_count: bonuses.filter(b => !b.is_expired && b.remaining_tokens > 0).length
+      active_count: bonuses.filter(b => b.remaining_tokens > 0).length
     }, origin, allowedOrigins);
 
   } catch (error) {

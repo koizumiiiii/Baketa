@@ -2,7 +2,7 @@ namespace Baketa.Core.License.Models;
 
 /// <summary>
 /// ボーナストークン情報
-/// Issue #280+#281: プロモーション等で付与されたボーナストークン
+/// Issue #280+#281+#347: プロモーション等で付与されたボーナストークン（永続）
 /// </summary>
 public sealed record BonusToken
 {
@@ -12,7 +12,7 @@ public sealed record BonusToken
     public required Guid Id { get; init; }
 
     /// <summary>
-    /// ボーナスの出所（promotion, campaign, referral等）
+    /// ボーナスの出所（promotion, campaign, referral, welcome等）
     /// </summary>
     public required string SourceType { get; init; }
 
@@ -32,19 +32,15 @@ public sealed record BonusToken
     public long RemainingTokens => GrantedTokens - UsedTokens;
 
     /// <summary>
-    /// 有効期限
+    /// 付与日時
     /// </summary>
-    public required DateTime ExpiresAt { get; init; }
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
     /// <summary>
-    /// 有効期限切れかどうか
+    /// 使用可能かどうか（残高あり）
+    /// [Issue #347] 有効期限廃止により、残高のみで判定
     /// </summary>
-    public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
-
-    /// <summary>
-    /// 使用可能かどうか（残高あり かつ 期限内）
-    /// </summary>
-    public bool IsUsable => RemainingTokens > 0 && !IsExpired;
+    public bool IsUsable => RemainingTokens > 0;
 }
 
 /// <summary>
@@ -95,11 +91,12 @@ public sealed class BonusTokensChangedEventArgs : EventArgs
 }
 
 /// <summary>
-/// [Issue #299] ボーナストークン情報（統合エンドポイント用DTO）
+/// [Issue #299+#347] ボーナストークン情報（統合エンドポイント用DTO）
 /// </summary>
 /// <remarks>
 /// 統合エンドポイント `/api/sync/init` から取得したデータを受け渡すための軽量DTO。
 /// 完全な <see cref="BonusToken"/> に変換せずに、必要最小限の情報のみを持つ。
+/// [Issue #347] 有効期限関連フィールド削除
 /// </remarks>
 public sealed record BonusTokenInfo
 {
@@ -109,9 +106,9 @@ public sealed record BonusTokenInfo
     /// <summary>残りトークン数</summary>
     public long RemainingTokens { get; init; }
 
-    /// <summary>期限切れか</summary>
-    public bool IsExpired { get; init; }
+    /// <summary>付与されたトークン数</summary>
+    public long GrantedTokens { get; init; }
 
-    /// <summary>有効期限（ISO 8601形式）</summary>
-    public string? ExpiresAt { get; init; }
+    /// <summary>使用済みトークン数</summary>
+    public long UsedTokens { get; init; }
 }
