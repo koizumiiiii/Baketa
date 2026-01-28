@@ -295,6 +295,14 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
                 }
             }
 
+            // [Issue #332] ウェルカムボーナス付与をログ
+            if (syncResult.WelcomeBonus?.Granted == true)
+            {
+                _logger.LogInformation(
+                    "[Issue #332] ウェルカムボーナス付与完了: Amount={Amount}",
+                    syncResult.WelcomeBonus.Amount);
+            }
+
             // ボーナストークン状態を適用（成功した場合、または部分的失敗でもbonus_tokensが成功した場合）
             var failedList = syncResult.FailedComponents ?? [];
             if (syncResult.BonusTokens != null && _bonusTokenService != null && !failedList.Contains("bonus_tokens"))

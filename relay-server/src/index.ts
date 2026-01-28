@@ -2051,6 +2051,32 @@ async function handleSyncInit(
       return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
     }
 
+    // 3.5. [Issue #332] ウェルカムボーナス自動付与（未付与の場合のみ）
+    let welcomeBonusGranted = false;
+    let welcomeBonusAmount = 0;
+    try {
+      const { data: welcomeBonusId, error: welcomeError } = await supabase.rpc(
+        'ensure_welcome_bonus_for_user',
+        { p_user_id: user.id }
+      );
+      if (welcomeError) {
+        console.error('[Issue #332] Welcome bonus check failed:', welcomeError);
+      } else if (welcomeBonusId) {
+        welcomeBonusGranted = true;
+        welcomeBonusAmount = 25000; // welcome_bonus_config.granted_tokens のデフォルト値
+        console.log(JSON.stringify({
+          event: 'welcome_bonus_granted',
+          user_id: user.id.substring(0, 8) + '...',
+          bonus_id: welcomeBonusId,
+          amount: welcomeBonusAmount,
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    } catch (welcomeErr) {
+      console.error('[Issue #332] Welcome bonus error:', welcomeErr);
+      // ウェルカムボーナス失敗は致命的ではない - 継続
+    }
+
     // 4. 全ステータスを並列取得（Promise.allSettledで部分的失敗を許容）
     const [promotionSettled, consentSettled, bonusSettled, quotaSettled] = await Promise.allSettled([
       // プロモーション状態
@@ -2137,6 +2163,7 @@ async function handleSyncInit(
     }
 
     // 9. 監査ログ
+    // [Issue #332] ウェルカムボーナス付与情報を追加
     const duration = Date.now() - startTime;
     console.log(JSON.stringify({
       event: 'sync_init',
@@ -2145,18 +2172,24 @@ async function handleSyncInit(
       has_consent: !!(consent.privacy_policy && consent.terms_of_service),
       bonus_count: bonusTokens.active_count,
       tokens_used: quota.tokens_used,
+      welcome_bonus_granted: welcomeBonusGranted,
       duration_ms: duration,
       partial_failures: failures.length > 0 ? failures : undefined,
       timestamp: new Date().toISOString(),
     }));
 
     // 10. 統合レスポンス（部分的失敗情報を含む）
+    // [Issue #332] ウェルカムボーナス情報を含める
     return successResponse({
       success: true,
       promotion,
       consent,
       bonus_tokens: bonusTokens,
       quota,
+      welcome_bonus: welcomeBonusGranted ? {
+        granted: true,
+        amount: welcomeBonusAmount,
+      } : undefined,
       partial_failure: failures.length > 0,
       failed_components: failures.length > 0 ? failures : undefined,
     }, origin, allowedOrigins);

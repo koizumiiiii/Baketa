@@ -608,6 +608,14 @@ public sealed class RelayServerClient : IAsyncDisposable
                         TokensLimit = response.Quota.TokensLimit
                     }
                     : null,
+                // [Issue #332] ウェルカムボーナス付与情報
+                WelcomeBonus = response.WelcomeBonus != null
+                    ? new SyncWelcomeBonusStatus
+                    {
+                        Granted = response.WelcomeBonus.Granted,
+                        Amount = response.WelcomeBonus.Amount
+                    }
+                    : null,
                 PartialFailure = response.PartialFailure,
                 FailedComponents = response.FailedComponents?.AsReadOnly()
             };
@@ -825,6 +833,10 @@ public sealed class RelayServerClient : IAsyncDisposable
         [JsonPropertyName("quota")]
         public RelaySyncQuota? Quota { get; set; }
 
+        /// <summary>[Issue #332] ウェルカムボーナス付与情報</summary>
+        [JsonPropertyName("welcome_bonus")]
+        public RelaySyncWelcomeBonus? WelcomeBonus { get; set; }
+
         /// <summary>部分的失敗があったかどうか</summary>
         [JsonPropertyName("partial_failure")]
         public bool PartialFailure { get; set; }
@@ -832,6 +844,18 @@ public sealed class RelayServerClient : IAsyncDisposable
         /// <summary>失敗したコンポーネント名リスト</summary>
         [JsonPropertyName("failed_components")]
         public List<string>? FailedComponents { get; set; }
+    }
+
+    /// <summary>
+    /// [Issue #332] ウェルカムボーナス付与情報
+    /// </summary>
+    private sealed class RelaySyncWelcomeBonus
+    {
+        [JsonPropertyName("granted")]
+        public bool Granted { get; set; }
+
+        [JsonPropertyName("amount")]
+        public long Amount { get; set; }
     }
 
     private sealed class RelaySyncPromotion
@@ -970,11 +994,26 @@ public sealed record SyncInitResponse
     /// <summary>クォータ状態</summary>
     public SyncQuotaStatus? Quota { get; init; }
 
+    /// <summary>[Issue #332] ウェルカムボーナス付与情報</summary>
+    public SyncWelcomeBonusStatus? WelcomeBonus { get; init; }
+
     /// <summary>部分的失敗があったかどうか</summary>
     public bool PartialFailure { get; init; }
 
     /// <summary>失敗したコンポーネント名リスト</summary>
     public IReadOnlyList<string>? FailedComponents { get; init; }
+}
+
+/// <summary>
+/// [Issue #332] ウェルカムボーナス付与情報
+/// </summary>
+public sealed record SyncWelcomeBonusStatus
+{
+    /// <summary>今回付与されたか</summary>
+    public bool Granted { get; init; }
+
+    /// <summary>付与量</summary>
+    public long Amount { get; init; }
 }
 
 /// <summary>
