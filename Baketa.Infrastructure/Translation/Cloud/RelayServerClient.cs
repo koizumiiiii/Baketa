@@ -227,11 +227,33 @@ public sealed class RelayServerClient : IAsyncDisposable
         using var httpResponse = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
         var processingTime = DateTime.UtcNow - startTime;
 
-        var responseBody = await httpResponse.Content.ReadFromJsonAsync<RelayTranslateResponse>(
-            _jsonOptions, cancellationToken).ConfigureAwait(false);
+        // [Issue #333] レスポンス本体を文字列として読み込み（デバッグ用）
+        var rawResponse = await httpResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        RelayTranslateResponse? responseBody = null;
+        try
+        {
+            responseBody = JsonSerializer.Deserialize<RelayTranslateResponse>(rawResponse, _jsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            // [Issue #333] JSONパースエラー時の詳細ログ
+            var truncatedResponse = rawResponse.Length > 500 ? rawResponse[..500] + "..." : rawResponse;
+            _logger.LogError(ex,
+                "[Issue #333] JSON parse error: StatusCode={StatusCode}, RawResponse={RawResponse}",
+                (int)httpResponse.StatusCode,
+                truncatedResponse);
+        }
 
         if (responseBody == null)
         {
+            // [Issue #333] レスポンス解析失敗時の詳細ログ
+            var truncatedResponse = rawResponse.Length > 500 ? rawResponse[..500] + "..." : rawResponse;
+            _logger.LogError(
+                "[Issue #333] Empty or invalid response: StatusCode={StatusCode}, RawResponse={RawResponse}",
+                (int)httpResponse.StatusCode,
+                truncatedResponse);
+
             return ImageTranslationResponse.Failure(
                 request.RequestId,
                 new TranslationErrorDetail
@@ -246,6 +268,15 @@ public sealed class RelayServerClient : IAsyncDisposable
         // HTTPステータスコードによるエラー判定
         if (!httpResponse.IsSuccessStatusCode)
         {
+            // [Issue #333] HTTPエラー時の詳細ログ
+            var truncatedResponse = rawResponse.Length > 500 ? rawResponse[..500] + "..." : rawResponse;
+            _logger.LogWarning(
+                "[Issue #333] HTTP error: StatusCode={StatusCode}, ErrorCode={ErrorCode}, ErrorMessage={ErrorMessage}, RawResponse={RawResponse}",
+                (int)httpResponse.StatusCode,
+                responseBody.Error?.Code ?? "unknown",
+                responseBody.Error?.Message ?? "unknown",
+                truncatedResponse);
+
             var errorCode = httpResponse.StatusCode switch
             {
                 System.Net.HttpStatusCode.Unauthorized => TranslationErrorDetail.Codes.SessionInvalid,

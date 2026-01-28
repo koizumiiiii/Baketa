@@ -1584,25 +1584,27 @@ TRANSLATION_REQUIRED: Translate ALL visible text in the image and output ONLY va
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`Gemini API error: status=${response.status}, body=${errorBody}`);
+      // [Issue #333] エラー詳細ログにrawResponse先頭200文字を含める
+      const truncatedBody = errorBody.length > 200 ? errorBody.substring(0, 200) + '...' : errorBody;
+      console.error(`[Issue #333] Gemini API error: status=${response.status}, body=${truncatedBody}`);
 
       if (response.status === 429) {
         return {
           success: false,
-          error: { code: 'RATE_LIMITED', message: 'Gemini API rate limit exceeded', isRetryable: true },
+          error: { code: 'RATE_LIMITED', message: `Gemini API rate limit exceeded (raw: ${truncatedBody})`, isRetryable: true },
         };
       }
 
       if (response.status === 401 || response.status === 403) {
         return {
           success: false,
-          error: { code: 'API_ERROR', message: 'Gemini API authentication failed', isRetryable: false },
+          error: { code: 'API_ERROR', message: `Gemini API authentication failed (raw: ${truncatedBody})`, isRetryable: false },
         };
       }
 
       return {
         success: false,
-        error: { code: 'API_ERROR', message: `Gemini API error: ${response.status}`, isRetryable: response.status >= 500 },
+        error: { code: 'API_ERROR', message: `Gemini API error: ${response.status} (raw: ${truncatedBody})`, isRetryable: response.status >= 500 },
       };
     }
 
@@ -1638,10 +1640,12 @@ TRANSLATION_REQUIRED: Translate ALL visible text in the image and output ONLY va
     // JSONをパース
     const parsed = parseAiJsonResponse(textContent);
     if (!parsed) {
-      console.error(`Failed to parse Gemini response as JSON: ${textContent}`);
+      // [Issue #333] JSONパースエラー時にrawResponse先頭200文字をエラーメッセージに含める
+      const truncatedContent = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent;
+      console.error(`[Issue #333] Failed to parse Gemini response as JSON: ${truncatedContent}`);
       return {
         success: false,
-        error: { code: 'API_ERROR', message: 'Invalid JSON response from Gemini', isRetryable: false },
+        error: { code: 'API_ERROR', message: `Invalid JSON response from Gemini (raw: ${truncatedContent})`, isRetryable: false },
       };
     }
 
