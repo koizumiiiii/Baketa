@@ -295,17 +295,26 @@ public sealed class BonusSyncHostedService : BackgroundService, IDisposable
                 }
             }
 
+            // [Issue #332] ウェルカムボーナス付与をログ
+            if (syncResult.WelcomeBonus?.Granted == true)
+            {
+                _logger.LogInformation(
+                    "[Issue #332] ウェルカムボーナス付与完了: Amount={Amount}",
+                    syncResult.WelcomeBonus.Amount);
+            }
+
             // ボーナストークン状態を適用（成功した場合、または部分的失敗でもbonus_tokensが成功した場合）
             var failedList = syncResult.FailedComponents ?? [];
             if (syncResult.BonusTokens != null && _bonusTokenService != null && !failedList.Contains("bonus_tokens"))
             {
+                // [Issue #347] 有効期限関連フィールド削除
                 _bonusTokenService.ApplySyncedData(
                     syncResult.BonusTokens.Bonuses.Select(b => new Core.License.Models.BonusTokenInfo
                     {
                         BonusId = b.BonusId,
                         RemainingTokens = b.RemainingTokens,
-                        IsExpired = b.IsExpired,
-                        ExpiresAt = b.ExpiresAt
+                        GrantedTokens = b.GrantedTokens,
+                        UsedTokens = b.UsedTokens
                     }).ToList(),
                     syncResult.BonusTokens.TotalRemaining);
 

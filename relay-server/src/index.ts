@@ -200,15 +200,13 @@ interface BonusSyncItem {
   used_tokens: number;
 }
 
-/** Issue #280+#281: ボーナストークン情報 */
+/** Issue #280+#281+#347: ボーナストークン情報（有効期限なし） */
 interface BonusTokenInfo {
   id: string;
   source_type: string;
   granted_tokens: number;
   used_tokens: number;
   remaining_tokens: number;
-  expires_at: string;
-  is_expired: boolean;
 }
 
 // ============================================
@@ -1497,12 +1495,12 @@ async function handlePromotionRedeem(
     if (userId && tokenAmount > 0) {
       console.log(`Granting bonus tokens: user=${userId.substring(0, 8)}..., tokens=${tokenAmount.toLocaleString()}`);
 
+      // [Issue #347] 有効期限削除 - p_expires_at パラメータなし
       const { data: bonusData, error: bonusError } = await supabase.rpc('grant_bonus_tokens', {
         p_user_id: userId,
         p_source_type: 'promotion',
         p_source_id: result.redemption_id,
-        p_granted_tokens: tokenAmount,
-        p_expires_at: result.expires_at
+        p_granted_tokens: tokenAmount
       });
 
       if (bonusError) {
@@ -2053,6 +2051,32 @@ async function handleSyncInit(
       return rateLimitResponse(origin, allowedOrigins, rateLimit.resetAt);
     }
 
+    // 3.5. [Issue #332] ウェルカムボーナス自動付与（未付与の場合のみ）
+    let welcomeBonusGranted = false;
+    let welcomeBonusAmount = 0;
+    try {
+      const { data: welcomeBonusId, error: welcomeError } = await supabase.rpc(
+        'ensure_welcome_bonus_for_user',
+        { p_user_id: user.id }
+      );
+      if (welcomeError) {
+        console.error('[Issue #332] Welcome bonus check failed:', welcomeError);
+      } else if (welcomeBonusId) {
+        welcomeBonusGranted = true;
+        welcomeBonusAmount = 25000; // welcome_bonus_config.granted_tokens のデフォルト値
+        console.log(JSON.stringify({
+          event: 'welcome_bonus_granted',
+          user_id: user.id.substring(0, 8) + '...',
+          bonus_id: welcomeBonusId,
+          amount: welcomeBonusAmount,
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    } catch (welcomeErr) {
+      console.error('[Issue #332] Welcome bonus error:', welcomeErr);
+      // ウェルカムボーナス失敗は致命的ではない - 継続
+    }
+
     // 4. 全ステータスを並列取得（Promise.allSettledで部分的失敗を許容）
     const [promotionSettled, consentSettled, bonusSettled, quotaSettled] = await Promise.allSettled([
       // プロモーション状態
@@ -2112,6 +2136,7 @@ async function handleSyncInit(
     }
 
     // 7. ボーナストークン状態の整形
+    // [Issue #347] 有効期限削除 - 残高のみで判定
     let bonusTokens = { bonuses: [] as BonusTokenInfo[], total_remaining: 0, active_count: 0 };
     if (bonusSettled.status === 'fulfilled') {
       const bonusResult = bonusSettled.value;
@@ -2119,9 +2144,9 @@ async function handleSyncInit(
       bonusTokens = {
         bonuses: bonusData,
         total_remaining: bonusData
-          .filter(b => !b.is_expired && b.remaining_tokens > 0)
+          .filter(b => b.remaining_tokens > 0)
           .reduce((sum, b) => sum + b.remaining_tokens, 0),
-        active_count: bonusData.filter(b => !b.is_expired && b.remaining_tokens > 0).length,
+        active_count: bonusData.filter(b => b.remaining_tokens > 0).length,
       };
     } else {
       failures.push('bonus_tokens');
@@ -2138,6 +2163,7 @@ async function handleSyncInit(
     }
 
     // 9. 監査ログ
+    // [Issue #332] ウェルカムボーナス付与情報を追加
     const duration = Date.now() - startTime;
     console.log(JSON.stringify({
       event: 'sync_init',
@@ -2146,18 +2172,24 @@ async function handleSyncInit(
       has_consent: !!(consent.privacy_policy && consent.terms_of_service),
       bonus_count: bonusTokens.active_count,
       tokens_used: quota.tokens_used,
+      welcome_bonus_granted: welcomeBonusGranted,
       duration_ms: duration,
       partial_failures: failures.length > 0 ? failures : undefined,
       timestamp: new Date().toISOString(),
     }));
 
     // 10. 統合レスポンス（部分的失敗情報を含む）
+    // [Issue #332] ウェルカムボーナス情報を含める
     return successResponse({
       success: true,
       promotion,
       consent,
       bonus_tokens: bonusTokens,
       quota,
+      welcome_bonus: welcomeBonusGranted ? {
+        granted: true,
+        amount: welcomeBonusAmount,
+      } : undefined,
       partial_failure: failures.length > 0,
       failed_components: failures.length > 0 ? failures : undefined,
     }, origin, allowedOrigins);
@@ -2261,9 +2293,9 @@ async function handleBonusTokensStatus(
     // 5. レスポンス構築
     const bonuses: BonusTokenInfo[] = Array.isArray(data) ? data : [];
 
-    // 有効なボーナス（未期限切れで残高あり）の合計を計算
+    // [Issue #347] 有効期限削除 - 残高のみで判定
     const totalRemaining = bonuses
-      .filter(b => !b.is_expired && b.remaining_tokens > 0)
+      .filter(b => b.remaining_tokens > 0)
       .reduce((sum, b) => sum + b.remaining_tokens, 0);
 
     console.log(JSON.stringify({
@@ -2277,7 +2309,7 @@ async function handleBonusTokensStatus(
     return successResponse({
       bonuses,
       total_remaining: totalRemaining,
-      active_count: bonuses.filter(b => !b.is_expired && b.remaining_tokens > 0).length
+      active_count: bonuses.filter(b => b.remaining_tokens > 0).length
     }, origin, allowedOrigins);
 
   } catch (error) {

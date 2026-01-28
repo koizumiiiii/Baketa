@@ -1,4 +1,6 @@
 using System;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -165,6 +167,9 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 // ウィンドウを表示
                 Show();
 
+                // 🔧 [Issue #340 Follow-up] WS_EX_LAYEREDを明示的に設定（透明度の初期化問題対策）
+                EnsureLayeredWindowStyle();
+
                 // 🔧 [Issue #340] WndProcフック方式でクリックスルーを有効化
                 // WS_EX_TRANSPARENTだけではAvaloniaと競合するため、WM_NCHITTEST + HTTRANSPARENTを使用
                 _clickThroughHelper?.Dispose();
@@ -308,10 +313,11 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
                 border.CornerRadius = new CornerRadius(0);
                 border.BorderThickness = new Thickness(0);
 
-                // ブラー効果風の薄い白背景
-                border.Background = new SolidColorBrush(Color.FromArgb(230, 255, 255, 255)); // ごく薄い白（90%透明度）
+                // 🔧 [OVERLAY_TRANSPARENCY_FIX] XAMLで定義されたグラデーション背景をそのまま使用
+                // 以前のソリッドホワイト上書き（Color.FromArgb(230, 255, 255, 255)）を削除
+                // XAMLのLinearGradientBrush（Opacity=0.95）がすりガラス効果を提供
 
-                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] 視認性向上インプレーススタイル適用完了（改善モード）");
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt", "✅ [InPlaceTranslationOverlay] 視認性向上インプレーススタイル適用完了（XAMLグラデーション維持）");
             }
         }
         catch (Exception ex)
@@ -578,4 +584,55 @@ public partial class InPlaceTranslationOverlayWindow : Window, IDisposable
 
     [GeneratedRegex(@"^[0-9\s\-\.~\p{P}]+$")]
     private static partial Regex RandomNumbersAndSymbolsRegex();
+
+    #region Win32 Transparency Support
+
+    // 🔧 [Issue #340 Follow-up] WS_EX_LAYEREDを明示的に設定して透明度の初期化問題を解決
+    private const int GWL_EXSTYLE = -20;
+    private const uint WS_EX_LAYERED = 0x00080000;
+    private const uint WS_EX_TRANSPARENT = 0x00000020;
+
+    [SupportedOSPlatform("windows")]
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint GetWindowLongPtr(nint hWnd, int nIndex);
+
+    [SupportedOSPlatform("windows")]
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong);
+
+    /// <summary>
+    /// Show()後にWS_EX_LAYEREDを確実に設定して透明度を有効化
+    /// Issue #340対応後に発生した白背景問題の修正
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    private void EnsureLayeredWindowStyle()
+    {
+        try
+        {
+            var hwnd = this.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+            if (hwnd == IntPtr.Zero)
+            {
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                    "⚠️ [OVERLAY_TRANSPARENCY] Could not get window handle for layered style");
+                return;
+            }
+
+            var currentStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+            var newStyle = (nint)((uint)currentStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
+
+            if (currentStyle != newStyle)
+            {
+                SetWindowLongPtr(hwnd, GWL_EXSTYLE, newStyle);
+                Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                    $"✅ [OVERLAY_TRANSPARENCY] WS_EX_LAYERED applied - HWND: 0x{hwnd:X}, Style: 0x{currentStyle:X} → 0x{newStyle:X}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Utils.SafeFileLogger.AppendLogWithTimestamp("debug_app_logs.txt",
+                $"⚠️ [OVERLAY_TRANSPARENCY] Failed to apply WS_EX_LAYERED: {ex.Message}");
+        }
+    }
+
+    #endregion
 }

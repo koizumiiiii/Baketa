@@ -1,12 +1,12 @@
 -- ============================================================
--- Issue #280 + #281: ボーナストークンテーブル
+-- Issue #280 + #281 + #347: ボーナストークンテーブル
 -- プロモーションコード等で付与されたボーナストークンを管理
 -- ============================================================
 --
 -- 設計背景:
 -- - プロモーションを「プラン付与」ではなく「トークン付与」として扱う
 -- - 複数のプロモーションを個別に管理可能
--- - 有効期限が近い順に消費
+-- - [Issue #347] 有効期限なし（永続トークン）
 -- - CRDT G-Counterパターンで競合解決（大きい方を採用）
 -- ============================================================
 
@@ -18,15 +18,12 @@ CREATE TABLE IF NOT EXISTS bonus_tokens (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
     -- ボーナスの出所
-    source_type VARCHAR(50) NOT NULL,  -- 'promotion', 'campaign', 'referral' 等
+    source_type VARCHAR(50) NOT NULL,  -- 'promotion', 'campaign', 'referral', 'welcome' 等
     source_id UUID,                     -- promotion_code_redemptions.id 等
 
     -- トークン管理
     granted_tokens BIGINT NOT NULL,     -- 付与トークン数
     used_tokens BIGINT NOT NULL DEFAULT 0,  -- 使用済み（サーバー同期対象）
-
-    -- 有効期限
-    expires_at TIMESTAMPTZ NOT NULL,
 
     -- メタデータ
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -37,13 +34,13 @@ CREATE TABLE IF NOT EXISTS bonus_tokens (
     CONSTRAINT valid_usage CHECK (used_tokens >= 0 AND used_tokens <= granted_tokens)
 );
 
--- インデックス: ユーザーのボーナスを有効期限順に取得
-CREATE INDEX IF NOT EXISTS idx_bonus_tokens_user_expires
-ON bonus_tokens(user_id, expires_at ASC);
+-- インデックス: ユーザーのボーナスを作成日順に取得
+CREATE INDEX IF NOT EXISTS idx_bonus_tokens_user_created
+ON bonus_tokens(user_id, created_at DESC);
 
 -- インデックス: 有効なボーナスのみ取得（部分インデックス）
 CREATE INDEX IF NOT EXISTS idx_bonus_tokens_active
-ON bonus_tokens(user_id, expires_at)
+ON bonus_tokens(user_id)
 WHERE used_tokens < granted_tokens;
 
 -- インデックス: source_idで検索（プロモーションコードとの紐付け）
@@ -71,8 +68,7 @@ RETURNS TABLE (
     granted_tokens BIGINT,
     used_tokens BIGINT,
     remaining_tokens BIGINT,
-    expires_at TIMESTAMPTZ,
-    is_expired BOOLEAN
+    created_at TIMESTAMPTZ
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -93,11 +89,10 @@ BEGIN
         bt.granted_tokens,
         bt.used_tokens,
         (bt.granted_tokens - bt.used_tokens)::BIGINT AS remaining_tokens,
-        bt.expires_at,
-        (bt.expires_at < NOW())::BOOLEAN AS is_expired
+        bt.created_at
     FROM bonus_tokens bt
     WHERE bt.user_id = v_user_id
-    ORDER BY bt.expires_at ASC;
+    ORDER BY bt.created_at DESC;
 END;
 $$;
 
@@ -172,8 +167,7 @@ RETURNS TABLE (
     granted_tokens BIGINT,
     used_tokens BIGINT,
     remaining_tokens BIGINT,
-    expires_at TIMESTAMPTZ,
-    is_expired BOOLEAN
+    created_at TIMESTAMPTZ
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -191,11 +185,10 @@ BEGIN
         bt.granted_tokens,
         bt.used_tokens,
         (bt.granted_tokens - bt.used_tokens)::BIGINT AS remaining_tokens,
-        bt.expires_at,
-        (bt.expires_at < NOW())::BOOLEAN AS is_expired
+        bt.created_at
     FROM bonus_tokens bt
     WHERE bt.user_id = p_user_id
-    ORDER BY bt.expires_at ASC;
+    ORDER BY bt.created_at DESC;
 END;
 $$;
 
@@ -256,14 +249,13 @@ GRANT EXECUTE ON FUNCTION sync_bonus_tokens_for_user(UUID, JSONB) TO service_rol
 
 -- ============================================================
 -- RPC関数: ボーナストークン付与（サービスロール用）
+-- [Issue #347] p_expires_at パラメータ削除
 -- ============================================================
--- プロモーションコード適用時に呼び出される
 CREATE OR REPLACE FUNCTION grant_bonus_tokens(
     p_user_id UUID,
     p_source_type VARCHAR(50),
     p_source_id UUID,
-    p_granted_tokens BIGINT,
-    p_expires_at TIMESTAMPTZ
+    p_granted_tokens BIGINT
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -282,23 +274,17 @@ BEGIN
         RAISE EXCEPTION 'granted_tokens must be positive';
     END IF;
 
-    IF p_expires_at <= NOW() THEN
-        RAISE EXCEPTION 'expires_at must be in the future';
-    END IF;
-
-    -- ボーナス付与
+    -- ボーナス付与（有効期限なし）
     INSERT INTO bonus_tokens (
         user_id,
         source_type,
         source_id,
-        granted_tokens,
-        expires_at
+        granted_tokens
     ) VALUES (
         p_user_id,
         p_source_type,
         p_source_id,
-        p_granted_tokens,
-        p_expires_at
+        p_granted_tokens
     )
     RETURNING id INTO v_bonus_id;
 
@@ -306,15 +292,15 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION grant_bonus_tokens(UUID, VARCHAR, UUID, BIGINT, TIMESTAMPTZ) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION grant_bonus_tokens(UUID, VARCHAR, UUID, BIGINT, TIMESTAMPTZ) TO service_role;
+REVOKE ALL ON FUNCTION grant_bonus_tokens(UUID, VARCHAR, UUID, BIGINT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION grant_bonus_tokens(UUID, VARCHAR, UUID, BIGINT) TO service_role;
 
 -- ============================================================
 -- コメント
 -- ============================================================
-COMMENT ON TABLE bonus_tokens IS 'Issue #280+#281: プロモーション等で付与されたボーナストークン';
-COMMENT ON COLUMN bonus_tokens.source_type IS 'ボーナスの出所: promotion, campaign, referral等';
+COMMENT ON TABLE bonus_tokens IS 'Issue #280+#281+#347: プロモーション等で付与されたボーナストークン（永続）';
+COMMENT ON COLUMN bonus_tokens.source_type IS 'ボーナスの出所: promotion, campaign, referral, welcome等';
 COMMENT ON COLUMN bonus_tokens.source_id IS '出所の識別子（例: promotion_code_redemptions.id）';
 COMMENT ON COLUMN bonus_tokens.granted_tokens IS '付与されたトークン数';
 COMMENT ON COLUMN bonus_tokens.used_tokens IS '使用済みトークン数（CRDT G-Counterで同期）';
-COMMENT ON COLUMN bonus_tokens.expires_at IS '有効期限（これを過ぎると消費不可）';
+COMMENT ON COLUMN bonus_tokens.created_at IS '付与日時';

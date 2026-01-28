@@ -227,11 +227,33 @@ public sealed class RelayServerClient : IAsyncDisposable
         using var httpResponse = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
         var processingTime = DateTime.UtcNow - startTime;
 
-        var responseBody = await httpResponse.Content.ReadFromJsonAsync<RelayTranslateResponse>(
-            _jsonOptions, cancellationToken).ConfigureAwait(false);
+        // [Issue #333] レスポンス本体を文字列として読み込み（デバッグ用）
+        var rawResponse = await httpResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        RelayTranslateResponse? responseBody = null;
+        try
+        {
+            responseBody = JsonSerializer.Deserialize<RelayTranslateResponse>(rawResponse, _jsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            // [Issue #333] JSONパースエラー時の詳細ログ
+            var truncatedResponse = rawResponse.Length > 500 ? rawResponse[..500] + "..." : rawResponse;
+            _logger.LogError(ex,
+                "[Issue #333] JSON parse error: StatusCode={StatusCode}, RawResponse={RawResponse}",
+                (int)httpResponse.StatusCode,
+                truncatedResponse);
+        }
 
         if (responseBody == null)
         {
+            // [Issue #333] レスポンス解析失敗時の詳細ログ
+            var truncatedResponse = rawResponse.Length > 500 ? rawResponse[..500] + "..." : rawResponse;
+            _logger.LogError(
+                "[Issue #333] Empty or invalid response: StatusCode={StatusCode}, RawResponse={RawResponse}",
+                (int)httpResponse.StatusCode,
+                truncatedResponse);
+
             return ImageTranslationResponse.Failure(
                 request.RequestId,
                 new TranslationErrorDetail
@@ -246,6 +268,15 @@ public sealed class RelayServerClient : IAsyncDisposable
         // HTTPステータスコードによるエラー判定
         if (!httpResponse.IsSuccessStatusCode)
         {
+            // [Issue #333] HTTPエラー時の詳細ログ
+            var truncatedResponse = rawResponse.Length > 500 ? rawResponse[..500] + "..." : rawResponse;
+            _logger.LogWarning(
+                "[Issue #333] HTTP error: StatusCode={StatusCode}, ErrorCode={ErrorCode}, ErrorMessage={ErrorMessage}, RawResponse={RawResponse}",
+                (int)httpResponse.StatusCode,
+                responseBody.Error?.Code ?? "unknown",
+                responseBody.Error?.Message ?? "unknown",
+                truncatedResponse);
+
             var errorCode = httpResponse.StatusCode switch
             {
                 System.Net.HttpStatusCode.Unauthorized => TranslationErrorDetail.Codes.SessionInvalid,
@@ -554,6 +585,7 @@ public sealed class RelayServerClient : IAsyncDisposable
                         TermsOfServiceVersion = response.Consent.TermsOfService?.Version
                     }
                     : null,
+                // [Issue #347] 有効期限関連フィールド削除
                 BonusTokens = response.BonusTokens != null
                     ? new SyncBonusTokensStatus
                     {
@@ -563,8 +595,8 @@ public sealed class RelayServerClient : IAsyncDisposable
                         {
                             BonusId = b.BonusId ?? string.Empty,
                             RemainingTokens = b.RemainingTokens,
-                            IsExpired = b.IsExpired,
-                            ExpiresAt = b.ExpiresAt
+                            GrantedTokens = b.GrantedTokens,
+                            UsedTokens = b.UsedTokens
                         }).ToList() ?? []
                     }
                     : null,
@@ -574,6 +606,14 @@ public sealed class RelayServerClient : IAsyncDisposable
                         YearMonth = response.Quota.YearMonth ?? string.Empty,
                         TokensUsed = response.Quota.TokensUsed,
                         TokensLimit = response.Quota.TokensLimit
+                    }
+                    : null,
+                // [Issue #332] ウェルカムボーナス付与情報
+                WelcomeBonus = response.WelcomeBonus != null
+                    ? new SyncWelcomeBonusStatus
+                    {
+                        Granted = response.WelcomeBonus.Granted,
+                        Amount = response.WelcomeBonus.Amount
                     }
                     : null,
                 PartialFailure = response.PartialFailure,
@@ -793,6 +833,10 @@ public sealed class RelayServerClient : IAsyncDisposable
         [JsonPropertyName("quota")]
         public RelaySyncQuota? Quota { get; set; }
 
+        /// <summary>[Issue #332] ウェルカムボーナス付与情報</summary>
+        [JsonPropertyName("welcome_bonus")]
+        public RelaySyncWelcomeBonus? WelcomeBonus { get; set; }
+
         /// <summary>部分的失敗があったかどうか</summary>
         [JsonPropertyName("partial_failure")]
         public bool PartialFailure { get; set; }
@@ -800,6 +844,18 @@ public sealed class RelayServerClient : IAsyncDisposable
         /// <summary>失敗したコンポーネント名リスト</summary>
         [JsonPropertyName("failed_components")]
         public List<string>? FailedComponents { get; set; }
+    }
+
+    /// <summary>
+    /// [Issue #332] ウェルカムボーナス付与情報
+    /// </summary>
+    private sealed class RelaySyncWelcomeBonus
+    {
+        [JsonPropertyName("granted")]
+        public bool Granted { get; set; }
+
+        [JsonPropertyName("amount")]
+        public long Amount { get; set; }
     }
 
     private sealed class RelaySyncPromotion
@@ -859,6 +915,9 @@ public sealed class RelayServerClient : IAsyncDisposable
         public int ActiveCount { get; set; }
     }
 
+    /// <summary>
+    /// [Issue #347] 有効期限関連フィールド削除
+    /// </summary>
     private sealed class RelaySyncBonusItem
     {
         // [Issue #298] サーバーは "id" を返す（"bonus_id" ではない）
@@ -868,11 +927,11 @@ public sealed class RelayServerClient : IAsyncDisposable
         [JsonPropertyName("remaining_tokens")]
         public long RemainingTokens { get; set; }
 
-        [JsonPropertyName("is_expired")]
-        public bool IsExpired { get; set; }
+        [JsonPropertyName("granted_tokens")]
+        public long GrantedTokens { get; set; }
 
-        [JsonPropertyName("expires_at")]
-        public string? ExpiresAt { get; set; }
+        [JsonPropertyName("used_tokens")]
+        public long UsedTokens { get; set; }
     }
 
     private sealed class RelaySyncQuota
@@ -935,11 +994,26 @@ public sealed record SyncInitResponse
     /// <summary>クォータ状態</summary>
     public SyncQuotaStatus? Quota { get; init; }
 
+    /// <summary>[Issue #332] ウェルカムボーナス付与情報</summary>
+    public SyncWelcomeBonusStatus? WelcomeBonus { get; init; }
+
     /// <summary>部分的失敗があったかどうか</summary>
     public bool PartialFailure { get; init; }
 
     /// <summary>失敗したコンポーネント名リスト</summary>
     public IReadOnlyList<string>? FailedComponents { get; init; }
+}
+
+/// <summary>
+/// [Issue #332] ウェルカムボーナス付与情報
+/// </summary>
+public sealed record SyncWelcomeBonusStatus
+{
+    /// <summary>今回付与されたか</summary>
+    public bool Granted { get; init; }
+
+    /// <summary>付与量</summary>
+    public long Amount { get; init; }
 }
 
 /// <summary>
@@ -997,7 +1071,7 @@ public sealed record SyncBonusTokensStatus
 }
 
 /// <summary>
-/// [Issue #299] ボーナストークン情報
+/// [Issue #299+#347] ボーナストークン情報（有効期限削除）
 /// </summary>
 public sealed record SyncBonusTokenInfo
 {
@@ -1007,11 +1081,11 @@ public sealed record SyncBonusTokenInfo
     /// <summary>残りトークン数</summary>
     public long RemainingTokens { get; init; }
 
-    /// <summary>期限切れか</summary>
-    public bool IsExpired { get; init; }
+    /// <summary>付与されたトークン数</summary>
+    public long GrantedTokens { get; init; }
 
-    /// <summary>有効期限</summary>
-    public string? ExpiresAt { get; init; }
+    /// <summary>使用済みトークン数</summary>
+    public long UsedTokens { get; init; }
 }
 
 /// <summary>
