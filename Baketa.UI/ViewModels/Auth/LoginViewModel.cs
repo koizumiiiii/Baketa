@@ -582,7 +582,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             "weak_password" or AuthErrorCodes.WeakPassword => Resources.Strings.Auth_Error_WeakPassword,
             AuthErrorCodes.InvalidToken => Resources.Strings.Auth_Error_InvalidToken,
             AuthErrorCodes.TokenExpired => Resources.Strings.Auth_Error_TokenExpired,
-            _ => string.Format(Resources.Strings.Auth_Error_LoginFailed, message)
+            _ => Resources.Strings.Auth_Error_LoginFailed
         };
     }
 
@@ -600,7 +600,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             System.Net.Http.HttpRequestException => Resources.Strings.Auth_Error_NetworkError,
             TaskCanceledException => Resources.Strings.Auth_Error_Timeout,
             UnauthorizedAccessException => Resources.Strings.Auth_Error_InvalidToken,
-            _ => string.Format(Resources.Strings.Auth_Error_LoginFailed, ex.Message)
+            _ => Resources.Strings.Auth_Error_LoginFailed
         };
     }
 }

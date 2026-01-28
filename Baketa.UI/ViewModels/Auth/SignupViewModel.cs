@@ -619,7 +619,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             AuthErrorCodes.InvalidToken => Resources.Strings.Auth_Error_InvalidToken,
             AuthErrorCodes.TokenExpired => Resources.Strings.Auth_Error_TokenExpired,
             "signup_disabled" => Resources.Strings.Auth_Error_SignupDisabled,
-            _ => string.Format(Resources.Strings.Auth_Error_SignupFailed, message)
+            _ => Resources.Strings.Auth_Error_SignupFailed
         };
     }
 
@@ -637,7 +637,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             System.Net.Http.HttpRequestException => Resources.Strings.Auth_Error_NetworkError,
             TaskCanceledException => Resources.Strings.Auth_Error_Timeout,
             UnauthorizedAccessException => Resources.Strings.Auth_Error_InvalidToken,
-            _ => string.Format(Resources.Strings.Auth_Error_SignupFailed, ex.Message)
+            _ => Resources.Strings.Auth_Error_SignupFailed
         };
     }
 
