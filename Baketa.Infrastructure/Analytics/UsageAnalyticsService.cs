@@ -87,7 +87,7 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService, IAsyncDispos
         // 設定読み込み
         // [Issue #297] ApiKeyは不要に - セッショントークン認証に変更
         _analyticsEndpoint = configuration["Analytics:Endpoint"]
-            ?? "https://baketa-relay.suke009.workers.dev/api/analytics/events";
+            ?? "https://api.baketa.app/api/analytics/events";
         _enableInDebug = configuration.GetValue("Analytics:EnableInDebug", false);
 
         // [Issue #307] アプリバージョン取得

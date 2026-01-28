@@ -18,7 +18,7 @@ public sealed class CloudTranslationSettings
     /// </remarks>
     [SettingMetadata(SettingLevel.Advanced, "Cloud Translation", "Relay Server URL",
         Description = "Cloud AI翻訳中継サーバーのURL")]
-    public string RelayServerUrl { get; set; } = "https://baketa-relay.suke009.workers.dev";
+    public string RelayServerUrl { get; set; } = "https://api.baketa.app";
 
     /// <summary>
     /// API Key（クライアント認証用）- 非推奨

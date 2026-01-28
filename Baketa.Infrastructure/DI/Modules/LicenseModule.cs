@@ -113,7 +113,7 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddHttpClient<License.PromotionCodeService>()
             .ConfigureHttpClient((sp, client) =>
             {
-                client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+                client.BaseAddress = new Uri("https://api.baketa.app");
                 client.Timeout = TimeSpan.FromSeconds(30);
                 client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
@@ -148,7 +148,7 @@ public sealed class LicenseModule : ServiceModuleBase
         services.AddHttpClient<License.BonusTokenService>()
             .ConfigureHttpClient((sp, client) =>
             {
-                client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+                client.BaseAddress = new Uri("https://api.baketa.app");
                 client.Timeout = TimeSpan.FromSeconds(30);
                 client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
@@ -171,7 +171,7 @@ public sealed class LicenseModule : ServiceModuleBase
                 var config = sp.GetRequiredService<IConfiguration>();
                 client.BaseAddress = new Uri(
                     config["CloudTranslation:RelayServerUrl"]
-                    ?? "https://baketa-relay.suke009.workers.dev");
+                    ?? "https://api.baketa.app");
                 client.Timeout = TimeSpan.FromSeconds(30);
                 client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
