@@ -132,15 +132,16 @@ UNIQUE (user_id, year_month)
 
 ボーナストークン付与。プロモーションコードや特典で付与されるトークン。
 
+> **[Issue #347]** 有効期限（`expires_at`）は削除され、ボーナストークンは永続化されました。
+
 ```sql
 CREATE TABLE bonus_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,                  -- profiles.id
-  source_type VARCHAR NOT NULL,           -- 付与元種別
+  source_type VARCHAR NOT NULL,           -- 付与元種別 (promotion, welcome, referral など)
   source_id UUID,                         -- 付与元ID (promotion_codes.id など)
   granted_tokens BIGINT NOT NULL,         -- 付与トークン数
   used_tokens BIGINT NOT NULL DEFAULT 0,  -- 使用済みトークン数
-  expires_at TIMESTAMPTZ NOT NULL,        -- 有効期限
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -150,11 +151,10 @@ CREATE TABLE bonus_tokens (
 |--------|-----|------|------|
 | `id` | UUID | NO | レコードID |
 | `user_id` | UUID | NO | ユーザーID |
-| `source_type` | VARCHAR | NO | 付与元種別 (`promotion`, `referral` など) |
+| `source_type` | VARCHAR | NO | 付与元種別 (`promotion`, `welcome`, `referral` など) |
 | `source_id` | UUID | YES | 付与元ID |
 | `granted_tokens` | BIGINT | NO | 付与トークン数 |
 | `used_tokens` | BIGINT | NO | 使用済みトークン数 |
-| `expires_at` | TIMESTAMPTZ | NO | 有効期限 |
 | `created_at` | TIMESTAMPTZ | NO | 作成日時 |
 | `updated_at` | TIMESTAMPTZ | NO | 更新日時 |
 

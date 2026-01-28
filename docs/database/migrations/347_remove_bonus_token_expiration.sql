@@ -37,6 +37,9 @@ WHERE used_tokens < granted_tokens;
 -- ============================================================
 -- Step 4: RPC関数の更新 - get_bonus_tokens()
 -- ============================================================
+-- 戻り値型が変わるため、先に削除が必要
+DROP FUNCTION IF EXISTS get_bonus_tokens();
+
 CREATE OR REPLACE FUNCTION get_bonus_tokens()
 RETURNS TABLE (
     id UUID,
@@ -75,6 +78,9 @@ $$;
 -- ============================================================
 -- Step 5: RPC関数の更新 - get_bonus_tokens_for_user()
 -- ============================================================
+-- 戻り値型が変わるため、先に削除が必要
+DROP FUNCTION IF EXISTS get_bonus_tokens_for_user(UUID);
+
 CREATE OR REPLACE FUNCTION get_bonus_tokens_for_user(p_user_id UUID)
 RETURNS TABLE (
     id UUID,
