@@ -1,0 +1,12 @@
+# Issue #179: Supabase Project Configuration
+# https://supabase.com/docs/guides/cli/config
+
+[project]
+id = "kajsoietcikivrwidqcs"
+
+[auth]
+# カスタムメールフックを有効化
+# Edge Functionでメール送信を処理
+[auth.hook.send_email]
+enabled = true
+uri = "pg-functions://supabase_functions_admin/send-auth-email"
