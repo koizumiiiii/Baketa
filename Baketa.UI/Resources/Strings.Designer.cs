@@ -456,6 +456,36 @@ public static class Strings
     public static string Error_PasswordMismatch => GetString("Error_PasswordMismatch");
     public static string Error_SignupFailed => GetString("Error_SignupFailed");
 
+    // ========== Auth Error Messages ==========
+
+    public static string Auth_Error_UserAlreadyExists => GetString("Auth_Error_UserAlreadyExists");
+    public static string Auth_Error_WeakPassword => GetString("Auth_Error_WeakPassword");
+    public static string Auth_Error_InvalidCredentials => GetString("Auth_Error_InvalidCredentials");
+    public static string Auth_Error_InvalidEmail => GetString("Auth_Error_InvalidEmail");
+    public static string Auth_Error_EmailNotConfirmed => GetString("Auth_Error_EmailNotConfirmed");
+    public static string Auth_Error_RateLimitExceeded => GetString("Auth_Error_RateLimitExceeded");
+    public static string Auth_Error_SignupDisabled => GetString("Auth_Error_SignupDisabled");
+    public static string Auth_Error_SignupFailed => GetString("Auth_Error_SignupFailed");
+    public static string Auth_Error_LoginFailed => GetString("Auth_Error_LoginFailed");
+    public static string Auth_Error_InvalidToken => GetString("Auth_Error_InvalidToken");
+    public static string Auth_Error_TokenExpired => GetString("Auth_Error_TokenExpired");
+    public static string Auth_Error_NetworkError => GetString("Auth_Error_NetworkError");
+    public static string Auth_Error_Timeout => GetString("Auth_Error_Timeout");
+    public static string Auth_Error_Unknown => GetString("Auth_Error_Unknown");
+
+    // ========== Auth Success Messages ==========
+
+    public static string Auth_Success_EmailSent => GetString("Auth_Success_EmailSent");
+    public static string Auth_Success_PasswordResetEmailSent => GetString("Auth_Success_PasswordResetEmailSent");
+    public static string Auth_Error_PasswordResetFailed => GetString("Auth_Error_PasswordResetFailed");
+    public static string Auth_Error_PasswordResetError => GetString("Auth_Error_PasswordResetError");
+
+    // ========== Auth Validation Messages ==========
+
+    public static string Auth_Validation_InvalidEmail => GetString("Auth_Validation_InvalidEmail");
+    public static string Auth_Validation_PasswordRequirement => GetString("Auth_Validation_PasswordRequirement");
+    public static string Auth_Validation_PasswordMismatch => GetString("Auth_Validation_PasswordMismatch");
+
     // ========== Confirmation Dialogs ==========
 
     public static string Dialog_LogoutConfirm => GetString("Dialog_LogoutConfirm");

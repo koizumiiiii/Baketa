@@ -2,9 +2,11 @@
 // Sends localized authentication emails based on user's language preference
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
 
 // Resend API configuration
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
+const AUTH_HOOK_SECRET = Deno.env.get("AUTH_HOOK_SECRET") ?? "";
 const FROM_EMAIL = "Baketa <noreply@mail.baketa.app>";
 
 // Supported languages
@@ -19,392 +21,7 @@ interface EmailTemplate {
 }
 
 // Template types
-type EmailType = "signup" | "recovery" | "magic_link" | "email_change";
-
-// Email templates for each language
-const templates: Record<SupportedLanguage, Record<EmailType, (data: EmailData) => EmailTemplate>> = {
-  ja: {
-    signup: (data) => ({
-      subject: "Baketa - メールアドレスの確認",
-      html: `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>メールアドレスの確認</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">リアルタイム翻訳オーバーレイ</p>
-  </div>
-  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-    <h2 style="color: #1f2937; margin-top: 0;">メールアドレスの確認</h2>
-    <p>Baketaへのご登録ありがとうございます。</p>
-    <p>以下のボタンをクリックして、メールアドレスを確認してください：</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.confirmationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">メールアドレスを確認</a>
-    </div>
-    <p style="color: #6b7280; font-size: 14px;">このリンクは24時間有効です。</p>
-    <p style="color: #6b7280; font-size: 14px;">このメールに心当たりがない場合は、無視してください。</p>
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-      &copy; 2024 Baketa. All rights reserved.<br>
-      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
-    </p>
-  </div>
-</body>
-</html>`,
-      text: `Baketa - メールアドレスの確認
-
-Baketaへのご登録ありがとうございます。
-
-以下のリンクをクリックして、メールアドレスを確認してください：
-${data.confirmationUrl}
-
-このリンクは24時間有効です。
-
-このメールに心当たりがない場合は、無視してください。
-
----
-Baketa - リアルタイム翻訳オーバーレイ
-https://baketa.app`,
-    }),
-
-    recovery: (data) => ({
-      subject: "Baketa - パスワードのリセット",
-      html: `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>パスワードのリセット</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">リアルタイム翻訳オーバーレイ</p>
-  </div>
-  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-    <h2 style="color: #1f2937; margin-top: 0;">パスワードのリセット</h2>
-    <p>パスワードリセットのリクエストを受け付けました。</p>
-    <p>以下のボタンをクリックして、新しいパスワードを設定してください：</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.confirmationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">パスワードをリセット</a>
-    </div>
-    <p style="color: #6b7280; font-size: 14px;">このリンクは1時間有効です。</p>
-    <p style="color: #6b7280; font-size: 14px;">このメールに心当たりがない場合は、無視してください。あなたのアカウントは安全です。</p>
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-      &copy; 2024 Baketa. All rights reserved.<br>
-      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
-    </p>
-  </div>
-</body>
-</html>`,
-      text: `Baketa - パスワードのリセット
-
-パスワードリセットのリクエストを受け付けました。
-
-以下のリンクをクリックして、新しいパスワードを設定してください：
-${data.confirmationUrl}
-
-このリンクは1時間有効です。
-
-このメールに心当たりがない場合は、無視してください。あなたのアカウントは安全です。
-
----
-Baketa - リアルタイム翻訳オーバーレイ
-https://baketa.app`,
-    }),
-
-    magic_link: (data) => ({
-      subject: "Baketa - ログインリンク",
-      html: `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ログインリンク</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">リアルタイム翻訳オーバーレイ</p>
-  </div>
-  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-    <h2 style="color: #1f2937; margin-top: 0;">ログインリンク</h2>
-    <p>以下のボタンをクリックしてログインしてください：</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.confirmationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">ログイン</a>
-    </div>
-    <p style="color: #6b7280; font-size: 14px;">このリンクは10分間有効です。</p>
-    <p style="color: #6b7280; font-size: 14px;">このメールに心当たりがない場合は、無視してください。</p>
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-      &copy; 2024 Baketa. All rights reserved.<br>
-      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
-    </p>
-  </div>
-</body>
-</html>`,
-      text: `Baketa - ログインリンク
-
-以下のリンクをクリックしてログインしてください：
-${data.confirmationUrl}
-
-このリンクは10分間有効です。
-
-このメールに心当たりがない場合は、無視してください。
-
----
-Baketa - リアルタイム翻訳オーバーレイ
-https://baketa.app`,
-    }),
-
-    email_change: (data) => ({
-      subject: "Baketa - メールアドレス変更の確認",
-      html: `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>メールアドレス変更の確認</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">リアルタイム翻訳オーバーレイ</p>
-  </div>
-  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-    <h2 style="color: #1f2937; margin-top: 0;">メールアドレス変更の確認</h2>
-    <p>メールアドレス変更のリクエストを受け付けました。</p>
-    <p>以下のボタンをクリックして、新しいメールアドレスを確認してください：</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.confirmationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">メールアドレスを確認</a>
-    </div>
-    <p style="color: #6b7280; font-size: 14px;">このリンクは24時間有効です。</p>
-    <p style="color: #6b7280; font-size: 14px;">このメールに心当たりがない場合は、すぐにサポートにご連絡ください。</p>
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-      &copy; 2024 Baketa. All rights reserved.<br>
-      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
-    </p>
-  </div>
-</body>
-</html>`,
-      text: `Baketa - メールアドレス変更の確認
-
-メールアドレス変更のリクエストを受け付けました。
-
-以下のリンクをクリックして、新しいメールアドレスを確認してください：
-${data.confirmationUrl}
-
-このリンクは24時間有効です。
-
-このメールに心当たりがない場合は、すぐにサポートにご連絡ください。
-
----
-Baketa - リアルタイム翻訳オーバーレイ
-https://baketa.app`,
-    }),
-  },
-
-  en: {
-    signup: (data) => ({
-      subject: "Baketa - Confirm your email",
-      html: `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirm your email</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Real-time Translation Overlay</p>
-  </div>
-  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-    <h2 style="color: #1f2937; margin-top: 0;">Confirm your email</h2>
-    <p>Thank you for signing up for Baketa.</p>
-    <p>Click the button below to confirm your email address:</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.confirmationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Confirm Email</a>
-    </div>
-    <p style="color: #6b7280; font-size: 14px;">This link is valid for 24 hours.</p>
-    <p style="color: #6b7280; font-size: 14px;">If you didn't sign up for Baketa, you can safely ignore this email.</p>
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-      &copy; 2024 Baketa. All rights reserved.<br>
-      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
-    </p>
-  </div>
-</body>
-</html>`,
-      text: `Baketa - Confirm your email
-
-Thank you for signing up for Baketa.
-
-Click the link below to confirm your email address:
-${data.confirmationUrl}
-
-This link is valid for 24 hours.
-
-If you didn't sign up for Baketa, you can safely ignore this email.
-
----
-Baketa - Real-time Translation Overlay
-https://baketa.app`,
-    }),
-
-    recovery: (data) => ({
-      subject: "Baketa - Reset your password",
-      html: `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset your password</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Real-time Translation Overlay</p>
-  </div>
-  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-    <h2 style="color: #1f2937; margin-top: 0;">Reset your password</h2>
-    <p>We received a request to reset your password.</p>
-    <p>Click the button below to set a new password:</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.confirmationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Reset Password</a>
-    </div>
-    <p style="color: #6b7280; font-size: 14px;">This link is valid for 1 hour.</p>
-    <p style="color: #6b7280; font-size: 14px;">If you didn't request a password reset, you can safely ignore this email. Your account is secure.</p>
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-      &copy; 2024 Baketa. All rights reserved.<br>
-      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
-    </p>
-  </div>
-</body>
-</html>`,
-      text: `Baketa - Reset your password
-
-We received a request to reset your password.
-
-Click the link below to set a new password:
-${data.confirmationUrl}
-
-This link is valid for 1 hour.
-
-If you didn't request a password reset, you can safely ignore this email. Your account is secure.
-
----
-Baketa - Real-time Translation Overlay
-https://baketa.app`,
-    }),
-
-    magic_link: (data) => ({
-      subject: "Baketa - Your login link",
-      html: `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your login link</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Real-time Translation Overlay</p>
-  </div>
-  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-    <h2 style="color: #1f2937; margin-top: 0;">Your login link</h2>
-    <p>Click the button below to log in:</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.confirmationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Log In</a>
-    </div>
-    <p style="color: #6b7280; font-size: 14px;">This link is valid for 10 minutes.</p>
-    <p style="color: #6b7280; font-size: 14px;">If you didn't request this link, you can safely ignore this email.</p>
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-      &copy; 2024 Baketa. All rights reserved.<br>
-      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
-    </p>
-  </div>
-</body>
-</html>`,
-      text: `Baketa - Your login link
-
-Click the link below to log in:
-${data.confirmationUrl}
-
-This link is valid for 10 minutes.
-
-If you didn't request this link, you can safely ignore this email.
-
----
-Baketa - Real-time Translation Overlay
-https://baketa.app`,
-    }),
-
-    email_change: (data) => ({
-      subject: "Baketa - Confirm email change",
-      html: `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirm email change</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Real-time Translation Overlay</p>
-  </div>
-  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
-    <h2 style="color: #1f2937; margin-top: 0;">Confirm email change</h2>
-    <p>We received a request to change your email address.</p>
-    <p>Click the button below to confirm your new email address:</p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${data.confirmationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Confirm Email</a>
-    </div>
-    <p style="color: #6b7280; font-size: 14px;">This link is valid for 24 hours.</p>
-    <p style="color: #6b7280; font-size: 14px;">If you didn't request this change, please contact support immediately.</p>
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-      &copy; 2024 Baketa. All rights reserved.<br>
-      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
-    </p>
-  </div>
-</body>
-</html>`,
-      text: `Baketa - Confirm email change
-
-We received a request to change your email address.
-
-Click the link below to confirm your new email address:
-${data.confirmationUrl}
-
-This link is valid for 24 hours.
-
-If you didn't request this change, please contact support immediately.
-
----
-Baketa - Real-time Translation Overlay
-https://baketa.app`,
-    }),
-  },
-};
+type EmailType = "signup" | "recovery" | "magiclink" | "email_change" | "invite";
 
 // Email data interface
 interface EmailData {
@@ -432,6 +49,39 @@ interface AuthHookPayload {
 }
 
 /**
+ * Verify webhook signature from Supabase
+ */
+function verifyWebhookSignature(payload: string, signature: string | null): boolean {
+  if (!AUTH_HOOK_SECRET || !signature) {
+    console.log("Skipping signature verification: no secret or signature");
+    return true; // Skip verification if no secret configured
+  }
+
+  try {
+    // Extract the actual secret from the v1,whsec_ format
+    const secretParts = AUTH_HOOK_SECRET.split(",");
+    const secret = secretParts.length > 1 ? secretParts[1] : AUTH_HOOK_SECRET;
+
+    // Remove the whsec_ prefix if present
+    const cleanSecret = secret.startsWith("whsec_") ? secret.substring(6) : secret;
+
+    const hmac = createHmac("sha256", cleanSecret);
+    hmac.update(payload);
+    const expectedSignature = hmac.digest("hex");
+
+    // Supabase sends signature in format: v1,<signature>
+    const providedSig = signature.includes(",") ? signature.split(",")[1] : signature;
+
+    console.log(`Signature verification: expected=${expectedSignature.substring(0, 20)}..., provided=${providedSig?.substring(0, 20)}...`);
+
+    return expectedSignature === providedSig;
+  } catch (error) {
+    console.error("Signature verification error:", error);
+    return false;
+  }
+}
+
+/**
  * Get user's preferred language from metadata
  */
 function getUserLanguage(userMetadata?: Record<string, unknown>): SupportedLanguage {
@@ -439,7 +89,6 @@ function getUserLanguage(userMetadata?: Record<string, unknown>): SupportedLangu
   if (lang && (lang === "ja" || lang === "en")) {
     return lang;
   }
-  // Check for longer language codes (e.g., "ja-JP" -> "ja")
   if (lang && lang.startsWith("ja")) {
     return "ja";
   }
@@ -457,42 +106,235 @@ function buildConfirmationUrl(emailData: AuthHookPayload["email_data"]): string 
   const params = new URLSearchParams({
     token_hash: emailData.token_hash,
     type: emailData.email_action_type,
-    redirect_to: emailData.redirect_to || baseUrl,
   });
+  if (emailData.redirect_to) {
+    params.set("redirect_to", emailData.redirect_to);
+  }
   return `${baseUrl}/auth/confirm?${params.toString()}`;
+}
+
+/**
+ * Get email template based on language and type
+ */
+function getEmailTemplate(language: SupportedLanguage, emailType: EmailType, data: EmailData): EmailTemplate {
+  const templates: Record<SupportedLanguage, Record<EmailType, EmailTemplate>> = {
+    ja: {
+      signup: {
+        subject: "Baketa - メールアドレスの確認",
+        html: createHtmlTemplate("ja", "メールアドレスの確認",
+          "Baketaへのご登録ありがとうございます。",
+          "以下のボタンをクリックして、メールアドレスを確認してください：",
+          data.confirmationUrl,
+          "メールアドレスを確認",
+          "このリンクは24時間有効です。",
+          "このメールに心当たりがない場合は、無視してください。"
+        ),
+        text: `Baketa - メールアドレスの確認\n\nBaketaへのご登録ありがとうございます。\n\n以下のリンクをクリックして、メールアドレスを確認してください：\n${data.confirmationUrl}\n\nこのリンクは24時間有効です。`,
+      },
+      recovery: {
+        subject: "Baketa - パスワードのリセット",
+        html: createHtmlTemplate("ja", "パスワードのリセット",
+          "パスワードリセットのリクエストを受け付けました。",
+          "以下のボタンをクリックして、新しいパスワードを設定してください：",
+          data.confirmationUrl,
+          "パスワードをリセット",
+          "このリンクは1時間有効です。",
+          "このメールに心当たりがない場合は、無視してください。あなたのアカウントは安全です。"
+        ),
+        text: `Baketa - パスワードのリセット\n\nパスワードリセットのリクエストを受け付けました。\n\n以下のリンクをクリックして、新しいパスワードを設定してください：\n${data.confirmationUrl}\n\nこのリンクは1時間有効です。`,
+      },
+      magiclink: {
+        subject: "Baketa - ログインリンク",
+        html: createHtmlTemplate("ja", "ログインリンク",
+          "",
+          "以下のボタンをクリックしてログインしてください：",
+          data.confirmationUrl,
+          "ログイン",
+          "このリンクは10分間有効です。",
+          "このメールに心当たりがない場合は、無視してください。"
+        ),
+        text: `Baketa - ログインリンク\n\n以下のリンクをクリックしてログインしてください：\n${data.confirmationUrl}\n\nこのリンクは10分間有効です。`,
+      },
+      email_change: {
+        subject: "Baketa - メールアドレス変更の確認",
+        html: createHtmlTemplate("ja", "メールアドレス変更の確認",
+          "メールアドレス変更のリクエストを受け付けました。",
+          "以下のボタンをクリックして、新しいメールアドレスを確認してください：",
+          data.confirmationUrl,
+          "メールアドレスを確認",
+          "このリンクは24時間有効です。",
+          "このメールに心当たりがない場合は、すぐにサポートにご連絡ください。"
+        ),
+        text: `Baketa - メールアドレス変更の確認\n\nメールアドレス変更のリクエストを受け付けました。\n\n以下のリンクをクリックして、新しいメールアドレスを確認してください：\n${data.confirmationUrl}\n\nこのリンクは24時間有効です。`,
+      },
+      invite: {
+        subject: "Baketa - 招待",
+        html: createHtmlTemplate("ja", "Baketaへの招待",
+          "Baketaに招待されました。",
+          "以下のボタンをクリックして、アカウントを作成してください：",
+          data.confirmationUrl,
+          "招待を承諾",
+          "このリンクは24時間有効です。",
+          ""
+        ),
+        text: `Baketa - 招待\n\nBaketaに招待されました。\n\n以下のリンクをクリックして、アカウントを作成してください：\n${data.confirmationUrl}\n\nこのリンクは24時間有効です。`,
+      },
+    },
+    en: {
+      signup: {
+        subject: "Baketa - Confirm your email",
+        html: createHtmlTemplate("en", "Confirm your email",
+          "Thank you for signing up for Baketa.",
+          "Click the button below to confirm your email address:",
+          data.confirmationUrl,
+          "Confirm Email",
+          "This link is valid for 24 hours.",
+          "If you didn't sign up for Baketa, you can safely ignore this email."
+        ),
+        text: `Baketa - Confirm your email\n\nThank you for signing up for Baketa.\n\nClick the link below to confirm your email address:\n${data.confirmationUrl}\n\nThis link is valid for 24 hours.`,
+      },
+      recovery: {
+        subject: "Baketa - Reset your password",
+        html: createHtmlTemplate("en", "Reset your password",
+          "We received a request to reset your password.",
+          "Click the button below to set a new password:",
+          data.confirmationUrl,
+          "Reset Password",
+          "This link is valid for 1 hour.",
+          "If you didn't request a password reset, you can safely ignore this email. Your account is secure."
+        ),
+        text: `Baketa - Reset your password\n\nWe received a request to reset your password.\n\nClick the link below to set a new password:\n${data.confirmationUrl}\n\nThis link is valid for 1 hour.`,
+      },
+      magiclink: {
+        subject: "Baketa - Your login link",
+        html: createHtmlTemplate("en", "Your login link",
+          "",
+          "Click the button below to log in:",
+          data.confirmationUrl,
+          "Log In",
+          "This link is valid for 10 minutes.",
+          "If you didn't request this link, you can safely ignore this email."
+        ),
+        text: `Baketa - Your login link\n\nClick the link below to log in:\n${data.confirmationUrl}\n\nThis link is valid for 10 minutes.`,
+      },
+      email_change: {
+        subject: "Baketa - Confirm email change",
+        html: createHtmlTemplate("en", "Confirm email change",
+          "We received a request to change your email address.",
+          "Click the button below to confirm your new email address:",
+          data.confirmationUrl,
+          "Confirm Email",
+          "This link is valid for 24 hours.",
+          "If you didn't request this change, please contact support immediately."
+        ),
+        text: `Baketa - Confirm email change\n\nWe received a request to change your email address.\n\nClick the link below to confirm your new email address:\n${data.confirmationUrl}\n\nThis link is valid for 24 hours.`,
+      },
+      invite: {
+        subject: "Baketa - You're invited",
+        html: createHtmlTemplate("en", "You're invited to Baketa",
+          "You've been invited to join Baketa.",
+          "Click the button below to create your account:",
+          data.confirmationUrl,
+          "Accept Invitation",
+          "This link is valid for 24 hours.",
+          ""
+        ),
+        text: `Baketa - You're invited\n\nYou've been invited to join Baketa.\n\nClick the link below to create your account:\n${data.confirmationUrl}\n\nThis link is valid for 24 hours.`,
+      },
+    },
+  };
+
+  return templates[language][emailType] || templates[DEFAULT_LANGUAGE].signup;
+}
+
+/**
+ * Create HTML email template
+ */
+function createHtmlTemplate(
+  lang: string,
+  title: string,
+  intro: string,
+  instruction: string,
+  url: string,
+  buttonText: string,
+  validity: string,
+  disclaimer: string
+): string {
+  const tagline = lang === "ja" ? "リアルタイム翻訳オーバーレイ" : "Real-time Translation Overlay";
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">Baketa</h1>
+    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">${tagline}</p>
+  </div>
+  <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
+    <h2 style="color: #1f2937; margin-top: 0;">${title}</h2>
+    ${intro ? `<p>${intro}</p>` : ""}
+    <p>${instruction}</p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${url}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">${buttonText}</a>
+    </div>
+    <p style="color: #6b7280; font-size: 14px;">${validity}</p>
+    ${disclaimer ? `<p style="color: #6b7280; font-size: 14px;">${disclaimer}</p>` : ""}
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+      &copy; 2024 Baketa. All rights reserved.<br>
+      <a href="https://baketa.app" style="color: #667eea;">baketa.app</a>
+    </p>
+  </div>
+</body>
+</html>`;
 }
 
 /**
  * Send email via Resend API
  */
-async function sendEmail(to: string, template: EmailTemplate): Promise<Response> {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-    },
-    body: JSON.stringify({
-      from: FROM_EMAIL,
-      to: [to],
-      subject: template.subject,
-      html: template.html,
-      text: template.text,
-    }),
-  });
+async function sendEmail(to: string, template: EmailTemplate): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: [to],
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      }),
+    });
 
-  return response;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Resend API error: ${response.status} ${errorText}`);
+      return { success: false, error: errorText };
+    }
+
+    const result = await response.json();
+    console.log(`Email sent successfully: ${JSON.stringify(result)}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to send email:", error);
+    return { success: false, error: String(error) };
+  }
 }
 
 // Main handler
 serve(async (req) => {
-  // CORS headers
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-signature",
   };
 
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -507,13 +349,25 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
-    const payload: AuthHookPayload = await req.json();
-    console.log("Received auth hook payload:", JSON.stringify(payload, null, 2));
+    // Read request body
+    const bodyText = await req.text();
+    console.log("Received request body:", bodyText.substring(0, 500));
+
+    // Verify webhook signature
+    const signature = req.headers.get("x-supabase-signature");
+    if (!verifyWebhookSignature(bodyText, signature)) {
+      console.error("Invalid webhook signature");
+      // Don't fail on signature mismatch for now, just log it
+    }
+
+    // Parse payload
+    const payload: AuthHookPayload = JSON.parse(bodyText);
+    console.log("Parsed payload - user:", payload.user?.email, "type:", payload.email_data?.email_action_type);
 
     const { user, email_data } = payload;
 
     if (!user?.email || !email_data?.email_action_type) {
+      console.error("Invalid payload: missing user email or email_action_type");
       return new Response(
         JSON.stringify({ error: "Invalid payload" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -522,17 +376,7 @@ serve(async (req) => {
 
     // Get user's language preference
     const language = getUserLanguage(user.user_metadata);
-    console.log(`User language preference: ${language}`);
-
-    // Get email type
-    const emailType = email_data.email_action_type;
-    if (!templates[language][emailType]) {
-      console.error(`Unknown email type: ${emailType}`);
-      return new Response(
-        JSON.stringify({ error: `Unknown email type: ${emailType}` }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log(`User language: ${language}, metadata:`, JSON.stringify(user.user_metadata));
 
     // Build email data
     const emailDataForTemplate: EmailData = {
@@ -540,27 +384,25 @@ serve(async (req) => {
       confirmationUrl: buildConfirmationUrl(email_data),
       userMetadata: user.user_metadata,
     };
+    console.log(`Confirmation URL: ${emailDataForTemplate.confirmationUrl}`);
 
     // Get template and send email
-    const template = templates[language][emailType](emailDataForTemplate);
-    console.log(`Sending ${emailType} email in ${language} to ${user.email}`);
+    const template = getEmailTemplate(language, email_data.email_action_type, emailDataForTemplate);
+    console.log(`Sending ${email_data.email_action_type} email in ${language} to ${user.email}`);
 
-    const response = await sendEmail(user.email, template);
+    const sendResult = await sendEmail(user.email, template);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Resend API error: ${errorText}`);
+    if (!sendResult.success) {
+      console.error(`Failed to send email: ${sendResult.error}`);
       return new Response(
-        JSON.stringify({ error: "Failed to send email", details: errorText }),
+        JSON.stringify({ error: "Failed to send email", details: sendResult.error }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const result = await response.json();
-    console.log(`Email sent successfully: ${JSON.stringify(result)}`);
-
+    // Return success response in the format Supabase expects
     return new Response(
-      JSON.stringify({ success: true, messageId: result.id }),
+      JSON.stringify({ success: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

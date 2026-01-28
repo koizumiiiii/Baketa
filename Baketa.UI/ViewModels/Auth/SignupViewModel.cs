@@ -182,21 +182,21 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         var emailRule = this.ValidationRule(
             vm => vm.Email,
             email => !string.IsNullOrWhiteSpace(email) && IsValidEmail(email),
-            "有効なメールアドレスを入力してください");
+            Resources.Strings.Auth_Validation_InvalidEmail);
         Disposables.Add(emailRule);
 
         // Passwordバリデーション（パスワード強度バリデーターを使用）
         var passwordRule = this.ValidationRule(
             vm => vm.Password,
             password => IsValidPassword(password),
-            "パスワードは8文字以上で、大文字・小文字・数字・記号のうち3種類以上を含む必要があります");
+            Resources.Strings.Auth_Validation_PasswordRequirement);
         Disposables.Add(passwordRule);
 
         // ConfirmPasswordバリデーション
         var confirmPasswordRule = this.ValidationRule(
             vm => vm.ConfirmPassword,
             confirmPassword => confirmPassword == Password,
-            "パスワードが一致しません");
+            Resources.Strings.Auth_Validation_PasswordMismatch);
         Disposables.Add(confirmPasswordRule);
     }
 
@@ -608,16 +608,18 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <returns>ユーザーフレンドリーなエラーメッセージ</returns>
     private static string GetAuthFailureMessage(string errorCode, string message)
     {
-        // 🔥 [FIX] AuthErrorCodes定数を使用（大文字小文字の不一致を修正）
+        // [Issue #179] ローカライズされたエラーメッセージを使用
         return errorCode switch
         {
-            AuthErrorCodes.UserAlreadyExists => "このメールアドレスは既に使用されています",
-            AuthErrorCodes.WeakPassword => "パスワードが弱すぎます。より強固なパスワードを設定してください",
-            AuthErrorCodes.InvalidCredentials => "無効なメールアドレス形式です",
-            AuthErrorCodes.EmailNotConfirmed => "確認メールを送信しました。メール内のリンクをクリックしてから、ログイン画面でログインしてください。",
-            AuthErrorCodes.RateLimitExceeded => "リクエストが多すぎます。しばらく時間をおいてから再試行してください",
-            "signup_disabled" => "現在、新規アカウント作成を停止しています",
-            _ => $"アカウント作成に失敗しました: {message}"
+            AuthErrorCodes.UserAlreadyExists => Resources.Strings.Auth_Error_UserAlreadyExists,
+            AuthErrorCodes.WeakPassword => Resources.Strings.Auth_Error_WeakPassword,
+            AuthErrorCodes.InvalidCredentials => Resources.Strings.Auth_Error_InvalidCredentials,
+            AuthErrorCodes.EmailNotConfirmed => Resources.Strings.Auth_Error_EmailNotConfirmed,
+            AuthErrorCodes.RateLimitExceeded => Resources.Strings.Auth_Error_RateLimitExceeded,
+            AuthErrorCodes.InvalidToken => Resources.Strings.Auth_Error_InvalidToken,
+            AuthErrorCodes.TokenExpired => Resources.Strings.Auth_Error_TokenExpired,
+            "signup_disabled" => Resources.Strings.Auth_Error_SignupDisabled,
+            _ => string.Format(Resources.Strings.Auth_Error_SignupFailed, message)
         };
     }
 
@@ -628,13 +630,14 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <returns>エラーメッセージ</returns>
     private static string GetUserFriendlyErrorMessage(Exception ex)
     {
+        // [Issue #179] ローカライズされたエラーメッセージを使用
         return ex switch
         {
-            TimeoutException => "接続がタイムアウトしました。インターネット接続をご確認ください",
-            System.Net.Http.HttpRequestException => "サーバーに接続できませんでした。インターネット接続をご確認ください",
-            TaskCanceledException => "処理がキャンセルされました",
-            UnauthorizedAccessException => "認証に失敗しました",
-            _ => $"予期しないエラーが発生しました: {ex.Message}"
+            TimeoutException => Resources.Strings.Auth_Error_Timeout,
+            System.Net.Http.HttpRequestException => Resources.Strings.Auth_Error_NetworkError,
+            TaskCanceledException => Resources.Strings.Auth_Error_Timeout,
+            UnauthorizedAccessException => Resources.Strings.Auth_Error_InvalidToken,
+            _ => string.Format(Resources.Strings.Auth_Error_SignupFailed, ex.Message)
         };
     }
 

@@ -513,7 +513,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             if (success)
             {
                 // 成功メッセージを表示（ErrorMessageフィールドを情報表示にも使用）
-                ErrorMessage = "パスワードリセットメールを送信しました。メールをご確認ください。";
+                ErrorMessage = Resources.Strings.Auth_Success_PasswordResetEmailSent;
 
                 // セキュリティ監査ログ
                 _auditLogger.LogSecurityEvent(
@@ -523,7 +523,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             }
             else
             {
-                ErrorMessage = "パスワードリセットに失敗しました。メールアドレスを確認してください。";
+                ErrorMessage = Resources.Strings.Auth_Error_PasswordResetFailed;
 
                 // 失敗ログ
                 _auditLogger.LogSecurityEvent(
@@ -536,7 +536,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         {
             var sanitizedEmail = InputValidator.SanitizeInput(Email);
             _logger?.LogError(ex, "パスワードリセット実行エラー: {Email}", sanitizedEmail);
-            ErrorMessage = "パスワードリセットの処理中にエラーが発生しました。";
+            ErrorMessage = Resources.Strings.Auth_Error_PasswordResetError;
 
             // エラーログ
             _auditLogger.LogSecurityEvent(
@@ -572,14 +572,17 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     /// <returns>ユーザーフレンドリーなエラーメッセージ</returns>
     private static string GetAuthFailureMessage(string errorCode, string message)
     {
+        // [Issue #179] ローカライズされたエラーメッセージを使用
         return errorCode switch
         {
-            "invalid_credentials" => "メールアドレスまたはパスワードが正しくありません",
-            "email_not_confirmed" => "メールアドレスが確認されていません。確認メールをご確認ください",
-            "too_many_requests" => "ログイン試行回数が上限に達しました。しばらく時間をおいてから再試行してください",
-            "user_not_found" => "アカウントが見つかりません",
-            "weak_password" => "パスワードが弱すぎます",
-            _ => $"ログインに失敗しました: {message}"
+            "invalid_credentials" or AuthErrorCodes.InvalidCredentials => Resources.Strings.Auth_Error_InvalidEmail,
+            "email_not_confirmed" or AuthErrorCodes.EmailNotConfirmed => Resources.Strings.Auth_Error_EmailNotConfirmed,
+            "too_many_requests" or AuthErrorCodes.RateLimitExceeded => Resources.Strings.Auth_Error_RateLimitExceeded,
+            "user_not_found" => Resources.Strings.Auth_Error_InvalidEmail,
+            "weak_password" or AuthErrorCodes.WeakPassword => Resources.Strings.Auth_Error_WeakPassword,
+            AuthErrorCodes.InvalidToken => Resources.Strings.Auth_Error_InvalidToken,
+            AuthErrorCodes.TokenExpired => Resources.Strings.Auth_Error_TokenExpired,
+            _ => string.Format(Resources.Strings.Auth_Error_LoginFailed, message)
         };
     }
 
@@ -590,13 +593,14 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     /// <returns>エラーメッセージ</returns>
     private static string GetUserFriendlyErrorMessage(Exception ex)
     {
+        // [Issue #179] ローカライズされたエラーメッセージを使用
         return ex switch
         {
-            TimeoutException => "接続がタイムアウトしました。インターネット接続をご確認ください",
-            System.Net.Http.HttpRequestException => "サーバーに接続できませんでした。インターネット接続をご確認ください",
-            TaskCanceledException => "処理がキャンセルされました",
-            UnauthorizedAccessException => "認証に失敗しました",
-            _ => $"予期しないエラーが発生しました: {ex.Message}"
+            TimeoutException => Resources.Strings.Auth_Error_Timeout,
+            System.Net.Http.HttpRequestException => Resources.Strings.Auth_Error_NetworkError,
+            TaskCanceledException => Resources.Strings.Auth_Error_Timeout,
+            UnauthorizedAccessException => Resources.Strings.Auth_Error_InvalidToken,
+            _ => string.Format(Resources.Strings.Auth_Error_LoginFailed, ex.Message)
         };
     }
 }
