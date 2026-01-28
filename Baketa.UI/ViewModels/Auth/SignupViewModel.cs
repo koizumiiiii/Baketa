@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Constants;
 using Baketa.UI.Framework;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
@@ -397,7 +398,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             // Supabase Edge Functionsで多言語メール送信時に使用
             var userMetadata = new Dictionary<string, object>
             {
-                { "language", _localizationService.CurrentCulture.TwoLetterISOLanguageName }
+                { UserMetadataKeys.Language, _localizationService.CurrentCulture.TwoLetterISOLanguageName }
             };
             _logger?.LogDebug("SignUp with language preference: {Language}", _localizationService.CurrentCulture.TwoLetterISOLanguageName);
 

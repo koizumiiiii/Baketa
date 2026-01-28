@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Constants;
 using Baketa.UI.Services;
 using Baketa.UI.Tests.Infrastructure;
 using Baketa.UI.ViewModels.Auth;
@@ -236,7 +237,16 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         await viewModel.SignupWithEmailCommand.Execute().FirstAsync();
 
         // Assert
-        _mockAuthService.Verify(x => x.SignUpWithEmailPasswordAsync("test@example.com", "Password123", It.IsAny<Dictionary<string, object>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        // [Gemini Review] userMetadataの内容を具体的に検証
+        _mockAuthService.Verify(x => x.SignUpWithEmailPasswordAsync(
+            "test@example.com",
+            "Password123",
+            It.Is<Dictionary<string, object>?>(d =>
+                d != null &&
+                d.ContainsKey(UserMetadataKeys.Language) &&
+                d[UserMetadataKeys.Language].ToString() == "ja"),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
         viewModel.IsLoading.Should().BeFalse();
     }
 
