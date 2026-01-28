@@ -143,9 +143,14 @@ public sealed class OverlaySettings
     /// <summary>
     /// クリックスルー機能の有効化
     /// </summary>
+    /// <remarks>
+    /// ⚠️ [WINDOWS_API_CONSTRAINT] クリックスルーとブラー効果は共存不可能
+    /// - true: クリックスルー有効、ブラー効果無効（LayeredOverlayWindow使用）
+    /// - false: クリックスルー無効、ブラー効果有効（CompositionOverlayWindow使用）
+    /// </remarks>
     [SettingMetadata(SettingLevel.Advanced, "Overlay", "クリックスルー",
-        Description = "オーバーレイをクリックしても底のアプリにクリックが通るようにします")]
-    public bool EnableClickThrough { get; set; } = false;
+        Description = "オーバーレイをクリックしても底のアプリにクリックが通るようにします（有効時はブラー効果が無効になります）")]
+    public bool EnableClickThrough { get; set; } = true;
 
     /// <summary>
     /// 翻訳結果のフェードアウトアニメーション時間（ミリ秒）

@@ -110,13 +110,26 @@ public sealed class WindowsOverlayWindowManager : IOverlayWindowManager, IDispos
     /// <returns>Compositionモードを使用する場合 true</returns>
     /// <remarks>
     /// 🔥 [DWM_BLUR_IMPLEMENTATION] フォールバック戦略:
-    /// 1. OverlaySettings.UseComposition が false → Layeredモード
-    /// 2. CompositionWindowFactory が null → Layeredモード（DI未登録）
-    /// 3. DWM Compositionがサポートされていない → Layeredモード（Windows XP等）
-    /// 4. 上記すべてクリア → Compositionモード
+    /// 1. OverlaySettings.EnableClickThrough が true → Layeredモード（クリックスルー優先）
+    /// 2. OverlaySettings.UseComposition が false → Layeredモード
+    /// 3. CompositionWindowFactory が null → Layeredモード（DI未登録）
+    /// 4. DWM Compositionがサポートされていない → Layeredモード（Windows XP等）
+    /// 5. 上記すべてクリア → Compositionモード
+    ///
+    /// ⚠️ [WINDOWS_API_CONSTRAINT] ブラー効果とクリックスルーは共存不可能
+    /// - DWM Composition (ブラー効果): WS_EX_LAYERED と互換性なし
+    /// - クリックスルー: WS_EX_LAYERED + UpdateLayeredWindow が必要
+    /// - EnableClickThrough=true の場合、ブラー効果は自動的に無効化される
     /// </remarks>
     private bool ShouldUseCompositionMode()
     {
+        // クリックスルーが有効な場合、Layeredモード必須（ブラー効果と共存不可）
+        if (_overlaySettings.EnableClickThrough)
+        {
+            _logger.LogDebug("🔥 [CLICK_THROUGH_PRIORITY] EnableClickThrough=true: Layeredモードを使用（ブラー効果無効）");
+            return false;
+        }
+
         // 設定で無効化されている場合
         if (!_overlaySettings.UseComposition)
         {

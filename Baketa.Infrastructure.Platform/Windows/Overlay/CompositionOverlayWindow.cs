@@ -241,11 +241,10 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
     /// </summary>
     private void CreateWindow()
     {
-        // 🔧 [Issue #340 Rollback] WS_EX_LAYEREDを削除
-        // DWM CompositionではWS_EX_LAYEREDは不要（設計通り）
-        // クリックスルーはWM_NCHITTEST + HTTRANSPARENTで実現（StaticWndProc/WndProcで処理）
-        // WS_EX_LAYEREDを使用するとSetLayeredWindowAttributesが必要になり、
-        // DWM Compositionのブラー効果と競合して白背景問題が発生する
+        // 🔧 [White Background Fix] WS_EX_LAYEREDを削除
+        // WS_EX_LAYEREDはSetLayeredWindowAttributesまたはUpdateLayeredWindowが必要で、
+        // どちらもDWM Compositionのブラー効果と競合する
+        // クリックスルーはWS_EX_TRANSPARENT + WM_NCHITTEST(HTTRANSPARENT)のみで対応
         const uint exStyle = (uint)ExtendedWindowStyles.WS_EX_TRANSPARENT
                            | LayeredWindowMethods.WS_EX_NOACTIVATE
                            | (uint)ExtendedWindowStyles.WS_EX_TOPMOST;
@@ -272,8 +271,8 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
             throw new InvalidOperationException($"CreateWindowEx failed - Error: {error}");
         }
 
-        // 🔧 [Issue #340 Rollback] SetLayeredWindowAttributesを削除
-        // DWM Compositionでは不要（WS_EX_LAYERED未使用のため）
+        // 🔧 [White Background Fix] SetLayeredWindowAttributesはApplyDwmEffects()後に呼び出す
+        // DWM Composition適用前に呼び出すと白背景問題が発生する
     }
 
     /// <summary>
@@ -312,6 +311,10 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
             {
                 ApplyWindowsBlurEffect();
             }
+
+            // 4. 🔧 [White Background Fix] WS_EX_LAYERED未使用のためSetLayeredWindowAttributesも不要
+            // DWM CompositionはWS_EX_LAYERED無しで正しく動作する
+            _logger.LogDebug("✅ [DWM_BLUR] WS_EX_LAYERED未使用（DWM Compositionのみ）");
         }
         catch (Exception ex)
         {
@@ -471,8 +474,9 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
         graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
 
-        // 🔥 黒ベースのオーバーレイ（ライト/ダークモード共通）
-        // SetWindowCompositionAttributeのブラー効果のみ使用
+        // 🔧 [White Background Fix] WS_EX_LAYERED未使用のため背景クリア不要
+        // DWM Compositionがブラー効果で背景を処理する
+        // 背景色は使用しない（SetWindowCompositionAttributeのGradientColorが背景）
 
         // テキスト描画（白テキスト、左寄せ・垂直中央）
         if (!string.IsNullOrWhiteSpace(_currentText))
