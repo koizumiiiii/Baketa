@@ -1,5 +1,5 @@
-using System.Management;
 using System.Runtime.Versioning;
+using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Hardware;
 using Baketa.Core.Models.Hardware;
 using Microsoft.Extensions.Logging;
@@ -8,15 +8,22 @@ namespace Baketa.Infrastructure.Services;
 
 /// <summary>
 /// [Issue #335] ハードウェアスペックチェッカー実装
+/// [Fix] WMI（System.Management）からIGpuEnvironmentDetector（DXGI/NVML）に移行
+/// - IL Trimming対応（System.Managementへの依存を削除）
+/// - 正確なVRAM（64-bit対応、4GB制限なし）
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class HardwareChecker : IHardwareChecker
 {
     private readonly ILogger<HardwareChecker> _logger;
+    private readonly IGpuEnvironmentDetector? _gpuEnvironmentDetector;
 
-    public HardwareChecker(ILogger<HardwareChecker> logger)
+    public HardwareChecker(
+        ILogger<HardwareChecker> logger,
+        IGpuEnvironmentDetector? gpuEnvironmentDetector = null)
     {
         _logger = logger;
+        _gpuEnvironmentDetector = gpuEnvironmentDetector;
     }
 
     /// <inheritdoc />
@@ -111,131 +118,35 @@ public sealed class HardwareChecker : IHardwareChecker
 
     private (string GpuName, int VramMb) GetGpuInfo()
     {
-        try
+        // IGpuEnvironmentDetectorが利用可能な場合は、キャッシュされた情報を使用
+        // （DXGI/NVMLベースで正確なVRAM情報を取得）
+        if (_gpuEnvironmentDetector != null)
         {
-            using var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM FROM Win32_VideoController");
-            foreach (ManagementObject obj in searcher.Get())
+            try
             {
-                var name = obj["Name"]?.ToString() ?? "Unknown GPU";
-                var adapterRam = obj["AdapterRAM"];
-
-                // AdapterRAM is in bytes, convert to MB
-                // Note: Win32_VideoController.AdapterRAM is limited to 4GB (uint32)
-                // For GPUs with more VRAM, we need alternative detection
-                var vramMb = 0;
-                if (adapterRam != null)
+                var cachedEnv = _gpuEnvironmentDetector.GetCachedEnvironment();
+                if (cachedEnv != null)
                 {
-                    var ramBytes = Convert.ToUInt64(adapterRam);
-                    vramMb = (int)(ramBytes / (1024 * 1024));
-
-                    // If VRAM is exactly 4GB (4294967296 bytes / 1MB = 4096MB),
-                    // it might be capped, try to estimate from GPU name
-                    if (vramMb == 4095 || vramMb == 4096)
-                    {
-                        vramMb = EstimateVramFromGpuName(name);
-                    }
+                    _logger.LogDebug("[Issue #335] GPU情報をキャッシュから取得: {GpuName}, VRAM={VramMb}MB",
+                        cachedEnv.GpuName, cachedEnv.AvailableMemoryMB);
+                    return (cachedEnv.GpuName, (int)cachedEnv.AvailableMemoryMB);
                 }
 
-                // Return the first discrete GPU found (usually NVIDIA/AMD)
-                if (name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("AMD", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Radeon", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("GeForce", StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger.LogDebug("[Issue #335] Discrete GPU detected: {Name}, VRAM: {VramMb}MB", name, vramMb);
-                    return (name, vramMb);
-                }
+                // キャッシュがない場合は同期的に検出を試みる
+                // 注: DetectEnvironmentAsyncは非同期だが、ここでは同期的に待機
+                var environment = _gpuEnvironmentDetector.DetectEnvironmentAsync().GetAwaiter().GetResult();
+                _logger.LogDebug("[Issue #335] GPU情報を検出: {GpuName}, VRAM={VramMb}MB",
+                    environment.GpuName, environment.AvailableMemoryMB);
+                return (environment.GpuName, (int)environment.AvailableMemoryMB);
             }
-
-            // Fallback: return the first GPU found
-            using var fallbackSearcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM FROM Win32_VideoController");
-            var first = fallbackSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
-            if (first != null)
+            catch (Exception ex)
             {
-                var name = first["Name"]?.ToString() ?? "Unknown GPU";
-                var ramBytes = Convert.ToUInt64(first["AdapterRAM"] ?? 0);
-                var vramMb = (int)(ramBytes / (1024 * 1024));
-                return (name, vramMb);
+                _logger.LogWarning(ex, "[Issue #335] IGpuEnvironmentDetector経由のGPU情報取得失敗");
             }
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "[Issue #335] GPU情報取得失敗");
-        }
 
+        // フォールバック: GPU情報が取得できない場合
+        _logger.LogWarning("[Issue #335] GPU情報を取得できません（IGpuEnvironmentDetector未登録またはエラー）");
         return ("Unknown GPU", 0);
-    }
-
-    /// <summary>
-    /// GPU名からVRAMを推定（Win32_VideoController.AdapterRAMの4GB制限対策）
-    /// </summary>
-    private static int EstimateVramFromGpuName(string gpuName)
-    {
-        var upperName = gpuName.ToUpperInvariant();
-
-        // NVIDIA RTX 40 series
-        if (upperName.Contains("4090")) return 24576;  // 24GB
-        if (upperName.Contains("4080")) return 16384;  // 16GB
-        if (upperName.Contains("4070 TI SUPER")) return 16384;  // 16GB
-        if (upperName.Contains("4070 TI")) return 12288;  // 12GB
-        if (upperName.Contains("4070 SUPER")) return 12288;  // 12GB
-        if (upperName.Contains("4070")) return 12288;  // 12GB
-        if (upperName.Contains("4060 TI")) return 8192;  // 8GB
-        if (upperName.Contains("4060")) return 8192;  // 8GB
-
-        // NVIDIA RTX 30 series
-        if (upperName.Contains("3090")) return 24576;  // 24GB
-        if (upperName.Contains("3080 TI")) return 12288;  // 12GB
-        if (upperName.Contains("3080")) return 10240;  // 10GB
-        if (upperName.Contains("3070 TI")) return 8192;  // 8GB
-        if (upperName.Contains("3070")) return 8192;  // 8GB
-        if (upperName.Contains("3060 TI")) return 8192;  // 8GB
-        if (upperName.Contains("3060")) return 12288;  // 12GB (desktop)
-        if (upperName.Contains("3050")) return 8192;  // 8GB
-
-        // NVIDIA RTX 20 series
-        if (upperName.Contains("2080 TI")) return 11264;  // 11GB
-        if (upperName.Contains("2080 SUPER")) return 8192;  // 8GB
-        if (upperName.Contains("2080")) return 8192;  // 8GB
-        if (upperName.Contains("2070 SUPER")) return 8192;  // 8GB
-        if (upperName.Contains("2070")) return 8192;  // 8GB
-        if (upperName.Contains("2060 SUPER")) return 8192;  // 8GB
-        if (upperName.Contains("2060")) return 6144;  // 6GB
-
-        // NVIDIA GTX 16 series
-        if (upperName.Contains("1660 TI")) return 6144;  // 6GB
-        if (upperName.Contains("1660 SUPER")) return 6144;  // 6GB
-        if (upperName.Contains("1660")) return 6144;  // 6GB
-        if (upperName.Contains("1650 SUPER")) return 4096;  // 4GB
-        if (upperName.Contains("1650")) return 4096;  // 4GB
-
-        // NVIDIA GTX 10 series
-        if (upperName.Contains("1080 TI")) return 11264;  // 11GB
-        if (upperName.Contains("1080")) return 8192;  // 8GB
-        if (upperName.Contains("1070 TI")) return 8192;  // 8GB
-        if (upperName.Contains("1070")) return 8192;  // 8GB
-        if (upperName.Contains("1060 6GB")) return 6144;  // 6GB
-        if (upperName.Contains("1060 3GB")) return 3072;  // 3GB
-        if (upperName.Contains("1060")) return 6144;  // Default to 6GB version
-        if (upperName.Contains("1050 TI")) return 4096;  // 4GB
-        if (upperName.Contains("1050")) return 2048;  // 2GB
-
-        // AMD RX 7000 series
-        if (upperName.Contains("7900 XTX")) return 24576;  // 24GB
-        if (upperName.Contains("7900 XT")) return 20480;  // 20GB
-        if (upperName.Contains("7800 XT")) return 16384;  // 16GB
-        if (upperName.Contains("7700 XT")) return 12288;  // 12GB
-        if (upperName.Contains("7600")) return 8192;  // 8GB
-
-        // AMD RX 6000 series
-        if (upperName.Contains("6900 XT")) return 16384;  // 16GB
-        if (upperName.Contains("6800 XT")) return 16384;  // 16GB
-        if (upperName.Contains("6800")) return 16384;  // 16GB
-        if (upperName.Contains("6700 XT")) return 12288;  // 12GB
-        if (upperName.Contains("6600 XT")) return 8192;  // 8GB
-        if (upperName.Contains("6600")) return 8192;  // 8GB
-
-        // Default: return 4GB (the capped value)
-        return 4096;
     }
 }
