@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Baketa.Ocr.V1;
 using Grpc.Core;
+using Grpc.Health.V1;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +23,7 @@ public sealed class GrpcOcrClient : IDisposable
 {
     private readonly GrpcChannel _channel;
     private readonly OcrService.OcrServiceClient _client;
+    private readonly Health.HealthClient _healthClient; // [Issue #328] gRPCネイティブヘルスチェック
     private readonly ILogger _logger;
     private readonly string _serverAddress;
     private bool _disposed;
@@ -30,6 +32,15 @@ public sealed class GrpcOcrClient : IDisposable
     private const int MaxRetryCount = 2;  // 2回リトライ（計3回試行）
     private static readonly int[] RetryDelaysMs = [500, 1000]; // 短いバックオフ
     private const int RetryTimeoutSeconds = 5; // リトライ時は短いタイムアウト（通常60秒→5秒）
+
+    // [Issue #334] CPUフォールバック用の連続タイムアウト検知
+    private int _consecutiveTimeouts;
+    private bool _hasSwitchedToCpu;
+
+    /// <summary>
+    /// [Issue #334] CPUフォールバックまでの連続タイムアウト閾値（デフォルト: 3）
+    /// </summary>
+    public int CpuFallbackTimeoutThreshold { get; set; } = 3;
 
     /// <summary>
     /// コンストラクタ
@@ -63,6 +74,7 @@ public sealed class GrpcOcrClient : IDisposable
         });
 
         _client = new OcrService.OcrServiceClient(_channel);
+        _healthClient = new Health.HealthClient(_channel); // [Issue #328] gRPCネイティブヘルスチェック
         _logger.LogInformation("GrpcOcrClient initialized: {ServerAddress}", _serverAddress);
     }
 
@@ -144,6 +156,9 @@ public sealed class GrpcOcrClient : IDisposable
 
                 if (response.IsSuccess)
                 {
+                    // [Issue #334] 成功時はタイムアウトカウンタをリセット
+                    _consecutiveTimeouts = 0;
+
                     if (attempt > 0)
                     {
                         _logger.LogInformation(
@@ -199,6 +214,18 @@ public sealed class GrpcOcrClient : IDisposable
             {
                 sw.Stop();
                 lastException = ex;
+
+                // [Issue #334] タイムアウトカウント増加とCPUフォールバック判定
+                _consecutiveTimeouts++;
+                _logger.LogWarning(
+                    "[gRPC-OCR] Timeout detected (consecutive: {Count}/{Threshold})",
+                    _consecutiveTimeouts, CpuFallbackTimeoutThreshold);
+
+                // CPUフォールバック実行（まだ切り替えていない場合のみ）
+                if (_consecutiveTimeouts >= CpuFallbackTimeoutThreshold && !_hasSwitchedToCpu)
+                {
+                    await TrySwitchToCpuAsync(cancellationToken).ConfigureAwait(false);
+                }
 
                 if (attempt < MaxRetryCount)
                 {
@@ -319,6 +346,95 @@ public sealed class GrpcOcrClient : IDisposable
                 Status = $"Error: {ex.StatusCode}",
                 Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
             };
+        }
+    }
+
+    /// <summary>
+    /// [Issue #328] gRPCネイティブヘルスチェック（grpc.health.v1.Health）を実行します
+    /// Python側のgrpc_health.v1.HealthServicerと通信
+    /// </summary>
+    /// <param name="serviceName">サービス名（"" for overall, "ocr_engine", "translation_engine"）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>ヘルスチェック結果（SERVING=healthy, NOT_SERVING=unhealthy）</returns>
+    public async Task<HealthCheckResponse> NativeHealthCheckAsync(
+        string serviceName = "",
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        try
+        {
+            var request = new HealthCheckRequest { Service = serviceName };
+            var callOptions = new CallOptions(
+                deadline: DateTime.UtcNow.AddSeconds(5),
+                cancellationToken: cancellationToken);
+
+            var response = await _healthClient.CheckAsync(request, callOptions).ConfigureAwait(false);
+
+            _logger.LogDebug(
+                "[gRPC-OCR] NativeHealthCheck: Service={ServiceName}, Status={Status}",
+                string.IsNullOrEmpty(serviceName) ? "(overall)" : serviceName,
+                response.Status);
+
+            return response;
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
+        {
+            // サービス名が登録されていない場合
+            _logger.LogWarning(
+                "[gRPC-OCR] NativeHealthCheck: Service '{ServiceName}' not found",
+                serviceName);
+
+            return new HealthCheckResponse { Status = HealthCheckResponse.Types.ServingStatus.ServiceUnknown };
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
+        {
+            // gRPCネイティブヘルスチェックが実装されていない（旧バージョン）
+            _logger.LogDebug(
+                "[gRPC-OCR] NativeHealthCheck not implemented, falling back to custom health check");
+
+            // フォールバック: カスタムヘルスチェックを使用
+            var customResponse = await HealthCheckAsync(cancellationToken).ConfigureAwait(false);
+            return new HealthCheckResponse
+            {
+                Status = customResponse.IsHealthy
+                    ? HealthCheckResponse.Types.ServingStatus.Serving
+                    : HealthCheckResponse.Types.ServingStatus.NotServing
+            };
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogWarning(ex, "[gRPC-OCR] NativeHealthCheck failed: {StatusCode}", ex.StatusCode);
+            return new HealthCheckResponse { Status = HealthCheckResponse.Types.ServingStatus.NotServing };
+        }
+    }
+
+    /// <summary>
+    /// [Issue #328] gRPCネイティブヘルスチェックが利用可能かテストします
+    /// </summary>
+    /// <returns>true: ネイティブヘルスチェック利用可能、false: カスタムヘルスチェックにフォールバック</returns>
+    public async Task<bool> IsNativeHealthCheckAvailableAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new HealthCheckRequest { Service = "" };
+            var callOptions = new CallOptions(
+                deadline: DateTime.UtcNow.AddSeconds(3),
+                cancellationToken: cancellationToken);
+
+            await _healthClient.CheckAsync(request, callOptions).ConfigureAwait(false);
+            return true;
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
+        {
+            _logger.LogDebug("[gRPC-OCR] Native health check not available (Unimplemented)");
+            return false;
+        }
+        catch (RpcException ex)
+        {
+            // 接続エラー等の場合はネイティブヘルスチェック自体はサポートされている可能性がある
+            _logger.LogDebug("[gRPC-OCR] Native health check probe failed: {StatusCode}", ex.StatusCode);
+            return ex.StatusCode != StatusCode.Unimplemented;
         }
     }
 
@@ -697,6 +813,152 @@ public sealed class GrpcOcrClient : IDisposable
             },
             Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
         };
+    }
+
+    /// <summary>
+    /// [Issue #334] デバイスを切り替えます（GPU/CPU）
+    /// </summary>
+    /// <param name="targetDevice">切り替え先デバイス ("cpu" or "cuda")</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>切り替え結果</returns>
+    public async Task<SwitchDeviceResponse> SwitchDeviceAsync(
+        string targetDevice,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetDevice);
+
+        var requestId = Guid.NewGuid().ToString();
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            var request = new SwitchDeviceRequest
+            {
+                TargetDevice = targetDevice,
+                RequestId = requestId
+            };
+
+            _logger.LogInformation("[gRPC-OCR] SwitchDevice: Switching to {TargetDevice}...", targetDevice);
+
+            var callOptions = new CallOptions(
+                deadline: DateTime.UtcNow.AddSeconds(60), // デバイス切り替えは時間がかかる可能性あり
+                cancellationToken: cancellationToken)
+                .WithWaitForReady(true);
+
+            var response = await _client.SwitchDeviceAsync(request, callOptions).ConfigureAwait(false);
+
+            sw.Stop();
+
+            if (response.IsSuccess)
+            {
+                _logger.LogInformation(
+                    "[gRPC-OCR] SwitchDevice success: {PreviousDevice} → {CurrentDevice} ({SwitchTimeMs}ms)",
+                    response.PreviousDevice,
+                    response.CurrentDevice,
+                    response.SwitchTimeMs);
+
+                // CPUに切り替えた場合はフラグを設定
+                if (targetDevice.Equals("cpu", StringComparison.OrdinalIgnoreCase))
+                {
+                    _hasSwitchedToCpu = true;
+                }
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "[gRPC-OCR] SwitchDevice failed: {ErrorType} - {Message}",
+                    response.Error?.ErrorType,
+                    response.Error?.Message);
+            }
+
+            return response;
+        }
+        catch (RpcException ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[gRPC-OCR] SwitchDevice RPC error: {StatusCode}", ex.StatusCode);
+
+            return new SwitchDeviceResponse
+            {
+                IsSuccess = false,
+                Message = $"RPC error: {ex.StatusCode}",
+                Error = new OcrError
+                {
+                    ErrorType = OcrErrorType.ProcessingError,
+                    Message = $"Failed to switch device: {ex.StatusCode}",
+                    Details = ex.Message,
+                    IsRetryable = ex.StatusCode == StatusCode.Unavailable
+                },
+                Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+            };
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[gRPC-OCR] SwitchDevice unexpected error");
+
+            return new SwitchDeviceResponse
+            {
+                IsSuccess = false,
+                Message = $"Unexpected error: {ex.Message}",
+                Error = new OcrError
+                {
+                    ErrorType = OcrErrorType.Unknown,
+                    Message = "Failed to switch device",
+                    Details = ex.Message,
+                    IsRetryable = false
+                },
+                Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(DateTime.UtcNow)
+            };
+        }
+    }
+
+    /// <summary>
+    /// [Issue #334] CPUモードへのフォールバックを試行
+    /// </summary>
+    private async Task TrySwitchToCpuAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogWarning(
+            "[gRPC-OCR] [Issue #334] Consecutive timeouts reached threshold ({Threshold}), switching to CPU mode...",
+            CpuFallbackTimeoutThreshold);
+
+        try
+        {
+            var response = await SwitchDeviceAsync("cpu", cancellationToken).ConfigureAwait(false);
+
+            if (response.IsSuccess)
+            {
+                _logger.LogInformation(
+                    "[gRPC-OCR] [Issue #334] Successfully switched to CPU mode: {Message}",
+                    response.Message);
+                _consecutiveTimeouts = 0; // カウンタリセット
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "[gRPC-OCR] [Issue #334] Failed to switch to CPU mode: {Message}",
+                    response.Message ?? response.Error?.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[gRPC-OCR] [Issue #334] Error switching to CPU mode");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #334] 現在のCPUフォールバック状態を取得
+    /// </summary>
+    public bool HasSwitchedToCpu => _hasSwitchedToCpu;
+
+    /// <summary>
+    /// [Issue #334] CPUフォールバック状態をリセット（テスト用）
+    /// </summary>
+    public void ResetCpuFallbackState()
+    {
+        _consecutiveTimeouts = 0;
+        _hasSwitchedToCpu = false;
     }
 
     /// <summary>

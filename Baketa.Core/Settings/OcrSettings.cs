@@ -404,6 +404,46 @@ public sealed class OcrSettings
     public bool EnableGpuAcceleration { get; set; } = true;
 
     /// <summary>
+    /// [Issue #334] OCR処理モード（GPU/CPU自動切り替え）
+    /// </summary>
+    /// <remarks>
+    /// Auto: VRAM不足時に自動的にCPUモードへフォールバック
+    /// GPU: GPU優先（VRAM不足でもGPUを使用し続ける）
+    /// CPU: CPU専用（GPUを使用しない）
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "処理モード",
+        Description = "OCR処理のデバイスモード（Auto推奨）",
+        ValidValues = [OcrProcessingMode.Auto, OcrProcessingMode.GPU, OcrProcessingMode.CPU])]
+    public OcrProcessingMode ProcessingMode { get; set; } = OcrProcessingMode.Auto;
+
+    /// <summary>
+    /// [Issue #334] CPUフォールバック連続タイムアウト閾値
+    /// </summary>
+    /// <remarks>
+    /// この回数連続でタイムアウトが発生した場合、CPUモードへフォールバックします。
+    /// デフォルト: 3回
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "フォールバック閾値",
+        Description = "CPUフォールバックまでの連続タイムアウト回数",
+        MinValue = 1,
+        MaxValue = 10)]
+    public int CpuFallbackTimeoutThreshold { get; set; } = 3;
+
+    /// <summary>
+    /// [Issue #334] CPUフォールバック用の最小VRAM容量（MB）
+    /// </summary>
+    /// <remarks>
+    /// 起動時にGPUのVRAM容量がこの値未満の場合、最初からCPUモードで動作します。
+    /// デフォルト: 4096MB（4GB）
+    /// </remarks>
+    [SettingMetadata(SettingLevel.Advanced, "OCR", "最小VRAM容量",
+        Description = "GPU使用に必要な最小VRAM（MB）",
+        Unit = "MB",
+        MinValue = 1024,
+        MaxValue = 16384)]
+    public int MinVramForGpuMb { get; set; } = 4096;
+
+    /// <summary>
     /// ONNX Runtimeプロバイダー優先順位
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "OCR", "実行プロバイダー",
@@ -497,6 +537,9 @@ public sealed class OcrSettings
             SaveProcessedImages = SaveProcessedImages,
             UseLanguageModel = UseLanguageModel,
             EnableGpuAcceleration = EnableGpuAcceleration,
+            ProcessingMode = ProcessingMode,
+            CpuFallbackTimeoutThreshold = CpuFallbackTimeoutThreshold,
+            MinVramForGpuMb = MinVramForGpuMb,
             OnnxExecutionProvider = OnnxExecutionProvider,
             OnnxModelPath = OnnxModelPath,
             EnableTdrProtection = EnableTdrProtection,
@@ -567,6 +610,27 @@ public enum OcrEngine
     /// Windows標準OCR
     /// </summary>
     WindowsOCR
+}
+
+/// <summary>
+/// [Issue #334] OCR処理モード（GPU/CPU切り替え）
+/// </summary>
+public enum OcrProcessingMode
+{
+    /// <summary>
+    /// 自動選択（VRAM不足時にCPUフォールバック）
+    /// </summary>
+    Auto,
+
+    /// <summary>
+    /// GPU優先（利用可能な場合）
+    /// </summary>
+    GPU,
+
+    /// <summary>
+    /// CPU専用（GPU使用しない）
+    /// </summary>
+    CPU
 }
 
 /// <summary>

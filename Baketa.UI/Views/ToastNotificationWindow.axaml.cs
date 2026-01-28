@@ -49,8 +49,8 @@ public partial class ToastNotificationWindow : Window
             if (iconText != null) iconText.Foreground = Brushes.White;
         }
 
-        // 画面左側に配置（MainOverlay近く）
-        ConfigurePosition();
+        // [Issue #344] 画面左下に配置（Openedイベントで実際の高さ取得後に位置設定）
+        this.Opened += OnWindowOpened;
 
         // 自動クローズタイマー
         if (durationMs > 0)
@@ -68,17 +68,51 @@ public partial class ToastNotificationWindow : Window
         }
     }
 
-    private void ConfigurePosition()
+    /// <summary>
+    /// [Issue #344] ウィンドウが開いた後に画面左下に配置
+    /// Openedイベントで実際の高さを取得してから位置を計算
+    /// </summary>
+    private void OnWindowOpened(object? sender, EventArgs e)
     {
-        // 画面左端、MainOverlayの下（縦方向で60%の位置）に配置
-        var screen = Screens.Primary;
-        if (screen != null)
+        // [Issue #343] レイアウト更新後に位置を設定（SizeToContentによる高さ計算完了を待つ）
+        Dispatcher.UIThread.Post(PositionToBottomLeft, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
+    /// [Issue #343] 画面左下に配置
+    /// </summary>
+    private void PositionToBottomLeft()
+    {
+        try
         {
-            var bounds = screen.WorkingArea;
-            var x = 16; // MainOverlayと同じ左マージン
-            var y = (int)(bounds.Height * 0.6); // 画面の60%位置
+            var screen = Screens.Primary;
+            if (screen == null) return;
+
+            var workingArea = screen.WorkingArea;
+            const int margin = 16;
+
+            // 実際のウィンドウサイズを取得（レイアウト完了後なので正確）
+            var windowHeight = (int)Bounds.Height;
+            if (windowHeight <= 0)
+            {
+                windowHeight = 100; // フォールバック値
+            }
+
+            // [Issue #343] WorkingArea.X/Y を考慮（マルチモニター対応）
+            // WorkingArea はタスクバーを除いた領域で、スクリーン座標で表される
+            var x = workingArea.X + margin;
+            var y = workingArea.Y + workingArea.Height - windowHeight - margin;
 
             Position = new PixelPoint(x, y);
+
+            System.Diagnostics.Debug.WriteLine(
+                $"[Toast] Position set to ({x}, {y}), " +
+                $"WorkingArea: ({workingArea.X}, {workingArea.Y}, {workingArea.Width}x{workingArea.Height}), " +
+                $"WindowHeight: {windowHeight}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Toast] Position error: {ex.Message}");
         }
     }
 

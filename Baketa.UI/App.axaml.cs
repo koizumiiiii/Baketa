@@ -1383,6 +1383,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     /// <summary>
     /// [Issue #335] 起動時ハードウェアチェック
     /// 推奨スペックを満たさない場合は警告を表示
+    /// [Issue #343] モーダルダイアログからトースト通知に変更
     /// </summary>
     private async Task PerformHardwareCheckAsync(IServiceProvider serviceProvider)
     {
@@ -1404,8 +1405,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                 return;
             }
 
-            // 警告がある場合はメッセージボックスを表示
-            var warningMessages = string.Join("\n", result.Warnings.Select(w => $"  • {w}"));
+            // 警告がある場合はトースト通知を表示
+            var warningMessages = string.Join("\n", result.Warnings.Select(w => $"• {w}"));
             var gpuInfo = $"GPU: {result.GpuName}";
             var ramInfo = $"RAM: {result.TotalRamGb}GB";
             var cpuInfo = $"CPU: {result.CpuCores}コア";
@@ -1414,12 +1415,12 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             switch (result.WarningLevel)
             {
                 case HardwareWarningLevel.Critical:
-                    title = "⚠️ ハードウェア要件 - 重大な警告";
-                    message = $"お使いの環境は最低要件を満たしていません。\n正常に動作しない可能性があります。\n\n検出されたスペック:\n  {gpuInfo}\n  {ramInfo}\n  {cpuInfo}\n\n問題点:\n{warningMessages}\n\n続行しますか？";
+                    title = "ハードウェア要件 - 重大な警告";
+                    message = $"お使いの環境は最低要件を満たしていません。正常に動作しない可能性があります。\n\n{gpuInfo}\n{ramInfo}\n{cpuInfo}\n\n{warningMessages}";
                     break;
                 case HardwareWarningLevel.Warning:
-                    title = "⚠️ ハードウェア要件の警告";
-                    message = $"お使いの環境は推奨スペックを満たしていません。\n動作が不安定になる可能性があります。\n\n検出されたスペック:\n  {gpuInfo}\n  {ramInfo}\n  {cpuInfo}\n\n推奨改善点:\n{warningMessages}";
+                    title = "ハードウェア要件の警告";
+                    message = $"お使いの環境は推奨スペックを満たしていません。\n\n{gpuInfo}\n{ramInfo}\n{cpuInfo}\n\n{warningMessages}";
                     break;
                 default:
                     // Info レベルはログのみで続行
@@ -1427,19 +1428,31 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                     return;
             }
 
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            // [Issue #343] トースト通知で表示（モーダルダイアログから変更）
+            var notificationService = serviceProvider.GetService<INotificationService>();
+            if (notificationService != null)
             {
-                var shouldContinue = await ShowHardwareWarningDialogAsync(
-                    title, message,
-                    result.WarningLevel == HardwareWarningLevel.Critical);
-
-                // Criticalレベルで「いいえ」を選択した場合はアプリを終了
-                if (result.WarningLevel == HardwareWarningLevel.Critical && !shouldContinue)
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    _logger?.LogWarning("[Issue #335] ユーザーがハードウェア警告で終了を選択");
-                    Environment.Exit(0);
-                }
-            });
+                    if (result.WarningLevel == HardwareWarningLevel.Critical)
+                    {
+                        // Critical: エラートースト（手動閉じるまで表示）
+                        await notificationService.ShowErrorAsync(title, message, duration: 0);
+                        _logger?.LogWarning("[Issue #343] Critical警告をトースト表示: {Message}", message);
+                    }
+                    else
+                    {
+                        // Warning: 警告トースト（10秒）
+                        await notificationService.ShowWarningAsync(title, message, duration: 10000);
+                        _logger?.LogWarning("[Issue #343] Warning警告をトースト表示: {Message}", message);
+                    }
+                });
+            }
+            else
+            {
+                // INotificationServiceが利用できない場合はログのみ
+                _logger?.LogWarning("[Issue #343] INotificationService利用不可、ログのみ: {Title} - {Message}", title, message);
+            }
         }
         catch (Exception ex)
         {
@@ -1448,158 +1461,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         }
     }
 
-    /// <summary>
-    /// [Issue #335] ハードウェア警告ダイアログを表示
-    /// </summary>
-    /// <param name="title">ダイアログタイトル</param>
-    /// <param name="message">メッセージ</param>
-    /// <param name="showYesNo">Yes/Noボタンを表示するか（falseの場合はOKのみ）</param>
-    /// <returns>続行する場合true</returns>
-    private static Task<bool> ShowHardwareWarningDialogAsync(string title, string message, bool showYesNo)
-    {
-        var tcs = new TaskCompletionSource<bool>();
-
-        var mainWindow = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-            ? desktop.MainWindow
-            : null;
-
-        // ダイアログウィンドウを作成
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 500,
-            Height = 350,
-            WindowStartupLocation = mainWindow != null
-                ? WindowStartupLocation.CenterOwner
-                : WindowStartupLocation.CenterScreen,
-            CanResize = false,
-            ShowInTaskbar = false,
-            Background = Avalonia.Media.Brushes.White
-        };
-
-        // メインコンテンツ
-        var stackPanel = new StackPanel
-        {
-            Margin = new Thickness(20),
-            Spacing = 15
-        };
-
-        // 警告アイコンとタイトル
-        var headerPanel = new StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            Spacing = 10
-        };
-
-        var warningIcon = new TextBlock
-        {
-            Text = "⚠️",
-            FontSize = 24,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-        };
-
-        var titleText = new TextBlock
-        {
-            Text = title.Replace("⚠️ ", ""),
-            FontSize = 16,
-            FontWeight = Avalonia.Media.FontWeight.Bold,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-        };
-
-        headerPanel.Children.Add(warningIcon);
-        headerPanel.Children.Add(titleText);
-
-        // メッセージテキスト（スクロール可能）
-        var messageScroll = new ScrollViewer
-        {
-            MaxHeight = 200,
-            Content = new TextBlock
-            {
-                Text = message,
-                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                FontSize = 12
-            }
-        };
-
-        // ボタンパネル
-        var buttonPanel = new StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Spacing = 10
-        };
-
-        if (showYesNo)
-        {
-            // Criticalレベル: はい/いいえボタン
-            var yesButton = new Button
-            {
-                Content = "続行する",
-                Padding = new Thickness(20, 8),
-                Background = Avalonia.Media.Brushes.Orange
-            };
-            yesButton.Click += (_, _) =>
-            {
-                tcs.TrySetResult(true);
-                dialog.Close();
-            };
-
-            var noButton = new Button
-            {
-                Content = "終了",
-                Padding = new Thickness(20, 8)
-            };
-            noButton.Click += (_, _) =>
-            {
-                tcs.TrySetResult(false);
-                dialog.Close();
-            };
-
-            buttonPanel.Children.Add(yesButton);
-            buttonPanel.Children.Add(noButton);
-        }
-        else
-        {
-            // Warningレベル: OKボタンのみ
-            var okButton = new Button
-            {
-                Content = "OK",
-                Padding = new Thickness(30, 8),
-                IsDefault = true
-            };
-            okButton.Click += (_, _) =>
-            {
-                tcs.TrySetResult(true);
-                dialog.Close();
-            };
-
-            buttonPanel.Children.Add(okButton);
-        }
-
-        stackPanel.Children.Add(headerPanel);
-        stackPanel.Children.Add(messageScroll);
-        stackPanel.Children.Add(buttonPanel);
-
-        dialog.Content = stackPanel;
-
-        // ダイアログが閉じられた場合のフォールバック
-        dialog.Closed += (_, _) =>
-        {
-            tcs.TrySetResult(true); // デフォルトは続行
-        };
-
-        // ダイアログを表示
-        if (mainWindow != null)
-        {
-            _ = dialog.ShowDialog(mainWindow);
-        }
-        else
-        {
-            dialog.Show();
-        }
-
-        return tcs.Task;
-    }
+    // [Issue #343] ShowHardwareWarningDialogAsync は削除されました
+    // ハードウェア警告は INotificationService.ShowErrorAsync/ShowWarningAsync で表示します
 
     /// <summary>
     /// Patreon認証結果の通知表示 (Issue #233)

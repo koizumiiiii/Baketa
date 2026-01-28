@@ -43,13 +43,17 @@
                  TextWrapping="Wrap"
                  Foreground="#202020"/>
 
-      <!-- メッセージ -->
-      <TextBlock Grid.Column="1" Grid.Row="1"
-                 Name="MessageText"
-                 FontSize="12"
-                 TextWrapping="Wrap"
-                 Foreground="#606060"
-                 Margin="0,4,0,0"/>
+      <!-- メッセージ（Issue #343: 長いメッセージ対応でMaxHeight追加） -->
+      <ScrollViewer Grid.Column="1" Grid.Row="1"
+                    MaxHeight="200"
+                    Margin="0,4,0,0"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+        <TextBlock Name="MessageText"
+                   FontSize="12"
+                   TextWrapping="Wrap"
+                   Foreground="#606060"/>
+      </ScrollViewer>
 
       <!-- 閉じるボタン -->
       <Button Grid.Column="2" Grid.RowSpan="2"

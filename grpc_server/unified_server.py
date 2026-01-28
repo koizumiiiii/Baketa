@@ -78,6 +78,9 @@ import grpc
 from grpc import aio
 from google.protobuf.timestamp_pb2 import Timestamp
 
+# [Issue #328] gRPC Native Health Check
+from grpc_health.v1 import health, health_pb2, health_pb2_grpc
+
 # Proto生成ファイル
 from protos import translation_pb2, translation_pb2_grpc
 from protos import ocr_pb2, ocr_pb2_grpc
@@ -227,6 +230,74 @@ class SuryaOcrEngine:
         except Exception as e:
             self.logger.exception(f"モデルロードエラー: {e}")
             return False
+
+    def switch_device(self, target_device: str) -> tuple[bool, str]:
+        """[Issue #334] デバイス切り替え（GPU/CPU）
+
+        Args:
+            target_device: "cpu" または "cuda"
+
+        Returns:
+            tuple[bool, str]: (成功フラグ, メッセージ)
+        """
+        import gc
+        import torch
+
+        target_device = target_device.lower()
+        if target_device not in ("cpu", "cuda"):
+            return False, f"Invalid device: {target_device}"
+
+        if self.device == target_device:
+            return True, f"Already on {target_device}"
+
+        previous_device = self.device
+        self.logger.info(f"[Issue #334] デバイス切り替え開始: {previous_device} -> {target_device}")
+
+        try:
+            # 1. 現在のモデルを解放
+            self.logger.info("[Issue #334] モデル解放中...")
+            if self.detection_predictor is not None:
+                del self.detection_predictor
+                self.detection_predictor = None
+            if self.recognition_predictor is not None:
+                del self.recognition_predictor
+                self.recognition_predictor = None
+            if self.foundation_predictor is not None:
+                del self.foundation_predictor
+                self.foundation_predictor = None
+
+            # 2. ガベージコレクション
+            gc.collect()
+
+            # 3. CUDAキャッシュクリア
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                self.logger.info("[Issue #334] CUDAキャッシュクリア完了")
+
+            # 4. 新デバイスでモデル再ロード
+            self.device = target_device
+            self.is_loaded = False
+
+            success = self._load_model_sync()
+            if success:
+                self.logger.info(f"[Issue #334] デバイス切り替え成功: {previous_device} -> {target_device}")
+                return True, f"Switched from {previous_device} to {target_device}"
+            else:
+                # フォールバック: 元のデバイスで再ロード試行
+                self.logger.warning(f"[Issue #334] {target_device}でのロード失敗、{previous_device}にフォールバック")
+                self.device = previous_device
+                self._load_model_sync()
+                return False, f"Failed to switch to {target_device}, reverted to {previous_device}"
+
+        except Exception as e:
+            self.logger.exception(f"[Issue #334] デバイス切り替えエラー: {e}")
+            # 元のデバイスで復旧試行
+            self.device = previous_device
+            try:
+                self._load_model_sync()
+            except:
+                pass
+            return False, f"Error during device switch: {str(e)}"
 
     def _resize_image_if_needed(self, image: "Image.Image") -> tuple:
         """画像が大きすぎる場合はリサイズ"""
@@ -503,6 +574,51 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
         response.details["engine"] = "Surya OCR"
         response.details["version"] = self.engine.VERSION
         response.timestamp.FromDatetime(datetime.utcnow())
+        return response
+
+    async def SwitchDevice(self, request, context):
+        """[Issue #334] デバイス切り替えRPC
+
+        VRAM不足時にCPUモードへ自動フォールバックするために使用。
+        切り替え中は他のRPCリクエストをブロック。
+        """
+        start_time = time.time()
+        self.logger.info(f"SwitchDevice RPC called - target: {request.target_device}, request_id: {request.request_id}")
+
+        response = ocr_pb2.SwitchDeviceResponse()
+        response.previous_device = self.engine.device
+
+        try:
+            loop = asyncio.get_running_loop()
+            success, message = await loop.run_in_executor(
+                self.executor,
+                self.engine.switch_device,
+                request.target_device
+            )
+
+            response.is_success = success
+            response.current_device = self.engine.device
+            response.message = message
+            response.switch_time_ms = int((time.time() - start_time) * 1000)
+            response.timestamp.FromDatetime(datetime.utcnow())
+
+            if success:
+                self.logger.info(f"SwitchDevice成功: {response.previous_device} -> {response.current_device}")
+            else:
+                self.logger.warning(f"SwitchDevice失敗: {message}")
+                response.error.error_type = ocr_pb2.OCR_ERROR_TYPE_PROCESSING_ERROR
+                response.error.message = message
+
+        except Exception as e:
+            self.logger.exception(f"SwitchDeviceエラー: {e}")
+            response.is_success = False
+            response.current_device = self.engine.device
+            response.message = str(e)
+            response.switch_time_ms = int((time.time() - start_time) * 1000)
+            response.error.error_type = ocr_pb2.OCR_ERROR_TYPE_PROCESSING_ERROR
+            response.error.message = str(e)
+            response.timestamp.FromDatetime(datetime.utcnow())
+
         return response
 
     async def RecognizeBatch(self, request, context):
@@ -848,6 +964,19 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     ocr_servicer = AsyncOcrServiceServicer(ocr_engine)
     ocr_pb2_grpc.add_OcrServiceServicer_to_server(ocr_servicer, server)
 
+    # [Issue #328] gRPC Native Health Check (grpc.health.v1.Health)
+    # サービス名: "" (全体), "ocr_engine", "translation_engine"
+    health_servicer = health.HealthServicer()
+    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+
+    # 初期状態: OCRエンジンは既にロード済み、翻訳は遅延ロード
+    health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+    health_servicer.set("ocr_engine",
+        health_pb2.HealthCheckResponse.SERVING if ocr_engine.is_loaded
+        else health_pb2.HealthCheckResponse.NOT_SERVING)
+    # 翻訳エンジンは遅延ロードのため、初期状態はSERVING（リクエスト時にロード）
+    health_servicer.set("translation_engine", health_pb2.HealthCheckResponse.SERVING)
+
     # リスニングアドレス設定
     listen_addr = f'{host}:{port}'
     server.add_insecure_port(listen_addr)
@@ -878,9 +1007,11 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     logger.info("Services available:")
     logger.info("   - TranslationService (Translate, TranslateBatch, HealthCheck, IsReady)")
     logger.info("   - OcrService (Recognize, RecognizeBatch, Detect, HealthCheck, IsReady)")
+    logger.info("   - grpc.health.v1.Health (Check, Watch) [Issue #328]")
     logger.info("   [Issue #320] Detect RPC: Detection-only for ROI learning (~10x faster)")
     logger.info("   [Issue #330] RecognizeBatch RPC: Batch OCR for partial regions")
     logger.info("   [Issue #337] Translation lazy loading: ~1GB memory saved until first use")
+    logger.info("   [Issue #328] Native Health Check: services '', 'ocr_engine', 'translation_engine'")
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")
 

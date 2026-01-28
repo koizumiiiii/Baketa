@@ -1,9 +1,12 @@
+import datetime
+
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -120,7 +123,7 @@ class OcrRequest(_message.Message):
     engine: OcrEngineType
     options: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, request_id: _Optional[str] = ..., image_data: _Optional[bytes] = ..., image_format: _Optional[str] = ..., languages: _Optional[_Iterable[str]] = ..., engine: _Optional[_Union[OcrEngineType, str]] = ..., options: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, request_id: _Optional[str] = ..., image_data: _Optional[bytes] = ..., image_format: _Optional[str] = ..., languages: _Optional[_Iterable[str]] = ..., engine: _Optional[_Union[OcrEngineType, str]] = ..., options: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class OcrResponse(_message.Message):
     __slots__ = ("request_id", "is_success", "regions", "region_count", "processing_time_ms", "error", "engine_name", "engine_version", "metadata", "timestamp")
@@ -151,7 +154,7 @@ class OcrResponse(_message.Message):
     engine_version: str
     metadata: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, request_id: _Optional[str] = ..., is_success: bool = ..., regions: _Optional[_Iterable[_Union[TextRegion, _Mapping]]] = ..., region_count: _Optional[int] = ..., processing_time_ms: _Optional[int] = ..., error: _Optional[_Union[OcrError, _Mapping]] = ..., engine_name: _Optional[str] = ..., engine_version: _Optional[str] = ..., metadata: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, request_id: _Optional[str] = ..., is_success: bool = ..., regions: _Optional[_Iterable[_Union[TextRegion, _Mapping]]] = ..., region_count: _Optional[int] = ..., processing_time_ms: _Optional[int] = ..., error: _Optional[_Union[OcrError, _Mapping]] = ..., engine_name: _Optional[str] = ..., engine_version: _Optional[str] = ..., metadata: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class OcrHealthCheckRequest(_message.Message):
     __slots__ = ()
@@ -174,7 +177,7 @@ class OcrHealthCheckResponse(_message.Message):
     status: str
     details: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, is_healthy: bool = ..., status: _Optional[str] = ..., details: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, is_healthy: bool = ..., status: _Optional[str] = ..., details: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class OcrIsReadyRequest(_message.Message):
     __slots__ = ()
@@ -197,7 +200,7 @@ class OcrIsReadyResponse(_message.Message):
     status: str
     details: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, is_ready: bool = ..., status: _Optional[str] = ..., details: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, is_ready: bool = ..., status: _Optional[str] = ..., details: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class DetectRequest(_message.Message):
     __slots__ = ("request_id", "image_data", "image_format", "engine", "options", "timestamp")
@@ -220,7 +223,7 @@ class DetectRequest(_message.Message):
     engine: OcrEngineType
     options: _containers.ScalarMap[str, str]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, request_id: _Optional[str] = ..., image_data: _Optional[bytes] = ..., image_format: _Optional[str] = ..., engine: _Optional[_Union[OcrEngineType, str]] = ..., options: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, request_id: _Optional[str] = ..., image_data: _Optional[bytes] = ..., image_format: _Optional[str] = ..., engine: _Optional[_Union[OcrEngineType, str]] = ..., options: _Optional[_Mapping[str, str]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class DetectResponse(_message.Message):
     __slots__ = ("request_id", "is_success", "regions", "region_count", "processing_time_ms", "error", "engine_name", "timestamp")
@@ -240,7 +243,7 @@ class DetectResponse(_message.Message):
     error: OcrError
     engine_name: str
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, request_id: _Optional[str] = ..., is_success: bool = ..., regions: _Optional[_Iterable[_Union[DetectedRegion, _Mapping]]] = ..., region_count: _Optional[int] = ..., processing_time_ms: _Optional[int] = ..., error: _Optional[_Union[OcrError, _Mapping]] = ..., engine_name: _Optional[str] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, request_id: _Optional[str] = ..., is_success: bool = ..., regions: _Optional[_Iterable[_Union[DetectedRegion, _Mapping]]] = ..., region_count: _Optional[int] = ..., processing_time_ms: _Optional[int] = ..., error: _Optional[_Union[OcrError, _Mapping]] = ..., engine_name: _Optional[str] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class RecognizeBatchRequest(_message.Message):
     __slots__ = ("batch_id", "requests", "timestamp")
@@ -250,7 +253,7 @@ class RecognizeBatchRequest(_message.Message):
     batch_id: str
     requests: _containers.RepeatedCompositeFieldContainer[OcrRequest]
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, batch_id: _Optional[str] = ..., requests: _Optional[_Iterable[_Union[OcrRequest, _Mapping]]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, batch_id: _Optional[str] = ..., requests: _Optional[_Iterable[_Union[OcrRequest, _Mapping]]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class RecognizeBatchResponse(_message.Message):
     __slots__ = ("batch_id", "is_success", "responses", "success_count", "total_count", "total_processing_time_ms", "error", "timestamp")
@@ -270,4 +273,30 @@ class RecognizeBatchResponse(_message.Message):
     total_processing_time_ms: int
     error: OcrError
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, batch_id: _Optional[str] = ..., is_success: bool = ..., responses: _Optional[_Iterable[_Union[OcrResponse, _Mapping]]] = ..., success_count: _Optional[int] = ..., total_count: _Optional[int] = ..., total_processing_time_ms: _Optional[int] = ..., error: _Optional[_Union[OcrError, _Mapping]] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, batch_id: _Optional[str] = ..., is_success: bool = ..., responses: _Optional[_Iterable[_Union[OcrResponse, _Mapping]]] = ..., success_count: _Optional[int] = ..., total_count: _Optional[int] = ..., total_processing_time_ms: _Optional[int] = ..., error: _Optional[_Union[OcrError, _Mapping]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class SwitchDeviceRequest(_message.Message):
+    __slots__ = ("target_device", "request_id")
+    TARGET_DEVICE_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    target_device: str
+    request_id: str
+    def __init__(self, target_device: _Optional[str] = ..., request_id: _Optional[str] = ...) -> None: ...
+
+class SwitchDeviceResponse(_message.Message):
+    __slots__ = ("is_success", "current_device", "previous_device", "message", "switch_time_ms", "error", "timestamp")
+    IS_SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_DEVICE_FIELD_NUMBER: _ClassVar[int]
+    PREVIOUS_DEVICE_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SWITCH_TIME_MS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
+    is_success: bool
+    current_device: str
+    previous_device: str
+    message: str
+    switch_time_ms: int
+    error: OcrError
+    timestamp: _timestamp_pb2.Timestamp
+    def __init__(self, is_success: bool = ..., current_device: _Optional[str] = ..., previous_device: _Optional[str] = ..., message: _Optional[str] = ..., switch_time_ms: _Optional[int] = ..., error: _Optional[_Union[OcrError, _Mapping]] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
