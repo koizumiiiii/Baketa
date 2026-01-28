@@ -22,9 +22,14 @@ public interface IAuthService
     /// </summary>
     /// <param name="email">User email address</param>
     /// <param name="password">User password</param>
+    /// <param name="userMetadata">Optional user metadata (e.g., language preference)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Authentication result</returns>
-    Task<AuthResult> SignUpWithEmailPasswordAsync(string email, string password, CancellationToken cancellationToken = default);
+    Task<AuthResult> SignUpWithEmailPasswordAsync(
+        string email,
+        string password,
+        Dictionary<string, object>? userMetadata = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Sign in with email and password

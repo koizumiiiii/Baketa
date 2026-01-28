@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Translation;
@@ -90,11 +91,17 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         mockPasswordValidator.Setup(x => x.GetStrengthMessage(It.IsAny<PasswordStrength>()))
             .Returns("普通");
 
+        // [Issue #179] ローカリゼーションサービスのモックを設定
+        var mockLocalizationService = new Mock<ILocalizationService>();
+        mockLocalizationService.Setup(x => x.CurrentCulture)
+            .Returns(new CultureInfo("ja"));
+
         return RunOnUIThread(() => new SignupViewModel(
             _mockAuthService.Object,
             Mock.Of<IOAuthCallbackHandler>(),
             Mock.Of<INavigationService>(),
             mockPasswordValidator.Object,
+            mockLocalizationService.Object,
             Mock.Of<Core.Abstractions.Events.IEventAggregator>(),
             Mock.Of<ILogger<SignupViewModel>>()));
     }

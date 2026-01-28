@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -26,6 +27,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     private readonly IOAuthCallbackHandler _oauthHandler;
     private readonly INavigationService _navigationService;
     private readonly IPasswordStrengthValidator _passwordValidator;
+    private readonly ILocalizationService _localizationService;
     private readonly ILogger<SignupViewModel>? _logger;
 
     // LoggerMessage delegates for structured logging
@@ -138,6 +140,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <param name="oauthHandler">OAuthコールバックハンドラー</param>
     /// <param name="navigationService">ナビゲーションサービス</param>
     /// <param name="passwordValidator">パスワード強度バリデーター</param>
+    /// <param name="localizationService">ローカライゼーションサービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="logger">ロガー</param>
     public SignupViewModel(
@@ -145,6 +148,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         IOAuthCallbackHandler oauthHandler,
         INavigationService navigationService,
         IPasswordStrengthValidator passwordValidator,
+        ILocalizationService localizationService,
         IEventAggregator eventAggregator,
         ILogger<SignupViewModel>? logger = null) : base(eventAggregator, logger)
     {
@@ -152,6 +156,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         _oauthHandler = oauthHandler ?? throw new ArgumentNullException(nameof(oauthHandler));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _passwordValidator = passwordValidator ?? throw new ArgumentNullException(nameof(passwordValidator));
+        _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _logger = logger;
 
         // バリデーションルールの設定
@@ -388,9 +393,17 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             if (_logger != null)
                 _logSignupAttempt(_logger, Email, null);
 
+            // [Issue #179] ユーザーの言語設定をuser_metadataに含める
+            // Supabase Edge Functionsで多言語メール送信時に使用
+            var userMetadata = new Dictionary<string, object>
+            {
+                { "language", _localizationService.CurrentCulture.TwoLetterISOLanguageName }
+            };
+            _logger?.LogDebug("SignUp with language preference: {Language}", _localizationService.CurrentCulture.TwoLetterISOLanguageName);
+
             // 🔥 [FIX] ConfigureAwait(true)に変更してUIスレッドで継続処理を実行
             // ConfigureAwait(false)だとバックグラウンドスレッドになり、プロパティ変更でAccessViolationが発生する
-            var result = await _authService.SignUpWithEmailPasswordAsync(Email, Password);
+            var result = await _authService.SignUpWithEmailPasswordAsync(Email, Password, userMetadata);
 
             if (result is AuthSuccess success)
             {

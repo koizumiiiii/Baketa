@@ -65,9 +65,14 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     /// </summary>
     /// <param name="email">User email address</param>
     /// <param name="password">User password</param>
+    /// <param name="userMetadata">Optional user metadata (e.g., language preference)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Authentication result</returns>
-    public async Task<AuthResult> SignUpWithEmailPasswordAsync(string email, string password, CancellationToken cancellationToken = default)
+    public async Task<AuthResult> SignUpWithEmailPasswordAsync(
+        string email,
+        string password,
+        Dictionary<string, object>? userMetadata = null,
+        CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
@@ -78,8 +83,21 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         {
             _logger.LogInformation("Starting email signup for user: {MaskedEmail}", MaskEmail(email));
 
-            // Call Supabase SignUp API
-            var session = await _supabaseClient.Auth.SignUp(email, password).ConfigureAwait(false);
+            // [Issue #179] Call Supabase SignUp API with user metadata (e.g., language preference)
+            Supabase.Gotrue.Session? session;
+            if (userMetadata != null && userMetadata.Count > 0)
+            {
+                var options = new Supabase.Gotrue.SignUpOptions
+                {
+                    Data = userMetadata
+                };
+                _logger.LogDebug("SignUp with user metadata: {MetadataKeys}", string.Join(", ", userMetadata.Keys));
+                session = await _supabaseClient.Auth.SignUp(email, password, options).ConfigureAwait(false);
+            }
+            else
+            {
+                session = await _supabaseClient.Auth.SignUp(email, password).ConfigureAwait(false);
+            }
 
             if (session?.User != null)
             {
