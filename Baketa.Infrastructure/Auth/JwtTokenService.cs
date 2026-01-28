@@ -24,7 +24,7 @@ public sealed class JwtTokenService(
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     private readonly ILogger<JwtTokenService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly string _relayServerUrl = settings?.Value?.RelayServerUrl
-        ?? "https://baketa-relay.suke009.workers.dev";
+        ?? "https://api.baketa.app";
 
     private JwtTokenPair? _currentTokenPair;
     private readonly object _tokenLock = new();

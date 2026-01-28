@@ -113,7 +113,7 @@ public sealed class LicenseSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "License", "Promotion API Endpoint",
         Description = "プロモーションコード検証サーバーのエンドポイントURL")]
-    public string PromotionApiEndpoint { get; set; } = "https://baketa-relay.suke009.workers.dev/api/promotion/redeem";
+    public string PromotionApiEndpoint { get; set; } = "https://api.baketa.app/api/promotion/redeem";
 
     /// <summary>
     /// 適用済みプロモーションコード（DPAPI暗号化）

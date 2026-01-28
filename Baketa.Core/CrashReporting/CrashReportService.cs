@@ -401,7 +401,7 @@ public sealed partial class CrashReportService : ICrashReportService
     /// <summary>
     /// クラッシュレポート送信先エンドポイント（レガシー用）
     /// </summary>
-    private const string CrashReportEndpointUrl = "https://baketa-relay.suke009.workers.dev/api/crash-report";
+    private const string CrashReportEndpointUrl = "https://api.baketa.app/api/crash-report";
 
     /// <inheritdoc />
     public Task DeleteCrashReportAsync(string reportId)

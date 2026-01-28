@@ -1080,7 +1080,7 @@ public class InfrastructureModule : ServiceModuleBase
         {
             services.Configure<Core.Settings.CloudTranslationSettings>(options =>
             {
-                options.RelayServerUrl = "https://baketa-relay.suke009.workers.dev";
+                options.RelayServerUrl = "https://api.baketa.app";
                 options.TimeoutSeconds = 30;
                 options.MaxRetries = 2;
                 options.PrimaryProviderId = "gemini";
@@ -1095,7 +1095,7 @@ public class InfrastructureModule : ServiceModuleBase
         // [Issue #261] Named HttpClient "RelayServer" 登録（ConsentService等で使用）
         services.AddHttpClient("RelayServer", client =>
         {
-            client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+            client.BaseAddress = new Uri("https://api.baketa.app");
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
         Console.WriteLine("✅ Named HttpClient [RelayServer] 登録完了");
@@ -1629,7 +1629,7 @@ public class InfrastructureModule : ServiceModuleBase
                 CrashReporting.CrashReportSender.HttpClientName)
             .ConfigureHttpClient(client =>
             {
-                client.BaseAddress = new Uri("https://baketa-relay.suke009.workers.dev");
+                client.BaseAddress = new Uri("https://api.baketa.app");
                 client.Timeout = TimeSpan.FromSeconds(30);
                 client.DefaultRequestHeaders.Add("User-Agent", "Baketa/1.0");
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
