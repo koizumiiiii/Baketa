@@ -264,7 +264,7 @@
         <!-- Form -->
         <div id="form-container">
             <div class="logo">Baketa</div>
-            <h1 id="title">Set New Password</h1>
+            <h1 id="title">Reset Your Password</h1>
             <p class="subtitle" id="subtitle">Enter a secure password</p>
 
             <div id="message" class="message"></div>
@@ -286,23 +286,23 @@
                     <h3 id="requirements-title">Password Requirements</h3>
                     <div class="requirement unmet" id="req-length">
                         <span class="requirement-icon">✓</span>
-                        <span id="req-length-text">8 or more characters</span>
+                        <span id="req-length-text">At least 8 characters</span>
                     </div>
                     <div class="requirement unmet" id="req-uppercase">
                         <span class="requirement-icon">✓</span>
-                        <span id="req-uppercase-text">Contains uppercase (A-Z)</span>
+                        <span id="req-uppercase-text">Contains an uppercase letter (A-Z)</span>
                     </div>
                     <div class="requirement unmet" id="req-lowercase">
                         <span class="requirement-icon">✓</span>
-                        <span id="req-lowercase-text">Contains lowercase (a-z)</span>
+                        <span id="req-lowercase-text">Contains a lowercase letter (a-z)</span>
                     </div>
                     <div class="requirement unmet" id="req-number">
                         <span class="requirement-icon">✓</span>
-                        <span id="req-number-text">Contains number (0-9)</span>
+                        <span id="req-number-text">Contains a number (0-9)</span>
                     </div>
                     <div class="requirement unmet" id="req-match">
                         <span class="requirement-icon">✓</span>
-                        <span id="req-match-text">Passwords match</span>
+                        <span id="req-match-text">Passwords must match</span>
                     </div>
                 </div>
 
@@ -320,8 +320,8 @@
                 </svg>
             </div>
             <div class="logo">Baketa</div>
-            <h1 class="success-title" id="success-title">Password Changed</h1>
-            <p class="success-message" id="success-message">Your new password has been set.<br>Please log in from the app.</p>
+            <h1 class="success-title" id="success-title">Password Changed!</h1>
+            <p class="success-message" id="success-message">Your password has been successfully updated.<br>Please log in from the Baketa app.</p>
 
             <div class="steps">
                 <h2 id="next-steps-title">Next Steps</h2>
@@ -376,31 +376,31 @@
                 errorInvalid: 'このリンクは無効または期限切れです。アプリから再度パスワードリセットをリクエストしてください。'
             },
             en: {
-                title: 'Set New Password',
+                title: 'Reset Your Password',
                 subtitle: 'Enter a secure password',
                 labelPassword: 'New Password',
                 labelConfirm: 'Confirm Password',
                 placeholderPassword: 'Enter new password',
                 placeholderConfirm: 'Enter password again',
                 requirementsTitle: 'Password Requirements',
-                reqLength: '8 or more characters',
-                reqUppercase: 'Contains uppercase (A-Z)',
-                reqLowercase: 'Contains lowercase (a-z)',
-                reqNumber: 'Contains number (0-9)',
-                reqMatch: 'Passwords match',
+                reqLength: 'At least 8 characters',
+                reqUppercase: 'Contains an uppercase letter (A-Z)',
+                reqLowercase: 'Contains a lowercase letter (a-z)',
+                reqNumber: 'Contains a number (0-9)',
+                reqMatch: 'Passwords must match',
                 btnText: 'Change Password',
                 btnLoading: 'Changing...',
-                successTitle: 'Password Changed',
-                successMessage: 'Your new password has been set.<br>Please log in from the app.',
+                successTitle: 'Password Changed!',
+                successMessage: 'Your password has been successfully updated.<br>Please log in from the Baketa app.',
                 nextStepsTitle: 'Next Steps',
                 step1: 'Close this page',
                 step2: 'Open the Baketa app',
                 step3: 'Log in with your new password',
                 infoMessage: 'Please enter your new password.',
-                errorExpired: 'This link has expired. Please request a password reset again.',
-                errorSame: 'You cannot use the same password as your current one.',
+                errorExpired: 'This link has expired. Please request a new password reset from the app.',
+                errorSame: 'Your new password cannot be the same as your old one.',
                 errorDefault: 'Failed to change password.',
-                errorInvalid: 'This link is invalid or expired. Please request a password reset from the app.'
+                errorInvalid: 'This link is either invalid or has expired. Please request a password reset from the app.'
             }
         };
 
