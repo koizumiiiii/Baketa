@@ -574,6 +574,9 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     }
 
 
+    // サポートされている言語コードの許可リスト（セキュリティ対策）
+    private static readonly string[] SupportedLanguageCodes = ["ja", "en"];
+
     /// <summary>
     /// ユーザーの言語設定をアプリケーションに適用します
     /// Issue #179: ログイン時にuser_metadataから言語設定を取得してアプリに反映
@@ -589,13 +592,20 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
 
         try
         {
-            // サポートされている言語コードに変換
+            // サポートされている言語コードに正規化
             var normalizedLanguage = language.ToLowerInvariant() switch
             {
                 "ja" or "ja-jp" => "ja",
                 "en" or "en-us" or "en-gb" => "en",
-                _ => language // その他はそのまま使用
+                _ => null // サポートされていない言語
             };
+
+            // [SECURITY] 許可リストに含まれない言語は拒否（パストラバーサル対策）
+            if (normalizedLanguage is null || !SupportedLanguageCodes.Contains(normalizedLanguage))
+            {
+                _logger?.LogWarning("サポートされていない言語コード '{Language}' が指定されました。言語設定は変更しません。", language);
+                return;
+            }
 
             var currentLanguage = _localizationService.CurrentCulture.TwoLetterISOLanguageName;
             if (currentLanguage.Equals(normalizedLanguage, StringComparison.OrdinalIgnoreCase))
