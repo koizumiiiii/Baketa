@@ -486,6 +486,9 @@ public static class Strings
     public static string Auth_Validation_InvalidEmail => GetString("Auth_Validation_InvalidEmail");
     public static string Auth_Validation_PasswordRequirement => GetString("Auth_Validation_PasswordRequirement");
     public static string Auth_Validation_PasswordMismatch => GetString("Auth_Validation_PasswordMismatch");
+    public static string Auth_Validation_PasswordMinLength => GetString("Auth_Validation_PasswordMinLength");
+    public static string Auth_Error_PasswordResetException => GetString("Auth_Error_PasswordResetException");
+    public static string Auth_Success_ConfirmationEmailSent => GetString("Auth_Success_ConfirmationEmailSent");
 
     // ========== License Token Gauge Labels ==========
 

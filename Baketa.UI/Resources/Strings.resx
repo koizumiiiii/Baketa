@@ -1605,5 +1605,14 @@
   <data name="Settings_License_TotalAvailable" xml:space="preserve">
     <value>合計利用可能</value>
   </data>
+  <data name="Auth_Validation_PasswordMinLength" xml:space="preserve">
+    <value>パスワードは6文字以上で入力してください</value>
+  </data>
+  <data name="Auth_Error_PasswordResetException" xml:space="preserve">
+    <value>パスワードリセットに失敗しました: {0}</value>
+  </data>
+  <data name="Auth_Success_ConfirmationEmailSent" xml:space="preserve">
+    <value>確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...</value>
+  </data>
 
 </root>

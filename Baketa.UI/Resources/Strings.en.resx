@@ -1605,5 +1605,14 @@
   <data name="Settings_License_TotalAvailable" xml:space="preserve">
     <value>Total Available</value>
   </data>
+  <data name="Auth_Validation_PasswordMinLength" xml:space="preserve">
+    <value>Password must be at least 6 characters</value>
+  </data>
+  <data name="Auth_Error_PasswordResetException" xml:space="preserve">
+    <value>Password reset failed: {0}</value>
+  </data>
+  <data name="Auth_Success_ConfirmationEmailSent" xml:space="preserve">
+    <value>Confirmation email sent. Please click the link in the email, then log in. Redirecting to login in 3 seconds...</value>
+  </data>
 
 </root>

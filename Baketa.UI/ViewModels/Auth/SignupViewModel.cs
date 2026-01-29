@@ -412,7 +412,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
                     _logSignupSuccess(_logger, Email, null);
 
                 // 🔥 [UX改善] 成功メッセージを緑色で表示し、数秒後にログイン画面へ自動遷移
-                SuccessMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...";
+                SuccessMessage = Resources.Strings.Auth_Success_ConfirmationEmailSent;
                 ErrorMessage = null; // エラーメッセージをクリア
 
                 _logger?.LogInformation("サインアップ成功: 確認メールを送信しました");
@@ -435,7 +435,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
                         _logSignupSuccess(_logger, Email, null);
 
                     // 緑色の成功メッセージを表示
-                    SuccessMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...";
+                    SuccessMessage = Resources.Strings.Auth_Success_ConfirmationEmailSent;
                     ErrorMessage = null;
 
                     _logger?.LogInformation("サインアップ成功（メール確認待ち）: 確認メールを送信しました");

@@ -151,7 +151,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         var passwordRule = this.ValidationRule(
             vm => vm.Password,
             password => !string.IsNullOrWhiteSpace(password) && password.Length >= 6,
-            "パスワードは6文字以上で入力してください");
+            Resources.Strings.Auth_Validation_PasswordMinLength);
         Disposables.Add(passwordRule);
 
         // ブロック状態チェック
@@ -270,7 +270,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         // パスワードリセットエラーハンドリング
         ForgotPasswordCommand.ThrownExceptions.Subscribe(ex =>
         {
-            ErrorMessage = $"パスワードリセットに失敗しました: {ex.Message}";
+            ErrorMessage = Resources.Strings.Auth_Error_PasswordResetError;
         });
     }
 
