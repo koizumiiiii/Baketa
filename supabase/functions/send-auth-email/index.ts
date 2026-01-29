@@ -82,19 +82,26 @@ function getUserLanguage(userMetadata?: Record<string, unknown>): SupportedLangu
 
 /**
  * Build confirmation URL from email data
+ *
+ * The URL must go through Supabase's verification endpoint first,
+ * then redirect to our landing page after token validation.
  */
 function buildConfirmationUrl(emailData: AuthHookPayload["email_data"], language: SupportedLanguage): string {
   // Issue #179 Phase 0-2: Use Cloudflare Pages domain for auth landing pages
-  const baseUrl = "https://auth.baketa.app";
+  const landingPageBase = "https://auth.baketa.app";
+  const supabaseVerifyEndpoint = "https://kajsoietcikivrwidqcs.supabase.co/auth/v1/verify";
+
+  // Build the landing page URL with language parameter
+  const landingPage = `${landingPageBase}/auth/callback/?lang=${language}`;
+
+  // Build the Supabase verification URL
   const params = new URLSearchParams({
     token_hash: emailData.token_hash,
     type: emailData.email_action_type,
-    lang: language,
+    redirect_to: landingPage,
   });
-  if (emailData.redirect_to) {
-    params.set("redirect_to", emailData.redirect_to);
-  }
-  return `${baseUrl}/auth/confirm?${params.toString()}`;
+
+  return `${supabaseVerifyEndpoint}?${params.toString()}`;
 }
 
 /**
