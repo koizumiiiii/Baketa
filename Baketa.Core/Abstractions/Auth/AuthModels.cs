@@ -50,12 +50,14 @@ public sealed record AuthSession(
 /// <param name="DisplayName">User display name (optional)</param>
 /// <param name="AvatarUrl">User avatar URL (optional)</param>
 /// <param name="Provider">Authentication provider used</param>
+/// <param name="Language">User's preferred language from user_metadata (optional)</param>
 public sealed record UserInfo(
     string Id,
     string Email,
     string? DisplayName = null,
     string? AvatarUrl = null,
-    AuthProvider? Provider = null);
+    AuthProvider? Provider = null,
+    string? Language = null);
 
 /// <summary>
 /// Authentication status change event arguments

@@ -29,6 +29,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     private readonly SecureSessionManager _sessionManager;
     private readonly LoginAttemptTracker _attemptTracker;
     private readonly SecurityAuditLogger _auditLogger;
+    private readonly ILocalizationService _localizationService;
     private readonly ILogger<LoginViewModel>? _logger;
 
     // LoggerMessage delegates for structured logging
@@ -103,6 +104,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     /// <param name="sessionManager">セッション管理</param>
     /// <param name="attemptTracker">ログイン試行追跡器</param>
     /// <param name="auditLogger">セキュリティ監査ログ</param>
+    /// <param name="localizationService">ローカライゼーションサービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="logger">ロガー</param>
     public LoginViewModel(
@@ -113,6 +115,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         SecureSessionManager sessionManager,
         LoginAttemptTracker attemptTracker,
         SecurityAuditLogger auditLogger,
+        ILocalizationService localizationService,
         IEventAggregator eventAggregator,
         ILogger<LoginViewModel>? logger = null) : base(eventAggregator, logger)
     {
@@ -123,6 +126,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _attemptTracker = attemptTracker ?? throw new ArgumentNullException(nameof(attemptTracker));
         _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
+        _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _logger = logger;
 
         // バリデーションルールの設定
@@ -398,6 +402,9 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                     _logger?.LogInformation("Remember Me: トークンを永続化しました");
                 }
 
+                // Issue #179: ログイン時にuser_metadataから言語設定を取得してアプリに反映
+                await ApplyUserLanguageSettingAsync(success.Session.User.Language);
+
                 // 認証成功イベントによりOnAuthStatusChangedがナビゲーションを処理
             }
             else if (result is AuthFailure failure)
@@ -464,8 +471,11 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                 return;
             }
 
-            if (result is AuthSuccess)
+            if (result is AuthSuccess success)
             {
+                // Issue #179: ログイン時にuser_metadataから言語設定を取得してアプリに反映
+                await ApplyUserLanguageSettingAsync(success.Session.User.Language);
+
                 // 認証成功時はOnAuthStatusChangedイベントで処理されるため、ここでは何もしない
                 _logger?.LogInformation("OAuth認証成功: {Provider}", provider);
             }
@@ -563,6 +573,52 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         base.Dispose(disposing);
     }
 
+
+    /// <summary>
+    /// ユーザーの言語設定をアプリケーションに適用します
+    /// Issue #179: ログイン時にuser_metadataから言語設定を取得してアプリに反映
+    /// </summary>
+    /// <param name="language">user_metadataから取得した言語コード (ja, en など)</param>
+    private async Task ApplyUserLanguageSettingAsync(string? language)
+    {
+        if (string.IsNullOrEmpty(language))
+        {
+            _logger?.LogDebug("ユーザーの言語設定がありません。現在の言語設定を維持します。");
+            return;
+        }
+
+        try
+        {
+            // サポートされている言語コードに変換
+            var normalizedLanguage = language.ToLowerInvariant() switch
+            {
+                "ja" or "ja-jp" => "ja",
+                "en" or "en-us" or "en-gb" => "en",
+                _ => language // その他はそのまま使用
+            };
+
+            var currentLanguage = _localizationService.CurrentCulture.TwoLetterISOLanguageName;
+            if (currentLanguage.Equals(normalizedLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger?.LogDebug("ユーザーの言語設定 ({Language}) は現在の設定と同じです。", normalizedLanguage);
+                return;
+            }
+
+            var success = await _localizationService.ChangeLanguageAsync(normalizedLanguage);
+            if (success)
+            {
+                _logger?.LogInformation("ユーザーの言語設定を適用しました: {Language}", normalizedLanguage);
+            }
+            else
+            {
+                _logger?.LogWarning("ユーザーの言語設定 ({Language}) の適用に失敗しました。", normalizedLanguage);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "言語設定の適用中にエラーが発生しました: {Language}", language);
+        }
+    }
 
     /// <summary>
     /// 認証失敗メッセージを取得します

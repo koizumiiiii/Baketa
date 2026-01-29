@@ -76,6 +76,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
             new SecureSessionManager(Mock.Of<ILogger<SecureSessionManager>>()),
             new LoginAttemptTracker(),
             new SecurityAuditLogger(Mock.Of<ILogger<SecurityAuditLogger>>()),
+            Mock.Of<ILocalizationService>(),
             Mock.Of<Core.Abstractions.Events.IEventAggregator>(),
             Mock.Of<ILogger<LoginViewModel>>()));
     }

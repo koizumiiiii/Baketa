@@ -657,7 +657,8 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
                 ?? user.UserMetadata?.GetValueOrDefault("full_name")?.ToString()
                 ?? user.Email?.Split('@')[0],
             AvatarUrl: user.UserMetadata?.GetValueOrDefault("avatar_url")?.ToString(),
-            Provider: MapFromIdentityProvider(user.AppMetadata?.GetValueOrDefault("provider")?.ToString())
+            Provider: MapFromIdentityProvider(user.AppMetadata?.GetValueOrDefault("provider")?.ToString()),
+            Language: user.UserMetadata?.GetValueOrDefault("language")?.ToString()
         );
 
         return new AuthSession(
