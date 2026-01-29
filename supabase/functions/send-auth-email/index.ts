@@ -84,7 +84,8 @@ function getUserLanguage(userMetadata?: Record<string, unknown>): SupportedLangu
  * Build confirmation URL from email data
  */
 function buildConfirmationUrl(emailData: AuthHookPayload["email_data"], language: SupportedLanguage): string {
-  const baseUrl = emailData.site_url || "https://baketa.app";
+  // Issue #179 Phase 0-2: Use Cloudflare Pages domain for auth landing pages
+  const baseUrl = "https://auth.baketa.app";
   const params = new URLSearchParams({
     token_hash: emailData.token_hash,
     type: emailData.email_action_type,
