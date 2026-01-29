@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baketa - 招待を受け入れました</title>
+    <title>Baketa - Invitation Accepted</title>
     <style>
         * {
             margin: 0;
@@ -122,34 +122,79 @@
 <body>
     <div class="container">
         <div class="icon">
-            <!-- User Plus icon -->
             <svg viewBox="0 0 24 24">
                 <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
             </svg>
         </div>
         <div class="logo">Baketa</div>
-        <h1>招待を受け入れました</h1>
-        <p>ようこそ！<br>招待が<span class="highlight">正常に完了</span>しました。</p>
+        <h1 id="title">Invitation Accepted</h1>
+        <p id="message">Welcome!<br>Your invitation has been <span class="highlight" id="highlight">successfully completed</span>.</p>
 
         <div class="steps">
-            <h2>次のステップ</h2>
+            <h2 id="next-steps-title">Next Steps</h2>
             <div class="step">
                 <div class="step-number">1</div>
-                <div class="step-text">このページを閉じてください</div>
+                <div class="step-text" id="step1">Close this page</div>
             </div>
             <div class="step">
                 <div class="step-number">2</div>
-                <div class="step-text">Baketaアプリを開いてください</div>
+                <div class="step-text" id="step2">Open the Baketa app</div>
             </div>
             <div class="step">
                 <div class="step-number">3</div>
-                <div class="step-text">招待されたアカウントでログインしてください</div>
+                <div class="step-text" id="step3">Log in with your invited account</div>
             </div>
         </div>
 
         <div class="footer">
-            <p>&copy; 2024 Baketa. All rights reserved.</p>
+            <p>&copy; 2025 Baketa. All rights reserved.</p>
         </div>
     </div>
+
+    <script>
+        const translations = {
+            ja: {
+                title: '招待を受け入れました',
+                message: 'ようこそ！<br>招待が<span class="highlight">正常に完了</span>しました。',
+                nextStepsTitle: '次のステップ',
+                step1: 'このページを閉じてください',
+                step2: 'Baketaアプリを開いてください',
+                step3: '招待されたアカウントでログインしてください'
+            },
+            en: {
+                title: 'Invitation Accepted',
+                message: 'Welcome!<br>Your invitation has been <span class="highlight">successfully completed</span>.',
+                nextStepsTitle: 'Next Steps',
+                step1: 'Close this page',
+                step2: 'Open the Baketa app',
+                step3: 'Log in with your invited account'
+            }
+        };
+
+        function getLanguage() {
+            const params = new URLSearchParams(window.location.search);
+            const langParam = params.get('lang');
+            if (langParam && (langParam === 'ja' || langParam === 'en')) {
+                return langParam;
+            }
+            const browserLang = navigator.language || navigator.userLanguage;
+            return browserLang.startsWith('ja') ? 'ja' : 'en';
+        }
+
+        function applyTranslations() {
+            const lang = getLanguage();
+            const t = translations[lang];
+
+            document.documentElement.lang = lang;
+            document.getElementById('title').textContent = t.title;
+            document.getElementById('message').innerHTML = t.message;
+            document.getElementById('next-steps-title').textContent = t.nextStepsTitle;
+            document.getElementById('step1').textContent = t.step1;
+            document.getElementById('step2').textContent = t.step2;
+            document.getElementById('step3').textContent = t.step3;
+        }
+
+        applyTranslations();
+    </script>
 </body>
 </html>

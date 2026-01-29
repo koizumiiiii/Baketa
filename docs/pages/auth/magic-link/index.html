@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baketa - ログイン完了</title>
+    <title>Baketa - Login Complete</title>
     <style>
         * {
             margin: 0;
@@ -122,34 +122,79 @@
 <body>
     <div class="container">
         <div class="icon">
-            <!-- Magic wand / link icon -->
             <svg viewBox="0 0 24 24">
                 <path d="M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29a.996.996 0 0 0-1.41 0L1.29 18.96a.996.996 0 0 0 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05a.996.996 0 0 0 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z"/>
             </svg>
         </div>
         <div class="logo">Baketa</div>
-        <h1>ログインが完了しました</h1>
-        <p>Magic Linkによる認証が<span class="highlight">成功</span>しました。</p>
+        <h1 id="title">Login Complete</h1>
+        <p id="message">Magic Link authentication was <span class="highlight" id="highlight">successful</span>.</p>
 
         <div class="steps">
-            <h2>次のステップ</h2>
+            <h2 id="next-steps-title">Next Steps</h2>
             <div class="step">
                 <div class="step-number">1</div>
-                <div class="step-text">このページを閉じてください</div>
+                <div class="step-text" id="step1">Close this page</div>
             </div>
             <div class="step">
                 <div class="step-number">2</div>
-                <div class="step-text">Baketaアプリに戻ってください</div>
+                <div class="step-text" id="step2">Return to the Baketa app</div>
             </div>
             <div class="step">
                 <div class="step-number">3</div>
-                <div class="step-text">自動的にログイン状態になっています</div>
+                <div class="step-text" id="step3">You are now logged in automatically</div>
             </div>
         </div>
 
         <div class="footer">
-            <p>&copy; 2024 Baketa. All rights reserved.</p>
+            <p>&copy; 2025 Baketa. All rights reserved.</p>
         </div>
     </div>
+
+    <script>
+        const translations = {
+            ja: {
+                title: 'ログインが完了しました',
+                message: 'Magic Linkによる認証が<span class="highlight">成功</span>しました。',
+                nextStepsTitle: '次のステップ',
+                step1: 'このページを閉じてください',
+                step2: 'Baketaアプリに戻ってください',
+                step3: '自動的にログイン状態になっています'
+            },
+            en: {
+                title: 'Login Complete',
+                message: 'Magic Link authentication was <span class="highlight">successful</span>.',
+                nextStepsTitle: 'Next Steps',
+                step1: 'Close this page',
+                step2: 'Return to the Baketa app',
+                step3: 'You are now logged in automatically'
+            }
+        };
+
+        function getLanguage() {
+            const params = new URLSearchParams(window.location.search);
+            const langParam = params.get('lang');
+            if (langParam && (langParam === 'ja' || langParam === 'en')) {
+                return langParam;
+            }
+            const browserLang = navigator.language || navigator.userLanguage;
+            return browserLang.startsWith('ja') ? 'ja' : 'en';
+        }
+
+        function applyTranslations() {
+            const lang = getLanguage();
+            const t = translations[lang];
+
+            document.documentElement.lang = lang;
+            document.getElementById('title').textContent = t.title;
+            document.getElementById('message').innerHTML = t.message;
+            document.getElementById('next-steps-title').textContent = t.nextStepsTitle;
+            document.getElementById('step1').textContent = t.step1;
+            document.getElementById('step2').textContent = t.step2;
+            document.getElementById('step3').textContent = t.step3;
+        }
+
+        applyTranslations();
+    </script>
 </body>
 </html>

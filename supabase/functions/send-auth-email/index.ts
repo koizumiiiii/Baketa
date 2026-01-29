@@ -83,11 +83,12 @@ function getUserLanguage(userMetadata?: Record<string, unknown>): SupportedLangu
 /**
  * Build confirmation URL from email data
  */
-function buildConfirmationUrl(emailData: AuthHookPayload["email_data"]): string {
+function buildConfirmationUrl(emailData: AuthHookPayload["email_data"], language: SupportedLanguage): string {
   const baseUrl = emailData.site_url || "https://baketa.app";
   const params = new URLSearchParams({
     token_hash: emailData.token_hash,
     type: emailData.email_action_type,
+    lang: language,
   });
   if (emailData.redirect_to) {
     params.set("redirect_to", emailData.redirect_to);
@@ -367,7 +368,7 @@ serve(async (req) => {
     // Build email data
     const emailDataForTemplate: EmailData = {
       email: user.email,
-      confirmationUrl: buildConfirmationUrl(email_data),
+      confirmationUrl: buildConfirmationUrl(email_data, language),
       userMetadata: user.user_metadata,
     };
     console.log(`Confirmation URL: ${emailDataForTemplate.confirmationUrl}`);
