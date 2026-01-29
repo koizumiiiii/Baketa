@@ -833,14 +833,14 @@
   <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
     <value>Available Plans:</value>
   </data>
-  <data name="Settings_Account_PatreonPlanStandard" xml:space="preserve">
-    <value>• Standard ($1/month): Ad-free</value>
-  </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/month): Cloud AI translation 4M tokens/month</value>
+    <value>• Pro ($3/month): Cloud AI translation 10M tokens/month</value>
   </data>
-  <data name="Settings_Account_PatreonPlanPremia" xml:space="preserve">
-    <value>• Premia ($5/month): Cloud AI translation 8M tokens/month</value>
+  <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
+    <value>• Premium ($5/month): Cloud AI translation 20M tokens/month</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
+    <value>• Ultimate ($9/month): Cloud AI translation 50M tokens/month</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>Login</value>
@@ -1586,6 +1586,24 @@
   </data>
   <data name="Auth_Validation_PasswordMismatch" xml:space="preserve">
     <value>Passwords do not match</value>
+  </data>
+  <data name="Settings_Account_LogoutSuccess" xml:space="preserve">
+    <value>Logged out successfully</value>
+  </data>
+  <data name="Settings_License_UsedTokens" xml:space="preserve">
+    <value>Used</value>
+  </data>
+  <data name="Settings_License_PlanRemaining" xml:space="preserve">
+    <value>Plan Remaining</value>
+  </data>
+  <data name="Settings_License_BonusLabel" xml:space="preserve">
+    <value>Bonus</value>
+  </data>
+  <data name="Settings_License_BonusTokens" xml:space="preserve">
+    <value>Bonus Tokens</value>
+  </data>
+  <data name="Settings_License_TotalAvailable" xml:space="preserve">
+    <value>Total Available</value>
   </data>
 
 </root>

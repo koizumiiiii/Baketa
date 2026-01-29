@@ -131,17 +131,17 @@
                                         IsVisible="{Binding HasBonusTokens}">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <Border Width="12" Height="12" CornerRadius="2" Background="{Binding UsageGaugeBrush}"/>
-                                    <TextBlock Text="使用済み" FontSize="10" VerticalAlignment="Center"
+                                    <TextBlock Text="{local:Localize Settings_License_UsedTokens}" FontSize="10" VerticalAlignment="Center"
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <Border Width="12" Height="12" CornerRadius="2" Background="#ADB5BD"/>
-                                    <TextBlock Text="プラン残" FontSize="10" VerticalAlignment="Center"
+                                    <TextBlock Text="{local:Localize Settings_License_PlanRemaining}" FontSize="10" VerticalAlignment="Center"
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <Border Width="12" Height="12" CornerRadius="2" Background="#28A745"/>
-                                    <TextBlock Text="ボーナス" FontSize="10" VerticalAlignment="Center"
+                                    <TextBlock Text="{local:Localize Settings_License_BonusLabel}" FontSize="10" VerticalAlignment="Center"
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                                 </StackPanel>
                             </StackPanel>
@@ -228,7 +228,7 @@
                         <!-- [Issue #307] Bonus Tokens (if available) -->
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBonusTokens}">
                             <TextBlock Grid.Column="0"
-                                       Text="ボーナストークン"
+                                       Text="{local:Localize Settings_License_BonusTokens}"
                                        VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
                                        Text="{Binding BonusTokensRemaining, StringFormat='{}{0:N0}'}"
@@ -240,7 +240,7 @@
                         <!-- [Issue #307] Total Token Pool (if has bonus) -->
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBonusTokens}">
                             <TextBlock Grid.Column="0"
-                                       Text="合計利用可能"
+                                       Text="{local:Localize Settings_License_TotalAvailable}"
                                        VerticalAlignment="Center"
                                        FontWeight="Medium"/>
                             <TextBlock Grid.Column="1"

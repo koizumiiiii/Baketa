@@ -297,6 +297,7 @@ public static class Strings
     public static string Settings_Account_Email => GetString("Settings_Account_Email");
     public static string Settings_Account_ChangePassword => GetString("Settings_Account_ChangePassword");
     public static string Settings_Account_Logout => GetString("Settings_Account_Logout");
+    public static string Settings_Account_LogoutSuccess => GetString("Settings_Account_LogoutSuccess");
     public static string Settings_Account_Login => GetString("Settings_Account_Login");
     public static string Settings_Account_Signup => GetString("Settings_Account_Signup");
     public static string Settings_Account_CurrentPlan => GetString("Settings_Account_CurrentPlan");
@@ -314,9 +315,9 @@ public static class Strings
     public static string Settings_Account_PatreonConnectDescription => GetString("Settings_Account_PatreonConnectDescription");
     public static string Settings_Account_PatreonConnectButton => GetString("Settings_Account_PatreonConnectButton");
     public static string Settings_Account_PatreonAvailablePlans => GetString("Settings_Account_PatreonAvailablePlans");
-    public static string Settings_Account_PatreonPlanStandard => GetString("Settings_Account_PatreonPlanStandard");
     public static string Settings_Account_PatreonPlanPro => GetString("Settings_Account_PatreonPlanPro");
-    public static string Settings_Account_PatreonPlanPremia => GetString("Settings_Account_PatreonPlanPremia");
+    public static string Settings_Account_PatreonPlanPremium => GetString("Settings_Account_PatreonPlanPremium");
+    public static string Settings_Account_PatreonPlanUltimate => GetString("Settings_Account_PatreonPlanUltimate");
     public static string Settings_Account_EmailLoginOptional => GetString("Settings_Account_EmailLoginOptional");
     public static string Settings_Account_PatreonSyncing => GetString("Settings_Account_PatreonSyncing");
     public static string Settings_Account_PatreonStatusSynced => GetString("Settings_Account_PatreonStatusSynced");
@@ -485,6 +486,14 @@ public static class Strings
     public static string Auth_Validation_InvalidEmail => GetString("Auth_Validation_InvalidEmail");
     public static string Auth_Validation_PasswordRequirement => GetString("Auth_Validation_PasswordRequirement");
     public static string Auth_Validation_PasswordMismatch => GetString("Auth_Validation_PasswordMismatch");
+
+    // ========== License Token Gauge Labels ==========
+
+    public static string Settings_License_UsedTokens => GetString("Settings_License_UsedTokens");
+    public static string Settings_License_PlanRemaining => GetString("Settings_License_PlanRemaining");
+    public static string Settings_License_BonusLabel => GetString("Settings_License_BonusLabel");
+    public static string Settings_License_BonusTokens => GetString("Settings_License_BonusTokens");
+    public static string Settings_License_TotalAvailable => GetString("Settings_License_TotalAvailable");
 
     // ========== Confirmation Dialogs ==========
 

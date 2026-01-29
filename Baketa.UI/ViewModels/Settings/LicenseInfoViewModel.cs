@@ -658,7 +658,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// </summary>
     private void OpenPlanChangePage()
     {
-        const string planChangeUrl = "https://patreon.com/baketa_translation";
+        const string planChangeUrl = "https://www.patreon.com/c/baketa_translation/membership";
 
         try
         {

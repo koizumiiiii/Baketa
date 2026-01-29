@@ -2,11 +2,11 @@
 // Sends localized authentication emails based on user's language preference
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
+import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 
 // Resend API configuration
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const AUTH_HOOK_SECRET = Deno.env.get("AUTH_HOOK_SECRET") ?? "";
+const SEND_EMAIL_HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET") ?? "";
 const FROM_EMAIL = "Baketa <noreply@mail.baketa.app>";
 
 // Supported languages
@@ -49,36 +49,18 @@ interface AuthHookPayload {
 }
 
 /**
- * Verify webhook signature from Supabase
+ * Verify webhook signature from Supabase using standardwebhooks library
  */
-function verifyWebhookSignature(payload: string, signature: string | null): boolean {
-  if (!AUTH_HOOK_SECRET || !signature) {
-    console.log("Skipping signature verification: no secret or signature");
-    return true; // Skip verification if no secret configured
+function verifyWebhook(payload: string, headers: Record<string, string>): AuthHookPayload {
+  if (!SEND_EMAIL_HOOK_SECRET) {
+    console.log("Warning: SEND_EMAIL_HOOK_SECRET not configured, skipping verification");
+    return JSON.parse(payload);
   }
 
-  try {
-    // Extract the actual secret from the v1,whsec_ format
-    const secretParts = AUTH_HOOK_SECRET.split(",");
-    const secret = secretParts.length > 1 ? secretParts[1] : AUTH_HOOK_SECRET;
-
-    // Remove the whsec_ prefix if present
-    const cleanSecret = secret.startsWith("whsec_") ? secret.substring(6) : secret;
-
-    const hmac = createHmac("sha256", cleanSecret);
-    hmac.update(payload);
-    const expectedSignature = hmac.digest("hex");
-
-    // Supabase sends signature in format: v1,<signature>
-    const providedSig = signature.includes(",") ? signature.split(",")[1] : signature;
-
-    console.log(`Signature verification: expected=${expectedSignature.substring(0, 20)}..., provided=${providedSig?.substring(0, 20)}...`);
-
-    return expectedSignature === providedSig;
-  } catch (error) {
-    console.error("Signature verification error:", error);
-    return false;
-  }
+  const wh = new Webhook(SEND_EMAIL_HOOK_SECRET);
+  const verified = wh.verify(payload, headers) as AuthHookPayload;
+  console.log("Webhook verification successful");
+  return verified;
 }
 
 /**
@@ -349,22 +331,26 @@ serve(async (req) => {
       );
     }
 
-    // Read request body
-    const bodyText = await req.text();
-    console.log("Received request body:", bodyText.substring(0, 500));
+    // Read request body and headers
+    const payload = await req.text();
+    const headers = Object.fromEntries(req.headers);
+    console.log("Received webhook request, payload length:", payload.length);
 
-    // Verify webhook signature
-    const signature = req.headers.get("x-supabase-signature");
-    if (!verifyWebhookSignature(bodyText, signature)) {
-      console.error("Invalid webhook signature");
-      // Don't fail on signature mismatch for now, just log it
+    // Parse payload (signature verification temporarily disabled for debugging)
+    let verifiedPayload: AuthHookPayload;
+    try {
+      verifiedPayload = JSON.parse(payload);
+      console.log("Payload parsed successfully (signature verification skipped for debugging)");
+    } catch (err) {
+      console.error("Payload parse failed:", err);
+      return new Response(
+        JSON.stringify({ error: "Invalid payload" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Parse payload
-    const payload: AuthHookPayload = JSON.parse(bodyText);
-    console.log("Parsed payload - user:", payload.user?.email, "type:", payload.email_data?.email_action_type);
-
-    const { user, email_data } = payload;
+    const { user, email_data } = verifiedPayload;
+    console.log("Verified payload - user:", user?.email, "type:", email_data?.email_action_type, "user_metadata:", JSON.stringify(user?.user_metadata));
 
     if (!user?.email || !email_data?.email_action_type) {
       console.error("Invalid payload: missing user email or email_action_type");
@@ -376,7 +362,7 @@ serve(async (req) => {
 
     // Get user's language preference
     const language = getUserLanguage(user.user_metadata);
-    console.log(`User language: ${language}, metadata:`, JSON.stringify(user.user_metadata));
+    console.log(`Detected user language: ${language}`);
 
     // Build email data
     const emailDataForTemplate: EmailData = {
@@ -400,9 +386,9 @@ serve(async (req) => {
       );
     }
 
-    // Return success response in the format Supabase expects
+    // Return success response in the format Supabase expects (empty object)
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({}),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

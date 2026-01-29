@@ -833,14 +833,14 @@
   <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
     <value>利用可能なプラン:</value>
   </data>
-  <data name="Settings_Account_PatreonPlanStandard" xml:space="preserve">
-    <value>• Standard ($1/月): 広告なし</value>
-  </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/月): クラウドAI翻訳 400万トークン/月</value>
+    <value>• Pro ($3/月): クラウドAI翻訳 1,000万トークン/月</value>
   </data>
-  <data name="Settings_Account_PatreonPlanPremia" xml:space="preserve">
-    <value>• Premia ($5/月): クラウドAI翻訳 800万トークン/月</value>
+  <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
+    <value>• Premium ($5/月): クラウドAI翻訳 2,000万トークン/月</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
+    <value>• Ultimate ($9/月): クラウドAI翻訳 5,000万トークン/月</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>ログイン</value>
@@ -1586,6 +1586,24 @@
   </data>
   <data name="Auth_Validation_PasswordMismatch" xml:space="preserve">
     <value>パスワードが一致しません</value>
+  </data>
+  <data name="Settings_Account_LogoutSuccess" xml:space="preserve">
+    <value>ログアウトしました</value>
+  </data>
+  <data name="Settings_License_UsedTokens" xml:space="preserve">
+    <value>使用済み</value>
+  </data>
+  <data name="Settings_License_PlanRemaining" xml:space="preserve">
+    <value>プラン残</value>
+  </data>
+  <data name="Settings_License_BonusLabel" xml:space="preserve">
+    <value>ボーナス</value>
+  </data>
+  <data name="Settings_License_BonusTokens" xml:space="preserve">
+    <value>ボーナストークン</value>
+  </data>
+  <data name="Settings_License_TotalAvailable" xml:space="preserve">
+    <value>合計利用可能</value>
   </data>
 
 </root>
