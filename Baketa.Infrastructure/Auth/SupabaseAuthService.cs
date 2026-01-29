@@ -711,43 +711,45 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
     {
         var message = ex.Message?.ToLowerInvariant() ?? string.Empty;
 
+        // [Issue #179] Infrastructure層ではエラーコードのみを返す
+        // メッセージのローカライズはUI層の責務
         return message switch
         {
             _ when message.Contains("invalid login credentials") ||
                    message.Contains("invalid password") ||
                    message.Contains("email not confirmed")
-                => new AuthFailure(AuthErrorCodes.InvalidCredentials, "メールアドレスまたはパスワードが正しくありません。"),
+                => new AuthFailure(AuthErrorCodes.InvalidCredentials, ex.Message ?? "InvalidCredentials"),
 
             _ when message.Contains("user not found")
-                => new AuthFailure(AuthErrorCodes.UserNotFound, "ユーザーが見つかりません。"),
+                => new AuthFailure(AuthErrorCodes.UserNotFound, ex.Message ?? "UserNotFound"),
 
             _ when message.Contains("user already registered") ||
                    message.Contains("email already exists")
-                => new AuthFailure(AuthErrorCodes.UserAlreadyExists, "このメールアドレスは既に使用されています。"),
+                => new AuthFailure(AuthErrorCodes.UserAlreadyExists, ex.Message ?? "UserAlreadyExists"),
 
             _ when message.Contains("email not confirmed")
-                => new AuthFailure(AuthErrorCodes.EmailNotConfirmed, "メールアドレスが確認されていません。確認メールをご確認ください。"),
+                => new AuthFailure(AuthErrorCodes.EmailNotConfirmed, ex.Message ?? "EmailNotConfirmed"),
 
             _ when message.Contains("weak password") ||
                    message.Contains("password should be")
-                => new AuthFailure(AuthErrorCodes.WeakPassword, "パスワードが弱すぎます。より強力なパスワードを設定してください。"),
+                => new AuthFailure(AuthErrorCodes.WeakPassword, ex.Message ?? "WeakPassword"),
 
             _ when message.Contains("rate limit") ||
                    message.Contains("too many requests")
-                => new AuthFailure(AuthErrorCodes.RateLimitExceeded, "リクエストが多すぎます。しばらくしてから再試行してください。"),
+                => new AuthFailure(AuthErrorCodes.RateLimitExceeded, ex.Message ?? "RateLimitExceeded"),
 
             _ when message.Contains("network") ||
                    message.Contains("connection")
-                => new AuthFailure(AuthErrorCodes.NetworkError, "ネットワークエラーが発生しました。インターネット接続をご確認ください。"),
+                => new AuthFailure(AuthErrorCodes.NetworkError, ex.Message ?? "NetworkError"),
 
             _ when message.Contains("token") ||
                    message.Contains("jwt")
-                => new AuthFailure(AuthErrorCodes.InvalidToken, "認証トークンが無効です。再度ログインしてください。"),
+                => new AuthFailure(AuthErrorCodes.InvalidToken, ex.Message ?? "InvalidToken"),
 
             _ when message.Contains("expired")
-                => new AuthFailure(AuthErrorCodes.TokenExpired, "セッションの有効期限が切れました。再度ログインしてください。"),
+                => new AuthFailure(AuthErrorCodes.TokenExpired, ex.Message ?? "TokenExpired"),
 
-            _ => new AuthFailure(AuthErrorCodes.UnexpectedError, $"認証エラーが発生しました: {ex.Message}")
+            _ => new AuthFailure(AuthErrorCodes.UnexpectedError, ex.Message ?? "UnexpectedError")
         };
     }
 
