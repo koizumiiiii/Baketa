@@ -7,7 +7,8 @@ namespace Baketa.Infrastructure.Translation.Cloud;
 /// Cloud AI翻訳サービス共通ヘルパー
 /// </summary>
 /// <remarks>
-/// DirectGeminiImageTranslator と DirectOpenAIImageTranslator で共有されるユーティリティメソッド。
+/// [Issue #351] DirectGeminiImageTranslator削除により、現在はDirectOpenAIImageTranslatorで使用。
+/// JSONパース、言語コード変換などのユーティリティメソッドを提供。
 /// </remarks>
 internal static class CloudTranslationHelpers
 {

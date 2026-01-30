@@ -511,7 +511,8 @@ public static class Strings
 
     public static string MainOverlay_StartButton_Tooltip => GetString("MainOverlay_StartButton_Tooltip");
     public static string MainOverlay_Singleshot_Execute => GetString("MainOverlay_Singleshot_Execute");
-    public static string MainOverlay_Singleshot_Clear => GetString("MainOverlay_Singleshot_Clear");
+    public static string MainOverlay_Singleshot_Reset => GetString("MainOverlay_Singleshot_Reset");
+    public static string MainOverlay_Live_Stop => GetString("MainOverlay_Live_Stop");
     public static string MainOverlay_Status_Initializing => GetString("MainOverlay_Status_Initializing");
     public static string MainOverlay_Status_Idle => GetString("MainOverlay_Status_Idle");
     public static string MainOverlay_Status_Ready => GetString("MainOverlay_Status_Ready");
