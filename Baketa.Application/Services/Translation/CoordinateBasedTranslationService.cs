@@ -519,6 +519,28 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 _ => (image.Width, image.Height) // フォールバック: リサイズなしの場合
             };
 
+            // [Issue #354] 変化領域をNormalizedRectに変換（ROI学習フィルタ用）
+            IReadOnlyList<NormalizedRect>? normalizedChangedRegions = null;
+            if (pipelineResult.ImageChangeResult?.ChangedRegions is { Length: > 0 } changedRects)
+            {
+                // 変化検知結果はキャプチャ画像サイズ基準なので、その座標系で正規化
+                var captureWidth = (float)image.Width;
+                var captureHeight = (float)image.Height;
+                normalizedChangedRegions = changedRects
+                    .Select(r => new NormalizedRect
+                    {
+                        X = r.X / captureWidth,
+                        Y = r.Y / captureHeight,
+                        Width = r.Width / captureWidth,
+                        Height = r.Height / captureHeight
+                    })
+                    .ToList();
+
+                _logger?.LogDebug(
+                    "[Issue #354] 変化領域を正規化: {Count}個の領域 (キャプチャサイズ={Width}x{Height})",
+                    normalizedChangedRegions.Count, captureWidth, captureHeight);
+            }
+
             // [Gemini Feedback] ゼロ除算防止のガード
             if (_roiManager != null && textChunks.Count > 0 && normalizeWidth > 0 && normalizeHeight > 0)
             {
@@ -568,12 +590,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             {
                                 try
                                 {
+                                    // [Issue #354] 変化領域フィルタを適用
                                     await _roiManager.ReportTextDetectionsAsync(
                                         detections,
                                         windowHandle,
                                         windowTitle,
                                         executablePath,
-                                        changedRegions: null, // TODO: [Issue #354] 変化領域を渡す
+                                        normalizedChangedRegions,
                                         cancellationToken).ConfigureAwait(false);
                                 }
                                 catch (Exception ex)
