@@ -95,8 +95,9 @@ function buildConfirmationUrl(emailData: AuthHookPayload["email_data"], language
   const landingPage = `${landingPageBase}/auth/callback/?lang=${language}`;
 
   // Build the Supabase verification URL
+  // Note: The parameter name should be "token" even when passing token_hash value
   const params = new URLSearchParams({
-    token_hash: emailData.token_hash,
+    token: emailData.token_hash,
     type: emailData.email_action_type,
     redirect_to: landingPage,
   });
