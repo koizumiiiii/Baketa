@@ -90,6 +90,7 @@ public class MainOverlayViewModel : ViewModelBase
         IErrorNotificationService errorNotificationService, // 🔥 [ISSUE#171_PHASE2] エラー通知サービス依存追加
         IAuthService authService, // 🔥 [ISSUE#176] 認証状態監視用
         Services.INotificationService notificationService, // 🔥 [Issue #300] トースト通知サービス
+        IUnifiedSettingsService unifiedSettingsService, // 🔥 [Issue #318] EXモード表示用
         IConsentService? consentService = null) // [Issue #261] 同意同期用（オプショナル）
         : base(eventAggregator, logger)
     {
@@ -121,6 +122,10 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 🔥 [Issue #300] トースト通知サービス設定
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+
+        // 🔥 [Issue #318] EXモード表示用設定サービス
+        _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
+        _unifiedSettingsService.SettingsChanged += OnUnifiedSettingsChanged;
 
         // [Issue #261] 同意サービス（オプショナル - 同期に使用）
         _consentService = consentService;
@@ -176,6 +181,7 @@ public class MainOverlayViewModel : ViewModelBase
     private readonly IAuthService _authService; // 🔥 [ISSUE#176] 認証状態監視用
     private readonly Services.INotificationService _notificationService; // 🔥 [Issue #300] トースト通知サービス
     private readonly IConsentService? _consentService; // [Issue #261] 同意同期用
+    private readonly IUnifiedSettingsService _unifiedSettingsService; // 🔥 [Issue #318] EXモード表示用
 
     #region Properties
 
@@ -184,6 +190,12 @@ public class MainOverlayViewModel : ViewModelBase
     /// ReactiveCommandのWhenAnyValueでウォームアップ完了状態を監視するため必須
     /// </summary>
     public bool IsWarmupCompleted => _warmupService.IsWarmupCompleted;
+
+    /// <summary>
+    /// 🔥 [Issue #318] EXモード（Cloud AI翻訳）が有効かどうか
+    /// UseLocalEngine=falseの場合にEXモードが有効
+    /// </summary>
+    public bool IsEXModeEnabled => !_unifiedSettingsService.GetTranslationSettings().UseLocalEngine;
 
     /// <summary>
     /// 🔥 [ISSUE#163_PHASE4] 現在の翻訳モード（None/Live/Singleshot）
@@ -2065,6 +2077,12 @@ public class MainOverlayViewModel : ViewModelBase
                 _authService.AuthStatusChanged -= OnAuthStatusChanged;
             }
 
+            // 🔥 [Issue #318] 設定変更イベントの購読解除
+            if (_unifiedSettingsService != null)
+            {
+                _unifiedSettingsService.SettingsChanged -= OnUnifiedSettingsChanged;
+            }
+
             Logger?.LogDebug("🔥 [PHASE5.2E] MainOverlayViewModel Dispose完了 - イベント購読解除");
         }
 
@@ -2179,6 +2197,23 @@ public class MainOverlayViewModel : ViewModelBase
                 Logger?.LogDebug("[AUTH_DEBUG] ログアウト時UIリセット完了 - 起動時状態に戻りました");
             }
         });
+    }
+
+    /// <summary>
+    /// 🔥 [Issue #318] 設定変更イベントハンドラ
+    /// EXモード（UseLocalEngine）の変更を検出してUIを更新
+    /// </summary>
+    private void OnUnifiedSettingsChanged(object? sender, SettingsChangedEventArgs e)
+    {
+        // 翻訳設定が変更された場合、EXモード表示を更新
+        if (e.SettingsType == SettingsType.Translation)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                this.RaisePropertyChanged(nameof(IsEXModeEnabled));
+                Logger?.LogDebug("[Issue #318] EXモード表示更新: IsEXModeEnabled={IsEX}", IsEXModeEnabled);
+            });
+        }
     }
 
     #endregion

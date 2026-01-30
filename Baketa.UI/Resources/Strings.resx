@@ -253,6 +253,12 @@
   <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
     <value>使用する翻訳エンジンを選択します</value>
   </data>
+  <data name="Settings_General_EXMode" xml:space="preserve">
+    <value>EXモード</value>
+  </data>
+  <data name="Settings_General_EXModeDescription" xml:space="preserve">
+    <value>高精度なEX翻訳エンジンを使用します</value>
+  </data>
   <data name="Settings_General_OfflineTranslation" xml:space="preserve">
     <value>オフライン翻訳</value>
   </data>

@@ -253,6 +253,12 @@
   <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
     <value>Select the translation engine to use</value>
   </data>
+  <data name="Settings_General_EXMode" xml:space="preserve">
+    <value>EX Mode</value>
+  </data>
+  <data name="Settings_General_EXModeDescription" xml:space="preserve">
+    <value>Use the high-precision EX translation engine</value>
+  </data>
   <data name="Settings_General_OfflineTranslation" xml:space="preserve">
     <value>Offline Translation</value>
   </data>

@@ -25,17 +25,17 @@
             <StackPanel Spacing="12">
                 <TextBlock Text="{local:Localize Settings_General_Translation}" FontSize="16" FontWeight="Medium"/>
 
-                <controls:SettingsItem Title="{local:Localize Settings_General_TranslationEngine}"
-                                        Description="{local:Localize Settings_General_TranslationEngineDescription}">
+                <!-- [Issue #318] EXモードトグル -->
+                <controls:SettingsItem Title="{local:Localize Settings_General_EXMode}"
+                                        Description="{local:Localize Settings_General_EXModeDescription}">
                     <controls:SettingsItem.SettingContent>
                         <StackPanel Spacing="8">
-                            <RadioButton Content="{local:Localize Settings_General_OfflineTranslation}"
-                                         IsChecked="{Binding UseLocalEngine}"
-                                         GroupName="TranslationEngine"/>
-                            <RadioButton Content="{local:Localize Settings_General_AITranslation}"
-                                         IsChecked="{Binding !UseLocalEngine}"
-                                         IsEnabled="{Binding IsCloudTranslationEnabled}"
-                                         GroupName="TranslationEngine"/>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ToggleSwitch IsChecked="{Binding !UseLocalEngine}"
+                                              IsEnabled="{Binding IsCloudTranslationEnabled}"
+                                              OnContent="⚡ ON"
+                                              OffContent="OFF"/>
+                            </StackPanel>
                             <TextBlock Text="{Binding CloudTranslationNote}"
                                        FontSize="11"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
