@@ -213,7 +213,7 @@ public class RoiManagerTests : IDisposable
 
         // Assert
         _learningEngineMock.Verify(
-            e => e.RecordDetection(bounds, 0.9f),
+            e => e.RecordDetection(bounds, 0.9f, 1),
             Times.Once);
     }
 
@@ -238,7 +238,7 @@ public class RoiManagerTests : IDisposable
 
         // Assert
         _learningEngineMock.Verify(
-            e => e.RecordDetection(It.IsAny<NormalizedRect>(), It.IsAny<float>()),
+            e => e.RecordDetection(It.IsAny<NormalizedRect>(), It.IsAny<float>(), It.IsAny<int>()),
             Times.Never);
     }
 
@@ -263,7 +263,7 @@ public class RoiManagerTests : IDisposable
 
         // Assert
         _learningEngineMock.Verify(
-            e => e.RecordDetection(It.IsAny<NormalizedRect>(), It.IsAny<float>()),
+            e => e.RecordDetection(It.IsAny<NormalizedRect>(), It.IsAny<float>(), It.IsAny<int>()),
             Times.Never);
     }
 

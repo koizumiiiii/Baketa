@@ -573,6 +573,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                                         windowHandle,
                                         windowTitle,
                                         executablePath,
+                                        changedRegions: null, // TODO: [Issue #354] 変化領域を渡す
                                         cancellationToken).ConfigureAwait(false);
                                 }
                                 catch (Exception ex)

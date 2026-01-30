@@ -29,7 +29,8 @@ public interface IRoiLearningEngine
     /// </summary>
     /// <param name="normalizedBounds">検出されたテキストの正規化矩形</param>
     /// <param name="confidence">検出信頼度</param>
-    void RecordDetection(NormalizedRect normalizedBounds, float confidence);
+    /// <param name="weight">[Issue #354] 重み（クラウド検証済み=2、ローカルのみ=1）</param>
+    void RecordDetection(NormalizedRect normalizedBounds, float confidence, int weight = 1);
 
     /// <summary>
     /// 複数のテキスト検出を一括記録
@@ -38,10 +39,23 @@ public interface IRoiLearningEngine
     void RecordDetections(IEnumerable<(NormalizedRect bounds, float confidence)> detections);
 
     /// <summary>
+    /// [Issue #354] 重み付きで複数のテキスト検出を一括記録
+    /// </summary>
+    /// <param name="detections">検出結果のコレクション（weight付き）</param>
+    void RecordDetectionsWithWeight(IEnumerable<(NormalizedRect bounds, float confidence, int weight)> detections);
+
+    /// <summary>
     /// テキスト非検出を記録（ネガティブサンプル）
     /// </summary>
     /// <param name="normalizedBounds">非検出領域の正規化矩形</param>
     void RecordNoDetection(NormalizedRect normalizedBounds);
+
+    /// <summary>
+    /// [Issue #354] テキスト検出missを記録（検出されたがテキストではなかった）
+    /// </summary>
+    /// <param name="normalizedBounds">miss領域の正規化矩形</param>
+    /// <returns>自動除外すべき領域のリスト（閾値を超えた場合）</returns>
+    IReadOnlyList<NormalizedRect> RecordMiss(NormalizedRect normalizedBounds);
 
     /// <summary>
     /// 現在の学習データからROI領域を生成
