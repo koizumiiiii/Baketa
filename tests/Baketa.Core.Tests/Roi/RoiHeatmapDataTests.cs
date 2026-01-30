@@ -348,4 +348,274 @@ public class RoiHeatmapDataTests
     }
 
     #endregion
+
+    #region [Issue #354] WithUpdatedCellsWeighted テスト
+
+    [Fact]
+    public void WithUpdatedCellsWeighted_ShouldApplyWeightToLearningRate()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4);
+        var detectedCells = new[] { (row: 1, column: 1, weight: 2), (row: 2, column: 2, weight: 1) };
+
+        // Act
+        var updated = heatmap.WithUpdatedCellsWeighted(detectedCells, learningRate: 0.1f);
+        // weight=2: 0.0 + 0.2 * (1.0 - 0.0) = 0.2
+        // weight=1: 0.0 + 0.1 * (1.0 - 0.0) = 0.1
+
+        // Assert
+        Assert.Equal(0.2f, updated.GetValue(1, 1), precision: 4);
+        Assert.Equal(0.1f, updated.GetValue(2, 2), precision: 4);
+    }
+
+    [Fact]
+    public void WithUpdatedCellsWeighted_WithSameCellMultipleTimes_ShouldUseMaxWeight()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4);
+        var detectedCells = new[]
+        {
+            (row: 1, column: 1, weight: 1),
+            (row: 1, column: 1, weight: 3), // 同じセルに高い重み
+            (row: 1, column: 1, weight: 2)
+        };
+
+        // Act
+        var updated = heatmap.WithUpdatedCellsWeighted(detectedCells, learningRate: 0.1f);
+        // 最大weight=3が適用: 0.0 + 0.3 * (1.0 - 0.0) = 0.3
+
+        // Assert
+        Assert.Equal(0.3f, updated.GetValue(1, 1), precision: 4);
+    }
+
+    [Fact]
+    public void WithUpdatedCellsWeighted_NonDetectedCells_ShouldDecay()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4, initialValue: 0.5f);
+        var detectedCells = new[] { (row: 0, column: 0, weight: 1) };
+
+        // Act
+        var updated = heatmap.WithUpdatedCellsWeighted(detectedCells, learningRate: 0.1f);
+        // 検出されなかったセル: 0.5 + 0.1 * (0.0 - 0.5) = 0.45
+
+        // Assert
+        Assert.Equal(0.45f, updated.GetValue(1, 1), precision: 4);
+    }
+
+    #endregion
+
+    #region [Issue #354] WithRecordedMiss テスト
+
+    [Fact]
+    public void WithRecordedMiss_ShouldIncrementMissCount()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4);
+        var missCells = new[] { (row: 1, column: 1) };
+
+        // Act
+        var updated = heatmap.WithRecordedMiss(missCells, resetThreshold: 3);
+
+        // Assert
+        Assert.Equal(1, updated.GetMissCount(1, 1));
+    }
+
+    [Fact]
+    public void WithRecordedMiss_WhenThresholdReached_ShouldResetScore()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4, initialValue: 0.8f);
+        var missCells = new[] { (row: 1, column: 1) };
+
+        // Act - 3回miss
+        var updated = heatmap.WithRecordedMiss(missCells, resetThreshold: 3);
+        updated = updated.WithRecordedMiss(missCells, resetThreshold: 3);
+        updated = updated.WithRecordedMiss(missCells, resetThreshold: 3); // 閾値到達
+
+        // Assert
+        Assert.Equal(3, updated.GetMissCount(1, 1));
+        Assert.Equal(0.0f, updated.GetValue(1, 1), precision: 4); // スコアがリセットされる
+    }
+
+    [Fact]
+    public void WithRecordedMiss_BeforeThreshold_ShouldNotResetScore()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4, initialValue: 0.8f);
+        var missCells = new[] { (row: 1, column: 1) };
+
+        // Act - 2回miss（閾値3未満）
+        var updated = heatmap.WithRecordedMiss(missCells, resetThreshold: 3);
+        updated = updated.WithRecordedMiss(missCells, resetThreshold: 3);
+
+        // Assert
+        Assert.Equal(2, updated.GetMissCount(1, 1));
+        Assert.Equal(0.8f, updated.GetValue(1, 1), precision: 4); // スコアは維持される
+    }
+
+    #endregion
+
+    #region [Issue #354] WithResetMissCount テスト
+
+    [Fact]
+    public void WithResetMissCount_ShouldResetMissCount()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4);
+        var missCells = new[] { (row: 1, column: 1), (row: 1, column: 1), (row: 1, column: 1) };
+        foreach (var cell in missCells)
+        {
+            heatmap = heatmap.WithRecordedMiss(new[] { cell }, resetThreshold: 10);
+        }
+        Assert.Equal(3, heatmap.GetMissCount(1, 1));
+
+        // Act
+        var detectedCells = new[] { (row: 1, column: 1) };
+        var updated = heatmap.WithResetMissCount(detectedCells);
+
+        // Assert
+        Assert.Equal(0, updated.GetMissCount(1, 1)); // リセットされる
+    }
+
+    #endregion
+
+    #region [Issue #354] GetHighMissCells テスト
+
+    [Fact]
+    public void GetHighMissCells_ShouldReturnCellsAboveThreshold()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4);
+        // セル(1,1)に5回miss
+        for (int i = 0; i < 5; i++)
+        {
+            heatmap = heatmap.WithRecordedMiss(new[] { (row: 1, column: 1) }, resetThreshold: 100);
+        }
+        // セル(2,2)に3回miss
+        for (int i = 0; i < 3; i++)
+        {
+            heatmap = heatmap.WithRecordedMiss(new[] { (row: 2, column: 2) }, resetThreshold: 100);
+        }
+
+        // Act
+        var highMissCells = heatmap.GetHighMissCells(threshold: 4);
+
+        // Assert
+        Assert.Single(highMissCells);
+        Assert.Contains(highMissCells, c => c.row == 1 && c.column == 1 && c.missCount == 5);
+    }
+
+    [Fact]
+    public void GetHighMissCells_WithNullMissCounts_ShouldReturnEmpty()
+    {
+        // Arrange - MissCountsがnullの古いフォーマット
+        var heatmap = new RoiHeatmapData
+        {
+            Rows = 4,
+            Columns = 4,
+            Values = new float[16],
+            SampleCounts = new int[16],
+            MissCounts = null
+        };
+
+        // Act
+        var highMissCells = heatmap.GetHighMissCells(threshold: 1);
+
+        // Assert
+        Assert.Empty(highMissCells);
+    }
+
+    #endregion
+
+    #region [Issue #354] GetMissCount テスト
+
+    [Fact]
+    public void GetMissCount_WithValidIndex_ShouldReturnMissCount()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4);
+        heatmap = heatmap.WithRecordedMiss(new[] { (row: 2, column: 3) }, resetThreshold: 10);
+
+        // Act
+        var missCount = heatmap.GetMissCount(2, 3);
+
+        // Assert
+        Assert.Equal(1, missCount);
+    }
+
+    [Fact]
+    public void GetMissCount_WithNullMissCounts_ShouldReturnZero()
+    {
+        // Arrange
+        var heatmap = new RoiHeatmapData
+        {
+            Rows = 4,
+            Columns = 4,
+            Values = new float[16],
+            SampleCounts = new int[16],
+            MissCounts = null
+        };
+
+        // Act
+        var missCount = heatmap.GetMissCount(1, 1);
+
+        // Assert
+        Assert.Equal(0, missCount);
+    }
+
+    [Fact]
+    public void GetMissCount_WithInvalidIndex_ShouldReturnZero()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4);
+
+        // Act
+        var missCount = heatmap.GetMissCount(10, 10); // 範囲外
+
+        // Assert
+        Assert.Equal(0, missCount);
+    }
+
+    #endregion
+
+    #region [Issue #354] MissCounts検証 テスト
+
+    [Fact]
+    public void IsValid_WithInvalidMissCountsLength_ShouldReturnFalse()
+    {
+        // Arrange
+        var heatmap = new RoiHeatmapData
+        {
+            Rows = 4,
+            Columns = 4,
+            Values = new float[16],
+            SampleCounts = new int[16],
+            MissCounts = new int[10] // 16ではなく10
+        };
+
+        // Act
+        var result = heatmap.IsValid();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsValid_WithNegativeMissCount_ShouldReturnFalse()
+    {
+        // Arrange
+        var heatmap = RoiHeatmapData.Create(4, 4);
+        var missCounts = (int[])heatmap.MissCounts!.Clone();
+        missCounts[0] = -1;
+        var invalidHeatmap = heatmap with { MissCounts = missCounts };
+
+        // Act
+        var result = invalidHeatmap.IsValid();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    #endregion
 }

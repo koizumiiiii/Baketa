@@ -112,7 +112,19 @@ public interface IRoiManager
     /// 複数のテキスト検出結果を一括報告（学習用）
     /// </summary>
     /// <param name="detections">検出結果のコレクション</param>
-    void ReportTextDetections(IEnumerable<(NormalizedRect bounds, float confidence)> detections);
+    /// <param name="changedRegions">[Issue #354] 変化領域のリスト（nullの場合は全検出を学習）</param>
+    void ReportTextDetections(
+        IEnumerable<(NormalizedRect bounds, float confidence)> detections,
+        IReadOnlyList<NormalizedRect>? changedRegions = null);
+
+    /// <summary>
+    /// [Issue #354] 重み付きで複数のテキスト検出結果を一括報告（学習用）
+    /// </summary>
+    /// <param name="detections">検出結果のコレクション（weight付き）</param>
+    /// <param name="changedRegions">変化領域のリスト（nullの場合は全検出を学習）</param>
+    void ReportTextDetectionsWithWeight(
+        IEnumerable<(NormalizedRect bounds, float confidence, int weight)> detections,
+        IReadOnlyList<NormalizedRect>? changedRegions = null);
 
     /// <summary>
     /// [Issue #293] ウィンドウ情報付きで複数のテキスト検出結果を一括報告（学習用）
@@ -121,6 +133,7 @@ public interface IRoiManager
     /// <param name="windowHandle">対象ウィンドウのハンドル</param>
     /// <param name="windowTitle">ウィンドウタイトル</param>
     /// <param name="executablePath">実行ファイルのパス</param>
+    /// <param name="changedRegions">[Issue #354] 変化領域のリスト（nullの場合は全検出を学習）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>Task</returns>
     Task ReportTextDetectionsAsync(
@@ -128,6 +141,7 @@ public interface IRoiManager
         IntPtr windowHandle,
         string windowTitle,
         string executablePath,
+        IReadOnlyList<NormalizedRect>? changedRegions = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -137,6 +151,15 @@ public interface IRoiManager
     /// <param name="normalizedY">正規化Y座標（0.0-1.0）</param>
     /// <returns>除外ゾーン内ならtrue</returns>
     bool IsInExclusionZone(float normalizedX, float normalizedY);
+
+    /// <summary>
+    /// [Issue #354] テキスト検出missを報告（検出されたがテキストではなかった）
+    /// </summary>
+    /// <param name="normalizedBounds">miss領域の正規化矩形</param>
+    /// <remarks>
+    /// 連続missが閾値を超えた場合、自動的に除外ゾーンに登録します。
+    /// </remarks>
+    void ReportMiss(NormalizedRect normalizedBounds);
 
     /// <summary>
     /// 除外ゾーンを追加

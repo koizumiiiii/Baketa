@@ -378,7 +378,9 @@ public sealed class RoiManager : IRoiManager, IDisposable
     }
 
     /// <inheritdoc />
-    public void ReportTextDetections(IEnumerable<(NormalizedRect bounds, float confidence)> detections)
+    public void ReportTextDetections(
+        IEnumerable<(NormalizedRect bounds, float confidence)> detections,
+        IReadOnlyList<NormalizedRect>? changedRegions = null)
     {
         if (!_settings.Enabled || !_settings.AutoLearningEnabled)
         {
@@ -403,6 +405,19 @@ public sealed class RoiManager : IRoiManager, IDisposable
             .Where(d => !IsInExclusionZone(d.bounds.CenterX, d.bounds.CenterY))
             .ToList();
 
+        // [Issue #354] 変化領域との照合
+        if (changedRegions != null && changedRegions.Count > 0)
+        {
+            var originalCount = filteredDetections.Count;
+            filteredDetections = filteredDetections
+                .Where(d => IsInChangedRegion(d.bounds, changedRegions))
+                .ToList();
+
+            _logger.LogDebug(
+                "[Issue #354] 変化領域フィルタ適用: {Original}個 → {Filtered}個 (除外: {Excluded}個)",
+                originalCount, filteredDetections.Count, originalCount - filteredDetections.Count);
+        }
+
         if (filteredDetections.Count > 0)
         {
             _learningEngine.RecordDetections(filteredDetections);
@@ -412,12 +427,83 @@ public sealed class RoiManager : IRoiManager, IDisposable
         }
     }
 
+    /// <summary>
+    /// [Issue #354] 検出領域が変化領域と重なるかをチェック
+    /// </summary>
+    private static bool IsInChangedRegion(NormalizedRect bounds, IReadOnlyList<NormalizedRect> changedRegions)
+    {
+        foreach (var changedRegion in changedRegions)
+        {
+            // 矩形の交差判定（AABB交差）
+            if (bounds.X < changedRegion.Right &&
+                bounds.Right > changedRegion.X &&
+                bounds.Y < changedRegion.Bottom &&
+                bounds.Bottom > changedRegion.Y)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <inheritdoc />
+    public void ReportTextDetectionsWithWeight(
+        IEnumerable<(NormalizedRect bounds, float confidence, int weight)> detections,
+        IReadOnlyList<NormalizedRect>? changedRegions = null)
+    {
+        if (!_settings.Enabled || !_settings.AutoLearningEnabled)
+        {
+            _logger.LogDebug(
+                "[Issue #354] ReportTextDetectionsWithWeight skipped: Enabled={Enabled}, AutoLearningEnabled={AutoLearning}",
+                _settings.Enabled, _settings.AutoLearningEnabled);
+            return;
+        }
+
+        // プロファイルがない場合は記録しない
+        lock (_lock)
+        {
+            if (_currentProfile == null)
+            {
+                _logger.LogDebug("[Issue #354] ReportTextDetectionsWithWeight: プロファイルがないためスキップ");
+                return;
+            }
+        }
+
+        // 除外ゾーン内の検出を除外
+        var filteredDetections = detections
+            .Where(d => !IsInExclusionZone(d.bounds.CenterX, d.bounds.CenterY))
+            .ToList();
+
+        // 変化領域との照合
+        if (changedRegions != null && changedRegions.Count > 0)
+        {
+            var originalCount = filteredDetections.Count;
+            filteredDetections = filteredDetections
+                .Where(d => IsInChangedRegion(d.bounds, changedRegions))
+                .ToList();
+
+            _logger.LogDebug(
+                "[Issue #354] 変化領域フィルタ適用（重み付き）: {Original}個 → {Filtered}個 (除外: {Excluded}個)",
+                originalCount, filteredDetections.Count, originalCount - filteredDetections.Count);
+        }
+
+        if (filteredDetections.Count > 0)
+        {
+            _learningEngine.RecordDetectionsWithWeight(filteredDetections);
+            var avgWeight = filteredDetections.Average(d => d.weight);
+            _logger.LogInformation(
+                "[Issue #354] ROI学習記録完了（重み付き）: {Count}個の検出をヒートマップに記録 (平均weight={AvgWeight:F1})",
+                filteredDetections.Count, avgWeight);
+        }
+    }
+
     /// <inheritdoc />
     public async Task ReportTextDetectionsAsync(
         IEnumerable<(NormalizedRect bounds, float confidence)> detections,
         IntPtr windowHandle,
         string windowTitle,
         string executablePath,
+        IReadOnlyList<NormalizedRect>? changedRegions = null,
         CancellationToken cancellationToken = default)
     {
         if (!_settings.Enabled || !_settings.AutoLearningEnabled)
@@ -441,6 +527,19 @@ public sealed class RoiManager : IRoiManager, IDisposable
             .Where(d => !IsInExclusionZone(d.bounds.CenterX, d.bounds.CenterY))
             .ToList();
 
+        // [Issue #354] 変化領域との照合
+        if (changedRegions != null && changedRegions.Count > 0)
+        {
+            var originalCount = filteredDetections.Count;
+            filteredDetections = filteredDetections
+                .Where(d => IsInChangedRegion(d.bounds, changedRegions))
+                .ToList();
+
+            _logger.LogDebug(
+                "[Issue #354] 変化領域フィルタ適用: {Original}個 → {Filtered}個 (除外: {Excluded}個)",
+                originalCount, filteredDetections.Count, originalCount - filteredDetections.Count);
+        }
+
         if (filteredDetections.Count > 0)
         {
             _learningEngine.RecordDetections(filteredDetections);
@@ -451,6 +550,42 @@ public sealed class RoiManager : IRoiManager, IDisposable
 
         // 学習後にプロファイルを保存（学習データを永続化）
         await SaveCurrentProfileAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public void ReportMiss(NormalizedRect normalizedBounds)
+    {
+        if (!_settings.Enabled || !_settings.AutoLearningEnabled)
+        {
+            return;
+        }
+
+        if (!_settings.EnableNegativeReinforcement)
+        {
+            _logger.LogDebug("[Issue #354] ReportMiss skipped: EnableNegativeReinforcement=false");
+            return;
+        }
+
+        // 既に除外ゾーン内の場合はスキップ
+        if (IsInExclusionZone(normalizedBounds.CenterX, normalizedBounds.CenterY))
+        {
+            return;
+        }
+
+        // 学習エンジンにmissを記録し、自動除外候補を取得
+        var exclusionCandidates = _learningEngine.RecordMiss(normalizedBounds);
+
+        // 自動除外が有効な場合、候補を除外ゾーンに登録
+        if (_settings.EnableAutoExclusionZone && exclusionCandidates.Count > 0)
+        {
+            foreach (var candidate in exclusionCandidates)
+            {
+                AddExclusionZone(candidate);
+                _logger.LogInformation(
+                    "[Issue #354] 自動除外ゾーン登録: {Bounds}",
+                    candidate);
+            }
+        }
     }
 
     /// <inheritdoc />

@@ -44,6 +44,15 @@ public sealed record RoiHeatmapData
     public int[] SampleCounts { get; init; } = [];
 
     /// <summary>
+    /// [Issue #354] 各セルの連続miss数
+    /// </summary>
+    /// <remarks>
+    /// テキスト検出されなかった連続回数。検出時にリセット。
+    /// 下位互換性のため、nullの場合はゼロ配列として扱う。
+    /// </remarks>
+    public int[]? MissCounts { get; init; }
+
+    /// <summary>
     /// 最後に更新された時刻
     /// </summary>
     public DateTime LastUpdatedAt { get; init; }
@@ -69,6 +78,12 @@ public sealed record RoiHeatmapData
             return false;
         }
 
+        // [Issue #354] MissCountsが存在する場合はサイズをチェック
+        if (MissCounts != null && MissCounts.Length != expectedSize)
+        {
+            return false;
+        }
+
         // 全ての値が有効範囲内であることを確認
         foreach (var value in Values)
         {
@@ -83,6 +98,18 @@ public sealed record RoiHeatmapData
             if (count < 0)
             {
                 return false;
+            }
+        }
+
+        // [Issue #354] MissCountsの値を検証
+        if (MissCounts != null)
+        {
+            foreach (var count in MissCounts)
+            {
+                if (count < 0)
+                {
+                    return false;
+                }
             }
         }
 
@@ -119,6 +146,28 @@ public sealed record RoiHeatmapData
         }
 
         return SampleCounts[row * Columns + column];
+    }
+
+    /// <summary>
+    /// [Issue #354] 指定したセルの連続miss数を取得
+    /// </summary>
+    /// <param name="row">行インデックス</param>
+    /// <param name="column">列インデックス</param>
+    /// <returns>連続miss数</returns>
+    public int GetMissCount(int row, int column)
+    {
+        if (row < 0 || row >= Rows || column < 0 || column >= Columns)
+        {
+            return 0;
+        }
+
+        // 下位互換性: MissCountsがnullの場合は0を返す
+        if (MissCounts == null)
+        {
+            return 0;
+        }
+
+        return MissCounts[row * Columns + column];
     }
 
     /// <summary>
@@ -269,6 +318,58 @@ public sealed record RoiHeatmapData
     }
 
     /// <summary>
+    /// [Issue #354] 重み付きで複数セルの値を一括更新した新しいヒートマップを作成
+    /// </summary>
+    /// <param name="detectedCells">検出されたセルと重みのリスト</param>
+    /// <param name="learningRate">基本学習率</param>
+    /// <returns>更新されたヒートマップ</returns>
+    public RoiHeatmapData WithUpdatedCellsWeighted((int row, int column, int weight)[] detectedCells, float learningRate = 0.1f)
+    {
+        var newValues = (float[])Values.Clone();
+        var newSampleCounts = (int[])SampleCounts.Clone();
+
+        // セルごとの最大重みを集約（同じセルに複数検出がある場合）
+        var cellWeights = new System.Collections.Generic.Dictionary<int, int>();
+        foreach (var (row, column, weight) in detectedCells)
+        {
+            if (row >= 0 && row < Rows && column >= 0 && column < Columns)
+            {
+                var index = row * Columns + column;
+                if (!cellWeights.TryGetValue(index, out var existingWeight) || weight > existingWeight)
+                {
+                    cellWeights[index] = weight;
+                }
+            }
+        }
+
+        // 全セルを更新
+        for (var index = 0; index < newValues.Length; index++)
+        {
+            var currentValue = newValues[index];
+            if (cellWeights.TryGetValue(index, out var weight))
+            {
+                // 検出されたセル: 重み付き学習率で更新
+                var effectiveLearningRate = learningRate * weight;
+                newValues[index] = currentValue + effectiveLearningRate * (1.0f - currentValue);
+            }
+            else
+            {
+                // 検出されなかったセル: 通常の減衰
+                newValues[index] = currentValue + learningRate * (0.0f - currentValue);
+            }
+            newSampleCounts[index]++;
+        }
+
+        return this with
+        {
+            Values = newValues,
+            SampleCounts = newSampleCounts,
+            LastUpdatedAt = DateTime.UtcNow,
+            TotalSamples = TotalSamples + 1
+        };
+    }
+
+    /// <summary>
     /// 減衰を適用した新しいヒートマップを作成
     /// </summary>
     /// <param name="decayRate">減衰率（0.0-1.0）</param>
@@ -290,6 +391,104 @@ public sealed record RoiHeatmapData
     }
 
     /// <summary>
+    /// [Issue #354] miss記録を適用した新しいヒートマップを作成
+    /// </summary>
+    /// <param name="missCells">missしたセルのリスト</param>
+    /// <param name="resetThreshold">この回数連続missでスコアをリセット</param>
+    /// <returns>更新されたヒートマップ</returns>
+    public RoiHeatmapData WithRecordedMiss((int row, int column)[] missCells, int resetThreshold = 3)
+    {
+        var newValues = (float[])Values.Clone();
+        var newMissCounts = EnsureMissCounts();
+
+        foreach (var (row, column) in missCells)
+        {
+            if (row >= 0 && row < Rows && column >= 0 && column < Columns)
+            {
+                var index = row * Columns + column;
+                newMissCounts[index]++;
+
+                // 連続missが閾値以上ならスコアをリセット
+                if (newMissCounts[index] >= resetThreshold)
+                {
+                    newValues[index] = 0.0f;
+                }
+            }
+        }
+
+        return this with
+        {
+            Values = newValues,
+            MissCounts = newMissCounts,
+            LastUpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// [Issue #354] 検出成功時にmissカウントをリセットした新しいヒートマップを作成
+    /// </summary>
+    /// <param name="detectedCells">検出されたセルのリスト</param>
+    /// <returns>更新されたヒートマップ</returns>
+    public RoiHeatmapData WithResetMissCount((int row, int column)[] detectedCells)
+    {
+        var newMissCounts = EnsureMissCounts();
+
+        foreach (var (row, column) in detectedCells)
+        {
+            if (row >= 0 && row < Rows && column >= 0 && column < Columns)
+            {
+                var index = row * Columns + column;
+                newMissCounts[index] = 0; // 検出されたのでmissカウントをリセット
+            }
+        }
+
+        return this with
+        {
+            MissCounts = newMissCounts,
+            LastUpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// [Issue #354] 連続missが閾値を超えたセルを取得
+    /// </summary>
+    /// <param name="threshold">閾値</param>
+    /// <returns>閾値を超えたセルのリスト</returns>
+    public (int row, int column, int missCount)[] GetHighMissCells(int threshold = 5)
+    {
+        if (MissCounts == null)
+        {
+            return [];
+        }
+
+        var results = new System.Collections.Generic.List<(int, int, int)>();
+        for (var row = 0; row < Rows; row++)
+        {
+            for (var column = 0; column < Columns; column++)
+            {
+                var missCount = MissCounts[row * Columns + column];
+                if (missCount >= threshold)
+                {
+                    results.Add((row, column, missCount));
+                }
+            }
+        }
+        return [.. results];
+    }
+
+    /// <summary>
+    /// [Issue #354] MissCountsを確保（nullの場合はゼロ配列を作成）
+    /// </summary>
+    private int[] EnsureMissCounts()
+    {
+        if (MissCounts != null)
+        {
+            return (int[])MissCounts.Clone();
+        }
+        return new int[Rows * Columns];
+    }
+
+    /// <summary>
     /// 新しいヒートマップを作成
     /// </summary>
     /// <param name="rows">行数</param>
@@ -303,6 +502,7 @@ public sealed record RoiHeatmapData
         var size = rows * columns;
         var values = new float[size];
         var sampleCounts = new int[size];
+        var missCounts = new int[size]; // [Issue #354]
 
         if (initialValue > 0.0f)
         {
@@ -315,6 +515,7 @@ public sealed record RoiHeatmapData
             Columns = columns,
             Values = values,
             SampleCounts = sampleCounts,
+            MissCounts = missCounts, // [Issue #354]
             LastUpdatedAt = DateTime.UtcNow,
             TotalSamples = 0
         };

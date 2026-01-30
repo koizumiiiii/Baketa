@@ -255,6 +255,48 @@ public sealed record RoiManagerSettings
 
     #endregion
 
+    #region [Issue #354] 負の強化・自動除外設定
+
+    /// <summary>
+    /// [Issue #354] 連続missでスコアリセットする閾値
+    /// </summary>
+    /// <remarks>
+    /// この回数連続でmissした場合、該当セルのスコアを0にリセット。
+    /// デフォルト: 3回
+    /// 推奨範囲: 2-5
+    /// </remarks>
+    public int ConsecutiveMissThresholdForReset { get; init; } = 3;
+
+    /// <summary>
+    /// [Issue #354] 自動除外ゾーン登録の閾値
+    /// </summary>
+    /// <remarks>
+    /// この回数連続でmissした場合、該当領域を除外ゾーンに自動登録。
+    /// デフォルト: 5回
+    /// 推奨範囲: 3-10
+    /// </remarks>
+    public int ConsecutiveMissThresholdForExclusion { get; init; } = 5;
+
+    /// <summary>
+    /// [Issue #354] 負の強化を有効化
+    /// </summary>
+    /// <remarks>
+    /// falseの場合、missは記録されるがスコアリセット・自動除外は行わない。
+    /// デフォルト: true
+    /// </remarks>
+    public bool EnableNegativeReinforcement { get; init; } = true;
+
+    /// <summary>
+    /// [Issue #354] 自動除外ゾーンの有効化
+    /// </summary>
+    /// <remarks>
+    /// falseの場合、連続missでも自動除外は行わない。
+    /// デフォルト: true
+    /// </remarks>
+    public bool EnableAutoExclusionZone { get; init; } = true;
+
+    #endregion
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -283,7 +325,11 @@ public sealed record RoiManagerSettings
             // [Issue #324] ROI優先監視モード設定の検証
             && MinDetectionCountForHighConfidence > 0
             && MinHighConfidenceRegionsForComplete > 0
-            && MinLearningSessionsForComplete > 0;
+            && MinLearningSessionsForComplete > 0
+            // [Issue #354] 負の強化・自動除外設定の検証
+            && ConsecutiveMissThresholdForReset > 0
+            && ConsecutiveMissThresholdForExclusion > 0
+            && ConsecutiveMissThresholdForReset <= ConsecutiveMissThresholdForExclusion;
     }
 
     /// <summary>

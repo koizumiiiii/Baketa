@@ -9,6 +9,7 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License; // [Issue #78 Phase 4] ILicenseManager用
 using Baketa.Core.Abstractions.Processing; // [Issue #293] ITextChangeDetectionService用
 using Baketa.Core.Abstractions.Roi; // [Issue #293] IRoiManager用
+using Baketa.Core.Models.Roi; // [Issue #354] NormalizedRect用
 using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
@@ -527,6 +528,98 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 nonEmptyChunks[i].TranslatedText = translationResults[i];
                 _logger.LogInformation("🔧 [TRANSLATION_RESULT] チャンク{Index}: '{Original}' → '{Translated}'",
                     i, nonEmptyChunks[i].CombinedText, translationResults[i]);
+            }
+
+            // ============================================================
+            // [Issue #354] Phase 2/3: ROI学習の重み付けと負の強化
+            // ============================================================
+            if (_roiManager?.IsEnabled == true && eventData.ImageWidth > 0 && eventData.ImageHeight > 0)
+            {
+                try
+                {
+                    // Cloud AI翻訳が使用されたかどうかを判定（weight=2を適用）
+                    var isCloudTranslation = engineUsed.Contains("Gemini", StringComparison.OrdinalIgnoreCase) ||
+                                             engineUsed.Contains("Cloud", StringComparison.OrdinalIgnoreCase) ||
+                                             engineUsed.Contains("OpenAI", StringComparison.OrdinalIgnoreCase);
+                    var learningWeight = isCloudTranslation ? 2 : 1;
+
+                    _logger?.LogInformation(
+                        "[Issue #354] ROI学習: Engine={Engine}, Weight={Weight}, ChunkCount={Count}",
+                        engineUsed, learningWeight, nonEmptyChunks.Count);
+
+                    // 翻訳成功したチャンクの重み付き学習
+                    var successfulDetections = new List<(NormalizedRect bounds, float confidence, int weight)>();
+                    var missRegions = new List<NormalizedRect>();
+
+                    for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
+                    {
+                        var chunk = nonEmptyChunks[i];
+                        var translatedText = translationResults[i];
+
+                        // 正規化座標を計算
+                        var normalizedBounds = new NormalizedRect
+                        {
+                            X = (float)chunk.CombinedBounds.X / eventData.ImageWidth,
+                            Y = (float)chunk.CombinedBounds.Y / eventData.ImageHeight,
+                            Width = (float)chunk.CombinedBounds.Width / eventData.ImageWidth,
+                            Height = (float)chunk.CombinedBounds.Height / eventData.ImageHeight
+                        };
+
+                        // Phase 2: 翻訳成功した領域を重み付き学習
+                        if (!string.IsNullOrEmpty(translatedText))
+                        {
+                            var confidence = chunk.AverageConfidence;
+                            successfulDetections.Add((normalizedBounds, confidence, learningWeight));
+                        }
+                        // Phase 3: 翻訳結果が空の場合はmissとして報告
+                        else
+                        {
+                            missRegions.Add(normalizedBounds);
+                            _logger?.LogDebug(
+                                "[Issue #354] Miss記録: Chunk={Index}, Bounds=({X:F3},{Y:F3})",
+                                i, normalizedBounds.X, normalizedBounds.Y);
+                        }
+                    }
+
+                    // Phase 2: 重み付き学習を実行
+                    if (successfulDetections.Count > 0)
+                    {
+                        _roiManager.ReportTextDetectionsWithWeight(successfulDetections, changedRegions: null);
+                        _logger?.LogInformation(
+                            "[Issue #354] ROI学習完了: SuccessCount={Success}, Weight={Weight}",
+                            successfulDetections.Count, learningWeight);
+#if DEBUG
+                        Console.WriteLine($"📚 [Issue #354] ROI学習: {successfulDetections.Count}件成功, weight={learningWeight}");
+#endif
+                    }
+
+                    // Phase 3: Missを報告
+                    foreach (var missRegion in missRegions)
+                    {
+                        _roiManager.ReportMiss(missRegion);
+                    }
+
+                    if (missRegions.Count > 0)
+                    {
+                        _logger?.LogInformation(
+                            "[Issue #354] Miss報告完了: MissCount={Miss}",
+                            missRegions.Count);
+#if DEBUG
+                        Console.WriteLine($"⚠️ [Issue #354] Miss報告: {missRegions.Count}件");
+#endif
+                    }
+
+                    // [Issue #354] ROI学習結果をプロファイルに保存
+                    if (successfulDetections.Count > 0 || missRegions.Count > 0)
+                    {
+                        await _roiManager.SaveCurrentProfileAsync(cancellationToken).ConfigureAwait(false);
+                        _logger?.LogDebug("[Issue #354] ROIプロファイル保存完了");
+                    }
+                }
+                catch (Exception roiEx)
+                {
+                    _logger?.LogWarning(roiEx, "[Issue #354] ROI学習中にエラー（処理は継続）");
+                }
             }
 
 #if DEBUG

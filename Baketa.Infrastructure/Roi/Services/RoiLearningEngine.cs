@@ -63,7 +63,7 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
     }
 
     /// <inheritdoc />
-    public void RecordDetection(NormalizedRect normalizedBounds, float confidence)
+    public void RecordDetection(NormalizedRect normalizedBounds, float confidence, int weight = 1)
     {
         if (!normalizedBounds.IsValid())
         {
@@ -82,14 +82,23 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
             _learningStartedAt ??= DateTime.UtcNow;
             _lastLearningAt = DateTime.UtcNow;
 
-            // 領域内の全セルを更新
+            // 領域内の全セルを更新（重み付き）
             var detectedCells = GetCellsInRegion(normalizedBounds);
-            _heatmap = _heatmap.WithUpdatedCells(detectedCells, _settings.LearningRate);
+            if (weight > 1)
+            {
+                // [Issue #354] 重み付き学習
+                var weightedCells = detectedCells.Select(c => (c.row, c.column, weight)).ToArray();
+                _heatmap = _heatmap.WithUpdatedCellsWeighted(weightedCells, _settings.LearningRate);
+            }
+            else
+            {
+                _heatmap = _heatmap.WithUpdatedCells(detectedCells, _settings.LearningRate);
+            }
             _positiveSamples++;
 
             _logger.LogTrace(
-                "Recorded detection: Bounds={Bounds}, Confidence={Confidence}, Cells={CellCount}",
-                normalizedBounds, confidence, detectedCells.Length);
+                "[Issue #354] Recorded detection: Bounds={Bounds}, Confidence={Confidence}, Weight={Weight}, Cells={CellCount}",
+                normalizedBounds, confidence, weight, detectedCells.Length);
         }
     }
 
@@ -136,6 +145,48 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
     }
 
     /// <inheritdoc />
+    public void RecordDetectionsWithWeight(IEnumerable<(NormalizedRect bounds, float confidence, int weight)> detections)
+    {
+        var detectionList = detections.ToList();
+        if (detectionList.Count == 0)
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            // スレッドセーフティ: ロック内でフラグをチェック
+            if (!IsLearningEnabled)
+            {
+                return;
+            }
+
+            _learningStartedAt ??= DateTime.UtcNow;
+            _lastLearningAt = DateTime.UtcNow;
+
+            // [Issue #354] 全検出領域のセルを重み付きで収集
+            var allCellsWithWeight = new List<(int row, int column, int weight)>();
+            foreach (var (bounds, _, weight) in detectionList)
+            {
+                if (bounds.IsValid())
+                {
+                    foreach (var cell in GetCellsInRegion(bounds))
+                    {
+                        allCellsWithWeight.Add((cell.row, cell.column, weight));
+                    }
+                }
+            }
+
+            _heatmap = _heatmap.WithUpdatedCellsWeighted([.. allCellsWithWeight], _settings.LearningRate);
+            _positiveSamples += detectionList.Count;
+
+            _logger.LogTrace(
+                "[Issue #354] Recorded {Count} weighted detections, {CellCount} cells updated",
+                detectionList.Count, allCellsWithWeight.Count);
+        }
+    }
+
+    /// <inheritdoc />
     public void RecordNoDetection(NormalizedRect normalizedBounds)
     {
         if (!normalizedBounds.IsValid())
@@ -160,6 +211,64 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
 
             _logger.LogTrace("Recorded no detection for bounds: {Bounds}", normalizedBounds);
         }
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<NormalizedRect> RecordMiss(NormalizedRect normalizedBounds)
+    {
+        var exclusionCandidates = new List<NormalizedRect>();
+
+        if (!normalizedBounds.IsValid())
+        {
+            _logger.LogWarning("[Issue #354] Invalid normalized bounds for miss: {Bounds}", normalizedBounds);
+            return exclusionCandidates;
+        }
+
+        lock (_lock)
+        {
+            if (!IsLearningEnabled)
+            {
+                return exclusionCandidates;
+            }
+
+            _learningStartedAt ??= DateTime.UtcNow;
+            _lastLearningAt = DateTime.UtcNow;
+
+            // 領域内のセルを取得
+            var missCells = GetCellsInRegion(normalizedBounds);
+
+            // miss記録を適用（スコアリセット閾値を使用）
+            _heatmap = _heatmap.WithRecordedMiss(
+                missCells,
+                _settings.ConsecutiveMissThresholdForReset);
+            _negativeSamples++;
+
+            // 自動除外の閾値を超えたセルをチェック
+            var highMissCells = _heatmap.GetHighMissCells(_settings.ConsecutiveMissThresholdForExclusion);
+            if (highMissCells.Length > 0)
+            {
+                // 連結セルをグループ化して除外領域を生成
+                var groups = GroupConnectedCells(highMissCells.Select(c => (c.row, c.column, 1.0f)).ToArray());
+                foreach (var group in groups)
+                {
+                    if (group.Count > 0)
+                    {
+                        var region = CreateRegionFromCells(group);
+                        exclusionCandidates.Add(region.NormalizedBounds);
+
+                        _logger.LogInformation(
+                            "[Issue #354] 自動除外候補: Bounds={Bounds}, MissCells={Count}",
+                            region.NormalizedBounds, group.Count);
+                    }
+                }
+            }
+
+            _logger.LogTrace(
+                "[Issue #354] Recorded miss: Bounds={Bounds}, Cells={CellCount}, ExclusionCandidates={ExclusionCount}",
+                normalizedBounds, missCells.Length, exclusionCandidates.Count);
+        }
+
+        return exclusionCandidates;
     }
 
     /// <inheritdoc />
