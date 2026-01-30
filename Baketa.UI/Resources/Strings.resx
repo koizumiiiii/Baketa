@@ -960,6 +960,9 @@
   <data name="Auth_Login_SignupLink" xml:space="preserve">
     <value>アカウント作成</value>
   </data>
+  <data name="Auth_Login_EmailExpander" xml:space="preserve">
+    <value>メールアドレスでログイン</value>
+  </data>
 
   <!-- ========== Signup View ========== -->
   <data name="Auth_Signup_Title" xml:space="preserve">
@@ -1021,6 +1024,9 @@
   </data>
   <data name="Auth_Signup_LoginLink" xml:space="preserve">
     <value>ログイン</value>
+  </data>
+  <data name="Auth_Signup_EmailExpander" xml:space="preserve">
+    <value>メールアドレスで登録</value>
   </data>
 
   <!-- ========== Premium Plan ========== -->
