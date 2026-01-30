@@ -70,7 +70,7 @@
 |---------|-------------|
 | **OCR** | [OCR実装ガイド](3-architecture/ocr-system/ocr-implementation.md) |
 | **翻訳** | [gRPC翻訳システム](3-architecture/translation/grpc-system.md) |
-| **ROI Manager** | [学習型テキスト検出最適化](3-architecture/roi-system/roi-manager.md) |
+| **ROI Manager** | [自動調整型テキスト検出最適化](3-architecture/roi-system/roi-manager.md) |
 | **統合AIサーバー** | [BaketaUnifiedServer](3-architecture/unified-ai-server.md) |
 | **キャプチャ** | [Windows Graphics Capture](3-architecture/capture-system/windows-graphics-capture.md) |
 | **認証** | [認証システム](3-architecture/auth/authentication-system.md) |
