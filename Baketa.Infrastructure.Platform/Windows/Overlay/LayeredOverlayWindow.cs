@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Threading;
@@ -48,7 +49,8 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     private int _currentWidth = 200;
     private int _currentHeight = 50;
     private int _originalHeight = 50; // 🔧 [MIN_HEIGHT] 元のテキスト領域の高さを保持
-    private Color _backgroundColor = Color.FromArgb(240, 255, 255, 255); // 半透明白
+    // 🎨 [Issue #348] 可読性向上: 黒50%透過背景
+    private Color _backgroundColor = Color.FromArgb(128, 0, 0, 0);
     private float _fontSize = 14f; // フォントサイズ（設定可能）
 
     // 🔥 [MESSAGE_COALESCING] メッセージ集約用フラグ
@@ -564,15 +566,18 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
 
             _hOldBitmap = LayeredWindowMethods.SelectObject(_hdcMem, _hBitmap);
 
-            // 🎨 GDI描画: 背景塗りつぶし
+            // 🎨 [Issue #348] GDI描画: グラデーション背景 + 袋文字 + ドロップシャドウ
             using (var g = Graphics.FromHdc(_hdcMem))
             {
-                g.Clear(_backgroundColor);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+
+                // 🎨 [Issue #348] グラデーション背景（左右フェード）
+                DrawGradientBackground(g, _currentWidth, _currentHeight, _backgroundColor);
 
                 // テキスト描画
                 if (!string.IsNullOrWhiteSpace(_currentText))
                 {
-                    using var brush = new SolidBrush(Color.FromArgb(255, 45, 45, 45)); // 濃いグレー
                     using var font = new Font("Segoe UI", _fontSize, FontStyle.Regular);
 
                     var padding = 8f;
@@ -581,13 +586,6 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                     // 🔧 [LINE_SPACING] テキストを行ごとに分割して、110%の行間で描画
                     var lines = GetWrappedTextLines(g, _currentText, font, textWidth);
                     var lineHeight = font.GetHeight(g) * 1.1f;
-
-                    // 1行ずつ描画（自動折り返しは無効）
-                    using var format = new StringFormat(StringFormat.GenericTypographic)
-                    {
-                        FormatFlags = StringFormatFlags.NoWrap,
-                        Trimming = StringTrimming.None
-                    };
 
                     var y = padding;
                     foreach (var line in lines)
@@ -598,7 +596,8 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                             break;
                         }
 
-                        g.DrawString(line, font, brush, new PointF(padding, y), format);
+                        // 🎨 [Issue #348] 袋文字（アウトライン + ドロップシャドウ）描画
+                        DrawOutlinedText(g, line, font, new PointF(padding, y));
                         y += lineHeight;
                     }
                 }
@@ -757,6 +756,117 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
         }
 
         return lines;
+    }
+
+    // ========================================
+    // 🎨 [Issue #348] 可読性向上: 描画ヘルパー
+    // ========================================
+
+    /// <summary>
+    /// グラデーション背景を描画（左右フェード）
+    /// </summary>
+    /// <remarks>
+    /// 🎨 [Issue #348] 中央から端にかけてフェードアウトするグラデーション
+    /// 境界線が曖昧になり、画面に馴染む効果
+    /// </remarks>
+    private static void DrawGradientBackground(Graphics g, int width, int height, Color backgroundColor)
+    {
+        // フェード幅（左右各20%）
+        var fadeWidth = width * 0.2f;
+
+        // 中央部分（不透明）
+        var centerRect = new RectangleF(fadeWidth, 0, width - fadeWidth * 2, height);
+        using (var centerBrush = new SolidBrush(backgroundColor))
+        {
+            g.FillRectangle(centerBrush, centerRect);
+        }
+
+        // 左側グラデーション（透明→不透明）
+        var leftRect = new RectangleF(0, 0, fadeWidth + 1, height); // +1 for overlap
+        using (var leftBrush = new LinearGradientBrush(
+            new PointF(0, 0),
+            new PointF(fadeWidth, 0),
+            Color.FromArgb(0, backgroundColor.R, backgroundColor.G, backgroundColor.B),
+            backgroundColor))
+        {
+            g.FillRectangle(leftBrush, leftRect);
+        }
+
+        // 右側グラデーション（不透明→透明）
+        var rightRect = new RectangleF(width - fadeWidth - 1, 0, fadeWidth + 1, height); // +1 for overlap
+        using (var rightBrush = new LinearGradientBrush(
+            new PointF(width - fadeWidth, 0),
+            new PointF(width, 0),
+            backgroundColor,
+            Color.FromArgb(0, backgroundColor.R, backgroundColor.G, backgroundColor.B)))
+        {
+            g.FillRectangle(rightBrush, rightRect);
+        }
+    }
+
+    /// <summary>
+    /// アウトライン付きテキストを描画（袋文字 + ドロップシャドウ）
+    /// </summary>
+    /// <remarks>
+    /// 🎨 [Issue #348] ノベルゲームで実績のある手法
+    /// - アウトライン: 1.5px チャコールグレー (#333333)
+    /// - ドロップシャドウ: オフセット1px, ぼかし効果（淡いシャドウで代用）
+    /// - テキスト: 白色
+    /// </remarks>
+    private static void DrawOutlinedText(Graphics g, string text, Font font, PointF position)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+
+        // 描画パラメータ
+        const float outlineWidth = 1.5f;
+        var outlineColor = Color.FromArgb(255, 51, 51, 51); // #333333 チャコールグレー
+        var shadowColor = Color.FromArgb(100, 0, 0, 0);      // 淡い黒シャドウ
+        var textColor = Color.White;
+
+        const float shadowOffsetX = 1f;
+        const float shadowOffsetY = 1f;
+
+        using var path = new GraphicsPath();
+        using var format = new StringFormat(StringFormat.GenericTypographic)
+        {
+            FormatFlags = StringFormatFlags.NoWrap,
+            Trimming = StringTrimming.None
+        };
+
+        // GraphicsPathにテキストを追加
+        path.AddString(
+            text,
+            font.FontFamily,
+            (int)font.Style,
+            g.DpiY * font.Size / 72f, // ポイントをピクセルに変換
+            position,
+            format);
+
+        // 1. ドロップシャドウ描画（オフセット位置に淡い色で）
+        using (var shadowPath = (GraphicsPath)path.Clone())
+        {
+            var shadowMatrix = new Matrix();
+            shadowMatrix.Translate(shadowOffsetX, shadowOffsetY);
+            shadowPath.Transform(shadowMatrix);
+
+            using var shadowBrush = new SolidBrush(shadowColor);
+            g.FillPath(shadowBrush, shadowPath);
+        }
+
+        // 2. アウトライン描画（太いペンでストローク）
+        using (var outlinePen = new Pen(outlineColor, outlineWidth * 2)
+        {
+            LineJoin = LineJoin.Round // 角を丸く
+        })
+        {
+            g.DrawPath(outlinePen, path);
+        }
+
+        // 3. テキスト本体描画（白色で塗りつぶし）
+        using (var textBrush = new SolidBrush(textColor))
+        {
+            g.FillPath(textBrush, path);
+        }
     }
 
     // ========================================
