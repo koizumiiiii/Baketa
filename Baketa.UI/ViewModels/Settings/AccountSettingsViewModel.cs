@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.License;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
@@ -33,6 +34,7 @@ public sealed class AccountSettingsViewModel : ViewModelBase
     private readonly PatreonSettings? _patreonSettings;
     private readonly ILicenseManager? _licenseManager;
     private readonly LicenseSettings? _licenseSettings;
+    private readonly IConsentService? _consentService;
     private readonly ILoggerFactory? _loggerFactory;
     private readonly ILogger<AccountSettingsViewModel>? _logger;
 
@@ -65,6 +67,7 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         IOptions<PatreonSettings>? patreonSettings = null,
         ILicenseManager? licenseManager = null,
         IOptions<LicenseSettings>? licenseSettings = null,
+        IConsentService? consentService = null,
         ILoggerFactory? loggerFactory = null,
         ILogger<AccountSettingsViewModel>? logger = null) : base(eventAggregator)
     {
@@ -74,6 +77,7 @@ public sealed class AccountSettingsViewModel : ViewModelBase
         _patreonSettings = patreonSettings?.Value;
         _licenseManager = licenseManager;
         _licenseSettings = licenseSettings?.Value;
+        _consentService = consentService;
         _loggerFactory = loggerFactory;
         _logger = logger;
 
@@ -548,6 +552,22 @@ public sealed class AccountSettingsViewModel : ViewModelBase
                 {
                     // Patreonクリア失敗はログアウト自体をブロックしない
                     _logger?.LogWarning(ex, "Patreon認証情報のクリアに失敗しましたが、ログアウト処理を続行します");
+                }
+            }
+
+            // [Fix] ローカルの同意設定をクリア（別アカウントログイン時の混在防止）
+            // サーバー記録は維持（同じユーザーが再ログインした場合はサーバーから同期）
+            if (_consentService != null)
+            {
+                try
+                {
+                    await _consentService.ClearLocalConsentAsync().ConfigureAwait(false);
+                    _logger?.LogDebug("ローカル同意設定をクリアしました");
+                }
+                catch (Exception ex)
+                {
+                    // 同意設定クリア失敗はログアウト自体をブロックしない
+                    _logger?.LogWarning(ex, "同意設定のクリアに失敗しましたが、ログアウト処理を続行します");
                 }
             }
 
