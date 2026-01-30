@@ -1558,7 +1558,7 @@
     <value>Login failed: {0}</value>
   </data>
   <data name="Auth_Error_InvalidToken" xml:space="preserve">
-    <value>Authentication token is invalid. Please log in again.</value>
+    <value>Authentication failed. Please try signing in with Google, Discord, or Twitch.</value>
   </data>
   <data name="Auth_Error_TokenExpired" xml:space="preserve">
     <value>Session has expired. Please log in again.</value>

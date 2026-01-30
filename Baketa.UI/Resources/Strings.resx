@@ -1558,7 +1558,7 @@
     <value>ログインに失敗しました: {0}</value>
   </data>
   <data name="Auth_Error_InvalidToken" xml:space="preserve">
-    <value>認証トークンが無効です。再度ログインしてください。</value>
+    <value>認証に失敗しました。Google、Discord、Twitchでのログインをお試しください。</value>
   </data>
   <data name="Auth_Error_TokenExpired" xml:space="preserve">
     <value>セッションの有効期限が切れました。再度ログインしてください。</value>
