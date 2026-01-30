@@ -64,10 +64,17 @@ public interface IPatreonOAuthService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Patreon連携を解除
+    /// Patreon連携を解除（サーバーセッション無効化 + ローカル削除）
     /// </summary>
     /// <param name="cancellationToken">キャンセルトークン</param>
     Task DisconnectAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// ローカルの認証情報のみをクリア（サーバーセッションは維持）
+    /// Supabaseログアウト時に使用。別アカウントログイン時の認証情報混在を防止。
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    Task ClearLocalCredentialsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 保存された認証情報を読み込む

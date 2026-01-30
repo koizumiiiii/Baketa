@@ -253,11 +253,17 @@
   <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
     <value>使用する翻訳エンジンを選択します</value>
   </data>
+  <data name="Settings_General_EXMode" xml:space="preserve">
+    <value>EXモード</value>
+  </data>
+  <data name="Settings_General_EXModeDescription" xml:space="preserve">
+    <value>高精度なEX翻訳エンジンを使用します</value>
+  </data>
   <data name="Settings_General_OfflineTranslation" xml:space="preserve">
     <value>オフライン翻訳</value>
   </data>
   <data name="Settings_General_AITranslation" xml:space="preserve">
-    <value>AI翻訳</value>
+    <value>EX翻訳</value>
   </data>
   <data name="Settings_General_AlphaNote" xml:space="preserve">
     <value>※ αテストではオフライン翻訳のみ利用可能</value>
@@ -269,7 +275,7 @@
     <value>今月の使用量:</value>
   </data>
   <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
-    <value>トークン</value>
+    <value></value>
   </data>
   <data name="Settings_General_TranslationLanguage" xml:space="preserve">
     <value>翻訳言語</value>
@@ -650,7 +656,7 @@
     <value>ライセンス</value>
   </data>
   <data name="Settings_License_Subtitle" xml:space="preserve">
-    <value>プラン情報とトークン使用状況を確認</value>
+    <value>プラン情報と使用状況を確認</value>
   </data>
   <data name="Settings_Upgrade_Title" xml:space="preserve">
     <value>プランアップグレード</value>
@@ -662,16 +668,16 @@
     <value>ライセンス情報を読み込み中...</value>
   </data>
   <data name="Settings_License_TokenUsage" xml:space="preserve">
-    <value>トークン使用量</value>
+    <value>使用量</value>
   </data>
   <data name="Settings_License_MonthlyUsage" xml:space="preserve">
     <value>月間使用量</value>
   </data>
   <data name="Settings_License_QuotaExceeded" xml:space="preserve">
-    <value>月間クォータを超過しました。クラウドAI翻訳は来月まで利用できません。</value>
+    <value>月間利用枠を超過しました。EX翻訳は来月まで利用できません。</value>
   </data>
   <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
-    <value>このプランではローカル翻訳のみ利用可能です。クラウドAI翻訳を使用するには、Pro以上のプランへアップグレードしてください。</value>
+    <value>このプランでは標準翻訳のみ利用可能です。EX翻訳を使用するには、Pro以上のプランへアップグレードしてください。</value>
   </data>
   <data name="Settings_License_PlanDetails" xml:space="preserve">
     <value>プラン詳細</value>
@@ -680,10 +686,10 @@
     <value>有効期限</value>
   </data>
   <data name="Settings_License_CloudAccess" xml:space="preserve">
-    <value>クラウドAIアクセス</value>
+    <value>EX翻訳</value>
   </data>
   <data name="Settings_License_MonthlyLimit" xml:space="preserve">
-    <value>月間トークン上限</value>
+    <value>月間利用枠</value>
   </data>
   <data name="Settings_License_Refresh" xml:space="preserve">
     <value>ライセンス情報を更新</value>
@@ -740,28 +746,34 @@
   </data>
 
   <data name="License_Desc_Free" xml:space="preserve">
-    <value>無料プラン - ボーナストークンでCloud AI利用可能</value>
+    <value>無料プラン - ボーナスでEX翻訳利用可能</value>
   </data>
   <data name="License_Desc_Standard" xml:space="preserve">
-    <value>スタンダードプラン - 広告なし、ローカル翻訳のみ</value>
+    <value>スタンダードプラン - 広告なし、標準翻訳のみ</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Proプラン - クラウドAI翻訳 月間1,000万トークン</value>
+    <value>Proプラン - EX翻訳 月間利用枠1,000万</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Premiaプラン - クラウドAI翻訳 月間800万トークン</value>
+    <value>Premiaプラン - EX翻訳 月間利用枠800万</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Premiumプラン - クラウドAI翻訳 月間2,000万トークン</value>
+    <value>Premiumプラン - EX翻訳 月間利用枠2,000万</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Ultimateプラン - クラウドAI翻訳 月間5,000万トークン</value>
+    <value>Ultimateプラン - EX翻訳 月間利用枠5,000万</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>無期限</value>
   </data>
   <data name="License_LocalOnly" xml:space="preserve">
-    <value>ローカルのみ</value>
+    <value>標準のみ</value>
+  </data>
+  <data name="License_EXTranslation_Available" xml:space="preserve">
+    <value>利用可能</value>
+  </data>
+  <data name="License_EXTranslation_Unavailable" xml:space="preserve">
+    <value>利用不可</value>
   </data>
   <data name="License_RefreshSuccess" xml:space="preserve">
     <value>ライセンス情報を更新しました</value>
@@ -825,7 +837,7 @@
     <value>Patreonアカウントと連携</value>
   </data>
   <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
-    <value>Patreonで支援中のアカウントと連携すると、広告なし・クラウドAI翻訳などの特典が利用できます</value>
+    <value>Patreonで支援中のアカウントと連携すると、広告なし・EX翻訳などの特典が利用できます</value>
   </data>
   <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
     <value>Patreonと連携する</value>
@@ -834,13 +846,13 @@
     <value>利用可能なプラン:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/月): クラウドAI翻訳 1,000万トークン/月</value>
+    <value>• Pro ($3/月): EX翻訳 月間利用枠1,000万</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium ($5/月): クラウドAI翻訳 2,000万トークン/月</value>
+    <value>• Premium ($5/月): EX翻訳 月間利用枠2,000万</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate ($9/月): クラウドAI翻訳 5,000万トークン/月</value>
+    <value>• Ultimate ($9/月): EX翻訳 月間利用枠5,000万</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>ログイン</value>
@@ -1037,7 +1049,7 @@
     <value>広告非表示</value>
   </data>
   <data name="Premium_FeatureCloudTranslation" xml:space="preserve">
-    <value>クラウド翻訳 (Google Gemini)</value>
+    <value>EX翻訳（高精度翻訳エンジン）</value>
   </data>
   <data name="Premium_FeaturePrioritySupport" xml:space="preserve">
     <value>優先サポート</value>
@@ -1254,19 +1266,19 @@
 
   <!-- [Issue #78 Phase 5] Token Usage Alerts -->
   <data name="TokenUsage_Warning_Title" xml:space="preserve">
-    <value>トークン使用量警告</value>
+    <value>使用量警告</value>
   </data>
   <data name="TokenUsage_Warning80_Message" xml:space="preserve">
-    <value>今月のCloud AIトークンを80%使用しました（残り: {0}）</value>
+    <value>今月のEX翻訳利用枠を80%使用しました（残り: {0}）</value>
   </data>
   <data name="TokenUsage_Warning90_Message" xml:space="preserve">
-    <value>今月のCloud AIトークンを90%使用しました（残り: {0}）</value>
+    <value>今月のEX翻訳利用枠を90%使用しました（残り: {0}）</value>
   </data>
   <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
-    <value>トークン上限到達</value>
+    <value>利用枠上限到達</value>
   </data>
   <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
-    <value>今月のCloud AIトークン上限に達しました。ローカル翻訳に自動切替します。</value>
+    <value>今月のEX翻訳利用枠上限に達しました。標準翻訳に自動切替します。</value>
   </data>
 
   <!-- [Issue #245] Window Selection Dialog -->
@@ -1606,7 +1618,7 @@
     <value>ボーナス</value>
   </data>
   <data name="Settings_License_BonusTokens" xml:space="preserve">
-    <value>ボーナストークン</value>
+    <value>ボーナス</value>
   </data>
   <data name="Settings_License_TotalAvailable" xml:space="preserve">
     <value>合計利用可能</value>

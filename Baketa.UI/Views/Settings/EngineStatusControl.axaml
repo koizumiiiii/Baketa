@@ -27,7 +27,7 @@
         </Button>
       </Grid>
 
-      <!-- LocalOnlyエンジン -->
+      <!-- 標準エンジン -->
       <Border Classes="StatusCard">
         <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
           <!-- ステータスアイコン -->
@@ -39,10 +39,10 @@
                        FontSize="16" />
           </Border>
 
-          <!-- エンジン名 -->
-          <TextBlock Grid.Column="1" 
-                     Text="LocalOnly エンジン"
-                     FontWeight="Medium" 
+          <!-- エンジン名 [Issue #318] LocalOnly → 標準 -->
+          <TextBlock Grid.Column="1"
+                     Text="標準エンジン"
+                     FontWeight="Medium"
                      VerticalAlignment="Center" />
 
           <!-- 状態テキスト -->
@@ -62,7 +62,7 @@
         </Grid>
       </Border>
 
-      <!-- CloudOnlyエンジン -->
+      <!-- EXエンジン -->
       <Border Classes="StatusCard">
         <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
           <!-- ステータスアイコン -->
@@ -74,10 +74,10 @@
                        FontSize="16" />
           </Border>
 
-          <!-- エンジン名 -->
-          <TextBlock Grid.Column="1" 
-                     Text="CloudOnly エンジン"
-                     FontWeight="Medium" 
+          <!-- エンジン名 [Issue #318] CloudOnly → EX -->
+          <TextBlock Grid.Column="1"
+                     Text="EXエンジン ⚡"
+                     FontWeight="Medium"
                      VerticalAlignment="Center" />
 
           <!-- 状態テキスト -->

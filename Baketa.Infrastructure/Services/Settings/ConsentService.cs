@@ -382,6 +382,26 @@ public sealed class ConsentService : IConsentService, IDisposable
         return version?.ToString() ?? "0.0.0";
     }
 
+    /// <inheritdoc/>
+    public async Task ClearLocalConsentAsync(CancellationToken cancellationToken = default)
+    {
+        await _settingsLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (File.Exists(BaketaSettingsPaths.ConsentSettingsPath))
+            {
+                File.Delete(BaketaSettingsPaths.ConsentSettingsPath);
+                _logger.LogInformation("ローカル同意設定をクリアしました（サーバー記録は維持）");
+            }
+
+            _cachedSettings = null;
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
+    }
+
     #region Server Sync (Issue #277)
 
     /// <summary>

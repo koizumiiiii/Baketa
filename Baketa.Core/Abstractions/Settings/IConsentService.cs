@@ -121,6 +121,13 @@ public interface IConsentService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// ローカルの同意状態をクリア（サーバー記録は維持）
+    /// Supabaseログアウト時に使用。別アカウントログイン時の同意状態混在を防止。
+    /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    Task ClearLocalConsentAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 同意が有効か確認（24時間以上経過していれば再同期）
     /// Issue #277: GDPR撤回の即時反映
     /// </summary>

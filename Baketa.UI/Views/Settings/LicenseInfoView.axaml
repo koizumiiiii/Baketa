@@ -215,36 +215,39 @@
                         </Grid>
 
                         <!-- Token Limit (for Pro/Premium/Ultimate) -->
+                        <!-- [Issue #318] 1/100正規化プロパティを使用 -->
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasPaidPlan}">
                             <TextBlock Grid.Column="0"
                                        Text="{local:Localize Settings_License_MonthlyLimit}"
                                        VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding TokenLimit, StringFormat='{}{0:N0}'}"
+                                       Text="{Binding TokenLimitNormalized, StringFormat='{}{0:N0}'}"
                                        FontWeight="Medium"
                                        VerticalAlignment="Center"/>
                         </Grid>
 
                         <!-- [Issue #307] Bonus Tokens (if available) -->
+                        <!-- [Issue #318] 1/100正規化プロパティを使用 -->
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBonusTokens}">
                             <TextBlock Grid.Column="0"
                                        Text="{local:Localize Settings_License_BonusTokens}"
                                        VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding BonusTokensRemaining, StringFormat='{}{0:N0}'}"
+                                       Text="{Binding BonusTokensRemainingNormalized, StringFormat='{}{0:N0}'}"
                                        FontWeight="Medium"
                                        Foreground="#28A745"
                                        VerticalAlignment="Center"/>
                         </Grid>
 
                         <!-- [Issue #307] Total Token Pool (if has bonus) -->
+                        <!-- [Issue #318] 1/100正規化プロパティを使用 -->
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBonusTokens}">
                             <TextBlock Grid.Column="0"
                                        Text="{local:Localize Settings_License_TotalAvailable}"
                                        VerticalAlignment="Center"
                                        FontWeight="Medium"/>
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding TotalTokenPool, StringFormat='{}{0:N0}'}"
+                                       Text="{Binding TotalTokenPoolNormalized, StringFormat='{}{0:N0}'}"
                                        FontWeight="Bold"
                                        VerticalAlignment="Center"/>
                         </Grid>
@@ -263,94 +266,6 @@
                         Classes="accent"/>
             </StackPanel>
 
-            <!-- Issue #237 Phase 2: プロモーションコードセクション -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="{local:Localize Settings_License_PromotionCode}" FontSize="16" FontWeight="Medium"/>
-
-                <!-- アクティブなプロモーション表示 -->
-                <Border IsVisible="{Binding HasActivePromotion}"
-                        Background="{DynamicResource SystemFillColorSuccessBackgroundBrush}"
-                        CornerRadius="8"
-                        Padding="16">
-                    <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <PathIcon Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
-                                      Width="16" Height="16"
-                                      Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
-                            <TextBlock Text="{Binding PromotionAppliedMessage}"
-                                       FontWeight="Medium"
-                                       Foreground="{DynamicResource SystemFillColorSuccessBrush}"/>
-                        </StackPanel>
-                        <!-- プロモーションコード表示 -->
-                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,0,0">
-                            <TextBlock Text="{local:Localize Settings_License_PromotionCodeLabel}"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding PromotionCodeDisplay}"
-                                       FontSize="12"
-                                       FontWeight="Medium"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,0,0">
-                            <TextBlock Text="{local:Localize Settings_License_PromotionExpires}"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding PromotionExpiresDisplay}"
-                                       FontSize="12"
-                                       FontWeight="Medium"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- プロモーションコード入力 -->
-                <Border IsVisible="{Binding !HasActivePromotion}"
-                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                        CornerRadius="8"
-                        Padding="16">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="{local:Localize Settings_License_PromotionCodeDescription}"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   TextWrapping="Wrap"/>
-
-                        <!-- コード入力 -->
-                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
-                            <TextBox Grid.Column="0"
-                                     Text="{Binding PromotionCode}"
-                                     Watermark="BAKETA-XXXXXXXX"
-                                     IsEnabled="{Binding !IsApplyingPromotion}"
-                                     Margin="0,0,8,0"/>
-                            <Button Grid.Column="1"
-                                    Content="{local:Localize Settings_License_PromotionApply}"
-                                    Command="{Binding ApplyPromotionCommand}"
-                                    IsEnabled="{Binding !IsApplyingPromotion}"
-                                    Padding="16,8"
-                                    Classes="accent"/>
-                        </Grid>
-
-                        <!-- ローディングインジケータ -->
-                        <StackPanel IsVisible="{Binding IsApplyingPromotion}"
-                                    Orientation="Horizontal"
-                                    Spacing="8"
-                                    HorizontalAlignment="Center">
-                            <ProgressBar IsIndeterminate="True" Width="100" Height="4"/>
-                            <TextBlock Text="{local:Localize Settings_License_PromotionVerifying}" FontSize="12"/>
-                        </StackPanel>
-
-                        <!-- ステータスメッセージ -->
-                        <Border IsVisible="{Binding PromotionStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                Padding="12,8"
-                                CornerRadius="6"
-                                Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock Text="{Binding PromotionStatusMessage}"
-                                       TextWrapping="Wrap"
-                                       FontSize="12"/>
-                        </Border>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+            <!-- プロモーションコードセクションは廃止（ボーナストークン表示で代替） -->
         </StackPanel>
 </UserControl>
