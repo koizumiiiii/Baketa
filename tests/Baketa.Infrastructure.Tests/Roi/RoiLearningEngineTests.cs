@@ -302,4 +302,160 @@ public class RoiLearningEngineTests
     }
 
     #endregion
+
+    #region [Issue #354] RecordDetectionsWithWeight テスト
+
+    [Fact]
+    public void RecordDetectionsWithWeight_ShouldApplyWeightToLearning()
+    {
+        // Arrange
+        var settings = Options.Create(new RoiManagerSettings
+        {
+            HeatmapRows = 4,
+            HeatmapColumns = 4,
+            LearningRate = 0.1f
+        });
+        var engine = new RoiLearningEngine(_loggerMock.Object, settings);
+
+        var detections = new[]
+        {
+            (new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f), 0.9f, 2), // weight=2
+            (new NormalizedRect(0.5f, 0.5f, 0.2f, 0.2f), 0.8f, 1)  // weight=1
+        };
+
+        // Act
+        engine.RecordDetectionsWithWeight(detections);
+
+        // Assert
+        var value1 = engine.GetHeatmapValueAt(0.15f, 0.15f); // weight=2 region
+        var value2 = engine.GetHeatmapValueAt(0.55f, 0.55f); // weight=1 region
+        Assert.True(value1 > value2); // 重みが大きい方がより学習される
+    }
+
+    [Fact]
+    public void RecordDetectionsWithWeight_WhenLearningDisabled_ShouldNotUpdate()
+    {
+        // Arrange
+        var engine = new RoiLearningEngine(_loggerMock.Object, _defaultSettings);
+        engine.IsLearningEnabled = false;
+        var initialValue = engine.GetHeatmapValueAt(0.15f, 0.15f);
+
+        var detections = new[]
+        {
+            (new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f), 0.9f, 2)
+        };
+
+        // Act
+        engine.RecordDetectionsWithWeight(detections);
+
+        // Assert
+        var newValue = engine.GetHeatmapValueAt(0.15f, 0.15f);
+        Assert.Equal(initialValue, newValue, precision: 4);
+    }
+
+    #endregion
+
+    #region [Issue #354] RecordMiss テスト
+
+    [Fact]
+    public void RecordMiss_ShouldReturnExclusionCandidates_WhenThresholdExceeded()
+    {
+        // Arrange
+        var settings = Options.Create(new RoiManagerSettings
+        {
+            HeatmapRows = 4,
+            HeatmapColumns = 4,
+            LearningRate = 0.1f,
+            ConsecutiveMissThresholdForExclusion = 3 // 3回missで除外候補
+        });
+        var engine = new RoiLearningEngine(_loggerMock.Object, settings);
+        var bounds = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+
+        // Act - 3回miss
+        var result1 = engine.RecordMiss(bounds);
+        var result2 = engine.RecordMiss(bounds);
+        var result3 = engine.RecordMiss(bounds); // 閾値到達
+
+        // Assert
+        Assert.Empty(result1); // 1回目は候補なし
+        Assert.Empty(result2); // 2回目も候補なし
+        Assert.NotEmpty(result3); // 3回目で除外候補発生
+    }
+
+    [Fact]
+    public void RecordMiss_WhenLearningDisabled_ShouldReturnEmpty()
+    {
+        // Arrange
+        var engine = new RoiLearningEngine(_loggerMock.Object, _defaultSettings);
+        engine.IsLearningEnabled = false;
+        var bounds = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+
+        // Act
+        var result = engine.RecordMiss(bounds);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void RecordMiss_CumulativeCount_ShouldReachThreshold()
+    {
+        // Arrange
+        // NOTE: RecordDetectionはmissカウントを自動リセットしない設計。
+        // missカウントのリセットはヒートマップの学習成功時に行われる（別フロー）
+        var settings = Options.Create(new RoiManagerSettings
+        {
+            HeatmapRows = 4,
+            HeatmapColumns = 4,
+            LearningRate = 0.1f,
+            ConsecutiveMissThresholdForExclusion = 5
+        });
+        var engine = new RoiLearningEngine(_loggerMock.Object, settings);
+        var bounds = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+
+        // 5回miss（閾値に到達）
+        var results = new List<IReadOnlyList<NormalizedRect>>();
+        for (int i = 0; i < 5; i++)
+        {
+            results.Add(engine.RecordMiss(bounds));
+        }
+
+        // Assert - 最初の4回は候補なし、5回目で除外候補発生
+        for (int i = 0; i < 4; i++)
+        {
+            Assert.Empty(results[i]);
+        }
+        Assert.NotEmpty(results[4]);
+    }
+
+    #endregion
+
+    #region [Issue #354] RecordDetection with weight テスト
+
+    [Fact]
+    public void RecordDetection_WithWeight_ShouldApplyWeightToLearning()
+    {
+        // Arrange
+        var settings = Options.Create(new RoiManagerSettings
+        {
+            HeatmapRows = 4,
+            HeatmapColumns = 4,
+            LearningRate = 0.1f
+        });
+        var engine = new RoiLearningEngine(_loggerMock.Object, settings);
+
+        var bounds1 = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+        var bounds2 = new NormalizedRect(0.5f, 0.5f, 0.2f, 0.2f);
+
+        // Act
+        engine.RecordDetection(bounds1, 0.9f, weight: 3);
+        engine.RecordDetection(bounds2, 0.9f, weight: 1);
+
+        // Assert
+        var value1 = engine.GetHeatmapValueAt(0.15f, 0.15f);
+        var value2 = engine.GetHeatmapValueAt(0.55f, 0.55f);
+        Assert.True(value1 > value2); // 重みが大きい方がより学習される
+    }
+
+    #endregion
 }
