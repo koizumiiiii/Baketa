@@ -215,36 +215,39 @@
                         </Grid>
 
                         <!-- Token Limit (for Pro/Premium/Ultimate) -->
+                        <!-- [Issue #318] 1/100正規化プロパティを使用 -->
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasPaidPlan}">
                             <TextBlock Grid.Column="0"
                                        Text="{local:Localize Settings_License_MonthlyLimit}"
                                        VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding TokenLimit, StringFormat='{}{0:N0}'}"
+                                       Text="{Binding TokenLimitNormalized, StringFormat='{}{0:N0}'}"
                                        FontWeight="Medium"
                                        VerticalAlignment="Center"/>
                         </Grid>
 
                         <!-- [Issue #307] Bonus Tokens (if available) -->
+                        <!-- [Issue #318] 1/100正規化プロパティを使用 -->
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBonusTokens}">
                             <TextBlock Grid.Column="0"
                                        Text="{local:Localize Settings_License_BonusTokens}"
                                        VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding BonusTokensRemaining, StringFormat='{}{0:N0}'}"
+                                       Text="{Binding BonusTokensRemainingNormalized, StringFormat='{}{0:N0}'}"
                                        FontWeight="Medium"
                                        Foreground="#28A745"
                                        VerticalAlignment="Center"/>
                         </Grid>
 
                         <!-- [Issue #307] Total Token Pool (if has bonus) -->
+                        <!-- [Issue #318] 1/100正規化プロパティを使用 -->
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBonusTokens}">
                             <TextBlock Grid.Column="0"
                                        Text="{local:Localize Settings_License_TotalAvailable}"
                                        VerticalAlignment="Center"
                                        FontWeight="Medium"/>
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding TotalTokenPool, StringFormat='{}{0:N0}'}"
+                                       Text="{Binding TotalTokenPoolNormalized, StringFormat='{}{0:N0}'}"
                                        FontWeight="Bold"
                                        VerticalAlignment="Center"/>
                         </Grid>

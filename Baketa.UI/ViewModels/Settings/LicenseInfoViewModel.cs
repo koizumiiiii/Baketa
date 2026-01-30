@@ -60,6 +60,15 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private bool _isLowTokenWarning;
     private bool _shouldShowUpgradePrompt;
 
+    // [Issue #318] トークン数を1/100に正規化して表示（割高感の軽減）
+    private const long TokenDisplayDivisor = 100;
+
+    /// <summary>
+    /// [Issue #318] トークン数を表示用に正規化（1/100、四捨五入）
+    /// 例: 1050 → 11, 2600 → 26, 1049 → 10
+    /// </summary>
+    private static long NormalizeForDisplay(long tokens) => (tokens + TokenDisplayDivisor / 2) / TokenDisplayDivisor;
+
     /// <summary>
     /// LicenseInfoViewModelを初期化します
     /// </summary>
@@ -160,6 +169,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// [Issue #318] トークン上限（1/100正規化、表示用）
+    /// </summary>
+    public long TokenLimitNormalized => NormalizeForDisplay(TokenLimit);
+
+    /// <summary>
     /// 使用率（0-100）
     /// </summary>
     public double UsagePercentage
@@ -227,6 +241,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// トークン使用量の表示文字列
     /// [Issue #280+#281] プラン枠がある場合は「使用量 / 上限」、
     /// ボーナストークンのみの場合は「残り X」を表示
+    /// [Issue #318] 1/100正規化で割高感を軽減
     /// </summary>
     public string TokenUsageDisplay
     {
@@ -234,13 +249,13 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         {
             if (TokenLimit > 0)
             {
-                // プラン枠がある場合: "1,234,567 / 4,000,000"
-                return $"{TokensUsed:N0} / {TokenLimit:N0}";
+                // プラン枠がある場合: "12,345 / 40,000"（1/100正規化）
+                return $"{NormalizeForDisplay(TokensUsed):N0} / {NormalizeForDisplay(TokenLimit):N0}";
             }
             else if (BonusTokensRemaining > 0)
             {
-                // ボーナストークンのみの場合: "残り 50,000,000"
-                return $"残り {BonusTokensRemaining:N0}";
+                // ボーナストークンのみの場合: "残り 500,000"（1/100正規化）
+                return $"残り {NormalizeForDisplay(BonusTokensRemaining):N0}";
             }
             else
             {
@@ -259,10 +274,16 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// [Issue #318] ボーナストークン残高（1/100正規化、表示用）
+    /// </summary>
+    public long BonusTokensRemainingNormalized => NormalizeForDisplay(BonusTokensRemaining);
+
+    /// <summary>
     /// [Issue #280+#281] ボーナストークン残高の表示文字列
+    /// [Issue #318] 1/100正規化で割高感を軽減
     /// </summary>
     public string BonusTokensDisplay => BonusTokensRemaining > 0
-        ? $"+{BonusTokensRemaining:N0} ボーナス"
+        ? $"+{NormalizeForDisplay(BonusTokensRemaining):N0} ボーナス"
         : string.Empty;
 
     /// <summary>
@@ -302,6 +323,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     public long TotalTokenPool => TokenLimit + BonusTokensRemaining;
 
     /// <summary>
+    /// [Issue #318] トークンプール合計（1/100正規化、表示用）
+    /// </summary>
+    public long TotalTokenPoolNormalized => NormalizeForDisplay(TotalTokenPool);
+
+    /// <summary>
     /// [Issue #307] 使用済みトークンの全体に対するパーセンテージ
     /// </summary>
     public double UsedPercentageOfTotal => TotalTokenPool > 0
@@ -332,7 +358,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
     /// <summary>
     /// [Issue #307] 合計表示用のトークン使用量文字列
-    /// "20,143,195 / 89,992,314" 形式
+    /// [Issue #318] 1/100正規化: "201,431 / 899,923" 形式
     /// </summary>
     public string CombinedTokenUsageDisplay
     {
@@ -340,11 +366,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         {
             if (TotalTokenPool > 0)
             {
-                return $"{TokensUsed:N0} / {TotalTokenPool:N0}";
+                return $"{NormalizeForDisplay(TokensUsed):N0} / {NormalizeForDisplay(TotalTokenPool):N0}";
             }
             else if (BonusTokensRemaining > 0)
             {
-                return $"残り {BonusTokensRemaining:N0}";
+                return $"残り {NormalizeForDisplay(BonusTokensRemaining):N0}";
             }
             else
             {
@@ -356,6 +382,7 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     /// <summary>
     /// [Issue #280+#281 Phase 5] トークン残量の表示文字列
     /// プラン枠とボーナスの内訳を表示
+    /// [Issue #318] 1/100正規化で割高感を軽減
     /// </summary>
     public string TokenBreakdownDisplay
     {
@@ -369,12 +396,12 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
             if (TokenLimit > 0)
             {
-                parts.Add($"プラン: {planRemaining:N0} / {TokenLimit:N0}");
+                parts.Add($"プラン: {NormalizeForDisplay(planRemaining):N0} / {NormalizeForDisplay(TokenLimit):N0}");
             }
 
             if (BonusTokensRemaining > 0)
             {
-                parts.Add($"ボーナス: {BonusTokensRemaining:N0}");
+                parts.Add($"ボーナス: {NormalizeForDisplay(BonusTokensRemaining):N0}");
             }
 
             return parts.Count > 0 ? string.Join(" + ", parts) : Strings.License_LocalOnly;

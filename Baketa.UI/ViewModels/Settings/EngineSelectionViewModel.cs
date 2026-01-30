@@ -39,6 +39,10 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
     private string _statusWarningMessage = string.Empty;
     private bool _isLoading;
 
+    // [Issue #318] トークン数を1/100に正規化して表示（割高感の軽減）
+    private const long TokenDisplayDivisor = 100;
+    private static long NormalizeForDisplay(long tokens) => (tokens + TokenDisplayDivisor / 2) / TokenDisplayDivisor;
+
     /// <summary>
     /// ViewModel活性化管理
     /// </summary>
@@ -104,7 +108,8 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
             var bonusTokens = _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
             if (bonusTokens > 0)
             {
-                return $"月間上限に達しました。ボーナストークン（残り{bonusTokens:N0}）で利用可能です。";
+                // [Issue #318] 1/100正規化で割高感を軽減
+                return $"月間上限に達しました。ボーナス（残り{NormalizeForDisplay(bonusTokens):N0}）で利用可能です。";
             }
 
             return "今月のトークン上限に達しました。来月リセットされます。";
@@ -532,10 +537,11 @@ public sealed class EngineSelectionViewModel : Framework.ViewModelBase, IActivat
         var baseDesc = "Gemini APIを使用した高品質クラウド翻訳。";
 
         // [Issue #296] クォータ超過だがボーナストークンで利用可能な場合
+        // [Issue #318] 1/100正規化で割高感を軽減
         if (IsQuotaExceededButBonusAvailable)
         {
             var bonusTokens = _bonusTokenService?.GetTotalRemainingTokens() ?? 0;
-            return $"{baseDesc}\n⚠️ 月間上限超過。ボーナストークン（残り{bonusTokens:N0}）で利用可能";
+            return $"{baseDesc}\n⚠️ 月間上限超過。ボーナス（残り{NormalizeForDisplay(bonusTokens):N0}）で利用可能";
         }
 
         if (!status.IsOnline)

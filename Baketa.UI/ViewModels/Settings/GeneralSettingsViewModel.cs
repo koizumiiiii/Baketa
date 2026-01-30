@@ -68,6 +68,10 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     // [Issue #280+#281] ボーナストークン残高
     private long _bonusTokensRemaining;
 
+    // [Issue #318] トークン数を1/100に正規化して表示（割高感の軽減）
+    private const long TokenDisplayDivisor = 100;
+    private static long NormalizeForDisplay(long tokens) => (tokens + TokenDisplayDivisor / 2) / TokenDisplayDivisor;
+
     // テーマ設定用バッキングフィールド
     private UiTheme _selectedTheme = UiTheme.Auto;
 
@@ -398,6 +402,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// Cloud AI使用量表示文字列
     /// [Issue #307] プラン+ボーナスの合計を表示
     /// 詳細な内訳はライセンスページで確認
+    /// [Issue #318] 1/100正規化で割高感を軽減
     /// </summary>
     public string CloudUsageDisplay
     {
@@ -406,8 +411,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             var totalPool = CloudTokenLimit + _bonusTokensRemaining;
             if (totalPool > 0)
             {
-                // 合計表示: "1,234,567 / 54,000,000"
-                return $"{CloudTokensUsed:N0} / {totalPool:N0}";
+                // 合計表示: "12,345 / 540,000"（1/100正規化）
+                return $"{NormalizeForDisplay(CloudTokensUsed):N0} / {NormalizeForDisplay(totalPool):N0}";
             }
             else
             {
