@@ -769,6 +769,12 @@
   <data name="License_LocalOnly" xml:space="preserve">
     <value>Standard Only</value>
   </data>
+  <data name="License_EXTranslation_Available" xml:space="preserve">
+    <value>Available</value>
+  </data>
+  <data name="License_EXTranslation_Unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
   <data name="License_RefreshSuccess" xml:space="preserve">
     <value>License information updated</value>
   </data>

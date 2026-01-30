@@ -217,10 +217,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
     /// <summary>
     /// 有効期限の表示文字列
+    /// Freeプランまたは有効期限なしの場合は「-」を表示
     /// </summary>
     public string ExpirationDateDisplay => ExpirationDate.HasValue
         ? ExpirationDate.Value.ToString("yyyy/MM/dd")
-        : Strings.License_NoExpiration;
+        : "-";
 
     /// <summary>
     /// トークン使用量の表示文字列
@@ -381,11 +382,11 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// クラウドアクセス状態の表示文字列
+    /// EX翻訳アクセス状態の表示文字列
     /// </summary>
     public string CloudAccessDisplay => HasCloudAccess
-        ? Strings.Common_Yes
-        : Strings.Common_No;
+        ? Strings.License_EXTranslation_Available
+        : Strings.License_EXTranslation_Unavailable;
 
     /// <summary>
     /// ステータスメッセージ

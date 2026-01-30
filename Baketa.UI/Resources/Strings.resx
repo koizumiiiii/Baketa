@@ -769,6 +769,12 @@
   <data name="License_LocalOnly" xml:space="preserve">
     <value>標準のみ</value>
   </data>
+  <data name="License_EXTranslation_Available" xml:space="preserve">
+    <value>利用可能</value>
+  </data>
+  <data name="License_EXTranslation_Unavailable" xml:space="preserve">
+    <value>利用不可</value>
+  </data>
   <data name="License_RefreshSuccess" xml:space="preserve">
     <value>ライセンス情報を更新しました</value>
   </data>

@@ -369,6 +369,8 @@ public static class Strings
     public static string License_Desc_Ultimate => GetString("License_Desc_Ultimate");
     public static string License_NoExpiration => GetString("License_NoExpiration");
     public static string License_LocalOnly => GetString("License_LocalOnly");
+    public static string License_EXTranslation_Available => GetString("License_EXTranslation_Available");
+    public static string License_EXTranslation_Unavailable => GetString("License_EXTranslation_Unavailable");
     public static string License_RefreshSuccess => GetString("License_RefreshSuccess");
     public static string License_RefreshFailed => GetString("License_RefreshFailed");
     public static string Settings_License_Upgrade => GetString("Settings_License_Upgrade");
