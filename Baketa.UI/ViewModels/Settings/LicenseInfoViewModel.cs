@@ -772,16 +772,18 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
     /// <summary>
     /// プロモーション状態を読み込みます
+    /// [Issue #318関連] ローカル情報だけでなくサーバーからのボーナストークン状態も確認
+    /// 別アカウントでログインした場合、ローカル情報は残っていてもボーナスは付与されていないため
     /// </summary>
     private void LoadPromotionState()
     {
         var promotion = _promotionCodeService.GetCurrentPromotion();
         _activePromotion = promotion;
-        HasActivePromotion = promotion?.IsValid == true;
+        // ローカルに有効なプロモーション情報があり、かつサーバーからボーナストークンが付与されている場合のみ有効
+        HasActivePromotion = promotion?.IsValid == true && HasBonusTokens;
 
         if (HasActivePromotion)
         {
-            this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
             this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
             this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
         }
@@ -879,9 +881,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
                 if (result.Success)
                 {
                     PromotionCode = string.Empty;
-                    HasActivePromotion = true;
+                    // プロモーション適用成功時は、サーバーからボーナストークンが付与されるため表示を有効化
                     // _activePromotionはOnPromotionStateChangedで設定される
-                    this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
+                    HasActivePromotion = true;
                     this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
                     this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
                     _logger?.LogInformation("プロモーションコード適用成功: Plan={Plan}", result.AppliedPlan);
@@ -909,13 +911,15 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
     /// <summary>
     /// プロモーション状態変更イベントハンドラ
+    /// [Issue #318関連] ボーナストークン状態も確認
     /// </summary>
     private void OnPromotionStateChanged(object? sender, PromotionStateChangedEventArgs e)
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             _activePromotion = e.NewPromotion;
-            HasActivePromotion = e.NewPromotion?.IsValid == true;
+            // ローカルに有効なプロモーション情報があり、かつサーバーからボーナストークンが付与されている場合のみ有効
+            HasActivePromotion = e.NewPromotion?.IsValid == true && HasBonusTokens;
 
             // [Issue #298] プラン表示名を再計算（プロモーションサフィックスの更新、Freeプランでも表示）
             var basePlanName = GetPlanDisplayName(CurrentPlan);
@@ -923,7 +927,6 @@ public sealed class LicenseInfoViewModel : ViewModelBase
                 ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
                 : basePlanName;
 
-            this.RaisePropertyChanged(nameof(PromotionExpiresDisplay));
             this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
             this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
             _logger?.LogDebug("プロモーション状態が変更されました: {Reason}", e.Reason);
@@ -954,6 +957,20 @@ public sealed class LicenseInfoViewModel : ViewModelBase
 
             // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
             UpdateTokenWarningState();
+
+            // [Issue #318関連] ボーナストークン変更時にプロモーション表示も再評価
+            // 別アカウントでログインした場合、ローカルプロモーション情報は残っていても
+            // サーバーからのボーナスは付与されていないため表示を更新
+            var promotion = _promotionCodeService.GetCurrentPromotion();
+            var wasActive = HasActivePromotion;
+            HasActivePromotion = promotion?.IsValid == true && HasBonusTokens;
+            if (wasActive != HasActivePromotion)
+            {
+                var basePlanName = GetPlanDisplayName(CurrentPlan);
+                PlanDisplayName = HasActivePromotion
+                    ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
+                    : basePlanName;
+            }
 
             _logger?.LogDebug("ボーナストークン状態が変更されました: {Reason}, 残高: {Remaining}",
                 e.Reason, e.TotalRemaining);

@@ -292,16 +292,7 @@
                                        FontWeight="Medium"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="24,0,0,0">
-                            <TextBlock Text="{local:Localize Settings_License_PromotionExpires}"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding PromotionExpiresDisplay}"
-                                       FontSize="12"
-                                       FontWeight="Medium"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <!-- [Issue #318関連] 有効期限表示は廃止されたため削除 -->
                     </StackPanel>
                 </Border>
 
