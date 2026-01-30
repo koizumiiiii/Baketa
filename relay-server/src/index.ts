@@ -3019,16 +3019,17 @@ async function handleSessionValidate(
     try {
       const membership = await getMembershipFromSession(env, sessionResult.session, true);
 
+      // [Fix] C#モデルはsnake_caseを期待するため、snake_caseで返す
       return successResponse({
-        SessionValid: true,
-        PatreonUserId: membership.userId,
-        Email: membership.email,
-        FullName: membership.fullName,
-        Plan: membership.plan,
-        TierId: membership.tierId,
-        PatronStatus: membership.patronStatus,
-        NextChargeDate: membership.nextChargeDate,
-        SessionExpiresAt: sessionResult.session.expiresAt,
+        session_valid: true,
+        patreon_user_id: membership.userId,
+        email: membership.email,
+        full_name: membership.fullName,
+        plan: membership.plan,
+        tier_id: membership.tierId,
+        patron_status: membership.patronStatus,
+        next_charge_date: membership.nextChargeDate,
+        session_expires_at: sessionResult.session.expiresAt,
       }, origin, allowedOrigins);
 
     } catch (error) {
