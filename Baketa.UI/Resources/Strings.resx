@@ -833,14 +833,14 @@
   <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
     <value>利用可能なプラン:</value>
   </data>
-  <data name="Settings_Account_PatreonPlanStandard" xml:space="preserve">
-    <value>• Standard ($1/月): 広告なし</value>
-  </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/月): クラウドAI翻訳 400万トークン/月</value>
+    <value>• Pro ($3/月): クラウドAI翻訳 1,000万トークン/月</value>
   </data>
-  <data name="Settings_Account_PatreonPlanPremia" xml:space="preserve">
-    <value>• Premia ($5/月): クラウドAI翻訳 800万トークン/月</value>
+  <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
+    <value>• Premium ($5/月): クラウドAI翻訳 2,000万トークン/月</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
+    <value>• Ultimate ($9/月): クラウドAI翻訳 5,000万トークン/月</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>ログイン</value>
@@ -960,6 +960,9 @@
   <data name="Auth_Login_SignupLink" xml:space="preserve">
     <value>アカウント作成</value>
   </data>
+  <data name="Auth_Login_EmailExpander" xml:space="preserve">
+    <value>メールアドレスでログイン</value>
+  </data>
 
   <!-- ========== Signup View ========== -->
   <data name="Auth_Signup_Title" xml:space="preserve">
@@ -1021,6 +1024,9 @@
   </data>
   <data name="Auth_Signup_LoginLink" xml:space="preserve">
     <value>ログイン</value>
+  </data>
+  <data name="Auth_Signup_EmailExpander" xml:space="preserve">
+    <value>メールアドレスで登録</value>
   </data>
 
   <!-- ========== Premium Plan ========== -->
@@ -1521,6 +1527,98 @@
   </data>
   <data name="GpuMemoryWarning_Title" xml:space="preserve">
     <value>GPUメモリ警告</value>
+  </data>
+
+  <!-- Issue #179: 認証エラーメッセージ -->
+  <data name="Auth_Error_UserAlreadyExists" xml:space="preserve">
+    <value>このメールアドレスは既に使用されています</value>
+  </data>
+  <data name="Auth_Error_WeakPassword" xml:space="preserve">
+    <value>パスワードが弱すぎます。より強固なパスワードを設定してください</value>
+  </data>
+  <data name="Auth_Error_InvalidCredentials" xml:space="preserve">
+    <value>無効なメールアドレス形式です</value>
+  </data>
+  <data name="Auth_Error_InvalidEmail" xml:space="preserve">
+    <value>メールアドレスまたはパスワードが正しくありません</value>
+  </data>
+  <data name="Auth_Error_EmailNotConfirmed" xml:space="preserve">
+    <value>確認メールを送信しました。メール内のリンクをクリックしてから、ログイン画面でログインしてください。</value>
+  </data>
+  <data name="Auth_Error_RateLimitExceeded" xml:space="preserve">
+    <value>リクエストが多すぎます。しばらく時間をおいてから再試行してください</value>
+  </data>
+  <data name="Auth_Error_SignupDisabled" xml:space="preserve">
+    <value>現在、新規アカウント作成を停止しています</value>
+  </data>
+  <data name="Auth_Error_SignupFailed" xml:space="preserve">
+    <value>アカウント作成に失敗しました: {0}</value>
+  </data>
+  <data name="Auth_Error_LoginFailed" xml:space="preserve">
+    <value>ログインに失敗しました: {0}</value>
+  </data>
+  <data name="Auth_Error_InvalidToken" xml:space="preserve">
+    <value>認証に失敗しました。Google、Discord、Twitchでのログインをお試しください。</value>
+  </data>
+  <data name="Auth_Error_TokenExpired" xml:space="preserve">
+    <value>セッションの有効期限が切れました。再度ログインしてください。</value>
+  </data>
+  <data name="Auth_Error_NetworkError" xml:space="preserve">
+    <value>ネットワークエラーが発生しました。インターネット接続を確認してください。</value>
+  </data>
+  <data name="Auth_Error_Timeout" xml:space="preserve">
+    <value>接続がタイムアウトしました。インターネット接続をご確認ください</value>
+  </data>
+  <data name="Auth_Error_Unknown" xml:space="preserve">
+    <value>認証エラーが発生しました</value>
+  </data>
+  <data name="Auth_Success_EmailSent" xml:space="preserve">
+    <value>メールを送信しました</value>
+  </data>
+  <data name="Auth_Success_PasswordResetEmailSent" xml:space="preserve">
+    <value>パスワードリセットメールを送信しました。メールを確認してください。</value>
+  </data>
+  <data name="Auth_Error_PasswordResetFailed" xml:space="preserve">
+    <value>パスワードリセットに失敗しました。メールアドレスを確認してください。</value>
+  </data>
+  <data name="Auth_Error_PasswordResetError" xml:space="preserve">
+    <value>パスワードリセットの処理中にエラーが発生しました。</value>
+  </data>
+  <data name="Auth_Validation_InvalidEmail" xml:space="preserve">
+    <value>有効なメールアドレスを入力してください</value>
+  </data>
+  <data name="Auth_Validation_PasswordRequirement" xml:space="preserve">
+    <value>パスワードは8文字以上で、大文字・小文字・数字・記号のうち3種類以上を含む必要があります</value>
+  </data>
+  <data name="Auth_Validation_PasswordMismatch" xml:space="preserve">
+    <value>パスワードが一致しません</value>
+  </data>
+  <data name="Settings_Account_LogoutSuccess" xml:space="preserve">
+    <value>ログアウトしました</value>
+  </data>
+  <data name="Settings_License_UsedTokens" xml:space="preserve">
+    <value>使用済み</value>
+  </data>
+  <data name="Settings_License_PlanRemaining" xml:space="preserve">
+    <value>プラン残</value>
+  </data>
+  <data name="Settings_License_BonusLabel" xml:space="preserve">
+    <value>ボーナス</value>
+  </data>
+  <data name="Settings_License_BonusTokens" xml:space="preserve">
+    <value>ボーナストークン</value>
+  </data>
+  <data name="Settings_License_TotalAvailable" xml:space="preserve">
+    <value>合計利用可能</value>
+  </data>
+  <data name="Auth_Validation_PasswordMinLength" xml:space="preserve">
+    <value>パスワードは6文字以上で入力してください</value>
+  </data>
+  <data name="Auth_Error_PasswordResetException" xml:space="preserve">
+    <value>パスワードリセットに失敗しました: {0}</value>
+  </data>
+  <data name="Auth_Success_ConfirmationEmailSent" xml:space="preserve">
+    <value>確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...</value>
   </data>
 
 </root>

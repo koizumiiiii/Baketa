@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -6,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Constants;
 using Baketa.UI.Framework;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
@@ -26,6 +28,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     private readonly IOAuthCallbackHandler _oauthHandler;
     private readonly INavigationService _navigationService;
     private readonly IPasswordStrengthValidator _passwordValidator;
+    private readonly ILocalizationService _localizationService;
     private readonly ILogger<SignupViewModel>? _logger;
 
     // LoggerMessage delegates for structured logging
@@ -138,6 +141,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <param name="oauthHandler">OAuthコールバックハンドラー</param>
     /// <param name="navigationService">ナビゲーションサービス</param>
     /// <param name="passwordValidator">パスワード強度バリデーター</param>
+    /// <param name="localizationService">ローカライゼーションサービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="logger">ロガー</param>
     public SignupViewModel(
@@ -145,6 +149,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         IOAuthCallbackHandler oauthHandler,
         INavigationService navigationService,
         IPasswordStrengthValidator passwordValidator,
+        ILocalizationService localizationService,
         IEventAggregator eventAggregator,
         ILogger<SignupViewModel>? logger = null) : base(eventAggregator, logger)
     {
@@ -152,6 +157,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         _oauthHandler = oauthHandler ?? throw new ArgumentNullException(nameof(oauthHandler));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _passwordValidator = passwordValidator ?? throw new ArgumentNullException(nameof(passwordValidator));
+        _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _logger = logger;
 
         // バリデーションルールの設定
@@ -176,21 +182,21 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
         var emailRule = this.ValidationRule(
             vm => vm.Email,
             email => !string.IsNullOrWhiteSpace(email) && IsValidEmail(email),
-            "有効なメールアドレスを入力してください");
+            Resources.Strings.Auth_Validation_InvalidEmail);
         Disposables.Add(emailRule);
 
         // Passwordバリデーション（パスワード強度バリデーターを使用）
         var passwordRule = this.ValidationRule(
             vm => vm.Password,
             password => IsValidPassword(password),
-            "パスワードは8文字以上で、大文字・小文字・数字・記号のうち3種類以上を含む必要があります");
+            Resources.Strings.Auth_Validation_PasswordRequirement);
         Disposables.Add(passwordRule);
 
         // ConfirmPasswordバリデーション
         var confirmPasswordRule = this.ValidationRule(
             vm => vm.ConfirmPassword,
             confirmPassword => confirmPassword == Password,
-            "パスワードが一致しません");
+            Resources.Strings.Auth_Validation_PasswordMismatch);
         Disposables.Add(confirmPasswordRule);
     }
 
@@ -388,9 +394,17 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
             if (_logger != null)
                 _logSignupAttempt(_logger, Email, null);
 
+            // [Issue #179] ユーザーの言語設定をuser_metadataに含める
+            // Supabase Edge Functionsで多言語メール送信時に使用
+            var userMetadata = new Dictionary<string, object>
+            {
+                { UserMetadataKeys.Language, _localizationService.CurrentCulture.TwoLetterISOLanguageName }
+            };
+            _logger?.LogDebug("SignUp with language preference: {Language}", _localizationService.CurrentCulture.TwoLetterISOLanguageName);
+
             // 🔥 [FIX] ConfigureAwait(true)に変更してUIスレッドで継続処理を実行
             // ConfigureAwait(false)だとバックグラウンドスレッドになり、プロパティ変更でAccessViolationが発生する
-            var result = await _authService.SignUpWithEmailPasswordAsync(Email, Password);
+            var result = await _authService.SignUpWithEmailPasswordAsync(Email, Password, userMetadata);
 
             if (result is AuthSuccess success)
             {
@@ -398,7 +412,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
                     _logSignupSuccess(_logger, Email, null);
 
                 // 🔥 [UX改善] 成功メッセージを緑色で表示し、数秒後にログイン画面へ自動遷移
-                SuccessMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...";
+                SuccessMessage = Resources.Strings.Auth_Success_ConfirmationEmailSent;
                 ErrorMessage = null; // エラーメッセージをクリア
 
                 _logger?.LogInformation("サインアップ成功: 確認メールを送信しました");
@@ -421,7 +435,7 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
                         _logSignupSuccess(_logger, Email, null);
 
                     // 緑色の成功メッセージを表示
-                    SuccessMessage = "確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...";
+                    SuccessMessage = Resources.Strings.Auth_Success_ConfirmationEmailSent;
                     ErrorMessage = null;
 
                     _logger?.LogInformation("サインアップ成功（メール確認待ち）: 確認メールを送信しました");
@@ -594,16 +608,18 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <returns>ユーザーフレンドリーなエラーメッセージ</returns>
     private static string GetAuthFailureMessage(string errorCode, string message)
     {
-        // 🔥 [FIX] AuthErrorCodes定数を使用（大文字小文字の不一致を修正）
+        // [Issue #179] ローカライズされたエラーメッセージを使用
         return errorCode switch
         {
-            AuthErrorCodes.UserAlreadyExists => "このメールアドレスは既に使用されています",
-            AuthErrorCodes.WeakPassword => "パスワードが弱すぎます。より強固なパスワードを設定してください",
-            AuthErrorCodes.InvalidCredentials => "無効なメールアドレス形式です",
-            AuthErrorCodes.EmailNotConfirmed => "確認メールを送信しました。メール内のリンクをクリックしてから、ログイン画面でログインしてください。",
-            AuthErrorCodes.RateLimitExceeded => "リクエストが多すぎます。しばらく時間をおいてから再試行してください",
-            "signup_disabled" => "現在、新規アカウント作成を停止しています",
-            _ => $"アカウント作成に失敗しました: {message}"
+            AuthErrorCodes.UserAlreadyExists => Resources.Strings.Auth_Error_UserAlreadyExists,
+            AuthErrorCodes.WeakPassword => Resources.Strings.Auth_Error_WeakPassword,
+            AuthErrorCodes.InvalidCredentials => Resources.Strings.Auth_Error_InvalidCredentials,
+            AuthErrorCodes.EmailNotConfirmed => Resources.Strings.Auth_Error_EmailNotConfirmed,
+            AuthErrorCodes.RateLimitExceeded => Resources.Strings.Auth_Error_RateLimitExceeded,
+            AuthErrorCodes.InvalidToken => Resources.Strings.Auth_Error_InvalidToken,
+            AuthErrorCodes.TokenExpired => Resources.Strings.Auth_Error_TokenExpired,
+            "signup_disabled" => Resources.Strings.Auth_Error_SignupDisabled,
+            _ => Resources.Strings.Auth_Error_SignupFailed
         };
     }
 
@@ -614,13 +630,14 @@ public sealed class SignupViewModel : ViewModelBase, ReactiveUI.Validation.Abstr
     /// <returns>エラーメッセージ</returns>
     private static string GetUserFriendlyErrorMessage(Exception ex)
     {
+        // [Issue #179] ローカライズされたエラーメッセージを使用
         return ex switch
         {
-            TimeoutException => "接続がタイムアウトしました。インターネット接続をご確認ください",
-            System.Net.Http.HttpRequestException => "サーバーに接続できませんでした。インターネット接続をご確認ください",
-            TaskCanceledException => "処理がキャンセルされました",
-            UnauthorizedAccessException => "認証に失敗しました",
-            _ => $"予期しないエラーが発生しました: {ex.Message}"
+            TimeoutException => Resources.Strings.Auth_Error_Timeout,
+            System.Net.Http.HttpRequestException => Resources.Strings.Auth_Error_NetworkError,
+            TaskCanceledException => Resources.Strings.Auth_Error_Timeout,
+            UnauthorizedAccessException => Resources.Strings.Auth_Error_InvalidToken,
+            _ => Resources.Strings.Auth_Error_SignupFailed
         };
     }
 

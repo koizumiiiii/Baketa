@@ -146,7 +146,7 @@ public sealed class SupabaseAuthServiceIntegrationTests : IDisposable
 
         // Act & Assert - .NET 8でTask.Delay()とCancellationTokenを使用するとTaskCanceledExceptionが投げられる
         await Assert.ThrowsAsync<TaskCanceledException>(() =>
-            _authService.SignUpWithEmailPasswordAsync("test@example.com", "password", cts.Token));
+            _authService.SignUpWithEmailPasswordAsync("test@example.com", "password", null, cts.Token));
     }
 
     #endregion

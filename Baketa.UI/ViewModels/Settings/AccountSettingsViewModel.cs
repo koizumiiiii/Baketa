@@ -454,7 +454,7 @@ public sealed class AccountSettingsViewModel : ViewModelBase
                 UserEmail = null;
                 UserDisplayName = null;
                 AuthProvider = null;
-                SetStatusMessage("ログアウトしました", false);
+                SetStatusMessage(Resources.Strings.Settings_Account_LogoutSuccess, false);
                 _logger?.LogInformation("認証状態が変更されました: ログアウト");
             }
         });

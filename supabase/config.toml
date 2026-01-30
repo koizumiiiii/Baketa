@@ -1,0 +1,9 @@
+# Issue #179: Supabase Project Configuration
+# https://supabase.com/docs/guides/cli/config
+
+[api]
+enabled = true
+port = 54321
+
+[auth]
+enabled = true

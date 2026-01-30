@@ -6,8 +6,9 @@
         x:Class="Baketa.UI.Views.Auth.LoginView"
         x:DataType="vm:LoginViewModel"
         Title="Baketa - Login"
-        Width="400" Height="600"
+        Width="400" Height="540"
         MinWidth="380" MinHeight="500"
+        SizeToContent="Height"
         Icon="/Assets/Icons/baketa.ico"
         WindowStartupLocation="CenterScreen"
         CanResize="False">
@@ -169,103 +170,96 @@
                         </Button>
                     </StackPanel>
                     
-                    <!-- Divider -->
-                    <Grid ColumnDefinitions="*,Auto,*" Margin="0,12">
-                        <Rectangle Grid.Column="0" Height="1" 
-                                   Fill="{DynamicResource BorderBrush}" 
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="{local:Localize Common_Or}"
-                                   Margin="16,0" FontSize="12"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <Rectangle Grid.Column="2" Height="1" 
-                                   Fill="{DynamicResource BorderBrush}" 
-                                   VerticalAlignment="Center"/>
-                    </Grid>
-                    
-                    <!-- Email/Password Form -->
-                    <StackPanel Spacing="12">
-                        <StackPanel>
-                            <TextBlock Text="{local:Localize Auth_Login_Email}"
-                                       FontSize="14" FontWeight="Medium"
-                                       Margin="0,0,0,4"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBox Classes="input-field"
-                                     Text="{Binding Email}"
-                                     Watermark="example@email.com"
-                                     KeyboardNavigation.TabIndex="1"/>
-                        </StackPanel>
-                        
-                        <StackPanel>
-                            <TextBlock Text="{local:Localize Auth_Login_Password}"
-                                       FontSize="14" FontWeight="Medium"
-                                       Margin="0,0,0,4"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBox Classes="input-field"
-                                     Text="{Binding Password}"
-                                     PasswordChar="•"
-                                     Watermark="{local:Localize Auth_Login_PasswordPlaceholder}"
-                                     KeyboardNavigation.TabIndex="2"/>
-                        </StackPanel>
-                        
-                        <!-- Remember Me & Forgot Password -->
-                        <Grid ColumnDefinitions="*,Auto">
-                            <CheckBox Grid.Column="0"
-                                      IsChecked="{Binding RememberMe}"
-                                      Content="{local:Localize Auth_Login_RememberMe}"
-                                      FontSize="13"
-                                      KeyboardNavigation.TabIndex="3"/>
-                            <Button Grid.Column="1"
-                                    Command="{Binding ForgotPasswordCommand}"
-                                    Classes="link"
-                                    Content="{local:Localize Auth_Login_ForgotPassword}"
-                                    FontSize="13"
-                                    Padding="4,0"
-                                    KeyboardNavigation.TabIndex="4"/>
-                        </Grid>
-
-                        <!-- Error Message (ボタンの上に配置) -->
-                        <Border IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                Background="{DynamicResource ErrorBackgroundBrush}"
-                                BorderBrush="{DynamicResource ErrorBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="12,8"
-                                Margin="0,4,0,0">
-                            <Grid ColumnDefinitions="Auto,*">
-                                <PathIcon Grid.Column="0"
-                                          Data="M12,2C17.53,2 22,6.47 22,12C22,17.53 17.53,22 12,22C6.47,22 2,17.53 2,12C2,6.47 6.47,2 12,2M13,17V15H11V17H13M13,13V7H11V13H13Z"
-                                          Width="16" Height="16"
-                                          Margin="0,2,8,0"
-                                          VerticalAlignment="Top"
-                                          Foreground="{DynamicResource ErrorForegroundBrush}"/>
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding ErrorMessage}"
-                                           TextWrapping="Wrap"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource ErrorForegroundBrush}"/>
-                            </Grid>
-                        </Border>
-
-                        <!-- Loading Indicator (ボタンの上に配置) -->
-                        <StackPanel IsVisible="{Binding IsLoading}"
-                                    Orientation="Horizontal"
-                                    HorizontalAlignment="Center"
-                                    Spacing="8"
-                                    Margin="0,8">
-                            <PathIcon Data="M12,1A11,11 0 1,0 23,12A11,11 0 0,0 12,1M12,19A7,7 0 1,1 19,12A7,7 0 0,1 12,19Z"
-                                      Width="16" Height="16"
-                                      Classes="spin"/>
-                            <TextBlock Text="{local:Localize Auth_Login_Loading}"
+                    <!-- Email/Password Form (折りたたみ) -->
+                    <Expander IsExpanded="False" Margin="0,12,0,0" HorizontalAlignment="Stretch">
+                        <Expander.Header>
+                            <TextBlock Text="{local:Localize Auth_Login_EmailExpander}"
                                        FontSize="13"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
+                        </Expander.Header>
+                        <StackPanel Spacing="12" Margin="0,8,0,0">
+                            <StackPanel>
+                                <TextBlock Text="{local:Localize Auth_Login_Email}"
+                                           FontSize="14" FontWeight="Medium"
+                                           Margin="0,0,0,4"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBox Classes="input-field"
+                                         Text="{Binding Email}"
+                                         Watermark="example@email.com"
+                                         KeyboardNavigation.TabIndex="1"/>
+                            </StackPanel>
 
-                        <!-- Login Button -->
-                        <!-- 注意: IsEnabledはCommandのCanExecuteで自動制御されるため明示的なバインドは不要 -->
-                        <Button Classes="primary-button"
-                                Command="{Binding LoginWithEmailCommand}"
-                                Content="{local:Localize Auth_Login_Button}"
-                                KeyboardNavigation.TabIndex="5"/>
+                            <StackPanel>
+                                <TextBlock Text="{local:Localize Auth_Login_Password}"
+                                           FontSize="14" FontWeight="Medium"
+                                           Margin="0,0,0,4"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBox Classes="input-field"
+                                         Text="{Binding Password}"
+                                         PasswordChar="•"
+                                         Watermark="{local:Localize Auth_Login_PasswordPlaceholder}"
+                                         KeyboardNavigation.TabIndex="2"/>
+                            </StackPanel>
+
+                            <!-- Remember Me & Forgot Password -->
+                            <Grid ColumnDefinitions="*,Auto">
+                                <CheckBox Grid.Column="0"
+                                          IsChecked="{Binding RememberMe}"
+                                          Content="{local:Localize Auth_Login_RememberMe}"
+                                          FontSize="13"
+                                          KeyboardNavigation.TabIndex="3"/>
+                                <Button Grid.Column="1"
+                                        Command="{Binding ForgotPasswordCommand}"
+                                        Classes="link"
+                                        Content="{local:Localize Auth_Login_ForgotPassword}"
+                                        FontSize="13"
+                                        Padding="4,0"
+                                        KeyboardNavigation.TabIndex="4"/>
+                            </Grid>
+
+                            <!-- Login Button -->
+                            <Button Classes="primary-button"
+                                    Command="{Binding LoginWithEmailCommand}"
+                                    Content="{local:Localize Auth_Login_Button}"
+                                    KeyboardNavigation.TabIndex="5"/>
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- Error Message -->
+                    <Border IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                            Background="{DynamicResource ErrorBackgroundBrush}"
+                            BorderBrush="{DynamicResource ErrorBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,8"
+                            Margin="0,12,0,0">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <PathIcon Grid.Column="0"
+                                      Data="M12,2C17.53,2 22,6.47 22,12C22,17.53 17.53,22 12,22C6.47,22 2,17.53 2,12C2,6.47 6.47,2 12,2M13,17V15H11V17H13M13,13V7H11V13H13Z"
+                                      Width="16" Height="16"
+                                      Margin="0,2,8,0"
+                                      VerticalAlignment="Top"
+                                      Foreground="{DynamicResource ErrorForegroundBrush}"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ErrorMessage}"
+                                       TextWrapping="Wrap"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource ErrorForegroundBrush}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Loading Indicator -->
+                    <StackPanel IsVisible="{Binding IsLoading}"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Spacing="8"
+                                Margin="0,8">
+                        <PathIcon Data="M12,1A11,11 0 1,0 23,12A11,11 0 0,0 12,1M12,19A7,7 0 1,1 19,12A7,7 0 0,1 12,19Z"
+                                  Width="16" Height="16"
+                                  Classes="spin"/>
+                        <TextBlock Text="{local:Localize Auth_Login_Loading}"
+                                   FontSize="13"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

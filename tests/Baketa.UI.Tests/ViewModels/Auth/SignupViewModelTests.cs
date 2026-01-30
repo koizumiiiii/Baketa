@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Auth;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Constants;
 using Baketa.UI.Services;
 using Baketa.UI.Tests.Infrastructure;
 using Baketa.UI.ViewModels.Auth;
@@ -26,6 +29,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     private readonly Mock<IOAuthCallbackHandler> _mockOAuthHandler;
     private readonly Mock<INavigationService> _mockNavigationService;
     private readonly Mock<IPasswordStrengthValidator> _mockPasswordValidator;
+    private readonly Mock<ILocalizationService> _mockLocalizationService;
     private readonly Mock<IEventAggregator> _mockEventAggregator;
     private readonly Mock<ILogger<SignupViewModel>> _mockLogger;
     private SignupViewModel? _currentViewModel;
@@ -36,6 +40,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         _mockOAuthHandler = new Mock<IOAuthCallbackHandler>();
         _mockNavigationService = new Mock<INavigationService>();
         _mockPasswordValidator = new Mock<IPasswordStrengthValidator>();
+        _mockLocalizationService = new Mock<ILocalizationService>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLogger = new Mock<ILogger<SignupViewModel>>();
 
@@ -51,6 +56,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         _mockOAuthHandler.Reset();
         _mockNavigationService.Reset();
         _mockPasswordValidator.Reset();
+        _mockLocalizationService.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
 
@@ -64,6 +70,10 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
             .Returns(PasswordStrength.Medium);
         _mockPasswordValidator.Setup(x => x.GetStrengthMessage(It.IsAny<PasswordStrength>()))
             .Returns("普通");
+
+        // [Issue #179] ローカリゼーションサービスのデフォルト設定
+        _mockLocalizationService.Setup(x => x.CurrentCulture)
+            .Returns(new CultureInfo("ja"));
     }
 
     /// <summary>
@@ -78,6 +88,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
             _mockOAuthHandler.Object,
             _mockNavigationService.Object,
             _mockPasswordValidator.Object,
+            _mockLocalizationService.Object,
             _mockEventAggregator.Object,
             _mockLogger.Object));
         return _currentViewModel;
@@ -134,7 +145,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockPasswordValidator.Object, _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -146,7 +157,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockPasswordValidator.Object, _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -158,7 +169,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockPasswordValidator.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockPasswordValidator.Object, _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -170,7 +181,19 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, null!, _mockEventAggregator.Object, _mockLogger.Object)));
+                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, null!, _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
+    }
+
+    [Fact]
+    public void Constructor_WithNullLocalizationService_ThrowsArgumentNullException()
+    {
+        // Arrange
+        ResetMocks();
+
+        // Act & Assert
+        RunOnUIThread(() =>
+            Assert.Throws<ArgumentNullException>(() =>
+                new SignupViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockPasswordValidator.Object, null!, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     #endregion
@@ -200,7 +223,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
     public async Task SignupWithEmailCommand_WithValidData_CallsAuthService()
     {
         // Arrange
-        _mockAuthService.Setup(x => x.SignUpWithEmailPasswordAsync("test@example.com", "Password123", It.IsAny<CancellationToken>()))
+        _mockAuthService.Setup(x => x.SignUpWithEmailPasswordAsync("test@example.com", "Password123", It.IsAny<Dictionary<string, object>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AuthSuccess(new AuthSession(
                 "access_token",
                 "refresh_token",
@@ -214,7 +237,16 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         await viewModel.SignupWithEmailCommand.Execute().FirstAsync();
 
         // Assert
-        _mockAuthService.Verify(x => x.SignUpWithEmailPasswordAsync("test@example.com", "Password123", It.IsAny<CancellationToken>()), Times.Once);
+        // [Gemini Review] userMetadataの内容を具体的に検証
+        _mockAuthService.Verify(x => x.SignUpWithEmailPasswordAsync(
+            "test@example.com",
+            "Password123",
+            It.Is<Dictionary<string, object>?>(d =>
+                d != null &&
+                d.ContainsKey(UserMetadataKeys.Language) &&
+                d[UserMetadataKeys.Language].ToString() == "ja"),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
         viewModel.IsLoading.Should().BeFalse();
     }
 
@@ -228,7 +260,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         var sanitizedEmail = Baketa.UI.Security.InputValidator.SanitizeInput(originalEmail);
         System.Diagnostics.Debug.WriteLine($"Signup Test - Original: {originalEmail}, Sanitized: {sanitizedEmail}");
 
-        _mockAuthService.Setup(x => x.SignUpWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _mockAuthService.Setup(x => x.SignUpWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Dictionary<string, object>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(failureResult)
             .Verifiable();
 
@@ -251,7 +283,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         });
 
         // Mock呼び出し確認
-        _mockAuthService.Verify(x => x.SignUpWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce, "SignupAuthServiceが呼び出されていません");
+        _mockAuthService.Verify(x => x.SignUpWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Dictionary<string, object>?>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce, "SignupAuthServiceが呼び出されていません");
 
         // 直接的なエラーメッセージ設定テスト
         var expectedMessage = "このメールアドレスは既に使用されています";
@@ -324,7 +356,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         var sanitizedEmail = Baketa.UI.Security.InputValidator.SanitizeInput(originalEmail);
         System.Diagnostics.Debug.WriteLine($"Signup Exception Test - Original: {originalEmail}, Sanitized: {sanitizedEmail}");
 
-        _mockAuthService.Setup(x => x.SignUpWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _mockAuthService.Setup(x => x.SignUpWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Dictionary<string, object>?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new TimeoutException("Connection timeout"))
             .Verifiable();
 
@@ -348,7 +380,7 @@ public sealed class SignupViewModelTests : AvaloniaTestBase
         });
 
         // Mock呼び出し確認
-        _mockAuthService.Verify(x => x.SignUpWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce, "SignupAuthService(Exception)が呼び出されていません");
+        _mockAuthService.Verify(x => x.SignUpWithEmailPasswordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Dictionary<string, object>?>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce, "SignupAuthService(Exception)が呼び出されていません");
 
         // 直接的なエラーメッセージ設定テスト
         var expectedMessage = "接続がタイムアウトしました。インターネット接続をご確認ください";

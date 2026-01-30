@@ -29,6 +29,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     private readonly SecureSessionManager _sessionManager;
     private readonly LoginAttemptTracker _attemptTracker;
     private readonly SecurityAuditLogger _auditLogger;
+    private readonly ILocalizationService _localizationService;
     private readonly ILogger<LoginViewModel>? _logger;
 
     // LoggerMessage delegates for structured logging
@@ -103,6 +104,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     /// <param name="sessionManager">セッション管理</param>
     /// <param name="attemptTracker">ログイン試行追跡器</param>
     /// <param name="auditLogger">セキュリティ監査ログ</param>
+    /// <param name="localizationService">ローカライゼーションサービス</param>
     /// <param name="eventAggregator">イベント集約器</param>
     /// <param name="logger">ロガー</param>
     public LoginViewModel(
@@ -113,6 +115,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         SecureSessionManager sessionManager,
         LoginAttemptTracker attemptTracker,
         SecurityAuditLogger auditLogger,
+        ILocalizationService localizationService,
         IEventAggregator eventAggregator,
         ILogger<LoginViewModel>? logger = null) : base(eventAggregator, logger)
     {
@@ -123,6 +126,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _attemptTracker = attemptTracker ?? throw new ArgumentNullException(nameof(attemptTracker));
         _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
+        _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _logger = logger;
 
         // バリデーションルールの設定
@@ -151,7 +155,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         var passwordRule = this.ValidationRule(
             vm => vm.Password,
             password => !string.IsNullOrWhiteSpace(password) && password.Length >= 6,
-            "パスワードは6文字以上で入力してください");
+            Resources.Strings.Auth_Validation_PasswordMinLength);
         Disposables.Add(passwordRule);
 
         // ブロック状態チェック
@@ -270,7 +274,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         // パスワードリセットエラーハンドリング
         ForgotPasswordCommand.ThrownExceptions.Subscribe(ex =>
         {
-            ErrorMessage = $"パスワードリセットに失敗しました: {ex.Message}";
+            ErrorMessage = Resources.Strings.Auth_Error_PasswordResetError;
         });
     }
 
@@ -398,6 +402,9 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                     _logger?.LogInformation("Remember Me: トークンを永続化しました");
                 }
 
+                // Issue #179: ログイン時にuser_metadataから言語設定を取得してアプリに反映
+                await ApplyUserLanguageSettingAsync(success.Session.User.Language);
+
                 // 認証成功イベントによりOnAuthStatusChangedがナビゲーションを処理
             }
             else if (result is AuthFailure failure)
@@ -464,8 +471,11 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                 return;
             }
 
-            if (result is AuthSuccess)
+            if (result is AuthSuccess success)
             {
+                // Issue #179: ログイン時にuser_metadataから言語設定を取得してアプリに反映
+                await ApplyUserLanguageSettingAsync(success.Session.User.Language);
+
                 // 認証成功時はOnAuthStatusChangedイベントで処理されるため、ここでは何もしない
                 _logger?.LogInformation("OAuth認証成功: {Provider}", provider);
             }
@@ -513,7 +523,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             if (success)
             {
                 // 成功メッセージを表示（ErrorMessageフィールドを情報表示にも使用）
-                ErrorMessage = "パスワードリセットメールを送信しました。メールをご確認ください。";
+                ErrorMessage = Resources.Strings.Auth_Success_PasswordResetEmailSent;
 
                 // セキュリティ監査ログ
                 _auditLogger.LogSecurityEvent(
@@ -523,7 +533,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
             }
             else
             {
-                ErrorMessage = "パスワードリセットに失敗しました。メールアドレスを確認してください。";
+                ErrorMessage = Resources.Strings.Auth_Error_PasswordResetFailed;
 
                 // 失敗ログ
                 _auditLogger.LogSecurityEvent(
@@ -536,7 +546,7 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
         {
             var sanitizedEmail = InputValidator.SanitizeInput(Email);
             _logger?.LogError(ex, "パスワードリセット実行エラー: {Email}", sanitizedEmail);
-            ErrorMessage = "パスワードリセットの処理中にエラーが発生しました。";
+            ErrorMessage = Resources.Strings.Auth_Error_PasswordResetError;
 
             // エラーログ
             _auditLogger.LogSecurityEvent(
@@ -564,6 +574,62 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     }
 
 
+    // サポートされている言語コードの許可リスト（セキュリティ対策）
+    private static readonly string[] SupportedLanguageCodes = ["ja", "en"];
+
+    /// <summary>
+    /// ユーザーの言語設定をアプリケーションに適用します
+    /// Issue #179: ログイン時にuser_metadataから言語設定を取得してアプリに反映
+    /// </summary>
+    /// <param name="language">user_metadataから取得した言語コード (ja, en など)</param>
+    private async Task ApplyUserLanguageSettingAsync(string? language)
+    {
+        if (string.IsNullOrEmpty(language))
+        {
+            _logger?.LogDebug("ユーザーの言語設定がありません。現在の言語設定を維持します。");
+            return;
+        }
+
+        try
+        {
+            // サポートされている言語コードに正規化
+            var normalizedLanguage = language.ToLowerInvariant() switch
+            {
+                "ja" or "ja-jp" => "ja",
+                "en" or "en-us" or "en-gb" => "en",
+                _ => null // サポートされていない言語
+            };
+
+            // [SECURITY] 許可リストに含まれない言語は拒否（パストラバーサル対策）
+            if (normalizedLanguage is null || !SupportedLanguageCodes.Contains(normalizedLanguage))
+            {
+                _logger?.LogWarning("サポートされていない言語コード '{Language}' が指定されました。言語設定は変更しません。", language);
+                return;
+            }
+
+            var currentLanguage = _localizationService.CurrentCulture.TwoLetterISOLanguageName;
+            if (currentLanguage.Equals(normalizedLanguage, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger?.LogDebug("ユーザーの言語設定 ({Language}) は現在の設定と同じです。", normalizedLanguage);
+                return;
+            }
+
+            var success = await _localizationService.ChangeLanguageAsync(normalizedLanguage);
+            if (success)
+            {
+                _logger?.LogInformation("ユーザーの言語設定を適用しました: {Language}", normalizedLanguage);
+            }
+            else
+            {
+                _logger?.LogWarning("ユーザーの言語設定 ({Language}) の適用に失敗しました。", normalizedLanguage);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "言語設定の適用中にエラーが発生しました: {Language}", language);
+        }
+    }
+
     /// <summary>
     /// 認証失敗メッセージを取得します
     /// </summary>
@@ -572,14 +638,17 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     /// <returns>ユーザーフレンドリーなエラーメッセージ</returns>
     private static string GetAuthFailureMessage(string errorCode, string message)
     {
+        // [Issue #179] ローカライズされたエラーメッセージを使用
         return errorCode switch
         {
-            "invalid_credentials" => "メールアドレスまたはパスワードが正しくありません",
-            "email_not_confirmed" => "メールアドレスが確認されていません。確認メールをご確認ください",
-            "too_many_requests" => "ログイン試行回数が上限に達しました。しばらく時間をおいてから再試行してください",
-            "user_not_found" => "アカウントが見つかりません",
-            "weak_password" => "パスワードが弱すぎます",
-            _ => $"ログインに失敗しました: {message}"
+            "invalid_credentials" or AuthErrorCodes.InvalidCredentials => Resources.Strings.Auth_Error_InvalidEmail,
+            "email_not_confirmed" or AuthErrorCodes.EmailNotConfirmed => Resources.Strings.Auth_Error_EmailNotConfirmed,
+            "too_many_requests" or AuthErrorCodes.RateLimitExceeded => Resources.Strings.Auth_Error_RateLimitExceeded,
+            "user_not_found" => Resources.Strings.Auth_Error_InvalidEmail,
+            "weak_password" or AuthErrorCodes.WeakPassword => Resources.Strings.Auth_Error_WeakPassword,
+            AuthErrorCodes.InvalidToken => Resources.Strings.Auth_Error_InvalidToken,
+            AuthErrorCodes.TokenExpired => Resources.Strings.Auth_Error_TokenExpired,
+            _ => Resources.Strings.Auth_Error_LoginFailed
         };
     }
 
@@ -590,13 +659,14 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
     /// <returns>エラーメッセージ</returns>
     private static string GetUserFriendlyErrorMessage(Exception ex)
     {
+        // [Issue #179] ローカライズされたエラーメッセージを使用
         return ex switch
         {
-            TimeoutException => "接続がタイムアウトしました。インターネット接続をご確認ください",
-            System.Net.Http.HttpRequestException => "サーバーに接続できませんでした。インターネット接続をご確認ください",
-            TaskCanceledException => "処理がキャンセルされました",
-            UnauthorizedAccessException => "認証に失敗しました",
-            _ => $"予期しないエラーが発生しました: {ex.Message}"
+            TimeoutException => Resources.Strings.Auth_Error_Timeout,
+            System.Net.Http.HttpRequestException => Resources.Strings.Auth_Error_NetworkError,
+            TaskCanceledException => Resources.Strings.Auth_Error_Timeout,
+            UnauthorizedAccessException => Resources.Strings.Auth_Error_InvalidToken,
+            _ => Resources.Strings.Auth_Error_LoginFailed
         };
     }
 }

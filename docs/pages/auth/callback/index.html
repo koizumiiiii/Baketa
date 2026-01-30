@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baketa - 認証処理中...</title>
+    <title>Baketa - Processing...</title>
     <style>
         * {
             margin: 0;
@@ -74,43 +74,74 @@
         (function() {
             'use strict';
 
-            // URLフラグメントからパラメータを取得
+            // Get language from URL parameter or browser
+            function getLanguage() {
+                const params = new URLSearchParams(window.location.search);
+                const langParam = params.get('lang');
+                if (langParam && (langParam === 'ja' || langParam === 'en')) {
+                    return langParam;
+                }
+                // Also check hash params
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const hashLang = hashParams.get('lang');
+                if (hashLang && (hashLang === 'ja' || hashLang === 'en')) {
+                    return hashLang;
+                }
+                const browserLang = navigator.language || navigator.userLanguage;
+                return browserLang.startsWith('ja') ? 'ja' : 'en';
+            }
+
+            const lang = getLanguage();
+
+            // URL fragment parameters
             const hash = window.location.hash.substring(1);
             const params = new URLSearchParams(hash);
             const type = params.get('type');
 
-            // デバッグ用（本番では削除可能）
+            // Debug
             console.log('[Baketa Auth Router] type:', type);
             console.log('[Baketa Auth Router] hash:', hash);
+            console.log('[Baketa Auth Router] lang:', lang);
 
-            // ベースパス（GitHub Pages用）
-            const basePath = '/Baketa/pages/auth';
+            // Base path (for Cloudflare Pages with custom domain)
+            const basePath = '/auth';
 
-            // タイプ別ルーティングマップ
+            // Type-based routing map
             const routes = {
-                'signup': '/confirm/',           // 新規登録確認
-                'invite': '/invite/',            // ユーザー招待
-                'magiclink': '/magic-link/',     // Magic Link認証
-                'email_change': '/email-changed/', // メールアドレス変更
-                'recovery': '/reset-password/'   // パスワードリセット
+                'signup': '/confirm/',
+                'invite': '/invite/',
+                'magiclink': '/magic-link/',
+                'email_change': '/email-changed/',
+                'recovery': '/reset-password/'
             };
 
-            // ルーティング実行
+            // Add lang parameter to hash if not present
+            function addLangToHash(hash, lang) {
+                const hashParams = new URLSearchParams(hash);
+                if (!hashParams.has('lang')) {
+                    hashParams.set('lang', lang);
+                }
+                return '#' + hashParams.toString();
+            }
+
+            // Execute routing
             if (type && routes[type]) {
-                // トークン情報を維持してリダイレクト
-                const targetUrl = basePath + routes[type] + window.location.hash;
+                const newHash = addLangToHash(hash, lang);
+                const targetUrl = basePath + routes[type] + newHash;
                 console.log('[Baketa Auth Router] Redirecting to:', targetUrl);
                 window.location.replace(targetUrl);
             } else if (type) {
-                // 未知のtypeの場合はconfirmにフォールバック
+                // Unknown type - fallback to confirm
                 console.warn('[Baketa Auth Router] Unknown type:', type, '- falling back to confirm');
-                window.location.replace(basePath + '/confirm/' + window.location.hash);
+                const newHash = addLangToHash(hash, lang);
+                window.location.replace(basePath + '/confirm/' + newHash);
             } else if (hash) {
-                // typeがないがhashがある場合もconfirmにフォールバック
+                // No type but has hash - fallback to confirm
                 console.warn('[Baketa Auth Router] No type found - falling back to confirm');
-                window.location.replace(basePath + '/confirm/' + window.location.hash);
+                const newHash = addLangToHash(hash, lang);
+                window.location.replace(basePath + '/confirm/' + newHash);
             }
-            // hashがない場合はこのページを表示（エラー状態）
+            // If no hash, display this page (error state)
         })();
     </script>
 </head>
@@ -118,16 +149,56 @@
     <div class="container">
         <div class="spinner"></div>
         <div class="logo">Baketa</div>
-        <h1>認証処理中...</h1>
-        <p>自動的にリダイレクトされます。<br>しばらくお待ちください。</p>
+        <h1 id="title">Authenticating...</h1>
+        <p id="subtitle">Please wait a moment while we redirect you.</p>
 
         <div class="error" id="errorMessage">
-            <p>リダイレクトに失敗しました。<br>このページを閉じて、再度メール内のリンクをクリックしてください。</p>
+            <p id="error-text">Redirect failed.<br>Please close this page and try the link in your email again.</p>
         </div>
     </div>
 
     <script>
-        // 3秒後もリダイレクトされていない場合はエラー表示
+        const translations = {
+            ja: {
+                title: '認証処理中...',
+                subtitle: '自動的にリダイレクトされます。<br>しばらくお待ちください。',
+                errorText: 'リダイレクトに失敗しました。<br>このページを閉じて、再度メール内のリンクをクリックしてください。'
+            },
+            en: {
+                title: 'Authenticating...',
+                subtitle: 'Please wait a moment while we redirect you.',
+                errorText: 'Redirect failed.<br>Please close this page and try the link in your email again.'
+            }
+        };
+
+        function getLanguage() {
+            const params = new URLSearchParams(window.location.search);
+            const langParam = params.get('lang');
+            if (langParam && (langParam === 'ja' || langParam === 'en')) {
+                return langParam;
+            }
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const hashLang = hashParams.get('lang');
+            if (hashLang && (hashLang === 'ja' || hashLang === 'en')) {
+                return hashLang;
+            }
+            const browserLang = navigator.language || navigator.userLanguage;
+            return browserLang.startsWith('ja') ? 'ja' : 'en';
+        }
+
+        function applyTranslations() {
+            const lang = getLanguage();
+            const t = translations[lang];
+
+            document.documentElement.lang = lang;
+            document.getElementById('title').textContent = t.title;
+            document.getElementById('subtitle').innerHTML = t.subtitle;
+            document.getElementById('error-text').innerHTML = t.errorText;
+        }
+
+        applyTranslations();
+
+        // Show error if not redirected after 3 seconds
         setTimeout(function() {
             if (window.location.pathname.includes('/callback/')) {
                 document.getElementById('errorMessage').style.display = 'block';

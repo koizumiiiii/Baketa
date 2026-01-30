@@ -28,6 +28,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
     private readonly Mock<IOAuthCallbackHandler> _mockOAuthHandler;
     private readonly Mock<INavigationService> _mockNavigationService;
     private readonly Mock<ITokenStorage> _mockTokenStorage;
+    private readonly Mock<ILocalizationService> _mockLocalizationService;
     private readonly Mock<IEventAggregator> _mockEventAggregator;
     private readonly Mock<ILogger<LoginViewModel>> _mockLogger;
     private LoginViewModel? _currentViewModel;
@@ -38,6 +39,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         _mockOAuthHandler = new Mock<IOAuthCallbackHandler>();
         _mockNavigationService = new Mock<INavigationService>();
         _mockTokenStorage = new Mock<ITokenStorage>();
+        _mockLocalizationService = new Mock<ILocalizationService>();
         _mockEventAggregator = new Mock<IEventAggregator>();
         _mockLogger = new Mock<ILogger<LoginViewModel>>();
 
@@ -53,6 +55,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         _mockOAuthHandler.Reset();
         _mockNavigationService.Reset();
         _mockTokenStorage.Reset();
+        _mockLocalizationService.Reset();
         _mockEventAggregator.Reset();
         _mockLogger.Reset();
 
@@ -60,6 +63,8 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         _mockNavigationService.Setup(x => x.ShowSignupAsync()).ReturnsAsync(true);
         _mockTokenStorage.Setup(x => x.StoreTokensAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
+        _mockLocalizationService.Setup(x => x.CurrentCulture).Returns(new System.Globalization.CultureInfo("ja"));
+        _mockLocalizationService.Setup(x => x.ChangeLanguageAsync(It.IsAny<string>())).ReturnsAsync(true);
     }
 
     /// <summary>
@@ -82,6 +87,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
             sessionManager,
             attemptTracker,
             new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance),
+            _mockLocalizationService.Object,
             _mockEventAggregator.Object,
             _mockLogger.Object));
         return _currentViewModel;
@@ -139,7 +145,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+                new LoginViewModel(null!, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -151,7 +157,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+                new LoginViewModel(_mockAuthService.Object, null!, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -163,7 +169,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, null!, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -175,7 +181,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, null!, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, null!, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -184,7 +190,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, null!, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockEventAggregator.Object, _mockLogger.Object)));
+                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, null!, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockLocalizationService.Object, _mockEventAggregator.Object, _mockLogger.Object)));
     }
 
     [Fact]
@@ -196,7 +202,7 @@ public sealed class LoginViewModelTests : AvaloniaTestBase
         // Act & Assert
         RunOnUIThread(() =>
             Assert.Throws<ArgumentNullException>(() =>
-                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), null!, _mockLogger.Object)));
+                new LoginViewModel(_mockAuthService.Object, _mockOAuthHandler.Object, _mockNavigationService.Object, _mockTokenStorage.Object, sessionManager, new LoginAttemptTracker(), new SecurityAuditLogger(NullLogger<SecurityAuditLogger>.Instance), _mockLocalizationService.Object, null!, _mockLogger.Object)));
     }
 
     #endregion

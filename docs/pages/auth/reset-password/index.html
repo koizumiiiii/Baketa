@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baketa - パスワードリセット</title>
+    <title>Baketa - Password Reset</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
@@ -261,58 +261,58 @@
 </head>
 <body>
     <div class="container">
-        <!-- フォーム表示 -->
+        <!-- Form -->
         <div id="form-container">
             <div class="logo">Baketa</div>
-            <h1>新しいパスワードを設定</h1>
-            <p class="subtitle">安全なパスワードを入力してください</p>
+            <h1 id="title">Reset Your Password</h1>
+            <p class="subtitle" id="subtitle">Enter a secure password</p>
 
             <div id="message" class="message"></div>
 
             <form id="reset-form">
                 <div class="form-group">
-                    <label for="password">新しいパスワード</label>
+                    <label for="password" id="label-password">New Password</label>
                     <input type="password" id="password" name="password"
-                           placeholder="新しいパスワードを入力" required>
+                           placeholder="" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="confirm-password">パスワード（確認）</label>
+                    <label for="confirm-password" id="label-confirm">Confirm Password</label>
                     <input type="password" id="confirm-password" name="confirm-password"
-                           placeholder="もう一度入力してください" required>
+                           placeholder="" required>
                 </div>
 
                 <div class="password-requirements">
-                    <h3>パスワード要件</h3>
+                    <h3 id="requirements-title">Password Requirements</h3>
                     <div class="requirement unmet" id="req-length">
                         <span class="requirement-icon">✓</span>
-                        <span>8文字以上</span>
+                        <span id="req-length-text">At least 8 characters</span>
                     </div>
                     <div class="requirement unmet" id="req-uppercase">
                         <span class="requirement-icon">✓</span>
-                        <span>大文字を含む (A-Z)</span>
+                        <span id="req-uppercase-text">Contains an uppercase letter (A-Z)</span>
                     </div>
                     <div class="requirement unmet" id="req-lowercase">
                         <span class="requirement-icon">✓</span>
-                        <span>小文字を含む (a-z)</span>
+                        <span id="req-lowercase-text">Contains a lowercase letter (a-z)</span>
                     </div>
                     <div class="requirement unmet" id="req-number">
                         <span class="requirement-icon">✓</span>
-                        <span>数字を含む (0-9)</span>
+                        <span id="req-number-text">Contains a number (0-9)</span>
                     </div>
                     <div class="requirement unmet" id="req-match">
                         <span class="requirement-icon">✓</span>
-                        <span>確認用パスワードが一致</span>
+                        <span id="req-match-text">Passwords must match</span>
                     </div>
                 </div>
 
                 <button type="submit" id="submit-btn" disabled>
-                    パスワードを変更
+                    <span id="btn-text">Change Password</span>
                 </button>
             </form>
         </div>
 
-        <!-- 成功表示 -->
+        <!-- Success -->
         <div id="success-container" class="success-container">
             <div class="success-icon">
                 <svg viewBox="0 0 24 24">
@@ -320,22 +320,22 @@
                 </svg>
             </div>
             <div class="logo">Baketa</div>
-            <h1 class="success-title">パスワードを変更しました</h1>
-            <p class="success-message">新しいパスワードが設定されました。<br>アプリからログインしてください。</p>
+            <h1 class="success-title" id="success-title">Password Changed!</h1>
+            <p class="success-message" id="success-message">Your password has been successfully updated.<br>Please log in from the Baketa app.</p>
 
             <div class="steps">
-                <h2>次のステップ</h2>
+                <h2 id="next-steps-title">Next Steps</h2>
                 <div class="step">
                     <div class="step-number">1</div>
-                    <div class="step-text">このページを閉じてください</div>
+                    <div class="step-text" id="step1">Close this page</div>
                 </div>
                 <div class="step">
                     <div class="step-number">2</div>
-                    <div class="step-text">Baketaアプリを開いてください</div>
+                    <div class="step-text" id="step2">Open the Baketa app</div>
                 </div>
                 <div class="step">
                     <div class="step-number">3</div>
-                    <div class="step-text">新しいパスワードでログインしてください</div>
+                    <div class="step-text" id="step3">Log in with your new password</div>
                 </div>
             </div>
         </div>
@@ -346,7 +346,109 @@
     </div>
 
     <script>
-        // Supabase設定
+        // Localization strings
+        const translations = {
+            ja: {
+                title: '新しいパスワードを設定',
+                subtitle: '安全なパスワードを入力してください',
+                labelPassword: '新しいパスワード',
+                labelConfirm: 'パスワード（確認）',
+                placeholderPassword: '新しいパスワードを入力',
+                placeholderConfirm: 'もう一度入力してください',
+                requirementsTitle: 'パスワード要件',
+                reqLength: '8文字以上',
+                reqUppercase: '大文字を含む (A-Z)',
+                reqLowercase: '小文字を含む (a-z)',
+                reqNumber: '数字を含む (0-9)',
+                reqMatch: '確認用パスワードが一致',
+                btnText: 'パスワードを変更',
+                btnLoading: '変更中...',
+                successTitle: 'パスワードを変更しました',
+                successMessage: '新しいパスワードが設定されました。<br>アプリからログインしてください。',
+                nextStepsTitle: '次のステップ',
+                step1: 'このページを閉じてください',
+                step2: 'Baketaアプリを開いてください',
+                step3: '新しいパスワードでログインしてください',
+                infoMessage: '新しいパスワードを入力してください。',
+                errorExpired: 'リンクの有効期限が切れています。もう一度パスワードリセットをリクエストしてください。',
+                errorSame: '現在のパスワードと同じパスワードは使用できません。',
+                errorDefault: 'パスワードの変更に失敗しました。',
+                errorInvalid: 'このリンクは無効または期限切れです。アプリから再度パスワードリセットをリクエストしてください。'
+            },
+            en: {
+                title: 'Reset Your Password',
+                subtitle: 'Enter a secure password',
+                labelPassword: 'New Password',
+                labelConfirm: 'Confirm Password',
+                placeholderPassword: 'Enter new password',
+                placeholderConfirm: 'Enter password again',
+                requirementsTitle: 'Password Requirements',
+                reqLength: 'At least 8 characters',
+                reqUppercase: 'Contains an uppercase letter (A-Z)',
+                reqLowercase: 'Contains a lowercase letter (a-z)',
+                reqNumber: 'Contains a number (0-9)',
+                reqMatch: 'Passwords must match',
+                btnText: 'Change Password',
+                btnLoading: 'Changing...',
+                successTitle: 'Password Changed!',
+                successMessage: 'Your password has been successfully updated.<br>Please log in from the Baketa app.',
+                nextStepsTitle: 'Next Steps',
+                step1: 'Close this page',
+                step2: 'Open the Baketa app',
+                step3: 'Log in with your new password',
+                infoMessage: 'Please enter your new password.',
+                errorExpired: 'This link has expired. Please request a new password reset from the app.',
+                errorSame: 'Your new password cannot be the same as your old one.',
+                errorDefault: 'Failed to change password.',
+                errorInvalid: 'This link is either invalid or has expired. Please request a password reset from the app.'
+            }
+        };
+
+        let currentLang = 'en';
+        let t = translations.en;
+
+        // Get language from URL parameter or browser
+        function getLanguage() {
+            const params = new URLSearchParams(window.location.search);
+            const langParam = params.get('lang');
+            if (langParam && (langParam === 'ja' || langParam === 'en')) {
+                return langParam;
+            }
+            const browserLang = navigator.language || navigator.userLanguage;
+            return browserLang.startsWith('ja') ? 'ja' : 'en';
+        }
+
+        // Apply translations
+        function applyTranslations() {
+            currentLang = getLanguage();
+            t = translations[currentLang];
+
+            document.documentElement.lang = currentLang;
+            document.getElementById('title').textContent = t.title;
+            document.getElementById('subtitle').textContent = t.subtitle;
+            document.getElementById('label-password').textContent = t.labelPassword;
+            document.getElementById('label-confirm').textContent = t.labelConfirm;
+            document.getElementById('password').placeholder = t.placeholderPassword;
+            document.getElementById('confirm-password').placeholder = t.placeholderConfirm;
+            document.getElementById('requirements-title').textContent = t.requirementsTitle;
+            document.getElementById('req-length-text').textContent = t.reqLength;
+            document.getElementById('req-uppercase-text').textContent = t.reqUppercase;
+            document.getElementById('req-lowercase-text').textContent = t.reqLowercase;
+            document.getElementById('req-number-text').textContent = t.reqNumber;
+            document.getElementById('req-match-text').textContent = t.reqMatch;
+            document.getElementById('btn-text').textContent = t.btnText;
+            document.getElementById('success-title').textContent = t.successTitle;
+            document.getElementById('success-message').innerHTML = t.successMessage;
+            document.getElementById('next-steps-title').textContent = t.nextStepsTitle;
+            document.getElementById('step1').textContent = t.step1;
+            document.getElementById('step2').textContent = t.step2;
+            document.getElementById('step3').textContent = t.step3;
+        }
+
+        // Initialize translations
+        applyTranslations();
+
+        // Supabase configuration
         const SUPABASE_URL = 'https://dshxqhdqxnbawxvyqqnj.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzaHhxaGRxeG5iYXd4dnlxcW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0MDE1NTQsImV4cCI6MjA0Nzk3NzU1NH0.YDCAwm2G32x9Nd1S5o7cUq_o2xfPkE8fPoXdPLGshBM';
 
@@ -359,7 +461,7 @@
         const formContainer = document.getElementById('form-container');
         const successContainer = document.getElementById('success-container');
 
-        // パスワード要件チェック
+        // Password requirements check
         function checkRequirements() {
             const password = passwordInput.value;
             const confirm = confirmInput.value;
@@ -372,14 +474,14 @@
                 match: password === confirm && password.length > 0
             };
 
-            // UI更新
+            // Update UI
             updateRequirement('req-length', checks.length);
             updateRequirement('req-uppercase', checks.uppercase);
             updateRequirement('req-lowercase', checks.lowercase);
             updateRequirement('req-number', checks.number);
             updateRequirement('req-match', checks.match);
 
-            // 入力フィールドのスタイル
+            // Input field styles
             const typesCount = [checks.uppercase, checks.lowercase, checks.number].filter(Boolean).length;
             const isValidPassword = checks.length && typesCount >= 2;
 
@@ -389,7 +491,7 @@
             confirmInput.classList.toggle('valid', checks.match);
             confirmInput.classList.toggle('error', confirm.length > 0 && !checks.match);
 
-            // ボタン有効化
+            // Enable button
             submitBtn.disabled = !(isValidPassword && checks.match);
         }
 
@@ -402,7 +504,7 @@
         passwordInput.addEventListener('input', checkRequirements);
         confirmInput.addEventListener('input', checkRequirements);
 
-        // メッセージ表示
+        // Show message
         function showMessage(text, type) {
             messageDiv.textContent = text;
             messageDiv.className = 'message ' + type;
@@ -412,14 +514,14 @@
             messageDiv.className = 'message';
         }
 
-        // フォーム送信
+        // Form submission
         document.getElementById('reset-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const password = passwordInput.value;
 
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="loading"></span>変更中...';
+            submitBtn.innerHTML = '<span class="loading"></span>' + t.btnLoading;
             hideMessage();
 
             try {
@@ -431,35 +533,35 @@
                     throw error;
                 }
 
-                // 成功
+                // Success
                 formContainer.style.display = 'none';
                 successContainer.style.display = 'block';
 
             } catch (error) {
                 console.error('Password update error:', error);
 
-                let errorMessage = 'パスワードの変更に失敗しました。';
+                let errorMessage = t.errorDefault;
 
                 if (error.message.includes('expired')) {
-                    errorMessage = 'リンクの有効期限が切れています。もう一度パスワードリセットをリクエストしてください。';
+                    errorMessage = t.errorExpired;
                 } else if (error.message.includes('same')) {
-                    errorMessage = '現在のパスワードと同じパスワードは使用できません。';
+                    errorMessage = t.errorSame;
                 } else if (error.message) {
                     errorMessage = error.message;
                 }
 
                 showMessage(errorMessage, 'error');
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'パスワードを変更';
+                submitBtn.innerHTML = '<span id="btn-text">' + t.btnText + '</span>';
             }
         });
 
-        // ページ読み込み時にセッション確認
+        // Check session on page load
         async function checkSession() {
             const { data: { session }, error } = await supabase.auth.getSession();
 
             if (error || !session) {
-                showMessage('このリンクは無効または期限切れです。アプリから再度パスワードリセットをリクエストしてください。', 'error');
+                showMessage(t.errorInvalid, 'error');
                 submitBtn.style.display = 'none';
                 document.getElementById('reset-form').querySelectorAll('input').forEach(input => {
                     input.disabled = true;
@@ -467,14 +569,14 @@
             }
         }
 
-        // URLハッシュからトークンを処理（Supabaseが自動的に処理）
+        // Handle token from URL hash (Supabase handles this automatically)
         supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY') {
-                showMessage('新しいパスワードを入力してください。', 'info');
+                showMessage(t.infoMessage, 'info');
             }
         });
 
-        // 初期化
+        // Initialize
         checkSession();
     </script>
 </body>

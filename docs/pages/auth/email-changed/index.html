@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baketa - メールアドレス変更完了</title>
+    <title>Baketa - Email Changed</title>
     <style>
         * {
             margin: 0;
@@ -134,38 +134,86 @@
 <body>
     <div class="container">
         <div class="icon">
-            <!-- Email / Edit icon -->
             <svg viewBox="0 0 24 24">
                 <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
             </svg>
         </div>
         <div class="logo">Baketa</div>
-        <h1>メールアドレスの変更が完了しました</h1>
-        <p>新しいメールアドレスが<span class="highlight">正常に確認</span>されました。</p>
+        <h1 id="title">Email Address Updated</h1>
+        <p id="message">Your new email address has been <span class="highlight" id="highlight">successfully verified</span>.</p>
 
         <div class="info-box">
-            <p>今後は新しいメールアドレスでログインしてください。</p>
+            <p id="info-text">Going forward, please use your new email address to log in.</p>
         </div>
 
         <div class="steps">
-            <h2>次のステップ</h2>
+            <h2 id="next-steps-title">Next Steps</h2>
             <div class="step">
                 <div class="step-number">1</div>
-                <div class="step-text">このページを閉じてください</div>
+                <div class="step-text" id="step1">Close this page</div>
             </div>
             <div class="step">
                 <div class="step-number">2</div>
-                <div class="step-text">Baketaアプリを開いてください</div>
+                <div class="step-text" id="step2">Open the Baketa app</div>
             </div>
             <div class="step">
                 <div class="step-number">3</div>
-                <div class="step-text">新しいメールアドレスでログインしてください</div>
+                <div class="step-text" id="step3">Log in with your new email address</div>
             </div>
         </div>
 
         <div class="footer">
-            <p>&copy; 2024 Baketa. All rights reserved.</p>
+            <p>&copy; 2025 Baketa. All rights reserved.</p>
         </div>
     </div>
+
+    <script>
+        const translations = {
+            ja: {
+                title: 'メールアドレスの変更が完了しました',
+                message: '新しいメールアドレスが<span class="highlight">正常に確認</span>されました。',
+                infoText: '今後は新しいメールアドレスでログインしてください。',
+                nextStepsTitle: '次のステップ',
+                step1: 'このページを閉じてください',
+                step2: 'Baketaアプリを開いてください',
+                step3: '新しいメールアドレスでログインしてください'
+            },
+            en: {
+                title: 'Email Address Updated',
+                message: 'Your new email address has been <span class="highlight">successfully verified</span>.',
+                infoText: 'Going forward, please use your new email address to log in.',
+                nextStepsTitle: 'Next Steps',
+                step1: 'Close this page',
+                step2: 'Open the Baketa app',
+                step3: 'Log in with your new email address'
+            }
+        };
+
+        function getLanguage() {
+            const params = new URLSearchParams(window.location.search);
+            const langParam = params.get('lang');
+            if (langParam && (langParam === 'ja' || langParam === 'en')) {
+                return langParam;
+            }
+            const browserLang = navigator.language || navigator.userLanguage;
+            return browserLang.startsWith('ja') ? 'ja' : 'en';
+        }
+
+        function applyTranslations() {
+            const lang = getLanguage();
+            const t = translations[lang];
+
+            document.documentElement.lang = lang;
+            document.getElementById('title').textContent = t.title;
+            document.getElementById('message').innerHTML = t.message;
+            document.getElementById('info-text').textContent = t.infoText;
+            document.getElementById('next-steps-title').textContent = t.nextStepsTitle;
+            document.getElementById('step1').textContent = t.step1;
+            document.getElementById('step2').textContent = t.step2;
+            document.getElementById('step3').textContent = t.step3;
+        }
+
+        applyTranslations();
+    </script>
 </body>
 </html>

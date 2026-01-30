@@ -176,9 +176,9 @@
                         <!-- プラン説明 -->
                         <StackPanel Spacing="4">
                             <TextBlock Text="{local:Localize Settings_Account_PatreonAvailablePlans}" FontSize="12" FontWeight="Medium"/>
-                            <TextBlock Text="{local:Localize Settings_Account_PatreonPlanStandard}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                             <TextBlock Text="{local:Localize Settings_Account_PatreonPlanPro}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                            <TextBlock Text="{local:Localize Settings_Account_PatreonPlanPremia}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonPlanPremium}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock Text="{local:Localize Settings_Account_PatreonPlanUltimate}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
