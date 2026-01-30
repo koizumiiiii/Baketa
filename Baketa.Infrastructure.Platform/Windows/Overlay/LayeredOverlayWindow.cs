@@ -50,7 +50,8 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     private int _currentHeight = 50;
     private int _originalHeight = 50; // 🔧 [MIN_HEIGHT] 元のテキスト領域の高さを保持
     // 🎨 [Issue #348] 可読性向上: 黒75%透過背景
-    private Color _backgroundColor = Color.FromArgb(192, 0, 0, 0);
+    // 🎨 [Issue #348] 可読性向上: 黒95%透過背景
+    private Color _backgroundColor = Color.FromArgb(242, 0, 0, 0);
     private float _fontSize = 14f; // フォントサイズ（設定可能）
 
     // 🔥 [MESSAGE_COALESCING] メッセージ集約用フラグ
@@ -587,7 +588,11 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                     var lines = GetWrappedTextLines(g, _currentText, font, textWidth);
                     var lineHeight = font.GetHeight(g) * 1.1f;
 
-                    var y = padding;
+                    // 🎨 [Issue #348] 垂直中央揃え
+                    var totalTextHeight = lines.Count * lineHeight;
+                    var y = (_currentHeight - totalTextHeight) / 2;
+                    if (y < padding) y = padding; // 最小パディング確保
+
                     foreach (var line in lines)
                     {
                         // 描画領域の高さを超える場合は描画を停止
@@ -771,31 +776,33 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     /// </remarks>
     private static void DrawGradientBackground(Graphics g, int width, int height, Color backgroundColor)
     {
-        // フェード幅（左右各20%）
-        var fadeWidth = width * 0.2f;
-        var transparentColor = Color.FromArgb(0, backgroundColor.R, backgroundColor.G, backgroundColor.B);
+        // フェード幅（左右各10%）- 狭めて可読性向上
+        var fadeWidth = width * 0.1f;
+        // 端は70%透過（Alpha=179）
+        const int edgeAlpha = 179;
+        var edgeColor = Color.FromArgb(edgeAlpha, backgroundColor.R, backgroundColor.G, backgroundColor.B);
 
         // 中央部分（不透明）
         var centerRect = new RectangleF(fadeWidth, 0, width - fadeWidth * 2, height);
         using var centerBrush = new SolidBrush(backgroundColor);
         g.FillRectangle(centerBrush, centerRect);
 
-        // 左側グラデーション（透明→不透明）
+        // 左側グラデーション（半透明→不透明）
         var leftRect = new RectangleF(0, 0, fadeWidth + 1, height); // +1 for overlap
         using var leftBrush = new LinearGradientBrush(
             new PointF(0, 0),
             new PointF(fadeWidth, 0),
-            transparentColor,
+            edgeColor,
             backgroundColor);
         g.FillRectangle(leftBrush, leftRect);
 
-        // 右側グラデーション（不透明→透明）
+        // 右側グラデーション（不透明→半透明）
         var rightRect = new RectangleF(width - fadeWidth - 1, 0, fadeWidth + 1, height); // +1 for overlap
         using var rightBrush = new LinearGradientBrush(
             new PointF(width - fadeWidth, 0),
             new PointF(width, 0),
             backgroundColor,
-            transparentColor);
+            edgeColor);
         g.FillRectangle(rightBrush, rightRect);
     }
 
