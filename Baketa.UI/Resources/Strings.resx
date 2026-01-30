@@ -1117,8 +1117,13 @@
   <data name="MainOverlay_Singleshot_Execute" xml:space="preserve">
     <value>シングルショット翻訳を実行</value>
   </data>
-  <data name="MainOverlay_Singleshot_Clear" xml:space="preserve">
-    <value>結果をクリア</value>
+  <data name="MainOverlay_Singleshot_Reset" xml:space="preserve">
+    <value>リセット</value>
+    <comment>[Issue #357] Shot翻訳アクティブ時のボタン/ツールチップテキスト</comment>
+  </data>
+  <data name="MainOverlay_Live_Stop" xml:space="preserve">
+    <value>停止</value>
+    <comment>[Issue #357] Live翻訳アクティブ時のボタンテキスト</comment>
   </data>
   <data name="MainOverlay_Status_Initializing" xml:space="preserve">
     <value>初期化中...</value>

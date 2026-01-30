@@ -1117,8 +1117,13 @@
   <data name="MainOverlay_Singleshot_Execute" xml:space="preserve">
     <value>Execute singleshot translation</value>
   </data>
-  <data name="MainOverlay_Singleshot_Clear" xml:space="preserve">
-    <value>Clear results</value>
+  <data name="MainOverlay_Singleshot_Reset" xml:space="preserve">
+    <value>Reset</value>
+    <comment>[Issue #357] Button/tooltip text when shot translation is active</comment>
+  </data>
+  <data name="MainOverlay_Live_Stop" xml:space="preserve">
+    <value>Stop</value>
+    <comment>[Issue #357] Button text when live translation is active</comment>
   </data>
   <data name="MainOverlay_Status_Initializing" xml:space="preserve">
     <value>Initializing...</value>

@@ -197,10 +197,50 @@
         </StackPanel>
       </Button>
       
+      <!-- [Issue #357] Shot翻訳ボタン - ウィンドウ選択後のみ表示 (Live翻訳より上に配置) -->
+      <!-- 🔥 [ISSUE#171] UI改善: Shot → Shot翻訳 に変更、状態による表示制御 -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
+      <!-- [Issue #318] EXモード時に⚡バッジ表示 -->
+      <!-- [Issue #357] アクティブ時はクリアアイコン(DismissIcon)に変更 -->
+      <Button Classes="translation-mode-button"
+              Classes.pulsing="{Binding IsSingleshotActive}"
+              IsEnabled="{Binding IsSingleshotEnabled}"
+              IsVisible="{Binding IsWindowSelected}"
+              Command="{Binding ExecuteSingleshotCommand}"
+              ToolTip.Tip="{Binding SingleshotButtonTooltip}"
+              Name="SingleshotButton">
+        <StackPanel Orientation="Vertical" Spacing="4">
+          <Panel Width="20" Height="20">
+            <!-- 通常状態: カメラアイコン -->
+            <PathIcon Data="{StaticResource CameraIcon}"
+                      Foreground="{DynamicResource OverlayIconBrush}"
+                      IsVisible="{Binding !IsSingleshotActive}"/>
+            <!-- [Issue #357] アクティブ状態: リセットアイコン（赤）→ 押すとリセットされることを視覚的に示す -->
+            <PathIcon Data="{StaticResource RefreshIcon}"
+                      Foreground="{DynamicResource OverlayStatusErrorBrush}"
+                      IsVisible="{Binding IsSingleshotActive}"/>
+            <!-- [Issue #318] EXモードバッジ -->
+            <TextBlock Text="⚡" FontSize="10"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Top"
+                       Margin="0,-4,-6,0"
+                       Foreground="#FFD700"
+                       IsVisible="{Binding IsEXModeEnabled}"/>
+          </Panel>
+          <TextBlock Text="{Binding SingleshotButtonText}"
+                     FontSize="10"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Foreground="{DynamicResource OverlayTextBrush}"
+                     IsVisible="{Binding !IsCollapsed}"/>
+        </StackPanel>
+      </Button>
+
       <!-- Live翻訳ボタン - ウィンドウ選択後のみ表示 -->
       <!-- 🔥 [ISSUE#171] UI改善: Start → Live翻訳 に変更、状態による表示制御 -->
       <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
       <!-- [Issue #318] EXモード時に⚡バッジ表示 -->
+      <!-- [Issue #357] アクティブ時はStopアイコンと「停止」テキストに動的変更 -->
       <Button Classes="translation-mode-button"
               Classes.pulsing="{Binding IsLiveActive}"
               IsEnabled="{Binding IsLiveEnabled}"
@@ -215,8 +255,8 @@
             <PathIcon Data="{StaticResource VideoIcon}"
                       Foreground="{DynamicResource OverlayIconBrush}"
                       IsVisible="{Binding !IsLiveActive}"/>
-            <!-- アクティブ状態: ビデオカメラアイコン（赤） -->
-            <PathIcon Data="{StaticResource VideoIcon}"
+            <!-- [Issue #357] アクティブ状態: 停止アイコン（赤） -->
+            <PathIcon Data="{StaticResource StopIcon}"
                       Foreground="{DynamicResource OverlayStatusErrorBrush}"
                       IsVisible="{Binding IsLiveActive}"/>
             <!-- [Issue #318] EXモードバッジ -->
@@ -227,45 +267,7 @@
                        Foreground="#FFD700"
                        IsVisible="{Binding IsEXModeEnabled}"/>
           </Panel>
-          <TextBlock Text="{local:Localize MainOverlay_LiveTranslation}"
-                     FontSize="10"
-                     HorizontalAlignment="Center"
-                     TextAlignment="Center"
-                     Foreground="{DynamicResource OverlayTextBrush}"
-                     IsVisible="{Binding !IsCollapsed}"/>
-        </StackPanel>
-      </Button>
-
-      <!-- Shot翻訳ボタン - ウィンドウ選択後のみ表示 -->
-      <!-- 🔥 [ISSUE#171] UI改善: Shot → Shot翻訳 に変更、状態による表示制御 -->
-      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
-      <!-- [Issue #318] EXモード時に⚡バッジ表示 -->
-      <Button Classes="translation-mode-button"
-              Classes.pulsing="{Binding IsSingleshotActive}"
-              IsEnabled="{Binding IsSingleshotEnabled}"
-              IsVisible="{Binding IsWindowSelected}"
-              Command="{Binding ExecuteSingleshotCommand}"
-              ToolTip.Tip="{Binding SingleshotButtonTooltip}"
-              Name="SingleshotButton">
-        <StackPanel Orientation="Vertical" Spacing="4">
-          <Panel Width="20" Height="20">
-            <!-- 通常状態: カメラアイコン -->
-            <PathIcon Data="{StaticResource CameraIcon}"
-                      Foreground="{DynamicResource OverlayIconBrush}"
-                      IsVisible="{Binding !IsSingleshotActive}"/>
-            <!-- アクティブ状態: カメラアイコン（赤） -->
-            <PathIcon Data="{StaticResource CameraIcon}"
-                      Foreground="{DynamicResource OverlayStatusErrorBrush}"
-                      IsVisible="{Binding IsSingleshotActive}"/>
-            <!-- [Issue #318] EXモードバッジ -->
-            <TextBlock Text="⚡" FontSize="10"
-                       HorizontalAlignment="Right"
-                       VerticalAlignment="Top"
-                       Margin="0,-4,-6,0"
-                       Foreground="#FFD700"
-                       IsVisible="{Binding IsEXModeEnabled}"/>
-          </Panel>
-          <TextBlock Text="{local:Localize MainOverlay_ShotTranslation}"
+          <TextBlock Text="{Binding LiveButtonText}"
                      FontSize="10"
                      HorizontalAlignment="Center"
                      TextAlignment="Center"
@@ -427,9 +429,42 @@
                   Foreground="{DynamicResource OverlayIconBrush}"/>
       </Button>
 
+      <!-- [Issue #357] Shot翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 (Live翻訳より上に配置) -->
+      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
+      <!-- [Issue #318] EXモード時に⚡バッジ表示 -->
+      <!-- [Issue #357] アクティブ時はクリアアイコン(DismissIcon)に変更 -->
+      <Button Classes="minimize-button"
+              Command="{Binding ExecuteSingleshotCommand}"
+              ToolTip.Tip="{Binding SingleshotButtonTooltip}"
+              IsEnabled="{Binding IsSingleshotEnabled}"
+              IsVisible="{Binding IsWindowSelected}"
+              Background="Transparent"
+              BorderThickness="0"
+              Width="36"
+              Height="36"
+              Margin="2">
+        <Panel Width="16" Height="16">
+          <PathIcon Data="{StaticResource CameraIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}"
+                    IsVisible="{Binding !IsSingleshotActive}"/>
+          <!-- [Issue #357] アクティブ状態: リセットアイコン（赤） -->
+          <PathIcon Data="{StaticResource RefreshIcon}"
+                    Foreground="{DynamicResource OverlayStatusErrorBrush}"
+                    IsVisible="{Binding IsSingleshotActive}"/>
+          <!-- [Issue #318] EXモードバッジ -->
+          <TextBlock Text="⚡" FontSize="8"
+                     HorizontalAlignment="Right"
+                     VerticalAlignment="Top"
+                     Margin="0,-2,-4,0"
+                     Foreground="#FFD700"
+                     IsVisible="{Binding IsEXModeEnabled}"/>
+        </Panel>
+      </Button>
+
       <!-- Live翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
       <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
       <!-- [Issue #318] EXモード時に⚡バッジ表示 -->
+      <!-- [Issue #357] アクティブ時はStopアイコンに動的変更 -->
       <Button Classes="minimize-button"
               Command="{Binding StartStopCommand}"
               ToolTip.Tip="{Binding StartButtonTooltip}"
@@ -445,39 +480,10 @@
           <PathIcon Data="{StaticResource VideoIcon}"
                     Foreground="{DynamicResource OverlayIconBrush}"
                     IsVisible="{Binding !IsLiveActive}"/>
-          <PathIcon Data="{StaticResource VideoIcon}"
+          <!-- [Issue #357] アクティブ状態: 停止アイコン（赤） -->
+          <PathIcon Data="{StaticResource StopIcon}"
                     Foreground="{DynamicResource OverlayStatusErrorBrush}"
                     IsVisible="{Binding IsLiveActive}"/>
-          <!-- [Issue #318] EXモードバッジ -->
-          <TextBlock Text="⚡" FontSize="8"
-                     HorizontalAlignment="Right"
-                     VerticalAlignment="Top"
-                     Margin="0,-2,-4,0"
-                     Foreground="#FFD700"
-                     IsVisible="{Binding IsEXModeEnabled}"/>
-        </Panel>
-      </Button>
-
-      <!-- Shot翻訳ボタン（縮小時） - ウィンドウ選択後のみ表示 -->
-      <!-- [Issue #245] PNG→PathIcon変換（テーマ対応、状態切替） -->
-      <!-- [Issue #318] EXモード時に⚡バッジ表示 -->
-      <Button Classes="minimize-button"
-              Command="{Binding ExecuteSingleshotCommand}"
-              ToolTip.Tip="{Binding SingleshotButtonTooltip}"
-              IsEnabled="{Binding IsSingleshotEnabled}"
-              IsVisible="{Binding IsWindowSelected}"
-              Background="Transparent"
-              BorderThickness="0"
-              Width="36"
-              Height="36"
-              Margin="2">
-        <Panel Width="16" Height="16">
-          <PathIcon Data="{StaticResource CameraIcon}"
-                    Foreground="{DynamicResource OverlayIconBrush}"
-                    IsVisible="{Binding !IsSingleshotActive}"/>
-          <PathIcon Data="{StaticResource CameraIcon}"
-                    Foreground="{DynamicResource OverlayStatusErrorBrush}"
-                    IsVisible="{Binding IsSingleshotActive}"/>
           <!-- [Issue #318] EXモードバッジ -->
           <TextBlock Text="⚡" FontSize="8"
                      HorizontalAlignment="Right"

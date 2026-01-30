@@ -242,6 +242,8 @@ public class MainOverlayViewModel : ViewModelBase
                     this.RaisePropertyChanged(nameof(SingleshotIconSource));
                     // 🔥 [ISSUE#164] SingleshotButtonTooltipは計算プロパティなので手動通知が必要
                     this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
+                    // 🔥 [Issue #357] SingleshotButtonTextは計算プロパティなので手動通知が必要
+                    this.RaisePropertyChanged(nameof(SingleshotButtonText));
                     // 🔥 [ISSUE#164_FIX] IsLiveEnabledは!IsSingleshotOverlayVisibleに依存するため通知が必要
                     this.RaisePropertyChanged(nameof(IsLiveEnabled));
                 }
@@ -255,6 +257,8 @@ public class MainOverlayViewModel : ViewModelBase
                         this.RaisePropertyChanged(nameof(SingleshotIconSource));
                         // 🔥 [ISSUE#164] SingleshotButtonTooltipは計算プロパティなので手動通知が必要
                         this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
+                        // 🔥 [Issue #357] SingleshotButtonTextは計算プロパティなので手動通知が必要
+                        this.RaisePropertyChanged(nameof(SingleshotButtonText));
                         // 🔥 [ISSUE#164_FIX] IsLiveEnabledは!IsSingleshotOverlayVisibleに依存するため通知が必要
                         this.RaisePropertyChanged(nameof(IsLiveEnabled));
                     });
@@ -296,6 +300,8 @@ public class MainOverlayViewModel : ViewModelBase
                     this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
                     // 🔥 [ISSUE#164_FIX] LiveIconSourceは計算プロパティなので手動通知が必要
                     this.RaisePropertyChanged(nameof(LiveIconSource));
+                    // 🔥 [Issue #357] LiveButtonTextは計算プロパティなので手動通知が必要
+                    this.RaisePropertyChanged(nameof(LiveButtonText));
                 }
                 else
                 {
@@ -315,6 +321,8 @@ public class MainOverlayViewModel : ViewModelBase
                         this.RaisePropertyChanged(nameof(IsSingleshotEnabled));
                         // 🔥 [ISSUE#164_FIX] LiveIconSourceは計算プロパティなので手動通知が必要
                         this.RaisePropertyChanged(nameof(LiveIconSource));
+                        // 🔥 [Issue #357] LiveButtonTextは計算プロパティなので手動通知が必要
+                        this.RaisePropertyChanged(nameof(LiveButtonText));
                     });
                 }
             }
@@ -740,11 +748,28 @@ public class MainOverlayViewModel : ViewModelBase
     /// Singleshotボタンのツールチップ（オーバーレイ表示状態で切り替え）
     /// </summary>
     /// <remarks>
-    /// 🔥 [ISSUE#164] UI/UX改善: オーバーレイ表示中は「結果をクリアする」、非表示時は「シングルショット翻訳を実行」
-    /// IsSingleshotOverlayVisibleの値に基づいてツールチップテキストを返す
+    /// [Issue #357] アクティブ時は「リセット」、非アクティブ時は「シングルショット翻訳を実行」
     /// </remarks>
     public string SingleshotButtonTooltip =>
-        IsSingleshotOverlayVisible ? Strings.MainOverlay_Singleshot_Clear : Strings.MainOverlay_Singleshot_Execute;
+        IsSingleshotOverlayVisible ? Strings.MainOverlay_Singleshot_Reset : Strings.MainOverlay_Singleshot_Execute;
+
+    /// <summary>
+    /// [Issue #357] Singleshotボタンのテキスト（オーバーレイ表示状態で切り替え）
+    /// </summary>
+    /// <remarks>
+    /// アクティブ時は「リセット」、非アクティブ時は「Shot翻訳」を表示
+    /// </remarks>
+    public string SingleshotButtonText =>
+        IsSingleshotOverlayVisible ? Strings.MainOverlay_Singleshot_Reset : Strings.MainOverlay_ShotTranslation;
+
+    /// <summary>
+    /// [Issue #357] Liveボタンのテキスト（翻訳状態で切り替え）
+    /// </summary>
+    /// <remarks>
+    /// アクティブ時は「停止」、非アクティブ時は「Live翻訳」を表示
+    /// </remarks>
+    public string LiveButtonText =>
+        IsLiveActive ? Strings.MainOverlay_Live_Stop : Strings.MainOverlay_LiveTranslation;
 
     public string InitializationText => CurrentStatus switch
     {
