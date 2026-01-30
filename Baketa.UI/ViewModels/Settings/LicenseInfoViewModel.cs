@@ -575,11 +575,8 @@ public sealed class LicenseInfoViewModel : ViewModelBase
     private void UpdateFromState(LicenseState state)
     {
         CurrentPlan = state.CurrentPlan;
-        // [Issue #298] プロモーション適用中の場合はサフィックスを追加（Freeプランでも表示）
-        var basePlanName = GetPlanDisplayName(state.CurrentPlan);
-        PlanDisplayName = HasActivePromotion
-            ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
-            : basePlanName;
+        // プラン名を表示（プロモーションサフィックスは廃止）
+        PlanDisplayName = GetPlanDisplayName(state.CurrentPlan);
         PlanDescription = GetPlanDescription(state.CurrentPlan);
 
         // [Issue #275再発防止] トークン使用量は2つのデータソースがある:
@@ -918,17 +915,8 @@ public sealed class LicenseInfoViewModel : ViewModelBase
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             _activePromotion = e.NewPromotion;
-            // ローカルに有効なプロモーション情報があり、かつサーバーからボーナストークンが付与されている場合のみ有効
+            // プロモーション表示は廃止（ボーナストークンの有無で判断）
             HasActivePromotion = e.NewPromotion?.IsValid == true && HasBonusTokens;
-
-            // [Issue #298] プラン表示名を再計算（プロモーションサフィックスの更新、Freeプランでも表示）
-            var basePlanName = GetPlanDisplayName(CurrentPlan);
-            PlanDisplayName = HasActivePromotion
-                ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
-                : basePlanName;
-
-            this.RaisePropertyChanged(nameof(PromotionPlanDisplayName));
-            this.RaisePropertyChanged(nameof(PromotionAppliedMessage));
             _logger?.LogDebug("プロモーション状態が変更されました: {Reason}", e.Reason);
         });
     }
@@ -958,19 +946,9 @@ public sealed class LicenseInfoViewModel : ViewModelBase
             // [Issue #280+#281 Phase 5] トークン残量警告状態を更新
             UpdateTokenWarningState();
 
-            // [Issue #318関連] ボーナストークン変更時にプロモーション表示も再評価
-            // 別アカウントでログインした場合、ローカルプロモーション情報は残っていても
-            // サーバーからのボーナスは付与されていないため表示を更新
+            // プロモーション表示は廃止（ボーナストークンの有無で判断するのみ）
             var promotion = _promotionCodeService.GetCurrentPromotion();
-            var wasActive = HasActivePromotion;
             HasActivePromotion = promotion?.IsValid == true && HasBonusTokens;
-            if (wasActive != HasActivePromotion)
-            {
-                var basePlanName = GetPlanDisplayName(CurrentPlan);
-                PlanDisplayName = HasActivePromotion
-                    ? $"{basePlanName} {Strings.License_Plan_PromotionSuffix}"
-                    : basePlanName;
-            }
 
             _logger?.LogDebug("ボーナストークン状態が変更されました: {Reason}, 残高: {Remaining}",
                 e.Reason, e.TotalRemaining);
