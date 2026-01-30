@@ -442,6 +442,44 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
     }
 
     /// <inheritdoc/>
+    public async Task ClearLocalCredentialsAsync(CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        await _syncLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // ローカルの認証情報ファイルのみ削除（サーバーセッションは維持）
+            if (File.Exists(_credentialsFilePath))
+            {
+                File.Delete(_credentialsFilePath);
+                _logger.LogInformation("ローカルPatreon認証情報をクリアしました（サーバーセッションは維持）");
+            }
+
+            // プロモーション設定もクリア（ユーザー間混在防止）
+            if (_promotionSettingsPersistence != null)
+            {
+                try
+                {
+                    await _promotionSettingsPersistence.ClearPromotionAsync(cancellationToken).ConfigureAwait(false);
+                    _logger.LogDebug("プロモーション設定をクリアしました");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "プロモーション設定のクリアに失敗しましたが、処理を続行します");
+                }
+            }
+
+            _cachedCredentials = null;
+            UpdateSyncStatus(PatreonSyncStatus.NotConnected);
+        }
+        finally
+        {
+            _syncLock.Release();
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<PatreonLocalCredentials?> LoadCredentialsAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

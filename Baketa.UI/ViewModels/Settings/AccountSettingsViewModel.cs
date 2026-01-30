@@ -532,7 +532,24 @@ public sealed class AccountSettingsViewModel : ViewModelBase
             IsLoading = true;
             ClearStatusMessage();
 
+            // Supabaseからログアウト
             await _authService.SignOutAsync().ConfigureAwait(false);
+
+            // [Fix] ローカルのPatreon認証情報をクリア（別アカウントログイン時の混在防止）
+            // サーバーセッションは維持（同じユーザーが再ログインした場合に再利用可能）
+            if (_patreonService != null)
+            {
+                try
+                {
+                    await _patreonService.ClearLocalCredentialsAsync().ConfigureAwait(false);
+                    _logger?.LogDebug("ローカルPatreon認証情報をクリアしました");
+                }
+                catch (Exception ex)
+                {
+                    // Patreonクリア失敗はログアウト自体をブロックしない
+                    _logger?.LogWarning(ex, "Patreon認証情報のクリアに失敗しましたが、ログアウト処理を続行します");
+                }
+            }
 
             _logger?.LogInformation("ログアウトしました");
         }
