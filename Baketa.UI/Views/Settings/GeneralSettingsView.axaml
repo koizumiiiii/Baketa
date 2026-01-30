@@ -42,7 +42,7 @@
                                        Margin="0,4,0,0"
                                        IsVisible="{Binding CloudTranslationNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-                            <!-- [Issue #78 Phase 5] Cloud AI使用量表示 -->
+                            <!-- [Issue #78 Phase 5] EX翻訳使用量表示 -->
                             <Border IsVisible="{Binding ShowCloudUsageInfo}"
                                     Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                     CornerRadius="4"
