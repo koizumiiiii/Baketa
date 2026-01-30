@@ -1104,9 +1104,7 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddSingleton<Translation.Cloud.PrimaryCloudTranslator>();
         Console.WriteLine("✅ PrimaryCloudTranslator登録完了 - Relay Server経由");
 
-        // DirectGeminiImageTranslator登録（HttpClientFactory使用）- Issue #237
-        services.AddHttpClient<Translation.Cloud.DirectGeminiImageTranslator>();
-        Console.WriteLine("✅ DirectGeminiImageTranslator登録完了 - HttpClientFactory使用");
+        // [Issue #351] DirectGeminiImageTranslator削除 - Relay Server経由に統一
 
         // DirectOpenAIImageTranslator登録（HttpClientFactory使用）- フォールバック用
         services.AddHttpClient<Translation.Cloud.DirectOpenAIImageTranslator>();
@@ -1116,25 +1114,12 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddSingleton<Translation.Cloud.SecondaryCloudTranslator>();
         Console.WriteLine("✅ SecondaryCloudTranslator登録完了 - スタブ実装（Relay Server未対応時用）");
 
-        // Primary Cloud翻訳エンジン登録
-        // UseDirectApiMode=true の場合は DirectGeminiImageTranslator を使用
-        // UseDirectApiMode=false の場合は PrimaryCloudTranslator（Relay Server経由）を使用
-        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>("primary", (provider, key) =>
-        {
-            var settings = provider.GetRequiredService<IOptions<Core.Settings.CloudTranslationSettings>>().Value;
-
-            if (settings.UseDirectApiMode)
-            {
-                Console.WriteLine("🔧 [Issue #237] Direct APIモード有効 - DirectGeminiImageTranslator使用");
-                return provider.GetRequiredService<Translation.Cloud.DirectGeminiImageTranslator>();
-            }
-            else
-            {
-                Console.WriteLine("🔧 [Issue #237] 通常モード - PrimaryCloudTranslator（Relay Server経由）使用");
-                return provider.GetRequiredService<Translation.Cloud.PrimaryCloudTranslator>();
-            }
-        });
-        Console.WriteLine("✅ Primary Cloud翻訳エンジン登録完了 - Keyed Service [primary] (Direct API切り替え対応)");
+        // [Issue #351] Primary Cloud翻訳エンジン登録（簡潔化）
+        // 常にPrimaryCloudTranslator（Relay Server経由）を使用
+        services.AddKeyedSingleton<CoreTranslation.ICloudImageTranslator>(
+            "primary",
+            (provider, key) => provider.GetRequiredService<Translation.Cloud.PrimaryCloudTranslator>());
+        Console.WriteLine("✅ Primary Cloud翻訳エンジン登録完了 - Keyed Service [primary] (Relay Server経由)");
 
         // Secondary Cloud翻訳エンジン - Keyed Service
         // UseDirectApiMode=true の場合は DirectOpenAIImageTranslator を使用（Gemini失敗時のフォールバック）
