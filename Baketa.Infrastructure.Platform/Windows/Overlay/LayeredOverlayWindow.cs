@@ -49,8 +49,8 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     private int _currentWidth = 200;
     private int _currentHeight = 50;
     private int _originalHeight = 50; // 🔧 [MIN_HEIGHT] 元のテキスト領域の高さを保持
-    // 🎨 [Issue #348] 可読性向上: 黒50%透過背景
-    private Color _backgroundColor = Color.FromArgb(128, 0, 0, 0);
+    // 🎨 [Issue #348] 可読性向上: 黒75%透過背景
+    private Color _backgroundColor = Color.FromArgb(192, 0, 0, 0);
     private float _fontSize = 14f; // フォントサイズ（設定可能）
 
     // 🔥 [MESSAGE_COALESCING] メッセージ集約用フラグ
@@ -773,35 +773,30 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     {
         // フェード幅（左右各20%）
         var fadeWidth = width * 0.2f;
+        var transparentColor = Color.FromArgb(0, backgroundColor.R, backgroundColor.G, backgroundColor.B);
 
         // 中央部分（不透明）
         var centerRect = new RectangleF(fadeWidth, 0, width - fadeWidth * 2, height);
-        using (var centerBrush = new SolidBrush(backgroundColor))
-        {
-            g.FillRectangle(centerBrush, centerRect);
-        }
+        using var centerBrush = new SolidBrush(backgroundColor);
+        g.FillRectangle(centerBrush, centerRect);
 
         // 左側グラデーション（透明→不透明）
         var leftRect = new RectangleF(0, 0, fadeWidth + 1, height); // +1 for overlap
-        using (var leftBrush = new LinearGradientBrush(
+        using var leftBrush = new LinearGradientBrush(
             new PointF(0, 0),
             new PointF(fadeWidth, 0),
-            Color.FromArgb(0, backgroundColor.R, backgroundColor.G, backgroundColor.B),
-            backgroundColor))
-        {
-            g.FillRectangle(leftBrush, leftRect);
-        }
+            transparentColor,
+            backgroundColor);
+        g.FillRectangle(leftBrush, leftRect);
 
         // 右側グラデーション（不透明→透明）
         var rightRect = new RectangleF(width - fadeWidth - 1, 0, fadeWidth + 1, height); // +1 for overlap
-        using (var rightBrush = new LinearGradientBrush(
+        using var rightBrush = new LinearGradientBrush(
             new PointF(width - fadeWidth, 0),
             new PointF(width, 0),
             backgroundColor,
-            Color.FromArgb(0, backgroundColor.R, backgroundColor.G, backgroundColor.B)))
-        {
-            g.FillRectangle(rightBrush, rightRect);
-        }
+            transparentColor);
+        g.FillRectangle(rightBrush, rightRect);
     }
 
     /// <summary>
@@ -843,30 +838,21 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
             format);
 
         // 1. ドロップシャドウ描画（オフセット位置に淡い色で）
-        using (var shadowPath = (GraphicsPath)path.Clone())
-        {
-            var shadowMatrix = new Matrix();
-            shadowMatrix.Translate(shadowOffsetX, shadowOffsetY);
-            shadowPath.Transform(shadowMatrix);
+        using var shadowPath = (GraphicsPath)path.Clone();
+        using var shadowMatrix = new Matrix();
+        shadowMatrix.Translate(shadowOffsetX, shadowOffsetY);
+        shadowPath.Transform(shadowMatrix);
 
-            using var shadowBrush = new SolidBrush(shadowColor);
-            g.FillPath(shadowBrush, shadowPath);
-        }
+        using var shadowBrush = new SolidBrush(shadowColor);
+        g.FillPath(shadowBrush, shadowPath);
 
         // 2. アウトライン描画（太いペンでストローク）
-        using (var outlinePen = new Pen(outlineColor, outlineWidth * 2)
-        {
-            LineJoin = LineJoin.Round // 角を丸く
-        })
-        {
-            g.DrawPath(outlinePen, path);
-        }
+        using var outlinePen = new Pen(outlineColor, outlineWidth * 2) { LineJoin = LineJoin.Round };
+        g.DrawPath(outlinePen, path);
 
         // 3. テキスト本体描画（白色で塗りつぶし）
-        using (var textBrush = new SolidBrush(textColor))
-        {
-            g.FillPath(textBrush, path);
-        }
+        using var textBrush = new SolidBrush(textColor);
+        g.FillPath(textBrush, path);
     }
 
     // ========================================
