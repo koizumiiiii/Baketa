@@ -257,7 +257,7 @@
     <value>Offline Translation</value>
   </data>
   <data name="Settings_General_AITranslation" xml:space="preserve">
-    <value>AI Translation</value>
+    <value>EX Translation</value>
   </data>
   <data name="Settings_General_AlphaNote" xml:space="preserve">
     <value>* Only offline translation is available in alpha test</value>
@@ -269,7 +269,7 @@
     <value>This month's usage:</value>
   </data>
   <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
-    <value>tokens</value>
+    <value></value>
   </data>
   <data name="Settings_General_TranslationLanguage" xml:space="preserve">
     <value>Translation Language</value>
@@ -650,7 +650,7 @@
     <value>License</value>
   </data>
   <data name="Settings_License_Subtitle" xml:space="preserve">
-    <value>View plan information and token usage</value>
+    <value>View plan information and usage</value>
   </data>
   <data name="Settings_Upgrade_Title" xml:space="preserve">
     <value>Plan Upgrade</value>
@@ -662,16 +662,16 @@
     <value>Loading license information...</value>
   </data>
   <data name="Settings_License_TokenUsage" xml:space="preserve">
-    <value>Token Usage</value>
+    <value>Usage</value>
   </data>
   <data name="Settings_License_MonthlyUsage" xml:space="preserve">
     <value>Monthly Usage</value>
   </data>
   <data name="Settings_License_QuotaExceeded" xml:space="preserve">
-    <value>Monthly quota exceeded. Cloud AI translation is unavailable until next month.</value>
+    <value>Monthly quota exceeded. EX Translation is unavailable until next month.</value>
   </data>
   <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
-    <value>This plan only supports local translation. Upgrade to Pro or higher to use Cloud AI translation.</value>
+    <value>This plan only supports standard translation. Upgrade to Pro or higher to use EX Translation.</value>
   </data>
   <data name="Settings_License_PlanDetails" xml:space="preserve">
     <value>Plan Details</value>
@@ -680,10 +680,10 @@
     <value>Expiration Date</value>
   </data>
   <data name="Settings_License_CloudAccess" xml:space="preserve">
-    <value>Cloud AI Access</value>
+    <value>EX Translation</value>
   </data>
   <data name="Settings_License_MonthlyLimit" xml:space="preserve">
-    <value>Monthly Token Limit</value>
+    <value>Monthly Quota</value>
   </data>
   <data name="Settings_License_Refresh" xml:space="preserve">
     <value>Refresh License Info</value>
@@ -740,22 +740,22 @@
   </data>
 
   <data name="License_Desc_Free" xml:space="preserve">
-    <value>Free Plan - Cloud AI available with bonus tokens</value>
+    <value>Free Plan - EX Translation available with bonus</value>
   </data>
   <data name="License_Desc_Standard" xml:space="preserve">
-    <value>Standard Plan - No ads, local translation only</value>
+    <value>Standard Plan - No ads, standard translation only</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Pro Plan - Cloud AI translation, 10M tokens/month</value>
+    <value>Pro Plan - EX Translation, 10M monthly quota</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Premia Plan - Cloud AI translation, 8M tokens/month</value>
+    <value>Premia Plan - EX Translation, 8M monthly quota</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Premium Plan - Cloud AI translation, 20M tokens/month</value>
+    <value>Premium Plan - EX Translation, 20M monthly quota</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Ultimate Plan - Cloud AI translation, 50M tokens/month</value>
+    <value>Ultimate Plan - EX Translation, 50M monthly quota</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
     <value>No Expiration</value>
@@ -825,7 +825,7 @@
     <value>Connect Patreon Account</value>
   </data>
   <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
-    <value>Link your Patreon supporter account to unlock benefits like ad-free experience and Cloud AI translation</value>
+    <value>Link your Patreon supporter account to unlock benefits like ad-free experience and EX Translation</value>
   </data>
   <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
     <value>Connect with Patreon</value>
@@ -834,13 +834,13 @@
     <value>Available Plans:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/month): Cloud AI translation 10M tokens/month</value>
+    <value>• Pro ($3/month): EX Translation 10M monthly quota</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium ($5/month): Cloud AI translation 20M tokens/month</value>
+    <value>• Premium ($5/month): EX Translation 20M monthly quota</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate ($9/month): Cloud AI translation 50M tokens/month</value>
+    <value>• Ultimate ($9/month): EX Translation 50M monthly quota</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
     <value>Login</value>
@@ -1037,7 +1037,7 @@
     <value>Ad-free</value>
   </data>
   <data name="Premium_FeatureCloudTranslation" xml:space="preserve">
-    <value>Cloud Translation (Google Gemini)</value>
+    <value>EX Translation (High-precision engine)</value>
   </data>
   <data name="Premium_FeaturePrioritySupport" xml:space="preserve">
     <value>Priority Support</value>
@@ -1254,19 +1254,19 @@
 
   <!-- [Issue #78 Phase 5] Token Usage Alerts -->
   <data name="TokenUsage_Warning_Title" xml:space="preserve">
-    <value>Token Usage Warning</value>
+    <value>Usage Warning</value>
   </data>
   <data name="TokenUsage_Warning80_Message" xml:space="preserve">
-    <value>You've used 80% of your Cloud AI tokens this month (remaining: {0})</value>
+    <value>You've used 80% of your EX Translation quota this month (remaining: {0})</value>
   </data>
   <data name="TokenUsage_Warning90_Message" xml:space="preserve">
-    <value>You've used 90% of your Cloud AI tokens this month (remaining: {0})</value>
+    <value>You've used 90% of your EX Translation quota this month (remaining: {0})</value>
   </data>
   <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
-    <value>Token Limit Reached</value>
+    <value>Quota Limit Reached</value>
   </data>
   <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
-    <value>You've reached your Cloud AI token limit. Switching to local translation.</value>
+    <value>You've reached your EX Translation quota limit. Switching to standard translation.</value>
   </data>
 
   <!-- [Issue #245] Window Selection Dialog -->
@@ -1606,7 +1606,7 @@
     <value>Bonus</value>
   </data>
   <data name="Settings_License_BonusTokens" xml:space="preserve">
-    <value>Bonus Tokens</value>
+    <value>Bonus</value>
   </data>
   <data name="Settings_License_TotalAvailable" xml:space="preserve">
     <value>Total Available</value>
