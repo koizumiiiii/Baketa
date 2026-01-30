@@ -761,7 +761,7 @@
     <value>No Expiration</value>
   </data>
   <data name="License_LocalOnly" xml:space="preserve">
-    <value>Local Only</value>
+    <value>Standard Only</value>
   </data>
   <data name="License_RefreshSuccess" xml:space="preserve">
     <value>License information updated</value>

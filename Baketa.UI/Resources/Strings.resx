@@ -761,7 +761,7 @@
     <value>無期限</value>
   </data>
   <data name="License_LocalOnly" xml:space="preserve">
-    <value>ローカルのみ</value>
+    <value>標準のみ</value>
   </data>
   <data name="License_RefreshSuccess" xml:space="preserve">
     <value>ライセンス情報を更新しました</value>
