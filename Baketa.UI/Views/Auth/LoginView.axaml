@@ -6,8 +6,9 @@
         x:Class="Baketa.UI.Views.Auth.LoginView"
         x:DataType="vm:LoginViewModel"
         Title="Baketa - Login"
-        Width="400" Height="600"
-        MinWidth="380" MinHeight="500"
+        Width="400" Height="420"
+        MinWidth="380" MinHeight="360"
+        SizeToContent="Height"
         Icon="/Assets/Icons/baketa.ico"
         WindowStartupLocation="CenterScreen"
         CanResize="False">
@@ -170,7 +171,7 @@
                     </StackPanel>
                     
                     <!-- Email/Password Form (折りたたみ) -->
-                    <Expander IsExpanded="False" Margin="0,12,0,0">
+                    <Expander IsExpanded="False" Margin="0,12,0,0" HorizontalAlignment="Stretch">
                         <Expander.Header>
                             <TextBlock Text="{local:Localize Auth_Login_EmailExpander}"
                                        FontSize="13"
