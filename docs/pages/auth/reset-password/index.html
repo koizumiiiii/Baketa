@@ -345,6 +345,7 @@
         </div>
     </div>
 
+    <script src="../shared/i18n.js"></script>
     <script>
         // Localization strings
         const translations = {
@@ -407,24 +408,7 @@
         let currentLang = 'en';
         let t = translations.en;
 
-        // Get language from URL parameter or browser
-        function getLanguage() {
-            // Check query string first
-            const params = new URLSearchParams(window.location.search);
-            const langParam = params.get('lang');
-            if (langParam && (langParam === 'ja' || langParam === 'en')) {
-                return langParam;
-            }
-            // Also check hash fragment (Supabase puts params after #)
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            const hashLang = hashParams.get('lang');
-            if (hashLang && (hashLang === 'ja' || hashLang === 'en')) {
-                return hashLang;
-            }
-            // Fallback to browser language
-            const browserLang = navigator.language || navigator.userLanguage;
-            return browserLang.startsWith('ja') ? 'ja' : 'en';
-        }
+        // getLanguage is loaded from shared/i18n.js
 
         // Apply translations
         function applyTranslations() {

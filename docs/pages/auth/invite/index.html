@@ -151,6 +151,7 @@
         </div>
     </div>
 
+    <script src="../shared/i18n.js"></script>
     <script>
         const translations = {
             ja: {
@@ -171,38 +172,14 @@
             }
         };
 
-        function getLanguage() {
-            // Check query string first
-            const params = new URLSearchParams(window.location.search);
-            const langParam = params.get('lang');
-            if (langParam && (langParam === 'ja' || langParam === 'en')) {
-                return langParam;
-            }
-            // Also check hash fragment (Supabase puts params after #)
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            const hashLang = hashParams.get('lang');
-            if (hashLang && (hashLang === 'ja' || hashLang === 'en')) {
-                return hashLang;
-            }
-            // Fallback to browser language
-            const browserLang = navigator.language || navigator.userLanguage;
-            return browserLang.startsWith('ja') ? 'ja' : 'en';
-        }
-
-        function applyTranslations() {
-            const lang = getLanguage();
-            const t = translations[lang];
-
-            document.documentElement.lang = lang;
-            document.getElementById('title').textContent = t.title;
-            document.getElementById('message').innerHTML = t.message;
-            document.getElementById('next-steps-title').textContent = t.nextStepsTitle;
-            document.getElementById('step1').textContent = t.step1;
-            document.getElementById('step2').textContent = t.step2;
-            document.getElementById('step3').textContent = t.step3;
-        }
-
-        applyTranslations();
+        applyTranslations(translations, {
+            title: 'title',
+            message: 'message',
+            nextStepsTitle: 'next-steps-title',
+            step1: 'step1',
+            step2: 'step2',
+            step3: 'step3'
+        });
     </script>
 </body>
 </html>
