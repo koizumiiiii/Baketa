@@ -28,8 +28,17 @@ public partial class AdaptiveCaptureServiceAdapter(
     private ServicesCaptureOptions _currentOptions = new();
     private bool _disposed;
 
+    /// <summary>
+    /// [Issue #361] 同時キャプチャ防止用セマフォ
+    /// 複数サービス（翻訳ループ、ROI監視、バックグラウンド学習）からの
+    /// 同時キャプチャによるACCESS_VIOLATIONを防止
+    /// </summary>
+    private static readonly SemaphoreSlim _captureSemaphore = new(1, 1);
+
     public async Task<IImage> CaptureScreenAsync()
     {
+        // [Issue #361] 同時キャプチャ防止
+        await _captureSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             _logger.LogInformation("🔥 適応的キャプチャサービスアダプター: CaptureScreenAsync呼び出され - Windows Graphics Capture API使用予定");
@@ -59,10 +68,16 @@ public partial class AdaptiveCaptureServiceAdapter(
             _logger.LogError(ex, "適応的画面キャプチャでエラー");
             throw;
         }
+        finally
+        {
+            _captureSemaphore.Release();
+        }
     }
 
     public async Task<IImage> CaptureRegionAsync(Rectangle region)
     {
+        // [Issue #361] 同時キャプチャ防止
+        await _captureSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             _logger.LogDebug("適応的領域キャプチャ開始: {Region}", region);
@@ -93,10 +108,16 @@ public partial class AdaptiveCaptureServiceAdapter(
             _logger.LogError(ex, "適応的領域キャプチャでエラー");
             throw;
         }
+        finally
+        {
+            _captureSemaphore.Release();
+        }
     }
 
     public async Task<IImage> CaptureWindowAsync(IntPtr windowHandle)
     {
+        // [Issue #361] 同時キャプチャ防止 - セマフォで排他制御
+        await _captureSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             Console.WriteLine("🔥🔥🔥 [ADAPTER] CaptureWindowAsync呼び出されました！HWND=0x{0:X}", windowHandle.ToInt64());
@@ -168,10 +189,17 @@ public partial class AdaptiveCaptureServiceAdapter(
             _logger.LogError(ex, "適応的ウィンドウキャプチャでエラー");
             throw;
         }
+        finally
+        {
+            // [Issue #361] セマフォ解放
+            _captureSemaphore.Release();
+        }
     }
 
     public async Task<IImage> CaptureClientAreaAsync(IntPtr windowHandle)
     {
+        // [Issue #361] 同時キャプチャ防止
+        await _captureSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             _logger.LogDebug("適応的クライアント領域キャプチャ開始: HWND=0x{WindowHandle:X}", windowHandle.ToInt64());
@@ -197,6 +225,10 @@ public partial class AdaptiveCaptureServiceAdapter(
         {
             _logger.LogError(ex, "適応的クライアント領域キャプチャでエラー");
             throw;
+        }
+        finally
+        {
+            _captureSemaphore.Release();
         }
     }
 
