@@ -29,6 +29,11 @@ jobs:
     permissions:
       contents: write
 
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: grpc_server
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -49,7 +54,6 @@ jobs:
           ${{ runner.os }}-pip-unified-server-
 
     - name: Install dependencies
-      working-directory: grpc_server
       run: |
         Write-Host "📦 Installing dependencies..."
         python -m pip install --upgrade pip
@@ -66,10 +70,8 @@ jobs:
         pip install pyinstaller
 
         Write-Host "✅ Dependencies installed"
-      shell: pwsh
 
     - name: Generate proto files
-      working-directory: grpc_server
       run: |
         Write-Host "🔧 Generating proto files..."
         python -m grpc_tools.protoc `
@@ -84,10 +86,8 @@ jobs:
         }
 
         Write-Host "✅ Proto files generated"
-      shell: pwsh
 
     - name: Build with PyInstaller
-      working-directory: grpc_server
       run: |
         Write-Host "🔨 Building BaketaUnifiedServer with PyInstaller..."
         pyinstaller BaketaUnifiedServer.spec --noconfirm
@@ -101,10 +101,8 @@ jobs:
           Write-Host "❌ Build failed: exe not found"
           exit 1
         }
-      shell: pwsh
 
     - name: Create zip package
-      working-directory: grpc_server
       run: |
         Write-Host "📦 Creating zip package..."
 
@@ -121,10 +119,10 @@ jobs:
         echo "## Build Summary" >> $env:GITHUB_STEP_SUMMARY
         echo "- Folder size: $folderSize MB" >> $env:GITHUB_STEP_SUMMARY
         echo "- Zip size: $zipSize MB" >> $env:GITHUB_STEP_SUMMARY
-      shell: pwsh
 
     - name: Get current version info
       id: version
+      working-directory: .
       run: |
         # Get latest commit info
         $commitHash = git rev-parse --short HEAD
@@ -134,9 +132,9 @@ jobs:
         echo "commit-date=$commitDate" >> $env:GITHUB_OUTPUT
 
         Write-Host "Commit: $commitHash ($commitDate)"
-      shell: pwsh
 
     - name: Update models-v2 release
+      working-directory: .
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -153,12 +151,8 @@ jobs:
           exit 1
         }
 
-        # Delete existing asset if exists
-        Write-Host "Deleting old BaketaUnifiedServer-cpu.zip if exists..."
-        gh release delete-asset models-v2 BaketaUnifiedServer-cpu.zip --yes 2>&1 | Out-Null
-
-        # Upload new asset
-        Write-Host "Uploading new BaketaUnifiedServer-cpu.zip..."
+        # Upload new asset (--clobber overwrites existing)
+        Write-Host "Uploading BaketaUnifiedServer-cpu.zip..."
         gh release upload models-v2 $zipPath --clobber
 
         if ($LASTEXITCODE -eq 0) {
@@ -166,20 +160,20 @@ jobs:
 
           # Update release notes with build info
           $notes = @"
-        ## Model Assets v2
+## Model Assets v2
 
-        This release contains model assets for Baketa.
+This release contains model assets for Baketa.
 
-        ### BaketaUnifiedServer (CPU)
-        - **Last updated**: $commitDate
-        - **Commit**: $commitHash
-        - **Auto-built by**: GitHub Actions (Issue #360)
+### BaketaUnifiedServer (CPU)
+- **Last updated**: $commitDate
+- **Commit**: $commitHash
+- **Auto-built by**: GitHub Actions (Issue #360)
 
-        ### Other Assets
-        - surya-detection-onnx.zip - OCR detection model
-        - surya-recognition-quantized.zip - OCR recognition model
-        - nllb-200-distilled-600M-ct2-int8.zip - Translation model
-        "@
+### Other Assets
+- surya-detection-onnx.zip - OCR detection model
+- surya-recognition-quantized.zip - OCR recognition model
+- nllb-200-distilled-600M-ct2-int8.zip - Translation model
+"@
 
           $notes | gh release edit models-v2 --notes-file -
 
@@ -191,4 +185,3 @@ jobs:
           Write-Host "❌ Failed to upload to models-v2"
           exit 1
         }
-      shell: pwsh
