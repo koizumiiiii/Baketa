@@ -550,6 +550,18 @@ public class ComponentDownloadService : IComponentDownloader
             return false;
         }
 
+        // [Issue #364] アプリバージョンが異なる場合は強制更新
+        // 古いバージョンでダウンロードされたコンポーネントには新機能が含まれていない可能性がある
+        var currentAppVersion = GetAppVersion();
+        if (!string.IsNullOrEmpty(localMetadata.AppVersion) &&
+            !string.Equals(localMetadata.AppVersion, currentAppVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation(
+                "[Issue #364] App version changed ({OldVersion} -> {NewVersion}) for {ComponentId}, forcing update",
+                localMetadata.AppVersion, currentAppVersion, component.Id);
+            return false;
+        }
+
         // Fetch remote Last-Modified using HEAD request
         try
         {
@@ -1217,7 +1229,9 @@ public class ComponentDownloadService : IComponentDownloader
             ComponentId = component.Id,
             LastModified = lastModified,
             DownloadedAt = DateTimeOffset.UtcNow,
-            DownloadUrl = component.DownloadUrl
+            DownloadUrl = component.DownloadUrl,
+            // [Issue #364] アプリバージョンを保存
+            AppVersion = GetAppVersion()
         };
 
         try
@@ -1327,6 +1341,23 @@ public class ComponentDownloadService : IComponentDownloader
         }
     }
 
+    /// <summary>
+    /// [Issue #364] 現在のアプリバージョンを取得
+    /// </summary>
+    private static string GetAppVersion()
+    {
+        try
+        {
+            var assembly = System.Reflection.Assembly.GetEntryAssembly();
+            var version = assembly?.GetName().Version;
+            return version?.ToString() ?? "unknown";
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
     #endregion
 }
 
@@ -1339,4 +1370,10 @@ internal class ComponentMetadata
     public DateTimeOffset LastModified { get; set; }
     public DateTimeOffset DownloadedAt { get; set; }
     public string DownloadUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// [Issue #364] ダウンロード時のアプリバージョン
+    /// バージョンが異なる場合は強制更新を行う
+    /// </summary>
+    public string AppVersion { get; set; } = string.Empty;
 }
