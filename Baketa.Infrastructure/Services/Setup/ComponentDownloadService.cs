@@ -1045,10 +1045,15 @@ public class ComponentDownloadService : IComponentDownloader
     {
         _logger.LogInformation("Extracting to: {DestinationPath}", destinationPath);
 
+        // [Issue #364] 展開前に既存のサーバープロセスを停止
+        // BaketaUnifiedServer.exeがロックされていると削除できないため
+        await StopServerProcessesAsync(destinationPath).ConfigureAwait(false);
+
         // Ensure destination directory exists
         if (Directory.Exists(destinationPath))
         {
-            Directory.Delete(destinationPath, recursive: true);
+            // [Issue #364] リトライ付きで削除（プロセス終了待ち）
+            await DeleteDirectoryWithRetryAsync(destinationPath, cancellationToken).ConfigureAwait(false);
         }
         Directory.CreateDirectory(destinationPath);
 
@@ -1059,6 +1064,120 @@ public class ComponentDownloadService : IComponentDownloader
         }, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Extraction complete: {DestinationPath}", destinationPath);
+    }
+
+    /// <summary>
+    /// [Issue #364] 指定ディレクトリ内のサーバープロセスを停止
+    /// BaketaUnifiedServer.exeがロックされている場合に対応
+    /// [Gemini Review] 段階的シャットダウン（CloseMainWindow → 待機 → Kill）を実装
+    /// </summary>
+    private async Task StopServerProcessesAsync(string directoryPath)
+    {
+        // 対象プロセス名のリスト
+        var targetProcessNames = new[] { "BaketaUnifiedServer", "BaketaTranslationServer", "BaketaOcrServer" };
+
+        foreach (var processName in targetProcessNames)
+        {
+            try
+            {
+                var processes = Process.GetProcessesByName(processName);
+                foreach (var process in processes)
+                {
+                    try
+                    {
+                        // プロセスのパスが対象ディレクトリ内かチェック
+                        var processPath = process.MainModule?.FileName;
+                        if (processPath != null && processPath.StartsWith(directoryPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logger.LogInformation("[Issue #364] サーバープロセスを停止中: {ProcessName} (PID: {PID})",
+                                processName, process.Id);
+
+                            // [Gemini Review] 段階的シャットダウン
+                            // 1. まず正常終了を促す
+                            if (process.CloseMainWindow())
+                            {
+                                // 正常終了を5秒待機
+                                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                try
+                                {
+                                    await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+                                    _logger.LogInformation("[Issue #364] サーバープロセス正常終了: {ProcessName}", processName);
+                                    continue; // 正常終了成功
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    _logger.LogDebug("[Issue #364] 正常終了待機タイムアウト、強制終了に移行: {ProcessName}", processName);
+                                }
+                            }
+
+                            // 2. 正常終了できなかった場合は強制終了
+                            process.Kill(entireProcessTree: true);
+                            await process.WaitForExitAsync().ConfigureAwait(false);
+
+                            _logger.LogInformation("[Issue #364] サーバープロセス強制終了完了: {ProcessName}", processName);
+                        }
+                    }
+                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                    {
+                        // プロセスが既に終了している場合は無視
+                        _logger.LogDebug("[Issue #364] プロセス停止中の例外（無視）: {Message}", ex.Message);
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Issue #364] プロセス停止処理でエラー: {ProcessName}", processName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// [Issue #364] リトライ付きディレクトリ削除
+    /// プロセス終了直後はファイルハンドルが解放されていない場合があるため
+    /// [Gemini Review] ログ出力を強化
+    /// </summary>
+    private async Task DeleteDirectoryWithRetryAsync(string directoryPath, CancellationToken cancellationToken)
+    {
+        const int maxRetries = 5;
+        const int retryDelayMs = 500;
+
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                Directory.Delete(directoryPath, recursive: true);
+                _logger.LogDebug("[Issue #364] ディレクトリ削除成功: {Path}", directoryPath);
+                return; // 成功
+            }
+            catch (UnauthorizedAccessException ex) when (attempt < maxRetries)
+            {
+                _logger.LogWarning(ex, "[Issue #364] ディレクトリ削除失敗、リトライします ({Attempt}/{MaxRetries}): {Path}",
+                    attempt, maxRetries, directoryPath);
+                await Task.Delay(retryDelayMs, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException ex) when (attempt < maxRetries)
+            {
+                _logger.LogWarning(ex, "[Issue #364] ディレクトリ削除失敗、リトライします ({Attempt}/{MaxRetries}): {Path}",
+                    attempt, maxRetries, directoryPath);
+                await Task.Delay(retryDelayMs, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        // 最後のリトライ
+        try
+        {
+            Directory.Delete(directoryPath, recursive: true);
+            _logger.LogInformation("[Issue #364] ディレクトリ削除成功（最終試行）: {Path}", directoryPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #364] ディレクトリ削除に最終的に失敗しました: {Path}", directoryPath);
+            throw;
+        }
     }
 
     private void ReportProgress(
