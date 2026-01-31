@@ -1069,6 +1069,7 @@ public class ComponentDownloadService : IComponentDownloader
     /// <summary>
     /// [Issue #364] 指定ディレクトリ内のサーバープロセスを停止
     /// BaketaUnifiedServer.exeがロックされている場合に対応
+    /// [Gemini Review] 段階的シャットダウン（CloseMainWindow → 待機 → Kill）を実装
     /// </summary>
     private async Task StopServerProcessesAsync(string directoryPath)
     {
@@ -1091,10 +1092,29 @@ public class ComponentDownloadService : IComponentDownloader
                             _logger.LogInformation("[Issue #364] サーバープロセスを停止中: {ProcessName} (PID: {PID})",
                                 processName, process.Id);
 
+                            // [Gemini Review] 段階的シャットダウン
+                            // 1. まず正常終了を促す
+                            if (process.CloseMainWindow())
+                            {
+                                // 正常終了を5秒待機
+                                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                                try
+                                {
+                                    await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+                                    _logger.LogInformation("[Issue #364] サーバープロセス正常終了: {ProcessName}", processName);
+                                    continue; // 正常終了成功
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    _logger.LogDebug("[Issue #364] 正常終了待機タイムアウト、強制終了に移行: {ProcessName}", processName);
+                                }
+                            }
+
+                            // 2. 正常終了できなかった場合は強制終了
                             process.Kill(entireProcessTree: true);
                             await process.WaitForExitAsync().ConfigureAwait(false);
 
-                            _logger.LogInformation("[Issue #364] サーバープロセス停止完了: {ProcessName}", processName);
+                            _logger.LogInformation("[Issue #364] サーバープロセス強制終了完了: {ProcessName}", processName);
                         }
                     }
                     catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -1118,6 +1138,7 @@ public class ComponentDownloadService : IComponentDownloader
     /// <summary>
     /// [Issue #364] リトライ付きディレクトリ削除
     /// プロセス終了直後はファイルハンドルが解放されていない場合があるため
+    /// [Gemini Review] ログ出力を強化
     /// </summary>
     private async Task DeleteDirectoryWithRetryAsync(string directoryPath, CancellationToken cancellationToken)
     {
@@ -1129,24 +1150,34 @@ public class ComponentDownloadService : IComponentDownloader
             try
             {
                 Directory.Delete(directoryPath, recursive: true);
+                _logger.LogDebug("[Issue #364] ディレクトリ削除成功: {Path}", directoryPath);
                 return; // 成功
             }
-            catch (UnauthorizedAccessException) when (attempt < maxRetries)
+            catch (UnauthorizedAccessException ex) when (attempt < maxRetries)
             {
-                _logger.LogDebug("[Issue #364] ディレクトリ削除リトライ {Attempt}/{MaxRetries}: {Path}",
+                _logger.LogWarning(ex, "[Issue #364] ディレクトリ削除失敗、リトライします ({Attempt}/{MaxRetries}): {Path}",
                     attempt, maxRetries, directoryPath);
                 await Task.Delay(retryDelayMs, cancellationToken).ConfigureAwait(false);
             }
-            catch (IOException) when (attempt < maxRetries)
+            catch (IOException ex) when (attempt < maxRetries)
             {
-                _logger.LogDebug("[Issue #364] ディレクトリ削除リトライ {Attempt}/{MaxRetries}: {Path}",
+                _logger.LogWarning(ex, "[Issue #364] ディレクトリ削除失敗、リトライします ({Attempt}/{MaxRetries}): {Path}",
                     attempt, maxRetries, directoryPath);
                 await Task.Delay(retryDelayMs, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        // 最後のリトライ（例外はスロー）
-        Directory.Delete(directoryPath, recursive: true);
+        // 最後のリトライ
+        try
+        {
+            Directory.Delete(directoryPath, recursive: true);
+            _logger.LogInformation("[Issue #364] ディレクトリ削除成功（最終試行）: {Path}", directoryPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #364] ディレクトリ削除に最終的に失敗しました: {Path}", directoryPath);
+            throw;
+        }
     }
 
     private void ReportProgress(
