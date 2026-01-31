@@ -1045,10 +1045,15 @@ public class ComponentDownloadService : IComponentDownloader
     {
         _logger.LogInformation("Extracting to: {DestinationPath}", destinationPath);
 
+        // [Issue #364] 展開前に既存のサーバープロセスを停止
+        // BaketaUnifiedServer.exeがロックされていると削除できないため
+        await StopServerProcessesAsync(destinationPath).ConfigureAwait(false);
+
         // Ensure destination directory exists
         if (Directory.Exists(destinationPath))
         {
-            Directory.Delete(destinationPath, recursive: true);
+            // [Issue #364] リトライ付きで削除（プロセス終了待ち）
+            await DeleteDirectoryWithRetryAsync(destinationPath, cancellationToken).ConfigureAwait(false);
         }
         Directory.CreateDirectory(destinationPath);
 
@@ -1059,6 +1064,89 @@ public class ComponentDownloadService : IComponentDownloader
         }, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Extraction complete: {DestinationPath}", destinationPath);
+    }
+
+    /// <summary>
+    /// [Issue #364] 指定ディレクトリ内のサーバープロセスを停止
+    /// BaketaUnifiedServer.exeがロックされている場合に対応
+    /// </summary>
+    private async Task StopServerProcessesAsync(string directoryPath)
+    {
+        // 対象プロセス名のリスト
+        var targetProcessNames = new[] { "BaketaUnifiedServer", "BaketaTranslationServer", "BaketaOcrServer" };
+
+        foreach (var processName in targetProcessNames)
+        {
+            try
+            {
+                var processes = Process.GetProcessesByName(processName);
+                foreach (var process in processes)
+                {
+                    try
+                    {
+                        // プロセスのパスが対象ディレクトリ内かチェック
+                        var processPath = process.MainModule?.FileName;
+                        if (processPath != null && processPath.StartsWith(directoryPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logger.LogInformation("[Issue #364] サーバープロセスを停止中: {ProcessName} (PID: {PID})",
+                                processName, process.Id);
+
+                            process.Kill(entireProcessTree: true);
+                            await process.WaitForExitAsync().ConfigureAwait(false);
+
+                            _logger.LogInformation("[Issue #364] サーバープロセス停止完了: {ProcessName}", processName);
+                        }
+                    }
+                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                    {
+                        // プロセスが既に終了している場合は無視
+                        _logger.LogDebug("[Issue #364] プロセス停止中の例外（無視）: {Message}", ex.Message);
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Issue #364] プロセス停止処理でエラー: {ProcessName}", processName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// [Issue #364] リトライ付きディレクトリ削除
+    /// プロセス終了直後はファイルハンドルが解放されていない場合があるため
+    /// </summary>
+    private async Task DeleteDirectoryWithRetryAsync(string directoryPath, CancellationToken cancellationToken)
+    {
+        const int maxRetries = 5;
+        const int retryDelayMs = 500;
+
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                Directory.Delete(directoryPath, recursive: true);
+                return; // 成功
+            }
+            catch (UnauthorizedAccessException) when (attempt < maxRetries)
+            {
+                _logger.LogDebug("[Issue #364] ディレクトリ削除リトライ {Attempt}/{MaxRetries}: {Path}",
+                    attempt, maxRetries, directoryPath);
+                await Task.Delay(retryDelayMs, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException) when (attempt < maxRetries)
+            {
+                _logger.LogDebug("[Issue #364] ディレクトリ削除リトライ {Attempt}/{MaxRetries}: {Path}",
+                    attempt, maxRetries, directoryPath);
+                await Task.Delay(retryDelayMs, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        // 最後のリトライ（例外はスロー）
+        Directory.Delete(directoryPath, recursive: true);
     }
 
     private void ReportProgress(
