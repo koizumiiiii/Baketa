@@ -159,23 +159,25 @@ jobs:
           Write-Host "✅ Successfully updated models-v2 release"
 
           # Update release notes with build info
-          $notes = @"
-## Model Assets v2
+          $notesFile = "release-notes.md"
+          @(
+            "## Model Assets v2",
+            "",
+            "This release contains model assets for Baketa.",
+            "",
+            "### BaketaUnifiedServer (CPU)",
+            "- **Last updated**: $commitDate",
+            "- **Commit**: $commitHash",
+            "- **Auto-built by**: GitHub Actions (Issue #360)",
+            "",
+            "### Other Assets",
+            "- surya-detection-onnx.zip - OCR detection model",
+            "- surya-recognition-quantized.zip - OCR recognition model",
+            "- nllb-200-distilled-600M-ct2-int8.zip - Translation model"
+          ) | Out-File -FilePath $notesFile -Encoding utf8
 
-This release contains model assets for Baketa.
-
-### BaketaUnifiedServer (CPU)
-- **Last updated**: $commitDate
-- **Commit**: $commitHash
-- **Auto-built by**: GitHub Actions (Issue #360)
-
-### Other Assets
-- surya-detection-onnx.zip - OCR detection model
-- surya-recognition-quantized.zip - OCR recognition model
-- nllb-200-distilled-600M-ct2-int8.zip - Translation model
-"@
-
-          $notes | gh release edit models-v2 --notes-file -
+          gh release edit models-v2 --notes-file $notesFile
+          Remove-Item $notesFile
 
           echo "## Deployment" >> $env:GITHUB_STEP_SUMMARY
           echo "- Release: models-v2" >> $env:GITHUB_STEP_SUMMARY
