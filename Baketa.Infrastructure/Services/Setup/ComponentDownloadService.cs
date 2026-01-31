@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Settings;
@@ -35,6 +36,9 @@ public class ComponentDownloadService : IComponentDownloader
 
     // [Issue #210] Cached GPU detection result
     private bool? _cachedSupportsCuda;
+
+    // [Issue #360] Component metadata file name for version tracking
+    private const string MetadataFileName = ".baketa-component-metadata.json";
 
     /// <inheritdoc/>
     public event EventHandler<ComponentDownloadProgressEventArgs>? DownloadProgressChanged;
@@ -226,14 +230,17 @@ public class ComponentDownloadService : IComponentDownloader
                 }
 
                 // [Issue #210] Handle split files for large CUDA downloads
+                // [Issue #360] Track Last-Modified for version checking
+                DateTimeOffset? lastModified = null;
+
                 if (component.SplitParts > 1)
                 {
-                    await DownloadAndConcatenateSplitFilesAsync(component, tempZipPath, cancellationToken).ConfigureAwait(false);
+                    lastModified = await DownloadAndConcatenateSplitFilesAsync(component, tempZipPath, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
                     // Download with progress reporting
-                    await DownloadFileWithProgressAsync(component, tempZipPath, cancellationToken).ConfigureAwait(false);
+                    lastModified = await DownloadFileWithProgressAsync(component, tempZipPath, cancellationToken).ConfigureAwait(false);
                 }
 
                 // Verify checksum if provided
@@ -273,6 +280,17 @@ public class ComponentDownloadService : IComponentDownloader
                         errorMessage: $"展開に失敗しました: {ex.Message}",
                         statusMessage: "エラー: 展開に失敗しました");
                     throw;
+                }
+
+                // [Issue #360] Save metadata for version tracking
+                if (lastModified.HasValue)
+                {
+                    await SaveComponentMetadataAsync(component, lastModified.Value, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    // If no Last-Modified was available, use current time
+                    await SaveComponentMetadataAsync(component, DateTimeOffset.UtcNow, cancellationToken).ConfigureAwait(false);
                 }
 
                 stopwatch.Stop();
@@ -506,14 +524,193 @@ public class ComponentDownloadService : IComponentDownloader
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<bool> IsComponentUpToDateAsync(ComponentInfo component, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // First check if component is installed at all
+        var isInstalled = await IsComponentInstalledAsync(component, cancellationToken).ConfigureAwait(false);
+        if (!isInstalled)
+        {
+            _logger.LogDebug("[Issue #360] Component not installed: {ComponentId}", component.Id);
+            return false;
+        }
+
+        // Read local metadata
+        var metadataPath = Path.Combine(component.LocalPath, MetadataFileName);
+        var localMetadata = await ReadComponentMetadataAsync(metadataPath, cancellationToken).ConfigureAwait(false);
+
+        if (localMetadata == null)
+        {
+            // No metadata found - assume outdated for safety
+            _logger.LogInformation(
+                "[Issue #360] No metadata found for {ComponentId}, assuming outdated",
+                component.Id);
+            return false;
+        }
+
+        // Fetch remote Last-Modified using HEAD request
+        try
+        {
+            var remoteLastModified = await GetRemoteLastModifiedAsync(component.DownloadUrl, cancellationToken).ConfigureAwait(false);
+
+            if (remoteLastModified == null)
+            {
+                // Cannot determine remote version - assume up to date to avoid unnecessary downloads
+                _logger.LogWarning(
+                    "[Issue #360] Cannot get remote Last-Modified for {ComponentId}, assuming up-to-date",
+                    component.Id);
+                return true;
+            }
+
+            var isUpToDate = localMetadata.LastModified >= remoteLastModified.Value;
+
+            _logger.LogInformation(
+                "[Issue #360] Version check for {ComponentId}: Local={LocalDate:s}, Remote={RemoteDate:s}, UpToDate={IsUpToDate}",
+                component.Id,
+                localMetadata.LastModified,
+                remoteLastModified.Value,
+                isUpToDate);
+
+            return isUpToDate;
+        }
+        catch (HttpRequestException ex)
+        {
+            // Network error - assume up to date to avoid blocking app startup
+            _logger.LogWarning(
+                ex,
+                "[Issue #360] Network error checking version for {ComponentId}, assuming up-to-date",
+                component.Id);
+            return true;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> DownloadMissingOrOutdatedComponentsAsync(CancellationToken cancellationToken = default)
+    {
+        var components = await GetRequiredComponentsAsync(cancellationToken).ConfigureAwait(false);
+
+        // Check each component's status (installed AND up-to-date)
+        var checkTasks = components.Select(async component =>
+        {
+            var isInstalled = await IsComponentInstalledAsync(component, cancellationToken).ConfigureAwait(false);
+            if (!isInstalled)
+            {
+                return (component, needsDownload: true, reason: "not installed");
+            }
+
+            var isUpToDate = await IsComponentUpToDateAsync(component, cancellationToken).ConfigureAwait(false);
+            return (component, needsDownload: !isUpToDate, reason: isUpToDate ? "up-to-date" : "outdated");
+        });
+
+        var checkResults = await Task.WhenAll(checkTasks).ConfigureAwait(false);
+
+        // Filter components that need download
+        var componentsToDownload = checkResults
+            .Where(r => r.needsDownload)
+            .Select(r => (r.component, r.reason))
+            .ToList();
+
+        if (componentsToDownload.Count == 0)
+        {
+            _logger.LogInformation("[Issue #360] All components are installed and up-to-date");
+            return 0;
+        }
+
+        _logger.LogInformation(
+            "[Issue #360] Found {Count} components to download/update: {Components}",
+            componentsToDownload.Count,
+            string.Join(", ", componentsToDownload.Select(c => $"{c.component.Id} ({c.reason})")));
+
+        // Download using existing parallel download logic
+        var maxConcurrentDownloads = _settings.MaxConcurrentDownloads > 0 ? _settings.MaxConcurrentDownloads : 2;
+        using var semaphore = new SemaphoreSlim(maxConcurrentDownloads);
+        var downloadCount = 0;
+        var failedComponents = new List<(ComponentInfo Component, Exception Exception)>();
+        var failedComponentsLock = new object();
+        var totalStopwatch = Stopwatch.StartNew();
+
+        var downloadTasks = componentsToDownload.Select(async item =>
+        {
+            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var componentStopwatch = Stopwatch.StartNew();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                _logger.LogInformation(
+                    "[Issue #360] Downloading component: {ComponentId} (reason: {Reason})",
+                    item.component.Id, item.reason);
+                await DownloadComponentAsync(item.component, cancellationToken).ConfigureAwait(false);
+                Interlocked.Increment(ref downloadCount);
+                componentStopwatch.Stop();
+                _logger.LogInformation(
+                    "[Issue #360] Completed download: {ComponentId} in {ElapsedMs}ms",
+                    item.component.Id, componentStopwatch.ElapsedMilliseconds);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                componentStopwatch.Stop();
+                _logger.LogWarning(
+                    ex,
+                    "[Issue #360] Failed to download component: {ComponentId} after {ElapsedMs}ms",
+                    item.component.Id, componentStopwatch.ElapsedMilliseconds);
+                lock (failedComponentsLock)
+                {
+                    failedComponents.Add((item.component, ex));
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(downloadTasks).ConfigureAwait(false);
+
+        totalStopwatch.Stop();
+        _logger.LogInformation(
+            "[Issue #360] Downloaded {SuccessCount}/{TotalCount} components in {ElapsedMs}ms",
+            downloadCount, componentsToDownload.Count, totalStopwatch.ElapsedMilliseconds);
+
+        // Handle failures
+        if (failedComponents.Count > 0)
+        {
+            var requiredFailures = failedComponents.Where(f => f.Component.IsRequired).ToList();
+            if (requiredFailures.Count > 0)
+            {
+                var failedIds = string.Join(", ", requiredFailures.Select(f => f.Component.Id));
+                _logger.LogError("[Issue #360] Required components failed to download: {FailedIds}", failedIds);
+                throw new AggregateException(
+                    $"Failed to download required components: {failedIds}",
+                    requiredFailures.Select(f => f.Exception));
+            }
+            else
+            {
+                var failedIds = string.Join(", ", failedComponents.Select(f => f.Component.Id));
+                _logger.LogWarning(
+                    "[Issue #360] Optional components failed to download: {FailedIds}. Continuing with partial success.",
+                    failedIds);
+            }
+        }
+
+        return downloadCount;
+    }
+
     #region Private Methods
 
     /// <summary>
     /// [Issue #210] Downloads and concatenates split files for large CUDA downloads
     /// Files are named using SplitPartSuffixFormat (default: {DownloadUrl}.001, .002, etc.)
     /// Includes part-level checksum verification for early failure detection
+    /// [Issue #360] Returns Last-Modified for version tracking
     /// </summary>
-    private async Task DownloadAndConcatenateSplitFilesAsync(
+    /// <returns>Last-Modified timestamp from the first part's response headers</returns>
+    private async Task<DateTimeOffset?> DownloadAndConcatenateSplitFilesAsync(
         ComponentInfo component,
         string destinationPath,
         CancellationToken cancellationToken)
@@ -525,6 +722,7 @@ public class ComponentDownloadService : IComponentDownloader
         var tempParts = new List<string>();
         var totalDownloaded = 0L;
         var downloadStartTime = Stopwatch.StartNew();
+        DateTimeOffset? lastModified = null; // [Issue #360] Track from first part
 
         try
         {
@@ -558,6 +756,12 @@ public class ComponentDownloadService : IComponentDownloader
                     cancellationToken).ConfigureAwait(false);
 
                 response.EnsureSuccessStatusCode();
+
+                // [Issue #360] Capture Last-Modified from first part
+                if (i == 1)
+                {
+                    lastModified = response.Content.Headers.LastModified ?? response.Headers.Date;
+                }
 
                 var partSize = response.Content.Headers.ContentLength ?? 0;
                 var partBytesReceived = 0L;
@@ -679,6 +883,8 @@ public class ComponentDownloadService : IComponentDownloader
                 totalDownloaded / (1024 * 1024),
                 totalElapsedSeconds,
                 averageSpeed / (1024 * 1024));
+
+            return lastModified;
         }
         finally
         {
@@ -778,12 +984,13 @@ public class ComponentDownloadService : IComponentDownloader
 
     /// <summary>
     /// [Issue #185] Downloads a file with progress reporting
-    /// Used for both component downloads and tokenizer downloads
+    /// [Issue #360] Returns Last-Modified for version tracking
     /// </summary>
     /// <param name="component">Component info containing download URL and expected size</param>
     /// <param name="destinationPath">Local path to save the downloaded file</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    private async Task DownloadFileWithProgressAsync(
+    /// <returns>Last-Modified timestamp from response headers</returns>
+    private async Task<DateTimeOffset?> DownloadFileWithProgressAsync(
         ComponentInfo component,
         string destinationPath,
         CancellationToken cancellationToken)
@@ -794,6 +1001,9 @@ public class ComponentDownloadService : IComponentDownloader
             cancellationToken).ConfigureAwait(false);
 
         response.EnsureSuccessStatusCode();
+
+        // [Issue #360] Capture Last-Modified for version tracking
+        var lastModified = response.Content.Headers.LastModified ?? response.Headers.Date;
 
         var totalBytes = response.Content.Headers.ContentLength ?? component.ExpectedSizeBytes;
         var bytesReceived = 0L;
@@ -820,6 +1030,8 @@ public class ComponentDownloadService : IComponentDownloader
                 lastReportTime.Restart();
             }
         }
+
+        return lastModified;
     }
 
     private static async Task<string> ComputeChecksumAsync(string filePath, CancellationToken cancellationToken)
@@ -870,5 +1082,142 @@ public class ComponentDownloadService : IComponentDownloader
         });
     }
 
+    /// <summary>
+    /// [Issue #360] Saves component metadata after successful download
+    /// [Gemini Review] Uses atomic write pattern (temp file + rename) for robustness
+    /// </summary>
+    private async Task SaveComponentMetadataAsync(
+        ComponentInfo component,
+        DateTimeOffset lastModified,
+        CancellationToken cancellationToken)
+    {
+        var metadataPath = Path.Combine(component.LocalPath, MetadataFileName);
+        var tempMetadataPath = metadataPath + ".tmp";
+        var metadata = new ComponentMetadata
+        {
+            ComponentId = component.Id,
+            LastModified = lastModified,
+            DownloadedAt = DateTimeOffset.UtcNow,
+            DownloadUrl = component.DownloadUrl
+        };
+
+        try
+        {
+            var json = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });
+
+            // Write to temp file first
+            await File.WriteAllTextAsync(tempMetadataPath, json, cancellationToken).ConfigureAwait(false);
+
+            // Atomic move (overwrite)
+            File.Move(tempMetadataPath, metadataPath, overwrite: true);
+
+            _logger.LogDebug("[Issue #360] Saved metadata for {ComponentId}: LastModified={LastModified:s}", component.Id, lastModified);
+        }
+        catch (Exception ex)
+        {
+            // Non-critical - log and continue
+            _logger.LogWarning(ex, "[Issue #360] Failed to save metadata for {ComponentId}", component.Id);
+
+            // Cleanup temp file
+            if (File.Exists(tempMetadataPath))
+            {
+                try { File.Delete(tempMetadataPath); }
+                catch { /* ignore */ }
+            }
+        }
+    }
+
+    /// <summary>
+    /// [Issue #360] Reads component metadata from local file
+    /// </summary>
+    private async Task<ComponentMetadata?> ReadComponentMetadataAsync(
+        string metadataPath,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(metadataPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(metadataPath, cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<ComponentMetadata>(json);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #360] Failed to read metadata from {Path}", metadataPath);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #360] Gets Last-Modified header from remote URL using HEAD request
+    /// [Gemini Review] Uses short timeout (5s) to avoid blocking app startup
+    /// </summary>
+    private async Task<DateTimeOffset?> GetRemoteLastModifiedAsync(
+        string url,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Head, url);
+            // Bypass cache to get actual remote version
+            request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
+
+            // [Gemini Review] Use short timeout (5s) for version check to avoid startup delay
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+            using var response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cts.Token).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "[Issue #360] HEAD request failed for {Url}: {StatusCode}",
+                    url, response.StatusCode);
+                return null;
+            }
+
+            // Try Last-Modified header first
+            if (response.Content.Headers.LastModified.HasValue)
+            {
+                return response.Content.Headers.LastModified.Value;
+            }
+
+            // Fallback to Date header
+            if (response.Headers.Date.HasValue)
+            {
+                return response.Headers.Date.Value;
+            }
+
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("[Issue #360] HEAD request timed out for {Url}", url);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #360] Failed to get Last-Modified for {Url}", url);
+            return null;
+        }
+    }
+
     #endregion
+}
+
+/// <summary>
+/// [Issue #360] Component metadata for version tracking
+/// </summary>
+internal class ComponentMetadata
+{
+    public string ComponentId { get; set; } = string.Empty;
+    public DateTimeOffset LastModified { get; set; }
+    public DateTimeOffset DownloadedAt { get; set; }
+    public string DownloadUrl { get; set; } = string.Empty;
 }

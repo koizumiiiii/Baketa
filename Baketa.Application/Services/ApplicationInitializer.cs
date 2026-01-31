@@ -298,7 +298,7 @@ public class ApplicationInitializer : ILoadingScreenInitializer
 
     /// <summary>
     /// [Issue #185] Step 0: 不足コンポーネントをダウンロードします
-    /// 既にインストール済みの場合はスキップします
+    /// [Issue #360] 古いコンポーネントの更新チェックも行います
     /// </summary>
     private async Task DownloadMissingComponentsAsync(CancellationToken cancellationToken)
     {
@@ -308,21 +308,22 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             return;
         }
 
-        _logger.LogInformation("コンポーネントダウンロードチェック開始");
+        _logger.LogInformation("[Issue #360] コンポーネントダウンロード・更新チェック開始");
 
         try
         {
+            // [Issue #360] 不足分と古いコンポーネントをダウンロード
             var downloadCount = await _componentDownloader
-                .DownloadMissingComponentsAsync(cancellationToken)
+                .DownloadMissingOrOutdatedComponentsAsync(cancellationToken)
                 .ConfigureAwait(false);
 
             if (downloadCount > 0)
             {
-                _logger.LogInformation("{Count}個のコンポーネントをダウンロードしました", downloadCount);
+                _logger.LogInformation("[Issue #360] {Count}個のコンポーネントをダウンロード/更新しました", downloadCount);
             }
             else
             {
-                _logger.LogInformation("全てのコンポーネントは既にインストール済みです");
+                _logger.LogInformation("[Issue #360] 全てのコンポーネントは最新です");
             }
 
             // [Issue #185] NLLB tokenizer.json 補完ダウンロード

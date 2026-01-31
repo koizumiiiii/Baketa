@@ -1,0 +1,187 @@
+name: Build and Deploy BaketaUnifiedServer
+
+# Issue #360: BaketaUnifiedServer CI/CD
+# Proto/サーバーコード変更時に自動ビルド・デプロイ
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'grpc_server/**'
+      - '**/*.proto'
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force rebuild even without changes'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  build-unified-server:
+    name: Build BaketaUnifiedServer (CPU)
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: grpc_server
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-unified-server-${{ hashFiles('grpc_server/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-unified-server-
+
+    - name: Install dependencies
+      run: |
+        Write-Host "📦 Installing dependencies..."
+        python -m pip install --upgrade pip
+
+        # Base requirements
+        pip install -r requirements.txt
+
+        # Additional dependencies for OCR (Surya)
+        pip install Pillow opencv-python-headless
+        pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+        pip install surya-ocr transformers safetensors einops pydantic
+
+        # PyInstaller for building
+        pip install pyinstaller
+
+        Write-Host "✅ Dependencies installed"
+
+    - name: Generate proto files
+      run: |
+        Write-Host "🔧 Generating proto files..."
+        python -m grpc_tools.protoc `
+          --proto_path=protos `
+          --python_out=protos `
+          --grpc_python_out=protos `
+          protos/translation.proto protos/ocr.proto
+
+        # Create __init__.py if not exists
+        if (-not (Test-Path "protos/__init__.py")) {
+          "" | Out-File -FilePath "protos/__init__.py" -Encoding utf8
+        }
+
+        Write-Host "✅ Proto files generated"
+
+    - name: Build with PyInstaller
+      run: |
+        Write-Host "🔨 Building BaketaUnifiedServer with PyInstaller..."
+        pyinstaller BaketaUnifiedServer.spec --noconfirm
+
+        # Verify build
+        $exePath = "dist/BaketaUnifiedServer/BaketaUnifiedServer.exe"
+        if (Test-Path $exePath) {
+          $size = [math]::Round((Get-Item $exePath).Length / 1MB, 2)
+          Write-Host "✅ Build successful: BaketaUnifiedServer.exe ($size MB)"
+        } else {
+          Write-Host "❌ Build failed: exe not found"
+          exit 1
+        }
+
+    - name: Create zip package
+      run: |
+        Write-Host "📦 Creating zip package..."
+
+        # Get folder size
+        $folderSize = [math]::Round((Get-ChildItem -Path "dist/BaketaUnifiedServer" -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
+        Write-Host "Folder size: $folderSize MB"
+
+        # Create zip
+        Compress-Archive -Path "dist/BaketaUnifiedServer/*" -DestinationPath "BaketaUnifiedServer-cpu.zip" -Force
+
+        $zipSize = [math]::Round((Get-Item "BaketaUnifiedServer-cpu.zip").Length / 1MB, 2)
+        Write-Host "✅ Zip created: BaketaUnifiedServer-cpu.zip ($zipSize MB)"
+
+        echo "## Build Summary" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Folder size: $folderSize MB" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Zip size: $zipSize MB" >> $env:GITHUB_STEP_SUMMARY
+
+    - name: Get current version info
+      id: version
+      working-directory: .
+      run: |
+        # Get latest commit info
+        $commitHash = git rev-parse --short HEAD
+        $commitDate = git log -1 --format="%ci" | ForEach-Object { $_.Substring(0, 10) }
+
+        echo "commit-hash=$commitHash" >> $env:GITHUB_OUTPUT
+        echo "commit-date=$commitDate" >> $env:GITHUB_OUTPUT
+
+        Write-Host "Commit: $commitHash ($commitDate)"
+
+    - name: Update models-v2 release
+      working-directory: .
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        Write-Host "🚀 Updating models-v2 release..."
+
+        $zipPath = "grpc_server/BaketaUnifiedServer-cpu.zip"
+        $commitHash = "${{ steps.version.outputs.commit-hash }}"
+        $commitDate = "${{ steps.version.outputs.commit-date }}"
+
+        # Check if models-v2 release exists
+        $releaseExists = gh release view models-v2 2>&1
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "❌ models-v2 release not found. Please create it manually first."
+          exit 1
+        }
+
+        # Upload new asset (--clobber overwrites existing)
+        Write-Host "Uploading BaketaUnifiedServer-cpu.zip..."
+        gh release upload models-v2 $zipPath --clobber
+
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Successfully updated models-v2 release"
+
+          # Update release notes with build info
+          $notes = @"
+## Model Assets v2
+
+This release contains model assets for Baketa.
+
+### BaketaUnifiedServer (CPU)
+- **Last updated**: $commitDate
+- **Commit**: $commitHash
+- **Auto-built by**: GitHub Actions (Issue #360)
+
+### Other Assets
+- surya-detection-onnx.zip - OCR detection model
+- surya-recognition-quantized.zip - OCR recognition model
+- nllb-200-distilled-600M-ct2-int8.zip - Translation model
+"@
+
+          $notes | gh release edit models-v2 --notes-file -
+
+          echo "## Deployment" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Release: models-v2" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Asset: BaketaUnifiedServer-cpu.zip" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Commit: $commitHash" >> $env:GITHUB_STEP_SUMMARY
+        } else {
+          Write-Host "❌ Failed to upload to models-v2"
+          exit 1
+        }
