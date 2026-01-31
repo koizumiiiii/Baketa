@@ -71,21 +71,37 @@ jobs:
 
         Write-Host "✅ Dependencies installed"
 
-    - name: Generate proto files
+    - name: Verify proto files
       run: |
-        Write-Host "🔧 Generating proto files..."
-        python -m grpc_tools.protoc `
-          --proto_path=protos `
-          --python_out=protos `
-          --grpc_python_out=protos `
-          protos/translation.proto protos/ocr.proto
+        Write-Host "🔧 Verifying proto files (using committed versions with relative imports)..."
 
-        # Create __init__.py if not exists
-        if (-not (Test-Path "protos/__init__.py")) {
-          "" | Out-File -FilePath "protos/__init__.py" -Encoding utf8
+        # [Issue #365 関連] CI/CDでproto再生成すると絶対インポートになり、
+        # PyInstallerバンドル内で動作しない。リポジトリの相対インポート版を使用する。
+
+        # Verify required proto files exist
+        $requiredFiles = @(
+          "protos/ocr_pb2.py",
+          "protos/ocr_pb2_grpc.py",
+          "protos/translation_pb2.py",
+          "protos/translation_pb2_grpc.py",
+          "protos/__init__.py"
+        )
+
+        foreach ($file in $requiredFiles) {
+          if (-not (Test-Path $file)) {
+            Write-Host "❌ Missing required proto file: $file"
+            exit 1
+          }
+          Write-Host "✓ Found: $file"
         }
 
-        Write-Host "✅ Proto files generated"
+        # Verify relative imports are present (sanity check)
+        $content = Get-Content "protos/ocr_pb2_grpc.py" -Raw
+        if ($content -notmatch "from protos import") {
+          Write-Host "⚠️ Warning: Proto file may not have relative imports"
+        }
+
+        Write-Host "✅ Proto files verified"
 
     - name: Build with PyInstaller
       run: |
