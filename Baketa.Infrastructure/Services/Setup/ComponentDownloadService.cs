@@ -1084,6 +1084,7 @@ public class ComponentDownloadService : IComponentDownloader
 
     /// <summary>
     /// [Issue #360] Saves component metadata after successful download
+    /// [Gemini Review] Uses atomic write pattern (temp file + rename) for robustness
     /// </summary>
     private async Task SaveComponentMetadataAsync(
         ComponentInfo component,
@@ -1091,6 +1092,7 @@ public class ComponentDownloadService : IComponentDownloader
         CancellationToken cancellationToken)
     {
         var metadataPath = Path.Combine(component.LocalPath, MetadataFileName);
+        var tempMetadataPath = metadataPath + ".tmp";
         var metadata = new ComponentMetadata
         {
             ComponentId = component.Id,
@@ -1102,13 +1104,26 @@ public class ComponentDownloadService : IComponentDownloader
         try
         {
             var json = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(metadataPath, json, cancellationToken).ConfigureAwait(false);
+
+            // Write to temp file first
+            await File.WriteAllTextAsync(tempMetadataPath, json, cancellationToken).ConfigureAwait(false);
+
+            // Atomic move (overwrite)
+            File.Move(tempMetadataPath, metadataPath, overwrite: true);
+
             _logger.LogDebug("[Issue #360] Saved metadata for {ComponentId}: LastModified={LastModified:s}", component.Id, lastModified);
         }
         catch (Exception ex)
         {
             // Non-critical - log and continue
             _logger.LogWarning(ex, "[Issue #360] Failed to save metadata for {ComponentId}", component.Id);
+
+            // Cleanup temp file
+            if (File.Exists(tempMetadataPath))
+            {
+                try { File.Delete(tempMetadataPath); }
+                catch { /* ignore */ }
+            }
         }
     }
 
@@ -1138,6 +1153,7 @@ public class ComponentDownloadService : IComponentDownloader
 
     /// <summary>
     /// [Issue #360] Gets Last-Modified header from remote URL using HEAD request
+    /// [Gemini Review] Uses short timeout (5s) to avoid blocking app startup
     /// </summary>
     private async Task<DateTimeOffset?> GetRemoteLastModifiedAsync(
         string url,
@@ -1149,10 +1165,14 @@ public class ComponentDownloadService : IComponentDownloader
             // Bypass cache to get actual remote version
             request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
 
+            // [Gemini Review] Use short timeout (5s) for version check to avoid startup delay
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+
             using var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
+                cts.Token).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -1176,31 +1196,16 @@ public class ComponentDownloadService : IComponentDownloader
 
             return null;
         }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("[Issue #360] HEAD request timed out for {Url}", url);
+            return null;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "[Issue #360] Failed to get Last-Modified for {Url}", url);
             return null;
         }
-    }
-
-    /// <summary>
-    /// [Issue #360] Fetches Last-Modified during download and saves metadata
-    /// </summary>
-    private async Task<DateTimeOffset?> GetAndSaveLastModifiedAsync(
-        ComponentInfo component,
-        HttpResponseMessage response,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset? lastModified = response.Content.Headers.LastModified
-            ?? response.Headers.Date
-            ?? DateTimeOffset.UtcNow;
-
-        if (lastModified.HasValue)
-        {
-            await SaveComponentMetadataAsync(component, lastModified.Value, cancellationToken).ConfigureAwait(false);
-        }
-
-        return lastModified;
     }
 
     #endregion
