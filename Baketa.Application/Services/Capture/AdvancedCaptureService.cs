@@ -114,28 +114,31 @@ public sealed class AdvancedCaptureService : IAdvancedCaptureService, IDisposabl
 
     #region ICaptureService基本実装
 
-    public async Task<IImage> CaptureScreenAsync()
+    public async Task<IImage> CaptureScreenAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var windowsImage = await _screenCapturer.CaptureScreenAsync().ConfigureAwait(false);
         return new WindowsImageAdapter(windowsImage);
     }
 
-    public async Task<IImage> CaptureRegionAsync(Rectangle region)
+    public async Task<IImage> CaptureRegionAsync(Rectangle region, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var windowsImage = await _screenCapturer.CaptureRegionAsync(region).ConfigureAwait(false);
         return new WindowsImageAdapter(windowsImage);
     }
 
-    public async Task<IImage> CaptureWindowAsync(IntPtr windowHandle)
+    public async Task<IImage> CaptureWindowAsync(IntPtr windowHandle, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var windowsImage = await _screenCapturer.CaptureWindowAsync(windowHandle).ConfigureAwait(false);
         return new WindowsImageAdapter(windowsImage);
     }
 
-    public async Task<IImage> CaptureClientAreaAsync(IntPtr windowHandle)
+    public async Task<IImage> CaptureClientAreaAsync(IntPtr windowHandle, CancellationToken cancellationToken = default)
     {
         // クライアント領域のキャプチャ（今後実装）
-        return await CaptureWindowAsync(windowHandle).ConfigureAwait(false);
+        return await CaptureWindowAsync(windowHandle, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<bool> DetectChangesAsync(IImage previousImage, IImage currentImage, float threshold = 0.05f)

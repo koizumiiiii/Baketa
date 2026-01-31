@@ -77,7 +77,7 @@ public class TranslationFlowIntegrationTests
         // キャプチャサービスのモック設定
         var mockImage = new Mock<IImage>();
         _mockCaptureService
-            .Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>()))
+            .Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(mockImage.Object);
 
         // Act
@@ -98,7 +98,7 @@ public class TranslationFlowIntegrationTests
 
         // キャプチャサービスが呼ばれたことを確認
         _mockCaptureService.Verify(
-            x => x.CaptureWindowAsync(testWindow.Handle),
+            x => x.CaptureWindowAsync(testWindow.Handle, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -118,7 +118,7 @@ public class TranslationFlowIntegrationTests
 
         // キャプチャ失敗をシミュレート
         _mockCaptureService
-            .Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>()))
+            .Setup(x => x.CaptureWindowAsync(It.IsAny<IntPtr>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("キャプチャに失敗しました"));
 
         // Act

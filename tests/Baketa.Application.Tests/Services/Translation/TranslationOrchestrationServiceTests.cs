@@ -194,7 +194,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert
         _captureServiceMock.Verify(
-            x => x.CaptureScreenAsync(),
+            x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()),
             Times.Once);
 
         // 翻訳結果が発行されることを確認
@@ -211,7 +211,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     {
         // Arrange - キャプチャに時間がかかるように設定
         _captureServiceMock
-            .Setup(x => x.CaptureScreenAsync())
+            .Setup(x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 await Task.Delay(500);
@@ -226,7 +226,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert - セマフォにより順次実行されることを確認
         _captureServiceMock.Verify(
-            x => x.CaptureScreenAsync(),
+            x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()),
             Times.Exactly(2));
     }
 
@@ -240,7 +240,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
         using var cts = new CancellationTokenSource();
 
         _captureServiceMock
-            .Setup(x => x.CaptureScreenAsync())
+            .Setup(x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 await Task.Delay(1000, cts.Token);
@@ -274,7 +274,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // Assert - 単発翻訳が実行されたことを確認
         _captureServiceMock.Verify(
-            x => x.CaptureScreenAsync(),
+            x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()),
             Times.AtLeastOnce);
 
         // Cleanup
@@ -292,7 +292,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
 
         // キャプチャに時間がかかるように設定
         _captureServiceMock
-            .Setup(x => x.CaptureScreenAsync())
+            .Setup(x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 await Task.Delay(200);
@@ -408,7 +408,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
         // Arrange
         var callCount = 0;
         _captureServiceMock
-            .Setup(x => x.CaptureScreenAsync())
+            .Setup(x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
                 callCount++;
@@ -536,7 +536,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
     private void SetupCaptureServiceMocks()
     {
         _captureServiceMock
-            .Setup(x => x.CaptureScreenAsync())
+            .Setup(x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(_imageMock.Object);
 
         _captureServiceMock

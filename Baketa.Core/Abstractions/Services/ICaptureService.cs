@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Imaging;
 
@@ -13,29 +14,33 @@ public interface ICaptureService
     /// <summary>
     /// 画面全体をキャプチャします
     /// </summary>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>キャプチャした画像</returns>
-    Task<IImage> CaptureScreenAsync();
+    Task<IImage> CaptureScreenAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 指定した領域をキャプチャします
     /// </summary>
     /// <param name="region">キャプチャする領域</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>キャプチャした画像</returns>
-    Task<IImage> CaptureRegionAsync(Rectangle region);
+    Task<IImage> CaptureRegionAsync(Rectangle region, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 指定したウィンドウをキャプチャします
     /// </summary>
     /// <param name="windowHandle">ウィンドウハンドル</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>キャプチャした画像</returns>
-    Task<IImage> CaptureWindowAsync(IntPtr windowHandle);
+    Task<IImage> CaptureWindowAsync(IntPtr windowHandle, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 指定したウィンドウのクライアント領域をキャプチャします
     /// </summary>
     /// <param name="windowHandle">ウィンドウハンドル</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>キャプチャした画像</returns>
-    Task<IImage> CaptureClientAreaAsync(IntPtr windowHandle);
+    Task<IImage> CaptureClientAreaAsync(IntPtr windowHandle, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// キャプチャした画像の差分を検出します
