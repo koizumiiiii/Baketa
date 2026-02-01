@@ -297,6 +297,41 @@ public sealed record RoiManagerSettings
 
     #endregion
 
+    #region [Issue #369] シードプロファイル設定
+
+    /// <summary>
+    /// [Issue #369] シードプロファイル機能を有効化
+    /// </summary>
+    /// <remarks>
+    /// 新規ゲーム検出時に、王道レイアウトのシードプロファイルを適用します。
+    /// これにより初回起動時から部分OCRが利用可能になり、OCR処理時間を短縮できます。
+    /// デフォルト: true
+    /// </remarks>
+    public bool EnableSeedProfile { get; init; } = true;
+
+    /// <summary>
+    /// [Issue #369] シードプロファイルの初期検出回数
+    /// </summary>
+    /// <remarks>
+    /// シード領域に設定する仮想的な検出回数。
+    /// 高い値を設定するとシード領域が「信頼できる」と判定されやすくなります。
+    /// デフォルト: 50回
+    /// 推奨範囲: 20-100
+    /// </remarks>
+    public int SeedProfileInitialDetectionCount { get; init; } = 50;
+
+    /// <summary>
+    /// [Issue #369] シードプロファイルの初期信頼度スコア
+    /// </summary>
+    /// <remarks>
+    /// シード領域に設定する初期信頼度スコア。
+    /// デフォルト: 0.6（60%）
+    /// 推奨範囲: 0.5-0.8
+    /// </remarks>
+    public float SeedProfileInitialConfidenceScore { get; init; } = 0.6f;
+
+    #endregion
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -329,7 +364,10 @@ public sealed record RoiManagerSettings
             // [Issue #354] 負の強化・自動除外設定の検証
             && ConsecutiveMissThresholdForReset > 0
             && ConsecutiveMissThresholdForExclusion > 0
-            && ConsecutiveMissThresholdForReset <= ConsecutiveMissThresholdForExclusion;
+            && ConsecutiveMissThresholdForReset <= ConsecutiveMissThresholdForExclusion
+            // [Issue #369] シードプロファイル設定の検証
+            && SeedProfileInitialDetectionCount > 0
+            && SeedProfileInitialConfidenceScore is >= 0.0f and <= 1.0f;
     }
 
     /// <summary>

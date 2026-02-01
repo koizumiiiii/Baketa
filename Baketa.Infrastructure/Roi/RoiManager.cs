@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Roi;
 using Baketa.Core.Models.Roi;
 using Baketa.Core.Settings;
+using Baketa.Infrastructure.Roi.SeedProfiles;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -191,11 +192,37 @@ public sealed class RoiManager : IRoiManager, IDisposable
             ? windowTitle
             : System.IO.Path.GetFileNameWithoutExtension(executablePath);
 
-        var newProfile = RoiProfile.Create(
-            profileId,
-            name ?? "Unknown",
-            executablePath,
-            windowTitle);
+        RoiProfile newProfile;
+
+        // [Issue #369] シードプロファイル適用
+        if (_settings.EnableSeedProfile)
+        {
+            newProfile = SeedProfileProvider.CreateSeededProfile(
+                profileId,
+                name ?? "Unknown",
+                executablePath,
+                windowTitle,
+                _settings);
+
+            _logger.LogInformation(
+                "Seed profile applied: Name={Name}, Regions={RegionCount}, HeatmapCells={HeatmapCells}",
+                name,
+                newProfile.Regions.Count,
+                newProfile.HeatmapData?.Values.Count(v => v > 0) ?? 0);
+        }
+        else
+        {
+            // シード無効時は空プロファイルを作成（従来動作）
+            newProfile = RoiProfile.Create(
+                profileId,
+                name ?? "Unknown",
+                executablePath,
+                windowTitle);
+
+            _logger.LogDebug(
+                "Seed profile disabled, creating empty profile: Name={Name}",
+                name);
+        }
 
         SetCurrentProfile(newProfile, RoiProfileChangeType.Created);
 
