@@ -297,6 +297,21 @@ public sealed record RoiManagerSettings
 
     #endregion
 
+    #region [Issue #370] デバウンス設定
+
+    /// <summary>
+    /// [Issue #370] ROI変化検知のデバウンス間隔（ミリ秒）
+    /// </summary>
+    /// <remarks>
+    /// 変化検知後、この間隔内の次のトリガーを抑制します。
+    /// 文字送りアニメーションなどによる過剰なトリガーを防止します。
+    /// デフォルト: 500ms
+    /// 推奨範囲: 200-1000
+    /// </remarks>
+    public int ChangeDetectionDebounceMs { get; init; } = 500;
+
+    #endregion
+
     #region [Issue #369] シードプロファイル設定
 
     /// <summary>
@@ -367,7 +382,9 @@ public sealed record RoiManagerSettings
             && ConsecutiveMissThresholdForReset <= ConsecutiveMissThresholdForExclusion
             // [Issue #369] シードプロファイル設定の検証
             && SeedProfileInitialDetectionCount > 0
-            && SeedProfileInitialConfidenceScore is >= 0.0f and <= 1.0f;
+            && SeedProfileInitialConfidenceScore is >= 0.0f and <= 1.0f
+            // [Issue #370] デバウンス設定の検証
+            && ChangeDetectionDebounceMs >= 0;
     }
 
     /// <summary>

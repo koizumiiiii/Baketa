@@ -678,13 +678,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 var chunk = nonEmptyChunks[i];
                 // chunk.TranslatedTextは既にLine 176で設定済み
 
-                // 🔥 [FIX6_NORMALIZE] ROI相対座標 → 画像絶対座標の正規化
+                // [FIX6_NORMALIZE] ROI相対座標 → 画像絶対座標の正規化
                 // Gemini推奨: キャッシュ保存前（オーバーレイ表示前）に座標を正規化
                 // CaptureRegion == null: フルスクリーンキャプチャ → 変換不要
                 // CaptureRegion != null: ROIキャプチャ → CombinedBoundsにOffsetを加算
                 chunk = NormalizeChunkCoordinates(chunk);
 
-                _logger.LogInformation("🔥 [FIX6_NORMALIZE] 座標正規化完了 - ChunkId: {ChunkId}, CaptureRegion: {CaptureRegion}, Bounds: ({X},{Y},{W}x{H})",
+                // [Issue #370] ログバッチ化: 詳細ログはDebugレベルに変更
+                _logger.LogDebug("Coordinate normalized - ChunkId: {ChunkId}, CaptureRegion: {CaptureRegion}, Bounds: ({X},{Y},{W}x{H})",
                     chunk.ChunkId,
                     chunk.CaptureRegion.HasValue ? $"({chunk.CaptureRegion.Value.X},{chunk.CaptureRegion.Value.Y})" : "null",
                     chunk.CombinedBounds.X, chunk.CombinedBounds.Y,
@@ -777,6 +778,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
                 _logger?.LogDebug($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}', Bounds: ({chunk.CombinedBounds.X},{chunk.CombinedBounds.Y},{chunk.CombinedBounds.Width}x{chunk.CombinedBounds.Height})");
                 Console.WriteLine($"✅ [OVERLAY_FIX] チャンク{i}オーバーレイ表示完了 - Text: '{chunk.TranslatedText}'");
+            }
+
+            // [Issue #370] ログバッチ化: 座標正規化の要約ログを1行で出力
+            var processedCount = Math.Min(nonEmptyChunks.Count, translationResults.Count);
+            if (processedCount > 0)
+            {
+                _logger.LogInformation("Coordinate normalization complete: {Count} chunks processed", processedCount);
             }
 
 #if DEBUG
