@@ -37,8 +37,10 @@ public class ComponentDownloadService : IComponentDownloader
     // [Issue #210] Cached GPU detection result
     private bool? _cachedSupportsCuda;
 
-    // [Issue #360] Component metadata file name for version tracking
-    private const string MetadataFileName = ".baketa-component-metadata.json";
+    // [Issue #360] Component metadata directory and file extension for version tracking
+    // メタデータは%APPDATA%\Baketa\component-metadata\に保存（ビルド時のコピーで削除されないように）
+    private const string MetadataDirectoryName = "component-metadata";
+    private const string MetadataFileExtension = ".meta.json";
 
     /// <inheritdoc/>
     public event EventHandler<ComponentDownloadProgressEventArgs>? DownloadProgressChanged;
@@ -537,8 +539,8 @@ public class ComponentDownloadService : IComponentDownloader
             return false;
         }
 
-        // Read local metadata
-        var metadataPath = Path.Combine(component.LocalPath, MetadataFileName);
+        // Read local metadata from %APPDATA%\Baketa\component-metadata\
+        var metadataPath = GetMetadataPath(component.Id);
         var localMetadata = await ReadComponentMetadataAsync(metadataPath, cancellationToken).ConfigureAwait(false);
 
         if (localMetadata == null)
@@ -550,17 +552,9 @@ public class ComponentDownloadService : IComponentDownloader
             return false;
         }
 
-        // [Issue #364] アプリバージョンが異なる場合は強制更新
-        // 古いバージョンでダウンロードされたコンポーネントには新機能が含まれていない可能性がある
-        var currentAppVersion = GetAppVersion();
-        if (!string.IsNullOrEmpty(localMetadata.AppVersion) &&
-            !string.Equals(localMetadata.AppVersion, currentAppVersion, StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogInformation(
-                "[Issue #364] App version changed ({OldVersion} -> {NewVersion}) for {ComponentId}, forcing update",
-                localMetadata.AppVersion, currentAppVersion, component.Id);
-            return false;
-        }
+        // [Issue #364 改善] アプリバージョンではなくLast-Modifiedのみで判断
+        // Model Assets v2はアプリ更新とは独立して管理される
+        // GitHub Releaseのファイルが更新された時のみ再ダウンロード
 
         // Fetch remote Last-Modified using HEAD request
         try
@@ -1214,6 +1208,17 @@ public class ComponentDownloadService : IComponentDownloader
     }
 
     /// <summary>
+    /// [Issue #360] Gets the metadata file path for a component
+    /// メタデータは %APPDATA%\Baketa\component-metadata\ に保存
+    /// これにより、ビルド時のコピーでメタデータが削除される問題を回避
+    /// </summary>
+    private string GetMetadataPath(string componentId)
+    {
+        var metadataDir = Path.Combine(_appDataPath, MetadataDirectoryName);
+        return Path.Combine(metadataDir, $"{componentId}{MetadataFileExtension}");
+    }
+
+    /// <summary>
     /// [Issue #360] Saves component metadata after successful download
     /// [Gemini Review] Uses atomic write pattern (temp file + rename) for robustness
     /// </summary>
@@ -1222,7 +1227,8 @@ public class ComponentDownloadService : IComponentDownloader
         DateTimeOffset lastModified,
         CancellationToken cancellationToken)
     {
-        var metadataPath = Path.Combine(component.LocalPath, MetadataFileName);
+        var metadataPath = GetMetadataPath(component.Id);
+        var metadataDir = Path.GetDirectoryName(metadataPath)!;
         var tempMetadataPath = metadataPath + ".tmp";
         var metadata = new ComponentMetadata
         {
@@ -1236,6 +1242,9 @@ public class ComponentDownloadService : IComponentDownloader
 
         try
         {
+            // Ensure metadata directory exists
+            Directory.CreateDirectory(metadataDir);
+
             var json = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });
 
             // Write to temp file first
@@ -1244,7 +1253,8 @@ public class ComponentDownloadService : IComponentDownloader
             // Atomic move (overwrite)
             File.Move(tempMetadataPath, metadataPath, overwrite: true);
 
-            _logger.LogDebug("[Issue #360] Saved metadata for {ComponentId}: LastModified={LastModified:s}", component.Id, lastModified);
+            _logger.LogInformation("[Issue #360] Saved metadata for {ComponentId}: Path={Path}, LastModified={LastModified:s}",
+                component.Id, metadataPath, lastModified);
         }
         catch (Exception ex)
         {
@@ -1344,11 +1354,25 @@ public class ComponentDownloadService : IComponentDownloader
     /// <summary>
     /// [Issue #364] 現在のアプリバージョンを取得
     /// </summary>
+    /// <remarks>
+    /// MinVerはAssemblyVersionを{major}.0.0.0に設定するため、major=0の間は常に0.0.0.0になる。
+    /// FileVersionは{major}.{minor}.{patch}.0に設定されるため、こちらを使用する。
+    /// </remarks>
     private static string GetAppVersion()
     {
         try
         {
             var assembly = System.Reflection.Assembly.GetEntryAssembly();
+            if (assembly?.Location is { Length: > 0 } location)
+            {
+                var fileVersionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(location);
+                if (!string.IsNullOrEmpty(fileVersionInfo.FileVersion))
+                {
+                    return fileVersionInfo.FileVersion;
+                }
+            }
+
+            // フォールバック: AssemblyVersion
             var version = assembly?.GetName().Version;
             return version?.ToString() ?? "unknown";
         }
