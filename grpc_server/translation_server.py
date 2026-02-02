@@ -44,12 +44,14 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
     # [Gemini Review Fix] 入力検証: ソーステキスト最大長
     MAX_SOURCE_TEXT_LENGTH = 10000  # 10,000文字（約30KB UTF-8）
 
-    def __init__(self, engine: TranslationEngine):
+    def __init__(self, engine: TranslationEngine, server_version: str = "unknown"):
         """
         Args:
             engine: TranslationEngineインスタンス（NllbEngine等）
+            server_version: [Issue #366] サーバーバージョン（バージョンチェック用）
         """
         self.engine = engine
+        self.server_version = server_version
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.logger.info(f"TranslationServicer initialized with engine: {engine.__class__.__name__}")
 
@@ -304,6 +306,7 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
                 status="OK" if is_healthy else "UNAVAILABLE",
                 timestamp=self._current_timestamp()
             )
+            response.details["server_version"] = self.server_version  # [Issue #366]
 
             return response
 
@@ -337,6 +340,7 @@ class TranslationServicer(translation_pb2_grpc.TranslationServiceServicer):
                 timestamp=self._current_timestamp()
             )
 
+            response.details["server_version"] = self.server_version  # [Issue #366]
             if is_ready:
                 supported_langs = self.engine.get_supported_languages()
                 response.details["supported_languages"] = ",".join(supported_langs)

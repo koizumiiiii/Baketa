@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using Baketa.Core.Abstractions.Events;
@@ -32,11 +33,31 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
     private bool _isReady;
     private bool _disposed;
     private readonly SemaphoreSlim _startLock = new(1, 1);
+    private string? _serverVersion;
 
     /// <summary>
     /// サーバーが準備完了かどうか
     /// </summary>
     public bool IsReady => _isReady;
+
+    /// <summary>
+    /// [Issue #366] サーバーバージョン（gRPCで取得）
+    /// </summary>
+    public string? ServerVersion => _serverVersion;
+
+    /// <summary>
+    /// [Issue #366] アプリバージョンとサーバーバージョンが不一致かどうか
+    /// 不一致の場合、コンポーネントの再ダウンロードが必要
+    /// </summary>
+    public bool IsVersionMismatch
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(_serverVersion)) return false;
+            var appVersion = GetAppVersion();
+            return !string.Equals(appVersion, _serverVersion, StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     /// <summary>
     /// サーバーポート
@@ -290,10 +311,36 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
                 cancellationToken: cancellationToken
             ).ConfigureAwait(false);
 
-            _logger.LogDebug(
-                "[UnifiedServer] gRPCヘルスチェック結果: IsReady={IsReady}, Status={Status}",
-                response.IsReady,
-                response.Status);
+            // [Issue #366] サーバーバージョンを取得
+            if (response.Details.TryGetValue("server_version", out var serverVersion))
+            {
+                _serverVersion = serverVersion;
+                var appVersion = GetAppVersion();
+                var versionMatch = string.Equals(appVersion, serverVersion, StringComparison.OrdinalIgnoreCase);
+
+                _logger.LogDebug(
+                    "[UnifiedServer] gRPCヘルスチェック結果: IsReady={IsReady}, Status={Status}, ServerVersion={ServerVersion}, AppVersion={AppVersion}, VersionMatch={VersionMatch}",
+                    response.IsReady,
+                    response.Status,
+                    serverVersion,
+                    appVersion,
+                    versionMatch);
+
+                if (!versionMatch)
+                {
+                    _logger.LogWarning(
+                        "[UnifiedServer] バージョン不一致検出: Server={ServerVersion}, App={AppVersion}. コンポーネント再ダウンロードが必要です。",
+                        serverVersion,
+                        appVersion);
+                }
+            }
+            else
+            {
+                _logger.LogDebug(
+                    "[UnifiedServer] gRPCヘルスチェック結果: IsReady={IsReady}, Status={Status}",
+                    response.IsReady,
+                    response.Status);
+            }
 
             return response.IsReady;
         }
@@ -824,5 +871,26 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         _logger.LogInformation("✅ [UnifiedServer] 非同期破棄完了");
 
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// [Issue #366] アプリケーションバージョンを取得
+    /// MinVerはAssemblyInformationalVersionAttributeにバージョンを設定
+    /// </summary>
+    private static string GetAppVersion()
+    {
+        var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+        var infoVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+
+        if (!string.IsNullOrEmpty(infoVersion))
+        {
+            // "+metadata" サフィックスを除去（例: "0.2.41+abc123" → "0.2.41"）
+            var plusIndex = infoVersion.IndexOf('+');
+            return plusIndex > 0 ? infoVersion[..plusIndex] : infoVersion;
+        }
+
+        // フォールバック: AssemblyName.Version
+        var version = assembly.GetName().Version;
+        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "0.0.0";
     }
 }
