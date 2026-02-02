@@ -61,46 +61,46 @@
 
   <!-- ========== Promotion Code Messages ========== -->
   <data name="Promotion_InvalidFormat" xml:space="preserve">
-    <value>Invalid promotion code format. Please enter in BAKETA-XXXXXXXX format.</value>
+    <value>プロモーションコードの形式が正しくありません。BAKETA-XXXXXXXX の形式で入力してください。</value>
   </data>
   <data name="Promotion_Applied" xml:space="preserve">
-    <value>Promotion code has been applied.</value>
+    <value>プロモーションコードが適用されました。</value>
   </data>
   <data name="Promotion_AlreadyProOrHigher" xml:space="preserve">
-    <value>You already have Pro plan or higher.</value>
+    <value>既にProプラン以上が適用されています。</value>
   </data>
   <data name="Promotion_ConnectionError" xml:space="preserve">
-    <value>Cannot connect to server. Please check your internet connection.</value>
+    <value>サーバーに接続できません。インターネット接続を確認してください。</value>
   </data>
   <data name="Promotion_Timeout" xml:space="preserve">
-    <value>Server response timed out.</value>
+    <value>サーバーからの応答がタイムアウトしました。</value>
   </data>
   <data name="Promotion_UnexpectedError" xml:space="preserve">
-    <value>An unexpected error occurred.</value>
+    <value>予期しないエラーが発生しました。</value>
   </data>
   <data name="Promotion_InvalidResponseFormat" xml:space="preserve">
-    <value>Invalid response format from server</value>
+    <value>サーバーからの応答形式が不正です</value>
   </data>
   <data name="Promotion_ResponseTooLarge" xml:space="preserve">
-    <value>Server response is too large</value>
+    <value>サーバーからの応答が大きすぎます</value>
   </data>
   <data name="Promotion_ParseError" xml:space="preserve">
-    <value>Failed to parse response</value>
+    <value>応答の解析に失敗しました</value>
   </data>
   <data name="Promotion_NoPlanInfo" xml:space="preserve">
-    <value>No plan information in server response</value>
+    <value>サーバーからの応答にプラン情報がありません</value>
   </data>
   <data name="Promotion_UnknownError" xml:space="preserve">
-    <value>An unknown error occurred</value>
+    <value>不明なエラーが発生しました</value>
   </data>
   <data name="Promotion_ApplyFailed" xml:space="preserve">
-    <value>Failed to apply the code.</value>
+    <value>コードの適用に失敗しました。</value>
   </data>
   <data name="Promotion_ServerError" xml:space="preserve">
-    <value>Server error: {0}</value>
+    <value>サーバーエラー: {0}</value>
   </data>
   <data name="Promotion_MockModeApplied" xml:space="preserve">
-    <value>[Mock Mode] Promotion code has been applied.</value>
+    <value>[モックモード] プロモーションコードが適用されました。</value>
   </data>
 
 </root>

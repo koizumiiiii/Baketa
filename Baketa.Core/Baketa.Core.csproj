@@ -40,7 +40,7 @@
 			<Generator>PublicResXFileCodeGenerator</Generator>
 			<LastGenOutput>Messages.Designer.cs</LastGenOutput>
 		</EmbeddedResource>
-		<EmbeddedResource Update="Resources\Messages.en.resx">
+		<EmbeddedResource Update="Resources\Messages.ja.resx">
 			<DependentUpon>Messages.resx</DependentUpon>
 		</EmbeddedResource>
 		<Compile Update="Resources\Messages.Designer.cs">
