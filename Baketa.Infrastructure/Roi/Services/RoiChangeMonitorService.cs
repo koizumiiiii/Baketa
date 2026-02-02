@@ -36,6 +36,10 @@ public sealed class RoiChangeMonitorService : IRoiChangeMonitorService
     private const float MinChangeRatioForTextAdvance = 0.1f; // 10%以上の変化でテキスト送りと判定
     private const int MinHashSampleSize = 512; // ハッシュ計算用サンプルサイズ
 
+    // [Issue #370] デバウンス設定
+    private const int DefaultDebounceIntervalMs = 500;
+    private DateTime _lastChangeDetectionTime = DateTime.MinValue;
+
     private bool _disposed;
 
     public RoiChangeMonitorService(
@@ -208,8 +212,23 @@ public sealed class RoiChangeMonitorService : IRoiChangeMonitorService
             var changeRatio = (float)changedRegions.Count / highConfidenceRegions.Count;
             var isLikelyTextAdvance = changeRatio >= MinChangeRatioForTextAdvance;
 
+            // [Issue #370] デバウンス処理: 短時間での重複イベント発火を抑制
+            var debounceMs = Settings.ChangeDetectionDebounceMs > 0
+                ? Settings.ChangeDetectionDebounceMs
+                : DefaultDebounceIntervalMs;
+            var debounceInterval = TimeSpan.FromMilliseconds(debounceMs);
+            var now = DateTime.UtcNow;
+            if (now - _lastChangeDetectionTime < debounceInterval)
+            {
+                _logger.LogDebug(
+                    "ROI change debounced: {ChangedCount} regions detected within {DebounceMs}ms, skipping event",
+                    changedRegions.Count, debounceMs);
+                return changedRegions;
+            }
+            _lastChangeDetectionTime = now;
+
             _logger.LogInformation(
-                "[Issue #324] ROI changes detected: {ChangedCount}/{TotalCount} regions, LikelyTextAdvance={IsTextAdvance}",
+                "ROI changes detected: {ChangedCount}/{TotalCount} regions, LikelyTextAdvance={IsTextAdvance}",
                 changedRegions.Count, highConfidenceRegions.Count, isLikelyTextAdvance);
 
             OnRoiChangeDetected(changedRegions, changeRatio, isLikelyTextAdvance);

@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace Baketa.Core.Settings;
 
 /// <summary>
@@ -82,6 +84,31 @@ public sealed class UnifiedServerSettings
     [SettingMetadata(SettingLevel.Debug, "Unified Server", "Health Check Timeout",
         Description = "個々のヘルスチェックのタイムアウト時間（秒）")]
     public int HealthCheckTimeoutSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// [Issue #360] コンポーネントメタデータディレクトリ名
+    /// </summary>
+    /// <remarks>
+    /// %APPDATA%\Baketa\{MetadataDirectoryName}\ にメタデータを保存
+    /// </remarks>
+    public string MetadataDirectoryName { get; set; } = "component-metadata";
+
+    /// <summary>
+    /// [Issue #360] 統合サーバーのメタデータファイル名
+    /// </summary>
+    public string UnifiedServerMetadataFileName { get; set; } = "unified_server.meta.json";
+
+    /// <summary>
+    /// [Issue #360] メタデータファイルのフルパスを取得
+    /// </summary>
+    public string GetMetadataFilePath()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Baketa",
+            MetadataDirectoryName,
+            UnifiedServerMetadataFileName);
+    }
 
     /// <summary>
     /// 設定を検証

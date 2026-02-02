@@ -343,14 +343,30 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         var exeDir = Path.GetDirectoryName(exePath)!;
         var parentDir = Path.GetDirectoryName(exeDir);
 
+        // [Issue #360] ダウンロード/展開完了判定を改善
+        // メタデータファイルが存在しない場合、ダウンロード/展開が未完了と判断
+        // [Gemini Review] パスを設定から取得（一元管理）
+        var metadataPath = _settings.GetMetadataFilePath();
+        var metadataExists = File.Exists(metadataPath);
+
         // [Gemini Review] ダウンロード中の判定を堅牢に（try-catch追加）
         var isDownloadInProgress = false;
         try
         {
-            if (parentDir != null && Directory.Exists(parentDir))
+            // メタデータが存在しない場合、ダウンロード/展開が未完了
+            if (!metadataExists)
             {
-                // BaketaUnifiedServer関連のファイルを具体的に検索
-                isDownloadInProgress = Directory.Exists(exeDir) ||
+                // grpc_serverディレクトリが存在すればダウンロード処理が開始されている可能性が高い
+                isDownloadInProgress = parentDir != null && Directory.Exists(parentDir);
+                if (isDownloadInProgress)
+                {
+                    _logger.LogInformation("[Issue #360] メタデータ未作成 + grpc_serverディレクトリ存在 → ダウンロード/展開中と判断");
+                }
+            }
+            else if (parentDir != null && Directory.Exists(parentDir))
+            {
+                // メタデータ存在時の追加チェック（ZIPやtmpファイル）
+                isDownloadInProgress =
                     Directory.GetFiles(parentDir, "BaketaUnifiedServer*.zip", SearchOption.TopDirectoryOnly).Length > 0 ||
                     Directory.GetFiles(parentDir, "*.tmp", SearchOption.TopDirectoryOnly).Length > 0;
             }
@@ -363,13 +379,16 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
 
         if (!isDownloadInProgress)
         {
-            _logger.LogDebug("[UnifiedServer] ダウンロード中の兆候なし - 即座にnullを返す");
+            _logger.LogDebug("[UnifiedServer] ダウンロード中の兆候なし - 即座にnullを返す (メタデータ: {MetadataExists})", metadataExists);
             return result;
         }
 
         // 初回ダウンロード待機（最大10分、5秒間隔でポーリング）
         const int maxWaitMinutes = 10;
         const int pollIntervalSeconds = 5;
+        // [Gemini Review] マジックナンバーを定数化（30秒ごとにログ出力）
+        const int logIntervalSeconds = 30;
+        const int attemptsPerLog = logIntervalSeconds / pollIntervalSeconds;
         var maxAttempts = (maxWaitMinutes * 60) / pollIntervalSeconds;
 
         _logger.LogInformation("⏳ [UnifiedServer] 初回ダウンロード待機開始（最大{MaxWait}分）", maxWaitMinutes);
@@ -390,8 +409,8 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
                 return result;
             }
 
-            // 進捗ログ（30秒ごと）
-            if (attempt % 6 == 0)
+            // 進捗ログ（logIntervalSecondsごと）
+            if (attempt % attemptsPerLog == 0)
             {
                 var elapsed = attempt * pollIntervalSeconds;
                 _logger.LogInformation("⏳ [UnifiedServer] ダウンロード待機中... {Elapsed}秒経過（最大{MaxWait}分）",
