@@ -784,3 +784,4 @@ analytics/data/*
 *.csv
 *.parquet
 *.xlsx
+*.zip.0*
