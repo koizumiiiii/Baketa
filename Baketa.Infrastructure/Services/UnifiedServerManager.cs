@@ -343,14 +343,31 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         var exeDir = Path.GetDirectoryName(exePath)!;
         var parentDir = Path.GetDirectoryName(exeDir);
 
+        // [Issue #360] ダウンロード/展開完了判定を改善
+        // メタデータファイルが存在しない場合、ダウンロード/展開が未完了と判断
+        var metadataPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Baketa", "component-metadata", "unified_server.meta.json");
+        var metadataExists = File.Exists(metadataPath);
+
         // [Gemini Review] ダウンロード中の判定を堅牢に（try-catch追加）
         var isDownloadInProgress = false;
         try
         {
-            if (parentDir != null && Directory.Exists(parentDir))
+            // メタデータが存在しない場合、ダウンロード/展開が未完了
+            if (!metadataExists)
             {
-                // BaketaUnifiedServer関連のファイルを具体的に検索
-                isDownloadInProgress = Directory.Exists(exeDir) ||
+                // grpc_serverディレクトリが存在すればダウンロード処理が開始されている可能性が高い
+                isDownloadInProgress = parentDir != null && Directory.Exists(parentDir);
+                if (isDownloadInProgress)
+                {
+                    _logger.LogInformation("[Issue #360] メタデータ未作成 + grpc_serverディレクトリ存在 → ダウンロード/展開中と判断");
+                }
+            }
+            else if (parentDir != null && Directory.Exists(parentDir))
+            {
+                // メタデータ存在時の追加チェック（ZIPやtmpファイル）
+                isDownloadInProgress =
                     Directory.GetFiles(parentDir, "BaketaUnifiedServer*.zip", SearchOption.TopDirectoryOnly).Length > 0 ||
                     Directory.GetFiles(parentDir, "*.tmp", SearchOption.TopDirectoryOnly).Length > 0;
             }
@@ -363,7 +380,7 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
 
         if (!isDownloadInProgress)
         {
-            _logger.LogDebug("[UnifiedServer] ダウンロード中の兆候なし - 即座にnullを返す");
+            _logger.LogDebug("[UnifiedServer] ダウンロード中の兆候なし - 即座にnullを返す (メタデータ: {MetadataExists})", metadataExists);
             return result;
         }
 
