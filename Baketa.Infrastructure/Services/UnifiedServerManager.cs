@@ -345,9 +345,8 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
 
         // [Issue #360] ダウンロード/展開完了判定を改善
         // メタデータファイルが存在しない場合、ダウンロード/展開が未完了と判断
-        var metadataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Baketa", "component-metadata", "unified_server.meta.json");
+        // [Gemini Review] パスを設定から取得（一元管理）
+        var metadataPath = _settings.GetMetadataFilePath();
         var metadataExists = File.Exists(metadataPath);
 
         // [Gemini Review] ダウンロード中の判定を堅牢に（try-catch追加）
@@ -387,6 +386,9 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         // 初回ダウンロード待機（最大10分、5秒間隔でポーリング）
         const int maxWaitMinutes = 10;
         const int pollIntervalSeconds = 5;
+        // [Gemini Review] マジックナンバーを定数化（30秒ごとにログ出力）
+        const int logIntervalSeconds = 30;
+        const int attemptsPerLog = logIntervalSeconds / pollIntervalSeconds;
         var maxAttempts = (maxWaitMinutes * 60) / pollIntervalSeconds;
 
         _logger.LogInformation("⏳ [UnifiedServer] 初回ダウンロード待機開始（最大{MaxWait}分）", maxWaitMinutes);
@@ -407,8 +409,8 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
                 return result;
             }
 
-            // 進捗ログ（30秒ごと）
-            if (attempt % 6 == 0)
+            // 進捗ログ（logIntervalSecondsごと）
+            if (attempt % attemptsPerLog == 0)
             {
                 var elapsed = attempt * pollIntervalSeconds;
                 _logger.LogInformation("⏳ [UnifiedServer] ダウンロード待機中... {Elapsed}秒経過（最大{MaxWait}分）",
