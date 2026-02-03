@@ -131,7 +131,7 @@
       <LastGenOutput>Strings.Designer.cs</LastGenOutput>
       <CustomToolNamespace>Baketa.UI.Resources</CustomToolNamespace>
     </EmbeddedResource>
-    <EmbeddedResource Update="Resources\Strings.en.resx">
+    <EmbeddedResource Update="Resources\Strings.ja.resx">
       <DependentUpon>Strings.resx</DependentUpon>
     </EmbeddedResource>
     <Compile Update="Resources\Strings.Designer.cs">

@@ -64,13 +64,13 @@
     <value>Baketa</value>
   </data>
   <data name="App_LoadingMessage" xml:space="preserve">
-    <value>Loading...</value>
+    <value>起動中...</value>
   </data>
   <data name="App_ErrorTitle" xml:space="preserve">
-    <value>Error</value>
+    <value>エラー</value>
   </data>
   <data name="App_Version" xml:space="preserve">
-    <value>Current Version: {0}</value>
+    <value>現在のバージョン: {0}</value>
   </data>
   <data name="App_Copyright" xml:space="preserve">
     <value>© 2024 Baketa. All rights reserved.</value>
@@ -78,231 +78,231 @@
 
   <!-- ========== Common Buttons ========== -->
   <data name="Common_Save" xml:space="preserve">
-    <value>Save</value>
+    <value>保存</value>
   </data>
   <data name="Common_Cancel" xml:space="preserve">
-    <value>Cancel</value>
+    <value>キャンセル</value>
   </data>
   <data name="Common_Apply" xml:space="preserve">
-    <value>Apply</value>
+    <value>適用</value>
   </data>
   <data name="Common_Reset" xml:space="preserve">
-    <value>Reset</value>
+    <value>リセット</value>
   </data>
   <data name="Common_Close" xml:space="preserve">
-    <value>Close</value>
+    <value>閉じる</value>
   </data>
   <data name="Common_OK" xml:space="preserve">
     <value>OK</value>
   </data>
   <data name="Common_Yes" xml:space="preserve">
-    <value>Yes</value>
+    <value>はい</value>
   </data>
   <data name="Common_No" xml:space="preserve">
-    <value>No</value>
+    <value>いいえ</value>
   </data>
   <data name="Common_Help" xml:space="preserve">
-    <value>Help</value>
+    <value>ヘルプ</value>
   </data>
   <data name="Common_Loading" xml:space="preserve">
-    <value>Loading...</value>
+    <value>読み込み中...</value>
   </data>
   <data name="Common_Or" xml:space="preserve">
-    <value>or</value>
+    <value>または</value>
   </data>
   <data name="Common_Submit" xml:space="preserve">
-    <value>Submit</value>
+    <value>送信</value>
   </data>
 
   <!-- ========== Main Overlay ========== -->
   <data name="MainOverlay_Minimize" xml:space="preserve">
-    <value>Minimize</value>
+    <value>最小化</value>
   </data>
   <data name="MainOverlay_SelectWindow" xml:space="preserve">
-    <value>Select Target Window</value>
+    <value>翻訳対象ウィンドウを選択</value>
   </data>
   <data name="MainOverlay_Target" xml:space="preserve">
-    <value>Target</value>
+    <value>ターゲット</value>
   </data>
   <data name="MainOverlay_ShowHideTranslation" xml:space="preserve">
-    <value>Show/Hide Translation</value>
+    <value>翻訳結果の表示/非表示</value>
   </data>
   <data name="MainOverlay_LiveTranslation" xml:space="preserve">
-    <value>Live Translation</value>
+    <value>Live翻訳</value>
   </data>
   <data name="MainOverlay_ShotTranslation" xml:space="preserve">
-    <value>Shot Translation</value>
+    <value>Shot翻訳</value>
   </data>
   <data name="MainOverlay_Preparing" xml:space="preserve">
-    <value>Preparing</value>
+    <value>準備中</value>
   </data>
   <data name="MainOverlay_ShowTranslation" xml:space="preserve">
-    <value>Show Translation</value>
+    <value>翻訳表示</value>
   </data>
   <data name="MainOverlay_Settings" xml:space="preserve">
-    <value>Settings</value>
+    <value>設定</value>
   </data>
   <data name="MainOverlay_Exit" xml:space="preserve">
-    <value>Exit</value>
+    <value>終了</value>
   </data>
   <data name="MainOverlay_DragToMove" xml:space="preserve">
-    <value>Drag to move</value>
+    <value>ドラッグして移動</value>
   </data>
   <data name="MainOverlay_Expand" xml:space="preserve">
-    <value>Expand</value>
+    <value>展開</value>
   </data>
   <data name="MainOverlay_SelectedWindow" xml:space="preserve">
-    <value>[Selected: {0}]</value>
+    <value>[選択中: {0}]</value>
   </data>
   <data name="MainOverlay_TranslationCount" xml:space="preserve">
-    <value>Translated: {0}</value>
+    <value>翻訳済み: {0}</value>
   </data>
 
   <!-- ========== Home View ========== -->
   <data name="Home_QuickStart" xml:space="preserve">
-    <value>Quick Start</value>
+    <value>クイックスタート</value>
   </data>
   <data name="Home_StartCapture" xml:space="preserve">
-    <value>Start Capture</value>
+    <value>キャプチャを開始</value>
   </data>
   <data name="Home_CaptureSettings" xml:space="preserve">
-    <value>Capture Settings</value>
+    <value>キャプチャ設定</value>
   </data>
   <data name="Home_TranslationSettings" xml:space="preserve">
-    <value>Translation Settings</value>
+    <value>翻訳設定</value>
   </data>
   <data name="Home_RecentTranslations" xml:space="preserve">
-    <value>Recent Translations</value>
+    <value>最近の翻訳</value>
   </data>
   <data name="Home_ViewAll" xml:space="preserve">
-    <value>View All</value>
+    <value>すべて表示</value>
   </data>
   <data name="Home_NoHistory" xml:space="preserve">
-    <value>No translation history yet</value>
+    <value>翻訳履歴はまだありません</value>
   </data>
   <data name="Home_UsageStatistics" xml:space="preserve">
-    <value>Usage Statistics</value>
+    <value>使用状況</value>
   </data>
   <data name="Home_CaptureStatus" xml:space="preserve">
-    <value>Capture Status:</value>
+    <value>キャプチャ状態:</value>
   </data>
   <data name="Home_TranslationEngine" xml:space="preserve">
-    <value>Translation Engine:</value>
+    <value>翻訳エンジン:</value>
   </data>
   <data name="Home_TargetLanguage" xml:space="preserve">
-    <value>Target Language:</value>
+    <value>翻訳先言語:</value>
   </data>
   <data name="Home_MemoryUsage" xml:space="preserve">
-    <value>Memory Usage:</value>
+    <value>メモリ使用量:</value>
   </data>
   <data name="Home_RunningTime" xml:space="preserve">
-    <value>Running Time:</value>
+    <value>実行時間:</value>
   </data>
   <data name="Home_Tips" xml:space="preserve">
-    <value>Tips</value>
+    <value>ヒント</value>
   </data>
   <data name="Home_Tip_OpenTabs" xml:space="preserve">
-    <value>Open each feature from the tabs on the left</value>
+    <value>左側のタブから各機能を開くことができます</value>
   </data>
   <data name="Home_Tip_SelectArea" xml:space="preserve">
-    <value>Select the area to translate on the game screen before starting capture</value>
+    <value>キャプチャ開始前に、ゲーム画面の翻訳したい領域を選択してください</value>
   </data>
   <data name="Home_Tip_OverlaySettings" xml:space="preserve">
-    <value>Customize display position and font in Overlay Settings</value>
+    <value>オーバーレイ設定で表示位置やフォントをカスタマイズできます</value>
   </data>
   <data name="Home_Tip_TranslationHistory" xml:space="preserve">
-    <value>Check past translations in Translation History</value>
+    <value>翻訳履歴から過去の翻訳内容を確認できます</value>
   </data>
 
   <!-- ========== Settings Window ========== -->
   <data name="Settings_Title" xml:space="preserve">
-    <value>Settings</value>
+    <value>設定</value>
   </data>
 
   <!-- ========== General Settings ========== -->
   <data name="Settings_General_Title" xml:space="preserve">
-    <value>General Settings</value>
+    <value>一般設定</value>
   </data>
   <data name="Settings_General_Subtitle" xml:space="preserve">
-    <value>Basic application settings</value>
+    <value>アプリケーションの基本的な動作設定</value>
   </data>
   <data name="Settings_General_Appearance" xml:space="preserve">
-    <value>Appearance</value>
+    <value>外観</value>
   </data>
   <data name="Settings_General_Theme" xml:space="preserve">
-    <value>Theme</value>
+    <value>テーマ</value>
   </data>
   <data name="Settings_General_ThemeDescription" xml:space="preserve">
-    <value>Select the application color theme</value>
+    <value>アプリケーションの配色テーマを選択します</value>
   </data>
   <data name="Settings_General_ThemeLight" xml:space="preserve">
-    <value>Light</value>
+    <value>ライト</value>
   </data>
   <data name="Settings_General_ThemeDark" xml:space="preserve">
-    <value>Dark</value>
+    <value>ダーク</value>
   </data>
   <data name="Settings_General_ThemeAuto" xml:space="preserve">
-    <value>Auto (Follow system)</value>
+    <value>自動（システム設定に従う）</value>
   </data>
   <data name="Settings_General_Translation" xml:space="preserve">
-    <value>Translation Settings</value>
+    <value>翻訳設定</value>
   </data>
   <data name="Settings_General_TranslationEngine" xml:space="preserve">
-    <value>Translation Engine</value>
+    <value>翻訳エンジン</value>
   </data>
   <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
-    <value>Select the translation engine to use</value>
+    <value>使用する翻訳エンジンを選択します</value>
   </data>
   <data name="Settings_General_EXMode" xml:space="preserve">
-    <value>EX Mode</value>
+    <value>EXモード</value>
   </data>
   <data name="Settings_General_EXModeDescription" xml:space="preserve">
-    <value>Use the high-precision EX translation engine</value>
+    <value>高精度なEX翻訳エンジンを使用します</value>
   </data>
   <data name="Settings_General_OfflineTranslation" xml:space="preserve">
-    <value>Offline Translation</value>
+    <value>オフライン翻訳</value>
   </data>
   <data name="Settings_General_AITranslation" xml:space="preserve">
-    <value>EX Translation</value>
+    <value>EX翻訳</value>
   </data>
   <data name="Settings_General_AlphaNote" xml:space="preserve">
-    <value>* Only offline translation is available in alpha test</value>
+    <value>※ αテストではオフライン翻訳のみ利用可能</value>
   </data>
   <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
-    <value>Available with Pro/Premium/Ultimate plan</value>
+    <value>Pro/Premium/Ultimateプランで利用可能</value>
   </data>
   <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
-    <value>This month's usage:</value>
+    <value>今月の使用量:</value>
   </data>
   <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
     <value></value>
   </data>
   <data name="Settings_General_TranslationLanguage" xml:space="preserve">
-    <value>Translation Language</value>
+    <value>翻訳言語</value>
   </data>
   <data name="Settings_General_TranslationLanguageDescription" xml:space="preserve">
-    <value>Select source and target languages</value>
+    <value>翻訳元と翻訳先の言語を選択します</value>
   </data>
   <data name="Settings_General_FontSize" xml:space="preserve">
-    <value>Translation Font Size</value>
+    <value>翻訳文字サイズ</value>
   </data>
   <data name="Settings_General_FontSizeDescription" xml:space="preserve">
-    <value>Size of translation text displayed on overlay</value>
+    <value>オーバーレイに表示される翻訳テキストのサイズ</value>
   </data>
   <data name="Settings_General_FontSizeUnit" xml:space="preserve">
     <value>px</value>
   </data>
   <data name="Settings_General_LanguagePairWarning" xml:space="preserve">
-    <value>* Please select different languages for source and target</value>
+    <value>※ 翻訳元と翻訳先は異なる言語を選択してください</value>
   </data>
   <data name="Settings_General_Language" xml:space="preserve">
-    <value>Language</value>
+    <value>言語</value>
   </data>
   <data name="Settings_General_LanguageDescription" xml:space="preserve">
-    <value>Select application display language</value>
+    <value>アプリケーションの表示言語を選択します</value>
   </data>
   <data name="Settings_General_LanguageJapanese" xml:space="preserve">
-    <value>Japanese</value>
+    <value>日本語</value>
   </data>
   <data name="Settings_General_LanguageEnglish" xml:space="preserve">
     <value>English</value>
@@ -310,389 +310,389 @@
 
   <!-- ========== Translation Settings ========== -->
   <data name="Settings_Translation_Title" xml:space="preserve">
-    <value>Translation Settings</value>
+    <value>翻訳設定</value>
   </data>
   <data name="Settings_Translation_Subtitle" xml:space="preserve">
-    <value>Configure translation engine, language pairs, and translation strategy</value>
+    <value>翻訳エンジン、言語ペア、翻訳戦略を設定してください</value>
   </data>
   <data name="Settings_Translation_LastSaved" xml:space="preserve">
-    <value>Last saved: {0:MM/dd HH:mm}</value>
+    <value>最終保存: {0:MM/dd HH:mm}</value>
   </data>
   <data name="Settings_Translation_UnsavedChanges" xml:space="preserve">
-    <value>Settings have unsaved changes</value>
+    <value>設定に未保存の変更があります</value>
   </data>
   <data name="Settings_Translation_DiscardChanges" xml:space="preserve">
-    <value>Discard Changes</value>
+    <value>変更を破棄</value>
   </data>
   <data name="Settings_Translation_Summary" xml:space="preserve">
-    <value>Current Settings Summary</value>
+    <value>現在の設定サマリー</value>
   </data>
   <data name="Settings_Translation_Engine" xml:space="preserve">
-    <value>Translation Engine</value>
+    <value>翻訳エンジン</value>
   </data>
   <data name="Settings_Translation_LanguagePair" xml:space="preserve">
-    <value>Language Pair</value>
+    <value>言語ペア</value>
   </data>
   <data name="Settings_Translation_Strategy" xml:space="preserve">
-    <value>Translation Strategy</value>
+    <value>翻訳戦略</value>
   </data>
   <data name="Settings_Translation_ChineseVariant" xml:space="preserve">
-    <value>Chinese Variant</value>
+    <value>中国語変種</value>
   </data>
   <data name="Settings_Translation_Fallback" xml:space="preserve">
-    <value>Fallback</value>
+    <value>フォールバック</value>
   </data>
   <data name="Settings_Translation_ChangeStatus" xml:space="preserve">
-    <value>Change Status</value>
+    <value>変更状態</value>
   </data>
   <data name="Settings_Translation_Import" xml:space="preserve">
-    <value>Import</value>
+    <value>インポート</value>
   </data>
   <data name="Settings_Translation_ImportTip" xml:space="preserve">
-    <value>Import from settings file</value>
+    <value>設定ファイルからインポート</value>
   </data>
   <data name="Settings_Translation_Export" xml:space="preserve">
-    <value>Export</value>
+    <value>エクスポート</value>
   </data>
   <data name="Settings_Translation_ExportTip" xml:space="preserve">
-    <value>Export settings to file</value>
+    <value>設定をファイルにエクスポート</value>
   </data>
   <data name="Settings_Translation_Load" xml:space="preserve">
-    <value>Load</value>
+    <value>読み込み</value>
   </data>
   <data name="Settings_Translation_LoadTip" xml:space="preserve">
-    <value>Load saved settings</value>
+    <value>保存済み設定を読み込み</value>
   </data>
   <data name="Settings_Translation_SaveTip" xml:space="preserve">
-    <value>Save current settings</value>
+    <value>現在の設定を保存</value>
   </data>
   <data name="Settings_Translation_ApplyTip" xml:space="preserve">
-    <value>Save and apply settings</value>
+    <value>設定を保存して適用</value>
   </data>
   <data name="Settings_Translation_Saving" xml:space="preserve">
-    <value>Saving settings...</value>
+    <value>設定を保存中...</value>
   </data>
 
   <!-- ========== Capture Settings ========== -->
   <data name="Settings_Capture_Title" xml:space="preserve">
-    <value>Capture Settings</value>
+    <value>キャプチャ設定</value>
   </data>
   <data name="Settings_Capture_Subtitle" xml:space="preserve">
-    <value>Detailed settings for screen capture and screenshot features</value>
+    <value>画面キャプチャとスクリーンショット機能の詳細設定</value>
   </data>
   <data name="Settings_Capture_Basic" xml:space="preserve">
-    <value>Basic Settings</value>
+    <value>基本設定</value>
   </data>
   <data name="Settings_Capture_Enabled" xml:space="preserve">
-    <value>Capture Feature</value>
+    <value>キャプチャ機能</value>
   </data>
   <data name="Settings_Capture_EnabledDescription" xml:space="preserve">
-    <value>Enable screen capture feature</value>
+    <value>画面キャプチャ機能を有効にします</value>
   </data>
   <data name="Settings_Capture_Interval" xml:space="preserve">
-    <value>Capture Interval</value>
+    <value>キャプチャ間隔</value>
   </data>
   <data name="Settings_Capture_IntervalDescription" xml:space="preserve">
-    <value>Interval for screen capture (shorter = more accurate, longer = faster)</value>
+    <value>画面をキャプチャする間隔（短いほど高精度、長いほど高速）</value>
   </data>
   <data name="Settings_Capture_Quality" xml:space="preserve">
-    <value>Capture Quality</value>
+    <value>キャプチャ品質</value>
   </data>
   <data name="Settings_Capture_QualityDescription" xml:space="preserve">
-    <value>Quality of captured images (higher = more accurate, lower = faster)</value>
+    <value>キャプチャ画像の品質（高いほど精度向上、低いほど高速）</value>
   </data>
   <data name="Settings_Capture_AreaMode" xml:space="preserve">
-    <value>Area Detection Mode</value>
+    <value>領域検出モード</value>
   </data>
   <data name="Settings_Capture_AreaModeDescription" xml:space="preserve">
-    <value>Choose between automatic text area detection or fixed region</value>
+    <value>テキスト領域を自動的に検出するか、固定領域を使用するかを選択</value>
   </data>
   <data name="Settings_Capture_AutoDetect" xml:space="preserve">
-    <value>Auto Detect</value>
+    <value>自動検出</value>
   </data>
   <data name="Settings_Capture_FixedArea" xml:space="preserve">
-    <value>Fixed Area</value>
+    <value>固定領域</value>
   </data>
   <data name="Settings_Capture_FixedAreaSection" xml:space="preserve">
-    <value>Fixed Capture Area</value>
+    <value>固定キャプチャ領域</value>
   </data>
   <data name="Settings_Capture_Position" xml:space="preserve">
-    <value>Position and Size</value>
+    <value>位置とサイズ</value>
   </data>
   <data name="Settings_Capture_PositionDescription" xml:space="preserve">
-    <value>Specify position and size of fixed capture area</value>
+    <value>固定キャプチャ領域の位置とサイズを指定</value>
   </data>
   <data name="Settings_Capture_Advanced" xml:space="preserve">
-    <value>Advanced Settings</value>
+    <value>詳細設定</value>
   </data>
   <data name="Settings_Capture_Monitor" xml:space="preserve">
-    <value>Target Monitor</value>
+    <value>対象モニター</value>
   </data>
   <data name="Settings_Capture_MonitorDescription" xml:space="preserve">
-    <value>Select monitor to capture in multi-monitor environment</value>
+    <value>マルチモニター環境でキャプチャするモニターを選択</value>
   </data>
   <data name="Settings_Capture_DpiScaling" xml:space="preserve">
-    <value>DPI Scaling Aware</value>
+    <value>DPIスケーリング考慮</value>
   </data>
   <data name="Settings_Capture_DpiScalingDescription" xml:space="preserve">
-    <value>Consider scaling in high DPI environments</value>
+    <value>高DPI環境でのスケーリングを考慮したキャプチャ</value>
   </data>
   <data name="Settings_Capture_HardwareAccel" xml:space="preserve">
-    <value>Hardware Acceleration</value>
+    <value>ハードウェアアクセラレーション</value>
   </data>
   <data name="Settings_Capture_HardwareAccelDescription" xml:space="preserve">
-    <value>Hardware acceleration using GPU</value>
+    <value>GPUを使用したハードウェアアクセラレーション</value>
   </data>
   <data name="Settings_Capture_DiffDetection" xml:space="preserve">
-    <value>Difference Detection Settings</value>
+    <value>差分検出設定</value>
   </data>
   <data name="Settings_Capture_DiffDetectionEnable" xml:space="preserve">
-    <value>Difference Detection Feature</value>
+    <value>差分検出機能</value>
   </data>
   <data name="Settings_Capture_DiffDetectionDescription" xml:space="preserve">
-    <value>Enable screen change difference detection</value>
+    <value>画面変更の差分検出機能を有効にします</value>
   </data>
 
   <!-- ========== OCR Settings ========== -->
   <data name="Settings_OCR_Title" xml:space="preserve">
-    <value>OCR Settings</value>
+    <value>OCR設定</value>
   </data>
   <data name="Settings_OCR_Subtitle" xml:space="preserve">
-    <value>Detailed settings for optical character recognition</value>
+    <value>光学文字認識の詳細設定</value>
   </data>
   <data name="Settings_OCR_Basic" xml:space="preserve">
-    <value>Basic Settings</value>
+    <value>基本設定</value>
   </data>
   <data name="Settings_OCR_Enabled" xml:space="preserve">
-    <value>Enable OCR</value>
+    <value>OCRを有効化</value>
   </data>
   <data name="Settings_OCR_EnabledDescription" xml:space="preserve">
-    <value>Automatically recognize text on screen</value>
+    <value>画面上のテキストを自動的に認識します</value>
   </data>
   <data name="Settings_OCR_Language" xml:space="preserve">
-    <value>Recognition Language</value>
+    <value>認識言語</value>
   </data>
   <data name="Settings_OCR_LanguageDescription" xml:space="preserve">
-    <value>Primary language for OCR recognition</value>
+    <value>OCRで認識する主要言語</value>
   </data>
   <data name="Settings_OCR_TargetLanguage" xml:space="preserve">
-    <value>Target Language</value>
+    <value>翻訳先言語</value>
   </data>
   <data name="Settings_OCR_TargetLanguageDescription" xml:space="preserve">
-    <value>Output language for translation results</value>
+    <value>翻訳結果の出力言語</value>
   </data>
   <data name="Settings_OCR_Confidence" xml:space="preserve">
-    <value>Confidence Threshold</value>
+    <value>信頼度閾値</value>
   </data>
   <data name="Settings_OCR_ConfidenceDescription" xml:space="preserve">
-    <value>Minimum confidence for text recognition (0.0-1.0)</value>
+    <value>テキスト認識の最小信頼度（0.0-1.0）</value>
   </data>
   <data name="Settings_OCR_Filtering" xml:space="preserve">
-    <value>Text Filtering</value>
+    <value>テキストフィルタリング</value>
   </data>
   <data name="Settings_OCR_FilteringDescription" xml:space="preserve">
-    <value>Enable post-processing of recognized text</value>
+    <value>認識されたテキストの後処理を有効にします</value>
   </data>
   <data name="Settings_OCR_Advanced" xml:space="preserve">
-    <value>Advanced Settings</value>
+    <value>詳細設定</value>
   </data>
   <data name="Settings_OCR_Preprocessing" xml:space="preserve">
-    <value>Image Preprocessing</value>
+    <value>画像前処理</value>
   </data>
   <data name="Settings_OCR_PreprocessingEnable" xml:space="preserve">
-    <value>Enable Image Preprocessing</value>
+    <value>画像前処理を有効化</value>
   </data>
   <data name="Settings_OCR_PreprocessingDescription" xml:space="preserve">
-    <value>Apply image preprocessing to improve OCR accuracy</value>
+    <value>OCR精度向上のための画像前処理を実行します</value>
   </data>
   <data name="Settings_OCR_Grayscale" xml:space="preserve">
-    <value>Grayscale Conversion</value>
+    <value>グレースケール変換</value>
   </data>
 
   <!-- ========== Overlay Settings ========== -->
   <data name="Settings_Overlay_Title" xml:space="preserve">
-    <value>Overlay Settings</value>
+    <value>オーバーレイ設定</value>
   </data>
   <data name="Settings_Overlay_Subtitle" xml:space="preserve">
-    <value>Settings for displaying translation results on game screen</value>
+    <value>翻訳結果をゲーム画面上に表示するオーバーレイの設定</value>
   </data>
   <data name="Settings_Overlay_ARNote" xml:space="preserve">
-    <value>AR-style display: Translation results are overlaid at the same position as original text, providing a Google Translate camera-like experience</value>
+    <value>⭐ AR風表示：元テキストと同じ位置に翻訳結果を重ね表示し、Google翻訳カメラのような体験を提供します</value>
   </data>
   <data name="Settings_Overlay_Basic" xml:space="preserve">
-    <value>Basic Settings</value>
+    <value>基本設定</value>
   </data>
   <data name="Settings_Overlay_Enabled" xml:space="preserve">
-    <value>Overlay Display</value>
+    <value>オーバーレイ表示</value>
   </data>
   <data name="Settings_Overlay_EnabledDescription" xml:space="preserve">
-    <value>Display translation results as overlay on game screen</value>
+    <value>翻訳結果をゲーム画面上にオーバーレイ表示します</value>
   </data>
   <data name="Settings_Overlay_Opacity" xml:space="preserve">
-    <value>Opacity</value>
+    <value>透明度</value>
   </data>
   <data name="Settings_Overlay_OpacityDescription" xml:space="preserve">
-    <value>Overlay opacity (higher = more opaque)</value>
+    <value>オーバーレイの透明度（高いほど不透明）</value>
   </data>
   <data name="Settings_Overlay_FontSize" xml:space="preserve">
-    <value>Translation Font Size</value>
+    <value>翻訳文字サイズ</value>
   </data>
   <data name="Settings_Overlay_FontSizeDescription" xml:space="preserve">
-    <value>Font size of translation text displayed on overlay</value>
+    <value>オーバーレイに表示される翻訳テキストの文字サイズ</value>
   </data>
   <data name="Settings_Overlay_BackgroundColor" xml:space="preserve">
-    <value>Background Color</value>
+    <value>背景色</value>
   </data>
   <data name="Settings_Overlay_BackgroundColorDescription" xml:space="preserve">
-    <value>Background color of overlay</value>
+    <value>オーバーレイの背景色</value>
   </data>
   <data name="Settings_Overlay_ChooseColor" xml:space="preserve">
-    <value>Choose Color...</value>
+    <value>色を選択...</value>
   </data>
   <data name="Settings_Overlay_TextColor" xml:space="preserve">
-    <value>Text Color</value>
+    <value>テキスト色</value>
   </data>
   <data name="Settings_Overlay_TextColorDescription" xml:space="preserve">
-    <value>Text color of overlay</value>
+    <value>オーバーレイのテキスト色</value>
   </data>
   <data name="Settings_Overlay_AutoHide" xml:space="preserve">
-    <value>Auto Hide Settings</value>
+    <value>自動非表示設定</value>
   </data>
   <data name="Settings_Overlay_AutoHideAuto" xml:space="preserve">
-    <value>Auto Hide for Live Translation</value>
+    <value>自動翻訳の自動非表示</value>
   </data>
   <data name="Settings_Overlay_AutoHideAutoDescription" xml:space="preserve">
-    <value>Automatically hide live translation results after specified time</value>
+    <value>自動翻訳の結果を指定時間後に自動的に非表示にします</value>
   </data>
   <data name="Settings_Overlay_AutoHideAutoDelay" xml:space="preserve">
-    <value>Live Translation Hide Delay</value>
+    <value>自動翻訳の非表示時間</value>
   </data>
   <data name="Settings_Overlay_AutoHideAutoDelayDescription" xml:space="preserve">
-    <value>Time until live translation results automatically disappear</value>
+    <value>自動翻訳結果が自動的に消えるまでの時間</value>
   </data>
   <data name="Settings_Overlay_AutoHideShotDelay" xml:space="preserve">
-    <value>Shot Translation Auto Hide Delay</value>
+    <value>単発翻訳の自動非表示時間</value>
   </data>
   <data name="Settings_Overlay_AutoHideShotDelayDescription" xml:space="preserve">
-    <value>Time until shot translation results automatically disappear</value>
+    <value>単発翻訳結果が自動的に消えるまでの時間</value>
   </data>
   <data name="Settings_Overlay_ManualClose" xml:space="preserve">
-    <value>Click to Close</value>
+    <value>クリックで閉じる</value>
   </data>
   <data name="Settings_Overlay_ManualCloseDescription" xml:space="preserve">
-    <value>Click overlay to manually hide it</value>
+    <value>オーバーレイをクリックして手動で非表示にできます</value>
   </data>
 
   <!-- ========== Account Settings ========== -->
   <data name="Settings_Account_Title" xml:space="preserve">
-    <value>Account</value>
+    <value>アカウント</value>
   </data>
   <data name="Settings_Account_Subtitle" xml:space="preserve">
-    <value>User authentication and account management</value>
+    <value>ユーザー認証とアカウント管理</value>
   </data>
   <data name="Settings_Account_Processing" xml:space="preserve">
-    <value>Processing...</value>
+    <value>処理中...</value>
   </data>
   <data name="Settings_Account_LoggedInWith" xml:space="preserve">
-    <value>Logged in with {0}</value>
+    <value>{0}でログイン</value>
   </data>
   <data name="Settings_Account_LoggedInStatus" xml:space="preserve">
-    <value>Logged in</value>
+    <value>ログイン中</value>
   </data>
   <data name="Settings_Account_Actions" xml:space="preserve">
-    <value>Account Actions</value>
+    <value>アカウント操作</value>
   </data>
   <data name="Settings_Account_LogoutDescription" xml:space="preserve">
-    <value>Log out from this device</value>
+    <value>このデバイスからログアウトします</value>
   </data>
   <data name="Settings_Account_NotLoggedIn" xml:space="preserve">
-    <value>Not logged in</value>
+    <value>ログインしていません</value>
   </data>
   <data name="Settings_Account_LoginBenefits" xml:space="preserve">
-    <value>Sign in to sync settings and access additional features</value>
+    <value>ログインすると、設定の同期や追加機能が利用できます</value>
   </data>
   <data name="Settings_Account_ForgotPassword" xml:space="preserve">
-    <value>Forgot password?</value>
+    <value>パスワードを忘れた場合</value>
   </data>
   <data name="Settings_Account_PasswordReset" xml:space="preserve">
-    <value>Password Reset</value>
+    <value>パスワードリセット</value>
   </data>
   <data name="Settings_Account_PasswordResetDescription" xml:space="preserve">
-    <value>We'll send a password reset link to your registered email address</value>
+    <value>登録したメールアドレスにパスワードリセットリンクを送信します</value>
   </data>
   <data name="Settings_Account_ResetEmailSent" xml:space="preserve">
-    <value>Reset email sent. Please check your inbox.</value>
+    <value>リセットメールを送信しました。メールを確認してください。</value>
   </data>
   <data name="Settings_Account_EmailAddress" xml:space="preserve">
-    <value>Email Address</value>
+    <value>メールアドレス</value>
   </data>
   <data name="Settings_Account_Profile" xml:space="preserve">
-    <value>Profile</value>
+    <value>プロフィール</value>
   </data>
   <data name="Settings_Account_Email" xml:space="preserve">
-    <value>Email</value>
+    <value>メール</value>
   </data>
   <data name="Settings_Account_ChangePassword" xml:space="preserve">
-    <value>Change Password</value>
+    <value>パスワード変更</value>
   </data>
   <data name="Settings_Account_Logout" xml:space="preserve">
-    <value>Logout</value>
+    <value>ログアウト</value>
   </data>
   <data name="Settings_Account_Login" xml:space="preserve">
-    <value>Login</value>
+    <value>ログイン</value>
   </data>
   <data name="Settings_Account_Signup" xml:space="preserve">
-    <value>Sign Up</value>
+    <value>新規登録</value>
   </data>
   <data name="Settings_Account_CurrentPlan" xml:space="preserve">
-    <value>Current Plan</value>
+    <value>現在のプラン</value>
   </data>
   <data name="Settings_Account_UpgradeToPremium" xml:space="preserve">
-    <value>Upgrade to Premium</value>
+    <value>Premiumにアップグレード</value>
   </data>
 
   <!-- ========== License Settings ========== -->
   <data name="Settings_License_Title" xml:space="preserve">
-    <value>License</value>
+    <value>ライセンス</value>
   </data>
   <data name="Settings_License_Subtitle" xml:space="preserve">
-    <value>View plan information and usage</value>
+    <value>プラン情報と使用状況を確認</value>
   </data>
   <data name="Settings_Upgrade_Title" xml:space="preserve">
-    <value>Plan Upgrade</value>
+    <value>プランアップグレード</value>
   </data>
   <data name="Settings_Upgrade_Subtitle" xml:space="preserve">
-    <value>Purchase or change your plan</value>
+    <value>プランの購入・変更</value>
   </data>
   <data name="Settings_License_Loading" xml:space="preserve">
-    <value>Loading license information...</value>
+    <value>ライセンス情報を読み込み中...</value>
   </data>
   <data name="Settings_License_TokenUsage" xml:space="preserve">
-    <value>Usage</value>
+    <value>使用量</value>
   </data>
   <data name="Settings_License_MonthlyUsage" xml:space="preserve">
-    <value>Monthly Usage</value>
+    <value>月間使用量</value>
   </data>
   <data name="Settings_License_QuotaExceeded" xml:space="preserve">
-    <value>Monthly quota exceeded. EX Translation is unavailable until next month.</value>
+    <value>月間利用枠を超過しました。EX翻訳は来月まで利用できません。</value>
   </data>
   <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
-    <value>This plan only supports standard translation. Upgrade to Pro or higher to use EX Translation.</value>
+    <value>このプランでは標準翻訳のみ利用可能です。EX翻訳を使用するには、Pro以上のプランへアップグレードしてください。</value>
   </data>
   <data name="Settings_License_PlanDetails" xml:space="preserve">
-    <value>Plan Details</value>
+    <value>プラン詳細</value>
   </data>
   <data name="Settings_License_ExpirationDate" xml:space="preserve">
-    <value>Expiration Date</value>
+    <value>有効期限</value>
   </data>
   <data name="Settings_License_CloudAccess" xml:space="preserve">
-    <value>EX Translation</value>
+    <value>EX翻訳</value>
   </data>
   <data name="Settings_License_MonthlyLimit" xml:space="preserve">
-    <value>Monthly Quota</value>
+    <value>月間利用枠</value>
   </data>
   <data name="Settings_License_Refresh" xml:space="preserve">
-    <value>Refresh License Info</value>
+    <value>ライセンス情報を更新</value>
   </data>
   <data name="License_Plan_Free" xml:space="preserve">
     <value>Free</value>
@@ -713,332 +713,332 @@
     <value>Ultimate</value>
   </data>
   <data name="License_Plan_Unknown" xml:space="preserve">
-    <value>Unknown</value>
+    <value>不明</value>
   </data>
   <data name="License_Plan_PromotionSuffix" xml:space="preserve">
-    <value>(Promotion Code Applied)</value>
+    <value>(プロモーションコード適用)</value>
   </data>
 
   <!-- Promotion Code Section -->
   <data name="Settings_License_PromotionCode" xml:space="preserve">
-    <value>Promotion Code</value>
+    <value>プロモーションコード</value>
   </data>
   <data name="Settings_License_PromotionExpires" xml:space="preserve">
-    <value>Expires:</value>
+    <value>有効期限:</value>
   </data>
   <data name="Settings_License_PromotionCodeLabel" xml:space="preserve">
-    <value>Code:</value>
+    <value>コード:</value>
   </data>
   <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
-    <value>If you have a promotion code, enter it below.</value>
+    <value>プロモーションコードをお持ちの場合は、下記に入力してください。</value>
   </data>
   <data name="Settings_License_PromotionApply" xml:space="preserve">
-    <value>Apply</value>
+    <value>適用</value>
   </data>
   <data name="Settings_License_PromotionVerifying" xml:space="preserve">
-    <value>Verifying...</value>
+    <value>確認中...</value>
   </data>
   <data name="Settings_License_PromotionAppliedFormat" xml:space="preserve">
-    <value>{0} has been applied</value>
+    <value>{0}が適用されています</value>
   </data>
   <data name="Settings_License_PromotionPlanPromo" xml:space="preserve">
-    <value>Promotion</value>
+    <value>プロモーション</value>
   </data>
 
   <data name="License_Desc_Free" xml:space="preserve">
-    <value>Free Plan - EX Translation available with bonus</value>
+    <value>無料プラン - ボーナスでEX翻訳利用可能</value>
   </data>
   <data name="License_Desc_Standard" xml:space="preserve">
-    <value>Standard Plan - No ads, standard translation only</value>
+    <value>スタンダードプラン - 広告なし、標準翻訳のみ</value>
   </data>
   <data name="License_Desc_Pro" xml:space="preserve">
-    <value>Pro Plan - EX Translation, 10M monthly quota</value>
+    <value>Proプラン - EX翻訳 月間利用枠1,000万</value>
   </data>
   <data name="License_Desc_Premia" xml:space="preserve">
-    <value>Premia Plan - EX Translation, 8M monthly quota</value>
+    <value>Premiaプラン - EX翻訳 月間利用枠800万</value>
   </data>
   <data name="License_Desc_Premium" xml:space="preserve">
-    <value>Premium Plan - EX Translation, 20M monthly quota</value>
+    <value>Premiumプラン - EX翻訳 月間利用枠2,000万</value>
   </data>
   <data name="License_Desc_Ultimate" xml:space="preserve">
-    <value>Ultimate Plan - EX Translation, 50M monthly quota</value>
+    <value>Ultimateプラン - EX翻訳 月間利用枠5,000万</value>
   </data>
   <data name="License_NoExpiration" xml:space="preserve">
-    <value>No Expiration</value>
+    <value>無期限</value>
   </data>
   <data name="License_LocalOnly" xml:space="preserve">
-    <value>Standard Only</value>
+    <value>標準のみ</value>
   </data>
   <data name="License_EXTranslation_Available" xml:space="preserve">
-    <value>Available</value>
+    <value>利用可能</value>
   </data>
   <data name="License_EXTranslation_Unavailable" xml:space="preserve">
-    <value>Unavailable</value>
+    <value>利用不可</value>
   </data>
   <data name="License_RefreshSuccess" xml:space="preserve">
-    <value>License information updated</value>
+    <value>ライセンス情報を更新しました</value>
   </data>
   <data name="License_RefreshFailed" xml:space="preserve">
-    <value>Failed to update license information</value>
+    <value>ライセンス情報の更新に失敗しました</value>
   </data>
   <data name="Settings_License_Upgrade" xml:space="preserve">
-    <value>Change Plan</value>
+    <value>プラン変更</value>
   </data>
   <data name="License_UpgradeComingSoon" xml:space="preserve">
-    <value>Upgrade feature coming soon</value>
+    <value>アップグレード機能は準備中です</value>
   </data>
   <data name="License_OpeningPlanPage" xml:space="preserve">
-    <value>Opening plan change page...</value>
+    <value>プラン変更ページを開いています...</value>
   </data>
   <data name="License_PlanPageOpenFailed" xml:space="preserve">
-    <value>Failed to open plan change page</value>
+    <value>プラン変更ページを開けませんでした</value>
   </data>
 
   <!-- Patreon Integration -->
   <data name="Settings_License_PatreonIntegration" xml:space="preserve">
-    <value>Patreon Integration</value>
+    <value>Patreon連携</value>
   </data>
   <data name="Settings_License_PatreonStatus" xml:space="preserve">
-    <value>Connection Status</value>
+    <value>接続状態</value>
   </data>
   <data name="Settings_License_LastSync" xml:space="preserve">
-    <value>Last Sync</value>
+    <value>最終同期</value>
   </data>
   <data name="Settings_License_ConnectPatreon" xml:space="preserve">
-    <value>Connect to Patreon</value>
+    <value>Patreonに接続</value>
   </data>
   <data name="Settings_License_DisconnectPatreon" xml:space="preserve">
-    <value>Disconnect</value>
+    <value>連携解除</value>
   </data>
   <data name="Settings_License_SyncPatreon" xml:space="preserve">
-    <value>Sync</value>
+    <value>同期</value>
   </data>
 
   <!-- Patreon Integration (Account Settings) -->
   <data name="Settings_Account_PatreonSection" xml:space="preserve">
-    <value>Patreon Integration</value>
+    <value>Patreon連携</value>
   </data>
   <data name="Settings_Account_PatreonUserFallback" xml:space="preserve">
-    <value>Patreon User</value>
+    <value>Patreonユーザー</value>
   </data>
   <data name="Settings_Account_PatreonPlanLabel" xml:space="preserve">
-    <value>Plan:</value>
+    <value>プラン:</value>
   </data>
   <data name="Settings_Account_PatreonLastSync" xml:space="preserve">
-    <value>Last sync: {0}</value>
+    <value>最終同期: {0}</value>
   </data>
   <data name="Settings_Account_PatreonSyncNow" xml:space="preserve">
-    <value>Sync Now</value>
+    <value>今すぐ同期</value>
   </data>
   <data name="Settings_Account_PatreonDisconnect" xml:space="preserve">
-    <value>Disconnect</value>
+    <value>連携解除</value>
   </data>
   <data name="Settings_Account_PatreonConnectTitle" xml:space="preserve">
-    <value>Connect Patreon Account</value>
+    <value>Patreonアカウントと連携</value>
   </data>
   <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
-    <value>Link your Patreon supporter account to unlock benefits like ad-free experience and EX Translation</value>
+    <value>Patreonで支援中のアカウントと連携すると、広告なし・EX翻訳などの特典が利用できます</value>
   </data>
   <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
-    <value>Connect with Patreon</value>
+    <value>Patreonと連携する</value>
   </data>
   <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
-    <value>Available Plans:</value>
+    <value>利用可能なプラン:</value>
   </data>
   <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
-    <value>• Pro ($3/month): EX Translation 10M monthly quota</value>
+    <value>• Pro ($3/月): EX翻訳 月間利用枠1,000万</value>
   </data>
   <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
-    <value>• Premium ($5/month): EX Translation 20M monthly quota</value>
+    <value>• Premium ($5/月): EX翻訳 月間利用枠2,000万</value>
   </data>
   <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
-    <value>• Ultimate ($9/month): EX Translation 50M monthly quota</value>
+    <value>• Ultimate ($9/月): EX翻訳 月間利用枠5,000万</value>
   </data>
   <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
-    <value>Login</value>
+    <value>ログイン</value>
   </data>
   <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
-    <value>Syncing...</value>
+    <value>同期中...</value>
   </data>
   <data name="Settings_Account_PatreonStatusSynced" xml:space="preserve">
-    <value>Synced</value>
+    <value>同期済み</value>
   </data>
   <data name="Settings_Account_PatreonStatusOffline" xml:space="preserve">
-    <value>Offline</value>
+    <value>オフライン</value>
   </data>
   <data name="Settings_Account_PatreonStatusTokenExpired" xml:space="preserve">
-    <value>Re-authentication required</value>
+    <value>再認証が必要</value>
   </data>
   <data name="Settings_Account_PatreonStatusError" xml:space="preserve">
-    <value>Error</value>
+    <value>エラー</value>
   </data>
   <data name="Settings_Account_PatreonStatusNotConnected" xml:space="preserve">
-    <value>Not connected</value>
+    <value>未連携</value>
   </data>
   <data name="Settings_Account_PatreonLinkedFormat" xml:space="preserve">
-    <value>Connected ({0})</value>
+    <value>連携済み（{0}）</value>
   </data>
   <data name="Settings_Account_MockModeTestUser" xml:space="preserve">
-    <value>Test User (Mock Mode)</value>
+    <value>テストユーザー (モックモード)</value>
   </data>
 
   <!-- ========== Advanced Settings ========== -->
   <data name="Settings_Advanced_Title" xml:space="preserve">
-    <value>Advanced Settings</value>
+    <value>拡張設定</value>
   </data>
   <data name="Settings_Advanced_Subtitle" xml:space="preserve">
-    <value>Detailed settings for advanced features and system optimization</value>
+    <value>高度な機能とシステム最適化の詳細設定</value>
   </data>
   <data name="Settings_Advanced_Warning" xml:space="preserve">
-    <value>Warning: These settings are for advanced users. Changes may cause unexpected behavior.</value>
+    <value>⚠️ 警告: これらの設定は上級ユーザー向けです。変更すると予期しない動作が発生する可能性があります。</value>
   </data>
   <data name="Settings_Advanced_Basic" xml:space="preserve">
-    <value>Basic Optimization Settings</value>
+    <value>基本最適化設定</value>
   </data>
   <data name="Settings_Advanced_CPU" xml:space="preserve">
-    <value>CPU/Process Settings</value>
+    <value>CPU・プロセス設定</value>
   </data>
   <data name="Settings_Advanced_Memory" xml:space="preserve">
-    <value>Memory/Buffering Settings</value>
+    <value>メモリ・バッファリング設定</value>
   </data>
   <data name="Settings_Advanced_Network" xml:space="preserve">
-    <value>Network Settings</value>
+    <value>ネットワーク設定</value>
   </data>
   <data name="Settings_Advanced_Seconds" xml:space="preserve">
-    <value>seconds</value>
+    <value>秒</value>
   </data>
   <data name="Settings_Advanced_Connections" xml:space="preserve">
-    <value>connections</value>
+    <value>接続</value>
   </data>
   <data name="Settings_Advanced_Retry" xml:space="preserve">
-    <value>Retry Settings</value>
+    <value>リトライ設定</value>
   </data>
   <data name="Settings_Advanced_Times" xml:space="preserve">
-    <value>times</value>
+    <value>回</value>
   </data>
   <data name="Settings_Advanced_Statistics" xml:space="preserve">
-    <value>Statistics/Monitoring Settings</value>
+    <value>統計・監視設定</value>
   </data>
   <data name="Settings_Advanced_Days" xml:space="preserve">
-    <value>days</value>
+    <value>日</value>
   </data>
   <data name="Settings_Advanced_Experimental" xml:space="preserve">
-    <value>Experimental/Debug Settings</value>
+    <value>実験的機能・デバッグ設定</value>
   </data>
   <data name="Settings_Advanced_Danger" xml:space="preserve">
-    <value>Danger: These settings are for developers. Do not use in production.</value>
+    <value>🚨 危険: これらの設定は開発者向けです。本番環境では使用しないでください。</value>
   </data>
 
   <!-- ========== Login View ========== -->
   <data name="Auth_Login_Title" xml:space="preserve">
-    <value>Sign in to Baketa</value>
+    <value>Baketa にログイン</value>
   </data>
   <data name="Auth_Login_Google" xml:space="preserve">
-    <value>Sign in with Google</value>
+    <value>Google でログイン</value>
   </data>
   <data name="Auth_Login_Discord" xml:space="preserve">
-    <value>Sign in with Discord</value>
+    <value>Discord でログイン</value>
   </data>
   <data name="Auth_Login_Twitch" xml:space="preserve">
-    <value>Sign in with Twitch</value>
+    <value>Twitch でログイン</value>
   </data>
   <data name="Auth_Login_Email" xml:space="preserve">
-    <value>Email</value>
+    <value>メールアドレス</value>
   </data>
   <data name="Auth_Login_EmailPlaceholder" xml:space="preserve">
     <value>example@email.com</value>
   </data>
   <data name="Auth_Login_Password" xml:space="preserve">
-    <value>Password</value>
+    <value>パスワード</value>
   </data>
   <data name="Auth_Login_PasswordPlaceholder" xml:space="preserve">
-    <value>Enter password</value>
+    <value>パスワードを入力</value>
   </data>
   <data name="Auth_Login_RememberMe" xml:space="preserve">
-    <value>Remember me</value>
+    <value>ログイン状態を保持</value>
   </data>
   <data name="Auth_Login_ForgotPassword" xml:space="preserve">
-    <value>Forgot password?</value>
+    <value>パスワードを忘れた方</value>
   </data>
   <data name="Auth_Login_Button" xml:space="preserve">
-    <value>Sign In</value>
+    <value>ログイン</value>
   </data>
   <data name="Auth_Login_Loading" xml:space="preserve">
-    <value>Authenticating...</value>
+    <value>認証中...</value>
   </data>
   <data name="Auth_Login_SignupPrompt" xml:space="preserve">
-    <value>New to Baketa? </value>
+    <value>初めてご利用の方は </value>
   </data>
   <data name="Auth_Login_SignupLink" xml:space="preserve">
-    <value>Create Account</value>
+    <value>アカウント作成</value>
   </data>
   <data name="Auth_Login_EmailExpander" xml:space="preserve">
-    <value>Sign in with email</value>
+    <value>メールアドレスでログイン</value>
   </data>
 
   <!-- ========== Signup View ========== -->
   <data name="Auth_Signup_Title" xml:space="preserve">
-    <value>Create Baketa Account</value>
+    <value>Baketa アカウントを作成</value>
   </data>
   <data name="Auth_Signup_Google" xml:space="preserve">
-    <value>Sign up with Google</value>
+    <value>Google で作成</value>
   </data>
   <data name="Auth_Signup_Discord" xml:space="preserve">
-    <value>Sign up with Discord</value>
+    <value>Discord で作成</value>
   </data>
   <data name="Auth_Signup_Twitch" xml:space="preserve">
-    <value>Sign up with Twitch</value>
+    <value>Twitch で作成</value>
   </data>
   <data name="Auth_Signup_OrEmail" xml:space="preserve">
-    <value>or sign up with email</value>
+    <value>またはメールで作成</value>
   </data>
   <data name="Auth_Signup_DisplayName" xml:space="preserve">
-    <value>Display Name</value>
+    <value>表示名</value>
   </data>
   <data name="Auth_Signup_DisplayNamePlaceholder" xml:space="preserve">
-    <value>Your display name</value>
+    <value>あなたの表示名</value>
   </data>
   <data name="Auth_Signup_Email" xml:space="preserve">
-    <value>Email</value>
+    <value>メールアドレス</value>
   </data>
   <data name="Auth_Signup_Password" xml:space="preserve">
-    <value>Password</value>
+    <value>パスワード</value>
   </data>
   <data name="Auth_Signup_PasswordPlaceholder" xml:space="preserve">
-    <value>8 or more characters</value>
+    <value>8文字以上</value>
   </data>
   <data name="Auth_Signup_PasswordRequirement" xml:space="preserve">
-    <value>* 8+ characters, with at least 3 of: uppercase, lowercase, numbers, symbols</value>
+    <value>※ 8文字以上、大文字・小文字・数字・記号のうち3種類以上</value>
   </data>
   <data name="Auth_Signup_ConfirmPassword" xml:space="preserve">
-    <value>Confirm Password</value>
+    <value>パスワード確認</value>
   </data>
   <data name="Auth_Signup_ConfirmPasswordPlaceholder" xml:space="preserve">
-    <value>Enter password again</value>
+    <value>もう一度パスワードを入力</value>
   </data>
   <data name="Auth_Signup_Terms" xml:space="preserve">
-    <value>Terms of Service</value>
+    <value>利用規約</value>
   </data>
   <data name="Auth_Signup_TermsAgree" xml:space="preserve">
-    <value>I agree to the</value>
+    <value>に同意します</value>
   </data>
   <data name="Auth_Signup_Privacy" xml:space="preserve">
-    <value>Privacy Policy</value>
+    <value>プライバシーポリシー</value>
   </data>
   <data name="Auth_Signup_Button" xml:space="preserve">
-    <value>Create Account</value>
+    <value>アカウントを作成</value>
   </data>
   <data name="Auth_Signup_Loading" xml:space="preserve">
-    <value>Creating account...</value>
+    <value>アカウント作成中...</value>
   </data>
   <data name="Auth_Signup_LoginPrompt" xml:space="preserve">
-    <value>Already have an account? </value>
+    <value>既にアカウントをお持ちの方は </value>
   </data>
   <data name="Auth_Signup_LoginLink" xml:space="preserve">
-    <value>Sign In</value>
+    <value>ログイン</value>
   </data>
   <data name="Auth_Signup_EmailExpander" xml:space="preserve">
-    <value>Sign up with email</value>
+    <value>メールアドレスで登録</value>
   </data>
 
   <!-- ========== Premium Plan ========== -->
@@ -1046,596 +1046,596 @@
     <value>Baketa Premium</value>
   </data>
   <data name="Premium_FeatureAdFree" xml:space="preserve">
-    <value>Ad-free</value>
+    <value>広告非表示</value>
   </data>
   <data name="Premium_FeatureCloudTranslation" xml:space="preserve">
-    <value>EX Translation (High-precision engine)</value>
+    <value>EX翻訳（高精度翻訳エンジン）</value>
   </data>
   <data name="Premium_FeaturePrioritySupport" xml:space="preserve">
-    <value>Priority Support</value>
+    <value>優先サポート</value>
   </data>
   <data name="Premium_FeatureEarlyAccess" xml:space="preserve">
-    <value>Early Access to New Features</value>
+    <value>新機能への優先アクセス</value>
   </data>
   <data name="Premium_Monthly" xml:space="preserve">
-    <value>$5/month</value>
+    <value>月額 ¥500</value>
   </data>
   <data name="Premium_Yearly" xml:space="preserve">
-    <value>$50/year (17% OFF)</value>
+    <value>年額 ¥5,000 (17% OFF)</value>
   </data>
 
   <!-- ========== Error Messages ========== -->
   <data name="Error_NetworkError" xml:space="preserve">
-    <value>A network error occurred</value>
+    <value>ネットワークエラーが発生しました</value>
   </data>
   <data name="Error_AuthenticationFailed" xml:space="preserve">
-    <value>Authentication failed</value>
+    <value>認証に失敗しました</value>
   </data>
   <data name="Error_TranslationFailed" xml:space="preserve">
-    <value>Translation failed</value>
+    <value>翻訳に失敗しました</value>
   </data>
   <data name="Error_OcrFailed" xml:space="preserve">
-    <value>OCR failed</value>
+    <value>OCRに失敗しました</value>
   </data>
   <data name="Error_WindowNotFound" xml:space="preserve">
-    <value>Target window not found</value>
+    <value>対象ウィンドウが見つかりません</value>
   </data>
   <data name="Error_InvalidEmail" xml:space="preserve">
-    <value>Invalid email address</value>
+    <value>無効なメールアドレスです</value>
   </data>
   <data name="Error_PasswordTooShort" xml:space="preserve">
-    <value>Password must be at least 8 characters</value>
+    <value>パスワードは8文字以上必要です</value>
   </data>
   <data name="Error_LoginFailed" xml:space="preserve">
-    <value>Login failed</value>
+    <value>ログインに失敗しました</value>
   </data>
   <data name="Error_PasswordMismatch" xml:space="preserve">
-    <value>Passwords do not match</value>
+    <value>パスワードが一致しません</value>
   </data>
   <data name="Error_SignupFailed" xml:space="preserve">
-    <value>Account creation failed</value>
+    <value>アカウント作成に失敗しました</value>
   </data>
 
   <!-- ========== Confirmation Dialogs ========== -->
   <data name="Dialog_LogoutConfirm" xml:space="preserve">
-    <value>Are you sure you want to logout?</value>
+    <value>ログアウトしますか？</value>
   </data>
   <data name="Dialog_DiscardChanges" xml:space="preserve">
-    <value>You have unsaved changes. Discard changes?</value>
+    <value>未保存の変更があります。変更を破棄しますか？</value>
   </data>
   <data name="Dialog_ResetSettings" xml:space="preserve">
-    <value>Reset settings to default?</value>
+    <value>設定をデフォルトに戻しますか？</value>
   </data>
   <data name="Dialog_ExitApp" xml:space="preserve">
-    <value>Exit application?</value>
+    <value>アプリケーションを終了しますか？</value>
   </data>
 
   <!-- MainOverlay Tooltips -->
   <data name="MainOverlay_StartButton_Tooltip" xml:space="preserve">
-    <value>Start translation</value>
+    <value>翻訳を開始</value>
   </data>
   <data name="MainOverlay_Singleshot_Execute" xml:space="preserve">
-    <value>Execute singleshot translation</value>
+    <value>シングルショット翻訳を実行</value>
   </data>
   <data name="MainOverlay_Singleshot_Reset" xml:space="preserve">
-    <value>Reset</value>
-    <comment>[Issue #357] Button/tooltip text when shot translation is active</comment>
+    <value>リセット</value>
+    <comment>[Issue #357] Shot翻訳アクティブ時のボタン/ツールチップテキスト</comment>
   </data>
   <data name="MainOverlay_Live_Stop" xml:space="preserve">
-    <value>Stop</value>
-    <comment>[Issue #357] Button text when live translation is active</comment>
+    <value>停止</value>
+    <comment>[Issue #357] Live翻訳アクティブ時のボタンテキスト</comment>
   </data>
   <data name="MainOverlay_Status_Initializing" xml:space="preserve">
-    <value>Initializing...</value>
+    <value>初期化中...</value>
   </data>
   <data name="MainOverlay_Status_Idle" xml:space="preserve">
-    <value>Not selected</value>
+    <value>未選択</value>
   </data>
   <data name="MainOverlay_Status_Ready" xml:space="preserve">
-    <value>Ready</value>
+    <value>準備完了</value>
   </data>
   <data name="MainOverlay_Status_Translating" xml:space="preserve">
-    <value>Translating</value>
+    <value>翻訳中</value>
   </data>
   <data name="MainOverlay_Status_Waiting" xml:space="preserve">
-    <value>Waiting</value>
+    <value>待機中</value>
   </data>
   <data name="MainOverlay_Warmup_Failed" xml:space="preserve">
-    <value>Model initialization failed. Please restart the app.</value>
+    <value>モデルの初期化に失敗しました。アプリを再起動してください。</value>
   </data>
   <data name="MainOverlay_Warmup_Loading" xml:space="preserve">
-    <value>Loading model... {0}</value>
+    <value>モデル読み込み中... {0}</value>
   </data>
   <data name="MainOverlay_Warmup_Complete" xml:space="preserve">
-    <value>Ready! You can start translating</value>
+    <value>準備完了！翻訳を開始できます</value>
   </data>
 
   <!-- Theme Options -->
   <data name="Theme_Light" xml:space="preserve">
-    <value>Light</value>
+    <value>ライト</value>
   </data>
   <data name="Theme_Dark" xml:space="preserve">
-    <value>Dark</value>
+    <value>ダーク</value>
   </data>
   <data name="Theme_Auto" xml:space="preserve">
-    <value>Auto (follow system setting)</value>
+    <value>自動（システム設定に従う）</value>
   </data>
 
   <!-- Size Options -->
   <data name="Size_Small" xml:space="preserve">
-    <value>Small (compact)</value>
+    <value>小（コンパクト）</value>
   </data>
   <data name="Size_Medium" xml:space="preserve">
-    <value>Medium (standard)</value>
+    <value>中（標準）</value>
   </data>
   <data name="Size_Large" xml:space="preserve">
-    <value>Large (easy to read)</value>
+    <value>大（見やすさ重視）</value>
   </data>
 
   <!-- Advanced Settings Toggle -->
   <data name="Settings_Advanced_Show" xml:space="preserve">
-    <value>Show advanced settings</value>
+    <value>詳細設定を表示</value>
   </data>
   <data name="Settings_Advanced_Hide" xml:space="preserve">
-    <value>Back to basic settings</value>
+    <value>基本設定に戻す</value>
   </data>
 
   <!-- Settings Window Status Messages -->
   <data name="Settings_Window_Title" xml:space="preserve">
-    <value>Settings</value>
+    <value>設定</value>
   </data>
   <data name="Settings_Status_HasChanges" xml:space="preserve">
-    <value>Settings have been modified</value>
+    <value>設定に変更があります</value>
   </data>
   <data name="Settings_Status_NoChanges" xml:space="preserve">
-    <value>No changes</value>
+    <value>変更なし</value>
   </data>
   <data name="Settings_Status_Saving" xml:space="preserve">
-    <value>Saving settings...</value>
+    <value>設定を保存中...</value>
   </data>
   <data name="Settings_Status_Saved" xml:space="preserve">
-    <value>Settings saved</value>
+    <value>設定を保存しました</value>
   </data>
   <data name="Settings_Status_SaveFailed" xml:space="preserve">
-    <value>Failed to save: {0}</value>
+    <value>保存に失敗しました: {0}</value>
   </data>
   <data name="Settings_Status_AccessDenied" xml:space="preserve">
-    <value>Failed to save: Access denied</value>
+    <value>保存に失敗しました: アクセスが拒否されました</value>
   </data>
   <data name="Settings_Status_IOError" xml:space="preserve">
-    <value>Failed to save: File I/O error</value>
+    <value>保存に失敗しました: ファイルI/Oエラー</value>
   </data>
   <data name="Settings_Status_Cancelled" xml:space="preserve">
-    <value>Changes cancelled</value>
+    <value>変更をキャンセルしました</value>
   </data>
   <data name="Settings_Status_Reset" xml:space="preserve">
-    <value>Settings reset</value>
+    <value>設定をリセットしました</value>
   </data>
 
   <!-- Settings Window Buttons -->
   <data name="Settings_Button_Reset" xml:space="preserve">
-    <value>Reset</value>
+    <value>リセット</value>
   </data>
   <data name="Settings_Button_Cancel" xml:space="preserve">
-    <value>Cancel</value>
+    <value>キャンセル</value>
   </data>
   <data name="Settings_Button_Save" xml:space="preserve">
-    <value>Save</value>
+    <value>保存</value>
   </data>
   <data name="Settings_Tooltip_Reset" xml:space="preserve">
-    <value>Reset all settings to default</value>
+    <value>すべての設定をデフォルトに戻します</value>
   </data>
   <data name="Settings_Tooltip_Cancel" xml:space="preserve">
-    <value>Discard changes and close</value>
+    <value>変更を破棄して閉じます</value>
   </data>
   <data name="Settings_Tooltip_Save" xml:space="preserve">
-    <value>Save changes</value>
+    <value>変更を保存します</value>
   </data>
 
   <!-- ========== Loading Screen ========== -->
   <!-- [Issue #185] Component download step -->
   <data name="Loading_DownloadingComponents" xml:space="preserve">
-    <value>Downloading components...</value>
+    <value>コンポーネントをダウンロードしています...</value>
   </data>
   <data name="Loading_ResolvingDependencies" xml:space="preserve">
-    <value>Resolving dependencies...</value>
+    <value>依存関係を解決しています...</value>
   </data>
   <data name="Loading_LoadingOCR" xml:space="preserve">
-    <value>Loading OCR model...</value>
+    <value>OCRモデルを読み込んでいます...</value>
   </data>
   <data name="Loading_InitializingTranslation" xml:space="preserve">
-    <value>Initializing translation engine...</value>
+    <value>翻訳エンジンを初期化しています...</value>
   </data>
   <data name="Loading_PreparingUI" xml:space="preserve">
-    <value>Preparing UI components...</value>
+    <value>UIコンポーネントを準備しています...</value>
   </data>
   <data name="Loading_SetupGpu" xml:space="preserve">
-    <value>Setting up GPU environment...</value>
+    <value>GPU環境をセットアップしています...</value>
   </data>
   <!-- [Issue #259] Loading Tips -->
   <data name="Loading_Tip_1" xml:space="preserve">
-    <value>Initial setup may take about 10 minutes. Please wait.</value>
+    <value>初回設定には10分程度かかる場合があります。お待ちください。</value>
   </data>
   <data name="Loading_Tip_2" xml:space="preserve">
-    <value>Translation overlay combining OCR and machine translation</value>
+    <value>ゲーム画面のテキストをリアルタイムで翻訳します</value>
   </data>
   <data name="Loading_Tip_3" xml:space="preserve">
-    <value>First launch may take longer due to model downloads</value>
+    <value>OCRと機械翻訳を組み合わせた翻訳オーバーレイです</value>
   </data>
   <data name="Loading_Tip_4" xml:space="preserve">
-    <value>Translation results are displayed as an overlay on the game screen</value>
+    <value>翻訳結果はゲーム画面に重ねて表示されます</value>
   </data>
   <data name="Loading_Tip_5" xml:space="preserve">
-    <value>Customize various options in the Settings screen</value>
+    <value>設定画面で各種オプションをカスタマイズできます</value>
   </data>
 
   <!-- [Issue #78 Phase 5] Token Usage Alerts -->
   <data name="TokenUsage_Warning_Title" xml:space="preserve">
-    <value>Usage Warning</value>
+    <value>使用量警告</value>
   </data>
   <data name="TokenUsage_Warning80_Message" xml:space="preserve">
-    <value>You've used 80% of your EX Translation quota this month (remaining: {0})</value>
+    <value>今月のEX翻訳利用枠を80%使用しました（残り: {0}）</value>
   </data>
   <data name="TokenUsage_Warning90_Message" xml:space="preserve">
-    <value>You've used 90% of your EX Translation quota this month (remaining: {0})</value>
+    <value>今月のEX翻訳利用枠を90%使用しました（残り: {0}）</value>
   </data>
   <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
-    <value>Quota Limit Reached</value>
+    <value>利用枠上限到達</value>
   </data>
   <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
-    <value>You've reached your EX Translation quota limit. Switching to standard translation.</value>
+    <value>今月のEX翻訳利用枠上限に達しました。標準翻訳に自動切替します。</value>
   </data>
 
   <!-- [Issue #245] Window Selection Dialog -->
   <data name="WindowSelection_Title" xml:space="preserve">
-    <value>Select Window</value>
+    <value>ウィンドウ選択</value>
   </data>
   <data name="WindowSelection_Header" xml:space="preserve">
-    <value>Select Translation Target Window</value>
+    <value>翻訳対象ウィンドウを選択</value>
   </data>
   <data name="WindowSelection_Subtitle" xml:space="preserve">
-    <value>Select the application window to translate (including minimized windows)</value>
+    <value>翻訳を開始するアプリケーションウィンドウを選択してください（最小化されているものも含む）</value>
   </data>
   <data name="WindowSelection_Refresh" xml:space="preserve">
-    <value>Refresh window list</value>
+    <value>ウィンドウリストを更新</value>
   </data>
   <data name="WindowSelection_Searching" xml:space="preserve">
-    <value>Searching for windows...</value>
+    <value>ウィンドウを検索中...</value>
   </data>
   <data name="WindowSelection_NoWindows" xml:space="preserve">
-    <value>No available windows found</value>
+    <value>利用可能なウィンドウが見つかりません</value>
   </data>
   <data name="WindowSelection_Minimized" xml:space="preserve">
-    <value>Minimized</value>
+    <value>最小化</value>
   </data>
   <data name="WindowSelection_Cancel" xml:space="preserve">
-    <value>Cancel</value>
+    <value>キャンセル</value>
   </data>
   <data name="WindowSelection_Select" xml:space="preserve">
-    <value>Select</value>
+    <value>選択</value>
   </data>
   <data name="WindowSelection_Update" xml:space="preserve">
-    <value>Refresh</value>
+    <value>更新</value>
   </data>
 
   <!-- ========== Crash Report Dialog [Issue #252] ========== -->
   <data name="CrashReport_WindowTitle" xml:space="preserve">
-    <value>Crash Report</value>
+    <value>クラッシュレポート</value>
   </data>
   <data name="CrashReport_HeaderText" xml:space="preserve">
-    <value>Unexpected Shutdown Detected</value>
+    <value>予期しない終了が発生しました</value>
   </data>
   <data name="CrashReport_DescriptionSingle" xml:space="preserve">
-    <value>The application unexpectedly quit during the last session. Would you like to send a crash report to help us improve?</value>
+    <value>前回の実行中にアプリケーションが予期せず終了しました。問題の改善のため、クラッシュレポートを送信していただけますか？</value>
   </data>
   <data name="CrashReport_DescriptionMultiple" xml:space="preserve">
-    <value>{0} recent crashes were detected. Would you like to send crash reports to help us improve?</value>
+    <value>最近{0}件のクラッシュが検出されました。問題の改善のため、クラッシュレポートを送信していただけますか？</value>
   </data>
   <data name="CrashReport_PrivacyNote" xml:space="preserve">
-    <value>For your privacy, reports do not contain personally identifiable information (username, email, IP address, etc.).</value>
+    <value>プライバシー保護のため、レポートには個人を特定できる情報（ユーザー名、メールアドレス、IPアドレス等）は含まれません。</value>
   </data>
   <data name="CrashReport_IncludeSystemInfo" xml:space="preserve">
-    <value>Include system information (OS, memory usage, etc.)</value>
+    <value>システム情報を含める（OS、メモリ使用量等）</value>
   </data>
   <data name="CrashReport_IncludeLogs" xml:space="preserve">
-    <value>Include recent logs</value>
+    <value>最近のログを含める</value>
   </data>
   <data name="CrashReport_SendButton" xml:space="preserve">
-    <value>Send Report</value>
+    <value>レポートを送信</value>
   </data>
   <data name="CrashReport_DontSendButton" xml:space="preserve">
-    <value>Don't Send</value>
+    <value>送信しない</value>
   </data>
   <data name="CrashReport_CrashDetailsTitle" xml:space="preserve">
-    <value>Crash Details</value>
+    <value>クラッシュ詳細</value>
   </data>
 
   <!-- ========== Crash Report Settings [Issue #252] ========== -->
   <data name="Settings_CrashReport_Title" xml:space="preserve">
-    <value>Crash Reports</value>
+    <value>クラッシュレポート</value>
   </data>
   <data name="Settings_CrashReport_AutoSend" xml:space="preserve">
-    <value>Auto-send crash reports</value>
+    <value>クラッシュレポートを自動送信</value>
   </data>
   <data name="Settings_CrashReport_AutoSendDescription" xml:space="preserve">
-    <value>Automatically send crash reports without showing a confirmation dialog</value>
+    <value>アプリケーションのクラッシュ時に確認ダイアログを表示せずに自動的にレポートを送信します</value>
   </data>
   <data name="Settings_CrashReport_IncludeSystemInfo" xml:space="preserve">
-    <value>Include system info</value>
+    <value>システム情報を含める</value>
   </data>
   <data name="Settings_CrashReport_IncludeSystemInfoDescription" xml:space="preserve">
-    <value>Include CPU, memory usage and other system information in reports</value>
+    <value>CPU、メモリ使用量などのシステム情報をレポートに含めます</value>
   </data>
   <data name="Settings_CrashReport_IncludeLogs" xml:space="preserve">
-    <value>Include app logs</value>
+    <value>アプリログを含める</value>
   </data>
   <data name="Settings_CrashReport_IncludeLogsDescription" xml:space="preserve">
-    <value>Include recent application logs in reports</value>
+    <value>最近のアプリケーションログをレポートに含めます</value>
   </data>
 
   <!-- ========== Update Dialog [Issue #249] ========== -->
   <data name="Update_WindowTitle" xml:space="preserve">
-    <value>Software Update</value>
+    <value>ソフトウェア更新</value>
   </data>
   <data name="Update_HeaderText" xml:space="preserve">
-    <value>A new version of {0} is available</value>
+    <value>{0}の新しいバージョンが利用可能です</value>
   </data>
   <data name="Update_InfoText" xml:space="preserve">
-    <value>{0} {1} is available (your version: {2}). Would you like to download it now?</value>
+    <value>{0} {1}が利用可能です（現在のバージョン: {2}）。今すぐダウンロードしますか？</value>
   </data>
   <data name="Update_SkipButton" xml:space="preserve">
-    <value>Skip This Version</value>
+    <value>このバージョンをスキップ</value>
   </data>
   <data name="Update_RemindLaterButton" xml:space="preserve">
-    <value>Remind Me Later</value>
+    <value>後で通知</value>
   </data>
   <data name="Update_DownloadButton" xml:space="preserve">
-    <value>Download</value>
+    <value>ダウンロード</value>
   </data>
   <data name="Update_DownloadProgress_Title" xml:space="preserve">
-    <value>Software Update</value>
+    <value>ソフトウェア更新</value>
   </data>
   <data name="Update_DownloadProgress_Downloading" xml:space="preserve">
-    <value>Downloading {0}...</value>
+    <value>{0} をダウンロード中...</value>
   </data>
   <data name="Update_DownloadProgress_Complete" xml:space="preserve">
-    <value>Download Complete</value>
+    <value>ダウンロード完了</value>
   </data>
   <data name="Update_DownloadProgress_InstallAndRelaunch" xml:space="preserve">
-    <value>Install and Relaunch</value>
+    <value>インストールと再起動</value>
   </data>
   <data name="Update_DownloadProgress_Cancel" xml:space="preserve">
-    <value>Cancel</value>
+    <value>キャンセル</value>
   </data>
 
   <!-- ========== Consent Dialog (Issue #261) ========== -->
   <data name="Consent_WindowTitle_Initial" xml:space="preserve">
-    <value>Terms of Service Agreement</value>
+    <value>利用規約への同意</value>
   </data>
   <data name="Consent_WindowTitle_Account" xml:space="preserve">
-    <value>Terms of Service Agreement</value>
+    <value>利用規約への同意</value>
   </data>
   <data name="Consent_Header_Initial" xml:space="preserve">
-    <value>Welcome to Baketa</value>
+    <value>Baketaへようこそ</value>
   </data>
   <data name="Consent_Header_Account" xml:space="preserve">
-    <value>Create Account</value>
+    <value>アカウント作成</value>
   </data>
   <data name="Consent_Description_Initial" xml:space="preserve">
-    <value>To use Baketa, you need to agree to our Terms of Service and Privacy Policy.</value>
+    <value>Baketaをご利用いただくには、利用規約とプライバシーポリシーへの同意が必要です。</value>
   </data>
   <data name="Consent_Description_Account" xml:space="preserve">
-    <value>To create an account, you need to agree to our Terms of Service and Privacy Policy.</value>
+    <value>アカウントを作成するには、利用規約とプライバシーポリシーへの同意が必要です。</value>
   </data>
   <data name="Consent_PrivacyPolicy_Label" xml:space="preserve">
-    <value>Privacy Policy</value>
+    <value>プライバシーポリシー</value>
   </data>
   <data name="Consent_PrivacyPolicy_Link" xml:space="preserve">
-    <value>Read Privacy Policy</value>
+    <value>プライバシーポリシーを読む</value>
   </data>
   <data name="Consent_PrivacyPolicy_Checkbox" xml:space="preserve">
-    <value>I agree to the Privacy Policy</value>
+    <value>プライバシーポリシーに同意します</value>
   </data>
   <data name="Consent_TermsOfService_Label" xml:space="preserve">
-    <value>Terms of Service</value>
+    <value>利用規約</value>
   </data>
   <data name="Consent_TermsOfService_Link" xml:space="preserve">
-    <value>Read Terms of Service</value>
+    <value>利用規約を読む</value>
   </data>
   <data name="Consent_TermsOfService_Checkbox" xml:space="preserve">
-    <value>I agree to the Terms of Service</value>
+    <value>利用規約に同意します</value>
   </data>
   <data name="Consent_Button_Accept" xml:space="preserve">
-    <value>Agree and Continue</value>
+    <value>同意して続行</value>
   </data>
   <data name="Consent_Button_Decline" xml:space="preserve">
-    <value>Decline and Exit</value>
+    <value>同意せず終了</value>
   </data>
 
   <!-- ========== Component Update Dialog [Issue #256] ========== -->
   <data name="ComponentUpdate_WindowTitle" xml:space="preserve">
-    <value>Component Update</value>
+    <value>コンポーネント更新</value>
   </data>
   <data name="ComponentUpdate_HeaderText" xml:space="preserve">
-    <value>Component updates are available</value>
+    <value>コンポーネントの更新が利用可能です</value>
   </data>
   <data name="ComponentUpdate_Description" xml:space="preserve">
-    <value>New versions are available for the following components. Would you like to update?</value>
+    <value>以下のコンポーネントに新しいバージョンがあります。更新しますか？</value>
   </data>
   <data name="ComponentUpdate_TotalSize" xml:space="preserve">
-    <value>Total download size: {0}</value>
+    <value>合計ダウンロードサイズ: {0}</value>
   </data>
   <data name="ComponentUpdate_VersionFormat" xml:space="preserve">
     <value>{0} → {1}</value>
   </data>
   <data name="ComponentUpdate_NotInstalled" xml:space="preserve">
-    <value>Not installed → {0}</value>
+    <value>未インストール → {0}</value>
   </data>
   <data name="ComponentUpdate_SizeFormat" xml:space="preserve">
-    <value>Size: {0}</value>
+    <value>サイズ: {0}</value>
   </data>
   <data name="ComponentUpdate_UpdateNowButton" xml:space="preserve">
-    <value>Update Now</value>
+    <value>今すぐ更新</value>
   </data>
   <data name="ComponentUpdate_RemindLaterButton" xml:space="preserve">
-    <value>Remind Later</value>
+    <value>後で通知</value>
   </data>
   <data name="ComponentUpdate_SkipButton" xml:space="preserve">
-    <value>Skip This Version</value>
+    <value>このバージョンをスキップ</value>
   </data>
   <data name="ComponentUpdate_CancelButton" xml:space="preserve">
-    <value>Cancel</value>
+    <value>キャンセル</value>
   </data>
   <data name="ComponentUpdate_CloseButton" xml:space="preserve">
-    <value>Close</value>
+    <value>閉じる</value>
   </data>
   <data name="ComponentUpdate_Status_Pending" xml:space="preserve">
-    <value>Pending</value>
+    <value>待機中</value>
   </data>
   <data name="ComponentUpdate_Status_Downloading" xml:space="preserve">
-    <value>Downloading...</value>
+    <value>ダウンロード中...</value>
   </data>
   <data name="ComponentUpdate_Status_Installing" xml:space="preserve">
-    <value>Installing...</value>
+    <value>インストール中...</value>
   </data>
   <data name="ComponentUpdate_Status_Completed" xml:space="preserve">
-    <value>Completed</value>
+    <value>完了</value>
   </data>
   <data name="ComponentUpdate_Status_Failed" xml:space="preserve">
-    <value>Failed</value>
+    <value>失敗</value>
   </data>
   <data name="ComponentUpdate_Status_Skipped" xml:space="preserve">
-    <value>Skipped</value>
+    <value>スキップ</value>
   </data>
   <data name="ComponentUpdate_AllCompleted" xml:space="preserve">
-    <value>All component updates completed</value>
+    <value>すべてのコンポーネントの更新が完了しました</value>
   </data>
   <data name="ComponentUpdate_SomeFailed" xml:space="preserve">
-    <value>Some component updates failed</value>
+    <value>一部のコンポーネントの更新に失敗しました</value>
   </data>
   <data name="ComponentUpdate_InsufficientDiskSpace" xml:space="preserve">
-    <value>Insufficient disk space (Required: {0}, Available: {1})</value>
+    <value>ディスク容量が不足しています（必要: {0}、空き: {1}）</value>
   </data>
   <data name="ComponentUpdate_NoUpdatesAvailable" xml:space="preserve">
-    <value>All components are up to date</value>
+    <value>すべてのコンポーネントは最新です</value>
   </data>
   <data name="ComponentUpdate_CheckingForUpdates" xml:space="preserve">
-    <value>Checking for updates...</value>
+    <value>更新を確認中...</value>
   </data>
 
   <!-- ========== Issue #300: OCR Recovery & Memory Warning ========== -->
   <data name="OcrRecovery_Title" xml:space="preserve">
-    <value>Text Recognition</value>
+    <value>文字認識</value>
   </data>
   <data name="OcrRecovery_Started" xml:space="preserve">
-    <value>Recovering text recognition engine. Please wait...</value>
+    <value>文字認識エンジンを復旧中です。しばらくお待ちください...</value>
   </data>
   <data name="OcrRecovery_Completed" xml:space="preserve">
-    <value>Text recognition engine recovered</value>
+    <value>文字認識エンジンが復旧しました</value>
   </data>
   <data name="OcrRecovery_Failed" xml:space="preserve">
-    <value>Text recognition engine recovery failed. Please restart Baketa.</value>
+    <value>文字認識エンジンの復旧に失敗しました。Baketaを再起動してください。</value>
   </data>
   <data name="MemoryWarning_Title" xml:space="preserve">
-    <value>Memory Warning</value>
+    <value>メモリ警告</value>
   </data>
   <data name="MemoryWarning_SystemMemory" xml:space="preserve">
-    <value>Memory usage is high ({0}%). Please close other applications.</value>
+    <value>メモリ使用率が高くなっています ({0}%)。他のアプリを閉じてください。</value>
   </data>
   <data name="GpuMemoryWarning_Title" xml:space="preserve">
-    <value>GPU Memory Warning</value>
+    <value>GPUメモリ警告</value>
   </data>
 
-  <!-- Issue #179: Auth error messages -->
+  <!-- Issue #179: 認証エラーメッセージ -->
   <data name="Auth_Error_UserAlreadyExists" xml:space="preserve">
-    <value>This email address is already in use</value>
+    <value>このメールアドレスは既に使用されています</value>
   </data>
   <data name="Auth_Error_WeakPassword" xml:space="preserve">
-    <value>Password is too weak. Please use a stronger password</value>
+    <value>パスワードが弱すぎます。より強固なパスワードを設定してください</value>
   </data>
   <data name="Auth_Error_InvalidCredentials" xml:space="preserve">
-    <value>Invalid email format</value>
+    <value>無効なメールアドレス形式です</value>
   </data>
   <data name="Auth_Error_InvalidEmail" xml:space="preserve">
-    <value>Invalid email address or password</value>
+    <value>メールアドレスまたはパスワードが正しくありません</value>
   </data>
   <data name="Auth_Error_EmailNotConfirmed" xml:space="preserve">
-    <value>Confirmation email sent. Please click the link in the email, then log in from the login screen.</value>
+    <value>確認メールを送信しました。メール内のリンクをクリックしてから、ログイン画面でログインしてください。</value>
   </data>
   <data name="Auth_Error_RateLimitExceeded" xml:space="preserve">
-    <value>Too many requests. Please try again later</value>
+    <value>リクエストが多すぎます。しばらく時間をおいてから再試行してください</value>
   </data>
   <data name="Auth_Error_SignupDisabled" xml:space="preserve">
-    <value>New account registration is currently disabled</value>
+    <value>現在、新規アカウント作成を停止しています</value>
   </data>
   <data name="Auth_Error_SignupFailed" xml:space="preserve">
-    <value>Account creation failed: {0}</value>
+    <value>アカウント作成に失敗しました: {0}</value>
   </data>
   <data name="Auth_Error_LoginFailed" xml:space="preserve">
-    <value>Login failed: {0}</value>
+    <value>ログインに失敗しました: {0}</value>
   </data>
   <data name="Auth_Error_InvalidToken" xml:space="preserve">
-    <value>Authentication failed. Please try signing in with Google, Discord, or Twitch.</value>
+    <value>認証に失敗しました。Google、Discord、Twitchでのログインをお試しください。</value>
   </data>
   <data name="Auth_Error_TokenExpired" xml:space="preserve">
-    <value>Session has expired. Please log in again.</value>
+    <value>セッションの有効期限が切れました。再度ログインしてください。</value>
   </data>
   <data name="Auth_Error_NetworkError" xml:space="preserve">
-    <value>Network error occurred. Please check your internet connection.</value>
+    <value>ネットワークエラーが発生しました。インターネット接続を確認してください。</value>
   </data>
   <data name="Auth_Error_Timeout" xml:space="preserve">
-    <value>Connection timed out. Please check your internet connection</value>
+    <value>接続がタイムアウトしました。インターネット接続をご確認ください</value>
   </data>
   <data name="Auth_Error_Unknown" xml:space="preserve">
-    <value>An authentication error occurred</value>
+    <value>認証エラーが発生しました</value>
   </data>
   <data name="Auth_Success_EmailSent" xml:space="preserve">
-    <value>Email sent</value>
+    <value>メールを送信しました</value>
   </data>
   <data name="Auth_Success_PasswordResetEmailSent" xml:space="preserve">
-    <value>Password reset email sent. Please check your inbox.</value>
+    <value>パスワードリセットメールを送信しました。メールを確認してください。</value>
   </data>
   <data name="Auth_Error_PasswordResetFailed" xml:space="preserve">
-    <value>Password reset failed. Please verify your email address.</value>
+    <value>パスワードリセットに失敗しました。メールアドレスを確認してください。</value>
   </data>
   <data name="Auth_Error_PasswordResetError" xml:space="preserve">
-    <value>An error occurred during password reset.</value>
+    <value>パスワードリセットの処理中にエラーが発生しました。</value>
   </data>
   <data name="Auth_Validation_InvalidEmail" xml:space="preserve">
-    <value>Please enter a valid email address</value>
+    <value>有効なメールアドレスを入力してください</value>
   </data>
   <data name="Auth_Validation_PasswordRequirement" xml:space="preserve">
-    <value>Password must be at least 8 characters and include 3 or more of: uppercase, lowercase, numbers, and symbols</value>
+    <value>パスワードは8文字以上で、大文字・小文字・数字・記号のうち3種類以上を含む必要があります</value>
   </data>
   <data name="Auth_Validation_PasswordMismatch" xml:space="preserve">
-    <value>Passwords do not match</value>
+    <value>パスワードが一致しません</value>
   </data>
   <data name="Settings_Account_LogoutSuccess" xml:space="preserve">
-    <value>Logged out successfully</value>
+    <value>ログアウトしました</value>
   </data>
   <data name="Settings_License_UsedTokens" xml:space="preserve">
-    <value>Used</value>
+    <value>使用済み</value>
   </data>
   <data name="Settings_License_PlanRemaining" xml:space="preserve">
-    <value>Plan Remaining</value>
+    <value>プラン残</value>
   </data>
   <data name="Settings_License_BonusLabel" xml:space="preserve">
-    <value>Bonus</value>
+    <value>ボーナス</value>
   </data>
   <data name="Settings_License_BonusTokens" xml:space="preserve">
-    <value>Bonus</value>
+    <value>ボーナス</value>
   </data>
   <data name="Settings_License_TotalAvailable" xml:space="preserve">
-    <value>Total Available</value>
+    <value>合計利用可能</value>
   </data>
   <data name="Auth_Validation_PasswordMinLength" xml:space="preserve">
-    <value>Password must be at least 6 characters</value>
+    <value>パスワードは6文字以上で入力してください</value>
   </data>
   <data name="Auth_Error_PasswordResetException" xml:space="preserve">
-    <value>Password reset failed: {0}</value>
+    <value>パスワードリセットに失敗しました: {0}</value>
   </data>
   <data name="Auth_Success_ConfirmationEmailSent" xml:space="preserve">
-    <value>Confirmation email sent. Please click the link in the email, then log in. Redirecting to login in 3 seconds...</value>
+    <value>確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...</value>
   </data>
 
 </root>

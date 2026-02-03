@@ -132,6 +132,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# [Issue #366] サーバーバージョン（ビルド時に自動更新）
+# ============================================================================
+SERVER_VERSION = "0.2.41"
+
 
 # ============================================================================
 # Surya OCR Engine (統合版)
@@ -563,6 +568,7 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
         response.status = "healthy" if self.engine.is_loaded else "unhealthy"
         response.details["engine"] = "Surya OCR"
         response.details["loaded"] = str(self.engine.is_loaded)
+        response.details["server_version"] = SERVER_VERSION  # [Issue #366]
         response.timestamp.FromDatetime(datetime.utcnow())
         return response
 
@@ -573,6 +579,7 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
         response.status = "ready" if self.engine.is_loaded else "loading"
         response.details["engine"] = "Surya OCR"
         response.details["version"] = self.engine.VERSION
+        response.details["server_version"] = SERVER_VERSION  # [Issue #366]
         response.timestamp.FromDatetime(datetime.utcnow())
         return response
 
@@ -866,7 +873,7 @@ def should_use_parallel_loading(device: str) -> bool:
 async def serve(host: str, port: int, model_path_arg: str | None = None):
     """統合gRPCサーバー起動"""
     logger.info("=" * 80)
-    logger.info("Baketa Unified AI Server Starting...")
+    logger.info(f"Baketa Unified AI Server v{SERVER_VERSION}")  # [Issue #366]
     logger.info("Issue #292: OCR + Translation in single process")
     logger.info("=" * 80)
 
@@ -958,7 +965,8 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     ])
 
     # サービス登録
-    translation_servicer = TranslationServicer(translation_engine)
+    # [Issue #366] SERVER_VERSIONを渡してバージョンチェック対応
+    translation_servicer = TranslationServicer(translation_engine, server_version=SERVER_VERSION)
     translation_pb2_grpc.add_TranslationServiceServicer_to_server(translation_servicer, server)
 
     ocr_servicer = AsyncOcrServiceServicer(ocr_engine)

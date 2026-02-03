@@ -1,93 +1,133 @@
 # Baketa
 
-**ゲーム翻訳オーバーレイアプリケーション**
+**Game Translation Overlay Application**
 
-Baketaは、ゲーム画面上のテキストをリアルタイムで翻訳し、透過オーバーレイとして表示するWindowsアプリケーションです。
+Baketa is a Windows application that translates text on game screens in real-time and displays the results as a transparent overlay.
+
+🇯🇵 [日本語版はこちら](README.ja.md)
 
 ---
 
-## 動作要件
+## System Requirements
 
+### Minimum Requirements
 - **OS**: Windows 10/11 (64-bit)
-- **メモリ**: 8GB以上推奨
-- **ストレージ**: 5GB以上の空き容量（翻訳モデル用）
-- **インターネット接続**: 初回起動時に必要（翻訳モデルのダウンロード）
+- **CPU**: Intel Core i5 / AMD Ryzen 5 or higher
+- **Memory**: 8GB or more (16GB recommended)
+- **Storage**: 5GB or more free space (for translation models)
+- **Internet**: Required on first launch (to download translation models)
+
+### Recommended (for GPU acceleration)
+- **GPU**: NVIDIA GTX 1060 or higher (CUDA compatible)
+- **VRAM**: 4GB or more
+
+> **Note**: Baketa works in CPU mode without a GPU, but translation speed will be slower.
 
 ---
 
-## インストール方法
+## Installation
 
-1. ダウンロードしたZIPファイルを任意のフォルダに展開します
-2. 展開したフォルダ内の `Baketa.exe` をダブルクリックして起動します
+1. Extract the downloaded ZIP file to any folder
+2. Double-click `Baketa.exe` in the extracted folder to launch
 
-**注意**: 初回起動時に翻訳モデル（約2GB）が自動的にダウンロードされます。
-
----
-
-## 基本的な使い方
-
-### 1. ゲームを起動
-翻訳したいゲームを通常通り起動します。
-
-### 2. Baketaを起動
-`Baketa.exe` を起動します。
-
-### 3. ゲームウィンドウを選択
-メイン画面でゲームウィンドウを選択します。
-
-### 4. 翻訳を開始
-**Start** ボタンをクリックすると、ゲーム画面のテキストが自動的に翻訳されます。
-
-### 5. 翻訳を停止
-**Stop** ボタンをクリックして翻訳を停止します。
+**Note**: Translation models (~2GB) will be automatically downloaded on first launch.
 
 ---
 
-## トラブルシューティング
+## Translation Modes
 
-### アプリが起動しない
+Baketa offers two translation modes:
 
-- **原因**: .NET Runtimeがインストールされていない可能性があります
-- **解決策**: [.NET 8.0 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) をインストールしてください
+### Live Translation (Automatic)
 
-### モデルのダウンロードに失敗する
+Continuously monitors the game screen and automatically translates when text changes.
 
-- **原因**: ネットワーク接続の問題
-- **解決策**:
-  1. インターネット接続を確認してください
-  2. ファイアウォールやセキュリティソフトがブロックしていないか確認してください
-  3. しばらく待ってから再度起動してください
+- Click **Start** to begin
+- Click **Stop** to end
+- Best for text-heavy RPGs and adventure games
 
-### 翻訳結果が表示されない
+### Shot Translation (Manual)
 
-- **原因**: ゲームウィンドウが正しく選択されていない可能性があります
-- **解決策**:
-  1. ゲームウィンドウを再選択してください
-  2. ゲームをウィンドウモードまたはボーダーレスウィンドウモードで実行してください
+Translates the screen only when you click the button.
 
-### オーバーレイが見づらい
-
-- **解決策**: 設定画面でフォントサイズや背景色を調整してください
+- Click **Shot** to translate
+- Useful for menus, status screens, and other static content
+- Saves resources by translating only when needed
 
 ---
 
-## ログファイルの場所
+## Basic Usage
 
-問題が発生した場合、以下の場所にあるログファイルをご確認ください：
+### 1. Launch Your Game
+Start the game you want to translate.
+
+### 2. Launch Baketa
+Run `Baketa.exe`.
+
+### 3. Select Game Window
+Choose the game window from the main screen.
+
+### 4. Start Translation
+- **Automatic**: Click the **Start** button
+- **Manual**: Click the **Shot** button
+
+### 5. Stop Translation
+Click the **Stop** button to stop translation.
+
+---
+
+## Troubleshooting
+
+### App Won't Start
+
+- **Cause**: .NET Runtime may not be installed
+- **Solution**: Install [.NET 8.0 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
+
+### Model Download Fails
+
+- **Cause**: Network connection issue
+- **Solution**:
+  1. Check your internet connection
+  2. Make sure firewall or security software isn't blocking the download
+  3. Wait a moment and try launching again
+
+### Translation Not Showing
+
+- **Cause**: Game window may not be properly selected
+- **Solution**:
+  1. Re-select the game window
+  2. Run the game in Windowed or Borderless Windowed mode
+
+### Overlay Hard to Read
+
+- **Solution**: Adjust font size in the Settings screen
+
+### Translation is Slow
+
+- **Cause**: May be running in CPU mode
+- **Solution**: If you have an NVIDIA GPU, verify that CUDA drivers are properly installed
+
+---
+
+## Log File Location
+
+If you encounter issues, check the log files at:
 
 ```
-%LOCALAPPDATA%\Baketa\logs\
+%USERPROFILE%\.baketa\settings\logs\
 ```
 
----
-
-## サポート・お問い合わせ
-
-- **バグ報告・機能リクエスト**: [GitHub Issues](https://github.com/koizumiiiii/Baketa/issues)
-- **公式サイト**: [https://koizumiiiii.github.io/Baketa/](https://koizumiiiii.github.io/Baketa/)
+Example: `C:\Users\<username>\.baketa\settings\logs\`
 
 ---
 
-## ライセンス
+## Support
 
-Copyright (c) 2024 Baketa. All rights reserved.
+- **Bug Reports & Feature Requests**: [GitHub Issues](https://github.com/koizumiiiii/Baketa/issues)
+- **Official Website**: [https://koizumiiiii.github.io/Baketa/](https://koizumiiiii.github.io/Baketa/)
+
+---
+
+## License
+
+Copyright (c) 2024-2026 Baketa. All rights reserved.
