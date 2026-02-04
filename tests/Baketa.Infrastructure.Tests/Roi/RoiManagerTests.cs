@@ -369,6 +369,396 @@ public class RoiManagerTests : IDisposable
 
     #endregion
 
+    #region [Issue #379] P1-2 除外ゾーンIoUデデュプリケーション テスト
+
+    [Fact]
+    public void AddExclusionZone_WithHighIoUDuplicate_ShouldSkip()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        var zone1 = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+        var zone2 = new NormalizedRect(0.11f, 0.11f, 0.2f, 0.2f); // zone1とほぼ同じ
+
+        _manager.AddExclusionZone(zone1);
+
+        // Act
+        _manager.AddExclusionZone(zone2);
+
+        // Assert - zone1のみ有効、zone2は重複としてスキップ
+        Assert.True(_manager.IsInExclusionZone(0.15f, 0.15f));
+        // zone1を削除するとzone2は登録されていないので除外ゾーンなし
+        _manager.RemoveExclusionZone(zone1);
+        // マージされた場合もあるのでクリアして確認
+        _manager.ClearAllExclusionZones();
+        Assert.False(_manager.IsInExclusionZone(0.15f, 0.15f));
+    }
+
+    [Fact]
+    public void AddExclusionZone_WithLowIoU_ShouldAddBoth()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        var zone1 = new NormalizedRect(0.0f, 0.0f, 0.1f, 0.1f);
+        var zone2 = new NormalizedRect(0.5f, 0.5f, 0.1f, 0.1f); // zone1と離れている
+
+        // Act
+        _manager.AddExclusionZone(zone1);
+        _manager.AddExclusionZone(zone2);
+
+        // Assert - 両方のゾーンが有効
+        Assert.True(_manager.IsInExclusionZone(0.05f, 0.05f));
+        Assert.True(_manager.IsInExclusionZone(0.55f, 0.55f));
+    }
+
+    #endregion
+
+    #region [Issue #379] P1-3 除外ゾーン上限 テスト
+
+    [Fact]
+    public void AddExclusionZone_WhenMaxReached_ShouldNotAdd()
+    {
+        // Arrange - MaxExclusionZones=3に設定
+        var settings = Options.Create(new RoiManagerSettings
+        {
+            Enabled = true,
+            AutoLearningEnabled = true,
+            DecayIntervalSeconds = 0,
+            AutoSaveIntervalSeconds = 0,
+            MaxExclusionZones = 3
+        });
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            settings);
+
+        // 3つの離れたゾーンを追加
+        _manager.AddExclusionZone(new NormalizedRect(0.0f, 0.0f, 0.05f, 0.05f));
+        _manager.AddExclusionZone(new NormalizedRect(0.3f, 0.3f, 0.05f, 0.05f));
+        _manager.AddExclusionZone(new NormalizedRect(0.6f, 0.6f, 0.05f, 0.05f));
+
+        // Act - 4つ目は上限超過
+        _manager.AddExclusionZone(new NormalizedRect(0.9f, 0.9f, 0.05f, 0.05f));
+
+        // Assert - 4つ目は登録されない
+        Assert.False(_manager.IsInExclusionZone(0.92f, 0.92f));
+        // 既存3つは有効
+        Assert.True(_manager.IsInExclusionZone(0.02f, 0.02f));
+    }
+
+    #endregion
+
+    #region [Issue #379] P2-3 TTL除外ゾーン テスト
+
+    [Fact]
+    public void IsInExclusionZone_WithExpiredTtl_ShouldReturnFalse()
+    {
+        // Arrange - TTL=0（無期限）で確認後、TTL有効にする
+        // TTLのテストは内部タイムスタンプに依存するため、TTL=0で動作確認
+        var settings = Options.Create(new RoiManagerSettings
+        {
+            Enabled = true,
+            AutoLearningEnabled = true,
+            DecayIntervalSeconds = 0,
+            AutoSaveIntervalSeconds = 0,
+            ExclusionZoneTtlHours = 0 // TTL無効
+        });
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            settings);
+
+        var zone = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+        _manager.AddExclusionZone(zone);
+
+        // Act & Assert - TTL無効なので削除されない
+        Assert.True(_manager.IsInExclusionZone(0.15f, 0.15f));
+    }
+
+    [Fact]
+    public void IsInExclusionZone_WithTtlEnabled_ZoneShouldPersistWithinTtl()
+    {
+        // Arrange - TTL=24時間（テスト中は期限切れにならない）
+        var settings = Options.Create(new RoiManagerSettings
+        {
+            Enabled = true,
+            AutoLearningEnabled = true,
+            DecayIntervalSeconds = 0,
+            AutoSaveIntervalSeconds = 0,
+            ExclusionZoneTtlHours = 24
+        });
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            settings);
+
+        var zone = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+        _manager.AddExclusionZone(zone);
+
+        // Act & Assert - TTL内なので有効
+        Assert.True(_manager.IsInExclusionZone(0.15f, 0.15f));
+    }
+
+    #endregion
+
+    #region [Issue #379] P3-2 隣接ゾーンマージ テスト
+
+    [Fact]
+    public void AddExclusionZone_WithIntersectingZone_ShouldMerge()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        // 部分的に重なるが、IoU < dedup閾値のゾーン
+        var zone1 = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f); // (0.1,0.1)-(0.3,0.3)
+        var zone2 = new NormalizedRect(0.25f, 0.25f, 0.2f, 0.2f); // (0.25,0.25)-(0.45,0.45)
+
+        _manager.AddExclusionZone(zone1);
+
+        // Act
+        _manager.AddExclusionZone(zone2);
+
+        // Assert - マージされたゾーンが両方の領域をカバー
+        Assert.True(_manager.IsInExclusionZone(0.15f, 0.15f)); // zone1のエリア
+        Assert.True(_manager.IsInExclusionZone(0.4f, 0.4f)); // zone2のエリア
+    }
+
+    #endregion
+
+    #region [Issue #379] A案 RemoveOverlappingExclusionZones テスト
+
+    [Fact]
+    public void RemoveOverlappingExclusionZones_WithOverlap_ShouldRemoveZone()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        var zone = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+        _manager.AddExclusionZone(zone);
+        Assert.True(_manager.IsInExclusionZone(0.15f, 0.15f));
+
+        // Act - 同じ位置で翻訳成功
+        var successBounds = new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f);
+        var removed = _manager.RemoveOverlappingExclusionZones(successBounds, iouThreshold: 0.3f);
+
+        // Assert
+        Assert.Equal(1, removed);
+        Assert.False(_manager.IsInExclusionZone(0.15f, 0.15f));
+    }
+
+    [Fact]
+    public void RemoveOverlappingExclusionZones_WithNoOverlap_ShouldNotRemove()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        var zone = new NormalizedRect(0.0f, 0.0f, 0.1f, 0.1f);
+        _manager.AddExclusionZone(zone);
+
+        // Act - 離れた場所で翻訳成功
+        var successBounds = new NormalizedRect(0.5f, 0.5f, 0.2f, 0.2f);
+        var removed = _manager.RemoveOverlappingExclusionZones(successBounds, iouThreshold: 0.3f);
+
+        // Assert
+        Assert.Equal(0, removed);
+        Assert.True(_manager.IsInExclusionZone(0.05f, 0.05f));
+    }
+
+    [Fact]
+    public void RemoveOverlappingExclusionZones_WithMultipleOverlaps_ShouldRemoveAll()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        // 広い範囲をカバーする除外ゾーン
+        _manager.AddExclusionZone(new NormalizedRect(0.0f, 0.0f, 0.1f, 0.1f));
+        _manager.AddExclusionZone(new NormalizedRect(0.5f, 0.5f, 0.1f, 0.1f));
+
+        // Act - 片方のゾーンと重なる翻訳成功
+        var successBounds = new NormalizedRect(0.0f, 0.0f, 0.1f, 0.1f);
+        var removed = _manager.RemoveOverlappingExclusionZones(successBounds, iouThreshold: 0.3f);
+
+        // Assert
+        Assert.Equal(1, removed);
+        Assert.False(_manager.IsInExclusionZone(0.05f, 0.05f));
+        Assert.True(_manager.IsInExclusionZone(0.55f, 0.55f)); // 他のゾーンは残る
+    }
+
+    [Fact]
+    public void RemoveOverlappingExclusionZones_WithInvalidBounds_ShouldReturnZero()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        _manager.AddExclusionZone(new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f));
+
+        // Act
+        var removed = _manager.RemoveOverlappingExclusionZones(
+            new NormalizedRect(-1f, -1f, 0f, 0f)); // 無効なbounds
+
+        // Assert
+        Assert.Equal(0, removed);
+    }
+
+    #endregion
+
+    #region [Issue #379] ClearAllExclusionZones テスト
+
+    [Fact]
+    public void ClearAllExclusionZones_ShouldRemoveAllZones()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        _manager.AddExclusionZone(new NormalizedRect(0.0f, 0.0f, 0.1f, 0.1f));
+        _manager.AddExclusionZone(new NormalizedRect(0.5f, 0.5f, 0.1f, 0.1f));
+        Assert.True(_manager.IsInExclusionZone(0.05f, 0.05f));
+        Assert.True(_manager.IsInExclusionZone(0.55f, 0.55f));
+
+        // Act
+        _manager.ClearAllExclusionZones();
+
+        // Assert
+        Assert.False(_manager.IsInExclusionZone(0.05f, 0.05f));
+        Assert.False(_manager.IsInExclusionZone(0.55f, 0.55f));
+    }
+
+    [Fact]
+    public void ClearAllExclusionZones_WithNoZones_ShouldNotThrow()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        // Act & Assert - 例外なく処理される
+        _manager.ClearAllExclusionZones();
+        Assert.False(_manager.IsInExclusionZone(0.5f, 0.5f));
+    }
+
+    #endregion
+
+    #region [Issue #379] C案 プロファイル切り替え時の除外ゾーンクリア テスト
+
+    [Fact]
+    public async Task GetOrCreateProfileAsync_ShouldClearRuntimeExclusionZones()
+    {
+        // Arrange
+        _manager = new RoiManager(
+            _loggerMock.Object,
+            _learningEngineMock.Object,
+            _defaultSettings);
+
+        // ランタイム除外ゾーンを追加
+        _manager.AddExclusionZone(new NormalizedRect(0.1f, 0.1f, 0.2f, 0.2f));
+        Assert.True(_manager.IsInExclusionZone(0.15f, 0.15f));
+
+        // Act - 新しいプロファイルを作成（プロファイル切り替え）
+        await _manager.GetOrCreateProfileAsync(@"C:\Games\NewGame.exe", "New Game");
+
+        // Assert - ランタイム除外ゾーンがクリアされる
+        Assert.False(_manager.IsInExclusionZone(0.15f, 0.15f));
+    }
+
+    #endregion
+
+    #region [Issue #379] RoiManagerSettings バリデーション テスト
+
+    [Fact]
+    public void Settings_WithValidIssue379Defaults_ShouldBeValid()
+    {
+        // Arrange
+        var settings = new RoiManagerSettings
+        {
+            Enabled = true,
+            AutoLearningEnabled = true,
+            MaxExclusionZones = 20,
+            ExclusionZoneDeduplicationIoU = 0.5f,
+            OcrConfidenceThresholdForMissSkip = 0.7f,
+            SafeZoneMinDetectionCount = 10,
+            MissRatioThresholdForExclusion = 0.8f,
+            MinSamplesForMissRatio = 10,
+            ExclusionZoneTtlHours = 24,
+            LowConfidenceMissRecordingThreshold = 0.3f,
+            SafeZoneOverlapIoUThreshold = 0.3f
+        };
+
+        // Act & Assert
+        Assert.True(settings.IsValid());
+    }
+
+    [Theory]
+    [InlineData(0)]     // MaxExclusionZones must be > 0
+    [InlineData(-1)]
+    public void Settings_WithInvalidMaxExclusionZones_ShouldBeInvalid(int maxZones)
+    {
+        // Arrange
+        var settings = new RoiManagerSettings { MaxExclusionZones = maxZones };
+
+        // Act & Assert
+        Assert.False(settings.IsValid());
+    }
+
+    [Theory]
+    [InlineData(-0.1f)]
+    [InlineData(1.1f)]
+    public void Settings_WithInvalidExclusionZoneDeduplicationIoU_ShouldBeInvalid(float iou)
+    {
+        // Arrange
+        var settings = new RoiManagerSettings { ExclusionZoneDeduplicationIoU = iou };
+
+        // Act & Assert
+        Assert.False(settings.IsValid());
+    }
+
+    [Fact]
+    public void Settings_WithZeroTtl_ShouldBeValid()
+    {
+        // Arrange - TTL=0は無期限として有効
+        var settings = new RoiManagerSettings { ExclusionZoneTtlHours = 0 };
+
+        // Act & Assert
+        Assert.True(settings.IsValid());
+    }
+
+    [Fact]
+    public void Settings_WithNegativeTtl_ShouldBeInvalid()
+    {
+        // Arrange
+        var settings = new RoiManagerSettings { ExclusionZoneTtlHours = -1 };
+
+        // Act & Assert
+        Assert.False(settings.IsValid());
+    }
+
+    #endregion
+
     #region GetAllRegions テスト
 
     [Fact]

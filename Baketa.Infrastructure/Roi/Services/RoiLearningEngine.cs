@@ -94,6 +94,9 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
             {
                 _heatmap = _heatmap.WithUpdatedCells(detectedCells, _settings.LearningRate);
             }
+
+            // [Issue #379] P2-2: ヒットカウント記録（Miss比率計算用）
+            _heatmap = _heatmap.WithRecordedHit(detectedCells);
             _positiveSamples++;
 
             _logger.LogTrace(
@@ -136,6 +139,9 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
             }
 
             _heatmap = _heatmap.WithUpdatedCells([.. allCells], _settings.LearningRate);
+
+            // [Issue #379] P2-2: ヒットカウント記録（Miss比率計算用）
+            _heatmap = _heatmap.WithRecordedHit([.. allCells]);
             _positiveSamples += detectionList.Count;
 
             _logger.LogTrace(
@@ -178,6 +184,10 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
             }
 
             _heatmap = _heatmap.WithUpdatedCellsWeighted([.. allCellsWithWeight], _settings.LearningRate);
+
+            // [Issue #379] P2-2: ヒットカウント記録（Miss比率計算用）
+            var uniqueHitCells = allCellsWithWeight.Select(c => (c.row, c.column)).Distinct().ToArray();
+            _heatmap = _heatmap.WithRecordedHit(uniqueHitCells);
             _positiveSamples += detectionList.Count;
 
             _logger.LogTrace(
@@ -243,12 +253,13 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
                 _settings.ConsecutiveMissThresholdForReset);
             _negativeSamples++;
 
-            // 自動除外の閾値を超えたセルをチェック
-            var highMissCells = _heatmap.GetHighMissCells(_settings.ConsecutiveMissThresholdForExclusion);
-            if (highMissCells.Length > 0)
+            // [Issue #379] P2-2: Miss比率ベースの除外候補生成
+            var highMissRatioCells = _heatmap.GetHighMissRatioCells(
+                _settings.MissRatioThresholdForExclusion,
+                _settings.MinSamplesForMissRatio);
+            if (highMissRatioCells.Length > 0)
             {
-                // 連結セルをグループ化して除外領域を生成
-                var groups = GroupConnectedCells(highMissCells.Select(c => (c.row, c.column, 1.0f)).ToArray());
+                var groups = GroupConnectedCells(highMissRatioCells.Select(c => (c.row, c.column, c.missRatio)).ToArray());
                 foreach (var group in groups)
                 {
                     if (group.Count > 0)
@@ -257,10 +268,55 @@ public sealed class RoiLearningEngine : IRoiLearningEngine
                         exclusionCandidates.Add(region.NormalizedBounds);
 
                         _logger.LogInformation(
-                            "[Issue #354] 自動除外候補: Bounds={Bounds}, MissCells={Count}",
+                            "[Issue #379] 比率ベース自動除外候補: Bounds={Bounds}, MissRatioCells={Count}",
                             region.NormalizedBounds, group.Count);
                     }
                 }
+            }
+
+            // [Issue #354] 連続Miss数ベースの除外候補生成（フォールバック）
+            var highMissCells = _heatmap.GetHighMissCells(_settings.ConsecutiveMissThresholdForExclusion);
+            if (highMissCells.Length > 0)
+            {
+                var groups = GroupConnectedCells(highMissCells.Select(c => (c.row, c.column, 1.0f)).ToArray());
+                foreach (var group in groups)
+                {
+                    if (group.Count > 0)
+                    {
+                        var region = CreateRegionFromCells(group);
+                        // 既に比率ベースで追加済みの場合はスキップ
+                        if (!exclusionCandidates.Any(c => c.CalculateIoU(region.NormalizedBounds) >= 0.5f))
+                        {
+                            exclusionCandidates.Add(region.NormalizedBounds);
+
+                            _logger.LogInformation(
+                                "[Issue #354] 連続Missベース自動除外候補: Bounds={Bounds}, MissCells={Count}",
+                                region.NormalizedBounds, group.Count);
+                        }
+                    }
+                }
+            }
+
+            // [Issue #379] P2-1: セーフゾーン保護
+            // 高い検出回数を持つ学習済み領域は除外候補から除去
+            if (exclusionCandidates.Count > 0)
+            {
+                var safeRegions = GenerateRegions(_settings.MinConfidenceForRegion, _settings.MinConfidenceForRegion);
+                exclusionCandidates.RemoveAll(candidate =>
+                {
+                    var isProtected = safeRegions.Any(r =>
+                        r.DetectionCount >= _settings.SafeZoneMinDetectionCount &&
+                        r.NormalizedBounds.CalculateIoU(candidate) >= _settings.SafeZoneOverlapIoUThreshold);
+
+                    if (isProtected)
+                    {
+                        _logger.LogInformation(
+                            "[Issue #379] セーフゾーン保護により除外候補を除去: {Bounds}",
+                            candidate);
+                    }
+
+                    return isProtected;
+                });
             }
 
             _logger.LogTrace(

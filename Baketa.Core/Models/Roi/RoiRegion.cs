@@ -331,6 +331,18 @@ public readonly record struct NormalizedRect
     }
 
     /// <summary>
+    /// [Issue #379] 2つの矩形を包含する最小矩形を返す（Union）
+    /// </summary>
+    public NormalizedRect Union(NormalizedRect other)
+    {
+        var minX = Math.Min(X, other.X);
+        var minY = Math.Min(Y, other.Y);
+        var maxRight = Math.Max(Right, other.Right);
+        var maxBottom = Math.Max(Bottom, other.Bottom);
+        return new NormalizedRect(minX, minY, maxRight - minX, maxBottom - minY);
+    }
+
+    /// <summary>
     /// IoU（Intersection over Union）を計算
     /// </summary>
     public float CalculateIoU(NormalizedRect other)

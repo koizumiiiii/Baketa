@@ -23,7 +23,9 @@ using Baketa.Core.Models.Validation; // [Issue #78 Phase 4] ValidatedTextChunk�
 using Baketa.Core.Translation.Abstractions; // [Issue #78 Phase 4] IParallelTranslationOrchestrator用
 using Baketa.Core.Translation.Models;
 using Baketa.Application.Services.Translation; // [Issue #291] ITranslationControlService用
+using Baketa.Core.Settings; // [Issue #379] RoiManagerSettings用
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options; // [Issue #379] IOptions用
 using Language = Baketa.Core.Translation.Models.Language;
 
 namespace Baketa.Application.EventHandlers.Translation;
@@ -62,6 +64,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly ITextChangeDetectionService? _textChangeDetectionService;
     // [Issue #293] ROI管理サービス（ヒートマップ値取得用）
     private readonly IRoiManager? _roiManager;
+    // [Issue #379] ROI管理設定（OCR信頼度閾値等）
+    private readonly RoiManagerSettings _roiSettings;
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
@@ -83,7 +87,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         // [Issue #293] テキスト変化検知サービス（オプショナル）
         ITextChangeDetectionService? textChangeDetectionService = null,
         // [Issue #293] ROI管理サービス（オプショナル）
-        IRoiManager? roiManager = null)
+        IRoiManager? roiManager = null,
+        // [Issue #379] ROI管理設定（オプショナル）
+        IOptions<RoiManagerSettings>? roiSettings = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -104,6 +110,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _textChangeDetectionService = textChangeDetectionService;
         // [Issue #293] ROI管理サービス
         _roiManager = roiManager;
+        // [Issue #379] ROI管理設定
+        _roiSettings = roiSettings?.Value ?? RoiManagerSettings.CreateDefault();
     }
 
     /// <inheritdoc />
@@ -570,14 +578,34 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                         {
                             var confidence = chunk.AverageConfidence;
                             successfulDetections.Add((normalizedBounds, confidence, learningWeight));
+
+                            // [Issue #379] P3-1: 低信頼度OCR結果は翻訳成功でもMissとして記録
+                            if (confidence < _roiSettings.LowConfidenceMissRecordingThreshold)
+                            {
+                                missRegions.Add(normalizedBounds);
+                                _logger?.LogDebug(
+                                    "[Issue #379] 低信頼度OCR Miss記録（翻訳成功だが信頼度低）: Chunk={Index}, Confidence={Confidence:F2}",
+                                    i, confidence);
+                            }
                         }
                         // Phase 3: 翻訳結果が空の場合はmissとして報告
+                        // [Issue #379] P1-1: OCR信頼度が高い場合は翻訳失敗であり、OCR missではない
                         else
                         {
-                            missRegions.Add(normalizedBounds);
-                            _logger?.LogDebug(
-                                "[Issue #354] Miss記録: Chunk={Index}, Bounds=({X:F3},{Y:F3})",
-                                i, normalizedBounds.X, normalizedBounds.Y);
+                            var confidence = chunk.AverageConfidence;
+                            if (confidence < _roiSettings.OcrConfidenceThresholdForMissSkip)
+                            {
+                                missRegions.Add(normalizedBounds);
+                                _logger?.LogDebug(
+                                    "[Issue #354] Miss記録: Chunk={Index}, Bounds=({X:F3},{Y:F3}), Confidence={Confidence:F2}",
+                                    i, normalizedBounds.X, normalizedBounds.Y, confidence);
+                            }
+                            else
+                            {
+                                _logger?.LogDebug(
+                                    "[Issue #379] Miss記録スキップ（翻訳失敗, OCR信頼度高）: Chunk={Index}, Confidence={Confidence:F2}",
+                                    i, confidence);
+                            }
                         }
                     }
 
@@ -591,6 +619,19 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 #if DEBUG
                         Console.WriteLine($"📚 [Issue #354] ROI学習: {successfulDetections.Count}件成功, weight={learningWeight}");
 #endif
+
+                        // [Issue #379] A案: 翻訳成功した領域と重なる除外ゾーンを自動解除
+                        var totalRemoved = 0;
+                        foreach (var (bounds, _, _) in successfulDetections)
+                        {
+                            totalRemoved += _roiManager.RemoveOverlappingExclusionZones(bounds);
+                        }
+                        if (totalRemoved > 0)
+                        {
+                            _logger?.LogInformation(
+                                "[Issue #379] 翻訳成功による除外ゾーン自動解除: RemovedCount={Count}",
+                                totalRemoved);
+                        }
                     }
 
                     // Phase 3: Missを報告

@@ -175,6 +175,19 @@ public interface IRoiManager
     bool RemoveExclusionZone(NormalizedRect zone);
 
     /// <summary>
+    /// [Issue #379] 全除外ゾーンをクリア
+    /// </summary>
+    void ClearAllExclusionZones();
+
+    /// <summary>
+    /// [Issue #379] 翻訳成功した領域と重なる除外ゾーンを自動解除
+    /// </summary>
+    /// <param name="successfulBounds">翻訳成功した領域の正規化矩形</param>
+    /// <param name="iouThreshold">解除判定のIoU閾値</param>
+    /// <returns>解除されたゾーン数</returns>
+    int RemoveOverlappingExclusionZones(NormalizedRect successfulBounds, float iouThreshold = 0.3f);
+
+    /// <summary>
     /// 学習データをリセット
     /// </summary>
     /// <param name="preserveExclusionZones">除外ゾーンを保持するかどうか</param>

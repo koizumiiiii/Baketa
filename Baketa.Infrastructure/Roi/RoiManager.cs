@@ -30,6 +30,8 @@ public sealed class RoiManager : IRoiManager, IDisposable
 
     private RoiProfile? _currentProfile;
     private readonly List<NormalizedRect> _exclusionZones = [];
+    // [Issue #379] P2-3: 除外ゾーンのタイムスタンプ管理（TTL用）
+    private readonly Dictionary<NormalizedRect, DateTime> _exclusionZoneTimestamps = [];
     private readonly System.Threading.Timer? _decayTimer;
     private readonly System.Threading.Timer? _autoSaveTimer;
 
@@ -626,6 +628,31 @@ public sealed class RoiManager : IRoiManager, IDisposable
                 return true;
             }
 
+            // [Issue #379] P2-3: TTL超過ゾーンを削除
+            if (_settings.ExclusionZoneTtlHours > 0)
+            {
+                var now = DateTime.UtcNow;
+                var ttl = TimeSpan.FromHours(_settings.ExclusionZoneTtlHours);
+                var expiredZones = new List<NormalizedRect>();
+
+                foreach (var zone in _exclusionZones)
+                {
+                    if (_exclusionZoneTimestamps.TryGetValue(zone, out var addedAt) &&
+                        (now - addedAt) > ttl)
+                    {
+                        expiredZones.Add(zone);
+                    }
+                }
+
+                foreach (var expired in expiredZones)
+                {
+                    _exclusionZones.Remove(expired);
+                    _exclusionZoneTimestamps.Remove(expired);
+                    _logger.LogInformation(
+                        "[Issue #379] TTL超過により除外ゾーンを削除: {Zone}", expired);
+                }
+            }
+
             // 一時的な除外ゾーンをチェック
             foreach (var zone in _exclusionZones)
             {
@@ -651,7 +678,46 @@ public sealed class RoiManager : IRoiManager, IDisposable
 
         lock (_lock)
         {
+            // [Issue #379] P1-2: IoUベースの重複チェック + P3-2: 隣接ゾーンマージ
+            for (var i = 0; i < _exclusionZones.Count; i++)
+            {
+                var existing = _exclusionZones[i];
+                var iou = zone.CalculateIoU(existing);
+
+                if (iou >= _settings.ExclusionZoneDeduplicationIoU)
+                {
+                    _logger.LogDebug(
+                        "[Issue #379] 重複除外ゾーンをスキップ: New={New}, Existing={Existing}, IoU >= {Threshold}",
+                        zone, existing, _settings.ExclusionZoneDeduplicationIoU);
+                    return;
+                }
+
+                // [Issue #379] P3-2: IoU < dedup閾値だがIntersectsの場合はマージ
+                if (zone.Intersects(existing))
+                {
+                    var merged = zone.Union(existing);
+                    _exclusionZones[i] = merged;
+                    _exclusionZoneTimestamps.Remove(existing);
+                    _exclusionZoneTimestamps[merged] = DateTime.UtcNow;
+                    _logger.LogDebug(
+                        "[Issue #379] 隣接除外ゾーンをマージ: New={New}, Existing={Existing}, Merged={Merged}",
+                        zone, existing, merged);
+                    return;
+                }
+            }
+
+            // [Issue #379] P1-3: 上限チェック
+            if (_exclusionZones.Count >= _settings.MaxExclusionZones)
+            {
+                _logger.LogWarning(
+                    "[Issue #379] 除外ゾーン上限到達: Count={Count}, Max={Max}",
+                    _exclusionZones.Count, _settings.MaxExclusionZones);
+                return;
+            }
+
             _exclusionZones.Add(zone);
+            // [Issue #379] P2-3: タイムスタンプ記録
+            _exclusionZoneTimestamps[zone] = DateTime.UtcNow;
             _logger.LogDebug("Added exclusion zone: {Zone}", zone);
         }
     }
@@ -664,10 +730,53 @@ public sealed class RoiManager : IRoiManager, IDisposable
             var removed = _exclusionZones.Remove(zone);
             if (removed)
             {
+                _exclusionZoneTimestamps.Remove(zone);
                 _logger.LogDebug("Removed exclusion zone: {Zone}", zone);
             }
 
             return removed;
+        }
+    }
+
+    /// <inheritdoc />
+    public int RemoveOverlappingExclusionZones(NormalizedRect successfulBounds, float iouThreshold = 0.3f)
+    {
+        if (!successfulBounds.IsValid())
+        {
+            return 0;
+        }
+
+        lock (_lock)
+        {
+            var removedCount = 0;
+            for (var i = _exclusionZones.Count - 1; i >= 0; i--)
+            {
+                var zone = _exclusionZones[i];
+                if (successfulBounds.CalculateIoU(zone) >= iouThreshold)
+                {
+                    _exclusionZones.RemoveAt(i);
+                    _exclusionZoneTimestamps.Remove(zone);
+                    removedCount++;
+
+                    _logger.LogInformation(
+                        "[Issue #379] 翻訳成功により除外ゾーン自動解除: Zone={Zone}, SuccessfulBounds={Bounds}",
+                        zone, successfulBounds);
+                }
+            }
+
+            return removedCount;
+        }
+    }
+
+    /// <inheritdoc />
+    public void ClearAllExclusionZones()
+    {
+        lock (_lock)
+        {
+            var count = _exclusionZones.Count;
+            _exclusionZones.Clear();
+            _exclusionZoneTimestamps.Clear();
+            _logger.LogInformation("[Issue #379] 全除外ゾーンクリア: Count={Count}", count);
         }
     }
 
@@ -681,6 +790,7 @@ public sealed class RoiManager : IRoiManager, IDisposable
             if (!preserveExclusionZones)
             {
                 _exclusionZones.Clear();
+                _exclusionZoneTimestamps.Clear();
             }
 
             if (_currentProfile != null)
@@ -726,11 +836,15 @@ public sealed class RoiManager : IRoiManager, IDisposable
                 _learningEngine.Reset();
             }
 
-            // 除外ゾーンを設定
+            // [Issue #379] C案: プロファイル切り替え時に一時除外ゾーンをクリア
             _exclusionZones.Clear();
+            _exclusionZoneTimestamps.Clear();
+
+            // プロファイルの永続化された除外ゾーンをインポート
             foreach (var zone in profile.ExclusionZones)
             {
                 _exclusionZones.Add(zone);
+                _exclusionZoneTimestamps[zone] = DateTime.UtcNow;
             }
 
             // イベント引数をロック内で準備（スレッドセーフティ確保）
