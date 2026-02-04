@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -207,6 +208,7 @@ public sealed class RelayServerClient : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         var startTime = DateTime.UtcNow;
+        var sw = Stopwatch.StartNew();
 
         // リクエストボディ作成
         var requestBody = new RelayTranslateRequest
@@ -224,8 +226,14 @@ public sealed class RelayServerClient : IAsyncDisposable
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", sessionToken);
         httpRequest.Content = JsonContent.Create(requestBody, options: _jsonOptions);
 
+        // [Issue #368] リクエスト準備完了時刻を記録
+        var prepMs = sw.ElapsedMilliseconds;
+
         using var httpResponse = await _httpClient.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
         var processingTime = DateTime.UtcNow - startTime;
+
+        // [Issue #368] HTTP送受信完了時刻を記録
+        var httpMs = sw.ElapsedMilliseconds - prepMs;
 
         // [Issue #333] レスポンス本体を文字列として読み込み（デバッグ用）
         var rawResponse = await httpResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -244,6 +252,26 @@ public sealed class RelayServerClient : IAsyncDisposable
                 (int)httpResponse.StatusCode,
                 truncatedResponse);
         }
+
+        // [Issue #368] レスポンスパース完了時刻を記録
+        var parseMs = sw.ElapsedMilliseconds - prepMs - httpMs;
+        sw.Stop();
+        var totalMs = sw.ElapsedMilliseconds;
+
+        // [Issue #368] サーバー処理時間とネットワーク往復時間を算出
+        // serverMs=0（サーバー未返却）の場合、networkMsは-1で「不明」を示す
+        var serverMs = (long)(responseBody?.ProcessingTimeMs ?? 0);
+        var networkMs = serverMs > 0 ? httpMs - serverMs : -1;
+        var imageSizeKb = (int)Math.Ceiling(request.ImageBase64.Length * 3.0 / 4 / 1024);
+
+        _logger.LogInformation(
+            "[Issue #368] Cloud translation timings: " +
+            "Prep={PrepMs}ms, HTTP={HttpMs}ms (Server={ServerMs}ms, Network~={NetworkMs}ms), " +
+            "Parse={ParseMs}ms, Total={TotalMs}ms, ImageSize={ImageSizeKB}KB, " +
+            "MimeType={MimeType}, Resolution={Width}x{Height}",
+            prepMs, httpMs, serverMs, networkMs,
+            parseMs, totalMs, imageSizeKb,
+            request.MimeType, request.Width, request.Height);
 
         if (responseBody == null)
         {
