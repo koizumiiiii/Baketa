@@ -338,17 +338,25 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
             // ============================================================
             // [Issue #293] Gate判定: テキスト変化検知によるフィルタリング
+            // [Issue #379] Singleshotモード時はGateフィルタリングをバイパス
             // ============================================================
-            nonEmptyChunks = await ApplyGateFilteringAsync(
-                nonEmptyChunks,
-                eventData.ImageWidth,
-                eventData.ImageHeight,
-                cancellationToken).ConfigureAwait(false);
-
-            if (nonEmptyChunks.Count == 0)
+            if (eventData.TranslationMode == Baketa.Core.Abstractions.Services.TranslationMode.Singleshot)
             {
-                _logger.LogInformation("🚪 [Issue #293] Gate判定: 全チャンクが変化なしと判定されスキップ");
-                return;
+                _logger?.LogInformation("🚪 [Issue #379] Gate判定スキップ: Singleshotモード（強制翻訳）, ChunkCount={Count}", nonEmptyChunks.Count);
+            }
+            else
+            {
+                nonEmptyChunks = await ApplyGateFilteringAsync(
+                    nonEmptyChunks,
+                    eventData.ImageWidth,
+                    eventData.ImageHeight,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (nonEmptyChunks.Count == 0)
+                {
+                    _logger.LogInformation("🚪 [Issue #293] Gate判定: 全チャンクが変化なしと判定されスキップ");
+                    return;
+                }
             }
 
             // ============================================================

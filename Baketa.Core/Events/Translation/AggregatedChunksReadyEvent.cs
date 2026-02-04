@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events;
 using Baketa.Core.Translation.Abstractions; // [Issue #290] FallbackTranslationResult用
@@ -130,6 +131,11 @@ public sealed class AggregatedChunksReadyEvent : EventBase
     /// 事前計算されたCloud AI翻訳結果が利用可能かどうか
     /// </summary>
     public bool HasPreComputedCloudResult => PreComputedCloudResult?.IsSuccess == true;
+
+    /// <summary>
+    /// [Issue #379] 翻訳モード（Singleshotモード時にGateフィルタリングをバイパス）
+    /// </summary>
+    public TranslationMode TranslationMode { get; init; } = TranslationMode.Live;
 
     /// <summary>
     /// 集約完了タイムスタンプ

@@ -1,3 +1,4 @@
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Abstractions; // [Issue #290] FallbackTranslationResult用
 
@@ -60,4 +61,11 @@ public interface ITextChunkAggregatorService
     /// </summary>
     /// <param name="result">事前計算されたCloud AI翻訳結果</param>
     void SetPreComputedCloudResult(FallbackTranslationResult? result);
+
+    /// <summary>
+    /// [Issue #379] 翻訳モードを設定
+    /// Singleshotモード時にGateフィルタリングをバイパスするために使用
+    /// </summary>
+    /// <param name="mode">翻訳モード</param>
+    void SetTranslationMode(TranslationMode mode);
 }
