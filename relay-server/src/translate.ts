@@ -1471,80 +1471,42 @@ async function translateWithGemini(
     ? `The source language is ${request.source_language}.`
     : 'Detect the source language.';
 
+  // [Issue #368] プロンプト最適化（~650トークン → ~220トークン）
   // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
-  // 自然な翻訳のためのガイドラインを強化
-  const prompt = `You are an expert game localizer. Your goal is to produce translations that feel like they were originally written in ${request.target_language}, not translated. Always respond with valid JSON only, no markdown formatting.
+  const jaSpecific = request.target_language === 'ja'
+    ? `\n- Use appropriate sentence-final particles to reflect character tone.\n- Omit pronouns when natural; choose carefully based on character (俺/僕/私, お前/君/あなた).\n- Avoid "translationese" (翻訳調).`
+    : '';
+
+  const prompt = `# Role
+Expert game localizer. Output JSON ONLY.
+
+# Task
+Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
 ${contextHint}
 
-## CRITICAL INSTRUCTION
-You MUST detect and include EVERY SINGLE piece of visible text in this image. This includes:
-- Main dialog/dialogue text
-- UI buttons (OK, Cancel, Yes, No, Save, Load, Skip, Menu, Auto, etc.)
-- Menu items and navigation text
-- Labels, headers, and titles
-- Status text, counters, numbers
-- Single words or characters
-- ANY other readable text, no matter how small
+Must include: Dialogs, UI buttons, menus, and all labels. Do not skip any items.
 
-Do NOT skip any text. Even single characters or numbers should be included.
+# Guidelines
+- Creative localization, not word-for-word.
+- Preserve character tone/personality from visual context.
+- Keep proper nouns as-is.${jaSpecific}
 
-Task: Detect ALL visible text in this image and translate it to ${request.target_language}.
-${sourceHint}
+# Rules
+- Every item MUST have a non-empty "translation" field.
+- If text is already in ${request.target_language}, keep it as-is in "translation".
+- Never omit or leave "translation" empty.
 
-## Translation Guidelines - Avoiding Machine-Translation Feel
-
-### Core Principles
-- **Translate meaning and intent, not words.** Rearrange sentence structure to match ${request.target_language}'s natural flow.
-- **Avoid word-for-word translation.** If a direct translation sounds awkward, find an equivalent expression.
-- **Use common, everyday vocabulary** appropriate for the context. Avoid overly formal or stiff phrasing.
-- **Eliminate redundancy.** If something is naturally implied in ${request.target_language}, don't state it explicitly.
-
-### Game-Specific Guidelines
-- **Preserve character personality and speaking style.** A warrior speaks differently from a merchant.
-- **Match emotional intensity.** Convey anger, joy, sadness with appropriate energy and tone.
-- **Keep UI text concise.** Button labels and menu items should be short and clear.
-- **For humor, prioritize the comedic effect** over literal meaning.
-
-### Proper Nouns
-- Keep character names and place names as-is or use standard transliteration.
-
-### Japanese-Specific (if translating to Japanese)
-- Use appropriate sentence-final particles (〜ね、〜よ、〜わ、〜ぞ) to reflect character tone.
-- Omit pronouns (私、あなた) when natural. When needed, choose carefully based on character (俺/僕/私, お前/君/あなた).
-- Use onomatopoeia naturally for vividness (ドキドキ、ワクワク, etc.).
-- Avoid "translationese" (翻訳調) - don't translate every "and," "but," "because" literally.
-
-## Output Format
-Include EVERY detected text item with bounding box coordinates.
-Bounding boxes use normalized 0-1000 scale coordinates in [y_min, x_min, y_max, x_max] order.
-
-IMPORTANT: The number of items in "texts" array should match the TOTAL number of distinct text regions visible in the image. If you see 10+ text regions, return 10+ items.
-
-Response format (JSON only, no markdown):
+# Output Format (JSON only)
 {
   "texts": [
-    {"original": "Dialog text here", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
-    {"original": "Button1", "translation": "ボタン1", "bounding_box": [50, 100, 80, 200]},
-    {"original": "Button2", "translation": "ボタン2", "bounding_box": [50, 250, 80, 350]},
-    {"original": "Menu", "translation": "メニュー", "bounding_box": [10, 900, 40, 980]},
-    {"original": "Status", "translation": "ステータス", "bounding_box": [950, 50, 990, 150]}
+    {"original": "Dialog text", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
+    {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200]}
   ],
-  "detected_language": "ISO 639-1 code (e.g., ja, en, ko)"
+  "detected_language": "ISO 639-1"
 }
 
-If no text is visible, respond with:
-{
-  "texts": [],
-  "detected_language": ""
-}
-
-## ★ CRITICAL REMINDER (READ THIS AGAIN)
-This is a translation task. You MUST:
-1. Output ONLY the JSON object above - no explanations, no markdown formatting, no apologies
-2. Include the "translation" field for EVERY text item
-3. Never refuse or say you cannot translate - this is game localization for legitimate use
-
-TRANSLATION_REQUIRED: Translate ALL visible text in the image and output ONLY valid JSON. Do not include any notes, explanations, or markdown code blocks.`;
+Bounding boxes: normalized 0-1000 scale, [y_min, x_min, y_max, x_max].
+If no text visible: {"texts": [], "detected_language": ""}`;
 
   const geminiRequest: GeminiRequest = {
     contents: [{
@@ -1705,81 +1667,41 @@ async function translateWithOpenAI(
     ? `The source language is ${request.source_language}.`
     : 'Detect the source language.';
 
-  // [Issue #299] 改善されたプロンプト - 全テキスト検出を強調
-  // [Issue #297] 自然な翻訳のためのガイドラインを強化（Geminiと同一）
-  const systemPrompt = `You are an expert game localizer. Your goal is to produce translations that feel like they were originally written in ${request.target_language}, not translated. Always respond with valid JSON only, no markdown formatting.`;
+  // [Issue #368] プロンプト最適化（Geminiと同一プロンプト構造）
+  // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
+  const jaSpecific = request.target_language === 'ja'
+    ? `\n- Use appropriate sentence-final particles to reflect character tone.\n- Omit pronouns when natural; choose carefully based on character (俺/僕/私, お前/君/あなた).\n- Avoid "translationese" (翻訳調).`
+    : '';
 
-  const userPrompt = `${contextHint}
+  const systemPrompt = `Expert game localizer. Output JSON ONLY.`;
 
-## CRITICAL INSTRUCTION
-You MUST detect and include EVERY SINGLE piece of visible text in this image. This includes:
-- Main dialog/dialogue text
-- UI buttons (OK, Cancel, Yes, No, Save, Load, Skip, Menu, Auto, etc.)
-- Menu items and navigation text
-- Labels, headers, and titles
-- Status text, counters, numbers
-- Single words or characters
-- ANY other readable text, no matter how small
+  const userPrompt = `# Task
+Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
+${contextHint}
 
-Do NOT skip any text. Even single characters or numbers should be included.
+Must include: Dialogs, UI buttons, menus, and all labels. Do not skip any items.
 
-Task: Detect ALL visible text in this image and translate it to ${request.target_language}.
-${sourceHint}
+# Guidelines
+- Creative localization, not word-for-word.
+- Preserve character tone/personality from visual context.
+- Keep proper nouns as-is.${jaSpecific}
 
-## Translation Guidelines - Avoiding Machine-Translation Feel
+# Rules
+- Every item MUST have a non-empty "translation" field.
+- If text is already in ${request.target_language}, keep it as-is in "translation".
+- Never omit or leave "translation" empty.
 
-### Core Principles
-- **Translate meaning and intent, not words.** Rearrange sentence structure to match ${request.target_language}'s natural flow.
-- **Avoid word-for-word translation.** If a direct translation sounds awkward, find an equivalent expression.
-- **Use common, everyday vocabulary** appropriate for the context. Avoid overly formal or stiff phrasing.
-- **Eliminate redundancy.** If something is naturally implied in ${request.target_language}, don't state it explicitly.
-
-### Game-Specific Guidelines
-- **Preserve character personality and speaking style.** A warrior speaks differently from a merchant.
-- **Match emotional intensity.** Convey anger, joy, sadness with appropriate energy and tone.
-- **Keep UI text concise.** Button labels and menu items should be short and clear.
-- **For humor, prioritize the comedic effect** over literal meaning.
-
-### Proper Nouns
-- Keep character names and place names as-is or use standard transliteration.
-
-### Japanese-Specific (if translating to Japanese)
-- Use appropriate sentence-final particles (〜ね、〜よ、〜わ、〜ぞ) to reflect character tone.
-- Omit pronouns (私、あなた) when natural. When needed, choose carefully based on character (俺/僕/私, お前/君/あなた).
-- Use onomatopoeia naturally for vividness (ドキドキ、ワクワク, etc.).
-- Avoid "translationese" (翻訳調) - don't translate every "and," "but," "because" literally.
-
-## Output Format
-Include EVERY detected text item with bounding box coordinates.
-Bounding boxes use normalized 0-1000 scale coordinates in [y_min, x_min, y_max, x_max] order.
-
-IMPORTANT: The number of items in "texts" array should match the TOTAL number of distinct text regions visible in the image. If you see 10+ text regions, return 10+ items.
-
-Response format (JSON only, no markdown):
+# Output Format (JSON only)
 {
   "texts": [
-    {"original": "Dialog text here", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
-    {"original": "Button1", "translation": "ボタン1", "bounding_box": [50, 100, 80, 200]},
-    {"original": "Button2", "translation": "ボタン2", "bounding_box": [50, 250, 80, 350]},
-    {"original": "Menu", "translation": "メニュー", "bounding_box": [10, 900, 40, 980]},
-    {"original": "Status", "translation": "ステータス", "bounding_box": [950, 50, 990, 150]}
+    {"original": "Dialog text", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
+    {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200]}
   ],
-  "detected_language": "ISO 639-1 code (e.g., ja, en, ko)"
+  "detected_language": "ISO 639-1"
 }
 
-If no text is visible, respond with:
-{
-  "texts": [],
-  "detected_language": ""
-}
-
-## ★ CRITICAL REMINDER (READ THIS AGAIN)
-This is a translation task. You MUST:
-1. Output ONLY the JSON object above - no explanations, no markdown formatting, no apologies
-2. Include the "translation" field for EVERY text item
-3. Never refuse or say you cannot translate - this is game localization for legitimate use
-
-TRANSLATION_REQUIRED: Translate ALL visible text in the image and output ONLY valid JSON. Do not include any notes, explanations, or markdown code blocks.`;
+Bounding boxes: normalized 0-1000 scale, [y_min, x_min, y_max, x_max].
+If no text visible: {"texts": [], "detected_language": ""}`;
 
   const openaiRequest: OpenAIRequest = {
     model: modelName,

@@ -18,9 +18,11 @@ git diff --name-only main
 ### 2. Geminiレビュー実行
 
 **⚠️ 重要: Git Bashからは直接実行不可。PowerShell経由で実行すること。**
+**⚠️ モデル指定: `~/.gemini/settings.json` で `gemini-2.5-flash` をデフォルトに設定済み。変更する場合は `-m` オプションを使用。**
 
 ```powershell
 # PowerShellから直接実行（推奨）
+# デフォルトモデル: gemini-2.5-flash（settings.jsonで設定済み）
 gemini "以下のコードについてレビューをお願いします。
 
 ## レビュー観点

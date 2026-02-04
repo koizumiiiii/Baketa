@@ -312,6 +312,91 @@ public sealed record RoiManagerSettings
 
     #endregion
 
+    #region [Issue #379] カスケード障害防御設定
+
+    /// <summary>
+    /// [Issue #379] 除外ゾーンの最大数
+    /// </summary>
+    /// <remarks>
+    /// これ以上の除外ゾーンは登録されません。
+    /// デフォルト: 20
+    /// </remarks>
+    public int MaxExclusionZones { get; init; } = 20;
+
+    /// <summary>
+    /// [Issue #379] 除外ゾーン重複判定のIoU閾値
+    /// </summary>
+    /// <remarks>
+    /// 既存ゾーンとのIoUがこの閾値以上の場合、重複として登録をスキップ。
+    /// デフォルト: 0.5
+    /// </remarks>
+    public float ExclusionZoneDeduplicationIoU { get; init; } = 0.5f;
+
+    /// <summary>
+    /// [Issue #379] Miss判定をスキップするOCR信頼度の閾値
+    /// </summary>
+    /// <remarks>
+    /// OCR信頼度がこの閾値以上の場合、翻訳失敗をOCR missとして記録しません。
+    /// デフォルト: 0.7
+    /// </remarks>
+    public float OcrConfidenceThresholdForMissSkip { get; init; } = 0.7f;
+
+    /// <summary>
+    /// [Issue #379] セーフゾーン判定の最小検出回数
+    /// </summary>
+    /// <remarks>
+    /// この回数以上検出された領域は除外候補から保護されます。
+    /// デフォルト: 10
+    /// </remarks>
+    public int SafeZoneMinDetectionCount { get; init; } = 10;
+
+    /// <summary>
+    /// [Issue #379] 除外判定のMiss比率閾値（0.0-1.0）
+    /// </summary>
+    /// <remarks>
+    /// missRatio = missCounts / (missCounts + hitCounts) がこの閾値以上の場合に除外候補とする。
+    /// デフォルト: 0.8
+    /// </remarks>
+    public float MissRatioThresholdForExclusion { get; init; } = 0.8f;
+
+    /// <summary>
+    /// [Issue #379] Miss比率計算に必要な最小サンプル数
+    /// </summary>
+    /// <remarks>
+    /// hitCounts + missCounts がこの値以上の場合のみMiss比率を評価。
+    /// デフォルト: 10
+    /// </remarks>
+    public int MinSamplesForMissRatio { get; init; } = 10;
+
+    /// <summary>
+    /// [Issue #379] 除外ゾーンのTTL（時間）
+    /// </summary>
+    /// <remarks>
+    /// 0の場合はTTL無効（無期限）。
+    /// デフォルト: 24時間
+    /// </remarks>
+    public int ExclusionZoneTtlHours { get; init; } = 24;
+
+    /// <summary>
+    /// [Issue #379] 低信頼度OCR結果をMissとして記録する閾値
+    /// </summary>
+    /// <remarks>
+    /// OCR信頼度がこの閾値未満の場合、翻訳成功でもMissとして記録。
+    /// デフォルト: 0.3
+    /// </remarks>
+    public float LowConfidenceMissRecordingThreshold { get; init; } = 0.3f;
+
+    /// <summary>
+    /// [Issue #379] セーフゾーン保護のIoU重複判定閾値
+    /// </summary>
+    /// <remarks>
+    /// セーフゾーンと除外候補のIoUがこの閾値以上の場合、除外候補を保護。
+    /// デフォルト: 0.3
+    /// </remarks>
+    public float SafeZoneOverlapIoUThreshold { get; init; } = 0.3f;
+
+    #endregion
+
     #region [Issue #369] シードプロファイル設定
 
     /// <summary>
@@ -380,6 +465,16 @@ public sealed record RoiManagerSettings
             && ConsecutiveMissThresholdForReset > 0
             && ConsecutiveMissThresholdForExclusion > 0
             && ConsecutiveMissThresholdForReset <= ConsecutiveMissThresholdForExclusion
+            // [Issue #379] カスケード障害防御設定の検証
+            && MaxExclusionZones > 0
+            && ExclusionZoneDeduplicationIoU is >= 0.0f and <= 1.0f
+            && OcrConfidenceThresholdForMissSkip is >= 0.0f and <= 1.0f
+            && SafeZoneMinDetectionCount > 0
+            && MissRatioThresholdForExclusion is >= 0.0f and <= 1.0f
+            && MinSamplesForMissRatio > 0
+            && ExclusionZoneTtlHours >= 0
+            && LowConfidenceMissRecordingThreshold is >= 0.0f and <= 1.0f
+            && SafeZoneOverlapIoUThreshold is >= 0.0f and <= 1.0f
             // [Issue #369] シードプロファイル設定の検証
             && SeedProfileInitialDetectionCount > 0
             && SeedProfileInitialConfidenceScore is >= 0.0f and <= 1.0f

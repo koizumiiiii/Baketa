@@ -452,8 +452,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     _ => (image.Width, image.Height)
                 };
                 _textChunkAggregatorService.SetImageContext(imageBase64, contextWidth, contextHeight);
-                _logger?.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height} (元サイズ), Base64Length={Length}",
-                    contextWidth, contextHeight, imageBase64.Length);
+
+                // [Issue #379] Singleshotモード時にGateフィルタリングをバイパスするためモードを伝播
+                var translationMode = options?.ForceCompleteExecution == true
+                    ? Baketa.Core.Abstractions.Services.TranslationMode.Singleshot
+                    : Baketa.Core.Abstractions.Services.TranslationMode.Live;
+                _textChunkAggregatorService.SetTranslationMode(translationMode);
+
+                _logger?.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height} (元サイズ), Base64Length={Length}, Mode={Mode}",
+                    contextWidth, contextHeight, imageBase64.Length, translationMode);
             }
             catch (Exception ex)
             {

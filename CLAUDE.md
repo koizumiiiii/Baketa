@@ -866,6 +866,8 @@ Once build succeeds with no errors, **MANDATORY** code review using gemini comma
 
 ```powershell
 # PowerShellから直接実行（推奨）
+# デフォルトモデル: gemini-2.5-flash（~/.gemini/settings.jsonで設定済み）
+# モデル変更時は -m オプション使用: gemini -m gemini-2.5-flash-lite "..."
 gemini "実装完了しました。以下のコードについてレビューをお願いします。
 
 ## 実装内容

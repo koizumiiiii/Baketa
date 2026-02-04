@@ -53,6 +53,14 @@ public sealed record RoiHeatmapData
     public int[]? MissCounts { get; init; }
 
     /// <summary>
+    /// [Issue #379] 各セルのヒット数（翻訳成功回数）
+    /// </summary>
+    /// <remarks>
+    /// Miss比率計算に使用。下位互換性のため、nullの場合はゼロ配列として扱う。
+    /// </remarks>
+    public int[]? HitCounts { get; init; }
+
+    /// <summary>
     /// 最後に更新された時刻
     /// </summary>
     public DateTime LastUpdatedAt { get; init; }
@@ -84,6 +92,12 @@ public sealed record RoiHeatmapData
             return false;
         }
 
+        // [Issue #379] HitCountsが存在する場合はサイズをチェック
+        if (HitCounts != null && HitCounts.Length != expectedSize)
+        {
+            return false;
+        }
+
         // 全ての値が有効範囲内であることを確認
         foreach (var value in Values)
         {
@@ -105,6 +119,18 @@ public sealed record RoiHeatmapData
         if (MissCounts != null)
         {
             foreach (var count in MissCounts)
+            {
+                if (count < 0)
+                {
+                    return false;
+                }
+            }
+        }
+
+        // [Issue #379] HitCountsの値を検証
+        if (HitCounts != null)
+        {
+            foreach (var count in HitCounts)
             {
                 if (count < 0)
                 {
@@ -477,6 +503,86 @@ public sealed record RoiHeatmapData
     }
 
     /// <summary>
+    /// [Issue #379] ヒット記録を適用した新しいヒートマップを作成
+    /// </summary>
+    /// <param name="hitCells">ヒットしたセルのリスト</param>
+    /// <returns>更新されたヒートマップ</returns>
+    public RoiHeatmapData WithRecordedHit((int row, int column)[] hitCells)
+    {
+        var newHitCounts = EnsureHitCounts();
+        var newMissCounts = EnsureMissCounts();
+
+        foreach (var (row, column) in hitCells)
+        {
+            if (row >= 0 && row < Rows && column >= 0 && column < Columns)
+            {
+                var index = row * Columns + column;
+                newHitCounts[index]++;
+                newMissCounts[index] = 0; // Hit時にmissカウントリセット
+            }
+        }
+
+        return this with
+        {
+            HitCounts = newHitCounts,
+            MissCounts = newMissCounts,
+            LastUpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// [Issue #379] Miss比率が閾値を超えたセルを取得
+    /// </summary>
+    /// <param name="ratioThreshold">Miss比率の閾値（0.0-1.0）</param>
+    /// <param name="minSamples">最小サンプル数（hitCounts + missCounts）</param>
+    /// <returns>閾値を超えたセルのリスト</returns>
+    public (int row, int column, float missRatio)[] GetHighMissRatioCells(float ratioThreshold, int minSamples)
+    {
+        var results = new System.Collections.Generic.List<(int, int, float)>();
+        var missCounts = MissCounts;
+        var hitCounts = HitCounts;
+
+        if (missCounts == null)
+        {
+            return [];
+        }
+
+        for (var row = 0; row < Rows; row++)
+        {
+            for (var column = 0; column < Columns; column++)
+            {
+                var index = row * Columns + column;
+                var miss = missCounts[index];
+                var hit = hitCounts != null ? hitCounts[index] : 0;
+                var total = miss + hit;
+
+                if (total >= minSamples)
+                {
+                    var missRatio = (float)miss / total;
+                    if (missRatio >= ratioThreshold)
+                    {
+                        results.Add((row, column, missRatio));
+                    }
+                }
+            }
+        }
+
+        return [.. results];
+    }
+
+    /// <summary>
+    /// [Issue #379] HitCountsを確保（nullの場合はゼロ配列を作成）
+    /// </summary>
+    private int[] EnsureHitCounts()
+    {
+        if (HitCounts != null)
+        {
+            return (int[])HitCounts.Clone();
+        }
+        return new int[Rows * Columns];
+    }
+
+    /// <summary>
     /// [Issue #354] MissCountsを確保（nullの場合はゼロ配列を作成）
     /// </summary>
     private int[] EnsureMissCounts()
@@ -503,6 +609,7 @@ public sealed record RoiHeatmapData
         var values = new float[size];
         var sampleCounts = new int[size];
         var missCounts = new int[size]; // [Issue #354]
+        var hitCounts = new int[size]; // [Issue #379]
 
         if (initialValue > 0.0f)
         {
@@ -516,6 +623,7 @@ public sealed record RoiHeatmapData
             Values = values,
             SampleCounts = sampleCounts,
             MissCounts = missCounts, // [Issue #354]
+            HitCounts = hitCounts, // [Issue #379]
             LastUpdatedAt = DateTime.UtcNow,
             TotalSamples = 0
         };

@@ -48,6 +48,9 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     // [Issue #290] Fork-Join並列実行で事前計算されたCloud AI翻訳結果
     private FallbackTranslationResult? _preComputedCloudResult;
 
+    // [Issue #379] 翻訳モード（Singleshotモード時にGateバイパス）
+    private TranslationMode _currentTranslationMode = TranslationMode.Live;
+
     public TimedChunkAggregator(
         IOptionsMonitor<TimedAggregatorSettings> settings,
         CoordinateBasedLineBreakProcessor lineBreakProcessor,
@@ -433,7 +436,10 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                         imageContext.Width,
                         imageContext.Height,
                         imageContext.PreComputedCloudResult
-                    );
+                    )
+                    {
+                        TranslationMode = imageContext.TranslationMode // [Issue #379]
+                    };
 
                     await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
                     Interlocked.Increment(ref _totalAggregationEvents);
@@ -510,7 +516,10 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                     imageContext.Width,
                     imageContext.Height,
                     imageContext.PreComputedCloudResult
-                );
+                )
+                {
+                    TranslationMode = imageContext.TranslationMode // [Issue #379]
+                };
 
                 await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
 
@@ -762,20 +771,31 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
         }
     }
 
-    /// <summary>
-    /// [Issue #78 Phase 4] 現在の画像コンテキストを取得
-    /// </summary>
-    private (string? ImageBase64, int Width, int Height, FallbackTranslationResult? PreComputedCloudResult) GetAndClearImageContext()
+    /// <inheritdoc />
+    public void SetTranslationMode(TranslationMode mode)
     {
         lock (_imageContextLock)
         {
-            var result = (_currentImageBase64, _currentImageWidth, _currentImageHeight, _preComputedCloudResult);
+            _currentTranslationMode = mode;
+            _logger.LogDebug("[Issue #379] 翻訳モード設定: {Mode}", mode);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #78 Phase 4] 現在の画像コンテキストを取得
+    /// </summary>
+    private (string? ImageBase64, int Width, int Height, FallbackTranslationResult? PreComputedCloudResult, TranslationMode TranslationMode) GetAndClearImageContext()
+    {
+        lock (_imageContextLock)
+        {
+            var result = (_currentImageBase64, _currentImageWidth, _currentImageHeight, _preComputedCloudResult, _currentTranslationMode);
 
             // 使用後にクリア（次回のイベント発行で再利用されないように）
             _currentImageBase64 = null;
             _currentImageWidth = 0;
             _currentImageHeight = 0;
             _preComputedCloudResult = null; // [Issue #290] Cloud結果もクリア
+            _currentTranslationMode = TranslationMode.Live; // [Issue #379] デフォルトに戻す
 
             return result;
         }
