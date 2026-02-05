@@ -1535,7 +1535,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             return 0f;
 
         var intersectionArea = (float)(intersectRight - intersectX) * (intersectBottom - intersectY);
-        var unionArea = (float)(a.Width * a.Height + b.Width * b.Height) - intersectionArea;
+        var unionArea = (float)a.Width * a.Height + (float)b.Width * b.Height - intersectionArea;
 
         return unionArea > 0 ? intersectionArea / unionArea : 0f;
     }

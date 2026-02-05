@@ -1491,16 +1491,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         TranslatedTextItem? bestMatch = null;
         float bestIoU = 0f;
 
-        foreach (var cloudText in cloudTexts)
+        foreach (var cloudText in cloudTexts
+            .Where(t => !usedCloudTexts.Contains(t) && t.HasBoundingBox))
         {
-            // 既に使用済みのものはスキップ
-            if (usedCloudTexts.Contains(cloudText))
-                continue;
-
-            // BoundingBoxがないものはスキップ
-            if (!cloudText.HasBoundingBox)
-                continue;
-
             var cloudBox = cloudText.BoundingBox!.Value;
 
             // Cloud AI BoundingBoxは0-1000正規化スケール → ピクセル座標に変換
@@ -1544,7 +1537,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             return 0f;
 
         var intersectionArea = (float)(intersectRight - intersectX) * (intersectBottom - intersectY);
-        var unionArea = (float)(a.Width * a.Height + b.Width * b.Height) - intersectionArea;
+        var unionArea = (float)a.Width * a.Height + (float)b.Width * b.Height - intersectionArea;
 
         return unionArea > 0 ? intersectionArea / unionArea : 0f;
     }
