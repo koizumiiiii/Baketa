@@ -35,6 +35,10 @@ namespace Baketa.Infrastructure.Processing.Strategies;
 /// </summary>
 public class OcrExecutionStageStrategy : IProcessingStageStrategy
 {
+    // [Issue #380] バッチOCR重複除去のIoU閾値
+    // 隣接ブロック境界の拡張による同一テキストの重複検出を除去するために使用
+    private const float DeduplicationIoUThreshold = 0.3f;
+
     private readonly ILogger<OcrExecutionStageStrategy> _logger;
     private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
     private readonly IImageLifecycleManager _imageLifecycleManager; // 🎯 UltraThink Phase 75: 安全な画像管理
@@ -1175,7 +1179,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             }
 
             // Phase 3: 結果を座標変換して集約
-            var allTextChunks = new List<object>();
+            var allTransformedRegions = new List<Baketa.Core.Abstractions.OCR.OcrTextRegion>();
             var allDetectedText = new System.Text.StringBuilder();
 
             for (var i = 0; i < batchResults.Count && i < regionMapping.Count; i++)
@@ -1186,13 +1190,28 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 // 座標変換: ROI相対座標 → 元画像絶対座標
                 var transformedRegions = TransformOcrResultsToAbsoluteCoordinates(ocrResults, region, context.Input);
 
-                allTextChunks.AddRange(transformedRegions.Cast<object>());
+                allTransformedRegions.AddRange(transformedRegions);
                 allDetectedText.Append(string.Join(" ", ocrResults.TextRegions.Select(r => r.Text)));
                 allDetectedText.Append(' ');
 
                 _logger.LogDebug("[Issue #330] バッチOCR結果: 領域{Region}, 検出テキスト{Count}個",
                     region, ocrResults.TextRegions.Count);
             }
+
+            // [Issue #380] バッチOCR結果のデデュプリケーション
+            // 隣接ブロック境界の重複により、同じテキストが複数回検出される問題を解決
+            var originalCount = allTransformedRegions.Count;
+            var deduplicatedRegions = DeduplicateBatchOcrResults(allTransformedRegions);
+            var removedCount = originalCount - deduplicatedRegions.Count;
+
+            if (removedCount > 0)
+            {
+                _logger.LogInformation(
+                    "[Issue #380] バッチOCRデデュプリケーション完了: {OriginalCount}個 → {DeduplicatedCount}個 (削除: {RemovedCount}個)",
+                    originalCount, deduplicatedRegions.Count, removedCount);
+            }
+
+            var allTextChunks = deduplicatedRegions.Cast<object>().ToList();
 
             stopwatch.Stop();
 
@@ -1435,6 +1454,90 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             transformedRegions.Count, roiRegion);
 
         return transformedRegions;
+    }
+
+    /// <summary>
+    /// [Issue #380] バッチOCR結果のデデュプリケーション
+    /// </summary>
+    /// <remarks>
+    /// バッチOCR実行時、隣接ブロック境界の拡張（15%+30%）により
+    /// 同じテキストが複数の重複領域から検出される問題を解決します。
+    ///
+    /// アルゴリズム:
+    /// 1. 全ペア(i, j)のBBox IoUを計算（O(n²)、通常n&lt;30で問題なし）
+    /// 2. IoU &gt;= DeduplicationIoUThreshold の場合:
+    ///    a. テキストA.Contains(B) or B.Contains(A) → 長い方を残す
+    ///    b. テキスト同一 → Confidenceが高い方を残す
+    ///    c. テキストが異なる（IoUが高くても別テキスト）→ 両方残す
+    /// 3. 重複フラグが立ったものを除外して返す
+    ///
+    /// 設計判断: IoUのみでの重複除去（テキスト類似度を無視）は行わない。
+    /// 理由: 画面上の同一位置に異なるテキスト（例: ボタンラベルとツールチップ）が
+    /// 重なるケースがあり、テキスト内容を考慮しないと意図しない削除が発生するため。
+    /// </remarks>
+    private List<Baketa.Core.Abstractions.OCR.OcrTextRegion> DeduplicateBatchOcrResults(
+        List<Baketa.Core.Abstractions.OCR.OcrTextRegion> regions)
+    {
+        if (regions.Count <= 1)
+            return regions;
+
+        var removed = new HashSet<int>();
+
+        for (int i = 0; i < regions.Count; i++)
+        {
+            if (removed.Contains(i))
+                continue;
+
+            for (int j = i + 1; j < regions.Count; j++)
+            {
+                if (removed.Contains(j))
+                    continue;
+
+                var iou = CalculateRectangleIoU(regions[i].Bounds, regions[j].Bounds);
+                if (iou < DeduplicationIoUThreshold)
+                    continue;
+
+                var textA = regions[i].Text?.Trim() ?? string.Empty;
+                var textB = regions[j].Text?.Trim() ?? string.Empty;
+
+                // テキスト類似度チェック: 同一または包含関係
+                if (textA == textB || textA.Contains(textB) || textB.Contains(textA))
+                {
+                    // 長いテキスト優先、同長ならConfidence優先
+                    var keepI = textA.Length > textB.Length ||
+                               (textA.Length == textB.Length && regions[i].Confidence >= regions[j].Confidence);
+                    removed.Add(keepI ? j : i);
+
+                    _logger.LogDebug(
+                        "[Issue #380] 重複OCR結果を除去: IoU={IoU:F2}, Keep='{KeepText}', Remove='{RemoveText}'",
+                        iou,
+                        keepI ? (textA.Length > 30 ? textA[..30] + "..." : textA) : (textB.Length > 30 ? textB[..30] + "..." : textB),
+                        keepI ? (textB.Length > 30 ? textB[..30] + "..." : textB) : (textA.Length > 30 ? textA[..30] + "..." : textA));
+                }
+                // テキストが異なる場合（IoUが高くても別のテキスト）は両方残す
+            }
+        }
+
+        return regions.Where((_, idx) => !removed.Contains(idx)).ToList();
+    }
+
+    /// <summary>
+    /// [Issue #380] 2つのRectangleのIoU（Intersection over Union）を計算
+    /// </summary>
+    private static float CalculateRectangleIoU(Rectangle a, Rectangle b)
+    {
+        var intersectX = Math.Max(a.X, b.X);
+        var intersectY = Math.Max(a.Y, b.Y);
+        var intersectRight = Math.Min(a.Right, b.Right);
+        var intersectBottom = Math.Min(a.Bottom, b.Bottom);
+
+        if (intersectRight <= intersectX || intersectBottom <= intersectY)
+            return 0f;
+
+        var intersectionArea = (float)(intersectRight - intersectX) * (intersectBottom - intersectY);
+        var unionArea = (float)(a.Width * a.Height + b.Width * b.Height) - intersectionArea;
+
+        return unionArea > 0 ? intersectionArea / unionArea : 0f;
     }
 
     #endregion
