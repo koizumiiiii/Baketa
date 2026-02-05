@@ -39,6 +39,10 @@ namespace Baketa.Application.EventHandlers.Translation;
 /// </summary>
 public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<AggregatedChunksReadyEvent>
 {
+    // [Issue #380] 座標ベースフォールバックマッチングのIoU閾値
+    // Cloud AI BoundingBoxとOCRチャンクCombinedBoundsの重なり判定に使用
+    private const float CoordinateMatchIoUThreshold = 0.3f;
+
     // 🔥 [PHASE1_SEMAPHORE] 翻訳実行制御用セマフォ（1並列のみ許可）
     // Gemini推奨の多層防御アーキテクチャ - 第2層: 物理的排他制御
     private static readonly SemaphoreSlim _translationExecutionSemaphore = new(1, 1);
@@ -387,7 +391,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 {
                     // [Issue #296] Originalテキストでマッチング
                     // Cloud AI（Gemini）は画像から再OCRするため、順序がローカルOCRと異なる場合がある
-                    translationResults = MatchCloudTranslationsToChunks(nonEmptyChunks, cloudTexts);
+                    // [Issue #380] 座標フォールバックマッチングのため画像サイズも渡す
+                    translationResults = MatchCloudTranslationsToChunks(
+                        nonEmptyChunks,
+                        cloudTexts,
+                        eventData.ImageWidth,
+                        eventData.ImageHeight);
 
                     _logger?.LogDebug(
                         "✅ [Issue #296] Fork-Join Cloud AI翻訳結果: {CloudCount}個 → {MatchedCount}個マッチ",
@@ -1328,7 +1337,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     /// </remarks>
     private List<string> MatchCloudTranslationsToChunks(
         List<TextChunk> chunks,
-        IReadOnlyList<TranslatedTextItem> cloudTexts)
+        IReadOnlyList<TranslatedTextItem> cloudTexts,
+        int imageWidth,
+        int imageHeight)
     {
         var results = new List<string>(chunks.Count);
 
@@ -1350,9 +1361,13 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 g => g.First().Translation ?? string.Empty,
                 StringComparer.Ordinal);
 
+        // [Issue #380] 座標ベースマッチング用: 使用済みCloud AI結果を追跡
+        var usedCloudTexts = new HashSet<TranslatedTextItem>();
+
         var matchedCount = 0;
         var normalizedMatchCount = 0;
         var partialMatchCount = 0;
+        var coordinateMatchCount = 0;
         var notDetectedCount = 0;
 
         for (int i = 0; i < chunks.Count; i++)
@@ -1365,6 +1380,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             {
                 results.Add(translation);
                 matchedCount++;
+                // 使用済みとしてマーク（完全一致の元を探す）
+                var usedItem = cloudTexts.FirstOrDefault(t => t.Original == chunkText);
+                if (usedItem != null) usedCloudTexts.Add(usedItem);
                 continue;
             }
 
@@ -1375,6 +1393,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             {
                 results.Add(translation);
                 normalizedMatchCount++;
+                // 使用済みとしてマーク
+                var usedItem = cloudTexts.FirstOrDefault(t => NormalizeText(t.Original) == normalizedChunkText);
+                if (usedItem != null) usedCloudTexts.Add(usedItem);
                 _logger?.LogDebug(
                     "🔍 [Issue #296] 正規化マッチ: Chunk[{Index}] '{ChunkText}' → '{Translation}'",
                     i, chunkText.Length > 30 ? chunkText[..30] + "..." : chunkText,
@@ -1396,6 +1417,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             {
                 results.Add(partialMatch.Translation ?? string.Empty);
                 partialMatchCount++;
+                usedCloudTexts.Add(partialMatch);
                 _logger?.LogDebug(
                     "🔍 [Issue #296] 部分マッチ: Chunk[{Index}] '{ChunkText}' ⊂⊃ '{CloudOriginal}' → '{Translation}'",
                     i,
@@ -1403,6 +1425,31 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     partialMatch.Original?.Length > 20 ? partialMatch.Original[..20] + "..." : partialMatch.Original,
                     partialMatch.Translation?.Length > 20 ? partialMatch.Translation[..20] + "..." : partialMatch.Translation);
                 continue;
+            }
+
+            // 3.5. [Issue #380] 座標ベースフォールバックマッチング（テキスト一致失敗時）
+            // Cloud AI BoundingBoxとチャンクCombinedBoundsのIoUで最も近いものを探す
+            if (imageWidth > 0 && imageHeight > 0)
+            {
+                var coordinateMatch = FindBestCoordinateMatch(
+                    chunks[i],
+                    cloudTexts,
+                    usedCloudTexts,
+                    imageWidth,
+                    imageHeight);
+
+                if (coordinateMatch != null)
+                {
+                    results.Add(coordinateMatch.Translation ?? string.Empty);
+                    coordinateMatchCount++;
+                    usedCloudTexts.Add(coordinateMatch);
+                    _logger?.LogDebug(
+                        "🔍 [Issue #380] 座標フォールバックマッチ: Chunk[{Index}] '{ChunkText}' → '{Translation}'",
+                        i,
+                        chunkText.Length > 20 ? chunkText[..20] + "..." : chunkText,
+                        coordinateMatch.Translation?.Length > 20 ? coordinateMatch.Translation[..20] + "..." : coordinateMatch.Translation);
+                    continue;
+                }
             }
 
             // 4. マッチなし: Cloud AIが検出しなかった → 翻訳不要と判断
@@ -1416,14 +1463,83 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         }
 
         _logger?.LogInformation(
-            "📊 [Issue #296] マッチング統計: 完全一致={Exact}, 正規化={Normalized}, 部分={Partial}, 未検出={NotDetected}, 合計={Total}",
-            matchedCount, normalizedMatchCount, partialMatchCount, notDetectedCount, chunks.Count);
+            "📊 [Issue #380] マッチング統計: 完全一致={Exact}, 正規化={Normalized}, 部分={Partial}, 座標={Coordinate}, 未検出={NotDetected}, 合計={Total}",
+            matchedCount, normalizedMatchCount, partialMatchCount, coordinateMatchCount, notDetectedCount, chunks.Count);
 
 #if DEBUG
-        Console.WriteLine($"📊 [Issue #296] マッチング統計: 完全={matchedCount}, 正規化={normalizedMatchCount}, 部分={partialMatchCount}, 未検出={notDetectedCount}");
+        Console.WriteLine($"📊 [Issue #380] マッチング統計: 完全={matchedCount}, 正規化={normalizedMatchCount}, 部分={partialMatchCount}, 座標={coordinateMatchCount}, 未検出={notDetectedCount}");
 #endif
 
         return results;
+    }
+
+    /// <summary>
+    /// [Issue #380] 座標ベースで最も近いCloud AIテキストを探す
+    /// </summary>
+    /// <remarks>
+    /// チャンクのCombinedBoundsとCloud AIのBoundingBoxのIoUを計算し、
+    /// IoU >= 0.3の中で最も高いものを返す。
+    /// テキストマッチングが失敗した場合のフォールバックとして使用。
+    /// </remarks>
+    private TranslatedTextItem? FindBestCoordinateMatch(
+        TextChunk chunk,
+        IReadOnlyList<TranslatedTextItem> cloudTexts,
+        HashSet<TranslatedTextItem> usedCloudTexts,
+        int imageWidth,
+        int imageHeight)
+    {
+        TranslatedTextItem? bestMatch = null;
+        float bestIoU = 0f;
+
+        foreach (var cloudText in cloudTexts
+            .Where(t => !usedCloudTexts.Contains(t) && t.HasBoundingBox))
+        {
+            var cloudBox = cloudText.BoundingBox!.Value;
+
+            // Cloud AI BoundingBoxは0-1000正規化スケール → ピクセル座標に変換
+            var scaledCloudRect = new System.Drawing.Rectangle(
+                cloudBox.X * imageWidth / 1000,
+                cloudBox.Y * imageHeight / 1000,
+                cloudBox.Width * imageWidth / 1000,
+                cloudBox.Height * imageHeight / 1000);
+
+            var iou = CalculateRectangleIoU(chunk.CombinedBounds, scaledCloudRect);
+
+            if (iou >= CoordinateMatchIoUThreshold && iou > bestIoU)
+            {
+                bestIoU = iou;
+                bestMatch = cloudText;
+                _logger?.LogDebug(
+                    "🔍 [Issue #380] 座標マッチ候補: IoU={IoU:F2}, Cloud='{Text}' CloudBox=({CX},{CY},{CW},{CH})→Scaled=({SX},{SY},{SW},{SH}), Chunk=({ChX},{ChY},{ChW},{ChH})",
+                    iou,
+                    cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                    cloudBox.X, cloudBox.Y, cloudBox.Width, cloudBox.Height,
+                    scaledCloudRect.X, scaledCloudRect.Y, scaledCloudRect.Width, scaledCloudRect.Height,
+                    chunk.CombinedBounds.X, chunk.CombinedBounds.Y,
+                    chunk.CombinedBounds.Width, chunk.CombinedBounds.Height);
+            }
+        }
+
+        return bestMatch;
+    }
+
+    /// <summary>
+    /// [Issue #380] 2つのRectangleのIoU（Intersection over Union）を計算
+    /// </summary>
+    private static float CalculateRectangleIoU(System.Drawing.Rectangle a, System.Drawing.Rectangle b)
+    {
+        var intersectX = Math.Max(a.X, b.X);
+        var intersectY = Math.Max(a.Y, b.Y);
+        var intersectRight = Math.Min(a.Right, b.Right);
+        var intersectBottom = Math.Min(a.Bottom, b.Bottom);
+
+        if (intersectRight <= intersectX || intersectBottom <= intersectY)
+            return 0f;
+
+        var intersectionArea = (float)(intersectRight - intersectX) * (intersectBottom - intersectY);
+        var unionArea = (float)a.Width * a.Height + (float)b.Width * b.Height - intersectionArea;
+
+        return unionArea > 0 ? intersectionArea / unionArea : 0f;
     }
 
     /// <summary>

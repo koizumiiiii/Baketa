@@ -26,10 +26,6 @@ public sealed class ProximityGroupingService
     /// </summary>
     public List<List<TextChunk>> GroupByProximity(IReadOnlyList<TextChunk> chunks)
     {
-        // 🚨 [ULTRA_DEBUG] GroupByProximityメソッド実行確認
-        Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] GroupByProximity実行開始！ - Count: {chunks.Count}");
-        _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] GroupByProximity実行開始！ - Count: {chunks.Count}");
-
         if (chunks.Count == 0)
         {
             _logger.LogDebug("チャンクが0個 - 空のグループリストを返します");
@@ -82,31 +78,16 @@ public sealed class ProximityGroupingService
         IReadOnlyList<TextChunk> chunks,
         ProximityContext context)
     {
-        Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] FindConnectedComponents開始！ - Count: {chunks.Count}");
-        _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] FindConnectedComponents開始！ - Count: {chunks.Count}");
-
         var groups = new List<List<TextChunk>>();
         var visited = new bool[chunks.Count];
         var chunksList = chunks.ToList(); // List操作のためのコピー
 
-        Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] forループ開始 - chunks.Count: {chunks.Count}");
-        _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] forループ開始 - chunks.Count: {chunks.Count}");
-
         for (int i = 0; i < chunks.Count; i++)
         {
-            Console.WriteLine($"🚨 [ULTRA_DEBUG] forループ i={i}, visited[{i}]={visited[i]}");
-            _logger?.LogDebug($"🚨 [ULTRA_DEBUG] forループ i={i}, visited[{i}]={visited[i]}");
-
             if (!visited[i])
             {
-                Console.WriteLine($"🚨 [ULTRA_DEBUG] DepthFirstSearch呼び出し直前 - i={i}");
-                _logger?.LogDebug($"🚨 [ULTRA_DEBUG] DepthFirstSearch呼び出し直前 - i={i}");
-
                 var group = new List<TextChunk>();
                 DepthFirstSearch(chunksList, i, visited, group, context);
-
-                Console.WriteLine($"🚨 [ULTRA_DEBUG] DepthFirstSearch完了 - i={i}, group.Count={group.Count}");
-                _logger?.LogDebug($"🚨 [ULTRA_DEBUG] DepthFirstSearch完了 - i={i}, group.Count={group.Count}");
 
                 if (group.Count > 0)
                 {
@@ -133,21 +114,12 @@ public sealed class ProximityGroupingService
         List<TextChunk> group,
         ProximityContext context)
     {
-        Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] DepthFirstSearch開始！ - startIndex: {startIndex}, chunks.Count: {chunks.Count}");
-        _logger?.LogDebug($"🚨🚨🚨 [ULTRA_DEBUG] DepthFirstSearch開始！ - startIndex: {startIndex}, chunks.Count: {chunks.Count}");
-
         var stack = new Stack<int>();
         stack.Push(startIndex);
-
-        Console.WriteLine($"🚨 [ULTRA_DEBUG] whileループ開始 - stack.Count: {stack.Count}");
-        _logger?.LogDebug($"🚨 [ULTRA_DEBUG] whileループ開始 - stack.Count: {stack.Count}");
 
         while (stack.Count > 0)
         {
             var currentIndex = stack.Pop();
-
-            Console.WriteLine($"🚨 [ULTRA_DEBUG] stack.Pop() - currentIndex: {currentIndex}, visited[{currentIndex}]: {visited[currentIndex]}");
-            _logger?.LogDebug($"🚨 [ULTRA_DEBUG] stack.Pop() - currentIndex: {currentIndex}, visited[{currentIndex}]: {visited[currentIndex]}");
 
             if (visited[currentIndex])
                 continue;
@@ -155,27 +127,12 @@ public sealed class ProximityGroupingService
             visited[currentIndex] = true;
             group.Add(chunks[currentIndex]);
 
-            Console.WriteLine($"🚨 [ULTRA_DEBUG] チャンク追加 - currentIndex: {currentIndex}, group.Count: {group.Count}");
-            _logger?.LogDebug($"🚨 [ULTRA_DEBUG] チャンク追加 - currentIndex: {currentIndex}, group.Count: {group.Count}");
-
-            Console.WriteLine($"🚨 [ULTRA_DEBUG] 隣接チャンク探索開始 - chunks.Count: {chunks.Count}");
-            _logger?.LogDebug($"🚨 [ULTRA_DEBUG] 隣接チャンク探索開始 - chunks.Count: {chunks.Count}");
-
             // 隣接するチャンクを探索
             for (int i = 0; i < chunks.Count; i++)
             {
-                Console.WriteLine($"🚨 [ULTRA_DEBUG] forループ i={i}, visited[{i}]={visited[i]}");
-                _logger?.LogDebug($"🚨 [ULTRA_DEBUG] forループ i={i}, visited[{i}]={visited[i]}");
-
                 if (!visited[i])
                 {
-                    Console.WriteLine($"🚨 [ULTRA_DEBUG] IsProximityClose呼び出し直前 - currentIndex:{currentIndex}, i:{i}");
-                    _logger?.LogDebug($"🚨 [ULTRA_DEBUG] IsProximityClose呼び出し直前 - currentIndex:{currentIndex}, i:{i}");
-
                     var isClose = _proximityAnalyzer.IsProximityClose(chunks[currentIndex], chunks[i], context);
-
-                    Console.WriteLine($"🚨 [ULTRA_DEBUG] IsProximityClose結果 - isClose:{isClose}");
-                    _logger?.LogDebug($"🚨 [ULTRA_DEBUG] IsProximityClose結果 - isClose:{isClose}");
 
                     if (isClose)
                     {
