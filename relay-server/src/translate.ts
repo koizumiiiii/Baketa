@@ -1489,7 +1489,8 @@ Must include: Dialogs, UI buttons, menus, and all labels. Do not skip any items.
 # Guidelines
 - Creative localization, not word-for-word.
 - Preserve character tone/personality from visual context.
-- Keep proper nouns as-is.${jaSpecific}
+- Keep proper nouns as-is.
+- When multiple lines of text are visually adjacent and form a continuous sentence or paragraph (e.g., dialog spanning 2-3 lines), combine them into ONE item with a single bounding_box covering the entire text area. Do NOT split a sentence across multiple items.${jaSpecific}
 
 # Rules
 - Every item MUST have a non-empty "translation" field.
@@ -1499,7 +1500,7 @@ Must include: Dialogs, UI buttons, menus, and all labels. Do not skip any items.
 # Output Format (JSON only)
 {
   "texts": [
-    {"original": "Dialog text", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
+    {"original": "Dialog text line1 line2", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
     {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200]}
   ],
   "detected_language": "ISO 639-1"
@@ -1684,7 +1685,8 @@ Must include: Dialogs, UI buttons, menus, and all labels. Do not skip any items.
 # Guidelines
 - Creative localization, not word-for-word.
 - Preserve character tone/personality from visual context.
-- Keep proper nouns as-is.${jaSpecific}
+- Keep proper nouns as-is.
+- When multiple lines of text are visually adjacent and form a continuous sentence or paragraph (e.g., dialog spanning 2-3 lines), combine them into ONE item with a single bounding_box covering the entire text area. Do NOT split a sentence across multiple items.${jaSpecific}
 
 # Rules
 - Every item MUST have a non-empty "translation" field.
@@ -1694,7 +1696,7 @@ Must include: Dialogs, UI buttons, menus, and all labels. Do not skip any items.
 # Output Format (JSON only)
 {
   "texts": [
-    {"original": "Dialog text", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
+    {"original": "Dialog text line1 line2", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
     {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200]}
   ],
   "detected_language": "ISO 639-1"

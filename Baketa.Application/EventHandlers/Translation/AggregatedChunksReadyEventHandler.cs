@@ -43,6 +43,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     // Cloud AI BoundingBoxとOCRチャンクCombinedBoundsの重なり判定に使用
     private const float CoordinateMatchIoUThreshold = 0.3f;
 
+    // [Issue #387] Cloud結果主導チャンクのChunkId開始オフセット
+    // Surya由来のChunkIdと区別するため
+    private const int CloudDrivenChunkIdOffset = 10000;
+
     // 🔥 [PHASE1_SEMAPHORE] 翻訳実行制御用セマフォ（1並列のみ許可）
     // Gemini推奨の多層防御アーキテクチャ - 第2層: 物理的排他制御
     private static readonly SemaphoreSlim _translationExecutionSemaphore = new(1, 1);
@@ -389,17 +393,56 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 // Cloud AI翻訳結果からテキストを抽出
                 if (cloudResponse?.Texts is { Count: > 0 } cloudTexts)
                 {
-                    // [Issue #296] Originalテキストでマッチング
-                    // Cloud AI（Gemini）は画像から再OCRするため、順序がローカルOCRと異なる場合がある
-                    // [Issue #380] 座標フォールバックマッチングのため画像サイズも渡す
-                    translationResults = MatchCloudTranslationsToChunks(
-                        nonEmptyChunks,
-                        cloudTexts,
-                        eventData.ImageWidth,
-                        eventData.ImageHeight);
+                    // [Issue #387] Cloud結果にBoundingBoxがある場合はCloud結果主導アプローチ
+                    // Cloud AI（Gemini）の意味的テキスト分離を活かし、個別BoundingBoxで正確なオーバーレイ表示
+                    var hasCloudBoundingBoxes = cloudTexts.Any(t => t.HasBoundingBox);
+
+                    if (hasCloudBoundingBoxes && eventData.ImageWidth > 0 && eventData.ImageHeight > 0)
+                    {
+                        _logger?.LogInformation(
+                            "[Issue #387] Cloud結果主導アプローチ: BoundingBox付きCloud結果を起点に処理");
+
+                        var (cloudOverlayChunks, cloudTranslations) = CreateCloudDrivenOverlayItems(
+                            nonEmptyChunks,
+                            cloudTexts,
+                            eventData.ImageWidth,
+                            eventData.ImageHeight);
+
+                        if (cloudOverlayChunks.Count > 0)
+                        {
+                            // Cloud主導の結果でnonEmptyChunksとtranslationResultsを置換
+                            nonEmptyChunks = cloudOverlayChunks;
+                            translationResults = cloudTranslations;
+                            _logger?.LogInformation(
+                                "[Issue #387] Cloud結果主導: {Count}個のオーバーレイアイテム作成",
+                                cloudOverlayChunks.Count);
+                        }
+                        else
+                        {
+                            // Cloud主導で0件 → 従来のSurya主導マッチングにフォールバック
+                            _logger?.LogWarning(
+                                "[Issue #387] Cloud結果主導で有効アイテム0件 → Surya主導マッチングにフォールバック");
+                            translationResults = MatchCloudTranslationsToChunks(
+                                nonEmptyChunks,
+                                cloudTexts,
+                                eventData.ImageWidth,
+                                eventData.ImageHeight);
+                        }
+                    }
+                    else
+                    {
+                        // BoundingBoxなし → 従来のテキストマッチング
+                        // [Issue #296] Originalテキストでマッチング
+                        // [Issue #380] 座標フォールバックマッチングのため画像サイズも渡す
+                        translationResults = MatchCloudTranslationsToChunks(
+                            nonEmptyChunks,
+                            cloudTexts,
+                            eventData.ImageWidth,
+                            eventData.ImageHeight);
+                    }
 
                     _logger?.LogDebug(
-                        "✅ [Issue #296] Fork-Join Cloud AI翻訳結果: {CloudCount}個 → {MatchedCount}個マッチ",
+                        "✅ [Issue #387] Fork-Join Cloud AI翻訳結果: {CloudCount}個 → {MatchedCount}個マッチ",
                         cloudTexts.Count, translationResults.Count(r => !string.IsNullOrEmpty(r)));
                 }
                 else if (!string.IsNullOrEmpty(cloudResponse?.TranslatedText))
@@ -526,7 +569,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     sourceLanguage: languagePair.SourceCode,
                     targetLanguage: languagePair.TargetCode,
                     processingTime: processingTime,
-                    engineName: engineUsed);
+                    engineName: engineUsed,
+                    isBatchAnalytics: true);
 
                 await _eventAggregator.PublishAsync(translationCompletedEvent, cancellationToken).ConfigureAwait(false);
                 _logger?.LogInformation(
@@ -1540,6 +1584,246 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         var unionArea = (float)a.Width * a.Height + (float)b.Width * b.Height - intersectionArea;
 
         return unionArea > 0 ? intersectionArea / unionArea : 0f;
+    }
+
+    /// <summary>
+    /// [Issue #387] Cloud結果主導のオーバーレイアイテム作成
+    /// Cloud AIの翻訳結果を起点として、Suryaチャンクで検証し、
+    /// Cloud BoundingBoxベースの座標でオーバーレイを配置する
+    /// </summary>
+    /// <remarks>
+    /// 従来のSurya主導アプローチ（MatchCloudTranslationsToChunks）では、
+    /// Suryaが「キャラクター名+セリフ」を1チャンクに結合した場合、
+    /// Cloud結果の部分マッチで最初の結果のみが採用される問題があった。
+    ///
+    /// Cloud主導アプローチでは:
+    /// 1. Cloud結果を直接イテレートし、各結果のBoundingBoxをオーバーレイ位置として使用
+    /// 2. Suryaチャンクとの包含率で検証（ハルシネーションフィルタ）
+    /// 3. Cloud座標をSurya矩形にクリッピング（表示位置の安定化）
+    /// </remarks>
+    private (List<TextChunk> overlayChunks, List<string> translations) CreateCloudDrivenOverlayItems(
+        List<TextChunk> suryaChunks,
+        IReadOnlyList<TranslatedTextItem> cloudTexts,
+        int imageWidth,
+        int imageHeight)
+    {
+        // [Issue #387] Cloud結果の包含率閾値
+        const float containmentThreshold = 0.3f;
+
+        var discardedCount = 0;
+        var noBboxCount = 0;
+
+        // ============================================================
+        // Phase 1: 各Cloud結果をSuryaチャンクにマッチング
+        // ============================================================
+        // Key: Surya ChunkId, Value: マッチしたCloud結果のリスト
+        var suryaGroupedItems = new Dictionary<int, List<(TranslatedTextItem cloudText, System.Drawing.Rectangle cloudPixelRect)>>();
+        // Suryaチャンクの参照を保持
+        var suryaChunkMap = suryaChunks.ToDictionary(c => c.ChunkId);
+
+        for (int i = 0; i < cloudTexts.Count; i++)
+        {
+            var cloudText = cloudTexts[i];
+
+            if (string.IsNullOrEmpty(cloudText.Translation))
+                continue;
+
+            if (!cloudText.HasBoundingBox)
+            {
+                noBboxCount++;
+                _logger?.LogDebug(
+                    "[Issue #387] Cloud結果スキップ（BoundingBoxなし）: '{Original}'",
+                    cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original);
+                continue;
+            }
+
+            var cloudBox = cloudText.BoundingBox!.Value;
+
+            // Cloud 0-1000正規化スケール → 画像ピクセル座標に変換
+            var cloudPixelRect = new System.Drawing.Rectangle(
+                cloudBox.X * imageWidth / 1000,
+                cloudBox.Y * imageHeight / 1000,
+                cloudBox.Width * imageWidth / 1000,
+                cloudBox.Height * imageHeight / 1000);
+
+            // Suryaチャンクとの包含率で検証
+            var (bestSuryaChunk, bestContainment) = FindBestContainingSuryaChunk(
+                cloudPixelRect, suryaChunks, containmentThreshold);
+
+            if (bestSuryaChunk == null)
+            {
+                discardedCount++;
+                _logger?.LogDebug(
+                    "[Issue #387] Cloud結果破棄（Surya裏付けなし）: '{Original}' CloudBox=({X},{Y},{W}x{H})",
+                    cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                    cloudPixelRect.X, cloudPixelRect.Y, cloudPixelRect.Width, cloudPixelRect.Height);
+                continue;
+            }
+
+            // Suryaチャンク別にグループ化
+            if (!suryaGroupedItems.TryGetValue(bestSuryaChunk.ChunkId, out var group))
+            {
+                group = [];
+                suryaGroupedItems[bestSuryaChunk.ChunkId] = group;
+            }
+            group.Add((cloudText, cloudPixelRect));
+        }
+
+        // ============================================================
+        // Phase 2: グループごとにオーバーレイアイテムを作成
+        // 同じSuryaチャンクに属する複数Cloud結果は翻訳を結合
+        // ============================================================
+        var overlayChunks = new List<TextChunk>();
+        var translations = new List<string>();
+        var chunkIndex = 0;
+
+        foreach (var (suryaChunkId, items) in suryaGroupedItems)
+        {
+            var suryaChunk = suryaChunkMap[suryaChunkId];
+
+            if (items.Count == 1)
+            {
+                // 単独 → Cloud BoundingBoxをSurya矩形にクリッピングして使用
+                var (cloudText, cloudPixelRect) = items[0];
+                var clippedRect = ClipToSuryaBounds(cloudPixelRect, suryaChunk.CombinedBounds);
+
+                overlayChunks.Add(new TextChunk
+                {
+                    ChunkId = CloudDrivenChunkIdOffset + chunkIndex,
+                    TextResults = suryaChunk.TextResults,
+                    CombinedBounds = clippedRect,
+                    CombinedText = cloudText.Original ?? string.Empty,
+                    TranslatedText = cloudText.Translation,
+                    SourceWindowHandle = suryaChunk.SourceWindowHandle,
+                    DetectedLanguage = suryaChunk.DetectedLanguage,
+                    CaptureRegion = suryaChunk.CaptureRegion
+                });
+                translations.Add(cloudText.Translation);
+
+                _logger?.LogDebug(
+                    "[Issue #387] Cloud結果採用（単独）: '{Translation}' Bounds=({X},{Y},{W}x{H})",
+                    cloudText.Translation?.Length > 40 ? cloudText.Translation[..40] + "..." : cloudText.Translation,
+                    clippedRect.X, clippedRect.Y, clippedRect.Width, clippedRect.Height);
+            }
+            else
+            {
+                // 複数のCloud結果が同じSuryaチャンクに属する → 結合
+                // Y座標順にソートして読み順を維持
+                var sortedItems = items.OrderBy(item => item.cloudPixelRect.Y).ToList();
+
+                var mergedTranslation = string.Join(" ", sortedItems.Select(item => item.cloudText.Translation));
+                var mergedOriginal = string.Join("", sortedItems.Select(item => item.cloudText.Original));
+
+                // 結合時はSuryaチャンクのCombinedBoundsを使用（全Cloud結果を包含する領域）
+                overlayChunks.Add(new TextChunk
+                {
+                    ChunkId = CloudDrivenChunkIdOffset + chunkIndex,
+                    TextResults = suryaChunk.TextResults,
+                    CombinedBounds = suryaChunk.CombinedBounds,
+                    CombinedText = mergedOriginal,
+                    TranslatedText = mergedTranslation,
+                    SourceWindowHandle = suryaChunk.SourceWindowHandle,
+                    DetectedLanguage = suryaChunk.DetectedLanguage,
+                    CaptureRegion = suryaChunk.CaptureRegion
+                });
+                translations.Add(mergedTranslation);
+
+                _logger?.LogInformation(
+                    "[Issue #387] Cloud結果結合（{Count}個→1個）: '{Translation}' SuryaBounds=({X},{Y},{W}x{H})",
+                    items.Count,
+                    mergedTranslation.Length > 50 ? mergedTranslation[..50] + "..." : mergedTranslation,
+                    suryaChunk.CombinedBounds.X, suryaChunk.CombinedBounds.Y,
+                    suryaChunk.CombinedBounds.Width, suryaChunk.CombinedBounds.Height);
+            }
+            chunkIndex++;
+        }
+
+        _logger?.LogInformation(
+            "[Issue #387] Cloud結果主導マッチング完了: Groups={Groups}, Discarded={Discarded}, NoBBox={NoBBox}, CloudTotal={Total}",
+            suryaGroupedItems.Count, discardedCount, noBboxCount, cloudTexts.Count);
+
+#if DEBUG
+        Console.WriteLine($"📊 [Issue #387] Cloud主導: グループ={suryaGroupedItems.Count}, 破棄={discardedCount}, BBox無し={noBboxCount}");
+#endif
+
+        return (overlayChunks, translations);
+    }
+
+    /// <summary>
+    /// [Issue #387] Cloud BoundingBoxを最も包含するSuryaチャンクを探す
+    /// </summary>
+    /// <remarks>
+    /// IoUではなく「包含率（intersection / cloudBoxArea）」を使用する。
+    /// 理由: Cloudが意味的に分離した小さなBoundingBoxは、Suryaの大きな結合チャンクに
+    /// 包含されるため、IoUでは低い値になり誤って棄却されてしまう。
+    /// 包含率なら、Cloud boxの大部分がSuryaチャンク内にあれば有効と判定できる。
+    /// </remarks>
+    private (TextChunk? bestChunk, float bestContainment) FindBestContainingSuryaChunk(
+        System.Drawing.Rectangle cloudPixelRect,
+        List<TextChunk> suryaChunks,
+        float threshold)
+    {
+        TextChunk? bestChunk = null;
+        var bestContainment = 0f;
+
+        var cloudArea = (float)cloudPixelRect.Width * cloudPixelRect.Height;
+        if (cloudArea <= 0)
+            return (null, 0f);
+
+        foreach (var chunk in suryaChunks)
+        {
+            var suryaBounds = chunk.CombinedBounds;
+
+            // 交差領域を計算
+            var intersectX = Math.Max(cloudPixelRect.X, suryaBounds.X);
+            var intersectY = Math.Max(cloudPixelRect.Y, suryaBounds.Y);
+            var intersectRight = Math.Min(cloudPixelRect.Right, suryaBounds.Right);
+            var intersectBottom = Math.Min(cloudPixelRect.Bottom, suryaBounds.Bottom);
+
+            if (intersectRight <= intersectX || intersectBottom <= intersectY)
+                continue;
+
+            var intersectionArea = (float)(intersectRight - intersectX) * (intersectBottom - intersectY);
+
+            // 包含率: Cloud boxの何%がSuryaチャンク内にあるか
+            var containment = intersectionArea / cloudArea;
+
+            if (containment >= threshold && containment > bestContainment)
+            {
+                bestContainment = containment;
+                bestChunk = chunk;
+            }
+        }
+
+        return (bestChunk, bestContainment);
+    }
+
+    /// <summary>
+    /// [Issue #387] Cloud BoundingBoxをSurya矩形にクリッピング
+    /// </summary>
+    /// <remarks>
+    /// Cloud AIの0-1000座標は「緩い」傾向があり、テキスト領域から
+    /// はみ出す場合がある。Suryaのピクセル精度の矩形をコンテナとして
+    /// クリッピングすることで、表示位置の安定性を向上させる。
+    /// クリッピング結果がゼロサイズになる場合は元のCloud座標を返す。
+    /// </remarks>
+    private static System.Drawing.Rectangle ClipToSuryaBounds(
+        System.Drawing.Rectangle cloudRect,
+        System.Drawing.Rectangle suryaBounds)
+    {
+        var clippedX = Math.Max(cloudRect.X, suryaBounds.X);
+        var clippedY = Math.Max(cloudRect.Y, suryaBounds.Y);
+        var clippedRight = Math.Min(cloudRect.Right, suryaBounds.Right);
+        var clippedBottom = Math.Min(cloudRect.Bottom, suryaBounds.Bottom);
+
+        var clippedWidth = clippedRight - clippedX;
+        var clippedHeight = clippedBottom - clippedY;
+
+        // クリッピング結果がゼロサイズになる場合は元のCloud座標を返す
+        if (clippedWidth <= 0 || clippedHeight <= 0)
+            return cloudRect;
+
+        return new System.Drawing.Rectangle(clippedX, clippedY, clippedWidth, clippedHeight);
     }
 
     /// <summary>

@@ -138,28 +138,57 @@ public sealed class CoordinateTransformationService : ICoordinateTransformationS
                 scaledY = roiBounds.Y;
                 scaledWidth = Math.Max(0, roiBounds.Width);
                 scaledHeight = Math.Max(0, roiBounds.Height);
-                Console.WriteLine($"🚀🚀🚀 [Issue #193 PHASE4] alreadyScaledToOriginalSize=TRUE → ROIスケーリングとDPI補正をスキップ: ({scaledX},{scaledY},{scaledWidth}x{scaledHeight})");
-                _logger.LogInformation("🚀 [Issue #193] 座標は既に元ウィンドウサイズにスケーリング済み - ROIスケーリングとDPI補正をスキップ: ({X},{Y},{W},{H})",
+                _logger.LogInformation("[Issue #386] alreadyScaledToOriginalSize=TRUE - ROIスケーリングとDPI補正をスキップ: ({X},{Y},{W},{H})",
                     scaledX, scaledY, scaledWidth, scaledHeight);
 
-                // 🚀 [Issue #193 PHASE4] Windows Graphics Capture APIはウィンドウ全体（タイトルバー含む）をキャプチャするため
-                // OCR座標はウィンドウ全体に対する相対座標（0,0 = タイトルバーの左上）
-                // ClientToScreenはクライアント領域（タイトルバーの下）からの変換なので、GetWindowRectを使用
+                // [Issue #386] ClientToScreen + タイトルバー補正
+                // WGCキャプチャはウィンドウ全体(タイトルバー含む)なので、
+                // OCR座標のY=0はタイトルバーの上端
+                // GetWindowRect.Top と ClientToScreen(0,0).Y の差分がタイトルバー高さ
                 if (GetWindowRect(windowHandle, out var windowRect))
                 {
-                    var screenX = windowRect.Left + scaledX;
-                    var screenY = windowRect.Top + scaledY;
-                    Console.WriteLine($"🚀🚀🚀 [Issue #193 PHASE4] GetWindowRect使用 - WindowPos=({windowRect.Left},{windowRect.Top}) + ROI=({scaledX},{scaledY}) = Screen=({screenX},{screenY})");
-                    _logger.LogInformation("🚀 [Issue #193 PHASE4] GetWindowRect使用 - WindowPos=({WinX},{WinY}) + ROI=({RoiX},{RoiY}) = Screen=({ScreenX},{ScreenY})",
-                        windowRect.Left, windowRect.Top, scaledX, scaledY, screenX, screenY);
+                    var clientOrigin = new Point(0, 0);
+                    if (ClientToScreen(windowHandle, ref clientOrigin))
+                    {
+                        // タイトルバー高さ = クライアント領域上端 - ウィンドウ上端
+                        var titleBarHeight = clientOrigin.Y - windowRect.Top;
+                        var leftBorder = clientOrigin.X - windowRect.Left;
 
-                    var resultBounds = new Rectangle(screenX, screenY, scaledWidth, scaledHeight);
-                    return resultBounds;
+                        _logger.LogDebug("[Issue #386] タイトルバー補正: titleBarHeight={TitleBar}, leftBorder={LeftBorder}, ClientOrigin=({CX},{CY}), WindowRect=({WX},{WY})",
+                            titleBarHeight, leftBorder, clientOrigin.X, clientOrigin.Y, windowRect.Left, windowRect.Top);
+
+                        if (scaledY >= titleBarHeight)
+                        {
+                            // クライアント領域内 → ClientToScreenベースで正確な変換
+                            var screenX = clientOrigin.X + (scaledX - leftBorder);
+                            var screenY = clientOrigin.Y + (scaledY - titleBarHeight);
+                            _logger.LogInformation("[Issue #386] ClientToScreenベース変換: ROI=({RoiX},{RoiY}) → Screen=({ScreenX},{ScreenY})",
+                                scaledX, scaledY, screenX, screenY);
+                            return new Rectangle(screenX, screenY, scaledWidth, scaledHeight);
+                        }
+                        else
+                        {
+                            // タイトルバー領域内（稀なケース）→ GetWindowRectベース
+                            var screenX = windowRect.Left + scaledX;
+                            var screenY = windowRect.Top + scaledY;
+                            _logger.LogInformation("[Issue #386] タイトルバー領域 - GetWindowRectベース変換: ROI=({RoiX},{RoiY}) → Screen=({ScreenX},{ScreenY})",
+                                scaledX, scaledY, screenX, screenY);
+                            return new Rectangle(screenX, screenY, scaledWidth, scaledHeight);
+                        }
+                    }
+                    else
+                    {
+                        // ClientToScreen失敗時はGetWindowRectフォールバック
+                        var screenX = windowRect.Left + scaledX;
+                        var screenY = windowRect.Top + scaledY;
+                        _logger.LogWarning("[Issue #386] ClientToScreen失敗 - GetWindowRectフォールバック: Screen=({ScreenX},{ScreenY})",
+                            screenX, screenY);
+                        return new Rectangle(screenX, screenY, scaledWidth, scaledHeight);
+                    }
                 }
                 else
                 {
-                    _logger.LogWarning("⚠️ [Issue #193 PHASE4] GetWindowRect失敗 - スケーリング後の座標をそのまま返します");
-                    Console.WriteLine($"⚠️ [Issue #193 PHASE4] GetWindowRect失敗");
+                    _logger.LogWarning("[Issue #386] GetWindowRect失敗 - スケーリング後の座標をそのまま返します");
                     return new Rectangle(scaledX, scaledY, scaledWidth, scaledHeight);
                 }
             }
