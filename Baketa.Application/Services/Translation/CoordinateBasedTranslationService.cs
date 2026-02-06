@@ -69,6 +69,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
     private static int _nextChunkId = 1000000;
 
+    // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
+    // Gemini Vision APIの処理時間はピクセル数に比例するため、テキスト翻訳に十分な解像度に縮小
+    private const int CloudImageMaxDimension = 960;
+    private const int CloudJpegQuality = 85;
+    private const string CloudImageMimeType = "image/jpeg";
+
     public CoordinateBasedTranslationService(
         ITranslationProcessingFacade processingFacade,
         IConfigurationFacade configurationFacade,
@@ -235,13 +241,19 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             string? forkJoinImageBase64 = null;
             int forkJoinContextWidth = 0;
             int forkJoinContextHeight = 0;
+            int forkJoinCloudImageWidth = 0;  // [Issue #381] 実際に送信する画像サイズ
+            int forkJoinCloudImageHeight = 0;
 
             // Fork-Join用の画像データを事前に抽出
             try
             {
-                var imageMemory = image.GetImageMemory();
-                forkJoinImageBase64 = Convert.ToBase64String(imageMemory.Span);
-                // [Issue #275] OriginalWidth/OriginalHeightを使用
+                // [Issue #381] Cloud AI用に解像度最適化 + JPEG変換
+                var cloudData = await PrepareCloudImageDataAsync(image).ConfigureAwait(false);
+                forkJoinImageBase64 = cloudData.Base64;
+                forkJoinCloudImageWidth = cloudData.Width;
+                forkJoinCloudImageHeight = cloudData.Height;
+
+                // [Issue #275] OriginalWidth/OriginalHeightを使用（オーバーレイ座標計算用）
                 (forkJoinContextWidth, forkJoinContextHeight) = image switch
                 {
                     IWindowsImage windowsImage => (windowsImage.OriginalWidth, windowsImage.OriginalHeight),
@@ -265,6 +277,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     forkJoinImageBase64!,
                     forkJoinContextWidth,
                     forkJoinContextHeight,
+                    forkJoinCloudImageWidth,   // [Issue #381] 実際のCloud画像サイズ（ログ用）
+                    forkJoinCloudImageHeight,  // [Issue #381]
                     cancellationToken);
 
                 _logger?.LogDebug("[Issue #290] Cloud AI翻訳タスク開始（OCRと並列実行中）");
@@ -439,19 +453,37 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // リサイズ後サイズ(Width/Height)を使うとCloud AI座標がローカルOCR座標とずれる
             try
             {
-                var imageMemory = image.GetImageMemory();
-                var imageBase64 = Convert.ToBase64String(imageMemory.Span);
-                // 🔥 [Issue #275] OriginalWidth/OriginalHeightを使用
+                // [Issue #381] Fork-Joinで生成済みのCloud画像データを再利用（ダウンスケール処理の最適化）
+                string imageBase64;
+                int cloudW, cloudH;
+
+                if (!string.IsNullOrEmpty(forkJoinImageBase64) && forkJoinCloudImageWidth > 0)
+                {
+                    imageBase64 = forkJoinImageBase64;
+                    cloudW = forkJoinCloudImageWidth;
+                    cloudH = forkJoinCloudImageHeight;
+                    _logger?.LogDebug("[Issue #381] Fork-JoinのCloud画像データを再利用: {W}x{H}", cloudW, cloudH);
+                }
+                else
+                {
+                    // Fork-Join未使用時のみ新規準備
+                    var cloudData = await PrepareCloudImageDataAsync(image).ConfigureAwait(false);
+                    imageBase64 = cloudData.Base64;
+                    cloudW = cloudData.Width;
+                    cloudH = cloudData.Height;
+                }
+
+                // 🔥 [Issue #275] OriginalWidth/OriginalHeightを使用（オーバーレイ座標計算用）
                 // ローカルOCR座標は元サイズにスケールバック済み(Issue #193)なので、
                 // Cloud AI座標も元サイズ基準で計算する必要がある
-                // IWindowsImageまたはWindowsImageAdapterにキャストできればOriginalWidth/Heightを使用
                 var (contextWidth, contextHeight) = image switch
                 {
                     IWindowsImage windowsImage => (windowsImage.OriginalWidth, windowsImage.OriginalHeight),
                     WindowsImageAdapter adapter => (adapter.OriginalWidth, adapter.OriginalHeight),
                     _ => (image.Width, image.Height)
                 };
-                _textChunkAggregatorService.SetImageContext(imageBase64, contextWidth, contextHeight);
+                // [Issue #381] 実際のCloud画像サイズもセット（ログ・トークン推定用）
+                _textChunkAggregatorService.SetImageContext(imageBase64, contextWidth, contextHeight, cloudW, cloudH);
 
                 // [Issue #379] Singleshotモード時にGateフィルタリングをバイパスするためモードを伝播
                 var translationMode = options?.ForceCompleteExecution == true
@@ -459,8 +491,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     : Baketa.Core.Abstractions.Services.TranslationMode.Live;
                 _textChunkAggregatorService.SetTranslationMode(translationMode);
 
-                _logger?.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height} (元サイズ), Base64Length={Length}, Mode={Mode}",
-                    contextWidth, contextHeight, imageBase64.Length, translationMode);
+                _logger?.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height} (元サイズ), Cloud={CloudW}x{CloudH}, Base64Length={Length}, Mode={Mode}",
+                    contextWidth, contextHeight, cloudW, cloudH, imageBase64.Length, translationMode);
             }
             catch (Exception ex)
             {
@@ -1320,6 +1352,82 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     #region [Issue #290] Fork-Join並列実行
 
     /// <summary>
+    /// [Issue #381] Cloud AI翻訳用に画像を準備（ダウンスケール + JPEG変換）
+    /// </summary>
+    /// <remarks>
+    /// 1. 長辺がCloudImageMaxDimensionを超える場合、アスペクト比を維持して縮小
+    /// 2. PNG → JPEG変換でファイルサイズを60-70%削減
+    /// BoundingBoxは0-1000正規化スケールのため、解像度変更による座標補正は不要。
+    /// </remarks>
+    private async Task<(string Base64, int Width, int Height)> PrepareCloudImageDataAsync(IImage image)
+    {
+        // 1. ダウンスケール
+        var maxDim = Math.Max(image.Width, image.Height);
+        IImage? resizedImage = null;
+        var cloudImage = image;
+
+        if (maxDim > CloudImageMaxDimension)
+        {
+            var scale = (double)CloudImageMaxDimension / maxDim;
+            var newWidth = (int)(image.Width * scale);
+            var newHeight = (int)(image.Height * scale);
+
+            resizedImage = await image.ResizeAsync(newWidth, newHeight).ConfigureAwait(false);
+            cloudImage = resizedImage;
+
+            _logger?.LogDebug(
+                "[Issue #381] Cloud AI用画像ダウンスケール: {OrigW}x{OrigH} → {NewW}x{NewH} (scale={Scale:F2})",
+                image.Width, image.Height, newWidth, newHeight, scale);
+        }
+
+        try
+        {
+            var width = cloudImage.Width;
+            var height = cloudImage.Height;
+
+            // 2. PNG → JPEG変換（サイズ削減）
+            var pngData = cloudImage.GetImageMemory();
+            var jpegData = ConvertToJpeg(pngData, CloudJpegQuality);
+            var base64 = Convert.ToBase64String(jpegData);
+
+            _logger?.LogDebug(
+                "[Issue #381] JPEG変換: PNG={PngKB}KB → JPEG={JpegKB}KB (quality={Quality}, 削減={Reduction:P0})",
+                pngData.Length / 1024, jpegData.Length / 1024, CloudJpegQuality,
+                1.0 - (double)jpegData.Length / pngData.Length);
+
+            return (base64, width, height);
+        }
+        finally
+        {
+            resizedImage?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// [Issue #381] PNG画像データをJPEGに変換
+    /// </summary>
+    private static byte[] ConvertToJpeg(ReadOnlyMemory<byte> pngImageData, int quality)
+    {
+        using var inputStream = new MemoryStream(pngImageData.ToArray());
+        using var bitmap = new System.Drawing.Bitmap(inputStream);
+        using var outputStream = new MemoryStream();
+        using var encoderParams = new System.Drawing.Imaging.EncoderParameters(1);
+
+        encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(
+            System.Drawing.Imaging.Encoder.Quality, (long)quality);
+
+        var jpegCodec = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders()
+            .FirstOrDefault(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
+
+        if (jpegCodec != null)
+            bitmap.Save(outputStream, jpegCodec, encoderParams);
+        else
+            bitmap.Save(outputStream, System.Drawing.Imaging.ImageFormat.Jpeg);
+
+        return outputStream.ToArray();
+    }
+
+    /// <summary>
     /// [Issue #290] Fork-Join並列実行（OCR || Cloud AI）が利用可能かチェック
     /// </summary>
     /// <param name="imageBase64">画像データ（Base64エンコード）</param>
@@ -1395,14 +1503,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     /// [Issue #290] Cloud AI翻訳を非同期実行（Fork-Join用）
     /// </summary>
     /// <param name="imageBase64">画像データ（Base64エンコード）</param>
-    /// <param name="contextWidth">画像幅</param>
-    /// <param name="contextHeight">画像高さ</param>
+    /// <param name="contextWidth">画像幅（座標マッピング用、元サイズ）</param>
+    /// <param name="contextHeight">画像高さ（座標マッピング用、元サイズ）</param>
+    /// <param name="cloudImageWidth">[Issue #381] 実際に送信するCloud画像幅（ログ・トークン推定用）</param>
+    /// <param name="cloudImageHeight">[Issue #381] 実際に送信するCloud画像高さ（ログ・トークン推定用）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>フォールバック翻訳結果</returns>
     private async Task<FallbackTranslationResult?> ExecuteForkJoinCloudTranslationAsync(
         string imageBase64,
         int contextWidth,
         int contextHeight,
+        int cloudImageWidth,
+        int cloudImageHeight,
         CancellationToken cancellationToken)
     {
         if (_fallbackOrchestrator == null || _licenseManager == null)
@@ -1421,14 +1533,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             var sessionToken = _licenseManager.CurrentState.SessionId ?? string.Empty;
 
             // リクエストを作成
+            // [Issue #381] Width/Heightは実際に送信するCloud画像サイズ（ログ・トークン推定用）
             var request = new ImageTranslationRequest
             {
                 ImageBase64 = imageBase64,
-                Width = contextWidth,
-                Height = contextHeight,
+                Width = cloudImageWidth > 0 ? cloudImageWidth : contextWidth,
+                Height = cloudImageHeight > 0 ? cloudImageHeight : contextHeight,
                 TargetLanguage = targetLanguage,
                 SessionToken = sessionToken,
-                MimeType = "image/png"
+                MimeType = CloudImageMimeType
             };
 
             // Cloud AI翻訳を実行（フォールバック付き）

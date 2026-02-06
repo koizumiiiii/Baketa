@@ -46,9 +46,11 @@ public interface ITextChunkAggregatorService
     /// 次回のAggregatedChunksReadyEvent発行時に画像データが含まれます
     /// </summary>
     /// <param name="imageBase64">画像データ（Base64エンコード）</param>
-    /// <param name="width">画像幅</param>
-    /// <param name="height">画像高さ</param>
-    void SetImageContext(string imageBase64, int width, int height);
+    /// <param name="width">画像幅（座標マッピング用、元サイズ）</param>
+    /// <param name="height">画像高さ（座標マッピング用、元サイズ）</param>
+    /// <param name="cloudImageWidth">[Issue #381] 実際に送信するCloud画像幅（ログ・トークン推定用）</param>
+    /// <param name="cloudImageHeight">[Issue #381] 実際に送信するCloud画像高さ（ログ・トークン推定用）</param>
+    void SetImageContext(string imageBase64, int width, int height, int cloudImageWidth = 0, int cloudImageHeight = 0);
 
     /// <summary>
     /// [Issue #78 Phase 4] 画像コンテキストをクリア

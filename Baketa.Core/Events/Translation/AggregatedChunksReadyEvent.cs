@@ -133,6 +133,18 @@ public sealed class AggregatedChunksReadyEvent : EventBase
     public bool HasPreComputedCloudResult => PreComputedCloudResult?.IsSuccess == true;
 
     /// <summary>
+    /// [Issue #381] 実際に送信するCloud画像幅（ログ・トークン推定用）
+    /// 0の場合はImageWidth（元サイズ）がフォールバックとして使用される
+    /// </summary>
+    public int CloudImageWidth { get; init; }
+
+    /// <summary>
+    /// [Issue #381] 実際に送信するCloud画像高さ（ログ・トークン推定用）
+    /// 0の場合はImageHeight（元サイズ）がフォールバックとして使用される
+    /// </summary>
+    public int CloudImageHeight { get; init; }
+
+    /// <summary>
     /// [Issue #379] 翻訳モード（Singleshotモード時にGateフィルタリングをバイパス）
     /// </summary>
     public TranslationMode TranslationMode { get; init; } = TranslationMode.Live;
