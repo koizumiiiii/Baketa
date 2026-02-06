@@ -1427,25 +1427,51 @@ function parseAiJsonResponse(textContent: string): ParsedAiResponse | null {
   }
   jsonText = jsonText.trim();
 
-  try {
-    const parsed = JSON.parse(jsonText);
+  // [Issue #387] 途中切れJSON回復: 完全なtextsアイテムのみを抽出
+  const tryParse = (text: string): ParsedAiResponse | null => {
+    try {
+      const parsed = JSON.parse(text);
 
-    // [Issue #275] 新形式（texts配列）の場合、後方互換性のためdetected_text/translated_textも設定
-    if (parsed.texts && Array.isArray(parsed.texts) && parsed.texts.length > 0) {
-      const firstText = parsed.texts[0];
-      return {
-        detected_text: firstText.original || '',
-        translated_text: firstText.translation || '',
-        detected_language: parsed.detected_language,
-        texts: parsed.texts,
-      };
+      // [Issue #275] 新形式（texts配列）の場合、後方互換性のためdetected_text/translated_textも設定
+      if (parsed.texts && Array.isArray(parsed.texts) && parsed.texts.length > 0) {
+        const firstText = parsed.texts[0];
+        return {
+          detected_text: firstText.original || '',
+          translated_text: firstText.translation || '',
+          detected_language: parsed.detected_language,
+          texts: parsed.texts,
+        };
+      }
+
+      // 旧形式の場合はそのまま返す
+      return parsed;
+    } catch {
+      return null;
     }
+  };
 
-    // 旧形式の場合はそのまま返す
-    return parsed;
-  } catch {
-    return null;
+  // 1. まず通常パースを試行
+  const result = tryParse(jsonText);
+  if (result) return result;
+
+  // 2. 途中切れJSON回復: 完全なオブジェクトを含む最後の位置まで切り詰めて再パース
+  // textsアレイ内の最後の完全なオブジェクト "}" の後で切る
+  const lastCompleteObj = jsonText.lastIndexOf('}');
+  if (lastCompleteObj > 0) {
+    // 最後の完全なオブジェクトまでを取得し、配列とルートオブジェクトを閉じる
+    let truncated = jsonText.substring(0, lastCompleteObj + 1);
+    // texts配列が閉じられていなければ閉じる
+    if (!truncated.includes(']}') && truncated.includes('"texts"')) {
+      truncated += ']}';
+    }
+    const recovered = tryParse(truncated);
+    if (recovered) {
+      console.warn(`[Issue #387] Recovered truncated JSON: extracted ${recovered.texts?.length || 0} items from incomplete response`);
+      return recovered;
+    }
   }
+
+  return null;
 }
 
 // ============================================
@@ -1523,7 +1549,7 @@ If no text visible: {"texts": [], "detected_language": ""}`;
     }],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 4096, // [Issue #297] OpenAIと同等に増加
+      maxOutputTokens: 8192, // [Issue #387] 途中切れ防止のため増加
     },
     // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応 - フィルターを緩和
     // BLOCK_NONE: ブロックしない（翻訳用途のため）
@@ -1590,6 +1616,11 @@ If no text visible: {"texts": [], "detected_language": ""}`;
       };
     }
 
+    // [Issue #387] MAX_TOKENSで応答が途中切れの場合のチェック
+    if (finishReason === 'MAX_TOKENS') {
+      console.warn(`[Issue #387] Gemini response truncated (MAX_TOKENS). Consider increasing maxOutputTokens.`);
+    }
+
     const textContent = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!textContent) {
       // finishReasonがある場合は詳細を含める
@@ -1605,10 +1636,11 @@ If no text visible: {"texts": [], "detected_language": ""}`;
     if (!parsed) {
       // [Issue #333] JSONパースエラー時にrawResponse先頭200文字をエラーメッセージに含める
       const truncatedContent = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent;
-      console.error(`[Issue #333] Failed to parse Gemini response as JSON: ${truncatedContent}`);
+      const reasonHint = finishReason === 'MAX_TOKENS' ? ' [TRUNCATED by MAX_TOKENS]' : '';
+      console.error(`[Issue #333] Failed to parse Gemini response as JSON${reasonHint}: ${truncatedContent}`);
       return {
         success: false,
-        error: { code: 'API_ERROR', message: `Invalid JSON response from Gemini (raw: ${truncatedContent})`, isRetryable: false },
+        error: { code: 'API_ERROR', message: `Invalid JSON response from Gemini${reasonHint} (raw: ${truncatedContent})`, isRetryable: finishReason === 'MAX_TOKENS' },
       };
     }
 
@@ -1723,7 +1755,7 @@ If no text visible: {"texts": [], "detected_language": ""}`;
         ],
       },
     ],
-    max_tokens: 4096, // [Issue #299] 全テキスト検出のため増加
+    max_tokens: 8192, // [Issue #387] 途中切れ防止のため増加
     temperature: 0.1,
   };
 
