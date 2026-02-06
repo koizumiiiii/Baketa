@@ -91,6 +91,7 @@ public class MainOverlayViewModel : ViewModelBase
         IAuthService authService, // 🔥 [ISSUE#176] 認証状態監視用
         Services.INotificationService notificationService, // 🔥 [Issue #300] トースト通知サービス
         IUnifiedSettingsService unifiedSettingsService, // 🔥 [Issue #318] EXモード表示用
+        ILocalizationService? localizationService = null, // 言語変更時のボタンテキスト更新用
         IConsentService? consentService = null) // [Issue #261] 同意同期用（オプショナル）
         : base(eventAggregator, logger)
     {
@@ -129,6 +130,12 @@ public class MainOverlayViewModel : ViewModelBase
 
         // [Issue #261] 同意サービス（オプショナル - 同期に使用）
         _consentService = consentService;
+
+        // 言語変更時にStrings依存の計算プロパティを再通知
+        if (localizationService != null)
+        {
+            localizationService.LanguageChanged += OnLanguageChanged;
+        }
 
         // 初期状態設定 - OCR初期化状態を動的に管理
         _isOcrInitialized = false; // OCR初期化を正常に監視（MonitorOcrInitializationAsyncで設定）
@@ -770,6 +777,17 @@ public class MainOverlayViewModel : ViewModelBase
     /// </remarks>
     public string LiveButtonText =>
         IsLiveActive ? Strings.MainOverlay_Live_Stop : Strings.MainOverlay_LiveTranslation;
+
+    /// <summary>
+    /// 言語変更時にStrings依存の計算プロパティを再通知
+    /// </summary>
+    private void OnLanguageChanged(object? sender, LanguageChangedEventArgs e)
+    {
+        this.RaisePropertyChanged(nameof(SingleshotButtonText));
+        this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
+        this.RaisePropertyChanged(nameof(LiveButtonText));
+        this.RaisePropertyChanged(nameof(InitializationText));
+    }
 
     public string InitializationText => CurrentStatus switch
     {
