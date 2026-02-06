@@ -14,6 +14,7 @@ namespace Baketa.Core.Events.EventTypes;
 /// <param name="targetLanguage">翻訳先言語コード</param>
 /// <param name="processingTime">翻訳処理時間</param>
 /// <param name="engineName">使用された翻訳エンジン名</param>
+/// <param name="isBatchAnalytics">バッチ分析用イベントかどうか（UIオーバーレイ表示不要）</param>
 /// <exception cref="ArgumentNullException">sourceTextまたはtranslatedTextがnullの場合</exception>
 public class TranslationCompletedEvent(
         string sourceText,
@@ -21,7 +22,8 @@ public class TranslationCompletedEvent(
         string sourceLanguage,
         string targetLanguage,
         TimeSpan processingTime,
-        string engineName = "Default") : EventBase
+        string engineName = "Default",
+        bool isBatchAnalytics = false) : EventBase
 {
     /// <summary>
     /// 元のテキスト
@@ -52,6 +54,11 @@ public class TranslationCompletedEvent(
     /// 使用された翻訳エンジン名
     /// </summary>
     public string EngineName { get; } = engineName ?? "Default";
+
+    /// <summary>
+    /// バッチ分析用イベントかどうか（UIオーバーレイ表示不要）
+    /// </summary>
+    public bool IsBatchAnalytics { get; } = isBatchAnalytics;
 
     /// <inheritdoc />
     public override string Name => "TranslationCompleted";

@@ -526,7 +526,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     sourceLanguage: languagePair.SourceCode,
                     targetLanguage: languagePair.TargetCode,
                     processingTime: processingTime,
-                    engineName: engineUsed);
+                    engineName: engineUsed,
+                    isBatchAnalytics: true);
 
                 await _eventAggregator.PublishAsync(translationCompletedEvent, cancellationToken).ConfigureAwait(false);
                 _logger?.LogInformation(

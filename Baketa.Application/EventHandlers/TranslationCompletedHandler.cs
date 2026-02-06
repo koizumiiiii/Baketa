@@ -49,6 +49,13 @@ public class TranslationCompletedHandler(
                 return;
             }
 
+            // [Issue #386] バッチ分析用イベントはオーバーレイ表示不要 → スキップ
+            if (eventData.IsBatchAnalytics)
+            {
+                _logger.LogDebug("[Issue #386] バッチ分析イベントをスキップ: {EventId}", eventData.Id);
+                return;
+            }
+
             // 統一言語設定サービスから言語ペア取得
             var languagePair = _languageConfig.GetCurrentLanguagePair();
             var defaultSourceLanguage = languagePair.SourceCode;

@@ -503,8 +503,29 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                     _currentHeight = requiredHeight;
 
                     // 🔧 [BOUNDARY_CHECK] 画面境界チェック
-                    var screenHeight = System.Windows.Forms.Screen.FromPoint(
-                        new System.Drawing.Point(_currentX, _currentY)).Bounds.Height;
+                    // [Issue #386] MonitorFromWindow + GetMonitorInfo で物理ピクセルの画面高さを取得
+                    // Screen.Bounds.Height は論理ピクセルを返すため、物理ピクセル座標との比較でDPI不整合が発生していた
+                    int screenHeight;
+                    var hMonitor = User32Methods.MonitorFromWindow(
+                        _hwnd, MonitorFlags.MONITOR_DEFAULTTONEAREST);
+                    if (hMonitor != IntPtr.Zero)
+                    {
+                        var monitorInfo = MONITORINFO.Create();
+                        if (User32Methods.GetMonitorInfo(hMonitor, ref monitorInfo))
+                        {
+                            screenHeight = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+                        }
+                        else
+                        {
+                            _logger.LogWarning("[Issue #386] GetMonitorInfo失敗 - 境界チェックをスキップ");
+                            screenHeight = int.MaxValue;
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("[Issue #386] MonitorFromWindow失敗 - 境界チェックをスキップ");
+                        screenHeight = int.MaxValue;
+                    }
 
                     var overlayBottom = _currentY + _currentHeight;
 
@@ -515,7 +536,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                         var adjustedY = Math.Max(0, screenHeight - _currentHeight);
 
                         _currentY = adjustedY;
-                        _logger.LogDebug("🔧 [BOUNDARY_CHECK] Y座標調整: {OriginalY} → {AdjustedY} (画面高さ: {ScreenHeight})",
+                        _logger.LogDebug("[Issue #386] [BOUNDARY_CHECK] Y座標調整: {OriginalY} → {AdjustedY} (物理画面高さ: {ScreenHeight})",
                             originalY, adjustedY, screenHeight);
                     }
 
