@@ -43,6 +43,8 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     private string? _currentImageBase64;
     private int _currentImageWidth;
     private int _currentImageHeight;
+    private int _currentCloudImageWidth;   // [Issue #381] 実際に送信するCloud画像サイズ
+    private int _currentCloudImageHeight;  // [Issue #381] 実際に送信するCloud画像サイズ
     private readonly object _imageContextLock = new();
 
     // [Issue #290] Fork-Join並列実行で事前計算されたCloud AI翻訳結果
@@ -438,7 +440,9 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                         imageContext.PreComputedCloudResult
                     )
                     {
-                        TranslationMode = imageContext.TranslationMode // [Issue #379]
+                        CloudImageWidth = imageContext.CloudImageWidth,   // [Issue #381]
+                        CloudImageHeight = imageContext.CloudImageHeight, // [Issue #381]
+                        TranslationMode = imageContext.TranslationMode    // [Issue #379]
                     };
 
                     await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
@@ -518,7 +522,9 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                     imageContext.PreComputedCloudResult
                 )
                 {
-                    TranslationMode = imageContext.TranslationMode // [Issue #379]
+                    CloudImageWidth = imageContext.CloudImageWidth,   // [Issue #381]
+                    CloudImageHeight = imageContext.CloudImageHeight, // [Issue #381]
+                    TranslationMode = imageContext.TranslationMode    // [Issue #379]
                 };
 
                 await _eventAggregator.PublishAsync(aggregatedEvent).ConfigureAwait(false);
@@ -723,16 +729,18 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     /// <param name="imageBase64">画像データ（Base64エンコード）</param>
     /// <param name="width">画像幅</param>
     /// <param name="height">画像高さ</param>
-    public void SetImageContext(string imageBase64, int width, int height)
+    public void SetImageContext(string imageBase64, int width, int height, int cloudImageWidth = 0, int cloudImageHeight = 0)
     {
         lock (_imageContextLock)
         {
             _currentImageBase64 = imageBase64;
             _currentImageWidth = width;
             _currentImageHeight = height;
+            _currentCloudImageWidth = cloudImageWidth;   // [Issue #381]
+            _currentCloudImageHeight = cloudImageHeight; // [Issue #381]
 
-            _logger.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height}, Base64Length={Length}",
-                width, height, imageBase64?.Length ?? 0);
+            _logger.LogDebug("[Issue #78] 画像コンテキスト設定: {Width}x{Height} (元サイズ), Cloud={CloudW}x{CloudH}, Base64Length={Length}",
+                width, height, cloudImageWidth, cloudImageHeight, imageBase64?.Length ?? 0);
         }
     }
 
@@ -746,6 +754,8 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
             _currentImageBase64 = null;
             _currentImageWidth = 0;
             _currentImageHeight = 0;
+            _currentCloudImageWidth = 0;   // [Issue #381]
+            _currentCloudImageHeight = 0;  // [Issue #381]
             _preComputedCloudResult = null; // [Issue #290] Cloud結果もクリア
 
             _logger.LogDebug("[Issue #78] 画像コンテキストクリア");
@@ -784,16 +794,18 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
     /// <summary>
     /// [Issue #78 Phase 4] 現在の画像コンテキストを取得
     /// </summary>
-    private (string? ImageBase64, int Width, int Height, FallbackTranslationResult? PreComputedCloudResult, TranslationMode TranslationMode) GetAndClearImageContext()
+    private (string? ImageBase64, int Width, int Height, int CloudImageWidth, int CloudImageHeight, FallbackTranslationResult? PreComputedCloudResult, TranslationMode TranslationMode) GetAndClearImageContext()
     {
         lock (_imageContextLock)
         {
-            var result = (_currentImageBase64, _currentImageWidth, _currentImageHeight, _preComputedCloudResult, _currentTranslationMode);
+            var result = (_currentImageBase64, _currentImageWidth, _currentImageHeight, _currentCloudImageWidth, _currentCloudImageHeight, _preComputedCloudResult, _currentTranslationMode);
 
             // 使用後にクリア（次回のイベント発行で再利用されないように）
             _currentImageBase64 = null;
             _currentImageWidth = 0;
             _currentImageHeight = 0;
+            _currentCloudImageWidth = 0;   // [Issue #381]
+            _currentCloudImageHeight = 0;  // [Issue #381]
             _preComputedCloudResult = null; // [Issue #290] Cloud結果もクリア
             _currentTranslationMode = TranslationMode.Live; // [Issue #379] デフォルトに戻す
 

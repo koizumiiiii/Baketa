@@ -1348,12 +1348,17 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             var sessionToken = _licenseManager!.CurrentState.SessionId;
 
             // 並列翻訳リクエストを作成
+            // [Issue #381] ImageWidth/HeightにはCloud画像の実サイズを使用（ログ・トークン推定用）
+            // CloudImageWidth/Heightが0（未設定）の場合は元サイズにフォールバック
+            var cloudW = eventData.CloudImageWidth > 0 ? eventData.CloudImageWidth : eventData.ImageWidth;
+            var cloudH = eventData.CloudImageHeight > 0 ? eventData.CloudImageHeight : eventData.ImageHeight;
             var request = new ParallelTranslationRequest
             {
                 OcrChunks = chunks,
                 ImageBase64 = eventData.ImageBase64!, // HasImageData で null でないことが保証済み
-                ImageWidth = eventData.ImageWidth,
-                ImageHeight = eventData.ImageHeight,
+                MimeType = "image/jpeg", // [Issue #381] JPEG変換済み
+                ImageWidth = cloudW,
+                ImageHeight = cloudH,
                 SourceLanguage = languagePair.SourceCode,
                 TargetLanguage = languagePair.TargetCode,
                 SessionToken = sessionToken,
@@ -1362,8 +1367,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             };
 
             _logger?.LogDebug(
-                "🌐 [Phase4] ParallelTranslationRequest作成: Chunks={Chunks}, ImageSize={Width}x{Height}, Lang={Source}→{Target}",
-                chunks.Count, eventData.ImageWidth, eventData.ImageHeight,
+                "🌐 [Phase4] ParallelTranslationRequest作成: Chunks={Chunks}, CloudImageSize={Width}x{Height}, Lang={Source}→{Target}",
+                chunks.Count, cloudW, cloudH,
                 languagePair.SourceCode, languagePair.TargetCode);
 
             // 並列翻訳を実行（ShouldUseParallelTranslation で null でないことが保証済み）
