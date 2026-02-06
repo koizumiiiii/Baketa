@@ -1607,17 +1607,19 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         int imageWidth,
         int imageHeight)
     {
-        var overlayChunks = new List<TextChunk>();
-        var translations = new List<string>();
+        // [Issue #387] Cloud結果の包含率閾値
+        const float containmentThreshold = 0.3f;
 
-        var validatedCount = 0;
         var discardedCount = 0;
         var noBboxCount = 0;
 
-        // [Issue #387] Cloud結果の包含率閾値
-        // Cloud boxの30%以上がSuryaチャンク内にあれば有効と判定
-        // IoUではなく包含率を使用（Cloud boxがSurya結合チャンクより小さいため）
-        const float containmentThreshold = 0.3f;
+        // ============================================================
+        // Phase 1: 各Cloud結果をSuryaチャンクにマッチング
+        // ============================================================
+        // Key: Surya ChunkId, Value: マッチしたCloud結果のリスト
+        var suryaGroupedItems = new Dictionary<int, List<(TranslatedTextItem cloudText, System.Drawing.Rectangle cloudPixelRect)>>();
+        // Suryaチャンクの参照を保持
+        var suryaChunkMap = suryaChunks.ToDictionary(c => c.ChunkId);
 
         for (int i = 0; i < cloudTexts.Count; i++)
         {
@@ -1650,7 +1652,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
             if (bestSuryaChunk == null)
             {
-                // Surya裏付けなし → ハルシネーションの可能性が高い、破棄
                 discardedCount++;
                 _logger?.LogDebug(
                     "[Issue #387] Cloud結果破棄（Surya裏付けなし）: '{Original}' CloudBox=({X},{Y},{W}x{H})",
@@ -1659,41 +1660,90 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 continue;
             }
 
-            // [Issue #387] Surya矩形へのクリッピング
-            // Cloud座標の「緩さ」をSuryaの物理精度で補完
-            var clippedRect = ClipToSuryaBounds(cloudPixelRect, bestSuryaChunk.CombinedBounds);
-
-            // Cloud結果主導のTextChunkを作成
-            var overlayChunk = new TextChunk
+            // Suryaチャンク別にグループ化
+            if (!suryaGroupedItems.TryGetValue(bestSuryaChunk.ChunkId, out var group))
             {
-                ChunkId = CloudDrivenChunkIdOffset + i,
-                TextResults = bestSuryaChunk.TextResults,
-                CombinedBounds = clippedRect,
-                CombinedText = cloudText.Original ?? string.Empty,
-                TranslatedText = cloudText.Translation,
-                SourceWindowHandle = bestSuryaChunk.SourceWindowHandle,
-                DetectedLanguage = bestSuryaChunk.DetectedLanguage,
-                CaptureRegion = bestSuryaChunk.CaptureRegion
-            };
+                group = [];
+                suryaGroupedItems[bestSuryaChunk.ChunkId] = group;
+            }
+            group.Add((cloudText, cloudPixelRect));
+        }
 
-            overlayChunks.Add(overlayChunk);
-            translations.Add(cloudText.Translation);
-            validatedCount++;
+        // ============================================================
+        // Phase 2: グループごとにオーバーレイアイテムを作成
+        // 同じSuryaチャンクに属する複数Cloud結果は翻訳を結合
+        // ============================================================
+        var overlayChunks = new List<TextChunk>();
+        var translations = new List<string>();
+        var chunkIndex = 0;
 
-            _logger?.LogDebug(
-                "[Issue #387] Cloud結果採用: '{Original}' → '{Translation}' Containment={Containment:F2} Bounds=({X},{Y},{W}x{H})",
-                cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
-                cloudText.Translation?.Length > 30 ? cloudText.Translation[..30] + "..." : cloudText.Translation,
-                bestContainment,
-                clippedRect.X, clippedRect.Y, clippedRect.Width, clippedRect.Height);
+        foreach (var (suryaChunkId, items) in suryaGroupedItems)
+        {
+            var suryaChunk = suryaChunkMap[suryaChunkId];
+
+            if (items.Count == 1)
+            {
+                // 単独 → Cloud BoundingBoxをSurya矩形にクリッピングして使用
+                var (cloudText, cloudPixelRect) = items[0];
+                var clippedRect = ClipToSuryaBounds(cloudPixelRect, suryaChunk.CombinedBounds);
+
+                overlayChunks.Add(new TextChunk
+                {
+                    ChunkId = CloudDrivenChunkIdOffset + chunkIndex,
+                    TextResults = suryaChunk.TextResults,
+                    CombinedBounds = clippedRect,
+                    CombinedText = cloudText.Original ?? string.Empty,
+                    TranslatedText = cloudText.Translation,
+                    SourceWindowHandle = suryaChunk.SourceWindowHandle,
+                    DetectedLanguage = suryaChunk.DetectedLanguage,
+                    CaptureRegion = suryaChunk.CaptureRegion
+                });
+                translations.Add(cloudText.Translation);
+
+                _logger?.LogDebug(
+                    "[Issue #387] Cloud結果採用（単独）: '{Translation}' Bounds=({X},{Y},{W}x{H})",
+                    cloudText.Translation?.Length > 40 ? cloudText.Translation[..40] + "..." : cloudText.Translation,
+                    clippedRect.X, clippedRect.Y, clippedRect.Width, clippedRect.Height);
+            }
+            else
+            {
+                // 複数のCloud結果が同じSuryaチャンクに属する → 結合
+                // Y座標順にソートして読み順を維持
+                var sortedItems = items.OrderBy(item => item.cloudPixelRect.Y).ToList();
+
+                var mergedTranslation = string.Join(" ", sortedItems.Select(item => item.cloudText.Translation));
+                var mergedOriginal = string.Join("", sortedItems.Select(item => item.cloudText.Original));
+
+                // 結合時はSuryaチャンクのCombinedBoundsを使用（全Cloud結果を包含する領域）
+                overlayChunks.Add(new TextChunk
+                {
+                    ChunkId = CloudDrivenChunkIdOffset + chunkIndex,
+                    TextResults = suryaChunk.TextResults,
+                    CombinedBounds = suryaChunk.CombinedBounds,
+                    CombinedText = mergedOriginal,
+                    TranslatedText = mergedTranslation,
+                    SourceWindowHandle = suryaChunk.SourceWindowHandle,
+                    DetectedLanguage = suryaChunk.DetectedLanguage,
+                    CaptureRegion = suryaChunk.CaptureRegion
+                });
+                translations.Add(mergedTranslation);
+
+                _logger?.LogInformation(
+                    "[Issue #387] Cloud結果結合（{Count}個→1個）: '{Translation}' SuryaBounds=({X},{Y},{W}x{H})",
+                    items.Count,
+                    mergedTranslation.Length > 50 ? mergedTranslation[..50] + "..." : mergedTranslation,
+                    suryaChunk.CombinedBounds.X, suryaChunk.CombinedBounds.Y,
+                    suryaChunk.CombinedBounds.Width, suryaChunk.CombinedBounds.Height);
+            }
+            chunkIndex++;
         }
 
         _logger?.LogInformation(
-            "[Issue #387] Cloud結果主導マッチング完了: Validated={Validated}, Discarded={Discarded}, NoBBox={NoBBox}, Total={Total}",
-            validatedCount, discardedCount, noBboxCount, cloudTexts.Count);
+            "[Issue #387] Cloud結果主導マッチング完了: Groups={Groups}, Discarded={Discarded}, NoBBox={NoBBox}, CloudTotal={Total}",
+            suryaGroupedItems.Count, discardedCount, noBboxCount, cloudTexts.Count);
 
 #if DEBUG
-        Console.WriteLine($"📊 [Issue #387] Cloud主導: 採用={validatedCount}, 破棄={discardedCount}, BBox無し={noBboxCount}");
+        Console.WriteLine($"📊 [Issue #387] Cloud主導: グループ={suryaGroupedItems.Count}, 破棄={discardedCount}, BBox無し={noBboxCount}");
 #endif
 
         return (overlayChunks, translations);
