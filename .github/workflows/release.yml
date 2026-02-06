@@ -191,18 +191,22 @@ jobs:
       run: |
         $version = "${{ steps.version.outputs.version }}"
         $publishDir = "./publish/Baketa-$version"
-        $zipName = "Baketa-$version.zip"
+        # [Issue #384] バージョン付きZIPはappcast生成用、Baketa.zipはリリースアセット用
+        $versionedZipName = "Baketa-$version.zip"
+        $stableZipName = "Baketa.zip"
 
         # Copy additional files (Issue #268: Use user-friendly README for release package)
         Copy-Item "docs/release/README.md" "$publishDir/" -ErrorAction SilentlyContinue
         Copy-Item "LICENSE" "$publishDir/" -ErrorAction SilentlyContinue
 
-        # Create zip package
-        Compress-Archive -Path "$publishDir/*" -DestinationPath "./publish/$zipName" -Force
+        # Create versioned zip (for appcast version extraction)
+        Compress-Archive -Path "$publishDir/*" -DestinationPath "./publish/$versionedZipName" -Force
+        # Create stable-named zip (for release asset)
+        Copy-Item "./publish/$versionedZipName" "./publish/$stableZipName" -Force
 
-        $size = [math]::Round((Get-Item "./publish/$zipName").Length / 1MB, 2)
+        $size = [math]::Round((Get-Item "./publish/$stableZipName").Length / 1MB, 2)
         echo "## .NET Package" >> $env:GITHUB_STEP_SUMMARY
-        echo "- Package: $zipName" >> $env:GITHUB_STEP_SUMMARY
+        echo "- Package: $stableZipName ($version)" >> $env:GITHUB_STEP_SUMMARY
         echo "- Size: $size MB" >> $env:GITHUB_STEP_SUMMARY
 
     # [Issue #249] Generate AppCast for auto-update
@@ -258,7 +262,13 @@ jobs:
         # Verify generation and signature
         if (Test-Path "./publish/appcast.json") {
           Write-Host "✅ appcast.json generated successfully"
+
+          # [Issue #384] appcast.json内のURLファイル名をBaketa.zipに置換
+          # appcastのbase-urlはバージョン固有パス維持、ファイル名のみ固定化
           $content = Get-Content "./publish/appcast.json" -Raw
+          $content = $content -replace "Baketa-$version\.zip", "Baketa.zip"
+          Set-Content "./publish/appcast.json" -Value $content -Encoding utf8
+          Write-Host "🔗 [Issue #384] appcast.json URL updated: Baketa-$version.zip → Baketa.zip"
           Write-Host $content
 
           # Verify signature is present
@@ -266,6 +276,7 @@ jobs:
             Write-Host "✅ Ed25519 signature verified in appcast.json"
             echo "## AppCast" >> $env:GITHUB_STEP_SUMMARY
             echo "- appcast.json generated with Ed25519 signature ✅" >> $env:GITHUB_STEP_SUMMARY
+            echo "- Download URL: .../v$version/Baketa.zip (stable filename)" >> $env:GITHUB_STEP_SUMMARY
           } else {
             Write-Host "❌ ERROR: No signature found in appcast.json!"
             Write-Host "   Check that NETSPARKLE_ED25519_PRIVATE_KEY secret is correctly set"
@@ -288,12 +299,14 @@ jobs:
 
         | File | Description |
         |------|-------------|
-        | ``Baketa-$version.zip`` | Main application (Windows x64, self-contained) |
+        | ``Baketa.zip`` | Main application (Windows x64, self-contained) |
         | ``appcast.json`` | Auto-update manifest (for existing installations) |
+
+        **Fixed download URL (always latest):** ``https://github.com/koizumiiiii/Baketa/releases/latest/download/Baketa.zip``
 
         ### Installation
 
-        1. Download ``Baketa-$version.zip``
+        1. Download ``Baketa.zip``
         2. Extract to desired location
         3. Run ``Baketa.UI.exe``
         4. On first run, required components will be downloaded automatically from [Model Assets v2](https://github.com/koizumiiiii/Baketa/releases/tag/models-v2)
@@ -326,7 +339,7 @@ jobs:
         name: "Baketa ${{ steps.version.outputs.version }}"
         body_path: release_notes.md
         files: |
-          ./publish/Baketa-${{ steps.version.outputs.version }}.zip
+          ./publish/Baketa.zip
           ./publish/appcast.json
         prerelease: ${{ steps.version.outputs.is-prerelease == 'true' }}
         make_latest: ${{ steps.version.outputs.is-prerelease == 'false' }}
