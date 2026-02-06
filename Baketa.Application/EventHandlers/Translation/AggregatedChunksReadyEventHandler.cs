@@ -397,6 +397,31 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     // Cloud AI（Gemini）の意味的テキスト分離を活かし、個別BoundingBoxで正確なオーバーレイ表示
                     var hasCloudBoundingBoxes = cloudTexts.Any(t => t.HasBoundingBox);
 
+                    // [Issue #387] 診断ログ: Cloud結果の詳細を出力
+                    for (int ci = 0; ci < cloudTexts.Count; ci++)
+                    {
+                        var ct = cloudTexts[ci];
+                        _logger?.LogInformation(
+                            "[Issue #387] Cloud結果[{Index}]: Original='{Original}' Translation='{Translation}' HasBBox={HasBBox} BBox={BBox}",
+                            ci,
+                            ct.Original?.Length > 50 ? ct.Original[..50] + "..." : ct.Original,
+                            ct.Translation?.Length > 50 ? ct.Translation[..50] + "..." : ct.Translation,
+                            ct.HasBoundingBox,
+                            ct.HasBoundingBox ? $"({ct.BoundingBox!.Value.X},{ct.BoundingBox!.Value.Y},{ct.BoundingBox!.Value.Width}x{ct.BoundingBox!.Value.Height})" : "N/A");
+                    }
+                    _logger?.LogInformation(
+                        "[Issue #387] hasCloudBoundingBoxes={HasBBox}, ImageSize={W}x{H}, SuryaChunks={Count}",
+                        hasCloudBoundingBoxes, eventData.ImageWidth, eventData.ImageHeight, nonEmptyChunks.Count);
+                    for (int si = 0; si < nonEmptyChunks.Count; si++)
+                    {
+                        var sc = nonEmptyChunks[si];
+                        _logger?.LogInformation(
+                            "[Issue #387] SuryaChunk[{Index}]: ChunkId={ChunkId} Bounds=({X},{Y},{W}x{H}) Text='{Text}'",
+                            si, sc.ChunkId,
+                            sc.CombinedBounds.X, sc.CombinedBounds.Y, sc.CombinedBounds.Width, sc.CombinedBounds.Height,
+                            sc.CombinedText?.Length > 50 ? sc.CombinedText[..50] + "..." : sc.CombinedText);
+                    }
+
                     if (hasCloudBoundingBoxes && eventData.ImageWidth > 0 && eventData.ImageHeight > 0)
                     {
                         _logger?.LogInformation(
@@ -1652,12 +1677,33 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
             if (bestSuryaChunk == null)
             {
-                discardedCount++;
-                _logger?.LogDebug(
-                    "[Issue #387] Cloud結果破棄（Surya裏付けなし）: '{Original}' CloudBox=({X},{Y},{W}x{H})",
+                // [Issue #387] 座標マッチング失敗 → テキスト内容でフォールバックマッチング
+                // Geminiのbounding boxは不正確な場合があるため、テキスト包含関係で検証
+                var normalizedCloudOriginal = NormalizeText(cloudText.Original ?? string.Empty);
+                if (!string.IsNullOrEmpty(normalizedCloudOriginal))
+                {
+                    bestSuryaChunk = suryaChunks.FirstOrDefault(chunk =>
+                    {
+                        var normalizedSuryaText = NormalizeText(chunk.CombinedText ?? string.Empty);
+                        return normalizedSuryaText.Contains(normalizedCloudOriginal, StringComparison.OrdinalIgnoreCase) ||
+                               normalizedCloudOriginal.Contains(normalizedSuryaText, StringComparison.OrdinalIgnoreCase);
+                    });
+                }
+
+                if (bestSuryaChunk == null)
+                {
+                    discardedCount++;
+                    _logger?.LogDebug(
+                        "[Issue #387] Cloud結果破棄（座標・テキスト両方で裏付けなし）: '{Original}' CloudBox=({X},{Y},{W}x{H})",
+                        cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                        cloudPixelRect.X, cloudPixelRect.Y, cloudPixelRect.Width, cloudPixelRect.Height);
+                    continue;
+                }
+
+                _logger?.LogInformation(
+                    "[Issue #387] テキストマッチングでSurya裏付け成功（座標不一致）: '{Original}' → SuryaChunk={ChunkId}",
                     cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
-                    cloudPixelRect.X, cloudPixelRect.Y, cloudPixelRect.Width, cloudPixelRect.Height);
-                continue;
+                    bestSuryaChunk.ChunkId);
             }
 
             // Suryaチャンク別にグループ化
