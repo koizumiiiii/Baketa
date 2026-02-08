@@ -1775,11 +1775,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     _logger?.LogDebug($"🎉 [PHASE12.2_COMPLETE] Phase 12.2早期リターン - AggregatedChunksReadyEventHandler経由で処理");
                     _logger?.LogInformation("🎉 [PHASE12.2_COMPLETE] 2重翻訳防止: AggregatedChunksReadyEventHandler経由で処理 - ID={TranslationId}", translationId);
 
-                    // クールダウン設定（次回の自動翻訳を適切に制御）
-                    lock (_lastTranslationTimeLock)
-                    {
-                        _lastTranslationCompletedAt = DateTime.UtcNow;
-                    }
+                    // [Issue #394] クールダウンは呼び出し元で設定済みのため、ここでは設定しない
+                    // - Auto path: ExecuteAutomaticTranslationStepAsync L1267 で設定済み
+                    //   → OCR処理中にクールダウンを消化（体感遅延削減）
+                    // - Singleshot path: ExecuteSingleTranslationAsync L1415 で設定される
 
                     return new TranslationResult
                     {
