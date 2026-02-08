@@ -51,6 +51,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     // Gemini推奨の多層防御アーキテクチャ - 第2層: 物理的排他制御
     private static readonly SemaphoreSlim _translationExecutionSemaphore = new(1, 1);
 
+    // [Issue #392] ResetSemaphoreForStopとfinallyブロックの二重解放を防止するフラグ
+    // ResetSemaphoreForStopがセマフォを解放した場合、finallyブロックでの解放をスキップ
+    private static volatile bool _semaphoreReleasedByStop;
+
     private readonly Baketa.Core.Abstractions.Translation.ITranslationService _translationService;
     private readonly IStreamingTranslationService? _streamingTranslationService;
     // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
@@ -149,12 +153,15 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         {
             try
             {
+                // [Issue #392] finallyブロックでの二重解放を防止するフラグを先に設定
+                _semaphoreReleasedByStop = true;
                 _translationExecutionSemaphore.Release();
                 Console.WriteLine("🔓 [STOP_CLEANUP] セマフォ強制解放完了 - Stop時クリーンアップ");
             }
             catch (SemaphoreFullException)
             {
                 // 既に解放済み（CurrentCount == 1）の場合は無視
+                _semaphoreReleasedByStop = false; // フラグをリセット
                 Console.WriteLine("ℹ️ [STOP_CLEANUP] セマフォは既に解放済み");
             }
         }
@@ -171,6 +178,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     public async Task HandleAsync(AggregatedChunksReadyEvent eventData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
+
+        // [Issue #391] 前回サイクルのフラグ残留を防止（新しいHandleAsync呼び出しごとにリセット）
+        _semaphoreReleasedByStop = false;
 
         // [Issue #291] キャンセルチェック（早期リターン）
         if (cancellationToken.IsCancellationRequested)
@@ -422,6 +432,20 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                             sc.CombinedText?.Length > 50 ? sc.CombinedText[..50] + "..." : sc.CombinedText);
                     }
 
+                    // Cloud結果の重複排除（Gemini APIが同一テキストを二重出力する場合の防御）
+                    // Original + BoundingBox座標が一致するアイテムを重複とみなす
+                    var dedupedCloudTexts = cloudTexts
+                        .GroupBy(t => (t.Original, t.BoundingBox?.X, t.BoundingBox?.Y, t.BoundingBox?.Width, t.BoundingBox?.Height))
+                        .Select(g => g.First())
+                        .ToList();
+
+                    if (dedupedCloudTexts.Count < cloudTexts.Count)
+                    {
+                        _logger?.LogWarning(
+                            "Cloud結果重複排除: {OriginalCount}件 → {DedupedCount}件（{RemovedCount}件の重複を除去）",
+                            cloudTexts.Count, dedupedCloudTexts.Count, cloudTexts.Count - dedupedCloudTexts.Count);
+                    }
+
                     if (hasCloudBoundingBoxes && eventData.ImageWidth > 0 && eventData.ImageHeight > 0)
                     {
                         _logger?.LogInformation(
@@ -429,7 +453,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
                         var (cloudOverlayChunks, cloudTranslations) = CreateCloudDrivenOverlayItems(
                             nonEmptyChunks,
-                            cloudTexts,
+                            dedupedCloudTexts,
                             eventData.ImageWidth,
                             eventData.ImageHeight);
 
@@ -449,7 +473,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                                 "[Issue #387] Cloud結果主導で有効アイテム0件 → Surya主導マッチングにフォールバック");
                             translationResults = MatchCloudTranslationsToChunks(
                                 nonEmptyChunks,
-                                cloudTexts,
+                                dedupedCloudTexts,
                                 eventData.ImageWidth,
                                 eventData.ImageHeight);
                         }
@@ -461,14 +485,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                         // [Issue #380] 座標フォールバックマッチングのため画像サイズも渡す
                         translationResults = MatchCloudTranslationsToChunks(
                             nonEmptyChunks,
-                            cloudTexts,
+                            dedupedCloudTexts,
                             eventData.ImageWidth,
                             eventData.ImageHeight);
                     }
 
                     _logger?.LogDebug(
-                        "✅ [Issue #387] Fork-Join Cloud AI翻訳結果: {CloudCount}個 → {MatchedCount}個マッチ",
-                        cloudTexts.Count, translationResults.Count(r => !string.IsNullOrEmpty(r)));
+                        "✅ [Issue #387] Fork-Join Cloud AI翻訳結果: {CloudCount}個（重複排除後） → {MatchedCount}個マッチ",
+                        dedupedCloudTexts.Count, translationResults.Count(r => !string.IsNullOrEmpty(r)));
                 }
                 else if (!string.IsNullOrEmpty(cloudResponse?.TranslatedText))
                 {
@@ -964,8 +988,25 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         finally
         {
             // 🔥 [PHASE1_SEMAPHORE] セマフォ解放（必ず実行）
-            _translationExecutionSemaphore.Release();
-            _logger?.LogDebug($"🔓 [PHASE1] セマフォ解放完了 - SessionId: {eventData.SessionId}");
+            // [Issue #392] ResetSemaphoreForStopが既に解放済みの場合はスキップ
+            if (_semaphoreReleasedByStop)
+            {
+                _semaphoreReleasedByStop = false; // フラグをリセット
+                _logger?.LogDebug("🔓 [PHASE1] セマフォはResetSemaphoreForStopで解放済み - スキップ (SessionId: {SessionId})", eventData.SessionId);
+            }
+            else
+            {
+                try
+                {
+                    _translationExecutionSemaphore.Release();
+                    _logger?.LogDebug("🔓 [PHASE1] セマフォ解放完了 - SessionId: {SessionId}", eventData.SessionId);
+                }
+                catch (SemaphoreFullException)
+                {
+                    // ResetSemaphoreForStopとの競合によるレースコンディション対策
+                    _logger?.LogWarning("⚠️ [PHASE1] セマフォ二重解放検出 - 無視 (SessionId: {SessionId})", eventData.SessionId);
+                }
+            }
         }
     }
 
@@ -1682,6 +1723,22 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
             if (bestSuryaChunk == null)
             {
+                // [Issue #391] OverlapRatio フォールバック: Surya面積ベースの重複率 + Y中心距離
+                // Cloud AIのBBoxがSuryaより縦に大きい（マージン含む）場合、包含率では失敗するが
+                // OverlapRatio（交差面積/Surya面積）ならSuryaが完全にカバーされていることを検出可能
+                bestSuryaChunk = FindBestOverlapRatioSuryaChunk(cloudPixelRect, suryaChunks);
+
+                if (bestSuryaChunk != null)
+                {
+                    _logger?.LogInformation(
+                        "[Issue #391] OverlapRatioマッチングでSurya裏付け成功: '{Original}' → SuryaChunk={ChunkId}",
+                        cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                        bestSuryaChunk.ChunkId);
+                }
+            }
+
+            if (bestSuryaChunk == null)
+            {
                 // [Issue #387] 座標マッチング失敗 → テキスト内容でフォールバックマッチング
                 // Geminiのbounding boxは不正確な場合があるため、テキスト包含関係で検証
                 var normalizedCloudOriginal = NormalizeText(cloudText.Original ?? string.Empty);
@@ -1847,6 +1904,72 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         }
 
         return (bestChunk, bestContainment);
+    }
+
+    /// <summary>
+    /// [Issue #391] OverlapRatio + Y中心距離によるフォールバックマッチング
+    /// </summary>
+    /// <remarks>
+    /// Cloud AIのBBoxがSuryaより縦に大きい場合（上下マージン含む）、
+    /// 包含率（intersection/cloudArea）では低い値になり失敗する。
+    /// OverlapRatio（intersection/suryaArea）を使用すれば、Suryaの領域が
+    /// Cloud BBox内に完全に含まれていることを検出できる。
+    /// Y中心距離条件を併用して、水平方向に離れた無関係な領域への誤マッチを防止。
+    /// </remarks>
+    private TextChunk? FindBestOverlapRatioSuryaChunk(
+        System.Drawing.Rectangle cloudPixelRect,
+        List<TextChunk> suryaChunks)
+    {
+        // [Issue #391] OverlapRatio閾値: Surya面積の50%以上がCloud BBox内にあればマッチ
+        const float overlapRatioThreshold = 0.5f;
+        // [Issue #391] Y中心距離: Surya高さの3倍以内なら近接と判定
+        const float yCenterDistanceMultiplier = 3.0f;
+
+        TextChunk? bestChunk = null;
+        var bestOverlapRatio = 0f;
+
+        var cloudCenterY = cloudPixelRect.Y + cloudPixelRect.Height / 2.0f;
+
+        foreach (var chunk in suryaChunks)
+        {
+            var suryaBounds = chunk.CombinedBounds;
+            var suryaArea = (float)suryaBounds.Width * suryaBounds.Height;
+            if (suryaArea <= 0)
+                continue;
+
+            // Y中心距離チェック
+            var suryaCenterY = suryaBounds.Y + suryaBounds.Height / 2.0f;
+            var yCenterDistance = Math.Abs(cloudCenterY - suryaCenterY);
+            var maxYDistance = suryaBounds.Height * yCenterDistanceMultiplier;
+            if (yCenterDistance > maxYDistance)
+                continue;
+
+            // 交差領域を計算
+            var intersectX = Math.Max(cloudPixelRect.X, suryaBounds.X);
+            var intersectY = Math.Max(cloudPixelRect.Y, suryaBounds.Y);
+            var intersectRight = Math.Min(cloudPixelRect.Right, suryaBounds.Right);
+            var intersectBottom = Math.Min(cloudPixelRect.Bottom, suryaBounds.Bottom);
+
+            if (intersectRight <= intersectX || intersectBottom <= intersectY)
+                continue;
+
+            var intersectionArea = (float)(intersectRight - intersectX) * (intersectBottom - intersectY);
+
+            // OverlapRatio: Surya面積の何%がCloud BBox内にあるか
+            var overlapRatio = intersectionArea / suryaArea;
+
+            if (overlapRatio >= overlapRatioThreshold && overlapRatio > bestOverlapRatio)
+            {
+                bestOverlapRatio = overlapRatio;
+                bestChunk = chunk;
+
+                _logger?.LogDebug(
+                    "[Issue #391] OverlapRatio候補: SuryaChunk={ChunkId}, Ratio={Ratio:F3}, YDist={YDist:F0}px (max={MaxY:F0}px)",
+                    chunk.ChunkId, overlapRatio, yCenterDistance, maxYDistance);
+            }
+        }
+
+        return bestChunk;
     }
 
     /// <summary>

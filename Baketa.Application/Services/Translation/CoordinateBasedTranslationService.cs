@@ -33,6 +33,7 @@ using Baketa.Core.Models.Roi; // [Issue #293] NormalizedRect
 using Baketa.Core.Models.Text; // [Issue #293] TextChangeWithGateResult, GateRegionInfo
 using IWindowManager = Baketa.Core.Abstractions.Platform.IWindowManager; // [Issue #293] ウィンドウ情報取得用
 using Baketa.Core.Utilities;
+// [Issue #392] Mechanism A/B削除: テキスト消失/変化検知はDetection段階のIsTextDisappearance()に移行
 using System.Diagnostics; // [Issue #290] Fork-Join計測用
 // NOTE: [PP-OCRv5削除] BatchProcessing参照削除
 using Baketa.Infrastructure.Translation.Local;
@@ -435,6 +436,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             return; // 早期リターン
                         }
 
+                        // [Issue #392] テキスト変化時のオーバーレイクリアはDetection段階のIsTextDisappearance()に移行
                         _logger?.LogDebug("🎯 [Issue #230] テキスト変化検知 - 翻訳を続行 (変化率: {ChangePercentage:P1})",
                             changeResult.ChangePercentage);
                     }

@@ -4,6 +4,8 @@ using Baketa.Core.Abstractions.Memory;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Models.Processing;
 using Baketa.Core.Settings;
+using Baketa.Core.Abstractions.OCR; // [Issue #392] OcrTextRegion参照
+using Baketa.Core.Abstractions.Translation; // [Issue #392] TextChunk参照
 using Baketa.Infrastructure.Processing.Strategies;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -377,6 +379,12 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                     executedStages.Add(stageType);
                     completedStage = stageType;
 
+                    // [Issue #392] OCR完了後、テキスト位置をImageChangeDetectionStageStrategyにフィードバック
+                    if (stageType == ProcessingStageType.OcrExecution && stageResult.Success && stageResult.Data is OcrExecutionResult ocrResult)
+                    {
+                        FeedbackOcrTextBoundsToDetectionStrategy(input, ocrResult);
+                    }
+
                     _logger.LogDebug("段階実行完了: {StageType}, 成功: {Success}, 処理時間: {ProcessingTime}ms",
                         stageType, stageResult.Success, stageStopwatch.Elapsed.TotalMilliseconds);
 
@@ -685,6 +693,70 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
         return Math.Max(0f, Math.Min(1f, reduction)); // 0-1の範囲でクランプ
     }
 
+    /// <summary>
+    /// [Issue #392] OCR結果のテキスト位置をImageChangeDetectionStageStrategyにフィードバック
+    /// 次サイクルのIsTextDisappearance()で「前回テキストがあった場所が変わったか」を判定するために使用
+    /// </summary>
+    private void FeedbackOcrTextBoundsToDetectionStrategy(ProcessingPipelineInput input, OcrExecutionResult ocrResult)
+    {
+        try
+        {
+            if (!_stageStrategies.TryGetValue(ProcessingStageType.ImageChangeDetection, out var strategy)
+                || strategy is not ImageChangeDetectionStageStrategy detectionStrategy)
+            {
+                return;
+            }
+
+            var contextId = ImageChangeDetectionStageStrategy.BuildContextId(
+                input.SourceWindowHandle, input.CaptureRegion);
+
+            // OcrExecutionResult.TextChunksはList<object>で、
+            // 実際にはOcrTextRegion（画像ピクセル座標）が格納されている。
+            // ただしOcrTextRegion.BoundsはOcrExecutionStageStrategyで
+            // OriginalWindowSizeにスケーリング済み（Issue #193）の場合がある。
+            // ChangedRegionsはCapturedImage座標系（リサイズ後）なので、
+            // TextBoundsをCapturedImage座標系に逆スケーリングする必要がある。
+            var textBounds = ocrResult.TextChunks
+                .OfType<OcrTextRegion>()
+                .Select(region => region.Bounds)
+                .Where(bounds => bounds.Width > 0 && bounds.Height > 0)
+                .ToArray();
+
+            // [Issue #392] OriginalWindowSize→CapturedImage座標への逆スケーリング
+            // OcrExecutionStageStrategyがIssue #193でOriginalWindowSizeにスケール済みの場合、
+            // ChangedRegionsはCapturedImage座標系なのでスケールを戻す
+            if (textBounds.Length > 0 && input.CapturedImage != null)
+            {
+                var capturedWidth = input.CapturedImage.Width;
+                var capturedHeight = input.CapturedImage.Height;
+                var originalSize = input.OriginalWindowSize;
+
+                if (originalSize.Width > 0 && originalSize.Height > 0 &&
+                    (originalSize.Width != capturedWidth || originalSize.Height != capturedHeight))
+                {
+                    var invScaleX = (double)capturedWidth / originalSize.Width;
+                    var invScaleY = (double)capturedHeight / originalSize.Height;
+
+                    _logger.LogDebug(
+                        "[Issue #392] TextBounds逆スケーリング: Original={OW}x{OH} → Captured={CW}x{CH}, InvScale=({SX:F3},{SY:F3})",
+                        originalSize.Width, originalSize.Height, capturedWidth, capturedHeight, invScaleX, invScaleY);
+
+                    textBounds = textBounds.Select(b => new System.Drawing.Rectangle(
+                        (int)(b.X * invScaleX),
+                        (int)(b.Y * invScaleY),
+                        Math.Max(1, (int)(b.Width * invScaleX)),
+                        Math.Max(1, (int)(b.Height * invScaleY))
+                    )).ToArray();
+                }
+            }
+
+            detectionStrategy.UpdatePreviousTextBounds(contextId, textBounds);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #392] OCRテキスト位置フィードバック失敗");
+        }
+    }
 
     public void Dispose()
     {

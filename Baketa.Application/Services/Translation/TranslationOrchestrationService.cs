@@ -116,6 +116,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         (0, TimeSpan.FromSeconds(10)),   // 0-2回: 10秒（デフォルト）
     ];
 
+    // [Issue #392] テキスト消失高速検知: 翻訳完了後の短間隔チェックモード
+    /// <summary>高速チェック残り回数</summary>
+    private int _postTranslationRapidCheckRemaining;
+    /// <summary>高速チェック間隔（テキスト消失を素早く検知するため）</summary>
+    private static readonly TimeSpan PostTranslationRapidCheckInterval = TimeSpan.FromSeconds(1.5);
+    /// <summary>高速チェック最大回数（超過後は通常のアダプティブ間隔に復帰）</summary>
+    private const int PostTranslationRapidCheckCount = 15; // 1.5s × 15 = 最大22.5秒間の高速監視
+
     #region コンストラクタ
 
     /// <summary>
@@ -380,6 +388,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             lock (_adaptiveIntervalLock)
             {
                 _consecutiveNoChangeCount = 0;
+                _postTranslationRapidCheckRemaining = 0; // [Issue #392]
             }
 
             // TODO: モード変更イベントの発行はViewModelで実行
@@ -961,14 +970,41 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     var actualInterval = interval;
                     lock (_adaptiveIntervalLock)
                     {
-                        if (imageChanged)
+                        if (imageChanged && _postTranslationRapidCheckRemaining <= 0)
                         {
-                            // 画像変化あり → カウンタリセット、通常間隔
+                            // 画像変化あり（新規翻訳）→ カウンタリセット、高速チェック開始
                             _consecutiveNoChangeCount = 0;
+
+                            // [Issue #392] 高速チェックモード開始: テキスト消失を素早く検知するため
+                            // 翻訳完了後のクールダウン(3s)を考慮し、初回は cooldown + 0.5s 後にチェック
+                            _postTranslationRapidCheckRemaining = PostTranslationRapidCheckCount;
+                            var cooldownSeconds = _settingsService.GetValue("Translation:PostTranslationCooldownSeconds", 3);
+                            actualInterval = TimeSpan.FromSeconds(cooldownSeconds + 0.5);
+
+                            _logger?.LogDebug(
+                                "[Issue #392] 高速チェックモード開始: 初回={InitialInterval:F1}s, 以降={RapidInterval:F1}s × {Count}回",
+                                actualInterval.TotalSeconds,
+                                PostTranslationRapidCheckInterval.TotalSeconds,
+                                PostTranslationRapidCheckCount);
+                        }
+                        else if (_postTranslationRapidCheckRemaining > 0)
+                        {
+                            // [Issue #392] 高速チェックモード中: 短間隔でテキスト消失を監視
+                            // imageChanged=true でも再起動せずカウンタを消費（テキスト消失後の
+                            // stale previousImage による誤検知で無限再起動を防止）
+                            _postTranslationRapidCheckRemaining--;
+                            actualInterval = PostTranslationRapidCheckInterval;
+                            _consecutiveNoChangeCount = 0;
+
+                            _logger?.LogDebug(
+                                "[Issue #392] 高速チェック中: Remaining={Remaining}, Interval={Interval:F1}s, ImageChanged={Changed}",
+                                _postTranslationRapidCheckRemaining,
+                                actualInterval.TotalSeconds,
+                                imageChanged);
                         }
                         else
                         {
-                            // 画像変化なし → カウンタ増加、アダプティブ間隔を適用
+                            // 画像変化なし（高速チェック完了後）→ カウンタ増加、アダプティブ間隔を適用
                             _consecutiveNoChangeCount++;
 
                             // 閾値に基づいてアダプティブ間隔を選択（降順定義のため最初のマッチを使用）
@@ -1216,10 +1252,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 return false; // [Issue #299] エラー時も変化なし扱い
             }
 
-            // 🔥 [ISSUE#163_REFACTOR] 翻訳結果が発行された場合のみ前回画像を更新
-            // publishedResultがnullでない = 翻訳結果がObservableに発行された
-            // publishedResultがnull = 重複/座標ベースモードでスキップされた
-            if (publishedResult != null && currentImage != null)
+            // [Issue #392] 前回画像を常に更新（翻訳結果の有無に関わらず）
+            // 理由: publishedResult==null の場合（テキスト消失等）でも前回画像を更新しないと、
+            // 次回の変化検知で常に「変化あり」となり、パイプラインが無限実行される。
+            // 元のIssue #163の設計意図（翻訳結果発行時のみ更新）よりも、
+            // パイプライン実行効率と消失検知の正確性を優先する。
+            if (currentImage != null)
             {
                 // 前回のキャプチャ画像を安全に更新
                 lock (_previousImageLock)

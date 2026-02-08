@@ -32,6 +32,11 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     // 解決策: ConcurrentDictionary<contextId, IImage>でコンテキストごとに前回画像を管理
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IImage?> _previousImages = new();
 
+    // [Issue #392] コンテキストID別に前回OCRテキスト位置を管理
+    // 前回のOCRで検出されたテキストのバウンディングボックスを保持し、
+    // 画像変化検知時に「テキストがあった場所が変わったか」を判定する
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Rectangle[]> _previousTextBounds = new();
+
     public ProcessingStageType StageType => ProcessingStageType.ImageChangeDetection;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(2); // 3段階フィルタリングによる高速化
 
@@ -69,7 +74,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
 
             // 🔥 [PHASE11_FIX] コンテキストIDを生成（ウィンドウハンドル + 領域ベース）
             // 各翻訳セッションごとに独立した画像履歴を保持
-            var contextId = $"window_{input.SourceWindowHandle}_region_{input.CaptureRegion.X}_{input.CaptureRegion.Y}_{input.CaptureRegion.Width}_{input.CaptureRegion.Height}";
+            var contextId = BuildContextId(input.SourceWindowHandle, input.CaptureRegion);
 
             // 🔥 [PHASE11_FIX] コンテキストID別に前回画像を取得
             _previousImages.TryGetValue(contextId, out var previousImageToUse);
@@ -167,7 +172,28 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     public void ClearPreviousImages()
     {
         _previousImages.Clear();
+        _previousTextBounds.Clear();
         _logger.LogInformation("🧹 [STOP_FIX] 画像変化検知履歴をクリア - Stop→Start後の初回翻訳を確実に実行");
+    }
+
+    /// <summary>
+    /// [Issue #392] 前回OCRテキスト位置を更新（パイプラインOCR完了後に呼び出し）
+    /// </summary>
+    /// <param name="contextId">コンテキストID（ウィンドウハンドル+領域）</param>
+    /// <param name="textBounds">OCRで検出されたテキストのバウンディングボックス配列</param>
+    public void UpdatePreviousTextBounds(string contextId, Rectangle[] textBounds)
+    {
+        _previousTextBounds[contextId] = textBounds;
+        _logger.LogDebug("[Issue #392] 前回テキスト位置を更新: ContextId={ContextId}, TextCount={Count}",
+            contextId, textBounds.Length);
+    }
+
+    /// <summary>
+    /// [Issue #392] コンテキストIDを生成（外部からのフィードバック用）
+    /// </summary>
+    public static string BuildContextId(IntPtr windowHandle, Rectangle captureRegion)
+    {
+        return $"window_{windowHandle}_region_{captureRegion.X}_{captureRegion.Y}_{captureRegion.Width}_{captureRegion.Height}";
     }
 
     /// <summary>
@@ -523,13 +549,19 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             // 条件1: 前回画像が存在する（初回実行ではない）
             // 条件2: 画像に変化がある（!changeResult.HasChanged → changeResult.HasChanged に修正）
             // 条件3: テキスト消失パターンに該当する（IsTextDisappearance判定）
-            if (previousImage != null && changeResult.HasChanged && IsTextDisappearance(changeResult))
+            var contextId = BuildContextId(windowHandle, captureRegion);
+            if (previousImage != null && changeResult.HasChanged && IsTextDisappearance(changeResult, contextId))
             {
                 // 消失領域をキャプチャ領域として設定
                 var disappearedRegions = new List<Rectangle> { captureRegion };
 
                 // 信頼度計算: Stage数と変化率から算出
-                float confidenceScore = CalculateDisappearanceConfidence(changeResult);
+                // [Issue #392] IsTextDisappearance()がtrueの場合、前回テキスト位置と変化領域の
+                // 重なりを事実ベースで確認済み。CalculateDisappearanceConfidenceのStage3ベース値
+                // (0.75)だと閾値(0.70)ギリギリで変化率補正で弾かれるケースがあるため、
+                // テキスト位置マッチのボーナス(+0.10)を加算して安定的に閾値を超えるようにする。
+                float confidenceScore = Math.Min(1.0f,
+                    CalculateDisappearanceConfidence(changeResult) + 0.10f);
 
                 // TextDisappearanceEvent作成・発行
                 var disappearanceEvent = new TextDisappearanceEvent(
@@ -588,63 +620,59 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     }
 
     /// <summary>
-    /// テキスト消失パターン判定（Phase 4.4: UltraThink + Gemini Review完了）
+    /// [Issue #392] テキスト消失/変化パターン判定（前回OCRテキスト位置 × 画像変化領域）
     /// </summary>
     /// <param name="changeResult">画像変化検知結果</param>
-    /// <returns>テキスト消失パターンに該当する場合true</returns>
+    /// <param name="contextId">コンテキストID</param>
+    /// <returns>前回テキストがあった領域で画像変化が検知された場合true</returns>
     /// <remarks>
-    /// Gemini推奨設計:
-    /// - ChangePercentage閾値: 15% (ゲームUIテキスト消失の典型的範囲)
-    /// - SSIM閾値: 85% (背景構造の類似性が高い)
-    /// - 偽陽性: 小さなUIアニメーションは除外される
-    /// - 偽陰性: 画面の20%以上を占める大テキストは検知されない（トレードオフ）
+    /// 旧方式（Issue #230で無効化）: 画像変化率+SSIMのみ → 画面フリッカーで誤検知
+    /// 新方式: 前回OCRで実際にテキストが検出された位置と、画像変化領域の重なりを判定
+    /// → 「テキストがあった場所が変わった」を事実ベースで検知
     /// </remarks>
-    private bool IsTextDisappearance(ImageChangeResult changeResult)
+    private bool IsTextDisappearance(ImageChangeResult changeResult, string contextId)
     {
-        // [Issue #230] 画像変化のみに基づくテキスト消失検知を無効化
-        // 理由: 画面フリッカー（小さな画像変化 + 高SSIM）がテキスト消失と誤検知され、
-        //       オーバーレイが不正にクリアされる問題が発生
-        // 正しいアプローチ: テキスト変化検知（OCR結果の比較）に基づいて判断すべき
-        // 将来実装: OCR結果が「テキストあり→なし」に変化した場合のみイベント発行
-        _logger.LogTrace("🔍 [Issue #230] IsTextDisappearance: false - 画像変化のみでのテキスト消失検知は無効化");
-        return false;
-
-        /* [Issue #230] 旧ロジック - 画面フリッカーで誤検知するため無効化
-        // 条件1: 画像に変化あり（前提条件、呼び出し元で既にチェック済みだが安全性のため再確認）
-        if (!changeResult.HasChanged)
+        // 前回テキスト位置がない場合はfalse（初回OCR前、またはテキスト未検出）
+        if (!_previousTextBounds.TryGetValue(contextId, out var textBounds) || textBounds.Length == 0)
         {
+            _logger.LogTrace("[Issue #392] IsTextDisappearance: false - 前回テキスト位置なし");
             return false;
         }
 
-        // 条件2: 変化率が小さい（テキスト消失程度の変化）
-        // ゲームUIのテキストボックス消失は通常5-15%の変化
-        const float maxChangePercentageForTextDisappearance = 0.15f; // Gemini推奨: 15%
-        if (changeResult.ChangePercentage > maxChangePercentageForTextDisappearance)
+        // 変化領域がない場合はfalse
+        if (changeResult.ChangedRegions == null || changeResult.ChangedRegions.Length == 0)
         {
-            _logger.LogTrace("🔍 IsTextDisappearance: false - 変化率が大きすぎる ({ChangePercentage:F3}% > {Threshold:F3}%)",
-                changeResult.ChangePercentage * 100, maxChangePercentageForTextDisappearance * 100);
+            _logger.LogTrace("[Issue #392] IsTextDisappearance: false - 変化領域なし");
             return false;
         }
 
-        // 条件3: SSIM判定（構造的類似性 - Stage 3で利用可能）
-        // テキスト消失は背景が似ているためSSIMが高い
-        const float minSSIMForTextDisappearance = 0.85f; // Gemini推奨: 85%
-        if (changeResult.SSIMScore.HasValue)
+        // 変化領域と前回テキスト位置の重なりを判定
+        foreach (var changedRegion in changeResult.ChangedRegions)
         {
-            if (changeResult.SSIMScore.Value < minSSIMForTextDisappearance)
+            foreach (var textRect in textBounds)
             {
-                _logger.LogTrace("🔍 IsTextDisappearance: false - SSIM類似性が低すぎる ({SSIM:F3} < {Threshold:F3})",
-                    changeResult.SSIMScore.Value, minSSIMForTextDisappearance);
-                return false;
+                if (changedRegion.IntersectsWith(textRect))
+                {
+                    _logger.LogInformation(
+                        "[Issue #392] IsTextDisappearance: true - テキスト領域で変化検知 (Changed=({CX},{CY},{CW}x{CH}), Text=({TX},{TY},{TW}x{TH}))",
+                        changedRegion.X, changedRegion.Y, changedRegion.Width, changedRegion.Height,
+                        textRect.X, textRect.Y, textRect.Width, textRect.Height);
+                    return true;
+                }
             }
         }
 
-        _logger.LogDebug("✅ IsTextDisappearance: true - 変化率: {ChangePercentage:F3}%, SSIM: {SSIM:F3}, Stage: {DetectionStage}",
-            changeResult.ChangePercentage * 100,
-            changeResult.SSIMScore ?? -1.0f,
-            changeResult.DetectionStage);
-
-        return true;
-        */
+        // 座標不一致のデバッグ情報を出力
+        _logger.LogDebug("[Issue #392] IsTextDisappearance: false - 変化領域{ChangedCount}個と前回テキスト{TextCount}個に重なりなし",
+            changeResult.ChangedRegions.Length, textBounds.Length);
+        if (changeResult.ChangedRegions.Length > 0 && textBounds.Length > 0)
+        {
+            var cr = changeResult.ChangedRegions[0];
+            var tb = textBounds[0];
+            _logger.LogDebug(
+                "[Issue #392] 座標デバッグ: ChangedRegion[0]=({CX},{CY},{CW}x{CH}), TextBounds[0]=({TX},{TY},{TW}x{TH})",
+                cr.X, cr.Y, cr.Width, cr.Height, tb.X, tb.Y, tb.Width, tb.Height);
+        }
+        return false;
     }
 }
