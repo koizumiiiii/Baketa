@@ -214,6 +214,31 @@ public sealed record ImageChangeDetectionSettings
     /// </remarks>
     public int MaxStabilizationWaitMs { get; init; } = 3000;
 
+    // ========================================
+    // [Issue #401] パイプラインレベル画面安定化設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #401] 画面安定化スキップの変化率閾値（上限）
+    /// </summary>
+    /// <remarks>
+    /// 画面変化率がこの値を超えた場合、画面遷移中と判定してパイプライン全体をスキップ。
+    /// デフォルト: 0.50（50%以上の変化でスキップ）
+    /// 推奨範囲: 0.30-0.70
+    /// </remarks>
+    public float ScreenStabilizationThreshold { get; init; } = 0.50f;
+
+    /// <summary>
+    /// [Issue #401] 画面安定化スキップ解除の変化率閾値（下限、ヒステリシス）
+    /// </summary>
+    /// <remarks>
+    /// スキップ状態を解除するための閾値。ScreenStabilizationThresholdより低く設定することで、
+    /// 閾値付近でのフラッピング（スキップと処理続行の繰り返し）を防止。
+    /// デフォルト: 0.35（35%以下に落ちたら安定と判定）
+    /// 推奨範囲: ScreenStabilizationThreshold - 0.15 程度
+    /// </remarks>
+    public float ScreenStabilizationRecoveryThreshold { get; init; } = 0.35f;
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -235,6 +260,10 @@ public sealed record ImageChangeDetectionSettings
             // [Issue #229] テキスト安定化設定の検証
             && TextStabilizationDelayMs >= 0
             && MaxStabilizationWaitMs >= TextStabilizationDelayMs
+            // [Issue #401] 画面安定化設定の検証
+            && ScreenStabilizationThreshold is > 0.0f and <= 1.0f
+            && ScreenStabilizationRecoveryThreshold is > 0.0f and <= 1.0f
+            && ScreenStabilizationRecoveryThreshold <= ScreenStabilizationThreshold
             // [Issue #293] ROIベース閾値設定の検証
             && RoiHighPriorityThresholdMultiplier > 0.0f
             && RoiLowPriorityThresholdMultiplier > 0.0f;
@@ -308,6 +337,9 @@ public sealed record ImageChangeDetectionSettings
             EnableTextStabilization = true,
             TextStabilizationDelayMs = 500,
             MaxStabilizationWaitMs = 3000,
+            // [Issue #401] 画面安定化設定
+            ScreenStabilizationThreshold = 0.50f,
+            ScreenStabilizationRecoveryThreshold = 0.35f,
             // [Issue #302] 下部ゾーン高感度化設定
             EnableLowerZoneHighSensitivity = true,
             LowerZoneSimilarityThreshold = 0.995f,
@@ -338,6 +370,9 @@ public sealed record ImageChangeDetectionSettings
             EnableTextStabilization = true,
             TextStabilizationDelayMs = 300,
             MaxStabilizationWaitMs = 2000,
+            // [Issue #401] 画面安定化設定（高感度: 低い閾値で早期スキップ）
+            ScreenStabilizationThreshold = 0.40f,
+            ScreenStabilizationRecoveryThreshold = 0.25f,
             // [Issue #302] 下部ゾーン高感度化設定（高感度: より広い範囲）
             EnableLowerZoneHighSensitivity = true,
             LowerZoneSimilarityThreshold = 0.998f,
@@ -368,6 +403,9 @@ public sealed record ImageChangeDetectionSettings
             EnableTextStabilization = true,
             TextStabilizationDelayMs = 800,
             MaxStabilizationWaitMs = 5000,
+            // [Issue #401] 画面安定化設定（低感度: 高い閾値でスキップしにくい）
+            ScreenStabilizationThreshold = 0.60f,
+            ScreenStabilizationRecoveryThreshold = 0.45f,
             // [Issue #302] 下部ゾーン高感度化設定（低感度: 狭い範囲）
             EnableLowerZoneHighSensitivity = true,
             LowerZoneSimilarityThreshold = 0.99f,
@@ -398,6 +436,9 @@ public sealed record ImageChangeDetectionSettings
             EnableTextStabilization = true,
             TextStabilizationDelayMs = 500,
             MaxStabilizationWaitMs = 3000,
+            // [Issue #401] 画面安定化設定
+            ScreenStabilizationThreshold = 0.50f,
+            ScreenStabilizationRecoveryThreshold = 0.35f,
             // [Issue #302] 下部ゾーン高感度化設定
             EnableLowerZoneHighSensitivity = true,
             LowerZoneSimilarityThreshold = 0.995f,

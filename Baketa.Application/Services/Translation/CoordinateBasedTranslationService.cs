@@ -66,7 +66,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService; // [Issue #290] Cloud翻訳可用性チェック
     private readonly IRoiManager? _roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
     private readonly IWindowManager? _windowManager; // [Issue #293] ウィンドウ情報取得用
+    private readonly IOptionsMonitor<ImageChangeDetectionSettings>? _imageChangeSettings; // [Issue #401] 画面安定化設定
     private bool _disposed;
+
+    // [Issue #401] ヒステリシス: ウィンドウごとの画面安定化スキップ状態
+    private readonly ConcurrentDictionary<IntPtr, bool> _screenStabilizationActive = new();
 
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
     private static int _nextChunkId = 1000000;
@@ -74,9 +78,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     // [Issue #397] ウィンドウハンドルごとの前回OCRテキストキャッシュ（テキスト変化検知用）
     private readonly ConcurrentDictionary<IntPtr, string> _previousOcrTextCache = new();
 
-    // [Issue #397] Gate A: シーン遷移後のFork-Joinクールダウン
-    private readonly ConcurrentDictionary<IntPtr, int> _sceneTransitionCooldown = new();
-    private const int SceneTransitionCooldownCycles = 2;
 
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
     // Gemini Vision APIの処理時間はピクセル数に比例するため、テキスト翻訳に十分な解像度に縮小
@@ -98,6 +99,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null, // [Issue #290] Cloud翻訳可用性チェック
         IRoiManager? roiManager = null, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
         IWindowManager? windowManager = null, // [Issue #293] ウィンドウ情報取得用
+        IOptionsMonitor<ImageChangeDetectionSettings>? imageChangeSettings = null, // [Issue #401] 画面安定化設定
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -113,6 +115,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
         _roiManager = roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
         _windowManager = windowManager; // [Issue #293] ウィンドウ情報取得用
+        _imageChangeSettings = imageChangeSettings; // [Issue #401] 画面安定化設定
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -277,18 +280,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 _logger?.LogDebug(ex, "[Issue #290] Fork-Join用画像データ抽出失敗");
             }
 
-            // [Issue #397] Gate A: シーン遷移クールダウン中はFork-Joinをスキップ
-            var cooldownRemaining = _sceneTransitionCooldown.AddOrUpdate(
-                windowHandle, 0, (_, current) => Math.Max(0, current - 1));
-
             // Fork-Join条件チェック＆Cloud AI翻訳タスク開始（OCRと並列実行）
-            if (cooldownRemaining > 0)
-            {
-                _logger?.LogDebug(
-                    "[Issue #397] Gate A: シーン遷移クールダウン中 - Fork-Joinスキップ (残り{Remaining}サイクル)",
-                    cooldownRemaining);
-            }
-            else if (ShouldUseForkJoinParallelExecution(forkJoinImageBase64, forkJoinContextWidth, forkJoinContextHeight))
+            if (ShouldUseForkJoinParallelExecution(forkJoinImageBase64, forkJoinContextWidth, forkJoinContextHeight))
             {
                 _logger?.LogInformation("🚀 [Issue #290] Fork-Join開始: OCR || Cloud AI を並列実行");
                 var forkJoinStopwatch = Stopwatch.StartNew();
@@ -336,12 +329,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogDebug("🎯 [OPTION_A] パイプライン完了 - ShouldContinue: {ShouldContinue}, Success: {Success}, EarlyTerminated: {EarlyTerminated}",
                 pipelineResult.ShouldContinue, pipelineResult.Success, pipelineResult.Metrics.EarlyTerminated);
 
-            // [Issue #397] パイプライン実行後にOCRテキストをキャッシュ更新（次サイクルのテキスト変化検知用）
-            if (!string.IsNullOrEmpty(pipelineResult.OcrResultText))
-            {
-                _previousOcrTextCache[windowHandle] = pipelineResult.OcrResultText;
-            }
-
             // 🎯 [OPTION_A] 早期リターンチェック - 画面変化なしで処理スキップ
             if (!pipelineResult.ShouldContinue || pipelineResult.Metrics.EarlyTerminated)
             {
@@ -360,26 +347,58 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 return; // 翻訳処理をスキップして即座にリターン
             }
 
-            // [Issue #397] P0-1: シーン遷移検出 - Cloud AIトークン浪費防止
-            // 画面全体が大きく変化した場合（ChangePercentage > 50%）はシーン遷移と判定し、
-            // Fork-Join Cloud AIをキャンセルしてトークン浪費を防止
-            if (forkJoinCloudTask != null && pipelineResult.ImageChangeResult != null)
+            // [Issue #401] 画面安定化チェック（ヒステリシス付き）
+            // 画面がまだ遷移中（シーン切替、テキスト送りの途中等）の可能性がある場合、
+            // パイプライン全体をスキップして安定してからOCR + Cloud AIを実行する
+            if (pipelineResult.ImageChangeResult != null)
             {
-                const float sceneTransitionThreshold = 0.5f;
+                var settings = _imageChangeSettings?.CurrentValue;
+                var stabilizationThreshold = settings?.ScreenStabilizationThreshold ?? 0.50f;
+                var recoveryThreshold = settings?.ScreenStabilizationRecoveryThreshold ?? 0.35f;
                 var changePercentage = pipelineResult.ImageChangeResult.ChangePercentage;
+                var hasPreviousBaseline = _previousOcrTextCache.ContainsKey(windowHandle);
+                var isStabilizationActive = _screenStabilizationActive.GetValueOrDefault(windowHandle, false);
 
-                if (changePercentage > sceneTransitionThreshold)
+                // ヒステリシス判定: スキップ中は低い閾値（recovery）、通常時は高い閾値で判定
+                var shouldSkip = hasPreviousBaseline &&
+                    (isStabilizationActive
+                        ? changePercentage > recoveryThreshold   // スキップ中: recovery閾値を下回るまで継続
+                        : changePercentage > stabilizationThreshold); // 通常: 高い閾値を超えたらスキップ開始
+
+                if (shouldSkip)
                 {
-                    _logger?.LogWarning(
-                        "[Issue #397] シーン遷移検出: Fork-Join Cloud AIをキャンセル " +
-                        "(ChangePercentage={Pct:F2}, Threshold={Threshold:F2})",
-                        changePercentage, sceneTransitionThreshold);
-                    await forkJoinCts.CancelAsync().ConfigureAwait(false);
-                    forkJoinCloudTask = null;
+                    _screenStabilizationActive[windowHandle] = true;
+                    _logger?.LogInformation(
+                        "[Issue #401] 画面安定化待ち: パイプライン全体をスキップ " +
+                        "(ChangePercentage={Pct:F2}, Threshold={Threshold:F2}, Recovery={Recovery:F2}, Active={Active}) - 次サイクルで再試行",
+                        changePercentage, stabilizationThreshold, recoveryThreshold, isStabilizationActive);
 
-                    // [Issue #397] Gate A: 次の数サイクルもFork-Joinを抑制
-                    _sceneTransitionCooldown[windowHandle] = SceneTransitionCooldownCycles;
+                    // Fork-Join Cloud翻訳をキャンセル（トークン浪費防止）
+                    if (forkJoinCloudTask != null)
+                    {
+                        await forkJoinCts.CancelAsync().ConfigureAwait(false);
+                    }
+
+                    // OCRテキストキャッシュは更新しない（次サイクルで再度変化を検知するため）
+                    ocrMeasurement.Complete();
+                    return;
                 }
+
+                // 安定化解除
+                if (isStabilizationActive)
+                {
+                    _screenStabilizationActive[windowHandle] = false;
+                    _logger?.LogInformation(
+                        "[Issue #401] 画面安定化完了: 処理を再開 (ChangePercentage={Pct:F2})",
+                        changePercentage);
+                }
+            }
+
+            // [Issue #397] 安定化チェック通過後にOCRテキストキャッシュを更新（次サイクルのテキスト変化検知用）
+            // ※安定化スキップ時はここに到達しないため、キャッシュは更新されない
+            if (!string.IsNullOrEmpty(pipelineResult.OcrResultText))
+            {
+                _previousOcrTextCache[windowHandle] = pipelineResult.OcrResultText;
             }
 
             // ✅ [DEBUG_FIX] 画面変化が検出されたことを明示的にログ出力
