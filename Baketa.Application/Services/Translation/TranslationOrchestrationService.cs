@@ -1793,6 +1793,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         IsCoordinateBasedMode = true // 座標ベースモードを示すフラグ - Observableスキップ + クールダウン設定
                     };
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // [Issue #402] Stop操作によるキャンセルはフォールバックせず上位に伝播
+                    _logger?.LogDebug("座標ベース処理がキャンセルされました: ID={TranslationId}", translationId);
+                    throw;
+                }
                 catch (Exception coordinateEx)
                 {
                     _logger?.LogDebug($"❌ 座標ベース処理でエラー発生: {coordinateEx.Message}");
