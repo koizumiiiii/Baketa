@@ -33,7 +33,7 @@ namespace Baketa.Infrastructure.Processing.Strategies;
 /// 既存のOCR処理システムとの統合
 /// 🎯 UltraThink Phase 50: ROI検出統合による翻訳表示復旧
 /// </summary>
-public class OcrExecutionStageStrategy : IProcessingStageStrategy
+public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
 {
     // [Issue #380] バッチOCR重複除去のIoU閾値
     // 隣接ブロック境界の拡張による同一テキストの重複検出を除去するために使用
@@ -70,7 +70,22 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     // [Issue #293 Phase 7.1] 探索モード時のテキスト欠落防止
     // ヒートマップ値がこの閾値以上のブロックもOCR対象に追加（MinConfidenceForRegion=0.3より低く設定）
     private const float HeatmapTextLikelihoodThreshold = 0.05f;
-    private const int GridSize = 4; // 4x4グリッド（変化検知と同じ）
+
+    // [Issue #397] テキスト隣接ブロック拡張範囲
+    private const int AdjacentHorizontalRange = 2; // 水平方向 ±2ブロック
+    private const int AdjacentVerticalRange = 1;   // 垂直方向 ±1ブロック
+
+    // [Issue #397] グリッドサイズ（変化検知と同じ16x9）
+    private readonly int _gridColumns;
+    private readonly int _gridRows;
+
+    // [Issue #397] 前サイクルでテキストが検出されたグリッドブロックの記録
+    // テキスト隣接ブロック自動包含のために使用
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, HashSet<(int Row, int Col)>> _previousTextBlocksPerContext = new();
+
+    // [Issue #397] P0-3: 部分OCRサイクルカウンター（初回数サイクルは拡張適用）
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> _partialOcrCycleCount = new();
+    private const int InitialExpansionCycleLimit = 3;
 
     public ProcessingStageType StageType => ProcessingStageType.OcrExecution;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(80);
@@ -101,6 +116,11 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         _regionMerger = regionMerger; // null許容（後方互換性）
         _roiManager = roiManager; // [Issue #293 Phase 7] null許容（後方互換性）
         _textChunkAggregator = textChunkAggregator; // null許容（翻訳無効時対応）
+
+        // [Issue #397] グリッドサイズ設定（変化検知と同期）
+        var changeDetectionDefaults = new ImageChangeDetectionSettings();
+        _gridColumns = changeDetectionDefaults.GridColumns; // 16
+        _gridRows = changeDetectionDefaults.GridRows; // 9
 
         // [Issue #293] 部分OCR設定の読み込み（設定がない場合はデフォルト値）
         var settings = roiSettings?.Value ?? new RoiManagerSettings();
@@ -233,16 +253,33 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             // これにより、新出現テキスト（2行目に折り返したテキストなど）を検出できる
             var changeResult = context.GetStageResult<ImageChangeDetectionResult>(ProcessingStageType.ImageChangeDetection);
 
+            // [Issue #397] 前サイクルのテキスト隣接ブロックを取得
+            var contextId = context.Input.ContextId ?? "default";
+            var textAdjacentBlocks = GetTextAdjacentBlocks(ocrImage.Width, ocrImage.Height, contextId);
+
+            // [Issue #397] P0-3: サイクルカウンターベースの拡張適用判定
+            var partialOcrCount = _partialOcrCycleCount.GetValueOrDefault(contextId, 0);
+            var shouldApplyInitialExpansion = partialOcrCount < InitialExpansionCycleLimit;
+
             if (TryGetLearnedRoiRegions(ocrImage.Width, ocrImage.Height, out var learnedRegions))
             {
                 // [Issue #293 Phase 7.3] 学習済みROI + 変化領域を併用
                 var combinedRegions = CombineLearnedRoiWithChangedRegions(
                     learnedRegions,
-                    changeResult);
+                    changeResult,
+                    textAdjacentBlocks);
 
                 // [Issue #293 Phase 8] テキスト欠落防止: 学習済みROIにも垂直・水平拡張を適用
                 combinedRegions = ExpandRegionsHorizontally(combinedRegions, ocrImage.Width, ocrImage.Height);
-                _logger.LogDebug("[Issue #293 Phase 8] 学習済みROI拡張適用: 水平15%+垂直30%");
+
+                // [Issue #397] P0-3: 初回数サイクルはPhase 2相当の追加拡張を適用（水平 + 下方）
+                if (shouldApplyInitialExpansion)
+                {
+                    combinedRegions = ApplyInitialDetectionExpansion(combinedRegions, ocrImage.Width, ocrImage.Height);
+                    _logger.LogDebug(
+                        "[Issue #397] 初回拡張適用 (サイクル {Cycle}/{Limit}): 水平±{HRange}、下方+{VRange}グリッドセル",
+                        partialOcrCount + 1, InitialExpansionCycleLimit, AdjacentHorizontalRange, AdjacentVerticalRange);
+                }
 
                 _logger.LogInformation("🎯 [Issue #293 Phase 7.3] 学習済みROI + 変化領域併用OCR: 学習済み{LearnedCount}領域 + 変化{ChangedCount}領域 = 合計{TotalCount}領域",
                     learnedRegions.Count, combinedRegions.Count - learnedRegions.Count, combinedRegions.Count);
@@ -252,8 +289,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             }
 
             // [Issue #293] 部分OCR実行の判定（結合済み領域を取得）- 学習済みROIがない場合のフォールバック
-            if (TryGetPartialOcrRegions(changeResult, ocrImage.Width, ocrImage.Height, out var mergedRegions))
+            if (TryGetPartialOcrRegions(changeResult, ocrImage.Width, ocrImage.Height, out var mergedRegions, textAdjacentBlocks))
             {
+                // [Issue #397] P0-3: 初回数サイクルはPhase 2相当の追加拡張を適用（水平 + 下方）
+                if (shouldApplyInitialExpansion)
+                {
+                    mergedRegions = ApplyInitialDetectionExpansion(mergedRegions, ocrImage.Width, ocrImage.Height);
+                    _logger.LogDebug(
+                        "[Issue #397] 初回拡張適用 (サイクル {Cycle}/{Limit}, 探索モード): 水平±{HRange}、下方+{VRange}グリッドセル",
+                        partialOcrCount + 1, InitialExpansionCycleLimit, AdjacentHorizontalRange, AdjacentVerticalRange);
+                }
+
                 _logger.LogInformation("🎯 [Issue #293] 変化領域ベース部分OCR実行: {RegionCount}結合領域を処理（探索モード）", mergedRegions.Count);
                 return await ExecutePartialOcrAsync(context, mergedRegions, ocrImage, stopwatch, cancellationToken)
                     .ConfigureAwait(false);
@@ -362,11 +408,12 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
                     textChunks = [.. scaledRegions.Cast<object>()];
 
-                    // 🔍 [Issue #193 DEBUG] スケーリング結果確認
+                    // [Issue #193] スケーリング結果確認
                     if (scaledRegions.Count > 0)
                     {
                         var first = scaledRegions[0];
-                        Console.WriteLine($"🚀 [Issue #193] スケーリング完了: 最初の領域 ({first.Bounds.X},{first.Bounds.Y},{first.Bounds.Width}x{first.Bounds.Height})");
+                        _logger.LogDebug("[Issue #193] スケーリング完了: 最初の領域 ({X},{Y},{Width}x{Height})",
+                            first.Bounds.X, first.Bounds.Y, first.Bounds.Width, first.Bounds.Height);
                     }
                 }
                 else
@@ -374,6 +421,11 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                     // スケーリング不要の場合はそのまま使用
                     textChunks = [.. ocrResults.TextRegions.Cast<object>()];
                 }
+
+                // [Issue #397] テキスト位置をグリッドブロックに記録（次サイクルの隣接ブロック拡張に使用）
+                // 全画面OCRではOCR画像サイズ基準の座標で記録（変化検知と同じ座標系）
+                var fullOcrContextId = context.Input.ContextId ?? "default";
+                RecordTextBlockPositions(ocrResults.TextRegions, ocrImage.Width, ocrImage.Height, fullOcrContextId);
 
                 _logger.LogInformation("✅ [PHASE5_COMPLETE] 全画面OCR完了 - テキスト長: {TextLength}文字, 領域数: {RegionCount}個",
                     detectedText.Length, textChunks.Count);
@@ -393,9 +445,8 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
 
             stopwatch.Stop();
 
-            _logger.LogInformation("🔧 [PHASE3.2_FIX] OCR実行段階完了 - 処理時間: {ElapsedMs}ms, 検出テキスト長: {TextLength}",
+            _logger.LogInformation("[PHASE3.2_FIX] OCR実行段階完了 - 処理時間: {ElapsedMs}ms, 検出テキスト長: {TextLength}",
                 stopwatch.ElapsedMilliseconds, detectedText.Length);
-            Console.WriteLine($"🔧 [PHASE3.2_FIX] OCR完了 - 処理時間: {stopwatch.ElapsedMilliseconds}ms, テキスト: '{detectedText.Substring(0, Math.Min(50, detectedText.Length))}...'");
 
             // 🎯 [OCR_DEBUG_LOG] OCR認識結果をデバッグログファイルに出力
             try
@@ -509,9 +560,8 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         catch (Exception ex)
         {
             stopwatch.Stop();
-            var error = $"🔧 [PHASE3.2_FIX] OCR実行段階で重大エラー: {ex.GetType().Name} - {ex.Message}";
+            var error = $"[PHASE3.2_FIX] OCR実行段階で重大エラー: {ex.GetType().Name} - {ex.Message}";
             _logger.LogError(ex, error);
-            Console.WriteLine($"🔧 [PHASE3.2_FIX] OCRエラー: {error}");
             return ProcessingStageResult.CreateError(StageType, error, stopwatch.Elapsed);
         }
     }
@@ -808,15 +858,55 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     /// </remarks>
     private List<Rectangle> CombineLearnedRoiWithChangedRegions(
         List<Rectangle> learnedRegions,
-        ImageChangeDetectionResult? changeResult)
+        ImageChangeDetectionResult? changeResult,
+        List<Rectangle>? textAdjacentBlocks = null)
     {
         // 学習済みROI領域を基本として使用
         var combinedRegions = new List<Rectangle>(learnedRegions);
 
-        // 変化領域がない場合はそのまま返す
+        // [Issue #397] テキスト隣接ブロックを追加（変化検知に依存しない探索領域）
+        if (textAdjacentBlocks is { Count: > 0 })
+        {
+            var adjacentToAdd = new List<Rectangle>();
+            foreach (var adjacentBlock in textAdjacentBlocks)
+            {
+                if (adjacentBlock.Width < _minPartialOcrWidth || adjacentBlock.Height < _minPartialOcrHeight)
+                    continue;
+
+                // 学習済みROI（パディング含む）と重複しない隣接ブロックのみ追加
+                var isWithinLearnedArea = learnedRegions.Any(learned =>
+                {
+                    var expandedLearned = Rectangle.Inflate(learned, RoiPaddingPixels, RoiPaddingPixels);
+                    return expandedLearned.IntersectsWith(adjacentBlock);
+                });
+
+                if (!isWithinLearnedArea)
+                {
+                    adjacentToAdd.Add(adjacentBlock);
+                }
+            }
+
+            if (adjacentToAdd.Count > 0)
+            {
+                if (_regionMerger != null)
+                {
+                    var mergedAdjacent = _regionMerger.MergeAdjacentRegions([.. adjacentToAdd]);
+                    combinedRegions.AddRange(mergedAdjacent);
+                    _logger.LogInformation("[Issue #397] テキスト隣接ブロック追加（ROI外）: {Count}領域（マージ後）", mergedAdjacent.Count);
+                }
+                else
+                {
+                    combinedRegions.AddRange(adjacentToAdd);
+                    _logger.LogInformation("[Issue #397] テキスト隣接ブロック追加（ROI外）: {Count}領域", adjacentToAdd.Count);
+                }
+            }
+        }
+
+        // 変化領域がない場合はここで返す
         if (changeResult?.ChangedRegions == null || changeResult.ChangedRegions.Length == 0)
         {
-            _logger.LogDebug("[Issue #293 Phase 7.3] 変化領域なし - 学習済みROIのみ使用");
+            _logger.LogDebug("[Issue #293 Phase 7.3] 変化領域なし - 学習済みROI{AdjacentInfo}使用",
+                textAdjacentBlocks is { Count: > 0 } ? "+テキスト隣接ブロック" : "のみ");
             return combinedRegions;
         }
 
@@ -890,7 +980,8 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         ImageChangeDetectionResult? changeResult,
         int imageWidth,
         int imageHeight,
-        out List<Rectangle> mergedRegions)
+        out List<Rectangle> mergedRegions,
+        List<Rectangle>? textAdjacentBlocks = null)
     {
         mergedRegions = [];
 
@@ -908,7 +999,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             return false;
         }
 
-        // [Issue #293 Phase 7.1] 変化領域 + ヒートマップ高値ブロックを収集
+        // [Issue #293 Phase 7.1] 変化領域 + ヒートマップ高値ブロック + テキスト隣接ブロックを収集
         var allRegions = new List<Rectangle>();
 
         // 1. 変化領域を追加（従来ロジック）
@@ -927,10 +1018,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                 heatmapBlocks.Count, HeatmapTextLikelihoodThreshold);
         }
 
-        // 変化領域もヒートマップ高値ブロックもない場合は全画面OCR
+        // 3. [Issue #397] テキスト隣接ブロックを追加（前サイクルのOCR結果に基づく探索拡張）
+        if (textAdjacentBlocks is { Count: > 0 })
+        {
+            allRegions.AddRange(textAdjacentBlocks);
+            _logger.LogDebug("[Issue #397] テキスト隣接ブロック追加（探索モード）: {Count}ブロック", textAdjacentBlocks.Count);
+        }
+
+        // 変化領域もヒートマップ高値ブロックもテキスト隣接ブロックもない場合は全画面OCR
         if (allRegions.Count == 0)
         {
-            _logger.LogDebug("[Issue #293] 部分OCRスキップ: 変化領域・ヒートマップ高値ブロックなし");
+            _logger.LogDebug("[Issue #293] 部分OCRスキップ: 変化領域・ヒートマップ高値ブロック・テキスト隣接ブロックなし");
             return false;
         }
 
@@ -1032,17 +1130,46 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
     }
 
     /// <summary>
+    /// [Issue #397] 初回検出時の追加拡張（水平 + 下方）
+    /// テキスト隣接ブロック履歴がない場合、Phase 2と同等の水平拡張に加え、
+    /// 下方にも1グリッドセル分の拡張を適用する。
+    /// これにより、初回cropでテキストが途切れる問題を軽減する。
+    /// </summary>
+    private List<Rectangle> ApplyInitialDetectionExpansion(List<Rectangle> regions, int imageWidth, int imageHeight)
+    {
+        if (regions.Count == 0 || imageWidth <= 0 || imageHeight <= 0) return regions;
+
+        // Phase 2の水平拡張範囲（±AdjacentHorizontalRange グリッドセル）と同等の絶対ピクセル値
+        var cellWidth = imageWidth / _gridColumns;
+        var cellHeight = imageHeight / _gridRows;
+        var horizontalExpansion = cellWidth * AdjacentHorizontalRange;
+        // 下方拡張: 1グリッドセル分（テキストが下にはみ出すケースに対応）
+        var verticalExpansion = cellHeight * AdjacentVerticalRange;
+
+        var expanded = new List<Rectangle>(regions.Count);
+        foreach (var r in regions)
+        {
+            var x = Math.Max(0, r.X - horizontalExpansion);
+            var right = Math.Min(imageWidth, r.Right + horizontalExpansion);
+            var bottom = Math.Min(imageHeight, r.Bottom + verticalExpansion);
+            expanded.Add(new Rectangle(x, r.Y, right - x, bottom - r.Y));
+        }
+
+        return expanded;
+    }
+
+    /// <summary>
     /// [Issue #293 Phase 7.1] ヒートマップで「テキストがありそう」なブロックを取得
     /// </summary>
     /// <remarks>
-    /// 4x4グリッドの各セルのヒートマップ値をチェックし、閾値以上のブロックを返す。
+    /// [Issue #397] 16x9グリッドの各セルのヒートマップ値をチェックし、閾値以上のブロックを返す。
     /// これにより、変化検知が見逃したがテキストが存在する可能性のある領域もOCR対象に含める。
     /// [コードレビュー対応] 整数除算による端の領域漏れを修正、小さい画像のエッジケース処理を追加
     /// </remarks>
     private List<Rectangle> GetHeatmapHighValueBlocks(int imageWidth, int imageHeight)
     {
         // [コードレビュー対応] 容量を事前に指定
-        var blocks = new List<Rectangle>(GridSize * GridSize);
+        var blocks = new List<Rectangle>(_gridRows * _gridColumns);
 
         // IRoiManagerが未注入または無効の場合はスキップ
         if (_roiManager == null || !_roiManager.IsEnabled)
@@ -1051,7 +1178,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         }
 
         // [コードレビュー対応] 非常に小さい画像のエッジケース処理
-        if (imageWidth < GridSize || imageHeight < GridSize)
+        if (imageWidth < _gridColumns || imageHeight < _gridRows)
         {
             // 画像が小さすぎる場合は全体を1つのブロックとして判定
             if (_roiManager.GetHeatmapValueAt(0.5f, 0.5f) >= HeatmapTextLikelihoodThreshold)
@@ -1063,21 +1190,20 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
             return blocks;
         }
 
-        // 4x4グリッドの各セルをチェック
-        for (int row = 0; row < GridSize; row++)
+        // [Issue #397] 16x9グリッドの各セルをチェック
+        for (int row = 0; row < _gridRows; row++)
         {
-            for (int col = 0; col < GridSize; col++)
+            for (int col = 0; col < _gridColumns; col++)
             {
                 // [コードレビュー対応] 整数除算による端の領域漏れを修正
-                // 各セルの開始位置と終了位置を正確に計算
-                var x = imageWidth * col / GridSize;
-                var y = imageHeight * row / GridSize;
-                var nextX = imageWidth * (col + 1) / GridSize;
-                var nextY = imageHeight * (row + 1) / GridSize;
+                var x = imageWidth * col / _gridColumns;
+                var y = imageHeight * row / _gridRows;
+                var nextX = imageWidth * (col + 1) / _gridColumns;
+                var nextY = imageHeight * (row + 1) / _gridRows;
 
                 // セルの中心座標を正規化（0.0-1.0）
-                var normalizedX = (col + 0.5f) / GridSize;
-                var normalizedY = (row + 0.5f) / GridSize;
+                var normalizedX = (col + 0.5f) / _gridColumns;
+                var normalizedY = (row + 0.5f) / _gridRows;
 
                 // ヒートマップ値を取得
                 var heatmapValue = _roiManager.GetHeatmapValueAt(normalizedX, normalizedY);
@@ -1094,6 +1220,121 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         }
 
         return blocks;
+    }
+
+    /// <summary>
+    /// [Issue #397] 前サイクルでテキストが検出されたブロックの隣接ブロックをRectangleリストとして返す
+    /// </summary>
+    /// <remarks>
+    /// テキスト行は水平方向に長いため、水平方向に2ブロック・垂直方向に1ブロック拡張する。
+    /// これにより、変化検知で拾えなかったダイアログの端のテキストも次サイクルでOCR対象に含まれる。
+    /// </remarks>
+    private List<Rectangle> GetTextAdjacentBlocks(int imageWidth, int imageHeight, string contextId)
+    {
+        var blocks = new List<Rectangle>();
+
+        if (!_previousTextBlocksPerContext.TryGetValue(contextId, out var previousTextBlocks) || previousTextBlocks.Count == 0)
+        {
+            return blocks;
+        }
+
+        // 隣接ブロック収集（定数で範囲制御）
+        var adjacentSet = new HashSet<(int Row, int Col)>();
+        foreach (var (row, col) in previousTextBlocks)
+        {
+            // 水平方向: ±AdjacentHorizontalRange ブロック
+            for (int dc = -AdjacentHorizontalRange; dc <= AdjacentHorizontalRange; dc++)
+            {
+                var nc = col + dc;
+                if (nc >= 0 && nc < _gridColumns)
+                {
+                    adjacentSet.Add((row, nc));
+                }
+            }
+            // 垂直方向: ±AdjacentVerticalRange ブロック
+            for (int dr = -AdjacentVerticalRange; dr <= AdjacentVerticalRange; dr++)
+            {
+                if (dr == 0) continue; // 中心行は水平ループで追加済み
+                var nr = row + dr;
+                if (nr >= 0 && nr < _gridRows)
+                {
+                    adjacentSet.Add((nr, col));
+                }
+            }
+        }
+
+        // [Issue #397] テキストブロック自体も含める（除外しない）
+        // 変化検知や学習ROIでカバーされない場合にテキスト領域が欠落する問題を防止
+        // マージ処理で重複は統合されるため、含めても実害なし
+
+        // Rectangleに変換
+        foreach (var (row, col) in adjacentSet)
+        {
+            var x = imageWidth * col / _gridColumns;
+            var y = imageHeight * row / _gridRows;
+            var nextX = imageWidth * (col + 1) / _gridColumns;
+            var nextY = imageHeight * (row + 1) / _gridRows;
+            blocks.Add(new Rectangle(x, y, nextX - x, nextY - y));
+        }
+
+        if (blocks.Count > 0)
+        {
+            _logger.LogDebug("[Issue #397] テキスト隣接ブロック追加: {Count}ブロック（前サイクルテキスト{TextCount}ブロックから拡張）",
+                blocks.Count, previousTextBlocks.Count);
+        }
+
+        return blocks;
+    }
+
+    /// <summary>
+    /// [Issue #397] OCR結果のテキスト位置をグリッドブロックに逆マッピングして記録
+    /// </summary>
+    /// <remarks>
+    /// imageWidth/imageHeightはtextRegionsの座標系と一致させる必要がある。
+    /// グリッド位置(Row, Col)は解像度非依存のため、全画面OCR(1280x720)と
+    /// 部分OCR(3840x2160)が交互に呼ばれても同じグリッドセルにマッピングされる。
+    /// </remarks>
+    private void RecordTextBlockPositions(
+        IReadOnlyList<Baketa.Core.Abstractions.OCR.OcrTextRegion> textRegions,
+        int imageWidth, int imageHeight,
+        string contextId)
+    {
+        // ゼロ除算ガード
+        if (imageWidth <= 0 || imageHeight <= 0) return;
+
+        var textBlocks = new HashSet<(int Row, int Col)>();
+
+        foreach (var region in textRegions)
+        {
+            if (region.Bounds.Width <= 0 || region.Bounds.Height <= 0) continue;
+
+            // テキスト中心座標からグリッドブロックを特定
+            var centerX = region.Bounds.X + region.Bounds.Width / 2;
+            var centerY = region.Bounds.Y + region.Bounds.Height / 2;
+
+            var col = Math.Clamp(centerX * _gridColumns / imageWidth, 0, _gridColumns - 1);
+            var row = Math.Clamp(centerY * _gridRows / imageHeight, 0, _gridRows - 1);
+            textBlocks.Add((row, col));
+
+            // テキストの左端・右端もカバー
+            var leftCol = Math.Clamp(region.Bounds.X * _gridColumns / imageWidth, 0, _gridColumns - 1);
+            var rightCol = Math.Clamp(region.Bounds.Right * _gridColumns / imageWidth, 0, _gridColumns - 1);
+            for (int c = leftCol; c <= rightCol; c++)
+            {
+                textBlocks.Add((row, c));
+            }
+        }
+
+        _previousTextBlocksPerContext[contextId] = textBlocks;
+
+        // [Issue #397] P0-3: 部分OCRサイクルカウンターをインクリメント
+        _partialOcrCycleCount.AddOrUpdate(contextId, 1, (_, count) => count + 1);
+
+        if (textBlocks.Count > 0)
+        {
+            _logger.LogDebug("[Issue #397] テキストブロック位置記録: {Count}ブロック, ContextId={ContextId}",
+                textBlocks.Count, contextId);
+        }
     }
 
     /// <summary>
@@ -1210,6 +1451,19 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
                     "[Issue #380] バッチOCRデデュプリケーション完了: {OriginalCount}個 → {DeduplicatedCount}個 (削除: {RemovedCount}個)",
                     originalCount, deduplicatedRegions.Count, removedCount);
             }
+
+            // [Issue #397] テキスト位置をグリッドブロックに記録（次サイクルの隣接ブロック拡張に使用）
+            // deduplicatedRegions はTransformOcrResultsToAbsoluteCoordinatesでOriginalWindowSize空間に
+            // スケーリング済みのため、グリッドマッピングにも同じ座標系の寸法を使用する
+            var partialContextId = context.Input.ContextId ?? "default";
+            var originalSize = context.Input.OriginalWindowSize;
+            var capturedSize = new Size(fullImage.Width, fullImage.Height);
+            var hasScaling = originalSize != Size.Empty &&
+                capturedSize.Width > 0 && capturedSize.Height > 0 &&
+                (originalSize.Width != capturedSize.Width || originalSize.Height != capturedSize.Height);
+            var recordWidth = hasScaling ? originalSize.Width : fullImage.Width;
+            var recordHeight = hasScaling ? originalSize.Height : fullImage.Height;
+            RecordTextBlockPositions(deduplicatedRegions, recordWidth, recordHeight, partialContextId);
 
             var allTextChunks = deduplicatedRegions.Cast<object>().ToList();
 
@@ -1640,6 +1894,15 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy
         }
     }
 #endif
+
+    /// <summary>
+    /// [Issue #397] リソース解放: テキストブロックキャッシュのクリア
+    /// </summary>
+    public void Dispose()
+    {
+        _previousTextBlocksPerContext.Clear();
+        _partialOcrCycleCount.Clear(); // [Issue #397] P0-3
+    }
 }
 
 /// <summary>

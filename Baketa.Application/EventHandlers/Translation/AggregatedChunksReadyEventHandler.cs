@@ -342,6 +342,19 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
                 .ToList();
 
+            // [Issue #397] P1-4: ゴミテキストフィルタ（アスペクト比 + 反復パターン）
+            var preGarbageCount = nonEmptyChunks.Count;
+            nonEmptyChunks = nonEmptyChunks
+                .Where(chunk => !IsGarbageText(chunk))
+                .ToList();
+            var garbageFilteredCount = preGarbageCount - nonEmptyChunks.Count;
+            if (garbageFilteredCount > 0)
+            {
+                _logger.LogWarning(
+                    "[Issue #397] ゴミテキスト{Count}件をフィルタリング（残り{Remaining}件）",
+                    garbageFilteredCount, nonEmptyChunks.Count);
+            }
+
             // 空のチャンクに空文字列を設定
             foreach (var emptyChunk in aggregatedChunks.Where(c => string.IsNullOrWhiteSpace(c.CombinedText)))
             {
@@ -1217,6 +1230,57 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     /// - 短いテキスト（20文字未満）はスキップ（ゲームUIの正当な繰り返し許容）
     /// - 空白区切り単語の繰り返しは正当性が高いためスキップ
     /// </remarks>
+    /// <summary>
+    /// [Issue #397] P1-4: ゴミテキスト判定
+    /// アスペクト比・反復パターンにより、翻訳不要なノイズテキストを除去
+    /// </summary>
+    private static bool IsGarbageText(TextChunk chunk)
+    {
+        // 1. アスペクト比フィルタ: H/W > 3.0（極端に縦長な矩形 = 装飾/ゴミ）
+        if (chunk.CombinedBounds.Width > 0 && chunk.CombinedBounds.Height > 0)
+        {
+            var hwRatio = (float)chunk.CombinedBounds.Height / chunk.CombinedBounds.Width;
+            if (hwRatio > 3.0f)
+                return true;
+        }
+
+        var text = chunk.CombinedText?.Trim();
+        if (string.IsNullOrEmpty(text)) return false;
+
+        // 2. 空白除去後の反復単一文字（例: "！！！", "！ ！ ！"）
+        var stripped = text.Replace(" ", "").Replace("\u3000", "");
+        if (stripped.Length >= 2 && stripped.Distinct().Count() == 1 && !char.IsLetterOrDigit(stripped[0]))
+            return true;
+
+        // 3. 単一の非英数字文字（例: "！", "？", "・"）
+        if (stripped.Length == 1 && !char.IsLetterOrDigit(stripped[0]))
+            return true;
+
+        // 4. [Issue #397] Gate C: 短い非CJKテキスト + 非英数字文字（OCRノイズ）
+        //    例: "N (A) Ä" → stripped "N(A)Ä" → 非英数字 '(' ')' を含む → garbage
+        if (stripped.Length >= 2 && stripped.Length <= 5
+            && !HasCjkCharacter(stripped)
+            && stripped.Any(c => !char.IsLetterOrDigit(c)))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// [Issue #397] Gate C: CJK文字（漢字・ひらがな・カタカナ）を含むか判定
+    /// </summary>
+    private static bool HasCjkCharacter(string text)
+    {
+        foreach (var c in text)
+        {
+            if (c is (>= '\u4E00' and <= '\u9FFF')   // CJK統合漢字
+                  or (>= '\u3040' and <= '\u309F')     // ひらがな
+                  or (>= '\u30A0' and <= '\u30FF'))     // カタカナ
+                return true;
+        }
+        return false;
+    }
+
     private static bool IsRepetitiveHallucination(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -2054,8 +2118,70 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             "🚪 [Issue #293] Gate判定開始: ChunkCount={Count}, RoiManager={RoiEnabled}, ImageSize={Width}x{Height}",
             chunks.Count, roiEnabled, imageWidth, imageHeight);
 
-        foreach (var chunk in chunks)
+        // [Issue #397] ゾーンベースSourceIDの事前計算
+        // 同一ゾーン内の複数チャンクがGate状態を相互汚染する問題を防止
+        // → ゾーンごとに最長テキストのチャンクのみGate評価、他は自動通過
+        // 注: 変化検知グリッド(16x9)より粗い8x6を使用。OCRのチャンク境界揺れ（数ピクセル）で
+        // 隣接ゾーンに振り分けられることを防ぎ、Gate状態の安定性を優先する設計。
+        const int zoneColumns = 8;
+        const int zoneRows = 6;
+        var chunkZoneMap = new Dictionary<int, string>(); // chunkIndex → sourceId
+        var zoneRepresentative = new Dictionary<string, int>(); // sourceId → longest chunk index
+
+        for (int i = 0; i < chunks.Count; i++)
         {
+            var chunk = chunks[i];
+            var text = chunk.CombinedText ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                chunkZoneMap[i] = string.Empty;
+                continue;
+            }
+
+            string sourceId;
+            if (imageWidth > 0 && imageHeight > 0)
+            {
+                var centerX = chunk.CombinedBounds.X + chunk.CombinedBounds.Width / 2;
+                var centerY = chunk.CombinedBounds.Y + chunk.CombinedBounds.Height / 2;
+                var zoneCol = Math.Clamp(centerX * zoneColumns / imageWidth, 0, zoneColumns - 1);
+                var zoneRow = Math.Clamp(centerY * zoneRows / imageHeight, 0, zoneRows - 1);
+                sourceId = $"zone_{zoneRow}_{zoneCol}";
+            }
+            else
+            {
+                sourceId = $"chunk_{chunk.CombinedBounds.X}_{chunk.CombinedBounds.Y}";
+            }
+
+            chunkZoneMap[i] = sourceId;
+
+            // 同一ゾーン内で最長テキストのチャンクを代表として記録
+            if (!zoneRepresentative.TryGetValue(sourceId, out var existingIdx) ||
+                text.Length > (chunks[existingIdx].CombinedText?.Length ?? 0))
+            {
+                zoneRepresentative[sourceId] = i;
+            }
+        }
+
+        // [Issue #397] ゾーン重複検出のログ
+        var duplicateZones = zoneRepresentative.Where(kv =>
+            chunkZoneMap.Count(z => z.Value == kv.Key) > 1).ToList();
+        if (duplicateZones.Count > 0)
+        {
+            foreach (var dz in duplicateZones)
+            {
+                var chunkCount = chunkZoneMap.Count(z => z.Value == dz.Key);
+                _logger?.LogDebug(
+                    "[Issue #397] ゾーン重複検出: {Zone} に{Count}チャンク → 代表チャンク(idx={RepIdx})のみGate評価",
+                    dz.Key, chunkCount, dz.Value);
+            }
+        }
+
+        // Gate評価済みゾーンのトラッキング
+        var evaluatedZones = new HashSet<string>();
+
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            var chunk = chunks[i];
             if (cancellationToken.IsCancellationRequested)
                 break;
 
@@ -2066,8 +2192,30 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 continue;
             }
 
-            // ソースIDを生成（座標ベース）
-            var sourceId = $"chunk_{chunk.CombinedBounds.X}_{chunk.CombinedBounds.Y}_{chunk.CombinedBounds.Width}_{chunk.CombinedBounds.Height}";
+            var sourceId = chunkZoneMap[i];
+
+            // [Issue #397] 同一ゾーンで既にGate評価済み → Gate状態汚染防止のため自動通過
+            if (evaluatedZones.Contains(sourceId))
+            {
+                gatedChunks.Add(chunk);
+                gatePassedCount++;
+                _logger?.LogDebug(
+                    "🚪 [Issue #397] Gate AUTO-PASS (同一ゾーン既評価): Zone={Zone}, Text='{Text}'",
+                    sourceId, text.Length > 30 ? text[..30] + "..." : text);
+                continue;
+            }
+
+            // [Issue #397] 代表チャンク以外はGate評価をスキップ（自動通過）
+            // 代表チャンク = 同一ゾーン内で最長テキストを持つチャンク
+            if (zoneRepresentative.TryGetValue(sourceId, out var repIdx) && repIdx != i)
+            {
+                gatedChunks.Add(chunk);
+                gatePassedCount++;
+                _logger?.LogDebug(
+                    "🚪 [Issue #397] Gate AUTO-PASS (非代表チャンク): Zone={Zone}, Text='{Text}'",
+                    sourceId, text.Length > 30 ? text[..30] + "..." : text);
+                continue;
+            }
 
             // 正規化座標を計算
             GateRegionInfo? regionInfo = null;
@@ -2082,7 +2230,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 float? heatmapValue = null;
                 if (_roiManager?.IsEnabled == true)
                 {
-                    // チャンクの中心座標でヒートマップ値を取得
                     var centerX = normalizedX + normalizedWidth / 2f;
                     var centerY = normalizedY + normalizedHeight / 2f;
                     heatmapValue = _roiManager.GetHeatmapValueAt(centerX, centerY);
@@ -2097,12 +2244,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     : GateRegionInfo.FromCoordinates(normalizedX, normalizedY, normalizedWidth, normalizedHeight);
             }
 
-            // Gate判定を実行
+            // Gate判定を実行（代表チャンクのみ）
             var gateResult = await _textChangeDetectionService.DetectChangeWithGateAsync(
                 text,
                 sourceId,
                 regionInfo,
                 cancellationToken).ConfigureAwait(false);
+
+            evaluatedZones.Add(sourceId);
 
             if (gateResult.ShouldTranslate)
             {

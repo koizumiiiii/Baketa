@@ -82,22 +82,24 @@ public sealed record ImageChangeDetectionSettings
     public bool EnableGridPartitioning { get; init; } = true;
 
     /// <summary>
-    /// [Issue #229] グリッドの行数
+    /// [Issue #229][Issue #397] グリッドの行数
     /// </summary>
     /// <remarks>
-    /// デフォルト: 4（4x4=16ブロック）
-    /// 推奨範囲: 3-6
+    /// デフォルト: 9（16x9=144ブロック、16:9画面で80x80正方形ブロック）
+    /// 推奨範囲: 4-16
+    /// [Issue #397] 4x4→16x9に細分化。変化検知精度の向上と隣接ブロック拡張コストの削減。
     /// </remarks>
-    public int GridRows { get; init; } = 4;
+    public int GridRows { get; init; } = 9;
 
     /// <summary>
-    /// [Issue #229] グリッドの列数
+    /// [Issue #229][Issue #397] グリッドの列数
     /// </summary>
     /// <remarks>
-    /// デフォルト: 4（4x4=16ブロック）
-    /// 推奨範囲: 3-6
+    /// デフォルト: 16（16x9=144ブロック、16:9画面で80x80正方形ブロック）
+    /// 推奨範囲: 4-16
+    /// [Issue #397] 4x4→16x9に細分化。変化検知精度の向上と隣接ブロック拡張コストの削減。
     /// </remarks>
-    public int GridColumns { get; init; } = 4;
+    public int GridColumns { get; init; } = 16;
 
     /// <summary>
     /// [Issue #229] グリッドブロック単位の類似度閾値
