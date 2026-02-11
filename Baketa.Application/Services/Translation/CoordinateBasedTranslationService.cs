@@ -753,25 +753,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // Phase 12.2完全移行完了: AggregatedChunksReadyEventHandler経由で翻訳 + オーバーレイ表示
             // [Issue #386] Phase 12.2デッドコード削除完了
         }
-        catch (TaskCanceledException ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // 🚨 [CRITICAL_FIX] TaskCanceledException詳細をERRORレベルでログ出力
-            _logger?.LogError(ex, "🚨 座標ベース翻訳処理がキャンセル/タイムアウトしました - これがバッチ翻訳実行されない根本原因");
-
-            Console.WriteLine($"🚨 [CRITICAL_FIX] TaskCanceledException発生: {ex.Message}");
-            Console.WriteLine($"🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {ex.CancellationToken.IsCancellationRequested}");
-            Console.WriteLine($"🚨 [CRITICAL_FIX] スタックトレース: {ex.StackTrace}");
-
-            // 🔥 [FILE_CONFLICT_FIX_15] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogError("🚨 [CRITICAL_FIX] TaskCanceledException発生: {Message}", ex.Message);
-            // 🔥 [FILE_CONFLICT_FIX_16] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogError("🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {IsCancellationRequested}",
-                ex.CancellationToken.IsCancellationRequested);
-            // 🔥 [FILE_CONFLICT_FIX_17] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogError("🚨 [CRITICAL_FIX] スタックトレース: {StackTrace}",
-                ex.StackTrace?.Replace(Environment.NewLine, " | "));
-
-            return;
+            // [Issue #402] Stop操作によるキャンセル → DEBUGレベルでログ出力し、rethrowで呼び出し元に伝搬
+            _logger?.LogDebug("座標ベース翻訳処理がキャンセルされました（Stop操作）");
+            throw;
         }
         catch (Exception ex)
         {
