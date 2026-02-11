@@ -190,10 +190,19 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
 
     /// <summary>
     /// [Issue #392] コンテキストIDを生成（外部からのフィードバック用）
+    /// [Issue #403] 1pxジッタ吸収: X, Y, Width, Heightを2px単位に丸めてコンテキストIDを正規化
+    /// キャプチャ高さが719↔720pxで交互に変化するケースで、異なるIDが生成されるのを防止
+    /// 丸めはID文字列のみに適用し、実画像データには影響しない
     /// </summary>
     public static string BuildContextId(IntPtr windowHandle, Rectangle captureRegion)
     {
-        return $"window_{windowHandle}_region_{captureRegion.X}_{captureRegion.Y}_{captureRegion.Width}_{captureRegion.Height}";
+        // [Issue #403] 切り上げ偶数丸め: 隣接する奇数/偶数が同じ値にマップされる
+        // 例: 719→720, 720→720（& ~1だと719→718, 720→720で異なるIDになるため不可）
+        var x = (captureRegion.X + 1) & ~1;
+        var y = (captureRegion.Y + 1) & ~1;
+        var w = (captureRegion.Width + 1) & ~1;
+        var h = (captureRegion.Height + 1) & ~1;
+        return $"window_{windowHandle}_region_{x}_{y}_{w}_{h}";
     }
 
     /// <summary>

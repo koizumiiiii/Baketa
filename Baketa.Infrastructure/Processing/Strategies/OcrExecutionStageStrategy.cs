@@ -65,7 +65,11 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
     // [Issue #293 Phase 7.2] テキスト欠落防止: 水平方向拡張（Gemini推奨）
     // 理由: テキストは通常水平方向に伸びるため、ROIの左右を相対的に拡張
     // 例: 元の幅640pxに対して左右各15% → 640 + 96×2 = 832px
-    private const float RoiHorizontalExpansionRatio = 0.15f; // 水平方向15%拡張
+    private const float RoiHorizontalExpansionRatio = 0.15f; // 学習済みROI用: 水平方向15%拡張
+
+    // [Issue #404] 変化検出ベースROI専用: テキストが変化領域境界を跨ぐケースに対応
+    // 学習済みROIは精度が高いため控えめ(15%)、変化領域は境界にテキストが跨ぐリスクが高いため大きめ(25%)
+    private const float ChangeDetectionRoiHorizontalExpansionRatio = 0.25f;
 
     // [Issue #293 Phase 7.1] 探索モード時のテキスト欠落防止
     // ヒートマップ値がこの閾値以上のブロックもOCR対象に追加（MinConfidenceForRegion=0.3より低く設定）
@@ -1094,7 +1098,7 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
     /// <returns>拡張適用済みの領域リスト</returns>
     /// <remarks>
     /// 変化領域ベースの部分OCRでテキストが境界で切れる問題を解決。
-    /// - 水平方向: 15%拡張（テキストは横に伸びやすい）
+    /// - 水平方向: 25%拡張（[Issue #404] テキストが変化領域境界を跨ぐケースに対応）
     /// - 垂直方向: 30%拡張（複数行テキスト対応、上下に行が追加される場合）
     /// </remarks>
     private static List<Rectangle> ExpandRegionsHorizontally(
@@ -1111,8 +1115,8 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
 
         foreach (var region in regions)
         {
-            // 水平方向15%拡張（学習済みROIと同じ）
-            var horizontalExpansion = (int)(region.Width * RoiHorizontalExpansionRatio);
+            // [Issue #404] 水平方向25%拡張（変化検出ROI専用 - 境界テキスト対応）
+            var horizontalExpansion = (int)(region.Width * ChangeDetectionRoiHorizontalExpansionRatio);
 
             // 垂直方向30%拡張（複数行テキスト対応）
             var verticalExpansion = (int)(region.Height * RoiVerticalExpansionRatio);
