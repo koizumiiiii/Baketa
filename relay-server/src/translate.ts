@@ -1510,7 +1510,8 @@ Expert game localizer. Output JSON ONLY.
 Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
 ${contextHint}
 
-Must include: Dialogs, UI buttons, menus, and all labels. Do not skip any items.
+Must include: Dialogs, UI buttons, menus, and all labels.
+Do not invent or guess text that is not clearly visible in the image.
 
 # Guidelines
 - Creative localization, not word-for-word.
@@ -1712,7 +1713,8 @@ async function translateWithOpenAI(
 Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
 ${contextHint}
 
-Must include: Dialogs, UI buttons, menus, and all labels. Do not skip any items.
+Must include: Dialogs, UI buttons, menus, and all labels.
+Do not invent or guess text that is not clearly visible in the image.
 
 # Guidelines
 - Creative localization, not word-for-word.
