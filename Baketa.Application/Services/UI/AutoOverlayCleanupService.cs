@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 using Baketa.Core.Events.Capture;
@@ -32,6 +33,8 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     private readonly IEventAggregator _eventAggregator;
     private readonly ILogger<AutoOverlayCleanupService> _logger;
     private readonly IOptionsMonitor<AutoOverlayCleanupSettings> _settings;
+    // [Issue #407] オーバーレイ削除時のGate状態リセット用（オプショナル）
+    private readonly ITextChangeDetectionService? _textChangeDetectionService;
 
     // Circuit Breaker設定（IOptions経由で動的取得）
     private float MinConfidenceScore => _settings.CurrentValue.MinConfidenceScore;
@@ -66,12 +69,14 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         IOverlayManager overlayManager,
         IEventAggregator eventAggregator,
         ILogger<AutoOverlayCleanupService> logger,
-        IOptionsMonitor<AutoOverlayCleanupSettings> settings)
+        IOptionsMonitor<AutoOverlayCleanupSettings> settings,
+        ITextChangeDetectionService? textChangeDetectionService = null) // [Issue #407] Gate状態リセット用
     {
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _textChangeDetectionService = textChangeDetectionService;
     }
 
     /// <inheritdoc />
@@ -197,6 +202,14 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             // 暫定対応: 全オーバーレイを削除
             await _overlayManager.HideAllAsync().ConfigureAwait(false);
             totalCleaned = regions.Count; // 暫定的に領域数でカウント
+
+            // [Issue #407] Gate状態リセット: オーバーレイ削除後に同じテキストが再出現した場合に再翻訳可能にする
+            if (_textChangeDetectionService != null)
+            {
+                _textChangeDetectionService.ClearAllPreviousTexts();
+                _logger.LogInformation(
+                    "[Issue #407] オーバーレイ削除に伴いGate状態をリセット");
+            }
 
             _logger.LogWarning("⚠️ [OVERLAY_UNIFICATION] 領域指定削除未実装のため全オーバーレイを削除 - WindowHandle: {WindowHandle}, 対象領域数: {RegionCount}",
                 windowHandle, regions.Count);
