@@ -34,6 +34,7 @@ using Baketa.Core.Models.Text; // [Issue #293] TextChangeWithGateResult, GateReg
 using IWindowManager = Baketa.Core.Abstractions.Platform.IWindowManager; // [Issue #293] ウィンドウ情報取得用
 using Baketa.Core.Utilities;
 // [Issue #392] Mechanism A/B削除: テキスト消失/変化検知はDetection段階のIsTextDisappearance()に移行
+using System.Collections.Concurrent; // [Issue #397] PreviousOcrTextキャッシュ用
 using System.Diagnostics; // [Issue #290] Fork-Join計測用
 // NOTE: [PP-OCRv5削除] BatchProcessing参照削除
 using Baketa.Infrastructure.Translation.Local;
@@ -65,10 +66,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService; // [Issue #290] Cloud翻訳可用性チェック
     private readonly IRoiManager? _roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
     private readonly IWindowManager? _windowManager; // [Issue #293] ウィンドウ情報取得用
+    private readonly IOptionsMonitor<ImageChangeDetectionSettings>? _imageChangeSettings; // [Issue #401] 画面安定化設定
     private bool _disposed;
+
+    // [Issue #401] ヒステリシス: ウィンドウごとの画面安定化スキップ状態
+    private readonly ConcurrentDictionary<IntPtr, bool> _screenStabilizationActive = new();
 
     // 🔥 [PHASE13.1_P1] スレッドセーフなChunkID生成カウンター（衝突リスク完全排除）
     private static int _nextChunkId = 1000000;
+
+    // [Issue #397] ウィンドウハンドルごとの前回OCRテキストキャッシュ（テキスト変化検知用）
+    private readonly ConcurrentDictionary<IntPtr, string> _previousOcrTextCache = new();
+
 
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
     // Gemini Vision APIの処理時間はピクセル数に比例するため、テキスト翻訳に十分な解像度に縮小
@@ -90,6 +99,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null, // [Issue #290] Cloud翻訳可用性チェック
         IRoiManager? roiManager = null, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
         IWindowManager? windowManager = null, // [Issue #293] ウィンドウ情報取得用
+        IOptionsMonitor<ImageChangeDetectionSettings>? imageChangeSettings = null, // [Issue #401] 画面安定化設定
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -105,6 +115,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
         _roiManager = roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
         _windowManager = windowManager; // [Issue #293] ウィンドウ情報取得用
+        _imageChangeSettings = imageChangeSettings; // [Issue #401] 画面安定化設定
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -239,6 +250,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // [Issue #290] Fork-Join並列実行: OCRとCloud AI翻訳を同時に開始
             // ============================================================
             Task<FallbackTranslationResult?>? forkJoinCloudTask = null;
+            // [Issue #397] Fork-Join用CTS: テキスト変化なし時にCloud翻訳をキャンセルしてトークン浪費を防止
+            using var forkJoinCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             string? forkJoinImageBase64 = null;
             int forkJoinContextWidth = 0;
             int forkJoinContextHeight = 0;
@@ -280,7 +293,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     forkJoinContextHeight,
                     forkJoinCloudImageWidth,   // [Issue #381] 実際のCloud画像サイズ（ログ用）
                     forkJoinCloudImageHeight,  // [Issue #381]
-                    cancellationToken);
+                    forkJoinCts.Token);  // [Issue #397] Fork-Join専用CTS（テキスト未変化時キャンセル可能）
 
                 _logger?.LogDebug("[Issue #290] Cloud AI翻訳タスク開始（OCRと並列実行中）");
             }
@@ -291,6 +304,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             // ProcessingPipelineInput作成（ContextIdは計算プロパティのため省略）
             // 🔥 [PHASE2.5_ROI_COORD_FIX] image.CaptureRegionを保持し、ROI座標オフセットを適用可能にする
+            // [Issue #397] 前回のOCRテキストをキャッシュから取得
+            _previousOcrTextCache.TryGetValue(windowHandle, out var previousOcrText);
+
             var pipelineInput = new Baketa.Core.Models.Processing.ProcessingPipelineInput
             {
                 CapturedImage = image,
@@ -300,7 +316,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 // 🚀 [Issue #193] GPU Shaderリサイズ後のOCR座標スケーリング用に元ウィンドウサイズを設定
                 OriginalWindowSize = GetOriginalWindowSize(windowHandle),
                 // 🔥 [Issue #193/#194] キャプチャ時に実行済みのOCR結果を伝達（二重OCR防止）
-                PreExecutedOcrResult = preExecutedOcrResult
+                PreExecutedOcrResult = preExecutedOcrResult,
+                // [Issue #397] テキスト変化検知用の前回OCRテキスト
+                PreviousOcrText = previousOcrText
             };
 
             // パイプライン実行（ImageChangeDetection → OcrExecution）
@@ -318,8 +336,69 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 _logger?.LogInformation("🎯 [OPTION_A] 画面変化なし - 早期リターン (EarlyTerminated: {EarlyTerminated})",
                     pipelineResult.Metrics.EarlyTerminated);
 
+                // [Issue #397] Fork-JoinのCloud翻訳をキャンセルしてトークン浪費を抑制
+                if (forkJoinCloudTask != null)
+                {
+                    _logger?.LogDebug("[Issue #397] テキスト未変化 - Fork-Join Cloud翻訳をキャンセル");
+                    await forkJoinCts.CancelAsync().ConfigureAwait(false);
+                }
+
                 ocrMeasurement.Complete();
                 return; // 翻訳処理をスキップして即座にリターン
+            }
+
+            // [Issue #401] 画面安定化チェック（ヒステリシス付き）
+            // 画面がまだ遷移中（シーン切替、テキスト送りの途中等）の可能性がある場合、
+            // パイプライン全体をスキップして安定してからOCR + Cloud AIを実行する
+            if (pipelineResult.ImageChangeResult != null)
+            {
+                var settings = _imageChangeSettings?.CurrentValue;
+                var stabilizationThreshold = settings?.ScreenStabilizationThreshold ?? 0.50f;
+                var recoveryThreshold = settings?.ScreenStabilizationRecoveryThreshold ?? 0.35f;
+                var changePercentage = pipelineResult.ImageChangeResult.ChangePercentage;
+                var hasPreviousBaseline = _previousOcrTextCache.ContainsKey(windowHandle);
+                var isStabilizationActive = _screenStabilizationActive.GetValueOrDefault(windowHandle, false);
+
+                // ヒステリシス判定: スキップ中は低い閾値（recovery）、通常時は高い閾値で判定
+                var shouldSkip = hasPreviousBaseline &&
+                    (isStabilizationActive
+                        ? changePercentage > recoveryThreshold   // スキップ中: recovery閾値を下回るまで継続
+                        : changePercentage > stabilizationThreshold); // 通常: 高い閾値を超えたらスキップ開始
+
+                if (shouldSkip)
+                {
+                    _screenStabilizationActive[windowHandle] = true;
+                    _logger?.LogInformation(
+                        "[Issue #401] 画面安定化待ち: パイプライン全体をスキップ " +
+                        "(ChangePercentage={Pct:F2}, Threshold={Threshold:F2}, Recovery={Recovery:F2}, Active={Active}) - 次サイクルで再試行",
+                        changePercentage, stabilizationThreshold, recoveryThreshold, isStabilizationActive);
+
+                    // Fork-Join Cloud翻訳をキャンセル（トークン浪費防止）
+                    if (forkJoinCloudTask != null)
+                    {
+                        await forkJoinCts.CancelAsync().ConfigureAwait(false);
+                    }
+
+                    // OCRテキストキャッシュは更新しない（次サイクルで再度変化を検知するため）
+                    ocrMeasurement.Complete();
+                    return;
+                }
+
+                // 安定化解除
+                if (isStabilizationActive)
+                {
+                    _screenStabilizationActive[windowHandle] = false;
+                    _logger?.LogInformation(
+                        "[Issue #401] 画面安定化完了: 処理を再開 (ChangePercentage={Pct:F2})",
+                        changePercentage);
+                }
+            }
+
+            // [Issue #397] 安定化チェック通過後にOCRテキストキャッシュを更新（次サイクルのテキスト変化検知用）
+            // ※安定化スキップ時はここに到達しないため、キャッシュは更新されない
+            if (!string.IsNullOrEmpty(pipelineResult.OcrResultText))
+            {
+                _previousOcrTextCache[windowHandle] = pipelineResult.OcrResultText;
             }
 
             // ✅ [DEBUG_FIX] 画面変化が検出されたことを明示的にログ出力
@@ -377,6 +456,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogDebug($"🎯 [OPTION_A] OCR結果取得 - ChunkCount: {textChunks.Count}");
             _logger?.LogDebug("🎯 [OPTION_A] OCR結果取得 - ChunkCount: {ChunkCount}, CancellationToken.IsCancellationRequested: {IsCancellationRequested}",
                 textChunks.Count, cancellationToken.IsCancellationRequested);
+
+            // [Issue #397] Gate B: OCR結果が空の場合、Cloud AI結果を破棄
+            if (textChunks.Count == 0 && forkJoinCloudTask != null)
+            {
+                _logger?.LogInformation(
+                    "[Issue #397] Gate B: OCRチャンク0件 - Cloud AI結果を破棄してトークン浪費防止");
+                await forkJoinCts.CancelAsync().ConfigureAwait(false);
+                forkJoinCloudTask = null;
+            }
 
             // 🚀 [FIX] OCR完了後はキャンセル無視でバッチ翻訳を実行（並列チャンク処理実現のため）
             if (textChunks.Count > 0 && cancellationToken.IsCancellationRequested)
@@ -665,25 +753,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // Phase 12.2完全移行完了: AggregatedChunksReadyEventHandler経由で翻訳 + オーバーレイ表示
             // [Issue #386] Phase 12.2デッドコード削除完了
         }
-        catch (TaskCanceledException ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // 🚨 [CRITICAL_FIX] TaskCanceledException詳細をERRORレベルでログ出力
-            _logger?.LogError(ex, "🚨 座標ベース翻訳処理がキャンセル/タイムアウトしました - これがバッチ翻訳実行されない根本原因");
-
-            Console.WriteLine($"🚨 [CRITICAL_FIX] TaskCanceledException発生: {ex.Message}");
-            Console.WriteLine($"🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {ex.CancellationToken.IsCancellationRequested}");
-            Console.WriteLine($"🚨 [CRITICAL_FIX] スタックトレース: {ex.StackTrace}");
-
-            // 🔥 [FILE_CONFLICT_FIX_15] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogError("🚨 [CRITICAL_FIX] TaskCanceledException発生: {Message}", ex.Message);
-            // 🔥 [FILE_CONFLICT_FIX_16] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogError("🚨 [CRITICAL_FIX] CancellationToken.IsCancellationRequested: {IsCancellationRequested}",
-                ex.CancellationToken.IsCancellationRequested);
-            // 🔥 [FILE_CONFLICT_FIX_17] ファイルアクセス競合回避のためILogger使用
-            _logger?.LogError("🚨 [CRITICAL_FIX] スタックトレース: {StackTrace}",
-                ex.StackTrace?.Replace(Environment.NewLine, " | "));
-
-            return;
+            // [Issue #402] Stop操作によるキャンセル → DEBUGレベルでログ出力し、rethrowで呼び出し元に伝搬
+            _logger?.LogDebug("座標ベース翻訳処理がキャンセルされました（Stop操作）");
+            throw;
         }
         catch (Exception ex)
         {
@@ -1652,6 +1726,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             {
                 disposableBatchProcessor.Dispose();
             }
+
+            // [Issue #397] OCRテキストキャッシュのクリア（メモリリーク防止）
+            _previousOcrTextCache.Clear();
 
             _disposed = true;
             _logger?.LogInformation("🧹 CoordinateBasedTranslationService disposed - Hash: {Hash}", this.GetHashCode());

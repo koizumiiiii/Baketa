@@ -124,8 +124,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     EnablePerformanceLogging = configuration.GetValue<bool>("ImageChangeDetection:EnablePerformanceLogging", true),
                     // [Issue #229] グリッド分割ハッシュ設定
                     EnableGridPartitioning = configuration.GetValue<bool>("ImageChangeDetection:EnableGridPartitioning", true),
-                    GridRows = configuration.GetValue<int>("ImageChangeDetection:GridRows", 4),
-                    GridColumns = configuration.GetValue<int>("ImageChangeDetection:GridColumns", 4),
+                    GridRows = configuration.GetValue<int>("ImageChangeDetection:GridRows", 9),
+                    GridColumns = configuration.GetValue<int>("ImageChangeDetection:GridColumns", 16),
                     GridBlockSimilarityThreshold = configuration.GetValue<float>("ImageChangeDetection:GridBlockSimilarityThreshold", 0.98f),
                     // [Issue #302] 下部ゾーン高感度化設定
                     EnableLowerZoneHighSensitivity = configuration.GetValue<bool>("ImageChangeDetection:EnableLowerZoneHighSensitivity", true),
@@ -1062,7 +1062,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     cachedGrid.ImageChecksum, currentChecksum);
 
                 // テキスト領域（下部）を優先的に変化ブロックとして追加
-                var textRow = rows - 1; // 最下行（Row=3 for 4x4 grid）
+                var textRow = rows - 1; // [Issue #397] 最下行（動的: 16x9ならRow=8）
                 for (int col = 0; col < cols; col++)
                 {
                     var blockIndex = textRow * cols + col;
@@ -1082,17 +1082,18 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             // 🔍 [DIAGNOSTIC] MinSimilarity=1.0000の場合、詳細ログ出力
             if (minSimilarity >= 0.9999f)
             {
-                // テキスト領域が含まれる下部ブロック（Row=3）のハッシュ値を確認
-                var row3Block0 = blockResults.FirstOrDefault(b => b.Row == 3 && b.Col == 0);
-                if (row3Block0.Hash != null)
+                // [Issue #397] テキスト領域が含まれる最終行ブロックのハッシュ値を確認
+                var lastRow = rows - 1;
+                var lastRowBlock0 = blockResults.FirstOrDefault(b => b.Row == lastRow && b.Col == 0);
+                if (lastRowBlock0.Hash != null)
                 {
-                    var cachedHash = cachedGrid.BlockHashes[row3Block0.Index];
-                    var currentHash = row3Block0.Hash;
+                    var cachedHash = cachedGrid.BlockHashes[lastRowBlock0.Index];
+                    var currentHash = lastRowBlock0.Hash;
                     // ハッシュの先頭8文字を比較用に出力
                     var cachedShort = cachedHash.Length > 8 ? cachedHash[..8] : cachedHash;
                     var currentShort = currentHash.Length > 8 ? currentHash[..8] : currentHash;
-                    _logger.LogDebug("🔍 [NewStage1_DIAG] MinSim=1.0 - Block[3,0] CachedHash={Cached}..., CurrentHash={Current}..., CacheAge={Age:F1}s",
-                        cachedShort, currentShort, (DateTime.UtcNow - cachedGrid.Timestamp).TotalSeconds);
+                    _logger.LogDebug("🔍 [NewStage1_DIAG] MinSim=1.0 - Block[{LastRow},0] CachedHash={Cached}..., CurrentHash={Current}..., CacheAge={Age:F1}s",
+                        lastRow, cachedShort, currentShort, (DateTime.UtcNow - cachedGrid.Timestamp).TotalSeconds);
                 }
 
                 // 🔍 [DIAGNOSTIC] 画像バイト単位のチェックサム比較
@@ -1512,16 +1513,17 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         {
             try
             {
-                // 簡易グリッドベース領域分割検出
+                // [Issue #397] 設定値ベースのグリッド領域分割検出
                 var regions = new List<Rectangle>();
-                var gridSize = 4; // 4x4グリッド
+                var gridCols = _settings.GridColumns;
+                var gridRows = _settings.GridRows;
 
-                var regionWidth = currentImage.Width / gridSize;
-                var regionHeight = currentImage.Height / gridSize;
+                var regionWidth = currentImage.Width / gridCols;
+                var regionHeight = currentImage.Height / gridRows;
 
-                for (int y = 0; y < gridSize; y++)
+                for (int y = 0; y < gridRows; y++)
                 {
-                    for (int x = 0; x < gridSize; x++)
+                    for (int x = 0; x < gridCols; x++)
                     {
                         regions.Add(new Rectangle(
                             x * regionWidth,
@@ -1531,7 +1533,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                     }
                 }
 
-                return [.. regions.Take(3)]; // 最大3領域まで（デモ実装）
+                return [.. regions.Take(gridCols)]; // 最大1行分の領域
             }
             catch
             {

@@ -86,6 +86,21 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                 contextId,
                 cancellationToken).ConfigureAwait(false);
 
+            // [Issue #302 DEBUG] EnhancedImageChangeDetectionServiceからの結果を詳細ログ
+            _logger.LogInformation("🔍 [STAGE_RESULT_DEBUG] EnhancedImageChangeDetectionService結果: HasChanged={HasChanged}, ChangePercentage={ChangePercentage:F4}, DetectionStage={DetectionStage}",
+                changeResult.HasChanged, changeResult.ChangePercentage, changeResult.DetectionStage);
+
+            var processingResult = CreateLegacyResult(changeResult);
+
+            // 🎯 [Issue #407] テキスト消失イベント発行（前回画像破棄前に実行 - ピクセル比較に必要）
+            await TryPublishTextDisappearanceEventAsync(
+                changeResult,
+                previousImageToUse,
+                currentImage,
+                input.SourceWindowHandle,
+                input.CaptureRegion,
+                cancellationToken).ConfigureAwait(false);
+
             // 🔥 [PHASE11_FIX] コンテキストID別に前回画像を更新（リソース管理付き）
             // 古い画像を破棄してから新しい画像を保存
             try
@@ -101,20 +116,6 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             {
                 _logger.LogWarning(disposeEx, "前回画像の破棄でエラー: {Message}", disposeEx.Message);
             }
-
-            // [Issue #302 DEBUG] EnhancedImageChangeDetectionServiceからの結果を詳細ログ
-            _logger.LogInformation("🔍 [STAGE_RESULT_DEBUG] EnhancedImageChangeDetectionService結果: HasChanged={HasChanged}, ChangePercentage={ChangePercentage:F4}, DetectionStage={DetectionStage}",
-                changeResult.HasChanged, changeResult.ChangePercentage, changeResult.DetectionStage);
-
-            var processingResult = CreateLegacyResult(changeResult);
-
-            // 🎯 UltraThink Phase 1: テキスト消失イベント発行（オーバーレイ自動削除システム統合）
-            await TryPublishTextDisappearanceEventAsync(
-                changeResult,
-                previousImageToUse,
-                input.SourceWindowHandle,
-                input.CaptureRegion,
-                cancellationToken).ConfigureAwait(false);
 
             _logger.LogDebug("🎯 拡張画像変化検知完了 - 変化: {HasChanged}, Stage: {DetectionStage}, 変化率: {ChangePercentage:F3}%, 処理時間: {ProcessingTimeMs}ms",
                 changeResult.HasChanged,
@@ -190,10 +191,19 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
 
     /// <summary>
     /// [Issue #392] コンテキストIDを生成（外部からのフィードバック用）
+    /// [Issue #403] 1pxジッタ吸収: X, Y, Width, Heightを2px単位に丸めてコンテキストIDを正規化
+    /// キャプチャ高さが719↔720pxで交互に変化するケースで、異なるIDが生成されるのを防止
+    /// 丸めはID文字列のみに適用し、実画像データには影響しない
     /// </summary>
     public static string BuildContextId(IntPtr windowHandle, Rectangle captureRegion)
     {
-        return $"window_{windowHandle}_region_{captureRegion.X}_{captureRegion.Y}_{captureRegion.Width}_{captureRegion.Height}";
+        // [Issue #403] 切り上げ偶数丸め: 隣接する奇数/偶数が同じ値にマップされる
+        // 例: 719→720, 720→720（& ~1だと719→718, 720→720で異なるIDになるため不可）
+        var x = (captureRegion.X + 1) & ~1;
+        var y = (captureRegion.Y + 1) & ~1;
+        var w = (captureRegion.Width + 1) & ~1;
+        var h = (captureRegion.Height + 1) & ~1;
+        return $"window_{windowHandle}_region_{x}_{y}_{w}_{h}";
     }
 
     /// <summary>
@@ -520,19 +530,21 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
 
     /// <summary>
     /// テキスト消失イベント発行（UltraThink Phase 1: オーバーレイ自動削除システム統合）
-    /// 
+    ///
     /// 画像変化検知の結果に基づいてTextDisappearanceEventを発行する。
     /// 変化がない場合（テキストが消失した可能性）にイベントを発行し、
     /// AutoOverlayCleanupServiceによるオーバーレイ自動削除を促す。
     /// </summary>
     /// <param name="changeResult">画像変化検知結果</param>
     /// <param name="previousImage">前回画像（null可能）</param>
+    /// <param name="currentImage">現在画像（ピクセル変化率比較用）</param>
     /// <param name="windowHandle">ソースウィンドウハンドル</param>
     /// <param name="captureRegion">キャプチャ領域</param>
     /// <param name="cancellationToken">キャンセレーショントークン</param>
     private async Task TryPublishTextDisappearanceEventAsync(
         ImageChangeResult changeResult,
         IImage? previousImage,
+        IImage currentImage,
         IntPtr windowHandle,
         Rectangle captureRegion,
         CancellationToken cancellationToken)
@@ -550,7 +562,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             // 条件2: 画像に変化がある（!changeResult.HasChanged → changeResult.HasChanged に修正）
             // 条件3: テキスト消失パターンに該当する（IsTextDisappearance判定）
             var contextId = BuildContextId(windowHandle, captureRegion);
-            if (previousImage != null && changeResult.HasChanged && IsTextDisappearance(changeResult, contextId))
+            if (previousImage != null && changeResult.HasChanged && IsTextDisappearance(changeResult, contextId, previousImage, currentImage))
             {
                 // 消失領域をキャプチャ領域として設定
                 var disappearedRegions = new List<Rectangle> { captureRegion };
@@ -621,16 +633,22 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
 
     /// <summary>
     /// [Issue #392] テキスト消失/変化パターン判定（前回OCRテキスト位置 × 画像変化領域）
+    /// [Issue #407] ピクセル変化率チェック追加 - 微小背景変化による誤判定を防止
     /// </summary>
     /// <param name="changeResult">画像変化検知結果</param>
     /// <param name="contextId">コンテキストID</param>
+    /// <param name="previousImage">前回画像（ピクセル変化率比較用）</param>
+    /// <param name="currentImage">現在画像（ピクセル変化率比較用）</param>
     /// <returns>前回テキストがあった領域で画像変化が検知された場合true</returns>
     /// <remarks>
     /// 旧方式（Issue #230で無効化）: 画像変化率+SSIMのみ → 画面フリッカーで誤検知
     /// 新方式: 前回OCRで実際にテキストが検出された位置と、画像変化領域の重なりを判定
+    /// + [Issue #407] 重なり検出時にテキスト領域内のピクセル変化率が閾値以上か確認
     /// → 「テキストがあった場所が変わった」を事実ベースで検知
     /// </remarks>
-    private bool IsTextDisappearance(ImageChangeResult changeResult, string contextId)
+    private bool IsTextDisappearance(
+        ImageChangeResult changeResult, string contextId,
+        IImage? previousImage, IImage currentImage)
     {
         // 前回テキスト位置がない場合はfalse（初回OCR前、またはテキスト未検出）
         if (!_previousTextBounds.TryGetValue(contextId, out var textBounds) || textBounds.Length == 0)
@@ -653,6 +671,21 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             {
                 if (changedRegion.IntersectsWith(textRect))
                 {
+                    // [Issue #407] ピクセル変化率チェック: 微小な背景変化によるテキスト消失誤判定を防止
+                    if (previousImage != null)
+                    {
+                        var changeRate = CalculateTextAreaChangeRate(
+                            previousImage, currentImage, textRect);
+
+                        if (changeRate < TextAreaChangeThreshold)
+                        {
+                            _logger.LogDebug(
+                                "[Issue #407] テキスト領域内の変化率が低い({Rate:P1} < {Threshold:P0}) - 消失判定をスキップ (Text=({TX},{TY},{TW}x{TH}))",
+                                changeRate, TextAreaChangeThreshold, textRect.X, textRect.Y, textRect.Width, textRect.Height);
+                            continue; // この textRect は消失していない
+                        }
+                    }
+
                     _logger.LogInformation(
                         "[Issue #392] IsTextDisappearance: true - テキスト領域で変化検知 (Changed=({CX},{CY},{CW}x{CH}), Text=({TX},{TY},{TW}x{TH}))",
                         changedRegion.X, changedRegion.Y, changedRegion.Width, changedRegion.Height,
@@ -674,5 +707,76 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                 cr.X, cr.Y, cr.Width, cr.Height, tb.X, tb.Y, tb.Width, tb.Height);
         }
         return false;
+    }
+
+    /// <summary>
+    /// [Issue #407] テキスト領域変化閾値
+    /// テキスト領域内のピクセル変化率がこの値未満の場合、テキスト消失とは判定しない
+    /// </summary>
+    private const float TextAreaChangeThreshold = 0.30f;
+
+    /// <summary>
+    /// [Issue #407] テキスト領域内のピクセル変化率を計算（サンプリングベース高速版）
+    /// </summary>
+    /// <param name="previousImage">前回画像</param>
+    /// <param name="currentImage">現在画像</param>
+    /// <param name="textRect">テキストのバウンディングボックス</param>
+    /// <returns>変化率 (0.0-1.0)</returns>
+    private static float CalculateTextAreaChangeRate(
+        IImage previousImage, IImage currentImage, Rectangle textRect)
+    {
+        // 画像境界にクランプ
+        var imageRect = new Rectangle(0, 0,
+            Math.Min(previousImage.Width, currentImage.Width),
+            Math.Min(previousImage.Height, currentImage.Height));
+        var clampedRect = Rectangle.Intersect(textRect, imageRect);
+
+        if (clampedRect.IsEmpty || clampedRect.Width <= 0 || clampedRect.Height <= 0)
+            return 1.0f; // 領域外 → 安全側で「変化あり」
+
+        try
+        {
+            // PixelDataLock は readonly ref struct のため using 宣言不可、明示的に Dispose() を呼ぶ
+            var prevLock = previousImage.LockPixelData();
+            var currLock = currentImage.LockPixelData();
+
+            int changedPixels = 0;
+            int totalSampled = 0;
+
+            // 等間隔サンプリング（最大約100サンプル）
+            int stepX = Math.Max(1, clampedRect.Width / 10);
+            int stepY = Math.Max(1, clampedRect.Height / 10);
+
+            for (int y = clampedRect.Y; y < clampedRect.Y + clampedRect.Height; y += stepY)
+            {
+                for (int x = clampedRect.X; x < clampedRect.X + clampedRect.Width; x += stepX)
+                {
+                    int prevOffset = y * prevLock.Stride + x * 4; // BGRA32
+                    int currOffset = y * currLock.Stride + x * 4;
+
+                    if (prevOffset + 2 >= prevLock.Data.Length ||
+                        currOffset + 2 >= currLock.Data.Length)
+                        continue;
+
+                    int diffB = Math.Abs(prevLock.Data[prevOffset] - currLock.Data[currOffset]);
+                    int diffG = Math.Abs(prevLock.Data[prevOffset + 1] - currLock.Data[currOffset + 1]);
+                    int diffR = Math.Abs(prevLock.Data[prevOffset + 2] - currLock.Data[currOffset + 2]);
+
+                    if (diffR + diffG + diffB > 30)
+                        changedPixels++;
+
+                    totalSampled++;
+                }
+            }
+
+            prevLock.Dispose();
+            currLock.Dispose();
+
+            return totalSampled > 0 ? (float)changedPixels / totalSampled : 1.0f;
+        }
+        catch
+        {
+            return 1.0f; // エラー時は安全側で「変化あり」
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -19,8 +20,7 @@ using Baketa.Core.Events.Translation;
 using Baketa.Core.License.Models; // [Issue #78 Phase 4] FeatureType用
 using Baketa.Core.Models.Text; // [Issue #293] GateRegionInfo用
 using Baketa.Core.Models.Translation;
-using Baketa.Core.Models.Validation; // [Issue #78 Phase 4] ValidatedTextChunk用
-using Baketa.Core.Translation.Abstractions; // [Issue #78 Phase 4] IParallelTranslationOrchestrator用
+using Baketa.Core.Translation.Abstractions; // TranslatedTextItem用
 using Baketa.Core.Translation.Models;
 using Baketa.Application.Services.Translation; // [Issue #291] ITranslationControlService用
 using Baketa.Core.Settings; // [Issue #379] RoiManagerSettings用
@@ -55,6 +55,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     // ResetSemaphoreForStopがセマフォを解放した場合、finallyブロックでの解放をスキップ
     private static volatile bool _semaphoreReleasedByStop;
 
+
     private readonly Baketa.Core.Abstractions.Translation.ITranslationService _translationService;
     private readonly IStreamingTranslationService? _streamingTranslationService;
     // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
@@ -64,8 +65,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly ILogger<AggregatedChunksReadyEventHandler> _logger;
     private readonly ICoordinateTransformationService _coordinateTransformationService; // 🔥 [COORDINATE_FIX]
     private readonly Core.Abstractions.Settings.IUnifiedSettingsService _unifiedSettingsService;
-    // [Issue #78 Phase 4] 並列翻訳オーケストレーター
-    private readonly IParallelTranslationOrchestrator? _parallelTranslationOrchestrator;
     private readonly ILicenseManager? _licenseManager;
     // [Issue #273] Cloud翻訳可用性統合サービス
     private readonly Core.Abstractions.Translation.ICloudTranslationAvailabilityService? _cloudTranslationAvailabilityService;
@@ -89,8 +88,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         ICoordinateTransformationService coordinateTransformationService, // 🔥 [COORDINATE_FIX]
         Core.Abstractions.Settings.IUnifiedSettingsService unifiedSettingsService,
         IStreamingTranslationService? streamingTranslationService = null,
-        // [Issue #78 Phase 4] 並列翻訳オーケストレーター（オプショナル）
-        IParallelTranslationOrchestrator? parallelTranslationOrchestrator = null,
         ILicenseManager? licenseManager = null,
         // [Issue #273] Cloud翻訳可用性統合サービス（オプショナル）
         Core.Abstractions.Translation.ICloudTranslationAvailabilityService? cloudTranslationAvailabilityService = null,
@@ -111,8 +108,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService)); // 🔥 [COORDINATE_FIX]
         _unifiedSettingsService = unifiedSettingsService ?? throw new ArgumentNullException(nameof(unifiedSettingsService));
         _streamingTranslationService = streamingTranslationService;
-        // [Issue #78 Phase 4] 並列翻訳オーケストレーター
-        _parallelTranslationOrchestrator = parallelTranslationOrchestrator;
         _licenseManager = licenseManager;
         // [Issue #273] Cloud翻訳可用性統合サービス
         _cloudTranslationAvailabilityService = cloudTranslationAvailabilityService;
@@ -169,6 +164,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         {
             Console.WriteLine($"ℹ️ [STOP_CLEANUP] セマフォは既に利用可能 - CurrentCount: {_translationExecutionSemaphore.CurrentCount}");
         }
+
     }
 
     /// <inheritdoc />
@@ -221,6 +217,36 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
             // 集約されたチャンクをリストに変換
             var aggregatedChunks = eventData.AggregatedChunks.ToList();
+
+            // [Issue #399] チャンク密度ガード: 小さなROIから大量テキスト検出 = ノイズ
+            {
+                var chunksByBounds = aggregatedChunks
+                    .GroupBy(c => (c.CombinedBounds.X / 200, c.CombinedBounds.Y / 200))
+                    .Where(g => g.Count() > 5)
+                    .ToList();
+
+                foreach (var denseGroup in chunksByBounds)
+                {
+                    var groupList = denseGroup.ToList();
+                    var groupBounds = groupList.Select(c => c.CombinedBounds).ToList();
+                    var minX = groupBounds.Min(b => b.X);
+                    var minY = groupBounds.Min(b => b.Y);
+                    var maxX = groupBounds.Max(b => b.X + b.Width);
+                    var maxY = groupBounds.Max(b => b.Y + b.Height);
+                    var area = (maxX - minX) * (maxY - minY);
+                    var groupCount = groupList.Count;
+                    var areaPerChunk = area / groupCount;
+
+                    if (areaPerChunk < 3000) // 1チャンクあたり3000px²未満 = 密集しすぎ
+                    {
+                        _logger.LogWarning(
+                            "[Issue #399] ノイズ密度検出: {Count}チャンクが{Area}px²に密集（{PerChunk}px²/chunk）- 除外",
+                            groupCount, area, areaPerChunk);
+                        var removeSet = new HashSet<TextChunk>(groupList);
+                        aggregatedChunks.RemoveAll(c => removeSet.Contains(c));
+                    }
+                }
+            }
 
             // 🔥 [CONFIDENCE_FILTER] 信頼度フィルタリング - 低信頼度結果を翻訳から除外
             var ocrSettings = _unifiedSettingsService.GetOcrSettings();
@@ -342,6 +368,19 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
                 .ToList();
 
+            // [Issue #397] P1-4: ゴミテキストフィルタ（アスペクト比 + 反復パターン）
+            var preGarbageCount = nonEmptyChunks.Count;
+            nonEmptyChunks = nonEmptyChunks
+                .Where(chunk => !IsGarbageText(chunk))
+                .ToList();
+            var garbageFilteredCount = preGarbageCount - nonEmptyChunks.Count;
+            if (garbageFilteredCount > 0)
+            {
+                _logger.LogWarning(
+                    "[Issue #397] ゴミテキスト{Count}件をフィルタリング（残り{Remaining}件）",
+                    garbageFilteredCount, nonEmptyChunks.Count);
+            }
+
             // 空のチャンクに空文字列を設定
             foreach (var emptyChunk in aggregatedChunks.Where(c => string.IsNullOrWhiteSpace(c.CombinedText)))
             {
@@ -376,6 +415,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     return;
                 }
             }
+
 
             // ============================================================
             // [Issue #290] Fork-Join: 事前計算されたCloud AI翻訳結果を優先使用
@@ -432,6 +472,21 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                             sc.CombinedText?.Length > 50 ? sc.CombinedText[..50] + "..." : sc.CombinedText);
                     }
 
+                    // [Issue #398] ハルシネーションガード: 結果件数が異常に多い場合はCloud結果を破棄
+                    const int MaxReasonableCloudResults = 20;
+                    if (cloudTexts.Count > MaxReasonableCloudResults)
+                    {
+                        _logger?.LogWarning(
+                            "[Issue #398] ハルシネーション検出: Cloud結果{Count}件が閾値{Max}件を超過 - 全Cloud結果を破棄",
+                            cloudTexts.Count, MaxReasonableCloudResults);
+
+                        // Cloud結果を使わず、ローカル翻訳にフォールバック
+                        translationResults = await ExecuteBatchTranslationAsync(
+                            nonEmptyChunks,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    else
+                    {
                     // Cloud結果の重複排除（Gemini APIが同一テキストを二重出力する場合の防御）
                     // Original + BoundingBox座標が一致するアイテムを重複とみなす
                     var dedupedCloudTexts = cloudTexts
@@ -493,6 +548,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     _logger?.LogDebug(
                         "✅ [Issue #387] Fork-Join Cloud AI翻訳結果: {CloudCount}個（重複排除後） → {MatchedCount}個マッチ",
                         dedupedCloudTexts.Count, translationResults.Count(r => !string.IsNullOrEmpty(r)));
+                    } // end of else (件数ガード通過)
                 }
                 else if (!string.IsNullOrEmpty(cloudResponse?.TranslatedText))
                 {
@@ -504,82 +560,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 {
                     // Cloud AI結果が空 → ローカル翻訳にフォールバック
                     _logger?.LogWarning("⚠️ [Issue #290] Fork-Join Cloud AI翻訳結果が空 - ローカル翻訳にフォールバック");
-                    // [Issue #291] CancellationTokenを伝播
-                    translationResults = await ExecuteBatchTranslationAsync(
-                        nonEmptyChunks,
-                        cancellationToken).ConfigureAwait(false);
-                }
-            }
-            else if (ShouldUseParallelTranslation(eventData))
-            {
-                // [Issue #78 Phase 4] 並列翻訳（ローカル + Cloud AI）を実行
-                _logger?.LogDebug("🌐 [Phase4] 並列翻訳モード開始 - ChunkCount: {Count}", nonEmptyChunks.Count);
-#if DEBUG
-                Console.WriteLine($"🌐 [Phase4] 並列翻訳モード開始 - ChunkCount: {nonEmptyChunks.Count}");
-#endif
-
-                // [Issue #291] CreateLinkedTokenSourceで外部キャンセルとタイムアウトを連携
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
-                var parallelResult = await ExecuteParallelTranslationAsync(
-                    nonEmptyChunks,
-                    eventData,
-                    linkedCts.Token).ConfigureAwait(false);
-
-                if (parallelResult.IsSuccess && parallelResult.ValidatedChunks.Count > 0)
-                {
-                    // ValidatedChunksから翻訳結果を取得
-                    translationResults = parallelResult.ValidatedChunks
-                        .Select(v => v.TranslatedText)
-                        .ToList();
-
-                    // [Issue #307] エンジン名を記録（TranslationEngineUsed enumを文字列に変換）
-                    engineUsed = parallelResult.EngineUsed.ToString();
-
-                    // [Code Review] 相互検証でチャンク数が変化した場合は警告
-                    var originalChunkCount = nonEmptyChunks.Count;
-
-                    // nonEmptyChunksをValidatedChunksのOriginalChunkで更新（座標情報保持）
-                    nonEmptyChunks = parallelResult.ValidatedChunks
-                        .Select(v => v.OriginalChunk)
-                        .ToList();
-
-                    if (originalChunkCount != nonEmptyChunks.Count)
-                    {
-                        _logger?.LogWarning(
-                            "⚠️ [Phase4] 相互検証でチャンク数が変化: {Original} → {Validated}（フィルタリングまたは統合/分割）",
-                            originalChunkCount, nonEmptyChunks.Count);
-                    }
-
-                    _logger?.LogDebug("✅ [Phase4] 並列翻訳完了 - Engine: {Engine}, 結果数: {Count}",
-                        engineUsed, translationResults.Count);
-#if DEBUG
-                    Console.WriteLine($"✅ [Phase4] 並列翻訳完了 - Engine: {engineUsed}, 結果数: {translationResults.Count}");
-#endif
-
-                    // 統計ログ
-                    if (parallelResult.ValidationStatistics != null)
-                    {
-                        _logger?.LogInformation(
-                            "📊 [Phase4] 相互検証統計: AcceptanceRate={Rate:P1}, CrossValidated={CrossValidated}, LocalOnly={LocalOnly}, Rescued={Rescued}",
-                            parallelResult.ValidationStatistics.AcceptanceRate,
-                            parallelResult.ValidationStatistics.CrossValidatedCount,
-                            parallelResult.ValidationStatistics.LocalOnlyCount,
-                            parallelResult.ValidationStatistics.RescuedCount);
-                    }
-                }
-                else
-                {
-                    // 並列翻訳失敗 → ローカル翻訳にフォールバック
-                    // [Issue #307] エンジン名を記録
-                    engineUsed = "Local";
-                    _logger?.LogWarning("⚠️ [Phase4] 並列翻訳失敗 - ローカル翻訳にフォールバック: {Error}",
-                        parallelResult.Error?.Message ?? "不明");
-#if DEBUG
-                    Console.WriteLine($"⚠️ [Phase4] 並列翻訳失敗 - ローカル翻訳にフォールバック");
-#endif
-
                     // [Issue #291] CancellationTokenを伝播
                     translationResults = await ExecuteBatchTranslationAsync(
                         nonEmptyChunks,
@@ -1202,6 +1182,20 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 return true;
         }
 
+        // [Issue #399] キリル文字検出（ゲームテキストに出現しない文字体系）
+        if (text.Any(c => c is (>= '\u0400' and <= '\u04FF')))
+            return true;
+
+        // [Issue #399] 純粋な数値テキスト（符号・小数点含む）: -4864, 40.00, 70
+        var stripped = text.Trim();
+        if (stripped.Length > 0 && stripped.All(c => char.IsDigit(c) || c is '-' or '+' or '.'))
+            return true;
+
+        // [Issue #399] 極短テキスト（1-2文字）で英数字のみ（CJK以外）: e, 70, п
+        if (stripped.Length <= 2 && !stripped.Any(c => c is (>= '\u4E00' and <= '\u9FFF')
+            or (>= '\u3040' and <= '\u309F') or (>= '\u30A0' and <= '\u30FF')))
+            return true;
+
         return false;
     }
 
@@ -1217,6 +1211,57 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     /// - 短いテキスト（20文字未満）はスキップ（ゲームUIの正当な繰り返し許容）
     /// - 空白区切り単語の繰り返しは正当性が高いためスキップ
     /// </remarks>
+    /// <summary>
+    /// [Issue #397] P1-4: ゴミテキスト判定
+    /// アスペクト比・反復パターンにより、翻訳不要なノイズテキストを除去
+    /// </summary>
+    private static bool IsGarbageText(TextChunk chunk)
+    {
+        // 1. アスペクト比フィルタ: H/W > 3.0（極端に縦長な矩形 = 装飾/ゴミ）
+        if (chunk.CombinedBounds.Width > 0 && chunk.CombinedBounds.Height > 0)
+        {
+            var hwRatio = (float)chunk.CombinedBounds.Height / chunk.CombinedBounds.Width;
+            if (hwRatio > 3.0f)
+                return true;
+        }
+
+        var text = chunk.CombinedText?.Trim();
+        if (string.IsNullOrEmpty(text)) return false;
+
+        // 2. 空白除去後の反復単一文字（例: "！！！", "！ ！ ！"）
+        var stripped = text.Replace(" ", "").Replace("\u3000", "");
+        if (stripped.Length >= 2 && stripped.Distinct().Count() == 1 && !char.IsLetterOrDigit(stripped[0]))
+            return true;
+
+        // 3. 単一の非英数字文字（例: "！", "？", "・"）
+        if (stripped.Length == 1 && !char.IsLetterOrDigit(stripped[0]))
+            return true;
+
+        // 4. [Issue #397] Gate C: 短い非CJKテキスト + 非英数字文字（OCRノイズ）
+        //    例: "N (A) Ä" → stripped "N(A)Ä" → 非英数字 '(' ')' を含む → garbage
+        if (stripped.Length >= 2 && stripped.Length <= 5
+            && !HasCjkCharacter(stripped)
+            && stripped.Any(c => !char.IsLetterOrDigit(c)))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// [Issue #397] Gate C: CJK文字（漢字・ひらがな・カタカナ）を含むか判定
+    /// </summary>
+    private static bool HasCjkCharacter(string text)
+    {
+        foreach (var c in text)
+        {
+            if (c is (>= '\u4E00' and <= '\u9FFF')   // CJK統合漢字
+                  or (>= '\u3040' and <= '\u309F')     // ひらがな
+                  or (>= '\u30A0' and <= '\u30FF'))     // カタカナ
+                return true;
+        }
+        return false;
+    }
+
     private static bool IsRepetitiveHallucination(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -1277,163 +1322,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// [Issue #78 Phase 4/5] 並列翻訳を使用すべきかを判定
-    /// </summary>
-    /// <param name="eventData">集約チャンクイベントデータ</param>
-    /// <returns>並列翻訳を使用すべき場合true</returns>
-    private bool ShouldUseParallelTranslation(AggregatedChunksReadyEvent eventData)
-    {
-        // [Issue #280+#281] 診断ログ: 各条件をInfo レベルで出力
-        _logger?.LogInformation(
-            "🔍 [Phase4診断] 並列翻訳判定開始 - Orchestrator={Orchestrator}, LicenseManager={LicenseManager}, CloudAvailability={CloudAvailability}, HasImageData={HasImageData}",
-            _parallelTranslationOrchestrator != null,
-            _licenseManager != null,
-            _cloudTranslationAvailabilityService?.IsEffectivelyEnabled,
-            eventData.HasImageData);
-
-        // 並列翻訳オーケストレーターが利用可能か
-        if (_parallelTranslationOrchestrator == null)
-        {
-            _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: オーケストレーター未登録");
-            return false;
-        }
-
-        // ライセンスマネージャーが利用可能か
-        if (_licenseManager == null)
-        {
-            _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: ライセンスマネージャー未登録");
-            return false;
-        }
-
-        // [Issue #273] Cloud翻訳可用性統合サービスで判定
-        // ライセンス状態とユーザー設定の両方を統合チェック
-        if (_cloudTranslationAvailabilityService != null)
-        {
-            if (!_cloudTranslationAvailabilityService.IsEffectivelyEnabled)
-            {
-                _logger?.LogInformation(
-                    "🔍 [Issue #273] 並列翻訳スキップ: Cloud翻訳無効 (Entitled={Entitled}, Preferred={Preferred})",
-                    _cloudTranslationAvailabilityService.IsEntitled,
-                    _cloudTranslationAvailabilityService.IsPreferred);
-                return false;
-            }
-        }
-        else
-        {
-            // フォールバック: 旧ロジック（ICloudTranslationAvailabilityService未登録時）
-            // 注: このフォールバックは段階的移行のため意図的に残しています。
-            // ICloudTranslationAvailabilityServiceがDIコンテナに登録されるまでの互換性を保つため。
-            // 将来的にすべての環境で新サービスが利用可能になれば削除可能です。
-            // Cloud AI翻訳機能が利用可能か（Pro/Premiaプラン）
-            if (!_licenseManager.IsFeatureAvailable(FeatureType.CloudAiTranslation))
-            {
-                _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: Cloud AI翻訳機能が無効（Free/Standardプラン）");
-                return false;
-            }
-
-            // [Issue #280+#281] ユーザー設定でCloud AI翻訳が有効か（UseLocalEngineで判定）
-            var translationSettings = _unifiedSettingsService.GetTranslationSettings();
-            if (translationSettings.UseLocalEngine)
-            {
-                _logger?.LogInformation("🔍 [Issue #280] 並列翻訳スキップ: ローカル翻訳が選択されている");
-                return false;
-            }
-        }
-
-        // 画像データが利用可能か
-        if (!eventData.HasImageData)
-        {
-            _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: 画像データなし");
-            return false;
-        }
-
-        // セッショントークンが利用可能か
-        var sessionId = _licenseManager.CurrentState.SessionId;
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            _logger?.LogInformation("🔍 [Phase4] 並列翻訳スキップ: セッショントークンなし");
-            return false;
-        }
-
-        _logger?.LogInformation("✅ [Issue #273] 並列翻訳使用: 全条件クリア");
-        return true;
-    }
-
-    /// <summary>
-    /// [Issue #78 Phase 4] 並列翻訳を実行
-    /// </summary>
-    /// <param name="chunks">翻訳対象のテキストチャンク</param>
-    /// <param name="eventData">集約チャンクイベントデータ</param>
-    /// <param name="cancellationToken">キャンセルトークン</param>
-    /// <returns>並列翻訳結果</returns>
-    private async Task<ParallelTranslationResult> ExecuteParallelTranslationAsync(
-        List<TextChunk> chunks,
-        AggregatedChunksReadyEvent eventData,
-        CancellationToken cancellationToken)
-    {
-        // 前提条件: このメソッドは ShouldUseParallelTranslation() が true を返した場合のみ呼び出される
-        // したがって、以下の null-forgiving operator (!) は安全:
-        // - _licenseManager: ShouldUseParallelTranslation() で null チェック済み
-        // - _parallelTranslationOrchestrator: ShouldUseParallelTranslation() で null チェック済み
-        // - eventData.ImageBase64: ShouldUseParallelTranslation() で HasImageData チェック済み
-
-        try
-        {
-            // 言語ペアを取得
-            var languagePair = _languageConfig.GetCurrentLanguagePair();
-
-            // セッショントークンを取得（ShouldUseParallelTranslation で存在確認済み）
-            var sessionToken = _licenseManager!.CurrentState.SessionId;
-
-            // 並列翻訳リクエストを作成
-            // [Issue #381] ImageWidth/HeightにはCloud画像の実サイズを使用（ログ・トークン推定用）
-            // CloudImageWidth/Heightが0（未設定）の場合は元サイズにフォールバック
-            var cloudW = eventData.CloudImageWidth > 0 ? eventData.CloudImageWidth : eventData.ImageWidth;
-            var cloudH = eventData.CloudImageHeight > 0 ? eventData.CloudImageHeight : eventData.ImageHeight;
-            var request = new ParallelTranslationRequest
-            {
-                OcrChunks = chunks,
-                ImageBase64 = eventData.ImageBase64!, // HasImageData で null でないことが保証済み
-                MimeType = "image/jpeg", // [Issue #381] JPEG変換済み
-                ImageWidth = cloudW,
-                ImageHeight = cloudH,
-                SourceLanguage = languagePair.SourceCode,
-                TargetLanguage = languagePair.TargetCode,
-                SessionToken = sessionToken,
-                UseCloudTranslation = true,
-                EnableCrossValidation = true
-            };
-
-            _logger?.LogDebug(
-                "🌐 [Phase4] ParallelTranslationRequest作成: Chunks={Chunks}, CloudImageSize={Width}x{Height}, Lang={Source}→{Target}",
-                chunks.Count, cloudW, cloudH,
-                languagePair.SourceCode, languagePair.TargetCode);
-
-            // 並列翻訳を実行（ShouldUseParallelTranslation で null でないことが保証済み）
-            var result = await _parallelTranslationOrchestrator!.TranslateAsync(request, cancellationToken)
-                .ConfigureAwait(false);
-
-            _logger?.LogInformation(
-                "🌐 [Phase4] 並列翻訳完了: Success={Success}, Engine={Engine}, TotalTime={TotalTime}ms",
-                result.IsSuccess, result.EngineUsed, result.Timing.TotalDuration.TotalMilliseconds);
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "❌ [Phase4] 並列翻訳エラー");
-
-            return ParallelTranslationResult.Failure(
-                new TranslationErrorDetail
-                {
-                    Code = TranslationErrorDetail.Codes.InternalError,
-                    Message = ex.Message,
-                    IsRetryable = true
-                });
-        }
     }
 
     /// <summary>
@@ -1709,6 +1597,18 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             }
 
             var cloudBox = cloudText.BoundingBox!.Value;
+
+            // [Issue #398] BBox妥当性フィルタ: Width/Height=0 または座標飽和を破棄
+            if (cloudBox.Width <= 0 || cloudBox.Height <= 0
+                || (cloudBox.X >= 999 && cloudBox.Y >= 999))
+            {
+                discardedCount++;
+                _logger?.LogDebug(
+                    "[Issue #398] Cloud結果破棄（無効BBox）: '{Original}' BBox=({X},{Y},{W}x{H})",
+                    cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                    cloudBox.X, cloudBox.Y, cloudBox.Width, cloudBox.Height);
+                continue;
+            }
 
             // Cloud 0-1000正規化スケール → 画像ピクセル座標に変換
             var cloudPixelRect = new System.Drawing.Rectangle(
@@ -2054,8 +1954,70 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             "🚪 [Issue #293] Gate判定開始: ChunkCount={Count}, RoiManager={RoiEnabled}, ImageSize={Width}x{Height}",
             chunks.Count, roiEnabled, imageWidth, imageHeight);
 
-        foreach (var chunk in chunks)
+        // [Issue #397] ゾーンベースSourceIDの事前計算
+        // 同一ゾーン内の複数チャンクがGate状態を相互汚染する問題を防止
+        // → ゾーンごとに最長テキストのチャンクのみGate評価、他は自動通過
+        // 注: 変化検知グリッド(16x9)より粗い8x6を使用。OCRのチャンク境界揺れ（数ピクセル）で
+        // 隣接ゾーンに振り分けられることを防ぎ、Gate状態の安定性を優先する設計。
+        const int zoneColumns = 8;
+        const int zoneRows = 6;
+        var chunkZoneMap = new Dictionary<int, string>(); // chunkIndex → sourceId
+        var zoneRepresentative = new Dictionary<string, int>(); // sourceId → longest chunk index
+
+        for (int i = 0; i < chunks.Count; i++)
         {
+            var chunk = chunks[i];
+            var text = chunk.CombinedText ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                chunkZoneMap[i] = string.Empty;
+                continue;
+            }
+
+            string sourceId;
+            if (imageWidth > 0 && imageHeight > 0)
+            {
+                var centerX = chunk.CombinedBounds.X + chunk.CombinedBounds.Width / 2;
+                var centerY = chunk.CombinedBounds.Y + chunk.CombinedBounds.Height / 2;
+                var zoneCol = Math.Clamp(centerX * zoneColumns / imageWidth, 0, zoneColumns - 1);
+                var zoneRow = Math.Clamp(centerY * zoneRows / imageHeight, 0, zoneRows - 1);
+                sourceId = $"zone_{zoneRow}_{zoneCol}";
+            }
+            else
+            {
+                sourceId = $"chunk_{chunk.CombinedBounds.X}_{chunk.CombinedBounds.Y}";
+            }
+
+            chunkZoneMap[i] = sourceId;
+
+            // 同一ゾーン内で最長テキストのチャンクを代表として記録
+            if (!zoneRepresentative.TryGetValue(sourceId, out var existingIdx) ||
+                text.Length > (chunks[existingIdx].CombinedText?.Length ?? 0))
+            {
+                zoneRepresentative[sourceId] = i;
+            }
+        }
+
+        // [Issue #397] ゾーン重複検出のログ
+        var duplicateZones = zoneRepresentative.Where(kv =>
+            chunkZoneMap.Count(z => z.Value == kv.Key) > 1).ToList();
+        if (duplicateZones.Count > 0)
+        {
+            foreach (var dz in duplicateZones)
+            {
+                var chunkCount = chunkZoneMap.Count(z => z.Value == dz.Key);
+                _logger?.LogDebug(
+                    "[Issue #397] ゾーン重複検出: {Zone} に{Count}チャンク → 代表チャンク(idx={RepIdx})のみGate評価",
+                    dz.Key, chunkCount, dz.Value);
+            }
+        }
+
+        // Gate評価済みゾーンのトラッキング
+        var evaluatedZones = new HashSet<string>();
+
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            var chunk = chunks[i];
             if (cancellationToken.IsCancellationRequested)
                 break;
 
@@ -2066,8 +2028,30 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 continue;
             }
 
-            // ソースIDを生成（座標ベース）
-            var sourceId = $"chunk_{chunk.CombinedBounds.X}_{chunk.CombinedBounds.Y}_{chunk.CombinedBounds.Width}_{chunk.CombinedBounds.Height}";
+            var sourceId = chunkZoneMap[i];
+
+            // [Issue #397] 同一ゾーンで既にGate評価済み → Gate状態汚染防止のため自動通過
+            if (evaluatedZones.Contains(sourceId))
+            {
+                gatedChunks.Add(chunk);
+                gatePassedCount++;
+                _logger?.LogDebug(
+                    "🚪 [Issue #397] Gate AUTO-PASS (同一ゾーン既評価): Zone={Zone}, Text='{Text}'",
+                    sourceId, text.Length > 30 ? text[..30] + "..." : text);
+                continue;
+            }
+
+            // [Issue #397] 代表チャンク以外はGate評価をスキップ（自動通過）
+            // 代表チャンク = 同一ゾーン内で最長テキストを持つチャンク
+            if (zoneRepresentative.TryGetValue(sourceId, out var repIdx) && repIdx != i)
+            {
+                gatedChunks.Add(chunk);
+                gatePassedCount++;
+                _logger?.LogDebug(
+                    "🚪 [Issue #397] Gate AUTO-PASS (非代表チャンク): Zone={Zone}, Text='{Text}'",
+                    sourceId, text.Length > 30 ? text[..30] + "..." : text);
+                continue;
+            }
 
             // 正規化座標を計算
             GateRegionInfo? regionInfo = null;
@@ -2082,7 +2066,6 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 float? heatmapValue = null;
                 if (_roiManager?.IsEnabled == true)
                 {
-                    // チャンクの中心座標でヒートマップ値を取得
                     var centerX = normalizedX + normalizedWidth / 2f;
                     var centerY = normalizedY + normalizedHeight / 2f;
                     heatmapValue = _roiManager.GetHeatmapValueAt(centerX, centerY);
@@ -2097,12 +2080,14 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     : GateRegionInfo.FromCoordinates(normalizedX, normalizedY, normalizedWidth, normalizedHeight);
             }
 
-            // Gate判定を実行
+            // Gate判定を実行（代表チャンクのみ）
             var gateResult = await _textChangeDetectionService.DetectChangeWithGateAsync(
                 text,
                 sourceId,
                 regionInfo,
                 cancellationToken).ConfigureAwait(false);
+
+            evaluatedZones.Add(sourceId);
 
             if (gateResult.ShouldTranslate)
             {

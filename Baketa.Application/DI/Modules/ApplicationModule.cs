@@ -222,6 +222,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     cloudTranslationAvailabilityService, // [Issue #290] Cloud翻訳可用性チェック
                     roiManager, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
                     windowManager, // [Issue #293] ウィンドウ情報取得用
+                    provider.GetService<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.ImageChangeDetectionSettings>>(), // [Issue #401] 画面安定化設定
                     logger);
                 Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join＋Gate統合済み");
                 return instance;
@@ -314,30 +315,8 @@ public sealed class ApplicationModule : ServiceModuleBase
         // 例: services.AddSingleton<IDictionaryService, DictionaryService>();
         // 例: services.AddSingleton<ITextReplacementService, TextReplacementService>();
 
-        // 🔥 [Issue #78 Phase 4] 並列翻訳オーケストレーター登録
-        // Pro/Premiaプラン向けのCloud AI翻訳並列実行・相互検証機能
-        Console.WriteLine("🔥 [Issue #78 Phase 4] ParallelTranslationOrchestrator DI登録開始");
-        services.AddSingleton<Baketa.Application.Services.Translation.ParallelTranslationOrchestrator>(provider =>
-        {
-            var translationService = provider.GetRequiredService<TranslationAbstractions.ITranslationService>();
-
-            // Cloud AI関連サービス（オプショナル - Pro/Premiaプランのみ）
-            var fallbackOrchestrator = provider.GetService<Baketa.Core.Translation.Abstractions.IFallbackOrchestrator>();
-            var crossValidator = provider.GetService<Baketa.Core.Abstractions.Validation.ICrossValidator>();
-            var logger = provider.GetRequiredService<ILogger<Baketa.Application.Services.Translation.ParallelTranslationOrchestrator>>();
-
-            Console.WriteLine($"✅ [Issue #78 Phase 4] ParallelTranslationOrchestrator作成: " +
-                $"FallbackOrchestrator={fallbackOrchestrator != null}, CrossValidator={crossValidator != null}");
-
-            return new Baketa.Application.Services.Translation.ParallelTranslationOrchestrator(
-                translationService,
-                fallbackOrchestrator,
-                crossValidator,
-                logger);
-        });
-        services.AddSingleton<Baketa.Core.Translation.Abstractions.IParallelTranslationOrchestrator>(
-            provider => provider.GetRequiredService<Baketa.Application.Services.Translation.ParallelTranslationOrchestrator>());
-        Console.WriteLine("✅ [Issue #78 Phase 4] ParallelTranslationOrchestrator DI登録完了");
+        // [Issue #400] Phase 4並列翻訳削除: ParallelTranslationOrchestrator DI登録を無効化
+        // Fork-Join Cloud AI翻訳が正規経路となったため不要
     }
 
     /// <summary>
