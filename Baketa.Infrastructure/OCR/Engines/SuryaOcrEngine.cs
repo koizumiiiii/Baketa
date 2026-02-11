@@ -489,7 +489,16 @@ public sealed class SuryaOcrEngine : IOcrEngine
             if (!response.IsSuccess || response.Responses.Count == 0)
             {
                 var errorMessage = response.Error?.Message ?? "Batch OCR failed";
-                _logger.LogWarning("[Issue #330] RecognizeBatchAsync failed: {Error}", errorMessage);
+
+                // [Issue #402] キャンセルによる失敗はDEBUGレベル
+                if (cancellationToken.IsCancellationRequested || errorMessage.Contains("Cancelled"))
+                {
+                    _logger.LogDebug("[Issue #330] RecognizeBatchAsync cancelled: {Error}", errorMessage);
+                }
+                else
+                {
+                    _logger.LogWarning("[Issue #330] RecognizeBatchAsync failed: {Error}", errorMessage);
+                }
 
                 // エラー時は空の結果リストを返す
                 var emptyResults = new List<OcrResults>();

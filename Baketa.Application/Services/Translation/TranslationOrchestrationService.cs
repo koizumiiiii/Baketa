@@ -1272,9 +1272,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     currentImage!,
                     cancellationToken).ConfigureAwait(false);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // [Issue #402] Stop操作によるキャンセルはOCRエラーではなく正常終了 → 上位のAutoLoopに伝播
+                _logger?.LogDebug("翻訳ステップがキャンセルされました: ID={TranslationId}", translationId);
+                throw;
+            }
             catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") ||
-                                                  translationEx.Message.Contains("OCR") ||
-                                                  translationEx is OperationCanceledException)
+                                                  translationEx.Message.Contains("OCR"))
             {
                 // OCRエラーの場合は翻訳結果を発行せず、ログ記録のみ
                 _logger?.LogDebug($"🚫 OCRエラーにより翻訳をスキップ: ID={translationId}, Error={translationEx.Message}");
@@ -2421,6 +2426,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 CapturedImage = null,    // 必要に応じて画像を保持
                 ProcessingTime = processingTime
             };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // [Issue #402] Stop操作によるキャンセルは上位に伝播（ERROR/WARNログ不要）
+            _logger?.LogDebug("翻訳処理がキャンセルされました: TranslationId={TranslationId}", translationId);
+            throw;
         }
 #pragma warning disable CA1031 // 翻訳処理のエラーハンドリングでアプリケーション安定性のため一般例外をキャッチ
         catch (Exception ex)

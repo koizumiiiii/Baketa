@@ -704,13 +704,23 @@ public sealed class GrpcOcrClient : IDisposable
         catch (RpcException ex)
         {
             sw.Stop();
-            _logger.LogError(ex, "[gRPC-OCR] RecognizeBatch RPC error: {StatusCode}", ex.StatusCode);
+
+            // [Issue #402] Stop操作によるキャンセルはDEBUGレベルでログ
+            if (ex.StatusCode == StatusCode.Cancelled)
+            {
+                _logger.LogDebug("[gRPC-OCR] RecognizeBatch cancelled by client");
+            }
+            else
+            {
+                _logger.LogError(ex, "[gRPC-OCR] RecognizeBatch RPC error: {StatusCode}", ex.StatusCode);
+            }
 
             var errorType = ex.StatusCode switch
             {
                 StatusCode.Unavailable => OcrErrorType.ServiceUnavailable,
                 StatusCode.DeadlineExceeded => OcrErrorType.Timeout,
                 StatusCode.ResourceExhausted => OcrErrorType.OutOfMemory,
+                StatusCode.Cancelled => OcrErrorType.ProcessingError,
                 _ => OcrErrorType.ProcessingError
             };
 
