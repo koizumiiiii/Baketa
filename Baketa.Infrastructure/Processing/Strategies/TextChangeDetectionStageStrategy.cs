@@ -65,9 +65,10 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                 _logger.LogDebug("初回テキスト検出 - 変化ありとして処理継続");
                 changeResult = TextChangeResult.CreateFirstTime(currentText, stopwatch.Elapsed);
             }
-            else if (normalizedPrev == normalizedCurr)
+            else if (normalizedPrev == normalizedCurr ||
+                     NormalizeSpaceless(normalizedPrev) == NormalizeSpaceless(normalizedCurr))
             {
-                // [Issue #397] 正規化後のテキストが同一
+                // [Issue #397] 正規化後のテキストが同一（スペース除去比較含む）
                 if (_typewriterInProgress.TryRemove(contextId, out _))
                 {
                     // タイプライター完了 → 最終テキストを翻訳対象にする
@@ -83,7 +84,9 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                     changeResult = TextChangeResult.CreateNoChange(previousText, stopwatch.Elapsed);
                 }
             }
-            else if (normalizedCurr.StartsWith(normalizedPrev, StringComparison.Ordinal) && normalizedCurr.Length > normalizedPrev.Length)
+            else if ((normalizedCurr.StartsWith(normalizedPrev, StringComparison.Ordinal) ||
+                      NormalizeSpaceless(normalizedCurr).StartsWith(NormalizeSpaceless(normalizedPrev), StringComparison.Ordinal))
+                     && normalizedCurr.Length > normalizedPrev.Length)
             {
                 // [Issue #397] P0-2: タイプライター演出検出
                 // 現在テキストが前回テキストを包含し末尾が成長 → 演出中と判定
@@ -150,6 +153,15 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
     private static string NormalizeForComparison(string text)
     {
         return NormalizeWhitespaceRegex().Replace(text, " ").Trim();
+    }
+
+    /// <summary>
+    /// [Issue #413] スペース除去正規化（OCRグルーピング揺れによる単語境界差異を吸収）
+    /// 例: "Sava Can I heck!" と "SavaCan I heck!" を同一と判定
+    /// </summary>
+    private static string NormalizeSpaceless(string text)
+    {
+        return text.Replace(" ", "");
     }
 
     [GeneratedRegex(@"\s+")]
