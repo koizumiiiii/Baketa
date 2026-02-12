@@ -80,17 +80,17 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             // [Issue #213] Phase 1: ダウンロードとGPUセットアップを並列実行
             // これらは独立した処理のため、並列化することで起動時間を短縮
             _logger.LogInformation("[Issue #213] Phase 1: コンポーネントダウンロードとGPUセットアップを並列実行");
-            ReportProgress("parallel_init", "初期化中（ダウンロード + GPU環境セットアップ）...", isCompleted: false, progress: 0);
+            ReportProgress("parallel_init", "Initializing (Download + GPU environment setup)...", isCompleted: false, progress: 0);
 
             var downloadTask = ExecuteStepAsync(
                 "download_components",
-                "コンポーネントをダウンロードしています...",
+                "Downloading components...",
                 DownloadMissingComponentsAsync,
                 cancellationToken);
 
             var gpuSetupTask = ExecuteStepAsync(
                 "setup_gpu",
-                "GPU環境をチェックしています...",
+                "Checking GPU environment...",
                 SetupGpuEnvironmentAsync,
                 cancellationToken);
 
@@ -100,7 +100,7 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             // [Issue #213] Phase 2: 依存関係解決（シーケンシャル - サービス登録に依存）
             await ExecuteStepAsync(
                 "resolve_dependencies",
-                "依存関係を解決しています...",
+                "Resolving dependencies...",
                 ResolveDependenciesAsync,
                 cancellationToken).ConfigureAwait(false);
 
@@ -114,17 +114,17 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             // [Issue #213] Phase 3: OCRと翻訳エンジンを並列初期化
             // これらは独立しており、並列化することで初期化時間を短縮
             _logger.LogInformation("[Issue #213] Phase 3: OCRと翻訳エンジンを並列初期化");
-            ReportProgress("parallel_engines", "OCR・翻訳エンジンを初期化中...", isCompleted: false, progress: 50);
+            ReportProgress("parallel_engines", "Initializing OCR and translation engines...", isCompleted: false, progress: 50);
 
             var ocrTask = ExecuteStepAsync(
                 "load_ocr",
-                "OCRモデルを読み込んでいます...",
+                "Loading OCR models...",
                 InitializeOcrAsync,
                 cancellationToken);
 
             var translationTask = ExecuteStepAsync(
                 "init_translation",
-                "翻訳エンジンを初期化しています...",
+                "Initializing translation engine...",
                 InitializeTranslationAsync,
                 cancellationToken);
 
@@ -134,7 +134,7 @@ public class ApplicationInitializer : ILoadingScreenInitializer
             // Step 4: UIコンポーネント準備（最後に実行）
             await ExecuteStepAsync(
                 "prepare_ui",
-                "UIコンポーネントを準備しています...",
+                "Preparing UI components...",
                 PrepareUIComponentsAsync,
                 cancellationToken).ConfigureAwait(false);
 
@@ -498,7 +498,7 @@ public class ApplicationInitializer : ILoadingScreenInitializer
         {
             // [Issue #198] 「ダウンロード完了」→「インストール完了」に変更
             // 解凍まで完了してから呼ばれるため、より正確な表現に
-            return $"{e.Component.DisplayName} のインストール完了";
+            return $"{e.Component.DisplayName} installation completed";
         }
 
         if (!string.IsNullOrEmpty(e.ErrorMessage))
@@ -511,7 +511,7 @@ public class ApplicationInitializer : ILoadingScreenInitializer
         var speedMBps = e.SpeedBytesPerSecond / 1024.0 / 1024.0;
 
         var etaStr = e.EstimatedTimeRemaining.HasValue
-            ? $" (残り {e.EstimatedTimeRemaining.Value.TotalSeconds:F0}秒)"
+            ? $" ({e.EstimatedTimeRemaining.Value.TotalSeconds:F0}s remaining)"
             : "";
 
         return $"{e.Component.DisplayName}: {receivedMB:F1}MB / {totalMB:F1}MB ({speedMBps:F1}MB/s){etaStr}";

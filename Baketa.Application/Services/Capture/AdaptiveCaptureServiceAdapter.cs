@@ -1,8 +1,10 @@
 using System.Drawing;
 using System.IO;
 using Baketa.Core.Abstractions.Capture;
+using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Events.EventTypes;
 // 🔥 [PHASE_K-29-G] CaptureOptions統合: Baketa.Core.Models.Capture削除
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Adapters;
@@ -19,12 +21,16 @@ public partial class AdaptiveCaptureServiceAdapter(
     IAdaptiveCaptureService adaptiveCaptureService,
     ILogger<AdaptiveCaptureServiceAdapter> logger,
     ICoordinateTransformationService coordinateTransformationService,
-    IImageChangeDetectionService? imageChangeDetectionService = null) : ICaptureService, IDisposable
+    IImageChangeDetectionService? imageChangeDetectionService = null,
+    IEventAggregator? eventAggregator = null,
+    Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter? windowManagerAdapter = null) : ICaptureService, IDisposable
 {
     private readonly IAdaptiveCaptureService _adaptiveCaptureService = adaptiveCaptureService ?? throw new ArgumentNullException(nameof(adaptiveCaptureService));
     private readonly ILogger<AdaptiveCaptureServiceAdapter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ICoordinateTransformationService _coordinateTransformationService = coordinateTransformationService ?? throw new ArgumentNullException(nameof(coordinateTransformationService));
     private readonly IImageChangeDetectionService? _imageChangeDetectionService = imageChangeDetectionService;
+    private readonly IEventAggregator? _eventAggregator = eventAggregator;
+    private readonly Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter? _windowManagerAdapter = windowManagerAdapter;
     private ServicesCaptureOptions _currentOptions = new();
     private bool _disposed;
 
@@ -187,12 +193,42 @@ public partial class AdaptiveCaptureServiceAdapter(
         catch (Exception ex)
         {
             _logger.LogError(ex, "適応的ウィンドウキャプチャでエラー");
+
+            // [Issue #389] キャプチャ全戦略失敗時にウィンドウの存在を確認
+            // ウィンドウが閉じられている場合、CaptureFailedEventを発行してUIリセットを促す
+            await PublishCaptureFailedIfWindowClosedAsync(windowHandle, ex).ConfigureAwait(false);
+
             throw;
         }
         finally
         {
             // [Issue #361] セマフォ解放
             _captureSemaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// [Issue #389] ウィンドウが閉じられている場合にCaptureFailedEventを発行
+    /// </summary>
+    private async Task PublishCaptureFailedIfWindowClosedAsync(IntPtr windowHandle, Exception ex)
+    {
+        if (_eventAggregator == null || _windowManagerAdapter == null) return;
+        if (windowHandle == IntPtr.Zero) return;
+
+        try
+        {
+            var bounds = _windowManagerAdapter.GetWindowBounds(windowHandle);
+            if (bounds == null)
+            {
+                _logger.LogInformation("[Issue #389] キャプチャ全戦略失敗 + ウィンドウが存在しない: Handle=0x{Handle:X} → CaptureFailedEvent発行",
+                    windowHandle.ToInt64());
+                await _eventAggregator.PublishAsync(new CaptureFailedEvent(
+                    Rectangle.Empty, ex, "Target window closed")).ConfigureAwait(false);
+            }
+        }
+        catch (Exception publishEx)
+        {
+            _logger.LogWarning(publishEx, "[Issue #389] CaptureFailedEvent発行中にエラー");
         }
     }
 

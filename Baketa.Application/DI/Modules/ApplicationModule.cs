@@ -275,6 +275,9 @@ public sealed class ApplicationModule : ServiceModuleBase
                 // Issue #293: 投機的OCRサービス（オプショナル）
                 var speculativeOcrService = provider.GetService<Baketa.Core.Abstractions.OCR.ISpeculativeOcrService>();
 
+                // [Issue #389] ウィンドウ存在チェック用
+                var windowManagerAdapter = provider.GetService<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter>();
+
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                     captureService,
                     settingsService,
@@ -287,6 +290,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     fallbackOrchestrator,
                     licenseManager,
                     speculativeOcrService,
+                    windowManagerAdapter,
                     logger);
             }
             catch (Exception ex)

@@ -90,6 +90,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             null, // fallbackOrchestrator（Issue #290: テスト用にnull）
             null, // licenseManager（Issue #290: テスト用にnull）
             null, // speculativeOcrService（Issue #293: テスト用にnull）
+            null, // windowManagerAdapter（Issue #389: テスト用にnull）
             _loggerMock.Object);
     }
 

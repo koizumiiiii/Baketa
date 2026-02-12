@@ -55,7 +55,9 @@ enum TranslationStepResult
     /// <summary>クールダウン中（状態維持、最短待機で再試行）</summary>
     InCooldown,
     /// <summary>エラー発生</summary>
-    Error
+    Error,
+    /// <summary>[Issue #389] 対象ウィンドウが閉じられた（ループ停止）</summary>
+    WindowClosed
 }
 
 /// <summary>
@@ -81,6 +83,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
     // Issue #293: 投機的OCRサービス（Shot翻訳応答時間短縮）
     private readonly ISpeculativeOcrService? _speculativeOcrService;
+
+    // [Issue #389] ウィンドウ存在チェック用
+    private readonly Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter? _windowManagerAdapter;
 
     // 状態管理
     private volatile bool _isAutomaticTranslationActive;
@@ -169,6 +174,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         IFallbackOrchestrator? fallbackOrchestrator = null,
         ILicenseManager? licenseManager = null,
         ISpeculativeOcrService? speculativeOcrService = null,
+        Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter? windowManagerAdapter = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -188,6 +194,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _fallbackOrchestrator = fallbackOrchestrator;
         _licenseManager = licenseManager;
         _speculativeOcrService = speculativeOcrService;
+        _windowManagerAdapter = windowManagerAdapter;
         _logger = logger;
 
         // Issue #293: 投機的OCRサービスが利用可能かログ出力
@@ -976,6 +983,13 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                     var stepResult = await ExecuteAutomaticTranslationStepAsync(cancellationToken).ConfigureAwait(false);
 
+                    // [Issue #389] 対象ウィンドウが閉じられた場合はループ終了
+                    if (stepResult == TranslationStepResult.WindowClosed)
+                    {
+                        _logger?.LogInformation("[Issue #389] 対象ウィンドウが閉じられたため自動翻訳ループを停止します");
+                        break;
+                    }
+
                     // [Issue #394] InCooldown時の残りクールダウン計算（ロック順序を守るため先に取得）
                     TimeSpan remainingCooldown = TimeSpan.Zero;
                     if (stepResult == TranslationStepResult.InCooldown)
@@ -1165,6 +1179,26 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
+            // [Issue #389] ウィンドウ存在チェック（キャプチャ前）
+            // キャプチャパイプラインはフォールバック（WGC → GDI）で常にnon-null画像を返すため、
+            // キャプチャ前に明示的にウィンドウの存在を確認する
+            if (_targetWindowHandle.HasValue && _windowManagerAdapter != null)
+            {
+                var bounds = _windowManagerAdapter.GetWindowBounds(_targetWindowHandle.Value);
+                if (bounds == null)
+                {
+                    _logger?.LogInformation("[Issue #389] 対象ウィンドウが閉じられました: Handle=0x{Handle:X}",
+                        _targetWindowHandle.Value.ToInt64());
+
+                    await _eventAggregator.PublishAsync(new CaptureFailedEvent(
+                        System.Drawing.Rectangle.Empty,
+                        new InvalidOperationException($"Target window has been closed: Handle=0x{_targetWindowHandle.Value.ToInt64():X}"),
+                        "Target window closed")).ConfigureAwait(false);
+
+                    return TranslationStepResult.WindowClosed;
+                }
+            }
+
             // 進行状況を通知
             PublishProgress(translationId, TranslationStatus.Capturing, 0.1f, "画面キャプチャ中...");
 
@@ -1184,7 +1218,11 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 _logger?.LogDebug($"🔥 [CAPTURE_DEBUG] CaptureWindowAsync呼び出し完了");
                 if (currentImage is null)
                 {
-                    throw new TranslationException("ウィンドウキャプチャに失敗しました");
+                    // [Issue #389] ウィンドウキャプチャ失敗時にCaptureFailedEventを発行
+                    var captureEx = new InvalidOperationException($"Window capture failed: Handle={windowHandle}");
+                    await _eventAggregator.PublishAsync(new CaptureFailedEvent(
+                        System.Drawing.Rectangle.Empty, captureEx, captureEx.Message)).ConfigureAwait(false);
+                    throw new TranslationException("Window capture failed");
                 }
                 _logger?.LogDebug($"📷 ウィンドウキャプチャ完了: {(currentImage is not null ? "成功" : "失敗")}");
             }
@@ -1356,6 +1394,29 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             currentImage?.Dispose(); // エラー時のリソース破棄
             _logger?.LogError(ex, "自動翻訳ステップでエラーが発生しました");
             PublishProgress(translationId, TranslationStatus.Error, 1.0f, $"エラー: {ex.Message}");
+
+            // [Issue #389] キャプチャ失敗後にウィンドウの存在を確認
+            // キャプチャが全戦略で失敗した場合、ウィンドウが閉じられた可能性が高い
+            if (_targetWindowHandle.HasValue && _windowManagerAdapter != null)
+            {
+                var bounds = _windowManagerAdapter.GetWindowBounds(_targetWindowHandle.Value);
+                if (bounds == null)
+                {
+                    _logger?.LogInformation("[Issue #389] キャプチャ失敗後にウィンドウが存在しないことを確認: Handle=0x{Handle:X}",
+                        _targetWindowHandle.Value.ToInt64());
+                    try
+                    {
+                        await _eventAggregator.PublishAsync(new CaptureFailedEvent(
+                            System.Drawing.Rectangle.Empty, ex, "Target window closed")).ConfigureAwait(false);
+                    }
+                    catch (Exception publishEx)
+                    {
+                        _logger?.LogWarning(publishEx, "[Issue #389] CaptureFailedEvent発行失敗");
+                    }
+                    return TranslationStepResult.WindowClosed;
+                }
+            }
+
             return TranslationStepResult.Error;
         }
 #pragma warning restore CA1031
@@ -1560,6 +1621,24 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         string translationId,
         CancellationToken cancellationToken)
     {
+        // [Issue #389] ウィンドウ存在チェック（キャプチャ前）
+        if (_targetWindowHandle.HasValue && _targetWindowHandle.Value != IntPtr.Zero && _windowManagerAdapter != null)
+        {
+            var bounds = _windowManagerAdapter.GetWindowBounds(_targetWindowHandle.Value);
+            if (bounds == null)
+            {
+                _logger?.LogInformation("[Issue #389] 対象ウィンドウが閉じられました（Singleshot）: Handle=0x{Handle:X}",
+                    _targetWindowHandle.Value.ToInt64());
+
+                await _eventAggregator.PublishAsync(new CaptureFailedEvent(
+                    System.Drawing.Rectangle.Empty,
+                    new InvalidOperationException($"Target window has been closed: Handle=0x{_targetWindowHandle.Value.ToInt64():X}"),
+                    "Target window closed")).ConfigureAwait(false);
+
+                return (null, null);
+            }
+        }
+
         // キャプチャ処理
         IImage? currentImage;
         if (_targetWindowHandle.HasValue && _targetWindowHandle.Value != IntPtr.Zero)
@@ -1808,6 +1887,19 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     _logger?.LogDebug($"❌ 座標ベース処理でエラー発生: {coordinateEx.Message}");
                     _logger?.LogDebug($"❌ エラーのスタックトレース: {coordinateEx.StackTrace}");
+
+                    // [Issue #389] ウィンドウが閉じられたことによるエラーの場合はフォールバックせず上位に伝播
+                    if (_targetWindowHandle.HasValue && _windowManagerAdapter != null)
+                    {
+                        var bounds = _windowManagerAdapter.GetWindowBounds(_targetWindowHandle.Value);
+                        if (bounds == null)
+                        {
+                            _logger?.LogInformation("[Issue #389] 座標ベース処理失敗後にウィンドウが存在しないことを確認: Handle=0x{Handle:X}",
+                                _targetWindowHandle.Value.ToInt64());
+                            throw; // 上位のcatchでWindowClosedとして処理される
+                        }
+                    }
+
                     _logger?.LogWarning(coordinateEx, "⚠️ 座標ベース処理でエラーが発生、従来のOCR処理にフォールバック: ID={TranslationId}", translationId);
                     // 座標ベース処理でエラーが発生した場合は従来のOCR処理にフォールバック
                     coordinateBasedTranslationExecuted = false;

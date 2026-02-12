@@ -990,6 +990,9 @@ public class MainOverlayViewModel : ViewModelBase
 
         // 🔥 [Issue #300] リソース監視イベントの購読（システムRAM警告も対応）
         SubscribeToEvent<ResourceMonitoringEvent>(OnResourceMonitoringWarning);
+
+        // [Issue #389] キャプチャ失敗イベントの購読（ウィンドウクローズ検知）
+        SubscribeToEvent<CaptureFailedEvent>(OnCaptureFailed);
     }
 
     private void InitializePropertyChangeHandlers()
@@ -1950,6 +1953,74 @@ public class MainOverlayViewModel : ViewModelBase
                 Logger?.LogInformation("[Issue #300] Memory warning cleared (usage: {Usage:F1}%)", memoryUsage);
             }
         });
+    }
+
+    /// <summary>
+    /// [Issue #389] キャプチャ失敗イベントハンドラー
+    /// 対象ウィンドウがクローズされた場合、翻訳を停止しウィンドウ選択を解除する
+    /// </summary>
+    private async Task OnCaptureFailed(CaptureFailedEvent evt)
+    {
+        Logger?.LogDebug("[Issue #389] CaptureFailedEvent received: {ErrorMessage}", evt.ErrorMessage);
+
+        try
+        {
+            // ウィンドウの有効性を確認
+            var isValid = await _windowManagementService.ValidateSelectedWindowAsync().ConfigureAwait(false);
+            if (isValid)
+            {
+                // ウィンドウはまだ存在する - 一時的なキャプチャエラーなので無視
+                Logger?.LogDebug("[Issue #389] Window is still valid - ignoring capture failure");
+                return;
+            }
+
+            Logger?.LogInformation("[Issue #389] Target window is no longer valid - stopping translation and clearing selection");
+
+            // [Issue #389] セマフォ強制リセット（翻訳中のgRPCタイムアウト対策）
+            Baketa.Application.EventHandlers.Translation.AggregatedChunksReadyEventHandler.ResetSemaphoreForStop();
+
+            // [Issue #389] StopTranslationRequestEventを発行（CTS キャンセルで翻訳ループを停止）
+            try
+            {
+                await PublishEventAsync(new StopTranslationRequestEvent()).ConfigureAwait(false);
+                Logger?.LogDebug("[Issue #389] StopTranslationRequestEvent published");
+            }
+            catch (Exception eventEx)
+            {
+                Logger?.LogWarning(eventEx, "[Issue #389] StopTranslationRequestEvent publish failed");
+            }
+
+            // 翻訳オーバーレイを非表示
+            try
+            {
+                await _overlayManager.HideAllAsync().ConfigureAwait(false);
+            }
+            catch (Exception overlayEx)
+            {
+                Logger?.LogWarning(overlayEx, "[Issue #389] Overlay hide failed");
+            }
+
+            // ウィンドウ選択を解除
+            await _windowManagementService.ClearWindowSelectionAsync().ConfigureAwait(false);
+
+            // UI状態を完全にリセット（初期状態に戻す）
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                IsTranslationActive = false;
+                IsLoading = false;
+                IsTranslationResultVisible = false;
+                IsSingleshotOverlayVisible = false;
+                SelectedWindow = null;
+                IsWindowSelected = false;
+                CurrentStatus = TranslationStatus.Idle;
+                Logger?.LogDebug("[Issue #389] UI state fully reset to initial state");
+            });
+
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "[Issue #389] Error handling capture failure");
+        }
     }
 
     /// <summary>
