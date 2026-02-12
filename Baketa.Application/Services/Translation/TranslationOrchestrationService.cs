@@ -87,6 +87,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // [Issue #389] ウィンドウ存在チェック用
     private readonly Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter? _windowManagerAdapter;
 
+    // [Issue #410] テキスト変化検知キャッシュリセット用
+    private readonly Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? _textChangeDetectionService;
+
     // 状態管理
     private volatile bool _isAutomaticTranslationActive;
     private volatile bool _isSingleTranslationActive;
@@ -175,6 +178,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ILicenseManager? licenseManager = null,
         ISpeculativeOcrService? speculativeOcrService = null,
         Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter? windowManagerAdapter = null,
+        Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? textChangeDetectionService = null,
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -195,6 +199,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _licenseManager = licenseManager;
         _speculativeOcrService = speculativeOcrService;
         _windowManagerAdapter = windowManagerAdapter;
+        _textChangeDetectionService = textChangeDetectionService;
         _logger = logger;
 
         // Issue #293: 投機的OCRサービスが利用可能かログ出力
@@ -414,10 +419,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 _postTranslationRapidCheckRemaining = 0; // [Issue #392]
             }
 
-            // TODO: モード変更イベントの発行はViewModelで実行
-            // await _eventAggregator.PublishAsync(
-            //     new TranslationModeChangedEvent(TranslationMode.Live, TranslationMode.Singleshot))
-            //     .ConfigureAwait(false);
+            // [Issue #410] 翻訳開始時にキャッシュをリセット（Shot→Live遷移時の誤判定防止）
+            _textChangeDetectionService?.ClearAllPreviousTexts();
+            _coordinateBasedTranslation?.ResetTranslationState();
 
             // バックグラウンドタスクで自動翻訳を実行
             try
@@ -606,6 +610,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             OnPropertyChanged(nameof(IsAnyTranslationActive));
 
             _logger?.LogDebug("🔧 [PHASE3.3_STOP] Stop完了 - Token競合解決済み");
+
+            // [Issue #410] テキスト変化検知キャッシュをクリア（言語変更後のSameText誤判定防止）
+            _textChangeDetectionService?.ClearAllPreviousTexts();
+            _coordinateBasedTranslation?.ResetTranslationState();
 
             // 前回の翻訳結果をリセット（再翻訳時の問題を回避）
             lock (_lastTranslatedTextLock)

@@ -278,6 +278,9 @@ public sealed class ApplicationModule : ServiceModuleBase
                 // [Issue #389] ウィンドウ存在チェック用
                 var windowManagerAdapter = provider.GetService<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter>();
 
+                // [Issue #410] テキスト変化検知キャッシュリセット用
+                var textChangeDetectionService = provider.GetService<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
+
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                     captureService,
                     settingsService,
@@ -291,6 +294,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     licenseManager,
                     speculativeOcrService,
                     windowManagerAdapter,
+                    textChangeDetectionService,
                     logger);
             }
             catch (Exception ex)

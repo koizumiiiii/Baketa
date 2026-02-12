@@ -82,6 +82,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
     // Gemini Vision APIの処理時間はピクセル数に比例するため、テキスト翻訳に十分な解像度に縮小
     private const int CloudImageMaxDimension = 960;
+
+    /// <summary>
+    /// [Issue #410] 翻訳開始時にキャッシュをリセット（Shot→Live遷移時の誤判定防止）
+    /// </summary>
+    public void ResetTranslationState()
+    {
+        _screenStabilizationActive.Clear();
+        _previousOcrTextCache.Clear();
+        _logger?.LogDebug("[Issue #410] 翻訳状態リセット: 安定化フラグ・OCRテキストキャッシュをクリア");
+    }
+
     private const int CloudJpegQuality = 85;
     private const string CloudImageMimeType = "image/jpeg";
 
@@ -350,7 +361,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // [Issue #401] 画面安定化チェック（ヒステリシス付き）
             // 画面がまだ遷移中（シーン切替、テキスト送りの途中等）の可能性がある場合、
             // パイプライン全体をスキップして安定してからOCR + Cloud AIを実行する
-            if (pipelineResult.ImageChangeResult != null)
+            // [Issue #410] Singleshotモード時は安定化チェックをバイパス（次サイクルがないため）
+            var isSingleshotForStabilization = _translationModeService?.CurrentMode == TranslationMode.Singleshot;
+            if (pipelineResult.ImageChangeResult != null && !isSingleshotForStabilization)
             {
                 var settings = _imageChangeSettings?.CurrentValue;
                 var stabilizationThreshold = settings?.ScreenStabilizationThreshold ?? 0.50f;

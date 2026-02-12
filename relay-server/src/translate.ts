@@ -90,6 +90,7 @@ interface GeminiRequest {
   generationConfig?: {
     temperature?: number;
     maxOutputTokens?: number;
+    frequencyPenalty?: number; // [Issue #411] 同一トークン反復抑制
   };
   // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応
   safetySettings?: Array<{
@@ -1409,6 +1410,26 @@ interface ParsedAiResponse {
 }
 
 /**
+ * [Issue #411] 反復文字パターンを検出しサニタイズする
+ * Geminiが改行やスペースを大量に反復生成するハルシネーションを検出・除去
+ * @returns サニタイズ済みテキストと反復検出フラグ
+ */
+function sanitizeRepetition(text: string): { sanitized: string; hasRepetition: boolean } {
+  // 同一文字が10回以上連続するパターンを検出（改行、スペース、任意の文字）
+  const repetitionPattern = /(.)\1{9,}/g;
+  const hasRepetition = repetitionPattern.test(text);
+
+  if (!hasRepetition) {
+    return { sanitized: text, hasRepetition: false };
+  }
+
+  // 反復を最大3回に圧縮
+  const sanitized = text.replace(/(.)\1{9,}/g, '$1$1$1');
+  console.warn(`[Issue #411] Repetition detected and sanitized: original=${text.length} chars, sanitized=${sanitized.length} chars`);
+  return { sanitized, hasRepetition: true };
+}
+
+/**
  * AIレスポンスからJSONをパース
  * マークダウンコードブロック（```json...```）を除去してパース
  * [Issue #275] 複数テキスト形式にも対応
@@ -1551,6 +1572,7 @@ If no text visible: {"texts": [], "detected_language": ""}`;
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192, // [Issue #387] 途中切れ防止のため増加
+      frequencyPenalty: 0.3, // [Issue #411] 改行等の同一トークン反復生成を抑制
     },
     // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応 - フィルターを緩和
     // BLOCK_NONE: ブロックしない（翻訳用途のため）
@@ -1632,16 +1654,26 @@ If no text visible: {"texts": [], "detected_language": ""}`;
       };
     }
 
-    // JSONをパース
-    const parsed = parseAiJsonResponse(textContent);
+    // [Issue #411] 反復文字のサニタイズ（改行ループ等のハルシネーション対策）
+    const { sanitized: sanitizedContent, hasRepetition } = sanitizeRepetition(textContent);
+
+    // [Issue #411] MAX_TOKENS + 反復検出 = ハルシネーションによるトークン浪費 → リトライ不可
+    if (finishReason === 'MAX_TOKENS' && hasRepetition) {
+      console.error(`[Issue #411] Gemini hallucination detected: repetition loop caused MAX_TOKENS truncation`);
+    }
+
+    // JSONをパース（サニタイズ済みテキストを使用）
+    const parsed = parseAiJsonResponse(sanitizedContent);
     if (!parsed) {
       // [Issue #333] JSONパースエラー時にrawResponse先頭200文字をエラーメッセージに含める
       const truncatedContent = textContent.length > 200 ? textContent.substring(0, 200) + '...' : textContent;
       const reasonHint = finishReason === 'MAX_TOKENS' ? ' [TRUNCATED by MAX_TOKENS]' : '';
-      console.error(`[Issue #333] Failed to parse Gemini response as JSON${reasonHint}: ${truncatedContent}`);
+      const repetitionHint = hasRepetition ? ' [REPETITION_DETECTED]' : '';
+      console.error(`[Issue #333] Failed to parse Gemini response as JSON${reasonHint}${repetitionHint}: ${truncatedContent}`);
       return {
         success: false,
-        error: { code: 'API_ERROR', message: `Invalid JSON response from Gemini${reasonHint} (raw: ${truncatedContent})`, isRetryable: finishReason === 'MAX_TOKENS' },
+        // [Issue #411] MAX_TOKENSでもリトライ不可（同一画像で同じ結果になるため）
+        error: { code: 'API_ERROR', message: `Invalid JSON response from Gemini${reasonHint}${repetitionHint} (raw: ${truncatedContent})`, isRetryable: false },
       };
     }
 
