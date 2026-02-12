@@ -598,8 +598,11 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
                 return LegacyCombineChunks(chunks);
             }
 
+            // [Issue #413] グルーピング前ノイズフィルタ
+            var filteredChunks = FilterNoiseChunks(chunks);
+
             // 近接度でグループ化
-            var proximityGroups = _proximityGroupingService.GroupByProximity(chunks);
+            var proximityGroups = _proximityGroupingService.GroupByProximity(filteredChunks);
 
             if (proximityGroups.Count == 0)
             {
@@ -673,6 +676,73 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
         };
 
         return [combinedChunk];
+    }
+
+    /// <summary>
+    /// [Issue #413] グルーピング前にOCRハルシネーションノイズを除外
+    /// 複数条件のANDで判定し、正常テキストの誤除外を防ぐ
+    /// </summary>
+    private List<TextChunk> FilterNoiseChunks(List<TextChunk> chunks)
+    {
+        var filtered = new List<TextChunk>(chunks.Count);
+        var removedCount = 0;
+
+        foreach (var chunk in chunks)
+        {
+            if (IsLikelyNoise(chunk))
+            {
+                removedCount++;
+                _logger.LogDebug(
+                    "[Issue #413] ノイズ除外: Text='{Text}' Confidence={Confidence:F3} Height={Height}",
+                    chunk.CombinedText, chunk.AverageConfidence, chunk.CombinedBounds.Height);
+                continue;
+            }
+            filtered.Add(chunk);
+        }
+
+        if (removedCount > 0)
+        {
+            _logger.LogInformation(
+                "[Issue #413] ノイズフィルタ: {Removed}/{Total}個を除外",
+                removedCount, chunks.Count);
+        }
+
+        // 全除外された場合は元のチャンクを返す（安全策）
+        return filtered.Count > 0 ? filtered : chunks;
+    }
+
+    private static bool IsLikelyNoise(TextChunk chunk)
+    {
+        var confidence = chunk.AverageConfidence;
+        var text = chunk.CombinedText;
+
+        // Rule 1: 極低信頼度は無条件除外
+        if (confidence < 0.30f)
+            return true;
+
+        // Rule 2: 低信頼度 + ノイズテキストパターン
+        if (confidence < 0.50f && IsNoiseTextPattern(text))
+            return true;
+
+        return false;
+    }
+
+    private static bool IsNoiseTextPattern(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return true;
+
+        // 1文字テキスト
+        if (text.Length <= 1) return true;
+
+        // 全文字が非単語文字（ダッシュ、ドット、アンダースコア、スペース）
+        if (text.All(c => c is '-' or '.' or '_' or ' '))
+            return true;
+
+        // 数字と記号のみ（英字を含まないテキスト）
+        if (!text.Any(c => char.IsLetter(c)))
+            return true;
+
+        return false;
     }
 
     /// <summary>
