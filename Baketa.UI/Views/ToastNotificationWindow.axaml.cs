@@ -89,13 +89,15 @@ public partial class ToastNotificationWindow : Window
             if (screen == null) return;
 
             var workingArea = screen.WorkingArea;
+            var scaling = screen.Scaling;
             const int margin = 16;
 
-            // 実際のウィンドウサイズを取得（レイアウト完了後なので正確）
-            var windowHeight = (int)Bounds.Height;
+            // 実際のウィンドウサイズを取得し、DPIスケーリングで物理ピクセルに変換
+            // Bounds.Height は論理ピクセル、WorkingArea は物理ピクセルのため変換が必要
+            var windowHeight = (int)(Bounds.Height * scaling);
             if (windowHeight <= 0)
             {
-                windowHeight = 100; // フォールバック値
+                windowHeight = (int)(100 * scaling); // フォールバック値
             }
 
             // [Issue #343] WorkingArea.X/Y を考慮（マルチモニター対応）

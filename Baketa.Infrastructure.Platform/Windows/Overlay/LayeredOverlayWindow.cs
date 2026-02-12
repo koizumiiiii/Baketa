@@ -737,7 +737,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     /// <param name="font">使用するフォント</param>
     /// <param name="maxWidth">最大幅（ピクセル）</param>
     /// <returns>分割された行のリスト</returns>
-    private List<string> GetWrappedTextLines(Graphics g, string text, Font font, float maxWidth)
+    private static List<string> GetWrappedTextLines(Graphics g, string text, Font font, float maxWidth)
     {
         var lines = new List<string>();
         var paragraphs = text.Split(new[] { '\n' }, StringSplitOptions.None);
@@ -750,38 +750,89 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                 continue;
             }
 
-            var words = paragraph.Split(' ');
-            var wrappedLine = new System.Text.StringBuilder();
-
-            foreach (var word in words)
+            // CJK文字を含む場合は文字単位で折り返す
+            if (ContainsCjkCharacters(paragraph))
             {
-                if (wrappedLine.Length > 0)
-                {
-                    var testLine = wrappedLine.ToString() + " " + word;
-                    if (g.MeasureString(testLine, font).Width > maxWidth)
-                    {
-                        lines.Add(wrappedLine.ToString());
-                        wrappedLine.Clear();
-                        wrappedLine.Append(word);
-                    }
-                    else
-                    {
-                        wrappedLine.Append(" " + word);
-                    }
-                }
-                else
-                {
-                    wrappedLine.Append(word);
-                }
+                WrapTextByCharacter(g, paragraph, font, maxWidth, lines);
             }
-
-            if (wrappedLine.Length > 0)
+            else
             {
-                lines.Add(wrappedLine.ToString());
+                WrapTextByWord(g, paragraph, font, maxWidth, lines);
             }
         }
 
         return lines;
+    }
+
+    /// <summary>
+    /// スペース区切りの単語単位でテキストを折り返す（英語等のラテン文字テキスト用）
+    /// </summary>
+    private static void WrapTextByWord(Graphics g, string paragraph, Font font, float maxWidth, List<string> lines)
+    {
+        var words = paragraph.Split(' ');
+        var wrappedLine = new System.Text.StringBuilder();
+
+        foreach (var word in words)
+        {
+            if (wrappedLine.Length > 0)
+            {
+                var testLine = wrappedLine.ToString() + " " + word;
+                if (g.MeasureString(testLine, font).Width > maxWidth)
+                {
+                    lines.Add(wrappedLine.ToString());
+                    wrappedLine.Clear();
+                    wrappedLine.Append(word);
+                }
+                else
+                {
+                    wrappedLine.Append(" " + word);
+                }
+            }
+            else
+            {
+                wrappedLine.Append(word);
+            }
+        }
+
+        if (wrappedLine.Length > 0)
+        {
+            lines.Add(wrappedLine.ToString());
+        }
+    }
+
+    /// <summary>
+    /// 文字単位でテキストを折り返す（CJK文字を含むテキスト用）
+    /// </summary>
+    private static void WrapTextByCharacter(Graphics g, string paragraph, Font font, float maxWidth, List<string> lines)
+    {
+        var currentLine = new System.Text.StringBuilder();
+        foreach (var ch in paragraph)
+        {
+            var testLine = currentLine.ToString() + ch;
+            if (currentLine.Length > 0 && g.MeasureString(testLine, font).Width > maxWidth)
+            {
+                lines.Add(currentLine.ToString());
+                currentLine.Clear();
+            }
+            currentLine.Append(ch);
+        }
+        if (currentLine.Length > 0)
+            lines.Add(currentLine.ToString());
+    }
+
+    /// <summary>
+    /// テキストにCJK文字（漢字、ひらがな、カタカナ、ハングル）が含まれるかを判定
+    /// </summary>
+    private static bool ContainsCjkCharacters(string text)
+    {
+        foreach (var ch in text)
+        {
+            if (ch >= 0x4E00 && ch <= 0x9FFF) return true;  // CJK統合漢字
+            if (ch >= 0x3040 && ch <= 0x309F) return true;  // ひらがな
+            if (ch >= 0x30A0 && ch <= 0x30FF) return true;  // カタカナ
+            if (ch >= 0xAC00 && ch <= 0xD7AF) return true;  // ハングル
+        }
+        return false;
     }
 
     // ========================================

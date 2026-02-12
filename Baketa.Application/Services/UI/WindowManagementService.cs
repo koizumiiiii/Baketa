@@ -214,12 +214,20 @@ public sealed class WindowManagementService : IWindowManagementService, IDisposa
     {
         try
         {
-            // TODO: より詳細なウィンドウ有効性検証ロジックを実装
-            // - ウィンドウが存在するか
-            // - ウィンドウがアクセス可能か
-            // - セキュリティ制限に引っかからないか
+            if (windowInfo.Handle == IntPtr.Zero || string.IsNullOrEmpty(windowInfo.Title))
+                return false;
 
-            return windowInfo.Handle != IntPtr.Zero && !string.IsNullOrEmpty(windowInfo.Title);
+            // [Issue #389] IWindowManagerAdapter.GetWindowBounds() でウィンドウの実在を確認
+            // ウィンドウが閉じられている場合、GetWindowBounds() は null を返す
+            var bounds = _windowManager.GetWindowBounds(windowInfo.Handle);
+            if (bounds == null)
+            {
+                _logger.LogInformation("[Issue #389] ウィンドウが存在しません: '{Title}' (Handle={Handle})",
+                    windowInfo.Title, windowInfo.Handle);
+                return false;
+            }
+
+            return true;
         }
         catch (Exception ex)
         {

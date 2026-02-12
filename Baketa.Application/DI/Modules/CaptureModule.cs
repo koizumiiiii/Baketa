@@ -85,12 +85,15 @@ public sealed class CaptureModule : ServiceModuleBase
                 var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AdaptiveCaptureServiceAdapter>>();
                 var coordinateTransformationService = provider.GetRequiredService<Baketa.Core.Abstractions.Services.ICoordinateTransformationService>();
                 var changeDetectionService = provider.GetService<Baketa.Core.Abstractions.Services.IImageChangeDetectionService>();
+                // [Issue #389] ウィンドウクローズ検知用
+                var eventAggregator = provider.GetService<Baketa.Core.Abstractions.Events.IEventAggregator>();
+                var windowManagerAdapter = provider.GetService<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter>();
 
                 logger.LogDebug("AdaptiveCaptureServiceAdapter インスタンス作成");
                 logger.LogInformation($"🎯 [PHASE_C] EnhancedImageChangeDetectionService統合: {(changeDetectionService != null ? "有効" : "無効")}");
                 logger.LogInformation("🎯 [WIN32_OVERLAY_FIX] CoordinateTransformationService統合: 動的ROIScaleFactor計算対応");
 
-                var adapter = new AdaptiveCaptureServiceAdapter(adaptiveService, logger, coordinateTransformationService, changeDetectionService);
+                var adapter = new AdaptiveCaptureServiceAdapter(adaptiveService, logger, coordinateTransformationService, changeDetectionService, eventAggregator, windowManagerAdapter);
                 logger.LogInformation("AdaptiveCaptureServiceAdapter 登録完了 - Phase C画面変化検知 + WIN32座標変換統合済み");
                 return adapter;
             }

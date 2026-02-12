@@ -188,21 +188,21 @@ public sealed class BackgroundWarmupService(
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-            ReportProgress(0.0, "ウォームアップ開始", WarmupPhase.Starting);
+            ReportProgress(0.0, "Starting warmup", WarmupPhase.Starting);
 
             // フェーズ1: GPU環境検出（10%）
             await WarmupGpuEnvironmentAsync(cancellationToken).ConfigureAwait(false);
-            ReportProgress(0.1, "GPU環境検出完了", WarmupPhase.GpuDetection);
+            ReportProgress(0.1, "GPU environment detected", WarmupPhase.GpuDetection);
 
             // フェーズ2: OCRエンジン初期化とウォームアップ（50%）
             await WarmupOcrEnginesAsync(cancellationToken).ConfigureAwait(false);
             _isOcrWarmupCompleted = true;
-            ReportProgress(0.6, "OCRウォームアップ完了", WarmupPhase.OcrWarmup);
+            ReportProgress(0.6, "OCR warmup completed", WarmupPhase.OcrWarmup);
 
             // フェーズ3: 翻訳エンジン初期化とウォームアップ（40%）
             await WarmupTranslationEnginesAsync(cancellationToken).ConfigureAwait(false);
             _isTranslationWarmupCompleted = true;
-            ReportProgress(1.0, "全ウォームアップ完了", WarmupPhase.Completed);
+            ReportProgress(1.0, "All warmup completed", WarmupPhase.Completed);
 
             _isWarmupCompleted = true;
             stopwatch.Stop();
@@ -227,7 +227,7 @@ public sealed class BackgroundWarmupService(
             LastError = ex;
 
             _logger.LogError(ex, "ウォームアップ中にエラーが発生しました");
-            ReportProgress(_warmupProgress, $"エラー: {ex.Message}", WarmupPhase.Starting);
+            ReportProgress(_warmupProgress, $"Error: {ex.Message}", WarmupPhase.Starting);
             throw;
         }
     }
@@ -257,7 +257,7 @@ public sealed class BackgroundWarmupService(
     {
         try
         {
-            ReportProgress(0.2, "OCRエンジン初期化中", WarmupPhase.OcrInitialization);
+            ReportProgress(0.2, "Initializing OCR engine", WarmupPhase.OcrInitialization);
 
             // IOcrEngineサービスを取得
             var ocrEngine = _serviceProvider.GetService<IOcrEngine>();
@@ -280,7 +280,7 @@ public sealed class BackgroundWarmupService(
                 }
             }
 
-            ReportProgress(0.4, "OCRエンジンウォームアップ中", WarmupPhase.OcrWarmup);
+            ReportProgress(0.4, "Warming up OCR engine", WarmupPhase.OcrWarmup);
 
             // OCRエンジンウォームアップ
             var warmupSuccess = await ocrEngine.WarmupAsync(cancellationToken).ConfigureAwait(false);
@@ -305,7 +305,7 @@ public sealed class BackgroundWarmupService(
     {
         try
         {
-            ReportProgress(0.7, "翻訳エンジン初期化中", WarmupPhase.TranslationInitialization);
+            ReportProgress(0.7, "Initializing translation engine", WarmupPhase.TranslationInitialization);
 
             // ITranslationEngineサービスを取得（全ての実装をウォームアップ）
             var translationEngines = _serviceProvider.GetServices<ITranslationEngine>().ToList();
@@ -350,7 +350,7 @@ public sealed class BackgroundWarmupService(
                         }
 
                         ReportProgress(currentProgress + progressIncrement,
-                            $"{engine.Name}ウォームアップ完了", WarmupPhase.TranslationWarmup);
+                            $"{engine.Name} warmup completed", WarmupPhase.TranslationWarmup);
                     }
                     catch (Exception ex)
                     {
