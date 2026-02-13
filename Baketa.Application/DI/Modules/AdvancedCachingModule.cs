@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Baketa.Application.Services.Cache;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.DI;
 using Baketa.Core.DI.Attributes;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,10 @@ public sealed class AdvancedCachingModule : ServiceModuleBase
         // ⚡ Step3: 高度キャッシングサービス登録
         services.AddSingleton<IAdvancedOcrCacheService, AdvancedOcrCacheService>();
         Console.WriteLine("✅ IAdvancedOcrCacheService登録完了");
+
+        // [Issue #415] Cloud翻訳キャッシュサービス（Fork-Join段階でのAPIコール抑制）
+        services.AddSingleton<ICloudTranslationCache, CloudTranslationCache>();
+        Console.WriteLine("✅ ICloudTranslationCache登録完了");
 
         // NOTE: [PP-OCRv5削除] IOcrEngineの登録はSuryaOcrModuleに移行
         // SuryaOcrModuleがIOcrEngine→SuryaOcrEngineを直接登録するため、

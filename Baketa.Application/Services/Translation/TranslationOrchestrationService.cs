@@ -90,6 +90,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // [Issue #410] テキスト変化検知キャッシュリセット用
     private readonly Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? _textChangeDetectionService;
 
+    // [Issue #415] Cloud翻訳キャッシュ
+    private readonly ICloudTranslationCache? _cloudTranslationCache;
+
     // 状態管理
     private volatile bool _isAutomaticTranslationActive;
     private volatile bool _isSingleTranslationActive;
@@ -179,6 +182,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         ISpeculativeOcrService? speculativeOcrService = null,
         Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter? windowManagerAdapter = null,
         Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? textChangeDetectionService = null,
+        ICloudTranslationCache? cloudTranslationCache = null, // [Issue #415] Cloud翻訳キャッシュ
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -200,6 +204,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _speculativeOcrService = speculativeOcrService;
         _windowManagerAdapter = windowManagerAdapter;
         _textChangeDetectionService = textChangeDetectionService;
+        _cloudTranslationCache = cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
         _logger = logger;
 
         // Issue #293: 投機的OCRサービスが利用可能かログ出力
@@ -2088,17 +2093,46 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 if (isCloudAiAvailable)
                 {
-                    // 🚀 Fork-Join: OCR + Cloud AI翻訳を並列実行
-                    var parallelResult = await ExecuteForkJoinOcrAndCloudAsync(
-                        image, translationId, currentRequestToken).ConfigureAwait(false);
+                    // [Issue #415] 画像ハッシュによるCloud APIコール抑制
+                    FallbackTranslationResult? cachedResult = null;
+                    long imageHash = 0;
 
-                    ocrResults = parallelResult.OcrResults;
-                    cloudTranslationResult = parallelResult.CloudResult;
+                    if (_cloudTranslationCache != null && _targetWindowHandle.HasValue)
+                    {
+                        imageHash = _cloudTranslationCache.ComputeImageHash(image.GetImageMemory());
+                        if (_cloudTranslationCache.TryGetCachedResult(_targetWindowHandle.Value, imageHash, out cachedResult))
+                        {
+                            _logger?.LogInformation("[Issue #415] セカンダリパス: Cloud APIスキップ（キャッシュ結果を再利用）");
+                        }
+                    }
 
-                    _logger?.LogInformation(
-                        "🚀 [Issue #290] Fork-Join完了: OCR={OcrMs}ms, Cloud={CloudMs}ms (並列実行)",
-                        parallelResult.OcrDuration.TotalMilliseconds,
-                        parallelResult.CloudDuration?.TotalMilliseconds ?? 0);
+                    if (cachedResult != null)
+                    {
+                        // キャッシュヒット → OCRのみ実行
+                        cloudTranslationResult = cachedResult;
+                        ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: currentRequestToken).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // キャッシュミス → 通常のFork-Join実行
+                        var parallelResult = await ExecuteForkJoinOcrAndCloudAsync(
+                            image, translationId, currentRequestToken).ConfigureAwait(false);
+
+                        ocrResults = parallelResult.OcrResults;
+                        cloudTranslationResult = parallelResult.CloudResult;
+
+                        // [Issue #415] 成功した結果をキャッシュに保存
+                        if (cloudTranslationResult?.IsSuccess == true && _cloudTranslationCache != null
+                            && _targetWindowHandle.HasValue && imageHash != 0)
+                        {
+                            _cloudTranslationCache.CacheResult(_targetWindowHandle.Value, imageHash, cloudTranslationResult);
+                        }
+
+                        _logger?.LogInformation(
+                            "🚀 [Issue #290] Fork-Join完了: OCR={OcrMs}ms, Cloud={CloudMs}ms (並列実行)",
+                            parallelResult.OcrDuration.TotalMilliseconds,
+                            parallelResult.CloudDuration?.TotalMilliseconds ?? 0);
+                    }
                 }
                 else
                 {

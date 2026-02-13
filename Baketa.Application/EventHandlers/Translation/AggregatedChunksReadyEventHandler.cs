@@ -56,23 +56,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     // ResetSemaphoreForStopがセマフォを解放した場合、finallyブロックでの解放をスキップ
     private static volatile bool _semaphoreReleasedByStop;
 
-    // [Issue #414] Cloud結果サイクル間重複排除キャッシュ
-    // 同一テキストが毎サイクルCloud AI翻訳されるのを防止（BBox揺れ耐性あり）
-    private const int CloudResultCacheTtlSeconds = 30;
-    private const float CloudResultCacheProximityThreshold = 50f; // 0-1000正規化スケールでの中心点距離閾値
-
-    private static readonly List<CloudResultCacheEntry> _cloudResultCache = [];
-    private static readonly object _cloudResultCacheLock = new();
-
-    /// <summary>
-    /// [Issue #414] Cloud結果キャッシュエントリ
-    /// </summary>
-    private sealed record CloudResultCacheEntry(
-        string NormalizedText,
-        float CenterX,   // 0-1000 正規化スケール
-        float CenterY,   // 0-1000 正規化スケール
-        DateTime CreatedAt);
-
+    // [Issue #415] Cloud翻訳キャッシュ（Fork-Join段階で画像ハッシュベースの抑制に移行）
+    private readonly ICloudTranslationCache? _cloudTranslationCache;
 
     private readonly Baketa.Core.Abstractions.Translation.ITranslationService _translationService;
     private readonly IStreamingTranslationService? _streamingTranslationService;
@@ -120,7 +105,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         // [Issue #379] ROI管理設定（オプショナル）
         IOptions<RoiManagerSettings>? roiSettings = null,
         // [Issue #414] ファジーテキストマッチング（オプショナル）
-        IFuzzyTextMatcher? fuzzyTextMatcher = null)
+        IFuzzyTextMatcher? fuzzyTextMatcher = null,
+        // [Issue #415] Cloud翻訳キャッシュ（オプショナル）
+        ICloudTranslationCache? cloudTranslationCache = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -143,6 +130,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _roiSettings = roiSettings?.Value ?? RoiManagerSettings.CreateDefault();
         // [Issue #414] ファジーテキストマッチング
         _fuzzyTextMatcher = fuzzyTextMatcher;
+        // [Issue #415] Cloud翻訳キャッシュ
+        _cloudTranslationCache = cloudTranslationCache;
     }
 
     /// <inheritdoc />
@@ -189,11 +178,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             Console.WriteLine($"ℹ️ [STOP_CLEANUP] セマフォは既に利用可能 - CurrentCount: {_translationExecutionSemaphore.CurrentCount}");
         }
 
-        // [Issue #414] Cloud結果キャッシュをクリア（次のStart時にクリーンな状態で開始）
-        lock (_cloudResultCacheLock)
-        {
-            _cloudResultCache.Clear();
-        }
+        // [Issue #415] Cloud翻訳キャッシュのクリアはFork-Join側（CoordinateBasedTranslationService.ResetTranslationState）で実施
     }
 
     /// <inheritdoc />
@@ -2097,96 +2082,15 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     }
 
     /// <summary>
-    /// [Issue #414] Cloud結果キャッシュの更新とサイクル間重複検出ログ
+    /// [Issue #414→#415] Cloud結果のサイクル間重複検出ログ（補助的な役割）
+    /// Fork-Join段階（Issue #415）で画像ハッシュベースのAPIコール抑制を実施するため、
+    /// ここでは結果数のログ記録のみ行う。
     /// </summary>
-    /// <remarks>
-    /// BBox中心点の近接度 + テキスト類似度で重複を検出しログ記録する。
-    /// Cloud APIコールは既に完了済みのため、ここでは結果のフィルタリングは行わない。
-    /// オーバーレイは毎サイクル再作成されるため、結果を除外するとオーバーレイが消失してしまう。
-    /// キャッシュは将来的にFork-Join段階でのAPIコール抑制に活用予定。
-    /// </remarks>
     private void UpdateCloudResultCache(List<TranslatedTextItem> cloudTexts)
     {
-        var now = DateTime.UtcNow;
-        var duplicateCount = 0;
-
-        lock (_cloudResultCacheLock)
-        {
-            // TTL超過エントリを除去
-            _cloudResultCache.RemoveAll(e =>
-                (now - e.CreatedAt).TotalSeconds > CloudResultCacheTtlSeconds);
-
-            foreach (var cloudText in cloudTexts)
-            {
-                if (cloudText.BoundingBox is not { } bbox)
-                    continue;
-
-                var centerX = bbox.X + bbox.Width / 2f;
-                var centerY = bbox.Y + bbox.Height / 2f;
-                var normalizedNew = NormalizeText(cloudText.Original ?? string.Empty);
-
-                if (string.IsNullOrEmpty(normalizedNew))
-                    continue;
-
-                // BBox中心点の近接度でキャッシュエントリを検索
-                CloudResultCacheEntry? matchedEntry = null;
-                var bestDist = float.MaxValue;
-
-                foreach (var cached in _cloudResultCache)
-                {
-                    var dx = centerX - cached.CenterX;
-                    var dy = centerY - cached.CenterY;
-                    var dist = MathF.Sqrt(dx * dx + dy * dy);
-
-                    if (dist <= CloudResultCacheProximityThreshold && dist < bestDist)
-                    {
-                        bestDist = dist;
-                        matchedEntry = cached;
-                    }
-                }
-
-                if (matchedEntry != null)
-                {
-                    var normalizedCached = matchedEntry.NormalizedText;
-
-                    // 重複分類（ログのみ、フィルタリングは行わない）
-                    if (normalizedNew == normalizedCached ||
-                        normalizedCached.Contains(normalizedNew, StringComparison.Ordinal))
-                    {
-                        duplicateCount++;
-                        _logger?.LogDebug(
-                            "[Issue #414] サイクル間重複検出（同一/劣化）: '{Text}' (dist={Dist:F1})",
-                            cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
-                            bestDist);
-                    }
-                    else if (normalizedNew.Contains(normalizedCached, StringComparison.Ordinal))
-                    {
-                        _logger?.LogInformation(
-                            "[Issue #414] サイクル間テキスト改善検出: '{Text}' (dist={Dist:F1})",
-                            cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
-                            bestDist);
-                    }
-
-                    // キャッシュを最新状態に更新
-                    _cloudResultCache.Remove(matchedEntry);
-                    _cloudResultCache.Add(new CloudResultCacheEntry(
-                        normalizedNew, centerX, centerY, now));
-                }
-                else
-                {
-                    // 新規テキスト → キャッシュ追加
-                    _cloudResultCache.Add(new CloudResultCacheEntry(
-                        normalizedNew, centerX, centerY, now));
-                }
-            }
-        }
-
-        if (duplicateCount > 0)
-        {
-            _logger?.LogInformation(
-                "[Issue #414] サイクル間重複検出: {Total}件中{Dup}件が前回と同一",
-                cloudTexts.Count, duplicateCount);
-        }
+        _logger?.LogDebug(
+            "[Issue #415] Cloud結果受信: {Count}件（APIコール抑制はFork-Join段階で実施済み）",
+            cloudTexts.Count);
     }
 
     /// <summary>

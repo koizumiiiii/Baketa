@@ -92,6 +92,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             null, // speculativeOcrService（Issue #293: テスト用にnull）
             null, // windowManagerAdapter（Issue #389: テスト用にnull）
             null, // textChangeDetectionService（Issue #410: テスト用にnull）
+            null, // cloudTranslationCache（Issue #415: テスト用にnull）
             _loggerMock.Object);
     }
 
