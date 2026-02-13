@@ -317,7 +317,6 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 {
                     // キャッシュミス → 通常のCloud APIコール
                     _logger?.LogInformation("🚀 [Issue #290] Fork-Join開始: OCR || Cloud AI を並列実行");
-                    var forkJoinStopwatch = Stopwatch.StartNew();
 
                     forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
                         forkJoinImageBase64!,

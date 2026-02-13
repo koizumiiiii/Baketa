@@ -1993,7 +1993,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             var gapY = Math.Max(0, Math.Max(cloudPixelRect.Y - suryaBounds.Bottom, suryaBounds.Y - cloudPixelRect.Bottom));
 
             // 最小辺間距離（ユークリッド距離の近似: X,Y両方にギャップがあれば対角距離）
-            var distance = (float)Math.Sqrt(gapX * gapX + gapY * gapY);
+            var distance = (float)Math.Sqrt((double)gapX * gapX + (double)gapY * gapY);
 
             // Cloud中心がSurya中心より上方向: BBoxが上に浮いている傾向 → マージンを大きく
             var suryaCenterY = suryaBounds.Y + suryaBounds.Height / 2.0f;

@@ -2108,8 +2108,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                     if (cachedResult != null)
                     {
-                        // キャッシュヒット → OCRのみ実行
-                        cloudTranslationResult = cachedResult;
+                        // キャッシュヒット → OCRのみ実行（Cloud結果は既にキャッシュ済みのため再利用不要）
                         ocrResults = await _ocrEngine!.RecognizeAsync(image, cancellationToken: currentRequestToken).ConfigureAwait(false);
                     }
                     else
