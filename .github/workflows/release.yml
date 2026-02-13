@@ -197,6 +197,7 @@ jobs:
 
         # Copy additional files (Issue #268: Use user-friendly README for release package)
         Copy-Item "docs/release/README.md" "$publishDir/" -ErrorAction SilentlyContinue
+        Copy-Item "docs/release/README.ja.md" "$publishDir/" -ErrorAction SilentlyContinue
         Copy-Item "LICENSE" "$publishDir/" -ErrorAction SilentlyContinue
 
         # Create versioned zip (for appcast version extraction)

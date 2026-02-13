@@ -75,7 +75,7 @@ public sealed record PerformanceMeasurementResult
 public sealed class PerformanceMeasurement : IDisposable
 {
     private static readonly string LogFilePath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "performance_analysis.log");
+        AppDomain.CurrentDomain.BaseDirectory, "Logs", "performance_analysis.log");
 
     private static readonly ConcurrentQueue<PerformanceMeasurementResult> Results = new();
     private static readonly object FileLock = new();
@@ -262,8 +262,11 @@ public sealed class PerformanceMeasurement : IDisposable
 
     private static void WriteToFile(string message)
     {
+#if DEBUG
         try
         {
+            var dir = Path.GetDirectoryName(LogFilePath);
+            if (dir != null) Directory.CreateDirectory(dir);
             lock (FileLock)
             {
                 File.AppendAllText(LogFilePath, message + Environment.NewLine);
@@ -273,6 +276,7 @@ public sealed class PerformanceMeasurement : IDisposable
         {
             // ファイル書き込みエラーは無視
         }
+#endif
     }
 
     private static void WriteToConsole(string message)

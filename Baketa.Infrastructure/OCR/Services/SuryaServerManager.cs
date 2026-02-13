@@ -104,6 +104,18 @@ public sealed class SuryaServerManager : IOcrServerManager
         if (_isUnifiedMode)
         {
             var timeoutSeconds = _unifiedServerSettings?.StartupTimeoutSeconds ?? 300;
+
+            // [Issue #422] 統合サーバーexe未検出時はダウンロード/展開中と判断しタイムアウトを延長
+            var unifiedExePath = Path.Combine(AppContext.BaseDirectory,
+                "grpc_server", "BaketaUnifiedServer", "BaketaUnifiedServer.exe");
+            if (!File.Exists(unifiedExePath))
+            {
+                var extendedTimeout = Math.Max(timeoutSeconds, 600);
+                _logger.LogInformation("⏳ [Issue #422] [Surya] 統合サーバーexe未検出 → ダウンロード/展開中と判断、タイムアウトを{Original}秒→{Extended}秒に延長",
+                    timeoutSeconds, extendedTimeout);
+                timeoutSeconds = extendedTimeout;
+            }
+
             _logger.LogInformation("🔄 [Issue #292] [Surya] 統合サーバーモード - gRPCポーリングで準備完了を待機中... Port {Port}, Timeout {Timeout}秒",
                 _port, timeoutSeconds);
 

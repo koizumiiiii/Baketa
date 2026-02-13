@@ -263,7 +263,7 @@ public class ComponentDownloadService : IComponentDownloader
                     component.ExpectedSizeBytes,
                     0,
                     isCompleted: false,
-                    statusMessage: $"{component.DisplayName} を展開しています... (数分かかる場合があります)");
+                    statusMessage: $"Extracting {component.DisplayName}... (this may take a few minutes)");
 
                 // Extract to destination with error handling
                 try
@@ -279,8 +279,8 @@ public class ComponentDownloadService : IComponentDownloader
                         component.ExpectedSizeBytes,
                         0,
                         isCompleted: false,
-                        errorMessage: $"展開に失敗しました: {ex.Message}",
-                        statusMessage: "エラー: 展開に失敗しました");
+                        errorMessage: $"Extraction failed: {ex.Message}",
+                        statusMessage: "Error: Extraction failed");
                     throw;
                 }
 
@@ -424,7 +424,7 @@ public class ComponentDownloadService : IComponentDownloader
         await Task.WhenAll(downloadTasks).ConfigureAwait(false);
 
         totalStopwatch.Stop();
-        _logger.LogInformation("[Gemini Review] Downloaded {SuccessCount}/{TotalCount} components in {ElapsedMs}ms (並列数: {Concurrency})",
+        _logger.LogInformation("[Gemini Review] Downloaded {SuccessCount}/{TotalCount} components in {ElapsedMs}ms (Concurrency: {Concurrency})",
             downloadCount, missingComponents.Count, totalStopwatch.ElapsedMilliseconds, maxConcurrentDownloads);
 
         // [Gemini Review] 部分的失敗の場合、エラーをログに出力
@@ -753,7 +753,7 @@ public class ComponentDownloadService : IComponentDownloader
                     component.ExpectedSizeBytes,
                     0,
                     isCompleted: false,
-                    statusMessage: $"{component.DisplayName} をダウンロード中... (パート {i}/{component.SplitParts})");
+                    statusMessage: $"Downloading {component.DisplayName}... (Part {i}/{component.SplitParts})");
 
                 // Download this part
                 using var response = await _httpClient.GetAsync(
@@ -800,7 +800,7 @@ public class ComponentDownloadService : IComponentDownloader
                             component.ExpectedSizeBytes,
                             speed,
                             isCompleted: false,
-                            statusMessage: $"{component.DisplayName} をダウンロード中... (パート {i}/{component.SplitParts}, {progressPercent:F1}%)");
+                            statusMessage: $"Downloading {component.DisplayName}... (Part {i}/{component.SplitParts}, {progressPercent:F1}%)");
 
                         lastBytesForSpeed = partBytesReceived;
                         lastReportTime.Restart();
@@ -824,7 +824,7 @@ public class ComponentDownloadService : IComponentDownloader
                             component.ExpectedSizeBytes,
                             0,
                             isCompleted: false,
-                            statusMessage: $"{component.DisplayName} パート {i} を検証中...");
+                            statusMessage: $"Verifying {component.DisplayName} Part {i}...");
 
                         // Need to close fileStream before computing checksum
                         await fileStream.DisposeAsync().ConfigureAwait(false);
@@ -875,7 +875,7 @@ public class ComponentDownloadService : IComponentDownloader
                             component.ExpectedSizeBytes,
                             0,
                             isCompleted: false,
-                            statusMessage: $"{component.DisplayName} を結合しています... ({concatPercent:F1}%)");
+                            statusMessage: $"Concatenating {component.DisplayName}... ({concatPercent:F1}%)");
                         lastConcatReportTime.Restart();
                     }
                 }
@@ -936,7 +936,7 @@ public class ComponentDownloadService : IComponentDownloader
             {
                 var requiredMB = requiredBytes / (1024 * 1024);
                 var availableMB = tempDrive.AvailableFreeSpace / (1024 * 1024);
-                var splitInfo = component.SplitParts > 1 ? $" ({component.SplitParts}パート分割)" : "";
+                var splitInfo = component.SplitParts > 1 ? $" ({component.SplitParts} parts)" : "";
                 var message = $"Insufficient disk space on drive ({tempDrive.Name}){splitInfo}. " +
                              $"Required: {requiredMB:N0} MB (download + extraction), Available: {availableMB:N0} MB";
                 _logger.LogError(message);
@@ -957,7 +957,7 @@ public class ComponentDownloadService : IComponentDownloader
             {
                 var requiredMB = tempRequiredBytes / (1024 * 1024);
                 var availableMB = tempDrive.AvailableFreeSpace / (1024 * 1024);
-                var splitInfo = component.SplitParts > 1 ? $" ({component.SplitParts}パート分割)" : "";
+                var splitInfo = component.SplitParts > 1 ? $" ({component.SplitParts} parts)" : "";
                 var message = $"Insufficient disk space on temp drive ({tempDrive.Name}){splitInfo}. " +
                              $"Required: {requiredMB:N0} MB, Available: {availableMB:N0} MB";
                 _logger.LogError(message);
