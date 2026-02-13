@@ -223,6 +223,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     roiManager, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
                     windowManager, // [Issue #293] ウィンドウ情報取得用
                     provider.GetService<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.ImageChangeDetectionSettings>>(), // [Issue #401] 画面安定化設定
+                    provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationCache>(), // [Issue #415] Cloud翻訳キャッシュ
                     logger);
                 Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join＋Gate統合済み");
                 return instance;
@@ -278,6 +279,9 @@ public sealed class ApplicationModule : ServiceModuleBase
                 // [Issue #389] ウィンドウ存在チェック用
                 var windowManagerAdapter = provider.GetService<Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter>();
 
+                // [Issue #410] テキスト変化検知キャッシュリセット用
+                var textChangeDetectionService = provider.GetService<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
+
                 return new Baketa.Application.Services.Translation.TranslationOrchestrationService(
                     captureService,
                     settingsService,
@@ -291,6 +295,8 @@ public sealed class ApplicationModule : ServiceModuleBase
                     licenseManager,
                     speculativeOcrService,
                     windowManagerAdapter,
+                    textChangeDetectionService,
+                    provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationCache>(), // [Issue #415] Cloud翻訳キャッシュ
                     logger);
             }
             catch (Exception ex)

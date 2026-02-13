@@ -65,9 +65,10 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                 _logger.LogDebug("初回テキスト検出 - 変化ありとして処理継続");
                 changeResult = TextChangeResult.CreateFirstTime(currentText, stopwatch.Elapsed);
             }
-            else if (normalizedPrev == normalizedCurr)
+            else if (normalizedPrev == normalizedCurr ||
+                     NormalizeSpaceless(normalizedPrev) == NormalizeSpaceless(normalizedCurr))
             {
-                // [Issue #397] 正規化後のテキストが同一
+                // [Issue #397] 正規化後のテキストが同一（スペース除去比較含む）
                 if (_typewriterInProgress.TryRemove(contextId, out _))
                 {
                     // タイプライター完了 → 最終テキストを翻訳対象にする
@@ -83,7 +84,9 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                     changeResult = TextChangeResult.CreateNoChange(previousText, stopwatch.Elapsed);
                 }
             }
-            else if (normalizedCurr.StartsWith(normalizedPrev, StringComparison.Ordinal) && normalizedCurr.Length > normalizedPrev.Length)
+            else if ((normalizedCurr.StartsWith(normalizedPrev, StringComparison.Ordinal) ||
+                      NormalizeSpaceless(normalizedCurr).StartsWith(NormalizeSpaceless(normalizedPrev), StringComparison.Ordinal))
+                     && normalizedCurr.Length > normalizedPrev.Length)
             {
                 // [Issue #397] P0-2: タイプライター演出検出
                 // 現在テキストが前回テキストを包含し末尾が成長 → 演出中と判定
@@ -102,7 +105,22 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
             }
 
             var threshold = _settings.CurrentValue.TextChangeThreshold;
-            var hasSignificantChange = changeResult.HasChanged && changeResult.ChangePercentage >= threshold;
+            // [Issue #410] Strategy層の閾値で独立判定
+            // TextChangeDetectionService（Gatekeeper）は長さベースの高い閾値（例: 19%）を使用するが、
+            // Strategy層のTextChangeThreshold（例: 10%）とは目的が異なる。
+            // Service層のHasChangedに依存すると、17%の変化が19%閾値で抑制され、
+            // ゲームダイアログの変化が永久に検出されないケースが発生する。
+            var hasSignificantChange = changeResult.ChangePercentage >= threshold;
+
+            // Service層のキャッシュ同期: Strategy層が翻訳を決定したがService層が更新していない場合、
+            // Service層のキャッシュを明示的に更新して次サイクルの比較基準を正しくする
+            if (hasSignificantChange && !changeResult.HasChanged)
+            {
+                _textChangeService.SetPreviousText(contextId, currentText);
+                _logger.LogInformation(
+                    "[Issue #410] Strategy層が翻訳決定（Service層閾値超過で補正）: ChangeRatio={Ratio:F3}, StrategyThreshold={SThreshold:F3}, ServiceThreshold={ServiceThreshold}",
+                    changeResult.ChangePercentage, threshold, "dynamic");
+            }
 
             _logger.LogDebug("テキスト変化検知完了 - 変化: {HasChanged}, 変化率: {ChangePercentage:F3}%, しきい値: {Threshold:F1}%",
                 hasSignificantChange, changeResult.ChangePercentage * 100, threshold * 100);
@@ -150,6 +168,15 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
     private static string NormalizeForComparison(string text)
     {
         return NormalizeWhitespaceRegex().Replace(text, " ").Trim();
+    }
+
+    /// <summary>
+    /// [Issue #413] スペース除去正規化（OCRグルーピング揺れによる単語境界差異を吸収）
+    /// 例: "Sava Can I heck!" と "SavaCan I heck!" を同一と判定
+    /// </summary>
+    private static string NormalizeSpaceless(string text)
+    {
+        return text.Replace(" ", "");
     }
 
     [GeneratedRegex(@"\s+")]

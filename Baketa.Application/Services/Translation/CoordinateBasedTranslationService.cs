@@ -67,6 +67,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly IRoiManager? _roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
     private readonly IWindowManager? _windowManager; // [Issue #293] ウィンドウ情報取得用
     private readonly IOptionsMonitor<ImageChangeDetectionSettings>? _imageChangeSettings; // [Issue #401] 画面安定化設定
+    private readonly ICloudTranslationCache? _cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
     private bool _disposed;
 
     // [Issue #401] ヒステリシス: ウィンドウごとの画面安定化スキップ状態
@@ -82,6 +83,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
     // Gemini Vision APIの処理時間はピクセル数に比例するため、テキスト翻訳に十分な解像度に縮小
     private const int CloudImageMaxDimension = 960;
+
+    /// <summary>
+    /// [Issue #410] 翻訳開始時にキャッシュをリセット（Shot→Live遷移時の誤判定防止）
+    /// </summary>
+    public void ResetTranslationState()
+    {
+        _screenStabilizationActive.Clear();
+        _previousOcrTextCache.Clear();
+        _cloudTranslationCache?.ClearAll(); // [Issue #415] Cloud翻訳キャッシュもクリア
+        _logger?.LogDebug("[Issue #410] 翻訳状態リセット: 安定化フラグ・OCRテキストキャッシュをクリア");
+    }
+
     private const int CloudJpegQuality = 85;
     private const string CloudImageMimeType = "image/jpeg";
 
@@ -100,6 +113,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         IRoiManager? roiManager = null, // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
         IWindowManager? windowManager = null, // [Issue #293] ウィンドウ情報取得用
         IOptionsMonitor<ImageChangeDetectionSettings>? imageChangeSettings = null, // [Issue #401] 画面安定化設定
+        ICloudTranslationCache? cloudTranslationCache = null, // [Issue #415] Cloud翻訳キャッシュ
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -116,6 +130,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _roiManager = roiManager; // [Issue #293] ROI学習マネージャー（ヒートマップ値取得用）
         _windowManager = windowManager; // [Issue #293] ウィンドウ情報取得用
         _imageChangeSettings = imageChangeSettings; // [Issue #401] 画面安定化設定
+        _cloudTranslationCache = cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -281,21 +296,38 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             }
 
             // Fork-Join条件チェック＆Cloud AI翻訳タスク開始（OCRと並列実行）
+            // [Issue #415] 画像ハッシュを上位スコープで保持（キャッシュチェック＋更新で再利用）
+            long forkJoinImageHash = 0;
+            FallbackTranslationResult? cachedCloudResult = null;
+
             if (ShouldUseForkJoinParallelExecution(forkJoinImageBase64, forkJoinContextWidth, forkJoinContextHeight))
             {
-                _logger?.LogInformation("🚀 [Issue #290] Fork-Join開始: OCR || Cloud AI を並列実行");
-                var forkJoinStopwatch = Stopwatch.StartNew();
+                // [Issue #415] 画像ハッシュによるCloud APIコール抑制
+                if (_cloudTranslationCache != null)
+                {
+                    forkJoinImageHash = _cloudTranslationCache.ComputeImageHash(image.GetImageMemory());
+                    if (_cloudTranslationCache.TryGetCachedResult(windowHandle, forkJoinImageHash, out cachedCloudResult))
+                    {
+                        _logger?.LogInformation(
+                            "[Issue #415] 画像ハッシュ一致 - Cloud APIスキップ（キャッシュ結果を再利用）");
+                    }
+                }
 
-                // Cloud AI翻訳を非同期で開始（awaitしない）
-                forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
-                    forkJoinImageBase64!,
-                    forkJoinContextWidth,
-                    forkJoinContextHeight,
-                    forkJoinCloudImageWidth,   // [Issue #381] 実際のCloud画像サイズ（ログ用）
-                    forkJoinCloudImageHeight,  // [Issue #381]
-                    forkJoinCts.Token);  // [Issue #397] Fork-Join専用CTS（テキスト未変化時キャンセル可能）
+                if (cachedCloudResult == null)
+                {
+                    // キャッシュミス → 通常のCloud APIコール
+                    _logger?.LogInformation("🚀 [Issue #290] Fork-Join開始: OCR || Cloud AI を並列実行");
 
-                _logger?.LogDebug("[Issue #290] Cloud AI翻訳タスク開始（OCRと並列実行中）");
+                    forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
+                        forkJoinImageBase64!,
+                        forkJoinContextWidth,
+                        forkJoinContextHeight,
+                        forkJoinCloudImageWidth,   // [Issue #381] 実際のCloud画像サイズ（ログ用）
+                        forkJoinCloudImageHeight,  // [Issue #381]
+                        forkJoinCts.Token);  // [Issue #397] Fork-Join専用CTS（テキスト未変化時キャンセル可能）
+
+                    _logger?.LogDebug("[Issue #290] Cloud AI翻訳タスク開始（OCRと並列実行中）");
+                }
             }
 
             // 🎯 [OPTION_A] SmartProcessingPipelineServiceで段階的フィルタリング実行
@@ -350,7 +382,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // [Issue #401] 画面安定化チェック（ヒステリシス付き）
             // 画面がまだ遷移中（シーン切替、テキスト送りの途中等）の可能性がある場合、
             // パイプライン全体をスキップして安定してからOCR + Cloud AIを実行する
-            if (pipelineResult.ImageChangeResult != null)
+            // [Issue #410] Singleshotモード時は安定化チェックをバイパス（次サイクルがないため）
+            var isSingleshotForStabilization = _translationModeService?.CurrentMode == TranslationMode.Singleshot;
+            if (pipelineResult.ImageChangeResult != null && !isSingleshotForStabilization)
             {
                 var settings = _imageChangeSettings?.CurrentValue;
                 var stabilizationThreshold = settings?.ScreenStabilizationThreshold ?? 0.50f;
@@ -515,12 +549,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         var changeResult = await _textChangeDetectionService.DetectTextChangeAsync(
                             previousText, currentCombinedText, contextId).ConfigureAwait(false);
 
-                        if (!changeResult.HasChanged)
+                        // [Issue #410] Service層のHasChangedは独自の高い閾値（例: 19%）を使用しており、
+                        // ゲームダイアログの変化が永久にブロックされるケースがある。
+                        // Pipeline Strategy層と同じ10%閾値で独立判定する。
+                        const float textChangeThreshold = 0.10f;
+                        if (changeResult.ChangePercentage < textChangeThreshold)
                         {
                             // テキスト変化なし → 翻訳・オーバーレイ更新をスキップ
-                            _logger?.LogInformation("🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (変化率: {ChangePercentage:P1})",
-                                changeResult.ChangePercentage);
-                            Console.WriteLine($"🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (前回と同じテキスト)");
+                            _logger?.LogInformation("🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (変化率: {ChangePercentage:P1}, 閾値: {Threshold:P1})",
+                                changeResult.ChangePercentage, textChangeThreshold);
                             return; // 早期リターン
                         }
 
@@ -591,8 +628,17 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             // ============================================================
             // [Issue #290] Fork-Join完了: Cloud AI翻訳結果を待機してセット
+            // [Issue #415] キャッシュヒット時はAPIコール不要 → 即座にセット
             // ============================================================
-            if (forkJoinCloudTask != null)
+            if (cachedCloudResult != null)
+            {
+                // [Issue #415] キャッシュヒット → 前回のCloud結果を再利用
+                _textChunkAggregatorService.SetPreComputedCloudResult(cachedCloudResult);
+                _logger?.LogInformation(
+                    "✅ [Issue #415] キャッシュヒット: Cloud AI翻訳結果をセット (Success={Success}, Engine={Engine})",
+                    cachedCloudResult.IsSuccess, cachedCloudResult.UsedEngine);
+            }
+            else if (forkJoinCloudTask != null)
             {
                 try
                 {
@@ -605,6 +651,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     if (cloudResult != null)
                     {
                         _textChunkAggregatorService.SetPreComputedCloudResult(cloudResult);
+
+                        // [Issue #415] 成功した結果をキャッシュに保存
+                        if (cloudResult.IsSuccess && _cloudTranslationCache != null && forkJoinImageHash != 0)
+                        {
+                            _cloudTranslationCache.CacheResult(windowHandle, forkJoinImageHash, cloudResult);
+                        }
+
                         _logger?.LogInformation(
                             "✅ [Issue #290] Fork-Join完了: Cloud AI翻訳結果をセット (Success={Success}, Engine={Engine}, WaitTime={WaitTime}ms)",
                             cloudResult.IsSuccess, cloudResult.UsedEngine, forkJoinStopwatch.ElapsedMilliseconds);
