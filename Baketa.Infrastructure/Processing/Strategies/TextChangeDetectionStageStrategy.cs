@@ -105,7 +105,22 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
             }
 
             var threshold = _settings.CurrentValue.TextChangeThreshold;
-            var hasSignificantChange = changeResult.HasChanged && changeResult.ChangePercentage >= threshold;
+            // [Issue #410] Strategy層の閾値で独立判定
+            // TextChangeDetectionService（Gatekeeper）は長さベースの高い閾値（例: 19%）を使用するが、
+            // Strategy層のTextChangeThreshold（例: 10%）とは目的が異なる。
+            // Service層のHasChangedに依存すると、17%の変化が19%閾値で抑制され、
+            // ゲームダイアログの変化が永久に検出されないケースが発生する。
+            var hasSignificantChange = changeResult.ChangePercentage >= threshold;
+
+            // Service層のキャッシュ同期: Strategy層が翻訳を決定したがService層が更新していない場合、
+            // Service層のキャッシュを明示的に更新して次サイクルの比較基準を正しくする
+            if (hasSignificantChange && !changeResult.HasChanged)
+            {
+                _textChangeService.SetPreviousText(contextId, currentText);
+                _logger.LogInformation(
+                    "[Issue #410] Strategy層が翻訳決定（Service層閾値超過で補正）: ChangeRatio={Ratio:F3}, StrategyThreshold={SThreshold:F3}, ServiceThreshold={ServiceThreshold}",
+                    changeResult.ChangePercentage, threshold, "dynamic");
+            }
 
             _logger.LogDebug("テキスト変化検知完了 - 変化: {HasChanged}, 変化率: {ChangePercentage:F3}%, しきい値: {Threshold:F1}%",
                 hasSignificantChange, changeResult.ChangePercentage * 100, threshold * 100);

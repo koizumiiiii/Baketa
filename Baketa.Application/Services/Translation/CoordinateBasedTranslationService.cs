@@ -550,12 +550,15 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         var changeResult = await _textChangeDetectionService.DetectTextChangeAsync(
                             previousText, currentCombinedText, contextId).ConfigureAwait(false);
 
-                        if (!changeResult.HasChanged)
+                        // [Issue #410] Service層のHasChangedは独自の高い閾値（例: 19%）を使用しており、
+                        // ゲームダイアログの変化が永久にブロックされるケースがある。
+                        // Pipeline Strategy層と同じ10%閾値で独立判定する。
+                        const float textChangeThreshold = 0.10f;
+                        if (changeResult.ChangePercentage < textChangeThreshold)
                         {
                             // テキスト変化なし → 翻訳・オーバーレイ更新をスキップ
-                            _logger?.LogInformation("🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (変化率: {ChangePercentage:P1})",
-                                changeResult.ChangePercentage);
-                            Console.WriteLine($"🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (前回と同じテキスト)");
+                            _logger?.LogInformation("🎯 [Issue #230] テキスト変化なし - 翻訳をスキップ (変化率: {ChangePercentage:P1}, 閾値: {Threshold:P1})",
+                                changeResult.ChangePercentage, textChangeThreshold);
                             return; // 早期リターン
                         }
 

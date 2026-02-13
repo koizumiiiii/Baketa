@@ -1763,9 +1763,20 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 var (cloudText, cloudPixelRect) = items[0];
                 var clippedRect = ClipToSuryaBounds(cloudPixelRect, suryaChunk.CombinedBounds);
 
-                // [Issue #414] 対策C: クリッピング結果がSurya領域の30%未満 → Surya座標を採用
+                // [Issue #414] 対策C: クリッピング失敗またはクリッピング結果が小さすぎる → Surya座標を採用
                 // マッチング済み＝同一テキスト確認済み。位置精度はピクセル解析のSuryaが上。
-                if (clippedRect.Height < suryaChunk.CombinedBounds.Height * 0.3f ||
+                // ClipToSuryaBoundsが元のCloud座標を返した場合＝矩形の交差なし（近接マージン等で
+                // マッチしたがBBox自体は重なっていない）→ Surya座標の方が正確
+                if (clippedRect == cloudPixelRect && clippedRect != suryaChunk.CombinedBounds)
+                {
+                    _logger?.LogInformation(
+                        "[Issue #414] Cloud/Surya矩形に交差なし → Surya境界を採用: Cloud=({CX},{CY},{CW}x{CH}) Surya=({SX},{SY},{SW}x{SH})",
+                        cloudPixelRect.X, cloudPixelRect.Y, cloudPixelRect.Width, cloudPixelRect.Height,
+                        suryaChunk.CombinedBounds.X, suryaChunk.CombinedBounds.Y,
+                        suryaChunk.CombinedBounds.Width, suryaChunk.CombinedBounds.Height);
+                    clippedRect = suryaChunk.CombinedBounds;
+                }
+                else if (clippedRect.Height < suryaChunk.CombinedBounds.Height * 0.3f ||
                     clippedRect.Width < suryaChunk.CombinedBounds.Width * 0.3f)
                 {
                     _logger?.LogInformation(
