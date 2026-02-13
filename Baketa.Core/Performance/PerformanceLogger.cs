@@ -17,13 +17,13 @@ public static class PerformanceLogger
     /// メインのパフォーマンス分析ログファイル
     /// </summary>
     public static readonly string MainLogPath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "performance_analysis.log");
+        AppDomain.CurrentDomain.BaseDirectory, "Logs", "performance_analysis.log");
 
     /// <summary>
     /// デバッグ情報用のログファイル
     /// </summary>
     public static readonly string DebugLogPath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "debug_detailed.log");
+        AppDomain.CurrentDomain.BaseDirectory, "Logs", "debug_detailed.log");
 
     /// <summary>
     /// 旧ログファイルパス（クリーンアップ用）
@@ -57,9 +57,11 @@ public static class PerformanceLogger
         {
             if (_initialized) return;
 
-            // 新しいログファイルを初期化
+#if DEBUG
+            // 新しいログファイルを初期化（DEBUGビルドのみ）
             InitializeLogFile(MainLogPath, "PERFORMANCE ANALYSIS");
             InitializeLogFile(DebugLogPath, "DEBUG DETAILED LOG");
+#endif
 
             // 既存の分散ログファイルをクリーンアップ（オプション）
             CleanupObsoleteLogs();
@@ -77,11 +79,10 @@ public static class PerformanceLogger
     {
         var timestampedMessage = $"[{DateTime.Now:HH:mm:ss.fff}] {message}";
 
+#if DEBUG
         WriteToFile(MainLogPath, timestampedMessage);
+#endif
         Console.WriteLine(timestampedMessage);
-
-        // 従来のDebugLogUtility互換性も提供
-        Console.WriteLine(message);
     }
 
     /// <summary>
@@ -89,8 +90,10 @@ public static class PerformanceLogger
     /// </summary>
     public static void LogDebug(string message)
     {
+#if DEBUG
         var timestampedMessage = $"[{DateTime.Now:HH:mm:ss.fff}] {message}";
         WriteToFile(DebugLogPath, timestampedMessage);
+#endif
     }
 
     /// <summary>
@@ -103,7 +106,9 @@ public static class PerformanceLogger
 
         var fullSummary = $"\n{separator}\n{summary}\n{separator}\n";
 
+#if DEBUG
         WriteToFile(MainLogPath, fullSummary);
+#endif
         Console.WriteLine(fullSummary);
     }
 
@@ -164,6 +169,8 @@ public static class PerformanceLogger
     {
         try
         {
+            var dir = Path.GetDirectoryName(logPath);
+            if (dir != null) Directory.CreateDirectory(dir);
             var initMessage = $"=== {header} - Started at {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n";
             File.WriteAllText(logPath, initMessage);
         }
@@ -177,6 +184,8 @@ public static class PerformanceLogger
     {
         try
         {
+            var dir = Path.GetDirectoryName(filePath);
+            if (dir != null) Directory.CreateDirectory(dir);
             lock (LogLock)
             {
                 File.AppendAllText(filePath, message + Environment.NewLine);

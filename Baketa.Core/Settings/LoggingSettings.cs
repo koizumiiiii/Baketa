@@ -17,7 +17,7 @@ public sealed record LoggingSettings
     /// </summary>
     [Display(Name = "デバッグログパス", Description = "デバッグ用ログファイルの出力パス")]
     [Required(ErrorMessage = "デバッグログパスは必須です")]
-    public string DebugLogPath { get; init; } = "debug_app_logs.txt";
+    public string DebugLogPath { get; init; } = Path.Combine("Logs", "debug_app_logs.txt");
 
     /// <summary>
     /// デバッグファイルログの有効性
@@ -48,7 +48,7 @@ public sealed record LoggingSettings
     /// Stage 2 ノイズフィルタの判定データを収集
     /// </summary>
     [Display(Name = "テレメトリログパス", Description = "テレメトリデータ収集用ログファイルの出力パス")]
-    public string TelemetryLogPath { get; init; } = "telemetry_stage2.csv";
+    public string TelemetryLogPath { get; init; } = Path.Combine("Logs", "telemetry_stage2.csv");
 
     /// <summary>
     /// [Issue #229] テレメトリログの有効性
@@ -123,7 +123,7 @@ public sealed record LoggingSettings
     /// <returns>開発設定</returns>
     public static LoggingSettings CreateDevelopmentSettings() => new()
     {
-        DebugLogPath = "dev_debug_logs.txt",
+        DebugLogPath = Path.Combine("Logs", "dev_debug_logs.txt"),
         EnableDebugFileLogging = true,
         MaxDebugLogFileSizeMB = 50, // 開発時は大きなサイズを許可
         DebugLogRetentionDays = 14 // 長い保持期間
