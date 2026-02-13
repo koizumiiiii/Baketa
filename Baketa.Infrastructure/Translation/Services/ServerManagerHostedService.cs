@@ -28,6 +28,11 @@ public sealed class ServerManagerHostedService : IHostedService
     /// </summary>
     private readonly string _translationServerExePath;
 
+    /// <summary>
+    /// [Fix] 統合サーバーexeのパス - 複数箇所で使用するため定数化
+    /// </summary>
+    private readonly string _unifiedServerExePath;
+
     public ServerManagerHostedService(
         IPythonServerManager serverManager,
         GrpcPortProvider portProvider,
@@ -43,6 +48,7 @@ public sealed class ServerManagerHostedService : IHostedService
 
         // [Gemini Review] パスをコンストラクタで一度だけ生成（DRY原則）
         _translationServerExePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaTranslationServer", "BaketaTranslationServer.exe");
+        _unifiedServerExePath = Path.Combine(AppContext.BaseDirectory, "grpc_server", "BaketaUnifiedServer", "BaketaUnifiedServer.exe");
     }
 
     /// <summary>
@@ -89,17 +95,29 @@ public sealed class ServerManagerHostedService : IHostedService
                         _logger.LogWarning("⚠️ [HOSTED_SERVICE] 初期化完了待機がタイムアウト（{Timeout}分）しました",
                             timeout.TotalMinutes);
 
-                        // [Issue #292] 統合サーバーモードの場合はexe確認をスキップ
+                        // [Fix] 統合サーバーモードでもexe存在チェックを実施
                         var isUnifiedModeForTimeout = _unifiedServerSettings?.Enabled ?? false;
-                        if (!isUnifiedModeForTimeout && !File.Exists(_translationServerExePath))
+                        if (isUnifiedModeForTimeout)
+                        {
+                            if (!File.Exists(_unifiedServerExePath))
+                            {
+                                _logger.LogWarning("⚠️ [HOSTED_SERVICE] 統合サーバーexeが見つかりません（ダウンロード/展開未完了の可能性） - サーバー起動を続行（ResolveServerExecutableWithRetryAsyncのリトライ待機に委ねる）");
+                            }
+                            else
+                            {
+                                _logger.LogInformation("✅ [HOSTED_SERVICE] 統合サーバーexe確認済み - サーバー起動を続行します");
+                            }
+                        }
+                        else if (!File.Exists(_translationServerExePath))
                         {
                             _logger.LogWarning("⚠️ [HOSTED_SERVICE] 翻訳サーバーexeが見つかりません - ダウンロード未完了の可能性があります: {Path}", _translationServerExePath);
                             _logger.LogInformation("ℹ️ [HOSTED_SERVICE] サーバー起動をスキップします。ダウンロード完了後にアプリを再起動してください。");
                             return; // サーバー起動をスキップ
                         }
-
-                        _logger.LogInformation("✅ [HOSTED_SERVICE] {Mode} - サーバー起動を続行します",
-                            isUnifiedModeForTimeout ? "統合サーバーモード" : "翻訳サーバーexe確認済み");
+                        else
+                        {
+                            _logger.LogInformation("✅ [HOSTED_SERVICE] 翻訳サーバーexe確認済み - サーバー起動を続行します");
+                        }
                     }
                 }
 
@@ -179,10 +197,25 @@ public sealed class ServerManagerHostedService : IHostedService
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var modelPath = Path.Combine(appDataPath, "Baketa", "Models", "nllb-200-distilled-600M-ct2", "model.bin");
 
-            var exists = File.Exists(modelPath);
-            _logger.LogDebug("[HOSTED_SERVICE] モデル存在チェック: {Path} = {Exists}", modelPath, exists);
+            if (!File.Exists(modelPath))
+            {
+                _logger.LogDebug("[HOSTED_SERVICE] NLLBモデル未検出 → 初回セットアップ");
+                return true;
+            }
 
-            return !exists;
+            // [Fix] 統合サーバーexeもチェック（旧バージョンからのアップグレード対応）
+            // NLLBモデルは存在するがunified_server.exeが新パスに未配置のケース
+            var isUnifiedMode = _unifiedServerSettings?.Enabled ?? false;
+            if (isUnifiedMode)
+            {
+                if (!File.Exists(_unifiedServerExePath))
+                {
+                    _logger.LogDebug("[HOSTED_SERVICE] 統合サーバーexe未検出 → 初回セットアップとみなす");
+                    return true;
+                }
+            }
+
+            return false;
         }
         catch (Exception ex)
         {
