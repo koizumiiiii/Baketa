@@ -14,6 +14,7 @@ using Baketa.Core.Models.Roi; // [Issue #354] NormalizedRect用
 using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Abstractions.UI;
+using Baketa.Core.Abstractions.Validation; // [Issue #414] IFuzzyTextMatcher用
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager統一インターフェース用
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Events.Translation;
@@ -55,6 +56,23 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     // ResetSemaphoreForStopがセマフォを解放した場合、finallyブロックでの解放をスキップ
     private static volatile bool _semaphoreReleasedByStop;
 
+    // [Issue #414] Cloud結果サイクル間重複排除キャッシュ
+    // 同一テキストが毎サイクルCloud AI翻訳されるのを防止（BBox揺れ耐性あり）
+    private const int CloudResultCacheTtlSeconds = 30;
+    private const float CloudResultCacheProximityThreshold = 50f; // 0-1000正規化スケールでの中心点距離閾値
+
+    private static readonly List<CloudResultCacheEntry> _cloudResultCache = [];
+    private static readonly object _cloudResultCacheLock = new();
+
+    /// <summary>
+    /// [Issue #414] Cloud結果キャッシュエントリ
+    /// </summary>
+    private sealed record CloudResultCacheEntry(
+        string NormalizedText,
+        float CenterX,   // 0-1000 正規化スケール
+        float CenterY,   // 0-1000 正規化スケール
+        DateTime CreatedAt);
+
 
     private readonly Baketa.Core.Abstractions.Translation.ITranslationService _translationService;
     private readonly IStreamingTranslationService? _streamingTranslationService;
@@ -77,6 +95,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     private readonly IRoiManager? _roiManager;
     // [Issue #379] ROI管理設定（OCR信頼度閾値等）
     private readonly RoiManagerSettings _roiSettings;
+    // [Issue #414] ファジーテキストマッチング（Cloud結果のあいまい一致検証用）
+    private readonly IFuzzyTextMatcher? _fuzzyTextMatcher;
 
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
@@ -98,7 +118,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         // [Issue #293] ROI管理サービス（オプショナル）
         IRoiManager? roiManager = null,
         // [Issue #379] ROI管理設定（オプショナル）
-        IOptions<RoiManagerSettings>? roiSettings = null)
+        IOptions<RoiManagerSettings>? roiSettings = null,
+        // [Issue #414] ファジーテキストマッチング（オプショナル）
+        IFuzzyTextMatcher? fuzzyTextMatcher = null)
     {
         _translationService = translationService ?? throw new ArgumentNullException(nameof(translationService));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -119,6 +141,8 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         _roiManager = roiManager;
         // [Issue #379] ROI管理設定
         _roiSettings = roiSettings?.Value ?? RoiManagerSettings.CreateDefault();
+        // [Issue #414] ファジーテキストマッチング
+        _fuzzyTextMatcher = fuzzyTextMatcher;
     }
 
     /// <inheritdoc />
@@ -165,6 +189,11 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             Console.WriteLine($"ℹ️ [STOP_CLEANUP] セマフォは既に利用可能 - CurrentCount: {_translationExecutionSemaphore.CurrentCount}");
         }
 
+        // [Issue #414] Cloud結果キャッシュをクリア（次のStart時にクリーンな状態で開始）
+        lock (_cloudResultCacheLock)
+        {
+            _cloudResultCache.Clear();
+        }
     }
 
     /// <inheritdoc />
@@ -500,6 +529,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                             "Cloud結果重複排除: {OriginalCount}件 → {DedupedCount}件（{RemovedCount}件の重複を除去）",
                             cloudTexts.Count, dedupedCloudTexts.Count, cloudTexts.Count - dedupedCloudTexts.Count);
                     }
+
+                    // [Issue #414] サイクル間重複検出（ログ記録 + キャッシュ更新のみ）
+                    // NOTE: Cloud APIコールは既に完了済みのため、ここでの結果フィルタリングは行わない。
+                    // 結果を除外するとオーバーレイが消失する（毎サイクル再作成のため）。
+                    // 将来的にはFork-Join段階でAPIコール自体を抑制する設計に移行予定。
+                    UpdateCloudResultCache(dedupedCloudTexts);
 
                     if (hasCloudBoundingBoxes && eventData.ImageWidth > 0 && eventData.ImageHeight > 0)
                     {
@@ -1637,6 +1672,19 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 }
             }
 
+            // [Issue #414] 対策A: 近接マージンマッチング（BBox間にギャップがある場合の救済）
+            if (bestSuryaChunk == null)
+            {
+                bestSuryaChunk = FindBestProximityMarginSuryaChunk(cloudPixelRect, suryaChunks);
+                if (bestSuryaChunk != null)
+                {
+                    _logger?.LogInformation(
+                        "[Issue #414] 近接マージンマッチングでSurya裏付け成功: '{Original}' → SuryaChunk={ChunkId}",
+                        cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                        bestSuryaChunk.ChunkId);
+                }
+            }
+
             if (bestSuryaChunk == null)
             {
                 // [Issue #387] 座標マッチング失敗 → テキスト内容でフォールバックマッチング
@@ -1650,6 +1698,41 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                         return normalizedSuryaText.Contains(normalizedCloudOriginal, StringComparison.OrdinalIgnoreCase) ||
                                normalizedCloudOriginal.Contains(normalizedSuryaText, StringComparison.OrdinalIgnoreCase);
                     });
+                }
+
+                // [Issue #414] 対策B: ファジーテキストマッチング（記号差異を吸収）
+                if (bestSuryaChunk == null && _fuzzyTextMatcher != null)
+                {
+                    var coreCloud = ExtractCoreCharacters(cloudText.Original ?? string.Empty);
+                    if (coreCloud.Length >= 2)
+                    {
+                        const float fuzzyThreshold = 0.8f;
+                        TextChunk? bestFuzzyChunk = null;
+                        var bestFuzzySimilarity = 0f;
+
+                        foreach (var chunk in suryaChunks)
+                        {
+                            var coreSurya = ExtractCoreCharacters(chunk.CombinedText ?? string.Empty);
+                            if (coreSurya.Length < 2)
+                                continue;
+
+                            var similarity = _fuzzyTextMatcher.CalculateSimilarity(coreCloud, coreSurya);
+                            if (similarity >= fuzzyThreshold && similarity > bestFuzzySimilarity)
+                            {
+                                bestFuzzySimilarity = similarity;
+                                bestFuzzyChunk = chunk;
+                            }
+                        }
+
+                        if (bestFuzzyChunk != null)
+                        {
+                            bestSuryaChunk = bestFuzzyChunk;
+                            _logger?.LogInformation(
+                                "[Issue #414] ファジーテキストマッチングでSurya裏付け成功: '{Original}' → SuryaChunk={ChunkId} (類似度={Similarity:F3})",
+                                cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                                bestFuzzyChunk.ChunkId, bestFuzzySimilarity);
+                        }
+                    }
                 }
 
                 if (bestSuryaChunk == null)
@@ -1694,6 +1777,18 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 // 単独 → Cloud BoundingBoxをSurya矩形にクリッピングして使用
                 var (cloudText, cloudPixelRect) = items[0];
                 var clippedRect = ClipToSuryaBounds(cloudPixelRect, suryaChunk.CombinedBounds);
+
+                // [Issue #414] 対策C: クリッピング結果がSurya領域の30%未満 → Surya座標を採用
+                // マッチング済み＝同一テキスト確認済み。位置精度はピクセル解析のSuryaが上。
+                if (clippedRect.Height < suryaChunk.CombinedBounds.Height * 0.3f ||
+                    clippedRect.Width < suryaChunk.CombinedBounds.Width * 0.3f)
+                {
+                    _logger?.LogInformation(
+                        "[Issue #414] クリッピング結果が小さすぎるためSurya境界を使用: Clipped=({CW}x{CH}) Surya=({SW}x{SH})",
+                        clippedRect.Width, clippedRect.Height,
+                        suryaChunk.CombinedBounds.Width, suryaChunk.CombinedBounds.Height);
+                    clippedRect = suryaChunk.CombinedBounds;
+                }
 
                 overlayChunks.Add(new TextChunk
                 {
@@ -1873,6 +1968,58 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     }
 
     /// <summary>
+    /// [Issue #414] 対策A: Cloud BBoxとSurya BBox間の最小辺間距離による近接マージンマッチング
+    /// </summary>
+    /// <remarks>
+    /// Cloud BBoxとSurya BBoxが数ピクセルのギャップで離れている場合、
+    /// 包含率やOverlapRatioでは交差面積がゼロとなりマッチングが失敗する。
+    /// BBox間の最小辺間距離がSurya高さの一定割合以内であれば近接と判定する。
+    /// Cloud AIはBBoxを上方に浮かせる傾向があるため、上方向のマージンを大きく取る。
+    /// </remarks>
+    private TextChunk? FindBestProximityMarginSuryaChunk(
+        System.Drawing.Rectangle cloudPixelRect,
+        List<TextChunk> suryaChunks)
+    {
+        TextChunk? bestChunk = null;
+        var bestDistance = float.MaxValue;
+
+        var cloudCenterY = cloudPixelRect.Y + cloudPixelRect.Height / 2.0f;
+
+        foreach (var chunk in suryaChunks)
+        {
+            var suryaBounds = chunk.CombinedBounds;
+            if (suryaBounds.Width <= 0 || suryaBounds.Height <= 0)
+                continue;
+
+            // X方向のギャップ（重なっている場合は0）
+            var gapX = Math.Max(0, Math.Max(cloudPixelRect.X - suryaBounds.Right, suryaBounds.X - cloudPixelRect.Right));
+            // Y方向のギャップ（重なっている場合は0）
+            var gapY = Math.Max(0, Math.Max(cloudPixelRect.Y - suryaBounds.Bottom, suryaBounds.Y - cloudPixelRect.Bottom));
+
+            // 最小辺間距離（ユークリッド距離の近似: X,Y両方にギャップがあれば対角距離）
+            var distance = (float)Math.Sqrt(gapX * gapX + gapY * gapY);
+
+            // Cloud中心がSurya中心より上方向: BBoxが上に浮いている傾向 → マージンを大きく
+            var suryaCenterY = suryaBounds.Y + suryaBounds.Height / 2.0f;
+            var margin = cloudCenterY < suryaCenterY
+                ? suryaBounds.Height * 0.25f  // 上方向: Surya高さの25%
+                : suryaBounds.Height * 0.15f; // 下方向: Surya高さの15%
+
+            if (distance <= margin && distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestChunk = chunk;
+
+                _logger?.LogDebug(
+                    "[Issue #414] 近接マージン候補: SuryaChunk={ChunkId}, Distance={Distance:F1}px, Margin={Margin:F1}px",
+                    chunk.ChunkId, distance, margin);
+            }
+        }
+
+        return bestChunk;
+    }
+
+    /// <summary>
     /// [Issue #387] Cloud BoundingBoxをSurya矩形にクリッピング
     /// </summary>
     /// <remarks>
@@ -1922,6 +2069,124 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         return new string(text
             .Where(c => !char.IsWhiteSpace(c) && !char.IsControl(c) && !punctuationToRemove.Contains(c))
             .ToArray());
+    }
+
+    /// <summary>
+    /// [Issue #414] 対策B: テキストからコア文字（ひらがな・カタカナ・CJK漢字・ASCII英数字）のみを抽出
+    /// </summary>
+    /// <remarks>
+    /// OCRとCloud AIで括弧・句読点・記号の認識差異が生じるため、
+    /// 意味を持つコア文字のみで比較することでファジーマッチングの精度を向上させる。
+    /// NormalizeTextよりも積極的に記号を除去する（括弧類も除去対象）。
+    /// </remarks>
+    private static string ExtractCoreCharacters(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        return new string(text
+            .Where(c =>
+                (c >= '\u3040' && c <= '\u309F') || // ひらがな
+                (c >= '\u30A0' && c <= '\u30FF') || // カタカナ
+                (c >= '\u4E00' && c <= '\u9FFF') || // CJK統合漢字
+                (c >= '\u3400' && c <= '\u4DBF') || // CJK統合漢字拡張A
+                (c >= 'A' && c <= 'Z') ||           // ASCII大文字
+                (c >= 'a' && c <= 'z') ||           // ASCII小文字
+                (c >= '0' && c <= '9'))             // ASCII数字
+            .ToArray());
+    }
+
+    /// <summary>
+    /// [Issue #414] Cloud結果キャッシュの更新とサイクル間重複検出ログ
+    /// </summary>
+    /// <remarks>
+    /// BBox中心点の近接度 + テキスト類似度で重複を検出しログ記録する。
+    /// Cloud APIコールは既に完了済みのため、ここでは結果のフィルタリングは行わない。
+    /// オーバーレイは毎サイクル再作成されるため、結果を除外するとオーバーレイが消失してしまう。
+    /// キャッシュは将来的にFork-Join段階でのAPIコール抑制に活用予定。
+    /// </remarks>
+    private void UpdateCloudResultCache(List<TranslatedTextItem> cloudTexts)
+    {
+        var now = DateTime.UtcNow;
+        var duplicateCount = 0;
+
+        lock (_cloudResultCacheLock)
+        {
+            // TTL超過エントリを除去
+            _cloudResultCache.RemoveAll(e =>
+                (now - e.CreatedAt).TotalSeconds > CloudResultCacheTtlSeconds);
+
+            foreach (var cloudText in cloudTexts)
+            {
+                if (cloudText.BoundingBox is not { } bbox)
+                    continue;
+
+                var centerX = bbox.X + bbox.Width / 2f;
+                var centerY = bbox.Y + bbox.Height / 2f;
+                var normalizedNew = NormalizeText(cloudText.Original ?? string.Empty);
+
+                if (string.IsNullOrEmpty(normalizedNew))
+                    continue;
+
+                // BBox中心点の近接度でキャッシュエントリを検索
+                CloudResultCacheEntry? matchedEntry = null;
+                var bestDist = float.MaxValue;
+
+                foreach (var cached in _cloudResultCache)
+                {
+                    var dx = centerX - cached.CenterX;
+                    var dy = centerY - cached.CenterY;
+                    var dist = MathF.Sqrt(dx * dx + dy * dy);
+
+                    if (dist <= CloudResultCacheProximityThreshold && dist < bestDist)
+                    {
+                        bestDist = dist;
+                        matchedEntry = cached;
+                    }
+                }
+
+                if (matchedEntry != null)
+                {
+                    var normalizedCached = matchedEntry.NormalizedText;
+
+                    // 重複分類（ログのみ、フィルタリングは行わない）
+                    if (normalizedNew == normalizedCached ||
+                        normalizedCached.Contains(normalizedNew, StringComparison.Ordinal))
+                    {
+                        duplicateCount++;
+                        _logger?.LogDebug(
+                            "[Issue #414] サイクル間重複検出（同一/劣化）: '{Text}' (dist={Dist:F1})",
+                            cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                            bestDist);
+                    }
+                    else if (normalizedNew.Contains(normalizedCached, StringComparison.Ordinal))
+                    {
+                        _logger?.LogInformation(
+                            "[Issue #414] サイクル間テキスト改善検出: '{Text}' (dist={Dist:F1})",
+                            cloudText.Original?.Length > 30 ? cloudText.Original[..30] + "..." : cloudText.Original,
+                            bestDist);
+                    }
+
+                    // キャッシュを最新状態に更新
+                    _cloudResultCache.Remove(matchedEntry);
+                    _cloudResultCache.Add(new CloudResultCacheEntry(
+                        normalizedNew, centerX, centerY, now));
+                }
+                else
+                {
+                    // 新規テキスト → キャッシュ追加
+                    _cloudResultCache.Add(new CloudResultCacheEntry(
+                        normalizedNew, centerX, centerY, now));
+                }
+            }
+        }
+
+        if (duplicateCount > 0)
+        {
+            _logger?.LogInformation(
+                "[Issue #414] サイクル間重複検出: {Total}件中{Dup}件が前回と同一",
+                cloudTexts.Count, duplicateCount);
+        }
     }
 
     /// <summary>
