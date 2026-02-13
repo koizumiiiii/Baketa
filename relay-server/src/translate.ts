@@ -91,6 +91,7 @@ interface GeminiRequest {
     temperature?: number;
     maxOutputTokens?: number;
     frequencyPenalty?: number; // [Issue #411] 同一トークン反復抑制
+    stopSequences?: string[]; // [Issue #411] 反復ループ早期停止
   };
   // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応
   safetySettings?: Array<{
@@ -1544,6 +1545,7 @@ Do not invent or guess text that is not clearly visible in the image.
 - Every item MUST have a non-empty "translation" field.
 - If text is already in ${request.target_language}, keep it as-is in "translation".
 - Never omit or leave "translation" empty.
+- Never repeat the same character more than 3 times consecutively.
 
 # Output Format (JSON only)
 {
@@ -1572,7 +1574,10 @@ If no text visible: {"texts": [], "detected_language": ""}`;
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192, // [Issue #387] 途中切れ防止のため増加
-      frequencyPenalty: 0.3, // [Issue #411] 改行等の同一トークン反復生成を抑制
+      // [Issue #411] 改行等の同一トークン反復生成を抑制
+      // Note: gemini-2.5-flash-lite はfrequencyPenalty未サポートのため条件付き
+      ...(modelName !== 'gemini-2.5-flash-lite' ? { frequencyPenalty: 0.3 } : {}),
+      stopSequences: ['\n\n\n\n\n'], // [Issue #411] 5連続改行で生成を強制停止（反復ループ対策）
     },
     // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応 - フィルターを緩和
     // BLOCK_NONE: ブロックしない（翻訳用途のため）
@@ -1758,6 +1763,7 @@ Do not invent or guess text that is not clearly visible in the image.
 - Every item MUST have a non-empty "translation" field.
 - If text is already in ${request.target_language}, keep it as-is in "translation".
 - Never omit or leave "translation" empty.
+- Never repeat the same character more than 3 times consecutively.
 
 # Output Format (JSON only)
 {
