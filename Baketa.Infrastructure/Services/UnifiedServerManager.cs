@@ -391,31 +391,29 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
         var parentDir = Path.GetDirectoryName(exeDir);
 
         // [Issue #360] ダウンロード/展開完了判定を改善
-        // メタデータファイルが存在しない場合、ダウンロード/展開が未完了と判断
         // [Gemini Review] パスを設定から取得（一元管理）
         var metadataPath = _settings.GetMetadataFilePath();
         var metadataExists = File.Exists(metadataPath);
 
         // [Gemini Review] ダウンロード中の判定を堅牢に（try-catch追加）
+        // [Fix] exe未検出 + grpc_serverディレクトリ存在 → メタデータ有無に関わらずダウンロード/展開中と判断
+        // 理由: 旧バージョンからのアップグレード時にメタデータだけ残存し、exeが新パスに未配置のケースに対応
         var isDownloadInProgress = false;
         try
         {
-            // メタデータが存在しない場合、ダウンロード/展開が未完了
-            if (!metadataExists)
+            if (parentDir != null && Directory.Exists(parentDir))
             {
-                // grpc_serverディレクトリが存在すればダウンロード処理が開始されている可能性が高い
-                isDownloadInProgress = parentDir != null && Directory.Exists(parentDir);
-                if (isDownloadInProgress)
+                // exe未検出 + grpc_serverディレクトリ存在 → ダウンロード/展開中と判断
+                isDownloadInProgress = true;
+
+                if (!metadataExists)
                 {
-                    _logger.LogInformation("[Issue #360] メタデータ未作成 + grpc_serverディレクトリ存在 → ダウンロード/展開中と判断");
+                    _logger.LogInformation("[Fix] メタデータ未作成 + grpc_serverディレクトリ存在 → 初回ダウンロード中と判断");
                 }
-            }
-            else if (parentDir != null && Directory.Exists(parentDir))
-            {
-                // メタデータ存在時の追加チェック（ZIPやtmpファイル）
-                isDownloadInProgress =
-                    Directory.GetFiles(parentDir, "BaketaUnifiedServer*.zip", SearchOption.TopDirectoryOnly).Length > 0 ||
-                    Directory.GetFiles(parentDir, "*.tmp", SearchOption.TopDirectoryOnly).Length > 0;
+                else
+                {
+                    _logger.LogInformation("[Fix] メタデータ存在するがexe未検出 → 展開中または再インストール中と判断して待機開始");
+                }
             }
         }
         catch (Exception ex) when (ex is DirectoryNotFoundException or UnauthorizedAccessException or IOException)
