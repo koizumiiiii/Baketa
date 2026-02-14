@@ -141,7 +141,7 @@ public sealed class DownloadProgressViewModel : ReactiveObject, IDisposable
         else
         {
             HasError = true;
-            ErrorMessage = "Download verification failed";
+            ErrorMessage = Strings.Update_DownloadProgress_VerificationFailed;
             IsActionButtonEnabled = false;
         }
     }

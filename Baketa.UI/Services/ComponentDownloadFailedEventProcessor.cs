@@ -1,6 +1,7 @@
 using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Events.Setup;
+using Baketa.UI.Resources;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.UI.Services;
@@ -43,10 +44,11 @@ public sealed class ComponentDownloadFailedEventProcessor : IEventProcessor<Comp
             {
                 // 必須コンポーネントの失敗 - エラー通知（手動で閉じるまで表示）
                 await _notificationService.ShowErrorAsync(
-                    "ダウンロード失敗",
-                    "必要なファイルのダウンロードに失敗しました。\n" +
-                    "アプリを再起動して再試行してください。\n\n" +
-                    $"失敗したコンポーネント: {string.Join(", ", eventData.FailedComponentIds)}",
+                    Strings.Download_Failed_Title,
+#pragma warning disable CA1863 // 通知メッセージは繰り返し使用しないためキャッシュ不要
+                    string.Format(Strings.Download_Failed_RequiredMessage,
+                        string.Join(", ", eventData.FailedComponentIds)),
+#pragma warning restore CA1863
                     duration: 0 // 手動で閉じるまで表示
                 ).ConfigureAwait(false);
             }
@@ -54,9 +56,8 @@ public sealed class ComponentDownloadFailedEventProcessor : IEventProcessor<Comp
             {
                 // オプションコンポーネントの失敗 - 警告通知（10秒表示）
                 await _notificationService.ShowWarningAsync(
-                    "一部のダウンロードに失敗",
-                    "一部の機能が利用できない可能性があります。\n" +
-                    "アプリを再起動して再試行してください。",
+                    Strings.Download_Failed_OptionalTitle,
+                    Strings.Download_Failed_OptionalMessage,
                     duration: 10000
                 ).ConfigureAwait(false);
             }

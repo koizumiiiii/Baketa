@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reactive;
@@ -17,6 +18,7 @@ using Baketa.Core.License.Events;
 using Baketa.Core.License.Models;
 using Baketa.Core.Settings;
 using Baketa.UI.Framework;
+using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -171,6 +173,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         ResetToDefaultsCommand = ReactiveCommand.Create(ResetToDefaults);
         ToggleAdvancedSettingsCommand = ReactiveCommand.Create(ToggleAdvancedSettings);
         OpenLogFolderCommand = ReactiveCommand.Create(OpenLogFolder);
+        OpenUpsellLinkCommand = ReactiveCommand.Create(OpenUpsellLink);
     }
 
     #region 基本設定プロパティ
@@ -447,6 +450,42 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// </summary>
     public bool ShowCloudUsageInfo => HasPaidPlan;
 
+    /// <summary>
+    /// [Issue #423] アップセルバナーを表示するかどうか
+    /// Free: 常時表示、Pro/Premium: 使用率80%以上、Ultimate: 非表示
+    /// </summary>
+    public bool ShowUpsellBanner
+    {
+        get
+        {
+            var plan = _licenseManager?.CurrentState?.CurrentPlan ?? PlanType.Free;
+            if (plan == PlanType.Ultimate) return false;
+            if (plan == PlanType.Free) return true;
+            return CloudUsagePercentage >= 80;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #423] アップセルメッセージ（プランに応じて変化）
+    /// </summary>
+    public string UpsellMessage
+    {
+        get
+        {
+            var plan = _licenseManager?.CurrentState?.CurrentPlan ?? PlanType.Free;
+            if (plan == PlanType.Free)
+            {
+                var hasBonusTokens = (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+                return hasBonusTokens
+                    ? Strings.Upsell_Free_WithBonus_Message
+                    : Strings.Upsell_Free_NoBonus_Message;
+            }
+            return plan is PlanType.Pro or PlanType.Premium
+                ? Strings.Upsell_Upgrade_Message
+                : string.Empty;
+        }
+    }
+
     #endregion
 
     #region テーマ設定プロパティ
@@ -552,6 +591,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// ログフォルダを開くコマンド
     /// </summary>
     public ReactiveCommand<Unit, Unit> OpenLogFolderCommand { get; }
+
+    /// <summary>
+    /// [Issue #423] アップセルリンクを開くコマンド
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> OpenUpsellLinkCommand { get; }
 
     #endregion
 
@@ -741,6 +785,23 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         catch (ArgumentException ex)
         {
             _logger?.LogError(ex, "無効なパスが指定されました: {LogPath}", logPath);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #423] Patreonプラン変更ページを開く
+    /// </summary>
+    private void OpenUpsellLink()
+    {
+        const string planUrl = "https://www.patreon.com/c/baketa_translation/membership";
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = planUrl, UseShellExecute = true });
+            _logger?.LogInformation("[Issue #423] アップセルリンクを開きました");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "[Issue #423] アップセルリンクを開けませんでした");
         }
     }
 
@@ -955,6 +1016,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
                 this.RaisePropertyChanged(nameof(CloudTranslationNote));
                 this.RaisePropertyChanged(nameof(HasPaidPlan));
                 this.RaisePropertyChanged(nameof(ShowCloudUsageInfo));
+                this.RaisePropertyChanged(nameof(ShowUpsellBanner));
+                this.RaisePropertyChanged(nameof(UpsellMessage));
 
                 // Cloud AI翻訳が利用可能になった/なくなった場合、UseLocalEngineも更新
                 var isCloudAvailable = _licenseManager?.IsFeatureAvailable(FeatureType.CloudAiTranslation) ?? false;
@@ -1046,6 +1109,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
                 this.RaisePropertyChanged(nameof(CloudUsageDisplay));
                 this.RaisePropertyChanged(nameof(CloudUsageGaugeBrush));
+                this.RaisePropertyChanged(nameof(ShowUpsellBanner));
             });
         }
         catch (Exception ex)
@@ -1069,6 +1133,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         // 派生プロパティの更新通知
         this.RaisePropertyChanged(nameof(CloudUsageDisplay));
         this.RaisePropertyChanged(nameof(CloudUsageGaugeBrush));
+        this.RaisePropertyChanged(nameof(ShowUpsellBanner));
     }
 
     /// <summary>
@@ -1138,6 +1203,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
             this.RaisePropertyChanged(nameof(ShowCloudUsageInfo));
             this.RaisePropertyChanged(nameof(CloudUsageDisplay));
             this.RaisePropertyChanged(nameof(CloudUsageGaugeBrush));
+            this.RaisePropertyChanged(nameof(ShowUpsellBanner));
+            this.RaisePropertyChanged(nameof(UpsellMessage));
 
             // ボーナストークンが0になった場合、Cloud AIが使えなくなる可能性
             // LicenseManager.IsFeatureAvailableでプラン・ボーナストークン両方をチェック

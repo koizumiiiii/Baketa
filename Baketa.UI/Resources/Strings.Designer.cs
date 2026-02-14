@@ -672,4 +672,32 @@ public static class Strings
     public static string MemoryWarning_Title => GetString("MemoryWarning_Title");
     public static string MemoryWarning_SystemMemory => GetString("MemoryWarning_SystemMemory");
     public static string GpuMemoryWarning_Title => GetString("GpuMemoryWarning_Title");
+
+    // ========== [Issue #424] i18n - Hardcoded string externalization ==========
+    public static string Download_Failed_Title => GetString("Download_Failed_Title");
+    public static string Download_Failed_RequiredMessage => GetString("Download_Failed_RequiredMessage");
+    public static string Download_Failed_OptionalTitle => GetString("Download_Failed_OptionalTitle");
+    public static string Download_Failed_OptionalMessage => GetString("Download_Failed_OptionalMessage");
+    public static string Update_DownloadProgress_VerificationFailed => GetString("Update_DownloadProgress_VerificationFailed");
+    public static string Session_Expired_Title => GetString("Session_Expired_Title");
+    public static string Session_Expired_Message => GetString("Session_Expired_Message");
+    public static string TestMode_Warning_Title => GetString("TestMode_Warning_Title");
+    public static string TestMode_Warning_Message => GetString("TestMode_Warning_Message");
+    public static string Hardware_Critical_Title => GetString("Hardware_Critical_Title");
+    public static string Hardware_Critical_Message => GetString("Hardware_Critical_Message");
+    public static string Hardware_Warning_Title => GetString("Hardware_Warning_Title");
+    public static string Hardware_Warning_Message => GetString("Hardware_Warning_Message");
+    public static string Hardware_CpuCores => GetString("Hardware_CpuCores");
+    public static string Patreon_AuthSuccess_Title => GetString("Patreon_AuthSuccess_Title");
+    public static string Patreon_AuthSuccess_Message => GetString("Patreon_AuthSuccess_Message");
+    public static string Patreon_AuthFailed_Title => GetString("Patreon_AuthFailed_Title");
+    public static string Patreon_AuthFailed_Message => GetString("Patreon_AuthFailed_Message");
+    public static string Translation_Error_StopFailed => GetString("Translation_Error_StopFailed");
+    public static string Translation_Error_StartFailed => GetString("Translation_Error_StartFailed");
+
+    // ========== [Issue #423] Upsell messages ==========
+    public static string Upsell_ViewPlans => GetString("Upsell_ViewPlans");
+    public static string Upsell_Free_WithBonus_Message => GetString("Upsell_Free_WithBonus_Message");
+    public static string Upsell_Free_NoBonus_Message => GetString("Upsell_Free_NoBonus_Message");
+    public static string Upsell_Upgrade_Message => GetString("Upsell_Upgrade_Message");
 }
