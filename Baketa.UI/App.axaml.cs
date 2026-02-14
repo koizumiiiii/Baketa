@@ -19,6 +19,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Models.Hardware;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
+using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
 using Baketa.UI.ViewModels;
@@ -821,8 +822,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                         if (notificationService != null)
                         {
                             await notificationService.ShowWarningAsync(
-                                "セッション期限切れ",
-                                "セッションが期限切れになりました。再度ログインしてください。",
+                                Strings.Session_Expired_Title,
+                                Strings.Session_Expired_Message,
                                 duration: 5000);
                         }
 
@@ -892,8 +893,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             if (notificationService != null)
             {
                 await notificationService.ShowWarningAsync(
-                    "🧪 テストモード有効",
-                    "ライセンスモックモードが有効です。本番環境では appsettings.json の License.EnableMockMode を false に設定してください。",
+                    Strings.TestMode_Warning_Title,
+                    Strings.TestMode_Warning_Message,
                     duration: 10000);
             }
 
@@ -1409,18 +1410,18 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             var warningMessages = string.Join("\n", result.Warnings.Select(w => $"• {w}"));
             var gpuInfo = $"GPU: {result.GpuName}";
             var ramInfo = $"RAM: {result.TotalRamGb}GB";
-            var cpuInfo = $"CPU: {result.CpuCores}コア";
+            var cpuInfo = string.Format(Strings.Hardware_CpuCores, result.CpuCores);
 
             string title, message;
             switch (result.WarningLevel)
             {
                 case HardwareWarningLevel.Critical:
-                    title = "ハードウェア要件 - 重大な警告";
-                    message = $"お使いの環境は最低要件を満たしていません。正常に動作しない可能性があります。\n\n{gpuInfo}\n{ramInfo}\n{cpuInfo}\n\n{warningMessages}";
+                    title = Strings.Hardware_Critical_Title;
+                    message = string.Format(Strings.Hardware_Critical_Message, gpuInfo, ramInfo, cpuInfo, warningMessages);
                     break;
                 case HardwareWarningLevel.Warning:
-                    title = "ハードウェア要件の警告";
-                    message = $"お使いの環境は推奨スペックを満たしていません。\n\n{gpuInfo}\n{ramInfo}\n{cpuInfo}\n\n{warningMessages}";
+                    title = Strings.Hardware_Warning_Title;
+                    message = string.Format(Strings.Hardware_Warning_Message, gpuInfo, ramInfo, cpuInfo, warningMessages);
                     break;
                 default:
                     // Info レベルはログのみで続行
@@ -1491,8 +1492,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             if (notification.IsSuccess)
             {
                 await notificationService.ShowSuccessAsync(
-                    "Patreon連携成功",
-                    $"Patreonアカウントとの連携が完了しました。プラン: {notification.PlanName}",
+                    Strings.Patreon_AuthSuccess_Title,
+                    string.Format(Strings.Patreon_AuthSuccess_Message, notification.PlanName),
                     duration: 5000);
 
                 _logger?.LogInformation("Patreon認証成功通知を表示: Plan={Plan}", notification.PlanName);
@@ -1500,8 +1501,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             else
             {
                 await notificationService.ShowErrorAsync(
-                    "Patreon連携失敗",
-                    notification.ErrorMessage ?? "認証処理中にエラーが発生しました",
+                    Strings.Patreon_AuthFailed_Title,
+                    notification.ErrorMessage ?? Strings.Patreon_AuthFailed_Message,
                     duration: 0); // エラーは手動で閉じるまで表示
 
                 _logger?.LogWarning("Patreon認証失敗通知を表示: Error={Error}", notification.ErrorMessage);

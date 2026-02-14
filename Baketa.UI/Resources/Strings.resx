@@ -1638,4 +1638,120 @@
     <value>Confirmation email sent. Please click the link in the email, then log in. Redirecting to login in 3 seconds...</value>
   </data>
 
+  <!-- ========== Issue #424: i18n - Hardcoded string externalization ========== -->
+
+  <!-- ComponentDownloadFailedEventProcessor -->
+  <data name="Download_Failed_Title" xml:space="preserve">
+    <value>Download Failed</value>
+  </data>
+  <data name="Download_Failed_RequiredMessage" xml:space="preserve">
+    <value>Required file download failed.
+Please restart the app to retry.
+
+Failed components: {0}</value>
+  </data>
+  <data name="Download_Failed_OptionalTitle" xml:space="preserve">
+    <value>Some Downloads Failed</value>
+  </data>
+  <data name="Download_Failed_OptionalMessage" xml:space="preserve">
+    <value>Some features may not be available.
+Please restart the app to retry.</value>
+  </data>
+
+  <!-- DownloadProgressViewModel -->
+  <data name="Update_DownloadProgress_VerificationFailed" xml:space="preserve">
+    <value>Download verification failed</value>
+  </data>
+
+  <!-- App.axaml.cs - Session -->
+  <data name="Session_Expired_Title" xml:space="preserve">
+    <value>Session Expired</value>
+  </data>
+  <data name="Session_Expired_Message" xml:space="preserve">
+    <value>Your session has expired. Please log in again.</value>
+  </data>
+
+  <!-- App.axaml.cs - Test Mode -->
+  <data name="TestMode_Warning_Title" xml:space="preserve">
+    <value>Test Mode Active</value>
+  </data>
+  <data name="TestMode_Warning_Message" xml:space="preserve">
+    <value>License mock mode is active. For production, set License.EnableMockMode to false in appsettings.json.</value>
+  </data>
+
+  <!-- App.axaml.cs - Hardware Check -->
+  <data name="Hardware_Critical_Title" xml:space="preserve">
+    <value>Hardware Requirements - Critical Warning</value>
+  </data>
+  <data name="Hardware_Critical_Message" xml:space="preserve">
+    <value>Your system does not meet the minimum requirements. Baketa may not work properly.
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_Warning_Title" xml:space="preserve">
+    <value>Hardware Requirements Warning</value>
+  </data>
+  <data name="Hardware_Warning_Message" xml:space="preserve">
+    <value>Your system does not meet the recommended specifications.
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_CpuCores" xml:space="preserve">
+    <value>CPU: {0} cores</value>
+  </data>
+
+  <!-- App.axaml.cs - Patreon Auth -->
+  <data name="Patreon_AuthSuccess_Title" xml:space="preserve">
+    <value>Patreon Link Successful</value>
+  </data>
+  <data name="Patreon_AuthSuccess_Message" xml:space="preserve">
+    <value>Patreon account linked successfully. Plan: {0}</value>
+  </data>
+  <data name="Patreon_AuthFailed_Title" xml:space="preserve">
+    <value>Patreon Link Failed</value>
+  </data>
+  <data name="Patreon_AuthFailed_Message" xml:space="preserve">
+    <value>An error occurred during authentication</value>
+  </data>
+
+  <!-- MainOverlayViewModel - Translation Error -->
+  <data name="Translation_Error_StopFailed" xml:space="preserve">
+    <value>Failed to stop translation.
+Cause: {0}
+Action: Please restart the app.</value>
+  </data>
+  <data name="Translation_Error_StartFailed" xml:space="preserve">
+    <value>Failed to start translation.
+Cause: {0}
+Action: Please restart the app.</value>
+  </data>
+
+  <!-- ========== Issue #423: Upsell messages ========== -->
+  <data name="Upsell_UpgradePrompt" xml:space="preserve">
+    <value>Upgrade your plan for more tokens</value>
+  </data>
+  <data name="Upsell_ViewPlans" xml:space="preserve">
+    <value>View Plans</value>
+  </data>
+  <data name="Upsell_Free_Message" xml:space="preserve">
+    <value>You're on the Free plan. Subscribe to unlock Cloud AI translation with monthly tokens.</value>
+  </data>
+  <data name="Upsell_Pro_Message" xml:space="preserve">
+    <value>Upgrade to Premium ($5/mo) for 2x more tokens, or Ultimate ($9/mo) for 5x more tokens.</value>
+  </data>
+  <data name="Upsell_Premium_Message" xml:space="preserve">
+    <value>Upgrade to Ultimate ($9/mo) for 2.5x more tokens and unlimited features.</value>
+  </data>
+  <data name="Upsell_UsageHigh_Message" xml:space="preserve">
+    <value>You've used {0}% of your tokens. Consider upgrading for more capacity.</value>
+  </data>
+
 </root>

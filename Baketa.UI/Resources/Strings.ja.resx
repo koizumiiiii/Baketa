@@ -1638,4 +1638,120 @@
     <value>確認メールを送信しました。メール内のリンクをクリックしてから、ログインしてください。3秒後にログイン画面に移動します...</value>
   </data>
 
+  <!-- ========== Issue #424: i18n - ハードコード文字列の外部化 ========== -->
+
+  <!-- ComponentDownloadFailedEventProcessor -->
+  <data name="Download_Failed_Title" xml:space="preserve">
+    <value>ダウンロード失敗</value>
+  </data>
+  <data name="Download_Failed_RequiredMessage" xml:space="preserve">
+    <value>必要なファイルのダウンロードに失敗しました。
+アプリを再起動して再試行してください。
+
+失敗したコンポーネント: {0}</value>
+  </data>
+  <data name="Download_Failed_OptionalTitle" xml:space="preserve">
+    <value>一部のダウンロードに失敗</value>
+  </data>
+  <data name="Download_Failed_OptionalMessage" xml:space="preserve">
+    <value>一部の機能が利用できない可能性があります。
+アプリを再起動して再試行してください。</value>
+  </data>
+
+  <!-- DownloadProgressViewModel -->
+  <data name="Update_DownloadProgress_VerificationFailed" xml:space="preserve">
+    <value>ダウンロードの検証に失敗しました</value>
+  </data>
+
+  <!-- App.axaml.cs - セッション -->
+  <data name="Session_Expired_Title" xml:space="preserve">
+    <value>セッション期限切れ</value>
+  </data>
+  <data name="Session_Expired_Message" xml:space="preserve">
+    <value>セッションが期限切れになりました。再度ログインしてください。</value>
+  </data>
+
+  <!-- App.axaml.cs - テストモード -->
+  <data name="TestMode_Warning_Title" xml:space="preserve">
+    <value>テストモード有効</value>
+  </data>
+  <data name="TestMode_Warning_Message" xml:space="preserve">
+    <value>ライセンスモックモードが有効です。本番環境では appsettings.json の License.EnableMockMode を false に設定してください。</value>
+  </data>
+
+  <!-- App.axaml.cs - ハードウェアチェック -->
+  <data name="Hardware_Critical_Title" xml:space="preserve">
+    <value>ハードウェア要件 - 重大な警告</value>
+  </data>
+  <data name="Hardware_Critical_Message" xml:space="preserve">
+    <value>お使いの環境は最低要件を満たしていません。正常に動作しない可能性があります。
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_Warning_Title" xml:space="preserve">
+    <value>ハードウェア要件の警告</value>
+  </data>
+  <data name="Hardware_Warning_Message" xml:space="preserve">
+    <value>お使いの環境は推奨スペックを満たしていません。
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_CpuCores" xml:space="preserve">
+    <value>CPU: {0}コア</value>
+  </data>
+
+  <!-- App.axaml.cs - Patreon認証 -->
+  <data name="Patreon_AuthSuccess_Title" xml:space="preserve">
+    <value>Patreon連携成功</value>
+  </data>
+  <data name="Patreon_AuthSuccess_Message" xml:space="preserve">
+    <value>Patreonアカウントとの連携が完了しました。プラン: {0}</value>
+  </data>
+  <data name="Patreon_AuthFailed_Title" xml:space="preserve">
+    <value>Patreon連携失敗</value>
+  </data>
+  <data name="Patreon_AuthFailed_Message" xml:space="preserve">
+    <value>認証処理中にエラーが発生しました</value>
+  </data>
+
+  <!-- MainOverlayViewModel - 翻訳エラー -->
+  <data name="Translation_Error_StopFailed" xml:space="preserve">
+    <value>翻訳の停止に失敗しました。
+原因: {0}
+対処: アプリを再起動してください。</value>
+  </data>
+  <data name="Translation_Error_StartFailed" xml:space="preserve">
+    <value>翻訳の開始に失敗しました。
+原因: {0}
+対処: アプリを再起動してください。</value>
+  </data>
+
+  <!-- ========== Issue #423: アップセルメッセージ ========== -->
+  <data name="Upsell_UpgradePrompt" xml:space="preserve">
+    <value>プランをアップグレードしてトークンを増やしましょう</value>
+  </data>
+  <data name="Upsell_ViewPlans" xml:space="preserve">
+    <value>プランを見る</value>
+  </data>
+  <data name="Upsell_Free_Message" xml:space="preserve">
+    <value>現在Freeプランです。サブスクリプションに登録して、Cloud AI翻訳と月間トークンを利用しましょう。</value>
+  </data>
+  <data name="Upsell_Pro_Message" xml:space="preserve">
+    <value>Premiumプラン($5/月)で2倍、Ultimateプラン($9/月)で5倍のトークンが利用可能です。</value>
+  </data>
+  <data name="Upsell_Premium_Message" xml:space="preserve">
+    <value>Ultimateプラン($9/月)にアップグレードして、2.5倍のトークンと全機能を利用しましょう。</value>
+  </data>
+  <data name="Upsell_UsageHigh_Message" xml:space="preserve">
+    <value>トークンの{0}%を使用しました。アップグレードでより多くの容量を確保できます。</value>
+  </data>
+
 </root>

@@ -1307,9 +1307,10 @@ public class MainOverlayViewModel : ViewModelBase
             });
 
             // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
-            var operation = IsTranslationActive ? "停止" : "開始";
-            await _errorNotificationService.ShowErrorAsync(
-                $"翻訳の{operation}に失敗しました。\n原因: {ex.Message}\n対処: アプリを再起動してください。").ConfigureAwait(false);
+            var errorMessage = IsTranslationActive
+                ? string.Format(Strings.Translation_Error_StopFailed, ex.Message)
+                : string.Format(Strings.Translation_Error_StartFailed, ex.Message);
+            await _errorNotificationService.ShowErrorAsync(errorMessage).ConfigureAwait(false);
         }
     }
 
