@@ -1735,23 +1735,17 @@ Action: Please restart the app.</value>
   </data>
 
   <!-- ========== Issue #423: Upsell messages ========== -->
-  <data name="Upsell_UpgradePrompt" xml:space="preserve">
-    <value>Upgrade your plan for more tokens</value>
-  </data>
   <data name="Upsell_ViewPlans" xml:space="preserve">
-    <value>View Plans</value>
+    <value>Change Plan →</value>
   </data>
-  <data name="Upsell_Free_Message" xml:space="preserve">
-    <value>You're on the Free plan. Subscribe to unlock Cloud AI translation with monthly tokens.</value>
+  <data name="Upsell_Free_WithBonus_Message" xml:space="preserve">
+    <value>⚡ Get more EX mode with a Pro plan</value>
   </data>
-  <data name="Upsell_Pro_Message" xml:space="preserve">
-    <value>Upgrade to Premium ($5/mo) for 2x more tokens, or Ultimate ($9/mo) for 5x more tokens.</value>
+  <data name="Upsell_Free_NoBonus_Message" xml:space="preserve">
+    <value>⚡ Subscribe to Pro plan to use EX mode</value>
   </data>
-  <data name="Upsell_Premium_Message" xml:space="preserve">
-    <value>Upgrade to Ultimate ($9/mo) for 2.5x more tokens and unlimited features.</value>
-  </data>
-  <data name="Upsell_UsageHigh_Message" xml:space="preserve">
-    <value>You've used {0}% of your tokens. Consider upgrading for more capacity.</value>
+  <data name="Upsell_Upgrade_Message" xml:space="preserve">
+    <value>⬆️ Upgrade your plan for more tokens</value>
   </data>
 
 </root>

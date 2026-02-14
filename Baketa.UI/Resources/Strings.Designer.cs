@@ -696,10 +696,8 @@ public static class Strings
     public static string Translation_Error_StartFailed => GetString("Translation_Error_StartFailed");
 
     // ========== [Issue #423] Upsell messages ==========
-    public static string Upsell_UpgradePrompt => GetString("Upsell_UpgradePrompt");
     public static string Upsell_ViewPlans => GetString("Upsell_ViewPlans");
-    public static string Upsell_Free_Message => GetString("Upsell_Free_Message");
-    public static string Upsell_Pro_Message => GetString("Upsell_Pro_Message");
-    public static string Upsell_Premium_Message => GetString("Upsell_Premium_Message");
-    public static string Upsell_UsageHigh_Message => GetString("Upsell_UsageHigh_Message");
+    public static string Upsell_Free_WithBonus_Message => GetString("Upsell_Free_WithBonus_Message");
+    public static string Upsell_Free_NoBonus_Message => GetString("Upsell_Free_NoBonus_Message");
+    public static string Upsell_Upgrade_Message => GetString("Upsell_Upgrade_Message");
 }

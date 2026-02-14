@@ -452,19 +452,16 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
     /// <summary>
     /// [Issue #423] アップセルバナーを表示するかどうか
-    /// Free/Pro/Premiumプランかつ使用量が70%以上、またはFreeプランの場合に表示
+    /// Free: 常時表示、Pro/Premium: 使用率80%以上、Ultimate: 非表示
     /// </summary>
     public bool ShowUpsellBanner
     {
         get
         {
             var plan = _licenseManager?.CurrentState?.CurrentPlan ?? PlanType.Free;
-            // Ultimateは最上位なのでアップセル不要
             if (plan == PlanType.Ultimate) return false;
-            // Freeプランは常に表示
             if (plan == PlanType.Free) return true;
-            // 有料プランは使用量70%以上で表示
-            return CloudUsagePercentage >= 70;
+            return CloudUsagePercentage >= 80;
         }
     }
 
@@ -476,13 +473,16 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         get
         {
             var plan = _licenseManager?.CurrentState?.CurrentPlan ?? PlanType.Free;
-            return plan switch
+            if (plan == PlanType.Free)
             {
-                PlanType.Free => Strings.Upsell_Free_Message,
-                PlanType.Pro => Strings.Upsell_Pro_Message,
-                PlanType.Premium => Strings.Upsell_Premium_Message,
-                _ => string.Empty
-            };
+                var hasBonusTokens = (_bonusTokenService?.GetTotalRemainingTokens() ?? 0) > 0;
+                return hasBonusTokens
+                    ? Strings.Upsell_Free_WithBonus_Message
+                    : Strings.Upsell_Free_NoBonus_Message;
+            }
+            return plan is PlanType.Pro or PlanType.Premium
+                ? Strings.Upsell_Upgrade_Message
+                : string.Empty;
         }
     }
 

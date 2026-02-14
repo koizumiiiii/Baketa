@@ -45,8 +45,10 @@ public sealed class ComponentDownloadFailedEventProcessor : IEventProcessor<Comp
                 // 必須コンポーネントの失敗 - エラー通知（手動で閉じるまで表示）
                 await _notificationService.ShowErrorAsync(
                     Strings.Download_Failed_Title,
+#pragma warning disable CA1863 // 通知メッセージは繰り返し使用しないためキャッシュ不要
                     string.Format(Strings.Download_Failed_RequiredMessage,
                         string.Join(", ", eventData.FailedComponentIds)),
+#pragma warning restore CA1863
                     duration: 0 // 手動で閉じるまで表示
                 ).ConfigureAwait(false);
             }

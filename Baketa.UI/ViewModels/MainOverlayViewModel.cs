@@ -1307,9 +1307,11 @@ public class MainOverlayViewModel : ViewModelBase
             });
 
             // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
+#pragma warning disable CA1863 // エラー通知は繰り返し使用しないためキャッシュ不要
             var errorMessage = IsTranslationActive
                 ? string.Format(Strings.Translation_Error_StopFailed, ex.Message)
                 : string.Format(Strings.Translation_Error_StartFailed, ex.Message);
+#pragma warning restore CA1863
             await _errorNotificationService.ShowErrorAsync(errorMessage).ConfigureAwait(false);
         }
     }

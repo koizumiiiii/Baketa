@@ -1735,23 +1735,17 @@
   </data>
 
   <!-- ========== Issue #423: アップセルメッセージ ========== -->
-  <data name="Upsell_UpgradePrompt" xml:space="preserve">
-    <value>プランをアップグレードしてトークンを増やしましょう</value>
-  </data>
   <data name="Upsell_ViewPlans" xml:space="preserve">
-    <value>プランを見る</value>
+    <value>プラン変更 →</value>
   </data>
-  <data name="Upsell_Free_Message" xml:space="preserve">
-    <value>現在Freeプランです。サブスクリプションに登録して、Cloud AI翻訳と月間トークンを利用しましょう。</value>
+  <data name="Upsell_Free_WithBonus_Message" xml:space="preserve">
+    <value>⚡ Proプラン加入でEXモードがもっと使える</value>
   </data>
-  <data name="Upsell_Pro_Message" xml:space="preserve">
-    <value>Premiumプラン($5/月)で2倍、Ultimateプラン($9/月)で5倍のトークンが利用可能です。</value>
+  <data name="Upsell_Free_NoBonus_Message" xml:space="preserve">
+    <value>⚡ Proプランに加入してEXモードを利用しよう</value>
   </data>
-  <data name="Upsell_Premium_Message" xml:space="preserve">
-    <value>Ultimateプラン($9/月)にアップグレードして、2.5倍のトークンと全機能を利用しましょう。</value>
-  </data>
-  <data name="Upsell_UsageHigh_Message" xml:space="preserve">
-    <value>トークンの{0}%を使用しました。アップグレードでより多くの容量を確保できます。</value>
+  <data name="Upsell_Upgrade_Message" xml:space="preserve">
+    <value>⬆️ プランアップグレードでもっと使える</value>
   </data>
 
 </root>

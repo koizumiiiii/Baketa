@@ -72,20 +72,24 @@
                             <Border IsVisible="{Binding ShowUpsellBanner}"
                                     Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
                                     CornerRadius="4"
-                                    Padding="12,8"
+                                    Padding="12,10"
                                     Margin="0,4,0,0">
-                                <StackPanel Spacing="6">
-                                    <TextBlock Text="{Binding UpsellMessage}"
-                                               FontSize="12"
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding UpsellMessage}"
+                                               FontSize="13"
                                                TextWrapping="Wrap"
+                                               VerticalAlignment="Center"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                    <Button Content="{local:Localize Upsell_ViewPlans}"
+                                    <Button Grid.Column="1"
+                                            Content="{local:Localize Upsell_ViewPlans}"
                                             Command="{Binding OpenUpsellLinkCommand}"
-                                            HorizontalAlignment="Left"
                                             Classes="accent"
-                                            FontSize="12"
-                                            Padding="12,4"/>
-                                </StackPanel>
+                                            FontSize="13"
+                                            Padding="16,8"
+                                            Margin="12,0,0,0"
+                                            VerticalAlignment="Center"/>
+                                </Grid>
                             </Border>
                         </StackPanel>
                     </controls:SettingsItem.SettingContent>

@@ -1410,6 +1410,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             var warningMessages = string.Join("\n", result.Warnings.Select(w => $"• {w}"));
             var gpuInfo = $"GPU: {result.GpuName}";
             var ramInfo = $"RAM: {result.TotalRamGb}GB";
+#pragma warning disable CA1863 // ハードウェア警告は起動時1回のみなのでキャッシュ不要
             var cpuInfo = string.Format(Strings.Hardware_CpuCores, result.CpuCores);
 
             string title, message;
@@ -1423,6 +1424,7 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                     title = Strings.Hardware_Warning_Title;
                     message = string.Format(Strings.Hardware_Warning_Message, gpuInfo, ramInfo, cpuInfo, warningMessages);
                     break;
+#pragma warning restore CA1863
                 default:
                     // Info レベルはログのみで続行
                     _logger?.LogInformation("[Issue #335] ハードウェア情報: {GpuInfo}, {RamInfo}, {CpuInfo}", gpuInfo, ramInfo, cpuInfo);
@@ -1493,7 +1495,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
             {
                 await notificationService.ShowSuccessAsync(
                     Strings.Patreon_AuthSuccess_Title,
+#pragma warning disable CA1863 // Patreon認証通知は1回のみなのでキャッシュ不要
                     string.Format(Strings.Patreon_AuthSuccess_Message, notification.PlanName),
+#pragma warning restore CA1863
                     duration: 5000);
 
                 _logger?.LogInformation("Patreon認証成功通知を表示: Plan={Plan}", notification.PlanName);
