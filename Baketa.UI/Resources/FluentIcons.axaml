@@ -131,4 +131,9 @@
     M3,11H21V13H3V11Z
   </StreamGeometry>
 
+  <!-- Lightning Bolt Icon (EX Mode badge) -->
+  <StreamGeometry x:Key="LightningIcon">
+    M11,1 L5,13 L10,13 L8,23 L19,9 L13,9 L17,1 Z
+  </StreamGeometry>
+
 </ResourceDictionary>

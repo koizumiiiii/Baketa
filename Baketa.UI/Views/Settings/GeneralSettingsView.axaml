@@ -68,28 +68,28 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- [Issue #423] アップセルバナー -->
+                            <!-- [Issue #423] アップセルバナー（カード型） -->
                             <Border IsVisible="{Binding ShowUpsellBanner}"
                                     Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
-                                    CornerRadius="4"
-                                    Padding="12,10"
-                                    Margin="0,4,0,0">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding UpsellMessage}"
+                                    BorderBrush="#D0A030"
+                                    BorderThickness="1.5"
+                                    CornerRadius="8"
+                                    Padding="16,14"
+                                    Margin="0,8,0,0">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="{Binding UpsellMessage}"
                                                FontSize="13"
+                                               FontWeight="Medium"
                                                TextWrapping="Wrap"
-                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                    <Button Grid.Column="1"
-                                            Content="{local:Localize Upsell_ViewPlans}"
+                                    <Button Content="{local:Localize Upsell_ViewPlans}"
                                             Command="{Binding OpenUpsellLinkCommand}"
                                             Classes="accent"
                                             FontSize="13"
-                                            Padding="16,8"
-                                            Margin="12,0,0,0"
-                                            VerticalAlignment="Center"/>
-                                </Grid>
+                                            Padding="24,10"
+                                            HorizontalAlignment="Center"/>
+                                </StackPanel>
                             </Border>
                         </StackPanel>
                     </controls:SettingsItem.SettingContent>
