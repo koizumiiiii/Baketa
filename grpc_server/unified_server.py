@@ -155,6 +155,7 @@ class SuryaOcrEngine:
         self.recognition_predictor = None
         self.detection_predictor = None
         self.is_loaded = False
+        self._use_cuda = False  # [Issue #426] 実際にCUDAが有効かどうか
         self.logger = logging.getLogger(f"{__name__}.SuryaOcrEngine")
 
     async def load_model(self) -> bool:
@@ -169,14 +170,15 @@ class SuryaOcrEngine:
             total_start = time.time()
 
             # CUDA利用可否チェック
-            use_cuda = False
+            self._use_cuda = False
             if self.device == "cuda":
                 try:
                     import torch
                     if torch.cuda.is_available():
-                        use_cuda = True
+                        self._use_cuda = True
                         gpu_name = torch.cuda.get_device_name(0)
-                        self.logger.info(f"CUDA利用可能: GPUモードで実行 ({gpu_name})")
+                        vram_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                        self.logger.info(f"CUDA利用可能: GPUモードで実行 ({gpu_name}, VRAM: {vram_total:.1f}GB)")
                     else:
                         self.logger.info("CUDA利用不可: CPUモードで実行")
                 except OSError as e:
@@ -185,8 +187,10 @@ class SuryaOcrEngine:
                     os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
             # デバイス設定の確定
-            if use_cuda:
+            if self._use_cuda:
                 os.environ["TORCH_DEVICE"] = "cuda"
+                # [Issue #426] TF32 + cuDNN最適化（Ada Lovelace Tensor Core活用）
+                self._enable_tf32_and_cudnn()
             else:
                 os.environ["TORCH_DEVICE"] = "cpu"
                 self.device = "cpu"
@@ -223,6 +227,11 @@ class SuryaOcrEngine:
             self.logger.info(f"[Timing] RecognitionPredictor: {time.time() - rec_start:.2f}秒")
             sys.stdout.flush()
 
+            # [Issue #426] ウォームアップ推論（CUDAカーネルキャッシュ + cuDNN autotuner）
+            if self._use_cuda:
+                self._warmup_inference()
+                self._log_vram_usage("モデルロード後")
+
             elapsed = time.time() - total_start
             self.logger.info(f"Surya OCRモデルロード完了 (合計: {elapsed:.2f}秒)")
             sys.stdout.flush()
@@ -235,6 +244,73 @@ class SuryaOcrEngine:
         except Exception as e:
             self.logger.exception(f"モデルロードエラー: {e}")
             return False
+
+    def _enable_tf32_and_cudnn(self):
+        """[Issue #426] TF32 + cuDNNベンチマークを有効化
+
+        TF32 (TensorFloat-32): FP32と同等の精度を保ちつつ Tensor Core で高速演算
+        - matmul: FP32の約3倍速（Ada Lovelace世代）
+        - cuDNN: conv層の最適カーネルを自動選択
+
+        FP16は Surya Recognition モデル（RoPE+カスタムデコーダー）と非互換のため不採用。
+        torch.compile は Windows で Triton 未対応のため不採用。
+        """
+        try:
+            import torch
+            # TF32: 19bit精度（mantissa 10bit）でFP32互換のまま Tensor Core 活用
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            # matmul精度を 'high' に設定（TF32を積極利用）
+            torch.set_float32_matmul_precision('high')
+            # cuDNN autotuner: conv層の最速カーネルを自動選択（初回のみ探索コスト発生）
+            torch.backends.cudnn.benchmark = True
+
+            self.logger.info("[Issue #426] TF32 + cuDNN benchmark 有効化完了")
+            self.logger.info("[Issue #426]   matmul.allow_tf32=True, cudnn.allow_tf32=True")
+            self.logger.info("[Issue #426]   float32_matmul_precision='high', cudnn.benchmark=True")
+        except Exception as e:
+            self.logger.warning(f"[Issue #426] TF32/cuDNN設定失敗（FP32フォールバック）: {e}")
+
+    def _warmup_inference(self):
+        """[Issue #426] ウォームアップ推論（CUDAカーネルキャッシュ + cuDNN autotuner初期化）
+
+        cuDNN benchmark は (入力テンソル形状, フィルタ形状) ごとに最速アルゴリズムを探索・キャッシュする。
+        実際のOCR入力サイズ (1280x720) に近いダミー画像でウォームアップすることで、
+        初回リクエスト時の探索コスト（数秒）を起動時に吸収する。
+        """
+        try:
+            import torch
+            from PIL import Image
+
+            warmup_start = time.time()
+            # 実際のOCR入力サイズに合わせる（cuDNNキャッシュはテンソル形状ごと）
+            warmup_size = (1280, 720)
+            self.logger.info(f"[Issue #426] ウォームアップ推論実行中 (size: {warmup_size})...")
+            sys.stdout.flush()
+
+            dummy_image = Image.new('RGB', warmup_size, color=(128, 128, 128))
+            with torch.inference_mode():
+                _ = self.recognition_predictor(
+                    [dummy_image],
+                    det_predictor=self.detection_predictor
+                )
+
+            warmup_elapsed = time.time() - warmup_start
+            self.logger.info(f"[Issue #426] ウォームアップ完了 ({warmup_elapsed:.2f}秒)")
+            sys.stdout.flush()
+        except Exception as e:
+            self.logger.warning(f"[Issue #426] ウォームアップ失敗（通常推論に影響なし）: {e}")
+
+    def _log_vram_usage(self, label: str = ""):
+        """[Issue #426] VRAM使用量をログ出力"""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                allocated = torch.cuda.memory_allocated(0) / (1024**3)
+                reserved = torch.cuda.memory_reserved(0) / (1024**3)
+                self.logger.info(f"[Issue #426] VRAM ({label}): allocated={allocated:.2f}GB, reserved={reserved:.2f}GB")
+        except Exception:
+            pass
 
     def switch_device(self, target_device: str) -> tuple[bool, str]:
         """[Issue #334] デバイス切り替え（GPU/CPU）
@@ -339,9 +415,12 @@ class SuryaOcrEngine:
 
             image, scale = self._resize_image_if_needed(image)
 
-            self.logger.info(f"OCR実行中... (サイズ: {image.size})")
+            self.logger.info(f"OCR実行中... (サイズ: {image.size}, device: {self.device})")
             start_time = time.time()
 
+            # [Issue #426] TF32 + cuDNN benchmark で自動高速化
+            # TF32/cuDNNは _enable_tf32_and_cudnn() でグローバル設定済み
+            # FP16 AMP は Surya Recognition (RoPE) と非互換のため不使用
             predictions = self.recognition_predictor(
                 [image],
                 det_predictor=self.detection_predictor
@@ -907,6 +986,10 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
         idle_timeout_seconds=300  # 5分アイドルでアンロード
     )
 
+    # [Issue #426] TF32 + cuDNN benchmark でOCR高速化
+    # FP16 AMP → Surya Recognition (RoPE) と非互換で認識失敗
+    # torch.compile → Windows で Triton 未対応
+    # TF32 → FP32互換の精度を保ちつつ Tensor Core で ~3倍速
     ocr_engine = SuryaOcrEngine(device=device)
 
     # 🔥 [Issue #337] OCRのみ事前ロード（翻訳は遅延ロード）
