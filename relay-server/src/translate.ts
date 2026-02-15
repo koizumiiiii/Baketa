@@ -1030,10 +1030,34 @@ async function authenticateUser(
     }
 
     if (cachedMembership) {
+      // [Fix] Patreon Freeユーザーの場合、Supabase連携経由でボーナストークンを確認
+      // 以前は hasBonusTokens: false 固定だったため、初回リクエストで403エラーになっていた
+      let hasBonusTokens = false;
+      if (cachedMembership.membership.plan === PLAN.FREE) {
+        const supabaseForBonus = getSupabaseClient(env);
+        if (supabaseForBonus) {
+          try {
+            const { data: profile, error: profileError } = await supabaseForBonus
+              .from('profiles')
+              .select('id')
+              .eq('patreon_user_id', patreonSession.userId)
+              .single();
+
+            if (!profileError && profile?.id) {
+              const bonusRemaining = await getBonusTokensRemaining(supabaseForBonus, profile.id);
+              hasBonusTokens = bonusRemaining > 0;
+              console.log(`[Fix] Patreon Free user bonus check: patreonId=${patreonSession.userId}, supabaseId=${profile.id.substring(0, 8)}..., bonusTokens=${hasBonusTokens}`);
+            }
+          } catch (error) {
+            console.error(`[Fix] Error checking bonus tokens for Patreon session user:`, error);
+          }
+        }
+      }
+
       const result: AuthenticatedUser = {
         userId: patreonSession.userId,
         plan: cachedMembership.membership.plan,
-        hasBonusTokens: false, // Patreonユーザーはボーナス不要（プランで判定）
+        hasBonusTokens,
         authMethod: 'patreon'
       };
       // キャッシュに保存（[Issue #286] Cache API使用）

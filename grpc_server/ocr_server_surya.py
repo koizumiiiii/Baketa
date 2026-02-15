@@ -58,6 +58,7 @@ class SuryaOcrEngine:
         self.recognition_predictor = None
         self.detection_predictor = None
         self.is_loaded = False
+        self._use_cuda = False
 
     def load(self) -> bool:
         """モデルをロード (Surya v0.17.0+ API)"""
@@ -81,6 +82,7 @@ class SuryaOcrEngine:
             # Issue #198: CUDA DLLロードエラー対策
             # PyTorchインポート前にCUDA利用可否を判定し、DLLエラーを防止
             # ユーザー環境: GPU有り＋PyTorch CPU版 → miniconda CUDA DLLエラー回避
+            # [Issue #426] 量子化モデルはCPU専用のためCUDA無効化を維持
             use_cuda = False
             if self.device == "cuda" and not self.use_quantized:
                 try:
@@ -117,8 +119,11 @@ class SuryaOcrEngine:
                 import torch
 
             # デバイス設定の確定
+            self._use_cuda = use_cuda
             if use_cuda:
                 os.environ["TORCH_DEVICE"] = "cuda"
+                # [Issue #426] TF32 + cuDNN最適化（Ada Lovelace Tensor Core活用）
+                self._enable_tf32_and_cudnn()
             else:
                 os.environ["TORCH_DEVICE"] = "cpu"
                 self.device = "cpu"
@@ -174,6 +179,11 @@ class SuryaOcrEngine:
             self.recognition_predictor = RecognitionPredictor(self.foundation_predictor)
             logger.info(f"[Timing] RecognitionPredictor: {time.time() - rec_start:.2f}秒")
 
+            # [Issue #426] ウォームアップ推論（CUDAカーネルキャッシュ + cuDNN autotuner初期化）
+            if self._use_cuda:
+                self._warmup_inference()
+                self._log_vram_usage("モデルロード後")
+
             elapsed = time.time() - total_start
             logger.info(f"Surya OCRモデルロード完了 (合計: {elapsed:.2f}秒)")
             self.is_loaded = True
@@ -186,6 +196,66 @@ class SuryaOcrEngine:
         except Exception as e:
             logger.exception(f"モデルロードエラー: {e}")
             return False
+
+    def _enable_tf32_and_cudnn(self):
+        """[Issue #426] TF32 + cuDNNベンチマークを有効化
+
+        TF32 (TensorFloat-32): FP32と同等の精度を保ちつつ Tensor Core で高速演算
+        cuDNN benchmark: conv層の最適カーネルを自動選択
+
+        FP16は Surya Recognition モデル（RoPE+カスタムデコーダー）と非互換のため不採用。
+        torch.compile は Windows で Triton 未対応のため不採用。
+        """
+        try:
+            import torch
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            torch.set_float32_matmul_precision('high')
+            torch.backends.cudnn.benchmark = True
+
+            logger.info("[Issue #426] TF32 + cuDNN benchmark 有効化完了")
+            logger.info("[Issue #426]   matmul.allow_tf32=True, cudnn.allow_tf32=True")
+            logger.info("[Issue #426]   float32_matmul_precision='high', cudnn.benchmark=True")
+        except Exception as e:
+            logger.warning(f"[Issue #426] TF32/cuDNN設定失敗（FP32フォールバック）: {e}")
+
+    def _warmup_inference(self):
+        """[Issue #426] ウォームアップ推論（CUDAカーネルキャッシュ + cuDNN autotuner初期化）
+
+        cuDNN benchmark は (入力テンソル形状, フィルタ形状) ごとに最速アルゴリズムを探索・キャッシュする。
+        実際のOCR入力サイズ (1280x720) に近いダミー画像でウォームアップすることで、
+        初回リクエスト時の探索コスト（数秒）を起動時に吸収する。
+        """
+        try:
+            import torch
+            from PIL import Image
+
+            warmup_start = time.time()
+            warmup_size = (1280, 720)
+            logger.info(f"[Issue #426] ウォームアップ推論実行中 (size: {warmup_size})...")
+
+            dummy_image = Image.new('RGB', warmup_size, color=(128, 128, 128))
+            with torch.inference_mode():
+                _ = self.recognition_predictor(
+                    [dummy_image],
+                    det_predictor=self.detection_predictor
+                )
+
+            warmup_elapsed = time.time() - warmup_start
+            logger.info(f"[Issue #426] ウォームアップ完了 ({warmup_elapsed:.2f}秒)")
+        except Exception as e:
+            logger.warning(f"[Issue #426] ウォームアップ失敗（通常推論に影響なし）: {e}")
+
+    def _log_vram_usage(self, label: str = ""):
+        """[Issue #426] VRAM使用量をログ出力"""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                allocated = torch.cuda.memory_allocated(0) / (1024**3)
+                reserved = torch.cuda.memory_reserved(0) / (1024**3)
+                logger.info(f"[Issue #426] VRAM ({label}): allocated={allocated:.2f}GB, reserved={reserved:.2f}GB")
+        except Exception:
+            pass
 
     # 画像サイズ上限（10MB）- Decompression Bomb攻撃対策
     MAX_IMAGE_SIZE = 10 * 1024 * 1024
@@ -247,10 +317,12 @@ class SuryaOcrEngine:
             if languages:
                 logger.info(f"言語指定: {languages} (Surya v0.17.0では自動検出を使用)")
 
-            logger.info(f"OCR実行中... (サイズ: {image.size})")
+            logger.info(f"OCR実行中... (サイズ: {image.size}, device: {self.device})")
             start_time = time.time()
 
-            # Surya OCR v0.17.0+ API: RecognitionPredictor + DetectionPredictor
+            # [Issue #426] TF32 + cuDNN benchmark で自動高速化
+            # TF32/cuDNNは _enable_tf32_and_cudnn() でグローバル設定済み
+            # FP16 AMP は Surya Recognition (RoPE) と非互換のため不使用
             predictions = self.recognition_predictor(
                 [image],
                 det_predictor=self.detection_predictor
