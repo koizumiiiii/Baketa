@@ -74,6 +74,10 @@ interface TranslateRequest {
   target_language: string;
   context?: string;
   request_id?: string;
+  // [Issue #427] 翻訳履歴（文脈維持用）
+  translation_history?: Array<{ original: string; translation: string }>;
+  // [Issue #429] OCR配置ヒント
+  ocr_hints?: { text_region_count: number; text_areas: string[] };
 }
 
 /** Gemini API リクエスト */
@@ -1545,6 +1549,27 @@ async function translateWithGemini(
     ? `The source language is ${request.source_language}.`
     : 'Detect the source language.';
 
+  // [Issue #427] 翻訳履歴から文脈セクションを構築
+  let historySection = '';
+  if (request.translation_history && request.translation_history.length > 0) {
+    const historyLines = request.translation_history
+      .map(h => `  "${h.original}" → "${h.translation}"`)
+      .join('\n');
+    historySection = `\n# Previous Translations (for consistency)
+Maintain consistent tone, character voice, and proper noun translations:
+${historyLines}
+`;
+  }
+
+  // [Issue #429] OCR配置ヒントセクションを構築
+  let ocrHintsSection = '';
+  if (request.ocr_hints && request.ocr_hints.text_region_count > 0) {
+    ocrHintsSection = `\n# OCR Detection Hints
+OCR detected ${request.ocr_hints.text_region_count} text region(s) in: ${request.ocr_hints.text_areas.join(', ')} area(s).
+Prioritize these areas when detecting text.
+`;
+  }
+
   // [Issue #368] プロンプト最適化（~650トークン → ~220トークン）
   // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
   const jaSpecific = request.target_language === 'ja'
@@ -1556,8 +1581,7 @@ Expert game localizer. Output JSON ONLY.
 
 # Task
 Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
-${contextHint}
-
+${contextHint}${historySection}${ocrHintsSection}
 Must include: Dialogs, UI buttons, menus, and all labels.
 Do not invent or guess text that is not clearly visible in the image.
 
@@ -1572,12 +1596,13 @@ Do not invent or guess text that is not clearly visible in the image.
 - If text is already in ${request.target_language}, keep it as-is in "translation".
 - Never omit or leave "translation" empty.
 - Never repeat the same character more than 3 times consecutively.
+- Include a confidence_score (0.0-1.0) for each translation indicating certainty.
 
 # Output Format (JSON only)
 {
   "texts": [
-    {"original": "Dialog text line1 line2", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
-    {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200]}
+    {"original": "Dialog text line1 line2", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950], "confidence_score": 0.95},
+    {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200], "confidence_score": 0.9}
   ],
   "detected_language": "ISO 639-1"
 }
@@ -1620,6 +1645,8 @@ If no text visible: {"texts": [], "detected_language": ""}`;
                   type: 'ARRAY',
                   items: { type: 'NUMBER' },
                 },
+                // [Issue #429] 翻訳の信頼度スコア
+                confidence_score: { type: 'NUMBER' },
               },
               required: ['original', 'translation'],
             },
@@ -1788,6 +1815,27 @@ async function translateWithOpenAI(
     ? `The source language is ${request.source_language}.`
     : 'Detect the source language.';
 
+  // [Issue #427] 翻訳履歴から文脈セクションを構築（Geminiと同一ロジック）
+  let historySection = '';
+  if (request.translation_history && request.translation_history.length > 0) {
+    const historyLines = request.translation_history
+      .map(h => `  "${h.original}" → "${h.translation}"`)
+      .join('\n');
+    historySection = `\n# Previous Translations (for consistency)
+Maintain consistent tone, character voice, and proper noun translations:
+${historyLines}
+`;
+  }
+
+  // [Issue #429] OCR配置ヒントセクションを構築（Geminiと同一ロジック）
+  let ocrHintsSection = '';
+  if (request.ocr_hints && request.ocr_hints.text_region_count > 0) {
+    ocrHintsSection = `\n# OCR Detection Hints
+OCR detected ${request.ocr_hints.text_region_count} text region(s) in: ${request.ocr_hints.text_areas.join(', ')} area(s).
+Prioritize these areas when detecting text.
+`;
+  }
+
   // [Issue #368] プロンプト最適化（Geminiと同一プロンプト構造）
   // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
   const jaSpecific = request.target_language === 'ja'
@@ -1798,8 +1846,7 @@ async function translateWithOpenAI(
 
   const userPrompt = `# Task
 Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
-${contextHint}
-
+${contextHint}${historySection}${ocrHintsSection}
 Must include: Dialogs, UI buttons, menus, and all labels.
 Do not invent or guess text that is not clearly visible in the image.
 
@@ -1814,12 +1861,13 @@ Do not invent or guess text that is not clearly visible in the image.
 - If text is already in ${request.target_language}, keep it as-is in "translation".
 - Never omit or leave "translation" empty.
 - Never repeat the same character more than 3 times consecutively.
+- Include a confidence_score (0.0-1.0) for each translation indicating certainty.
 
 # Output Format (JSON only)
 {
   "texts": [
-    {"original": "Dialog text line1 line2", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950]},
-    {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200]}
+    {"original": "Dialog text line1 line2", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950], "confidence_score": 0.95},
+    {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200], "confidence_score": 0.9}
   ],
   "detected_language": "ISO 639-1"
 }

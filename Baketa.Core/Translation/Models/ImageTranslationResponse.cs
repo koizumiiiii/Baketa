@@ -181,6 +181,12 @@ public sealed class TranslatedTextItem
     /// バウンディングボックスが設定されているか
     /// </summary>
     public bool HasBoundingBox => BoundingBox.HasValue;
+
+    /// <summary>
+    /// [Issue #429] 翻訳の信頼度スコア（0.0〜1.0）
+    /// AIによる自己評価。低スコアの翻訳はフィルタリング対象
+    /// </summary>
+    public float? ConfidenceScore { get; init; }
 }
 
 /// <summary>
