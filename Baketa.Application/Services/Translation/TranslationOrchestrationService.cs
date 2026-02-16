@@ -945,7 +945,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         var interval = TimeSpan.FromMilliseconds(intervalMs);
 
         // PaddleOCRエラー発生時の遅延調整
-        var minInterval = TimeSpan.FromMilliseconds(500); // 最小間隔を500msに設定
+        var minInterval = TimeSpan.FromMilliseconds(200); // [Issue #435] 最小間隔を200msに緩和（キャプチャ+ハッシュ比較は高速）
         if (interval < minInterval)
         {
             interval = minInterval;
@@ -1044,17 +1044,18 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                                 break;
 
                             case TranslationStepResult.InCooldown:
-                                // [Issue #394] クールダウン中 → NoChangeCountを凍結（増減なし）
-                                // 高速チェックカウンタも消費しない（クールダウン中は時間を浪費しない）
-                                actualInterval = remainingCooldown.TotalSeconds > 0.1
-                                    ? TimeSpan.FromSeconds(Math.Min(remainingCooldown.TotalSeconds + 0.1, 0.5))
-                                    : TimeSpan.FromMilliseconds(500);
+                                // [Issue #435] クールダウン中も変化検知を実行するため、
+                                // 残りクールダウン時間に基づいて最適な間隔を設定
+                                // NoChangeCountを凍結（増減なし）、高速チェックカウンタも消費しない
+                                actualInterval = remainingCooldown.TotalSeconds > 0.5
+                                    ? TimeSpan.FromMilliseconds(300) // 変化検知 + クールダウン消化
+                                    : TimeSpan.FromMilliseconds(100); // クールダウン残りわずか → 即座に翻訳開始
 
                                 _logger?.LogDebug(
-                                    "[Issue #394] クールダウン中（状態凍結）: NoChangeCount={Count}, RemainingCooldown={Remaining:F1}s, NextInterval={Interval:F1}s",
+                                    "[Issue #435] クールダウン中（変化検知継続）: NoChangeCount={Count}, RemainingCooldown={Remaining:F1}s, NextInterval={Interval}ms",
                                     _consecutiveNoChangeCount,
                                     remainingCooldown.TotalSeconds,
-                                    actualInterval.TotalSeconds);
+                                    actualInterval.TotalMilliseconds);
                                 break;
 
                             case TranslationStepResult.NoChange:
@@ -1156,37 +1157,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _logger?.LogDebug($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
         _logger?.LogDebug($"   📡 CaptureServiceが利用可能: {_captureService != null}");
 
-        // 翻訳完了後のクールダウン期間チェック
-        DateTime lastTranslationTime;
-        lock (_lastTranslationTimeLock)
-        {
-            lastTranslationTime = _lastTranslationCompletedAt;
-        }
-
-        var cooldownSeconds = _settingsService.GetValue("Translation:PostTranslationCooldownSeconds", 3);
-        var timeSinceLastTranslation = DateTime.UtcNow - lastTranslationTime;
-
-        if (timeSinceLastTranslation.TotalSeconds < cooldownSeconds)
-        {
-            var remainingCooldown = cooldownSeconds - timeSinceLastTranslation.TotalSeconds;
-
-            // 緊急デバッグ: クールダウン中の直接書き込み
-            try
-            {
-                // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-            }
-            catch { }
-
-            _logger?.LogDebug("[Issue #394] クールダウン中: ID={TranslationId}, 残り{Remaining:F1}秒", translationId, remainingCooldown);
-            return TranslationStepResult.InCooldown;
-        }
-
-        // 緊急デバッグ: クールダウン通過確認
-        try
-        {
-            // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-        }
-        catch { }
+        // [Issue #435] クールダウンチェックは変化検知後に移動
+        // キャプチャ→変化検知→クールダウンチェック→翻訳 の順序で実行し、
+        // クールダウン中も画面変化を検知し続ける
 
         IImage? currentImage = null;
         var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -1301,6 +1274,30 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 {
                     previousImageForComparison?.Dispose();
                 }
+            }
+
+            // [Issue #435] クールダウンチェック（変化検知後、翻訳実行前）
+            // クールダウン中でも画面変化を検知し続けるため、ここでチェック
+            DateTime lastTranslationTime;
+            lock (_lastTranslationTimeLock)
+            {
+                lastTranslationTime = _lastTranslationCompletedAt;
+            }
+
+            var cooldownSeconds = _settingsService.GetValue("Translation:PostTranslationCooldownSeconds", 3);
+            var timeSinceLastTranslation = DateTime.UtcNow - lastTranslationTime;
+
+            if (timeSinceLastTranslation.TotalSeconds < cooldownSeconds)
+            {
+                var remainingCooldown = cooldownSeconds - timeSinceLastTranslation.TotalSeconds;
+                _logger?.LogDebug(
+                    "[Issue #435] クールダウン中（変化検知済み）: ID={TranslationId}, 残り{Remaining:F1}秒",
+                    translationId, remainingCooldown);
+
+                // クールダウン中は _previousCapturedImage を更新しない
+                // → 次サイクルでも「変化あり」と判定され、クールダウン明けに即翻訳開始
+                currentImage?.Dispose();
+                return TranslationStepResult.InCooldown;
             }
 
             // キャンセルチェック
