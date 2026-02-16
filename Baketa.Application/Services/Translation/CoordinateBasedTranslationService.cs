@@ -300,7 +300,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             long forkJoinImageHash = 0;
             FallbackTranslationResult? cachedCloudResult = null;
 
-            if (ShouldUseForkJoinParallelExecution(forkJoinImageBase64, forkJoinContextWidth, forkJoinContextHeight))
+            // [Issue #431] 画面安定化中はFork-Joinを開始しない（Cloud APIトークン浪費防止）
+            // 既存の#401安定化ガード（line 392+）はパイプライン実行後にチェックするため、
+            // Fork-Joinが先に発火してCloud APIコールが送信済みになる問題を解決
+            var isStabilizationActiveForForkJoin = _screenStabilizationActive.GetValueOrDefault(windowHandle, false);
+            if (isStabilizationActiveForForkJoin)
+            {
+                _logger?.LogInformation(
+                    "[Issue #431] 画面安定化中 - Fork-Join Cloud翻訳をスキップ（トークン浪費防止）");
+            }
+
+            if (!isStabilizationActiveForForkJoin &&
+                ShouldUseForkJoinParallelExecution(forkJoinImageBase64, forkJoinContextWidth, forkJoinContextHeight))
             {
                 // [Issue #415] 画像ハッシュによるCloud APIコール抑制
                 if (_cloudTranslationCache != null)
@@ -425,6 +436,37 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     _logger?.LogInformation(
                         "[Issue #401] 画面安定化完了: 処理を再開 (ChangePercentage={Pct:F2})",
                         changePercentage);
+
+                    // [Issue #431] 安定化解除フレームでFork-Join Cloud翻訳を遅延開始
+                    // 安定化中にFork-Joinがスキップされていたため、ここで開始する
+                    // （OCRは完了済みなので並列ではなく逐次実行だが、NLLBフォールバックを防止）
+                    if (forkJoinCloudTask == null && cachedCloudResult == null &&
+                        ShouldUseForkJoinParallelExecution(forkJoinImageBase64, forkJoinContextWidth, forkJoinContextHeight))
+                    {
+                        // キャッシュチェック
+                        if (_cloudTranslationCache != null && forkJoinImageBase64 != null)
+                        {
+                            forkJoinImageHash = _cloudTranslationCache.ComputeImageHash(image.GetImageMemory());
+                            if (_cloudTranslationCache.TryGetCachedResult(windowHandle, forkJoinImageHash, out cachedCloudResult))
+                            {
+                                _logger?.LogInformation(
+                                    "[Issue #431] 安定化解除後 - キャッシュヒット（Cloud APIスキップ）");
+                            }
+                        }
+
+                        if (cachedCloudResult == null)
+                        {
+                            _logger?.LogInformation(
+                                "🚀 [Issue #431] 安定化解除 - Fork-Join Cloud翻訳を遅延開始");
+                            forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
+                                forkJoinImageBase64!,
+                                forkJoinContextWidth,
+                                forkJoinContextHeight,
+                                forkJoinCloudImageWidth,
+                                forkJoinCloudImageHeight,
+                                forkJoinCts.Token);
+                        }
+                    }
                 }
             }
 

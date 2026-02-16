@@ -92,6 +92,8 @@ interface GeminiRequest {
     maxOutputTokens?: number;
     frequencyPenalty?: number; // [Issue #411] 同一トークン反復抑制
     stopSequences?: string[]; // [Issue #411] 反復ループ早期停止
+    responseMimeType?: string; // [Issue #428] JSON出力を構造的に保証
+    responseSchema?: object;   // [Issue #428] レスポンスのスキーマ定義
   };
   // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応
   safetySettings?: Array<{
@@ -1602,6 +1604,30 @@ If no text visible: {"texts": [], "detected_language": ""}`;
       // Note: gemini-2.5-flash-lite はfrequencyPenalty未サポートのため条件付き
       ...(modelName !== 'gemini-2.5-flash-lite' ? { frequencyPenalty: 0.3 } : {}),
       stopSequences: ['\n\n\n\n\n'], // [Issue #411] 5連続改行で生成を強制停止（反復ループ対策）
+      // [Issue #428] JSON出力を構造的に保証（プロンプト指示だけでなくAPIレベルで強制）
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          texts: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                original: { type: 'STRING' },
+                translation: { type: 'STRING' },
+                bounding_box: {
+                  type: 'ARRAY',
+                  items: { type: 'NUMBER' },
+                },
+              },
+              required: ['original', 'translation'],
+            },
+          },
+          detected_language: { type: 'STRING' },
+        },
+        required: ['texts'],
+      },
     },
     // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応 - フィルターを緩和
     // BLOCK_NONE: ブロックしない（翻訳用途のため）
