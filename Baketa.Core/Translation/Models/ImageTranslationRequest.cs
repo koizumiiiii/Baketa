@@ -1,3 +1,5 @@
+using Baketa.Core.Models;
+
 namespace Baketa.Core.Translation.Abstractions;
 
 /// <summary>
@@ -46,6 +48,18 @@ public sealed class ImageTranslationRequest
     public string? Context { get; init; }
 
     /// <summary>
+    /// [Issue #427] 翻訳履歴（文脈維持用）
+    /// 直近の翻訳結果を含め、口調・固有名詞の一貫性を維持する
+    /// </summary>
+    public IReadOnlyList<TranslationHistoryEntry>? TranslationHistory { get; init; }
+
+    /// <summary>
+    /// [Issue #429] OCR配置ヒント（軽量版）
+    /// Surya Detectionで検出済みのテキスト領域情報をCloud翻訳に伝達
+    /// </summary>
+    public OcrHints? OcrHints { get; init; }
+
+    /// <summary>
     /// セッショントークン（認証用）
     /// </summary>
     public required string SessionToken { get; init; }
@@ -73,4 +87,28 @@ public sealed class ImageTranslationRequest
             Context = context
         };
     }
+}
+
+/// <summary>
+/// [Issue #427] 翻訳履歴エントリ
+/// </summary>
+public sealed record TranslationHistoryEntry
+{
+    /// <summary>原文テキスト</summary>
+    public required string Original { get; init; }
+
+    /// <summary>訳文テキスト</summary>
+    public required string Translation { get; init; }
+}
+
+/// <summary>
+/// [Issue #429] OCR配置ヒント（軽量版）
+/// </summary>
+public sealed record OcrHints
+{
+    /// <summary>検出されたテキスト領域の数</summary>
+    public int TextRegionCount { get; init; }
+
+    /// <summary>テキスト領域の大まかな位置（Top/Center/Bottom）</summary>
+    public IReadOnlyList<string> TextAreas { get; init; } = [];
 }

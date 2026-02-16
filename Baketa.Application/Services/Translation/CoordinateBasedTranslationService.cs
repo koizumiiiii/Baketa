@@ -79,6 +79,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     // [Issue #397] ウィンドウハンドルごとの前回OCRテキストキャッシュ（テキスト変化検知用）
     private readonly ConcurrentDictionary<IntPtr, string> _previousOcrTextCache = new();
 
+    // [Issue #427] ウィンドウハンドルごとの翻訳履歴バッファ（文脈維持用、最大5件）
+    private const int MaxTranslationHistoryCount = 5;
+    private readonly ConcurrentDictionary<IntPtr, List<TranslationHistoryEntry>> _translationHistoryBuffer = new();
+
+    // [Issue #429] 前回サイクルのOCRヒントキャッシュ（次サイクルのFork-Joinに注入）
+    // ゲーム画面ではテキスト位置が連続フレームでほぼ同じため、前回結果が有効なヒントになる
+    private readonly ConcurrentDictionary<IntPtr, OcrHints> _previousOcrHintsCache = new();
+
 
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
     // Gemini Vision APIの処理時間はピクセル数に比例するため、テキスト翻訳に十分な解像度に縮小
@@ -92,7 +100,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _screenStabilizationActive.Clear();
         _previousOcrTextCache.Clear();
         _cloudTranslationCache?.ClearAll(); // [Issue #415] Cloud翻訳キャッシュもクリア
-        _logger?.LogDebug("[Issue #410] 翻訳状態リセット: 安定化フラグ・OCRテキストキャッシュをクリア");
+        _translationHistoryBuffer.Clear(); // [Issue #427] 翻訳履歴もクリア
+        _previousOcrHintsCache.Clear(); // [Issue #429] OCRヒントキャッシュもクリア
+        _logger?.LogDebug("[Issue #410] 翻訳状態リセット: 安定化フラグ・OCRテキストキャッシュ・翻訳履歴・OCRヒントをクリア");
     }
 
     private const int CloudJpegQuality = 85;
@@ -329,13 +339,20 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     // キャッシュミス → 通常のCloud APIコール
                     _logger?.LogInformation("🚀 [Issue #290] Fork-Join開始: OCR || Cloud AI を並列実行");
 
+                    // [Issue #429] 前回サイクルのOCRヒントキャッシュを取得
+                    // Fork-JoinではCloud AIとOCRが並列実行のため、現在のOCR結果は未取得。
+                    // ゲーム画面ではテキスト位置が連続フレームでほぼ同じため、前回結果が有効なヒントになる。
+                    _previousOcrHintsCache.TryGetValue(windowHandle, out var previousOcrHints);
+
                     forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
                         forkJoinImageBase64!,
                         forkJoinContextWidth,
                         forkJoinContextHeight,
                         forkJoinCloudImageWidth,   // [Issue #381] 実際のCloud画像サイズ（ログ用）
                         forkJoinCloudImageHeight,  // [Issue #381]
-                        forkJoinCts.Token);  // [Issue #397] Fork-Join専用CTS（テキスト未変化時キャンセル可能）
+                        forkJoinCts.Token,  // [Issue #397] Fork-Join専用CTS（テキスト未変化時キャンセル可能）
+                        windowHandle,  // [Issue #427] 翻訳履歴用
+                        previousOcrHints);  // [Issue #429] 前回サイクルのOCRヒント
 
                     _logger?.LogDebug("[Issue #290] Cloud AI翻訳タスク開始（OCRと並列実行中）");
                 }
@@ -458,13 +475,18 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         {
                             _logger?.LogInformation(
                                 "🚀 [Issue #431] 安定化解除 - Fork-Join Cloud翻訳を遅延開始");
+                            // [Issue #429] 前回サイクルのOCRヒントキャッシュを取得
+                            _previousOcrHintsCache.TryGetValue(windowHandle, out var recoveryOcrHints);
+
                             forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
                                 forkJoinImageBase64!,
                                 forkJoinContextWidth,
                                 forkJoinContextHeight,
                                 forkJoinCloudImageWidth,
                                 forkJoinCloudImageHeight,
-                                forkJoinCts.Token);
+                                forkJoinCts.Token,
+                                windowHandle,
+                                recoveryOcrHints);  // [Issue #429] 前回サイクルのOCRヒント
                         }
                     }
                 }
@@ -532,6 +554,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogDebug($"🎯 [OPTION_A] OCR結果取得 - ChunkCount: {textChunks.Count}");
             _logger?.LogDebug("🎯 [OPTION_A] OCR結果取得 - ChunkCount: {ChunkCount}, CancellationToken.IsCancellationRequested: {IsCancellationRequested}",
                 textChunks.Count, cancellationToken.IsCancellationRequested);
+
+            // [Issue #429] OCRヒントキャッシュを更新（次サイクルのFork-Joinに注入するため）
+            if (textChunks.Count > 0 && forkJoinContextHeight > 0)
+            {
+                _previousOcrHintsCache[windowHandle] = BuildOcrHints(textChunks, forkJoinContextHeight);
+            }
 
             // [Issue #397] Gate B: OCR結果が空の場合、Cloud AI結果を破棄
             if (textChunks.Count == 0 && forkJoinCloudTask != null)
@@ -1679,6 +1707,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     /// <param name="cloudImageWidth">[Issue #381] 実際に送信するCloud画像幅（ログ・トークン推定用）</param>
     /// <param name="cloudImageHeight">[Issue #381] 実際に送信するCloud画像高さ（ログ・トークン推定用）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <param name="windowHandle">[Issue #427] ウィンドウハンドル（翻訳履歴取得用）</param>
+    /// <param name="cachedOcrHints">[Issue #429] 前回サイクルのOCRヒントキャッシュ</param>
     /// <returns>フォールバック翻訳結果</returns>
     private async Task<FallbackTranslationResult?> ExecuteForkJoinCloudTranslationAsync(
         string imageBase64,
@@ -1686,7 +1716,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         int contextHeight,
         int cloudImageWidth,
         int cloudImageHeight,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IntPtr windowHandle = default,
+        OcrHints? cachedOcrHints = null)
     {
         if (_fallbackOrchestrator == null || _licenseManager == null)
             return null;
@@ -1703,6 +1735,27 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // セッショントークンを取得
             var sessionToken = _licenseManager.CurrentState.SessionId ?? string.Empty;
 
+            // [Issue #427] 翻訳履歴を取得
+            IReadOnlyList<TranslationHistoryEntry>? history = null;
+            if (windowHandle != IntPtr.Zero &&
+                _translationHistoryBuffer.TryGetValue(windowHandle, out var historyList) &&
+                historyList.Count > 0)
+            {
+                lock (historyList)
+                {
+                    history = historyList.ToList().AsReadOnly();
+                }
+                _logger?.LogDebug("[Issue #427] 翻訳履歴を注入: {Count}件", history.Count);
+            }
+
+            // [Issue #429] OCR配置ヒントを注入（前回サイクルのキャッシュから取得）
+            OcrHints? ocrHints = cachedOcrHints;
+            if (ocrHints != null)
+            {
+                _logger?.LogDebug("[Issue #429] OCR配置ヒント注入: {Count}領域, Areas=[{Areas}]",
+                    ocrHints.TextRegionCount, string.Join(", ", ocrHints.TextAreas));
+            }
+
             // リクエストを作成
             // [Issue #381] Width/Heightは実際に送信するCloud画像サイズ（ログ・トークン推定用）
             var request = new ImageTranslationRequest
@@ -1712,7 +1765,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 Height = cloudImageHeight > 0 ? cloudImageHeight : contextHeight,
                 TargetLanguage = targetLanguage,
                 SessionToken = sessionToken,
-                MimeType = CloudImageMimeType
+                MimeType = CloudImageMimeType,
+                TranslationHistory = history,
+                OcrHints = ocrHints
             };
 
             // Cloud AI翻訳を実行（フォールバック付き）
@@ -1723,6 +1778,13 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogInformation(
                 "✅ [Issue #290] Fork-Join Cloud AI翻訳完了: Success={Success}, Engine={Engine}, Duration={Duration}ms",
                 result.IsSuccess, result.UsedEngine, stopwatch.ElapsedMilliseconds);
+
+            // [Issue #427] 翻訳成功時に履歴バッファに蓄積
+            if (result.IsSuccess && windowHandle != IntPtr.Zero &&
+                result.Response?.Texts is { Count: > 0 } texts)
+            {
+                AppendTranslationHistory(windowHandle, texts);
+            }
 
             return result;
         }
@@ -1736,6 +1798,65 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             _logger?.LogWarning(ex, "[Issue #290] Fork-Join Cloud AI翻訳でエラー発生");
             return null;
         }
+    }
+
+    /// <summary>
+    /// [Issue #427] 翻訳履歴バッファに蓄積（最大MaxTranslationHistoryCount件）
+    /// </summary>
+    private void AppendTranslationHistory(IntPtr windowHandle, IReadOnlyList<TranslatedTextItem> texts)
+    {
+        var historyList = _translationHistoryBuffer.GetOrAdd(windowHandle, _ => new List<TranslationHistoryEntry>());
+        lock (historyList)
+        {
+            // 翻訳結果から代表的なテキスト（最長のもの）を1件履歴に追加
+            var representative = texts
+                .Where(t => !string.IsNullOrWhiteSpace(t.Original) && !string.IsNullOrWhiteSpace(t.Translation))
+                .OrderByDescending(t => t.Original.Length)
+                .FirstOrDefault();
+
+            if (representative != null)
+            {
+                historyList.Add(new TranslationHistoryEntry
+                {
+                    Original = representative.Original,
+                    Translation = representative.Translation
+                });
+
+                // 上限超過時は古いものを削除
+                while (historyList.Count > MaxTranslationHistoryCount)
+                {
+                    historyList.RemoveAt(0);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// [Issue #429] OCR検出結果から軽量配置ヒントを生成
+    /// </summary>
+    private static OcrHints BuildOcrHints(
+        IReadOnlyList<Baketa.Core.Abstractions.Translation.TextChunk> textChunks,
+        int contextHeight)
+    {
+        var areas = new List<string>();
+        var topThird = contextHeight / 3;
+        var bottomThird = contextHeight * 2 / 3;
+
+        foreach (var chunk in textChunks)
+        {
+            var centerY = chunk.CombinedBounds.Y + chunk.CombinedBounds.Height / 2;
+            var area = centerY < topThird ? "Top"
+                     : centerY < bottomThird ? "Center"
+                     : "Bottom";
+            if (!areas.Contains(area))
+                areas.Add(area);
+        }
+
+        return new OcrHints
+        {
+            TextRegionCount = textChunks.Count,
+            TextAreas = areas.AsReadOnly()
+        };
     }
 
     #endregion
@@ -1824,6 +1945,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             // [Issue #397] OCRテキストキャッシュのクリア（メモリリーク防止）
             _previousOcrTextCache.Clear();
+            _previousOcrHintsCache.Clear();
 
             _disposed = true;
             _logger?.LogInformation("🧹 CoordinateBasedTranslationService disposed - Hash: {Hash}", this.GetHashCode());

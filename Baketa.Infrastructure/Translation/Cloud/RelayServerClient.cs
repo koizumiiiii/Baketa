@@ -219,7 +219,19 @@ public sealed class RelayServerClient : IAsyncDisposable
             SourceLanguage = request.SourceLanguage,
             TargetLanguage = request.TargetLanguage,
             Context = request.Context,
-            RequestId = request.RequestId
+            RequestId = request.RequestId,
+            // [Issue #427] 翻訳履歴を注入
+            TranslationHistory = request.TranslationHistory?.Select(h => new RelayHistoryEntry
+            {
+                Original = h.Original,
+                Translation = h.Translation
+            }).ToList(),
+            // [Issue #429] OCR配置ヒントを注入
+            OcrHints = request.OcrHints != null ? new RelayOcrHints
+            {
+                TextRegionCount = request.OcrHints.TextRegionCount,
+                TextAreas = [.. request.OcrHints.TextAreas]
+            } : null
         };
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/translate");
@@ -377,7 +389,9 @@ public sealed class RelayServerClient : IAsyncDisposable
                                 t.BoundingBox[0], // y = y_min
                                 t.BoundingBox[3] - t.BoundingBox[1], // width = x_max - x_min
                                 t.BoundingBox[2] - t.BoundingBox[0]) // height = y_max - y_min
-                            : null
+                            : null,
+                        // [Issue #429] 信頼度スコア
+                        ConfidenceScore = t.ConfidenceScore
                     })
                     .ToList();
 
@@ -703,6 +717,14 @@ public sealed class RelayServerClient : IAsyncDisposable
 
         [JsonPropertyName("request_id")]
         public string? RequestId { get; set; }
+
+        /// <summary>[Issue #427] 翻訳履歴（文脈維持用）</summary>
+        [JsonPropertyName("translation_history")]
+        public List<RelayHistoryEntry>? TranslationHistory { get; set; }
+
+        /// <summary>[Issue #429] OCR配置ヒント</summary>
+        [JsonPropertyName("ocr_hints")]
+        public RelayOcrHints? OcrHints { get; set; }
     }
 
     private sealed class RelayTranslateResponse
@@ -778,6 +800,30 @@ public sealed class RelayServerClient : IAsyncDisposable
         /// </summary>
         [JsonPropertyName("bounding_box")]
         public int[]? BoundingBox { get; set; }
+
+        /// <summary>[Issue #429] 翻訳の信頼度スコア (0.0-1.0)</summary>
+        [JsonPropertyName("confidence_score")]
+        public float? ConfidenceScore { get; set; }
+    }
+
+    /// <summary>[Issue #427] 翻訳履歴エントリ</summary>
+    private sealed class RelayHistoryEntry
+    {
+        [JsonPropertyName("original")]
+        public string Original { get; set; } = string.Empty;
+
+        [JsonPropertyName("translation")]
+        public string Translation { get; set; } = string.Empty;
+    }
+
+    /// <summary>[Issue #429] OCR配置ヒント</summary>
+    private sealed class RelayOcrHints
+    {
+        [JsonPropertyName("text_region_count")]
+        public int TextRegionCount { get; set; }
+
+        [JsonPropertyName("text_areas")]
+        public List<string> TextAreas { get; set; } = [];
     }
 
     private sealed class RelayTokenUsage
