@@ -57,7 +57,11 @@ enum TranslationStepResult
     /// <summary>エラー発生</summary>
     Error,
     /// <summary>[Issue #389] 対象ウィンドウが閉じられた（ループ停止）</summary>
-    WindowClosed
+    WindowClosed,
+    /// <summary>[Issue #436] 翻訳をバックグラウンドにディスパッチ（ループは監視継続）</summary>
+    TranslationDispatched,
+    /// <summary>[Issue #436] 前回の翻訳がまだ実行中（新規ディスパッチ不可）</summary>
+    TranslationInFlight
 }
 
 /// <summary>
@@ -128,6 +132,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // リソース管理
     private readonly CancellationTokenSource _disposeCts = new();
     private bool _disposed;
+
+    // [Issue #436] 非ブロッキング翻訳ディスパッチ
+    private Task? _translationInFlightTask;
+    private readonly object _translationInFlightLock = new();
 
     // [Issue #299] アダプティブ間隔: 画像変化なし時の間隔延長
     /// <summary>連続「変化なし」カウント</summary>
@@ -602,6 +610,35 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     _logger?.LogDebug("自動翻訳タスクが正常にキャンセルされました");
                 }
             }
+
+            // [Issue #436] インフライト翻訳タスクの完了を待機
+            Task? inFlightTask;
+            lock (_translationInFlightLock)
+            {
+                inFlightTask = _translationInFlightTask;
+            }
+
+            if (inFlightTask is { IsCompleted: false })
+            {
+                try
+                {
+                    await inFlightTask.WaitAsync(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false);
+                    _logger?.LogDebug("[Issue #436] インフライト翻訳タスクが正常に完了しました");
+                }
+                catch (TimeoutException)
+                {
+                    _logger?.LogWarning("[Issue #436] インフライト翻訳タスクの待機がタイムアウトしました");
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogDebug("[Issue #436] インフライト翻訳タスクの待機がキャンセルされました");
+                }
+            }
+
+            lock (_translationInFlightLock)
+            {
+                _translationInFlightTask = null;
+            }
         }
         finally
         {
@@ -927,6 +964,41 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     }
 
     /// <summary>
+    /// [Issue #436] 完了したバックグラウンド翻訳タスクを収穫し、_translationInFlightTask をクリアする。
+    /// </summary>
+    /// <returns>翻訳が正常完了した場合 true（RapidCheckMode起動用）</returns>
+    private bool HarvestCompletedTranslation()
+    {
+        lock (_translationInFlightLock)
+        {
+            if (_translationInFlightTask is null or { IsCompleted: false })
+                return false;
+
+            var task = _translationInFlightTask;
+            _translationInFlightTask = null;
+
+            if (task.IsCompletedSuccessfully)
+            {
+                _logger?.LogDebug("[Issue #436] インフライト翻訳が正常完了");
+                return true;
+            }
+
+            // Faulted or Canceled
+            if (task.IsFaulted)
+            {
+                _logger?.LogWarning(task.Exception?.InnerException,
+                    "[Issue #436] インフライト翻訳がエラーで完了");
+            }
+            else if (task.IsCanceled)
+            {
+                _logger?.LogDebug("[Issue #436] インフライト翻訳がキャンセルで完了");
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 自動翻訳ループを実行
     /// </summary>
     private async Task ExecuteAutomaticTranslationLoopAsync(CancellationToken cancellationToken)
@@ -987,13 +1059,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                     if (cancellationToken.IsCancellationRequested)
                         break;
 
-                    // 自動翻訳を実行
-                    try
-                    {
-                        // System.IO.File.AppendAllText( // 診断システム実装により debug_app_logs.txt への出力を無効化;
-                    }
-                    catch { }
+                    // [Issue #436] 完了済みインフライト翻訳を収穫
+                    bool translationJustCompleted = HarvestCompletedTranslation();
 
+                    // 自動翻訳を実行
                     var stepResult = await ExecuteAutomaticTranslationStepAsync(cancellationToken).ConfigureAwait(false);
 
                     // [Issue #389] 対象ウィンドウが閉じられた場合はループ終了
@@ -1044,7 +1113,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                                 break;
 
                             case TranslationStepResult.InCooldown:
-                                // [Issue #435] クールダウン中も変化検知を実行するため、
+                                // [Issue #436] クールダウン中はキャプチャ・変化検知をスキップ（GridHashCache保全）
                                 // 残りクールダウン時間に基づいて最適な間隔を設定
                                 // NoChangeCountを凍結（増減なし）、高速チェックカウンタも消費しない
                                 actualInterval = remainingCooldown.TotalSeconds > 0.5
@@ -1056,6 +1125,19 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                                     _consecutiveNoChangeCount,
                                     remainingCooldown.TotalSeconds,
                                     actualInterval.TotalMilliseconds);
+                                break;
+
+                            case TranslationStepResult.TranslationDispatched:
+                                // [Issue #436] 翻訳をバックグラウンドにディスパッチ → 監視継続
+                                _consecutiveNoChangeCount = 0;
+                                actualInterval = TimeSpan.FromMilliseconds(300);
+                                _logger?.LogDebug(
+                                    "[Issue #436] 翻訳ディスパッチ完了、監視継続: Interval=300ms");
+                                break;
+
+                            case TranslationStepResult.TranslationInFlight:
+                                // [Issue #436] 前回の翻訳がまだ実行中 → 高速ポーリングで監視継続
+                                actualInterval = TimeSpan.FromMilliseconds(300);
                                 break;
 
                             case TranslationStepResult.NoChange:
@@ -1075,26 +1157,62 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                                 }
                                 else
                                 {
-                                    // 高速チェック完了後 → カウンタ増加、アダプティブ間隔を適用
-                                    _consecutiveNoChangeCount++;
-
-                                    // 閾値に基づいてアダプティブ間隔を選択（降順定義のため最初のマッチを使用）
-                                    foreach (var (threshold, adaptiveInterval) in AdaptiveIntervals)
+                                    // [Issue #436] InFlightタスクが存在する場合は300msで監視継続（Adaptive抑制）
+                                    // ステップ関数はInFlight中にTranslationInFlightを直接返すが、
+                                    // 完了済み未Harvestのタスクが残っている場合にNoChangeで到達しうる
+                                    // → 次サイクルで即座にHarvest → RapidCheck起動
+                                    bool isInFlight;
+                                    lock (_translationInFlightLock)
                                     {
-                                        if (_consecutiveNoChangeCount >= threshold)
-                                        {
-                                            actualInterval = adaptiveInterval;
-                                            break;
-                                        }
+                                        isInFlight = _translationInFlightTask is not null;
                                     }
 
-                                    _logger?.LogDebug(
-                                        "[Issue #299] Adaptive interval: NoChangeCount={Count}, Interval={Interval}s",
-                                        _consecutiveNoChangeCount,
-                                        actualInterval.TotalSeconds);
+                                    if (isInFlight)
+                                    {
+                                        actualInterval = TimeSpan.FromMilliseconds(300);
+                                        _logger?.LogDebug(
+                                            "[Issue #436] InFlight中のため監視継続: Interval=300ms, NoChangeCount={Count}",
+                                            _consecutiveNoChangeCount);
+                                    }
+                                    else
+                                    {
+                                        // 高速チェック完了後 → カウンタ増加、アダプティブ間隔を適用
+                                        _consecutiveNoChangeCount++;
+
+                                        // 閾値に基づいてアダプティブ間隔を選択（降順定義のため最初のマッチを使用）
+                                        foreach (var (threshold, adaptiveInterval) in AdaptiveIntervals)
+                                        {
+                                            if (_consecutiveNoChangeCount >= threshold)
+                                            {
+                                                actualInterval = adaptiveInterval;
+                                                break;
+                                            }
+                                        }
+
+                                        _logger?.LogDebug(
+                                            "[Issue #299] Adaptive interval: NoChangeCount={Count}, Interval={Interval}s",
+                                            _consecutiveNoChangeCount,
+                                            actualInterval.TotalSeconds);
+                                    }
                                 }
                                 break;
                         }
+                    }
+
+                    // [Issue #436] インフライト翻訳が完了した場合、RapidCheckModeを起動
+                    // ただし、同じサイクルで新しい翻訳がディスパッチされた場合はスキップ
+                    // （監視継続の300msインターバルで上書きしてしまうため）
+                    if (translationJustCompleted && _postTranslationRapidCheckRemaining <= 0
+                        && stepResult != TranslationStepResult.TranslationDispatched)
+                    {
+                        _postTranslationRapidCheckRemaining = PostTranslationRapidCheckCount;
+                        // [Issue #436] クールダウンはディスパッチ時点で起点設定済みのため、
+                        // Harvest時点では既に経過している → 即座にチェック開始
+                        actualInterval = TimeSpan.FromMilliseconds(300);
+
+                        _logger?.LogDebug(
+                            "[Issue #436] インフライト翻訳完了 → 高速チェックモード開始: 初回={InitialInterval}ms",
+                            actualInterval.TotalMilliseconds);
                     }
 
                     // 次の実行まで待機
@@ -1157,9 +1275,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _logger?.LogDebug($"   ⏱️ 開始時キャンセル要求: {cancellationToken.IsCancellationRequested}");
         _logger?.LogDebug($"   📡 CaptureServiceが利用可能: {_captureService != null}");
 
-        // [Issue #435] クールダウンチェックは変化検知後に移動
-        // キャプチャ→変化検知→クールダウンチェック→翻訳 の順序で実行し、
-        // クールダウン中も画面変化を検知し続ける
+        // [Issue #436] InFlight/Cooldownチェックはキャプチャ・変化検知の前に実行。
+        // EnhancedImageChangeDetectionServiceの内部GridHashCacheは毎回無条件更新されるため、
+        // InFlight/Cooldown中に変化検知を実行するとテキスト変化がキャッシュに吸収される。
 
         IImage? currentImage = null;
         var captureStopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -1182,6 +1300,41 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         "Target window closed")).ConfigureAwait(false);
 
                     return TranslationStepResult.WindowClosed;
+                }
+            }
+
+            // [Issue #436] InFlightチェック（キャプチャ・変化検知前）
+            // GridHashCache保全: InFlight中は検知をスキップし、完了後に正しく変化を検出
+            lock (_translationInFlightLock)
+            {
+                if (_translationInFlightTask is { IsCompleted: false })
+                {
+                    _logger?.LogDebug(
+                        "[Issue #436] 翻訳インフライト中、キャプチャ・検知スキップ: ID={TranslationId}",
+                        translationId);
+                    return TranslationStepResult.TranslationInFlight;
+                }
+            }
+
+            // [Issue #436] クールダウンチェック（キャプチャ・変化検知前）
+            // GridHashCache保全: Cooldown中は検知をスキップし、解除後に正しく変化を検出
+            {
+                DateTime lastTranslationTime;
+                lock (_lastTranslationTimeLock)
+                {
+                    lastTranslationTime = _lastTranslationCompletedAt;
+                }
+
+                var cooldownSeconds = _settingsService.GetValue("Translation:PostTranslationCooldownSeconds", 3);
+                var timeSinceLastTranslation = DateTime.UtcNow - lastTranslationTime;
+
+                if (timeSinceLastTranslation.TotalSeconds < cooldownSeconds)
+                {
+                    var remainingCooldown = cooldownSeconds - timeSinceLastTranslation.TotalSeconds;
+                    _logger?.LogDebug(
+                        "[Issue #436] クールダウン中、キャプチャ・検知スキップ: ID={TranslationId}, 残り{Remaining:F1}秒",
+                        translationId, remainingCooldown);
+                    return TranslationStepResult.InCooldown;
                 }
             }
 
@@ -1229,166 +1382,123 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             cancellationToken.ThrowIfCancellationRequested();
 
             // 画面変化検出による無駄な処理の削減
-            IImage? previousImageForComparison = null;
+            // [Issue #436] Clone() は SafeImageAdapter で未サポートのため、
+            // 参照を取得して直接比較する。_previousCapturedImage は
+            // バックグラウンドタスク完了後にのみ更新されるため、
+            // 比較中に Dispose されるリスクは低い（参照保持中は GC されない）。
+            IImage? previousImageRef = null;
             lock (_previousImageLock)
             {
-                if (_previousCapturedImage != null)
-                {
-                    try
-                    {
-                        // 比較用に前回画像をクローン（lock外で比較するため）
-                        previousImageForComparison = _previousCapturedImage.Clone();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogDebug($"⚠️ 前回画像クローン失敗、翻訳処理を継続: {ex.Message}");
-                        _logger?.LogWarning(ex, "前回画像のクローンに失敗しましたが、翻訳処理を継続します");
-                    }
-                }
+                previousImageRef = _previousCapturedImage;
             }
 
-            if (previousImageForComparison != null && currentImage != null)
+            if (previousImageRef != null && currentImage != null)
             {
                 try
                 {
                     var hasChanges = await _captureService.DetectChangesAsync(
-                        previousImageForComparison, currentImage, 0.05f)
+                        previousImageRef, currentImage, 0.05f)
                         .ConfigureAwait(false);
 
                     if (!hasChanges)
                     {
-                        _logger?.LogDebug($"🔄 画面に変化がないため翻訳をスキップ: ID={translationId}");
-                        _logger?.LogTrace("画面に変化がないため翻訳をスキップします");
+                        _logger?.LogDebug("🔄 画面に変化がないため翻訳をスキップ: ID={TranslationId}", translationId);
                         currentImage?.Dispose();
-                        previousImageForComparison?.Dispose();
                         return TranslationStepResult.NoChange;
                     }
-                    _logger?.LogDebug($"📸 画面変化を検出、翻訳処理を継続: ID={translationId}");
+                    _logger?.LogDebug("📸 画面変化を検出、翻訳処理を継続: ID={TranslationId}", translationId);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // [Issue #436] バックグラウンドタスクが _previousCapturedImage を更新した場合
+                    _logger?.LogDebug("前回画像がDispose済み、変化ありとして処理を継続: ID={TranslationId}", translationId);
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogDebug($"⚠️ 画面変化検出でエラー、翻訳処理を継続: {ex.Message}");
-                    _logger?.LogWarning(ex, "画面変化検出でエラーが発生しましたが、翻訳処理を継続します");
-                }
-                finally
-                {
-                    previousImageForComparison?.Dispose();
+                    _logger?.LogDebug("画面変化検出でエラー、翻訳処理を継続: ID={TranslationId}, {Message}", translationId, ex.Message);
                 }
             }
 
-            // [Issue #435] クールダウンチェック（変化検知後、翻訳実行前）
-            // クールダウン中でも画面変化を検知し続けるため、ここでチェック
-            DateTime lastTranslationTime;
-            lock (_lastTranslationTimeLock)
-            {
-                lastTranslationTime = _lastTranslationCompletedAt;
-            }
-
-            var cooldownSeconds = _settingsService.GetValue("Translation:PostTranslationCooldownSeconds", 3);
-            var timeSinceLastTranslation = DateTime.UtcNow - lastTranslationTime;
-
-            if (timeSinceLastTranslation.TotalSeconds < cooldownSeconds)
-            {
-                var remainingCooldown = cooldownSeconds - timeSinceLastTranslation.TotalSeconds;
-                _logger?.LogDebug(
-                    "[Issue #435] クールダウン中（変化検知済み）: ID={TranslationId}, 残り{Remaining:F1}秒",
-                    translationId, remainingCooldown);
-
-                // クールダウン中は _previousCapturedImage を更新しない
-                // → 次サイクルでも「変化あり」と判定され、クールダウン明けに即翻訳開始
-                currentImage?.Dispose();
-                return TranslationStepResult.InCooldown;
-            }
+            // [Issue #436] InFlight/Cooldownチェックはキャプチャ・変化検知前に移動済み。
+            // ここに到達 = InFlight/Cooldown共になし → ディスパッチ可能
 
             // キャンセルチェック
             cancellationToken.ThrowIfCancellationRequested();
 
-            // 🔥 [ISSUE#163_REFACTOR] 既にキャプチャされた画像を翻訳・発行
-            TranslationResult? publishedResult = null;
-
-            try
+            // [Issue #436] クールダウン起点を設定
+            lock (_lastTranslationTimeLock)
             {
-                // [Issue #394] クールダウン起点を「リクエスト送出時」に変更
-                // 翻訳処理中にクールダウンを消化し、ユーザー体感の遅延を削減
-                lock (_lastTranslationTimeLock)
-                {
-                    _lastTranslationCompletedAt = DateTime.UtcNow;
-                }
-
-                publishedResult = await TranslateAndPublishAsync(
-                    translationId,
-                    currentImage!,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                // [Issue #402] Stop操作によるキャンセルはOCRエラーではなく正常終了 → 上位のAutoLoopに伝播
-                _logger?.LogDebug("翻訳ステップがキャンセルされました: ID={TranslationId}", translationId);
-                throw;
-            }
-            catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") ||
-                                                  translationEx.Message.Contains("OCR"))
-            {
-                // OCRエラーの場合は翻訳結果を発行せず、ログ記録のみ
-                _logger?.LogDebug($"🚫 OCRエラーにより翻訳をスキップ: ID={translationId}, Error={translationEx.Message}");
-                _logger?.LogWarning(translationEx, "OCRエラーにより翻訳をスキップしました: TranslationId={TranslationId}", translationId);
-
-                // PaddleOCRエラーの場合は追加の待機を設定
-                if (translationEx.Message.Contains("PaddlePredictor") || translationEx.Message.Contains("run failed"))
-                {
-                    _logger?.LogDebug($"⏳ PaddleOCRエラーのため追加待機を実行: 2秒");
-                    _logger?.LogInformation("PaddleOCRエラーが発生したため、次のキャプチャまで2秒待機します");
-
-                    // エラー発生時のクールダウンを設定
-                    lock (_lastTranslationTimeLock)
-                    {
-                        _lastTranslationCompletedAt = DateTime.UtcNow.AddSeconds(2);
-                    }
-                }
-
-                // 現在の画像を破棄して早期リターン
-                currentImage?.Dispose();
-                return TranslationStepResult.Error;
+                _lastTranslationCompletedAt = DateTime.UtcNow;
             }
 
-            // [Issue #392] 前回画像を常に更新（翻訳結果の有無に関わらず）
-            // 理由: publishedResult==null の場合（テキスト消失等）でも前回画像を更新しないと、
-            // 次回の変化検知で常に「変化あり」となり、パイプラインが無限実行される。
-            // 元のIssue #163の設計意図（翻訳結果発行時のみ更新）よりも、
-            // パイプライン実行効率と消失検知の正確性を優先する。
-            if (currentImage != null)
-            {
-                // 前回のキャプチャ画像を安全に更新
-                lock (_previousImageLock)
-                {
-                    var oldImage = _previousCapturedImage;
-                    _previousCapturedImage = null; // 一旦クリア
+            // [Issue #436] _previousCapturedImage の更新は翻訳完了後（Harvest時）に行う。
+            // InFlight中はキャプチャ・変化検知をスキップするため、
+            // GridHashCacheと_previousCapturedImageの両方が保全される。
+            // バックグラウンドタスク完了後に _previousCapturedImage を更新する。
 
+            // [Issue #436] Task.Run で翻訳をバックグラウンド実行
+            // currentImage の所有権をバックグラウンドタスクに完全譲渡
+            // バックグラウンドタスクが翻訳に使用し、完了後に _previousCapturedImage を更新してから Dispose
+            var capturedTranslationId = translationId;
+            var capturedCancellationToken = cancellationToken;
+            var capturedCurrentImage = currentImage!;
+
+            lock (_translationInFlightLock)
+            {
+                _translationInFlightTask = Task.Run(async () =>
+                {
                     try
                     {
-                        // 現在の画像のコピーを作成して保持
-                        _previousCapturedImage = currentImage.Clone();
+                        await TranslateAndPublishAsync(
+                            capturedTranslationId,
+                            capturedCurrentImage,
+                            capturedCancellationToken).ConfigureAwait(false);
+
+                        // [Issue #436] 翻訳完了後に _previousCapturedImage を更新
+                        // バックグラウンドタスクが画像の所有権を持っているため、ここで安全に更新
+                        lock (_previousImageLock)
+                        {
+                            var oldImage = _previousCapturedImage;
+                            _previousCapturedImage = capturedCurrentImage; // 所有権移転（Disposeしない）
+                            oldImage?.Dispose();
+                        }
                     }
+                    catch (OperationCanceledException) when (capturedCancellationToken.IsCancellationRequested)
+                    {
+                        _logger?.LogDebug("[Issue #436] バックグラウンド翻訳がキャンセルされました: ID={TranslationId}",
+                            capturedTranslationId);
+                        capturedCurrentImage.Dispose();
+                    }
+                    catch (Exception translationEx) when (translationEx.Message.Contains("PaddlePredictor") ||
+                                                          translationEx.Message.Contains("OCR"))
+                    {
+                        _logger?.LogWarning(translationEx,
+                            "[Issue #436] OCRエラーにより翻訳をスキップ: ID={TranslationId}", capturedTranslationId);
+
+                        // OCRエラー時の追加クールダウン
+                        if (translationEx.Message.Contains("PaddlePredictor") || translationEx.Message.Contains("run failed"))
+                        {
+                            lock (_lastTranslationTimeLock)
+                            {
+                                _lastTranslationCompletedAt = DateTime.UtcNow.AddSeconds(2);
+                            }
+                        }
+
+                        capturedCurrentImage.Dispose();
+                    }
+#pragma warning disable CA1031 // バックグラウンドタスクでのアプリケーション安定性のため一般例外をキャッチ
                     catch (Exception ex)
                     {
-                        _logger?.LogDebug($"⚠️ 前回画像の更新に失敗: {ex.Message}");
-                        _logger?.LogWarning(ex, "前回キャプチャ画像の更新に失敗しました");
+                        _logger?.LogError(ex, "[Issue #436] バックグラウンド翻訳でエラー: ID={TranslationId}",
+                            capturedTranslationId);
+                        capturedCurrentImage.Dispose();
                     }
-
-                    // 古い画像を安全に破棄
-                    oldImage?.Dispose();
-                }
+#pragma warning restore CA1031
+                }, capturedCancellationToken);
             }
 
-            // 🚀 [FUNDAMENTAL_FIX] 現在の画像のDisposeは行わない - CaptureCompletedEventハンドラーが責任を持つ
-            // currentImage?.Dispose(); // CaptureCompletedEventで使用するため削除
-
-            // [Issue #325] 画像変化検知を通過して翻訳処理を実行した = 変化あり
-            // publishedResultはObservable発行の有無（座標ベースモードではnull）であり、
-            // Adaptive Intervalの判定には使わない。
-            // 画像変化がなければ1159行で既にreturn false;しているため、
-            // ここに到達した時点で変化があったと判定する。
-            return TranslationStepResult.Executed;
+            _logger?.LogDebug("[Issue #436] 翻訳をバックグラウンドにディスパッチ: ID={TranslationId}", translationId);
+            return TranslationStepResult.TranslationDispatched;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -2920,6 +3030,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         lock (_previousImageLock)
         {
             _previousCapturedImage?.Dispose();
+        }
+
+        // [Issue #436] インフライト翻訳タスクをクリア
+        lock (_translationInFlightLock)
+        {
+            _translationInFlightTask = null;
         }
 
         _disposed = true;

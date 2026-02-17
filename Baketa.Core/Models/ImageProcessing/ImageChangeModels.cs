@@ -281,13 +281,21 @@ public record GridHashCache
     /// </summary>
     public long ImageChecksum { get; init; }
 
-    public GridHashCache(string[] blockHashes, int rows, int columns, DateTime timestamp, long imageChecksum = 0)
+    /// <summary>
+    /// [Issue #436] ロバストチェックサム（量子化SUM）
+    /// GPUノイズ耐性のある変化検知用。画像全体を16バイト間隔でサンプリングし、
+    /// 各バイトを3bit量子化(>>5)した合計値。カーソル等の局所ノイズに強い。
+    /// </summary>
+    public long RobustImageChecksum { get; init; }
+
+    public GridHashCache(string[] blockHashes, int rows, int columns, DateTime timestamp, long imageChecksum = 0, long robustImageChecksum = 0)
     {
         BlockHashes = blockHashes;
         Rows = rows;
         Columns = columns;
         Timestamp = timestamp;
         ImageChecksum = imageChecksum;
+        RobustImageChecksum = robustImageChecksum;
     }
 }
 

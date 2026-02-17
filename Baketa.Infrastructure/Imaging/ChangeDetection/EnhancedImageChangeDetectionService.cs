@@ -951,6 +951,8 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
 
             // [Issue #229] 画像チェックサム計算（フォールバック用）
             var currentChecksum = CalculateImageChecksum(currentImage);
+            // [Issue #436] ロバストチェックサム計算（GPUノイズ耐性フォールバック用）
+            var currentRobustChecksum = CalculateRobustImageChecksum(currentImage);
 
             // 並列ハッシュ計算（ブロック情報も保持）
             var hashTasks = Enumerable.Range(0, totalBlocks).Select(i => Task.Run(() =>
@@ -970,7 +972,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 // 初回またはサイズ変更
                 var newCache = new GridHashCache(
                     blockResults.OrderBy(b => b.Index).Select(b => b.Hash).ToArray(),
-                    rows, cols, DateTime.UtcNow, currentChecksum);
+                    rows, cols, DateTime.UtcNow, currentChecksum, currentRobustChecksum);
                 _gridHashCache.AddOrUpdate(contextId, newCache, (_, _) => newCache);
 
                 _logger.LogDebug("🔲 [NewStage1] 初回キャッシュ作成 - Context: {ContextId}, Blocks: {Blocks}, Checksum: {Checksum}", contextId, totalBlocks, currentChecksum);
@@ -1056,8 +1058,9 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             // [Issue #229][Gemini Review] チェックサムフォールバック検出
             // ハッシュが同一でもチェックサムが異なれば変化ありと判定
             var checksumChanged = currentChecksum != cachedGrid.ImageChecksum;
-            if (changedBlocks.Count == 0 && checksumChanged)
+            if (changedBlocks.Count == 0 && checksumChanged && minSimilarity < 0.999f)
             {
+                // 通常フォールバック: ハッシュ類似度が十分低い → テキスト変化の可能性が高い
                 _logger.LogInformation("🔄 [NewStage1_FALLBACK] チェックサムフォールバック発動 - ハッシュ同一だが画像変化検出 (Cached: {Cached:X16}, Current: {Current:X16})",
                     cachedGrid.ImageChecksum, currentChecksum);
 
@@ -1072,11 +1075,42 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 minSimilarity = FallbackSimilarityThreshold; // フォールバック検出時の仮の類似度
                 mostChangedIndex = textRow * cols;
             }
+            else if (changedBlocks.Count == 0 && checksumChanged && minSimilarity >= 0.999f)
+            {
+                // [Issue #436] ハッシュ完全一致 + チェックサム不一致
+                // ロバストチェックサム（量子化SUM）でGPUノイズとテキスト変化を判別
+                var robustDiff = Math.Abs(currentRobustChecksum - cachedGrid.RobustImageChecksum);
 
-            // キャッシュ更新（チェックサム含む）
+                if (robustDiff > RobustChecksumDiffThreshold)
+                {
+                    // テキスト変化を検出 → フォールバック発動
+                    _logger.LogInformation(
+                        "🔄 [NewStage1_ROBUST_FALLBACK] ロバストチェックサムで変化検出 - Diff: {Diff}, Threshold: {Threshold}, MinSim: {MinSim:F4}",
+                        robustDiff, RobustChecksumDiffThreshold, minSimilarity);
+
+                    var textRow = rows - 1;
+                    for (int col = 0; col < cols; col++)
+                    {
+                        var blockIndex = textRow * cols + col;
+                        var block = blockResults.First(b => b.Index == blockIndex);
+                        changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                    }
+                    minSimilarity = FallbackSimilarityThreshold;
+                    mostChangedIndex = textRow * cols;
+                }
+                else
+                {
+                    // GPUノイズ → 抑制（ロバストチェックサム差分をログに記録して閾値調整に活用）
+                    _logger.LogDebug(
+                        "🛡️ [NewStage1_FALLBACK_SUPPRESSED] ロバストチェックサム差分が閾値以下 - Diff: {Diff}, Threshold: {Threshold}, MinSim: {MinSim:F4}, Context: {ContextId}",
+                        robustDiff, RobustChecksumDiffThreshold, minSimilarity, contextId);
+                }
+            }
+
+            // キャッシュ更新（チェックサム + ロバストチェックサム含む）
             var updatedCache = new GridHashCache(
                 blockResults.OrderBy(b => b.Index).Select(b => b.Hash).ToArray(),
-                rows, cols, DateTime.UtcNow, currentChecksum);
+                rows, cols, DateTime.UtcNow, currentChecksum, currentRobustChecksum);
             _gridHashCache.AddOrUpdate(contextId, updatedCache, (_, _) => updatedCache);
 
             // 🔍 [DIAGNOSTIC] MinSimilarity=1.0000の場合、詳細ログ出力
@@ -1593,6 +1627,11 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     private const int ChecksumSampleSize = 2000;
     private const float FallbackSimilarityThreshold = 0.95f;
 
+    // [Issue #436] ロバストチェックサム差分閾値
+    // カーソルノイズ: ~1,800（256サンプル × 最大差7）
+    // テキスト変化: ~30,000+（数千サンプル × 平均差3-4）
+    private const long RobustChecksumDiffThreshold = 5000;
+
     /// <summary>
     /// [Issue #293/#302統合] ROI統合動的閾値を取得
     /// </summary>
@@ -1667,6 +1706,37 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "チェックサム計算エラー - デフォルト値を返却");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #436] ロバストチェックサム（量子化SUM）を計算
+    /// GPUキャプチャノイズ（カーソル点滅等）に耐性のある変化検知用。
+    /// 画像全体を16バイト間隔でサンプリングし、各バイトを3bit量子化(>>5, 8段階)した合計値を返す。
+    /// SUM方式のため、局所的なノイズ（カーソル ~256サンプル）は閾値以下に収まり、
+    /// テキスト変化（数千サンプル）は閾値を大きく超える。
+    /// </summary>
+    private long CalculateRobustImageChecksum(IImage image)
+    {
+        try
+        {
+            var imageMemory = image.GetImageMemory();
+            var imageSpan = imageMemory.Span;
+
+            if (imageSpan.IsEmpty) return 0;
+
+            long sum = 0;
+            for (int i = 0; i < imageSpan.Length; i += 16)
+            {
+                sum += imageSpan[i] >> 5; // 3bit量子化: 0-255 → 0-7
+            }
+
+            return sum;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ロバストチェックサム計算エラー");
             return 0;
         }
     }
