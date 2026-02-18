@@ -7,7 +7,6 @@ using Baketa.Application.Services.Translation;
 using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 using Baketa.Application.Tests.TestUtilities;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
@@ -33,7 +32,6 @@ public class TranslationOrchestrationServiceTests : IDisposable
     private readonly Mock<ICaptureService> _captureServiceMock;
     private readonly Mock<ISettingsService> _settingsServiceMock;
     private readonly Mock<Baketa.Core.Abstractions.OCR.IOcrEngine> _ocrEngineMock;
-    // [REMOVED] private readonly Mock<ITranslationEngineFactory> _translationEngineFactoryMock;
     private readonly Mock<TranslationAbstractions.ITranslationService> _translationServiceMock;
     private readonly Mock<IEventAggregator> _eventAggregatorMock;
     private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
@@ -52,7 +50,6 @@ public class TranslationOrchestrationServiceTests : IDisposable
         _captureServiceMock = new Mock<ICaptureService>();
         _settingsServiceMock = new Mock<ISettingsService>();
         _ocrEngineMock = new Mock<Baketa.Core.Abstractions.OCR.IOcrEngine>();
-        // [REMOVED] _translationEngineFactoryMock = new Mock<ITranslationEngineFactory>();
         _translationServiceMock = new Mock<TranslationAbstractions.ITranslationService>();
         _eventAggregatorMock = new Mock<IEventAggregator>();
         _loggerMock = new Mock<ILogger<TranslationOrchestrationService>>();

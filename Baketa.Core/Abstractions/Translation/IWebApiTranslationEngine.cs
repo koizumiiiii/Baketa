@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions;
+namespace Baketa.Core.Abstractions.Translation;
 
 /// <summary>
 /// WebAPI翻訳エンジン固有の機能を定義するインターフェース

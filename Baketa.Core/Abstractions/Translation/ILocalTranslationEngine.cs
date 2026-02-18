@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions;
+namespace Baketa.Core.Abstractions.Translation;
 
 /// <summary>
 /// ローカル翻訳エンジンのインターフェース

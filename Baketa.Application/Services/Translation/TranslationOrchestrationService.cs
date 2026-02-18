@@ -10,7 +10,6 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.OCR;
@@ -73,7 +72,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     private readonly ICaptureService _captureService;
     private readonly ISettingsService _settingsService;
     private readonly Baketa.Core.Abstractions.OCR.IOcrEngine _ocrEngine;
-    // [REMOVED] ITranslationEngineFactoryは使用されないため削除
     private readonly CoordinateBasedTranslationService? _coordinateBasedTranslation;
     private readonly IEventAggregator _eventAggregator;
     private readonly TranslationService _translationService;

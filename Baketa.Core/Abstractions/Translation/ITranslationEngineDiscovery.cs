@@ -2,11 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 
 
-namespace Baketa.Core.Translation.Abstractions;
+namespace Baketa.Core.Abstractions.Translation;
 /// <summary>
 /// 翻訳エンジン検出サービスのインターフェース
 /// </summary>

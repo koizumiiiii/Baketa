@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 using TransModels = Baketa.Core.Translation.Models;
+using ITranslationServiceContract = Baketa.Core.Translation.Abstractions.ITranslationService;
 
 namespace Baketa.Application.Translation;
 
@@ -23,7 +25,7 @@ namespace Baketa.Application.Translation;
 public sealed class StandardTranslationService(
         ILogger<StandardTranslationService> logger,
         ITranslationPipeline pipeline,
-        ITranslationEngineDiscovery engineDiscovery) : ITranslationService
+        ITranslationEngineDiscovery engineDiscovery) : ITranslationServiceContract
 {
     private readonly ILogger<StandardTranslationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ITranslationPipeline _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));

@@ -25,6 +25,11 @@ public abstract class TranslationEngineBase : ITranslationEngine, IAsyncDisposab
     private bool _disposed;
 
     /// <summary>
+    /// ロガーインスタンス
+    /// </summary>
+    protected ILogger Logger => _logger;
+
+    /// <summary>
     /// エンジンが初期化されているかどうか
     /// </summary>
     protected bool IsInitialized { get; set; }

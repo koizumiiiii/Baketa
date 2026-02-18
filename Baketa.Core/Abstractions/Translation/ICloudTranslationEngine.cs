@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 
-namespace Baketa.Core.Translation.Abstractions;
+namespace Baketa.Core.Abstractions.Translation;
 
 /// <summary>
 /// クラウドAI翻訳エンジンのインターフェース

@@ -347,9 +347,6 @@ public class InfrastructureModule : ServiceModuleBase
         services.AddSingleton<ICircuitBreaker<Baketa.Core.Translation.Models.TranslationResponse>, EnhancedTranslationCircuitBreaker>();
         Console.WriteLine("✅ [PHASE2] EnhancedTranslationCircuitBreaker登録完了 - FailureThreshold: 5, RecoveryTimeout: 60s, フォールバック機能付き");
 
-        // 翻訳エンジンファクトリーを登録
-        services.AddSingleton<Baketa.Core.Abstractions.Factories.ITranslationEngineFactory, Baketa.Core.Translation.Factories.DefaultTranslationEngineFactory>();
-
         // パフォーマンス監視サービスを登録 (Issue #144)
         services.AddSingleton<Baketa.Infrastructure.Translation.Services.ITranslationPerformanceMonitor, Baketa.Infrastructure.Translation.Services.TranslationPerformanceMonitor>();
 

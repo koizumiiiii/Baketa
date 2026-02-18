@@ -1,11 +1,9 @@
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Cache;
 using Baketa.Core.Translation.Common;
 using Baketa.Core.Translation.Events;
-using Baketa.Core.Translation.Factories;
 using Baketa.Core.Translation.Repositories;
 using Baketa.Core.Translation.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -71,9 +69,6 @@ public static class TranslationServiceCollectionExtensions
 
         // 注意: DummyEngineとSimpleEngineはテスト用のため、プロダクションコードでは使用しない
         // テスト時は Baketa.Core.Tests.Translation.Testing 名前空間から利用可能
-
-        // 翻訳エンジンファクトリーの登録
-        services.AddSingleton<ITranslationEngineFactory, DefaultTranslationEngineFactory>();
 
         return services;
     }
