@@ -63,5 +63,15 @@ public enum GateDecision
     /// <summary>
     /// 大幅な長さ変化 → 翻訳実行
     /// </summary>
-    SignificantLengthChange
+    SignificantLengthChange,
+
+    /// <summary>
+    /// [Issue #432] タイプライター成長中 → 翻訳遅延
+    /// </summary>
+    TypewriterGrowing,
+
+    /// <summary>
+    /// [Issue #432] タイプライター最大遅延超過 → 強制翻訳
+    /// </summary>
+    TypewriterMaxDelayExceeded
 }

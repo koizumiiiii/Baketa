@@ -28,6 +28,10 @@ public class TextChangeDetectionService : ITextChangeDetectionService
     private readonly IGateStrategy _gateStrategy;
     private readonly ConcurrentDictionary<string, string> _previousTextCache = new();
 
+    // [Issue #432] タイプライター演出検知用の状態追跡
+    private readonly ConcurrentDictionary<string, int> _typewriterGrowthCycles = new();
+    private readonly ConcurrentDictionary<string, int> _typewriterStabilizationCount = new();
+
     /// <summary>
     /// スタック割り当ての閾値（512要素 = 約2KB）
     /// </summary>
@@ -164,9 +168,48 @@ public class TextChangeDetectionService : ITextChangeDetectionService
                 }
             }
 
-            // 同一テキストチェック
-            if (_settings.SkipIdenticalText && previousText == currentText)
+            // 同一テキストチェック（[Issue #432] 全角/半角正規化後に比較）
+            var normalizedCurrent = NormalizeFullWidthToHalfWidth(currentText);
+            var normalizedPrevious = NormalizeFullWidthToHalfWidth(previousText ?? string.Empty);
+            if (_settings.SkipIdenticalText && normalizedPrevious == normalizedCurrent)
             {
+                // [Issue #432] タイプライター成長中に同一テキストを検出 → 安定化判定
+                if (_settings.EnableTypewriterDetection && _typewriterGrowthCycles.TryGetValue(sourceId, out var growthCycles) && growthCycles > 0)
+                {
+                    var stabilizationCount = _typewriterStabilizationCount.AddOrUpdate(sourceId, 1, (_, count) => count + 1);
+
+                    if (stabilizationCount >= _settings.TypewriterStabilizationCycles)
+                    {
+                        // 安定化完了 → 翻訳実行
+                        _logger.LogDebug(
+                            "[Issue #432] Typewriter stabilized - SourceId: {SourceId}, GrowthCycles: {GrowthCycles}, StabilizationCount: {StabilizationCount}",
+                            sourceId, growthCycles, stabilizationCount);
+
+                        // タイプライター状態をリセット
+                        _typewriterGrowthCycles.TryRemove(sourceId, out _);
+                        _typewriterStabilizationCount.TryRemove(sourceId, out _);
+
+                        return TextChangeWithGateResult.CreateSufficientChange(
+                            previousText,
+                            currentText,
+                            1.0f,
+                            GetAppliedThreshold(currentText.Length, regionInfo),
+                            0,
+                            stopwatch.Elapsed);
+                    }
+
+                    // まだ安定化待ち
+                    _logger.LogDebug(
+                        "[Issue #432] Typewriter waiting for stabilization - SourceId: {SourceId}, StabilizationCount: {StabilizationCount}/{Required}",
+                        sourceId, stabilizationCount, _settings.TypewriterStabilizationCycles);
+
+                    return TextChangeWithGateResult.CreateTypewriterGrowing(
+                        previousText,
+                        currentText,
+                        GetAppliedThreshold(currentText.Length, regionInfo),
+                        stopwatch.Elapsed);
+                }
+
                 _logger.LogDebug(
                     "[Issue #293] Identical text, skipping - SourceId: {SourceId}",
                     sourceId);
@@ -175,6 +218,60 @@ public class TextChangeDetectionService : ITextChangeDetectionService
                     currentText,
                     GetAppliedThreshold(currentText.Length, regionInfo),
                     stopwatch.Elapsed);
+            }
+
+            // [Issue #432] タイプライター演出検知（正規化後の前方一致で成長中かチェック）
+            if (_settings.EnableTypewriterDetection && previousText != null
+                && normalizedCurrent.StartsWith(normalizedPrevious, StringComparison.Ordinal)
+                && normalizedCurrent.Length > normalizedPrevious.Length)
+            {
+                // 安定化カウンタをリセット（テキストが変化したため）
+                _typewriterStabilizationCount.TryRemove(sourceId, out _);
+
+                var currentGrowthCycles = _typewriterGrowthCycles.AddOrUpdate(sourceId, 1, (_, count) => count + 1);
+
+                if (currentGrowthCycles >= _settings.TypewriterMaxDelayCycles)
+                {
+                    // 最大遅延超過 → 強制翻訳
+                    _logger.LogDebug(
+                        "[Issue #432] Typewriter max delay exceeded - SourceId: {SourceId}, GrowthCycles: {GrowthCycles}",
+                        sourceId, currentGrowthCycles);
+
+                    // タイプライター状態をリセット
+                    _typewriterGrowthCycles.TryRemove(sourceId, out _);
+
+                    // キャッシュ更新
+                    UpdatePreviousText(sourceId, currentText);
+
+                    return TextChangeWithGateResult.CreateTypewriterMaxDelayExceeded(
+                        previousText,
+                        currentText,
+                        GetAppliedThreshold(currentText.Length, regionInfo),
+                        stopwatch.Elapsed);
+                }
+
+                // 成長中 → 翻訳遅延（キャッシュは更新して次回比較用に最新テキストを保持）
+                _logger.LogDebug(
+                    "[Issue #432] Typewriter growing - SourceId: {SourceId}, GrowthCycles: {GrowthCycles}/{Max}, PrevLen: {PrevLen}, CurrLen: {CurrLen}",
+                    sourceId, currentGrowthCycles, _settings.TypewriterMaxDelayCycles, previousText.Length, currentText.Length);
+
+                UpdatePreviousText(sourceId, currentText);
+
+                return TextChangeWithGateResult.CreateTypewriterGrowing(
+                    previousText,
+                    currentText,
+                    GetAppliedThreshold(currentText.Length, regionInfo),
+                    stopwatch.Elapsed);
+            }
+
+            // [Issue #432] 前方一致でなくなった → タイプライター状態リセット（シーン切替等）
+            if (_typewriterGrowthCycles.ContainsKey(sourceId))
+            {
+                _logger.LogDebug(
+                    "[Issue #432] Typewriter reset (non-prefix change) - SourceId: {SourceId}",
+                    sourceId);
+                _typewriterGrowthCycles.TryRemove(sourceId, out _);
+                _typewriterStabilizationCount.TryRemove(sourceId, out _);
             }
 
             // 長さ変化による強制翻訳チェック
@@ -274,6 +371,9 @@ public class TextChangeDetectionService : ITextChangeDetectionService
     public void ClearPreviousText(string contextId)
     {
         _previousTextCache.TryRemove(contextId, out _);
+        // [Issue #432] タイプライター状態もクリア
+        _typewriterGrowthCycles.TryRemove(contextId, out _);
+        _typewriterStabilizationCount.TryRemove(contextId, out _);
         _logger.LogDebug("前回テキストキャッシュクリア - Context: {ContextId}", contextId);
     }
 
@@ -282,6 +382,9 @@ public class TextChangeDetectionService : ITextChangeDetectionService
     {
         var clearedCount = _previousTextCache.Count;
         _previousTextCache.Clear();
+        // [Issue #432] タイプライター状態もクリア
+        _typewriterGrowthCycles.Clear();
+        _typewriterStabilizationCount.Clear();
         _logger.LogInformation("全前回テキストキャッシュクリア - クリア件数: {Count}", clearedCount);
     }
 
@@ -304,6 +407,45 @@ public class TextChangeDetectionService : ITextChangeDetectionService
     public int GetCacheSize() => _previousTextCache.Count;
 
     #region Private Methods
+
+    /// <summary>
+    /// [Issue #432] OCR全角/半角不一致を吸収するためのテキスト正規化。
+    /// 全角ASCII (U+FF01～U+FF5E) を半角 (U+0021～U+007E) に変換する。
+    /// </summary>
+    private static string NormalizeFullWidthToHalfWidth(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        // 全角ASCII文字が含まれていなければそのまま返す（高速パス）
+        var hasFullWidth = false;
+        foreach (var c in text)
+        {
+            if (c is >= '\uFF01' and <= '\uFF5E')
+            {
+                hasFullWidth = true;
+                break;
+            }
+        }
+
+        if (!hasFullWidth)
+        {
+            return text;
+        }
+
+        return string.Create(text.Length, text, static (span, source) =>
+        {
+            for (var i = 0; i < source.Length; i++)
+            {
+                var c = source[i];
+                span[i] = c is >= '\uFF01' and <= '\uFF5E'
+                    ? (char)(c - 0xFEE0)
+                    : c;
+            }
+        });
+    }
 
     /// <summary>
     /// 前回テキストを更新（スレッドセーフ）
