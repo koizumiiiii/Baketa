@@ -163,11 +163,50 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
     }
 
     /// <summary>
-    /// [Issue #397] テキスト比較用の正規化（OCRの空白・改行揺れを吸収）
+    /// [Issue #397][Issue #432] テキスト比較用の正規化（OCRの空白・改行揺れ＋全角/半角揺れを吸収）
     /// </summary>
     private static string NormalizeForComparison(string text)
     {
-        return NormalizeWhitespaceRegex().Replace(text, " ").Trim();
+        var whitespaceNormalized = NormalizeWhitespaceRegex().Replace(text, " ").Trim();
+        return NormalizeFullWidthToHalfWidth(whitespaceNormalized);
+    }
+
+    /// <summary>
+    /// [Issue #432] OCR全角/半角不一致を吸収するためのテキスト正規化。
+    /// 全角ASCII (U+FF01～U+FF5E) を半角 (U+0021～U+007E) に変換する。
+    /// </summary>
+    private static string NormalizeFullWidthToHalfWidth(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        var hasFullWidth = false;
+        foreach (var c in text)
+        {
+            if (c is >= '\uFF01' and <= '\uFF5E')
+            {
+                hasFullWidth = true;
+                break;
+            }
+        }
+
+        if (!hasFullWidth)
+        {
+            return text;
+        }
+
+        return string.Create(text.Length, text, static (span, source) =>
+        {
+            for (var i = 0; i < source.Length; i++)
+            {
+                var c = source[i];
+                span[i] = c is >= '\uFF01' and <= '\uFF5E'
+                    ? (char)(c - 0xFEE0)
+                    : c;
+            }
+        });
     }
 
     /// <summary>

@@ -184,6 +184,50 @@ public sealed record TextChangeWithGateResult
     }
 
     /// <summary>
+    /// [Issue #432] タイプライター成長中（翻訳遅延）の結果を作成
+    /// </summary>
+    public static TextChangeWithGateResult CreateTypewriterGrowing(
+        string? previousText,
+        string currentText,
+        float appliedThreshold,
+        TimeSpan processingTime = default)
+    {
+        return new TextChangeWithGateResult
+        {
+            ChangePercentage = 0.0f,
+            ShouldTranslate = false,
+            Decision = GateDecision.TypewriterGrowing,
+            AppliedThreshold = appliedThreshold,
+            PreviousText = previousText,
+            CurrentText = currentText,
+            EditDistance = currentText.Length - (previousText?.Length ?? 0),
+            ProcessingTime = processingTime
+        };
+    }
+
+    /// <summary>
+    /// [Issue #432] タイプライター最大遅延超過（強制翻訳）の結果を作成
+    /// </summary>
+    public static TextChangeWithGateResult CreateTypewriterMaxDelayExceeded(
+        string? previousText,
+        string currentText,
+        float appliedThreshold,
+        TimeSpan processingTime = default)
+    {
+        return new TextChangeWithGateResult
+        {
+            ChangePercentage = 1.0f,
+            ShouldTranslate = true,
+            Decision = GateDecision.TypewriterMaxDelayExceeded,
+            AppliedThreshold = appliedThreshold,
+            PreviousText = previousText,
+            CurrentText = currentText,
+            EditDistance = currentText.Length - (previousText?.Length ?? 0),
+            ProcessingTime = processingTime
+        };
+    }
+
+    /// <summary>
     /// 大幅な長さ変化（翻訳実行）の結果を作成
     /// </summary>
     public static TextChangeWithGateResult CreateSignificantLengthChange(

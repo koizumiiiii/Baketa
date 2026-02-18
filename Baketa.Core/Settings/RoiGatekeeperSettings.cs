@@ -252,6 +252,39 @@ public sealed record RoiGatekeeperSettings
     /// </remarks>
     public float LowHeatmapThreshold { get; init; } = 0.3f;
 
+    // ========================================
+    // [Issue #432] タイプライター演出検知設定
+    // ========================================
+
+    /// <summary>
+    /// タイプライター演出検知を有効化
+    /// </summary>
+    /// <remarks>
+    /// テキストが前方一致で成長中の場合、翻訳を遅延します。
+    /// デフォルト: true
+    /// </remarks>
+    public bool EnableTypewriterDetection { get; init; } = true;
+
+    /// <summary>
+    /// タイプライター安定化に必要な連続同一回数
+    /// </summary>
+    /// <remarks>
+    /// テキストが変化しなくなってからこの回数連続で同一だった場合、
+    /// テキストが完成したと判定して翻訳を実行します。
+    /// デフォルト: 1
+    /// </remarks>
+    public int TypewriterStabilizationCycles { get; init; } = 1;
+
+    /// <summary>
+    /// タイプライター最大遅延サイクル
+    /// </summary>
+    /// <remarks>
+    /// テキストが成長し続けた場合、このサイクル数を超えたら強制翻訳します。
+    /// 長いテキストが際限なく遅延されることを防止します。
+    /// デフォルト: 10
+    /// </remarks>
+    public int TypewriterMaxDelayCycles { get; init; } = 10;
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -271,7 +304,10 @@ public sealed record RoiGatekeeperSettings
             && LowHeatmapThresholdMultiplier > 0.0f
             && HighHeatmapThreshold is >= 0.0f and <= 1.0f
             && LowHeatmapThreshold is >= 0.0f and <= 1.0f
-            && LowHeatmapThreshold < HighHeatmapThreshold;
+            && LowHeatmapThreshold < HighHeatmapThreshold
+            // [Issue #432] タイプライター演出検知の検証
+            && TypewriterStabilizationCycles >= 1
+            && TypewriterMaxDelayCycles >= 1;
     }
 
     /// <summary>
@@ -294,7 +330,10 @@ public sealed record RoiGatekeeperSettings
             MediumTextChangeThreshold = 0.2f,
             LongTextChangeThreshold = 0.12f,
             LengthChangeForceThreshold = 0.6f,
-            MinTextLength = 3
+            MinTextLength = 3,
+            EnableTypewriterDetection = true,
+            TypewriterStabilizationCycles = 1,
+            TypewriterMaxDelayCycles = 8
         };
     }
 
