@@ -450,6 +450,28 @@ public sealed class RoiManager : IRoiManager, IDisposable
         if (filteredDetections.Count > 0)
         {
             _learningEngine.RecordDetections(filteredDetections);
+
+            // [Issue #436] ヒートマップ記録後、即座にRegionsをインメモリ再生成
+            // BackgroundLearningServiceのDetection-Only結果をStart前のROI判定に即反映
+            // GenerateRegionsは16x16グリッド分析で軽量（<1ms）
+            // Note: ProfileChangedイベントは発火しない（UI通知不要、OCR側はGetAllRegions()で最新値取得）
+            lock (_lock)
+            {
+                if (_currentProfile != null)
+                {
+                    var regions = _learningEngine.GenerateRegions(
+                        _settings.MinConfidenceForRegion,
+                        _settings.MinConfidenceForRegion);
+                    if (regions.Count > 0)
+                    {
+                        _currentProfile = _currentProfile with { Regions = regions, UpdatedAt = DateTime.UtcNow };
+                        _logger.LogInformation(
+                            "[Issue #436] ROI領域をインメモリ更新: {Count}領域生成",
+                            regions.Count);
+                    }
+                }
+            }
+
             _logger.LogInformation(
                 "[Issue #293] ROI学習記録完了: {Count}個の検出をヒートマップに記録",
                 filteredDetections.Count);

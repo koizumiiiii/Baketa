@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Baketa.Application.Services.UI;
 using Baketa.Core.Abstractions.Capture;
 using Baketa.Core.Abstractions.Monitoring;
@@ -98,6 +100,38 @@ public sealed class BackgroundLearningService : BackgroundService
     {
         var newHandle = e.CurrentWindow?.Handle ?? IntPtr.Zero;
         SetSelectedWindow(newHandle);
+
+        // [Issue #436] ウィンドウ選択時にROIプロファイルを事前ロード
+        // Detection-Only開始前にプロファイルを確保し、ヒートマップ記録を可能にする
+        if (newHandle != IntPtr.Zero && _roiManager != null && e.CurrentWindow != null)
+        {
+            _ = EnsureRoiProfileLoadedAsync(newHandle, e.CurrentWindow.Title);
+        }
+    }
+
+    /// <summary>
+    /// [Issue #436] ROIプロファイルを事前ロード/作成
+    /// ウィンドウ選択直後に呼び出し、Detection-Only結果のヒートマップ記録を可能にする
+    /// </summary>
+    private async Task EnsureRoiProfileLoadedAsync(IntPtr windowHandle, string windowTitle)
+    {
+        try
+        {
+            var executablePath = GetExecutablePathFromHandle(windowHandle);
+            if (string.IsNullOrEmpty(executablePath))
+            {
+                _logger.LogDebug("[Issue #436] 実行ファイルパス取得失敗 - ROIプロファイル事前ロードスキップ");
+                return;
+            }
+
+            await _roiManager!.GetOrCreateProfileAsync(executablePath, windowTitle).ConfigureAwait(false);
+            _logger.LogInformation(
+                "[Issue #436] ROIプロファイル事前ロード完了 - Detection-Only学習が即座に有効化");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #436] ROIプロファイル事前ロード失敗（学習はStart後に開始）");
+        }
     }
 
     /// <summary>
@@ -523,6 +557,28 @@ public sealed class BackgroundLearningService : BackgroundService
 
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// [Issue #436] ウィンドウハンドルから実行ファイルパスを取得
+    /// </summary>
+    private string GetExecutablePathFromHandle(IntPtr windowHandle)
+    {
+        try
+        {
+            _ = GetWindowThreadProcessId(windowHandle, out uint processId);
+            if (processId == 0) return string.Empty;
+            using var process = Process.GetProcessById((int)processId);
+            return process.MainModule?.FileName ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[Issue #436] 実行ファイルパス取得エラー: Handle=0x{Handle:X}", windowHandle.ToInt64());
+            return string.Empty;
+        }
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     /// <inheritdoc />
     public override void Dispose()

@@ -57,6 +57,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
         _eventAggregatorMock = new Mock<IEventAggregator>();
         _loggerMock = new Mock<ILogger<TranslationOrchestrationService>>();
         _imageMock = new Mock<IImage>();
+        _imageMock.Setup(x => x.Clone()).Returns(() => new Mock<IImage>().Object);
 
         // CaptureService のモック設定
         SetupCaptureServiceMocks();
