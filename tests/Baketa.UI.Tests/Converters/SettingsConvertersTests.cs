@@ -3,6 +3,7 @@ using System.Globalization;
 using Avalonia.Media;
 using Baketa.Core.Settings;
 using Baketa.UI.Converters;
+using Baketa.UI.Resources;
 using Baketa.UI.Tests.Infrastructure;
 using Xunit;
 
@@ -10,28 +11,37 @@ namespace Baketa.UI.Tests.Converters;
 
 /// <summary>
 /// SettingsConvertersのテストクラス
+/// リソース文字列を使用するコンバーターのテストではStrings定数で期待値を参照
 /// </summary>
 public sealed class SettingsConvertersTests : AvaloniaTestBase
 {
     #region UiSizeToStringConverterTests
 
     /// <summary>
-    /// UiSizeが正しく日本語文字列に変換されることをテスト
+    /// UiSizeが正しくリソース文字列に変換されることをテスト
     /// </summary>
-    [Theory]
-    [InlineData(UiSize.Small, "小（コンパクト）")]
-    [InlineData(UiSize.Medium, "中（標準）")]
-    [InlineData(UiSize.Large, "大（見やすさ重視）")]
-    public void UiSizeToStringConverter_Convert_ReturnsCorrectString(UiSize input, string expected)
+    [Fact]
+    public void UiSizeToStringConverter_Convert_Small_ReturnsCorrectString()
     {
-        // Arrange
         var converter = UiSizeToStringConverter.Instance;
+        var result = converter.Convert(UiSize.Small, typeof(string), null, CultureInfo.InvariantCulture);
+        Assert.Equal(Strings.Size_Small, result);
+    }
 
-        // Act
-        var result = converter.Convert(input, typeof(string), null, CultureInfo.InvariantCulture);
+    [Fact]
+    public void UiSizeToStringConverter_Convert_Medium_ReturnsCorrectString()
+    {
+        var converter = UiSizeToStringConverter.Instance;
+        var result = converter.Convert(UiSize.Medium, typeof(string), null, CultureInfo.InvariantCulture);
+        Assert.Equal(Strings.Size_Medium, result);
+    }
 
-        // Assert
-        Assert.Equal(expected, result);
+    [Fact]
+    public void UiSizeToStringConverter_Convert_Large_ReturnsCorrectString()
+    {
+        var converter = UiSizeToStringConverter.Instance;
+        var result = converter.Convert(UiSize.Large, typeof(string), null, CultureInfo.InvariantCulture);
+        Assert.Equal(Strings.Size_Large, result);
     }
 
     /// <summary>
@@ -40,13 +50,8 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void UiSizeToStringConverter_Convert_WithNull_ReturnsNull()
     {
-        // Arrange
         var converter = UiSizeToStringConverter.Instance;
-
-        // Act
         var result = converter.Convert(null, typeof(string), null, CultureInfo.InvariantCulture);
-
-        // Assert
         Assert.Null(result);
     }
 
@@ -56,14 +61,8 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void UiSizeToStringConverter_Convert_WithInvalidValue_ReturnsToString()
     {
-        // Arrange
         var converter = UiSizeToStringConverter.Instance;
-        var invalidValue = 999;
-
-        // Act
-        var result = converter.Convert(invalidValue, typeof(string), null, CultureInfo.InvariantCulture);
-
-        // Assert
+        var result = converter.Convert(999, typeof(string), null, CultureInfo.InvariantCulture);
         Assert.Equal("999", result);
     }
 
@@ -73,12 +72,9 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void UiSizeToStringConverter_ConvertBack_ThrowsNotSupportedException()
     {
-        // Arrange
         var converter = UiSizeToStringConverter.Instance;
-
-        // Act & Assert
         Assert.Throws<NotSupportedException>(() =>
-            converter.ConvertBack("小（コンパクト）", typeof(UiSize), null, CultureInfo.InvariantCulture));
+            converter.ConvertBack(Strings.Size_Small, typeof(UiSize), null, CultureInfo.InvariantCulture));
     }
 
     #endregion
@@ -93,26 +89,16 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [InlineData(false)]  // 変更なし：グリーン
     public void BoolToStatusColorConverter_Convert_ReturnsCorrectBrush(bool hasChanges)
     {
-        // Arrange
         var converter = BoolToStatusColorConverter.Instance;
-
-        // Act
         var result = RunOnUIThread(() => converter.Convert(hasChanges, typeof(Brush), null, CultureInfo.InvariantCulture));
 
-        // Assert
         Assert.IsType<SolidColorBrush>(result);
         var brush = result as SolidColorBrush;
 
         if (hasChanges)
-        {
-            // オレンジ色の確認
             Assert.Equal(Color.FromRgb(255, 165, 0), brush!.Color);
-        }
         else
-        {
-            // グリーン色の確認
             Assert.Equal(Color.FromRgb(34, 139, 34), brush!.Color);
-        }
     }
 
     /// <summary>
@@ -121,16 +107,12 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void BoolToStatusColorConverter_Convert_WithNull_ReturnsGrayBrush()
     {
-        // Arrange
         var converter = BoolToStatusColorConverter.Instance;
-
-        // Act
         var result = RunOnUIThread(() => converter.Convert(null, typeof(Brush), null, CultureInfo.InvariantCulture));
 
-        // Assert
         Assert.IsType<SolidColorBrush>(result);
         var brush = result as SolidColorBrush;
-        Assert.Equal(Color.FromRgb(128, 128, 128), brush!.Color); // null は不明な状態としてグレー
+        Assert.Equal(Color.FromRgb(128, 128, 128), brush!.Color);
     }
 
     /// <summary>
@@ -139,10 +121,7 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact(Skip = "ハングアップ問題のため一時的に無効化")]
     public void BoolToStatusColorConverter_ConvertBack_ThrowsNotSupportedException()
     {
-        // Arrange
         var converter = BoolToStatusColorConverter.Instance;
-
-        // Act & Assert - UIスレッドでブラシ作成とテストを同時実行
         RunOnUIThread(() =>
         {
             var brush = new SolidColorBrush(Color.FromRgb(255, 165, 0));
@@ -156,22 +135,30 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     #region UiThemeToStringConverterTests
 
     /// <summary>
-    /// UiThemeが正しく日本語文字列に変換されることをテスト
+    /// UiThemeが正しくリソース文字列に変換されることをテスト
     /// </summary>
-    [Theory]
-    [InlineData(UiTheme.Light, "ライト")]
-    [InlineData(UiTheme.Dark, "ダーク")]
-    [InlineData(UiTheme.Auto, "自動（システム設定に従う）")]
-    public void UiThemeToStringConverter_Convert_ReturnsCorrectString(UiTheme input, string expected)
+    [Fact]
+    public void UiThemeToStringConverter_Convert_Light_ReturnsCorrectString()
     {
-        // Arrange
         var converter = UiThemeToStringConverter.Instance;
+        var result = converter.Convert(UiTheme.Light, typeof(string), null, CultureInfo.InvariantCulture);
+        Assert.Equal(Strings.Theme_Light, result);
+    }
 
-        // Act
-        var result = converter.Convert(input, typeof(string), null, CultureInfo.InvariantCulture);
+    [Fact]
+    public void UiThemeToStringConverter_Convert_Dark_ReturnsCorrectString()
+    {
+        var converter = UiThemeToStringConverter.Instance;
+        var result = converter.Convert(UiTheme.Dark, typeof(string), null, CultureInfo.InvariantCulture);
+        Assert.Equal(Strings.Theme_Dark, result);
+    }
 
-        // Assert
-        Assert.Equal(expected, result);
+    [Fact]
+    public void UiThemeToStringConverter_Convert_Auto_ReturnsCorrectString()
+    {
+        var converter = UiThemeToStringConverter.Instance;
+        var result = converter.Convert(UiTheme.Auto, typeof(string), null, CultureInfo.InvariantCulture);
+        Assert.Equal(Strings.Theme_Auto, result);
     }
 
     /// <summary>
@@ -180,13 +167,8 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void UiThemeToStringConverter_Convert_WithNull_ReturnsNull()
     {
-        // Arrange
         var converter = UiThemeToStringConverter.Instance;
-
-        // Act
         var result = converter.Convert(null, typeof(string), null, CultureInfo.InvariantCulture);
-
-        // Assert
         Assert.Null(result);
     }
 
@@ -196,14 +178,8 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void UiThemeToStringConverter_Convert_WithInvalidValue_ReturnsToString()
     {
-        // Arrange
         var converter = UiThemeToStringConverter.Instance;
-        var invalidValue = 999;
-
-        // Act
-        var result = converter.Convert(invalidValue, typeof(string), null, CultureInfo.InvariantCulture);
-
-        // Assert
+        var result = converter.Convert(999, typeof(string), null, CultureInfo.InvariantCulture);
         Assert.Equal("999", result);
     }
 
@@ -213,12 +189,9 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void UiThemeToStringConverter_ConvertBack_ThrowsNotSupportedException()
     {
-        // Arrange
         var converter = UiThemeToStringConverter.Instance;
-
-        // Act & Assert
         Assert.Throws<NotSupportedException>(() =>
-            converter.ConvertBack("ライト", typeof(UiTheme), null, CultureInfo.InvariantCulture));
+            converter.ConvertBack(Strings.Theme_Light, typeof(UiTheme), null, CultureInfo.InvariantCulture));
     }
 
     #endregion
@@ -228,35 +201,31 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     /// <summary>
     /// BoolToAdvancedSettingsTextConverterが正しいテキストを返すことをテスト
     /// </summary>
-    [Theory]
-    [InlineData(true, "基本設定に戻す")]
-    [InlineData(false, "詳細設定を表示")]
-    public void BoolToAdvancedSettingsTextConverter_Convert_ReturnsCorrectText(bool input, string expected)
+    [Fact]
+    public void BoolToAdvancedSettingsTextConverter_Convert_True_ReturnsHideText()
     {
-        // Arrange
         var converter = BoolToAdvancedSettingsTextConverter.Instance;
+        var result = converter.Convert(true, typeof(string), null, CultureInfo.InvariantCulture);
+        Assert.Equal(Strings.Settings_Advanced_Hide, result);
+    }
 
-        // Act
-        var result = converter.Convert(input, typeof(string), null, CultureInfo.InvariantCulture);
-
-        // Assert
-        Assert.Equal(expected, result);
+    [Fact]
+    public void BoolToAdvancedSettingsTextConverter_Convert_False_ReturnsShowText()
+    {
+        var converter = BoolToAdvancedSettingsTextConverter.Instance;
+        var result = converter.Convert(false, typeof(string), null, CultureInfo.InvariantCulture);
+        Assert.Equal(Strings.Settings_Advanced_Show, result);
     }
 
     /// <summary>
     /// BoolToAdvancedSettingsTextConverterでnull値を渡した場合のテスト
     /// </summary>
     [Fact]
-    public void BoolToAdvancedSettingsTextConverter_Convert_WithNull_ReturnsCorrectDefault()
+    public void BoolToAdvancedSettingsTextConverter_Convert_WithNull_ReturnsShowText()
     {
-        // Arrange
         var converter = BoolToAdvancedSettingsTextConverter.Instance;
-
-        // Act
         var result = converter.Convert(null, typeof(string), null, CultureInfo.InvariantCulture);
-
-        // Assert
-        Assert.Equal("詳細設定を表示", result); // null は false として扱われる
+        Assert.Equal(Strings.Settings_Advanced_Show, result);
     }
 
     /// <summary>
@@ -265,12 +234,9 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void BoolToAdvancedSettingsTextConverter_ConvertBack_ThrowsNotSupportedException()
     {
-        // Arrange
         var converter = BoolToAdvancedSettingsTextConverter.Instance;
-
-        // Act & Assert
         Assert.Throws<NotSupportedException>(() =>
-            converter.ConvertBack("基本設定に戻す", typeof(bool), null, CultureInfo.InvariantCulture));
+            converter.ConvertBack(Strings.Settings_Advanced_Hide, typeof(bool), null, CultureInfo.InvariantCulture));
     }
 
     #endregion
@@ -285,13 +251,8 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [InlineData(false, "M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z")]   // 下向き矢印
     public void BoolToExpandIconConverter_Convert_ReturnsCorrectPath(bool input, string expected)
     {
-        // Arrange
         var converter = BoolToExpandIconConverter.Instance;
-
-        // Act
         var result = converter.Convert(input, typeof(string), null, CultureInfo.InvariantCulture);
-
-        // Assert
         Assert.Equal(expected, result);
     }
 
@@ -301,14 +262,9 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void BoolToExpandIconConverter_Convert_WithNull_ReturnsDownArrow()
     {
-        // Arrange
         var converter = BoolToExpandIconConverter.Instance;
-
-        // Act
         var result = converter.Convert(null, typeof(string), null, CultureInfo.InvariantCulture);
-
-        // Assert
-        Assert.Equal("M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z", result); // null は false として扱われ下向き矢印
+        Assert.Equal("M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z", result);
     }
 
     /// <summary>
@@ -317,10 +273,7 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void BoolToExpandIconConverter_ConvertBack_ThrowsNotSupportedException()
     {
-        // Arrange
         var converter = BoolToExpandIconConverter.Instance;
-
-        // Act & Assert
         Assert.Throws<NotSupportedException>(() =>
             converter.ConvertBack("M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z", typeof(bool), null, CultureInfo.InvariantCulture));
     }
@@ -335,28 +288,11 @@ public sealed class SettingsConvertersTests : AvaloniaTestBase
     [Fact]
     public void AllConverters_SingletonInstance_AreSameReference()
     {
-        // Arrange & Act
-        var uiSizeConverter1 = UiSizeToStringConverter.Instance;
-        var uiSizeConverter2 = UiSizeToStringConverter.Instance;
-
-        var uiThemeConverter1 = UiThemeToStringConverter.Instance;
-        var uiThemeConverter2 = UiThemeToStringConverter.Instance;
-
-        var boolToTextConverter1 = BoolToAdvancedSettingsTextConverter.Instance;
-        var boolToTextConverter2 = BoolToAdvancedSettingsTextConverter.Instance;
-
-        var boolToIconConverter1 = BoolToExpandIconConverter.Instance;
-        var boolToIconConverter2 = BoolToExpandIconConverter.Instance;
-
-        var boolToColorConverter1 = BoolToStatusColorConverter.Instance;
-        var boolToColorConverter2 = BoolToStatusColorConverter.Instance;
-
-        // Assert
-        Assert.Same(uiSizeConverter1, uiSizeConverter2);
-        Assert.Same(uiThemeConverter1, uiThemeConverter2);
-        Assert.Same(boolToTextConverter1, boolToTextConverter2);
-        Assert.Same(boolToIconConverter1, boolToIconConverter2);
-        Assert.Same(boolToColorConverter1, boolToColorConverter2);
+        Assert.Same(UiSizeToStringConverter.Instance, UiSizeToStringConverter.Instance);
+        Assert.Same(UiThemeToStringConverter.Instance, UiThemeToStringConverter.Instance);
+        Assert.Same(BoolToAdvancedSettingsTextConverter.Instance, BoolToAdvancedSettingsTextConverter.Instance);
+        Assert.Same(BoolToExpandIconConverter.Instance, BoolToExpandIconConverter.Instance);
+        Assert.Same(BoolToStatusColorConverter.Instance, BoolToStatusColorConverter.Instance);
     }
 
     #endregion
