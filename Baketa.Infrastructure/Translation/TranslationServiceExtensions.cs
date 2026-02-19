@@ -4,7 +4,6 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Cloud;
-using Baketa.Infrastructure.Translation.Local;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

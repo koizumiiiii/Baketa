@@ -37,7 +37,6 @@ using Baketa.Core.Utilities;
 using System.Collections.Concurrent; // [Issue #397] PreviousOcrTextキャッシュ用
 using System.Diagnostics; // [Issue #290] Fork-Join計測用
 // NOTE: [PP-OCRv5削除] BatchProcessing参照削除
-using Baketa.Infrastructure.Translation.Local;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

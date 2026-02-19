@@ -35,11 +35,8 @@ using Baketa.Infrastructure.Services.Settings;
 using Baketa.Infrastructure.Services.Setup;
 using Baketa.Infrastructure.Services.Translation;
 using Baketa.Infrastructure.Translation;
-using Baketa.Infrastructure.Translation.Local;
 using Baketa.Infrastructure.Validation;
 using Baketa.Core.Abstractions.Validation;
-// 翻訳エンジンをNLLB-200に統一
-using Baketa.Infrastructure.Translation.Local.ConnectionPool;
 using Baketa.Infrastructure.Translation.Services;
 using System.Net.Http;
 using Microsoft.Extensions.Configuration;
@@ -123,17 +120,7 @@ public class InfrastructureModule : ServiceModuleBase
         // [Fix v0.2.17] 1パラメータ版にも追加 - Cloud AI翻訳が動作しない問題を修正
         RegisterCloudAIServices(services);
 
-        // Phase 5: ポート競合防止機構サービス
-        RegisterPortManagementServices(services);
-
-        // Step 1: Python環境解決と診断サービス（即座の応急処置）
-        RegisterPythonEnvironmentServices(services);
-
-        // Phase 0+1: NLLB修正対応サービス（30秒再起動問題解決）
-        RegisterNllbFixServices(services);
-
-        // Phase 2: 完全安定化サービス（接続信頼性向上・キャッシュ管理強化）
-        RegisterPhase2Services(services);
+        // [Issue #445] Python翻訳インフラ廃止: PortManagement/PythonEnvironment/NllbFix/Phase2 は不要
 
         // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
         RegisterWarmupServices(services);
@@ -195,16 +182,10 @@ public class InfrastructureModule : ServiceModuleBase
         // [Issue #293] ROI Manager サービス登録（configuration付き）
         RegisterRoiManagerServices(services, configuration);
 
-        // 🔥 [PHASE12.5.4_FIX] RegisterPortManagementServicesを最優先実行
-        // 理由: RegisterNllb200TranslationServicesがIPythonServerManager登録状況を確認するため、
-        //       先にIPythonServerManagerを登録する必要がある
-        RegisterPortManagementServices(services);
-
-        // NLLB-200翻訳サービス（高品質版）を登録
-        // IPythonServerManager登録済みの状態でConnectionPool登録判定を実行
+        // [Issue #445] Python翻訳インフラ廃止: PortManagement不要、NLLB-200をONNX直接推論に統一
         RegisterNllb200TranslationServices(services);
 
-        // 🚀 Phase 2.3: TranslationSettings登録（gRPC Client対応）
+        // 🚀 Phase 2.3: TranslationSettings登録（ONNX設定対応）
         RegisterTranslationSettings(services);
 
         // 翻訳サービス（エンジン登録後）
@@ -213,14 +194,7 @@ public class InfrastructureModule : ServiceModuleBase
         // Issue #78: Cloud AI翻訳サービス（Pro/Premia向け）
         RegisterCloudAIServices(services);
 
-        // Step 1: Python環境解決と診断サービス（即座の応急処置）
-        RegisterPythonEnvironmentServices(services);
-
-        // Phase 0+1: NLLB修正対応サービス（30秒再起動問題解決）
-        RegisterNllbFixServices(services);
-
-        // Phase 2: 完全安定化サービス（接続信頼性向上・キャッシュ管理強化）
-        RegisterPhase2Services(services);
+        // [Issue #445] Phase 2 (CacheManagement等) は Python翻訳インフラ廃止に伴い不要
 
         // ウォームアップサービス（Issue #143: コールドスタート遅延根絶）
         RegisterWarmupServices(services);
@@ -279,51 +253,8 @@ public class InfrastructureModule : ServiceModuleBase
         RegisterProximityGroupingServices(services);
     }
 
-    /// <summary>
-    /// Phase 5: ポート競合防止機構サービスを登録します。
-    /// </summary>
-    /// <param name="services">サービスコレクション</param>
-    private static void RegisterPortManagementServices(IServiceCollection services)
-    {
-        Console.WriteLine("🚀 Issue #147 Phase 5: ポート競合防止機構サービス登録開始");
-
-        // ポート管理サービス（Singleton: グローバルMutex管理）
-        services.AddSingleton<IPortManagementService, Baketa.Infrastructure.Translation.Services.PortManagementService>();
-        Console.WriteLine("✅ PortManagementService登録完了 - Mutexプロセス間競合防止");
-
-        // Pythonサーバー管理サービス（Singleton: ヘルスチェック機能付き）
-        services.AddSingleton<IPythonServerManager, Baketa.Infrastructure.Translation.Services.PythonServerManager>();
-        Console.WriteLine("✅ PythonServerManager登録完了 - 動的ポート管理・自動復旧");
-
-        Console.WriteLine("🎉 Phase 5: ポート競合防止機構サービス登録完了");
-    }
-
-    /// <summary>
-    /// Step 1: Python環境解決と診断サービスを登録します（即座の応急処置）
-    /// </summary>
-    /// <param name="services">サービスコレクション</param>
-    private static void RegisterPythonEnvironmentServices(IServiceCollection services)
-    {
-        // Step 1: Python環境解決と診断サービス登録（即座の応急処置）
-        services.AddSingleton<PythonEnvironmentResolver>();
-        services.AddTransient<EnhancedDiagnosticReport>();
-        services.AddSingleton<PortManager>();
-    }
-
-    /// <summary>
-    /// Phase 0+1: NLLB修正対応サービスを登録します（30秒再起動問題解決）
-    /// </summary>
-    /// <param name="services">サービスコレクション</param>
-    private static void RegisterNllbFixServices(IServiceCollection services)
-    {
-        // Phase 1: 30秒再起動ループの根本解決
-        services.AddSingleton<ModelCacheManager>();
-        services.AddSingleton<DynamicHealthCheckManager>();
-
-        // Phase 1: DynamicHealthCheckManagerをイベントプロセッサーとして登録
-        services.AddSingleton<IEventProcessor<EventTypes.PythonServerStatusChangedEvent>>(provider =>
-            provider.GetRequiredService<DynamicHealthCheckManager>());
-    }
+    // [Issue #445] RegisterPortManagementServices, RegisterPythonEnvironmentServices, RegisterNllbFixServices は
+    // Python翻訳インフラ廃止に伴い削除
 
     /// <summary>
     /// 翻訳サービスを登録します。
@@ -350,18 +281,7 @@ public class InfrastructureModule : ServiceModuleBase
         // パフォーマンス監視サービスを登録 (Issue #144)
         services.AddSingleton<Baketa.Infrastructure.Translation.Services.ITranslationPerformanceMonitor, Baketa.Infrastructure.Translation.Services.TranslationPerformanceMonitor>();
 
-        // 🚨 翻訳サーバー安定化: Python サーバーヘルスモニター（バックグラウンドサービス）
-        Console.WriteLine("🔍 [DI_DEBUG] PythonServerHealthMonitor登録開始");
-
-        // 🔥 [PHASE5.2J_FIX] Gemini推奨修正: AddSingleton削除（二重登録問題解決）
-        // AddHostedService<T>()は内部的にシングルトン登録も行うため、明示的なAddSingletonは不要
-        // 二重登録によりGetServices<IHostedService>()でInvalidOperationExceptionが発生していた
-        // services.AddSingleton<Baketa.Infrastructure.Translation.Services.PythonServerHealthMonitor>(); // ← 削除
-
-        // HostedServiceとしてのみ登録（これでシングルトン + IHostedService両方が登録される）
-        services.AddHostedService<PythonServerHealthMonitor>();
-
-        Console.WriteLine("✅ [DI_DEBUG] PythonServerHealthMonitor登録完了 - 自動ヘルスチェック・再起動機能");
+        // [Issue #445] PythonServerHealthMonitor は Python翻訳インフラ廃止に伴い削除
 
         // 🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム統合
         Console.WriteLine("🚀 Issue #147 Phase 3.2: ハイブリッド翻訳戦略システム登録開始");
@@ -514,117 +434,29 @@ public class InfrastructureModule : ServiceModuleBase
             services.Remove(service);
         }
 
-        // 🎭 Issue #147 Phase 3.2: Mock翻訳エンジン登録（ハイブリッド戦略テスト用）
-        // 🚀 Python翻訳エンジン実運用 - モデルロード待機機構完成により安定動作
+        // [Issue #445] ConnectionPool / GrpcTranslationClient は Python翻訳インフラ廃止に伴い削除
 
-        // 🔥 [PHASE3.3] gRPC通信モード: PythonServerManager登録時はConnectionPool不要
-        // gRPC経由の通信ではConnectionPoolの代わりにgRPCクライアントを使用
-        var pythonServerManagerRegistered = services.Any(sd =>
-            sd.ServiceType == typeof(IPythonServerManager));
-
-        if (!pythonServerManagerRegistered)
-        {
-            // ✅ FixedSizeConnectionPool登録（レガシーTCP接続モード専用）
-            services.AddSingleton<IConnectionPool, Baketa.Infrastructure.Translation.Local.ConnectionPool.FixedSizeConnectionPool>();
-            Console.WriteLine("✅ FixedSizeConnectionPool登録完了 - レガシーTCP接続モード");
-        }
-        else
-        {
-            // ✅ ConnectionPool未登録（gRPC通信モード）
-            Console.WriteLine("🔧 [PHASE3.3] ConnectionPool登録スキップ - gRPC通信モード（gRPCクライアント使用）");
-        }
-
-        // 🎯 [UltraThink Solution] appsettings.json固定ポート優先 + ServerManagerHostedService起動監視
-        // 問題: DIコンテナ解決タイミング vs IHostedService実行タイミングのミスマッチ
-        // 解決: appsettings.jsonのGrpcServerAddressを優先使用、ServerManagerはそのポートで起動
-
-        // GrpcPortProvider登録（動的ポート管理用、将来の拡張用）
+        // GrpcPortProvider登録（OCR用 UnifiedServer のポート管理で引き続き使用）
         services.AddSingleton<Baketa.Infrastructure.Translation.Services.GrpcPortProvider>();
 
-        // ServerManagerHostedService登録（Pythonサーバー起動・監視）
+        // ServerManagerHostedService登録（UnifiedServer起動・OCR用）
         services.AddHostedService<Baketa.Infrastructure.Translation.Services.ServerManagerHostedService>();
 
-        // ✅ [UltraThink Fix] GrpcTranslationClient - appsettings.json固定ポート優先使用
-        // appsettings.jsonに設定がある場合は即座に使用し、DIブロックを回避
-        // [Issue #292] 統合サーバーモードでは統合ポートを優先使用
-        services.AddSingleton<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>(provider =>
-        {
-            Console.WriteLine("🚨🚨🚨 [ULTRA_DEBUG] GrpcTranslationClientファクトリー実行開始！");
-            var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>>();
-            Console.WriteLine("🚨🚨🚨 [ULTRA_DEBUG] ILogger取得完了");
-
-            // [Issue #292] 統合サーバー設定を取得
-            var unifiedSettings = provider.GetService<UnifiedServerSettings>();
-            var isUnifiedMode = unifiedSettings?.Enabled ?? false;
-            logger.LogDebug("[Issue #292] 統合サーバーモード: {IsUnifiedMode}", isUnifiedMode);
-
-            // [Issue #292] 統合サーバーモードでは統合ポートを使用
-            if (isUnifiedMode)
-            {
-                var unifiedPort = unifiedSettings?.Port ?? ServerPortConstants.UnifiedServerPort;
-                var unifiedAddress = $"http://127.0.0.1:{unifiedPort}";
-                logger.LogInformation("✅ [Issue #292] 統合サーバーモード: {Address}", unifiedAddress);
-                return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(unifiedAddress, logger);
-            }
-
-            var translationSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranslationSettings>>().Value;
-            Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] TranslationSettings取得完了 - GrpcServerAddress: '{translationSettings.GrpcServerAddress}'");
-
-            // appsettings.jsonに設定がある場合は優先使用
-            Console.WriteLine($"🚨🚨🚨 [ULTRA_DEBUG] 条件チェック: IsNullOrEmpty = {string.IsNullOrEmpty(translationSettings.GrpcServerAddress)}");
-            if (!string.IsNullOrEmpty(translationSettings.GrpcServerAddress))
-            {
-                logger.LogInformation("✅ [FIXED_PORT] appsettings.json設定使用: {Address}", translationSettings.GrpcServerAddress);
-                return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(translationSettings.GrpcServerAddress, logger);
-            }
-
-            // 設定がない場合はGrpcPortProviderを使用（動的ポート管理）
-            // ⚠️ この場合はブロッキング待機が発生するため、appsettings.json設定を推奨
-            logger.LogWarning("⚠️ [DYNAMIC_PORT] appsettings.json未設定、動的ポート待機（推奨されません）");
-            var portProvider = provider.GetRequiredService<Baketa.Infrastructure.Translation.Services.GrpcPortProvider>();
-            var port = portProvider.GetPortAsync().GetAwaiter().GetResult();
-            var serverAddress = $"http://localhost:{port}";
-            logger.LogInformation("✅ [DYNAMIC_PORT] GrpcServerAddress確定: {ServerAddress}", serverAddress);
-
-            return new Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient(serverAddress, logger);
-        });
-
-        services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationClient>(provider =>
-        {
-            var client = provider.GetRequiredService<Baketa.Infrastructure.Translation.Clients.GrpcTranslationClient>();
-            return client;
-        });
-
-        // [Issue #445] UseOnnxInference 設定に基づいてエンジンを切り替え
+        // [Issue #445] ONNX Runtime 直接推論モード（Python/gRPC 翻訳サーバー不要）
         services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
         {
             var translationSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranslationSettings>>().Value;
+            var onnxLogger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine>>();
+            var modelDir = !string.IsNullOrEmpty(translationSettings.OnnxModelDirectory)
+                ? translationSettings.OnnxModelDirectory
+                : ResolveDefaultOnnxModelDirectory();
 
-            if (translationSettings.UseOnnxInference)
-            {
-                // ONNX Runtime 直接推論モード（Python/gRPC サーバー不要）
-                var onnxLogger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine>>();
-                var modelDir = !string.IsNullOrEmpty(translationSettings.OnnxModelDirectory)
-                    ? translationSettings.OnnxModelDirectory
-                    : ResolveDefaultOnnxModelDirectory();
-
-                onnxLogger.LogInformation("[Issue #445] OnnxTranslationEngine を登録: ModelDir={ModelDir}", modelDir);
-                return new Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine(modelDir, onnxLogger);
-            }
-            else
-            {
-                // 従来の Python/gRPC モード
-                var client = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationClient>();
-                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter>>();
-                var serverManager = provider.GetRequiredService<IPythonServerManager>();
-
-                logger.LogInformation("[PHASE3.1] GrpcTranslationEngineAdapter を ITranslationEngine として登録");
-                return new Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter(client, logger, serverManager);
-            }
+            onnxLogger.LogInformation("[Issue #445] OnnxTranslationEngine を登録: ModelDir={ModelDir}", modelDir);
+            return new Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine(modelDir, onnxLogger);
         });
 
-        Console.WriteLine("🚀 [Issue #445] ITranslationEngine 登録完了（ONNX/gRPC 設定切替対応）");
-        Console.WriteLine($"🚀 [PHASE3.1] Clean Architecture実現: 通信層抽象化完了（削除した既存登録数: {existingTranslationEngines.Count}）");
+        Console.WriteLine("🚀 [Issue #445] OnnxTranslationEngine 登録完了（Python/gRPC翻訳廃止）");
+        Console.WriteLine($"🚀 [Issue #445] Clean Architecture実現: 通信層抽象化完了（削除した既存登録数: {existingTranslationEngines.Count}）");
     }
 
     /// <summary>
@@ -1211,31 +1043,8 @@ public class InfrastructureModule : ServiceModuleBase
         Console.WriteLine("🎉 Issue #78 Phase 3/3.5: 相互検証ロジック登録完了");
     }
 
-    /// <summary>
-    /// Phase 2: 完全安定化サービス登録（接続信頼性向上・キャッシュ管理強化）
-    /// </summary>
-    private static void RegisterPhase2Services(IServiceCollection services)
-    {
-        Console.WriteLine("🚀 [PHASE2] 完全安定化サービス登録開始（接続信頼性向上・キャッシュ管理強化）");
-
-        // CacheManagementService: ModelCacheManagerを基盤とした高度キャッシュ管理
-        services.AddSingleton<CacheManagementService>(provider =>
-        {
-            var logger = provider.GetRequiredService<ILogger<CacheManagementService>>();
-            var configuration = provider.GetRequiredService<IConfiguration>();
-            var modelCacheManager = provider.GetRequiredService<ModelCacheManager>();
-
-            logger.LogInformation("🗂️ CacheManagementService初期化 - 高度キャッシュ管理機能");
-            return new CacheManagementService(logger, configuration, modelCacheManager);
-        });
-
-        Console.WriteLine("✅ [PHASE2] CacheManagementService登録完了");
-
-        // SmartConnectionEstablisher: FixedSizeConnectionPool統合済み（追加DI不要）
-        Console.WriteLine("✅ [PHASE2] SmartConnectionEstablisher統合完了（FixedSizeConnectionPool内統合）");
-
-        Console.WriteLine("🎉 [PHASE2] Phase 2完全安定化サービス登録完了 - システム信頼性向上");
-    }
+    // [Issue #445] RegisterPhase2Services は Python翻訳インフラ廃止に伴い削除
+    // (CacheManagementService / SmartConnectionEstablisher は不要)
 
     /// <summary>
     /// Modelsディレクトリを確実に見つけるためのヘルパーメソッド

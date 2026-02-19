@@ -977,8 +977,7 @@ public class MainOverlayViewModel : ViewModelBase
         // 翻訳結果表示状態変更イベントの購読
         SubscribeToEvent<TranslationDisplayVisibilityChangedEvent>(OnTranslationDisplayVisibilityChanged);
 
-        // 🔥 [PHASE2_PROBLEM2] Pythonサーバー状態変更イベントの購読（翻訳エンジン初期化完了検知）
-        SubscribeToEvent<Baketa.Core.Events.EventTypes.PythonServerStatusChangedEvent>(OnPythonServerStatusChanged);
+        // [Issue #445] PythonServerStatusChangedEvent はPython翻訳インフラ廃止に伴い削除
 
         // 最初の翻訳結果受信イベントの購読（ローディング終了用）
         Logger?.LogWarning("🔔 [SUBSCRIBE] FirstTranslationResultReceivedEvent購読開始 - 型: {EventType}", typeof(FirstTranslationResultReceivedEvent).FullName);
@@ -2026,54 +2025,7 @@ public class MainOverlayViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// 🔥 [PHASE2_PROBLEM2] Pythonサーバー状態変更イベントハンドラー
-    /// TranslationInitializationServiceがサーバー起動完了時にこのイベントを発行
-    /// StartButton制御の核心部分
-    /// </summary>
-    private async Task OnPythonServerStatusChanged(Baketa.Core.Events.EventTypes.PythonServerStatusChangedEvent eventData)
-    {
-        try
-        {
-            Logger?.LogInformation("🔥 [PHASE2_PROBLEM2] Pythonサーバー状態変更: Ready={IsReady}, Port={Port}, Message={Message}",
-                eventData.IsServerReady, eventData.ServerPort, eventData.StatusMessage);
-
-            // UI更新をメインスレッドで実行
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                // StartCaptureCommandの有効/無効を制御
-                IsTranslationEngineInitializing = !eventData.IsServerReady;
-
-                // サーバー準備完了時の追加処理
-                if (eventData.IsServerReady)
-                {
-                    Logger?.LogInformation("✅ [PHASE2_PROBLEM2] 翻訳サーバー準備完了 - StartButton有効化");
-                    Logger?.LogDebug("✅ [PHASE2_PROBLEM2] 翻訳サーバー準備完了 - StartButton有効化");
-                }
-                else
-                {
-                    // 初期化中または失敗時
-                    if (eventData.StatusMessage.Contains("エラー"))
-                    {
-                        Logger?.LogWarning("❌ [PHASE2_PROBLEM2] 翻訳サーバーエラー - StartButton無効化");
-                        Logger?.LogDebug($"❌ [PHASE2_PROBLEM2] 翻訳サーバーエラー: {eventData.StatusMessage}");
-                    }
-                    else
-                    {
-                        Logger?.LogInformation("🔄 [PHASE2_PROBLEM2] 翻訳サーバー初期化中 - StartButton無効化");
-                        Logger?.LogDebug("🔄 [PHASE2_PROBLEM2] 翻訳サーバー初期化中 - StartButton無効化");
-                    }
-                }
-            });
-
-            await Task.CompletedTask.ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "❌ [PHASE2_PROBLEM2] Pythonサーバー状態変更イベント処理エラー");
-            Logger?.LogDebug($"❌ [PHASE2_PROBLEM2] イベント処理エラー: {ex.Message}");
-        }
-    }
+    // [Issue #445] OnPythonServerStatusChanged は Python翻訳インフラ廃止に伴い削除
 
     /// <summary>
     /// 🔥 [PHASE5.2E] ウォームアップ進捗変更イベントハンドラー
