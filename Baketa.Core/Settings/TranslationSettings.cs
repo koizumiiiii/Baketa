@@ -395,6 +395,22 @@ public sealed class TranslationSettings : ITranslationSettings
         Description = "gRPCサーバーのURL（例: http://localhost:50051）")]
     public string GrpcServerAddress { get; set; } = "http://localhost:50051";
 
+    /// <summary>
+    /// ONNX Runtime による直接推論を使用する（Python/gRPC サーバー不要）
+    /// Issue #445: true の場合、NLLB-200 をC#から直接実行
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "ONNX直接推論",
+        Description = "Python/gRPCサーバーなしでNLLB-200翻訳を直接実行します")]
+    public bool UseOnnxInference { get; set; }
+
+    /// <summary>
+    /// ONNX モデルディレクトリパス（空の場合は既定パスを使用）
+    /// Issue #445: Models/nllb-200-onnx/ が既定
+    /// </summary>
+    [SettingMetadata(SettingLevel.Advanced, "Translation", "ONNXモデルパス",
+        Description = "ONNX翻訳モデルのディレクトリパス（空=既定パス使用）")]
+    public string OnnxModelDirectory { get; set; } = string.Empty;
+
     // 🚨 サーバー監視・自動再起動設定（安定化対応）
 
     /// <summary>
@@ -491,6 +507,9 @@ public sealed class TranslationSettings : ITranslationSettings
             // Phase 2.3: gRPC設定のクローン
             UseGrpcClient = UseGrpcClient,
             GrpcServerAddress = GrpcServerAddress,
+            // Issue #445: ONNX直接推論設定のクローン
+            UseOnnxInference = UseOnnxInference,
+            OnnxModelDirectory = OnnxModelDirectory,
             // サーバー監視・自動再起動設定のクローン
             EnableServerAutoRestart = EnableServerAutoRestart,
             MaxConsecutiveFailures = MaxConsecutiveFailures,

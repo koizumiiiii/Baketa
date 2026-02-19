@@ -595,17 +595,35 @@ public class InfrastructureModule : ServiceModuleBase
             return client;
         });
 
+        // [Issue #445] UseOnnxInference 設定に基づいてエンジンを切り替え
         services.AddSingleton<Baketa.Core.Abstractions.Translation.ITranslationEngine>(provider =>
         {
-            var client = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationClient>();
-            var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter>>();
-            var serverManager = provider.GetRequiredService<IPythonServerManager>();
+            var translationSettings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TranslationSettings>>().Value;
 
-            logger.LogInformation("🔥 [PHASE3.1_FIX] GrpcTranslationEngineAdapterをITranslationEngineとして登録（ServerManager統合）");
-            return new Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter(client, logger, serverManager);
+            if (translationSettings.UseOnnxInference)
+            {
+                // ONNX Runtime 直接推論モード（Python/gRPC サーバー不要）
+                var onnxLogger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine>>();
+                var modelDir = !string.IsNullOrEmpty(translationSettings.OnnxModelDirectory)
+                    ? translationSettings.OnnxModelDirectory
+                    : System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "nllb-200-onnx");
+
+                onnxLogger.LogInformation("[Issue #445] OnnxTranslationEngine を登録: ModelDir={ModelDir}", modelDir);
+                return new Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine(modelDir, onnxLogger);
+            }
+            else
+            {
+                // 従来の Python/gRPC モード
+                var client = provider.GetRequiredService<Baketa.Core.Abstractions.Translation.ITranslationClient>();
+                var logger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter>>();
+                var serverManager = provider.GetRequiredService<IPythonServerManager>();
+
+                logger.LogInformation("[PHASE3.1] GrpcTranslationEngineAdapter を ITranslationEngine として登録");
+                return new Baketa.Infrastructure.Translation.Adapters.GrpcTranslationEngineAdapter(client, logger, serverManager);
+            }
         });
 
-        Console.WriteLine("🚀 [PHASE3.1] GrpcTranslationEngineAdapter登録完了");
+        Console.WriteLine("🚀 [Issue #445] ITranslationEngine 登録完了（ONNX/gRPC 設定切替対応）");
         Console.WriteLine($"🚀 [PHASE3.1] Clean Architecture実現: 通信層抽象化完了（削除した既存登録数: {existingTranslationEngines.Count}）");
     }
 
