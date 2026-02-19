@@ -82,27 +82,23 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase
     {
         try
         {
-            var encoderPath = Path.Combine(_modelDirectory, "encoder_model.onnx");
-            var decoderPath = Path.Combine(_modelDirectory, "decoder_model.onnx");
-            var decoderWithPastPath = Path.Combine(_modelDirectory, "decoder_with_past_model.onnx");
+            // int8量子化モデル（*_quantized.onnx）があればそちらを優先
+            var encoderPath = ResolveModelPath("encoder_model");
+            var decoderPath = ResolveModelPath("decoder_model");
+            var decoderWithPastPath = ResolveModelPath("decoder_with_past_model");
 
-            if (!File.Exists(encoderPath))
+            if (encoderPath == null)
             {
-                Logger.LogError("ONNX encoder model not found: {Path}", encoderPath);
+                Logger.LogError("ONNX encoder model not found in: {Dir}", _modelDirectory);
                 return Task.FromResult(false);
             }
-            if (!File.Exists(decoderPath))
+            if (decoderPath == null)
             {
-                Logger.LogError("ONNX decoder model not found: {Path}", decoderPath);
+                Logger.LogError("ONNX decoder model not found in: {Dir}", _modelDirectory);
                 return Task.FromResult(false);
             }
 
-            var sessionOptions = new SessionOptions
-            {
-                GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
-                InterOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2),
-                IntraOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2),
-            };
+            var sessionOptions = CreateSessionOptions();
 
             var sw = Stopwatch.StartNew();
 
@@ -111,17 +107,20 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase
 
             sw.Restart();
             _encoderSession = new InferenceSession(encoderPath, sessionOptions);
-            Logger.LogInformation("ONNX encoder session loaded: {Elapsed}ms", sw.ElapsedMilliseconds);
+            Logger.LogInformation("ONNX encoder session loaded: {Elapsed}ms, model={Model}",
+                sw.ElapsedMilliseconds, Path.GetFileName(encoderPath));
 
             sw.Restart();
             _decoderSession = new InferenceSession(decoderPath, sessionOptions);
-            Logger.LogInformation("ONNX decoder session loaded: {Elapsed}ms", sw.ElapsedMilliseconds);
+            Logger.LogInformation("ONNX decoder session loaded: {Elapsed}ms, model={Model}",
+                sw.ElapsedMilliseconds, Path.GetFileName(decoderPath));
 
-            if (_useKvCache && File.Exists(decoderWithPastPath))
+            if (_useKvCache && decoderWithPastPath != null)
             {
                 sw.Restart();
                 _decoderWithPastSession = new InferenceSession(decoderWithPastPath, sessionOptions);
-                Logger.LogInformation("ONNX decoder_with_past session loaded: {Elapsed}ms", sw.ElapsedMilliseconds);
+                Logger.LogInformation("ONNX decoder_with_past session loaded: {Elapsed}ms, model={Model}",
+                    sw.ElapsedMilliseconds, Path.GetFileName(decoderWithPastPath));
             }
 
             Logger.LogInformation("OnnxTranslationEngine initialized: model={ModelDir}, kvCache={UseKvCache}",
@@ -134,6 +133,49 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase
             Logger.LogError(ex, "Failed to initialize OnnxTranslationEngine");
             return Task.FromResult(false);
         }
+    }
+
+    /// <summary>
+    /// モデルファイルパスを解決（量子化版を優先）
+    /// </summary>
+    private string? ResolveModelPath(string baseName)
+    {
+        // 量子化モデルを優先
+        var quantizedPath = Path.Combine(_modelDirectory, $"{baseName}_quantized.onnx");
+        if (File.Exists(quantizedPath))
+        {
+            Logger.LogDebug("Using quantized model: {Path}", Path.GetFileName(quantizedPath));
+            return quantizedPath;
+        }
+
+        var standardPath = Path.Combine(_modelDirectory, $"{baseName}.onnx");
+        return File.Exists(standardPath) ? standardPath : null;
+    }
+
+    /// <summary>
+    /// SessionOptions を作成（CUDA GPU → CPU フォールバック）
+    /// </summary>
+    private SessionOptions CreateSessionOptions()
+    {
+        var options = new SessionOptions
+        {
+            GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
+        };
+
+        try
+        {
+            options.AppendExecutionProvider_CUDA(0);
+            Logger.LogInformation("[Issue #445] CUDA GPU acceleration enabled (device 0)");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("[Issue #445] CUDA unavailable, falling back to CPU: {Message}", ex.Message);
+            // CPU フォールバック: スレッド数を設定
+            options.InterOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2);
+            options.IntraOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2);
+        }
+
+        return options;
     }
 
     public override Task<IReadOnlyCollection<LanguagePair>> GetSupportedLanguagePairsAsync()

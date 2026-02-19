@@ -606,7 +606,7 @@ public class InfrastructureModule : ServiceModuleBase
                 var onnxLogger = provider.GetRequiredService<ILogger<Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine>>();
                 var modelDir = !string.IsNullOrEmpty(translationSettings.OnnxModelDirectory)
                     ? translationSettings.OnnxModelDirectory
-                    : System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "nllb-200-onnx");
+                    : ResolveDefaultOnnxModelDirectory();
 
                 onnxLogger.LogInformation("[Issue #445] OnnxTranslationEngine を登録: ModelDir={ModelDir}", modelDir);
                 return new Baketa.Infrastructure.Translation.Onnx.OnnxTranslationEngine(modelDir, onnxLogger);
@@ -625,6 +625,19 @@ public class InfrastructureModule : ServiceModuleBase
 
         Console.WriteLine("🚀 [Issue #445] ITranslationEngine 登録完了（ONNX/gRPC 設定切替対応）");
         Console.WriteLine($"🚀 [PHASE3.1] Clean Architecture実現: 通信層抽象化完了（削除した既存登録数: {existingTranslationEngines.Count}）");
+    }
+
+    /// <summary>
+    /// ONNX モデルのデフォルトディレクトリを解決（int8量子化版を優先）
+    /// </summary>
+    private static string ResolveDefaultOnnxModelDirectory()
+    {
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var int8Dir = System.IO.Path.Combine(baseDir, "Models", "nllb-200-onnx-int8");
+        if (System.IO.Directory.Exists(int8Dir))
+            return int8Dir;
+
+        return System.IO.Path.Combine(baseDir, "Models", "nllb-200-onnx");
     }
 
     /// <summary>
