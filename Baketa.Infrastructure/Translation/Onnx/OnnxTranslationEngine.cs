@@ -153,27 +153,19 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase
     }
 
     /// <summary>
-    /// SessionOptions を作成（CUDA GPU → CPU フォールバック）
+    /// SessionOptions を作成（CPU実行、INT8量子化モデルに最適化）
     /// </summary>
     private SessionOptions CreateSessionOptions()
     {
         var options = new SessionOptions
         {
             GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
+            InterOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2),
+            IntraOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2),
         };
 
-        try
-        {
-            options.AppendExecutionProvider_CUDA(0);
-            Logger.LogInformation("[Issue #445] CUDA GPU acceleration enabled (device 0)");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning("[Issue #445] CUDA unavailable, falling back to CPU: {Message}", ex.Message);
-            // CPU フォールバック: スレッド数を設定
-            options.InterOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2);
-            options.IntraOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2);
-        }
+        Logger.LogInformation("[Issue #445] CPU execution provider: InterOp={InterOp}, IntraOp={IntraOp} threads",
+            options.InterOpNumThreads, options.IntraOpNumThreads);
 
         return options;
     }

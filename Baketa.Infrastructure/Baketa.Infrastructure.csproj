@@ -73,8 +73,8 @@
 		<PackageReference Include="System.IO.Hashing" Version="10.0.1" />
 		<!-- GPU環境検出・テンソル処理用パッケージ（Issue #143対応） -->
 		<PackageReference Include="System.Numerics.Tensors" Version="9.0.8" />
-		<!-- Issue #445: CUDA EP で GPU推論を有効化（CPU自動フォールバック含む） -->
-		<PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.22.0" />
+		<!-- Issue #445: ONNX Runtime CPU-only（INT8量子化モデルはCPUが高速、~2GB削減） -->
+		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.22.0" />
 		<!-- Phase 3.3: WMI GPU利用率監視用 -->
 		<PackageReference Include="System.Management" Version="8.0.0" />
 		
