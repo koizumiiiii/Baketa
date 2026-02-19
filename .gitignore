@@ -416,6 +416,8 @@ Models/HuggingFace/
 Models/ngram/
 Models/Official_Helsinki/
 Models/ONNX/
+Models/nllb-200-onnx/
+Models/nllb-200-onnx-int8/
 Models/opus-mt-*/
 Models/ppocrv5/
 Models/pp-ocrv5/
