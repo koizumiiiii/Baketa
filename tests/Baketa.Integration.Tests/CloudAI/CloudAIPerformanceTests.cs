@@ -412,6 +412,7 @@ public class CloudAIPerformanceTests(ITestOutputHelper output)
     {
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
+        services.AddSingleton(new Mock<ILicenseManager>().Object);
         return services;
     }
 

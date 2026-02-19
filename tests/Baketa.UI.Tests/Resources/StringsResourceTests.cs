@@ -32,7 +32,7 @@ public class StringsResourceTests
     {
         // Arrange
         var originalCulture = Strings.Culture;
-        Strings.Culture = CultureInfo.InvariantCulture;
+        Strings.Culture = new CultureInfo("ja");
 
         try
         {
@@ -236,7 +236,7 @@ public class StringsResourceTests
             var enValue = Strings.Common_Save;
 
             // Act - Switch to Japanese
-            Strings.Culture = CultureInfo.InvariantCulture;
+            Strings.Culture = new CultureInfo("ja");
             var jaValue = Strings.Common_Save;
 
             // Assert

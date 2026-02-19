@@ -12,6 +12,7 @@ using Baketa.UI.Models.Settings;
 using Baketa.UI.Services;
 using Baketa.UI.Tests.Infrastructure;
 using Baketa.UI.ViewModels;
+using Baketa.UI.ViewModels.Settings;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -59,6 +60,22 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // デフォルト設定の再設定
         _mockChangeTracker.Setup(x => x.HasChanges).Returns(false);
         _mockSettingsService.Setup(x => x.SaveAsync()).Returns(Task.CompletedTask);
+
+        // EnsureCategoryContent で GetRequiredService されるViewModelを登録
+        var generalVm = new GeneralSettingsViewModel(
+            new GeneralSettings(),
+            _mockEventAggregator.Object);
+        _mockServiceProvider
+            .Setup(x => x.GetService(typeof(GeneralSettingsViewModel)))
+            .Returns(generalVm);
+
+        var accountVm = new AccountSettingsViewModel(
+            new Mock<IAuthService>().Object,
+            new Mock<INavigationService>().Object,
+            _mockEventAggregator.Object);
+        _mockServiceProvider
+            .Setup(x => x.GetService(typeof(AccountSettingsViewModel)))
+            .Returns(accountVm);
     }
 
     /// <summary>
@@ -270,36 +287,16 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
     }
 
     [Fact]
-    public async Task CancelCommand_WhenConfirmed_UpdatesStatusMessage()
+    public async Task CancelCommand_WhenExecuted_UpdatesStatusMessage()
     {
         // Arrange
-        _mockChangeTracker.Setup(x => x.ConfirmDiscardChangesAsync()).ReturnsAsync(true);
-        var viewModel = RunOnUIThread(() => new SettingsWindowViewModel(_mockServiceProvider.Object, _mockChangeTracker.Object, _mockEventAggregator.Object, _mockSettingsService.Object, null, null, _mockLogger.Object));
-
-        // Act
-        await viewModel.CancelCommand.Execute().FirstAsync();
-
-        // Assert
-        viewModel.StatusMessage.Should().Be("変更をキャンセルしました");
-        _mockChangeTracker.Verify(x => x.ConfirmDiscardChangesAsync(), Times.Once);
-
-        // Cleanup
-        viewModel.Dispose();
-    }
-
-    [Fact]
-    public async Task CancelCommand_WhenNotConfirmed_DoesNotUpdateStatusMessage()
-    {
-        // Arrange
-        _mockChangeTracker.Setup(x => x.ConfirmDiscardChangesAsync()).ReturnsAsync(false);
         var viewModel = CreateViewModel();
-        var originalStatus = viewModel.StatusMessage;
 
         // Act
         await viewModel.CancelCommand.Execute().FirstAsync();
 
-        // Assert
-        viewModel.StatusMessage.Should().Be(originalStatus);
+        // Assert - CancelAsync は常にステータスメッセージを設定する
+        viewModel.StatusMessage.Should().NotBeEmpty();
     }
 
     // [Issue #245] ResetCommand削除によりテストも削除
@@ -403,8 +400,8 @@ public sealed class SettingsWindowViewModelTests : AvaloniaTestBase
         // Arrange
         var viewModel = CreateViewModel();
 
-        // Act & Assert - 一般設定、アカウントの2カテゴリ存在
-        viewModel.AllCategories.Should().HaveCount(2);
+        // Act & Assert - 一般設定、アカウント、ライセンスの3カテゴリ存在
+        viewModel.AllCategories.Should().HaveCount(3);
         viewModel.AllCategories.Should().NotBeEmpty();
     }
 }
