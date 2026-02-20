@@ -418,6 +418,7 @@ Models/Official_Helsinki/
 Models/ONNX/
 Models/nllb-200-onnx/
 Models/nllb-200-onnx-int8/
+Models/nllb-200-onnx-int8-sliced/
 Models/opus-mt-*/
 Models/ppocrv5/
 Models/pp-ocrv5/
@@ -505,6 +506,9 @@ capture_cache/
 data/cipher-sessions.db*
 data/cipher-*.db*
 data/*.sqlite*
+
+# FLORES-200 dataset (downloaded for vocab analysis)
+data/flores200_dataset/
 
 # User-specific MCP settings and API keys
 %USERPROFILE%/.claude/
