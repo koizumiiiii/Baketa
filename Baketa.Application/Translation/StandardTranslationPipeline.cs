@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
-using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation;
 using Baketa.Core.Translation.Abstractions;
@@ -34,7 +33,7 @@ namespace Baketa.Application.Translation;
 #pragma warning disable CA2016 // CancellationTokenパラメーターの転送問題を一時的に拘束します
 public sealed class StandardTranslationPipeline(
         ILogger<StandardTranslationPipeline> logger,
-        ITranslationEngineFactory engineFactory,
+        IEnumerable<Core.Abstractions.Translation.ITranslationEngine> engines,
         ITranslationCache cache,
         ITranslationManager translationManager,
         IEventAggregator eventAggregator,
@@ -42,7 +41,7 @@ public sealed class StandardTranslationPipeline(
         Baketa.Core.Translation.Common.TranslationOptions options) : ITranslationPipeline
 {
     private readonly ILogger<StandardTranslationPipeline> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly ITranslationEngineFactory _engineFactory = engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
+    private readonly IReadOnlyList<Core.Abstractions.Translation.ITranslationEngine> _engines = [.. engines ?? throw new ArgumentNullException(nameof(engines))];
     private readonly ITranslationCache _cache = cache ?? throw new ArgumentNullException(nameof(cache));
     private readonly ITranslationManager _translationManager = translationManager ?? throw new ArgumentNullException(nameof(translationManager));
     private readonly IEventAggregator _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
@@ -165,27 +164,12 @@ public sealed class StandardTranslationPipeline(
 
             if (!string.IsNullOrEmpty(preferredEngine))
             {
-                engine = await _engineFactory.GetEngineAsync(preferredEngine).ConfigureAwait(false)
+                engine = _engines.FirstOrDefault(e => string.Equals(e.Name, preferredEngine, StringComparison.OrdinalIgnoreCase))
                     ?? throw new InvalidOperationException($"指定された翻訳エンジン '{preferredEngine}' が見つかりません。");
             }
             else
             {
-                var languagePair = new Baketa.Core.Translation.Models.LanguagePair
-                {
-                    SourceLanguage = new Baketa.Core.Translation.Models.Language
-                    {
-                        Code = request.SourceLanguage.Code,
-                        Name = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code,
-                        DisplayName = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code
-                    },
-                    TargetLanguage = new Baketa.Core.Translation.Models.Language
-                    {
-                        Code = request.TargetLanguage.Code,
-                        Name = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code,
-                        DisplayName = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code
-                    }
-                };
-                engine = await _engineFactory.GetBestEngineForLanguagePairAsync(languagePair).ConfigureAwait(false)
+                engine = _engines.FirstOrDefault()
                     ?? throw new InvalidOperationException("翻訳エンジンが見つかりません。");
             }
 
@@ -582,26 +566,12 @@ public sealed class StandardTranslationPipeline(
 
                 if (!string.IsNullOrEmpty(preferredEngine))
                 {
-                    engine = await _engineFactory.GetEngineAsync(preferredEngine).ConfigureAwait(false) ?? throw new InvalidOperationException($"指定された翻訳エンジン '{preferredEngine}' が見つかりません。");
+                    engine = _engines.FirstOrDefault(e => string.Equals(e.Name, preferredEngine, StringComparison.OrdinalIgnoreCase))
+                        ?? throw new InvalidOperationException($"指定された翻訳エンジン '{preferredEngine}' が見つかりません。");
                 }
                 else
                 {
-                    var languagePair = new Baketa.Core.Translation.Models.LanguagePair
-                    {
-                        SourceLanguage = new Baketa.Core.Translation.Models.Language
-                        {
-                            Code = sourceLang.Code,
-                            Name = !string.IsNullOrEmpty(sourceLang.DisplayName) ? sourceLang.DisplayName : sourceLang.Code,
-                            DisplayName = !string.IsNullOrEmpty(sourceLang.DisplayName) ? sourceLang.DisplayName : sourceLang.Code
-                        },
-                        TargetLanguage = new Baketa.Core.Translation.Models.Language
-                        {
-                            Code = targetLang.Code,
-                            Name = !string.IsNullOrEmpty(targetLang.DisplayName) ? targetLang.DisplayName : targetLang.Code,
-                            DisplayName = !string.IsNullOrEmpty(targetLang.DisplayName) ? targetLang.DisplayName : targetLang.Code
-                        }
-                    };
-                    engine = await _engineFactory.GetBestEngineForLanguagePairAsync(languagePair).ConfigureAwait(false)
+                    engine = _engines.FirstOrDefault()
                         ?? throw new InvalidOperationException(
                             $"言語ペア '{sourceLang?.Code}' -> '{targetLang?.Code}' に対応する翻訳エンジンが見つかりません。");
                 }

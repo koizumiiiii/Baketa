@@ -77,4 +77,20 @@ public interface ITranslationEngine : IDisposable
     /// </summary>
     /// <returns>初期化が成功すればtrue</returns>
     Task<bool> InitializeAsync();
+
+    /// <summary>
+    /// テキストの言語を自動検出します
+    /// </summary>
+    /// <param name="text">検出対象テキスト</param>
+    /// <param name="cancellationToken">キャンセレーショントークン</param>
+    /// <returns>検出された言語と信頼度</returns>
+    Task<LanguageDetectionResult> DetectLanguageAsync(
+        string text,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(new LanguageDetectionResult
+        {
+            DetectedLanguage = new Language { Code = "auto", DisplayName = "自動検出" },
+            Confidence = 0.0f,
+            EngineName = Name
+        });
 }

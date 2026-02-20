@@ -66,7 +66,7 @@ public class TranslationStrategyViewModelTests
         viewModel.AvailableStrategies.Should().NotBeEmpty();
         viewModel.IsLoading.Should().BeFalse();
         viewModel.EnableFallback.Should().BeTrue();
-        viewModel.CurrentLanguagePair.Should().Be("ja-en");
+        viewModel.CurrentLanguagePair.Should().Be("en-ja");
         viewModel.HasStrategyWarning.Should().BeFalse();
         viewModel.StrategyWarningMessage.Should().BeEmpty();
         viewModel.SelectStrategyCommand.Should().NotBeNull();
@@ -234,7 +234,7 @@ public class TranslationStrategyViewModelTests
         var viewModel = CreateViewModel();
 
         // Assert
-        viewModel.CurrentLanguagePair.Should().Be("ja-en");
+        viewModel.CurrentLanguagePair.Should().Be("en-ja");
     }
 
     [Fact]

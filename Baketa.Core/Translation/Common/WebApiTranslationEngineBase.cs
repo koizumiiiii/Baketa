@@ -5,8 +5,7 @@ using System.Net.Http.Headers;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
-using Baketa.Core.Translation.Abstractions;
-using Baketa.Core.Translation.Common;
+using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
@@ -69,7 +68,7 @@ public abstract class WebApiTranslationEngineBase : TranslationEngineBase, IWebA
         string apiKey,
         WebApiTranslationOptions options,
         ILogger? logger = null)
-        : base(logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<TranslationEngineBase>.Instance)
+        : base(logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<WebApiTranslationEngineBase>.Instance)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(options);
@@ -79,7 +78,6 @@ public abstract class WebApiTranslationEngineBase : TranslationEngineBase, IWebA
         _options = options;
 
         // HTTPクライアントの設定
-        // 注意: この時点では派生クラスのメソッドは使用不可
         ConfigureHttpClientInternal();
     }
 
@@ -124,8 +122,6 @@ public abstract class WebApiTranslationEngineBase : TranslationEngineBase, IWebA
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        // Web API翻訳エンジンでの言語検出はサブクラスで実装する必要があります
-        // デフォルト実装はディスパッチするためのものです
         Logger?.LogWarning("WebAPI翻訳エンジンでの言語検出はサブクラスで実装されていません: {EngineName}", Name);
 
         return base.DetectLanguageAsync(text, cancellationToken);
@@ -228,7 +224,6 @@ public abstract class WebApiTranslationEngineBase : TranslationEngineBase, IWebA
     protected virtual void UpdateQuotaInfo(HttpResponseHeaders headers)
     {
         ArgumentNullException.ThrowIfNull(headers);
-        // サブクラスで実装する場合はオーバーライドしてください
     }
 
     /// <summary>

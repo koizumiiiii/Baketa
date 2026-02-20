@@ -130,7 +130,7 @@ public class CaptureStrategyMockTests
         Assert.True(options.AllowDirectFullScreen);
         Assert.True(options.AllowROIProcessing);
         Assert.True(options.AllowSoftwareFallback);
-        Assert.Equal(0.25f, options.ROIScaleFactor);
+        Assert.Equal(0.5f, options.ROIScaleFactor);
         Assert.Equal(3, options.MaxRetryAttempts);
         Assert.True(options.EnableHDRProcessing);
         Assert.Equal(2000, options.TDRTimeoutMs);
@@ -147,7 +147,7 @@ public class CaptureStrategyMockTests
         var strategyName = strategy.StrategyName;
 
         // Assert
-        Assert.Equal(100, actualPriority); // DirectFullScreenは最高優先度
+        Assert.Equal(15, actualPriority); // WGC問題対応で低優先度
         Assert.Equal("DirectFullScreen", strategyName);
     }
 

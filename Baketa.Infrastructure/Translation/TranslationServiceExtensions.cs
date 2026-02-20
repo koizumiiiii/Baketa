@@ -1,16 +1,11 @@
 using System;
 using System.IO;
-using Baketa.Core.Abstractions.Factories;
 using Baketa.Core.Abstractions.Translation;
-using Baketa.Core.Translation.Factories;
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
 using Baketa.Infrastructure.Translation.Cloud;
-using Baketa.Infrastructure.Translation.Local;
-// OPUS-MT ONNX実装とSentencePiece削除済み
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using CoreTranslationAbstractions = Baketa.Core.Translation.Abstractions;
 
 namespace Baketa.Infrastructure.Translation;
 
@@ -27,9 +22,6 @@ public static class TranslationServiceExtensions
     public static IServiceCollection AddTranslationServices(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-
-        // ITranslationEngineFactoryを登録（TranslationOrchestrationServiceで必要）
-        services.AddSingleton<ITranslationEngineFactory, DefaultTranslationEngineFactory>();
 
         // ✨ 翻訳エンジン登録（単一エンジン使用）
         // CORRECTION_PLAN: フォールバック機能は存在しない。設定に基づいて単一のエンジンを使用する。
