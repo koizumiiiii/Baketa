@@ -262,30 +262,30 @@ class SuryaOcrEngine:
             torch.backends.cudnn.allow_tf32 = True
             # matmul精度を 'high' に設定（TF32を積極利用）
             torch.set_float32_matmul_precision('high')
-            # cuDNN autotuner: conv層の最速カーネルを自動選択（初回のみ探索コスト発生）
-            torch.backends.cudnn.benchmark = True
+            # [Issue #450] cuDNN autotuner を無効化
+            # benchmark=True は入力サイズ固定の学習向け。ゲームOCRはcropサイズが毎回異なるため、
+            # 新形状のたびに探索コスト（数秒）が発生し逆効果。False でデフォルトアルゴリズムを使用。
+            torch.backends.cudnn.benchmark = False
 
-            self.logger.info("[Issue #426] TF32 + cuDNN benchmark 有効化完了")
+            self.logger.info("[Issue #426] TF32有効化 + [Issue #450] cuDNN benchmark無効化完了")
             self.logger.info("[Issue #426]   matmul.allow_tf32=True, cudnn.allow_tf32=True")
-            self.logger.info("[Issue #426]   float32_matmul_precision='high', cudnn.benchmark=True")
+            self.logger.info("[Issue #450]   float32_matmul_precision='high', cudnn.benchmark=False")
         except Exception as e:
             self.logger.warning(f"[Issue #426] TF32/cuDNN設定失敗（FP32フォールバック）: {e}")
 
     def _warmup_inference(self):
-        """[Issue #426] ウォームアップ推論（CUDAカーネルキャッシュ + cuDNN autotuner初期化）
+        """[Issue #426][Issue #450] ウォームアップ推論（CUDAカーネル初期化）
 
-        cuDNN benchmark は (入力テンソル形状, フィルタ形状) ごとに最速アルゴリズムを探索・キャッシュする。
-        実際のOCR入力サイズ (1280x720) に近いダミー画像でウォームアップすることで、
-        初回リクエスト時の探索コスト（数秒）を起動時に吸収する。
+        cudnn.benchmark=False のため autotuner 探索は不要。
+        1枚のダミー画像で Detection パイプラインの基本カーネルを初期化するのみ。
         """
         try:
             import torch
             from PIL import Image
 
             warmup_start = time.time()
-            # 実際のOCR入力サイズに合わせる（cuDNNキャッシュはテンソル形状ごと）
             warmup_size = (1280, 720)
-            self.logger.info(f"[Issue #426] ウォームアップ推論実行中 (size: {warmup_size})...")
+            self.logger.info(f"[Issue #450] ウォームアップ推論実行中 (1枚, size: {warmup_size})...")
             sys.stdout.flush()
 
             dummy_image = Image.new('RGB', warmup_size, color=(128, 128, 128))
@@ -296,7 +296,7 @@ class SuryaOcrEngine:
                 )
 
             warmup_elapsed = time.time() - warmup_start
-            self.logger.info(f"[Issue #426] ウォームアップ完了 ({warmup_elapsed:.2f}秒)")
+            self.logger.info(f"[Issue #450] ウォームアップ完了 ({warmup_elapsed:.2f}秒)")
             sys.stdout.flush()
         except Exception as e:
             self.logger.warning(f"[Issue #426] ウォームアップ失敗（通常推論に影響なし）: {e}")
@@ -480,6 +480,168 @@ class SuryaOcrEngine:
                 "engine_name": "Surya OCR",
                 "engine_version": self.VERSION
             }
+
+    def recognize_batch(self, image_bytes_list: List[bytes], languages: Optional[List[str]] = None) -> List[dict]:
+        """[Issue #450] 複数画像を一括でバッチ推論
+
+        Surya の RecognitionPredictor は内部的に continuous batching を実装しており、
+        複数画像を同時に渡すことで Detection/Recognition の両方がバッチ処理される。
+        CUDA: Detection batch_size=36, Recognition batch_size=256
+
+        Args:
+            image_bytes_list: 画像バイト配列のリスト
+            languages: 言語リスト（全画像共通）
+
+        Returns:
+            各画像の認識結果の辞書リスト
+        """
+        if not self.is_loaded:
+            raise RuntimeError("モデルが未ロードです")
+
+        if not image_bytes_list:
+            return []
+
+        from PIL import Image as PILImage
+
+        # 1. 全画像をPIL Imageに変換 + リサイズ
+        images = []
+        scales = []
+        per_image_errors = {}  # index -> error message
+
+        for i, image_bytes in enumerate(image_bytes_list):
+            try:
+                if len(image_bytes) > self.MAX_IMAGE_SIZE:
+                    raise ValueError(f"画像サイズが上限を超えています: {len(image_bytes)} bytes")
+
+                img = PILImage.open(io.BytesIO(image_bytes))
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+
+                img, scale = self._resize_image_if_needed(img)
+                images.append(img)
+                scales.append(scale)
+            except Exception as e:
+                self.logger.error(f"[Issue #450] バッチ画像{i}の前処理エラー: {e}")
+                per_image_errors[i] = str(e)
+                # プレースホルダー（後で結果マッピング時にスキップ）
+                images.append(None)
+                scales.append(1.0)
+
+        # 有効な画像のみ抽出
+        valid_indices = [i for i in range(len(images)) if images[i] is not None]
+        valid_images = [images[i] for i in valid_indices]
+
+        if not valid_images:
+            # 全画像がエラーの場合
+            return [
+                {
+                    "success": False,
+                    "error": per_image_errors.get(i, "Unknown error"),
+                    "regions": [],
+                    "processing_time_ms": 0,
+                    "engine_name": "Surya OCR",
+                    "engine_version": self.VERSION
+                }
+                for i in range(len(image_bytes_list))
+            ]
+
+        # 2. バッチ推論（Detection + Recognition を一括実行）
+        self.logger.info(f"[Issue #450] バッチOCR実行中... ({len(valid_images)}枚, device: {self.device})")
+        start_time = time.time()
+
+        try:
+            predictions = self.recognition_predictor(
+                valid_images,
+                det_predictor=self.detection_predictor
+            )
+        except Exception as e:
+            self.logger.exception(f"[Issue #450] バッチ推論エラー: {e}")
+            return [
+                {
+                    "success": False,
+                    "error": str(e),
+                    "regions": [],
+                    "processing_time_ms": 0,
+                    "engine_name": "Surya OCR",
+                    "engine_version": self.VERSION
+                }
+                for _ in range(len(image_bytes_list))
+            ]
+
+        elapsed = time.time() - start_time
+        elapsed_ms = int(elapsed * 1000)
+
+        # 3. 結果を元のインデックス順にマッピング
+        results = []
+        pred_idx = 0
+
+        for i in range(len(image_bytes_list)):
+            if i in per_image_errors:
+                # 前処理でエラーになった画像
+                results.append({
+                    "success": False,
+                    "error": per_image_errors[i],
+                    "regions": [],
+                    "processing_time_ms": 0,
+                    "engine_name": "Surya OCR",
+                    "engine_version": self.VERSION
+                })
+            elif pred_idx < len(predictions):
+                # バッチ推論結果をパース
+                scale = scales[i]
+                inv_scale = 1.0 / scale if scale != 1.0 else 1.0
+                ocr_result = predictions[pred_idx]
+                pred_idx += 1
+
+                regions = []
+                text_lines = getattr(ocr_result, 'text_lines', [])
+                if not text_lines:
+                    text_lines = getattr(ocr_result, 'lines', [])
+
+                for idx, line in enumerate(text_lines):
+                    bbox = getattr(line, 'bbox', None)
+                    polygon = getattr(line, 'polygon', None)
+                    confidence = getattr(line, 'confidence', 0.0)
+                    text = getattr(line, 'text', '')
+
+                    region = {
+                        "text": text,
+                        "confidence": float(confidence) if confidence else 0.0,
+                        "bbox": {
+                            "points": [
+                                {"x": float(p[0]) * inv_scale, "y": float(p[1]) * inv_scale}
+                                for p in polygon
+                            ] if polygon else [],
+                            "x": int(bbox[0] * inv_scale) if bbox else 0,
+                            "y": int(bbox[1] * inv_scale) if bbox else 0,
+                            "width": int((bbox[2] - bbox[0]) * inv_scale) if bbox and len(bbox) >= 4 else 0,
+                            "height": int((bbox[3] - bbox[1]) * inv_scale) if bbox and len(bbox) >= 4 else 0,
+                        },
+                        "line_index": idx
+                    }
+                    regions.append(region)
+
+                results.append({
+                    "success": True,
+                    "regions": regions,
+                    "processing_time_ms": elapsed_ms,
+                    "engine_name": "Surya OCR",
+                    "engine_version": self.VERSION
+                })
+            else:
+                results.append({
+                    "success": False,
+                    "error": "Prediction result missing",
+                    "regions": [],
+                    "processing_time_ms": 0,
+                    "engine_name": "Surya OCR",
+                    "engine_version": self.VERSION
+                })
+
+        total_regions = sum(len(r["regions"]) for r in results if r["success"])
+        self.logger.info(f"[Issue #450] バッチOCR完了: {len(valid_images)}枚, {total_regions}領域検出 ({elapsed_ms}ms)")
+
+        return results
 
     def detect_only(self, image_bytes: bytes) -> dict:
         """[Issue #320] テキスト領域の位置のみを検出（Recognitionをスキップ）
@@ -708,13 +870,11 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
         return response
 
     async def RecognizeBatch(self, request, context):
-        """[Issue #330] バッチ認識RPC
+        """[Issue #330/#450] バッチ認識RPC
 
-        複数の画像領域を一括でOCR処理し、gRPC呼び出しオーバーヘッドを削減。
-        部分OCRで15領域を処理する場合: 15回→1回のgRPC呼び出しに削減。
-
-        Note: Pythonサーバーはmax_workers=1のため、内部的には逐次処理。
-        gRPC呼び出し回数削減による高速化がメリット。
+        複数の画像領域を一括でOCR処理。
+        [Issue #450] Surya の内部バッチ処理を活用し、Detection/Recognition を
+        GPU上で並列バッチ推論。逐次処理比で大幅な高速化を実現。
         """
         batch_start = time.time()
         self.logger.info(f"RecognizeBatch RPC called - batch_id: {request.batch_id}, count: {len(request.requests)}")
@@ -724,59 +884,58 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
         response.total_count = len(request.requests)
 
         try:
-            success_count = 0
-            loop = asyncio.get_running_loop()
+            # [Issue #450] 全画像を収集して一括バッチ推論
+            image_bytes_list = []
+            request_ids = []
+            languages = None
 
             for ocr_request in request.requests:
-                try:
-                    languages = list(ocr_request.languages) if ocr_request.languages else None
+                image_bytes_list.append(bytes(ocr_request.image_data))
+                request_ids.append(ocr_request.request_id)
+                if languages is None and ocr_request.languages:
+                    languages = list(ocr_request.languages)
 
-                    # 同期処理をスレッドプールで実行（逐次）
-                    result = await loop.run_in_executor(
-                        self.executor,
-                        self.engine.recognize,
-                        ocr_request.image_data,
-                        languages
-                    )
+            # 同期的なバッチ推論をスレッドプールで実行
+            loop = asyncio.get_running_loop()
+            batch_results = await loop.run_in_executor(
+                self.executor,
+                self.engine.recognize_batch,
+                image_bytes_list,
+                languages
+            )
 
-                    ocr_response = response.responses.add()
-                    ocr_response.request_id = ocr_request.request_id
-                    ocr_response.is_success = result["success"]
-                    ocr_response.processing_time_ms = result["processing_time_ms"]
-                    ocr_response.engine_name = result["engine_name"]
-                    ocr_response.engine_version = result["engine_version"]
-                    ocr_response.region_count = len(result["regions"])
+            # 結果をgRPCレスポンスに変換
+            success_count = 0
+            for i, result in enumerate(batch_results):
+                ocr_response = response.responses.add()
+                ocr_response.request_id = request_ids[i] if i < len(request_ids) else ""
+                ocr_response.is_success = result["success"]
+                ocr_response.processing_time_ms = result["processing_time_ms"]
+                ocr_response.engine_name = result["engine_name"]
+                ocr_response.engine_version = result["engine_version"]
+                ocr_response.region_count = len(result["regions"])
 
-                    for region_data in result["regions"]:
-                        region = ocr_response.regions.add()
-                        region.text = region_data["text"]
-                        region.confidence = region_data["confidence"]
-                        region.line_index = region_data["line_index"]
+                for region_data in result["regions"]:
+                    region = ocr_response.regions.add()
+                    region.text = region_data["text"]
+                    region.confidence = region_data["confidence"]
+                    region.line_index = region_data["line_index"]
 
-                        bbox = region_data["bbox"]
-                        region.bounding_box.x = bbox["x"]
-                        region.bounding_box.y = bbox["y"]
-                        region.bounding_box.width = bbox["width"]
-                        region.bounding_box.height = bbox["height"]
+                    bbox = region_data["bbox"]
+                    region.bounding_box.x = bbox["x"]
+                    region.bounding_box.y = bbox["y"]
+                    region.bounding_box.width = bbox["width"]
+                    region.bounding_box.height = bbox["height"]
 
-                        for point in bbox["points"]:
-                            p = region.bounding_box.points.add()
-                            p.x = point["x"]
-                            p.y = point["y"]
+                    for point in bbox["points"]:
+                        p = region.bounding_box.points.add()
+                        p.x = point["x"]
+                        p.y = point["y"]
 
-                    ocr_response.timestamp.FromDatetime(datetime.utcnow())
+                ocr_response.timestamp.FromDatetime(datetime.utcnow())
 
-                    if result["success"]:
-                        success_count += 1
-
-                except Exception as e:
-                    self.logger.error(f"RecognizeBatch item error (request_id: {ocr_request.request_id}): {e}")
-                    ocr_response = response.responses.add()
-                    ocr_response.request_id = ocr_request.request_id
-                    ocr_response.is_success = False
-                    ocr_response.error.error_type = ocr_pb2.OCR_ERROR_TYPE_PROCESSING_ERROR
-                    ocr_response.error.message = str(e)
-                    ocr_response.timestamp.FromDatetime(datetime.utcnow())
+                if result["success"]:
+                    success_count += 1
 
             response.success_count = success_count
             response.is_success = success_count > 0
