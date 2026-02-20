@@ -6,7 +6,7 @@
 .DESCRIPTION
     - Gitタグからバージョンを取得し、unified_server.pyに埋め込み
     - CPU版とCUDA版を順次ビルド
-    - models-v2リリースへのアップロード準備
+    - models-v3リリースへのアップロード準備
 
 .PARAMETER All
     CPU版とCUDA版の両方をビルド（デフォルト）
@@ -258,12 +258,12 @@ foreach ($type in $buildSuccess.Keys) {
 
 # Step 7: アップロード（オプション）
 if ($Upload) {
-    Write-Host "`n[Step 5] Uploading to GitHub Releases (models-v2)" -ForegroundColor Green
+    Write-Host "`n[Step 5] Uploading to GitHub Releases (models-v3)" -ForegroundColor Green
 
     foreach ($type in $packages.Keys) {
         if ($packages[$type] -and (Test-Path $packages[$type])) {
             Write-Host "  Uploading $($packages[$type])..." -ForegroundColor Cyan
-            gh release upload models-v2 $packages[$type] --clobber
+            gh release upload models-v3 $packages[$type] --clobber
         }
     }
 
@@ -272,7 +272,7 @@ if ($Upload) {
     if (Test-Path $splitDir) {
         Get-ChildItem $splitDir -Filter "*.zip.*" | ForEach-Object {
             Write-Host "  Uploading $($_.Name)..." -ForegroundColor Cyan
-            gh release upload models-v2 $_.FullName --clobber
+            gh release upload models-v3 $_.FullName --clobber
         }
     }
 }

@@ -72,7 +72,7 @@ jobs:
       shell: pwsh
 
     # [Issue #292] BaketaTranslationServer is no longer built here
-    # It's replaced by BaketaUnifiedServer which is distributed via models-v2 release
+    # It's replaced by BaketaUnifiedServer which is distributed via models-v3 release
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
@@ -122,7 +122,7 @@ jobs:
       shell: pwsh
 
     # [Issue #292] Translation Server is no longer copied here
-    # BaketaUnifiedServer is auto-downloaded from models-v2 on first run
+    # BaketaUnifiedServer is auto-downloaded from models-v3 on first run
 
     - name: Optimize package size
       run: |
@@ -310,7 +310,7 @@ jobs:
         1. Download ``Baketa.zip``
         2. Extract to desired location
         3. Run ``Baketa.UI.exe``
-        4. On first run, required components will be downloaded automatically from [Model Assets v2](https://github.com/koizumiiiii/Baketa/releases/tag/models-v2)
+        4. On first run, required components will be downloaded automatically from [Model Assets v3](https://github.com/koizumiiiii/Baketa/releases/tag/models-v3)
 
         ### Auto-Update
 
@@ -319,13 +319,13 @@ jobs:
         - Click to download and install the update automatically
         - The application will restart with the new version
 
-        ### Auto-Downloaded Components (from models-v2)
+        ### Auto-Downloaded Components (from models-v3)
 
         The following components are downloaded automatically on first run:
         - **BaketaUnifiedServer.zip** (~300MB CPU / ~2.7GB CUDA) - Unified AI Server (OCR + Translation)
         - **surya-detection-onnx.zip** (~31MB) - Detection model (ONNX INT8)
         - **surya-recognition-quantized.zip** (~665MB) - Recognition model (Quantized PyTorch)
-        - **nllb-200-distilled-600M-ct2.zip** (~1.1GB) - Translation model
+        - **nllb-200-onnx-int8.zip** (~1.8GB) - Translation model (ONNX INT8)
 
         ### System Requirements
 

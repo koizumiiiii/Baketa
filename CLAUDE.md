@@ -137,12 +137,13 @@ py -3.10 -m venv venv_build_cuda
 .\venv_build_cuda\Scripts\pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cu126
 ```
 
-### models-v2 リリース（統合AIサーバー配布）
+### models-v3 リリース（統合AIサーバー + モデル配布）
 
-Issue #292: 統合AIサーバー（BaketaUnifiedServer.exe）は `models-v2` リリースで配布されます。
+Issue #292: 統合AIサーバー（BaketaUnifiedServer.exe）は `models-v3` リリースで配布されます。
 OCRと翻訳を単一プロセスで実行し、VRAMを効率的に使用します。
+翻訳モデルはPR #451でC# ONNX直接推論に移行しました。
 
-**リリースURL:** https://github.com/koizumiiiii/Baketa/releases/tag/models-v2
+**リリースURL:** https://github.com/koizumiiiii/Baketa/releases/tag/models-v3
 
 **アセット構成:**
 | ファイル | 説明 | サイズ |
@@ -151,7 +152,7 @@ OCRと翻訳を単一プロセスで実行し、VRAMを効率的に使用しま�
 | BaketaUnifiedServer-cuda.zip.001/.002 | CUDA版統合AIサーバー（分割） | ~2.7GB |
 | surya-detection-onnx.zip | OCR検出モデル (ONNX INT8) | ~31MB |
 | surya-recognition-quantized.zip | OCR認識モデル (PyTorch量子化) | ~665MB |
-| nllb-200-distilled-600M-ct2-int8.zip | NLLB翻訳モデル (CTranslate2 int8量子化) | ~1GB |
+| nllb-200-onnx-int8.zip | NLLB翻訳モデル (ONNX INT8量子化、C#直接推論) | ~1.8GB |
 
 **CUDA版の結合方法:**
 ```cmd
@@ -163,8 +164,8 @@ copy /b BaketaUnifiedServer-cuda.zip.001+BaketaUnifiedServer-cuda.zip.002 Baketa
 2. CUDA版: `.\venv_build_cuda\Scripts\pyinstaller BaketaUnifiedServer.spec`
 3. GitHub 2GB制限のため、CUDA版は分割してアップロード
 
-**旧バージョン (models-v1):**
-models-v1 は後方互換性のために残されていますが、新規インストールでは使用されません。
+**旧バージョン (models-v1, models-v2):**
+models-v1, models-v2 は後方互換性のために残されていますが、新規インストールでは使用されません。
 
 ### 開発時のBaketaUnifiedServer同期 (重要)
 
@@ -226,9 +227,9 @@ git push origin v0.2.1
 release/
 ├── Baketa.exe
 ├── grpc_server/
-│   └── BaketaUnifiedServer/      # 初回起動時にmodels-v2から自動ダウンロード
+│   └── BaketaUnifiedServer/      # 初回起動時にmodels-v3から自動ダウンロード
 └── Models/
-    ├── nllb-200-ct2/                 # NLLB翻訳モデル（CTranslate2 int8、自動ダウンロード）
+    ├── nllb-200-onnx-int8/           # NLLB翻訳モデル（ONNX INT8、自動ダウンロード）
     └── surya-quantized/              # Surya OCRモデル（自動ダウンロード）
 ```
 

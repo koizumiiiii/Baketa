@@ -193,9 +193,9 @@ public sealed class ServerManagerHostedService : IHostedService
     {
         try
         {
-            // %AppData%\Baketa\Models\nllb-200-distilled-600M-ct2\model.bin をチェック
-            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var modelPath = Path.Combine(appDataPath, "Baketa", "Models", "nllb-200-distilled-600M-ct2", "model.bin");
+            // ONNX INT8モデルの存在チェック（BaseDirectory/Models/nllb-200-onnx-int8）
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var modelPath = Path.Combine(baseDir, "Models", "nllb-200-onnx-int8", "encoder_model_quantized.onnx");
 
             if (!File.Exists(modelPath))
             {

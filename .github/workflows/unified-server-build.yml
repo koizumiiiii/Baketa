@@ -149,35 +149,35 @@ jobs:
 
         Write-Host "Commit: $commitHash ($commitDate)"
 
-    - name: Update models-v2 release
+    - name: Update models-v3 release
       working-directory: .
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        Write-Host "🚀 Updating models-v2 release..."
+        Write-Host "🚀 Updating models-v3 release..."
 
         $zipPath = "grpc_server/BaketaUnifiedServer-cpu.zip"
         $commitHash = "${{ steps.version.outputs.commit-hash }}"
         $commitDate = "${{ steps.version.outputs.commit-date }}"
 
-        # Check if models-v2 release exists
-        $releaseExists = gh release view models-v2 2>&1
+        # Check if models-v3 release exists
+        $releaseExists = gh release view models-v3 2>&1
         if ($LASTEXITCODE -ne 0) {
-          Write-Host "❌ models-v2 release not found. Please create it manually first."
+          Write-Host "❌ models-v3 release not found. Please create it manually first."
           exit 1
         }
 
         # Upload new asset (--clobber overwrites existing)
         Write-Host "Uploading BaketaUnifiedServer-cpu.zip..."
-        gh release upload models-v2 $zipPath --clobber
+        gh release upload models-v3 $zipPath --clobber
 
         if ($LASTEXITCODE -eq 0) {
-          Write-Host "✅ Successfully updated models-v2 release"
+          Write-Host "✅ Successfully updated models-v3 release"
 
           # Update release notes with build info
           $notesFile = "release-notes.md"
           @(
-            "## Model Assets v2",
+            "## Model Assets v3",
             "",
             "This release contains model assets for Baketa.",
             "",
@@ -189,17 +189,17 @@ jobs:
             "### Other Assets",
             "- surya-detection-onnx.zip - OCR detection model",
             "- surya-recognition-quantized.zip - OCR recognition model",
-            "- nllb-200-distilled-600M-ct2-int8.zip - Translation model"
+            "- nllb-200-onnx-int8.zip - Translation model (ONNX INT8)"
           ) | Out-File -FilePath $notesFile -Encoding utf8
 
-          gh release edit models-v2 --notes-file $notesFile
+          gh release edit models-v3 --notes-file $notesFile
           Remove-Item $notesFile
 
           echo "## Deployment" >> $env:GITHUB_STEP_SUMMARY
-          echo "- Release: models-v2" >> $env:GITHUB_STEP_SUMMARY
+          echo "- Release: models-v3" >> $env:GITHUB_STEP_SUMMARY
           echo "- Asset: BaketaUnifiedServer-cpu.zip" >> $env:GITHUB_STEP_SUMMARY
           echo "- Commit: $commitHash" >> $env:GITHUB_STEP_SUMMARY
         } else {
-          Write-Host "❌ Failed to upload to models-v2"
+          Write-Host "❌ Failed to upload to models-v3"
           exit 1
         }

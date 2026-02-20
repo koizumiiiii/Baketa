@@ -464,12 +464,20 @@ public class InfrastructureModule : ServiceModuleBase
     /// </summary>
     private static string ResolveDefaultOnnxModelDirectory()
     {
+        // 1. BaseDirectory（リリース版: ComponentDownloadServiceのダウンロード先）
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;
         var int8Dir = System.IO.Path.Combine(baseDir, "Models", "nllb-200-onnx-int8");
         if (System.IO.Directory.Exists(int8Dir))
             return int8Dir;
 
-        return System.IO.Path.Combine(baseDir, "Models", "nllb-200-onnx");
+        // 2. カレントディレクトリ（開発時: dotnet run のワーキングディレクトリ）
+        var currentDir = System.IO.Directory.GetCurrentDirectory();
+        var devInt8Dir = System.IO.Path.Combine(currentDir, "Models", "nllb-200-onnx-int8");
+        if (System.IO.Directory.Exists(devInt8Dir))
+            return devInt8Dir;
+
+        // フォールバック: BaseDirectory配下（ダウンロード前の初回起動時はまだ存在しない）
+        return int8Dir;
     }
 
     /// <summary>

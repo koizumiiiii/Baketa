@@ -61,9 +61,9 @@ BaketaUnifiedServerは、**Surya OCR**と**NLLB-200翻訳**を単一プロセス
 
 ## 配布形態
 
-統合AIサーバーは `models-v2` リリースで配布されます。
+統合AIサーバーは `models-v3` リリースで配布されます。
 
-**リリースURL**: https://github.com/koizumiiiii/Baketa/releases/tag/models-v2
+**リリースURL**: https://github.com/koizumiiiii/Baketa/releases/tag/models-v3
 
 | アセット | 説明 | サイズ |
 |---------|------|--------|
