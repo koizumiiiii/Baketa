@@ -1,0 +1,300 @@
+{
+  "config": {
+    "sentences_per_pair": 50,
+    "max_length": 128,
+    "num_pairs": 34
+  },
+  "memory": {
+    "original": {
+      "load_time": 5.528736352920532,
+      "mem_delta_mb": 1817.2890625,
+      "mem_total_mb": 1933.46875
+    },
+    "sliced": {
+      "load_time": 3.583540916442871,
+      "mem_delta_mb": 1034.48828125,
+      "mem_total_mb": 1191.05859375
+    }
+  },
+  "pairs": {
+    "jpn_Jpan→eng_Latn": {
+      "bleu_original": 18.674561412190993,
+      "bleu_sliced": 19.37604292145735,
+      "bleu_diff": 0.7014815092663582,
+      "latency_original_mean": 0.7363193988800049,
+      "latency_sliced_mean": 0.549637565612793,
+      "speed_ratio": 1.3396453316633836
+    },
+    "zho_Hans→eng_Latn": {
+      "bleu_original": 22.101579013101734,
+      "bleu_sliced": 24.858802171325003,
+      "bleu_diff": 2.757223158223269,
+      "latency_original_mean": 0.8008366107940674,
+      "latency_sliced_mean": 0.5426227474212646,
+      "speed_ratio": 1.4758625851937217
+    },
+    "zho_Hant→eng_Latn": {
+      "bleu_original": 17.830204833520547,
+      "bleu_sliced": 18.307949172007152,
+      "bleu_diff": 0.47774433848660536,
+      "latency_original_mean": 0.875240330696106,
+      "latency_sliced_mean": 0.614985179901123,
+      "speed_ratio": 1.4231893048818292
+    },
+    "kor_Hang→eng_Latn": {
+      "bleu_original": 20.541268930653146,
+      "bleu_sliced": 20.510605112404583,
+      "bleu_diff": -0.03066381824856279,
+      "latency_original_mean": 0.7302665424346924,
+      "latency_sliced_mean": 0.5486994028091431,
+      "speed_ratio": 1.3309045694163162
+    },
+    "fra_Latn→eng_Latn": {
+      "bleu_original": 38.64407832894664,
+      "bleu_sliced": 39.70606923495174,
+      "bleu_diff": 1.0619909060051,
+      "latency_original_mean": 0.8043068742752075,
+      "latency_sliced_mean": 0.5356446027755737,
+      "speed_ratio": 1.5015681481853724
+    },
+    "deu_Latn→eng_Latn": {
+      "bleu_original": 36.260904681193395,
+      "bleu_sliced": 36.85653122659273,
+      "bleu_diff": 0.5956265453993339,
+      "latency_original_mean": 0.7839781427383423,
+      "latency_sliced_mean": 0.5795877838134765,
+      "speed_ratio": 1.3526478035476381
+    },
+    "spa_Latn→eng_Latn": {
+      "bleu_original": 28.3338878745756,
+      "bleu_sliced": 29.807805608597143,
+      "bleu_diff": 1.4739177340215441,
+      "latency_original_mean": 0.7858994579315186,
+      "latency_sliced_mean": 0.5889243268966675,
+      "speed_ratio": 1.334465944160959
+    },
+    "rus_Cyrl→eng_Latn": {
+      "bleu_original": 29.88004757042802,
+      "bleu_sliced": 30.500187490686887,
+      "bleu_diff": 0.6201399202588682,
+      "latency_original_mean": 0.7948169136047363,
+      "latency_sliced_mean": 0.5660886859893799,
+      "speed_ratio": 1.4040501661247606
+    },
+    "arb_Arab→eng_Latn": {
+      "bleu_original": 34.06832958099069,
+      "bleu_sliced": 34.259433621201076,
+      "bleu_diff": 0.19110404021038363,
+      "latency_original_mean": 0.8291384029388428,
+      "latency_sliced_mean": 0.6272499227523803,
+      "speed_ratio": 1.3218629016334882
+    },
+    "por_Latn→eng_Latn": {
+      "bleu_original": 44.123969208949404,
+      "bleu_sliced": 44.5209446249899,
+      "bleu_diff": 0.39697541604049746,
+      "latency_original_mean": 0.8129192447662353,
+      "latency_sliced_mean": 0.5576702785491944,
+      "speed_ratio": 1.457705881118648
+    },
+    "ita_Latn→eng_Latn": {
+      "bleu_original": 31.91389436131688,
+      "bleu_sliced": 32.48549809269161,
+      "bleu_diff": 0.5716037313747258,
+      "latency_original_mean": 0.7844477272033692,
+      "latency_sliced_mean": 0.5493115901947021,
+      "speed_ratio": 1.4280560272273222
+    },
+    "nld_Latn→eng_Latn": {
+      "bleu_original": 33.88195236221567,
+      "bleu_sliced": 33.1938555149188,
+      "bleu_diff": -0.6880968472968689,
+      "latency_original_mean": 0.7418238592147827,
+      "latency_sliced_mean": 0.5325910663604736,
+      "speed_ratio": 1.3928582472930442
+    },
+    "pol_Latn→eng_Latn": {
+      "bleu_original": 26.860169460433134,
+      "bleu_sliced": 26.94080127939953,
+      "bleu_diff": 0.08063181896639549,
+      "latency_original_mean": 0.7963924741744995,
+      "latency_sliced_mean": 0.5999925470352173,
+      "speed_ratio": 1.3273372779541448
+    },
+    "tur_Latn→eng_Latn": {
+      "bleu_original": 30.108309466927093,
+      "bleu_sliced": 30.4689508838399,
+      "bleu_diff": 0.3606414169128058,
+      "latency_original_mean": 0.748157434463501,
+      "latency_sliced_mean": 0.5426641321182251,
+      "speed_ratio": 1.3786749301877705
+    },
+    "vie_Latn→eng_Latn": {
+      "bleu_original": 35.44631548728245,
+      "bleu_sliced": 33.995733643418184,
+      "bleu_diff": -1.4505818438642635,
+      "latency_original_mean": 0.78221670627594,
+      "latency_sliced_mean": 0.5477257394790649,
+      "speed_ratio": 1.428117486353474
+    },
+    "tha_Thai→eng_Latn": {
+      "bleu_original": 22.35101723258217,
+      "bleu_sliced": 23.322983005946085,
+      "bleu_diff": 0.971965773363916,
+      "latency_original_mean": 0.8488028907775879,
+      "latency_sliced_mean": 0.5589632844924927,
+      "speed_ratio": 1.518530669770651
+    },
+    "ind_Latn→eng_Latn": {
+      "bleu_original": 36.20848223158492,
+      "bleu_sliced": 36.48133564816986,
+      "bleu_diff": 0.2728534165849439,
+      "latency_original_mean": 0.7520688915252686,
+      "latency_sliced_mean": 0.546042857170105,
+      "speed_ratio": 1.3773074432708523
+    },
+    "hin_Deva→eng_Latn": {
+      "bleu_original": 39.668146295849944,
+      "bleu_sliced": 40.43427534177722,
+      "bleu_diff": 0.7661290459272792,
+      "latency_original_mean": 0.7521296215057373,
+      "latency_sliced_mean": 0.5487306690216065,
+      "speed_ratio": 1.3706717411053286
+    },
+    "ukr_Cyrl→eng_Latn": {
+      "bleu_original": 35.283065556364505,
+      "bleu_sliced": 36.20810284062476,
+      "bleu_diff": 0.9250372842602559,
+      "latency_original_mean": 0.7797793817520141,
+      "latency_sliced_mean": 0.5682614374160767,
+      "speed_ratio": 1.3722194229784865
+    },
+    "ces_Latn→eng_Latn": {
+      "bleu_original": 37.50882770947348,
+      "bleu_sliced": 37.64414944574533,
+      "bleu_diff": 0.13532173627184818,
+      "latency_original_mean": 0.8123163557052613,
+      "latency_sliced_mean": 0.5511359167098999,
+      "speed_ratio": 1.4738947890649599
+    },
+    "hun_Latn→eng_Latn": {
+      "bleu_original": 28.03020043012857,
+      "bleu_sliced": 28.26642918369742,
+      "bleu_diff": 0.23622875356884876,
+      "latency_original_mean": 0.826191782951355,
+      "latency_sliced_mean": 0.5414799308776855,
+      "speed_ratio": 1.5258031477033316
+    },
+    "ron_Latn→eng_Latn": {
+      "bleu_original": 45.56543452184877,
+      "bleu_sliced": 43.93589323083056,
+      "bleu_diff": -1.6295412910182137,
+      "latency_original_mean": 0.8066107892990112,
+      "latency_sliced_mean": 0.6304207992553711,
+      "speed_ratio": 1.2794799763138351
+    },
+    "zsm_Latn→eng_Latn": {
+      "bleu_original": 40.96561362458414,
+      "bleu_sliced": 40.81735126495223,
+      "bleu_diff": -0.14826235963190726,
+      "latency_original_mean": 0.7610031747817994,
+      "latency_sliced_mean": 0.5284232044219971,
+      "speed_ratio": 1.4401395858726609
+    },
+    "ben_Beng→eng_Latn": {
+      "bleu_original": 33.6497323832519,
+      "bleu_sliced": 33.86734948969644,
+      "bleu_diff": 0.21761710644453558,
+      "latency_original_mean": 0.7589825057983398,
+      "latency_sliced_mean": 0.5356762790679932,
+      "speed_ratio": 1.4168678648956985
+    },
+    "fin_Latn→eng_Latn": {
+      "bleu_original": 26.853532892162708,
+      "bleu_sliced": 27.51498706603501,
+      "bleu_diff": 0.6614541738723041,
+      "latency_original_mean": 0.7574917840957641,
+      "latency_sliced_mean": 0.5263568019866943,
+      "speed_ratio": 1.4391222479441097
+    },
+    "nob_Latn→eng_Latn": {
+      "bleu_original": 37.149024357622096,
+      "bleu_sliced": 37.67813087955259,
+      "bleu_diff": 0.529106521930494,
+      "latency_original_mean": 0.7885493469238282,
+      "latency_sliced_mean": 0.5615627527236938,
+      "speed_ratio": 1.4042052167797865
+    },
+    "dan_Latn→eng_Latn": {
+      "bleu_original": 40.48569487592784,
+      "bleu_sliced": 41.85915447671444,
+      "bleu_diff": 1.373459600786596,
+      "latency_original_mean": 0.771655740737915,
+      "latency_sliced_mean": 0.5558046197891235,
+      "speed_ratio": 1.3883579107901027
+    },
+    "ell_Grek→eng_Latn": {
+      "bleu_original": 32.31565340551356,
+      "bleu_sliced": 32.48248677489072,
+      "bleu_diff": 0.16683336937715865,
+      "latency_original_mean": 0.7928714847564697,
+      "latency_sliced_mean": 0.5583693361282349,
+      "speed_ratio": 1.4199767670880463
+    },
+    "swe_Latn→eng_Latn": {
+      "bleu_original": 37.98859345263218,
+      "bleu_sliced": 37.88221758386858,
+      "bleu_diff": -0.10637586876359961,
+      "latency_original_mean": 0.7937086057662964,
+      "latency_sliced_mean": 0.5886252737045288,
+      "speed_ratio": 1.3484106803146088
+    },
+    "eng_Latn→jpn_Jpan": {
+      "bleu_original": 0.1710203132066466,
+      "bleu_sliced": 0.1336147672500636,
+      "bleu_diff": -0.03740554595658299,
+      "latency_original_mean": 0.8862690544128418,
+      "latency_sliced_mean": 0.6697321939468384,
+      "speed_ratio": 1.3233185778182728
+    },
+    "eng_Latn→zho_Hans": {
+      "bleu_original": 1.2422228520158394,
+      "bleu_sliced": 1.2206935081379582,
+      "bleu_diff": -0.02152934387788119,
+      "latency_original_mean": 0.6992901706695557,
+      "latency_sliced_mean": 0.4756376838684082,
+      "speed_ratio": 1.470216079142762
+    },
+    "eng_Latn→fra_Latn": {
+      "bleu_original": 42.72580273147709,
+      "bleu_sliced": 40.703669732769995,
+      "bleu_diff": -2.022132998707093,
+      "latency_original_mean": 1.004595823287964,
+      "latency_sliced_mean": 0.6964030981063842,
+      "speed_ratio": 1.4425493310118782
+    },
+    "eng_Latn→deu_Latn": {
+      "bleu_original": 23.090784956521187,
+      "bleu_sliced": 23.64553177726757,
+      "bleu_diff": 0.5547468207463844,
+      "latency_original_mean": 0.922424807548523,
+      "latency_sliced_mean": 0.7054246664047241,
+      "speed_ratio": 1.3076163217395904
+    },
+    "eng_Latn→rus_Cyrl": {
+      "bleu_original": 27.92260435606337,
+      "bleu_sliced": 27.775987932038362,
+      "bleu_diff": -0.14661642402500874,
+      "latency_original_mean": 0.9556545782089233,
+      "latency_sliced_mean": 0.6315837192535401,
+      "speed_ratio": 1.5131083165639514
+    }
+  },
+  "summary": {
+    "bleu_diff_mean": 0.28878317049736674,
+    "bleu_diff_median": 0.31674741674887485,
+    "bleu_diff_std": 0.8589762782875785,
+    "speed_ratio_mean": 1.4037865498561997,
+    "speed_ratio_median": 1.4041276914522736
+  }
+}

@@ -6,7 +6,7 @@ namespace Baketa.Infrastructure.Translation.Onnx;
 
 /// <summary>
 /// NLLB-200 用トークナイザー
-/// SentencePiece BPE モデル + 言語コードトークン
+/// SentencePiece BPE モデル + 言語コードトークン + ボキャブラリマッピング
 /// </summary>
 internal sealed class NllbTokenizer
 {
@@ -14,7 +14,12 @@ internal sealed class NllbTokenizer
     private readonly Dictionary<string, int> _langCodeToId;
     private readonly Dictionary<int, string> _idToLangCode;
 
-    // 特殊トークン
+    // ボキャブラリスライシング用マッピング（Issue #452）
+    // null の場合はマッピング不要（オリジナルvocab使用）
+    private readonly int[]? _newToOld;  // new_id → old_fairseq_id
+    private readonly Dictionary<int, int>? _oldToNew;  // old_fairseq_id → new_id
+
+    // 特殊トークン（スライス後も位置は変わらない）
     public const int BosTokenId = 0;  // <s>
     public const int PadTokenId = 1;  // <pad>
     public const int EosTokenId = 2;  // </s>
@@ -27,11 +32,17 @@ internal sealed class NllbTokenizer
 
     public string SourceLanguage { get; set; } = "eng_Latn";
 
-    private NllbTokenizer(Tokenizer spTokenizer, Dictionary<string, int> langCodes)
+    private NllbTokenizer(
+        Tokenizer spTokenizer,
+        Dictionary<string, int> langCodes,
+        int[]? newToOld = null,
+        Dictionary<int, int>? oldToNew = null)
     {
         _spTokenizer = spTokenizer;
         _langCodeToId = langCodes;
         _idToLangCode = langCodes.ToDictionary(kv => kv.Value, kv => kv.Key);
+        _newToOld = newToOld;
+        _oldToNew = oldToNew;
     }
 
     /// <summary>
@@ -41,6 +52,7 @@ internal sealed class NllbTokenizer
     {
         var spModelPath = Path.Combine(modelDir, "sentencepiece.bpe.model");
         var langCodesPath = Path.Combine(modelDir, "lang_codes.json");
+        var vocabMappingPath = Path.Combine(modelDir, "vocab_mapping.json");
 
         if (!File.Exists(spModelPath))
             throw new FileNotFoundException("SentencePiece モデルが見つかりません", spModelPath);
@@ -59,7 +71,7 @@ internal sealed class NllbTokenizer
         }
         else
         {
-            // フォールバック: 主要言語のみ
+            // フォールバック: 主要言語のみ（オリジナルvocab用）
             langCodes = new Dictionary<string, int>
             {
                 ["eng_Latn"] = 256047,
@@ -75,12 +87,27 @@ internal sealed class NllbTokenizer
             };
         }
 
-        return new NllbTokenizer(spTokenizer, langCodes);
+        // ボキャブラリマッピング読み込み（Issue #452: スライス済みモデル用）
+        int[]? newToOld = null;
+        Dictionary<int, int>? oldToNew = null;
+        if (File.Exists(vocabMappingPath))
+        {
+            var mappingJson = File.ReadAllText(vocabMappingPath);
+            var mapping = JsonSerializer.Deserialize<VocabMappingData>(mappingJson)
+                ?? throw new InvalidOperationException("vocab_mapping.json の解析に失敗");
+
+            newToOld = mapping.NewToOld;
+            oldToNew = [];
+            for (int i = 0; i < newToOld.Length; i++)
+                oldToNew[newToOld[i]] = i;
+        }
+
+        return new NllbTokenizer(spTokenizer, langCodes, newToOld, oldToNew);
     }
 
     /// <summary>
     /// テキストをトークンIDに変換
-    /// 出力: [src_lang_id, sp_token_1, sp_token_2, ..., eos_id]
+    /// 出力: [src_lang_id, token_1, token_2, ..., eos_id]
     /// </summary>
     public int[] Encode(string text)
     {
@@ -91,18 +118,32 @@ internal sealed class NllbTokenizer
         var encoded = _spTokenizer.EncodeToIds(text);
 
         // SP 特殊トークン (0=unk, 1=bos, 2=eos) をフィルタリング
-        var spTokens = new List<int>();
-        foreach (var id in encoded)
+        var tokens = new List<int>();
+        foreach (var spId in encoded)
         {
-            if (id >= 3) // SP の通常トークンのみ
-                spTokens.Add(id + FairseqOffset);
+            if (spId < 3) continue; // SP の特殊トークンをスキップ
+
+            var fairseqId = spId + FairseqOffset;
+
+            if (_oldToNew != null)
+            {
+                // スライス済みモデル: fairseq ID → new ID にマッピング
+                if (_oldToNew.TryGetValue(fairseqId, out var newId))
+                    tokens.Add(newId);
+                else
+                    tokens.Add(UnkTokenId); // スライスで除外されたトークンは <unk> に
+            }
+            else
+            {
+                tokens.Add(fairseqId);
+            }
         }
 
-        // [src_lang] + [sp_tokens + offset...] + [eos]
-        var result = new int[spTokens.Count + 2];
+        // [src_lang] + [tokens...] + [eos]
+        var result = new int[tokens.Count + 2];
         result[0] = srcLangId;
-        for (int i = 0; i < spTokens.Count; i++)
-            result[i + 1] = spTokens[i];
+        for (int i = 0; i < tokens.Count; i++)
+            result[i + 1] = tokens[i];
         result[^1] = EosTokenId;
 
         return result;
@@ -129,7 +170,7 @@ internal sealed class NllbTokenizer
     /// </summary>
     public string Decode(ReadOnlySpan<int> tokenIds)
     {
-        // 特殊トークンと言語コードをフィルタリングし、オフセットを元に戻す
+        // 特殊トークンと言語コードをフィルタリングし、SP内部IDに変換
         var filtered = new List<int>();
         foreach (var id in tokenIds)
         {
@@ -137,13 +178,43 @@ internal sealed class NllbTokenizer
                 continue;
             if (_idToLangCode.ContainsKey(id))
                 continue;
+
+            int fairseqId;
+            if (_newToOld != null)
+            {
+                // スライス済みモデル: new ID → old fairseq ID に復元
+                if (id >= 0 && id < _newToOld.Length)
+                    fairseqId = _newToOld[id];
+                else
+                    continue; // 範囲外はスキップ
+            }
+            else
+            {
+                fairseqId = id;
+            }
+
             // fairseq オフセットを元に戻して SP 内部IDに変換
-            filtered.Add(id - FairseqOffset);
+            filtered.Add(fairseqId - FairseqOffset);
         }
 
         if (filtered.Count == 0)
             return string.Empty;
 
         return _spTokenizer.Decode(filtered) ?? string.Empty;
+    }
+
+    /// <summary>
+    /// vocab_mapping.json のデシリアライズ用モデル
+    /// </summary>
+    private sealed class VocabMappingData
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("new_vocab_size")]
+        public int NewVocabSize { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("original_vocab_size")]
+        public int OriginalVocabSize { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("new_to_old")]
+        public int[] NewToOld { get; set; } = [];
     }
 }
