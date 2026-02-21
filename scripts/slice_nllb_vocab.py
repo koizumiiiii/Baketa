@@ -24,6 +24,7 @@ import os
 import sys
 import shutil
 import time
+from sentencepiece import sentencepiece_model_pb2 as sp_pb2
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -133,9 +134,8 @@ print()
 print('=== Step 3: 出力ディレクトリ準備 ===')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# 非ボキャブラリファイルをコピー
+# 非ボキャブラリファイルをコピー（SPモデル以外）
 copy_files = [
-    'sentencepiece.bpe.model',
     'config.json',
     'generation_config.json',
     'tokenizer_config.json',
@@ -146,6 +146,25 @@ for fname in copy_files:
     if os.path.exists(src):
         shutil.copy2(src, os.path.join(OUTPUT_DIR, fname))
         print(f'  コピー: {fname}')
+
+# SentencePieceモデルを修正してコピー
+# 削除されたトークンをUNUSED(type=5)に変更し、BPEがサブトークンに自然分解するようにする
+# これにより、スライスで除外されたトークン（例: "Server","Dragon"等）が
+# <unk>ではなく保持済みサブワード（例: "Ser"+"ver"）で表現される
+sp_src = os.path.join(MODEL_DIR, 'sentencepiece.bpe.model')
+sp_dst = os.path.join(OUTPUT_DIR, 'sentencepiece.bpe.model')
+sp_model = sp_pb2.ModelProto()
+with open(sp_src, 'rb') as f:
+    sp_model.ParseFromString(f.read())
+modified_count = 0
+for i, p in enumerate(sp_model.pieces):
+    if i not in sp_keep_ids and p.type == 1:  # NORMAL → UNUSED
+        p.type = 5
+        modified_count += 1
+with open(sp_dst, 'wb') as f:
+    f.write(sp_model.SerializeToString())
+print(f'  SPモデル修正: {modified_count:,} ピースをUNUSEDに変更')
+print(f'  保存: sentencepiece.bpe.model (修正済み)')
 
 # vocab_mapping.json を保存
 mapping_data = {

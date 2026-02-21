@@ -231,7 +231,16 @@ for i, p in enumerate(model.pieces):
     if p.type == 1 and p.score >= high_score_threshold:
         high_score_ids.add(i)
 
-hybrid_safe = (reachable_ids & (corpus_token_ids | high_score_ids)) | always_keep
+# 到達可能な単一文字ピースは常に保持（BPEの基礎単位であり、
+# type=UNUSEDにしてもSPの文字レベルマッチングは無効化されないため）
+reachable_single_chars = set()
+for i, p in enumerate(model.pieces):
+    if p.type == 1 and i in reachable_ids:
+        clean = p.piece.replace('\u2581', '')
+        if len(clean) <= 1:
+            reachable_single_chars.add(i)
+
+hybrid_safe = (reachable_ids & (corpus_token_ids | high_score_ids)) | always_keep | reachable_single_chars
 
 print(f'全語彙: {sp.GetPieceSize():,}')
 print()
