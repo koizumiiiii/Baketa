@@ -9,15 +9,15 @@ using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Server;
 using Baketa.Core.Events;
 using Baketa.Core.Settings;
-using Baketa.Translation.V1;
+using Baketa.Ocr.V1;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Services;
 
 /// <summary>
-/// Issue #292: OCR+翻訳統合AIサーバー管理
-/// OCRと翻訳を単一プロセスで実行することでVRAMを削減
+/// Issue #292: Surya OCR AIサーバー管理
+/// [Issue #458] 翻訳はC# OnnxTranslationEngineに移行済み。OCRのみを管理。
 /// </summary>
 public sealed class UnifiedServerManager : IUnifiedAIServerManager
 {
@@ -302,11 +302,11 @@ public sealed class UnifiedServerManager : IUnifiedAIServerManager
                 }
             });
 
-            var client = new TranslationService.TranslationServiceClient(channel);
+            var client = new OcrService.OcrServiceClient(channel);
 
-            // gRPC IsReady RPCを呼び出し
+            // [Issue #458] gRPC IsReady RPCを呼び出し（OCRサービス経由）
             var response = await client.IsReadyAsync(
-                new IsReadyRequest(),
+                new OcrIsReadyRequest(),
                 deadline: DateTime.UtcNow.AddSeconds(_settings.HealthCheckTimeoutSeconds),
                 cancellationToken: cancellationToken
             ).ConfigureAwait(false);

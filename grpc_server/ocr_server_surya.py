@@ -451,7 +451,7 @@ def serve(port: int = 50052, device: str = "cuda"):
     # 🔧 [Issue #189] KeepAlive設定 - 長時間OCR処理中の接続切断を防止
     # 根本原因: C#クライアントが10秒ごとにPINGを送信するが、サーバー側デフォルトの
     # max_pings_without_data=2制限に引っかかり「Too many pings」エラーで接続切断
-    # 解決策: Translation Server (start_server.py) と同一のKeepAlive設定を適用
+    # 解決策: C#クライアントに合わせたKeepAlive設定を適用
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=1),
         options=[

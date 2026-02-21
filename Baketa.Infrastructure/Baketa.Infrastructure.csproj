@@ -38,8 +38,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<!-- Phase 2.1: gRPC翻訳サービス定義 -->
-		<Protobuf Include="Translation\Protos\translation.proto" GrpcServices="Client" />
 		<!-- Issue #189: gRPC OCRサービス定義 (Surya OCR) -->
 		<Protobuf Include="OCR\Protos\ocr.proto" GrpcServices="Client" />
 	</ItemGroup>
