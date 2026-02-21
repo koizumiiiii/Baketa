@@ -323,8 +323,6 @@ jobs:
 
         The following components are downloaded automatically on first run:
         - **BaketaUnifiedServer.zip** (~300MB CPU / ~2.7GB CUDA) - Unified AI Server (OCR + Translation)
-        - **surya-detection-onnx.zip** (~31MB) - Detection model (ONNX INT8)
-        - **surya-recognition-quantized.zip** (~665MB) - Recognition model (Quantized PyTorch)
         - **nllb-200-onnx-int8.zip** (~1.8GB) - Translation model (ONNX INT8)
 
         ### System Requirements

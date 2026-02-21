@@ -187,8 +187,6 @@ jobs:
             "- **Auto-built by**: GitHub Actions (Issue #360)",
             "",
             "### Other Assets",
-            "- surya-detection-onnx.zip - OCR detection model",
-            "- surya-recognition-quantized.zip - OCR recognition model",
             "- nllb-200-onnx-int8.zip - Translation model (ONNX INT8)"
           ) | Out-File -FilePath $notesFile -Encoding utf8
 

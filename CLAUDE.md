@@ -150,8 +150,6 @@ OCRと翻訳を単一プロセスで実行し、VRAMを効率的に使用しま�
 |----------|------|--------|
 | BaketaUnifiedServer-cpu.zip | CPU版統合AIサーバー | ~300MB |
 | BaketaUnifiedServer-cuda.zip.001/.002 | CUDA版統合AIサーバー（分割） | ~2.7GB |
-| surya-detection-onnx.zip | OCR検出モデル (ONNX INT8) | ~31MB |
-| surya-recognition-quantized.zip | OCR認識モデル (PyTorch量子化) | ~665MB |
 | nllb-200-onnx-int8.zip | NLLB翻訳モデル (ONNX INT8量子化、C#直接推論) | ~1.8GB |
 
 **CUDA版の結合方法:**
