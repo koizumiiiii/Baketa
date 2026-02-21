@@ -227,8 +227,7 @@ release/
 ├── grpc_server/
 │   └── BaketaUnifiedServer/      # 初回起動時にmodels-v3から自動ダウンロード
 └── Models/
-    ├── nllb-200-onnx-int8/           # NLLB翻訳モデル（ONNX INT8、自動ダウンロード）
-    └── surya-quantized/              # Surya OCRモデル（自動ダウンロード）
+    └── nllb-200-onnx-int8/           # NLLB翻訳モデル（ONNX INT8、自動ダウンロード）
 ```
 
 **開発時にexeが古くてエラーが出る場合:**
@@ -452,14 +451,13 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 ### OCR and Translation Pipeline
 1. **Screen Capture**: Windows Graphics Capture API (native DLL) with PrintWindow fallback
 2. **Image Processing**: OpenCV filters and preprocessing
-3. **OCR**: Surya OCR (gRPC-based Python server)
-   - **Detection**: ONNX INT8 quantized model
-   - **Recognition**: PyTorch quantized model (Issue #197)
+3. **OCR**: Surya OCR (unified Python server)
+   - **Detection**: Surya native model (S3 auto-download)
+   - **Recognition**: Surya Foundation model (S3 auto-download)
    - **Protocol**: gRPC with Keep-Alive
-4. **Translation**: gRPC-based Python translation server
-   - **C# Client**: `GrpcTranslationClient` (HTTP/2 communication)
-   - **Python Server**: NLLB-200 engine with CTranslate2 optimization
-   - **Protocol**: gRPC (port 50051, auto-start, Keep-Alive)
+4. **Translation**: C# ONNX Runtime direct inference
+   - **Engine**: `OnnxTranslationEngine` (NLLB-200 ONNX INT8)
+   - **Tokenizer**: SentencePiece (C# native)
    - **Fallback**: Google Gemini cloud translation
 5. **Overlay Display**: Transparent Avalonia windows
 

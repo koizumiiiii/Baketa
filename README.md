@@ -12,7 +12,7 @@
 
 | カテゴリ | 機能 |
 |---------|------|
-| **OCR** | Surya OCR (ONNX Detection + PyTorch Recognition)、Windows Graphics Capture API |
+| **OCR** | Surya OCR (Detection + Recognition)、Windows Graphics Capture API |
 | **翻訳** | 標準翻訳 (NLLB-200ローカル)、EX翻訳 (高精度クラウド)、gRPC通信 |
 | **ROI Manager** | ゲーム別テキスト位置調整、動的閾値制御、部分OCR最適化 |
 | **統合AIサーバー** | OCR+翻訳を単一プロセスで実行、VRAM 50%削減 |
@@ -79,8 +79,8 @@ Baketa.Core (抽象化・イベント)
 graph LR
     Capture[Windows Graphics Capture] --> Filter[OpenCV Filters]
     Filter --> OCR[Surya OCR Server]
-    OCR --> Det[Detection<br/>ONNX]
-    OCR --> Rec[Recognition<br/>PyTorch]
+    OCR --> Det[Detection]
+    OCR --> Rec[Recognition]
     Rec --> Chunks[Text Chunks]
 ```
 

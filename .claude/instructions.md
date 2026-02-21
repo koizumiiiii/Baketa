@@ -9,8 +9,8 @@
 - **Security**: CodeQL-compliant implementation with security-first design
 - **CI/CD**: GitHub Actions with Windows Server 2022, sequential test execution
 - **Architecture**: Clean Architecture with modular DI and event aggregation
-- **OCR Engine**: Surya OCR (gRPC-based, ONNX INT8 detection, PyTorch recognition)
-- **Translation**: NLLB-200 (CTranslate2) + Google Gemini (Cloud)
+- **OCR Engine**: Surya OCR (gRPC-based, native Detection + Recognition via BaketaUnifiedServer)
+- **Translation**: NLLB-200 (C# ONNX Runtime, nllb-200-onnx-int8) + Google Gemini (Cloud)
 - **Recent Features**: Privacy consent, feedback system, update checking, ROI Manager
 - **AI Integration**: Gemini for code review and technical consultation
 
