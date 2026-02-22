@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Baketa.Core.Abstractions.GPU;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Platform.Windows.GPU;
@@ -31,12 +32,9 @@ public sealed class WindowsGpuEnvironmentDetector : IGpuEnvironmentDetector, IDi
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // [Issue #213] キャッシュファイルパスを設定（AppData/Local/Baketa/gpu_cache.json）
-        var appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Baketa");
-        Directory.CreateDirectory(appDataPath);
-        _cacheFilePath = Path.Combine(appDataPath, "gpu_cache.json");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        Directory.CreateDirectory(BaketaSettingsPaths.CacheDirectory);
+        _cacheFilePath = BaketaSettingsPaths.GpuCachePath;
 
         // 注: 非同期キャッシュ読み込みはDetectEnvironmentAsync内で遅延実行
     }

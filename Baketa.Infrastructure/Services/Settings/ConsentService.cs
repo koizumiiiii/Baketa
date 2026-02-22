@@ -334,7 +334,7 @@ public sealed class ConsentService : IConsentService, IDisposable
 
         try
         {
-            BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+            BaketaSettingsPaths.EnsureDirectoriesExist();
 
             if (File.Exists(BaketaSettingsPaths.ConsentSettingsPath))
             {
@@ -364,7 +364,7 @@ public sealed class ConsentService : IConsentService, IDisposable
 
     private async Task SaveSettingsAsync(ConsentSettings settings, CancellationToken cancellationToken)
     {
-        BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+        BaketaSettingsPaths.EnsureDirectoriesExist();
 
         var json = JsonSerializer.Serialize(settings, _jsonOptions);
         await File.WriteAllTextAsync(

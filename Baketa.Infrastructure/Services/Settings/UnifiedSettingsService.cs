@@ -57,12 +57,12 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         _logger = logger;
 
         // ユーザー設定ディレクトリを確実に作成
-        BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+        BaketaSettingsPaths.EnsureDirectoriesExist();
 
         // ファイルシステム監視の初期化
-        if (Directory.Exists(BaketaSettingsPaths.UserSettingsDirectory))
+        if (Directory.Exists(BaketaSettingsPaths.SettingsDirectory))
         {
-            _fileWatcher = new FileSystemWatcher(BaketaSettingsPaths.UserSettingsDirectory, "*.json")
+            _fileWatcher = new FileSystemWatcher(BaketaSettingsPaths.SettingsDirectory, "*.json")
             {
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.CreationTime,
                 EnableRaisingEvents = false
@@ -72,7 +72,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         }
 
         _logger?.LogInformation("UnifiedSettingsService初期化完了 - 監視ディレクトリ: {Directory}",
-            BaketaSettingsPaths.UserSettingsDirectory);
+            BaketaSettingsPaths.SettingsDirectory);
     }
 
     /// <inheritdoc />
@@ -160,7 +160,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
         var json = JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true });
 
         // [Issue #280+#281] ディレクトリが存在することを確認（ファイル書き込み前）
-        BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+        BaketaSettingsPaths.EnsureDirectoriesExist();
 
         _logger?.LogDebug("[Issue #280+#281] 翻訳設定を保存: UseLocalEngine={UseLocal}, EnableCloudAi={EnableCloud}, Path={Path}",
             settings.UseLocalEngine, settings.EnableCloudAiTranslation, BaketaSettingsPaths.TranslationSettingsPath);
@@ -260,7 +260,7 @@ public sealed class UnifiedSettingsService : IUnifiedSettingsService, IDisposabl
     public async Task UpdatePromotionSettingsAsync(IPromotionSettings settings, CancellationToken cancellationToken = default)
     {
         // [Issue #237] ディレクトリが存在することを確認
-        BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+        BaketaSettingsPaths.EnsureDirectoriesExist();
 
         var promotionData = new Dictionary<string, object?>();
 

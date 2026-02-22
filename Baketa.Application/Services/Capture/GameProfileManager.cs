@@ -74,9 +74,8 @@ public sealed class GameProfileManager : IGameProfileManager
     {
         _logger = logger;
 
-        // プロファイル保存ディレクトリの設定
-        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        _profilesDirectory = Path.Combine(appDataPath, "Baketa", "CaptureProfiles");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        _profilesDirectory = BaketaSettingsPaths.CaptureProfilesDirectory;
 
         // ディレクトリが存在しない場合は作成
         if (!Directory.Exists(_profilesDirectory))

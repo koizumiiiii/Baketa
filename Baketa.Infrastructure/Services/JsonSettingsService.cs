@@ -42,10 +42,8 @@ public sealed class JsonSettingsService : ISettingsService
         // ファイルパスの決定
         if (string.IsNullOrWhiteSpace(settingsFilePath))
         {
-            // ユーザー設定ディレクトリを取得
-            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var settingsDirectory = Path.Combine(userProfile, ".baketa", "settings");
-            _settingsFilePath = Path.Combine(settingsDirectory, "user-settings.json");
+            // [Issue #459] BaketaSettingsPaths経由に統一
+            _settingsFilePath = Path.Combine(BaketaSettingsPaths.SettingsDirectory, "user-settings.json");
         }
         else
         {
@@ -494,11 +492,11 @@ public sealed class JsonSettingsService : ISettingsService
     /// </summary>
     private async Task SaveTranslationSettingsToFileAsync(TranslationSettings settings)
     {
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var settingsDirectory = Path.Combine(userProfile, ".baketa", "settings");
-        var translationSettingsPath = Path.Combine(settingsDirectory, "translation-settings.json");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        var translationSettingsPath = BaketaSettingsPaths.TranslationSettingsPath;
 
         // 設定ディレクトリを作成
+        var settingsDirectory = BaketaSettingsPaths.SettingsDirectory;
         if (!Directory.Exists(settingsDirectory))
         {
             Directory.CreateDirectory(settingsDirectory);

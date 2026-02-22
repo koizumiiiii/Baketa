@@ -756,7 +756,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     private void OpenLogFolder()
     {
         // TODO: 実際のログフォルダパスを取得して開く
-        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Baketa", "Logs");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        var logPath = BaketaSettingsPaths.LogDirectory;
 
         try
         {

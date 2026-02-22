@@ -56,9 +56,8 @@ public sealed class GameProfileHotReloadManager : IDisposable
         _hysteresisSettings = hysteresisSettings ?? throw new ArgumentNullException(nameof(hysteresisSettings));
         _predictiveSettings = predictiveSettings ?? throw new ArgumentNullException(nameof(predictiveSettings));
 
-        // プロファイル保存ディレクトリの設定
-        _profilesDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Baketa", "GameProfiles");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        _profilesDirectory = BaketaSettingsPaths.GameProfilesDirectory;
 
         Directory.CreateDirectory(_profilesDirectory);
 

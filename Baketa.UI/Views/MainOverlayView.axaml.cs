@@ -16,7 +16,7 @@ public partial class MainOverlayView : Window
 {
     // #246: 位置永続化用の設定ファイル名
     private static readonly string OverlayPositionFilePath = Path.Combine(
-        BaketaSettingsPaths.UserSettingsDirectory,
+        BaketaSettingsPaths.SettingsDirectory,
         "overlay-position.json");
 
     // 位置保存のデバウンス用（ドラッグ中の頻繁な保存を防ぐ）
@@ -103,7 +103,7 @@ public partial class MainOverlayView : Window
     {
         try
         {
-            BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+            BaketaSettingsPaths.EnsureDirectoriesExist();
 
             var positionData = new OverlayPositionData
             {

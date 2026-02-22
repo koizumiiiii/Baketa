@@ -88,11 +88,9 @@ public sealed class PatreonOAuthService : IPatreonOAuthService, IDisposable
         _promotionSettingsPersistence = promotionSettingsPersistence;  // [Issue #298] null可
         _lazyPromotionCodeService = lazyPromotionCodeService;  // [Issue #293] 循環依存回避のためLazy化
 
-        // 資格情報保存パス
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var credentialsDir = Path.Combine(userProfile, ".baketa", "license");
-        Directory.CreateDirectory(credentialsDir);
-        _credentialsFilePath = Path.Combine(credentialsDir, "patreon-credentials.json");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        Directory.CreateDirectory(BaketaSettingsPaths.LicenseDirectory);
+        _credentialsFilePath = BaketaSettingsPaths.PatreonCredentialsPath;
 
         _jsonOptions = new JsonSerializerOptions
         {

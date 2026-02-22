@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using Baketa.Core.Abstractions.Logging;
 using Baketa.Core.Abstractions.Monitoring;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Translation.Metrics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -54,16 +55,12 @@ public sealed class IntegratedPerformanceMetricsCollector : IPerformanceMetricsC
         _flushSemaphore = new SemaphoreSlim(1, 1);
         _cancellationTokenSource = new CancellationTokenSource();
 
-        // ログファイルパス設定
-        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var baketaMetricsPath = Path.Combine(appDataPath, "Baketa", "Metrics");
-        var baketaReportsPath = Path.Combine(appDataPath, "Baketa", "Reports");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        Directory.CreateDirectory(BaketaSettingsPaths.MetricsDirectory);
+        Directory.CreateDirectory(BaketaSettingsPaths.ReportsDirectory);
 
-        Directory.CreateDirectory(baketaMetricsPath);
-        Directory.CreateDirectory(baketaReportsPath);
-
-        _metricsLogPath = Path.Combine(baketaMetricsPath, $"performance-{DateTime.Now:yyyy-MM-dd}.log");
-        _reportsPath = baketaReportsPath;
+        _metricsLogPath = Path.Combine(BaketaSettingsPaths.MetricsDirectory, $"performance-{DateTime.Now:yyyy-MM-dd}.log");
+        _reportsPath = BaketaSettingsPaths.ReportsDirectory;
 
         // フラッシュタイマー設定（設定可能）
         var flushInterval = TimeSpan.FromSeconds(_settings.FlushIntervalSeconds);

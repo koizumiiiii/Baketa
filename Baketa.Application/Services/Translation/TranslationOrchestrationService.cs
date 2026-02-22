@@ -867,10 +867,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
         try
         {
-            // translation-settings.jsonから直接読み取り
-            var translationSettingsPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".baketa", "settings", "translation-settings.json");
+            // [Issue #459] BaketaSettingsPaths経由に統一
+            var translationSettingsPath = BaketaSettingsPaths.TranslationSettingsPath;
 
             if (File.Exists(translationSettingsPath))
             {
