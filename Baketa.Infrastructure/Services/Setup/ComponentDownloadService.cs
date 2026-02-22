@@ -557,9 +557,13 @@ public class ComponentDownloadService : IComponentDownloader
         // GitHub Releaseのファイルが更新された時のみ再ダウンロード
 
         // Fetch remote Last-Modified using HEAD request
+        // [Issue #456] 分割ファイルの場合、ベースURLは存在しないため .001 サフィックス付きURLでチェック
         try
         {
-            var remoteLastModified = await GetRemoteLastModifiedAsync(component.DownloadUrl, cancellationToken).ConfigureAwait(false);
+            var versionCheckUrl = component.SplitParts > 1
+                ? $"{component.DownloadUrl}{string.Format(component.SplitPartSuffixFormat, 1)}"
+                : component.DownloadUrl;
+            var remoteLastModified = await GetRemoteLastModifiedAsync(versionCheckUrl, cancellationToken).ConfigureAwait(false);
 
             if (remoteLastModified == null)
             {
