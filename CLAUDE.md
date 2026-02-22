@@ -150,8 +150,6 @@ OCRと翻訳を単一プロセスで実行し、VRAMを効率的に使用しま�
 |----------|------|--------|
 | BaketaUnifiedServer-cpu.zip | CPU版統合AIサーバー | ~300MB |
 | BaketaUnifiedServer-cuda.zip.001/.002 | CUDA版統合AIサーバー（分割） | ~2.7GB |
-| surya-detection-onnx.zip | OCR検出モデル (ONNX INT8) | ~31MB |
-| surya-recognition-quantized.zip | OCR認識モデル (PyTorch量子化) | ~665MB |
 | nllb-200-onnx-int8.zip | NLLB翻訳モデル (ONNX INT8量子化、C#直接推論) | ~1.8GB |
 
 **CUDA版の結合方法:**
@@ -229,8 +227,7 @@ release/
 ├── grpc_server/
 │   └── BaketaUnifiedServer/      # 初回起動時にmodels-v3から自動ダウンロード
 └── Models/
-    ├── nllb-200-onnx-int8/           # NLLB翻訳モデル（ONNX INT8、自動ダウンロード）
-    └── surya-quantized/              # Surya OCRモデル（自動ダウンロード）
+    └── nllb-200-onnx-int8/           # NLLB翻訳モデル（ONNX INT8、自動ダウンロード）
 ```
 
 **開発時にexeが古くてエラーが出る場合:**
@@ -454,14 +451,13 @@ The project is migrating from `Baketa.Core.Interfaces` → `Baketa.Core.Abstract
 ### OCR and Translation Pipeline
 1. **Screen Capture**: Windows Graphics Capture API (native DLL) with PrintWindow fallback
 2. **Image Processing**: OpenCV filters and preprocessing
-3. **OCR**: Surya OCR (gRPC-based Python server)
-   - **Detection**: ONNX INT8 quantized model
-   - **Recognition**: PyTorch quantized model (Issue #197)
+3. **OCR**: Surya OCR (unified Python server)
+   - **Detection**: Surya native model (S3 auto-download)
+   - **Recognition**: Surya Foundation model (S3 auto-download)
    - **Protocol**: gRPC with Keep-Alive
-4. **Translation**: gRPC-based Python translation server
-   - **C# Client**: `GrpcTranslationClient` (HTTP/2 communication)
-   - **Python Server**: NLLB-200 engine with CTranslate2 optimization
-   - **Protocol**: gRPC (port 50051, auto-start, Keep-Alive)
+4. **Translation**: C# ONNX Runtime direct inference
+   - **Engine**: `OnnxTranslationEngine` (NLLB-200 ONNX INT8)
+   - **Tokenizer**: SentencePiece (C# native)
    - **Fallback**: Google Gemini cloud translation
 5. **Overlay Display**: Transparent Avalonia windows
 
@@ -607,102 +603,6 @@ _logger.LogInformation("Event {EventType} processing started (Count: {Count})", 
 - **Unit Testing**: xUnit with Moq
 - **UI Testing**: Avalonia test framework
 - **Performance**: Custom benchmarking
-
-## gRPC Translation System
-
-Baketa uses gRPC (HTTP/2) for high-performance C# ↔ Python communication in translation processing.
-
-### Architecture Components
-
-#### C# Side (Baketa.Infrastructure)
-1. **GrpcTranslationClient** (`Translation/Clients/GrpcTranslationClient.cs`)
-   - HTTP/2 gRPC channel with Keep-Alive (10s interval)
-   - Automatic reconnection with `WithWaitForReady(true)`
-   - Timeout: 30 seconds per request
-
-2. **GrpcTranslationEngineAdapter** (`Translation/Adapters/GrpcTranslationEngineAdapter.cs`)
-   - Implements `ITranslationEngine` interface
-   - Auto-starts Python server on first translation
-   - Batch translation support (max 32 items)
-
-3. **PythonServerManager** (`Translation/Services/PythonServerManager.cs`)
-   - Automatic Python gRPC server startup
-   - Health check and ready state monitoring
-   - Process lifecycle management
-
-#### Python Side (grpc_server/)
-1. **start_server.py**
-   - Entry point for gRPC server
-   - Model: NLLB-200-distilled-600M CTranslate2 int8 (~1GB)
-   - Port: 50051 (default)
-
-2. **translation_server.py** - `TranslationServicer`
-   - Implements 4 RPC methods:
-     - `Translate()`: Single text translation ✅ **Active**
-     - `TranslateBatch()`: Batch translation (max 32) ✅ **Active**
-     - `HealthCheck()`: Server health status ✅ Available
-     - `IsReady()`: Model readiness check ✅ Available
-
-3. **engines/ctranslate2_engine.py**
-   - Optimized NLLB-200 engine (int8 quantized)
-   - Memory: ~1GB (Issue #337 軽量化)
-   - Default engine for all translation
-
-### gRPC API Specification
-
-See `Baketa.Infrastructure/Translation/Protos/translation.proto` for full specification.
-
-**Key Message Types**:
-- `TranslateRequest`: source_text, source_language, target_language, request_id
-- `TranslateResponse`: translated_text, confidence_score, is_success, error
-- `BatchTranslateRequest`: repeated TranslateRequest, batch_id
-- `BatchTranslateResponse`: repeated TranslateResponse, success_count
-
-### Configuration
-
-```json
-// appsettings.json
-{
-  "Translation": {
-    "UseGrpcClient": true,
-    "GrpcServerAddress": "http://127.0.0.1:50051"
-  }
-}
-```
-
-### Technical Features
-- **Protocol**: HTTP/2 with Keep-Alive (prevents 112s idle disconnect)
-- **Auto-start**: Python server starts automatically on first translation
-- **Error Handling**: Circuit breaker pattern, automatic retry
-- **Performance**: Batch translation support for efficiency
-- **Monitoring**: Health checks, ready state verification
-
-### Starting Python gRPC Server Manually
-
-```cmd
-# Standard NLLB-200 engine
-python grpc_server/start_server.py
-
-# CTranslate2 optimized engine (80% memory reduction)
-python grpc_server/start_server.py --use-ctranslate2
-
-# Custom port
-python grpc_server/start_server.py --port 50052
-```
-
-### Troubleshooting
-
-**Server won't start**:
-- Check Python 3.10+ is installed: `python --version`
-- Install dependencies: `pip install -r requirements.txt`
-- Check port 50051 is available: `netstat -an | findstr :50051`
-
-**UNAVAILABLE error on first translation**:
-- **Fixed**: Added `WithWaitForReady(true)` in Phase 5.2D
-- Client now waits for TCP connection before sending RPC
-
-**Unicode encoding errors**:
-- **Fixed**: Python server uses UTF-8 encoding (`sys.stdout.reconfigure(encoding='utf-8')`)
 
 ## Common Development Scenarios
 

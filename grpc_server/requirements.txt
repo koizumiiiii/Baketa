@@ -1,5 +1,5 @@
-# Baketa gRPC Translation Server Dependencies
-# Phase 2.2: Python gRPC Server
+# Baketa gRPC OCR Server Dependencies
+# [Issue #458] Translation moved to C# OnnxTranslationEngine
 
 # gRPC (pinned versions for stability)
 # [Issue #212] protobuf 5.x fixed for PyInstaller compatibility
@@ -30,8 +30,7 @@ pynvml>=11.5.0
 # Optional: GPU support (uncomment if CUDA is available)
 # torch[cuda]>=2.0.0
 
-# Phase 2.2.1: CTranslate2 for optimized inference (80% memory reduction: 2.4GB -> 500MB)
-ctranslate2>=3.20.0
+# [Issue #458] ctranslate2 は削除（翻訳はC# OnnxTranslationEngineに移行済み）
 
 # [ALPHA_0.1.2] HuggingFace Hub integration for automatic model download
 huggingface_hub>=0.20.0

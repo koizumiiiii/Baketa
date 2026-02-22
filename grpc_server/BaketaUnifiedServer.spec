@@ -1,10 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 Baketa Unified AI Server - PyInstaller Spec File
-Issue #292: OCR + 翻訳統合AIサーバー
+Issue #292: OCR AIサーバー
 
-統合サーバーはOCR (Surya) と翻訳 (NLLB-200/CTranslate2) を
-単一プロセスで実行します。
+[Issue #458] 翻訳はC# OnnxTranslationEngineに移行済み。
+このサーバーはOCR (Surya) のみを提供します。
 
 ビルド方法:
     CPU版: .\venv_build\Scripts\pyinstaller BaketaUnifiedServer.spec
@@ -21,15 +21,11 @@ a = Analysis(
     binaries=[],
     datas=[
         ('protos', 'protos'),
-        ('engines', 'engines'),
-        ('translation_server.py', '.'),
         ('resource_monitor.py', '.'),
     ],
     hiddenimports=[
         # gRPC関連
         'protos',
-        'protos.translation_pb2',
-        'protos.translation_pb2_grpc',
         'protos.ocr_pb2',
         'protos.ocr_pb2_grpc',
         'grpc',
@@ -38,13 +34,8 @@ a = Analysis(
         'google.protobuf',
         'google.protobuf.timestamp_pb2',
 
-        # 翻訳エンジン (CTranslate2)
-        'engines',
-        'engines.base',
-        'engines.ctranslate2_engine',
-        'translation_server',
+        # リソース監視
         'resource_monitor',
-        'ctranslate2',
 
         # PyTorch関連（Surya OCR依存）
         'torch',

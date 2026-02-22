@@ -20,10 +20,8 @@ Baketa-{version}.zip
 ```
 
 ### 1.3 追加コンポーネント（初回起動時ダウンロード）
-- BaketaSuryaOcrServer (~174MB)
-- surya-detection-onnx (~31MB)
-- surya-recognition-quantized (~665MB)
-- nllb-200-distilled-600M-ct2 (~1.1GB)
+- BaketaUnifiedServer (~300MB CPU / ~2.7GB CUDA)
+- nllb-200-onnx-int8 (~1.8GB)
 
 ## 2. ライブラリ比較
 

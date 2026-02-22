@@ -82,13 +82,10 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
 # Proto生成ファイル
-from protos import translation_pb2, translation_pb2_grpc
 from protos import ocr_pb2, ocr_pb2_grpc
 
-# エンジン
-# 🔥 [Issue #337] LazyLoadingTranslator追加（遅延読み込み/自動アンロード）
-from engines.ctranslate2_engine import CTranslate2Engine, LazyLoadingTranslator
-from translation_server import TranslationServicer
+# [Issue #458] CTranslate2/翻訳エンジンはC# OnnxTranslationEngineに移行済み
+# translation_pb2, engines.ctranslate2_engine, translation_server は削除
 from resource_monitor import ResourceMonitor
 
 # UTF-8エンコーディング強制（Windows対応）
@@ -1066,53 +1063,19 @@ def detect_device() -> tuple[str, str | None]:
     return "cuda", gpu_name
 
 
-def get_available_vram_mb() -> float:
-    """利用可能なVRAM量を取得 (MB)"""
-    try:
-        import torch
-        if torch.cuda.is_available():
-            props = torch.cuda.get_device_properties(0)
-            return props.total_memory / 1024 / 1024  # MB
-    except Exception:
-        pass
-    return 0.0
-
-
-def should_use_parallel_loading(device: str) -> bool:
-    """並列ロードを使用するかどうかを判定
-
-    Args:
-        device: "cuda" or "cpu"
-
-    Returns:
-        True: 並列ロード（VRAM 8GB以上のGPU）
-        False: 逐次ロード（VRAM不足またはCPUモード）
-    """
-    if device == "cpu":
-        logger.info("CPUモード - 逐次モデルロードを使用")
-        return False
-
-    vram_mb = get_available_vram_mb()
-    if vram_mb >= 8192:  # 8GB
-        logger.info(f"VRAM: {vram_mb:.0f}MB - 並列モデルロードを使用")
-        return True
-    elif vram_mb > 0:
-        logger.info(f"VRAM: {vram_mb:.0f}MB - 逐次モデルロードを使用 (VRAM節約)")
-        return False
-    else:
-        logger.info("VRAM検出失敗 - 逐次モデルロードを使用")
-        return False
+# [Issue #458] get_available_vram_mb / should_use_parallel_loading は
+# 翻訳モデル並列ロード用だったが、翻訳廃止に伴い削除
 
 
 # ============================================================================
 # Main Server
 # ============================================================================
 
-async def serve(host: str, port: int, model_path_arg: str | None = None):
-    """統合gRPCサーバー起動"""
+async def serve(host: str, port: int):
+    """統合gRPCサーバー起動（OCR専用、翻訳はC# OnnxTranslationEngineに移行済み）"""
     logger.info("=" * 80)
     logger.info(f"Baketa Unified AI Server v{SERVER_VERSION}")  # [Issue #366]
-    logger.info("Issue #292: OCR + Translation in single process")
+    logger.info("Issue #292: OCR server (Translation moved to C# ONNX Runtime)")
     logger.info("=" * 80)
 
     # デバイス検出（CUDA_VISIBLE_DEVICES環境変数を尊重）
@@ -1120,30 +1083,10 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     if gpu_name:
         logger.info(f"GPU: {gpu_name}")
 
-    # モデルパス決定 (翻訳用)
-    if model_path_arg:
-        translation_model_path = Path(model_path_arg)
-    else:
-        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
-        # 🔥 [Issue #337] 600Mモデルに変更（5.5GB → 1GB）
-        translation_model_path = Path(appdata) / "Baketa" / "Models" / "nllb-200-distilled-600M-ct2"
-
-    logger.info(f"Translation model path: {translation_model_path}")
     logger.info(f"Device: {device}")
 
-    # エンジン初期化
-    # 🔥 [Issue #337] CTranslate2EngineをLazyLoadingTranslatorでラップ
-    # 翻訳モデルは初回リクエスト時にロード、5分アイドルでアンロード
-    base_translation_engine = CTranslate2Engine(
-        model_path=str(translation_model_path),
-        device=device,
-        compute_type="int8",
-        enable_flash_attention=False  # RTX 40シリーズでFlash Attention 2非対応のため無効化
-    )
-    translation_engine = LazyLoadingTranslator(
-        engine=base_translation_engine,
-        idle_timeout_seconds=300  # 5分アイドルでアンロード
-    )
+    # [Issue #458] 翻訳はC# OnnxTranslationEngineに移行済み
+    # CTranslate2Engine / LazyLoadingTranslator は削除
 
     # [Issue #426] TF32 + cuDNN benchmark でOCR高速化
     # FP16 AMP → Surya Recognition (RoPE) と非互換で認識失敗
@@ -1151,10 +1094,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     # TF32 → FP32互換の精度を保ちつつ Tensor Core で ~3倍速
     ocr_engine = SuryaOcrEngine(device=device)
 
-    # 🔥 [Issue #337] OCRのみ事前ロード（翻訳は遅延ロード）
-    # モデルロード (並列 or 逐次)
-    use_parallel = should_use_parallel_loading(device)
-
+    # モデルロード
     logger.info("=" * 80)
     logger.info("Loading AI Models...")
     logger.info("=" * 80)
@@ -1162,14 +1102,7 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     load_start = time.time()
 
     # [Gemini Review Fix] 初期化失敗時はプロセスを終了してC#側に通知
-    # 🔥 [Issue #337] OCRのみ事前ロード、翻訳は遅延ロード
     try:
-        # 翻訳モデルは遅延ロード（初回リクエスト時にLazyLoadingTranslatorがロード）
-        logger.info("[Translation] Lazy loading enabled - will load on first request")
-        logger.info("[Translation] Model: NLLB-200-distilled-600M (~1GB)")
-        logger.info("[Translation] Idle timeout: 300 seconds (auto-unload)")
-
-        # OCRモデルのみ事前ロード
         logger.info("[OCR] Loading Surya OCR...")
         sys.stdout.flush()
         await ocr_engine.load_model()
@@ -1207,25 +1140,18 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     ])
 
     # サービス登録
-    # [Issue #366] SERVER_VERSIONを渡してバージョンチェック対応
-    translation_servicer = TranslationServicer(translation_engine, server_version=SERVER_VERSION)
-    translation_pb2_grpc.add_TranslationServiceServicer_to_server(translation_servicer, server)
-
+    # [Issue #458] 翻訳サービスは削除（C# OnnxTranslationEngineに移行済み）
     ocr_servicer = AsyncOcrServiceServicer(ocr_engine)
     ocr_pb2_grpc.add_OcrServiceServicer_to_server(ocr_servicer, server)
 
     # [Issue #328] gRPC Native Health Check (grpc.health.v1.Health)
-    # サービス名: "" (全体), "ocr_engine", "translation_engine"
     health_servicer = health.HealthServicer()
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
 
-    # 初期状態: OCRエンジンは既にロード済み、翻訳は遅延ロード
     health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
     health_servicer.set("ocr_engine",
         health_pb2.HealthCheckResponse.SERVING if ocr_engine.is_loaded
         else health_pb2.HealthCheckResponse.NOT_SERVING)
-    # 翻訳エンジンは遅延ロードのため、初期状態はSERVING（リクエスト時にロード）
-    health_servicer.set("translation_engine", health_pb2.HealthCheckResponse.SERVING)
 
     # リスニングアドレス設定
     listen_addr = f'{host}:{port}'
@@ -1238,11 +1164,9 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
     logger.info("=" * 80)
     logger.info(f"Baketa Unified AI Server is running on {listen_addr}")
     sys.stdout.flush()
-    # 🔥 [Issue #337] LazyLoadingTranslator使用
-    logger.info(f"   Translation Engine: {translation_engine.__class__.__name__}")
-    logger.info(f"   Translation Model: {translation_engine.engine.model_name} (lazy loading)")
     logger.info(f"   OCR Engine: Surya OCR v{ocr_engine.VERSION}")
     logger.info(f"   Device: {device}")
+    logger.info(f"   [Issue #458] Translation: C# OnnxTranslationEngine (not served via gRPC)")
 
     # C#側への起動完了シグナル
     try:
@@ -1255,13 +1179,11 @@ async def serve(host: str, port: int, model_path_arg: str | None = None):
 
     logger.info("=" * 80)
     logger.info("Services available:")
-    logger.info("   - TranslationService (Translate, TranslateBatch, HealthCheck, IsReady)")
     logger.info("   - OcrService (Recognize, RecognizeBatch, Detect, HealthCheck, IsReady)")
     logger.info("   - grpc.health.v1.Health (Check, Watch) [Issue #328]")
     logger.info("   [Issue #320] Detect RPC: Detection-only for ROI learning (~10x faster)")
     logger.info("   [Issue #330] RecognizeBatch RPC: Batch OCR for partial regions")
-    logger.info("   [Issue #337] Translation lazy loading: ~1GB memory saved until first use")
-    logger.info("   [Issue #328] Native Health Check: services '', 'ocr_engine', 'translation_engine'")
+    logger.info("   [Issue #328] Native Health Check: services '', 'ocr_engine'")
     logger.info("=" * 80)
     logger.info("Press Ctrl+C to stop the server")
 
@@ -1337,12 +1259,7 @@ def main():
         action="store_true",
         help="Enable debug logging"
     )
-    parser.add_argument(
-        "--model-path",
-        type=str,
-        default=None,
-        help="Path to translation model directory"
-    )
+    # [Issue #458] --model-path は翻訳モデル用だったが、C# OnnxTranslationEngineに移行済みのため削除
 
     args = parser.parse_args()
 
@@ -1352,14 +1269,12 @@ def main():
     logger.info("Server configuration:")
     logger.info(f"  Host: {args.host}")
     logger.info(f"  Port: {args.port}")
-    logger.info(f"  Model path: {args.model_path or '(default)'}")
     logger.info(f"  Debug mode: {args.debug}")
 
     try:
         asyncio.run(serve(
             host=args.host,
             port=args.port,
-            model_path_arg=args.model_path
         ))
     except KeyboardInterrupt:
         logger.info("Server interrupted by user")

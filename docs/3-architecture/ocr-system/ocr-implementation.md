@@ -1,9 +1,9 @@
 # OCR実装ガイド
 
 > **Note**: このドキュメントは歴史的な参考資料として一部PaddleOCR関連の記述を含んでいます。
-> **現在のOCRシステム**: Surya OCR (gRPC-based Python server)
-> - **Detection**: ONNX INT8量子化モデル
-> - **Recognition**: PyTorch量子化モデル
+> **現在のOCRシステム**: Surya OCR (BaketaUnifiedServer経由)
+> - **Detection**: Surya DetectionPredictor (S3自動ダウンロード)
+> - **Recognition**: Surya FoundationPredictor (S3自動ダウンロード)
 > - **通信**: gRPC (HTTP/2)、ポート50051
 > - **詳細**: `CLAUDE.md` のOCR/Translation Pipelineセクション参照
 

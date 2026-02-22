@@ -109,8 +109,8 @@
 - **Privacy Management**: GDPR-compliant consent system in `Baketa.Core/Services/PrivacyConsentService.cs`
 - **Feedback System**: GitHub Issues API integration in `Baketa.Core/Services/FeedbackService.cs`
 - **Update System**: GitHub Releases API with SparkleUpdater (Ed25519 signatures)
-- **Surya OCR Integration**: gRPC-based Python server with ONNX INT8 detection and PyTorch recognition
-- **NLLB-200 Translation**: CTranslate2-optimized multilingual translation (80% memory reduction)
+- **Surya OCR Integration**: gRPC-based Python server (BaketaUnifiedServer) with native Detection + Recognition
+- **NLLB-200 Translation**: C# ONNX Runtime direct inference (nllb-200-onnx-int8)
 - **Cloud AI Translation**: Gemini API integration via Cloudflare Workers relay
 - **ROI Manager**: Learning-based text detection optimization (Issue #293)
 - **Security Enhancements**: CodeQL-compliant exception handling patterns
