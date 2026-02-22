@@ -419,10 +419,15 @@ Models/ONNX/
 Models/nllb-200-onnx/
 Models/nllb-200-onnx-int8/
 Models/nllb-200-onnx-int8-sliced/
+Models/nllb-200-onnx-int8-orig/
+Models/surya-quantized/
 Models/opus-mt-*/
 Models/ppocrv5/
 Models/pp-ocrv5/
 Models/ppocrv5-onnx/
+
+# Temporary investigation scripts
+_tmp_*
 
 # OCR/Translation temporary files
 temp_ocr/
