@@ -666,7 +666,7 @@ internal sealed class Program
             // 🔥 [OPTION_C] カスタムファイルロガーの追加
             // [Issue #329] ログファイルはLogs/ディレクトリに統一
             // [Issue #345] ログローテーション設定
-            BaketaSettingsPaths.EnsureUserSettingsDirectoryExists();
+            BaketaSettingsPaths.EnsureDirectoriesExist();
             var debugLogPath = Path.Combine(BaketaSettingsPaths.LogDirectory, "baketa_app.log");
 
             // [Issue #345] ログローテーション設定を読み込み

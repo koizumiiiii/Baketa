@@ -4,6 +4,7 @@ using System.Text.Json;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Events.Diagnostics;
+using Baketa.Core.Settings;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 
@@ -17,9 +18,8 @@ public sealed class DiagnosticReportGenerator : IDiagnosticReportGenerator
 {
     private readonly ILogger<DiagnosticReportGenerator> _logger;
     private readonly IBatchOcrProcessor? _batchOcrProcessor;
-    private static readonly string ReportsDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Baketa", "Reports");
+    // [Issue #459] BaketaSettingsPaths経由に統一
+    private static readonly string ReportsDirectory = BaketaSettingsPaths.ReportsDirectory;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

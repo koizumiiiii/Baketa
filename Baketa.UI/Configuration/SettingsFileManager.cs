@@ -25,10 +25,9 @@ public class SettingsFileManager
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // ユーザーローカルディレクトリに設定フォルダーを作成
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        _settingsDirectory = Path.Combine(userProfile, ".baketa", "settings");
-        _settingsFilePath = Path.Combine(_settingsDirectory, "translation-settings.json");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        _settingsDirectory = Core.Settings.BaketaSettingsPaths.SettingsDirectory;
+        _settingsFilePath = Core.Settings.BaketaSettingsPaths.TranslationSettingsPath;
 
         // JSONシリアライゼーションオプション
         _jsonOptions = new JsonSerializerOptions

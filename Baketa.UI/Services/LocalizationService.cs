@@ -282,10 +282,8 @@ public class LocalizationService : ILocalizationService, IDisposable
     {
         try
         {
-            var settingsPath = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Baketa",
-                "settings.json");
+            // [Issue #459] BaketaSettingsPaths経由に統一
+            var settingsPath = BaketaSettingsPaths.MainSettingsPath;
 
             if (!System.IO.File.Exists(settingsPath))
             {

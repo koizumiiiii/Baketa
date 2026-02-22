@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using Baketa.Core.Settings;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 
@@ -42,9 +43,8 @@ public sealed class TokenUsageRepository : ITokenUsageRepository, IDisposable
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // データディレクトリ設定
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        _dataDirectory = Path.Combine(userProfile, ".baketa", "token-usage");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        _dataDirectory = BaketaSettingsPaths.TokenUsageDirectory;
         _summaryFilePath = Path.Combine(_dataDirectory, "monthly-summary.json");
         _recordsFilePath = Path.Combine(_dataDirectory, "usage-records.json");
 

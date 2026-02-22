@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Services.Setup.Models;
 using Microsoft.Extensions.Logging;
 
@@ -26,10 +27,8 @@ public sealed class ComponentVersionService : IComponentVersionService, IDisposa
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // %LOCALAPPDATA%/Baketa/component-versions.json
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var baketaFolder = Path.Combine(localAppData, "Baketa");
-        _versionsFilePath = Path.Combine(baketaFolder, "component-versions.json");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        _versionsFilePath = BaketaSettingsPaths.ComponentVersionsPath;
 
         _logger.LogDebug("[Issue #256] ComponentVersionService initialized. Path: {Path}", _versionsFilePath);
     }

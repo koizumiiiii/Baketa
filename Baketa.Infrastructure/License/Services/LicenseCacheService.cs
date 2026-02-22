@@ -38,10 +38,9 @@ public sealed class LicenseCacheService : ILicenseCacheService, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
 
-        // キャッシュディレクトリ設定
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        _cacheDirectory = Path.Combine(userProfile, ".baketa", "license");
-        _cacheFilePath = Path.Combine(_cacheDirectory, "license-cache.json");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        _cacheDirectory = BaketaSettingsPaths.LicenseDirectory;
+        _cacheFilePath = BaketaSettingsPaths.LicenseCachePath;
         _pendingConsumptionsFilePath = Path.Combine(_cacheDirectory, "pending-consumptions.json");
 
         _jsonOptions = new JsonSerializerOptions

@@ -89,7 +89,7 @@ public sealed class UnifiedServerSettings
     /// [Issue #360] コンポーネントメタデータディレクトリ名
     /// </summary>
     /// <remarks>
-    /// %APPDATA%\Baketa\{MetadataDirectoryName}\ にメタデータを保存
+    /// %USERPROFILE%\.baketa\component-metadata\ にメタデータを保存
     /// </remarks>
     public string MetadataDirectoryName { get; set; } = "component-metadata";
 
@@ -103,10 +103,9 @@ public sealed class UnifiedServerSettings
     /// </summary>
     public string GetMetadataFilePath()
     {
+        // [Issue #459] BaketaSettingsPaths経由に統一
         return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Baketa",
-            MetadataDirectoryName,
+            BaketaSettingsPaths.ComponentMetadataDirectory,
             UnifiedServerMetadataFileName);
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Services;
@@ -32,10 +33,8 @@ public class FirstRunService : IFirstRunService
     {
         _logger = logger;
 
-        // %APPDATA%\Baketa\first-run.flag
-        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var baketaPath = Path.Combine(appDataPath, "Baketa");
-        _flagFilePath = Path.Combine(baketaPath, "first-run.flag");
+        // [Issue #459] BaketaSettingsPaths経由に統一
+        _flagFilePath = BaketaSettingsPaths.FirstRunFlagPath;
 
         _logger.LogDebug("FirstRunService initialized. Flag file path: {FlagFilePath}", _flagFilePath);
     }

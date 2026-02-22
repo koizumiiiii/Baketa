@@ -38,7 +38,7 @@ public class ComponentDownloadService : IComponentDownloader
     private bool? _cachedSupportsCuda;
 
     // [Issue #360] Component metadata directory and file extension for version tracking
-    // メタデータは%APPDATA%\Baketa\component-metadata\に保存（ビルド時のコピーで削除されないように）
+    // メタデータは%USERPROFILE%\.baketa\component-metadata\に保存（ビルド時のコピーで削除されないように）
     private const string MetadataDirectoryName = "component-metadata";
     private const string MetadataFileExtension = ".meta.json";
 
@@ -59,10 +59,8 @@ public class ComponentDownloadService : IComponentDownloader
         // Configure HttpClient timeout from settings
         _httpClient.Timeout = TimeSpan.FromSeconds(_settings.DownloadTimeoutSeconds);
 
-        // %APPDATA%\Baketa for user data
-        _appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Baketa");
+        // [Issue #459] %USERPROFILE%\.baketa に統一
+        _appDataPath = BaketaSettingsPaths.BaseDirectory;
 
         // Application base path for bundled components
         _appBasePath = AppContext.BaseDirectory;
@@ -1213,13 +1211,11 @@ public class ComponentDownloadService : IComponentDownloader
 
     /// <summary>
     /// [Issue #360] Gets the metadata file path for a component
-    /// メタデータは %APPDATA%\Baketa\component-metadata\ に保存
-    /// これにより、ビルド時のコピーでメタデータが削除される問題を回避
+    /// [Issue #459] BaketaSettingsPaths.ComponentMetadataDirectory に統一
     /// </summary>
-    private string GetMetadataPath(string componentId)
+    private static string GetMetadataPath(string componentId)
     {
-        var metadataDir = Path.Combine(_appDataPath, MetadataDirectoryName);
-        return Path.Combine(metadataDir, $"{componentId}{MetadataFileExtension}");
+        return Path.Combine(BaketaSettingsPaths.ComponentMetadataDirectory, $"{componentId}{MetadataFileExtension}");
     }
 
     /// <summary>
