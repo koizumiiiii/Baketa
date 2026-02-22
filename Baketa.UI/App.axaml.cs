@@ -19,6 +19,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Models.Hardware;
 using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
+using Baketa.Infrastructure.Services;
 using Baketa.UI.Resources;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
@@ -282,6 +283,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // [Issue #459] 設定ディレクトリのマイグレーション（最初期に実行）
+        SettingsDirectoryMigrationService.Migrate(_logger);
+
         Console.WriteLine("🚨🚨🚨 [FRAMEWORK] OnFrameworkInitializationCompleted開始！ 🚨🚨🚨");
         Console.WriteLine("🚀 OnFrameworkInitializationCompleted開始");
         System.Diagnostics.Debug.WriteLine("🚀 OnFrameworkInitializationCompleted開始");
