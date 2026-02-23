@@ -488,8 +488,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                             // セキュリティ強化: 不正なトークンを削除
                             try
                             {
+                                _logger?.LogWarning("[TOKEN_CLEAR][Path-5] App.axaml.cs: GetCurrentSessionAsync failed during startup — clearing stored tokens. Error={Error}", authEx.Message);
                                 await tokenStorage.ClearTokensAsync().ConfigureAwait(true);
-                                _logger?.LogInformation("セッション復元失敗に伴い、保存されたトークンをクリアしました");
+                                _logger?.LogInformation("[TOKEN_CLEAR][Path-5] セッション復元失敗に伴い、保存されたトークンをクリアしました");
                             }
                             catch (Exception clearEx)
                             {
