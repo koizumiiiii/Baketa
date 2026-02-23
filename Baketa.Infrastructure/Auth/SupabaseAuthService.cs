@@ -481,14 +481,14 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
             }
             else
             {
-                _logger.LogWarning("Session restoration returned no valid session, clearing stored tokens");
+                _logger.LogWarning("[TOKEN_CLEAR][Path-3A] SupabaseAuthService.RestoreSessionAsync: SetSession returned null/no user — clearing stored tokens");
                 await _tokenStorage.ClearTokensAsync(cancellationToken).ConfigureAwait(false);
                 AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, false));
             }
         }
         catch (GotrueException ex)
         {
-            _logger.LogWarning(ex, "Session restoration failed (invalid/expired tokens), clearing stored tokens");
+            _logger.LogWarning(ex, "[TOKEN_CLEAR][Path-3B] SupabaseAuthService.RestoreSessionAsync: GotrueException (invalid/expired tokens) — clearing stored tokens. Message={Message}", ex.Message);
             await _tokenStorage.ClearTokensAsync(cancellationToken).ConfigureAwait(false);
             AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, false));
         }
@@ -521,8 +521,9 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
             await _supabaseClient.Auth.SignOut().ConfigureAwait(false);
 
             // Clear stored tokens from persistent storage
+            _logger.LogInformation("[TOKEN_CLEAR][Path-3C] SupabaseAuthService.SignOutAsync: Normal signout flow — clearing stored tokens");
             await _tokenStorage.ClearTokensAsync(cancellationToken).ConfigureAwait(false);
-            _logger.LogDebug("Cleared stored tokens");
+            _logger.LogDebug("[TOKEN_CLEAR][Path-3C] Cleared stored tokens");
 
             _logger.LogInformation("User signout completed");
             AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, true));
@@ -536,6 +537,7 @@ public sealed class SupabaseAuthService : IAuthService, IDisposable
         {
             _logger.LogError(ex, "Error during signout");
             // Even if signout fails on server, clear local state and tokens
+            _logger.LogWarning("[TOKEN_CLEAR][Path-3D] SupabaseAuthService.SignOutAsync: Error recovery — clearing stored tokens. Error={Error}", ex.Message);
             await _tokenStorage.ClearTokensAsync(CancellationToken.None).ConfigureAwait(false);
             AuthStatusChanged?.Invoke(this, new AuthStatusChangedEventArgs(false, null, true));
         }

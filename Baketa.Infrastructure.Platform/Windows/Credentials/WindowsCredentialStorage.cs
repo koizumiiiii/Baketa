@@ -127,19 +127,25 @@ public sealed class WindowsCredentialStorage : ITokenStorage
     {
         try
         {
-            _logger.LogDebug("Clearing authentication tokens from Windows Credential Manager");
+            // Issue #461: スタックトレースを記録して呼び出し元を特定可能にする
+            // パフォーマンス考慮: StackTraceはコストが高いためWarning有効時のみ取得
+            if (_logger.IsEnabled(LogLevel.Warning))
+            {
+                var stackTrace = Environment.StackTrace;
+                _logger.LogWarning("[TOKEN_CLEAR] ClearTokensAsync called. StackTrace:\n{StackTrace}", stackTrace);
+            }
 
             bool accessDeleted = DeleteCredential(AccessTokenTarget);
             bool refreshDeleted = DeleteCredential(RefreshTokenTarget);
 
-            _logger.LogInformation("Authentication tokens cleared (Access: {Access}, Refresh: {Refresh})",
+            _logger.LogWarning("[TOKEN_CLEAR] Authentication tokens cleared from Windows Credential Manager (Access: {Access}, Refresh: {Refresh})",
                 accessDeleted, refreshDeleted);
 
             return Task.FromResult(true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error clearing authentication tokens");
+            _logger.LogError(ex, "[TOKEN_CLEAR] Error clearing authentication tokens");
             return Task.FromResult(false);
         }
     }

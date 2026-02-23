@@ -76,14 +76,15 @@ public sealed class TokenExpirationHandler : ITokenExpirationHandler, IDisposabl
                 }
 
                 // 3. ローカルトークンを削除
+                _logger.LogWarning("[TOKEN_CLEAR][Path-1A] Infrastructure.TokenExpirationHandler: HandleTokenExpiredAsync normal flow. Reason={Reason}, UserId={UserId}", reason, MaskUserId(userId));
                 var cleared = await _tokenStorage.ClearTokensAsync(cancellationToken).ConfigureAwait(false);
                 if (cleared)
                 {
-                    _logger.LogInformation("Local tokens cleared successfully");
+                    _logger.LogInformation("[TOKEN_CLEAR][Path-1A] Local tokens cleared successfully");
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to clear local tokens or no tokens existed");
+                    _logger.LogWarning("[TOKEN_CLEAR][Path-1A] Failed to clear local tokens or no tokens existed");
                 }
 
                 // 4. イベント発火（UI層でハンドリング）
@@ -107,11 +108,12 @@ public sealed class TokenExpirationHandler : ITokenExpirationHandler, IDisposabl
                 // エラーが発生してもトークンは確実に削除
                 try
                 {
+                    _logger.LogWarning("[TOKEN_CLEAR][Path-1B] Infrastructure.TokenExpirationHandler: Error recovery in HandleTokenExpiredAsync. OriginalReason={Reason}, Error={Error}", reason, ex.Message);
                     await _tokenStorage.ClearTokensAsync(CancellationToken.None).ConfigureAwait(false);
                 }
                 catch (Exception clearEx)
                 {
-                    _logger.LogError(clearEx, "Failed to clear tokens during error recovery");
+                    _logger.LogError(clearEx, "[TOKEN_CLEAR][Path-1B] Failed to clear tokens during error recovery");
                 }
 
                 // エラー時もイベントは発火（UI側で適切に処理させる）

@@ -95,12 +95,14 @@ public sealed class TokenExpirationHandler : IDisposable
                 cancellationToken: cancellationToken).ConfigureAwait(false);
 
             // 3. Clear local tokens
+            _logger.LogWarning("[TOKEN_CLEAR][Path-2A] UI.TokenExpirationHandler: HandleTokenExpiredAsync. Reason={Reason}, UserId={UserId}", reason, userId);
             await _tokenStorage.ClearTokensAsync(cancellationToken).ConfigureAwait(false);
-            _logger.LogInformation("Local tokens cleared");
+            _logger.LogInformation("[TOKEN_CLEAR][Path-2A] Local tokens cleared");
 
-            // 4. Sign out from Supabase
+            // 4. Sign out from Supabase (注意: SignOutAsync内でも ClearTokensAsync が呼ばれる = Path-3C/3D)
             try
             {
+                _logger.LogWarning("[TOKEN_CLEAR][Path-2B] UI.TokenExpirationHandler: Calling SignOutAsync (will trigger Path-3C/3D)");
                 await _authService.SignOutAsync(cancellationToken).ConfigureAwait(false);
                 _logger.LogInformation("Signed out from authentication service");
             }
