@@ -160,14 +160,56 @@ public sealed class Win32OverlayManager : IOverlayManager
 
     /// <inheritdoc/>
     /// <remarks>
-    /// [Issue #408] Win32OverlayManagerではオーバーレイの位置情報を保持していないため、
-    /// 暫定的に全オーバーレイを削除して対応。
-    /// 実際の領域指定削除はSimpleInPlaceOverlayManager側で実装済み。
+    /// [Issue #408] Win32Overlayの位置情報を使用して領域指定削除を実行。
+    /// 指定された領域と交差するオーバーレイのみを非表示・破棄する。
     /// </remarks>
     public async Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("[Issue #408] Win32OverlayManager.HideOverlaysInAreaAsync - 全削除で代替: Area={Area}", area);
-        await HideAllAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var overlaysToRemove = new List<(string Key, Win32Overlay Overlay)>();
+
+            foreach (var kvp in _activeOverlays)
+            {
+                var pos = kvp.Value.Position;
+                var overlayRect = new Rectangle(pos.X, pos.Y, pos.Width, pos.Height);
+
+                if (overlayRect.IntersectsWith(area))
+                {
+                    overlaysToRemove.Add((kvp.Key, kvp.Value));
+                }
+            }
+
+            if (overlaysToRemove.Count == 0)
+            {
+                _logger.LogDebug("[Issue #408] HideOverlaysInAreaAsync - 交差するオーバーレイなし: Area={Area}", area);
+                return;
+            }
+
+            _logger.LogDebug("[Issue #408] HideOverlaysInAreaAsync - 領域指定削除: Area={Area}, 対象={Count}/{Total}",
+                area, overlaysToRemove.Count, _activeOverlays.Count);
+
+            foreach (var (key, overlay) in overlaysToRemove)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await overlay.HideAsync().ConfigureAwait(false);
+                if (_activeOverlays.TryRemove(key, out _))
+                {
+                    overlay.Dispose();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Issue #408] HideOverlaysInAreaAsync エラー: Area={Area}", area);
+            throw;
+        }
     }
 
     /// <inheritdoc/>

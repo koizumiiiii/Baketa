@@ -801,17 +801,24 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 return;
             }
 
-            // 🧹 [OVERLAY_CLEANUP] 新しいオーバーレイ表示前に古いオーバーレイをクリア
+            // 🧹 [OVERLAY_CLEANUP] Gate PASSしたチャンク領域のオーバーレイのみ削除
+            // HideAllAsync()は使用しない — BLOCKされたチャンクのオーバーレイを巻き添えで消さないため
             try
             {
-                await _overlayManager.HideAllAsync().ConfigureAwait(false);
-                _logger?.LogDebug("🧹 [OVERLAY_CLEANUP] 古いオーバーレイをクリアしました");
-                Console.WriteLine("🧹 [OVERLAY_CLEANUP] 古いオーバーレイをクリアしました");
+                foreach (var chunk in nonEmptyChunks)
+                {
+                    var bounds = chunk.CombinedBounds;
+                    if (bounds.Width > 0 && bounds.Height > 0)
+                    {
+                        var area = new System.Drawing.Rectangle(bounds.X, bounds.Y, bounds.Width, bounds.Height);
+                        await _overlayManager.HideOverlaysInAreaAsync(area, excludeChunkId: -1, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                _logger?.LogDebug("🧹 [OVERLAY_CLEANUP] Gate PASSチャンク領域のオーバーレイをクリア: {Count}領域", nonEmptyChunks.Count);
             }
             catch (Exception cleanupEx)
             {
                 _logger?.LogWarning(cleanupEx, "⚠️ [OVERLAY_CLEANUP] オーバーレイクリーンアップ中にエラー - 処理継続");
-                Console.WriteLine($"⚠️ [OVERLAY_CLEANUP] クリーンアップエラー: {cleanupEx.Message}");
             }
 
             // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()で直接オーバーレイ表示
