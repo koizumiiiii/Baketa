@@ -73,5 +73,11 @@ public enum GateDecision
     /// <summary>
     /// [Issue #432] タイプライター最大遅延超過 → 強制翻訳
     /// </summary>
-    TypewriterMaxDelayExceeded
+    TypewriterMaxDelayExceeded,
+
+    /// <summary>
+    /// [Issue #465] 静的UI要素 → 翻訳スキップ
+    /// 同一テキストが連続して検出された場合、静的UI要素として扱い翻訳をスキップ
+    /// </summary>
+    StaticUiElement
 }

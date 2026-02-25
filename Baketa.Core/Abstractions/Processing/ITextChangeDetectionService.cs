@@ -47,6 +47,12 @@ public interface ITextChangeDetectionService
     void ClearAllPreviousTexts();
 
     /// <summary>
+    /// [Issue #465] 静的UI要素マーカーと連続カウンタをクリア
+    /// Start/Stop切り替え時に呼び出し、静的UI検出をリセットする
+    /// </summary>
+    void ClearStaticUiMarkers();
+
+    /// <summary>
     /// キャッシュから前回テキストを取得
     /// [Issue #230] OCR完了後のテキスト変化検知に使用
     /// </summary>

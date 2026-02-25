@@ -125,9 +125,9 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         statistics.OverlaysCleanedUp.Should().Be(2); // Number of regions
         statistics.RejectedByConfidence.Should().Be(0);
 
-        // 🔧 [OVERLAY_UNIFICATION] TODO: Phase 4で領域指定削除実装後はループに戻す
-        // 暫定: HideAllAsync が1回呼ばれることを確認
-        _overlayManagerMock.Verify(om => om.HideAllAsync(It.IsAny<CancellationToken>()), Times.Once);
+        // [Issue #408] 領域指定削除: HideOverlaysInAreaAsync が各領域に対して呼ばれることを確認
+        _overlayManagerMock.Verify(om => om.HideOverlaysInAreaAsync(
+            It.IsAny<Rectangle>(), -1, It.IsAny<CancellationToken>()), Times.Exactly(regions.Count));
     }
 
     [Fact]
@@ -233,9 +233,9 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         // Assert
         result.Should().Be(regions.Count);
 
-        // 🔧 [OVERLAY_UNIFICATION] TODO: Phase 4で領域指定削除実装後はループに戻す
-        // 暫定: HideAllAsync が1回呼ばれることを確認
-        _overlayManagerMock.Verify(om => om.HideAllAsync(It.IsAny<CancellationToken>()), Times.Once);
+        // [Issue #408] 領域指定削除: HideOverlaysInAreaAsync が各領域に対して呼ばれることを確認
+        _overlayManagerMock.Verify(om => om.HideOverlaysInAreaAsync(
+            It.IsAny<Rectangle>(), -1, It.IsAny<CancellationToken>()), Times.Exactly(regions.Count));
     }
 
     [Fact]

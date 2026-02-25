@@ -228,6 +228,27 @@ public sealed record TextChangeWithGateResult
     }
 
     /// <summary>
+    /// [Issue #465] 静的UI要素（翻訳スキップ）の結果を作成
+    /// </summary>
+    public static TextChangeWithGateResult CreateStaticUiElement(
+        string text,
+        float appliedThreshold,
+        TimeSpan processingTime = default)
+    {
+        return new TextChangeWithGateResult
+        {
+            ChangePercentage = 0.0f,
+            ShouldTranslate = false,
+            Decision = GateDecision.StaticUiElement,
+            AppliedThreshold = appliedThreshold,
+            PreviousText = text,
+            CurrentText = text,
+            EditDistance = 0,
+            ProcessingTime = processingTime
+        };
+    }
+
+    /// <summary>
     /// 大幅な長さ変化（翻訳実行）の結果を作成
     /// </summary>
     public static TextChangeWithGateResult CreateSignificantLengthChange(

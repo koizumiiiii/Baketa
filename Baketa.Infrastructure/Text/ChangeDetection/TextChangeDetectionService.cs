@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Text;
 using Baketa.Core.Models.Text;
@@ -21,7 +22,7 @@ namespace Baketa.Infrastructure.Text.ChangeDetection;
 /// - 最適化されたLevenshtein距離計算（stackalloc/ArrayPool）
 /// - Strategyパターンによる責務分離
 /// </remarks>
-public class TextChangeDetectionService : ITextChangeDetectionService
+public partial class TextChangeDetectionService : ITextChangeDetectionService
 {
     private readonly ILogger<TextChangeDetectionService> _logger;
     private readonly RoiGatekeeperSettings _settings;
@@ -31,6 +32,10 @@ public class TextChangeDetectionService : ITextChangeDetectionService
     // [Issue #432] タイプライター演出検知用の状態追跡
     private readonly ConcurrentDictionary<string, int> _typewriterGrowthCycles = new();
     private readonly ConcurrentDictionary<string, int> _typewriterStabilizationCount = new();
+
+    // [Issue #465] 静的UI要素検出用の状態追跡
+    private readonly ConcurrentDictionary<string, int> _sameTextConsecutiveCount = new();
+    private readonly ConcurrentDictionary<string, string> _staticUiMarkers = new(); // sourceId → normalizedText
 
     /// <summary>
     /// スタック割り当ての閾値（512要素 = 約2KB）
@@ -146,6 +151,22 @@ public class TextChangeDetectionService : ITextChangeDetectionService
                     stopwatch.Elapsed);
             }
 
+            // [Issue #465] 静的UI要素チェック（最も早い段階で判定）
+            var normalizedCurrentForStaticUi = NormalizeFullWidthToHalfWidth(NormalizeOcrNoise(currentText));
+            if (_settings.EnableStaticUiDetection
+                && _staticUiMarkers.TryGetValue(sourceId, out var markedText)
+                && markedText == normalizedCurrentForStaticUi)
+            {
+                _logger.LogDebug(
+                    "[Issue #465] Static UI element detected, skipping - SourceId: {SourceId}, Text: {Text}",
+                    sourceId, currentText.Length > 20 ? currentText[..20] + "..." : currentText);
+
+                return TextChangeWithGateResult.CreateStaticUiElement(
+                    currentText,
+                    GetAppliedThreshold(currentText.Length, regionInfo),
+                    stopwatch.Elapsed);
+            }
+
             // 前回テキストを取得
             var previousText = GetPreviousText(sourceId);
 
@@ -168,9 +189,9 @@ public class TextChangeDetectionService : ITextChangeDetectionService
                 }
             }
 
-            // 同一テキストチェック（[Issue #432] 全角/半角正規化後に比較）
-            var normalizedCurrent = NormalizeFullWidthToHalfWidth(currentText);
-            var normalizedPrevious = NormalizeFullWidthToHalfWidth(previousText ?? string.Empty);
+            // 同一テキストチェック（[Issue #409] OCRノイズ正規化 + [Issue #432] 全角/半角正規化後に比較）
+            var normalizedCurrent = NormalizeFullWidthToHalfWidth(NormalizeOcrNoise(currentText));
+            var normalizedPrevious = NormalizeFullWidthToHalfWidth(NormalizeOcrNoise(previousText ?? string.Empty));
             if (_settings.SkipIdenticalText && normalizedPrevious == normalizedCurrent)
             {
                 // [Issue #432] タイプライター成長中に同一テキストを検出 → 安定化判定
@@ -210,6 +231,19 @@ public class TextChangeDetectionService : ITextChangeDetectionService
                         stopwatch.Elapsed);
                 }
 
+                // [Issue #465] 静的UI要素検出: 連続同一テキスト回数をインクリメント
+                if (_settings.EnableStaticUiDetection)
+                {
+                    var consecutiveCount = _sameTextConsecutiveCount.AddOrUpdate(sourceId, 1, (_, count) => count + 1);
+                    if (consecutiveCount >= _settings.StaticUiDetectionThreshold)
+                    {
+                        _staticUiMarkers[sourceId] = normalizedCurrent;
+                        _logger.LogInformation(
+                            "[Issue #465] Static UI element registered - SourceId: {SourceId}, ConsecutiveCount: {Count}",
+                            sourceId, consecutiveCount);
+                    }
+                }
+
                 _logger.LogDebug(
                     "[Issue #293] Identical text, skipping - SourceId: {SourceId}",
                     sourceId);
@@ -219,6 +253,11 @@ public class TextChangeDetectionService : ITextChangeDetectionService
                     GetAppliedThreshold(currentText.Length, regionInfo),
                     stopwatch.Elapsed);
             }
+
+            // [Issue #465] テキストが変化した → 連続同一カウンタをリセット
+            _sameTextConsecutiveCount.TryRemove(sourceId, out _);
+            // テキストが変化した場合は静的UIマーカーも解除（動的テキストに変わった可能性）
+            _staticUiMarkers.TryRemove(sourceId, out _);
 
             // [Issue #432] タイプライター演出検知（正規化後の前方一致で成長中かチェック）
             if (_settings.EnableTypewriterDetection && previousText != null
@@ -274,10 +313,10 @@ public class TextChangeDetectionService : ITextChangeDetectionService
                 _typewriterStabilizationCount.TryRemove(sourceId, out _);
             }
 
-            // 長さ変化による強制翻訳チェック
+            // 長さ変化による強制翻訳チェック（[Issue #409] 正規化後の長さで比較）
             if (_settings.EnableLengthChangeForceTranslate && previousText != null)
             {
-                var lengthChangeRatio = CalculateLengthChangeRatio(previousText.Length, currentText.Length);
+                var lengthChangeRatio = CalculateLengthChangeRatio(normalizedPrevious.Length, normalizedCurrent.Length);
                 if (lengthChangeRatio >= _settings.LengthChangeForceThreshold)
                 {
                     _logger.LogDebug(
@@ -296,9 +335,9 @@ public class TextChangeDetectionService : ITextChangeDetectionService
                 }
             }
 
-            // Levenshtein距離計算（最適化版）
-            var editDistance = CalculateLevenshteinDistanceOptimized(previousText ?? "", currentText);
-            var maxLength = Math.Max(previousText?.Length ?? 0, currentText.Length);
+            // Levenshtein距離計算（最適化版）（[Issue #409] 正規化後テキストで計算）
+            var editDistance = CalculateLevenshteinDistanceOptimized(normalizedPrevious, normalizedCurrent);
+            var maxLength = Math.Max(normalizedPrevious.Length, normalizedCurrent.Length);
             var changePercentage = maxLength > 0 ? (float)editDistance / maxLength : 0f;
 
             // 適用する閾値を決定
@@ -385,7 +424,19 @@ public class TextChangeDetectionService : ITextChangeDetectionService
         // [Issue #432] タイプライター状態もクリア
         _typewriterGrowthCycles.Clear();
         _typewriterStabilizationCount.Clear();
-        _logger.LogInformation("全前回テキストキャッシュクリア - クリア件数: {Count}", clearedCount);
+        // [Issue #465] 連続カウンタはクリアするが、静的UIマーカーは意図的に保持
+        _sameTextConsecutiveCount.Clear();
+        _logger.LogInformation("全前回テキストキャッシュクリア - クリア件数: {Count}, 静的UIマーカー保持: {MarkerCount}",
+            clearedCount, _staticUiMarkers.Count);
+    }
+
+    /// <inheritdoc />
+    public void ClearStaticUiMarkers()
+    {
+        var markerCount = _staticUiMarkers.Count;
+        _staticUiMarkers.Clear();
+        _sameTextConsecutiveCount.Clear();
+        _logger.LogInformation("[Issue #465] 静的UIマーカーをクリア - クリア件数: {Count}", markerCount);
     }
 
     /// <inheritdoc />
@@ -446,6 +497,33 @@ public class TextChangeDetectionService : ITextChangeDetectionService
             }
         });
     }
+
+    /// <summary>
+    /// [Issue #409] OCR末尾ノイズ正規化。
+    /// HTMLタグ除去、末尾装飾文字（●◎○◆◇■□▲△▼▽★☆※）除去、末尾空白トリミング。
+    /// Gate比較前に適用し、OCRの揺れによる不要な再翻訳を防止する。
+    /// </summary>
+    internal static string NormalizeOcrNoise(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        // HTMLタグ除去
+        var result = HtmlTagRegex().Replace(text, "");
+
+        // 末尾装飾文字除去
+        result = result.TrimEnd('●', '◎', '○', '◆', '◇', '■', '□', '▲', '△', '▼', '▽', '★', '☆', '※');
+
+        // 末尾空白トリミング
+        result = result.TrimEnd();
+
+        return result;
+    }
+
+    [GeneratedRegex(@"<[^>]+>", RegexOptions.Compiled)]
+    private static partial Regex HtmlTagRegex();
 
     /// <summary>
     /// 前回テキストを更新（スレッドセーフ）

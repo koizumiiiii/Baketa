@@ -136,6 +136,68 @@ SERVER_VERSION = "0.2.41"
 
 
 # ============================================================================
+# [Issue #467] OCR Recognition キャッシュ
+# ============================================================================
+
+class RecognitionCache:
+    """[Issue #467] 画像単位のOCR結果キャッシュ
+
+    ROIクロップ画像全体のSHA256ハッシュでキャッシュし、
+    変化なし画像のOCR Recognition処理をスキップする。
+    """
+
+    def __init__(self, max_entries: int = 50):
+        self._cache: dict[str, tuple[dict, float]] = {}  # hash → (result_dict, timestamp)
+        self._max_entries = max_entries
+        self._hits = 0
+        self._misses = 0
+        self._logger = logging.getLogger(f"{__name__}.RecognitionCache")
+
+    def _compute_hash(self, image_bytes: bytes) -> str:
+        """SHA256ハッシュの先頭16文字を返す"""
+        import hashlib
+        return hashlib.sha256(image_bytes).hexdigest()[:16]
+
+    def get(self, image_bytes: bytes) -> Optional[dict]:
+        """キャッシュからOCR結果を取得。ヒットならresult dictを返す"""
+        h = self._compute_hash(image_bytes)
+        entry = self._cache.get(h)
+        if entry is not None:
+            self._hits += 1
+            self._logger.debug(f"[Issue #467] Cache HIT: {h}")
+            return entry[0]
+        self._misses += 1
+        return None
+
+    def put(self, image_bytes: bytes, result: dict) -> None:
+        """OCR結果をキャッシュに保存"""
+        h = self._compute_hash(image_bytes)
+
+        # 最大エントリ数を超えた場合、最も古いエントリを削除
+        if len(self._cache) >= self._max_entries and h not in self._cache:
+            oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
+            del self._cache[oldest_key]
+
+        self._cache[h] = (result, time.time())
+
+    def clear(self) -> None:
+        """キャッシュをクリア"""
+        self._cache.clear()
+        self._logger.info("[Issue #467] Cache cleared")
+
+    def get_stats(self) -> dict:
+        """キャッシュ統計を取得"""
+        total = self._hits + self._misses
+        hit_rate = self._hits / total if total > 0 else 0.0
+        return {
+            "cache_size": len(self._cache),
+            "cache_hits": self._hits,
+            "cache_misses": self._misses,
+            "cache_hit_rate": round(hit_rate, 3)
+        }
+
+
+# ============================================================================
 # Surya OCR Engine (統合版)
 # ============================================================================
 
@@ -154,6 +216,8 @@ class SuryaOcrEngine:
         self.is_loaded = False
         self._use_cuda = False  # [Issue #426] 実際にCUDAが有効かどうか
         self.logger = logging.getLogger(f"{__name__}.SuryaOcrEngine")
+        # [Issue #467] OCR結果キャッシュ
+        self._recognition_cache = RecognitionCache(max_entries=50)
 
     async def load_model(self) -> bool:
         """非同期でモデルをロード"""
@@ -403,6 +467,16 @@ class SuryaOcrEngine:
         if len(image_bytes) > self.MAX_IMAGE_SIZE:
             raise ValueError(f"画像サイズが上限を超えています: {len(image_bytes)} bytes")
 
+        # [Issue #467] キャッシュチェック
+        cached_result = self._recognition_cache.get(image_bytes)
+        if cached_result is not None:
+            cache_stats = self._recognition_cache.get_stats()
+            self.logger.info(f"[Issue #467] Cache HIT - スキップ (hit_rate: {cache_stats['cache_hit_rate']:.1%})")
+            result = dict(cached_result)
+            result["cache_hit"] = True
+            result["cache_hit_rate"] = cache_stats["cache_hit_rate"]
+            return result
+
         try:
             from PIL import Image
 
@@ -457,15 +531,23 @@ class SuryaOcrEngine:
                     }
                     regions.append(region)
 
-            self.logger.info(f"OCR完了: {len(regions)}領域検出 ({elapsed*1000:.0f}ms)")
+            cache_stats = self._recognition_cache.get_stats()
+            self.logger.info(f"OCR完了: {len(regions)}領域検出 ({elapsed*1000:.0f}ms, cache_hit_rate: {cache_stats['cache_hit_rate']:.1%})")
 
-            return {
+            result = {
                 "success": True,
                 "regions": regions,
                 "processing_time_ms": int(elapsed * 1000),
                 "engine_name": "Surya OCR",
-                "engine_version": self.VERSION
+                "engine_version": self.VERSION,
+                "cache_hit": False,
+                "cache_hit_rate": cache_stats["cache_hit_rate"]
             }
+
+            # [Issue #467] キャッシュに保存
+            self._recognition_cache.put(image_bytes, result)
+
+            return result
 
         except Exception as e:
             self.logger.exception(f"OCRエラー: {e}")
@@ -500,12 +582,34 @@ class SuryaOcrEngine:
 
         from PIL import Image as PILImage
 
-        # 1. 全画像をPIL Imageに変換 + リサイズ
+        # [Issue #467] バッチ画像のキャッシュチェック
+        cached_results = {}  # index → cached result
+        uncached_indices = []
+        for i, image_bytes in enumerate(image_bytes_list):
+            cached = self._recognition_cache.get(image_bytes)
+            if cached is not None:
+                result = dict(cached)
+                result["cache_hit"] = True
+                cached_results[i] = result
+            else:
+                uncached_indices.append(i)
+
+        if cached_results:
+            self.logger.info(f"[Issue #467] バッチキャッシュ: {len(cached_results)}/{len(image_bytes_list)}件ヒット")
+
+        # 全画像がキャッシュヒットした場合は早期リターン
+        if not uncached_indices:
+            cache_stats = self._recognition_cache.get_stats()
+            self.logger.info(f"[Issue #467] バッチ全件キャッシュヒット (hit_rate: {cache_stats['cache_hit_rate']:.1%})")
+            return [cached_results[i] for i in range(len(image_bytes_list))]
+
+        # 1. キャッシュミスの画像のみPIL Imageに変換 + リサイズ
         images = []
         scales = []
         per_image_errors = {}  # index -> error message
 
-        for i, image_bytes in enumerate(image_bytes_list):
+        for i in uncached_indices:
+            image_bytes = image_bytes_list[i]
             try:
                 if len(image_bytes) > self.MAX_IMAGE_SIZE:
                     raise ValueError(f"画像サイズが上限を超えています: {len(image_bytes)} bytes")
@@ -520,29 +624,40 @@ class SuryaOcrEngine:
             except Exception as e:
                 self.logger.error(f"[Issue #450] バッチ画像{i}の前処理エラー: {e}")
                 per_image_errors[i] = str(e)
-                # プレースホルダー（後で結果マッピング時にスキップ）
                 images.append(None)
                 scales.append(1.0)
 
-        # 有効な画像のみ抽出
-        valid_indices = [i for i in range(len(images)) if images[i] is not None]
-        valid_images = [images[i] for i in valid_indices]
+        # 有効な画像のみ抽出（uncachedのみ）
+        valid_image_pairs = [(i, img, sc) for i, img, sc in zip(uncached_indices, images, scales) if img is not None]
+        valid_images = [pair[1] for pair in valid_image_pairs]
 
         if not valid_images:
-            # 全画像がエラーの場合
-            return [
-                {
-                    "success": False,
-                    "error": per_image_errors.get(i, "Unknown error"),
-                    "regions": [],
-                    "processing_time_ms": 0,
-                    "engine_name": "Surya OCR",
-                    "engine_version": self.VERSION
-                }
-                for i in range(len(image_bytes_list))
-            ]
+            # 全画像がエラー（キャッシュ分は除く）
+            final_results = []
+            for i in range(len(image_bytes_list)):
+                if i in cached_results:
+                    final_results.append(cached_results[i])
+                elif i in per_image_errors:
+                    final_results.append({
+                        "success": False,
+                        "error": per_image_errors[i],
+                        "regions": [],
+                        "processing_time_ms": 0,
+                        "engine_name": "Surya OCR",
+                        "engine_version": self.VERSION
+                    })
+                else:
+                    final_results.append({
+                        "success": False,
+                        "error": "Unknown error",
+                        "regions": [],
+                        "processing_time_ms": 0,
+                        "engine_name": "Surya OCR",
+                        "engine_version": self.VERSION
+                    })
+            return final_results
 
-        # 2. バッチ推論（Detection + Recognition を一括実行）
+        # 2. バッチ推論（Detection + Recognition を一括実行）— キャッシュミス分のみ
         self.logger.info(f"[Issue #450] バッチOCR実行中... ({len(valid_images)}枚, device: {self.device})")
         start_time = time.time()
 
@@ -554,28 +669,86 @@ class SuryaOcrEngine:
         except Exception as e:
             self.logger.exception(f"[Issue #450] バッチ推論エラー: {e}")
             return [
-                {
+                cached_results.get(i, {
                     "success": False,
                     "error": str(e),
                     "regions": [],
                     "processing_time_ms": 0,
                     "engine_name": "Surya OCR",
                     "engine_version": self.VERSION
-                }
-                for _ in range(len(image_bytes_list))
+                })
+                for i in range(len(image_bytes_list))
             ]
 
         elapsed = time.time() - start_time
         elapsed_ms = int(elapsed * 1000)
 
-        # 3. 結果を元のインデックス順にマッピング
-        results = []
-        pred_idx = 0
+        # 3. 推論結果をvalid_image_pairsと対応付け
+        uncached_results = {}  # original_index → result
+        for pred_idx, (orig_idx, _, scale) in enumerate(valid_image_pairs):
+            if pred_idx >= len(predictions):
+                uncached_results[orig_idx] = {
+                    "success": False,
+                    "error": "Prediction result missing",
+                    "regions": [],
+                    "processing_time_ms": 0,
+                    "engine_name": "Surya OCR",
+                    "engine_version": self.VERSION
+                }
+                continue
 
+            inv_scale = 1.0 / scale if scale != 1.0 else 1.0
+            ocr_result = predictions[pred_idx]
+
+            regions = []
+            text_lines = getattr(ocr_result, 'text_lines', [])
+            if not text_lines:
+                text_lines = getattr(ocr_result, 'lines', [])
+
+            for idx, line in enumerate(text_lines):
+                bbox = getattr(line, 'bbox', None)
+                polygon = getattr(line, 'polygon', None)
+                confidence = getattr(line, 'confidence', 0.0)
+                text = getattr(line, 'text', '')
+
+                region = {
+                    "text": text,
+                    "confidence": float(confidence) if confidence else 0.0,
+                    "bbox": {
+                        "points": [
+                            {"x": float(p[0]) * inv_scale, "y": float(p[1]) * inv_scale}
+                            for p in polygon
+                        ] if polygon else [],
+                        "x": int(bbox[0] * inv_scale) if bbox else 0,
+                        "y": int(bbox[1] * inv_scale) if bbox else 0,
+                        "width": int((bbox[2] - bbox[0]) * inv_scale) if bbox and len(bbox) >= 4 else 0,
+                        "height": int((bbox[3] - bbox[1]) * inv_scale) if bbox and len(bbox) >= 4 else 0,
+                    },
+                    "line_index": idx
+                }
+                regions.append(region)
+
+            result = {
+                "success": True,
+                "regions": regions,
+                "processing_time_ms": elapsed_ms,
+                "engine_name": "Surya OCR",
+                "engine_version": self.VERSION,
+                "cache_hit": False
+            }
+            uncached_results[orig_idx] = result
+
+            # [Issue #467] キャッシュに保存
+            self._recognition_cache.put(image_bytes_list[orig_idx], result)
+
+        # 4. 元のインデックス順に結果をマージ
+        cache_stats = self._recognition_cache.get_stats()
+        final_results = []
         for i in range(len(image_bytes_list)):
-            if i in per_image_errors:
-                # 前処理でエラーになった画像
-                results.append({
+            if i in cached_results:
+                final_results.append(cached_results[i])
+            elif i in per_image_errors:
+                final_results.append({
                     "success": False,
                     "error": per_image_errors[i],
                     "regions": [],
@@ -583,50 +756,10 @@ class SuryaOcrEngine:
                     "engine_name": "Surya OCR",
                     "engine_version": self.VERSION
                 })
-            elif pred_idx < len(predictions):
-                # バッチ推論結果をパース
-                scale = scales[i]
-                inv_scale = 1.0 / scale if scale != 1.0 else 1.0
-                ocr_result = predictions[pred_idx]
-                pred_idx += 1
-
-                regions = []
-                text_lines = getattr(ocr_result, 'text_lines', [])
-                if not text_lines:
-                    text_lines = getattr(ocr_result, 'lines', [])
-
-                for idx, line in enumerate(text_lines):
-                    bbox = getattr(line, 'bbox', None)
-                    polygon = getattr(line, 'polygon', None)
-                    confidence = getattr(line, 'confidence', 0.0)
-                    text = getattr(line, 'text', '')
-
-                    region = {
-                        "text": text,
-                        "confidence": float(confidence) if confidence else 0.0,
-                        "bbox": {
-                            "points": [
-                                {"x": float(p[0]) * inv_scale, "y": float(p[1]) * inv_scale}
-                                for p in polygon
-                            ] if polygon else [],
-                            "x": int(bbox[0] * inv_scale) if bbox else 0,
-                            "y": int(bbox[1] * inv_scale) if bbox else 0,
-                            "width": int((bbox[2] - bbox[0]) * inv_scale) if bbox and len(bbox) >= 4 else 0,
-                            "height": int((bbox[3] - bbox[1]) * inv_scale) if bbox and len(bbox) >= 4 else 0,
-                        },
-                        "line_index": idx
-                    }
-                    regions.append(region)
-
-                results.append({
-                    "success": True,
-                    "regions": regions,
-                    "processing_time_ms": elapsed_ms,
-                    "engine_name": "Surya OCR",
-                    "engine_version": self.VERSION
-                })
+            elif i in uncached_results:
+                final_results.append(uncached_results[i])
             else:
-                results.append({
+                final_results.append({
                     "success": False,
                     "error": "Prediction result missing",
                     "regions": [],
@@ -635,10 +768,12 @@ class SuryaOcrEngine:
                     "engine_version": self.VERSION
                 })
 
-        total_regions = sum(len(r["regions"]) for r in results if r["success"])
-        self.logger.info(f"[Issue #450] バッチOCR完了: {len(valid_images)}枚, {total_regions}領域検出 ({elapsed_ms}ms)")
+        total_regions = sum(len(r["regions"]) for r in final_results if r.get("success"))
+        self.logger.info(
+            f"[Issue #450] バッチOCR完了: {len(valid_images)}枚推論 + {len(cached_results)}枚キャッシュ, "
+            f"{total_regions}領域検出 ({elapsed_ms}ms, cache_hit_rate: {cache_stats['cache_hit_rate']:.1%})")
 
-        return results
+        return final_results
 
     def detect_only(self, image_bytes: bytes) -> dict:
         """[Issue #320] テキスト領域の位置のみを検出（Recognitionをスキップ）
@@ -787,6 +922,12 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
                     p.y = point["y"]
 
             response.timestamp.FromDatetime(datetime.utcnow())
+
+            # [Issue #467] cache_hit情報をmetadataに書き込み（C#側でログ出力可能にする）
+            response.metadata["cache_hit"] = str(result.get("cache_hit", False)).lower()
+            if "cache_hit_rate" in result:
+                response.metadata["cache_hit_rate"] = f"{result['cache_hit_rate']:.3f}"
+
             return response
 
         except Exception as e:
@@ -930,6 +1071,11 @@ class AsyncOcrServiceServicer(ocr_pb2_grpc.OcrServiceServicer):
                         p.y = point["y"]
 
                 ocr_response.timestamp.FromDatetime(datetime.utcnow())
+
+                # [Issue #467] cache_hit情報をmetadataに書き込み
+                ocr_response.metadata["cache_hit"] = str(result.get("cache_hit", False)).lower()
+                if "cache_hit_rate" in result:
+                    ocr_response.metadata["cache_hit_rate"] = f"{result['cache_hit_rate']:.3f}"
 
                 if result["success"]:
                     success_count += 1

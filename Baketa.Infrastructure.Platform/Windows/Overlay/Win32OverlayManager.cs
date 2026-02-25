@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Drawing;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.UI.Overlays;
@@ -155,6 +156,18 @@ public sealed class Win32OverlayManager : IOverlayManager
             _logger.LogError(ex, "全Win32オーバーレイ非表示中にエラーが発生しました");
             throw;
         }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// [Issue #408] Win32OverlayManagerではオーバーレイの位置情報を保持していないため、
+    /// 暫定的に全オーバーレイを削除して対応。
+    /// 実際の領域指定削除はSimpleInPlaceOverlayManager側で実装済み。
+    /// </remarks>
+    public async Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("[Issue #408] Win32OverlayManager.HideOverlaysInAreaAsync - 全削除で代替: Area={Area}", area);
+        await HideAllAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
