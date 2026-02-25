@@ -815,55 +815,39 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
         {
             if (!state.IsInStabilization)
             {
-                // [FIX] 安定化モード開始 - 最初の変化検出時はOCRを許可
-                // バグ修正: 以前は最初の変化でもOCRを抑制していたため、20秒以上の遅延が発生していた
-                // [FIX] OCR許可後はstateをリセットして次回は新規サイクルとして開始
-                // これによりOCR処理時間がタイムアウト計測に含まれる問題を解消
+                // [Issue #469] 最初の変化検出: OCR即許可 + 安定化モード開始
+                // - OCRを即許可して初回翻訳を遅延なく実行（20秒遅延問題の回避）
+                // - 同時に安定化モードに入り、テキスト表示完了後にOCR再実行を可能にする
+                // - 初回OCR中にテキスト表示が進行した場合、安定化完了後に再OCRで完全テキスト取得
+                state.EnterStabilization();
 
-                _logger.LogDebug("🕐 [TextStabilization] 変化検出 - Context: {ContextId}（OCR許可、安定化サイクル開始せず）",
+                _logger.LogDebug("🕐 [TextStabilization] 変化検出 - Context: {ContextId}（OCR許可、安定化モード開始）",
                     contextId);
 
-                // [FIX] 最初の変化検出時はOCRを許可（nullを返す）
-                // 安定化モードには入らない = 次回の変化検出時も「最初の変化」として扱う
-                // これによりOCR処理時間がタイムアウト計測に含まれることを防止
-                return null;
-            }
-
-            // 既に安定化モード中：タイムアウトチェック
-            // 注: このブランチは連続した高速変化（タイプライターエフェクト）時のみ到達
-            if (state.HasTimedOut(now, _settings.MaxStabilizationWaitMs))
-            {
-                // タイムアウト：強制的にOCR実行許可
-                var totalMs = (now - state.FirstChangeTime).TotalMilliseconds;
-                var actualWaitMs = (now - state.LastChangeTime).TotalMilliseconds;
-                state.Reset();
-
-                _logger.LogDebug("⏰ [TextStabilization] 安定化タイムアウト - Context: {ContextId}, 総経過: {TotalMs:F0}ms, 最終変化から: {ActualWaitMs:F0}ms",
-                    contextId, totalMs, actualWaitMs);
-
                 return null; // OCR実行許可
             }
 
-            // 安定化モード中の連続変化：抑制するかどうかを判定
+            // [Issue #469] 安定化モード中に変化継続（タイプライターエフェクト等）
+            // 初回OCRは既に許可済み → 追加OCRを抑制し、テキスト安定化を待つ
+            // HandleStabilizationOnNoChangeでテキスト安定化を検出→再OCRトリガー
+            state.UpdateLastChange();
             var sinceFirstChange = (now - state.FirstChangeTime).TotalMilliseconds;
 
-            // [FIX] 最初の変化から安定化遅延時間内の連続変化のみ抑制
-            // 遅延時間を超えたら次のOCRを許可（リセット）
-            if (sinceFirstChange >= _settings.TextStabilizationDelayMs)
+            // ハードタイムアウト: OCR処理時間(~3.5s)を考慮して十分な猶予を設定
+            // MaxStabilizationWaitMs(3000ms) * 2 = 6000ms
+            // これはフォールバック用。通常はHandleStabilizationOnNoChangeで安定化検出→再OCR
+            var hardTimeoutMs = _settings.MaxStabilizationWaitMs * 2;
+            if (sinceFirstChange >= hardTimeoutMs)
             {
-                // 安定化遅延時間経過：OCR許可してリセット
                 state.Reset();
 
-                _logger.LogDebug("✅ [TextStabilization] 安定化遅延完了 - Context: {ContextId}, WaitedMs: {Ms:F0}ms",
+                _logger.LogDebug("⏰ [TextStabilization] ハードタイムアウト - Context: {ContextId}, 総経過: {TotalMs:F0}ms - OCR強制許可",
                     contextId, sinceFirstChange);
 
-                return null; // OCR実行許可
+                return null; // フォールバック: OCR実行許可
             }
 
-            // 変化継続：最終変化時刻を更新してOCR抑制継続
-            state.UpdateLastChange();
-
-            _logger.LogDebug("🔄 [TextStabilization] 変化継続（待機中）- Context: {ContextId}, SinceFirstChange: {Ms:F0}ms",
+            _logger.LogDebug("🔄 [TextStabilization] 変化継続（OCR抑制）- Context: {ContextId}, 総経過: {Ms:F0}ms",
                 contextId, sinceFirstChange);
 
             return ImageChangeResult.CreateNoChange(elapsed, detectionStage: 1);
@@ -899,15 +883,19 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 return null;
             }
 
-            // 安定化モード中に変化なしを検出
+            // [Issue #469] 安定化モード中に変化なしを検出
+            // テキスト表示が完了した可能性 → 安定化判定
+            var sinceLastChange = (now - state.LastChangeTime).TotalMilliseconds;
+            var sinceFirstChange = (now - state.FirstChangeTime).TotalMilliseconds;
+
             if (state.HasStabilized(now, _settings.TextStabilizationDelayMs) || state.HasTimedOut(now, _settings.MaxStabilizationWaitMs))
             {
-                // 安定化完了またはタイムアウト：OCR実行許可
-                var waitedMs = (now - state.FirstChangeTime).TotalMilliseconds;
+                // 安定化完了またはタイムアウト：再OCR実行トリガー
                 state.Reset();
 
-                _logger.LogInformation("✅ [TextStabilization] 安定化完了 - Context: {ContextId}, WaitedMs: {WaitedMs:F0}ms",
-                    contextId, waitedMs);
+                _logger.LogInformation("✅ [TextStabilization] 安定化完了（再OCRトリガー）- Context: {ContextId}, " +
+                    "総経過: {TotalMs:F0}ms, 最終変化から: {SinceLastMs:F0}ms",
+                    contextId, sinceFirstChange, sinceLastChange);
 
                 // 「変化あり」として返すことでOCRをトリガー
                 return ImageChangeResult.CreateChanged(
@@ -920,8 +908,9 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             }
 
             // まだ安定化待機時間が経過していない
-            _logger.LogDebug("⏳ [TextStabilization] 安定化待機中（変化なし）- Context: {ContextId}, SinceLastChange: {Ms:F0}ms",
-                contextId, (now - state.LastChangeTime).TotalMilliseconds);
+            _logger.LogDebug("⏳ [TextStabilization] 安定化待機中（変化なし）- Context: {ContextId}, " +
+                "最終変化から: {SinceLastMs:F0}ms, 総経過: {TotalMs:F0}ms",
+                contextId, sinceLastChange, sinceFirstChange);
 
             return null; // 通常の「変化なし」処理を続行
         }

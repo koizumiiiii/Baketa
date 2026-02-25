@@ -37,12 +37,6 @@ public sealed class Win32OverlayManager : IOverlayManager
     /// <inheritdoc/>
     public async Task<IOverlay> ShowAsync(OverlayContent content, OverlayPosition position)
     {
-        // 🚨 [ULTRATHINK_WIN32_TRACE1] Win32OverlayManager.ShowAsync開始トレースログ
-        var timestamp1 = DateTime.Now.ToString("HH:mm:ss.fff");
-        var threadId1 = Environment.CurrentManagedThreadId;
-        System.IO.File.AppendAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "baketa_debug.log"),
-            $"[{timestamp1}][T{threadId1:D2}] 🔥 [ULTRATHINK_WIN32_TRACE1] Win32OverlayManager.ShowAsync開始 - Position: ({position.X},{position.Y},{position.Width}x{position.Height})\r\n");
-
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(position);
 
