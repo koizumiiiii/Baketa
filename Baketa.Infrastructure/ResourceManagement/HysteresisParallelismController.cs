@@ -66,6 +66,19 @@ public sealed class HysteresisParallelismController : IDisposable
 
             AddMeasurement(measurement);
 
+            // VRAM緊急時はMinAdjustmentIntervalをバイパスして即座に並列度を最小化
+            if (gpuMetrics.VramUsagePercent >= 90.0 && _currentParallelism > _settings.MinParallelism)
+            {
+                var previousParallelism = _currentParallelism;
+                _currentParallelism = _settings.MinParallelism;
+                _lastAdjustmentTime = DateTime.UtcNow;
+
+                _logger.LogWarning("🚨 VRAM緊急制限発動: VRAM {VramUsage:F1}% >= 90% により並列度を即座に最小化 - {Previous} → {Min}",
+                    gpuMetrics.VramUsagePercent, previousParallelism, _currentParallelism);
+
+                return _currentParallelism;
+            }
+
             // フラッピング防止：最小間隔チェック
             if (DateTime.UtcNow - _lastAdjustmentTime < _settings.MinAdjustmentInterval)
             {
@@ -74,7 +87,7 @@ public sealed class HysteresisParallelismController : IDisposable
                 return _currentParallelism;
             }
 
-            // 緊急制限チェック
+            // 緊急制限チェック（GPU温度）
             if (gpuMetrics.GpuTemperatureCelsius >= 90.0)
             {
                 return ApplyEmergencyLimiting(gpuMetrics.GpuTemperatureCelsius);

@@ -40,6 +40,10 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
     // [Issue #229] テキスト安定化待機状態
     private readonly ConcurrentDictionary<string, StabilizationState> _stabilizationStates = new();
 
+    // 連続SUPPRESS検知カウンタ（1フレーム検出窓問題対策）
+    private readonly ConcurrentDictionary<string, int> _consecutiveSuppressCount = new();
+    private const int MaxConsecutiveSuppressBeforeForceDetect = 3;
+
     // パフォーマンス統計
     private readonly ConcurrentDictionary<int, List<TimeSpan>> _stageTimings = new()
     {
@@ -449,6 +453,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             _imageHashCache.TryRemove(contextId, out _);
             _gridHashCache.TryRemove(contextId, out _);
             _stabilizationStates.TryRemove(contextId, out _); // [Issue #229] 安定化状態もクリア
+            _consecutiveSuppressCount.TryRemove(contextId, out _);
             _logger.LogDebug("🗑️ キャッシュクリア - Context: {ContextId}", contextId);
         }
         else
@@ -462,6 +467,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             _imageHashCache.Clear();
             _gridHashCache.Clear();
             _stabilizationStates.Clear(); // [Issue #229] 安定化状態もクリア
+            _consecutiveSuppressCount.Clear();
 
             _logger.LogInformation("🗑️ 全キャッシュクリア - Quick: {QuickCount}, Image: {ImageCount}, Grid: {GridCount}, Stabilization: {StabilizationCount}",
                 quickCount, imageCount, gridCount, stabilizationCount);
@@ -1047,6 +1053,7 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
             // [Issue #229][Gemini Review] チェックサムフォールバック検出
             // ハッシュが同一でもチェックサムが異なれば変化ありと判定
             var checksumChanged = currentChecksum != cachedGrid.ImageChecksum;
+            var skipCacheUpdate = false; // SUPPRESS時はキャッシュ更新をスキップ（1フレーム検出窓問題対策）
             if (changedBlocks.Count == 0 && checksumChanged && minSimilarity < 0.999f)
             {
                 // 通常フォールバック: ハッシュ類似度が十分低い → テキスト変化の可能性が高い
@@ -1089,18 +1096,53 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 }
                 else
                 {
-                    // GPUノイズ → 抑制（ロバストチェックサム差分をログに記録して閾値調整に活用）
-                    _logger.LogDebug(
-                        "🛡️ [NewStage1_FALLBACK_SUPPRESSED] ロバストチェックサム差分が閾値以下 - Diff: {Diff}, Threshold: {Threshold}, MinSim: {MinSim:F4}, Context: {ContextId}",
-                        robustDiff, RobustChecksumDiffThreshold, minSimilarity, contextId);
+                    // GPUノイズ → 抑制候補（連続SUPPRESS検知で強制検出に昇格）
+                    var suppressCount = _consecutiveSuppressCount.AddOrUpdate(contextId, 1, (_, count) => count + 1);
+
+                    if (suppressCount >= MaxConsecutiveSuppressBeforeForceDetect)
+                    {
+                        // 連続SUPPRESS限界超過 → 実際の変化と判断して強制検出
+                        _logger.LogInformation(
+                            "🔄 [NewStage1_SUPPRESS_OVERRIDE] 連続SUPPRESS {Count}回で強制変化検出 - RobustDiff: {Diff}, Threshold: {Threshold}, Context: {ContextId}",
+                            suppressCount, robustDiff, RobustChecksumDiffThreshold, contextId);
+
+                        var textRow = rows - 1;
+                        for (int col = 0; col < cols; col++)
+                        {
+                            var blockIndex = textRow * cols + col;
+                            var block = blockResults.First(b => b.Index == blockIndex);
+                            changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                        }
+                        minSimilarity = FallbackSimilarityThreshold;
+                        mostChangedIndex = textRow * cols;
+                        _consecutiveSuppressCount.TryRemove(contextId, out _);
+                        // キャッシュ更新あり（新しい参照フレームへ移行）
+                    }
+                    else
+                    {
+                        // SUPPRESS継続 → キャッシュ更新をスキップして参照フレームを維持
+                        skipCacheUpdate = true;
+                        _logger.LogDebug(
+                            "🛡️ [NewStage1_FALLBACK_SUPPRESSED] ロバストチェックサム差分が閾値以下 - Diff: {Diff}, Threshold: {Threshold}, MinSim: {MinSim:F4}, SuppressCount: {SuppressCount}/{Max}, Context: {ContextId}",
+                            robustDiff, RobustChecksumDiffThreshold, minSimilarity, suppressCount, MaxConsecutiveSuppressBeforeForceDetect, contextId);
+                    }
                 }
             }
 
-            // キャッシュ更新（チェックサム + ロバストチェックサム含む）
-            var updatedCache = new GridHashCache(
-                blockResults.OrderBy(b => b.Index).Select(b => b.Hash).ToArray(),
-                rows, cols, DateTime.UtcNow, currentChecksum, currentRobustChecksum);
-            _gridHashCache.AddOrUpdate(contextId, updatedCache, (_, _) => updatedCache);
+            // 変化検出時 or チェックサム未変化時は連続SUPPRESSカウンターをリセット
+            if (changedBlocks.Count > 0 || !checksumChanged)
+            {
+                _consecutiveSuppressCount.TryRemove(contextId, out _);
+            }
+
+            // キャッシュ更新（SUPPRESS時はスキップして参照フレームを維持）
+            if (!skipCacheUpdate)
+            {
+                var updatedCache = new GridHashCache(
+                    blockResults.OrderBy(b => b.Index).Select(b => b.Hash).ToArray(),
+                    rows, cols, DateTime.UtcNow, currentChecksum, currentRobustChecksum);
+                _gridHashCache.AddOrUpdate(contextId, updatedCache, (_, _) => updatedCache);
+            }
 
             // 🔍 [DIAGNOSTIC] MinSimilarity=1.0000の場合、詳細ログ出力
             if (minSimilarity >= 0.9999f)

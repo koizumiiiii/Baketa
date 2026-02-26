@@ -208,6 +208,9 @@ class SuryaOcrEngine:
     MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
     MAX_IMAGE_DIMENSION = 2048
 
+    # [Issue #473] N回推論ごとにGC + CUDAキャッシュクリアを実行
+    _GC_INTERVAL = 10
+
     def __init__(self, device: str = "cuda"):
         self.device = device
         self.foundation_predictor = None
@@ -215,6 +218,7 @@ class SuryaOcrEngine:
         self.detection_predictor = None
         self.is_loaded = False
         self._use_cuda = False  # [Issue #426] 実際にCUDAが有効かどうか
+        self._inference_count = 0  # [Issue #473] 推論カウンター
         self.logger = logging.getLogger(f"{__name__}.SuryaOcrEngine")
         # [Issue #467] OCR結果キャッシュ
         self._recognition_cache = RecognitionCache(max_entries=50)
@@ -441,6 +445,27 @@ class SuryaOcrEngine:
                 pass
             return False, f"Error during device switch: {str(e)}"
 
+    def _periodic_memory_cleanup(self):
+        """[Issue #473] 定期的なメモリクリーンアップ
+
+        毎回gc.collect()を呼ぶとオーバーヘッドがあるため、
+        _GC_INTERVAL回の推論ごとに実行する。
+        """
+        self._inference_count += 1
+        if self._inference_count % self._GC_INTERVAL != 0:
+            return
+
+        import gc
+        gc.collect()
+
+        if self._use_cuda:
+            try:
+                import torch
+                torch.cuda.empty_cache()
+                self.logger.debug(f"[Issue #473] 定期メモリクリーンアップ実行 (推論{self._inference_count}回目)")
+            except Exception:
+                pass
+
     def _resize_image_if_needed(self, image: "Image.Image") -> tuple:
         """画像が大きすぎる場合はリサイズ"""
         from PIL import Image
@@ -477,12 +502,17 @@ class SuryaOcrEngine:
             result["cache_hit_rate"] = cache_stats["cache_hit_rate"]
             return result
 
+        image = None
+        predictions = None
         try:
             from PIL import Image
 
-            image = Image.open(io.BytesIO(image_bytes))
+            buf = io.BytesIO(image_bytes)
+            image = Image.open(buf)
             if image.mode != "RGB":
+                original = image
                 image = image.convert("RGB")
+                original.close()
 
             image, scale = self._resize_image_if_needed(image)
 
@@ -559,6 +589,12 @@ class SuryaOcrEngine:
                 "engine_name": "Surya OCR",
                 "engine_version": self.VERSION
             }
+        finally:
+            # [Issue #473] メモリリーク防止: 画像・推論結果の明示的解放
+            if image is not None:
+                image.close()
+            del predictions
+            self._periodic_memory_cleanup()
 
     def recognize_batch(self, image_bytes_list: List[bytes], languages: Optional[List[str]] = None) -> List[dict]:
         """[Issue #450] 複数画像を一括でバッチ推論
@@ -614,9 +650,12 @@ class SuryaOcrEngine:
                 if len(image_bytes) > self.MAX_IMAGE_SIZE:
                     raise ValueError(f"画像サイズが上限を超えています: {len(image_bytes)} bytes")
 
-                img = PILImage.open(io.BytesIO(image_bytes))
+                buf = io.BytesIO(image_bytes)
+                img = PILImage.open(buf)
                 if img.mode != "RGB":
+                    original = img
                     img = img.convert("RGB")
+                    original.close()
 
                 img, scale = self._resize_image_if_needed(img)
                 images.append(img)
@@ -668,6 +707,12 @@ class SuryaOcrEngine:
             )
         except Exception as e:
             self.logger.exception(f"[Issue #450] バッチ推論エラー: {e}")
+            # [Issue #473] エラー時も画像を解放
+            for img in images:
+                if img is not None:
+                    img.close()
+            images.clear()
+            self._periodic_memory_cleanup()
             return [
                 cached_results.get(i, {
                     "success": False,
@@ -772,6 +817,14 @@ class SuryaOcrEngine:
         self.logger.info(
             f"[Issue #450] バッチOCR完了: {len(valid_images)}枚推論 + {len(cached_results)}枚キャッシュ, "
             f"{total_regions}領域検出 ({elapsed_ms}ms, cache_hit_rate: {cache_stats['cache_hit_rate']:.1%})")
+
+        # [Issue #473] メモリリーク防止: バッチ画像・推論結果の明示的解放
+        for img in images:
+            if img is not None:
+                img.close()
+        images.clear()
+        del predictions
+        self._periodic_memory_cleanup()
 
         return final_results
 

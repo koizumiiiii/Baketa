@@ -425,9 +425,10 @@ public sealed class HybridResourceManager : IResourceManager, IDisposable
         var shouldAdjust = ShouldAdjustParallelism(isHighLoad, isLowLoad, currentTrend, now);
 
         // Important: VRAM統合による強制調整の適用
+        // タプルは (Increase, Decrease) の順序。高負荷時はDecrease、低負荷時はIncrease
         if (forceAdjustmentDueToVram)
         {
-            shouldAdjust = (isHighLoad && !isLowLoad, !isHighLoad && isLowLoad);
+            shouldAdjust = (Increase: !isHighLoad && isLowLoad, Decrease: isHighLoad && !isLowLoad);
         }
 
         if (shouldAdjust.Decrease)

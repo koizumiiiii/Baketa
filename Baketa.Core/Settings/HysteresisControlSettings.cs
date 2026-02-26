@@ -15,7 +15,7 @@ public sealed record HysteresisControlSettings
 
     /// <summary>GPU使用率下限しきい値（この値を下回ると並列度を上げる）</summary>
     [Range(10.0, 70.0)]
-    public double GpuLowerThresholdPercent { get; init; } = 50.0;
+    public double GpuLowerThresholdPercent { get; init; } = 60.0;
 
     /// <summary>VRAM使用率上限しきい値</summary>
     [Range(50.0, 95.0)]
@@ -23,7 +23,7 @@ public sealed record HysteresisControlSettings
 
     /// <summary>VRAM使用率下限しきい値</summary>
     [Range(10.0, 70.0)]
-    public double VramLowerThresholdPercent { get; init; } = 40.0;
+    public double VramLowerThresholdPercent { get; init; } = 50.0;
 
     /// <summary>並列度調整の最小間隔（フラッピング防止）</summary>
     public TimeSpan MinAdjustmentInterval { get; init; } = TimeSpan.FromSeconds(10);
@@ -42,7 +42,7 @@ public sealed record HysteresisControlSettings
 
     /// <summary>安定性確認に必要な連続測定回数</summary>
     [Range(2, 10)]
-    public int StabilityRequiredMeasurements { get; init; } = 3;
+    public int StabilityRequiredMeasurements { get; init; } = 5;
 
     /// <summary>緊急時の並列度制限（GPU温度 >= 90°C時）</summary>
     [Range(1, 4)]
