@@ -395,11 +395,18 @@ public sealed class LoginViewModel : ViewModelBase, ReactiveUI.Validation.Abstra
                 // Remember Me: トークンを永続化
                 if (RememberMe)
                 {
-                    await _tokenStorage.StoreTokensAsync(
+                    var tokensStored = await _tokenStorage.StoreTokensAsync(
                         success.Session.AccessToken,
                         success.Session.RefreshToken);
 
-                    _logger?.LogInformation("Remember Me: トークンを永続化しました");
+                    if (tokensStored)
+                    {
+                        _logger?.LogInformation("Remember Me: トークンを永続化しました");
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("Remember Me: トークンの永続化に失敗しました — 次回起動時に再ログインが必要です");
+                    }
                 }
 
                 // Issue #179: ログイン時にuser_metadataから言語設定を取得してアプリに反映

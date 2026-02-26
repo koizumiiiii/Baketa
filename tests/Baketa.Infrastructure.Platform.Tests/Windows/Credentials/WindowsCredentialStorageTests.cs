@@ -24,12 +24,15 @@ public sealed class WindowsCredentialStorageTests : IAsyncLifetime
 
     // テスト用の固定トークン
     private const string TestAccessToken = "test-access-token-12345";
-    private const string TestRefreshToken = "test-refresh-token-67890";
+    private const string TestRefreshToken = "test-refresh-token-67890-padding-xx";
+
+    // テスト専用プレフィックス（本番クレデンシャルとの衝突を回避）
+    private const string TestTargetPrefix = "BaketaTest";
 
     public WindowsCredentialStorageTests()
     {
         _mockLogger = new Mock<ILogger<WindowsCredentialStorage>>();
-        _storage = new WindowsCredentialStorage(_mockLogger.Object);
+        _storage = new WindowsCredentialStorage(_mockLogger.Object, TestTargetPrefix);
     }
 
     /// <summary>
@@ -63,7 +66,7 @@ public sealed class WindowsCredentialStorageTests : IAsyncLifetime
     public void Constructor_WithValidLogger_InitializesCorrectly()
     {
         // Arrange & Act
-        var storage = new WindowsCredentialStorage(_mockLogger.Object);
+        var storage = new WindowsCredentialStorage(_mockLogger.Object, TestTargetPrefix);
 
         // Assert
         storage.Should().NotBeNull();
@@ -180,7 +183,7 @@ public sealed class WindowsCredentialStorageTests : IAsyncLifetime
 
         // Arrange - Unicode文字を含むトークン
         var unicodeAccessToken = "アクセストークン_テスト_日本語";
-        var unicodeRefreshToken = "リフレッシュトークン_テスト_日本語";
+        var unicodeRefreshToken = "リフレッシュトークン_テスト_日本語_パディング追加文字列_拡張テスト";
         await _storage.StoreTokensAsync(unicodeAccessToken, unicodeRefreshToken);
 
         // Act
@@ -345,7 +348,7 @@ public sealed class WindowsCredentialStorageTests : IAsyncLifetime
 
         // Act - Overwrite with new tokens
         var newAccessToken = "new-access-token";
-        var newRefreshToken = "new-refresh-token";
+        var newRefreshToken = "new-refresh-token-padding-xxxxxxx";
         var storeResult = await _storage.StoreTokensAsync(newAccessToken, newRefreshToken);
 
         // Assert
@@ -375,7 +378,7 @@ public sealed class WindowsCredentialStorageTests : IAsyncLifetime
         for (int i = 0; i < iterations; i++)
         {
             var accessToken = $"access-{i}";
-            var refreshToken = $"refresh-{i}";
+            var refreshToken = $"refresh-token-padding-xxxxxxxx-{i}";
             tasks[i] = Task.Run(async () =>
             {
                 await _storage.StoreTokensAsync(accessToken, refreshToken);
@@ -405,7 +408,7 @@ public sealed class WindowsCredentialStorageTests : IAsyncLifetime
             // Store操作
             tasks.Add(Task.Run(async () =>
             {
-                await _storage.StoreTokensAsync($"access-{index}", $"refresh-{index}");
+                await _storage.StoreTokensAsync($"access-{index}", $"refresh-token-padding-xxxxxxxx-{index}");
             }));
             // Retrieve操作
             tasks.Add(Task.Run(async () =>
@@ -422,6 +425,66 @@ public sealed class WindowsCredentialStorageTests : IAsyncLifetime
         // Assert - すべてのタスクが例外なく完了
         await Task.WhenAll(tasks);
         tasks.Should().AllSatisfy(t => t.IsCompletedSuccessfully.Should().BeTrue());
+    }
+
+    #endregion
+
+    #region RefreshToken Short Token Warning Tests
+
+    [SkippableFact]
+    public async Task StoreTokensAsync_WithShortRefreshToken_StoresSuccessfully()
+    {
+        // Skip on non-Windows
+        Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "Windows-only test");
+
+        // Arrange - 12文字のRefreshToken（Issue #461で報告された異常値）
+        // 短いが SetSession では動作するため、保存はブロックしない
+        var shortRefreshToken = "abc123def456";
+
+        // Act
+        var result = await _storage.StoreTokensAsync(TestAccessToken, shortRefreshToken);
+
+        // Assert - 警告ログは出るが保存は成功する
+        result.Should().BeTrue();
+
+        var retrieved = await _storage.RetrieveTokensAsync();
+        retrieved.Should().NotBeNull();
+        retrieved!.Value.RefreshToken.Should().Be(shortRefreshToken);
+    }
+
+    [SkippableTheory]
+    [InlineData(1)]
+    [InlineData(12)]
+    [InlineData(31)]
+    public async Task StoreTokensAsync_WithRefreshTokenBelowMinLength_StoresWithWarning(int length)
+    {
+        // Skip on non-Windows
+        Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "Windows-only test");
+
+        // Arrange
+        var shortRefreshToken = new string('x', length);
+
+        // Act - 短くても保存は成功する（警告ログのみ）
+        var result = await _storage.StoreTokensAsync(TestAccessToken, shortRefreshToken);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [SkippableFact]
+    public async Task StoreTokensAsync_WithRefreshTokenAtMinLength_ReturnsTrue()
+    {
+        // Skip on non-Windows
+        Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "Windows-only test");
+
+        // Arrange - ちょうど32文字（最小長の境界値、警告なし）
+        var exactMinRefreshToken = new string('x', 32);
+
+        // Act
+        var result = await _storage.StoreTokensAsync(TestAccessToken, exactMinRefreshToken);
+
+        // Assert
+        result.Should().BeTrue();
     }
 
     #endregion

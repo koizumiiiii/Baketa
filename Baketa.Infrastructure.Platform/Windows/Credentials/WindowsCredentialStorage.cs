@@ -13,13 +13,11 @@ namespace Baketa.Infrastructure.Platform.Windows.Credentials;
 /// </summary>
 public sealed class WindowsCredentialStorage : ITokenStorage
 {
-    // Obfuscated credential target names (not easily searchable)
-    // Format: "{AppHash}_{UserHash}_{Purpose}"
-    private static readonly string CredentialTargetPrefix = GenerateObfuscatedPrefix();
-    private static readonly string AccessTokenTarget = $"{CredentialTargetPrefix}_AT";
-    private static readonly string RefreshTokenTarget = $"{CredentialTargetPrefix}_RT";
-
     private readonly ILogger<WindowsCredentialStorage> _logger;
+
+    // Instance-level credential target names (allows test isolation)
+    private readonly string _accessTokenTarget;
+    private readonly string _refreshTokenTarget;
 
     /// <summary>
     /// Generate an obfuscated credential target prefix unique to this machine/user
@@ -34,9 +32,20 @@ public sealed class WindowsCredentialStorage : ITokenStorage
         return Convert.ToHexString(hashBytes[..8]);
     }
 
-    public WindowsCredentialStorage(ILogger<WindowsCredentialStorage> logger)
+    /// <param name="logger">Logger instance</param>
+    /// <param name="targetPrefix">
+    /// Optional credential target prefix. When null (default), uses the production
+    /// obfuscated prefix derived from machine/user identity.
+    /// Pass a custom prefix in tests to isolate test credentials from production.
+    /// </param>
+    public WindowsCredentialStorage(
+        ILogger<WindowsCredentialStorage> logger,
+        string? targetPrefix = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        var prefix = targetPrefix ?? GenerateObfuscatedPrefix();
+        _accessTokenTarget = $"{prefix}_AT";
+        _refreshTokenTarget = $"{prefix}_RT";
     }
 
     /// <summary>
@@ -49,6 +58,19 @@ public sealed class WindowsCredentialStorage : ITokenStorage
 
         try
         {
+            // RefreshToken 最小長チェック (警告のみ、保存はブロックしない)
+            // 正常なSupabase RefreshTokenは40-60文字。12文字等の異常な短さでも
+            // SetSessionでは動作するため、保存して次回起動時のセッション復元に使用する
+            const int MinRefreshTokenLength = 32;
+            if (refreshToken.Length < MinRefreshTokenLength)
+            {
+                _logger.LogWarning(
+                    "RefreshToken is suspiciously short ({Length} chars < {MinLength} chars). " +
+                    "Storing anyway as short tokens may still be valid for session restore. " +
+                    "This may indicate a Supabase SDK issue.",
+                    refreshToken.Length, MinRefreshTokenLength);
+            }
+
             // トークンサイズをログ出力（デバッグ用）
             // JWT tokens contain only ASCII characters, so UTF-8 encoding uses 1 byte per character
             // This allows storing tokens up to 2560 characters (within Windows Credential Manager limit)
@@ -72,8 +94,8 @@ public sealed class WindowsCredentialStorage : ITokenStorage
                 return Task.FromResult(false);
             }
 
-            bool accessStored = WriteCredential(AccessTokenTarget, "BaketaAccessToken", accessToken, out int accessError);
-            bool refreshStored = WriteCredential(RefreshTokenTarget, "BaketaRefreshToken", refreshToken, out int refreshError);
+            bool accessStored = WriteCredential(_accessTokenTarget, "BaketaAccessToken", accessToken, out int accessError);
+            bool refreshStored = WriteCredential(_refreshTokenTarget, "BaketaRefreshToken", refreshToken, out int refreshError);
 
             if (accessStored && refreshStored)
             {
@@ -101,8 +123,8 @@ public sealed class WindowsCredentialStorage : ITokenStorage
         {
             _logger.LogDebug("Retrieving authentication tokens from Windows Credential Manager");
 
-            string? accessToken = ReadCredential(AccessTokenTarget);
-            string? refreshToken = ReadCredential(RefreshTokenTarget);
+            string? accessToken = ReadCredential(_accessTokenTarget);
+            string? refreshToken = ReadCredential(_refreshTokenTarget);
 
             if (!string.IsNullOrEmpty(accessToken) && !string.IsNullOrEmpty(refreshToken))
             {
@@ -135,8 +157,8 @@ public sealed class WindowsCredentialStorage : ITokenStorage
                 _logger.LogWarning("[TOKEN_CLEAR] ClearTokensAsync called. StackTrace:\n{StackTrace}", stackTrace);
             }
 
-            bool accessDeleted = DeleteCredential(AccessTokenTarget);
-            bool refreshDeleted = DeleteCredential(RefreshTokenTarget);
+            bool accessDeleted = DeleteCredential(_accessTokenTarget);
+            bool refreshDeleted = DeleteCredential(_refreshTokenTarget);
 
             _logger.LogWarning("[TOKEN_CLEAR] Authentication tokens cleared from Windows Credential Manager (Access: {Access}, Refresh: {Refresh})",
                 accessDeleted, refreshDeleted);
@@ -157,8 +179,8 @@ public sealed class WindowsCredentialStorage : ITokenStorage
     {
         try
         {
-            string? accessToken = ReadCredential(AccessTokenTarget);
-            string? refreshToken = ReadCredential(RefreshTokenTarget);
+            string? accessToken = ReadCredential(_accessTokenTarget);
+            string? refreshToken = ReadCredential(_refreshTokenTarget);
 
             return Task.FromResult(!string.IsNullOrEmpty(accessToken) && !string.IsNullOrEmpty(refreshToken));
         }
