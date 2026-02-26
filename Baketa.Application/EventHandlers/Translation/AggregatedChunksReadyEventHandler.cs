@@ -922,6 +922,16 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     $"[{timestamp4}][T{threadId4:D2}] 🚨 [ULTRATHINK_TRACE4] ShowAsync呼び出し直前 - チャンク{i}, Text: '{content.Text}', Position: ({position.X},{position.Y},{position.Width}x{position.Height}), OverlayManagerType: {overlayManagerType}\r\n");
 #endif
 
+                // [Race condition fix] ShowAsync直前のキャンセルチェック
+                // Stop後にin-flightの翻訳処理がオーバーレイを作成してしまう問題を防止
+                // L841のループ先頭チェックからここまで~85行のコード実行中にStopされる可能性がある
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    _logger?.LogInformation("🛑 ShowAsync直前にキャンセル検出 - オーバーレイ表示をスキップ ({Completed}/{Total})",
+                        i, nonEmptyChunks.Count);
+                    break;
+                }
+
                 try
                 {
                     await _overlayManager.ShowAsync(content, position).ConfigureAwait(false);
@@ -1837,11 +1847,15 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                         suryaChunk.CombinedBounds.Width, suryaChunk.CombinedBounds.Height);
                     clippedRect = suryaChunk.CombinedBounds;
                 }
-                else if (clippedRect.Height < suryaChunk.CombinedBounds.Height * 0.3f ||
-                    clippedRect.Width < suryaChunk.CombinedBounds.Width * 0.3f)
+                else if (clippedRect.Height < suryaChunk.CombinedBounds.Height * 0.7f ||
+                    clippedRect.Width < suryaChunk.CombinedBounds.Width * 0.7f)
                 {
+                    // [Issue #414] しきい値を0.3→0.7に引き上げ
+                    // Cloud AI の 0-1000 座標系は粗いため、BBox高さがSuryaより大幅に小さくなるケースがある
+                    // 例: Cloud高さ73px vs Surya高さ105px (69.5%) → 縦幅の狭いオーバーレイになる
+                    // Suryaのピクセル精度の方が信頼できるため、30%以上の縮小でSurya座標にフォールバック
                     _logger?.LogInformation(
-                        "[Issue #414] クリッピング結果が小さすぎるためSurya境界を使用: Clipped=({CW}x{CH}) Surya=({SW}x{SH})",
+                        "[Issue #414] クリッピング結果がSurya境界比70%未満のためSurya境界を使用: Clipped=({CW}x{CH}) Surya=({SW}x{SH})",
                         clippedRect.Width, clippedRect.Height,
                         suryaChunk.CombinedBounds.Width, suryaChunk.CombinedBounds.Height);
                     clippedRect = suryaChunk.CombinedBounds;
@@ -2085,7 +2099,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     /// クリッピングすることで、表示位置の安定性を向上させる。
     /// クリッピング結果がゼロサイズになる場合は元のCloud座標を返す。
     /// </remarks>
-    private static System.Drawing.Rectangle ClipToSuryaBounds(
+    internal static System.Drawing.Rectangle ClipToSuryaBounds(
         System.Drawing.Rectangle cloudRect,
         System.Drawing.Rectangle suryaBounds)
     {
