@@ -285,6 +285,28 @@ public sealed record RoiGatekeeperSettings
     /// </remarks>
     public int TypewriterMaxDelayCycles { get; init; } = 10;
 
+    // ========================================
+    // [Issue #465] 静的UI要素検出設定
+    // ========================================
+
+    /// <summary>
+    /// 静的UI要素の自動検出を有効化
+    /// </summary>
+    /// <remarks>
+    /// 同一テキストが連続して検出された場合、静的UI要素として翻訳をスキップします。
+    /// デフォルト: true
+    /// </remarks>
+    public bool EnableStaticUiDetection { get; init; } = true;
+
+    /// <summary>
+    /// 静的UI要素と判定する連続同一テキスト回数
+    /// </summary>
+    /// <remarks>
+    /// SameText判定がこの回数以上連続した場合、静的UIとしてマーキングします。
+    /// デフォルト: 3
+    /// </remarks>
+    public int StaticUiDetectionThreshold { get; init; } = 3;
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -307,7 +329,9 @@ public sealed record RoiGatekeeperSettings
             && LowHeatmapThreshold < HighHeatmapThreshold
             // [Issue #432] タイプライター演出検知の検証
             && TypewriterStabilizationCycles >= 1
-            && TypewriterMaxDelayCycles >= 1;
+            && TypewriterMaxDelayCycles >= 1
+            // [Issue #465] 静的UI要素検出の検証
+            && StaticUiDetectionThreshold >= 1;
     }
 
     /// <summary>

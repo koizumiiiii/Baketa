@@ -432,6 +432,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             // [Issue #410] 翻訳開始時にキャッシュをリセット（Shot→Live遷移時の誤判定防止）
             _textChangeDetectionService?.ClearAllPreviousTexts();
+            // [Issue #465] 静的UI要素マーカーもリセット（新規セッション開始）
+            _textChangeDetectionService?.ClearStaticUiMarkers();
             _coordinateBasedTranslation?.ResetTranslationState();
 
             // バックグラウンドタスクで自動翻訳を実行
@@ -653,6 +655,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             // [Issue #410] テキスト変化検知キャッシュをクリア（言語変更後のSameText誤判定防止）
             _textChangeDetectionService?.ClearAllPreviousTexts();
+            // [Issue #465] 静的UI要素マーカーもリセット（セッション終了）
+            _textChangeDetectionService?.ClearStaticUiMarkers();
             _coordinateBasedTranslation?.ResetTranslationState();
 
             // 前回の翻訳結果をリセット（再翻訳時の問題を回避）

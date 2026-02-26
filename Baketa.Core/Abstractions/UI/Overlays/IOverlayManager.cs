@@ -1,3 +1,5 @@
+using System.Drawing;
+
 namespace Baketa.Core.Abstractions.UI.Overlays;
 
 /// <summary>
@@ -25,6 +27,14 @@ public interface IOverlayManager
     /// </summary>
     /// <param name="cancellationToken">キャンセルトークン</param>
     Task HideAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// [Issue #408] 指定領域内のオーバーレイを非表示にして破棄
+    /// </summary>
+    /// <param name="area">対象領域</param>
+    /// <param name="excludeChunkId">除外するChunkID（-1で除外なし）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    Task HideOverlaysInAreaAsync(Rectangle area, int excludeChunkId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 管理下の全オーバーレイの可視性を設定（破棄せずに表示/非表示を切り替え）

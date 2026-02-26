@@ -198,39 +198,25 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
 
         try
         {
-            // 🔧 [OVERLAY_UNIFICATION] TODO: IOverlayManagerには領域指定削除機能がないため、Phase 4で実装必要
-            // 暫定対応: 全オーバーレイを削除
-            await _overlayManager.HideAllAsync().ConfigureAwait(false);
-            totalCleaned = regions.Count; // 暫定的に領域数でカウント
-
-            // [Issue #407] Gate状態リセット: オーバーレイ削除後に同じテキストが再出現した場合に再翻訳可能にする
-            if (_textChangeDetectionService != null)
-            {
-                _textChangeDetectionService.ClearAllPreviousTexts();
-                _logger.LogInformation(
-                    "[Issue #407] オーバーレイ削除に伴いGate状態をリセット");
-            }
-
-            _logger.LogWarning("⚠️ [OVERLAY_UNIFICATION] 領域指定削除未実装のため全オーバーレイを削除 - WindowHandle: {WindowHandle}, 対象領域数: {RegionCount}",
-                windowHandle, regions.Count);
-
-            // TODO: Phase 4で以下の機能を IOverlayManager に追加:
-            // - HideOverlaysInAreaAsync(Rectangle region, int excludeChunkId, CancellationToken)
-            // - または、領域内のオーバーレイを取得するメソッド + 個別HideAsync
-
-            /* 元の実装（領域指定削除）:
+            // [Issue #408] 領域指定オーバーレイ削除
             foreach (var region in regions)
             {
                 await _overlayManager.HideOverlaysInAreaAsync(region, excludeChunkId: -1, cancellationToken).ConfigureAwait(false);
                 totalCleaned++;
             }
-            _logger.LogDebug("🎯 領域指定オーバーレイ削除完了 - WindowHandle: {WindowHandle}, 対象領域数: {RegionCount}",
+
+            // [Issue #408] ゾーン特定Gate状態クリア（全リセットではなく消失領域のゾーンのみ）
+            if (_textChangeDetectionService != null)
+            {
+                ClearGateForRegions(regions, windowHandle);
+            }
+
+            _logger.LogDebug("[Issue #408] 領域指定オーバーレイ削除完了 - WindowHandle: {WindowHandle}, 対象領域数: {RegionCount}",
                 windowHandle, regions.Count);
-            */
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ 領域指定オーバーレイ削除エラー - WindowHandle: {WindowHandle}", windowHandle);
+            _logger.LogError(ex, "領域指定オーバーレイ削除エラー - WindowHandle: {WindowHandle}", windowHandle);
             throw;
         }
 
@@ -274,6 +260,43 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
 
         _logger.LogWarning("⚠️ UpdateCircuitBreakerSettings呼び出し検出 - 設定外部化により、appsettings.jsonでの設定変更を推奨します。" +
             "要求値: 信頼度閾値={MinConfidence:F2}, 最大削除レート={MaxRate}/秒", minConfidenceScore, maxCleanupRate);
+    }
+
+    /// <summary>
+    /// [Issue #408] 消失領域からゾーンIDを計算し、該当ゾーンのGate状態をクリア
+    /// AggregatedChunksReadyEventHandlerと同じ8x6グリッドを使用
+    /// </summary>
+    private void ClearGateForRegions(IEnumerable<Rectangle> regions, nint windowHandle)
+    {
+        // デフォルト解像度（実際のウィンドウサイズは取得困難なためフォールバック値を使用）
+        const int defaultWidth = 1920;
+        const int defaultHeight = 1080;
+        const int zoneColumns = 8;
+        const int zoneRows = 6;
+
+        var clearedZones = new HashSet<string>();
+
+        foreach (var region in regions)
+        {
+            // 領域中心からゾーンIDを計算
+            var centerX = region.X + region.Width / 2;
+            var centerY = region.Y + region.Height / 2;
+            var zoneCol = Math.Clamp(centerX * zoneColumns / defaultWidth, 0, zoneColumns - 1);
+            var zoneRow = Math.Clamp(centerY * zoneRows / defaultHeight, 0, zoneRows - 1);
+            var zoneId = $"zone_{zoneRow}_{zoneCol}";
+
+            if (clearedZones.Add(zoneId))
+            {
+                _textChangeDetectionService!.ClearPreviousText(zoneId);
+            }
+        }
+
+        if (clearedZones.Count > 0)
+        {
+            _logger.LogInformation(
+                "[Issue #408] ゾーン特定Gate状態クリア - Zones: [{Zones}]",
+                string.Join(", ", clearedZones));
+        }
     }
 
     /// <summary>

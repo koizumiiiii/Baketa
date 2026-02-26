@@ -382,8 +382,20 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 .Where(chunk => !string.IsNullOrWhiteSpace(chunk.CombinedText))
                 .ToList();
 
-            // [Issue #397] P1-4: ゴミテキストフィルタ（アスペクト比 + 反復パターン）
+            // [Issue #397][Issue #466] ゴミテキストフィルタ（アスペクト比 + 反復パターン + 数字記号のみ + スクリプト混入）
             var preGarbageCount = nonEmptyChunks.Count;
+#if DEBUG
+            var garbageTexts = nonEmptyChunks
+                .Where(chunk => IsGarbageText(chunk))
+                .Select(chunk => chunk.CombinedText?.Trim() ?? "")
+                .ToList();
+            if (garbageTexts.Count > 0)
+            {
+                _logger.LogDebug(
+                    "[Issue #466] フィルタ対象ゴミテキスト: [{GarbageTexts}]",
+                    string.Join(", ", garbageTexts.Select(t => $"\"{t}\"")));
+            }
+#endif
             nonEmptyChunks = nonEmptyChunks
                 .Where(chunk => !IsGarbageText(chunk))
                 .ToList();
@@ -789,17 +801,24 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 return;
             }
 
-            // 🧹 [OVERLAY_CLEANUP] 新しいオーバーレイ表示前に古いオーバーレイをクリア
+            // 🧹 [OVERLAY_CLEANUP] Gate PASSしたチャンク領域のオーバーレイのみ削除
+            // HideAllAsync()は使用しない — BLOCKされたチャンクのオーバーレイを巻き添えで消さないため
             try
             {
-                await _overlayManager.HideAllAsync().ConfigureAwait(false);
-                _logger?.LogDebug("🧹 [OVERLAY_CLEANUP] 古いオーバーレイをクリアしました");
-                Console.WriteLine("🧹 [OVERLAY_CLEANUP] 古いオーバーレイをクリアしました");
+                foreach (var chunk in nonEmptyChunks)
+                {
+                    var bounds = chunk.CombinedBounds;
+                    if (bounds.Width > 0 && bounds.Height > 0)
+                    {
+                        var area = new System.Drawing.Rectangle(bounds.X, bounds.Y, bounds.Width, bounds.Height);
+                        await _overlayManager.HideOverlaysInAreaAsync(area, excludeChunkId: -1, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                _logger?.LogDebug("🧹 [OVERLAY_CLEANUP] Gate PASSチャンク領域のオーバーレイをクリア: {Count}領域", nonEmptyChunks.Count);
             }
             catch (Exception cleanupEx)
             {
                 _logger?.LogWarning(cleanupEx, "⚠️ [OVERLAY_CLEANUP] オーバーレイクリーンアップ中にエラー - 処理継続");
-                Console.WriteLine($"⚠️ [OVERLAY_CLEANUP] クリーンアップエラー: {cleanupEx.Message}");
             }
 
             // 🔧 [OVERLAY_UNIFICATION] 統一IOverlayManager.ShowAsync()で直接オーバーレイ表示
@@ -1264,6 +1283,48 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             && stripped.Any(c => !char.IsLetterOrDigit(c)))
             return true;
 
+        // 5. [Issue #466] 数字・記号のみ（例: "710-40", "1", "12:34"）
+        if (IsDigitOrPunctuationOnly(stripped))
+            return true;
+
+        // 6. [Issue #466] キリル文字等の予期しないスクリプト混入（例: "Q.Load ш Q.Save"）
+        if (ContainsUnexpectedScript(stripped))
+            return true;
+
+        // 7. [Issue #466] CJK文字を含まない3文字未満のテキスト（例: "Ch", "A"）
+        //    ただしCJK文字を含む場合は保護（日本語2文字名「桃子」等）
+        if (stripped.Length < 3 && !HasCjkCharacter(stripped))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// [Issue #466] 数字・記号のみで構成されたテキストを判定
+    /// 例: "710-40", "1", "12:34", "100%"
+    /// </summary>
+    private static bool IsDigitOrPunctuationOnly(string text)
+    {
+        foreach (var c in text)
+        {
+            if (char.IsLetter(c))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// [Issue #466] キリル文字等の予期しないスクリプトが含まれているか判定
+    /// OCR誤認識により英語テキストにキリル文字が混入するケースを検出
+    /// </summary>
+    private static bool ContainsUnexpectedScript(string text)
+    {
+        foreach (var c in text)
+        {
+            // キリル文字 (U+0400-U+04FF)
+            if (c is >= '\u0400' and <= '\u04FF')
+                return true;
+        }
         return false;
     }
 
@@ -2130,9 +2191,22 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
         // ROIマネージャーの状態をログ出力
         var roiEnabled = _roiManager?.IsEnabled ?? false;
+
+        // [Issue #464] 安定したゾーン計算を保証
+        // imageWidth/HeightはOriginalWidth/Height（フルウィンドウ）であるべき
+        // 0やROIクロップサイズの場合はフォールバック
+        var stableWidth = imageWidth > 0 ? imageWidth : 1920;
+        var stableHeight = imageHeight > 0 ? imageHeight : 1080;
+        if (imageWidth <= 0 || imageHeight <= 0)
+        {
+            _logger?.LogWarning(
+                "[Issue #464] imageSize無効値を検出: {Width}x{Height} → フォールバック: {StableWidth}x{StableHeight}",
+                imageWidth, imageHeight, stableWidth, stableHeight);
+        }
+
         _logger?.LogInformation(
             "🚪 [Issue #293] Gate判定開始: ChunkCount={Count}, RoiManager={RoiEnabled}, ImageSize={Width}x{Height}",
-            chunks.Count, roiEnabled, imageWidth, imageHeight);
+            chunks.Count, roiEnabled, stableWidth, stableHeight);
 
         // [Issue #397] ゾーンベースSourceIDの事前計算
         // 同一ゾーン内の複数チャンクがGate状態を相互汚染する問題を防止
@@ -2154,19 +2228,15 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                 continue;
             }
 
-            string sourceId;
-            if (imageWidth > 0 && imageHeight > 0)
-            {
-                var centerX = chunk.CombinedBounds.X + chunk.CombinedBounds.Width / 2;
-                var centerY = chunk.CombinedBounds.Y + chunk.CombinedBounds.Height / 2;
-                var zoneCol = Math.Clamp(centerX * zoneColumns / imageWidth, 0, zoneColumns - 1);
-                var zoneRow = Math.Clamp(centerY * zoneRows / imageHeight, 0, zoneRows - 1);
-                sourceId = $"zone_{zoneRow}_{zoneCol}";
-            }
-            else
-            {
-                sourceId = $"chunk_{chunk.CombinedBounds.X}_{chunk.CombinedBounds.Y}";
-            }
+            // [Issue #464] CombinedBoundsがimageSize範囲内であることを検証
+            var centerX = chunk.CombinedBounds.X + chunk.CombinedBounds.Width / 2;
+            var centerY = chunk.CombinedBounds.Y + chunk.CombinedBounds.Height / 2;
+            centerX = Math.Clamp(centerX, 0, stableWidth - 1);
+            centerY = Math.Clamp(centerY, 0, stableHeight - 1);
+
+            var zoneCol = Math.Clamp(centerX * zoneColumns / stableWidth, 0, zoneColumns - 1);
+            var zoneRow = Math.Clamp(centerY * zoneRows / stableHeight, 0, zoneRows - 1);
+            var sourceId = $"zone_{zoneRow}_{zoneCol}";
 
             chunkZoneMap[i] = sourceId;
 

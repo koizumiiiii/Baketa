@@ -159,19 +159,25 @@ public sealed class GrpcOcrClient : IDisposable
                     // [Issue #334] 成功時はタイムアウトカウンタをリセット
                     _consecutiveTimeouts = 0;
 
+                    // [Issue #467] OCR Recognitionキャッシュ情報をレスポンスmetadataから取得
+                    var cacheHit = response.Metadata.TryGetValue("cache_hit", out var ch) ? ch : "N/A";
+                    var cacheHitRate = response.Metadata.TryGetValue("cache_hit_rate", out var chr) ? chr : "N/A";
+
                     if (attempt > 0)
                     {
                         _logger.LogInformation(
-                            "[gRPC-OCR] Success after {Attempt} retries: {RegionCount} regions in {ElapsedMs}ms",
-                            attempt, response.RegionCount, sw.ElapsedMilliseconds);
+                            "[gRPC-OCR] Success after {Attempt} retries: {RegionCount} regions in {ElapsedMs}ms (CacheHit: {CacheHit})",
+                            attempt, response.RegionCount, sw.ElapsedMilliseconds, cacheHit);
                     }
                     else
                     {
                         _logger.LogInformation(
-                            "[gRPC-OCR] Success: {RegionCount} regions detected in {ElapsedMs}ms (Server: {ServerMs}ms)",
+                            "[gRPC-OCR] Success: {RegionCount} regions detected in {ElapsedMs}ms (Server: {ServerMs}ms, CacheHit: {CacheHit}, CacheHitRate: {CacheHitRate})",
                             response.RegionCount,
                             sw.ElapsedMilliseconds,
-                            response.ProcessingTimeMs);
+                            response.ProcessingTimeMs,
+                            cacheHit,
+                            cacheHitRate);
                     }
                     return response;
                 }
@@ -692,12 +698,24 @@ public sealed class GrpcOcrClient : IDisposable
 
             sw.Stop();
 
+            // [Issue #467] バッチ内の最初のレスポンスからキャッシュ情報を取得
+            var batchCacheHit = "N/A";
+            var batchCacheHitRate = "N/A";
+            if (response.Responses.Count > 0)
+            {
+                var firstResp = response.Responses[0];
+                batchCacheHit = firstResp.Metadata.TryGetValue("cache_hit", out var bch) ? bch : "N/A";
+                batchCacheHitRate = firstResp.Metadata.TryGetValue("cache_hit_rate", out var bchr) ? bchr : "N/A";
+            }
+
             _logger.LogInformation(
-                "[gRPC-OCR] RecognizeBatch completed: {SuccessCount}/{TotalCount} success in {ElapsedMs}ms (Server: {ServerMs}ms)",
+                "[gRPC-OCR] RecognizeBatch completed: {SuccessCount}/{TotalCount} success in {ElapsedMs}ms (Server: {ServerMs}ms, CacheHit: {CacheHit}, CacheHitRate: {CacheHitRate})",
                 response.SuccessCount,
                 response.TotalCount,
                 sw.ElapsedMilliseconds,
-                response.TotalProcessingTimeMs);
+                response.TotalProcessingTimeMs,
+                batchCacheHit,
+                batchCacheHitRate);
 
             return response;
         }
