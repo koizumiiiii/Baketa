@@ -283,6 +283,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             var passedChunks = new List<TextChunk>();
             var borderlineAcceptedCount = 0;
             var roiRelaxedAcceptedCount = 0;
+            var cloudBypassCount = 0;
 
             foreach (var chunk in aggregatedChunks)
             {
@@ -346,7 +347,33 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     continue;
                 }
 
-                // ケース4: 閾値未満 → 却下
+                // ケース4: [Issue #478] Cloud翻訳結果 + Surya検出一致によるバイパス
+                // Cloud結果が存在し、このSuryaチャンクとBBoxが一致する場合は信頼度に関わらず採用
+                if (eventData.HasPreComputedCloudResult &&
+                    !IsNoisePattern(chunk.CombinedText))
+                {
+                    var cloudTexts = eventData.PreComputedCloudResult!.Response?.Texts;
+                    if (cloudTexts is { Count: > 0 })
+                    {
+                        var matchingCloud = FindMatchingCloudResult(
+                            chunk.CombinedBounds, cloudTexts,
+                            eventData.ImageWidth, eventData.ImageHeight);
+
+                        if (matchingCloud != null)
+                        {
+                            passedChunks.Add(chunk);
+                            cloudBypassCount++;
+                            _logger.LogInformation(
+                                "[Issue #478] [OCR_CHUNK] CLOUD_BYPASS Conf={Confidence:F3} CloudText='{CloudText}' SuryaText='{SuryaText}'",
+                                confidence,
+                                matchingCloud.Original?.Length > 50 ? matchingCloud.Original[..50] + "..." : matchingCloud.Original,
+                                chunk.CombinedText!.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
+                            continue;
+                        }
+                    }
+                }
+
+                // ケース5: 閾値未満 → 却下
                 _logger.LogInformation("🔍 [OCR_CHUNK] ❌FAIL Conf={Confidence:F3} Threshold={Threshold:F2} Text='{Text}'",
                     confidence, confidenceThreshold,
                     chunk.CombinedText?.Length > 50 ? chunk.CombinedText[..50] + "..." : chunk.CombinedText);
@@ -355,12 +382,12 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             var highConfidenceChunks = passedChunks;
             var filteredByConfidenceCount = aggregatedChunks.Count - highConfidenceChunks.Count;
 
-            if (filteredByConfidenceCount > 0 || borderlineAcceptedCount > 0 || roiRelaxedAcceptedCount > 0)
+            if (filteredByConfidenceCount > 0 || borderlineAcceptedCount > 0 || roiRelaxedAcceptedCount > 0 || cloudBypassCount > 0)
             {
-                Console.WriteLine($"🔍 [CONFIDENCE_FILTER] 信頼度フィルタリング: {filteredByConfidenceCount}件除外, {borderlineAcceptedCount}件ボーダーライン採用, {roiRelaxedAcceptedCount}件ROI緩和採用（閾値={confidenceThreshold:F2}）");
+                Console.WriteLine($"🔍 [CONFIDENCE_FILTER] 信頼度フィルタリング: {filteredByConfidenceCount}件除外, {borderlineAcceptedCount}件ボーダーライン採用, {roiRelaxedAcceptedCount}件ROI緩和採用, {cloudBypassCount}件Cloudバイパス採用（閾値={confidenceThreshold:F2}）");
                 _logger.LogInformation(
-                    "🔍 [CONFIDENCE_FILTER] 信頼度{Threshold:F2}未満の{FilteredCount}件をフィルタリング, {BorderlineCount}件ボーダーライン採用, {RoiRelaxedCount}件ROI緩和採用（残り{RemainingCount}件）",
-                    confidenceThreshold, filteredByConfidenceCount, borderlineAcceptedCount, roiRelaxedAcceptedCount, highConfidenceChunks.Count);
+                    "🔍 [CONFIDENCE_FILTER] 信頼度{Threshold:F2}未満の{FilteredCount}件をフィルタリング, {BorderlineCount}件ボーダーライン採用, {RoiRelaxedCount}件ROI緩和採用, {CloudBypassCount}件Cloudバイパス採用（残り{RemainingCount}件）",
+                    confidenceThreshold, filteredByConfidenceCount, borderlineAcceptedCount, roiRelaxedAcceptedCount, cloudBypassCount, highConfidenceChunks.Count);
             }
 
             // 🔥 [HALLUCINATION_FILTER] 繰り返しフレーズ検出 - OCRハルシネーション除外
@@ -1634,6 +1661,37 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         var unionArea = (float)a.Width * a.Height + (float)b.Width * b.Height - intersectionArea;
 
         return unionArea > 0 ? intersectionArea / unionArea : 0f;
+    }
+
+    /// <summary>
+    /// [Issue #478] SuryaチャンクのBBoxに一致するCloud翻訳結果を検索
+    /// Cloud AI BoundingBox（0-1000正規化スケール）をピクセル座標に変換し、IoUで一致判定
+    /// </summary>
+    private TranslatedTextItem? FindMatchingCloudResult(
+        System.Drawing.Rectangle suryaBounds,
+        IReadOnlyList<TranslatedTextItem> cloudTexts,
+        int imageWidth, int imageHeight)
+    {
+        if (imageWidth <= 0 || imageHeight <= 0)
+            return null;
+
+        foreach (var cloudText in cloudTexts)
+        {
+            if (!cloudText.HasBoundingBox) continue;
+            var cloudBox = cloudText.BoundingBox!.Value;
+
+            // Cloud AI BoundingBoxは0-1000正規化スケール → ピクセル座標に変換
+            var cloudPixelRect = new System.Drawing.Rectangle(
+                cloudBox.X * imageWidth / 1000,
+                cloudBox.Y * imageHeight / 1000,
+                cloudBox.Width * imageWidth / 1000,
+                cloudBox.Height * imageHeight / 1000);
+
+            var iou = CalculateRectangleIoU(cloudPixelRect, suryaBounds);
+            if (iou >= CoordinateMatchIoUThreshold)
+                return cloudText;
+        }
+        return null;
     }
 
     /// <summary>
