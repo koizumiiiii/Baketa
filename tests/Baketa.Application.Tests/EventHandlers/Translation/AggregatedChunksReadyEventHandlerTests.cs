@@ -200,6 +200,215 @@ public class AggregatedChunksReadyEventHandlerTests
     }
 
     // ========================================================
+    // [Issue #482] IsGarbageText マークアップ検出テスト
+    // ========================================================
+
+    [Fact]
+    public void IsGarbageText_WithHtmlMarkup_ReturnsTrue()
+    {
+        // Arrange: 実際のバグケース - OCRがマークアップを検出
+        var chunk = CreateChunkWithText("<math>\\sim</math>");
+
+        // Act
+        var result = AggregatedChunksReadyEventHandler.IsGarbageText(chunk);
+
+        // Assert
+        result.Should().BeTrue("HTML/LaTeXマークアップが50%以上を占めるテキストはゴミ");
+    }
+
+    [Fact]
+    public void IsGarbageText_WithLatexCommands_ReturnsTrue()
+    {
+        // Arrange: LaTeXコマンドが大半を占めるテキスト
+        var chunk = CreateChunkWithText("\\frac \\alpha \\beta");
+
+        // Act
+        var result = AggregatedChunksReadyEventHandler.IsGarbageText(chunk);
+
+        // Assert
+        result.Should().BeTrue("LaTeXコマンドが50%以上を占めるテキストはゴミ");
+    }
+
+    [Fact]
+    public void IsGarbageText_WithHtmlClosingTags_ReturnsTrue()
+    {
+        // Arrange: 閉じタグのみ
+        var chunk = CreateChunkWithText("</div></span></p>");
+
+        // Act
+        var result = AggregatedChunksReadyEventHandler.IsGarbageText(chunk);
+
+        // Assert
+        result.Should().BeTrue("HTMLタグのみのテキストはゴミ");
+    }
+
+    [Fact]
+    public void IsGarbageText_WithMinorMarkupInText_ReturnsFalse()
+    {
+        // Arrange: テキスト内に少量のタグ的文字列がある（占有率<50%）
+        var chunk = CreateChunkWithText("The hero said <something> happened today");
+
+        // Act
+        var result = AggregatedChunksReadyEventHandler.IsGarbageText(chunk);
+
+        // Assert
+        result.Should().BeFalse("マークアップ占有率が50%未満なら正常テキスト");
+    }
+
+    [Fact]
+    public void IsGarbageText_WithGameAngleBrackets_ReturnsFalse()
+    {
+        // Arrange: ゲーム内の数字付き山括弧（HTMLタグではない）
+        var chunk = CreateChunkWithText("Level <5> completed");
+
+        // Act
+        var result = AggregatedChunksReadyEventHandler.IsGarbageText(chunk);
+
+        // Assert
+        result.Should().BeFalse("<5>はHTMLタグとして検出されないため正常テキスト");
+    }
+
+    [Fact]
+    public void IsGarbageText_WithNormalGameText_ReturnsFalse()
+    {
+        // Arrange: 通常のゲームテキスト
+        var chunk = CreateChunkWithText("Bree Oi, Chief!");
+
+        // Act
+        var result = AggregatedChunksReadyEventHandler.IsGarbageText(chunk);
+
+        // Assert
+        result.Should().BeFalse("通常のゲームテキストはゴミではない");
+    }
+
+    [Fact]
+    public void IsGarbageText_WithBackslashInGameText_ReturnsFalse()
+    {
+        // Arrange: ゲーム内のファイルパス的テキスト（バックスラッシュを含むがテキスト部分が多い）
+        var chunk = CreateChunkWithText("Save to C:\\Games\\data completed");
+
+        // Act
+        var result = AggregatedChunksReadyEventHandler.IsGarbageText(chunk);
+
+        // Assert: \Games(6) + \data(5) = 11 / 30文字(空白除去) = 37% < 50%
+        result.Should().BeFalse("バックスラッシュを含むがテキスト部分が多い場合は正常テキスト");
+    }
+
+    // ========================================================
+    // [Issue #483] IsGarbageTranslation テスト
+    // ========================================================
+
+    [Fact]
+    public void IsGarbageTranslation_WithRepeatedBrackets_ReturnsTrue()
+    {
+        // Arrange: 実際のバグケース - NLLBが括弧を繰り返し出力
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            " ()  ()  ()  ()  () ", "テスト");
+
+        // Assert
+        result.Should().BeTrue("記号のみのテキストはゴミ翻訳");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithSymbolsOnly_ReturnsTrue()
+    {
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            "■ ■ ■ ■", "テスト");
+
+        result.Should().BeTrue("文字・数字を含まないテキストはゴミ翻訳");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithRepeatedWords_ReturnsTrue()
+    {
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            "the the the the the the", "テスト");
+
+        result.Should().BeTrue("同一単語が75%以上を占める場合はゴミ翻訳");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithExactly75PercentRepeat_ReturnsTrue()
+    {
+        // Arrange: 4語中3語同一 = ちょうど75%（境界値テスト: >= 0.75）
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            "go go go stop", "テスト");
+
+        // Assert: "go"が3/4=75% → >= 0.75 なのでtrue
+        result.Should().BeTrue("ちょうど75%の場合もゴミ翻訳として判定される");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithWhitespaceOnly_ReturnsFalse()
+    {
+        // Arrange: 空白のみの翻訳結果
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            "   ", "テスト");
+
+        // Assert: IsNullOrWhiteSpace → false（「翻訳なし」扱い、ゴミではない）
+        result.Should().BeFalse("空白のみはゴミではなく翻訳なしとして処理される");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithExcessiveLength_ReturnsTrue()
+    {
+        // Arrange: 非CJKソースに対して5倍超の膨張
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            new string('A', 31), "Hello");
+
+        // Assert: 31/5 = 6.2 > 5.0
+        result.Should().BeTrue("膨張率が閾値を超える場合はゴミ翻訳");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithNormalTranslation_ReturnsFalse()
+    {
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            "The organization has been defeated.", "組織は倒された。");
+
+        result.Should().BeFalse("正常な翻訳結果はゴミではない");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithLegitimateRepeat_ReturnsFalse()
+    {
+        // "oh"は3/7=43% → 75%未満
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            "Oh oh oh what a beautiful morning", "おお素晴らしい朝");
+
+        result.Should().BeFalse("正当な繰り返しは許容すべき");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithCjkExpansion_ReturnsFalse()
+    {
+        // CJKソースの場合、閾値は8.0倍 → 28/8=3.5 < 8.0
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            "Tokyo Tower observation deck", "東京タワー展望台");
+
+        result.Should().BeFalse("CJK→英語の自然な膨張は許容すべき");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithNull_ReturnsFalse()
+    {
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            null, "テスト");
+
+        result.Should().BeFalse("nullは「翻訳なし」であってゴミではない");
+    }
+
+    [Fact]
+    public void IsGarbageTranslation_WithEmptySource_ReturnsFalse()
+    {
+        // ソースが空の場合、膨張率チェックはスキップされる
+        var result = AggregatedChunksReadyEventHandler.IsGarbageTranslation(
+            "Some text", "");
+
+        result.Should().BeFalse("ソースが空の場合は膨張率チェックをスキップ");
+    }
+
+    // ========================================================
     // ヘルパーメソッド
     // ========================================================
 
@@ -279,6 +488,18 @@ public class AggregatedChunksReadyEventHandlerTests
             coordTransformMock.Object,
             settingsServiceMock.Object);
     }
+
+    /// <summary>
+    /// IsGarbageTextテスト用のTextChunkを生成
+    /// </summary>
+    private static TextChunk CreateChunkWithText(string text) => new()
+    {
+        ChunkId = 1,
+        TextResults = [],
+        CombinedBounds = new DrawingRectangle(100, 100, 200, 50),
+        CombinedText = text,
+        SourceWindowHandle = IntPtr.Zero
+    };
 
     /// <summary>
     /// テスト用のシンプルなイベントデータを作成

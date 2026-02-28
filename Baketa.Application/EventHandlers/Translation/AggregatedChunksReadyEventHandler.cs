@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
@@ -38,7 +39,7 @@ namespace Baketa.Application.EventHandlers.Translation;
 /// TimedChunkAggregatorから発行されるAggregatedChunksReadyEventを受信し、
 /// CoordinateBasedTranslationService.ProcessBatchTranslationAsync()相当の処理を実行
 /// </summary>
-public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<AggregatedChunksReadyEvent>
+public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<AggregatedChunksReadyEvent>
 {
     // [Issue #380] 座標ベースフォールバックマッチングのIoU閾値
     // Cloud AI BoundingBoxとOCRチャンクCombinedBoundsの重なり判定に使用
@@ -682,9 +683,21 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
             // 翻訳結果を各チャンクに設定
             for (int i = 0; i < Math.Min(nonEmptyChunks.Count, translationResults.Count); i++)
             {
-                nonEmptyChunks[i].TranslatedText = translationResults[i];
+                var translated = translationResults[i];
+
+                // [Issue #483] 翻訳結果の品質検証 - ゴミ出力をフィルタリング
+                if (IsGarbageTranslation(translated, nonEmptyChunks[i].CombinedText))
+                {
+                    _logger.LogWarning(
+                        "[Issue #483] ゴミ翻訳検出 チャンク{Index}: '{Original}' → '{Translated}' - 表示をスキップ",
+                        i, nonEmptyChunks[i].CombinedText, translated);
+                    nonEmptyChunks[i].TranslatedText = ""; // 空文字設定でオーバーレイ表示をスキップ
+                    continue;
+                }
+
+                nonEmptyChunks[i].TranslatedText = translated;
                 _logger.LogInformation("🔧 [TRANSLATION_RESULT] チャンク{Index}: '{Original}' → '{Translated}'",
-                    i, nonEmptyChunks[i].CombinedText, translationResults[i]);
+                    i, nonEmptyChunks[i].CombinedText, translated);
             }
 
             // ============================================================
@@ -712,6 +725,9 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
                     {
                         var chunk = nonEmptyChunks[i];
                         var translatedText = translationResults[i];
+
+                        // TODO: [Issue #483] ゴミ翻訳（IsGarbageTranslation=true）も現在は
+                        //       「翻訳成功」として学習される。chunk.TranslatedTextで判定すべきか要検討。
 
                         // 正規化座標を計算
                         var normalizedBounds = new NormalizedRect
@@ -874,6 +890,10 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
                 var chunk = nonEmptyChunks[i];
                 // chunk.TranslatedTextは既にLine 176で設定済み
+
+                // [Issue #483] ゴミ翻訳でTranslatedTextが空に設定されたチャンクをスキップ
+                if (string.IsNullOrEmpty(chunk.TranslatedText))
+                    continue;
 
                 // [FIX6_NORMALIZE] ROI相対座標 → 画像絶対座標の正規化
                 // Gemini推奨: キャッシュ保存前（オーバーレイ表示前）に座標を正規化
@@ -1291,7 +1311,7 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
     /// [Issue #397] P1-4: ゴミテキスト判定
     /// アスペクト比・反復パターンにより、翻訳不要なノイズテキストを除去
     /// </summary>
-    private static bool IsGarbageText(TextChunk chunk)
+    internal static bool IsGarbageText(TextChunk chunk)
     {
         // 1. アスペクト比フィルタ: H/W > 3.0（極端に縦長な矩形 = 装飾/ゴミ）
         if (chunk.CombinedBounds.Width > 0 && chunk.CombinedBounds.Height > 0)
@@ -1332,6 +1352,65 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
         //    ただしCJK文字を含む場合は保護（日本語2文字名「桃子」等）
         if (stripped.Length < 3 && !HasCjkCharacter(stripped))
             return true;
+
+        // 8. [Issue #482] HTML/LaTeXマークアップ検出
+        //    OCRがソースコードやUI要素を誤検出した場合のフィルタ
+        //    例: "<math>\sim</math>", "\frac \alpha \beta"
+        //    NOTE: 空白を含むtextに対して実行（strippedだと単語境界が消失し偽マッチが発生）
+        var markupLength = 0;
+        foreach (Match m in HtmlTagRegex().Matches(text))
+            markupLength += m.Length;
+        foreach (Match m in LatexCommandRegex().Matches(text))
+            markupLength += m.Length;
+        if (text.Length > 0 && (double)markupLength / text.Length >= 0.5)
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// [Issue #483] 翻訳結果の品質検証
+    /// NLLB等のSeq2Seqモデルが生成するゴミ出力パターンを検出
+    /// </summary>
+    internal static bool IsGarbageTranslation(string? translatedText, string? sourceText)
+    {
+        if (string.IsNullOrWhiteSpace(translatedText))
+            return false; // null/空はゴミではなく「翻訳なし」として別途処理
+
+        var trimmed = translatedText.Trim();
+
+        // 1. 文字・数字が全く含まれない（記号・括弧のみ）
+        //    例: " ()  ()  ()  () ", "■ ■ ■", "---...---"
+        if (!trimmed.Any(c => char.IsLetterOrDigit(c)))
+            return true;
+
+        // 2. 同一トークンの過度な頻度（最頻出単語が全体の75%以上）
+        //    例: "the the the the the the", "() () () ()"
+        //    保護: "Oh oh oh what a beautiful morning" → "oh"が3/7=43%なのでfalse
+        var words = trimmed.Split([' ', '\u3000'], StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length >= 4)
+        {
+            // 最頻出単語の出現回数
+            var maxWordFreq = words.GroupBy(w => w, StringComparer.OrdinalIgnoreCase)
+                .Max(g => g.Count());
+            // 最頻出単語が全単語の75%以上を占める場合
+            if ((double)maxWordFreq / words.Length >= 0.75)
+                return true;
+        }
+
+        // 3. 出力が入力より極端に長い（膨張率チェック）
+        //    CJK→アルファベットの自然膨張を考慮して閾値を設定
+        if (!string.IsNullOrEmpty(sourceText) && sourceText.Length >= 2)
+        {
+            var ratio = (double)trimmed.Length / sourceText.Length;
+            // CJK文字を含むソースの場合、膨張率の閾値を緩和（CJK→英語は3-4倍が正常）
+            var hasCjk = sourceText.Any(c => c is (>= '\u4E00' and <= '\u9FFF')
+                or (>= '\u3040' and <= '\u309F') or (>= '\u30A0' and <= '\u30FF')
+                or (>= '\uAC00' and <= '\uD7AF'));
+            var maxRatio = hasCjk ? 8.0 : 5.0;
+            if (ratio > maxRatio)
+                return true;
+        }
 
         return false;
     }
@@ -2446,4 +2525,11 @@ public sealed class AggregatedChunksReadyEventHandler : IEventProcessor<Aggregat
 
         return gatedChunks;
     }
+
+    // [Issue #482] HTML/LaTeXマークアップ検出用正規表現
+    [GeneratedRegex(@"</?[a-zA-Z][^>]*>")]
+    private static partial Regex HtmlTagRegex();
+
+    [GeneratedRegex(@"\\[a-zA-Z]{2,}")]
+    private static partial Regex LatexCommandRegex();
 }

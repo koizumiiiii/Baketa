@@ -60,6 +60,15 @@ public class TextDisappearanceEvent : IEvent
     public float ConfidenceScore { get; }
 
     /// <summary>
+    /// [Issue #481] 元ウィンドウサイズ（GPUリサイズスケーリング補正用）
+    /// DisappearedRegionsはキャプチャ画像座標（リサイズ後）だが、
+    /// オーバーレイは元ウィンドウサイズ座標で配置されるため、
+    /// スケール倍率の計算に使用する。
+    /// Size.Emptyの場合はスケーリング不要（キャプチャサイズ＝ウィンドウサイズ）
+    /// </summary>
+    public Size OriginalWindowSize { get; }
+
+    /// <summary>
     /// コンストラクタ（既存互換）
     /// </summary>
     /// <param name="regions">消失したテキスト領域</param>
@@ -76,11 +85,13 @@ public class TextDisappearanceEvent : IEvent
     /// <param name="sourceWindow">ソースウィンドウハンドル</param>
     /// <param name="regionId">領域ID（オーバーレイとの関連付け用）</param>
     /// <param name="confidenceScore">検知信頼度 (0.0-1.0)</param>
+    /// <param name="originalWindowSize">[Issue #481] 元ウィンドウサイズ（GPUリサイズスケーリング補正用）</param>
     public TextDisappearanceEvent(
         IReadOnlyList<Rectangle> regions,
         IntPtr sourceWindow = default,
         string? regionId = null,
-        float confidenceScore = 1.0f)
+        float confidenceScore = 1.0f,
+        Size originalWindowSize = default)
     {
         ArgumentNullException.ThrowIfNull(regions, nameof(regions));
         if (confidenceScore < 0.0f || confidenceScore > 1.0f)
@@ -90,6 +101,7 @@ public class TextDisappearanceEvent : IEvent
         SourceWindowHandle = sourceWindow;
         RegionId = regionId;
         ConfidenceScore = confidenceScore;
+        OriginalWindowSize = originalWindowSize;
         Timestamp = DateTime.UtcNow;
         DetectedAt = DateTime.UtcNow;
     }

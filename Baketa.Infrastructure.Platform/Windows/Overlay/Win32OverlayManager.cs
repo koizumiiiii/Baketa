@@ -246,5 +246,11 @@ public sealed class Win32OverlayManager : IOverlayManager
     }
 
     /// <inheritdoc/>
-    public int ActiveOverlayCount => _windowsOverlayWindowManager.ActiveOverlayCount;
+    /// <remarks>
+    /// [Issue #481] Win32OverlayManager自身の_activeOverlaysから取得。
+    /// WindowsOverlayWindowManagerに委譲すると、HideOverlaysInAreaAsync()で
+    /// 削除されたオーバーレイがWindowsOverlayWindowManager側に残り、
+    /// ActiveOverlayCountが実際より多くなる不整合が発生するため。
+    /// </remarks>
+    public int ActiveOverlayCount => _activeOverlays.Count;
 }

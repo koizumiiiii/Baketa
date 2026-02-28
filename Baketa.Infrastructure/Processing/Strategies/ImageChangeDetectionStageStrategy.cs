@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Imaging;
@@ -36,6 +37,12 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     // 前回のOCRで検出されたテキストのバウンディングボックスを保持し、
     // 画像変化検知時に「テキストがあった場所が変わったか」を判定する
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Rectangle[]> _previousTextBounds = new();
+
+    // [Issue #481] オーバーレイに関連付けられた過去のテキスト位置を蓄積保持
+    // _previousTextBoundsは最新OCR結果のみだが、これは過去N世代分を保持
+    // テキストAが消えた後も、A位置が追跡対象として残り続けるための機構
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, List<Rectangle>> _historicalTextBounds = new();
+    private const int MaxHistoricalBoundsPerContext = 50;
 
     public ProcessingStageType StageType => ProcessingStageType.ImageChangeDetection;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(2); // 3段階フィルタリングによる高速化
@@ -99,6 +106,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                 currentImage,
                 input.SourceWindowHandle,
                 input.CaptureRegion,
+                input.OriginalWindowSize,
                 cancellationToken).ConfigureAwait(false);
 
             // 🔥 [PHASE11_FIX] コンテキストID別に前回画像を更新（リソース管理付き）
@@ -174,6 +182,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     {
         _previousImages.Clear();
         _previousTextBounds.Clear();
+        _historicalTextBounds.Clear();
         _logger.LogInformation("🧹 [STOP_FIX] 画像変化検知履歴をクリア - Stop→Start後の初回翻訳を確実に実行");
     }
 
@@ -184,9 +193,34 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     /// <param name="textBounds">OCRで検出されたテキストのバウンディングボックス配列</param>
     public void UpdatePreviousTextBounds(string contextId, Rectangle[] textBounds)
     {
+        // [Issue #481] 既存の位置を履歴に保存（上書き前）
+        // 新しいOCR結果に含まれない旧テキスト位置を蓄積し、テキスト消失検知の追跡範囲を広げる
+        if (_previousTextBounds.TryGetValue(contextId, out var oldBounds) && oldBounds.Length > 0)
+        {
+            var historical = _historicalTextBounds.GetOrAdd(contextId, _ => new List<Rectangle>());
+            lock (historical)
+            {
+                // 新しいOCR結果にも含まれるものは除外（まだ表示中のテキスト）
+                foreach (var old in oldBounds)
+                {
+                    if (!textBounds.Any(nb => nb.IntersectsWith(old)))
+                    {
+                        historical.Add(old);
+                    }
+                }
+
+                // 上限制御
+                if (historical.Count > MaxHistoricalBoundsPerContext)
+                {
+                    historical.RemoveRange(0, historical.Count - MaxHistoricalBoundsPerContext);
+                }
+            }
+        }
+
         _previousTextBounds[contextId] = textBounds;
-        _logger.LogDebug("[Issue #392] 前回テキスト位置を更新: ContextId={ContextId}, TextCount={Count}",
-            contextId, textBounds.Length);
+        _logger.LogDebug("[Issue #392] 前回テキスト位置を更新: ContextId={ContextId}, TextCount={Count}, HistoricalCount={HistCount}",
+            contextId, textBounds.Length,
+            _historicalTextBounds.TryGetValue(contextId, out var hist) ? hist.Count : 0);
     }
 
     /// <summary>
@@ -547,6 +581,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         IImage currentImage,
         IntPtr windowHandle,
         Rectangle captureRegion,
+        Size originalWindowSize,
         CancellationToken cancellationToken)
     {
         // EventAggregatorが統合されていない場合はスキップ
@@ -580,10 +615,18 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                     regions: disappearedRegions,
                     sourceWindow: windowHandle,
                     regionId: $"capture_{DateTime.UtcNow:yyyyMMddHHmmssfff}",
-                    confidenceScore: confidenceScore
+                    confidenceScore: confidenceScore,
+                    originalWindowSize: originalWindowSize
                 );
 
                 await _eventAggregator.PublishAsync(disappearanceEvent).ConfigureAwait(false);
+
+                // [Issue #481] テキスト消失イベント発行後、該当コンテキストの履歴をクリア
+                // 消失検知が成功したので、蓄積された過去テキスト位置はもう不要
+                if (_historicalTextBounds.TryGetValue(contextId, out var hist))
+                {
+                    lock (hist) { hist.Clear(); }
+                }
 
                 _logger.LogDebug("🎯 TextDisappearanceEvent発行完了 - RegionId: {RegionId}, 信頼度: {Confidence:F3}, 領域: {Region}",
                     disappearanceEvent.RegionId, confidenceScore, captureRegion);
@@ -650,10 +693,27 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         ImageChangeResult changeResult, string contextId,
         IImage? previousImage, IImage currentImage)
     {
-        // 前回テキスト位置がない場合はfalse（初回OCR前、またはテキスト未検出）
-        if (!_previousTextBounds.TryGetValue(contextId, out var textBounds) || textBounds.Length == 0)
+        // 前回テキスト位置がない場合は履歴も確認
+        _previousTextBounds.TryGetValue(contextId, out var textBounds);
+
+        // [Issue #481] 現在のテキスト位置 + 履歴テキスト位置を結合して判定
+        // _previousTextBoundsは最新OCR結果のみだが、過去に検出されたテキスト位置も追跡対象に含める
+        var allTextBounds = new List<Rectangle>();
+        if (textBounds != null && textBounds.Length > 0)
         {
-            _logger.LogTrace("[Issue #392] IsTextDisappearance: false - 前回テキスト位置なし");
+            allTextBounds.AddRange(textBounds);
+        }
+        if (_historicalTextBounds.TryGetValue(contextId, out var historical))
+        {
+            lock (historical)
+            {
+                allTextBounds.AddRange(historical);
+            }
+        }
+
+        if (allTextBounds.Count == 0)
+        {
+            _logger.LogTrace("[Issue #392] IsTextDisappearance: false - 前回テキスト位置なし（履歴含む）");
             return false;
         }
 
@@ -664,10 +724,10 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             return false;
         }
 
-        // 変化領域と前回テキスト位置の重なりを判定
+        // 変化領域と前回テキスト位置（+履歴）の重なりを判定
         foreach (var changedRegion in changeResult.ChangedRegions)
         {
-            foreach (var textRect in textBounds)
+            foreach (var textRect in allTextBounds)
             {
                 if (changedRegion.IntersectsWith(textRect))
                 {
@@ -687,7 +747,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                     }
 
                     _logger.LogInformation(
-                        "[Issue #392] IsTextDisappearance: true - テキスト領域で変化検知 (Changed=({CX},{CY},{CW}x{CH}), Text=({TX},{TY},{TW}x{TH}))",
+                        "[Issue #392/#481] IsTextDisappearance: true - テキスト領域で変化検知 (Changed=({CX},{CY},{CW}x{CH}), Text=({TX},{TY},{TW}x{TH}))",
                         changedRegion.X, changedRegion.Y, changedRegion.Width, changedRegion.Height,
                         textRect.X, textRect.Y, textRect.Width, textRect.Height);
                     return true;
@@ -696,12 +756,12 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         }
 
         // 座標不一致のデバッグ情報を出力
-        _logger.LogDebug("[Issue #392] IsTextDisappearance: false - 変化領域{ChangedCount}個と前回テキスト{TextCount}個に重なりなし",
-            changeResult.ChangedRegions.Length, textBounds.Length);
-        if (changeResult.ChangedRegions.Length > 0 && textBounds.Length > 0)
+        _logger.LogDebug("[Issue #392/#481] IsTextDisappearance: false - 変化領域{ChangedCount}個とテキスト{TextCount}個（現在+履歴）に重なりなし",
+            changeResult.ChangedRegions.Length, allTextBounds.Count);
+        if (changeResult.ChangedRegions.Length > 0 && allTextBounds.Count > 0)
         {
             var cr = changeResult.ChangedRegions[0];
-            var tb = textBounds[0];
+            var tb = allTextBounds[0];
             _logger.LogDebug(
                 "[Issue #392] 座標デバッグ: ChangedRegion[0]=({CX},{CY},{CW}x{CH}), TextBounds[0]=({TX},{TY},{TW}x{TH})",
                 cr.X, cr.Y, cr.Width, cr.Height, tb.X, tb.Y, tb.Width, tb.Height);
