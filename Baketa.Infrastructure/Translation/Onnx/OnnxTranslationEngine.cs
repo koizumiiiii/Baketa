@@ -55,7 +55,7 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase
 
     public override string Name => "NLLB-200 ONNX";
 
-    public IReadOnlyList<string> Aliases { get; } = ["NLLB200-ONNX", "onnx-nllb", "nllb-onnx"];
+    public IReadOnlyList<string> Aliases { get; } = ["NLLB200", "NLLB200-ONNX", "onnx-nllb", "nllb-onnx"];
 
     public override string Description => "Local NLLB-200 translation via ONNX Runtime (no Python required)";
 
