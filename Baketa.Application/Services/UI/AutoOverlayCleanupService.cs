@@ -198,11 +198,24 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
 
         try
         {
+            var beforeCount = _overlayManager.ActiveOverlayCount;
+
             // [Issue #408] 領域指定オーバーレイ削除
             foreach (var region in regions)
             {
                 await _overlayManager.HideOverlaysInAreaAsync(region, excludeChunkId: -1, cancellationToken).ConfigureAwait(false);
                 totalCleaned++;
+            }
+
+            // [Issue #481] 座標系不一致フォールバック: 領域指定削除でオーバーレイが1つも消えなかった場合、
+            // キャプチャ相対座標とスクリーン絶対座標の不一致が原因の可能性があるため全消去にフォールバック
+            var afterCount = _overlayManager.ActiveOverlayCount;
+            if (beforeCount > 0 && afterCount == beforeCount)
+            {
+                _logger.LogInformation("[Issue #481] 領域指定削除で交差なし（座標系不一致の可能性） - HideAllAsyncにフォールバック (ActiveOverlays={Count})",
+                    afterCount);
+                await _overlayManager.HideAllAsync(cancellationToken).ConfigureAwait(false);
+                totalCleaned = beforeCount;
             }
 
             // [Issue #408] ゾーン特定Gate状態クリア（全リセットではなく消失領域のゾーンのみ）
