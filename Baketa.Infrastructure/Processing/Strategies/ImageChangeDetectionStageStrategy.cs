@@ -106,6 +106,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                 currentImage,
                 input.SourceWindowHandle,
                 input.CaptureRegion,
+                input.OriginalWindowSize,
                 cancellationToken).ConfigureAwait(false);
 
             // 🔥 [PHASE11_FIX] コンテキストID別に前回画像を更新（リソース管理付き）
@@ -580,6 +581,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         IImage currentImage,
         IntPtr windowHandle,
         Rectangle captureRegion,
+        Size originalWindowSize,
         CancellationToken cancellationToken)
     {
         // EventAggregatorが統合されていない場合はスキップ
@@ -613,7 +615,8 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                     regions: disappearedRegions,
                     sourceWindow: windowHandle,
                     regionId: $"capture_{DateTime.UtcNow:yyyyMMddHHmmssfff}",
-                    confidenceScore: confidenceScore
+                    confidenceScore: confidenceScore,
+                    originalWindowSize: originalWindowSize
                 );
 
                 await _eventAggregator.PublishAsync(disappearanceEvent).ConfigureAwait(false);

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.UI;
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION]
 using Baketa.Core.Events.Capture;
@@ -35,6 +36,8 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     private readonly IOptionsMonitor<AutoOverlayCleanupSettings> _settings;
     // [Issue #407] オーバーレイ削除時のGate状態リセット用（オプショナル）
     private readonly ITextChangeDetectionService? _textChangeDetectionService;
+    // [Issue #481] キャプチャ座標→スクリーン座標変換用
+    private readonly ICoordinateTransformationService? _coordinateTransformationService;
 
     // Circuit Breaker設定（IOptions経由で動的取得）
     private float MinConfidenceScore => _settings.CurrentValue.MinConfidenceScore;
@@ -70,13 +73,15 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         IEventAggregator eventAggregator,
         ILogger<AutoOverlayCleanupService> logger,
         IOptionsMonitor<AutoOverlayCleanupSettings> settings,
-        ITextChangeDetectionService? textChangeDetectionService = null) // [Issue #407] Gate状態リセット用
+        ITextChangeDetectionService? textChangeDetectionService = null, // [Issue #407] Gate状態リセット用
+        ICoordinateTransformationService? coordinateTransformationService = null) // [Issue #481] 座標変換用
     {
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _textChangeDetectionService = textChangeDetectionService;
+        _coordinateTransformationService = coordinateTransformationService;
     }
 
     /// <inheritdoc />
@@ -146,7 +151,8 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             // 実際のオーバーレイ削除実行
             var cleanedCount = await CleanupOverlaysInRegionAsync(
                 eventData.SourceWindowHandle,
-                eventData.DisappearedRegions).ConfigureAwait(false);
+                eventData.DisappearedRegions,
+                eventData.OriginalWindowSize).ConfigureAwait(false);
 
             // 削除成功時の統計更新
             if (cleanedCount > 0)
@@ -182,6 +188,19 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         IReadOnlyList<Rectangle> regions,
         CancellationToken cancellationToken = default)
     {
+        return await CleanupOverlaysInRegionAsync(windowHandle, regions, Size.Empty, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// [Issue #481] GPUリサイズスケーリング対応版の領域指定オーバーレイ削除
+    /// </summary>
+    private async Task<int> CleanupOverlaysInRegionAsync(
+        IntPtr windowHandle,
+        IReadOnlyList<Rectangle> regions,
+        Size originalWindowSize,
+        CancellationToken cancellationToken = default)
+    {
         if (!_isInitialized)
         {
             _logger.LogWarning("サービス未初期化のため削除要求をスキップ");
@@ -200,20 +219,27 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         {
             var beforeCount = _overlayManager.ActiveOverlayCount;
 
-            // [Issue #408] 領域指定オーバーレイ削除
-            foreach (var region in regions)
+            // [Issue #481] キャプチャ座標→元ウィンドウサイズ座標にスケーリング
+            // DisappearedRegionsはGPUリサイズ後のキャプチャ座標（例: 1280x720）だが、
+            // オーバーレイは元ウィンドウサイズ（例: 3840x2160）で配置されている
+            var scaledRegions = ScaleToOriginalWindowSize(regions, originalWindowSize);
+
+            // スケーリング後の座標をスクリーン絶対座標に変換
+            var screenRegions = ConvertToScreenCoordinates(scaledRegions, windowHandle);
+
+            // [Issue #408] 領域指定オーバーレイ削除（スクリーン座標で実行）
+            foreach (var region in screenRegions)
             {
                 await _overlayManager.HideOverlaysInAreaAsync(region, excludeChunkId: -1, cancellationToken).ConfigureAwait(false);
                 totalCleaned++;
             }
 
-            // [Issue #481] 座標系不一致フォールバック: 領域指定削除でオーバーレイが1つも消えなかった場合、
-            // キャプチャ相対座標とスクリーン絶対座標の不一致が原因の可能性があるため全消去にフォールバック
+            // [Issue #481] フォールバック: 座標変換が利用不可で領域指定削除が効かなかった場合のみ全消去
             var afterCount = _overlayManager.ActiveOverlayCount;
             if (beforeCount > 0 && afterCount == beforeCount)
             {
-                _logger.LogInformation("[Issue #481] 領域指定削除で交差なし（座標系不一致の可能性） - HideAllAsyncにフォールバック (ActiveOverlays={Count})",
-                    afterCount);
+                _logger.LogInformation("[Issue #481] 領域指定削除で交差なし - HideAllAsyncにフォールバック (Before={Before}, After={After})",
+                    beforeCount, afterCount);
                 await _overlayManager.HideAllAsync(cancellationToken).ConfigureAwait(false);
                 totalCleaned = beforeCount;
             }
@@ -273,6 +299,97 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
 
         _logger.LogWarning("⚠️ UpdateCircuitBreakerSettings呼び出し検出 - 設定外部化により、appsettings.jsonでの設定変更を推奨します。" +
             "要求値: 信頼度閾値={MinConfidence:F2}, 最大削除レート={MaxRate}/秒", minConfidenceScore, maxCleanupRate);
+    }
+
+    /// <summary>
+    /// [Issue #481] キャプチャ座標を元ウィンドウサイズ座標にスケーリング
+    /// GPUリサイズ（例: 3840x2160 → 1280x720）の逆変換を行う。
+    /// オーバーレイはOcrExecutionStageStrategyで元ウィンドウサイズに
+    /// スケーリングされた座標で配置されるため、
+    /// DisappearedRegionsも同じ座標系に揃える必要がある。
+    /// </summary>
+    private IReadOnlyList<Rectangle> ScaleToOriginalWindowSize(IReadOnlyList<Rectangle> regions, Size originalWindowSize)
+    {
+        // OriginalWindowSizeが未設定の場合はスケーリング不要
+        if (originalWindowSize.IsEmpty)
+        {
+            return regions;
+        }
+
+        // キャプチャサイズを最初の領域から推定（DisappearedRegionsは常にキャプチャ全域）
+        var captureRegion = regions[0];
+        var captureWidth = captureRegion.Width;
+        var captureHeight = captureRegion.Height;
+
+        // サイズが同じならスケーリング不要
+        if (captureWidth == originalWindowSize.Width && captureHeight == originalWindowSize.Height)
+        {
+            return regions;
+        }
+
+        // スケール倍率を計算
+        var scaleX = (double)originalWindowSize.Width / captureWidth;
+        var scaleY = (double)originalWindowSize.Height / captureHeight;
+
+        var scaled = new List<Rectangle>(regions.Count);
+        foreach (var region in regions)
+        {
+            scaled.Add(new Rectangle(
+                (int)(region.X * scaleX),
+                (int)(region.Y * scaleY),
+                (int)(region.Width * scaleX),
+                (int)(region.Height * scaleY)));
+        }
+
+        _logger.LogDebug("[Issue #481] GPUリサイズスケーリング補正: {CaptureW}x{CaptureH} → {OrigW}x{OrigH} (倍率: {ScaleX:F2}x{ScaleY:F2}), 例: {Before} → {After}",
+            captureWidth, captureHeight,
+            originalWindowSize.Width, originalWindowSize.Height,
+            scaleX, scaleY,
+            regions[0], scaled[0]);
+
+        return scaled;
+    }
+
+    /// <summary>
+    /// [Issue #481] キャプチャ相対座標をスクリーン絶対座標に変換
+    /// AggregatedChunksReadyEventHandlerと同じ変換パラメータを使用
+    /// </summary>
+    private IReadOnlyList<Rectangle> ConvertToScreenCoordinates(IReadOnlyList<Rectangle> regions, IntPtr windowHandle)
+    {
+        if (_coordinateTransformationService == null || windowHandle == IntPtr.Zero)
+        {
+            _logger.LogDebug("[Issue #481] 座標変換サービス未利用（キャプチャ座標のまま使用）");
+            return regions;
+        }
+
+        try
+        {
+            var isBorderless = _coordinateTransformationService.DetectBorderlessOrFullscreen(windowHandle);
+            var converted = new List<Rectangle>(regions.Count);
+
+            foreach (var region in regions)
+            {
+                var screenRegion = _coordinateTransformationService.ConvertRoiToScreenCoordinates(
+                    region,
+                    windowHandle,
+                    roiScaleFactor: 1.0f,
+                    isBorderlessOrFullscreen: isBorderless,
+                    alreadyScaledToOriginalSize: true);
+                converted.Add(screenRegion);
+            }
+
+            _logger.LogDebug("[Issue #481] 座標変換完了: {Count}領域, 例: {Original} → {Screen}",
+                regions.Count,
+                regions[0],
+                converted[0]);
+
+            return converted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Issue #481] 座標変換失敗 - キャプチャ座標のまま使用");
+            return regions;
+        }
     }
 
     /// <summary>
