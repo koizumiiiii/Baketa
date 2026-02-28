@@ -709,6 +709,14 @@ public sealed class SuryaOcrEngine : IOcrEngine
 
         foreach (var region in response.Regions)
         {
+            // [Issue #480] Detection-Only結果（空テキスト、Conf≈1.0）をフィルタリング
+            // Surya OCRのDetection-Onlyモードはtext='', confidence≈1.0を返すが、
+            // Recognition結果用のこのメソッドでは空テキストは不正データ
+            if (string.IsNullOrWhiteSpace(region.Text))
+            {
+                continue;
+            }
+
             var bbox = region.BoundingBox;
             var bounds = new Rectangle(
                 bbox.X,
