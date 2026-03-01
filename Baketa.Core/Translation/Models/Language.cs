@@ -140,22 +140,74 @@ public class Language
     /// <summary>
     /// 韓国語(Korean)
     /// </summary>
-    public static Language Korean => new() { Code = "ko", DisplayName = "한국어" };
+    public static Language Korean => new()
+    {
+        Code = "ko",
+        Name = "Korean",
+        DisplayName = "한국어",
+        NativeName = "한국어",
+        RegionCode = "KR"
+    };
 
     /// <summary>
     /// スペイン語(Spanish)
     /// </summary>
-    public static Language Spanish => new() { Code = "es", DisplayName = "Español" };
+    public static Language Spanish => new()
+    {
+        Code = "es",
+        Name = "Spanish",
+        DisplayName = "Español",
+        NativeName = "Español",
+        RegionCode = "ES"
+    };
 
     /// <summary>
     /// フランス語(French)
     /// </summary>
-    public static Language French => new() { Code = "fr", DisplayName = "Français" };
+    public static Language French => new()
+    {
+        Code = "fr",
+        Name = "French",
+        DisplayName = "Français",
+        NativeName = "Français",
+        RegionCode = "FR"
+    };
 
     /// <summary>
     /// ドイツ語(German)
     /// </summary>
-    public static Language German => new() { Code = "de", DisplayName = "Deutsch" };
+    public static Language German => new()
+    {
+        Code = "de",
+        Name = "German",
+        DisplayName = "Deutsch",
+        NativeName = "Deutsch",
+        RegionCode = "DE"
+    };
+
+    /// <summary>
+    /// イタリア語(Italian)
+    /// </summary>
+    public static Language Italian => new()
+    {
+        Code = "it",
+        Name = "Italian",
+        DisplayName = "Italiano",
+        NativeName = "Italiano",
+        RegionCode = "IT"
+    };
+
+    /// <summary>
+    /// ポルトガル語(Portuguese)
+    /// </summary>
+    public static Language Portuguese => new()
+    {
+        Code = "pt",
+        Name = "Portuguese",
+        DisplayName = "Português",
+        NativeName = "Português",
+        RegionCode = "BR"
+    };
 
     /// <summary>
     /// ロシア語(Russian)
@@ -231,6 +283,8 @@ public class Language
             "ES" => Spanish,
             "FR" => French,
             "DE" => German,
+            "IT" => Italian,
+            "PT" => Portuguese,
             "RU" => Russian,
             "AR" => Arabic,
             _ => new Language { Code = code, Name = code, DisplayName = code } // 未知の言語の場合はコードをそのまま表示名として使用

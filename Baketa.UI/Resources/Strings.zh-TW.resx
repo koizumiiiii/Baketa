@@ -1,0 +1,1751 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="0" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ========== App General ========== -->
+  <data name="App_Title" xml:space="preserve">
+    <value>Baketa</value>
+  </data>
+  <data name="App_LoadingMessage" xml:space="preserve">
+    <value>載入中...</value>
+  </data>
+  <data name="App_ErrorTitle" xml:space="preserve">
+    <value>錯誤</value>
+  </data>
+  <data name="App_Version" xml:space="preserve">
+    <value>目前版本: {0}</value>
+  </data>
+  <data name="App_Copyright" xml:space="preserve">
+    <value>© 2024 Baketa. All rights reserved.</value>
+  </data>
+
+  <!-- ========== Common Buttons ========== -->
+  <data name="Common_Save" xml:space="preserve">
+    <value>儲存</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Common_Apply" xml:space="preserve">
+    <value>套用</value>
+  </data>
+  <data name="Common_Reset" xml:space="preserve">
+    <value>重設</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>關閉</value>
+  </data>
+  <data name="Common_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>是</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>否</value>
+  </data>
+  <data name="Common_Help" xml:space="preserve">
+    <value>說明</value>
+  </data>
+  <data name="Common_Loading" xml:space="preserve">
+    <value>載入中...</value>
+  </data>
+  <data name="Common_Or" xml:space="preserve">
+    <value>或</value>
+  </data>
+  <data name="Common_Submit" xml:space="preserve">
+    <value>送出</value>
+  </data>
+
+  <!-- ========== Main Overlay ========== -->
+  <data name="MainOverlay_Minimize" xml:space="preserve">
+    <value>最小化</value>
+  </data>
+  <data name="MainOverlay_SelectWindow" xml:space="preserve">
+    <value>選擇目標視窗</value>
+  </data>
+  <data name="MainOverlay_Target" xml:space="preserve">
+    <value>目標</value>
+  </data>
+  <data name="MainOverlay_ShowHideTranslation" xml:space="preserve">
+    <value>顯示/隱藏翻譯</value>
+  </data>
+  <data name="MainOverlay_LiveTranslation" xml:space="preserve">
+    <value>即時翻譯</value>
+  </data>
+  <data name="MainOverlay_ShotTranslation" xml:space="preserve">
+    <value>截圖翻譯</value>
+  </data>
+  <data name="MainOverlay_Preparing" xml:space="preserve">
+    <value>準備中</value>
+  </data>
+  <data name="MainOverlay_ShowTranslation" xml:space="preserve">
+    <value>顯示翻譯</value>
+  </data>
+  <data name="MainOverlay_Settings" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="MainOverlay_Exit" xml:space="preserve">
+    <value>結束</value>
+  </data>
+  <data name="MainOverlay_DragToMove" xml:space="preserve">
+    <value>拖曳以移動</value>
+  </data>
+  <data name="MainOverlay_Expand" xml:space="preserve">
+    <value>展開</value>
+  </data>
+  <data name="MainOverlay_SelectedWindow" xml:space="preserve">
+    <value>[已選擇: {0}]</value>
+  </data>
+  <data name="MainOverlay_TranslationCount" xml:space="preserve">
+    <value>已翻譯: {0}</value>
+  </data>
+
+  <!-- ========== Home View ========== -->
+  <data name="Home_QuickStart" xml:space="preserve">
+    <value>快速開始</value>
+  </data>
+  <data name="Home_StartCapture" xml:space="preserve">
+    <value>開始擷取</value>
+  </data>
+  <data name="Home_CaptureSettings" xml:space="preserve">
+    <value>擷取設定</value>
+  </data>
+  <data name="Home_TranslationSettings" xml:space="preserve">
+    <value>翻譯設定</value>
+  </data>
+  <data name="Home_RecentTranslations" xml:space="preserve">
+    <value>最近的翻譯</value>
+  </data>
+  <data name="Home_ViewAll" xml:space="preserve">
+    <value>檢視全部</value>
+  </data>
+  <data name="Home_NoHistory" xml:space="preserve">
+    <value>尚無翻譯紀錄</value>
+  </data>
+  <data name="Home_UsageStatistics" xml:space="preserve">
+    <value>使用統計</value>
+  </data>
+  <data name="Home_CaptureStatus" xml:space="preserve">
+    <value>擷取狀態:</value>
+  </data>
+  <data name="Home_TranslationEngine" xml:space="preserve">
+    <value>翻譯引擎:</value>
+  </data>
+  <data name="Home_TargetLanguage" xml:space="preserve">
+    <value>目標語言:</value>
+  </data>
+  <data name="Home_MemoryUsage" xml:space="preserve">
+    <value>記憶體使用:</value>
+  </data>
+  <data name="Home_RunningTime" xml:space="preserve">
+    <value>執行時間:</value>
+  </data>
+  <data name="Home_Tips" xml:space="preserve">
+    <value>提示</value>
+  </data>
+  <data name="Home_Tip_OpenTabs" xml:space="preserve">
+    <value>從左側標籤頁開啟各項功能</value>
+  </data>
+  <data name="Home_Tip_SelectArea" xml:space="preserve">
+    <value>開始擷取前，請先選擇遊戲畫面中需要翻譯的區域</value>
+  </data>
+  <data name="Home_Tip_OverlaySettings" xml:space="preserve">
+    <value>在覆疊層設定中自訂顯示位置和字型</value>
+  </data>
+  <data name="Home_Tip_TranslationHistory" xml:space="preserve">
+    <value>在翻譯紀錄中查看過去的翻譯內容</value>
+  </data>
+
+  <!-- ========== Settings Window ========== -->
+  <data name="Settings_Title" xml:space="preserve">
+    <value>設定</value>
+  </data>
+
+  <!-- ========== General Settings ========== -->
+  <data name="Settings_General_Title" xml:space="preserve">
+    <value>一般設定</value>
+  </data>
+  <data name="Settings_General_Subtitle" xml:space="preserve">
+    <value>應用程式基本設定</value>
+  </data>
+  <data name="Settings_General_Appearance" xml:space="preserve">
+    <value>外觀</value>
+  </data>
+  <data name="Settings_General_Theme" xml:space="preserve">
+    <value>佈景主題</value>
+  </data>
+  <data name="Settings_General_ThemeDescription" xml:space="preserve">
+    <value>選擇應用程式的配色主題</value>
+  </data>
+  <data name="Settings_General_ThemeLight" xml:space="preserve">
+    <value>淺色</value>
+  </data>
+  <data name="Settings_General_ThemeDark" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="Settings_General_ThemeAuto" xml:space="preserve">
+    <value>自動（跟隨系統）</value>
+  </data>
+  <data name="Settings_General_Translation" xml:space="preserve">
+    <value>翻譯設定</value>
+  </data>
+  <data name="Settings_General_TranslationEngine" xml:space="preserve">
+    <value>翻譯引擎</value>
+  </data>
+  <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
+    <value>選擇要使用的翻譯引擎</value>
+  </data>
+  <data name="Settings_General_EXMode" xml:space="preserve">
+    <value>EX模式</value>
+  </data>
+  <data name="Settings_General_EXModeDescription" xml:space="preserve">
+    <value>使用高精度EX翻譯引擎</value>
+  </data>
+  <data name="Settings_General_OfflineTranslation" xml:space="preserve">
+    <value>離線翻譯</value>
+  </data>
+  <data name="Settings_General_AITranslation" xml:space="preserve">
+    <value>EX翻譯</value>
+  </data>
+  <data name="Settings_General_AlphaNote" xml:space="preserve">
+    <value>※ Alpha測試期間僅提供離線翻譯</value>
+  </data>
+  <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
+    <value>Pro/Premium/Ultimate方案可用</value>
+  </data>
+  <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
+    <value>本月使用量:</value>
+  </data>
+  <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
+    <value></value>
+  </data>
+  <data name="Settings_General_TranslationLanguage" xml:space="preserve">
+    <value>翻譯語言</value>
+  </data>
+  <data name="Settings_General_TranslationLanguageDescription" xml:space="preserve">
+    <value>選擇來源語言和目標語言</value>
+  </data>
+  <data name="Settings_General_FontSize" xml:space="preserve">
+    <value>翻譯字型大小</value>
+  </data>
+  <data name="Settings_General_FontSizeDescription" xml:space="preserve">
+    <value>覆疊層上顯示的翻譯文字大小</value>
+  </data>
+  <data name="Settings_General_FontSizeUnit" xml:space="preserve">
+    <value>px</value>
+  </data>
+  <data name="Settings_General_LanguagePairWarning" xml:space="preserve">
+    <value>※ 請為來源語言和目標語言選擇不同的語言</value>
+  </data>
+  <data name="Settings_General_Language" xml:space="preserve">
+    <value>語言</value>
+  </data>
+  <data name="Settings_General_LanguageDescription" xml:space="preserve">
+    <value>選擇應用程式顯示語言</value>
+  </data>
+  <data name="Settings_General_LanguageJapanese" xml:space="preserve">
+    <value>日語</value>
+  </data>
+  <data name="Settings_General_LanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+
+  <!-- ========== Translation Settings ========== -->
+  <data name="Settings_Translation_Title" xml:space="preserve">
+    <value>翻譯設定</value>
+  </data>
+  <data name="Settings_Translation_Subtitle" xml:space="preserve">
+    <value>設定翻譯引擎、語言對和翻譯策略</value>
+  </data>
+  <data name="Settings_Translation_LastSaved" xml:space="preserve">
+    <value>上次儲存: {0:MM/dd HH:mm}</value>
+  </data>
+  <data name="Settings_Translation_UnsavedChanges" xml:space="preserve">
+    <value>設定有未儲存的變更</value>
+  </data>
+  <data name="Settings_Translation_DiscardChanges" xml:space="preserve">
+    <value>捨棄變更</value>
+  </data>
+  <data name="Settings_Translation_Summary" xml:space="preserve">
+    <value>目前設定摘要</value>
+  </data>
+  <data name="Settings_Translation_Engine" xml:space="preserve">
+    <value>翻譯引擎</value>
+  </data>
+  <data name="Settings_Translation_LanguagePair" xml:space="preserve">
+    <value>語言對</value>
+  </data>
+  <data name="Settings_Translation_Strategy" xml:space="preserve">
+    <value>翻譯策略</value>
+  </data>
+  <data name="Settings_Translation_ChineseVariant" xml:space="preserve">
+    <value>中文變體</value>
+  </data>
+  <data name="Settings_Translation_Fallback" xml:space="preserve">
+    <value>備援</value>
+  </data>
+  <data name="Settings_Translation_ChangeStatus" xml:space="preserve">
+    <value>變更狀態</value>
+  </data>
+  <data name="Settings_Translation_Import" xml:space="preserve">
+    <value>匯入</value>
+  </data>
+  <data name="Settings_Translation_ImportTip" xml:space="preserve">
+    <value>從設定檔匯入</value>
+  </data>
+  <data name="Settings_Translation_Export" xml:space="preserve">
+    <value>匯出</value>
+  </data>
+  <data name="Settings_Translation_ExportTip" xml:space="preserve">
+    <value>將設定匯出到檔案</value>
+  </data>
+  <data name="Settings_Translation_Load" xml:space="preserve">
+    <value>載入</value>
+  </data>
+  <data name="Settings_Translation_LoadTip" xml:space="preserve">
+    <value>載入已儲存的設定</value>
+  </data>
+  <data name="Settings_Translation_SaveTip" xml:space="preserve">
+    <value>儲存目前設定</value>
+  </data>
+  <data name="Settings_Translation_ApplyTip" xml:space="preserve">
+    <value>儲存並套用設定</value>
+  </data>
+  <data name="Settings_Translation_Saving" xml:space="preserve">
+    <value>正在儲存設定...</value>
+  </data>
+
+  <!-- ========== Capture Settings ========== -->
+  <data name="Settings_Capture_Title" xml:space="preserve">
+    <value>擷取設定</value>
+  </data>
+  <data name="Settings_Capture_Subtitle" xml:space="preserve">
+    <value>螢幕擷取和截圖功能的詳細設定</value>
+  </data>
+  <data name="Settings_Capture_Basic" xml:space="preserve">
+    <value>基本設定</value>
+  </data>
+  <data name="Settings_Capture_Enabled" xml:space="preserve">
+    <value>擷取功能</value>
+  </data>
+  <data name="Settings_Capture_EnabledDescription" xml:space="preserve">
+    <value>啟用螢幕擷取功能</value>
+  </data>
+  <data name="Settings_Capture_Interval" xml:space="preserve">
+    <value>擷取間隔</value>
+  </data>
+  <data name="Settings_Capture_IntervalDescription" xml:space="preserve">
+    <value>螢幕擷取間隔（越短越精確，越長越快速）</value>
+  </data>
+  <data name="Settings_Capture_Quality" xml:space="preserve">
+    <value>擷取品質</value>
+  </data>
+  <data name="Settings_Capture_QualityDescription" xml:space="preserve">
+    <value>擷取影像的品質（越高越精確，越低越快速）</value>
+  </data>
+  <data name="Settings_Capture_AreaMode" xml:space="preserve">
+    <value>區域偵測模式</value>
+  </data>
+  <data name="Settings_Capture_AreaModeDescription" xml:space="preserve">
+    <value>選擇自動偵測文字區域或使用固定區域</value>
+  </data>
+  <data name="Settings_Capture_AutoDetect" xml:space="preserve">
+    <value>自動偵測</value>
+  </data>
+  <data name="Settings_Capture_FixedArea" xml:space="preserve">
+    <value>固定區域</value>
+  </data>
+  <data name="Settings_Capture_FixedAreaSection" xml:space="preserve">
+    <value>固定擷取區域</value>
+  </data>
+  <data name="Settings_Capture_Position" xml:space="preserve">
+    <value>位置和大小</value>
+  </data>
+  <data name="Settings_Capture_PositionDescription" xml:space="preserve">
+    <value>指定固定擷取區域的位置和大小</value>
+  </data>
+  <data name="Settings_Capture_Advanced" xml:space="preserve">
+    <value>進階設定</value>
+  </data>
+  <data name="Settings_Capture_Monitor" xml:space="preserve">
+    <value>目標螢幕</value>
+  </data>
+  <data name="Settings_Capture_MonitorDescription" xml:space="preserve">
+    <value>在多螢幕環境中選擇要擷取的螢幕</value>
+  </data>
+  <data name="Settings_Capture_DpiScaling" xml:space="preserve">
+    <value>DPI縮放感知</value>
+  </data>
+  <data name="Settings_Capture_DpiScalingDescription" xml:space="preserve">
+    <value>在高DPI環境中考慮縮放</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccel" xml:space="preserve">
+    <value>硬體加速</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccelDescription" xml:space="preserve">
+    <value>使用GPU進行硬體加速</value>
+  </data>
+  <data name="Settings_Capture_DiffDetection" xml:space="preserve">
+    <value>差異偵測設定</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionEnable" xml:space="preserve">
+    <value>差異偵測功能</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionDescription" xml:space="preserve">
+    <value>啟用螢幕變更差異偵測功能</value>
+  </data>
+
+  <!-- ========== OCR Settings ========== -->
+  <data name="Settings_OCR_Title" xml:space="preserve">
+    <value>OCR設定</value>
+  </data>
+  <data name="Settings_OCR_Subtitle" xml:space="preserve">
+    <value>光學字元辨識的詳細設定</value>
+  </data>
+  <data name="Settings_OCR_Basic" xml:space="preserve">
+    <value>基本設定</value>
+  </data>
+  <data name="Settings_OCR_Enabled" xml:space="preserve">
+    <value>啟用OCR</value>
+  </data>
+  <data name="Settings_OCR_EnabledDescription" xml:space="preserve">
+    <value>自動辨識螢幕上的文字</value>
+  </data>
+  <data name="Settings_OCR_Language" xml:space="preserve">
+    <value>辨識語言</value>
+  </data>
+  <data name="Settings_OCR_LanguageDescription" xml:space="preserve">
+    <value>OCR辨識的主要語言</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguage" xml:space="preserve">
+    <value>目標語言</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguageDescription" xml:space="preserve">
+    <value>翻譯結果的輸出語言</value>
+  </data>
+  <data name="Settings_OCR_Confidence" xml:space="preserve">
+    <value>信心度閾值</value>
+  </data>
+  <data name="Settings_OCR_ConfidenceDescription" xml:space="preserve">
+    <value>文字辨識的最低信心度（0.0-1.0）</value>
+  </data>
+  <data name="Settings_OCR_Filtering" xml:space="preserve">
+    <value>文字篩選</value>
+  </data>
+  <data name="Settings_OCR_FilteringDescription" xml:space="preserve">
+    <value>啟用已辨識文字的後處理</value>
+  </data>
+  <data name="Settings_OCR_Advanced" xml:space="preserve">
+    <value>進階設定</value>
+  </data>
+  <data name="Settings_OCR_Preprocessing" xml:space="preserve">
+    <value>影像前處理</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingEnable" xml:space="preserve">
+    <value>啟用影像前處理</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingDescription" xml:space="preserve">
+    <value>套用影像前處理以提高OCR準確度</value>
+  </data>
+  <data name="Settings_OCR_Grayscale" xml:space="preserve">
+    <value>灰階轉換</value>
+  </data>
+
+  <!-- ========== Overlay Settings ========== -->
+  <data name="Settings_Overlay_Title" xml:space="preserve">
+    <value>覆疊層設定</value>
+  </data>
+  <data name="Settings_Overlay_Subtitle" xml:space="preserve">
+    <value>在遊戲畫面上顯示翻譯結果的覆疊層設定</value>
+  </data>
+  <data name="Settings_Overlay_ARNote" xml:space="preserve">
+    <value>AR風格顯示：翻譯結果覆蓋在原文相同位置，提供類似Google翻譯相機的體驗</value>
+  </data>
+  <data name="Settings_Overlay_Basic" xml:space="preserve">
+    <value>基本設定</value>
+  </data>
+  <data name="Settings_Overlay_Enabled" xml:space="preserve">
+    <value>覆疊層顯示</value>
+  </data>
+  <data name="Settings_Overlay_EnabledDescription" xml:space="preserve">
+    <value>將翻譯結果以覆疊層形式顯示在遊戲畫面上</value>
+  </data>
+  <data name="Settings_Overlay_Opacity" xml:space="preserve">
+    <value>不透明度</value>
+  </data>
+  <data name="Settings_Overlay_OpacityDescription" xml:space="preserve">
+    <value>覆疊層不透明度（越高越不透明）</value>
+  </data>
+  <data name="Settings_Overlay_FontSize" xml:space="preserve">
+    <value>翻譯字型大小</value>
+  </data>
+  <data name="Settings_Overlay_FontSizeDescription" xml:space="preserve">
+    <value>覆疊層上顯示的翻譯文字字型大小</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColor" xml:space="preserve">
+    <value>背景顏色</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColorDescription" xml:space="preserve">
+    <value>覆疊層的背景顏色</value>
+  </data>
+  <data name="Settings_Overlay_ChooseColor" xml:space="preserve">
+    <value>選擇顏色...</value>
+  </data>
+  <data name="Settings_Overlay_TextColor" xml:space="preserve">
+    <value>文字顏色</value>
+  </data>
+  <data name="Settings_Overlay_TextColorDescription" xml:space="preserve">
+    <value>覆疊層的文字顏色</value>
+  </data>
+  <data name="Settings_Overlay_AutoHide" xml:space="preserve">
+    <value>自動隱藏設定</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAuto" xml:space="preserve">
+    <value>即時翻譯自動隱藏</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDescription" xml:space="preserve">
+    <value>在指定時間後自動隱藏即時翻譯結果</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelay" xml:space="preserve">
+    <value>即時翻譯隱藏延遲</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelayDescription" xml:space="preserve">
+    <value>即時翻譯結果自動消失前的時間</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelay" xml:space="preserve">
+    <value>截圖翻譯自動隱藏延遲</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelayDescription" xml:space="preserve">
+    <value>截圖翻譯結果自動消失前的時間</value>
+  </data>
+  <data name="Settings_Overlay_ManualClose" xml:space="preserve">
+    <value>點擊關閉</value>
+  </data>
+  <data name="Settings_Overlay_ManualCloseDescription" xml:space="preserve">
+    <value>點擊覆疊層可手動隱藏</value>
+  </data>
+
+  <!-- ========== Account Settings ========== -->
+  <data name="Settings_Account_Title" xml:space="preserve">
+    <value>帳戶</value>
+  </data>
+  <data name="Settings_Account_Subtitle" xml:space="preserve">
+    <value>使用者驗證和帳戶管理</value>
+  </data>
+  <data name="Settings_Account_Processing" xml:space="preserve">
+    <value>處理中...</value>
+  </data>
+  <data name="Settings_Account_LoggedInWith" xml:space="preserve">
+    <value>已透過{0}登入</value>
+  </data>
+  <data name="Settings_Account_LoggedInStatus" xml:space="preserve">
+    <value>已登入</value>
+  </data>
+  <data name="Settings_Account_Actions" xml:space="preserve">
+    <value>帳戶操作</value>
+  </data>
+  <data name="Settings_Account_LogoutDescription" xml:space="preserve">
+    <value>從此裝置登出</value>
+  </data>
+  <data name="Settings_Account_NotLoggedIn" xml:space="preserve">
+    <value>未登入</value>
+  </data>
+  <data name="Settings_Account_LoginBenefits" xml:space="preserve">
+    <value>登入後可同步設定並使用更多功能</value>
+  </data>
+  <data name="Settings_Account_ForgotPassword" xml:space="preserve">
+    <value>忘記密碼？</value>
+  </data>
+  <data name="Settings_Account_PasswordReset" xml:space="preserve">
+    <value>重設密碼</value>
+  </data>
+  <data name="Settings_Account_PasswordResetDescription" xml:space="preserve">
+    <value>我們將向您註冊的電子信箱發送密碼重設連結</value>
+  </data>
+  <data name="Settings_Account_ResetEmailSent" xml:space="preserve">
+    <value>重設信件已發送，請檢查您的收件匣。</value>
+  </data>
+  <data name="Settings_Account_EmailAddress" xml:space="preserve">
+    <value>電子信箱</value>
+  </data>
+  <data name="Settings_Account_Profile" xml:space="preserve">
+    <value>個人資料</value>
+  </data>
+  <data name="Settings_Account_Email" xml:space="preserve">
+    <value>信箱</value>
+  </data>
+  <data name="Settings_Account_ChangePassword" xml:space="preserve">
+    <value>變更密碼</value>
+  </data>
+  <data name="Settings_Account_Logout" xml:space="preserve">
+    <value>登出</value>
+  </data>
+  <data name="Settings_Account_Login" xml:space="preserve">
+    <value>登入</value>
+  </data>
+  <data name="Settings_Account_Signup" xml:space="preserve">
+    <value>註冊</value>
+  </data>
+  <data name="Settings_Account_CurrentPlan" xml:space="preserve">
+    <value>目前方案</value>
+  </data>
+  <data name="Settings_Account_UpgradeToPremium" xml:space="preserve">
+    <value>升級至Premium</value>
+  </data>
+
+  <!-- ========== License Settings ========== -->
+  <data name="Settings_License_Title" xml:space="preserve">
+    <value>授權</value>
+  </data>
+  <data name="Settings_License_Subtitle" xml:space="preserve">
+    <value>檢視方案資訊和使用狀況</value>
+  </data>
+  <data name="Settings_Upgrade_Title" xml:space="preserve">
+    <value>方案升級</value>
+  </data>
+  <data name="Settings_Upgrade_Subtitle" xml:space="preserve">
+    <value>購買或變更方案</value>
+  </data>
+  <data name="Settings_License_Loading" xml:space="preserve">
+    <value>正在載入授權資訊...</value>
+  </data>
+  <data name="Settings_License_TokenUsage" xml:space="preserve">
+    <value>使用量</value>
+  </data>
+  <data name="Settings_License_MonthlyUsage" xml:space="preserve">
+    <value>每月使用量</value>
+  </data>
+  <data name="Settings_License_QuotaExceeded" xml:space="preserve">
+    <value>每月配額已超限。EX翻譯在下月之前不可用。</value>
+  </data>
+  <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
+    <value>此方案僅支援標準翻譯。升級至Pro或更高方案以使用EX翻譯。</value>
+  </data>
+  <data name="Settings_License_PlanDetails" xml:space="preserve">
+    <value>方案詳情</value>
+  </data>
+  <data name="Settings_License_ExpirationDate" xml:space="preserve">
+    <value>到期日</value>
+  </data>
+  <data name="Settings_License_CloudAccess" xml:space="preserve">
+    <value>EX翻譯</value>
+  </data>
+  <data name="Settings_License_MonthlyLimit" xml:space="preserve">
+    <value>每月配額</value>
+  </data>
+  <data name="Settings_License_Refresh" xml:space="preserve">
+    <value>重新整理授權資訊</value>
+  </data>
+  <data name="License_Plan_Free" xml:space="preserve">
+    <value>Free</value>
+  </data>
+  <data name="License_Plan_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="License_Plan_Pro" xml:space="preserve">
+    <value>Pro</value>
+  </data>
+  <data name="License_Plan_Premia" xml:space="preserve">
+    <value>Premia</value>
+  </data>
+  <data name="License_Plan_Premium" xml:space="preserve">
+    <value>Premium</value>
+  </data>
+  <data name="License_Plan_Ultimate" xml:space="preserve">
+    <value>Ultimate</value>
+  </data>
+  <data name="License_Plan_Unknown" xml:space="preserve">
+    <value>未知</value>
+  </data>
+  <data name="License_Plan_PromotionSuffix" xml:space="preserve">
+    <value>（已套用促銷代碼）</value>
+  </data>
+
+  <!-- Promotion Code Section -->
+  <data name="Settings_License_PromotionCode" xml:space="preserve">
+    <value>促銷代碼</value>
+  </data>
+  <data name="Settings_License_PromotionExpires" xml:space="preserve">
+    <value>到期日:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeLabel" xml:space="preserve">
+    <value>代碼:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
+    <value>如果您有促銷代碼，請在下方輸入。</value>
+  </data>
+  <data name="Settings_License_PromotionApply" xml:space="preserve">
+    <value>套用</value>
+  </data>
+  <data name="Settings_License_PromotionVerifying" xml:space="preserve">
+    <value>驗證中...</value>
+  </data>
+  <data name="Settings_License_PromotionAppliedFormat" xml:space="preserve">
+    <value>{0}已套用</value>
+  </data>
+  <data name="Settings_License_PromotionPlanPromo" xml:space="preserve">
+    <value>促銷</value>
+  </data>
+
+  <data name="License_Desc_Free" xml:space="preserve">
+    <value>免費方案 - 可透過獎勵使用EX翻譯</value>
+  </data>
+  <data name="License_Desc_Standard" xml:space="preserve">
+    <value>Standard方案 - 無廣告，僅標準翻譯</value>
+  </data>
+  <data name="License_Desc_Pro" xml:space="preserve">
+    <value>Pro方案 - EX翻譯，每月配額1000萬</value>
+  </data>
+  <data name="License_Desc_Premia" xml:space="preserve">
+    <value>Premia方案 - EX翻譯，每月配額800萬</value>
+  </data>
+  <data name="License_Desc_Premium" xml:space="preserve">
+    <value>Premium方案 - EX翻譯，每月配額2000萬</value>
+  </data>
+  <data name="License_Desc_Ultimate" xml:space="preserve">
+    <value>Ultimate方案 - EX翻譯，每月配額5000萬</value>
+  </data>
+  <data name="License_NoExpiration" xml:space="preserve">
+    <value>無期限</value>
+  </data>
+  <data name="License_LocalOnly" xml:space="preserve">
+    <value>僅標準翻譯</value>
+  </data>
+  <data name="License_EXTranslation_Available" xml:space="preserve">
+    <value>可用</value>
+  </data>
+  <data name="License_EXTranslation_Unavailable" xml:space="preserve">
+    <value>不可用</value>
+  </data>
+  <data name="License_RefreshSuccess" xml:space="preserve">
+    <value>授權資訊已更新</value>
+  </data>
+  <data name="License_RefreshFailed" xml:space="preserve">
+    <value>授權資訊更新失敗</value>
+  </data>
+  <data name="Settings_License_Upgrade" xml:space="preserve">
+    <value>變更方案</value>
+  </data>
+  <data name="License_UpgradeComingSoon" xml:space="preserve">
+    <value>升級功能即將推出</value>
+  </data>
+  <data name="License_OpeningPlanPage" xml:space="preserve">
+    <value>正在開啟方案變更頁面...</value>
+  </data>
+  <data name="License_PlanPageOpenFailed" xml:space="preserve">
+    <value>無法開啟方案變更頁面</value>
+  </data>
+
+  <!-- Patreon Integration -->
+  <data name="Settings_License_PatreonIntegration" xml:space="preserve">
+    <value>Patreon整合</value>
+  </data>
+  <data name="Settings_License_PatreonStatus" xml:space="preserve">
+    <value>連線狀態</value>
+  </data>
+  <data name="Settings_License_LastSync" xml:space="preserve">
+    <value>上次同步</value>
+  </data>
+  <data name="Settings_License_ConnectPatreon" xml:space="preserve">
+    <value>連結到Patreon</value>
+  </data>
+  <data name="Settings_License_DisconnectPatreon" xml:space="preserve">
+    <value>中斷連結</value>
+  </data>
+  <data name="Settings_License_SyncPatreon" xml:space="preserve">
+    <value>同步</value>
+  </data>
+
+  <!-- Patreon Integration (Account Settings) -->
+  <data name="Settings_Account_PatreonSection" xml:space="preserve">
+    <value>Patreon整合</value>
+  </data>
+  <data name="Settings_Account_PatreonUserFallback" xml:space="preserve">
+    <value>Patreon使用者</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanLabel" xml:space="preserve">
+    <value>方案:</value>
+  </data>
+  <data name="Settings_Account_PatreonLastSync" xml:space="preserve">
+    <value>上次同步: {0}</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncNow" xml:space="preserve">
+    <value>立即同步</value>
+  </data>
+  <data name="Settings_Account_PatreonDisconnect" xml:space="preserve">
+    <value>中斷連結</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectTitle" xml:space="preserve">
+    <value>連結Patreon帳戶</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
+    <value>關聯您的Patreon支持者帳戶，解鎖無廣告和EX翻譯等權益</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
+    <value>連結Patreon</value>
+  </data>
+  <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
+    <value>可用方案:</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
+    <value>• Pro（$3/月）：EX翻譯，每月配額1000萬</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
+    <value>• Premium（$5/月）：EX翻譯，每月配額2000萬</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
+    <value>• Ultimate（$9/月）：EX翻譯，每月配額5000萬</value>
+  </data>
+  <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
+    <value>登入</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
+    <value>同步中...</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusSynced" xml:space="preserve">
+    <value>已同步</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusOffline" xml:space="preserve">
+    <value>離線</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusTokenExpired" xml:space="preserve">
+    <value>需要重新驗證</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusError" xml:space="preserve">
+    <value>錯誤</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusNotConnected" xml:space="preserve">
+    <value>未連結</value>
+  </data>
+  <data name="Settings_Account_PatreonLinkedFormat" xml:space="preserve">
+    <value>已連結（{0}）</value>
+  </data>
+  <data name="Settings_Account_MockModeTestUser" xml:space="preserve">
+    <value>測試使用者（模擬模式）</value>
+  </data>
+
+  <!-- ========== Advanced Settings ========== -->
+  <data name="Settings_Advanced_Title" xml:space="preserve">
+    <value>進階設定</value>
+  </data>
+  <data name="Settings_Advanced_Subtitle" xml:space="preserve">
+    <value>進階功能和系統最佳化的詳細設定</value>
+  </data>
+  <data name="Settings_Advanced_Warning" xml:space="preserve">
+    <value>警告：這些設定適用於進階使用者。變更可能導致非預期的行為。</value>
+  </data>
+  <data name="Settings_Advanced_Basic" xml:space="preserve">
+    <value>基本最佳化設定</value>
+  </data>
+  <data name="Settings_Advanced_CPU" xml:space="preserve">
+    <value>CPU/處理程序設定</value>
+  </data>
+  <data name="Settings_Advanced_Memory" xml:space="preserve">
+    <value>記憶體/緩衝設定</value>
+  </data>
+  <data name="Settings_Advanced_Network" xml:space="preserve">
+    <value>網路設定</value>
+  </data>
+  <data name="Settings_Advanced_Seconds" xml:space="preserve">
+    <value>秒</value>
+  </data>
+  <data name="Settings_Advanced_Connections" xml:space="preserve">
+    <value>連線</value>
+  </data>
+  <data name="Settings_Advanced_Retry" xml:space="preserve">
+    <value>重試設定</value>
+  </data>
+  <data name="Settings_Advanced_Times" xml:space="preserve">
+    <value>次</value>
+  </data>
+  <data name="Settings_Advanced_Statistics" xml:space="preserve">
+    <value>統計/監控設定</value>
+  </data>
+  <data name="Settings_Advanced_Days" xml:space="preserve">
+    <value>天</value>
+  </data>
+  <data name="Settings_Advanced_Experimental" xml:space="preserve">
+    <value>實驗性/偵錯設定</value>
+  </data>
+  <data name="Settings_Advanced_Danger" xml:space="preserve">
+    <value>危險：這些設定適用於開發人員。請勿在正式環境中使用。</value>
+  </data>
+
+  <!-- ========== Login View ========== -->
+  <data name="Auth_Login_Title" xml:space="preserve">
+    <value>登入 Baketa</value>
+  </data>
+  <data name="Auth_Login_Google" xml:space="preserve">
+    <value>使用Google登入</value>
+  </data>
+  <data name="Auth_Login_Discord" xml:space="preserve">
+    <value>使用Discord登入</value>
+  </data>
+  <data name="Auth_Login_Twitch" xml:space="preserve">
+    <value>使用Twitch登入</value>
+  </data>
+  <data name="Auth_Login_Email" xml:space="preserve">
+    <value>電子信箱</value>
+  </data>
+  <data name="Auth_Login_EmailPlaceholder" xml:space="preserve">
+    <value>example@email.com</value>
+  </data>
+  <data name="Auth_Login_Password" xml:space="preserve">
+    <value>密碼</value>
+  </data>
+  <data name="Auth_Login_PasswordPlaceholder" xml:space="preserve">
+    <value>輸入密碼</value>
+  </data>
+  <data name="Auth_Login_RememberMe" xml:space="preserve">
+    <value>記住登入狀態</value>
+  </data>
+  <data name="Auth_Login_ForgotPassword" xml:space="preserve">
+    <value>忘記密碼？</value>
+  </data>
+  <data name="Auth_Login_Button" xml:space="preserve">
+    <value>登入</value>
+  </data>
+  <data name="Auth_Login_Loading" xml:space="preserve">
+    <value>驗證中...</value>
+  </data>
+  <data name="Auth_Login_SignupPrompt" xml:space="preserve">
+    <value>還沒有帳戶？</value>
+  </data>
+  <data name="Auth_Login_SignupLink" xml:space="preserve">
+    <value>建立帳戶</value>
+  </data>
+  <data name="Auth_Login_EmailExpander" xml:space="preserve">
+    <value>使用信箱登入</value>
+  </data>
+
+  <!-- ========== Signup View ========== -->
+  <data name="Auth_Signup_Title" xml:space="preserve">
+    <value>建立Baketa帳戶</value>
+  </data>
+  <data name="Auth_Signup_Google" xml:space="preserve">
+    <value>使用Google註冊</value>
+  </data>
+  <data name="Auth_Signup_Discord" xml:space="preserve">
+    <value>使用Discord註冊</value>
+  </data>
+  <data name="Auth_Signup_Twitch" xml:space="preserve">
+    <value>使用Twitch註冊</value>
+  </data>
+  <data name="Auth_Signup_OrEmail" xml:space="preserve">
+    <value>或使用信箱註冊</value>
+  </data>
+  <data name="Auth_Signup_DisplayName" xml:space="preserve">
+    <value>顯示名稱</value>
+  </data>
+  <data name="Auth_Signup_DisplayNamePlaceholder" xml:space="preserve">
+    <value>您的顯示名稱</value>
+  </data>
+  <data name="Auth_Signup_Email" xml:space="preserve">
+    <value>電子信箱</value>
+  </data>
+  <data name="Auth_Signup_Password" xml:space="preserve">
+    <value>密碼</value>
+  </data>
+  <data name="Auth_Signup_PasswordPlaceholder" xml:space="preserve">
+    <value>8個字元以上</value>
+  </data>
+  <data name="Auth_Signup_PasswordRequirement" xml:space="preserve">
+    <value>※ 8個字元以上，需包含大寫、小寫、數字、符號中的至少3種</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPassword" xml:space="preserve">
+    <value>確認密碼</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPasswordPlaceholder" xml:space="preserve">
+    <value>再次輸入密碼</value>
+  </data>
+  <data name="Auth_Signup_Terms" xml:space="preserve">
+    <value>服務條款</value>
+  </data>
+  <data name="Auth_Signup_TermsAgree" xml:space="preserve">
+    <value>我同意</value>
+  </data>
+  <data name="Auth_Signup_Privacy" xml:space="preserve">
+    <value>隱私權政策</value>
+  </data>
+  <data name="Auth_Signup_Button" xml:space="preserve">
+    <value>建立帳戶</value>
+  </data>
+  <data name="Auth_Signup_Loading" xml:space="preserve">
+    <value>正在建立帳戶...</value>
+  </data>
+  <data name="Auth_Signup_LoginPrompt" xml:space="preserve">
+    <value>已有帳戶？</value>
+  </data>
+  <data name="Auth_Signup_LoginLink" xml:space="preserve">
+    <value>登入</value>
+  </data>
+  <data name="Auth_Signup_EmailExpander" xml:space="preserve">
+    <value>使用信箱註冊</value>
+  </data>
+
+  <!-- ========== Premium Plan ========== -->
+  <data name="Premium_Title" xml:space="preserve">
+    <value>Baketa Premium</value>
+  </data>
+  <data name="Premium_FeatureAdFree" xml:space="preserve">
+    <value>無廣告</value>
+  </data>
+  <data name="Premium_FeatureCloudTranslation" xml:space="preserve">
+    <value>EX翻譯（高精度翻譯引擎）</value>
+  </data>
+  <data name="Premium_FeaturePrioritySupport" xml:space="preserve">
+    <value>優先支援</value>
+  </data>
+  <data name="Premium_FeatureEarlyAccess" xml:space="preserve">
+    <value>搶先體驗新功能</value>
+  </data>
+  <data name="Premium_Monthly" xml:space="preserve">
+    <value>$5/月</value>
+  </data>
+  <data name="Premium_Yearly" xml:space="preserve">
+    <value>$50/年（優惠17%）</value>
+  </data>
+
+  <!-- ========== Error Messages ========== -->
+  <data name="Error_NetworkError" xml:space="preserve">
+    <value>發生網路錯誤</value>
+  </data>
+  <data name="Error_AuthenticationFailed" xml:space="preserve">
+    <value>驗證失敗</value>
+  </data>
+  <data name="Error_TranslationFailed" xml:space="preserve">
+    <value>翻譯失敗</value>
+  </data>
+  <data name="Error_OcrFailed" xml:space="preserve">
+    <value>OCR失敗</value>
+  </data>
+  <data name="Error_WindowNotFound" xml:space="preserve">
+    <value>找不到目標視窗</value>
+  </data>
+  <data name="Error_InvalidEmail" xml:space="preserve">
+    <value>無效的電子信箱地址</value>
+  </data>
+  <data name="Error_PasswordTooShort" xml:space="preserve">
+    <value>密碼至少需要8個字元</value>
+  </data>
+  <data name="Error_LoginFailed" xml:space="preserve">
+    <value>登入失敗</value>
+  </data>
+  <data name="Error_PasswordMismatch" xml:space="preserve">
+    <value>密碼不相符</value>
+  </data>
+  <data name="Error_SignupFailed" xml:space="preserve">
+    <value>帳戶建立失敗</value>
+  </data>
+
+  <!-- ========== Confirmation Dialogs ========== -->
+  <data name="Dialog_LogoutConfirm" xml:space="preserve">
+    <value>確定要登出嗎？</value>
+  </data>
+  <data name="Dialog_DiscardChanges" xml:space="preserve">
+    <value>有未儲存的變更。要捨棄變更嗎？</value>
+  </data>
+  <data name="Dialog_ResetSettings" xml:space="preserve">
+    <value>將設定還原為預設值？</value>
+  </data>
+  <data name="Dialog_ExitApp" xml:space="preserve">
+    <value>結束應用程式？</value>
+  </data>
+
+  <!-- MainOverlay Tooltips -->
+  <data name="MainOverlay_StartButton_Tooltip" xml:space="preserve">
+    <value>開始翻譯</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Execute" xml:space="preserve">
+    <value>執行單次翻譯</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Reset" xml:space="preserve">
+    <value>重設</value>
+    <comment>[Issue #357] Button/tooltip text when shot translation is active</comment>
+  </data>
+  <data name="MainOverlay_Live_Stop" xml:space="preserve">
+    <value>停止</value>
+    <comment>[Issue #357] Button text when live translation is active</comment>
+  </data>
+  <data name="MainOverlay_Status_Initializing" xml:space="preserve">
+    <value>初始化中...</value>
+  </data>
+  <data name="MainOverlay_Status_Idle" xml:space="preserve">
+    <value>未選擇</value>
+  </data>
+  <data name="MainOverlay_Status_Ready" xml:space="preserve">
+    <value>就緒</value>
+  </data>
+  <data name="MainOverlay_Status_Translating" xml:space="preserve">
+    <value>翻譯中</value>
+  </data>
+  <data name="MainOverlay_Status_Waiting" xml:space="preserve">
+    <value>等待中</value>
+  </data>
+  <data name="MainOverlay_Warmup_Failed" xml:space="preserve">
+    <value>模型初始化失敗。請重新啟動應用程式。</value>
+  </data>
+  <data name="MainOverlay_Warmup_Loading" xml:space="preserve">
+    <value>正在載入模型... {0}</value>
+  </data>
+  <data name="MainOverlay_Warmup_Complete" xml:space="preserve">
+    <value>準備就緒！可以開始翻譯了</value>
+  </data>
+
+  <!-- Theme Options -->
+  <data name="Theme_Light" xml:space="preserve">
+    <value>淺色</value>
+  </data>
+  <data name="Theme_Dark" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="Theme_Auto" xml:space="preserve">
+    <value>自動（跟隨系統設定）</value>
+  </data>
+
+  <!-- Size Options -->
+  <data name="Size_Small" xml:space="preserve">
+    <value>小（精簡）</value>
+  </data>
+  <data name="Size_Medium" xml:space="preserve">
+    <value>中（標準）</value>
+  </data>
+  <data name="Size_Large" xml:space="preserve">
+    <value>大（易讀）</value>
+  </data>
+
+  <!-- Advanced Settings Toggle -->
+  <data name="Settings_Advanced_Show" xml:space="preserve">
+    <value>顯示進階設定</value>
+  </data>
+  <data name="Settings_Advanced_Hide" xml:space="preserve">
+    <value>返回基本設定</value>
+  </data>
+
+  <!-- Settings Window Status Messages -->
+  <data name="Settings_Window_Title" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="Settings_Status_HasChanges" xml:space="preserve">
+    <value>設定已修改</value>
+  </data>
+  <data name="Settings_Status_NoChanges" xml:space="preserve">
+    <value>無變更</value>
+  </data>
+  <data name="Settings_Status_Saving" xml:space="preserve">
+    <value>正在儲存設定...</value>
+  </data>
+  <data name="Settings_Status_Saved" xml:space="preserve">
+    <value>設定已儲存</value>
+  </data>
+  <data name="Settings_Status_SaveFailed" xml:space="preserve">
+    <value>儲存失敗: {0}</value>
+  </data>
+  <data name="Settings_Status_AccessDenied" xml:space="preserve">
+    <value>儲存失敗: 存取被拒絕</value>
+  </data>
+  <data name="Settings_Status_IOError" xml:space="preserve">
+    <value>儲存失敗: 檔案I/O錯誤</value>
+  </data>
+  <data name="Settings_Status_Cancelled" xml:space="preserve">
+    <value>變更已取消</value>
+  </data>
+  <data name="Settings_Status_Reset" xml:space="preserve">
+    <value>設定已重設</value>
+  </data>
+
+  <!-- Settings Window Buttons -->
+  <data name="Settings_Button_Reset" xml:space="preserve">
+    <value>重設</value>
+  </data>
+  <data name="Settings_Button_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Settings_Button_Save" xml:space="preserve">
+    <value>儲存</value>
+  </data>
+  <data name="Settings_Tooltip_Reset" xml:space="preserve">
+    <value>將所有設定還原為預設值</value>
+  </data>
+  <data name="Settings_Tooltip_Cancel" xml:space="preserve">
+    <value>捨棄變更並關閉</value>
+  </data>
+  <data name="Settings_Tooltip_Save" xml:space="preserve">
+    <value>儲存變更</value>
+  </data>
+
+  <!-- ========== Loading Screen ========== -->
+  <!-- [Issue #185] Component download step -->
+  <data name="Loading_DownloadingComponents" xml:space="preserve">
+    <value>正在下載元件...</value>
+  </data>
+  <data name="Loading_ResolvingDependencies" xml:space="preserve">
+    <value>正在解析相依性...</value>
+  </data>
+  <data name="Loading_LoadingOCR" xml:space="preserve">
+    <value>正在載入OCR模型...</value>
+  </data>
+  <data name="Loading_InitializingTranslation" xml:space="preserve">
+    <value>正在初始化翻譯引擎...</value>
+  </data>
+  <data name="Loading_PreparingUI" xml:space="preserve">
+    <value>正在準備UI元件...</value>
+  </data>
+  <data name="Loading_SetupGpu" xml:space="preserve">
+    <value>正在設定GPU環境...</value>
+  </data>
+  <!-- [Issue #259] Loading Tips -->
+  <data name="Loading_Tip_1" xml:space="preserve">
+    <value>首次設定可能需要約10分鐘，請耐心等候。</value>
+  </data>
+  <data name="Loading_Tip_2" xml:space="preserve">
+    <value>結合OCR和機器翻譯的翻譯覆疊層</value>
+  </data>
+  <data name="Loading_Tip_3" xml:space="preserve">
+    <value>首次啟動可能因模型下載而耗時較長</value>
+  </data>
+  <data name="Loading_Tip_4" xml:space="preserve">
+    <value>翻譯結果以覆疊層形式顯示在遊戲畫面上</value>
+  </data>
+  <data name="Loading_Tip_5" xml:space="preserve">
+    <value>在設定畫面自訂各種選項</value>
+  </data>
+
+  <!-- [Issue #78 Phase 5] Token Usage Alerts -->
+  <data name="TokenUsage_Warning_Title" xml:space="preserve">
+    <value>使用量警告</value>
+  </data>
+  <data name="TokenUsage_Warning80_Message" xml:space="preserve">
+    <value>本月EX翻譯配額已使用80%（剩餘: {0}）</value>
+  </data>
+  <data name="TokenUsage_Warning90_Message" xml:space="preserve">
+    <value>本月EX翻譯配額已使用90%（剩餘: {0}）</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
+    <value>已達配額上限</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
+    <value>本月EX翻譯配額已用完。自動切換至標準翻譯。</value>
+  </data>
+
+  <!-- [Issue #245] Window Selection Dialog -->
+  <data name="WindowSelection_Title" xml:space="preserve">
+    <value>選擇視窗</value>
+  </data>
+  <data name="WindowSelection_Header" xml:space="preserve">
+    <value>選擇翻譯目標視窗</value>
+  </data>
+  <data name="WindowSelection_Subtitle" xml:space="preserve">
+    <value>選擇要翻譯的應用程式視窗（包括最小化的視窗）</value>
+  </data>
+  <data name="WindowSelection_Refresh" xml:space="preserve">
+    <value>重新整理視窗清單</value>
+  </data>
+  <data name="WindowSelection_Searching" xml:space="preserve">
+    <value>正在搜尋視窗...</value>
+  </data>
+  <data name="WindowSelection_NoWindows" xml:space="preserve">
+    <value>找不到可用的視窗</value>
+  </data>
+  <data name="WindowSelection_Minimized" xml:space="preserve">
+    <value>已最小化</value>
+  </data>
+  <data name="WindowSelection_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="WindowSelection_Select" xml:space="preserve">
+    <value>選擇</value>
+  </data>
+  <data name="WindowSelection_Update" xml:space="preserve">
+    <value>重新整理</value>
+  </data>
+
+  <!-- ========== Crash Report Dialog [Issue #252] ========== -->
+  <data name="CrashReport_WindowTitle" xml:space="preserve">
+    <value>當機報告</value>
+  </data>
+  <data name="CrashReport_HeaderText" xml:space="preserve">
+    <value>偵測到非預期的關閉</value>
+  </data>
+  <data name="CrashReport_DescriptionSingle" xml:space="preserve">
+    <value>應用程式在上次執行期間非預期結束。是否傳送當機報告以協助我們改善？</value>
+  </data>
+  <data name="CrashReport_DescriptionMultiple" xml:space="preserve">
+    <value>偵測到最近{0}次當機。是否傳送當機報告以協助我們改善？</value>
+  </data>
+  <data name="CrashReport_PrivacyNote" xml:space="preserve">
+    <value>為保護您的隱私，報告不包含個人身分資訊（使用者名稱、信箱地址、IP位址等）。</value>
+  </data>
+  <data name="CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>包含系統資訊（作業系統、記憶體使用等）</value>
+  </data>
+  <data name="CrashReport_IncludeLogs" xml:space="preserve">
+    <value>包含最近的記錄</value>
+  </data>
+  <data name="CrashReport_SendButton" xml:space="preserve">
+    <value>傳送報告</value>
+  </data>
+  <data name="CrashReport_DontSendButton" xml:space="preserve">
+    <value>不傳送</value>
+  </data>
+  <data name="CrashReport_CrashDetailsTitle" xml:space="preserve">
+    <value>當機詳情</value>
+  </data>
+
+  <!-- ========== Crash Report Settings [Issue #252] ========== -->
+  <data name="Settings_CrashReport_Title" xml:space="preserve">
+    <value>當機報告</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSend" xml:space="preserve">
+    <value>自動傳送當機報告</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSendDescription" xml:space="preserve">
+    <value>當機時自動傳送報告，不顯示確認對話方塊</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>包含系統資訊</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfoDescription" xml:space="preserve">
+    <value>在報告中包含CPU、記憶體使用等系統資訊</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogs" xml:space="preserve">
+    <value>包含應用程式記錄</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogsDescription" xml:space="preserve">
+    <value>在報告中包含最近的應用程式記錄</value>
+  </data>
+
+  <!-- ========== Update Dialog [Issue #249] ========== -->
+  <data name="Update_WindowTitle" xml:space="preserve">
+    <value>軟體更新</value>
+  </data>
+  <data name="Update_HeaderText" xml:space="preserve">
+    <value>{0}有新版本可用</value>
+  </data>
+  <data name="Update_InfoText" xml:space="preserve">
+    <value>{0} {1}已可用（目前版本: {2}）。是否立即下載？</value>
+  </data>
+  <data name="Update_SkipButton" xml:space="preserve">
+    <value>略過此版本</value>
+  </data>
+  <data name="Update_RemindLaterButton" xml:space="preserve">
+    <value>稍後提醒</value>
+  </data>
+  <data name="Update_DownloadButton" xml:space="preserve">
+    <value>下載</value>
+  </data>
+  <data name="Update_DownloadProgress_Title" xml:space="preserve">
+    <value>軟體更新</value>
+  </data>
+  <data name="Update_DownloadProgress_Downloading" xml:space="preserve">
+    <value>正在下載{0}...</value>
+  </data>
+  <data name="Update_DownloadProgress_Complete" xml:space="preserve">
+    <value>下載完成</value>
+  </data>
+  <data name="Update_DownloadProgress_InstallAndRelaunch" xml:space="preserve">
+    <value>安裝並重新啟動</value>
+  </data>
+  <data name="Update_DownloadProgress_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+
+  <!-- ========== Consent Dialog (Issue #261) ========== -->
+  <data name="Consent_WindowTitle_Initial" xml:space="preserve">
+    <value>服務條款同意</value>
+  </data>
+  <data name="Consent_WindowTitle_Account" xml:space="preserve">
+    <value>服務條款同意</value>
+  </data>
+  <data name="Consent_Header_Initial" xml:space="preserve">
+    <value>歡迎使用Baketa</value>
+  </data>
+  <data name="Consent_Header_Account" xml:space="preserve">
+    <value>建立帳戶</value>
+  </data>
+  <data name="Consent_Description_Initial" xml:space="preserve">
+    <value>使用Baketa前，需要同意我們的服務條款和隱私權政策。</value>
+  </data>
+  <data name="Consent_Description_Account" xml:space="preserve">
+    <value>建立帳戶前，需要同意我們的服務條款和隱私權政策。</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Label" xml:space="preserve">
+    <value>隱私權政策</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Link" xml:space="preserve">
+    <value>閱讀隱私權政策</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Checkbox" xml:space="preserve">
+    <value>我同意隱私權政策</value>
+  </data>
+  <data name="Consent_TermsOfService_Label" xml:space="preserve">
+    <value>服務條款</value>
+  </data>
+  <data name="Consent_TermsOfService_Link" xml:space="preserve">
+    <value>閱讀服務條款</value>
+  </data>
+  <data name="Consent_TermsOfService_Checkbox" xml:space="preserve">
+    <value>我同意服務條款</value>
+  </data>
+  <data name="Consent_Button_Accept" xml:space="preserve">
+    <value>同意並繼續</value>
+  </data>
+  <data name="Consent_Button_Decline" xml:space="preserve">
+    <value>不同意並結束</value>
+  </data>
+
+  <!-- ========== Component Update Dialog [Issue #256] ========== -->
+  <data name="ComponentUpdate_WindowTitle" xml:space="preserve">
+    <value>元件更新</value>
+  </data>
+  <data name="ComponentUpdate_HeaderText" xml:space="preserve">
+    <value>有元件更新可用</value>
+  </data>
+  <data name="ComponentUpdate_Description" xml:space="preserve">
+    <value>以下元件有新版本可用。是否更新？</value>
+  </data>
+  <data name="ComponentUpdate_TotalSize" xml:space="preserve">
+    <value>總下載大小: {0}</value>
+  </data>
+  <data name="ComponentUpdate_VersionFormat" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="ComponentUpdate_NotInstalled" xml:space="preserve">
+    <value>未安裝 → {0}</value>
+  </data>
+  <data name="ComponentUpdate_SizeFormat" xml:space="preserve">
+    <value>大小: {0}</value>
+  </data>
+  <data name="ComponentUpdate_UpdateNowButton" xml:space="preserve">
+    <value>立即更新</value>
+  </data>
+  <data name="ComponentUpdate_RemindLaterButton" xml:space="preserve">
+    <value>稍後提醒</value>
+  </data>
+  <data name="ComponentUpdate_SkipButton" xml:space="preserve">
+    <value>略過此版本</value>
+  </data>
+  <data name="ComponentUpdate_CancelButton" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="ComponentUpdate_CloseButton" xml:space="preserve">
+    <value>關閉</value>
+  </data>
+  <data name="ComponentUpdate_Status_Pending" xml:space="preserve">
+    <value>等待中</value>
+  </data>
+  <data name="ComponentUpdate_Status_Downloading" xml:space="preserve">
+    <value>下載中...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Installing" xml:space="preserve">
+    <value>安裝中...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Completed" xml:space="preserve">
+    <value>已完成</value>
+  </data>
+  <data name="ComponentUpdate_Status_Failed" xml:space="preserve">
+    <value>失敗</value>
+  </data>
+  <data name="ComponentUpdate_Status_Skipped" xml:space="preserve">
+    <value>已略過</value>
+  </data>
+  <data name="ComponentUpdate_AllCompleted" xml:space="preserve">
+    <value>所有元件更新已完成</value>
+  </data>
+  <data name="ComponentUpdate_SomeFailed" xml:space="preserve">
+    <value>部分元件更新失敗</value>
+  </data>
+  <data name="ComponentUpdate_InsufficientDiskSpace" xml:space="preserve">
+    <value>磁碟空間不足（需要: {0}，可用: {1}）</value>
+  </data>
+  <data name="ComponentUpdate_NoUpdatesAvailable" xml:space="preserve">
+    <value>所有元件皆為最新版本</value>
+  </data>
+  <data name="ComponentUpdate_CheckingForUpdates" xml:space="preserve">
+    <value>正在檢查更新...</value>
+  </data>
+
+  <!-- ========== Issue #300: OCR Recovery & Memory Warning ========== -->
+  <data name="OcrRecovery_Title" xml:space="preserve">
+    <value>文字辨識</value>
+  </data>
+  <data name="OcrRecovery_Started" xml:space="preserve">
+    <value>正在復原文字辨識引擎，請稍候...</value>
+  </data>
+  <data name="OcrRecovery_Completed" xml:space="preserve">
+    <value>文字辨識引擎已復原</value>
+  </data>
+  <data name="OcrRecovery_Failed" xml:space="preserve">
+    <value>文字辨識引擎復原失敗。請重新啟動Baketa。</value>
+  </data>
+  <data name="MemoryWarning_Title" xml:space="preserve">
+    <value>記憶體警告</value>
+  </data>
+  <data name="MemoryWarning_SystemMemory" xml:space="preserve">
+    <value>記憶體使用率過高（{0}%）。請關閉其他應用程式。</value>
+  </data>
+  <data name="GpuMemoryWarning_Title" xml:space="preserve">
+    <value>GPU記憶體警告</value>
+  </data>
+
+  <!-- Issue #179: Auth error messages -->
+  <data name="Auth_Error_UserAlreadyExists" xml:space="preserve">
+    <value>此信箱地址已被使用</value>
+  </data>
+  <data name="Auth_Error_WeakPassword" xml:space="preserve">
+    <value>密碼強度過弱，請設定更強的密碼</value>
+  </data>
+  <data name="Auth_Error_InvalidCredentials" xml:space="preserve">
+    <value>信箱格式無效</value>
+  </data>
+  <data name="Auth_Error_InvalidEmail" xml:space="preserve">
+    <value>信箱地址或密碼不正確</value>
+  </data>
+  <data name="Auth_Error_EmailNotConfirmed" xml:space="preserve">
+    <value>確認信件已發送。請點擊信件中的連結，然後在登入頁面登入。</value>
+  </data>
+  <data name="Auth_Error_RateLimitExceeded" xml:space="preserve">
+    <value>要求過於頻繁，請稍後再試</value>
+  </data>
+  <data name="Auth_Error_SignupDisabled" xml:space="preserve">
+    <value>目前暫停新帳戶註冊</value>
+  </data>
+  <data name="Auth_Error_SignupFailed" xml:space="preserve">
+    <value>帳戶建立失敗: {0}</value>
+  </data>
+  <data name="Auth_Error_LoginFailed" xml:space="preserve">
+    <value>登入失敗: {0}</value>
+  </data>
+  <data name="Auth_Error_InvalidToken" xml:space="preserve">
+    <value>驗證失敗。請嘗試使用Google、Discord或Twitch登入。</value>
+  </data>
+  <data name="Auth_Error_TokenExpired" xml:space="preserve">
+    <value>工作階段已過期。請重新登入。</value>
+  </data>
+  <data name="Auth_Error_NetworkError" xml:space="preserve">
+    <value>發生網路錯誤。請檢查您的網路連線。</value>
+  </data>
+  <data name="Auth_Error_Timeout" xml:space="preserve">
+    <value>連線逾時。請檢查您的網路連線</value>
+  </data>
+  <data name="Auth_Error_Unknown" xml:space="preserve">
+    <value>發生驗證錯誤</value>
+  </data>
+  <data name="Auth_Success_EmailSent" xml:space="preserve">
+    <value>信件已發送</value>
+  </data>
+  <data name="Auth_Success_PasswordResetEmailSent" xml:space="preserve">
+    <value>密碼重設信件已發送，請檢查您的收件匣。</value>
+  </data>
+  <data name="Auth_Error_PasswordResetFailed" xml:space="preserve">
+    <value>密碼重設失敗。請確認您的信箱地址。</value>
+  </data>
+  <data name="Auth_Error_PasswordResetError" xml:space="preserve">
+    <value>密碼重設過程中發生錯誤。</value>
+  </data>
+  <data name="Auth_Validation_InvalidEmail" xml:space="preserve">
+    <value>請輸入有效的電子信箱地址</value>
+  </data>
+  <data name="Auth_Validation_PasswordRequirement" xml:space="preserve">
+    <value>密碼至少8個字元，且需包含大寫、小寫、數字、符號中的至少3種</value>
+  </data>
+  <data name="Auth_Validation_PasswordMismatch" xml:space="preserve">
+    <value>密碼不相符</value>
+  </data>
+  <data name="Settings_Account_LogoutSuccess" xml:space="preserve">
+    <value>已成功登出</value>
+  </data>
+  <data name="Settings_License_UsedTokens" xml:space="preserve">
+    <value>已使用</value>
+  </data>
+  <data name="Settings_License_PlanRemaining" xml:space="preserve">
+    <value>方案剩餘</value>
+  </data>
+  <data name="Settings_License_BonusLabel" xml:space="preserve">
+    <value>獎勵</value>
+  </data>
+  <data name="Settings_License_BonusTokens" xml:space="preserve">
+    <value>獎勵</value>
+  </data>
+  <data name="Settings_License_TotalAvailable" xml:space="preserve">
+    <value>總可用量</value>
+  </data>
+  <data name="Auth_Validation_PasswordMinLength" xml:space="preserve">
+    <value>密碼至少需要6個字元</value>
+  </data>
+  <data name="Auth_Error_PasswordResetException" xml:space="preserve">
+    <value>密碼重設失敗: {0}</value>
+  </data>
+  <data name="Auth_Success_ConfirmationEmailSent" xml:space="preserve">
+    <value>確認信件已發送。請點擊信件中的連結，然後登入。3秒後將跳轉至登入頁面...</value>
+  </data>
+
+  <!-- ========== Issue #424: i18n - Hardcoded string externalization ========== -->
+
+  <!-- ComponentDownloadFailedEventProcessor -->
+  <data name="Download_Failed_Title" xml:space="preserve">
+    <value>下載失敗</value>
+  </data>
+  <data name="Download_Failed_RequiredMessage" xml:space="preserve">
+    <value>必要檔案下載失敗。
+請重新啟動應用程式重試。
+
+失敗的元件: {0}</value>
+  </data>
+  <data name="Download_Failed_OptionalTitle" xml:space="preserve">
+    <value>部分下載失敗</value>
+  </data>
+  <data name="Download_Failed_OptionalMessage" xml:space="preserve">
+    <value>部分功能可能不可用。
+請重新啟動應用程式重試。</value>
+  </data>
+
+  <!-- DownloadProgressViewModel -->
+  <data name="Update_DownloadProgress_VerificationFailed" xml:space="preserve">
+    <value>下載驗證失敗</value>
+  </data>
+
+  <!-- App.axaml.cs - Session -->
+  <data name="Session_Expired_Title" xml:space="preserve">
+    <value>工作階段已過期</value>
+  </data>
+  <data name="Session_Expired_Message" xml:space="preserve">
+    <value>您的工作階段已過期。請重新登入。</value>
+  </data>
+
+  <!-- App.axaml.cs - Test Mode -->
+  <data name="TestMode_Warning_Title" xml:space="preserve">
+    <value>測試模式已啟用</value>
+  </data>
+  <data name="TestMode_Warning_Message" xml:space="preserve">
+    <value>授權模擬模式已啟用。正式環境請在appsettings.json中將License.EnableMockMode設為false。</value>
+  </data>
+
+  <!-- App.axaml.cs - Hardware Check -->
+  <data name="Hardware_Critical_Title" xml:space="preserve">
+    <value>硬體需求 - 嚴重警告</value>
+  </data>
+  <data name="Hardware_Critical_Message" xml:space="preserve">
+    <value>您的系統不符合最低需求。Baketa可能無法正常運作。
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_Warning_Title" xml:space="preserve">
+    <value>硬體需求警告</value>
+  </data>
+  <data name="Hardware_Warning_Message" xml:space="preserve">
+    <value>您的系統不符合建議規格。
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_CpuCores" xml:space="preserve">
+    <value>CPU: {0}核心</value>
+  </data>
+
+  <!-- App.axaml.cs - Patreon Auth -->
+  <data name="Patreon_AuthSuccess_Title" xml:space="preserve">
+    <value>Patreon連結成功</value>
+  </data>
+  <data name="Patreon_AuthSuccess_Message" xml:space="preserve">
+    <value>Patreon帳戶連結成功。方案: {0}</value>
+  </data>
+  <data name="Patreon_AuthFailed_Title" xml:space="preserve">
+    <value>Patreon連結失敗</value>
+  </data>
+  <data name="Patreon_AuthFailed_Message" xml:space="preserve">
+    <value>驗證過程中發生錯誤</value>
+  </data>
+
+  <!-- MainOverlayViewModel - Translation Error -->
+  <data name="Translation_Error_StopFailed" xml:space="preserve">
+    <value>停止翻譯失敗。
+原因: {0}
+處理: 請重新啟動應用程式。</value>
+  </data>
+  <data name="Translation_Error_StartFailed" xml:space="preserve">
+    <value>啟動翻譯失敗。
+原因: {0}
+處理: 請重新啟動應用程式。</value>
+  </data>
+
+  <!-- ========== Issue #423: Upsell messages ========== -->
+  <data name="Upsell_ViewPlans" xml:space="preserve">
+    <value>變更方案 →</value>
+  </data>
+  <data name="Upsell_Free_WithBonus_Message" xml:space="preserve">
+    <value>⚡ 訂閱Pro方案取得更多EX模式額度</value>
+  </data>
+  <data name="Upsell_Free_NoBonus_Message" xml:space="preserve">
+    <value>⚡ 訂閱Pro方案以使用EX模式</value>
+  </data>
+  <data name="Upsell_Upgrade_Message" xml:space="preserve">
+    <value>⬆️ 升級方案取得更多額度</value>
+  </data>
+
+</root>

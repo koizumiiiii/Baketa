@@ -949,7 +949,8 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
                 {
                     Text = chunkWithScreenCoords.TranslatedText,
                     OriginalText = chunkWithScreenCoords.CombinedText,
-                    FontSize = translationSettings.OverlayFontSize
+                    FontSize = translationSettings.OverlayFontSize,
+                    FontFamily = GetOverlayFontFamily(translationSettings.DefaultTargetLanguage)
                 };
 
                 var position = new OverlayPosition
@@ -2532,4 +2533,19 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
 
     [GeneratedRegex(@"\\[a-zA-Z]{2,}")]
     private static partial Regex LatexCommandRegex();
+
+    /// <summary>
+    /// ターゲット言語に応じたオーバーレイ用システムフォントファミリーを返す
+    /// </summary>
+    private static string GetOverlayFontFamily(string targetLanguage)
+    {
+        return targetLanguage.ToLowerInvariant() switch
+        {
+            "ja" => "Yu Gothic UI",
+            "zh-cn" or "zho_hans" => "Microsoft YaHei UI",
+            "zh-tw" or "zho_hant" => "Microsoft JhengHei UI",
+            "ko" or "kor_hang" => "Malgun Gothic",
+            _ => "Segoe UI" // 英語・欧州言語
+        };
+    }
 }

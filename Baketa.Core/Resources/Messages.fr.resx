@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="0" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ========== Promotion Code Messages ========== -->
+  <data name="Promotion_InvalidFormat" xml:space="preserve">
+    <value>Format du code promotionnel invalide. Veuillez saisir au format BAKETA-XXXXXXXX.</value>
+  </data>
+  <data name="Promotion_Applied" xml:space="preserve">
+    <value>Le code promotionnel a été appliqué.</value>
+  </data>
+  <data name="Promotion_AlreadyProOrHigher" xml:space="preserve">
+    <value>Vous disposez déjà du plan Pro ou supérieur.</value>
+  </data>
+  <data name="Promotion_ConnectionError" xml:space="preserve">
+    <value>Impossible de se connecter au serveur. Veuillez vérifier votre connexion Internet.</value>
+  </data>
+  <data name="Promotion_Timeout" xml:space="preserve">
+    <value>Le délai de réponse du serveur a expiré.</value>
+  </data>
+  <data name="Promotion_UnexpectedError" xml:space="preserve">
+    <value>Une erreur inattendue s'est produite.</value>
+  </data>
+  <data name="Promotion_InvalidResponseFormat" xml:space="preserve">
+    <value>Format de réponse du serveur invalide</value>
+  </data>
+  <data name="Promotion_ResponseTooLarge" xml:space="preserve">
+    <value>La réponse du serveur est trop volumineuse</value>
+  </data>
+  <data name="Promotion_ParseError" xml:space="preserve">
+    <value>Échec de l'analyse de la réponse</value>
+  </data>
+  <data name="Promotion_NoPlanInfo" xml:space="preserve">
+    <value>Aucune information de plan dans la réponse du serveur</value>
+  </data>
+  <data name="Promotion_UnknownError" xml:space="preserve">
+    <value>Une erreur inconnue s'est produite</value>
+  </data>
+  <data name="Promotion_ApplyFailed" xml:space="preserve">
+    <value>Échec de l'application du code.</value>
+  </data>
+  <data name="Promotion_ServerError" xml:space="preserve">
+    <value>Erreur serveur : {0}</value>
+  </data>
+  <data name="Promotion_MockModeApplied" xml:space="preserve">
+    <value>[Mode simulation] Le code promotionnel a été appliqué.</value>
+  </data>
+
+</root>

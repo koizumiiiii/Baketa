@@ -170,7 +170,15 @@ public sealed class ConsentDialogViewModel : ReactiveObject, IDisposable
     public IReadOnlyList<SupportedLanguage> AvailableUiLanguages { get; } = new List<SupportedLanguage>
     {
         new("ja", "日本語", "Japanese"),
-        new("en", "English", "English")
+        new("en", "English", "English"),
+        new("zh-CN", "简体中文", "Chinese (Simplified)"),
+        new("zh-TW", "繁體中文", "Chinese (Traditional)"),
+        new("ko", "한국어", "Korean"),
+        new("fr", "Français", "French"),
+        new("de", "Deutsch", "German"),
+        new("it", "Italiano", "Italian"),
+        new("es", "Español", "Spanish"),
+        new("pt", "Português", "Portuguese")
     }.AsReadOnly();
 
     /// <summary>

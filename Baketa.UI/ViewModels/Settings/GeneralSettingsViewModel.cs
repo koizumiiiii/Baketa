@@ -341,7 +341,12 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// <summary>
     /// 利用可能な言語リスト
     /// </summary>
-    public ObservableCollection<string> AvailableLanguages { get; } = ["Japanese", "English"];
+    public ObservableCollection<string> AvailableLanguages { get; } =
+    [
+        "Japanese", "English",
+        "Chinese (Simplified)", "Chinese (Traditional)",
+        "Korean", "French", "German", "Italian", "Spanish", "Portuguese"
+    ];
 
     /// <summary>
     /// 利用可能な翻訳先言語リスト
@@ -537,13 +542,21 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// 利用可能なUI言語リスト（日本語と英語のみ）
-    /// 翻訳言語を増やすタイミングでUI言語も増やす予定
+    /// 利用可能なUI言語リスト
+    /// [Issue #475] Tier 1 LTR言語を追加
     /// </summary>
     public IReadOnlyList<SupportedLanguage> AvailableUiLanguages { get; } = new List<SupportedLanguage>
     {
         new("ja", "日本語", "Japanese"),
-        new("en", "English", "English")
+        new("en", "English", "English"),
+        new("zh-CN", "简体中文", "Chinese (Simplified)"),
+        new("zh-TW", "繁體中文", "Chinese (Traditional)"),
+        new("ko", "한국어", "Korean"),
+        new("fr", "Français", "French"),
+        new("de", "Deutsch", "German"),
+        new("it", "Italiano", "Italian"),
+        new("es", "Español", "Spanish"),
+        new("pt", "Português", "Portuguese")
     }.AsReadOnly();
 
     #endregion
@@ -632,9 +645,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// </summary>
     private void InitializeFromTranslationSettings(TranslationSettings settings)
     {
-        // 翻訳言語の復元（NLLB形式 ja/en から表示名に変換）
-        _sourceLanguage = settings.DefaultSourceLanguage == "ja" ? "Japanese" : "English";
-        _targetLanguage = settings.DefaultTargetLanguage == "ja" ? "Japanese" : "English";
+        // 翻訳言語の復元（言語コードから表示名に変換）
+        _sourceLanguage = Baketa.Core.Utilities.LanguageCodeConverter.ToDisplayName(settings.DefaultSourceLanguage, "English");
+        _targetLanguage = Baketa.Core.Utilities.LanguageCodeConverter.ToDisplayName(settings.DefaultTargetLanguage, "English");
         _fontSize = settings.OverlayFontSize;
 
         // [Issue #78 Phase 5] Cloud AI翻訳設定の復元
@@ -858,14 +871,13 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     {
         AvailableTargetLanguages.Clear();
 
-        // 翻訳元言語に基づいて翻訳先言語を設定
-        if (SourceLanguage == "Japanese")
+        // ソース言語以外の全言語をターゲット言語として追加
+        foreach (var lang in AvailableLanguages)
         {
-            AvailableTargetLanguages.Add("English");
-        }
-        else if (SourceLanguage == "English")
-        {
-            AvailableTargetLanguages.Add("Japanese");
+            if (!string.Equals(lang, SourceLanguage, StringComparison.Ordinal))
+            {
+                AvailableTargetLanguages.Add(lang);
+            }
         }
 
         // 現在の翻訳先言語が選択肢にない場合は最初の選択肢を選択
@@ -971,9 +983,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         get
         {
             var settings = _originalTranslationSettings.Clone();
-            // 表示名からNLLB形式に変換
-            settings.DefaultSourceLanguage = SourceLanguage == "Japanese" ? "ja" : "en";
-            settings.DefaultTargetLanguage = TargetLanguage == "Japanese" ? "ja" : "en";
+            // 表示名から言語コードに変換
+            settings.DefaultSourceLanguage = Baketa.Core.Utilities.LanguageCodeConverter.ToLanguageCode(SourceLanguage, "en");
+            settings.DefaultTargetLanguage = Baketa.Core.Utilities.LanguageCodeConverter.ToLanguageCode(TargetLanguage, "en");
             settings.OverlayFontSize = FontSize;
             // [Issue #78 Phase 5] + [Issue #280+#281] Cloud AI翻訳設定を反映
             // UseLocalEngine=true(ローカル翻訳) → EnableCloudAiTranslation=false

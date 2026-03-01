@@ -452,6 +452,8 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase
             Language.Korean,
             Language.French,
             Language.German,
+            Language.Italian,
+            Language.Portuguese,
             Language.Spanish,
             Language.Russian,
             Language.Arabic,

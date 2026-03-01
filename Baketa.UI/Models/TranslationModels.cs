@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ReactiveUI;
 
 namespace Baketa.UI.Models;
@@ -234,18 +235,41 @@ public static class AvailableLanguages
     public static readonly IReadOnlyList<LanguageInfo> SupportedLanguages =
     [
         new() { Code = "auto", DisplayName = "自動検出", NativeName = "Auto Detect", Flag = "🌍", IsAutoDetect = true },
-            new() { Code = "ja", DisplayName = "日本語", NativeName = "日本語", Flag = "🇯🇵", RegionCode = "JP" },
-            new() { Code = "en", DisplayName = "英語", NativeName = "English", Flag = "🇺🇸", RegionCode = "US" }
+        new() { Code = "ja", DisplayName = "日本語", NativeName = "日本語", Flag = "🇯🇵", RegionCode = "JP" },
+        new() { Code = "en", DisplayName = "英語", NativeName = "English", Flag = "🇺🇸", RegionCode = "US" },
+        new() { Code = "zh-CN", DisplayName = "簡体字中国語", NativeName = "简体中文", Flag = "🇨🇳", RegionCode = "CN" },
+        new() { Code = "zh-TW", DisplayName = "繁体字中国語", NativeName = "繁體中文", Flag = "🇹🇼", RegionCode = "TW" },
+        new() { Code = "ko", DisplayName = "韓国語", NativeName = "한국어", Flag = "🇰🇷", RegionCode = "KR" },
+        new() { Code = "fr", DisplayName = "フランス語", NativeName = "Français", Flag = "🇫🇷", RegionCode = "FR" },
+        new() { Code = "de", DisplayName = "ドイツ語", NativeName = "Deutsch", Flag = "🇩🇪", RegionCode = "DE" },
+        new() { Code = "it", DisplayName = "イタリア語", NativeName = "Italiano", Flag = "🇮🇹", RegionCode = "IT" },
+        new() { Code = "es", DisplayName = "スペイン語", NativeName = "Español", Flag = "🇪🇸", RegionCode = "ES" },
+        new() { Code = "pt", DisplayName = "ポルトガル語", NativeName = "Português", Flag = "🇧🇷", RegionCode = "BR" }
     ];
 
     /// <summary>
-    /// 現在サポートされている言語ペア
+    /// 現在サポートされている言語ペア（全言語間の組み合わせを動的生成）
     /// </summary>
-    public static readonly IReadOnlyList<string> SupportedLanguagePairs =
-    [
-        "ja-en",   // 日本語 → 英語
-            "en-ja"    // 英語 → 日本語
-    ];
+    public static readonly IReadOnlyList<string> SupportedLanguagePairs = GenerateSupportedPairs();
+
+    private static List<string> GenerateSupportedPairs()
+    {
+        var codes = SupportedLanguages
+            .Where(l => !l.IsAutoDetect)
+            .Select(l => l.Code)
+            .ToList();
+
+        var pairs = new List<string>();
+        foreach (var src in codes)
+        {
+            foreach (var tgt in codes)
+            {
+                if (src != tgt)
+                    pairs.Add($"{src}-{tgt}");
+            }
+        }
+        return pairs;
+    }
 }
 
 /// <summary>

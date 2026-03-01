@@ -218,6 +218,9 @@ public class LocalizationService : ILocalizationService, IDisposable
                 "ja" or "ja-JP" => "FontFamily.Japanese",
                 "en" or "en-US" => "FontFamily.English",
                 "zh" or "zh-CN" or "zh-Hans" => "FontFamily.Chinese",
+                "zh-TW" or "zh-Hant" => "FontFamily.ChineseTraditional",
+                "ko" or "ko-KR" => "FontFamily.Korean",
+                "fr" or "de" or "it" or "es" or "pt" or "ru" or "vi" => "FontFamily.European",
                 _ => "FontFamily.Japanese" // デフォルトは日本語
             };
 
