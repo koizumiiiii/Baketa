@@ -69,6 +69,20 @@ public interface ITextChangeDetectionService
     void SetPreviousText(string contextId, string text);
 
     /// <summary>
+    /// [Issue #486] 指定ゾーンにテキストが存在することを確認（OCR検出時に呼び出し）
+    /// TextDisappearanceイベントによる誤削除を防止するための安定性追跡
+    /// </summary>
+    /// <param name="sourceId">ゾーンID（zone_{row}_{col}）</param>
+    void ConfirmTextPresence(string sourceId);
+
+    /// <summary>
+    /// [Issue #486] 指定ゾーンで最後にテキストが確認された時刻を取得
+    /// </summary>
+    /// <param name="sourceId">ゾーンID</param>
+    /// <returns>最終確認時刻。未確認の場合はnull</returns>
+    DateTime? GetLastTextConfirmation(string sourceId);
+
+    /// <summary>
     /// [Issue #293] Gate判定を含むテキスト変化検知
     /// </summary>
     /// <remarks>
