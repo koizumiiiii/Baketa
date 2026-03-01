@@ -37,6 +37,11 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
     private readonly ConcurrentDictionary<string, int> _sameTextConsecutiveCount = new();
     private readonly ConcurrentDictionary<string, string> _staticUiMarkers = new(); // sourceId → normalizedText
 
+    // [Issue #486] OCR確認ベースのテキスト安定性追跡
+    // OCRがテキストを検出するたびにタイムスタンプを記録し、
+    // TextDisappearanceの誤判定による不要なオーバーレイ削除を抑制する
+    private readonly ConcurrentDictionary<string, DateTime> _textPresenceConfirmations = new();
+
     /// <summary>
     /// スタック割り当ての閾値（512要素 = 約2KB）
     /// </summary>
@@ -413,7 +418,23 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
         // [Issue #432] タイプライター状態もクリア
         _typewriterGrowthCycles.TryRemove(contextId, out _);
         _typewriterStabilizationCount.TryRemove(contextId, out _);
+        // [Issue #486] _textPresenceConfirmationsは意図的にクリアしない。
+        // ClearPreviousTextはTextDisappearanceイベントから呼ばれるが、
+        // 安定性タイムスタンプをここでクリアするとIsZoneStableチェックが無効化され、
+        // 安定性追跡の目的が失われる。ClearAllPreviousTexts()（Start/Stop時）でのみクリアする。
         _logger.LogDebug("前回テキストキャッシュクリア - Context: {ContextId}", contextId);
+    }
+
+    /// <inheritdoc />
+    public void ConfirmTextPresence(string sourceId)
+    {
+        _textPresenceConfirmations[sourceId] = DateTime.UtcNow;
+    }
+
+    /// <inheritdoc />
+    public DateTime? GetLastTextConfirmation(string sourceId)
+    {
+        return _textPresenceConfirmations.TryGetValue(sourceId, out var timestamp) ? timestamp : null;
     }
 
     /// <inheritdoc />
@@ -426,6 +447,8 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
         _typewriterStabilizationCount.Clear();
         // [Issue #465] 連続カウンタはクリアするが、静的UIマーカーは意図的に保持
         _sameTextConsecutiveCount.Clear();
+        // [Issue #486] テキスト存在確認もクリア（Start/Stop切り替え時）
+        _textPresenceConfirmations.Clear();
         _logger.LogInformation("全前回テキストキャッシュクリア - クリア件数: {Count}, 静的UIマーカー保持: {MarkerCount}",
             clearedCount, _staticUiMarkers.Count);
     }

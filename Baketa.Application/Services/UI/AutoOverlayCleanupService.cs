@@ -60,6 +60,10 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     private volatile bool _isInitialized = false;
     private bool _disposed = false;
 
+    // [Issue #486] テキスト安定性チェックの時間窓（秒）
+    // OCRが最後にテキストを確認してからこの秒数以内なら、TextDisappearanceを抑制
+    private const double TextStabilityWindowSeconds = 5.0;
+
     // IEventProcessor<T>の必須プロパティ
     /// <summary>イベント処理優先度（高優先度でオーバーレイを迅速に削除）</summary>
     public int Priority => 100;
@@ -148,11 +152,19 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
                 return;
             }
 
+            // [Issue #486] テキスト安定性チェック: OCRがまだテキストを確認しているゾーンは削除抑制
+            if (_textChangeDetectionService != null && IsZoneStable(eventData))
+            {
+                _logger.LogDebug("[Issue #486] テキスト安定性チェックにより削除を抑制 - OCRがまだテキストを検出中");
+                return;
+            }
+
             // 実際のオーバーレイ削除実行
             var cleanedCount = await CleanupOverlaysInRegionAsync(
                 eventData.SourceWindowHandle,
                 eventData.DisappearedRegions,
-                eventData.OriginalWindowSize).ConfigureAwait(false);
+                eventData.OriginalWindowSize,
+                eventData.CaptureImageSize).ConfigureAwait(false);
 
             // 削除成功時の統計更新
             if (cleanedCount > 0)
@@ -188,17 +200,19 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         IReadOnlyList<Rectangle> regions,
         CancellationToken cancellationToken = default)
     {
-        return await CleanupOverlaysInRegionAsync(windowHandle, regions, Size.Empty, cancellationToken)
+        return await CleanupOverlaysInRegionAsync(windowHandle, regions, Size.Empty, Size.Empty, cancellationToken)
             .ConfigureAwait(false);
     }
 
     /// <summary>
     /// [Issue #481] GPUリサイズスケーリング対応版の領域指定オーバーレイ削除
+    /// [Issue #486] CaptureImageSize追加（ゾーン計算の座標系統一）
     /// </summary>
     private async Task<int> CleanupOverlaysInRegionAsync(
         IntPtr windowHandle,
         IReadOnlyList<Rectangle> regions,
         Size originalWindowSize,
+        Size captureImageSize = default,
         CancellationToken cancellationToken = default)
     {
         if (!_isInitialized)
@@ -234,20 +248,22 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
                 totalCleaned++;
             }
 
-            // [Issue #481] フォールバック: 座標変換が利用不可で領域指定削除が効かなかった場合のみ全消去
+            // [Issue #486] HideAllAsyncフォールバックを除去
+            // 以前はスコープ指定削除で一致なしの場合にHideAllAsyncにフォールバックしていたが、
+            // これは無関係のオーバーレイまで破壊するため削除。
+            // テキスト安定性チェック(HandleAsync内)により、誤判定自体が抑制される。
             var afterCount = _overlayManager.ActiveOverlayCount;
             if (beforeCount > 0 && afterCount == beforeCount)
             {
-                _logger.LogInformation("[Issue #481] 領域指定削除で交差なし - HideAllAsyncにフォールバック (Before={Before}, After={After})",
+                _logger.LogDebug("[Issue #486] 領域指定削除で交差なし - HideAllAsyncフォールバックは廃止済み (Before={Before}, After={After})",
                     beforeCount, afterCount);
-                await _overlayManager.HideAllAsync(cancellationToken).ConfigureAwait(false);
-                totalCleaned = beforeCount;
             }
 
             // [Issue #408] ゾーン特定Gate状態クリア（全リセットではなく消失領域のゾーンのみ）
+            // [Issue #486] CaptureImageSizeを渡してAggregatedChunksReadyEventHandlerと同じ座標系で計算
             if (_textChangeDetectionService != null)
             {
-                ClearGateForRegions(regions, windowHandle);
+                ClearGateForRegions(regions, windowHandle, captureImageSize);
             }
 
             _logger.LogDebug("[Issue #408] 領域指定オーバーレイ削除完了 - WindowHandle: {WindowHandle}, 対象領域数: {RegionCount}",
@@ -393,27 +409,44 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     }
 
     /// <summary>
-    /// [Issue #408] 消失領域からゾーンIDを計算し、該当ゾーンのGate状態をクリア
-    /// AggregatedChunksReadyEventHandlerと同じ8x6グリッドを使用
+    /// [Issue #486] 領域中心座標からゾーンIDを計算する共通メソッド
+    /// AggregatedChunksReadyEventHandlerと同じ8x6グリッドを使用。
+    /// ClearGateForRegions, IsZoneStable の両方で使用する一元化された計算。
     /// </summary>
-    private void ClearGateForRegions(IEnumerable<Rectangle> regions, nint windowHandle)
+    private static string CalculateZoneId(Rectangle region, int gridWidth, int gridHeight)
     {
-        // デフォルト解像度（実際のウィンドウサイズは取得困難なためフォールバック値を使用）
-        const int defaultWidth = 1920;
-        const int defaultHeight = 1080;
         const int zoneColumns = 8;
         const int zoneRows = 6;
 
+        var centerX = region.X + region.Width / 2;
+        var centerY = region.Y + region.Height / 2;
+        var zoneCol = Math.Clamp(centerX * zoneColumns / gridWidth, 0, zoneColumns - 1);
+        var zoneRow = Math.Clamp(centerY * zoneRows / gridHeight, 0, zoneRows - 1);
+        return $"zone_{zoneRow}_{zoneCol}";
+    }
+
+    /// <summary>
+    /// [Issue #486] CaptureImageSizeからゾーン計算用のグリッドサイズを取得
+    /// </summary>
+    private static (int Width, int Height) GetGridDimensions(Size captureImageSize)
+    {
+        return (
+            captureImageSize.Width > 0 ? captureImageSize.Width : 1920,
+            captureImageSize.Height > 0 ? captureImageSize.Height : 1080);
+    }
+
+    /// <summary>
+    /// [Issue #408] 消失領域からゾーンIDを計算し、該当ゾーンのGate状態をクリア
+    /// [Issue #486] キャプチャ画像サイズを使用してAggregatedChunksReadyEventHandlerと同じ座標系で計算
+    /// </summary>
+    private void ClearGateForRegions(IEnumerable<Rectangle> regions, nint windowHandle, Size captureImageSize = default)
+    {
+        var (gridWidth, gridHeight) = GetGridDimensions(captureImageSize);
         var clearedZones = new HashSet<string>();
 
         foreach (var region in regions)
         {
-            // 領域中心からゾーンIDを計算
-            var centerX = region.X + region.Width / 2;
-            var centerY = region.Y + region.Height / 2;
-            var zoneCol = Math.Clamp(centerX * zoneColumns / defaultWidth, 0, zoneColumns - 1);
-            var zoneRow = Math.Clamp(centerY * zoneRows / defaultHeight, 0, zoneRows - 1);
-            var zoneId = $"zone_{zoneRow}_{zoneCol}";
+            var zoneId = CalculateZoneId(region, gridWidth, gridHeight);
 
             if (clearedZones.Add(zoneId))
             {
@@ -424,9 +457,39 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         if (clearedZones.Count > 0)
         {
             _logger.LogInformation(
-                "[Issue #408] ゾーン特定Gate状態クリア - Zones: [{Zones}]",
-                string.Join(", ", clearedZones));
+                "[Issue #408] ゾーン特定Gate状態クリア - Zones: [{Zones}], GridSize: {Width}x{Height}",
+                string.Join(", ", clearedZones), gridWidth, gridHeight);
         }
+    }
+
+    /// <summary>
+    /// [Issue #486] テキスト安定性チェック: OCRが最近テキストを確認したゾーンかどうかを判定
+    /// DisappearedRegionsの全領域について、対応するゾーンのテキスト存在確認タイムスタンプを確認。
+    /// いずれかのゾーンで安定性が確認された場合、TextDisappearance処理を抑制する。
+    /// </summary>
+    private bool IsZoneStable(TextDisappearanceEvent eventData)
+    {
+        var (gridWidth, gridHeight) = GetGridDimensions(eventData.CaptureImageSize);
+
+        foreach (var region in eventData.DisappearedRegions)
+        {
+            var zoneId = CalculateZoneId(region, gridWidth, gridHeight);
+
+            var lastConfirmation = _textChangeDetectionService!.GetLastTextConfirmation(zoneId);
+            if (lastConfirmation.HasValue)
+            {
+                var secondsAgo = (DateTime.UtcNow - lastConfirmation.Value).TotalSeconds;
+                if (secondsAgo < TextStabilityWindowSeconds)
+                {
+                    _logger.LogDebug(
+                        "[Issue #486] ゾーン安定: {ZoneId} - テキスト最終確認: {SecondsAgo:F1}秒前 < 安定窓: {Window}秒",
+                        zoneId, secondsAgo, TextStabilityWindowSeconds);
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

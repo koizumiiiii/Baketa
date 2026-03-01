@@ -616,12 +616,14 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                     CalculateDisappearanceConfidence(changeResult) + 0.10f);
 
                 // TextDisappearanceEvent作成・発行
+                // [Issue #486] CaptureImageSizeを追加: ゾーン計算でAggregatedChunksReadyEventHandlerと同じ座標系を使用
                 var disappearanceEvent = new TextDisappearanceEvent(
                     regions: disappearedRegions,
                     sourceWindow: windowHandle,
                     regionId: $"capture_{DateTime.UtcNow:yyyyMMddHHmmssfff}",
                     confidenceScore: confidenceScore,
-                    originalWindowSize: originalWindowSize
+                    originalWindowSize: originalWindowSize,
+                    captureImageSize: new Size(captureRegion.Width, captureRegion.Height)
                 );
 
                 await _eventAggregator.PublishAsync(disappearanceEvent).ConfigureAwait(false);
