@@ -2537,7 +2537,7 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
     /// <summary>
     /// ターゲット言語に応じたオーバーレイ用システムフォントファミリーを返す
     /// </summary>
-    private static string GetOverlayFontFamily(string targetLanguage)
+    internal static string GetOverlayFontFamily(string targetLanguage)
     {
         return targetLanguage.ToLowerInvariant() switch
         {
