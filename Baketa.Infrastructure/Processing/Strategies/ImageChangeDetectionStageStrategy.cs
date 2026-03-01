@@ -735,6 +735,8 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                 var textArea = textRect.Width * textRect.Height;
                 if (textArea < MinTextBoundsArea)
                 {
+                    _logger.LogDebug("[Issue #486] 極小テキスト矩形をスキップ (Area={Area}, Text=({TX},{TY},{TW}x{TH}))",
+                        textArea, textRect.X, textRect.Y, textRect.Width, textRect.Height);
                     continue;
                 }
 
