@@ -201,9 +201,11 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             lock (historical)
             {
                 // 新しいOCR結果にも含まれるものは除外（まだ表示中のテキスト）
+                // [Issue #486] 極小テキスト矩形は履歴に蓄積しない
                 foreach (var old in oldBounds)
                 {
-                    if (!textBounds.Any(nb => nb.IntersectsWith(old)))
+                    if (old.Width * old.Height >= MinTextBoundsArea &&
+                        !textBounds.Any(nb => nb.IntersectsWith(old)))
                     {
                         historical.Add(old);
                     }
@@ -729,6 +731,13 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         {
             foreach (var textRect in allTextBounds)
             {
+                // [Issue #486] 極小テキスト矩形をスキップ（OCRノイズ/UI要素の誤検出）
+                var textArea = textRect.Width * textRect.Height;
+                if (textArea < MinTextBoundsArea)
+                {
+                    continue;
+                }
+
                 if (changedRegion.IntersectsWith(textRect))
                 {
                     // [Issue #407] ピクセル変化率チェック: 微小な背景変化によるテキスト消失誤判定を防止
@@ -774,6 +783,15 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     /// テキスト領域内のピクセル変化率がこの値未満の場合、テキスト消失とは判定しない
     /// </summary>
     private const float TextAreaChangeThreshold = 0.30f;
+
+    /// <summary>
+    /// [Issue #486] テキスト矩形の最小面積（px²）
+    /// この面積未満のテキスト矩形はOCRノイズ/UI要素の誤検出とみなし、
+    /// テキスト消失判定から除外する。
+    /// ログ分析: 誤判定トリガーは全て面積500px²未満（14x5=70, 12x10=120, 21x15=315等）
+    /// 正当なテキストは面積3,600px²以上（150x24, 358x26等）
+    /// </summary>
+    private const int MinTextBoundsArea = 500;
 
     /// <summary>
     /// [Issue #407] テキスト領域内のピクセル変化率を計算（サンプリングベース高速版）
