@@ -599,10 +599,13 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
             // 条件2: 画像に変化がある（!changeResult.HasChanged → changeResult.HasChanged に修正）
             // 条件3: テキスト消失パターンに該当する（IsTextDisappearance判定）
             var contextId = BuildContextId(windowHandle, captureRegion);
-            if (previousImage != null && changeResult.HasChanged && IsTextDisappearance(changeResult, contextId, previousImage, currentImage))
+            var disappearedTextRect = previousImage != null && changeResult.HasChanged
+                ? FindDisappearedTextRegion(changeResult, contextId, previousImage, currentImage)
+                : (Rectangle?)null;
+            if (disappearedTextRect.HasValue)
             {
-                // 消失領域をキャプチャ領域として設定
-                var disappearedRegions = new List<Rectangle> { captureRegion };
+                // [Issue #486] 消失領域を具体的なテキスト矩形に限定（captureRegion全体ではなく）
+                var disappearedRegions = new List<Rectangle> { disappearedTextRect.Value };
 
                 // 信頼度計算: Stage数と変化率から算出
                 // [Issue #392] IsTextDisappearance()がtrueの場合、前回テキスト位置と変化領域の
@@ -684,14 +687,16 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     /// <param name="contextId">コンテキストID</param>
     /// <param name="previousImage">前回画像（ピクセル変化率比較用）</param>
     /// <param name="currentImage">現在画像（ピクセル変化率比較用）</param>
-    /// <returns>前回テキストがあった領域で画像変化が検知された場合true</returns>
+    /// <returns>消失したテキスト矩形。消失が検知されなかった場合はnull</returns>
     /// <remarks>
     /// 旧方式（Issue #230で無効化）: 画像変化率+SSIMのみ → 画面フリッカーで誤検知
     /// 新方式: 前回OCRで実際にテキストが検出された位置と、画像変化領域の重なりを判定
     /// + [Issue #407] 重なり検出時にテキスト領域内のピクセル変化率が閾値以上か確認
     /// → 「テキストがあった場所が変わった」を事実ベースで検知
+    /// [Issue #486] 戻り値をboolから具体的なテキスト矩形に変更。
+    /// captureRegion全体ではなく、消失したテキスト領域のみをDisappearedRegionsとして使用する。
     /// </remarks>
-    private bool IsTextDisappearance(
+    private Rectangle? FindDisappearedTextRegion(
         ImageChangeResult changeResult, string contextId,
         IImage? previousImage, IImage currentImage)
     {
@@ -716,14 +721,14 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         if (allTextBounds.Count == 0)
         {
             _logger.LogTrace("[Issue #392] IsTextDisappearance: false - 前回テキスト位置なし（履歴含む）");
-            return false;
+            return null;
         }
 
-        // 変化領域がない場合はfalse
+        // 変化領域がない場合はnull
         if (changeResult.ChangedRegions == null || changeResult.ChangedRegions.Length == 0)
         {
             _logger.LogTrace("[Issue #392] IsTextDisappearance: false - 変化領域なし");
-            return false;
+            return null;
         }
 
         // 変化領域と前回テキスト位置（+履歴）の重なりを判定
@@ -758,10 +763,10 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                     }
 
                     _logger.LogInformation(
-                        "[Issue #392/#481] IsTextDisappearance: true - テキスト領域で変化検知 (Changed=({CX},{CY},{CW}x{CH}), Text=({TX},{TY},{TW}x{TH}))",
+                        "[Issue #392/#481/#486] TextDisappearance検知 - テキスト矩形を返却 (Changed=({CX},{CY},{CW}x{CH}), Text=({TX},{TY},{TW}x{TH}))",
                         changedRegion.X, changedRegion.Y, changedRegion.Width, changedRegion.Height,
                         textRect.X, textRect.Y, textRect.Width, textRect.Height);
-                    return true;
+                    return textRect;
                 }
             }
         }
@@ -777,7 +782,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
                 "[Issue #392] 座標デバッグ: ChangedRegion[0]=({CX},{CY},{CW}x{CH}), TextBounds[0]=({TX},{TY},{TW}x{TH})",
                 cr.X, cr.Y, cr.Width, cr.Height, tb.X, tb.Y, tb.Width, tb.Height);
         }
-        return false;
+        return null;
     }
 
     /// <summary>
