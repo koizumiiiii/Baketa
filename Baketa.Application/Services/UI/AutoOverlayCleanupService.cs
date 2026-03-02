@@ -345,9 +345,22 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         }
         else
         {
+            // フォールバック: regions[0]から推定（レガシー互換）
+            // ただし、異常に小さいサイズ（テキスト矩形）の場合はスケーリングをスキップ
             var captureRegion = regions[0];
             captureWidth = captureRegion.Width;
             captureHeight = captureRegion.Height;
+
+            // regions[0]がキャプチャ全域ではなくテキスト矩形の場合、
+            // スケール倍率が異常値（例: 64倍）になるためスケーリングを中止
+            if (captureWidth < originalWindowSize.Width / 4 || captureHeight < originalWindowSize.Height / 4)
+            {
+                _logger.LogWarning(
+                    "[Issue #486] CaptureImageSize未設定かつregions[0]が小さすぎるためスケーリングスキップ: " +
+                    "Region={Region}, OriginalWindow={OrigW}x{OrigH}",
+                    regions[0], originalWindowSize.Width, originalWindowSize.Height);
+                return regions;
+            }
         }
 
         // サイズが同じならスケーリング不要
