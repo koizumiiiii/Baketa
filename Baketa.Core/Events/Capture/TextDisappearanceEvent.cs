@@ -69,6 +69,13 @@ public class TextDisappearanceEvent : IEvent
     public Size OriginalWindowSize { get; }
 
     /// <summary>
+    /// [Issue #486] キャプチャ画像サイズ（ゾーン計算の座標系統一用）
+    /// AggregatedChunksReadyEventHandlerと同じ座標系でゾーンIDを計算するために使用。
+    /// DisappearedRegionsと同じ座標空間（GPUリサイズ後のキャプチャサイズ）。
+    /// </summary>
+    public Size CaptureImageSize { get; }
+
+    /// <summary>
     /// コンストラクタ（既存互換）
     /// </summary>
     /// <param name="regions">消失したテキスト領域</param>
@@ -86,12 +93,14 @@ public class TextDisappearanceEvent : IEvent
     /// <param name="regionId">領域ID（オーバーレイとの関連付け用）</param>
     /// <param name="confidenceScore">検知信頼度 (0.0-1.0)</param>
     /// <param name="originalWindowSize">[Issue #481] 元ウィンドウサイズ（GPUリサイズスケーリング補正用）</param>
+    /// <param name="captureImageSize">[Issue #486] キャプチャ画像サイズ（ゾーン計算用）</param>
     public TextDisappearanceEvent(
         IReadOnlyList<Rectangle> regions,
         IntPtr sourceWindow = default,
         string? regionId = null,
         float confidenceScore = 1.0f,
-        Size originalWindowSize = default)
+        Size originalWindowSize = default,
+        Size captureImageSize = default)
     {
         ArgumentNullException.ThrowIfNull(regions, nameof(regions));
         if (confidenceScore < 0.0f || confidenceScore > 1.0f)
@@ -102,6 +111,7 @@ public class TextDisappearanceEvent : IEvent
         RegionId = regionId;
         ConfidenceScore = confidenceScore;
         OriginalWindowSize = originalWindowSize;
+        CaptureImageSize = captureImageSize;
         Timestamp = DateTime.UtcNow;
         DetectedAt = DateTime.UtcNow;
     }
