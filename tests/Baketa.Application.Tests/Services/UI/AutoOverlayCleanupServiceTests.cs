@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Application.Services.UI;
 using Baketa.Core.Abstractions.Events;
+using Baketa.Core.Abstractions.Processing; // [Issue #486] ITextChangeDetectionService用
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager 用
 using Baketa.Core.Events.Capture;
 using Baketa.Core.Settings;
@@ -298,6 +299,242 @@ public class AutoOverlayCleanupServiceTests : IDisposable
         _service.Dispose();
         _service.Dispose(); // Second call should not throw
     }
+
+    #region [Issue #486] ScaleToOriginalWindowSize テスト
+
+    /// <summary>
+    /// captureImageSizeが正しく設定されている場合、
+    /// DisappearedRegionsが正確にスケーリングされてHideOverlaysInAreaAsyncに渡される
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_WithCaptureImageSize_ShouldScaleRegionsCorrectly()
+    {
+        // Arrange
+        await _service.InitializeAsync();
+
+        // キャプチャ座標（1280x720空間）でのテキスト矩形
+        var captureRegion = new Rectangle(480, 571, 60, 24);
+        var eventData = new TextDisappearanceEvent(
+            regions: [captureRegion],
+            sourceWindow: new IntPtr(12345),
+            regionId: "test-scaling",
+            confidenceScore: 0.85f,
+            originalWindowSize: new Size(3840, 2160),
+            captureImageSize: new Size(1280, 720)
+        );
+
+        Rectangle capturedArea = default;
+        _overlayManagerMock
+            .Setup(om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), -1, It.IsAny<CancellationToken>()))
+            .Callback<Rectangle, int, CancellationToken>((area, _, _) => capturedArea = area)
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.HandleAsync(eventData);
+
+        // Assert: scaleX = 3840/1280 = 3.0, scaleY = 2160/720 = 3.0
+        // (480*3, 571*3, 60*3, 24*3) = (1440, 1713, 180, 72)
+        capturedArea.X.Should().Be(1440);
+        capturedArea.Y.Should().Be(1713);
+        capturedArea.Width.Should().Be(180);
+        capturedArea.Height.Should().Be(72);
+    }
+
+    /// <summary>
+    /// OriginalWindowSizeがEmptyの場合、スケーリングせずそのままの座標で削除
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_WithEmptyOriginalWindowSize_ShouldNotScale()
+    {
+        // Arrange
+        await _service.InitializeAsync();
+
+        var region = new Rectangle(100, 200, 50, 30);
+        var eventData = new TextDisappearanceEvent(
+            regions: [region],
+            sourceWindow: new IntPtr(12345),
+            regionId: "test-no-scale",
+            confidenceScore: 0.85f,
+            originalWindowSize: Size.Empty,
+            captureImageSize: new Size(1280, 720)
+        );
+
+        Rectangle capturedArea = default;
+        _overlayManagerMock
+            .Setup(om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), -1, It.IsAny<CancellationToken>()))
+            .Callback<Rectangle, int, CancellationToken>((area, _, _) => capturedArea = area)
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.HandleAsync(eventData);
+
+        // Assert: スケーリングなし、元の座標のまま
+        capturedArea.X.Should().Be(100);
+        capturedArea.Y.Should().Be(200);
+        capturedArea.Width.Should().Be(50);
+        capturedArea.Height.Should().Be(30);
+    }
+
+    /// <summary>
+    /// CaptureImageSizeとOriginalWindowSizeが同じ場合、スケーリング不要
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_WithSameCaptureAndOriginalSize_ShouldNotScale()
+    {
+        // Arrange
+        await _service.InitializeAsync();
+
+        var region = new Rectangle(500, 600, 200, 100);
+        var eventData = new TextDisappearanceEvent(
+            regions: [region],
+            sourceWindow: new IntPtr(12345),
+            regionId: "test-same-size",
+            confidenceScore: 0.85f,
+            originalWindowSize: new Size(1920, 1080),
+            captureImageSize: new Size(1920, 1080)
+        );
+
+        Rectangle capturedArea = default;
+        _overlayManagerMock
+            .Setup(om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), -1, It.IsAny<CancellationToken>()))
+            .Callback<Rectangle, int, CancellationToken>((area, _, _) => capturedArea = area)
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.HandleAsync(eventData);
+
+        // Assert: サイズ同一のためスケーリングなし
+        capturedArea.X.Should().Be(500);
+        capturedArea.Y.Should().Be(600);
+        capturedArea.Width.Should().Be(200);
+        capturedArea.Height.Should().Be(100);
+    }
+
+    /// <summary>
+    /// CaptureImageSizeが未設定でregions[0]が小さいテキスト矩形の場合、
+    /// 異常なスケール倍率を防ぐためスケーリングをスキップする
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_WithEmptyCaptureImageSizeAndSmallRegion_ShouldSkipScaling()
+    {
+        // Arrange
+        await _service.InitializeAsync();
+
+        // CaptureImageSize未設定、regions[0]は小さいテキスト矩形
+        var smallTextRegion = new Rectangle(480, 571, 60, 24);
+        var eventData = new TextDisappearanceEvent(
+            regions: [smallTextRegion],
+            sourceWindow: new IntPtr(12345),
+            regionId: "test-fallback-guard",
+            confidenceScore: 0.85f,
+            originalWindowSize: new Size(3840, 2160),
+            captureImageSize: Size.Empty // 未設定
+        );
+
+        Rectangle capturedArea = default;
+        _overlayManagerMock
+            .Setup(om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), -1, It.IsAny<CancellationToken>()))
+            .Callback<Rectangle, int, CancellationToken>((area, _, _) => capturedArea = area)
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.HandleAsync(eventData);
+
+        // Assert: 60 < 3840/4=960, 24 < 2160/4=540 → スケーリングスキップ
+        // 元の座標がそのまま渡される（異常な64倍スケーリングは発生しない）
+        capturedArea.X.Should().Be(480);
+        capturedArea.Y.Should().Be(571);
+        capturedArea.Width.Should().Be(60);
+        capturedArea.Height.Should().Be(24);
+    }
+
+    /// <summary>
+    /// テキスト安定性チェック: OCRが最近テキストを確認したゾーンはTextDisappearance削除を抑制
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_WithStableZone_ShouldSuppressCleanup()
+    {
+        // Arrange
+        var textChangeDetectionMock = new Mock<ITextChangeDetectionService>();
+
+        // zone_4_3が最近確認済み（1秒前）
+        textChangeDetectionMock
+            .Setup(s => s.GetLastTextConfirmation(It.IsAny<string>()))
+            .Returns(DateTime.UtcNow.AddSeconds(-1));
+
+        var serviceWithTextDetection = new AutoOverlayCleanupService(
+            _overlayManagerMock.Object,
+            _eventAggregatorMock.Object,
+            _loggerMock.Object,
+            _settingsMock.Object,
+            textChangeDetectionMock.Object);
+
+        await serviceWithTextDetection.InitializeAsync();
+
+        var eventData = new TextDisappearanceEvent(
+            regions: [new Rectangle(480, 571, 60, 24)],
+            sourceWindow: new IntPtr(12345),
+            regionId: "test-stability",
+            confidenceScore: 0.85f,
+            originalWindowSize: new Size(3840, 2160),
+            captureImageSize: new Size(1280, 720)
+        );
+
+        // Act
+        await serviceWithTextDetection.HandleAsync(eventData);
+
+        // Assert: 安定性チェックにより削除が抑制される
+        _overlayManagerMock.Verify(
+            om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        serviceWithTextDetection.Dispose();
+    }
+
+    /// <summary>
+    /// テキスト安定性チェック: 安定性ウィンドウ外のゾーンは削除を許可
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_WithExpiredStability_ShouldAllowCleanup()
+    {
+        // Arrange
+        var textChangeDetectionMock = new Mock<ITextChangeDetectionService>();
+
+        // zone確認が6秒前（5秒のウィンドウ外）
+        textChangeDetectionMock
+            .Setup(s => s.GetLastTextConfirmation(It.IsAny<string>()))
+            .Returns(DateTime.UtcNow.AddSeconds(-6));
+
+        var serviceWithTextDetection = new AutoOverlayCleanupService(
+            _overlayManagerMock.Object,
+            _eventAggregatorMock.Object,
+            _loggerMock.Object,
+            _settingsMock.Object,
+            textChangeDetectionMock.Object);
+
+        await serviceWithTextDetection.InitializeAsync();
+
+        var eventData = new TextDisappearanceEvent(
+            regions: [new Rectangle(480, 571, 60, 24)],
+            sourceWindow: new IntPtr(12345),
+            regionId: "test-expired-stability",
+            confidenceScore: 0.85f,
+            originalWindowSize: new Size(3840, 2160),
+            captureImageSize: new Size(1280, 720)
+        );
+
+        // Act
+        await serviceWithTextDetection.HandleAsync(eventData);
+
+        // Assert: ウィンドウ外なので削除が実行される
+        _overlayManagerMock.Verify(
+            om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), -1, It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        serviceWithTextDetection.Dispose();
+    }
+
+    #endregion
 
     private static TextDisappearanceEvent CreateTestEvent(float confidenceScore)
     {
