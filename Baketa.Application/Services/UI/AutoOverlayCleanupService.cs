@@ -236,7 +236,8 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             // [Issue #481] キャプチャ座標→元ウィンドウサイズ座標にスケーリング
             // DisappearedRegionsはGPUリサイズ後のキャプチャ座標（例: 1280x720）だが、
             // オーバーレイは元ウィンドウサイズ（例: 3840x2160）で配置されている
-            var scaledRegions = ScaleToOriginalWindowSize(regions, originalWindowSize);
+            // [Issue #486] captureImageSizeを明示的に渡す（regions[0]からの推定は不正確）
+            var scaledRegions = ScaleToOriginalWindowSize(regions, originalWindowSize, captureImageSize);
 
             // スケーリング後の座標をスクリーン絶対座標に変換
             var screenRegions = ConvertToScreenCoordinates(scaledRegions, windowHandle);
@@ -324,7 +325,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     /// スケーリングされた座標で配置されるため、
     /// DisappearedRegionsも同じ座標系に揃える必要がある。
     /// </summary>
-    private IReadOnlyList<Rectangle> ScaleToOriginalWindowSize(IReadOnlyList<Rectangle> regions, Size originalWindowSize)
+    private IReadOnlyList<Rectangle> ScaleToOriginalWindowSize(IReadOnlyList<Rectangle> regions, Size originalWindowSize, Size captureImageSize = default)
     {
         // OriginalWindowSizeが未設定の場合はスケーリング不要
         if (originalWindowSize.IsEmpty)
@@ -332,10 +333,22 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
             return regions;
         }
 
-        // キャプチャサイズを最初の領域から推定（DisappearedRegionsは常にキャプチャ全域）
-        var captureRegion = regions[0];
-        var captureWidth = captureRegion.Width;
-        var captureHeight = captureRegion.Height;
+        // [Issue #486] キャプチャサイズはCaptureImageSizeから取得
+        // 以前はregions[0]のサイズから推定していたが、DisappearedRegionsがテキスト矩形に限定されたため
+        // regions[0]はキャプチャ全域ではなく個別のテキスト矩形になった。
+        // captureImageSizeが未設定の場合のみフォールバックとしてregions[0]を使用。
+        int captureWidth, captureHeight;
+        if (!captureImageSize.IsEmpty)
+        {
+            captureWidth = captureImageSize.Width;
+            captureHeight = captureImageSize.Height;
+        }
+        else
+        {
+            var captureRegion = regions[0];
+            captureWidth = captureRegion.Width;
+            captureHeight = captureRegion.Height;
+        }
 
         // サイズが同じならスケーリング不要
         if (captureWidth == originalWindowSize.Width && captureHeight == originalWindowSize.Height)
