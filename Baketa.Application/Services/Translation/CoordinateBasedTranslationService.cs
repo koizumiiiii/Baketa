@@ -410,7 +410,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // 画面がまだ遷移中（シーン切替、テキスト送りの途中等）の可能性がある場合、
             // パイプライン全体をスキップして安定してからOCR + Cloud AIを実行する
             // [Issue #410] Singleshotモード時は安定化チェックをバイパス（次サイクルがないため）
+            // [Issue #486] テキスト変化検知が成功した場合は安定化をバイパス（有効なテキストが検出済み）
             var isSingleshotForStabilization = _translationModeService?.CurrentMode == TranslationMode.Singleshot;
+            var hasConfirmedTextChange = pipelineResult.TextChangeResult?.HasTextChanged == true;
             if (pipelineResult.ImageChangeResult != null && !isSingleshotForStabilization)
             {
                 var settings = _imageChangeSettings?.CurrentValue;
@@ -425,6 +427,19 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     (isStabilizationActive
                         ? changePercentage > recoveryThreshold   // スキップ中: recovery閾値を下回るまで継続
                         : changePercentage > stabilizationThreshold); // 通常: 高い閾値を超えたらスキップ開始
+
+                // [Issue #486] パイプラインがTextChangeDetectionまで正常に完了し、
+                // テキスト変化が確認された場合、安定化スキップをバイパスする。
+                // 理由: OCRでテキストが検出・変化確認済みなら、画面は「不安定」ではなく
+                // ダイアログ更新等の正常な遷移。安定化待ちすると次のテキストを見逃す。
+                if (shouldSkip && hasConfirmedTextChange)
+                {
+                    _logger?.LogInformation(
+                        "[Issue #486] テキスト変化確認済みのため安定化スキップをバイパス " +
+                        "(ChangePercentage={Pct:F2}, TextChangeResult.HasTextChanged=True) - 翻訳を続行",
+                        changePercentage);
+                    shouldSkip = false;
+                }
 
                 if (shouldSkip)
                 {

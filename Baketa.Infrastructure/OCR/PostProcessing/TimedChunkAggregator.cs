@@ -716,11 +716,18 @@ public sealed class TimedChunkAggregator : ITextChunkAggregatorService, IDisposa
         var confidence = chunk.AverageConfidence;
         var text = chunk.CombinedText;
 
-        // Rule 1: 極低信頼度は無条件除外
-        if (confidence < 0.30f)
+        // Rule 1: 極低信頼度は無条件除外（ハルシネーション対策）
+        if (confidence < 0.15f)
             return true;
 
-        // Rule 2: 低信頼度 + ノイズテキストパターン
+        // Rule 2: 低信頼度 + 短いテキストは除外
+        // [Issue #486] ゲーム特有のフォント・背景色により信頼度が低くなる場合があるが、
+        // 十分な長さのテキストは有意である可能性が高いため保持する。
+        // 例: "i...don't feel so well..." (confidence=0.247, 28文字) は有効なゲームテキスト
+        if (confidence < 0.30f && (text == null || text.Length < 10))
+            return true;
+
+        // Rule 3: 低信頼度 + ノイズテキストパターン
         if (confidence < 0.50f && IsNoiseTextPattern(text))
             return true;
 
