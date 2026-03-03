@@ -21,6 +21,17 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
     // [Issue #397] P0-2: タイプライター演出検出の状態管理
     private readonly ConcurrentDictionary<string, bool> _typewriterInProgress = new();
 
+    // [Issue #486] パイプライン連続低変化率ブロック検出。
+    // 変化率が0超だがthreshold未満の状態が連続した場合、前回テキストをリセットして
+    // 次サイクルでパイプラインを通過させる。ゲームダイアログの小さな変化が
+    // パイプラインを永久にブロックする問題を解決する。
+    private readonly ConcurrentDictionary<string, int> _consecutiveLowChangeCount = new();
+
+    /// <summary>
+    /// [Issue #486] 連続低変化率でリセットするまでのサイクル数
+    /// </summary>
+    private const int ConsecutiveLowChangeResetThreshold = 3;
+
     public ProcessingStageType StageType => ProcessingStageType.TextChangeDetection;
     public TimeSpan EstimatedProcessingTime => TimeSpan.FromMilliseconds(1);
 
@@ -111,6 +122,33 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
             // Service層のHasChangedに依存すると、17%の変化が19%閾値で抑制され、
             // ゲームダイアログの変化が永久に検出されないケースが発生する。
             var hasSignificantChange = changeResult.ChangePercentage >= threshold;
+
+            // [Issue #486] 連続低変化率ブロック検出:
+            // 変化率が0超だがthreshold未満の状態が連続した場合、前回テキストをリセット。
+            // ゲームダイアログの小さな変化（例: 1ゾーンのみ更新で全体6.25%）が
+            // パイプラインを永久にブロックする問題を解決する。
+            if (!hasSignificantChange && changeResult.ChangePercentage > 0)
+            {
+                var lowChangeCount = _consecutiveLowChangeCount.AddOrUpdate(contextId, 1, (_, c) => c + 1);
+                if (lowChangeCount >= ConsecutiveLowChangeResetThreshold)
+                {
+                    _logger.LogInformation(
+                        "[Issue #486] {Count}回連続低変化率検知 - 前回テキストをリセットしてパイプラインを通過: " +
+                        "ChangeRate={ChangeRate:F3}%, Threshold={Threshold:F1}%",
+                        lowChangeCount, changeResult.ChangePercentage * 100, threshold * 100);
+
+                    // 前回テキストを現在テキストに更新して、次サイクルの基準を最新にする
+                    _textChangeService.SetPreviousText(contextId, currentText);
+                    _consecutiveLowChangeCount.TryRemove(contextId, out _);
+                    // 今回のサイクルを通過させる
+                    hasSignificantChange = true;
+                }
+            }
+            else
+            {
+                // 変化が十分 or 完全同一（0%） → カウンタリセット
+                _consecutiveLowChangeCount.TryRemove(contextId, out _);
+            }
 
             // Service層のキャッシュ同期: Strategy層が翻訳を決定したがService層が更新していない場合、
             // Service層のキャッシュを明示的に更新して次サイクルの比較基準を正しくする

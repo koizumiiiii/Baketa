@@ -37,6 +37,22 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
     private readonly ConcurrentDictionary<string, int> _sameTextConsecutiveCount = new();
     private readonly ConcurrentDictionary<string, string> _staticUiMarkers = new(); // sourceId → normalizedText
 
+    // [Issue #486] OCR確認ベースのテキスト安定性追跡
+    // OCRがテキストを検出するたびにタイムスタンプを記録し、
+    // TextDisappearanceの誤判定による不要なオーバーレイ削除を抑制する
+    private readonly ConcurrentDictionary<string, DateTime> _textPresenceConfirmations = new();
+
+    // [Issue #486] Gate entry TTL: _previousTextCacheエントリの登録時刻を追跡。
+    // 同一テキストが長時間キャッシュされている場合に自動失効させ、
+    // TextDisappearanceが発火しないゾーンのGateを自動クリアする。
+    private readonly ConcurrentDictionary<string, DateTime> _previousTextTimestamps = new();
+
+    /// <summary>
+    /// [Issue #486] Gate entry TTL（秒）。この時間を超えてキャッシュされた同一テキストは
+    /// 期限切れとして扱い、再翻訳を許可する。ゲームダイアログの典型的な表示間隔を考慮。
+    /// </summary>
+    private const double GateEntryTtlSeconds = 15.0;
+
     /// <summary>
     /// スタック割り当ての閾値（512要素 = 約2KB）
     /// </summary>
@@ -194,6 +210,37 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
             var normalizedPrevious = NormalizeFullWidthToHalfWidth(NormalizeOcrNoise(previousText ?? string.Empty));
             if (_settings.SkipIdenticalText && normalizedPrevious == normalizedCurrent)
             {
+                // [Issue #486] Gate entry TTL: キャッシュされた同一テキストが一定時間経過している場合、
+                // TextDisappearanceが発火しないゾーンでもGateを自動クリアして再翻訳を許可する。
+                // ゲームダイアログが変化してもOCRが同じ部分テキスト（例: キャラ名のみ）を
+                // 繰り返し検出する場合に、オーバーレイが永久に残る問題を解決する。
+                if (_previousTextTimestamps.TryGetValue(sourceId, out var cachedAt))
+                {
+                    var cacheAge = (DateTime.UtcNow - cachedAt).TotalSeconds;
+                    if (cacheAge > GateEntryTtlSeconds)
+                    {
+                        _logger.LogInformation(
+                            "[Issue #486] Gate entry TTL expired - SourceId: {SourceId}, CacheAge: {CacheAge:F1}s > TTL: {TTL}s, forcing re-translation",
+                            sourceId, cacheAge, GateEntryTtlSeconds);
+
+                        // キャッシュを更新して新規テキスト扱いにする
+                        UpdatePreviousText(sourceId, currentText);
+                        // タイプライター・静的UI状態もリセット
+                        _typewriterGrowthCycles.TryRemove(sourceId, out _);
+                        _typewriterStabilizationCount.TryRemove(sourceId, out _);
+                        _sameTextConsecutiveCount.TryRemove(sourceId, out _);
+                        _staticUiMarkers.TryRemove(sourceId, out _);
+
+                        return TextChangeWithGateResult.CreateSufficientChange(
+                            previousText,
+                            currentText,
+                            1.0f,
+                            GetAppliedThreshold(currentText.Length, regionInfo),
+                            0,
+                            stopwatch.Elapsed);
+                    }
+                }
+
                 // [Issue #432] タイプライター成長中に同一テキストを検出 → 安定化判定
                 if (_settings.EnableTypewriterDetection && _typewriterGrowthCycles.TryGetValue(sourceId, out var growthCycles) && growthCycles > 0)
                 {
@@ -410,10 +457,28 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
     public void ClearPreviousText(string contextId)
     {
         _previousTextCache.TryRemove(contextId, out _);
+        // [Issue #486] Gate entry TTL: タイムスタンプもクリア
+        _previousTextTimestamps.TryRemove(contextId, out _);
         // [Issue #432] タイプライター状態もクリア
         _typewriterGrowthCycles.TryRemove(contextId, out _);
         _typewriterStabilizationCount.TryRemove(contextId, out _);
+        // [Issue #486] _textPresenceConfirmationsは意図的にクリアしない。
+        // ClearPreviousTextはTextDisappearanceイベントから呼ばれるが、
+        // 安定性タイムスタンプをここでクリアするとIsZoneStableチェックが無効化され、
+        // 安定性追跡の目的が失われる。ClearAllPreviousTexts()（Start/Stop時）でのみクリアする。
         _logger.LogDebug("前回テキストキャッシュクリア - Context: {ContextId}", contextId);
+    }
+
+    /// <inheritdoc />
+    public void ConfirmTextPresence(string sourceId)
+    {
+        _textPresenceConfirmations[sourceId] = DateTime.UtcNow;
+    }
+
+    /// <inheritdoc />
+    public DateTime? GetLastTextConfirmation(string sourceId)
+    {
+        return _textPresenceConfirmations.TryGetValue(sourceId, out var timestamp) ? timestamp : null;
     }
 
     /// <inheritdoc />
@@ -421,11 +486,15 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
     {
         var clearedCount = _previousTextCache.Count;
         _previousTextCache.Clear();
+        // [Issue #486] Gate entry TTL: タイムスタンプもクリア
+        _previousTextTimestamps.Clear();
         // [Issue #432] タイプライター状態もクリア
         _typewriterGrowthCycles.Clear();
         _typewriterStabilizationCount.Clear();
         // [Issue #465] 連続カウンタはクリアするが、静的UIマーカーは意図的に保持
         _sameTextConsecutiveCount.Clear();
+        // [Issue #486] テキスト存在確認もクリア（Start/Stop切り替え時）
+        _textPresenceConfirmations.Clear();
         _logger.LogInformation("全前回テキストキャッシュクリア - クリア件数: {Count}, 静的UIマーカー保持: {MarkerCount}",
             clearedCount, _staticUiMarkers.Count);
     }
@@ -531,6 +600,8 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
     private void UpdatePreviousText(string sourceId, string text)
     {
         _previousTextCache.AddOrUpdate(sourceId, text, (_, _) => text);
+        // [Issue #486] Gate entry TTL: テキスト更新時にタイムスタンプも記録
+        _previousTextTimestamps[sourceId] = DateTime.UtcNow;
         _logger.LogDebug(
             "[Issue #293] Previous text updated - SourceId: {SourceId}, Length: {Length}",
             sourceId, text.Length);

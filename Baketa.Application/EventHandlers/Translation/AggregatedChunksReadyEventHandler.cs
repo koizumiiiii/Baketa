@@ -2516,12 +2516,20 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
             }
         }
 
+        // [Issue #486] OCR確認ベースのテキスト安定性追跡:
+        // Gate判定の結果に関わらず、OCRがテキストを検出した全ゾーンの存在確認を更新。
+        // これにより、TextDisappearanceの誤判定でオーバーレイが不要に削除されるのを防止。
+        foreach (var zoneId in evaluatedZones)
+        {
+            _textChangeDetectionService.ConfirmTextPresence(zoneId);
+        }
+
         if (gateBlockedCount > 0 || gatePassedCount > 0)
         {
             Console.WriteLine($"🚪 [Issue #293] Gate判定完了: {gatePassedCount}件通過, {gateBlockedCount}件ブロック");
             _logger?.LogInformation(
-                "🚪 [Issue #293] Gate判定完了: Passed={Passed}, Blocked={Blocked}, RoiEnabled={RoiEnabled}",
-                gatePassedCount, gateBlockedCount, roiEnabled);
+                "🚪 [Issue #293] Gate判定完了: Passed={Passed}, Blocked={Blocked}, RoiEnabled={RoiEnabled}, PresenceConfirmed={ConfirmedZones}",
+                gatePassedCount, gateBlockedCount, roiEnabled, evaluatedZones.Count);
         }
 
         return gatedChunks;
