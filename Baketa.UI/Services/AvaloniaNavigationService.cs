@@ -20,12 +20,15 @@ namespace Baketa.UI.Services;
 /// </remarks>
 /// <param name="serviceProvider">サービスプロバイダー</param>
 /// <param name="logger">ロガー</param>
+/// <param name="dispatcher">[Issue #485] UIスレッドディスパッチャー</param>
 internal sealed class AvaloniaNavigationService(
     IServiceProvider serviceProvider,
-    ILogger<AvaloniaNavigationService> logger) : INavigationService, IDisposable
+    ILogger<AvaloniaNavigationService> logger,
+    IUIDispatcher dispatcher) : INavigationService, IDisposable
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     private readonly ILogger<AvaloniaNavigationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IUIDispatcher _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
     private bool _disposed;
 
     // 🔥 [ISSUE#167] 二重ナビゲーション防止フラグ
@@ -67,7 +70,7 @@ internal sealed class AvaloniaNavigationService(
             {
                 // 🔥 [ISSUE#167] メインウィンドウを表示し、認証モードを有効化
                 // UIスレッドで実行する必要がある
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                await _dispatcher.InvokeAsync(async () =>
                 {
                     mainOverlayViewModel = _serviceProvider.GetService<MainOverlayViewModel>();
                     if (mainOverlayViewModel != null)
@@ -126,7 +129,7 @@ internal sealed class AvaloniaNavigationService(
             {
                 // 🔥 [ISSUE#167] メインウィンドウを表示し、認証モードを有効化
                 // UIスレッドで実行する必要がある
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                await _dispatcher.InvokeAsync(async () =>
                 {
                     mainOverlayViewModel = _serviceProvider.GetService<MainOverlayViewModel>();
                     if (mainOverlayViewModel != null)
@@ -179,7 +182,7 @@ internal sealed class AvaloniaNavigationService(
         _isNavigatingToMainWindow = true;
         try
         {
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            await _dispatcher.InvokeAsync(async () =>
             {
                 await ShowMainWindowInternalAsync().ConfigureAwait(false);
             }).ConfigureAwait(false);
@@ -340,7 +343,7 @@ internal sealed class AvaloniaNavigationService(
         {
             _logNavigating(_logger, "SwitchToLogin", null);
 
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            await _dispatcher.InvokeAsync(async () =>
             {
                 if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
                     desktop.MainWindow is MainOverlayView mainOverlay)
@@ -370,7 +373,7 @@ internal sealed class AvaloniaNavigationService(
             _logNavigating(_logger, "SwitchToSignup", null);
             _logger.LogDebug("[AUTH_DEBUG] SwitchToSignupAsync開始");
 
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+            await _dispatcher.InvokeAsync(async () =>
             {
                 _logger.LogDebug("[AUTH_DEBUG] UIThread.InvokeAsync内部開始");
 

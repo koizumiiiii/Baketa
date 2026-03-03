@@ -146,6 +146,7 @@ internal sealed class UIModule : ServiceModuleBase
         // 例: services.AddSingleton<INotificationService, AvaloniaNotificationService>();
 
         // ページ遷移とナビゲーション
+        services.AddSingleton<IUIDispatcher, AvaloniaUIDispatcher>(); // [Issue #485] Dispatcher抽象化
         services.AddSingleton<INavigationService, AvaloniaNavigationService>();
         // 例: services.AddSingleton<IPageService, AvaloniaPageService>();
 
