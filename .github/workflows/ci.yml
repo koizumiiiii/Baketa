@@ -54,7 +54,7 @@ jobs:
       shell: cmd
       
     - name: Upload Native DLL
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: native-dll
         path: |
@@ -86,7 +86,7 @@ jobs:
       shell: powershell
 
     - name: Download Native DLL
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native-dll
         path: BaketaCaptureNative/bin/Debug/
@@ -146,7 +146,7 @@ jobs:
         CI: true
     
     - name: Upload test results
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: test-results

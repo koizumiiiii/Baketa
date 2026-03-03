@@ -25,6 +25,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     private readonly Mock<IServiceProvider> _mockServiceProvider;
     private readonly Mock<ILogger<AvaloniaNavigationService>> _mockLogger;
     private readonly Mock<IAuthService> _mockAuthService;
+    private readonly Mock<IUIDispatcher> _mockDispatcher;
     // 削除: 使用しないFieldを削除してテストを簡素化
     private readonly LoginViewModel _loginViewModel;
     private readonly SignupViewModel _signupViewModel;
@@ -37,6 +38,11 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
         _mockServiceProvider = new Mock<IServiceProvider>();
         _mockLogger = new Mock<ILogger<AvaloniaNavigationService>>();
         _mockAuthService = new Mock<IAuthService>();
+        // [Issue #485] UIスレッドディスパッチャーのモック - 同期的に実行してデッドロックを回避
+        _mockDispatcher = new Mock<IUIDispatcher>();
+        _mockDispatcher.Setup(x => x.InvokeAsync(It.IsAny<Func<Task>>()))
+            .Returns<Func<Task>>(action => action());
+        _mockDispatcher.Setup(x => x.CheckAccess()).Returns(true);
         // 削除: 使用しないインスタンス初期化を削除
         // テスト簡素化のためStubLoginViewModel作成
         _loginViewModel = CreateStubLoginViewModel();
@@ -137,7 +143,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     private AvaloniaNavigationService CreateNavigationService()
     {
         _navigationService?.Dispose();
-        _navigationService = new AvaloniaNavigationService(_mockServiceProvider.Object, _mockLogger.Object);
+        _navigationService = new AvaloniaNavigationService(_mockServiceProvider.Object, _mockLogger.Object, _mockDispatcher.Object);
         return _navigationService;
     }
 
@@ -176,7 +182,7 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new AvaloniaNavigationService(null!, _mockLogger.Object));
+            new AvaloniaNavigationService(null!, _mockLogger.Object, _mockDispatcher.Object));
     }
 
     [Fact]
@@ -184,7 +190,15 @@ public sealed class AvaloniaNavigationServiceTests : AvaloniaTestBase
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new AvaloniaNavigationService(_mockServiceProvider.Object, null!));
+            new AvaloniaNavigationService(_mockServiceProvider.Object, null!, _mockDispatcher.Object));
+    }
+
+    [Fact]
+    public void Constructor_WithNullDispatcher_ThrowsArgumentNullException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new AvaloniaNavigationService(_mockServiceProvider.Object, _mockLogger.Object, null!));
     }
 
     #endregion
