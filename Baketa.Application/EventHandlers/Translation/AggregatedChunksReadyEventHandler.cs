@@ -84,6 +84,14 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
     // [Issue #414] ファジーテキストマッチング（Cloud結果のあいまい一致検証用）
     private readonly IFuzzyTextMatcher? _fuzzyTextMatcher;
 
+    // [Issue #491] OCR不検出ベースのオーバーレイ自動クリア
+    // 前サイクルでOCRがテキストを検出したゾーンのセット
+    private HashSet<string> _previousCycleZones = [];
+    // ゾーンごとの連続不検出カウンター
+    private readonly ConcurrentDictionary<string, int> _zoneAbsenceCounter = new();
+    // 不検出と判定する連続サイクル数
+    private const int OcrAbsenceThreshold = 3;
+
     public AggregatedChunksReadyEventHandler(
         Baketa.Core.Abstractions.Translation.ITranslationService translationService,
         // 🔧 [OVERLAY_UNIFICATION] IInPlaceTranslationOverlayManager → IOverlayManager に統一
@@ -2479,6 +2487,9 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
                 regionInfo = heatmapValue.HasValue
                     ? GateRegionInfo.WithHeatmap(normalizedX, normalizedY, normalizedWidth, normalizedHeight, heatmapValue.Value)
                     : GateRegionInfo.FromCoordinates(normalizedX, normalizedY, normalizedWidth, normalizedHeight);
+
+                // [Issue #491] OCR信頼度をGateRegionInfoに設定（CJK1文字Gate判定に使用）
+                regionInfo = regionInfo with { ConfidenceScore = (float)chunk.AverageConfidence };
             }
 
             // Gate判定を実行（代表チャンクのみ）
@@ -2531,7 +2542,127 @@ public sealed partial class AggregatedChunksReadyEventHandler : IEventProcessor<
                 gatePassedCount, gateBlockedCount, roiEnabled, evaluatedZones.Count);
         }
 
+        // [Issue #491] OCR不検出ベースのオーバーレイ自動クリア
+        var sourceWindowHandle = chunks.FirstOrDefault()?.SourceWindowHandle ?? IntPtr.Zero;
+        await ProcessOcrAbsenceCleanupAsync(
+            evaluatedZones, imageWidth, imageHeight, sourceWindowHandle, cancellationToken).ConfigureAwait(false);
+
         return gatedChunks;
+    }
+
+    /// <summary>
+    /// [Issue #491] OCR不検出ベースのオーバーレイ自動クリア
+    /// </summary>
+    /// <remarks>
+    /// 前回のOCRサイクルでテキストが検出されたゾーンのうち、今回検出されなかったゾーンの
+    /// 不検出カウンターをインクリメント。連続OcrAbsenceThresholdサイクル不検出で
+    /// TextDisappearanceEventを発行してオーバーレイを削除。
+    /// evaluatedZonesはGate-BLOCKEDゾーンも含むため、OCRで検出されたゾーン全体を追跡できる。
+    /// </remarks>
+    private async Task ProcessOcrAbsenceCleanupAsync(
+        HashSet<string> currentCycleZones,
+        int imageWidth,
+        int imageHeight,
+        IntPtr sourceWindowHandle,
+        CancellationToken cancellationToken)
+    {
+        // 前回存在→今回不存在のゾーンを特定
+        var disappearedZones = _previousCycleZones.Except(currentCycleZones).ToList();
+        var zonesToClear = new List<string>();
+
+        foreach (var zoneId in disappearedZones)
+        {
+            var count = _zoneAbsenceCounter.AddOrUpdate(zoneId, 1, (_, c) => c + 1);
+            if (count >= OcrAbsenceThreshold)
+            {
+                zonesToClear.Add(zoneId);
+                _zoneAbsenceCounter.TryRemove(zoneId, out _);
+            }
+            else
+            {
+                _logger?.LogDebug(
+                    "[Issue #491] OCR不検出カウント: Zone={Zone}, Count={Count}/{Threshold}",
+                    zoneId, count, OcrAbsenceThreshold);
+            }
+        }
+
+        // 今回検出されたゾーンの不検出カウンターをリセット
+        foreach (var zoneId in currentCycleZones)
+        {
+            _zoneAbsenceCounter.TryRemove(zoneId, out _);
+        }
+
+        // 前回ゾーンを更新
+        _previousCycleZones = [.. currentCycleZones];
+
+        // 連続不検出ゾーンのオーバーレイをクリア
+        if (zonesToClear.Count > 0)
+        {
+            _logger?.LogInformation(
+                "[Issue #491] OCR不検出によるオーバーレイクリア: Zones={Zones}",
+                string.Join(", ", zonesToClear));
+            Console.WriteLine($"🧹 [Issue #491] OCR不検出クリア: {string.Join(", ", zonesToClear)}");
+
+            // Gate状態をクリアして再検出時にFirstTextとして扱われるようにする
+            foreach (var zoneId in zonesToClear)
+            {
+                _textChangeDetectionService?.ClearPreviousText(zoneId);
+            }
+
+            // ゾーンIDからキャプチャ画像座標の矩形を計算してTextDisappearanceEventを発行
+            var stableWidth = imageWidth > 0 ? imageWidth : 1920;
+            var stableHeight = imageHeight > 0 ? imageHeight : 1080;
+            var regions = ConvertZonesToRectangles(zonesToClear, stableWidth, stableHeight);
+
+            if (regions.Count > 0)
+            {
+                var disappearanceEvent = new Baketa.Core.Events.Capture.TextDisappearanceEvent(
+                    regions,
+                    sourceWindow: sourceWindowHandle,
+                    regionId: "ocr_absence_cleanup",
+                    confidenceScore: 1.0f,
+                    captureImageSize: new System.Drawing.Size(stableWidth, stableHeight));
+
+                try
+                {
+                    await _eventAggregator.PublishAsync(disappearanceEvent, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex,
+                        "[Issue #491] TextDisappearanceEvent発行エラー: {Message}", ex.Message);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// [Issue #491] ゾーンIDリストからキャプチャ座標系の矩形リストに変換
+    /// </summary>
+    private static List<System.Drawing.Rectangle> ConvertZonesToRectangles(
+        List<string> zoneIds, int imageWidth, int imageHeight)
+    {
+        const int zoneColumns = 8;
+        const int zoneRows = 6;
+        var zoneWidth = imageWidth / zoneColumns;
+        var zoneHeight = imageHeight / zoneRows;
+        var rectangles = new List<System.Drawing.Rectangle>();
+
+        foreach (var zoneId in zoneIds)
+        {
+            // "zone_{row}_{col}" 形式を解析
+            var parts = zoneId.Split('_');
+            if (parts.Length == 3
+                && int.TryParse(parts[1], out var row)
+                && int.TryParse(parts[2], out var col))
+            {
+                rectangles.Add(new System.Drawing.Rectangle(
+                    col * zoneWidth, row * zoneHeight, zoneWidth, zoneHeight));
+            }
+        }
+
+        return rectangles;
     }
 
     // [Issue #482] HTML/LaTeXマークアップ検出用正規表現
