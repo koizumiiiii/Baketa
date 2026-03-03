@@ -17,6 +17,16 @@ public class EventAggregatorTests
     private readonly CancellationTestProcessor _cancellationProcessor;
 
     /// <summary>
+    /// 非同期fire-and-forget処理の完了を待機するタイムアウト（ミリ秒）
+    /// </summary>
+    private const int AsyncCompletionTimeoutMs = 5000;
+
+    /// <summary>
+    /// ポーリング間隔（ミリ秒）
+    /// </summary>
+    private const int PollingIntervalMs = 20;
+
+    /// <summary>
     /// コンストラクタ
     /// </summary>
     public EventAggregatorTests()
@@ -28,6 +38,18 @@ public class EventAggregatorTests
         _testProcessor = new TestEventProcessor();
         _errorProcessor = new ErrorTestEventProcessor();
         _cancellationProcessor = new CancellationTestProcessor();
+    }
+
+    /// <summary>
+    /// 非ブロッキング非同期処理の完了をポーリングで待機するヘルパー
+    /// </summary>
+    private static async Task WaitForConditionAsync(Func<bool> condition, int timeoutMs = AsyncCompletionTimeoutMs)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(PollingIntervalMs);
+        }
     }
 
     /// <summary>
@@ -43,8 +65,8 @@ public class EventAggregatorTests
         // Act
         await _eventAggregator.PublishAsync(testEvent);
 
-        // 🚀 Phase 2対応: 非ブロッキング処理の完了を待機
-        await Task.Delay(100); // 非同期処理の完了を待機
+        // 非ブロッキング処理の完了をポーリングで待機（CI環境でのフレーキーテスト対策）
+        await WaitForConditionAsync(() => _testProcessor.CallCount >= 1);
 
         // Assert
         Assert.Equal(1, _testProcessor.CallCount);
@@ -64,7 +86,7 @@ public class EventAggregatorTests
 
         // 一度イベントを発行して登録確認
         await _eventAggregator.PublishAsync(testEvent);
-        await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
+        await WaitForConditionAsync(() => _testProcessor.CallCount >= 1);
         Assert.Equal(1, _testProcessor.CallCount);
 
         // テスト履歴をクリア
@@ -75,7 +97,9 @@ public class EventAggregatorTests
 
         // Act
         await _eventAggregator.PublishAsync(testEvent);
-        await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
+
+        // 購読解除後はイベントが処理されないことを確認（短い待機で十分）
+        await Task.Delay(200);
 
         // Assert
         Assert.Equal(0, _testProcessor.CallCount);
@@ -97,7 +121,7 @@ public class EventAggregatorTests
 
         // Act
         await _eventAggregator.PublishAsync(testEvent);
-        await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
+        await WaitForConditionAsync(() => _testProcessor.CallCount >= 1 && secondProcessor.CallCount >= 1);
 
         // Assert
         Assert.Equal(1, _testProcessor.CallCount);
@@ -140,11 +164,11 @@ public class EventAggregatorTests
         // Act
         // エラーイベントを発行
         await _eventAggregator.PublishAsync(errorEvent);
-        await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
+        await WaitForConditionAsync(() => _errorProcessor.ErrorOccurred);
 
         // 通常イベントを発行
         await _eventAggregator.PublishAsync(testEvent);
-        await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
+        await WaitForConditionAsync(() => _testProcessor.CallCount >= 1);
 
         // Assert
         Assert.True(_errorProcessor.ErrorOccurred);
@@ -208,7 +232,7 @@ public class EventAggregatorTests
 
         // Act
         await _eventAggregator.PublishAsync(testEvent);
-        await Task.Delay(100); // 🚀 Phase 2対応: 非ブロッキング処理完了待機
+        await WaitForConditionAsync(() => _testProcessor.CallCount >= 1);
 
         // Assert
         Assert.Equal(1, _testProcessor.CallCount);
