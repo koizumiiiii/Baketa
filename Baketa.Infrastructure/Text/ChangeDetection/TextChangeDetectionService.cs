@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Text;
@@ -153,18 +154,32 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
                     stopwatch.Elapsed);
             }
 
-            // 最小文字数チェック
+            // 最小文字数チェック（[Issue #491] CJK1文字例外付き）
             if (currentText.Length < _settings.MinTextLength)
             {
-                _logger.LogDebug(
-                    "[Issue #293] Text too short ({Length} < {Min}), skipping - SourceId: {SourceId}",
-                    currentText.Length, _settings.MinTextLength, sourceId);
+                // [Issue #491] CJK1文字テキストの特例: 高信頼度CJK文字はGate通過許可
+                if (_settings.EnableCjkSingleCharPass
+                    && currentText.Length == 1
+                    && IsCjkCharacter(currentText[0])
+                    && regionInfo?.ConfidenceScore >= _settings.CjkSingleCharConfidenceThreshold)
+                {
+                    _logger.LogInformation(
+                        "[Issue #491] CJK single char Gate pass: '{Text}' (Confidence={Confidence:F3}, Threshold={Threshold:F2}) - SourceId: {SourceId}",
+                        currentText, regionInfo.ConfidenceScore, _settings.CjkSingleCharConfidenceThreshold, sourceId);
+                    // MinTextLengthチェックをスキップして通常のGate評価に進む
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "[Issue #293] Text too short ({Length} < {Min}), skipping - SourceId: {SourceId}",
+                        currentText.Length, _settings.MinTextLength, sourceId);
 
-                return TextChangeWithGateResult.CreateTextTooShort(
-                    GetPreviousText(sourceId),
-                    currentText,
-                    GetAppliedThreshold(currentText.Length, regionInfo),
-                    stopwatch.Elapsed);
+                    return TextChangeWithGateResult.CreateTextTooShort(
+                        GetPreviousText(sourceId),
+                        currentText,
+                        GetAppliedThreshold(currentText.Length, regionInfo),
+                        stopwatch.Elapsed);
+                }
             }
 
             // [Issue #465] 静的UI要素チェック（最も早い段階で判定）
@@ -750,6 +765,18 @@ public partial class TextChangeDetectionService : ITextChangeDetectionService
         }
     }
 
+    /// <summary>
+    /// [Issue #491] CJK文字（漢字・ひらがな・カタカナ等）かどうかを判定
+    /// </summary>
+    /// <remarks>
+    /// char.GetUnicodeCategory → OtherLetter でCJK統合漢字、ひらがな、カタカナを広くカバー。
+    /// ラテン文字やアラビア文字等の1文字ノイズとは区別される。
+    /// </remarks>
+    internal static bool IsCjkCharacter(char c)
+    {
+        return char.GetUnicodeCategory(c) == UnicodeCategory.OtherLetter;
+    }
+
     #endregion
 }
 
@@ -779,7 +806,10 @@ internal sealed class DefaultGateStrategy : IGateStrategy
             return GateDecision.EmptyText;
         }
 
-        if (currentText.Length < _settings.MinTextLength)
+        // [Issue #491] CJK1文字はDetectChangeWithGateAsyncで判定済みのため、
+        // ここに到達した場合は許可された1文字テキスト
+        if (currentText.Length < _settings.MinTextLength
+            && !(currentText.Length == 1 && _settings.EnableCjkSingleCharPass && TextChangeDetectionService.IsCjkCharacter(currentText[0])))
         {
             return GateDecision.TextTooShort;
         }

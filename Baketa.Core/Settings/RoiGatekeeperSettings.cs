@@ -135,6 +135,30 @@ public sealed record RoiGatekeeperSettings
     public int MinTextLength { get; init; } = 2;
 
     // ========================================
+    // [Issue #491] CJK1文字テキスト許容設定
+    // ========================================
+
+    /// <summary>
+    /// CJK1文字テキストのGate通過を許可
+    /// </summary>
+    /// <remarks>
+    /// CJK文字（漢字・ひらがな・カタカナ等）1文字のテキストは、
+    /// 信頼度がCjkSingleCharConfidenceThreshold以上の場合にMinTextLengthを無視してGate通過を許可。
+    /// ゲームのキャラクター名（瞳、蛍、翠、薫等）の翻訳を可能にする。
+    /// デフォルト: true
+    /// </remarks>
+    public bool EnableCjkSingleCharPass { get; init; } = true;
+
+    /// <summary>
+    /// CJK1文字テキストのGate通過に必要な最小OCR信頼度
+    /// </summary>
+    /// <remarks>
+    /// 高い信頼度を要求することで、ノイズによる誤検出を防止。
+    /// デフォルト: 0.90（90%以上）
+    /// </remarks>
+    public float CjkSingleCharConfidenceThreshold { get; init; } = 0.90f;
+
+    // ========================================
     // 統計設定
     // ========================================
 
@@ -331,7 +355,9 @@ public sealed record RoiGatekeeperSettings
             && TypewriterStabilizationCycles >= 1
             && TypewriterMaxDelayCycles >= 1
             // [Issue #465] 静的UI要素検出の検証
-            && StaticUiDetectionThreshold >= 1;
+            && StaticUiDetectionThreshold >= 1
+            // [Issue #491] CJK1文字許容の検証
+            && CjkSingleCharConfidenceThreshold is >= 0.0f and <= 1.0f;
     }
 
     /// <summary>
