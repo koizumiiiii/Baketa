@@ -14,6 +14,7 @@ using Baketa.Core.Abstractions.Imaging;
 using Baketa.Core.Abstractions.License;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Abstractions.Settings;
 using Baketa.Core.Abstractions.Roi;
 using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.Text;
@@ -94,6 +95,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
     // [Issue #415] Cloud翻訳キャッシュ
     private readonly ICloudTranslationCache? _cloudTranslationCache;
+
+    // ONNXモデル オンデマンドロード/アンロード用
+    private readonly IUnifiedSettingsService? _unifiedSettingsService;
 
     // 状態管理
     private volatile bool _isAutomaticTranslationActive;
@@ -189,6 +193,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         Baketa.Core.Abstractions.Platform.Windows.Adapters.IWindowManagerAdapter? windowManagerAdapter = null,
         Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? textChangeDetectionService = null,
         ICloudTranslationCache? cloudTranslationCache = null, // [Issue #415] Cloud翻訳キャッシュ
+        IUnifiedSettingsService? unifiedSettingsService = null, // ONNXモデル オンデマンドロード/アンロード
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -211,7 +216,14 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _windowManagerAdapter = windowManagerAdapter;
         _textChangeDetectionService = textChangeDetectionService;
         _cloudTranslationCache = cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
+        _unifiedSettingsService = unifiedSettingsService;
         _logger = logger;
+
+        // 設定変更時にONNXモデルのロード/アンロードをトリガー
+        if (_unifiedSettingsService != null)
+        {
+            _unifiedSettingsService.SettingsChanged += OnTranslationSettingsChanged;
+        }
 
         // Issue #293: 投機的OCRサービスが利用可能かログ出力
         if (_speculativeOcrService?.IsEnabled == true)
@@ -682,6 +694,135 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             //     .ConfigureAwait(false);
 
             _logger?.LogInformation("自動翻訳を停止しました");
+
+            // Live翻訳停止後、Cloudモードが有効ならONNXモデルをアンロード
+            await TryUnloadOnnxModelsAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Cloudモード有効時にONNXモデルをアンロードしてメモリを解放
+    /// </summary>
+    private async Task TryUnloadOnnxModelsAsync()
+    {
+        try
+        {
+            // ローカル翻訳モードならアンロードしない
+            if (IsUseLocalEngine())
+            {
+                return;
+            }
+
+            // 利用可能なエンジンからアンロード可能なものを探してアンロード
+            var unloadableEngines = _translationService.GetAvailableEngines()
+                .OfType<IUnloadableTranslationEngine>();
+
+            foreach (var engine in unloadableEngines)
+            {
+                await engine.UnloadModelsAsync().ConfigureAwait(false);
+                _logger?.LogInformation("Live翻訳停止 + Cloudモード → {EngineName} モデルをアンロード", engine.Name);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "ONNXモデルアンロードでエラー（無視して続行）");
+        }
+    }
+
+    /// <summary>
+    /// 翻訳設定変更時にONNXモデルのロード/アンロードをトリガー
+    /// </summary>
+    private void OnTranslationSettingsChanged(object? sender, SettingsChangedEventArgs e)
+    {
+        if (e.SettingsType != SettingsType.Translation)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var useLocal = _unifiedSettingsService!.GetTranslationSettings().UseLocalEngine;
+
+                if (useLocal)
+                {
+                    // ローカルモードに切替 → ONNXモデルをプリロード
+                    var engine = _translationService.GetAvailableEngines()
+                        .OfType<IUnloadableTranslationEngine>()
+                        .FirstOrDefault();
+
+                    if (engine != null)
+                    {
+                        var isReady = await ((ITranslationEngine)engine).IsReadyAsync().ConfigureAwait(false);
+                        if (!isReady)
+                        {
+                            _logger?.LogInformation("ローカルモードに切替 → ONNXモデルをプリロード開始");
+                            await ((ITranslationEngine)engine).InitializeAsync().ConfigureAwait(false);
+                        }
+                    }
+                }
+                else
+                {
+                    // Cloudモードに切替 → ONNXモデルをアンロード
+                    await TryUnloadOnnxModelsForCloudModeAsync().ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "設定変更時のONNXモデルロード/アンロードでエラー（無視して続行）");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Cloudモード切替時にONNXモデルをアンロード（Live翻訳中でなければ）
+    /// </summary>
+    private async Task TryUnloadOnnxModelsForCloudModeAsync()
+    {
+        // Live翻訳中はアンロードしない（停止時にアンロードされる）
+        if (_isAutomaticTranslationActive)
+        {
+            _logger?.LogDebug("Live翻訳中のためONNXモデルアンロードを延期");
+            return;
+        }
+
+        var engines = _translationService.GetAvailableEngines()
+            .OfType<IUnloadableTranslationEngine>();
+
+        foreach (var engine in engines)
+        {
+            await engine.UnloadModelsAsync().ConfigureAwait(false);
+            _logger?.LogInformation("Cloudモードに切替 → {EngineName} モデルをアンロード", engine.Name);
+        }
+    }
+
+    /// <summary>
+    /// translation-settings.json から UseLocalEngine を読み取る
+    /// </summary>
+    private static bool IsUseLocalEngine()
+    {
+        try
+        {
+            var settingsPath = BaketaSettingsPaths.TranslationSettingsPath;
+            if (!File.Exists(settingsPath))
+            {
+                return true; // デフォルトはローカル
+            }
+
+            var json = File.ReadAllText(settingsPath);
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("useLocalEngine", out var value))
+            {
+                return value.GetBoolean();
+            }
+
+            return true; // プロパティ未設定時はローカル
+        }
+        catch
+        {
+            return true; // エラー時はローカルと見なしてアンロードしない
         }
     }
 
@@ -2998,6 +3139,12 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         if (_disposed) return;
 
         _logger?.LogDebug("TranslationOrchestrationServiceを破棄します");
+
+        // 設定変更イベントの購読解除
+        if (_unifiedSettingsService != null)
+        {
+            _unifiedSettingsService.SettingsChanged -= OnTranslationSettingsChanged;
+        }
 
         // 非同期停止を同期的に実行
         try
