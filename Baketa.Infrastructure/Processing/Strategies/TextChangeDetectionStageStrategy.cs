@@ -58,6 +58,22 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                 return ProcessingStageResult.CreateError(StageType, "OCR結果が取得できません", stopwatch.Elapsed);
             }
 
+            // [Issue #500] Detection-Onlyフィルタによるスキップ → テキスト変化なしとして早期終了
+            if (ocrResult.DetectionOnlySkipped)
+            {
+                _logger.LogDebug("[Issue #500] Detection-Onlyフィルタでスキップ済み - テキスト変化なしとして処理");
+                var skipResult = new TextChangeDetectionResult
+                {
+                    HasTextChanged = false,
+                    ChangePercentage = 0f,
+                    PreviousText = context.Input.PreviousOcrText,
+                    CurrentText = context.Input.PreviousOcrText,
+                    ProcessingTime = stopwatch.Elapsed,
+                    AlgorithmUsed = "DetectionOnlySkip"
+                };
+                return ProcessingStageResult.CreateSuccess(StageType, skipResult);
+            }
+
             var currentText = ocrResult.DetectedText;
             var previousText = context.Input.PreviousOcrText;
             var contextId = context.Input.ContextId;
