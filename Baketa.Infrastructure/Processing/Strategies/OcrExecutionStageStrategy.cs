@@ -13,6 +13,7 @@ using Baketa.Core.Abstractions.Platform.Windows; // 🎯 UltraThink: IWindowsIma
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Abstractions.Roi; // [Issue #293 Phase 7] IRoiManager用
 using Baketa.Core.Abstractions.Services; // 🔥 [COORDINATE_FIX] ICoordinateTransformationService用
+using Baketa.Core.Models.ImageProcessing; // [Issue #500] HashAlgorithmType用
 using Baketa.Core.Abstractions.Translation; // 🔧 [TRANSLATION_FIX] ITextChunkAggregatorService, TextChunk用
 using Baketa.Core.Models.Roi; // [Issue #293 Phase 7] RoiRegion, NormalizedRect用
 using Baketa.Core.Extensions; // 🔥 [PHASE5.2C] ToPooledByteArrayWithLengthAsync拡張メソッド用
@@ -47,6 +48,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
     private readonly ICoordinateTransformationService _coordinateTransformationService; // 🔥 [COORDINATE_FIX] ROI→スクリーン座標変換
     private readonly IRoiRegionMerger? _regionMerger; // [Issue #293] 隣接領域結合サービス
     private readonly IRoiManager? _roiManager; // [Issue #293 Phase 7] 学習済みROI管理
+    private readonly IDetectionBoundsCache? _detectionBoundsCache; // [Issue #500] Detection-Onlyフィルタ用キャッシュ
+    private readonly ImageChangeDetectionSettings? _changeDetectionSettings; // [Issue #500] Detection-Onlyフィルタ設定
+    private readonly IPerceptualHashService? _perceptualHashService; // [Issue #500] pHash比較用
+
     private readonly int _nextChunkId = 1; // 🔧 [TRANSLATION_FIX] チャンクID生成用
 
     // 🔥 [PHASE2.1] ボーダーレス/フルスクリーン検出結果のMetadataキー
@@ -110,7 +115,10 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
         IOptions<RoiManagerSettings>? roiSettings = null, // [Issue #293] 部分OCR設定（オプショナル）
         IRoiRegionMerger? regionMerger = null, // [Issue #293] 隣接領域結合（オプショナル）
         IRoiManager? roiManager = null, // [Issue #293 Phase 7] 学習済みROI管理（オプショナル）
-        ITextChunkAggregatorService? textChunkAggregator = null) // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
+        ITextChunkAggregatorService? textChunkAggregator = null, // 🔧 [TRANSLATION_FIX] 翻訳パイプライン統合
+        IDetectionBoundsCache? detectionBoundsCache = null, // [Issue #500] Detection-Onlyフィルタ用キャッシュ
+        IOptions<ImageChangeDetectionSettings>? changeDetectionSettings = null, // [Issue #500] Detection-Onlyフィルタ設定
+        IPerceptualHashService? perceptualHashService = null) // [Issue #500] pHash比較用
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ocrEngine = ocrEngine ?? throw new ArgumentNullException(nameof(ocrEngine));
@@ -120,6 +128,9 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
         _regionMerger = regionMerger; // null許容（後方互換性）
         _roiManager = roiManager; // [Issue #293 Phase 7] null許容（後方互換性）
         _textChunkAggregator = textChunkAggregator; // null許容（翻訳無効時対応）
+        _detectionBoundsCache = detectionBoundsCache; // [Issue #500] null許容（後方互換性）
+        _changeDetectionSettings = changeDetectionSettings?.Value; // [Issue #500] null許容
+        _perceptualHashService = perceptualHashService; // [Issue #500] null許容（後方互換性）
 
         // [Issue #397] グリッドサイズ設定（変化検知と同期）
         var changeDetectionDefaults = new ImageChangeDetectionSettings();
@@ -259,6 +270,25 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
 
             // [Issue #397] 前サイクルのテキスト隣接ブロックを取得
             var contextId = context.Input.ContextId ?? "default";
+
+            // [Issue #500] Detection-Only中間フィルタ
+            var detectionSkipResult = await TrySkipWithDetectionOnlyAsync(ocrImage, contextId, cancellationToken)
+                .ConfigureAwait(false);
+            if (detectionSkipResult != null)
+            {
+                stopwatch.Stop();
+                _logger.LogInformation(
+                    "[Issue #500] Detection-Onlyフィルタでスキップ - ContextId: {ContextId}, 処理時間: {ElapsedMs:F1}ms",
+                    contextId, stopwatch.Elapsed.TotalMilliseconds);
+                return new ProcessingStageResult
+                {
+                    StageType = StageType,
+                    Success = true,
+                    ProcessingTime = stopwatch.Elapsed,
+                    Data = detectionSkipResult
+                };
+            }
+
             var textAdjacentBlocks = GetTextAdjacentBlocks(ocrImage.Width, ocrImage.Height, contextId);
 
             // [Issue #397] P0-3: サイクルカウンターベースの拡張適用判定
@@ -1796,6 +1826,207 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
         var unionArea = (float)a.Width * a.Height + (float)b.Width * b.Height - intersectionArea;
 
         return unionArea > 0 ? intersectionArea / unionArea : 0f;
+    }
+
+    #endregion
+
+    #region [Issue #500] Detection-Only中間フィルタ
+
+    /// <summary>
+    /// [Issue #500] Detection-Only + pHashでフルOCRをスキップ可能か判定
+    /// </summary>
+    /// <returns>スキップ可能な場合はOcrExecutionResult、フルOCR続行の場合はnull</returns>
+    private async Task<OcrExecutionResult?> TrySkipWithDetectionOnlyAsync(
+        IImage ocrImage,
+        string contextId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // 設定無効 or キャッシュ未登録 → フルOCR続行
+            if (_detectionBoundsCache == null ||
+                _changeDetectionSettings is not { EnableDetectionOnlyFilter: true })
+            {
+                return null;
+            }
+
+            // Detection-Only実行（~200ms）— 初回でもキャッシュ初期化のために実行
+            var previousEntry = _detectionBoundsCache.GetPreviousEntry(contextId);
+
+            var detectionResults = await _ocrEngine.DetectTextRegionsAsync(ocrImage, cancellationToken)
+                .ConfigureAwait(false);
+            var currentBounds = detectionResults.TextRegions
+                .Select(r => r.Bounds)
+                .Where(b => b.Width > 0 && b.Height > 0)
+                .ToArray();
+
+            // [Issue #500] 各矩形のpHash計算（~1ms total）
+            var currentHashes = ComputeRegionHashes(ocrImage, currentBounds);
+
+            // キャッシュ更新（Detection成功時は常に）
+            _detectionBoundsCache.UpdateEntry(contextId, new DetectionCacheEntry(currentBounds, currentHashes));
+
+            // 前回エントリなし（初回） → フルOCR続行（キャッシュは初期化済み）
+            if (previousEntry == null)
+            {
+                _logger.LogDebug("[Issue #500] 初回Detection-Only実行 - キャッシュ初期化: {Count}個の矩形", currentBounds.Length);
+                return null;
+            }
+
+            var previousBounds = previousEntry.Bounds;
+
+            // ボックス数差がtolerance超過 → フルOCR続行
+            var countDiff = Math.Abs(currentBounds.Length - previousBounds.Length);
+            if (countDiff > _changeDetectionSettings.DetectionBoxCountTolerance)
+            {
+                _logger.LogDebug(
+                    "[Issue #500] Detection矩形数差がtolerance超過: current={Current}, previous={Previous}, tolerance={Tolerance}",
+                    currentBounds.Length, previousBounds.Length, _changeDetectionSettings.DetectionBoxCountTolerance);
+                return null;
+            }
+
+            // IoUベース双方向マッチング
+            if (!AreDetectionBoundsMatching(currentBounds, previousBounds, _changeDetectionSettings.DetectionIoUThreshold))
+            {
+                _logger.LogDebug(
+                    "[Issue #500] Detection矩形IoUマッチング失敗 - フルOCR続行: current={Current}個, previous={Previous}個",
+                    currentBounds.Length, previousBounds.Length);
+                return null;
+            }
+
+            // [Issue #500] IoUマッチした矩形ペアのpHash比較（コンテンツ変化検出）
+            if (!AreRegionHashesMatching(
+                    currentBounds, currentHashes,
+                    previousBounds, previousEntry.RegionHashes,
+                    _changeDetectionSettings.DetectionIoUThreshold,
+                    _changeDetectionSettings.DetectionRegionHashThreshold))
+            {
+                _logger.LogInformation(
+                    "[Issue #500] pHash不一致 - 位置同一だがコンテンツ変化あり: ContextId={ContextId}",
+                    contextId);
+                return null;
+            }
+
+            // 全マッチ → スキップ
+            return new OcrExecutionResult
+            {
+                DetectedText = string.Empty,
+                DetectionOnlySkipped = true,
+                ProcessingTime = TimeSpan.Zero,
+                Success = true
+            };
+        }
+        catch (Exception ex)
+        {
+            // 例外発生 → フルOCR続行（安全側に倒す）
+            _logger.LogWarning(ex, "[Issue #500] Detection-Onlyフィルタで例外発生 - フルOCR続行");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// [Issue #500] 各矩形領域のpHashを計算
+    /// </summary>
+    private string[] ComputeRegionHashes(IImage image, Rectangle[] bounds)
+    {
+        if (_perceptualHashService == null || bounds.Length == 0)
+            return [];
+
+        var hashes = new string[bounds.Length];
+        for (int i = 0; i < bounds.Length; i++)
+        {
+            try
+            {
+                hashes[i] = _perceptualHashService.ComputeHashForRegion(
+                    image, bounds[i], HashAlgorithmType.DifferenceHash);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[Issue #500] pHash計算失敗 - 矩形{Index}: {Bounds}", i, bounds[i]);
+                hashes[i] = string.Empty;
+            }
+        }
+        return hashes;
+    }
+
+    /// <summary>
+    /// [Issue #500] IoUマッチした矩形ペアのpHash類似度を検証
+    /// </summary>
+    internal bool AreRegionHashesMatching(
+        Rectangle[] currentBounds, string[] currentHashes,
+        Rectangle[] previousBounds, string[] previousHashes,
+        float iouThreshold, float hashThreshold)
+    {
+        // pHashサービス未登録 → pHash検証スキップ（IoUのみで判定）
+        if (_perceptualHashService == null)
+            return true;
+
+        // ハッシュ配列が空 → pHash検証スキップ
+        if (currentHashes.Length == 0 || previousHashes.Length == 0)
+            return true;
+
+        for (int i = 0; i < currentBounds.Length; i++)
+        {
+            if (i >= currentHashes.Length || string.IsNullOrEmpty(currentHashes[i]))
+                continue;
+
+            int bestMatchIdx = -1;
+            float bestIoU = 0f;
+            for (int j = 0; j < previousBounds.Length; j++)
+            {
+                var iou = CalculateRectangleIoU(currentBounds[i], previousBounds[j]);
+                if (iou > bestIoU) { bestIoU = iou; bestMatchIdx = j; }
+            }
+
+            if (bestMatchIdx < 0 || bestIoU < iouThreshold)
+                return false;
+
+            if (bestMatchIdx >= previousHashes.Length || string.IsNullOrEmpty(previousHashes[bestMatchIdx]))
+                continue;
+
+            var similarity = _perceptualHashService.CompareHashes(
+                currentHashes[i], previousHashes[bestMatchIdx],
+                HashAlgorithmType.DifferenceHash);
+
+            if (similarity < hashThreshold)
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// [Issue #500] 2つのDetection矩形配列が双方向でIoUマッチングするか判定
+    /// </summary>
+    internal static bool AreDetectionBoundsMatching(
+        Rectangle[] current,
+        Rectangle[] previous,
+        float iouThreshold)
+    {
+        // 両方空 → マッチ
+        if (current.Length == 0 && previous.Length == 0)
+            return true;
+
+        // 片方空、他方非空 → アンマッチ
+        if (current.Length == 0 || previous.Length == 0)
+            return false;
+
+        // current→previous: 全currentに対してpreviousのいずれかとIoU≧閾値
+        foreach (var c in current)
+        {
+            var bestIoU = previous.Max(p => CalculateRectangleIoU(c, p));
+            if (bestIoU < iouThreshold)
+                return false;
+        }
+
+        // previous→current: 全previousに対してcurrentのいずれかとIoU≧閾値
+        foreach (var p in previous)
+        {
+            var bestIoU = current.Max(c => CalculateRectangleIoU(p, c));
+            if (bestIoU < iouThreshold)
+                return false;
+        }
+
+        return true;
     }
 
     #endregion

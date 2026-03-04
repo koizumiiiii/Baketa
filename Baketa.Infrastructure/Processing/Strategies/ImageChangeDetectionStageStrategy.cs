@@ -27,6 +27,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     private readonly IImageChangeDetectionService _changeDetectionService;
     private readonly ILogger<ImageChangeDetectionStageStrategy> _logger;
     private readonly IEventAggregator? _eventAggregator; // UltraThink Phase 1: オーバーレイ自動削除統合（オプショナル）
+    private readonly IDetectionBoundsCache? _detectionBoundsCache; // [Issue #500] Detection-Onlyフィルタ用キャッシュ
 
     // 🔥 [PHASE11_FIX] コンテキストID別に前回画像を管理（Singleton問題解決）
     // 問題: Singletonの_previousImageが複数の処理経路で共有され、初回実行でもpreviousImage != nullになる
@@ -50,11 +51,13 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
     public ImageChangeDetectionStageStrategy(
         IImageChangeDetectionService changeDetectionService,
         ILogger<ImageChangeDetectionStageStrategy> logger,
-        IEventAggregator? eventAggregator = null) // UltraThink Phase 1: オプショナル統合
+        IEventAggregator? eventAggregator = null, // UltraThink Phase 1: オプショナル統合
+        IDetectionBoundsCache? detectionBoundsCache = null) // [Issue #500] Detection-Onlyフィルタ用キャッシュ
     {
         _changeDetectionService = changeDetectionService ?? throw new ArgumentNullException(nameof(changeDetectionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventAggregator = eventAggregator; // null許可（段階的統合対応）
+        _detectionBoundsCache = detectionBoundsCache; // [Issue #500] null許容
 
         if (_eventAggregator != null)
         {
@@ -183,6 +186,7 @@ public class ImageChangeDetectionStageStrategy : IProcessingStageStrategy
         _previousImages.Clear();
         _previousTextBounds.Clear();
         _historicalTextBounds.Clear();
+        _detectionBoundsCache?.ClearAll(); // [Issue #500] Detection-Onlyフィルタ用キャッシュもクリア
         _logger.LogInformation("🧹 [STOP_FIX] 画像変化検知履歴をクリア - Stop→Start後の初回翻訳を確実に実行");
     }
 

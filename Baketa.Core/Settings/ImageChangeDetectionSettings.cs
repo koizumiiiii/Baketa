@@ -239,6 +239,47 @@ public sealed record ImageChangeDetectionSettings
     /// </remarks>
     public float ScreenStabilizationRecoveryThreshold { get; init; } = 0.35f;
 
+    // ========================================
+    // [Issue #500] Detection-Only中間フィルタ設定
+    // ========================================
+
+    /// <summary>
+    /// [Issue #500] Detection-Onlyフィルタを有効化
+    /// </summary>
+    /// <remarks>
+    /// 有効にすると、フルOCR（Detection+Recognition）の前にDetection-Only（~230ms）を実行し、
+    /// バウンディングボックスが前回と同一ならRecognitionをスキップします。
+    /// </remarks>
+    public bool EnableDetectionOnlyFilter { get; init; } = true;
+
+    /// <summary>
+    /// [Issue #500] Detection矩形のIoU一致閾値
+    /// </summary>
+    /// <remarks>
+    /// 前回と今回のDetection矩形をIoUで比較し、この閾値以上であれば「同一テキスト」と判定。
+    /// デフォルト: 0.75（75%以上のIoUで一致）
+    /// 推奨範囲: 0.60-0.90
+    /// </remarks>
+    public float DetectionIoUThreshold { get; init; } = 0.75f;
+
+    /// <summary>
+    /// [Issue #500] Detection矩形数の許容差
+    /// </summary>
+    /// <remarks>
+    /// 前回と今回のDetection矩形数の差がこの値以下であれば比較対象。
+    /// デフォルト: 1（±1個の差は許容）
+    /// </remarks>
+    public int DetectionBoxCountTolerance { get; init; } = 1;
+
+    /// <summary>
+    /// [Issue #500] Detection矩形内ピクセルハッシュの一致閾値
+    /// </summary>
+    /// <remarks>
+    /// IoUマッチした矩形ペアのpHash類似度がこの値以上であれば「同一コンテンツ」と判定。
+    /// デフォルト: 0.90（90%以上のpHash類似度で一致）
+    /// </remarks>
+    public float DetectionRegionHashThreshold { get; init; } = 0.90f;
+
     /// <summary>
     /// 設定値の妥当性を検証
     /// </summary>
@@ -266,7 +307,11 @@ public sealed record ImageChangeDetectionSettings
             && ScreenStabilizationRecoveryThreshold <= ScreenStabilizationThreshold
             // [Issue #293] ROIベース閾値設定の検証
             && RoiHighPriorityThresholdMultiplier > 0.0f
-            && RoiLowPriorityThresholdMultiplier > 0.0f;
+            && RoiLowPriorityThresholdMultiplier > 0.0f
+            // [Issue #500] Detection-Onlyフィルタ設定の検証
+            && DetectionIoUThreshold is >= 0.0f and <= 1.0f
+            && DetectionBoxCountTolerance >= 0
+            && DetectionRegionHashThreshold is >= 0.0f and <= 1.0f;
     }
 
     /// <summary>

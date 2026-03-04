@@ -383,6 +383,9 @@ public class SmartProcessingPipelineService : ISmartProcessingPipelineService, I
                     if (stageType == ProcessingStageType.OcrExecution && stageResult.Success && stageResult.Data is OcrExecutionResult ocrResult)
                     {
                         FeedbackOcrTextBoundsToDetectionStrategy(input, ocrResult);
+                        // [Issue #500] Note: Detection矩形キャッシュはOcrExecutionStageStrategy.TrySkipWithDetectionOnlyAsyncが
+                        // Detection-Only結果で直接更新する。フルOCR TextChunks（集約後）とは矩形数が異なるため、
+                        // ここではキャッシュを上書きしない。
                     }
 
                     _logger.LogDebug("段階実行完了: {StageType}, 成功: {Success}, 処理時間: {ProcessingTime}ms",

@@ -1237,7 +1237,7 @@ internal sealed class Program
 
         // 🎯 UltraThink Phase 21 修正: OCR処理パイプライン復旧のためのSmartProcessingPipelineService登録
         Console.WriteLine("🔧 ProcessingServices登録開始 - OCR処理パイプライン修復");
-        services.AddProcessingServices();
+        services.AddProcessingServices(configurationForInfrastructure);
         Console.WriteLine("✅ ProcessingServices登録完了 - SmartProcessingPipelineService + 戦略4種");
 
         // 🚀 NEW ARCHITECTURE: TimedAggregatorModule登録（完全自律型設定システム）
