@@ -160,11 +160,22 @@ public sealed class CloudTranslationAvailabilityService : ICloudTranslationAvail
 
         UpdateState(newEntitled, currentPreferred, reason);
 
-        // 利用資格を得た場合、ユーザー設定も自動的に有効化（新規アップグレードのUX向上）
+        // 利用資格を得た場合の自動有効化
+        // ユーザーが明示的にローカルエンジンを選択している場合は上書きしない
         if (newEntitled && !wasEntitled)
         {
-            _logger.LogInformation("利用資格を取得したため、Cloud翻訳を自動有効化します");
-            FireAndForgetSetPreferredAsync(true);
+            var currentSettings = _unifiedSettingsService.GetTranslationSettings();
+            if (currentSettings.UseLocalEngine)
+            {
+                _logger.LogInformation(
+                    "利用資格を取得しましたが、ユーザーがローカルエンジンを選択しているため自動有効化をスキップします (Reason: {Reason})",
+                    e.Reason);
+            }
+            else
+            {
+                _logger.LogInformation("利用資格を取得したため、Cloud翻訳を自動有効化します (Reason: {Reason})", e.Reason);
+                FireAndForgetSetPreferredAsync(true);
+            }
         }
     }
 

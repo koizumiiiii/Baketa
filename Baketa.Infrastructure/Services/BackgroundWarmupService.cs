@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using System.IO;
+using System.Text.Json;
 using Baketa.Core.Abstractions.GPU;
 using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Translation;
+using Baketa.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -318,6 +321,9 @@ public sealed class BackgroundWarmupService(
             var warmupTasks = new List<Task>();
             var progressIncrement = 0.3 / translationEngines.Count; // 30%を翻訳エンジン数で分割
 
+            // Cloudモード時はアンロード可能な大規模モデルエンジンの初期化をスキップ
+            var skipHeavyModels = !IsUseLocalEngine();
+
             foreach (var (engine, index) in translationEngines.Select((e, i) => (e, i)))
             {
                 var currentProgress = 0.7 + (index * progressIncrement);
@@ -326,6 +332,14 @@ public sealed class BackgroundWarmupService(
                 {
                     try
                     {
+                        // Cloudモード時はONNX等の大規模モデルエンジンをスキップ
+                        if (skipHeavyModels && engine is IUnloadableTranslationEngine)
+                        {
+                            _logger.LogInformation(
+                                "Cloudモードのため翻訳エンジンウォームアップをスキップ: {EngineName}", engine.Name);
+                            return;
+                        }
+
                         _logger.LogDebug("翻訳エンジン初期化: {EngineName}", engine.Name);
 
                         // 翻訳エンジン初期化
@@ -435,6 +449,35 @@ public sealed class BackgroundWarmupService(
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "ウォームアップ進捗通知中にエラーが発生しました");
+        }
+    }
+
+    /// <summary>
+    /// translation-settings.json から UseLocalEngine を読み取る
+    /// </summary>
+    private static bool IsUseLocalEngine()
+    {
+        try
+        {
+            var settingsPath = BaketaSettingsPaths.TranslationSettingsPath;
+            if (!File.Exists(settingsPath))
+            {
+                return true; // デフォルトはローカル
+            }
+
+            var json = File.ReadAllText(settingsPath);
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("useLocalEngine", out var value))
+            {
+                return value.GetBoolean();
+            }
+
+            return true;
+        }
+        catch
+        {
+            return true; // エラー時はローカルと見なす
         }
     }
 
