@@ -99,7 +99,22 @@ public sealed class WindowsCredentialStorage : ITokenStorage
 
             if (accessStored && refreshStored)
             {
-                _logger.LogInformation("Authentication tokens stored successfully");
+                // [Issue #461] 書き込み後の読み戻し検証（データ完全性チェック）
+                string? verifyAccess = ReadCredential(_accessTokenTarget, out int verifyAccessError);
+                string? verifyRefresh = ReadCredential(_refreshTokenTarget, out int verifyRefreshError);
+
+                if (verifyAccess != accessToken || verifyRefresh != refreshToken)
+                {
+                    _logger.LogError(
+                        "[Issue #461] CRITICAL: Tokens written but read-back verification FAILED! " +
+                        "AccessVerify: {AccessOk} (Win32Error={AccessError}, DataMatch={AccessMatch}), " +
+                        "RefreshVerify: {RefreshOk} (Win32Error={RefreshError}, DataMatch={RefreshMatch})",
+                        verifyAccess != null, verifyAccessError, verifyAccess == accessToken,
+                        verifyRefresh != null, verifyRefreshError, verifyRefresh == refreshToken);
+                    return Task.FromResult(false);
+                }
+
+                _logger.LogInformation("Authentication tokens stored and verified successfully");
                 return Task.FromResult(true);
             }
 
@@ -123,8 +138,8 @@ public sealed class WindowsCredentialStorage : ITokenStorage
         {
             _logger.LogDebug("Retrieving authentication tokens from Windows Credential Manager");
 
-            string? accessToken = ReadCredential(_accessTokenTarget);
-            string? refreshToken = ReadCredential(_refreshTokenTarget);
+            string? accessToken = ReadCredential(_accessTokenTarget, out int accessError);
+            string? refreshToken = ReadCredential(_refreshTokenTarget, out int refreshError);
 
             if (!string.IsNullOrEmpty(accessToken) && !string.IsNullOrEmpty(refreshToken))
             {
@@ -132,7 +147,17 @@ public sealed class WindowsCredentialStorage : ITokenStorage
                 return Task.FromResult<(string, string)?>((accessToken, refreshToken));
             }
 
-            _logger.LogDebug("No stored authentication tokens found");
+            // [Issue #461] 診断: どのトークンが見つからないか + Win32エラーコードを記録
+            // ERROR_NOT_FOUND (1168) = 正常な「存在しない」状態
+            // その他のエラーコード = Windows Credential Manager の異常
+            _logger.LogWarning(
+                "[Issue #461] Token retrieval failed - " +
+                "AccessToken: {AccessFound} (Win32Error={AccessError}), " +
+                "RefreshToken: {RefreshFound} (Win32Error={RefreshError}), " +
+                "TargetPrefix={TargetPrefix}",
+                accessToken != null, accessError,
+                refreshToken != null, refreshError,
+                _accessTokenTarget[..^3]); // "_AT" を除いたプレフィックス
             return Task.FromResult<(string, string)?>(null);
         }
         catch (Exception ex)
@@ -179,10 +204,23 @@ public sealed class WindowsCredentialStorage : ITokenStorage
     {
         try
         {
-            string? accessToken = ReadCredential(_accessTokenTarget);
-            string? refreshToken = ReadCredential(_refreshTokenTarget);
+            string? accessToken = ReadCredential(_accessTokenTarget, out int accessError);
+            string? refreshToken = ReadCredential(_refreshTokenTarget, out int refreshError);
 
-            return Task.FromResult(!string.IsNullOrEmpty(accessToken) && !string.IsNullOrEmpty(refreshToken));
+            var hasTokens = !string.IsNullOrEmpty(accessToken) && !string.IsNullOrEmpty(refreshToken);
+
+            if (!hasTokens)
+            {
+                // [Issue #461] トークン不在の診断情報
+                _logger.LogWarning(
+                    "[Issue #461] HasStoredTokens=false - " +
+                    "AccessToken: {AccessFound} (Win32Error={AccessError}), " +
+                    "RefreshToken: {RefreshFound} (Win32Error={RefreshError})",
+                    accessToken != null, accessError,
+                    refreshToken != null, refreshError);
+            }
+
+            return Task.FromResult(hasTokens);
         }
         catch (Exception ex)
         {
@@ -228,12 +266,15 @@ public sealed class WindowsCredentialStorage : ITokenStorage
     /// <summary>
     /// Read a credential from Windows Credential Manager
     /// </summary>
-    private static string? ReadCredential(string targetName)
+    private static string? ReadCredential(string targetName, out int win32ErrorCode)
     {
         if (!NativeMethods.CredRead(targetName, NativeMethods.CRED_TYPE_GENERIC, 0, out IntPtr credentialPtr))
         {
+            win32ErrorCode = Marshal.GetLastWin32Error();
             return null;
         }
+
+        win32ErrorCode = 0;
 
         try
         {

@@ -1043,9 +1043,10 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
                 }
                 else if (isCloudAvailable && UseLocalEngine)
                 {
-                    // [Issue #243] Cloud AIが使えるようになった場合、設定に基づいてCloud AIに切り替え
+                    // [Issue #243] Cloud AIが使えるようになった場合、保存済み設定を確認
+                    // ユーザーが明示的にローカルを選択した場合（UseLocalEngine=true）は上書きしない
                     var currentSettings = _unifiedSettingsService?.GetTranslationSettings();
-                    if (currentSettings?.EnableCloudAiTranslation == true)
+                    if (currentSettings?.EnableCloudAiTranslation == true && !currentSettings.UseLocalEngine)
                     {
                         _logger?.LogInformation("[Issue #243] Cloud AIが利用可能になったためCloud AI翻訳に切り替え");
                         UseLocalEngine = false;
@@ -1173,10 +1174,8 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
             var newSettings = _unifiedSettingsService.GetTranslationSettings();
 
-            // Cloud AI翻訳設定の変更を反映
-            // EnableCloudAiTranslation=true → UseLocalEngine=false（AI翻訳）
-            // EnableCloudAiTranslation=false → UseLocalEngine=true（ローカル翻訳）
-            var newUseLocalEngine = !newSettings.EnableCloudAiTranslation;
+            // 保存済みのUseLocalEngineを直接反映（EnableCloudAiTranslationからの間接判定は不整合の原因）
+            var newUseLocalEngine = newSettings.UseLocalEngine;
             if (UseLocalEngine != newUseLocalEngine)
             {
                 _logger?.LogInformation(

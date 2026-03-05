@@ -1,6 +1,8 @@
 using Baketa.Core.Abstractions.Processing;
+using Baketa.Core.Settings;
 using Baketa.Infrastructure.Processing;
 using Baketa.Infrastructure.Processing.Strategies;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Baketa.Infrastructure.DI;
@@ -16,12 +18,26 @@ public static class ProcessingServiceExtensions
     /// </summary>
     /// <param name="services">サービスコレクション</param>
     /// <returns>サービスコレクション</returns>
-    public static IServiceCollection AddProcessingServices(this IServiceCollection services)
+    public static IServiceCollection AddProcessingServices(this IServiceCollection services, IConfiguration? configuration = null)
     {
         // 🎯 UltraThink Phase 21 修正: OCR処理パイプライン復旧のためのDI登録
 
         // 1. PipelineExecutionManager を登録（Strategy A: 排他制御実装）
         services.AddSingleton<IPipelineExecutionManager, PipelineExecutionManager>();
+
+        // [Issue #500] Detection-Onlyフィルタ用キャッシュ（Singleton: サイクル間で矩形を保持）
+        services.AddSingleton<IDetectionBoundsCache, DetectionBoundsCache>();
+
+        // [Issue #500] ImageChangeDetectionSettings をappsettings.jsonからバインド
+        var imageChangeSection = configuration?.GetSection("ImageChangeDetection");
+        if (imageChangeSection?.Exists() == true)
+        {
+            services.Configure<ImageChangeDetectionSettings>(imageChangeSection);
+        }
+        else
+        {
+            services.Configure<ImageChangeDetectionSettings>(options => { });
+        }
 
         // 2. SmartProcessingPipelineService本体を登録
         services.AddSingleton<ISmartProcessingPipelineService, SmartProcessingPipelineService>();

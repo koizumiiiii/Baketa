@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Drawing;
 using System.Text.RegularExpressions;
+using Baketa.Core.Abstractions.OCR;
 using Baketa.Core.Abstractions.Processing;
 using Baketa.Core.Models.Processing;
 using Microsoft.Extensions.Logging;
@@ -20,6 +22,9 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
 
     // [Issue #397] P0-2: タイプライター演出検出の状態管理
     private readonly ConcurrentDictionary<string, bool> _typewriterInProgress = new();
+
+    // [Issue #501] 前回のOCRテキスト領域キャッシュ（領域単位タイプライター判定用）
+    private readonly ConcurrentDictionary<string, List<OcrTextRegion>> _previousTextRegions = new();
 
     // [Issue #486] パイプライン連続低変化率ブロック検出。
     // 変化率が0超だがthreshold未満の状態が連続した場合、前回テキストをリセットして
@@ -58,6 +63,22 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                 return ProcessingStageResult.CreateError(StageType, "OCR結果が取得できません", stopwatch.Elapsed);
             }
 
+            // [Issue #500] Detection-Onlyフィルタによるスキップ → テキスト変化なしとして早期終了
+            if (ocrResult.DetectionOnlySkipped)
+            {
+                _logger.LogDebug("[Issue #500] Detection-Onlyフィルタでスキップ済み - テキスト変化なしとして処理");
+                var skipResult = new TextChangeDetectionResult
+                {
+                    HasTextChanged = false,
+                    ChangePercentage = 0f,
+                    PreviousText = context.Input.PreviousOcrText,
+                    CurrentText = context.Input.PreviousOcrText,
+                    ProcessingTime = stopwatch.Elapsed,
+                    AlgorithmUsed = "DetectionOnlySkip"
+                };
+                return ProcessingStageResult.CreateSuccess(StageType, skipResult);
+            }
+
             var currentText = ocrResult.DetectedText;
             var previousText = context.Input.PreviousOcrText;
             var contextId = context.Input.ContextId;
@@ -83,6 +104,8 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                 if (_typewriterInProgress.TryRemove(contextId, out _))
                 {
                     // タイプライター完了 → 最終テキストを翻訳対象にする
+                    // [Issue #501] 領域キャッシュもクリア
+                    _previousTextRegions.TryRemove(contextId, out _);
                     _logger.LogInformation(
                         "[Issue #397] タイプライター完了検出 - 最終テキストを翻訳 (Len={Len})",
                         currentText.Length);
@@ -95,22 +118,55 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                     changeResult = TextChangeResult.CreateNoChange(previousText, stopwatch.Elapsed);
                 }
             }
-            else if ((normalizedCurr.StartsWith(normalizedPrev, StringComparison.Ordinal) ||
-                      NormalizeSpaceless(normalizedCurr).StartsWith(NormalizeSpaceless(normalizedPrev), StringComparison.Ordinal))
-                     && normalizedCurr.Length > normalizedPrev.Length)
+            else if (normalizedCurr.Length > normalizedPrev.Length)
             {
-                // [Issue #397] P0-2: タイプライター演出検出
-                // 現在テキストが前回テキストを包含し末尾が成長 → 演出中と判定
-                _typewriterInProgress[contextId] = true;
-                _logger.LogDebug(
-                    "[Issue #397] タイプライター演出検出 - 翻訳を遅延 (PrevLen={PrevLen}, CurrLen={CurrLen}, Growth=+{Growth})",
-                    previousText.Length, currentText.Length, currentText.Length - previousText.Length);
-                changeResult = TextChangeResult.CreateNoChange(previousText, stopwatch.Elapsed);
+                // [Issue #501] 領域単位のタイプライター判定を優先
+                var currentRegions = ocrResult.TextChunks.OfType<OcrTextRegion>().ToList();
+                _previousTextRegions.TryGetValue(contextId, out var previousRegions);
+
+                var isTypewriter = false;
+
+                if (previousRegions != null && previousRegions.Count > 0 && currentRegions.Count > 0)
+                {
+                    // 領域単位の判定: 同一位置の領域内テキスト成長のみタイプライター
+                    isTypewriter = IsTypewriterByRegion(currentRegions, previousRegions);
+                    _logger.LogDebug(
+                        "[Issue #501] 領域単位タイプライター判定: Result={IsTypewriter}, CurrRegions={CurrCount}, PrevRegions={PrevCount}",
+                        isTypewriter, currentRegions.Count, previousRegions.Count);
+                }
+                else
+                {
+                    // フォールバック: 前回領域情報がない場合は既存の結合テキスト比較
+                    isTypewriter = normalizedCurr.StartsWith(normalizedPrev, StringComparison.Ordinal) ||
+                                   NormalizeSpaceless(normalizedCurr).StartsWith(NormalizeSpaceless(normalizedPrev), StringComparison.Ordinal);
+                    _logger.LogDebug(
+                        "[Issue #501] フォールバック判定（前回領域なし）: Result={IsTypewriter}, CurrRegions={CurrCount}",
+                        isTypewriter, currentRegions.Count);
+                }
+
+                if (isTypewriter)
+                {
+                    _typewriterInProgress[contextId] = true;
+                    _logger.LogDebug(
+                        "[Issue #501] タイプライター演出検出（領域単位） - 翻訳を遅延 (PrevLen={PrevLen}, CurrLen={CurrLen})",
+                        previousText.Length, currentText.Length);
+                    changeResult = TextChangeResult.CreateNoChange(previousText, stopwatch.Elapsed);
+                }
+                else
+                {
+                    // テキストは成長しているが、領域単位ではタイプライターではない（OCRカバレッジ差分等）
+                    // → 通常の変化検知に委任
+                    _typewriterInProgress.TryRemove(contextId, out _);
+                    changeResult = await _textChangeService.DetectTextChangeAsync(
+                        previousText, currentText, contextId).ConfigureAwait(false);
+                }
             }
             else
             {
                 // テキストが完全に異なる（シーン切替等） → タイプライター状態をクリアして通常判定
                 _typewriterInProgress.TryRemove(contextId, out _);
+                // [Issue #501] 領域キャッシュもクリア
+                _previousTextRegions.TryRemove(contextId, out _);
                 changeResult = await _textChangeService.DetectTextChangeAsync(
                     previousText, currentText, contextId).ConfigureAwait(false);
             }
@@ -172,6 +228,13 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
                 ProcessingTime = stopwatch.Elapsed,
                 AlgorithmUsed = changeResult.AlgorithmUsed.ToString()
             };
+
+            // [Issue #501] 今回のOCR領域を次回比較用に保存
+            var regionsToCache = ocrResult.TextChunks.OfType<OcrTextRegion>().ToList();
+            if (regionsToCache.Count > 0)
+            {
+                _previousTextRegions[contextId] = regionsToCache;
+            }
 
             return ProcessingStageResult.CreateSuccess(StageType, result);
         }
@@ -254,6 +317,58 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
     private static string NormalizeSpaceless(string text)
     {
         return text.Replace(" ", "");
+    }
+
+    /// <summary>
+    /// [Issue #501] 領域単位でタイプライター演出を判定。
+    /// 同一位置（IoU >= 閾値）の領域内でテキストが成長している場合のみタイプライター。
+    /// 新規領域の追加や、異なる位置の領域変化はタイプライターとみなさない。
+    /// </summary>
+    private bool IsTypewriterByRegion(
+        List<OcrTextRegion> currentRegions,
+        List<OcrTextRegion> previousRegions)
+    {
+        if (currentRegions.Count == 0 || previousRegions.Count == 0)
+            return false;
+
+        const float iouThreshold = 0.5f;
+        var hasGrowingRegion = false;
+
+        foreach (var current in currentRegions)
+        {
+            var matchedPrevious = previousRegions
+                .FirstOrDefault(prev => CalculateIoU(current.Bounds, prev.Bounds) >= iouThreshold);
+
+            if (matchedPrevious == null)
+                continue; // 新規領域 → タイプライター判定に関与しない
+
+            var normalizedCurr = NormalizeForComparison(current.Text);
+            var normalizedPrev = NormalizeForComparison(matchedPrevious.Text);
+
+            if (normalizedCurr.Length > normalizedPrev.Length &&
+                (normalizedCurr.StartsWith(normalizedPrev, StringComparison.Ordinal) ||
+                 NormalizeSpaceless(normalizedCurr).StartsWith(NormalizeSpaceless(normalizedPrev), StringComparison.Ordinal)))
+            {
+                hasGrowingRegion = true;
+            }
+        }
+
+        return hasGrowingRegion;
+    }
+
+    /// <summary>
+    /// [Issue #501] 2つの矩形のIoU（Intersection over Union）を計算
+    /// </summary>
+    internal static float CalculateIoU(Rectangle a, Rectangle b)
+    {
+        var intersection = Rectangle.Intersect(a, b);
+        if (intersection.IsEmpty)
+            return 0f;
+
+        float intersectionArea = (float)intersection.Width * intersection.Height;
+        float unionArea = ((float)a.Width * a.Height) + ((float)b.Width * b.Height) - intersectionArea;
+
+        return unionArea > 0 ? intersectionArea / unionArea : 0f;
     }
 
     [GeneratedRegex(@"\s+")]

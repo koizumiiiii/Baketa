@@ -13,7 +13,7 @@ namespace Baketa.Infrastructure.Translation.Onnx;
 /// NLLB-200 ONNX モデルを使用したローカル翻訳エンジン
 /// Python/gRPC サーバー不要で C# のみで推論を実行
 /// </summary>
-public sealed class OnnxTranslationEngine : TranslationEngineBase
+public sealed class OnnxTranslationEngine : TranslationEngineBase, IUnloadableTranslationEngine
 {
     private readonly string _modelDirectory;
     private readonly bool _useKvCache;
@@ -469,6 +469,42 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase
             }
         }
         return pairs.AsReadOnly();
+    }
+
+    /// <summary>
+    /// ONNXモデルをメモリからアンロードしてメモリを解放する。
+    /// 次回のTranslateAsync呼び出し時に自動で再ロードされる。
+    /// </summary>
+    public async Task UnloadModelsAsync()
+    {
+        await _inferenceLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (!IsInitialized)
+            {
+                Logger.LogDebug("ONNX models already unloaded");
+                return;
+            }
+
+            _encoderSession?.Dispose();
+            _encoderSession = null;
+
+            _decoderSession?.Dispose();
+            _decoderSession = null;
+
+            _decoderWithPastSession?.Dispose();
+            _decoderWithPastSession = null;
+
+            _tokenizer = null;
+
+            IsInitialized = false;
+
+            Logger.LogInformation("ONNX models unloaded - memory released (~1.6-2.4GB)");
+        }
+        finally
+        {
+            _inferenceLock.Release();
+        }
     }
 
     protected override void DisposeManagedResources()

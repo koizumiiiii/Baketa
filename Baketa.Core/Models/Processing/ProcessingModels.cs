@@ -507,6 +507,11 @@ public sealed record OcrExecutionResult
     public TimeSpan ProcessingTime { get; init; }
     public bool Success { get; init; } = true;
     public string? ErrorMessage { get; init; }
+
+    /// <summary>
+    /// [Issue #500] Detection-Onlyフィルタによりスキップされた場合true
+    /// </summary>
+    public bool DetectionOnlySkipped { get; init; }
 }
 
 /// <summary>

@@ -297,6 +297,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     windowManagerAdapter,
                     textChangeDetectionService,
                     provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationCache>(), // [Issue #415] Cloud翻訳キャッシュ
+                    provider.GetService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>(), // ONNXモデル オンデマンドロード/アンロード
                     logger);
             }
             catch (Exception ex)
