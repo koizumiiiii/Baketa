@@ -365,8 +365,8 @@ public partial class TextChangeDetectionStageStrategy : IProcessingStageStrategy
         if (intersection.IsEmpty)
             return 0f;
 
-        float intersectionArea = intersection.Width * intersection.Height;
-        float unionArea = (a.Width * a.Height) + (b.Width * b.Height) - intersectionArea;
+        float intersectionArea = (float)intersection.Width * intersection.Height;
+        float unionArea = ((float)a.Width * a.Height) + ((float)b.Width * b.Height) - intersectionArea;
 
         return unionArea > 0 ? intersectionArea / unionArea : 0f;
     }
