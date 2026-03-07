@@ -2088,38 +2088,21 @@ public class MainOverlayViewModel : ViewModelBase
     #region FirstRun
 
     /// <summary>
-    /// 初回起動チェックと設定画面自動表示
+    /// 初回起動チェック
+    /// [Issue #495] ウィザードはApp.axaml.csで処理済みのため、ここでは追加処理のみ
     /// </summary>
-    private async Task CheckAndHandleFirstRunAsync()
+    private Task CheckAndHandleFirstRunAsync()
     {
-        try
+        if (_firstRunService.IsFirstRun())
         {
-            Logger?.LogInformation("🔍 初回起動チェック開始");
-
-            if (_firstRunService.IsFirstRun())
-            {
-                Logger?.LogInformation("✅ 初回起動を検出 - 設定画面を自動表示します");
-
-                // UIスレッドで設定画面を開く
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    Logger?.LogInformation("🎯 設定画面を開きます");
-                    ExecuteSettings();
-                });
-
-                // 初回起動フラグをマーク
-                _firstRunService.MarkAsRun();
-                Logger?.LogInformation("✅ 初回起動フラグをマークしました");
-            }
-            else
-            {
-                Logger?.LogInformation("ℹ️ 2回目以降の起動です");
-            }
+            Logger?.LogDebug("[Issue #495] 初回起動（ウィザード未完了の可能性）");
         }
-        catch (Exception ex)
+        else
         {
-            Logger?.LogError(ex, "❌ 初回起動チェック処理でエラーが発生しました: {Message}", ex.Message);
+            Logger?.LogDebug("2回目以降の起動です");
         }
+
+        return Task.CompletedTask;
     }
 
     #endregion
