@@ -21,6 +21,7 @@ using Baketa.Core.Settings;
 using Baketa.Infrastructure.Platform.Windows.Capture;
 using Baketa.Infrastructure.Services;
 using Baketa.UI.Resources;
+using Baketa.UI.Configuration;
 using Baketa.UI.Services;
 using Baketa.UI.Utils;
 using Baketa.UI.ViewModels;
@@ -391,6 +392,9 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                     {
                         // 🔥 [ISSUE#167] デバッグ出力
                         Console.WriteLine("🔥🔥🔥 [AUTH_DEBUG] InvokeAsync開始 🔥🔥🔥");
+
+                        // --- 0. [Issue #495] 初回セットアップウィザード（ローディング前に表示） ---
+                        await CheckAndShowFirstRunWizardAsync(serviceProvider);
 
                         // --- 1. ローディング画面の準備 ---
                         _logger?.LogInformation("ローディング画面初期化開始");
@@ -1100,6 +1104,61 @@ internal sealed partial class App : Avalonia.Application, IDisposable
         {
             // クラッシュレポート処理の失敗はアプリ起動をブロックしない
             _logger?.LogWarning(ex, "[Issue #252] クラッシュレポート処理中にエラー（継続）");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #495] 初回セットアップウィザード表示
+    /// 初回起動時に母国語を選択させ、TargetLang + UI言語を自動設定
+    /// ConsentDialogの前に表示することで、同意画面も選択言語で表示される
+    /// </summary>
+    private async Task CheckAndShowFirstRunWizardAsync(IServiceProvider serviceProvider)
+    {
+        try
+        {
+            var firstRunService = serviceProvider.GetService<Infrastructure.Services.IFirstRunService>();
+            if (firstRunService == null || !firstRunService.IsFirstRun())
+            {
+                _logger?.LogDebug("[Issue #495] 初回起動ではないため、ウィザードをスキップ");
+                return;
+            }
+
+            _logger?.LogInformation("[Issue #495] 初回起動を検出 - セットアップウィザードを表示");
+
+            var localizationService = serviceProvider.GetRequiredService<ILocalizationService>();
+            var settingsFileManager = serviceProvider.GetRequiredService<SettingsFileManager>();
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+
+            var viewModel = new FirstRunWizardViewModel(
+                localizationService,
+                settingsFileManager,
+                firstRunService,
+                loggerFactory.CreateLogger<FirstRunWizardViewModel>());
+
+            var wizard = new FirstRunWizardWindow(viewModel);
+
+            // アイコン設定
+            try
+            {
+                var iconUri = new Uri(BAKETA_ICON_PATH);
+                wizard.Icon = new Avalonia.Controls.WindowIcon(Avalonia.Platform.AssetLoader.Open(iconUri));
+            }
+            catch (Exception iconEx)
+            {
+                Console.WriteLine($"[Issue #495] ウィザードアイコン設定失敗: {iconEx.Message}");
+            }
+
+            // ダイアログとして表示し、完了を待つ
+            wizard.Show();
+            var tcs = new TaskCompletionSource<bool>();
+            wizard.Closed += (_, _) => tcs.TrySetResult(viewModel.IsCompleted);
+            await tcs.Task.ConfigureAwait(true);
+
+            _logger?.LogInformation("[Issue #495] セットアップウィザード完了: IsCompleted={IsCompleted}", viewModel.IsCompleted);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "[Issue #495] セットアップウィザード処理中にエラー（継続）");
         }
     }
 

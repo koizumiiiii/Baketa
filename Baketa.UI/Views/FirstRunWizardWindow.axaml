@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Baketa.UI.ViewModels"
+        x:Class="Baketa.UI.Views.FirstRunWizardWindow"
+        Title="Baketa - Setup"
+        Width="460"
+        MinHeight="380"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="True"
+        Topmost="True"
+        x:DataType="vm:FirstRunWizardViewModel">
+
+    <Window.Styles>
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="24,10"/>
+            <Setter Property="MinWidth" Value="160"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+    </Window.Styles>
+
+    <StackPanel Margin="32" Spacing="24">
+        <!-- Logo + App Name -->
+        <StackPanel HorizontalAlignment="Center" Spacing="8">
+            <Image Source="avares://Baketa/Assets/Icons/baketa-256.png"
+                   Width="72" Height="72"
+                   HorizontalAlignment="Center"/>
+            <TextBlock Text="Baketa"
+                       FontSize="26"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Description -->
+        <TextBlock Text="Select your language / あなたの言語を選択してください"
+                   TextWrapping="Wrap"
+                   TextAlignment="Center"
+                   FontSize="14"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   HorizontalAlignment="Center"
+                   MaxWidth="380"/>
+
+        <!-- Language Selection -->
+        <ComboBox ItemsSource="{Binding AvailableLanguages}"
+                  SelectedItem="{Binding SelectedLanguage}"
+                  HorizontalAlignment="Stretch"
+                  MinHeight="40"
+                  FontSize="14">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding NativeName}" FontWeight="SemiBold"/>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+
+        <!-- Confirm Button -->
+        <Button Classes="primary"
+                Content="OK"
+                Command="{Binding ConfirmCommand}"
+                HorizontalAlignment="Center"
+                Name="ConfirmButton"/>
+    </StackPanel>
+</Window>
