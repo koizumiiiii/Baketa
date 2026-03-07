@@ -67,6 +67,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly IWindowManager? _windowManager; // [Issue #293] ウィンドウ情報取得用
     private readonly IOptionsMonitor<ImageChangeDetectionSettings>? _imageChangeSettings; // [Issue #401] 画面安定化設定
     private readonly ICloudTranslationCache? _cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
+    private readonly IDetectionBoundsCache? _detectionBoundsCache; // [Issue #508] Detection-Onlyキャッシュからのフォールバックヒント
     private bool _disposed;
 
     // [Issue #401] ヒステリシス: ウィンドウごとの画面安定化スキップ状態
@@ -85,6 +86,11 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     // [Issue #429] 前回サイクルのOCRヒントキャッシュ（次サイクルのFork-Joinに注入）
     // ゲーム画面ではテキスト位置が連続フレームでほぼ同じため、前回結果が有効なヒントになる
     private readonly ConcurrentDictionary<IntPtr, OcrHints> _previousOcrHintsCache = new();
+
+    // [Issue #508] Shot翻訳前Detection-Onlyの結果を直接受け渡すフィールド
+    // DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止
+    private volatile System.Drawing.Rectangle[]? _precomputedHintBounds;
+    private volatile int _precomputedHintImageHeight; // Detection実行時の画像高さ（座標系補正用）
 
 
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
@@ -123,6 +129,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         IWindowManager? windowManager = null, // [Issue #293] ウィンドウ情報取得用
         IOptionsMonitor<ImageChangeDetectionSettings>? imageChangeSettings = null, // [Issue #401] 画面安定化設定
         ICloudTranslationCache? cloudTranslationCache = null, // [Issue #415] Cloud翻訳キャッシュ
+        IDetectionBoundsCache? detectionBoundsCache = null, // [Issue #508] Detection-Onlyキャッシュからのフォールバックヒント
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -140,6 +147,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _windowManager = windowManager; // [Issue #293] ウィンドウ情報取得用
         _imageChangeSettings = imageChangeSettings; // [Issue #401] 画面安定化設定
         _cloudTranslationCache = cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
+        _detectionBoundsCache = detectionBoundsCache; // [Issue #508] Detection-Onlyキャッシュからのフォールバックヒント
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -223,6 +231,19 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         }
     }
 
+
+    /// <summary>
+    /// [Issue #508] Shot翻訳前のDetection-Only結果を直接設定する。
+    /// DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止。
+    /// 1回使用後に自動クリアされる。
+    /// </summary>
+    /// <param name="bounds">Detection-Only結果のバウンディングボックス配列</param>
+    /// <param name="imageHeight">Detection実行時の画像高さ（座標系補正用）</param>
+    public void SetPrecomputedHintBounds(System.Drawing.Rectangle[] bounds, int imageHeight)
+    {
+        _precomputedHintBounds = bounds;
+        _precomputedHintImageHeight = imageHeight;
+    }
 
     /// <summary>
     /// 座標ベース翻訳処理を実行
@@ -342,6 +363,46 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     // Fork-JoinではCloud AIとOCRが並列実行のため、現在のOCR結果は未取得。
                     // ゲーム画面ではテキスト位置が連続フレームでほぼ同じため、前回結果が有効なヒントになる。
                     _previousOcrHintsCache.TryGetValue(windowHandle, out var previousOcrHints);
+
+                    // [Issue #508] フォールバック1: Shot翻訳前Detection-Onlyの直接結果
+                    // DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止
+                    if (previousOcrHints == null)
+                    {
+                        var precomputed = Interlocked.Exchange(ref _precomputedHintBounds, null);
+                        if (precomputed is { Length: > 0 })
+                        {
+                            // Detection画像の高さを使用（boundsがDetection画像の座標系のため）
+                            var hintHeight = _precomputedHintImageHeight > 0 ? _precomputedHintImageHeight : forkJoinContextHeight;
+                            previousOcrHints = BuildOcrHintsFromBounds(precomputed, hintHeight);
+                            _logger?.LogInformation(
+                                "[Issue #508] Shot前Detection-Only結果からOCRヒントを構築: {Count}領域, Areas=[{Areas}], ImageHeight={Height}",
+                                previousOcrHints.TextRegionCount, string.Join(", ", previousOcrHints.TextAreas), hintHeight);
+                        }
+                    }
+
+                    // [Issue #508] フォールバック2: DetectionBoundsCacheから構築（Live翻訳用）
+                    // Detection-Onlyフィルタが毎サイクルで書き込むバウンディングボックスを活用
+                    if (previousOcrHints == null && _detectionBoundsCache != null)
+                    {
+                        try
+                        {
+                            var contextId = $"Window_{windowHandle.ToInt64()}";
+                            var cachedEntry = _detectionBoundsCache.GetPreviousEntry(contextId);
+                            if (cachedEntry?.Bounds is { Length: > 0 })
+                            {
+                                // キャッシュにはDetection画像の高さ情報がないため、bounds自体から推定
+                                var estimatedHeight = EstimateImageHeightFromBounds(cachedEntry.Bounds);
+                                previousOcrHints = BuildOcrHintsFromBounds(cachedEntry.Bounds, estimatedHeight);
+                                _logger?.LogInformation(
+                                    "[Issue #508] DetectionBoundsCacheからOCRヒントを構築: {Count}領域, Areas=[{Areas}], EstHeight={Height}",
+                                    previousOcrHints.TextRegionCount, string.Join(", ", previousOcrHints.TextAreas), estimatedHeight);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogDebug(ex, "[Issue #508] DetectionBoundsCacheからのヒント構築に失敗（ヒントなしで続行）");
+                        }
+                    }
 
                     forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
                         forkJoinImageBase64!,
@@ -1843,6 +1904,55 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// [Issue #508] Detection-Onlyのバウンディングボックスから軽量配置ヒントを生成
+    /// </summary>
+    /// <summary>
+    /// [Issue #508] DetectionBoundsCacheのboundsから画像高さを推定する。
+    /// キャッシュにはDetection画像の高さ情報がないため、boundsの最下端座標から推定。
+    /// </summary>
+    private static int EstimateImageHeightFromBounds(System.Drawing.Rectangle[] bounds)
+    {
+        var maxBottom = 0;
+        foreach (var rect in bounds)
+        {
+            var bottom = rect.Y + rect.Height;
+            if (bottom > maxBottom) maxBottom = bottom;
+        }
+        // 最下端の矩形が画面下部にあると仮定し、余裕を持たせて高さを推定
+        // 一般的なキャプチャ解像度: 720, 1080, 1440, 2160
+        return maxBottom switch
+        {
+            <= 800 => 720,
+            <= 1200 => 1080,
+            <= 1600 => 1440,
+            _ => 2160
+        };
+    }
+
+    internal static OcrHints BuildOcrHintsFromBounds(System.Drawing.Rectangle[] bounds, int contextHeight)
+    {
+        var areas = new List<string>();
+        var topThird = contextHeight / 3;
+        var bottomThird = contextHeight * 2 / 3;
+
+        foreach (var rect in bounds)
+        {
+            var centerY = rect.Y + rect.Height / 2;
+            var area = centerY < topThird ? "Top"
+                     : centerY < bottomThird ? "Center"
+                     : "Bottom";
+            if (!areas.Contains(area))
+                areas.Add(area);
+        }
+
+        return new OcrHints
+        {
+            TextRegionCount = bounds.Length,
+            TextAreas = areas.AsReadOnly()
+        };
     }
 
     /// <summary>
