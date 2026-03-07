@@ -419,6 +419,27 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                             _logger?.LogInformation("LoadingViewModel設定完了（フォールバック）");
                         }
 
+                        // --- 1.5 [Issue #511] 早期アップデートチェック（初期化ハング対策） ---
+                        _logger?.LogInformation("[Issue #511] 早期アップデートチェック開始");
+                        try
+                        {
+                            var pythonServerManager = serviceProvider.GetService<IPythonServerManager>();
+                            var updateLogger = serviceProvider.GetService<ILogger<UpdateService>>();
+                            _updateService = new UpdateService(pythonServerManager, updateLogger);
+
+                            var updateFound = await _updateService.CheckForUpdatesEarlyAsync(3000);
+                            if (updateFound)
+                            {
+                                _logger?.LogInformation("[Issue #511] 更新検出 - ユーザーに通知済み");
+                                // 「今すぐ更新」→ NetSparkleがDL＆再起動を処理
+                                // 「スキップ」→ 通常の初期化に進む
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "[Issue #511] 早期アップデートチェック失敗（継続）");
+                        }
+
                         // --- 2. アプリケーション初期化 ---
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 2: アプリケーション初期化開始");
                         var loadingStartTime = System.Diagnostics.Stopwatch.StartNew();
@@ -905,9 +926,28 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     {
         try
         {
+            // [Issue #511] 早期チェックで既に初期化済みの場合
+            if (_updateService != null)
+            {
+                _logger?.LogInformation("[Issue #511] UpdateService既に初期化済み - バックグラウンドチェックのみ");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(5000).ConfigureAwait(false);
+                        await _updateService.CheckForUpdatesInBackgroundAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "[Issue #249] サイレント更新チェック失敗（継続）");
+                    }
+                });
+                return;
+            }
+
+            // フォールバック: 早期チェックが実行されなかった場合の既存ロジック
             _logger?.LogInformation("[Issue #249] UpdateService初期化開始...");
 
-            // UpdateServiceをDI経由ではなく直接作成（現時点ではシンプルな実装）
             var pythonServerManager = serviceProvider.GetService<IPythonServerManager>();
             var updateLogger = serviceProvider.GetService<ILogger<UpdateService>>();
 
