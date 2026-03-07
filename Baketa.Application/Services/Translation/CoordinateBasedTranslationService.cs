@@ -90,6 +90,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     // [Issue #508] Shot翻訳前Detection-Onlyの結果を直接受け渡すフィールド
     // DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止
     private volatile System.Drawing.Rectangle[]? _precomputedHintBounds;
+    private volatile int _precomputedHintImageHeight; // Detection実行時の画像高さ（座標系補正用）
 
 
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
@@ -236,9 +237,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     /// DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止。
     /// 1回使用後に自動クリアされる。
     /// </summary>
-    public void SetPrecomputedHintBounds(System.Drawing.Rectangle[] bounds)
+    /// <param name="bounds">Detection-Only結果のバウンディングボックス配列</param>
+    /// <param name="imageHeight">Detection実行時の画像高さ（座標系補正用）</param>
+    public void SetPrecomputedHintBounds(System.Drawing.Rectangle[] bounds, int imageHeight)
     {
         _precomputedHintBounds = bounds;
+        _precomputedHintImageHeight = imageHeight;
     }
 
     /// <summary>
@@ -367,10 +371,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                         var precomputed = Interlocked.Exchange(ref _precomputedHintBounds, null);
                         if (precomputed is { Length: > 0 })
                         {
-                            previousOcrHints = BuildOcrHintsFromBounds(precomputed, forkJoinContextHeight);
+                            // Detection画像の高さを使用（boundsがDetection画像の座標系のため）
+                            var hintHeight = _precomputedHintImageHeight > 0 ? _precomputedHintImageHeight : forkJoinContextHeight;
+                            previousOcrHints = BuildOcrHintsFromBounds(precomputed, hintHeight);
                             _logger?.LogInformation(
-                                "[Issue #508] Shot前Detection-Only結果からOCRヒントを構築: {Count}領域, Areas=[{Areas}]",
-                                previousOcrHints.TextRegionCount, string.Join(", ", previousOcrHints.TextAreas));
+                                "[Issue #508] Shot前Detection-Only結果からOCRヒントを構築: {Count}領域, Areas=[{Areas}], ImageHeight={Height}",
+                                previousOcrHints.TextRegionCount, string.Join(", ", previousOcrHints.TextAreas), hintHeight);
                         }
                     }
 
@@ -384,10 +390,12 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                             var cachedEntry = _detectionBoundsCache.GetPreviousEntry(contextId);
                             if (cachedEntry?.Bounds is { Length: > 0 })
                             {
-                                previousOcrHints = BuildOcrHintsFromBounds(cachedEntry.Bounds, forkJoinContextHeight);
+                                // キャッシュにはDetection画像の高さ情報がないため、bounds自体から推定
+                                var estimatedHeight = EstimateImageHeightFromBounds(cachedEntry.Bounds);
+                                previousOcrHints = BuildOcrHintsFromBounds(cachedEntry.Bounds, estimatedHeight);
                                 _logger?.LogInformation(
-                                    "[Issue #508] DetectionBoundsCacheからOCRヒントを構築: {Count}領域, Areas=[{Areas}]",
-                                    previousOcrHints.TextRegionCount, string.Join(", ", previousOcrHints.TextAreas));
+                                    "[Issue #508] DetectionBoundsCacheからOCRヒントを構築: {Count}領域, Areas=[{Areas}], EstHeight={Height}",
+                                    previousOcrHints.TextRegionCount, string.Join(", ", previousOcrHints.TextAreas), estimatedHeight);
                             }
                         }
                         catch (Exception ex)
@@ -1901,6 +1909,29 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     /// <summary>
     /// [Issue #508] Detection-Onlyのバウンディングボックスから軽量配置ヒントを生成
     /// </summary>
+    /// <summary>
+    /// [Issue #508] DetectionBoundsCacheのboundsから画像高さを推定する。
+    /// キャッシュにはDetection画像の高さ情報がないため、boundsの最下端座標から推定。
+    /// </summary>
+    private static int EstimateImageHeightFromBounds(System.Drawing.Rectangle[] bounds)
+    {
+        var maxBottom = 0;
+        foreach (var rect in bounds)
+        {
+            var bottom = rect.Y + rect.Height;
+            if (bottom > maxBottom) maxBottom = bottom;
+        }
+        // 最下端の矩形が画面下部にあると仮定し、余裕を持たせて高さを推定
+        // 一般的なキャプチャ解像度: 720, 1080, 1440, 2160
+        return maxBottom switch
+        {
+            <= 800 => 720,
+            <= 1200 => 1080,
+            <= 1600 => 1440,
+            _ => 2160
+        };
+    }
+
     internal static OcrHints BuildOcrHintsFromBounds(System.Drawing.Rectangle[] bounds, int contextHeight)
     {
         var areas = new List<string>();

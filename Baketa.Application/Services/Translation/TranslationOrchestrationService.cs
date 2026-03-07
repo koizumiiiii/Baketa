@@ -1935,10 +1935,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 if (detectionBounds.Length > 0)
                 {
-                    _coordinateBasedTranslation.SetPrecomputedHintBounds(detectionBounds);
+                    _coordinateBasedTranslation.SetPrecomputedHintBounds(detectionBounds, currentImage!.Height);
                     _logger?.LogInformation(
-                        "[Issue #508] Shot翻訳前Detection-Only完了: {Count}個のテキスト領域を検出（直接パス）",
-                        detectionBounds.Length);
+                        "[Issue #508] Shot翻訳前Detection-Only完了: {Count}個のテキスト領域を検出（直接パス, ImageHeight={Height}）",
+                        detectionBounds.Length, currentImage!.Height);
                 }
             }
             catch (Exception ex)
