@@ -87,6 +87,10 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     // ゲーム画面ではテキスト位置が連続フレームでほぼ同じため、前回結果が有効なヒントになる
     private readonly ConcurrentDictionary<IntPtr, OcrHints> _previousOcrHintsCache = new();
 
+    // [Issue #508] Shot翻訳前Detection-Onlyの結果を直接受け渡すフィールド
+    // DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止
+    private volatile System.Drawing.Rectangle[]? _precomputedHintBounds;
+
 
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
     // Gemini Vision APIの処理時間はピクセル数に比例するため、テキスト翻訳に十分な解像度に縮小
@@ -228,6 +232,16 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
 
     /// <summary>
+    /// [Issue #508] Shot翻訳前のDetection-Only結果を直接設定する。
+    /// DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止。
+    /// 1回使用後に自動クリアされる。
+    /// </summary>
+    public void SetPrecomputedHintBounds(System.Drawing.Rectangle[] bounds)
+    {
+        _precomputedHintBounds = bounds;
+    }
+
+    /// <summary>
     /// 座標ベース翻訳処理を実行
     /// バッチOCR処理 → 複数ウィンドウオーバーレイ表示の統合フロー
     /// </summary>
@@ -346,13 +360,26 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     // ゲーム画面ではテキスト位置が連続フレームでほぼ同じため、前回結果が有効なヒントになる。
                     _previousOcrHintsCache.TryGetValue(windowHandle, out var previousOcrHints);
 
-                    // [Issue #508] フォールバック: 前回OCRヒントが空の場合、DetectionBoundsCacheから構築
+                    // [Issue #508] フォールバック1: Shot翻訳前Detection-Onlyの直接結果
+                    // DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止
+                    if (previousOcrHints == null)
+                    {
+                        var precomputed = Interlocked.Exchange(ref _precomputedHintBounds, null);
+                        if (precomputed is { Length: > 0 })
+                        {
+                            previousOcrHints = BuildOcrHintsFromBounds(precomputed, forkJoinContextHeight);
+                            _logger?.LogInformation(
+                                "[Issue #508] Shot前Detection-Only結果からOCRヒントを構築: {Count}領域, Areas=[{Areas}]",
+                                previousOcrHints.TextRegionCount, string.Join(", ", previousOcrHints.TextAreas));
+                        }
+                    }
+
+                    // [Issue #508] フォールバック2: DetectionBoundsCacheから構築（Live翻訳用）
                     // Detection-Onlyフィルタが毎サイクルで書き込むバウンディングボックスを活用
                     if (previousOcrHints == null && _detectionBoundsCache != null)
                     {
                         try
                         {
-                            // ProcessingPipelineInput.ContextId と同じ形式で統一
                             var contextId = $"Window_{windowHandle.ToInt64()}";
                             var cachedEntry = _detectionBoundsCache.GetPreviousEntry(contextId);
                             if (cachedEntry?.Bounds is { Length: > 0 })

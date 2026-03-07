@@ -96,9 +96,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // [Issue #415] Cloud翻訳キャッシュ
     private readonly ICloudTranslationCache? _cloudTranslationCache;
 
-    // [Issue #508] Shot翻訳前のDetection-Only実行用
-    private readonly IDetectionBoundsCache? _detectionBoundsCache;
-
     // ONNXモデル オンデマンドロード/アンロード用
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
 
@@ -197,7 +194,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? textChangeDetectionService = null,
         ICloudTranslationCache? cloudTranslationCache = null, // [Issue #415] Cloud翻訳キャッシュ
         IUnifiedSettingsService? unifiedSettingsService = null, // ONNXモデル オンデマンドロード/アンロード
-        IDetectionBoundsCache? detectionBoundsCache = null, // [Issue #508] Shot翻訳前のDetection-Only用
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -221,7 +217,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _textChangeDetectionService = textChangeDetectionService;
         _cloudTranslationCache = cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
         _unifiedSettingsService = unifiedSettingsService;
-        _detectionBoundsCache = detectionBoundsCache; // [Issue #508]
         _logger = logger;
 
         // 設定変更時にONNXモデルのロード/アンロードをトリガー
@@ -1925,9 +1920,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             return (null, null);
         }
 
-        // [Issue #508] Shot翻訳前にDetection-Onlyを実行してOCRヒントをキャッシュ
-        // Fork-Join開始時にCoordinateBasedTranslationServiceがDetectionBoundsCacheからヒントを読み取る
-        if (_detectionBoundsCache != null && _targetWindowHandle.HasValue)
+        // [Issue #508] Shot翻訳前にDetection-Onlyを実行してOCRヒントを直接渡す
+        // DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止
+        if (_coordinateBasedTranslation != null && _targetWindowHandle.HasValue)
         {
             try
             {
@@ -1940,11 +1935,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
                 if (detectionBounds.Length > 0)
                 {
-                    var contextId = $"Window_{_targetWindowHandle.Value.ToInt64()}";
-                    _detectionBoundsCache.UpdateEntry(contextId,
-                        new DetectionCacheEntry(detectionBounds, []));
+                    _coordinateBasedTranslation.SetPrecomputedHintBounds(detectionBounds);
                     _logger?.LogInformation(
-                        "[Issue #508] Shot翻訳前Detection-Only完了: {Count}個のテキスト領域を検出",
+                        "[Issue #508] Shot翻訳前Detection-Only完了: {Count}個のテキスト領域を検出（直接パス）",
                         detectionBounds.Length);
                 }
             }

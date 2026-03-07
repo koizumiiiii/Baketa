@@ -299,7 +299,6 @@ public sealed class ApplicationModule : ServiceModuleBase
                     textChangeDetectionService,
                     provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationCache>(), // [Issue #415] Cloud翻訳キャッシュ
                     provider.GetService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>(), // ONNXモデル オンデマンドロード/アンロード
-                    provider.GetService<Baketa.Core.Abstractions.Processing.IDetectionBoundsCache>(), // [Issue #508] Shot翻訳前のDetection-Only用
                     logger);
             }
             catch (Exception ex)
