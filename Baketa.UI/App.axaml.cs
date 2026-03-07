@@ -665,27 +665,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                     _logger?.LogWarning(singleshotEx, "SingleshotEventProcessor登録失敗");
                 }
 
-                // 📊 [Issue #269] AnalyticsEventProcessor登録 - 翻訳イベントの使用統計記録
-                // [Issue #297] 名前空間修正: Core.Events.TranslationEvents → Core.Translation.Events
-                // [Issue #307] 両方の名前空間のTranslationCompletedEventに対応
-                try
-                {
-                    var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-
-                    // Core.Translation.Events.TranslationCompletedEvent 購読（StandardTranslationPipeline用）
-                    var analyticsProcessor1 = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>();
-                    eventAggregator.Subscribe<Baketa.Core.Translation.Events.TranslationCompletedEvent>(analyticsProcessor1);
-
-                    // Core.Events.EventTypes.TranslationCompletedEvent 購読（TranslationPipelineService用）
-                    var analyticsProcessor2 = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>();
-                    eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>(analyticsProcessor2);
-
-                    Console.WriteLine("✅ AnalyticsEventProcessor登録完了（両イベントタイプ対応）");
-                }
-                catch (Exception analyticsEx)
-                {
-                    _logger?.LogWarning(analyticsEx, "[Issue #307] AnalyticsEventProcessor登録失敗（継続）");
-                }
+                // 📊 [Issue #506] AnalyticsEventProcessorの登録はEventHandlerInitializationServiceで実施
+                // （App.axaml.csとの二重登録を解消）
 
                 // 🔧 [Issue #300] OcrRecoveryEventProcessor登録 - OCRサーバー復旧時のユーザー通知
                 try

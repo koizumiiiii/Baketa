@@ -41,7 +41,10 @@ public class LoadingViewModel : ViewModelBase
         ["resolve_dependencies"] = 15,  // 依存関係解決
         ["load_ocr"] = 20,              // OCRエンジン読み込み
         ["init_translation"] = 15,      // 翻訳エンジン初期化
-        ["prepare_ui"] = 10             // UI準備
+        ["prepare_ui"] = 10,            // UI準備
+        // [Issue #507] フェーズグループ通知（重み0: 個別ステップで進捗管理するため）
+        ["parallel_init"] = 0,          // Phase 1 開始通知
+        ["parallel_engines"] = 0        // Phase 3 開始通知
     };
 
     /// <summary>
@@ -122,7 +125,10 @@ public class LoadingViewModel : ViewModelBase
             new("resolve_dependencies", Strings.Loading_ResolvingDependencies),
             new("load_ocr", Strings.Loading_LoadingOCR),
             new("init_translation", Strings.Loading_InitializingTranslation),
-            new("prepare_ui", Strings.Loading_PreparingUI)
+            new("prepare_ui", Strings.Loading_PreparingUI),
+            // [Issue #507] フェーズグループ通知ステップ（UIには表示されないが、進捗イベント受信用）
+            new("parallel_init", Strings.Loading_ResolvingDependencies),
+            new("parallel_engines", Strings.Loading_LoadingOCR)
         ];
 
         // [Issue #259] Tips文字列を初期化（リソースファイルから取得）
