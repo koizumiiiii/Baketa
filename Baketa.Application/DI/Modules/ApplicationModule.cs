@@ -224,6 +224,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     windowManager, // [Issue #293] ウィンドウ情報取得用
                     provider.GetService<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.ImageChangeDetectionSettings>>(), // [Issue #401] 画面安定化設定
                     provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationCache>(), // [Issue #415] Cloud翻訳キャッシュ
+                    provider.GetService<Baketa.Core.Abstractions.Processing.IDetectionBoundsCache>(), // [Issue #508] Detection-Onlyキャッシュからのフォールバックヒント
                     logger);
                 Console.WriteLine("✅ [OPTION_A] CoordinateBasedTranslationService インスタンス作成完了 - 画面変化検知＋テキスト変化検知＋Singleshotバイパス＋Fork-Join＋Gate統合済み");
                 return instance;
@@ -298,6 +299,7 @@ public sealed class ApplicationModule : ServiceModuleBase
                     textChangeDetectionService,
                     provider.GetService<Baketa.Core.Abstractions.Translation.ICloudTranslationCache>(), // [Issue #415] Cloud翻訳キャッシュ
                     provider.GetService<Baketa.Core.Abstractions.Settings.IUnifiedSettingsService>(), // ONNXモデル オンデマンドロード/アンロード
+                    provider.GetService<Baketa.Core.Abstractions.Processing.IDetectionBoundsCache>(), // [Issue #508] Shot翻訳前のDetection-Only用
                     logger);
             }
             catch (Exception ex)

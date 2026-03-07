@@ -92,6 +92,7 @@ public class TranslationOrchestrationServiceTests : IDisposable
             null, // textChangeDetectionService（Issue #410: テスト用にnull）
             null, // cloudTranslationCache（Issue #415: テスト用にnull）
             null, // unifiedSettingsService（ONNXモデル オンデマンドロード/アンロード: テスト用にnull）
+            null, // detectionBoundsCache（Issue #508: テスト用にnull）
             _loggerMock.Object);
     }
 

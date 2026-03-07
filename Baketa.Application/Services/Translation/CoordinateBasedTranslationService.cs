@@ -67,6 +67,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private readonly IWindowManager? _windowManager; // [Issue #293] ウィンドウ情報取得用
     private readonly IOptionsMonitor<ImageChangeDetectionSettings>? _imageChangeSettings; // [Issue #401] 画面安定化設定
     private readonly ICloudTranslationCache? _cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
+    private readonly IDetectionBoundsCache? _detectionBoundsCache; // [Issue #508] Detection-Onlyキャッシュからのフォールバックヒント
     private bool _disposed;
 
     // [Issue #401] ヒステリシス: ウィンドウごとの画面安定化スキップ状態
@@ -123,6 +124,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         IWindowManager? windowManager = null, // [Issue #293] ウィンドウ情報取得用
         IOptionsMonitor<ImageChangeDetectionSettings>? imageChangeSettings = null, // [Issue #401] 画面安定化設定
         ICloudTranslationCache? cloudTranslationCache = null, // [Issue #415] Cloud翻訳キャッシュ
+        IDetectionBoundsCache? detectionBoundsCache = null, // [Issue #508] Detection-Onlyキャッシュからのフォールバックヒント
         ILogger<CoordinateBasedTranslationService>? logger = null)
     {
         _processingFacade = processingFacade ?? throw new ArgumentNullException(nameof(processingFacade));
@@ -140,6 +142,7 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         _windowManager = windowManager; // [Issue #293] ウィンドウ情報取得用
         _imageChangeSettings = imageChangeSettings; // [Issue #401] 画面安定化設定
         _cloudTranslationCache = cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
+        _detectionBoundsCache = detectionBoundsCache; // [Issue #508] Detection-Onlyキャッシュからのフォールバックヒント
         _logger = logger;
 
         // 🚀 [Phase 2.1] Service Locator Anti-pattern除去: ファサード経由でEventAggregatorを取得
@@ -342,6 +345,29 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                     // Fork-JoinではCloud AIとOCRが並列実行のため、現在のOCR結果は未取得。
                     // ゲーム画面ではテキスト位置が連続フレームでほぼ同じため、前回結果が有効なヒントになる。
                     _previousOcrHintsCache.TryGetValue(windowHandle, out var previousOcrHints);
+
+                    // [Issue #508] フォールバック: 前回OCRヒントが空の場合、DetectionBoundsCacheから構築
+                    // Detection-Onlyフィルタが毎サイクルで書き込むバウンディングボックスを活用
+                    if (previousOcrHints == null && _detectionBoundsCache != null)
+                    {
+                        try
+                        {
+                            // ProcessingPipelineInput.ContextId と同じ形式で統一
+                            var contextId = $"Window_{windowHandle.ToInt64()}";
+                            var cachedEntry = _detectionBoundsCache.GetPreviousEntry(contextId);
+                            if (cachedEntry?.Bounds is { Length: > 0 })
+                            {
+                                previousOcrHints = BuildOcrHintsFromBounds(cachedEntry.Bounds, forkJoinContextHeight);
+                                _logger?.LogInformation(
+                                    "[Issue #508] DetectionBoundsCacheからOCRヒントを構築: {Count}領域, Areas=[{Areas}]",
+                                    previousOcrHints.TextRegionCount, string.Join(", ", previousOcrHints.TextAreas));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogDebug(ex, "[Issue #508] DetectionBoundsCacheからのヒント構築に失敗（ヒントなしで続行）");
+                        }
+                    }
 
                     forkJoinCloudTask = ExecuteForkJoinCloudTranslationAsync(
                         forkJoinImageBase64!,
@@ -1843,6 +1869,32 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// [Issue #508] Detection-Onlyのバウンディングボックスから軽量配置ヒントを生成
+    /// </summary>
+    internal static OcrHints BuildOcrHintsFromBounds(System.Drawing.Rectangle[] bounds, int contextHeight)
+    {
+        var areas = new List<string>();
+        var topThird = contextHeight / 3;
+        var bottomThird = contextHeight * 2 / 3;
+
+        foreach (var rect in bounds)
+        {
+            var centerY = rect.Y + rect.Height / 2;
+            var area = centerY < topThird ? "Top"
+                     : centerY < bottomThird ? "Center"
+                     : "Bottom";
+            if (!areas.Contains(area))
+                areas.Add(area);
+        }
+
+        return new OcrHints
+        {
+            TextRegionCount = bounds.Length,
+            TextAreas = areas.AsReadOnly()
+        };
     }
 
     /// <summary>

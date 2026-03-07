@@ -96,6 +96,9 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // [Issue #415] Cloud翻訳キャッシュ
     private readonly ICloudTranslationCache? _cloudTranslationCache;
 
+    // [Issue #508] Shot翻訳前のDetection-Only実行用
+    private readonly IDetectionBoundsCache? _detectionBoundsCache;
+
     // ONNXモデル オンデマンドロード/アンロード用
     private readonly IUnifiedSettingsService? _unifiedSettingsService;
 
@@ -194,6 +197,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? textChangeDetectionService = null,
         ICloudTranslationCache? cloudTranslationCache = null, // [Issue #415] Cloud翻訳キャッシュ
         IUnifiedSettingsService? unifiedSettingsService = null, // ONNXモデル オンデマンドロード/アンロード
+        IDetectionBoundsCache? detectionBoundsCache = null, // [Issue #508] Shot翻訳前のDetection-Only用
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -217,6 +221,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _textChangeDetectionService = textChangeDetectionService;
         _cloudTranslationCache = cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
         _unifiedSettingsService = unifiedSettingsService;
+        _detectionBoundsCache = detectionBoundsCache; // [Issue #508]
         _logger = logger;
 
         // 設定変更時にONNXモデルのロード/アンロードをトリガー
@@ -1918,6 +1923,35 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         {
             _logger?.LogDebug("❌ 画面キャプチャが失敗しました: ID={Id}", translationId);
             return (null, null);
+        }
+
+        // [Issue #508] Shot翻訳前にDetection-Onlyを実行してOCRヒントをキャッシュ
+        // Fork-Join開始時にCoordinateBasedTranslationServiceがDetectionBoundsCacheからヒントを読み取る
+        if (_detectionBoundsCache != null && _targetWindowHandle.HasValue)
+        {
+            try
+            {
+                var detectionResults = await _ocrEngine.DetectTextRegionsAsync(currentImage!, cancellationToken)
+                    .ConfigureAwait(false);
+                var detectionBounds = detectionResults.TextRegions
+                    .Select(r => r.Bounds)
+                    .Where(b => b.Width > 0 && b.Height > 0)
+                    .ToArray();
+
+                if (detectionBounds.Length > 0)
+                {
+                    var contextId = $"Window_{_targetWindowHandle.Value.ToInt64()}";
+                    _detectionBoundsCache.UpdateEntry(contextId,
+                        new DetectionCacheEntry(detectionBounds, []));
+                    _logger?.LogInformation(
+                        "[Issue #508] Shot翻訳前Detection-Only完了: {Count}個のテキスト領域を検出",
+                        detectionBounds.Length);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "[Issue #508] Shot翻訳前Detection-Only失敗（ヒントなしで続行）");
+            }
         }
 
         // 翻訳実行
