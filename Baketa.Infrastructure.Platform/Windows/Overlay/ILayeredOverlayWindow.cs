@@ -94,6 +94,16 @@ public interface ILayeredOverlayWindow : IDisposable
     void SetFontSize(float fontSize);
 
     /// <summary>
+    /// フォントファミリーを設定
+    /// </summary>
+    /// <param name="fontFamily">フォントファミリー名（例: "Yu Gothic UI", "Malgun Gothic"）</param>
+    /// <remarks>
+    /// ターゲット言語に応じたシステムフォントを指定。
+    /// GDI描画で使用されるため、システムにインストールされたフォント名を指定する。
+    /// </remarks>
+    void SetFontFamily(string fontFamily);
+
+    /// <summary>
     /// ウィンドウが表示中かどうか
     /// </summary>
     bool IsVisible { get; }

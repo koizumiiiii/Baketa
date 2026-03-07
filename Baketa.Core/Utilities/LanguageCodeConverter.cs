@@ -20,15 +20,51 @@ public static class LanguageCodeConverter
         // 英語
         { "English", "en" },
         { "英語", "en" },
-        
+
         // 日本語
         { "Japanese", "ja" },
         { "日本語", "ja" },
-        
+
         // 中国語
         { "Chinese", "zh" },
         { "中国語", "zh" },
-        
+        { "Chinese (Simplified)", "zh-CN" },
+        { "简体中文", "zh-CN" },
+        { "簡体字中国語", "zh-CN" },
+        { "Chinese (Traditional)", "zh-TW" },
+        { "繁體中文", "zh-TW" },
+        { "繁体字中国語", "zh-TW" },
+
+        // 韓国語
+        { "Korean", "ko" },
+        { "한국어", "ko" },
+        { "韓国語", "ko" },
+
+        // フランス語
+        { "French", "fr" },
+        { "Français", "fr" },
+        { "フランス語", "fr" },
+
+        // ドイツ語
+        { "German", "de" },
+        { "Deutsch", "de" },
+        { "ドイツ語", "de" },
+
+        // イタリア語
+        { "Italian", "it" },
+        { "Italiano", "it" },
+        { "イタリア語", "it" },
+
+        // スペイン語
+        { "Spanish", "es" },
+        { "Español", "es" },
+        { "スペイン語", "es" },
+
+        // ポルトガル語
+        { "Portuguese", "pt" },
+        { "Português", "pt" },
+        { "ポルトガル語", "pt" },
+
         // 自動検出
         { "Auto", "auto" },
         { "自動", "auto" },
@@ -43,6 +79,14 @@ public static class LanguageCodeConverter
         { "en", "English" },
         { "ja", "Japanese" },
         { "zh", "Chinese" },
+        { "zh-cn", "Chinese (Simplified)" },
+        { "zh-tw", "Chinese (Traditional)" },
+        { "ko", "Korean" },
+        { "fr", "French" },
+        { "de", "German" },
+        { "it", "Italian" },
+        { "es", "Spanish" },
+        { "pt", "Portuguese" },
         { "auto", "Auto" }
     };
 
@@ -54,6 +98,14 @@ public static class LanguageCodeConverter
         { "en", "英語" },
         { "ja", "日本語" },
         { "zh", "中国語" },
+        { "zh-cn", "簡体字中国語" },
+        { "zh-tw", "繁体字中国語" },
+        { "ko", "韓国語" },
+        { "fr", "フランス語" },
+        { "de", "ドイツ語" },
+        { "it", "イタリア語" },
+        { "es", "スペイン語" },
+        { "pt", "ポルトガル語" },
         { "auto", "自動" }
     };
 
@@ -112,8 +164,15 @@ public static class LanguageCodeConverter
             "en" => "en",
             "ja" => "ja",
             "zh-CN" or "zh" => "zh",
+            "zh-TW" => "zh-TW",
+            "ko" => "ko",
+            "fr" => "fr",
+            "de" => "de",
+            "it" => "it",
+            "es" => "es",
+            "pt" => "pt",
             "auto" => "auto",
-            _ => "en"
+            _ => language.Code
         };
     }
 
@@ -134,7 +193,14 @@ public static class LanguageCodeConverter
         {
             "en" => Language.English,
             "ja" => Language.Japanese,
-            "zh" => Language.ChineseSimplified,
+            "zh" or "zh-cn" => Language.ChineseSimplified,
+            "zh-tw" => Language.ChineseTraditional,
+            "ko" => Language.Korean,
+            "fr" => Language.French,
+            "de" => Language.German,
+            "it" => Language.Italian,
+            "es" => Language.Spanish,
+            "pt" => Language.Portuguese,
             "auto" => Language.Auto,
             _ => fallbackLanguage
         };

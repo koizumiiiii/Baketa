@@ -102,6 +102,12 @@ public sealed class LayeredOverlayWindowAdapter : IOverlayWindow
         // contentがOverlayContentの場合
         if (content is OverlayContent overlayContent)
         {
+            // フォントファミリーが指定されている場合は設定
+            if (!string.IsNullOrEmpty(overlayContent.FontFamily))
+            {
+                _layeredWindow.SetFontFamily(overlayContent.FontFamily);
+            }
+
             // フォントサイズが指定されている場合は設定
             if (overlayContent.FontSize.HasValue)
             {

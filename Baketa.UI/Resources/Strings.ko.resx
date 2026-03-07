@@ -1,0 +1,1751 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="0" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ========== App General ========== -->
+  <data name="App_Title" xml:space="preserve">
+    <value>Baketa</value>
+  </data>
+  <data name="App_LoadingMessage" xml:space="preserve">
+    <value>로딩 중...</value>
+  </data>
+  <data name="App_ErrorTitle" xml:space="preserve">
+    <value>오류</value>
+  </data>
+  <data name="App_Version" xml:space="preserve">
+    <value>현재 버전: {0}</value>
+  </data>
+  <data name="App_Copyright" xml:space="preserve">
+    <value>© 2024 Baketa. All rights reserved.</value>
+  </data>
+
+  <!-- ========== Common Buttons ========== -->
+  <data name="Common_Save" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="Common_Apply" xml:space="preserve">
+    <value>적용</value>
+  </data>
+  <data name="Common_Reset" xml:space="preserve">
+    <value>초기화</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>닫기</value>
+  </data>
+  <data name="Common_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>예</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>아니오</value>
+  </data>
+  <data name="Common_Help" xml:space="preserve">
+    <value>도움말</value>
+  </data>
+  <data name="Common_Loading" xml:space="preserve">
+    <value>로딩 중...</value>
+  </data>
+  <data name="Common_Or" xml:space="preserve">
+    <value>또는</value>
+  </data>
+  <data name="Common_Submit" xml:space="preserve">
+    <value>제출</value>
+  </data>
+
+  <!-- ========== Main Overlay ========== -->
+  <data name="MainOverlay_Minimize" xml:space="preserve">
+    <value>최소화</value>
+  </data>
+  <data name="MainOverlay_SelectWindow" xml:space="preserve">
+    <value>대상 창 선택</value>
+  </data>
+  <data name="MainOverlay_Target" xml:space="preserve">
+    <value>대상</value>
+  </data>
+  <data name="MainOverlay_ShowHideTranslation" xml:space="preserve">
+    <value>번역 표시/숨기기</value>
+  </data>
+  <data name="MainOverlay_LiveTranslation" xml:space="preserve">
+    <value>실시간 번역</value>
+  </data>
+  <data name="MainOverlay_ShotTranslation" xml:space="preserve">
+    <value>샷 번역</value>
+  </data>
+  <data name="MainOverlay_Preparing" xml:space="preserve">
+    <value>준비 중</value>
+  </data>
+  <data name="MainOverlay_ShowTranslation" xml:space="preserve">
+    <value>번역 표시</value>
+  </data>
+  <data name="MainOverlay_Settings" xml:space="preserve">
+    <value>설정</value>
+  </data>
+  <data name="MainOverlay_Exit" xml:space="preserve">
+    <value>종료</value>
+  </data>
+  <data name="MainOverlay_DragToMove" xml:space="preserve">
+    <value>드래그하여 이동</value>
+  </data>
+  <data name="MainOverlay_Expand" xml:space="preserve">
+    <value>펼치기</value>
+  </data>
+  <data name="MainOverlay_SelectedWindow" xml:space="preserve">
+    <value>[선택됨: {0}]</value>
+  </data>
+  <data name="MainOverlay_TranslationCount" xml:space="preserve">
+    <value>번역 완료: {0}</value>
+  </data>
+
+  <!-- ========== Home View ========== -->
+  <data name="Home_QuickStart" xml:space="preserve">
+    <value>빠른 시작</value>
+  </data>
+  <data name="Home_StartCapture" xml:space="preserve">
+    <value>캡처 시작</value>
+  </data>
+  <data name="Home_CaptureSettings" xml:space="preserve">
+    <value>캡처 설정</value>
+  </data>
+  <data name="Home_TranslationSettings" xml:space="preserve">
+    <value>번역 설정</value>
+  </data>
+  <data name="Home_RecentTranslations" xml:space="preserve">
+    <value>최근 번역</value>
+  </data>
+  <data name="Home_ViewAll" xml:space="preserve">
+    <value>전체 보기</value>
+  </data>
+  <data name="Home_NoHistory" xml:space="preserve">
+    <value>아직 번역 기록이 없습니다</value>
+  </data>
+  <data name="Home_UsageStatistics" xml:space="preserve">
+    <value>사용 통계</value>
+  </data>
+  <data name="Home_CaptureStatus" xml:space="preserve">
+    <value>캡처 상태:</value>
+  </data>
+  <data name="Home_TranslationEngine" xml:space="preserve">
+    <value>번역 엔진:</value>
+  </data>
+  <data name="Home_TargetLanguage" xml:space="preserve">
+    <value>대상 언어:</value>
+  </data>
+  <data name="Home_MemoryUsage" xml:space="preserve">
+    <value>메모리 사용량:</value>
+  </data>
+  <data name="Home_RunningTime" xml:space="preserve">
+    <value>실행 시간:</value>
+  </data>
+  <data name="Home_Tips" xml:space="preserve">
+    <value>팁</value>
+  </data>
+  <data name="Home_Tip_OpenTabs" xml:space="preserve">
+    <value>왼쪽 탭에서 각 기능을 열 수 있습니다</value>
+  </data>
+  <data name="Home_Tip_SelectArea" xml:space="preserve">
+    <value>캡처를 시작하기 전에 게임 화면에서 번역할 영역을 선택하세요</value>
+  </data>
+  <data name="Home_Tip_OverlaySettings" xml:space="preserve">
+    <value>오버레이 설정에서 표시 위치와 글꼴을 사용자 지정할 수 있습니다</value>
+  </data>
+  <data name="Home_Tip_TranslationHistory" xml:space="preserve">
+    <value>번역 기록에서 이전 번역을 확인할 수 있습니다</value>
+  </data>
+
+  <!-- ========== Settings Window ========== -->
+  <data name="Settings_Title" xml:space="preserve">
+    <value>설정</value>
+  </data>
+
+  <!-- ========== General Settings ========== -->
+  <data name="Settings_General_Title" xml:space="preserve">
+    <value>일반 설정</value>
+  </data>
+  <data name="Settings_General_Subtitle" xml:space="preserve">
+    <value>기본 애플리케이션 설정</value>
+  </data>
+  <data name="Settings_General_Appearance" xml:space="preserve">
+    <value>외관</value>
+  </data>
+  <data name="Settings_General_Theme" xml:space="preserve">
+    <value>테마</value>
+  </data>
+  <data name="Settings_General_ThemeDescription" xml:space="preserve">
+    <value>애플리케이션 색상 테마를 선택합니다</value>
+  </data>
+  <data name="Settings_General_ThemeLight" xml:space="preserve">
+    <value>밝은 테마</value>
+  </data>
+  <data name="Settings_General_ThemeDark" xml:space="preserve">
+    <value>어두운 테마</value>
+  </data>
+  <data name="Settings_General_ThemeAuto" xml:space="preserve">
+    <value>자동 (시스템 설정 따름)</value>
+  </data>
+  <data name="Settings_General_Translation" xml:space="preserve">
+    <value>번역 설정</value>
+  </data>
+  <data name="Settings_General_TranslationEngine" xml:space="preserve">
+    <value>번역 엔진</value>
+  </data>
+  <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
+    <value>사용할 번역 엔진을 선택합니다</value>
+  </data>
+  <data name="Settings_General_EXMode" xml:space="preserve">
+    <value>EX 모드</value>
+  </data>
+  <data name="Settings_General_EXModeDescription" xml:space="preserve">
+    <value>고정밀 EX 번역 엔진을 사용합니다</value>
+  </data>
+  <data name="Settings_General_OfflineTranslation" xml:space="preserve">
+    <value>오프라인 번역</value>
+  </data>
+  <data name="Settings_General_AITranslation" xml:space="preserve">
+    <value>EX 번역</value>
+  </data>
+  <data name="Settings_General_AlphaNote" xml:space="preserve">
+    <value>* 알파 테스트에서는 오프라인 번역만 사용할 수 있습니다</value>
+  </data>
+  <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
+    <value>Pro/Premium/Ultimate 플랜에서 사용할 수 있습니다</value>
+  </data>
+  <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
+    <value>이번 달 사용량:</value>
+  </data>
+  <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
+    <value></value>
+  </data>
+  <data name="Settings_General_TranslationLanguage" xml:space="preserve">
+    <value>번역 언어</value>
+  </data>
+  <data name="Settings_General_TranslationLanguageDescription" xml:space="preserve">
+    <value>원본 언어와 대상 언어를 선택합니다</value>
+  </data>
+  <data name="Settings_General_FontSize" xml:space="preserve">
+    <value>번역 글꼴 크기</value>
+  </data>
+  <data name="Settings_General_FontSizeDescription" xml:space="preserve">
+    <value>오버레이에 표시되는 번역 텍스트의 크기</value>
+  </data>
+  <data name="Settings_General_FontSizeUnit" xml:space="preserve">
+    <value>px</value>
+  </data>
+  <data name="Settings_General_LanguagePairWarning" xml:space="preserve">
+    <value>* 원본 언어와 대상 언어를 다르게 선택해 주세요</value>
+  </data>
+  <data name="Settings_General_Language" xml:space="preserve">
+    <value>언어</value>
+  </data>
+  <data name="Settings_General_LanguageDescription" xml:space="preserve">
+    <value>애플리케이션 표시 언어를 선택합니다</value>
+  </data>
+  <data name="Settings_General_LanguageJapanese" xml:space="preserve">
+    <value>일본어</value>
+  </data>
+  <data name="Settings_General_LanguageEnglish" xml:space="preserve">
+    <value>영어</value>
+  </data>
+
+  <!-- ========== Translation Settings ========== -->
+  <data name="Settings_Translation_Title" xml:space="preserve">
+    <value>번역 설정</value>
+  </data>
+  <data name="Settings_Translation_Subtitle" xml:space="preserve">
+    <value>번역 엔진, 언어 쌍 및 번역 전략을 구성합니다</value>
+  </data>
+  <data name="Settings_Translation_LastSaved" xml:space="preserve">
+    <value>마지막 저장: {0:MM/dd HH:mm}</value>
+  </data>
+  <data name="Settings_Translation_UnsavedChanges" xml:space="preserve">
+    <value>저장되지 않은 변경사항이 있습니다</value>
+  </data>
+  <data name="Settings_Translation_DiscardChanges" xml:space="preserve">
+    <value>변경사항 취소</value>
+  </data>
+  <data name="Settings_Translation_Summary" xml:space="preserve">
+    <value>현재 설정 요약</value>
+  </data>
+  <data name="Settings_Translation_Engine" xml:space="preserve">
+    <value>번역 엔진</value>
+  </data>
+  <data name="Settings_Translation_LanguagePair" xml:space="preserve">
+    <value>언어 쌍</value>
+  </data>
+  <data name="Settings_Translation_Strategy" xml:space="preserve">
+    <value>번역 전략</value>
+  </data>
+  <data name="Settings_Translation_ChineseVariant" xml:space="preserve">
+    <value>중국어 변형</value>
+  </data>
+  <data name="Settings_Translation_Fallback" xml:space="preserve">
+    <value>대체</value>
+  </data>
+  <data name="Settings_Translation_ChangeStatus" xml:space="preserve">
+    <value>변경 상태</value>
+  </data>
+  <data name="Settings_Translation_Import" xml:space="preserve">
+    <value>가져오기</value>
+  </data>
+  <data name="Settings_Translation_ImportTip" xml:space="preserve">
+    <value>설정 파일에서 가져오기</value>
+  </data>
+  <data name="Settings_Translation_Export" xml:space="preserve">
+    <value>내보내기</value>
+  </data>
+  <data name="Settings_Translation_ExportTip" xml:space="preserve">
+    <value>설정을 파일로 내보내기</value>
+  </data>
+  <data name="Settings_Translation_Load" xml:space="preserve">
+    <value>불러오기</value>
+  </data>
+  <data name="Settings_Translation_LoadTip" xml:space="preserve">
+    <value>저장된 설정 불러오기</value>
+  </data>
+  <data name="Settings_Translation_SaveTip" xml:space="preserve">
+    <value>현재 설정 저장</value>
+  </data>
+  <data name="Settings_Translation_ApplyTip" xml:space="preserve">
+    <value>설정 저장 및 적용</value>
+  </data>
+  <data name="Settings_Translation_Saving" xml:space="preserve">
+    <value>설정 저장 중...</value>
+  </data>
+
+  <!-- ========== Capture Settings ========== -->
+  <data name="Settings_Capture_Title" xml:space="preserve">
+    <value>캡처 설정</value>
+  </data>
+  <data name="Settings_Capture_Subtitle" xml:space="preserve">
+    <value>화면 캡처 및 스크린샷 기능의 세부 설정</value>
+  </data>
+  <data name="Settings_Capture_Basic" xml:space="preserve">
+    <value>기본 설정</value>
+  </data>
+  <data name="Settings_Capture_Enabled" xml:space="preserve">
+    <value>캡처 기능</value>
+  </data>
+  <data name="Settings_Capture_EnabledDescription" xml:space="preserve">
+    <value>화면 캡처 기능을 사용합니다</value>
+  </data>
+  <data name="Settings_Capture_Interval" xml:space="preserve">
+    <value>캡처 간격</value>
+  </data>
+  <data name="Settings_Capture_IntervalDescription" xml:space="preserve">
+    <value>화면 캡처 간격 (짧을수록 정확, 길수록 빠름)</value>
+  </data>
+  <data name="Settings_Capture_Quality" xml:space="preserve">
+    <value>캡처 품질</value>
+  </data>
+  <data name="Settings_Capture_QualityDescription" xml:space="preserve">
+    <value>캡처 이미지 품질 (높을수록 정확, 낮을수록 빠름)</value>
+  </data>
+  <data name="Settings_Capture_AreaMode" xml:space="preserve">
+    <value>영역 감지 모드</value>
+  </data>
+  <data name="Settings_Capture_AreaModeDescription" xml:space="preserve">
+    <value>자동 텍스트 영역 감지 또는 고정 영역 중 선택합니다</value>
+  </data>
+  <data name="Settings_Capture_AutoDetect" xml:space="preserve">
+    <value>자동 감지</value>
+  </data>
+  <data name="Settings_Capture_FixedArea" xml:space="preserve">
+    <value>고정 영역</value>
+  </data>
+  <data name="Settings_Capture_FixedAreaSection" xml:space="preserve">
+    <value>고정 캡처 영역</value>
+  </data>
+  <data name="Settings_Capture_Position" xml:space="preserve">
+    <value>위치 및 크기</value>
+  </data>
+  <data name="Settings_Capture_PositionDescription" xml:space="preserve">
+    <value>고정 캡처 영역의 위치와 크기를 지정합니다</value>
+  </data>
+  <data name="Settings_Capture_Advanced" xml:space="preserve">
+    <value>고급 설정</value>
+  </data>
+  <data name="Settings_Capture_Monitor" xml:space="preserve">
+    <value>대상 모니터</value>
+  </data>
+  <data name="Settings_Capture_MonitorDescription" xml:space="preserve">
+    <value>다중 모니터 환경에서 캡처할 모니터를 선택합니다</value>
+  </data>
+  <data name="Settings_Capture_DpiScaling" xml:space="preserve">
+    <value>DPI 스케일링 인식</value>
+  </data>
+  <data name="Settings_Capture_DpiScalingDescription" xml:space="preserve">
+    <value>고해상도 DPI 환경에서 스케일링을 고려합니다</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccel" xml:space="preserve">
+    <value>하드웨어 가속</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccelDescription" xml:space="preserve">
+    <value>GPU를 사용한 하드웨어 가속</value>
+  </data>
+  <data name="Settings_Capture_DiffDetection" xml:space="preserve">
+    <value>차이 감지 설정</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionEnable" xml:space="preserve">
+    <value>차이 감지 기능</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionDescription" xml:space="preserve">
+    <value>화면 변경 차이 감지를 사용합니다</value>
+  </data>
+
+  <!-- ========== OCR Settings ========== -->
+  <data name="Settings_OCR_Title" xml:space="preserve">
+    <value>OCR 설정</value>
+  </data>
+  <data name="Settings_OCR_Subtitle" xml:space="preserve">
+    <value>광학 문자 인식의 세부 설정</value>
+  </data>
+  <data name="Settings_OCR_Basic" xml:space="preserve">
+    <value>기본 설정</value>
+  </data>
+  <data name="Settings_OCR_Enabled" xml:space="preserve">
+    <value>OCR 사용</value>
+  </data>
+  <data name="Settings_OCR_EnabledDescription" xml:space="preserve">
+    <value>화면의 텍스트를 자동으로 인식합니다</value>
+  </data>
+  <data name="Settings_OCR_Language" xml:space="preserve">
+    <value>인식 언어</value>
+  </data>
+  <data name="Settings_OCR_LanguageDescription" xml:space="preserve">
+    <value>OCR 인식의 주요 언어</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguage" xml:space="preserve">
+    <value>대상 언어</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguageDescription" xml:space="preserve">
+    <value>번역 결과의 출력 언어</value>
+  </data>
+  <data name="Settings_OCR_Confidence" xml:space="preserve">
+    <value>신뢰도 임계값</value>
+  </data>
+  <data name="Settings_OCR_ConfidenceDescription" xml:space="preserve">
+    <value>텍스트 인식의 최소 신뢰도 (0.0-1.0)</value>
+  </data>
+  <data name="Settings_OCR_Filtering" xml:space="preserve">
+    <value>텍스트 필터링</value>
+  </data>
+  <data name="Settings_OCR_FilteringDescription" xml:space="preserve">
+    <value>인식된 텍스트의 후처리를 사용합니다</value>
+  </data>
+  <data name="Settings_OCR_Advanced" xml:space="preserve">
+    <value>고급 설정</value>
+  </data>
+  <data name="Settings_OCR_Preprocessing" xml:space="preserve">
+    <value>이미지 전처리</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingEnable" xml:space="preserve">
+    <value>이미지 전처리 사용</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingDescription" xml:space="preserve">
+    <value>OCR 정확도를 향상시키기 위해 이미지 전처리를 적용합니다</value>
+  </data>
+  <data name="Settings_OCR_Grayscale" xml:space="preserve">
+    <value>회색조 변환</value>
+  </data>
+
+  <!-- ========== Overlay Settings ========== -->
+  <data name="Settings_Overlay_Title" xml:space="preserve">
+    <value>오버레이 설정</value>
+  </data>
+  <data name="Settings_Overlay_Subtitle" xml:space="preserve">
+    <value>게임 화면에 번역 결과를 표시하기 위한 설정</value>
+  </data>
+  <data name="Settings_Overlay_ARNote" xml:space="preserve">
+    <value>AR 스타일 표시: 번역 결과가 원본 텍스트와 같은 위치에 오버레이되어 Google 번역 카메라와 같은 경험을 제공합니다</value>
+  </data>
+  <data name="Settings_Overlay_Basic" xml:space="preserve">
+    <value>기본 설정</value>
+  </data>
+  <data name="Settings_Overlay_Enabled" xml:space="preserve">
+    <value>오버레이 표시</value>
+  </data>
+  <data name="Settings_Overlay_EnabledDescription" xml:space="preserve">
+    <value>게임 화면에 번역 결과를 오버레이로 표시합니다</value>
+  </data>
+  <data name="Settings_Overlay_Opacity" xml:space="preserve">
+    <value>불투명도</value>
+  </data>
+  <data name="Settings_Overlay_OpacityDescription" xml:space="preserve">
+    <value>오버레이 불투명도 (높을수록 불투명)</value>
+  </data>
+  <data name="Settings_Overlay_FontSize" xml:space="preserve">
+    <value>번역 글꼴 크기</value>
+  </data>
+  <data name="Settings_Overlay_FontSizeDescription" xml:space="preserve">
+    <value>오버레이에 표시되는 번역 텍스트의 글꼴 크기</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColor" xml:space="preserve">
+    <value>배경 색상</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColorDescription" xml:space="preserve">
+    <value>오버레이의 배경 색상</value>
+  </data>
+  <data name="Settings_Overlay_ChooseColor" xml:space="preserve">
+    <value>색상 선택...</value>
+  </data>
+  <data name="Settings_Overlay_TextColor" xml:space="preserve">
+    <value>텍스트 색상</value>
+  </data>
+  <data name="Settings_Overlay_TextColorDescription" xml:space="preserve">
+    <value>오버레이의 텍스트 색상</value>
+  </data>
+  <data name="Settings_Overlay_AutoHide" xml:space="preserve">
+    <value>자동 숨기기 설정</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAuto" xml:space="preserve">
+    <value>실시간 번역 자동 숨기기</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDescription" xml:space="preserve">
+    <value>지정된 시간 후 실시간 번역 결과를 자동으로 숨깁니다</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelay" xml:space="preserve">
+    <value>실시간 번역 숨기기 지연</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelayDescription" xml:space="preserve">
+    <value>실시간 번역 결과가 자동으로 사라질 때까지의 시간</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelay" xml:space="preserve">
+    <value>샷 번역 자동 숨기기 지연</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelayDescription" xml:space="preserve">
+    <value>샷 번역 결과가 자동으로 사라질 때까지의 시간</value>
+  </data>
+  <data name="Settings_Overlay_ManualClose" xml:space="preserve">
+    <value>클릭하여 닫기</value>
+  </data>
+  <data name="Settings_Overlay_ManualCloseDescription" xml:space="preserve">
+    <value>오버레이를 클릭하여 수동으로 숨깁니다</value>
+  </data>
+
+  <!-- ========== Account Settings ========== -->
+  <data name="Settings_Account_Title" xml:space="preserve">
+    <value>계정</value>
+  </data>
+  <data name="Settings_Account_Subtitle" xml:space="preserve">
+    <value>사용자 인증 및 계정 관리</value>
+  </data>
+  <data name="Settings_Account_Processing" xml:space="preserve">
+    <value>처리 중...</value>
+  </data>
+  <data name="Settings_Account_LoggedInWith" xml:space="preserve">
+    <value>{0}(으)로 로그인됨</value>
+  </data>
+  <data name="Settings_Account_LoggedInStatus" xml:space="preserve">
+    <value>로그인됨</value>
+  </data>
+  <data name="Settings_Account_Actions" xml:space="preserve">
+    <value>계정 작업</value>
+  </data>
+  <data name="Settings_Account_LogoutDescription" xml:space="preserve">
+    <value>이 기기에서 로그아웃합니다</value>
+  </data>
+  <data name="Settings_Account_NotLoggedIn" xml:space="preserve">
+    <value>로그인되지 않음</value>
+  </data>
+  <data name="Settings_Account_LoginBenefits" xml:space="preserve">
+    <value>로그인하여 설정을 동기화하고 추가 기능을 이용하세요</value>
+  </data>
+  <data name="Settings_Account_ForgotPassword" xml:space="preserve">
+    <value>비밀번호를 잊으셨나요?</value>
+  </data>
+  <data name="Settings_Account_PasswordReset" xml:space="preserve">
+    <value>비밀번호 재설정</value>
+  </data>
+  <data name="Settings_Account_PasswordResetDescription" xml:space="preserve">
+    <value>등록된 이메일 주소로 비밀번호 재설정 링크를 보내드립니다</value>
+  </data>
+  <data name="Settings_Account_ResetEmailSent" xml:space="preserve">
+    <value>재설정 이메일이 발송되었습니다. 받은편지함을 확인해 주세요.</value>
+  </data>
+  <data name="Settings_Account_EmailAddress" xml:space="preserve">
+    <value>이메일 주소</value>
+  </data>
+  <data name="Settings_Account_Profile" xml:space="preserve">
+    <value>프로필</value>
+  </data>
+  <data name="Settings_Account_Email" xml:space="preserve">
+    <value>이메일</value>
+  </data>
+  <data name="Settings_Account_ChangePassword" xml:space="preserve">
+    <value>비밀번호 변경</value>
+  </data>
+  <data name="Settings_Account_Logout" xml:space="preserve">
+    <value>로그아웃</value>
+  </data>
+  <data name="Settings_Account_Login" xml:space="preserve">
+    <value>로그인</value>
+  </data>
+  <data name="Settings_Account_Signup" xml:space="preserve">
+    <value>가입</value>
+  </data>
+  <data name="Settings_Account_CurrentPlan" xml:space="preserve">
+    <value>현재 플랜</value>
+  </data>
+  <data name="Settings_Account_UpgradeToPremium" xml:space="preserve">
+    <value>Premium으로 업그레이드</value>
+  </data>
+
+  <!-- ========== License Settings ========== -->
+  <data name="Settings_License_Title" xml:space="preserve">
+    <value>라이선스</value>
+  </data>
+  <data name="Settings_License_Subtitle" xml:space="preserve">
+    <value>플랜 정보 및 사용량 확인</value>
+  </data>
+  <data name="Settings_Upgrade_Title" xml:space="preserve">
+    <value>플랜 업그레이드</value>
+  </data>
+  <data name="Settings_Upgrade_Subtitle" xml:space="preserve">
+    <value>플랜 구매 또는 변경</value>
+  </data>
+  <data name="Settings_License_Loading" xml:space="preserve">
+    <value>라이선스 정보 로딩 중...</value>
+  </data>
+  <data name="Settings_License_TokenUsage" xml:space="preserve">
+    <value>사용량</value>
+  </data>
+  <data name="Settings_License_MonthlyUsage" xml:space="preserve">
+    <value>월간 사용량</value>
+  </data>
+  <data name="Settings_License_QuotaExceeded" xml:space="preserve">
+    <value>월간 할당량이 초과되었습니다. 다음 달까지 EX 번역을 사용할 수 없습니다.</value>
+  </data>
+  <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
+    <value>이 플랜은 표준 번역만 지원합니다. EX 번역을 사용하려면 Pro 이상으로 업그레이드하세요.</value>
+  </data>
+  <data name="Settings_License_PlanDetails" xml:space="preserve">
+    <value>플랜 상세</value>
+  </data>
+  <data name="Settings_License_ExpirationDate" xml:space="preserve">
+    <value>만료일</value>
+  </data>
+  <data name="Settings_License_CloudAccess" xml:space="preserve">
+    <value>EX 번역</value>
+  </data>
+  <data name="Settings_License_MonthlyLimit" xml:space="preserve">
+    <value>월간 할당량</value>
+  </data>
+  <data name="Settings_License_Refresh" xml:space="preserve">
+    <value>라이선스 정보 새로고침</value>
+  </data>
+  <data name="License_Plan_Free" xml:space="preserve">
+    <value>Free</value>
+  </data>
+  <data name="License_Plan_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="License_Plan_Pro" xml:space="preserve">
+    <value>Pro</value>
+  </data>
+  <data name="License_Plan_Premia" xml:space="preserve">
+    <value>Premia</value>
+  </data>
+  <data name="License_Plan_Premium" xml:space="preserve">
+    <value>Premium</value>
+  </data>
+  <data name="License_Plan_Ultimate" xml:space="preserve">
+    <value>Ultimate</value>
+  </data>
+  <data name="License_Plan_Unknown" xml:space="preserve">
+    <value>알 수 없음</value>
+  </data>
+  <data name="License_Plan_PromotionSuffix" xml:space="preserve">
+    <value>(프로모션 코드 적용됨)</value>
+  </data>
+
+  <!-- Promotion Code Section -->
+  <data name="Settings_License_PromotionCode" xml:space="preserve">
+    <value>프로모션 코드</value>
+  </data>
+  <data name="Settings_License_PromotionExpires" xml:space="preserve">
+    <value>만료:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeLabel" xml:space="preserve">
+    <value>코드:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
+    <value>프로모션 코드가 있으시면 아래에 입력해 주세요.</value>
+  </data>
+  <data name="Settings_License_PromotionApply" xml:space="preserve">
+    <value>적용</value>
+  </data>
+  <data name="Settings_License_PromotionVerifying" xml:space="preserve">
+    <value>확인 중...</value>
+  </data>
+  <data name="Settings_License_PromotionAppliedFormat" xml:space="preserve">
+    <value>{0}이(가) 적용되었습니다</value>
+  </data>
+  <data name="Settings_License_PromotionPlanPromo" xml:space="preserve">
+    <value>프로모션</value>
+  </data>
+
+  <data name="License_Desc_Free" xml:space="preserve">
+    <value>Free 플랜 - 보너스를 통한 EX 번역 사용 가능</value>
+  </data>
+  <data name="License_Desc_Standard" xml:space="preserve">
+    <value>Standard 플랜 - 광고 없음, 표준 번역만 지원</value>
+  </data>
+  <data name="License_Desc_Pro" xml:space="preserve">
+    <value>Pro 플랜 - EX 번역, 월 1,000만 할당량</value>
+  </data>
+  <data name="License_Desc_Premia" xml:space="preserve">
+    <value>Premia 플랜 - EX 번역, 월 800만 할당량</value>
+  </data>
+  <data name="License_Desc_Premium" xml:space="preserve">
+    <value>Premium 플랜 - EX 번역, 월 2,000만 할당량</value>
+  </data>
+  <data name="License_Desc_Ultimate" xml:space="preserve">
+    <value>Ultimate 플랜 - EX 번역, 월 5,000만 할당량</value>
+  </data>
+  <data name="License_NoExpiration" xml:space="preserve">
+    <value>만료 없음</value>
+  </data>
+  <data name="License_LocalOnly" xml:space="preserve">
+    <value>표준 전용</value>
+  </data>
+  <data name="License_EXTranslation_Available" xml:space="preserve">
+    <value>사용 가능</value>
+  </data>
+  <data name="License_EXTranslation_Unavailable" xml:space="preserve">
+    <value>사용 불가</value>
+  </data>
+  <data name="License_RefreshSuccess" xml:space="preserve">
+    <value>라이선스 정보가 업데이트되었습니다</value>
+  </data>
+  <data name="License_RefreshFailed" xml:space="preserve">
+    <value>라이선스 정보 업데이트에 실패했습니다</value>
+  </data>
+  <data name="Settings_License_Upgrade" xml:space="preserve">
+    <value>플랜 변경</value>
+  </data>
+  <data name="License_UpgradeComingSoon" xml:space="preserve">
+    <value>업그레이드 기능이 곧 출시됩니다</value>
+  </data>
+  <data name="License_OpeningPlanPage" xml:space="preserve">
+    <value>플랜 변경 페이지를 여는 중...</value>
+  </data>
+  <data name="License_PlanPageOpenFailed" xml:space="preserve">
+    <value>플랜 변경 페이지를 열 수 없습니다</value>
+  </data>
+
+  <!-- Patreon Integration -->
+  <data name="Settings_License_PatreonIntegration" xml:space="preserve">
+    <value>Patreon 연동</value>
+  </data>
+  <data name="Settings_License_PatreonStatus" xml:space="preserve">
+    <value>연결 상태</value>
+  </data>
+  <data name="Settings_License_LastSync" xml:space="preserve">
+    <value>마지막 동기화</value>
+  </data>
+  <data name="Settings_License_ConnectPatreon" xml:space="preserve">
+    <value>Patreon에 연결</value>
+  </data>
+  <data name="Settings_License_DisconnectPatreon" xml:space="preserve">
+    <value>연결 해제</value>
+  </data>
+  <data name="Settings_License_SyncPatreon" xml:space="preserve">
+    <value>동기화</value>
+  </data>
+
+  <!-- Patreon Integration (Account Settings) -->
+  <data name="Settings_Account_PatreonSection" xml:space="preserve">
+    <value>Patreon 연동</value>
+  </data>
+  <data name="Settings_Account_PatreonUserFallback" xml:space="preserve">
+    <value>Patreon 사용자</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanLabel" xml:space="preserve">
+    <value>플랜:</value>
+  </data>
+  <data name="Settings_Account_PatreonLastSync" xml:space="preserve">
+    <value>마지막 동기화: {0}</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncNow" xml:space="preserve">
+    <value>지금 동기화</value>
+  </data>
+  <data name="Settings_Account_PatreonDisconnect" xml:space="preserve">
+    <value>연결 해제</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectTitle" xml:space="preserve">
+    <value>Patreon 계정 연결</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
+    <value>Patreon 후원자 계정을 연결하여 광고 없는 경험과 EX 번역 등의 혜택을 이용하세요</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
+    <value>Patreon으로 연결</value>
+  </data>
+  <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
+    <value>이용 가능한 플랜:</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
+    <value>• Pro ($3/월): EX 번역 월 1,000만 할당량</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
+    <value>• Premium ($5/월): EX 번역 월 2,000만 할당량</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
+    <value>• Ultimate ($9/월): EX 번역 월 5,000만 할당량</value>
+  </data>
+  <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
+    <value>로그인</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
+    <value>동기화 중...</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusSynced" xml:space="preserve">
+    <value>동기화됨</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusOffline" xml:space="preserve">
+    <value>오프라인</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusTokenExpired" xml:space="preserve">
+    <value>재인증 필요</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusError" xml:space="preserve">
+    <value>오류</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusNotConnected" xml:space="preserve">
+    <value>연결되지 않음</value>
+  </data>
+  <data name="Settings_Account_PatreonLinkedFormat" xml:space="preserve">
+    <value>연결됨 ({0})</value>
+  </data>
+  <data name="Settings_Account_MockModeTestUser" xml:space="preserve">
+    <value>테스트 사용자 (Mock 모드)</value>
+  </data>
+
+  <!-- ========== Advanced Settings ========== -->
+  <data name="Settings_Advanced_Title" xml:space="preserve">
+    <value>고급 설정</value>
+  </data>
+  <data name="Settings_Advanced_Subtitle" xml:space="preserve">
+    <value>고급 기능 및 시스템 최적화를 위한 세부 설정</value>
+  </data>
+  <data name="Settings_Advanced_Warning" xml:space="preserve">
+    <value>경고: 이 설정은 고급 사용자를 위한 것입니다. 변경 시 예기치 않은 동작이 발생할 수 있습니다.</value>
+  </data>
+  <data name="Settings_Advanced_Basic" xml:space="preserve">
+    <value>기본 최적화 설정</value>
+  </data>
+  <data name="Settings_Advanced_CPU" xml:space="preserve">
+    <value>CPU/프로세스 설정</value>
+  </data>
+  <data name="Settings_Advanced_Memory" xml:space="preserve">
+    <value>메모리/버퍼링 설정</value>
+  </data>
+  <data name="Settings_Advanced_Network" xml:space="preserve">
+    <value>네트워크 설정</value>
+  </data>
+  <data name="Settings_Advanced_Seconds" xml:space="preserve">
+    <value>초</value>
+  </data>
+  <data name="Settings_Advanced_Connections" xml:space="preserve">
+    <value>연결</value>
+  </data>
+  <data name="Settings_Advanced_Retry" xml:space="preserve">
+    <value>재시도 설정</value>
+  </data>
+  <data name="Settings_Advanced_Times" xml:space="preserve">
+    <value>회</value>
+  </data>
+  <data name="Settings_Advanced_Statistics" xml:space="preserve">
+    <value>통계/모니터링 설정</value>
+  </data>
+  <data name="Settings_Advanced_Days" xml:space="preserve">
+    <value>일</value>
+  </data>
+  <data name="Settings_Advanced_Experimental" xml:space="preserve">
+    <value>실험적/디버그 설정</value>
+  </data>
+  <data name="Settings_Advanced_Danger" xml:space="preserve">
+    <value>위험: 이 설정은 개발자 전용입니다. 프로덕션 환경에서는 사용하지 마세요.</value>
+  </data>
+
+  <!-- ========== Login View ========== -->
+  <data name="Auth_Login_Title" xml:space="preserve">
+    <value>Baketa에 로그인</value>
+  </data>
+  <data name="Auth_Login_Google" xml:space="preserve">
+    <value>Google로 로그인</value>
+  </data>
+  <data name="Auth_Login_Discord" xml:space="preserve">
+    <value>Discord로 로그인</value>
+  </data>
+  <data name="Auth_Login_Twitch" xml:space="preserve">
+    <value>Twitch로 로그인</value>
+  </data>
+  <data name="Auth_Login_Email" xml:space="preserve">
+    <value>이메일</value>
+  </data>
+  <data name="Auth_Login_EmailPlaceholder" xml:space="preserve">
+    <value>example@email.com</value>
+  </data>
+  <data name="Auth_Login_Password" xml:space="preserve">
+    <value>비밀번호</value>
+  </data>
+  <data name="Auth_Login_PasswordPlaceholder" xml:space="preserve">
+    <value>비밀번호 입력</value>
+  </data>
+  <data name="Auth_Login_RememberMe" xml:space="preserve">
+    <value>로그인 상태 유지</value>
+  </data>
+  <data name="Auth_Login_ForgotPassword" xml:space="preserve">
+    <value>비밀번호를 잊으셨나요?</value>
+  </data>
+  <data name="Auth_Login_Button" xml:space="preserve">
+    <value>로그인</value>
+  </data>
+  <data name="Auth_Login_Loading" xml:space="preserve">
+    <value>인증 중...</value>
+  </data>
+  <data name="Auth_Login_SignupPrompt" xml:space="preserve">
+    <value>Baketa가 처음이신가요? </value>
+  </data>
+  <data name="Auth_Login_SignupLink" xml:space="preserve">
+    <value>계정 만들기</value>
+  </data>
+  <data name="Auth_Login_EmailExpander" xml:space="preserve">
+    <value>이메일로 로그인</value>
+  </data>
+
+  <!-- ========== Signup View ========== -->
+  <data name="Auth_Signup_Title" xml:space="preserve">
+    <value>Baketa 계정 만들기</value>
+  </data>
+  <data name="Auth_Signup_Google" xml:space="preserve">
+    <value>Google로 가입</value>
+  </data>
+  <data name="Auth_Signup_Discord" xml:space="preserve">
+    <value>Discord로 가입</value>
+  </data>
+  <data name="Auth_Signup_Twitch" xml:space="preserve">
+    <value>Twitch로 가입</value>
+  </data>
+  <data name="Auth_Signup_OrEmail" xml:space="preserve">
+    <value>또는 이메일로 가입</value>
+  </data>
+  <data name="Auth_Signup_DisplayName" xml:space="preserve">
+    <value>표시 이름</value>
+  </data>
+  <data name="Auth_Signup_DisplayNamePlaceholder" xml:space="preserve">
+    <value>표시 이름을 입력하세요</value>
+  </data>
+  <data name="Auth_Signup_Email" xml:space="preserve">
+    <value>이메일</value>
+  </data>
+  <data name="Auth_Signup_Password" xml:space="preserve">
+    <value>비밀번호</value>
+  </data>
+  <data name="Auth_Signup_PasswordPlaceholder" xml:space="preserve">
+    <value>8자 이상</value>
+  </data>
+  <data name="Auth_Signup_PasswordRequirement" xml:space="preserve">
+    <value>* 8자 이상, 대문자, 소문자, 숫자, 기호 중 3가지 이상 포함</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPassword" xml:space="preserve">
+    <value>비밀번호 확인</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPasswordPlaceholder" xml:space="preserve">
+    <value>비밀번호를 다시 입력하세요</value>
+  </data>
+  <data name="Auth_Signup_Terms" xml:space="preserve">
+    <value>이용약관</value>
+  </data>
+  <data name="Auth_Signup_TermsAgree" xml:space="preserve">
+    <value>~에 동의합니다</value>
+  </data>
+  <data name="Auth_Signup_Privacy" xml:space="preserve">
+    <value>개인정보처리방침</value>
+  </data>
+  <data name="Auth_Signup_Button" xml:space="preserve">
+    <value>계정 만들기</value>
+  </data>
+  <data name="Auth_Signup_Loading" xml:space="preserve">
+    <value>계정 생성 중...</value>
+  </data>
+  <data name="Auth_Signup_LoginPrompt" xml:space="preserve">
+    <value>이미 계정이 있으신가요? </value>
+  </data>
+  <data name="Auth_Signup_LoginLink" xml:space="preserve">
+    <value>로그인</value>
+  </data>
+  <data name="Auth_Signup_EmailExpander" xml:space="preserve">
+    <value>이메일로 가입</value>
+  </data>
+
+  <!-- ========== Premium Plan ========== -->
+  <data name="Premium_Title" xml:space="preserve">
+    <value>Baketa Premium</value>
+  </data>
+  <data name="Premium_FeatureAdFree" xml:space="preserve">
+    <value>광고 없음</value>
+  </data>
+  <data name="Premium_FeatureCloudTranslation" xml:space="preserve">
+    <value>EX 번역 (고정밀 엔진)</value>
+  </data>
+  <data name="Premium_FeaturePrioritySupport" xml:space="preserve">
+    <value>우선 지원</value>
+  </data>
+  <data name="Premium_FeatureEarlyAccess" xml:space="preserve">
+    <value>신기능 조기 이용</value>
+  </data>
+  <data name="Premium_Monthly" xml:space="preserve">
+    <value>$5/월</value>
+  </data>
+  <data name="Premium_Yearly" xml:space="preserve">
+    <value>$50/년 (17% 할인)</value>
+  </data>
+
+  <!-- ========== Error Messages ========== -->
+  <data name="Error_NetworkError" xml:space="preserve">
+    <value>네트워크 오류가 발생했습니다</value>
+  </data>
+  <data name="Error_AuthenticationFailed" xml:space="preserve">
+    <value>인증에 실패했습니다</value>
+  </data>
+  <data name="Error_TranslationFailed" xml:space="preserve">
+    <value>번역에 실패했습니다</value>
+  </data>
+  <data name="Error_OcrFailed" xml:space="preserve">
+    <value>OCR에 실패했습니다</value>
+  </data>
+  <data name="Error_WindowNotFound" xml:space="preserve">
+    <value>대상 창을 찾을 수 없습니다</value>
+  </data>
+  <data name="Error_InvalidEmail" xml:space="preserve">
+    <value>잘못된 이메일 주소입니다</value>
+  </data>
+  <data name="Error_PasswordTooShort" xml:space="preserve">
+    <value>비밀번호는 8자 이상이어야 합니다</value>
+  </data>
+  <data name="Error_LoginFailed" xml:space="preserve">
+    <value>로그인에 실패했습니다</value>
+  </data>
+  <data name="Error_PasswordMismatch" xml:space="preserve">
+    <value>비밀번호가 일치하지 않습니다</value>
+  </data>
+  <data name="Error_SignupFailed" xml:space="preserve">
+    <value>계정 생성에 실패했습니다</value>
+  </data>
+
+  <!-- ========== Confirmation Dialogs ========== -->
+  <data name="Dialog_LogoutConfirm" xml:space="preserve">
+    <value>정말 로그아웃하시겠습니까?</value>
+  </data>
+  <data name="Dialog_DiscardChanges" xml:space="preserve">
+    <value>저장되지 않은 변경사항이 있습니다. 변경사항을 취소하시겠습니까?</value>
+  </data>
+  <data name="Dialog_ResetSettings" xml:space="preserve">
+    <value>설정을 기본값으로 초기화하시겠습니까?</value>
+  </data>
+  <data name="Dialog_ExitApp" xml:space="preserve">
+    <value>애플리케이션을 종료하시겠습니까?</value>
+  </data>
+
+  <!-- MainOverlay Tooltips -->
+  <data name="MainOverlay_StartButton_Tooltip" xml:space="preserve">
+    <value>번역 시작</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Execute" xml:space="preserve">
+    <value>단일 샷 번역 실행</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Reset" xml:space="preserve">
+    <value>초기화</value>
+    <comment>[Issue #357] Button/tooltip text when shot translation is active</comment>
+  </data>
+  <data name="MainOverlay_Live_Stop" xml:space="preserve">
+    <value>중지</value>
+    <comment>[Issue #357] Button text when live translation is active</comment>
+  </data>
+  <data name="MainOverlay_Status_Initializing" xml:space="preserve">
+    <value>초기화 중...</value>
+  </data>
+  <data name="MainOverlay_Status_Idle" xml:space="preserve">
+    <value>선택되지 않음</value>
+  </data>
+  <data name="MainOverlay_Status_Ready" xml:space="preserve">
+    <value>준비 완료</value>
+  </data>
+  <data name="MainOverlay_Status_Translating" xml:space="preserve">
+    <value>번역 중</value>
+  </data>
+  <data name="MainOverlay_Status_Waiting" xml:space="preserve">
+    <value>대기 중</value>
+  </data>
+  <data name="MainOverlay_Warmup_Failed" xml:space="preserve">
+    <value>모델 초기화에 실패했습니다. 앱을 다시 시작해 주세요.</value>
+  </data>
+  <data name="MainOverlay_Warmup_Loading" xml:space="preserve">
+    <value>모델 로딩 중... {0}</value>
+  </data>
+  <data name="MainOverlay_Warmup_Complete" xml:space="preserve">
+    <value>준비 완료! 번역을 시작할 수 있습니다</value>
+  </data>
+
+  <!-- Theme Options -->
+  <data name="Theme_Light" xml:space="preserve">
+    <value>밝은 테마</value>
+  </data>
+  <data name="Theme_Dark" xml:space="preserve">
+    <value>어두운 테마</value>
+  </data>
+  <data name="Theme_Auto" xml:space="preserve">
+    <value>자동 (시스템 설정 따름)</value>
+  </data>
+
+  <!-- Size Options -->
+  <data name="Size_Small" xml:space="preserve">
+    <value>작게 (컴팩트)</value>
+  </data>
+  <data name="Size_Medium" xml:space="preserve">
+    <value>보통 (표준)</value>
+  </data>
+  <data name="Size_Large" xml:space="preserve">
+    <value>크게 (읽기 쉬움)</value>
+  </data>
+
+  <!-- Advanced Settings Toggle -->
+  <data name="Settings_Advanced_Show" xml:space="preserve">
+    <value>고급 설정 표시</value>
+  </data>
+  <data name="Settings_Advanced_Hide" xml:space="preserve">
+    <value>기본 설정으로 돌아가기</value>
+  </data>
+
+  <!-- Settings Window Status Messages -->
+  <data name="Settings_Window_Title" xml:space="preserve">
+    <value>설정</value>
+  </data>
+  <data name="Settings_Status_HasChanges" xml:space="preserve">
+    <value>설정이 변경되었습니다</value>
+  </data>
+  <data name="Settings_Status_NoChanges" xml:space="preserve">
+    <value>변경사항 없음</value>
+  </data>
+  <data name="Settings_Status_Saving" xml:space="preserve">
+    <value>설정 저장 중...</value>
+  </data>
+  <data name="Settings_Status_Saved" xml:space="preserve">
+    <value>설정이 저장되었습니다</value>
+  </data>
+  <data name="Settings_Status_SaveFailed" xml:space="preserve">
+    <value>저장 실패: {0}</value>
+  </data>
+  <data name="Settings_Status_AccessDenied" xml:space="preserve">
+    <value>저장 실패: 접근이 거부되었습니다</value>
+  </data>
+  <data name="Settings_Status_IOError" xml:space="preserve">
+    <value>저장 실패: 파일 I/O 오류</value>
+  </data>
+  <data name="Settings_Status_Cancelled" xml:space="preserve">
+    <value>변경사항이 취소되었습니다</value>
+  </data>
+  <data name="Settings_Status_Reset" xml:space="preserve">
+    <value>설정이 초기화되었습니다</value>
+  </data>
+
+  <!-- Settings Window Buttons -->
+  <data name="Settings_Button_Reset" xml:space="preserve">
+    <value>초기화</value>
+  </data>
+  <data name="Settings_Button_Cancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="Settings_Button_Save" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="Settings_Tooltip_Reset" xml:space="preserve">
+    <value>모든 설정을 기본값으로 초기화</value>
+  </data>
+  <data name="Settings_Tooltip_Cancel" xml:space="preserve">
+    <value>변경사항을 취소하고 닫기</value>
+  </data>
+  <data name="Settings_Tooltip_Save" xml:space="preserve">
+    <value>변경사항 저장</value>
+  </data>
+
+  <!-- ========== Loading Screen ========== -->
+  <!-- [Issue #185] Component download step -->
+  <data name="Loading_DownloadingComponents" xml:space="preserve">
+    <value>구성 요소 다운로드 중...</value>
+  </data>
+  <data name="Loading_ResolvingDependencies" xml:space="preserve">
+    <value>종속성 해결 중...</value>
+  </data>
+  <data name="Loading_LoadingOCR" xml:space="preserve">
+    <value>OCR 모델 로딩 중...</value>
+  </data>
+  <data name="Loading_InitializingTranslation" xml:space="preserve">
+    <value>번역 엔진 초기화 중...</value>
+  </data>
+  <data name="Loading_PreparingUI" xml:space="preserve">
+    <value>UI 구성 요소 준비 중...</value>
+  </data>
+  <data name="Loading_SetupGpu" xml:space="preserve">
+    <value>GPU 환경 설정 중...</value>
+  </data>
+  <!-- [Issue #259] Loading Tips -->
+  <data name="Loading_Tip_1" xml:space="preserve">
+    <value>초기 설정에는 약 10분이 소요될 수 있습니다. 잠시 기다려 주세요.</value>
+  </data>
+  <data name="Loading_Tip_2" xml:space="preserve">
+    <value>OCR과 기계 번역을 결합한 번역 오버레이</value>
+  </data>
+  <data name="Loading_Tip_3" xml:space="preserve">
+    <value>처음 실행 시 모델 다운로드로 인해 시간이 더 걸릴 수 있습니다</value>
+  </data>
+  <data name="Loading_Tip_4" xml:space="preserve">
+    <value>번역 결과는 게임 화면에 오버레이로 표시됩니다</value>
+  </data>
+  <data name="Loading_Tip_5" xml:space="preserve">
+    <value>설정 화면에서 다양한 옵션을 사용자 지정할 수 있습니다</value>
+  </data>
+
+  <!-- [Issue #78 Phase 5] Token Usage Alerts -->
+  <data name="TokenUsage_Warning_Title" xml:space="preserve">
+    <value>사용량 경고</value>
+  </data>
+  <data name="TokenUsage_Warning80_Message" xml:space="preserve">
+    <value>이번 달 EX 번역 할당량의 80%를 사용했습니다 (잔여: {0})</value>
+  </data>
+  <data name="TokenUsage_Warning90_Message" xml:space="preserve">
+    <value>이번 달 EX 번역 할당량의 90%를 사용했습니다 (잔여: {0})</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
+    <value>할당량 한도 도달</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
+    <value>EX 번역 할당량 한도에 도달했습니다. 표준 번역으로 전환합니다.</value>
+  </data>
+
+  <!-- [Issue #245] Window Selection Dialog -->
+  <data name="WindowSelection_Title" xml:space="preserve">
+    <value>창 선택</value>
+  </data>
+  <data name="WindowSelection_Header" xml:space="preserve">
+    <value>번역 대상 창 선택</value>
+  </data>
+  <data name="WindowSelection_Subtitle" xml:space="preserve">
+    <value>번역할 애플리케이션 창을 선택하세요 (최소화된 창 포함)</value>
+  </data>
+  <data name="WindowSelection_Refresh" xml:space="preserve">
+    <value>창 목록 새로고침</value>
+  </data>
+  <data name="WindowSelection_Searching" xml:space="preserve">
+    <value>창 검색 중...</value>
+  </data>
+  <data name="WindowSelection_NoWindows" xml:space="preserve">
+    <value>사용 가능한 창을 찾을 수 없습니다</value>
+  </data>
+  <data name="WindowSelection_Minimized" xml:space="preserve">
+    <value>최소화됨</value>
+  </data>
+  <data name="WindowSelection_Cancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="WindowSelection_Select" xml:space="preserve">
+    <value>선택</value>
+  </data>
+  <data name="WindowSelection_Update" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+
+  <!-- ========== Crash Report Dialog [Issue #252] ========== -->
+  <data name="CrashReport_WindowTitle" xml:space="preserve">
+    <value>충돌 보고서</value>
+  </data>
+  <data name="CrashReport_HeaderText" xml:space="preserve">
+    <value>예기치 않은 종료가 감지되었습니다</value>
+  </data>
+  <data name="CrashReport_DescriptionSingle" xml:space="preserve">
+    <value>이전 세션에서 애플리케이션이 예기치 않게 종료되었습니다. 개선을 위해 충돌 보고서를 보내시겠습니까?</value>
+  </data>
+  <data name="CrashReport_DescriptionMultiple" xml:space="preserve">
+    <value>최근 {0}건의 충돌이 감지되었습니다. 개선을 위해 충돌 보고서를 보내시겠습니까?</value>
+  </data>
+  <data name="CrashReport_PrivacyNote" xml:space="preserve">
+    <value>개인정보 보호를 위해 보고서에는 개인 식별 정보(사용자 이름, 이메일, IP 주소 등)가 포함되지 않습니다.</value>
+  </data>
+  <data name="CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>시스템 정보 포함 (OS, 메모리 사용량 등)</value>
+  </data>
+  <data name="CrashReport_IncludeLogs" xml:space="preserve">
+    <value>최근 로그 포함</value>
+  </data>
+  <data name="CrashReport_SendButton" xml:space="preserve">
+    <value>보고서 전송</value>
+  </data>
+  <data name="CrashReport_DontSendButton" xml:space="preserve">
+    <value>전송하지 않기</value>
+  </data>
+  <data name="CrashReport_CrashDetailsTitle" xml:space="preserve">
+    <value>충돌 상세 정보</value>
+  </data>
+
+  <!-- ========== Crash Report Settings [Issue #252] ========== -->
+  <data name="Settings_CrashReport_Title" xml:space="preserve">
+    <value>충돌 보고서</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSend" xml:space="preserve">
+    <value>충돌 보고서 자동 전송</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSendDescription" xml:space="preserve">
+    <value>확인 대화 상자를 표시하지 않고 충돌 보고서를 자동으로 전송합니다</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>시스템 정보 포함</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfoDescription" xml:space="preserve">
+    <value>보고서에 CPU, 메모리 사용량 및 기타 시스템 정보를 포함합니다</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogs" xml:space="preserve">
+    <value>앱 로그 포함</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogsDescription" xml:space="preserve">
+    <value>보고서에 최근 애플리케이션 로그를 포함합니다</value>
+  </data>
+
+  <!-- ========== Update Dialog [Issue #249] ========== -->
+  <data name="Update_WindowTitle" xml:space="preserve">
+    <value>소프트웨어 업데이트</value>
+  </data>
+  <data name="Update_HeaderText" xml:space="preserve">
+    <value>{0}의 새 버전을 사용할 수 있습니다</value>
+  </data>
+  <data name="Update_InfoText" xml:space="preserve">
+    <value>{0} {1}을(를) 사용할 수 있습니다 (현재 버전: {2}). 지금 다운로드하시겠습니까?</value>
+  </data>
+  <data name="Update_SkipButton" xml:space="preserve">
+    <value>이 버전 건너뛰기</value>
+  </data>
+  <data name="Update_RemindLaterButton" xml:space="preserve">
+    <value>나중에 알림</value>
+  </data>
+  <data name="Update_DownloadButton" xml:space="preserve">
+    <value>다운로드</value>
+  </data>
+  <data name="Update_DownloadProgress_Title" xml:space="preserve">
+    <value>소프트웨어 업데이트</value>
+  </data>
+  <data name="Update_DownloadProgress_Downloading" xml:space="preserve">
+    <value>{0} 다운로드 중...</value>
+  </data>
+  <data name="Update_DownloadProgress_Complete" xml:space="preserve">
+    <value>다운로드 완료</value>
+  </data>
+  <data name="Update_DownloadProgress_InstallAndRelaunch" xml:space="preserve">
+    <value>설치 및 다시 시작</value>
+  </data>
+  <data name="Update_DownloadProgress_Cancel" xml:space="preserve">
+    <value>취소</value>
+  </data>
+
+  <!-- ========== Consent Dialog (Issue #261) ========== -->
+  <data name="Consent_WindowTitle_Initial" xml:space="preserve">
+    <value>이용약관 동의</value>
+  </data>
+  <data name="Consent_WindowTitle_Account" xml:space="preserve">
+    <value>이용약관 동의</value>
+  </data>
+  <data name="Consent_Header_Initial" xml:space="preserve">
+    <value>Baketa에 오신 것을 환영합니다</value>
+  </data>
+  <data name="Consent_Header_Account" xml:space="preserve">
+    <value>계정 만들기</value>
+  </data>
+  <data name="Consent_Description_Initial" xml:space="preserve">
+    <value>Baketa를 사용하려면 이용약관 및 개인정보처리방침에 동의해야 합니다.</value>
+  </data>
+  <data name="Consent_Description_Account" xml:space="preserve">
+    <value>계정을 만들려면 이용약관 및 개인정보처리방침에 동의해야 합니다.</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Label" xml:space="preserve">
+    <value>개인정보처리방침</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Link" xml:space="preserve">
+    <value>개인정보처리방침 읽기</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Checkbox" xml:space="preserve">
+    <value>개인정보처리방침에 동의합니다</value>
+  </data>
+  <data name="Consent_TermsOfService_Label" xml:space="preserve">
+    <value>이용약관</value>
+  </data>
+  <data name="Consent_TermsOfService_Link" xml:space="preserve">
+    <value>이용약관 읽기</value>
+  </data>
+  <data name="Consent_TermsOfService_Checkbox" xml:space="preserve">
+    <value>이용약관에 동의합니다</value>
+  </data>
+  <data name="Consent_Button_Accept" xml:space="preserve">
+    <value>동의하고 계속</value>
+  </data>
+  <data name="Consent_Button_Decline" xml:space="preserve">
+    <value>거부하고 종료</value>
+  </data>
+
+  <!-- ========== Component Update Dialog [Issue #256] ========== -->
+  <data name="ComponentUpdate_WindowTitle" xml:space="preserve">
+    <value>구성 요소 업데이트</value>
+  </data>
+  <data name="ComponentUpdate_HeaderText" xml:space="preserve">
+    <value>구성 요소 업데이트를 사용할 수 있습니다</value>
+  </data>
+  <data name="ComponentUpdate_Description" xml:space="preserve">
+    <value>다음 구성 요소의 새 버전을 사용할 수 있습니다. 업데이트하시겠습니까?</value>
+  </data>
+  <data name="ComponentUpdate_TotalSize" xml:space="preserve">
+    <value>총 다운로드 크기: {0}</value>
+  </data>
+  <data name="ComponentUpdate_VersionFormat" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="ComponentUpdate_NotInstalled" xml:space="preserve">
+    <value>미설치 → {0}</value>
+  </data>
+  <data name="ComponentUpdate_SizeFormat" xml:space="preserve">
+    <value>크기: {0}</value>
+  </data>
+  <data name="ComponentUpdate_UpdateNowButton" xml:space="preserve">
+    <value>지금 업데이트</value>
+  </data>
+  <data name="ComponentUpdate_RemindLaterButton" xml:space="preserve">
+    <value>나중에 알림</value>
+  </data>
+  <data name="ComponentUpdate_SkipButton" xml:space="preserve">
+    <value>이 버전 건너뛰기</value>
+  </data>
+  <data name="ComponentUpdate_CancelButton" xml:space="preserve">
+    <value>취소</value>
+  </data>
+  <data name="ComponentUpdate_CloseButton" xml:space="preserve">
+    <value>닫기</value>
+  </data>
+  <data name="ComponentUpdate_Status_Pending" xml:space="preserve">
+    <value>대기 중</value>
+  </data>
+  <data name="ComponentUpdate_Status_Downloading" xml:space="preserve">
+    <value>다운로드 중...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Installing" xml:space="preserve">
+    <value>설치 중...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Completed" xml:space="preserve">
+    <value>완료</value>
+  </data>
+  <data name="ComponentUpdate_Status_Failed" xml:space="preserve">
+    <value>실패</value>
+  </data>
+  <data name="ComponentUpdate_Status_Skipped" xml:space="preserve">
+    <value>건너뜀</value>
+  </data>
+  <data name="ComponentUpdate_AllCompleted" xml:space="preserve">
+    <value>모든 구성 요소 업데이트가 완료되었습니다</value>
+  </data>
+  <data name="ComponentUpdate_SomeFailed" xml:space="preserve">
+    <value>일부 구성 요소 업데이트에 실패했습니다</value>
+  </data>
+  <data name="ComponentUpdate_InsufficientDiskSpace" xml:space="preserve">
+    <value>디스크 공간이 부족합니다 (필요: {0}, 사용 가능: {1})</value>
+  </data>
+  <data name="ComponentUpdate_NoUpdatesAvailable" xml:space="preserve">
+    <value>모든 구성 요소가 최신 상태입니다</value>
+  </data>
+  <data name="ComponentUpdate_CheckingForUpdates" xml:space="preserve">
+    <value>업데이트 확인 중...</value>
+  </data>
+
+  <!-- ========== Issue #300: OCR Recovery & Memory Warning ========== -->
+  <data name="OcrRecovery_Title" xml:space="preserve">
+    <value>텍스트 인식</value>
+  </data>
+  <data name="OcrRecovery_Started" xml:space="preserve">
+    <value>텍스트 인식 엔진을 복구하고 있습니다. 잠시 기다려 주세요...</value>
+  </data>
+  <data name="OcrRecovery_Completed" xml:space="preserve">
+    <value>텍스트 인식 엔진이 복구되었습니다</value>
+  </data>
+  <data name="OcrRecovery_Failed" xml:space="preserve">
+    <value>텍스트 인식 엔진 복구에 실패했습니다. Baketa를 다시 시작해 주세요.</value>
+  </data>
+  <data name="MemoryWarning_Title" xml:space="preserve">
+    <value>메모리 경고</value>
+  </data>
+  <data name="MemoryWarning_SystemMemory" xml:space="preserve">
+    <value>메모리 사용량이 높습니다 ({0}%). 다른 애플리케이션을 닫아 주세요.</value>
+  </data>
+  <data name="GpuMemoryWarning_Title" xml:space="preserve">
+    <value>GPU 메모리 경고</value>
+  </data>
+
+  <!-- Issue #179: Auth error messages -->
+  <data name="Auth_Error_UserAlreadyExists" xml:space="preserve">
+    <value>이 이메일 주소는 이미 사용 중입니다</value>
+  </data>
+  <data name="Auth_Error_WeakPassword" xml:space="preserve">
+    <value>비밀번호가 너무 약합니다. 더 강력한 비밀번호를 사용해 주세요</value>
+  </data>
+  <data name="Auth_Error_InvalidCredentials" xml:space="preserve">
+    <value>잘못된 이메일 형식입니다</value>
+  </data>
+  <data name="Auth_Error_InvalidEmail" xml:space="preserve">
+    <value>잘못된 이메일 주소 또는 비밀번호입니다</value>
+  </data>
+  <data name="Auth_Error_EmailNotConfirmed" xml:space="preserve">
+    <value>확인 이메일이 발송되었습니다. 이메일의 링크를 클릭한 후 로그인 화면에서 로그인해 주세요.</value>
+  </data>
+  <data name="Auth_Error_RateLimitExceeded" xml:space="preserve">
+    <value>요청이 너무 많습니다. 나중에 다시 시도해 주세요</value>
+  </data>
+  <data name="Auth_Error_SignupDisabled" xml:space="preserve">
+    <value>현재 신규 계정 등록이 비활성화되어 있습니다</value>
+  </data>
+  <data name="Auth_Error_SignupFailed" xml:space="preserve">
+    <value>계정 생성 실패: {0}</value>
+  </data>
+  <data name="Auth_Error_LoginFailed" xml:space="preserve">
+    <value>로그인 실패: {0}</value>
+  </data>
+  <data name="Auth_Error_InvalidToken" xml:space="preserve">
+    <value>인증에 실패했습니다. Google, Discord 또는 Twitch로 로그인해 보세요.</value>
+  </data>
+  <data name="Auth_Error_TokenExpired" xml:space="preserve">
+    <value>세션이 만료되었습니다. 다시 로그인해 주세요.</value>
+  </data>
+  <data name="Auth_Error_NetworkError" xml:space="preserve">
+    <value>네트워크 오류가 발생했습니다. 인터넷 연결을 확인해 주세요.</value>
+  </data>
+  <data name="Auth_Error_Timeout" xml:space="preserve">
+    <value>연결 시간이 초과되었습니다. 인터넷 연결을 확인해 주세요</value>
+  </data>
+  <data name="Auth_Error_Unknown" xml:space="preserve">
+    <value>인증 오류가 발생했습니다</value>
+  </data>
+  <data name="Auth_Success_EmailSent" xml:space="preserve">
+    <value>이메일이 전송되었습니다</value>
+  </data>
+  <data name="Auth_Success_PasswordResetEmailSent" xml:space="preserve">
+    <value>비밀번호 재설정 이메일이 전송되었습니다. 받은편지함을 확인해 주세요.</value>
+  </data>
+  <data name="Auth_Error_PasswordResetFailed" xml:space="preserve">
+    <value>비밀번호 재설정에 실패했습니다. 이메일 주소를 확인해 주세요.</value>
+  </data>
+  <data name="Auth_Error_PasswordResetError" xml:space="preserve">
+    <value>비밀번호 재설정 중 오류가 발생했습니다.</value>
+  </data>
+  <data name="Auth_Validation_InvalidEmail" xml:space="preserve">
+    <value>유효한 이메일 주소를 입력해 주세요</value>
+  </data>
+  <data name="Auth_Validation_PasswordRequirement" xml:space="preserve">
+    <value>비밀번호는 8자 이상이며, 대문자, 소문자, 숫자, 기호 중 3가지 이상을 포함해야 합니다</value>
+  </data>
+  <data name="Auth_Validation_PasswordMismatch" xml:space="preserve">
+    <value>비밀번호가 일치하지 않습니다</value>
+  </data>
+  <data name="Settings_Account_LogoutSuccess" xml:space="preserve">
+    <value>성공적으로 로그아웃되었습니다</value>
+  </data>
+  <data name="Settings_License_UsedTokens" xml:space="preserve">
+    <value>사용됨</value>
+  </data>
+  <data name="Settings_License_PlanRemaining" xml:space="preserve">
+    <value>플랜 잔여</value>
+  </data>
+  <data name="Settings_License_BonusLabel" xml:space="preserve">
+    <value>보너스</value>
+  </data>
+  <data name="Settings_License_BonusTokens" xml:space="preserve">
+    <value>보너스</value>
+  </data>
+  <data name="Settings_License_TotalAvailable" xml:space="preserve">
+    <value>총 사용 가능</value>
+  </data>
+  <data name="Auth_Validation_PasswordMinLength" xml:space="preserve">
+    <value>비밀번호는 6자 이상이어야 합니다</value>
+  </data>
+  <data name="Auth_Error_PasswordResetException" xml:space="preserve">
+    <value>비밀번호 재설정 실패: {0}</value>
+  </data>
+  <data name="Auth_Success_ConfirmationEmailSent" xml:space="preserve">
+    <value>확인 이메일이 발송되었습니다. 이메일의 링크를 클릭한 후 로그인해 주세요. 3초 후 로그인 페이지로 이동합니다...</value>
+  </data>
+
+  <!-- ========== Issue #424: i18n - Hardcoded string externalization ========== -->
+
+  <!-- ComponentDownloadFailedEventProcessor -->
+  <data name="Download_Failed_Title" xml:space="preserve">
+    <value>다운로드 실패</value>
+  </data>
+  <data name="Download_Failed_RequiredMessage" xml:space="preserve">
+    <value>필수 파일 다운로드에 실패했습니다.
+앱을 다시 시작하여 재시도해 주세요.
+
+실패한 구성 요소: {0}</value>
+  </data>
+  <data name="Download_Failed_OptionalTitle" xml:space="preserve">
+    <value>일부 다운로드 실패</value>
+  </data>
+  <data name="Download_Failed_OptionalMessage" xml:space="preserve">
+    <value>일부 기능을 사용할 수 없을 수 있습니다.
+앱을 다시 시작하여 재시도해 주세요.</value>
+  </data>
+
+  <!-- DownloadProgressViewModel -->
+  <data name="Update_DownloadProgress_VerificationFailed" xml:space="preserve">
+    <value>다운로드 확인에 실패했습니다</value>
+  </data>
+
+  <!-- App.axaml.cs - Session -->
+  <data name="Session_Expired_Title" xml:space="preserve">
+    <value>세션 만료</value>
+  </data>
+  <data name="Session_Expired_Message" xml:space="preserve">
+    <value>세션이 만료되었습니다. 다시 로그인해 주세요.</value>
+  </data>
+
+  <!-- App.axaml.cs - Test Mode -->
+  <data name="TestMode_Warning_Title" xml:space="preserve">
+    <value>테스트 모드 활성화</value>
+  </data>
+  <data name="TestMode_Warning_Message" xml:space="preserve">
+    <value>라이선스 Mock 모드가 활성화되어 있습니다. 프로덕션 환경에서는 appsettings.json에서 License.EnableMockMode를 false로 설정하세요.</value>
+  </data>
+
+  <!-- App.axaml.cs - Hardware Check -->
+  <data name="Hardware_Critical_Title" xml:space="preserve">
+    <value>하드웨어 요구사항 - 심각한 경고</value>
+  </data>
+  <data name="Hardware_Critical_Message" xml:space="preserve">
+    <value>시스템이 최소 요구사항을 충족하지 않습니다. Baketa가 제대로 작동하지 않을 수 있습니다.
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_Warning_Title" xml:space="preserve">
+    <value>하드웨어 요구사항 경고</value>
+  </data>
+  <data name="Hardware_Warning_Message" xml:space="preserve">
+    <value>시스템이 권장 사양을 충족하지 않습니다.
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_CpuCores" xml:space="preserve">
+    <value>CPU: {0}코어</value>
+  </data>
+
+  <!-- App.axaml.cs - Patreon Auth -->
+  <data name="Patreon_AuthSuccess_Title" xml:space="preserve">
+    <value>Patreon 연결 성공</value>
+  </data>
+  <data name="Patreon_AuthSuccess_Message" xml:space="preserve">
+    <value>Patreon 계정이 성공적으로 연결되었습니다. 플랜: {0}</value>
+  </data>
+  <data name="Patreon_AuthFailed_Title" xml:space="preserve">
+    <value>Patreon 연결 실패</value>
+  </data>
+  <data name="Patreon_AuthFailed_Message" xml:space="preserve">
+    <value>인증 중 오류가 발생했습니다</value>
+  </data>
+
+  <!-- MainOverlayViewModel - Translation Error -->
+  <data name="Translation_Error_StopFailed" xml:space="preserve">
+    <value>번역 중지에 실패했습니다.
+원인: {0}
+조치: 앱을 다시 시작해 주세요.</value>
+  </data>
+  <data name="Translation_Error_StartFailed" xml:space="preserve">
+    <value>번역 시작에 실패했습니다.
+원인: {0}
+조치: 앱을 다시 시작해 주세요.</value>
+  </data>
+
+  <!-- ========== Issue #423: Upsell messages ========== -->
+  <data name="Upsell_ViewPlans" xml:space="preserve">
+    <value>플랜 변경 →</value>
+  </data>
+  <data name="Upsell_Free_WithBonus_Message" xml:space="preserve">
+    <value>⚡ Pro 플랜으로 더 많은 EX 모드를 이용하세요</value>
+  </data>
+  <data name="Upsell_Free_NoBonus_Message" xml:space="preserve">
+    <value>⚡ Pro 플랜을 구독하여 EX 모드를 사용하세요</value>
+  </data>
+  <data name="Upsell_Upgrade_Message" xml:space="preserve">
+    <value>⬆️ 플랜을 업그레이드하여 더 많은 토큰을 받으세요</value>
+  </data>
+
+</root>

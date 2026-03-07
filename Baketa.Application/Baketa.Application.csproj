@@ -30,6 +30,7 @@
 	<!-- テストアセンブリからのアクセスを許可 -->
 	<ItemGroup>
 		<InternalsVisibleTo Include="Baketa.Application.Tests" />
+		<InternalsVisibleTo Include="Baketa.Integration.Tests" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1057,54 +1057,6 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     }
 
     /// <summary>
-    /// 言語コードから表示名を取得
-    /// </summary>
-    /// <param name="languageCode">言語コード</param>
-    /// <returns>言語の表示名</returns>
-    private static string GetLanguageDisplayName(string languageCode)
-    {
-        return languageCode.ToLowerInvariant() switch
-        {
-            "ja" => "Japanese",
-            "en" => "English",
-            "zh" or "zh-cn" or "zh-hans" => "Chinese (Simplified)",
-            "zh-tw" or "zh-hant" => "Chinese (Traditional)",
-            "ko" => "Korean",
-            "fr" => "French",
-            "de" => "German",
-            "es" => "Spanish",
-            "pt" => "Portuguese",
-            "ru" => "Russian",
-            _ => languageCode.ToUpperInvariant()
-        };
-    }
-
-    /// <summary>
-    /// 日本語表示名を言語コードに変換します
-    /// </summary>
-    /// <param name="displayName">日本語表示名（例：「英語」「簡体字中国語」）</param>
-    /// <returns>言語コード（例：「en」「zh-cn」）</returns>
-    private static string GetLanguageCode(string displayName)
-    {
-        return displayName switch
-        {
-            "日本語" => "ja",
-            "英語" => "en",
-            "English" => "en",  // 🔧 FIX: 英語表示名追加
-            "Japanese" => "ja", // 🔧 FIX: 日本語表示名追加
-            "簡体字中国語" => "zh-cn",
-            "繁体字中国語" => "zh-tw",
-            "韓国語" => "ko",
-            "フランス語" => "fr",
-            "ドイツ語" => "de",
-            "スペイン語" => "es",
-            "ポルトガル語" => "pt",
-            "ロシア語" => "ru",
-            _ => displayName.ToLowerInvariant() // 不明な場合はそのまま小文字で返す
-        };
-    }
-
-    /// <summary>
     /// [Issue #436] 完了したバックグラウンド翻訳タスクを収穫し、_translationInFlightTask をクリアする。
     /// </summary>
     /// <returns>翻訳が正常完了した場合 true（RapidCheckMode起動用）</returns>
@@ -2132,7 +2084,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                         OriginalText = "",
                         TranslatedText = "",
                         DetectedLanguage = "ja",
-                        TargetLanguage = GetLanguageCode(_settingsService.GetValue("UI:TranslationLanguage", "英語")),
+                        TargetLanguage = LanguageCodeConverter.ToLanguageCode(_settingsService.GetValue("UI:TranslationLanguage", "英語")),
                         Confidence = 1.0f,
                         ProcessingTime = DateTime.UtcNow - startTime,
                         IsCoordinateBasedMode = true // 座標ベースモードを示すフラグ - Observableスキップ + クールダウン設定
@@ -2880,7 +2832,7 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 Mode = mode,
                 OriginalText = string.Empty,
                 TranslatedText = $"翻訳エラー: {ex.Message}",
-                TargetLanguage = GetLanguageCode(_settingsService.GetValue("UI:TranslationLanguage", "英語")),
+                TargetLanguage = LanguageCodeConverter.ToLanguageCode(_settingsService.GetValue("UI:TranslationLanguage", "英語")),
                 Confidence = 0.0f,
                 ProcessingTime = processingTime
             };

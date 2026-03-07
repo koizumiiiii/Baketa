@@ -43,6 +43,14 @@ public class LanguageConfigurationTests
         Assert.Contains(config.SupportedLanguages, lang => lang.Code == "zh");
         Assert.Contains(config.SupportedLanguages, lang => lang.Code == "zh-Hans");
         Assert.Contains(config.SupportedLanguages, lang => lang.Code == "zh-Hant");
+
+        // Tier 1 LTR言語が含まれていることを確認
+        Assert.Contains(config.SupportedLanguages, lang => lang.Code == "ko");
+        Assert.Contains(config.SupportedLanguages, lang => lang.Code == "fr");
+        Assert.Contains(config.SupportedLanguages, lang => lang.Code == "de");
+        Assert.Contains(config.SupportedLanguages, lang => lang.Code == "it");
+        Assert.Contains(config.SupportedLanguages, lang => lang.Code == "es");
+        Assert.Contains(config.SupportedLanguages, lang => lang.Code == "pt");
     }
 
     [Theory]
@@ -51,6 +59,12 @@ public class LanguageConfigurationTests
     [InlineData("zh-Hans", "中国語（簡体字）")]
     [InlineData("zh-Hant", "中国語（繁体字）")]
     [InlineData("auto", "自動検出")]
+    [InlineData("ko", "韓国語")]
+    [InlineData("fr", "フランス語")]
+    [InlineData("de", "ドイツ語")]
+    [InlineData("it", "イタリア語")]
+    [InlineData("es", "スペイン語")]
+    [InlineData("pt", "ポルトガル語")]
     public void GetLanguageInfo_WithValidCode_ShouldReturnCorrectInfo(string code, string expectedName)
     {
         // Arrange
@@ -123,6 +137,22 @@ public class LanguageConfigurationTests
     [InlineData("en", "en", false)] // 同じ言語への翻訳は不要
     [InlineData("nonexistent", "ja", false)] // 存在しない言語
     [InlineData("en", "nonexistent", false)] // 存在しない言語
+    // Tier 1 LTR言語の翻訳ペア
+    [InlineData("ko", "ja", true)]
+    [InlineData("ja", "ko", true)]
+    [InlineData("fr", "en", true)]
+    [InlineData("en", "fr", true)]
+    [InlineData("de", "ja", true)]
+    [InlineData("it", "en", true)]
+    [InlineData("en", "it", true)]
+    [InlineData("es", "ja", true)]
+    [InlineData("pt", "en", true)]
+    [InlineData("en", "pt", true)]
+    [InlineData("fr", "de", true)] // 非英日ペア
+    [InlineData("it", "pt", true)] // 非英日ペア
+    // 未サポート言語はfalse
+    [InlineData("ru", "ja", false)]
+    [InlineData("ar", "en", false)]
     public void IsTranslationPairSupported_ShouldReturnCorrectResult(
         string sourceLang,
         string targetLang,

@@ -35,6 +35,7 @@
 	<!-- テスタビリティ向上: internal メンバーをテストプロジェクトからアクセス可能に -->
 	<ItemGroup>
 		<InternalsVisibleTo Include="Baketa.Infrastructure.Tests" />
+		<InternalsVisibleTo Include="Baketa.Integration.Tests" />
 	</ItemGroup>
 
 	<ItemGroup>

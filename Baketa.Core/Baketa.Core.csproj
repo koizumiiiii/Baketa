@@ -43,6 +43,30 @@
 		<EmbeddedResource Update="Resources\Messages.ja.resx">
 			<DependentUpon>Messages.resx</DependentUpon>
 		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.zh-CN.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.zh-TW.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.ko.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.fr.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.de.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.it.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.es.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\Messages.pt.resx">
+			<DependentUpon>Messages.resx</DependentUpon>
+		</EmbeddedResource>
 		<Compile Update="Resources\Messages.Designer.cs">
 			<DesignTime>True</DesignTime>
 			<AutoGen>True</AutoGen>

@@ -1,0 +1,1751 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="0" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ========== App General ========== -->
+  <data name="App_Title" xml:space="preserve">
+    <value>Baketa</value>
+  </data>
+  <data name="App_LoadingMessage" xml:space="preserve">
+    <value>Wird geladen...</value>
+  </data>
+  <data name="App_ErrorTitle" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+  <data name="App_Version" xml:space="preserve">
+    <value>Aktuelle Version: {0}</value>
+  </data>
+  <data name="App_Copyright" xml:space="preserve">
+    <value>© 2024 Baketa. Alle Rechte vorbehalten.</value>
+  </data>
+
+  <!-- ========== Common Buttons ========== -->
+  <data name="Common_Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Common_Apply" xml:space="preserve">
+    <value>Anwenden</value>
+  </data>
+  <data name="Common_Reset" xml:space="preserve">
+    <value>Zurücksetzen</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>Schließen</value>
+  </data>
+  <data name="Common_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>Ja</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>Nein</value>
+  </data>
+  <data name="Common_Help" xml:space="preserve">
+    <value>Hilfe</value>
+  </data>
+  <data name="Common_Loading" xml:space="preserve">
+    <value>Wird geladen...</value>
+  </data>
+  <data name="Common_Or" xml:space="preserve">
+    <value>oder</value>
+  </data>
+  <data name="Common_Submit" xml:space="preserve">
+    <value>Absenden</value>
+  </data>
+
+  <!-- ========== Main Overlay ========== -->
+  <data name="MainOverlay_Minimize" xml:space="preserve">
+    <value>Minimieren</value>
+  </data>
+  <data name="MainOverlay_SelectWindow" xml:space="preserve">
+    <value>Zielfenster auswählen</value>
+  </data>
+  <data name="MainOverlay_Target" xml:space="preserve">
+    <value>Ziel</value>
+  </data>
+  <data name="MainOverlay_ShowHideTranslation" xml:space="preserve">
+    <value>Übersetzung ein-/ausblenden</value>
+  </data>
+  <data name="MainOverlay_LiveTranslation" xml:space="preserve">
+    <value>Live-Übersetzung</value>
+  </data>
+  <data name="MainOverlay_ShotTranslation" xml:space="preserve">
+    <value>Einzelübersetzung</value>
+  </data>
+  <data name="MainOverlay_Preparing" xml:space="preserve">
+    <value>Wird vorbereitet</value>
+  </data>
+  <data name="MainOverlay_ShowTranslation" xml:space="preserve">
+    <value>Übersetzung anzeigen</value>
+  </data>
+  <data name="MainOverlay_Settings" xml:space="preserve">
+    <value>Einstellungen</value>
+  </data>
+  <data name="MainOverlay_Exit" xml:space="preserve">
+    <value>Beenden</value>
+  </data>
+  <data name="MainOverlay_DragToMove" xml:space="preserve">
+    <value>Zum Verschieben ziehen</value>
+  </data>
+  <data name="MainOverlay_Expand" xml:space="preserve">
+    <value>Erweitern</value>
+  </data>
+  <data name="MainOverlay_SelectedWindow" xml:space="preserve">
+    <value>[Ausgewählt: {0}]</value>
+  </data>
+  <data name="MainOverlay_TranslationCount" xml:space="preserve">
+    <value>Übersetzt: {0}</value>
+  </data>
+
+  <!-- ========== Home View ========== -->
+  <data name="Home_QuickStart" xml:space="preserve">
+    <value>Schnellstart</value>
+  </data>
+  <data name="Home_StartCapture" xml:space="preserve">
+    <value>Aufnahme starten</value>
+  </data>
+  <data name="Home_CaptureSettings" xml:space="preserve">
+    <value>Aufnahmeeinstellungen</value>
+  </data>
+  <data name="Home_TranslationSettings" xml:space="preserve">
+    <value>Übersetzungseinstellungen</value>
+  </data>
+  <data name="Home_RecentTranslations" xml:space="preserve">
+    <value>Letzte Übersetzungen</value>
+  </data>
+  <data name="Home_ViewAll" xml:space="preserve">
+    <value>Alle anzeigen</value>
+  </data>
+  <data name="Home_NoHistory" xml:space="preserve">
+    <value>Noch kein Übersetzungsverlauf vorhanden</value>
+  </data>
+  <data name="Home_UsageStatistics" xml:space="preserve">
+    <value>Nutzungsstatistiken</value>
+  </data>
+  <data name="Home_CaptureStatus" xml:space="preserve">
+    <value>Aufnahmestatus:</value>
+  </data>
+  <data name="Home_TranslationEngine" xml:space="preserve">
+    <value>Übersetzungsmodul:</value>
+  </data>
+  <data name="Home_TargetLanguage" xml:space="preserve">
+    <value>Zielsprache:</value>
+  </data>
+  <data name="Home_MemoryUsage" xml:space="preserve">
+    <value>Speicherverbrauch:</value>
+  </data>
+  <data name="Home_RunningTime" xml:space="preserve">
+    <value>Laufzeit:</value>
+  </data>
+  <data name="Home_Tips" xml:space="preserve">
+    <value>Tipps</value>
+  </data>
+  <data name="Home_Tip_OpenTabs" xml:space="preserve">
+    <value>Öffnen Sie die einzelnen Funktionen über die Registerkarten auf der linken Seite</value>
+  </data>
+  <data name="Home_Tip_SelectArea" xml:space="preserve">
+    <value>Wählen Sie vor dem Starten der Aufnahme den zu übersetzenden Bereich auf dem Spielbildschirm aus</value>
+  </data>
+  <data name="Home_Tip_OverlaySettings" xml:space="preserve">
+    <value>Passen Sie die Anzeigeposition und Schriftart in den Overlay-Einstellungen an</value>
+  </data>
+  <data name="Home_Tip_TranslationHistory" xml:space="preserve">
+    <value>Überprüfen Sie vergangene Übersetzungen im Übersetzungsverlauf</value>
+  </data>
+
+  <!-- ========== Settings Window ========== -->
+  <data name="Settings_Title" xml:space="preserve">
+    <value>Einstellungen</value>
+  </data>
+
+  <!-- ========== General Settings ========== -->
+  <data name="Settings_General_Title" xml:space="preserve">
+    <value>Allgemeine Einstellungen</value>
+  </data>
+  <data name="Settings_General_Subtitle" xml:space="preserve">
+    <value>Grundlegende Anwendungseinstellungen</value>
+  </data>
+  <data name="Settings_General_Appearance" xml:space="preserve">
+    <value>Erscheinungsbild</value>
+  </data>
+  <data name="Settings_General_Theme" xml:space="preserve">
+    <value>Design</value>
+  </data>
+  <data name="Settings_General_ThemeDescription" xml:space="preserve">
+    <value>Wählen Sie das Farbschema der Anwendung</value>
+  </data>
+  <data name="Settings_General_ThemeLight" xml:space="preserve">
+    <value>Hell</value>
+  </data>
+  <data name="Settings_General_ThemeDark" xml:space="preserve">
+    <value>Dunkel</value>
+  </data>
+  <data name="Settings_General_ThemeAuto" xml:space="preserve">
+    <value>Automatisch (Systemeinstellung)</value>
+  </data>
+  <data name="Settings_General_Translation" xml:space="preserve">
+    <value>Übersetzungseinstellungen</value>
+  </data>
+  <data name="Settings_General_TranslationEngine" xml:space="preserve">
+    <value>Übersetzungsmodul</value>
+  </data>
+  <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
+    <value>Wählen Sie das zu verwendende Übersetzungsmodul</value>
+  </data>
+  <data name="Settings_General_EXMode" xml:space="preserve">
+    <value>EX-Modus</value>
+  </data>
+  <data name="Settings_General_EXModeDescription" xml:space="preserve">
+    <value>Verwenden Sie das hochpräzise EX-Übersetzungsmodul</value>
+  </data>
+  <data name="Settings_General_OfflineTranslation" xml:space="preserve">
+    <value>Offline-Übersetzung</value>
+  </data>
+  <data name="Settings_General_AITranslation" xml:space="preserve">
+    <value>EX-Übersetzung</value>
+  </data>
+  <data name="Settings_General_AlphaNote" xml:space="preserve">
+    <value>* Im Alphatest ist nur die Offline-Übersetzung verfügbar</value>
+  </data>
+  <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
+    <value>Verfügbar mit Pro-/Premium-/Ultimate-Plan</value>
+  </data>
+  <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
+    <value>Nutzung in diesem Monat:</value>
+  </data>
+  <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
+    <value></value>
+  </data>
+  <data name="Settings_General_TranslationLanguage" xml:space="preserve">
+    <value>Übersetzungssprache</value>
+  </data>
+  <data name="Settings_General_TranslationLanguageDescription" xml:space="preserve">
+    <value>Wählen Sie Ausgangs- und Zielsprache</value>
+  </data>
+  <data name="Settings_General_FontSize" xml:space="preserve">
+    <value>Schriftgröße der Übersetzung</value>
+  </data>
+  <data name="Settings_General_FontSizeDescription" xml:space="preserve">
+    <value>Größe des Übersetzungstextes auf dem Overlay</value>
+  </data>
+  <data name="Settings_General_FontSizeUnit" xml:space="preserve">
+    <value>px</value>
+  </data>
+  <data name="Settings_General_LanguagePairWarning" xml:space="preserve">
+    <value>* Bitte wählen Sie unterschiedliche Sprachen für Ausgangs- und Zielsprache</value>
+  </data>
+  <data name="Settings_General_Language" xml:space="preserve">
+    <value>Sprache</value>
+  </data>
+  <data name="Settings_General_LanguageDescription" xml:space="preserve">
+    <value>Wählen Sie die Anzeigesprache der Anwendung</value>
+  </data>
+  <data name="Settings_General_LanguageJapanese" xml:space="preserve">
+    <value>Japanisch</value>
+  </data>
+  <data name="Settings_General_LanguageEnglish" xml:space="preserve">
+    <value>Englisch</value>
+  </data>
+
+  <!-- ========== Translation Settings ========== -->
+  <data name="Settings_Translation_Title" xml:space="preserve">
+    <value>Übersetzungseinstellungen</value>
+  </data>
+  <data name="Settings_Translation_Subtitle" xml:space="preserve">
+    <value>Konfigurieren Sie Übersetzungsmodul, Sprachpaare und Übersetzungsstrategie</value>
+  </data>
+  <data name="Settings_Translation_LastSaved" xml:space="preserve">
+    <value>Zuletzt gespeichert: {0:MM/dd HH:mm}</value>
+  </data>
+  <data name="Settings_Translation_UnsavedChanges" xml:space="preserve">
+    <value>Einstellungen haben ungespeicherte Änderungen</value>
+  </data>
+  <data name="Settings_Translation_DiscardChanges" xml:space="preserve">
+    <value>Änderungen verwerfen</value>
+  </data>
+  <data name="Settings_Translation_Summary" xml:space="preserve">
+    <value>Aktuelle Einstellungsübersicht</value>
+  </data>
+  <data name="Settings_Translation_Engine" xml:space="preserve">
+    <value>Übersetzungsmodul</value>
+  </data>
+  <data name="Settings_Translation_LanguagePair" xml:space="preserve">
+    <value>Sprachpaar</value>
+  </data>
+  <data name="Settings_Translation_Strategy" xml:space="preserve">
+    <value>Übersetzungsstrategie</value>
+  </data>
+  <data name="Settings_Translation_ChineseVariant" xml:space="preserve">
+    <value>Chinesische Variante</value>
+  </data>
+  <data name="Settings_Translation_Fallback" xml:space="preserve">
+    <value>Ausweichlösung</value>
+  </data>
+  <data name="Settings_Translation_ChangeStatus" xml:space="preserve">
+    <value>Änderungsstatus</value>
+  </data>
+  <data name="Settings_Translation_Import" xml:space="preserve">
+    <value>Importieren</value>
+  </data>
+  <data name="Settings_Translation_ImportTip" xml:space="preserve">
+    <value>Aus Einstellungsdatei importieren</value>
+  </data>
+  <data name="Settings_Translation_Export" xml:space="preserve">
+    <value>Exportieren</value>
+  </data>
+  <data name="Settings_Translation_ExportTip" xml:space="preserve">
+    <value>Einstellungen in Datei exportieren</value>
+  </data>
+  <data name="Settings_Translation_Load" xml:space="preserve">
+    <value>Laden</value>
+  </data>
+  <data name="Settings_Translation_LoadTip" xml:space="preserve">
+    <value>Gespeicherte Einstellungen laden</value>
+  </data>
+  <data name="Settings_Translation_SaveTip" xml:space="preserve">
+    <value>Aktuelle Einstellungen speichern</value>
+  </data>
+  <data name="Settings_Translation_ApplyTip" xml:space="preserve">
+    <value>Einstellungen speichern und anwenden</value>
+  </data>
+  <data name="Settings_Translation_Saving" xml:space="preserve">
+    <value>Einstellungen werden gespeichert...</value>
+  </data>
+
+  <!-- ========== Capture Settings ========== -->
+  <data name="Settings_Capture_Title" xml:space="preserve">
+    <value>Aufnahmeeinstellungen</value>
+  </data>
+  <data name="Settings_Capture_Subtitle" xml:space="preserve">
+    <value>Detaillierte Einstellungen für Bildschirmaufnahme und Screenshot-Funktionen</value>
+  </data>
+  <data name="Settings_Capture_Basic" xml:space="preserve">
+    <value>Grundeinstellungen</value>
+  </data>
+  <data name="Settings_Capture_Enabled" xml:space="preserve">
+    <value>Aufnahmefunktion</value>
+  </data>
+  <data name="Settings_Capture_EnabledDescription" xml:space="preserve">
+    <value>Bildschirmaufnahme-Funktion aktivieren</value>
+  </data>
+  <data name="Settings_Capture_Interval" xml:space="preserve">
+    <value>Aufnahmeintervall</value>
+  </data>
+  <data name="Settings_Capture_IntervalDescription" xml:space="preserve">
+    <value>Intervall für die Bildschirmaufnahme (kürzer = genauer, länger = schneller)</value>
+  </data>
+  <data name="Settings_Capture_Quality" xml:space="preserve">
+    <value>Aufnahmequalität</value>
+  </data>
+  <data name="Settings_Capture_QualityDescription" xml:space="preserve">
+    <value>Qualität der aufgenommenen Bilder (höher = genauer, niedriger = schneller)</value>
+  </data>
+  <data name="Settings_Capture_AreaMode" xml:space="preserve">
+    <value>Bereichserkennungsmodus</value>
+  </data>
+  <data name="Settings_Capture_AreaModeDescription" xml:space="preserve">
+    <value>Wählen Sie zwischen automatischer Textbereichserkennung oder festem Bereich</value>
+  </data>
+  <data name="Settings_Capture_AutoDetect" xml:space="preserve">
+    <value>Automatische Erkennung</value>
+  </data>
+  <data name="Settings_Capture_FixedArea" xml:space="preserve">
+    <value>Fester Bereich</value>
+  </data>
+  <data name="Settings_Capture_FixedAreaSection" xml:space="preserve">
+    <value>Fester Aufnahmebereich</value>
+  </data>
+  <data name="Settings_Capture_Position" xml:space="preserve">
+    <value>Position und Größe</value>
+  </data>
+  <data name="Settings_Capture_PositionDescription" xml:space="preserve">
+    <value>Position und Größe des festen Aufnahmebereichs festlegen</value>
+  </data>
+  <data name="Settings_Capture_Advanced" xml:space="preserve">
+    <value>Erweiterte Einstellungen</value>
+  </data>
+  <data name="Settings_Capture_Monitor" xml:space="preserve">
+    <value>Zielmonitor</value>
+  </data>
+  <data name="Settings_Capture_MonitorDescription" xml:space="preserve">
+    <value>Monitor für die Aufnahme in einer Multi-Monitor-Umgebung auswählen</value>
+  </data>
+  <data name="Settings_Capture_DpiScaling" xml:space="preserve">
+    <value>DPI-Skalierung berücksichtigen</value>
+  </data>
+  <data name="Settings_Capture_DpiScalingDescription" xml:space="preserve">
+    <value>Skalierung in hochauflösenden DPI-Umgebungen berücksichtigen</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccel" xml:space="preserve">
+    <value>Hardwarebeschleunigung</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccelDescription" xml:space="preserve">
+    <value>Hardwarebeschleunigung mit GPU</value>
+  </data>
+  <data name="Settings_Capture_DiffDetection" xml:space="preserve">
+    <value>Unterschiedserkennungs-Einstellungen</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionEnable" xml:space="preserve">
+    <value>Unterschiedserkennung</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionDescription" xml:space="preserve">
+    <value>Erkennung von Bildschirmänderungen aktivieren</value>
+  </data>
+
+  <!-- ========== OCR Settings ========== -->
+  <data name="Settings_OCR_Title" xml:space="preserve">
+    <value>OCR-Einstellungen</value>
+  </data>
+  <data name="Settings_OCR_Subtitle" xml:space="preserve">
+    <value>Detaillierte Einstellungen für die optische Zeichenerkennung</value>
+  </data>
+  <data name="Settings_OCR_Basic" xml:space="preserve">
+    <value>Grundeinstellungen</value>
+  </data>
+  <data name="Settings_OCR_Enabled" xml:space="preserve">
+    <value>OCR aktivieren</value>
+  </data>
+  <data name="Settings_OCR_EnabledDescription" xml:space="preserve">
+    <value>Text auf dem Bildschirm automatisch erkennen</value>
+  </data>
+  <data name="Settings_OCR_Language" xml:space="preserve">
+    <value>Erkennungssprache</value>
+  </data>
+  <data name="Settings_OCR_LanguageDescription" xml:space="preserve">
+    <value>Primäre Sprache für die OCR-Erkennung</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguage" xml:space="preserve">
+    <value>Zielsprache</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguageDescription" xml:space="preserve">
+    <value>Ausgabesprache für Übersetzungsergebnisse</value>
+  </data>
+  <data name="Settings_OCR_Confidence" xml:space="preserve">
+    <value>Konfidenzschwelle</value>
+  </data>
+  <data name="Settings_OCR_ConfidenceDescription" xml:space="preserve">
+    <value>Mindestvertrauen für die Texterkennung (0,0-1,0)</value>
+  </data>
+  <data name="Settings_OCR_Filtering" xml:space="preserve">
+    <value>Textfilterung</value>
+  </data>
+  <data name="Settings_OCR_FilteringDescription" xml:space="preserve">
+    <value>Nachbearbeitung des erkannten Textes aktivieren</value>
+  </data>
+  <data name="Settings_OCR_Advanced" xml:space="preserve">
+    <value>Erweiterte Einstellungen</value>
+  </data>
+  <data name="Settings_OCR_Preprocessing" xml:space="preserve">
+    <value>Bildvorverarbeitung</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingEnable" xml:space="preserve">
+    <value>Bildvorverarbeitung aktivieren</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingDescription" xml:space="preserve">
+    <value>Bildvorverarbeitung zur Verbesserung der OCR-Genauigkeit anwenden</value>
+  </data>
+  <data name="Settings_OCR_Grayscale" xml:space="preserve">
+    <value>Graustufenkonvertierung</value>
+  </data>
+
+  <!-- ========== Overlay Settings ========== -->
+  <data name="Settings_Overlay_Title" xml:space="preserve">
+    <value>Overlay-Einstellungen</value>
+  </data>
+  <data name="Settings_Overlay_Subtitle" xml:space="preserve">
+    <value>Einstellungen zur Anzeige von Übersetzungsergebnissen auf dem Spielbildschirm</value>
+  </data>
+  <data name="Settings_Overlay_ARNote" xml:space="preserve">
+    <value>AR-Anzeige: Übersetzungsergebnisse werden an der gleichen Position wie der Originaltext überlagert, ähnlich wie bei Google Translate mit Kamera</value>
+  </data>
+  <data name="Settings_Overlay_Basic" xml:space="preserve">
+    <value>Grundeinstellungen</value>
+  </data>
+  <data name="Settings_Overlay_Enabled" xml:space="preserve">
+    <value>Overlay-Anzeige</value>
+  </data>
+  <data name="Settings_Overlay_EnabledDescription" xml:space="preserve">
+    <value>Übersetzungsergebnisse als Overlay auf dem Spielbildschirm anzeigen</value>
+  </data>
+  <data name="Settings_Overlay_Opacity" xml:space="preserve">
+    <value>Deckkraft</value>
+  </data>
+  <data name="Settings_Overlay_OpacityDescription" xml:space="preserve">
+    <value>Overlay-Deckkraft (höher = undurchsichtiger)</value>
+  </data>
+  <data name="Settings_Overlay_FontSize" xml:space="preserve">
+    <value>Schriftgröße der Übersetzung</value>
+  </data>
+  <data name="Settings_Overlay_FontSizeDescription" xml:space="preserve">
+    <value>Schriftgröße des Übersetzungstextes auf dem Overlay</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColor" xml:space="preserve">
+    <value>Hintergrundfarbe</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColorDescription" xml:space="preserve">
+    <value>Hintergrundfarbe des Overlays</value>
+  </data>
+  <data name="Settings_Overlay_ChooseColor" xml:space="preserve">
+    <value>Farbe wählen...</value>
+  </data>
+  <data name="Settings_Overlay_TextColor" xml:space="preserve">
+    <value>Textfarbe</value>
+  </data>
+  <data name="Settings_Overlay_TextColorDescription" xml:space="preserve">
+    <value>Textfarbe des Overlays</value>
+  </data>
+  <data name="Settings_Overlay_AutoHide" xml:space="preserve">
+    <value>Automatisches Ausblenden</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAuto" xml:space="preserve">
+    <value>Automatisches Ausblenden für Live-Übersetzung</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDescription" xml:space="preserve">
+    <value>Live-Übersetzungsergebnisse nach einer bestimmten Zeit automatisch ausblenden</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelay" xml:space="preserve">
+    <value>Verzögerung beim Ausblenden der Live-Übersetzung</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelayDescription" xml:space="preserve">
+    <value>Zeit bis zum automatischen Ausblenden der Live-Übersetzungsergebnisse</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelay" xml:space="preserve">
+    <value>Verzögerung beim automatischen Ausblenden der Einzelübersetzung</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelayDescription" xml:space="preserve">
+    <value>Zeit bis zum automatischen Ausblenden der Einzelübersetzungsergebnisse</value>
+  </data>
+  <data name="Settings_Overlay_ManualClose" xml:space="preserve">
+    <value>Klicken zum Schließen</value>
+  </data>
+  <data name="Settings_Overlay_ManualCloseDescription" xml:space="preserve">
+    <value>Overlay durch Klicken manuell ausblenden</value>
+  </data>
+
+  <!-- ========== Account Settings ========== -->
+  <data name="Settings_Account_Title" xml:space="preserve">
+    <value>Konto</value>
+  </data>
+  <data name="Settings_Account_Subtitle" xml:space="preserve">
+    <value>Benutzerauthentifizierung und Kontoverwaltung</value>
+  </data>
+  <data name="Settings_Account_Processing" xml:space="preserve">
+    <value>Wird verarbeitet...</value>
+  </data>
+  <data name="Settings_Account_LoggedInWith" xml:space="preserve">
+    <value>Angemeldet mit {0}</value>
+  </data>
+  <data name="Settings_Account_LoggedInStatus" xml:space="preserve">
+    <value>Angemeldet</value>
+  </data>
+  <data name="Settings_Account_Actions" xml:space="preserve">
+    <value>Kontoaktionen</value>
+  </data>
+  <data name="Settings_Account_LogoutDescription" xml:space="preserve">
+    <value>Von diesem Gerät abmelden</value>
+  </data>
+  <data name="Settings_Account_NotLoggedIn" xml:space="preserve">
+    <value>Nicht angemeldet</value>
+  </data>
+  <data name="Settings_Account_LoginBenefits" xml:space="preserve">
+    <value>Melden Sie sich an, um Einstellungen zu synchronisieren und auf zusätzliche Funktionen zuzugreifen</value>
+  </data>
+  <data name="Settings_Account_ForgotPassword" xml:space="preserve">
+    <value>Passwort vergessen?</value>
+  </data>
+  <data name="Settings_Account_PasswordReset" xml:space="preserve">
+    <value>Passwort zurücksetzen</value>
+  </data>
+  <data name="Settings_Account_PasswordResetDescription" xml:space="preserve">
+    <value>Wir senden Ihnen einen Link zum Zurücksetzen des Passworts an Ihre registrierte E-Mail-Adresse</value>
+  </data>
+  <data name="Settings_Account_ResetEmailSent" xml:space="preserve">
+    <value>E-Mail zum Zurücksetzen gesendet. Bitte überprüfen Sie Ihren Posteingang.</value>
+  </data>
+  <data name="Settings_Account_EmailAddress" xml:space="preserve">
+    <value>E-Mail-Adresse</value>
+  </data>
+  <data name="Settings_Account_Profile" xml:space="preserve">
+    <value>Profil</value>
+  </data>
+  <data name="Settings_Account_Email" xml:space="preserve">
+    <value>E-Mail</value>
+  </data>
+  <data name="Settings_Account_ChangePassword" xml:space="preserve">
+    <value>Passwort ändern</value>
+  </data>
+  <data name="Settings_Account_Logout" xml:space="preserve">
+    <value>Abmelden</value>
+  </data>
+  <data name="Settings_Account_Login" xml:space="preserve">
+    <value>Anmelden</value>
+  </data>
+  <data name="Settings_Account_Signup" xml:space="preserve">
+    <value>Registrieren</value>
+  </data>
+  <data name="Settings_Account_CurrentPlan" xml:space="preserve">
+    <value>Aktueller Plan</value>
+  </data>
+  <data name="Settings_Account_UpgradeToPremium" xml:space="preserve">
+    <value>Auf Premium upgraden</value>
+  </data>
+
+  <!-- ========== License Settings ========== -->
+  <data name="Settings_License_Title" xml:space="preserve">
+    <value>Lizenz</value>
+  </data>
+  <data name="Settings_License_Subtitle" xml:space="preserve">
+    <value>Planinformationen und Nutzung anzeigen</value>
+  </data>
+  <data name="Settings_Upgrade_Title" xml:space="preserve">
+    <value>Plan-Upgrade</value>
+  </data>
+  <data name="Settings_Upgrade_Subtitle" xml:space="preserve">
+    <value>Kaufen oder ändern Sie Ihren Plan</value>
+  </data>
+  <data name="Settings_License_Loading" xml:space="preserve">
+    <value>Lizenzinformationen werden geladen...</value>
+  </data>
+  <data name="Settings_License_TokenUsage" xml:space="preserve">
+    <value>Nutzung</value>
+  </data>
+  <data name="Settings_License_MonthlyUsage" xml:space="preserve">
+    <value>Monatliche Nutzung</value>
+  </data>
+  <data name="Settings_License_QuotaExceeded" xml:space="preserve">
+    <value>Monatliches Kontingent überschritten. EX-Übersetzung ist bis nächsten Monat nicht verfügbar.</value>
+  </data>
+  <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
+    <value>Dieser Plan unterstützt nur die Standardübersetzung. Upgraden Sie auf Pro oder höher, um die EX-Übersetzung zu nutzen.</value>
+  </data>
+  <data name="Settings_License_PlanDetails" xml:space="preserve">
+    <value>Plan-Details</value>
+  </data>
+  <data name="Settings_License_ExpirationDate" xml:space="preserve">
+    <value>Ablaufdatum</value>
+  </data>
+  <data name="Settings_License_CloudAccess" xml:space="preserve">
+    <value>EX-Übersetzung</value>
+  </data>
+  <data name="Settings_License_MonthlyLimit" xml:space="preserve">
+    <value>Monatliches Kontingent</value>
+  </data>
+  <data name="Settings_License_Refresh" xml:space="preserve">
+    <value>Lizenzinformationen aktualisieren</value>
+  </data>
+  <data name="License_Plan_Free" xml:space="preserve">
+    <value>Kostenlos</value>
+  </data>
+  <data name="License_Plan_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="License_Plan_Pro" xml:space="preserve">
+    <value>Pro</value>
+  </data>
+  <data name="License_Plan_Premia" xml:space="preserve">
+    <value>Premia</value>
+  </data>
+  <data name="License_Plan_Premium" xml:space="preserve">
+    <value>Premium</value>
+  </data>
+  <data name="License_Plan_Ultimate" xml:space="preserve">
+    <value>Ultimate</value>
+  </data>
+  <data name="License_Plan_Unknown" xml:space="preserve">
+    <value>Unbekannt</value>
+  </data>
+  <data name="License_Plan_PromotionSuffix" xml:space="preserve">
+    <value>(Aktionscode angewendet)</value>
+  </data>
+
+  <!-- Promotion Code Section -->
+  <data name="Settings_License_PromotionCode" xml:space="preserve">
+    <value>Aktionscode</value>
+  </data>
+  <data name="Settings_License_PromotionExpires" xml:space="preserve">
+    <value>Läuft ab:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeLabel" xml:space="preserve">
+    <value>Code:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
+    <value>Wenn Sie einen Aktionscode haben, geben Sie ihn unten ein.</value>
+  </data>
+  <data name="Settings_License_PromotionApply" xml:space="preserve">
+    <value>Anwenden</value>
+  </data>
+  <data name="Settings_License_PromotionVerifying" xml:space="preserve">
+    <value>Wird überprüft...</value>
+  </data>
+  <data name="Settings_License_PromotionAppliedFormat" xml:space="preserve">
+    <value>{0} wurde angewendet</value>
+  </data>
+  <data name="Settings_License_PromotionPlanPromo" xml:space="preserve">
+    <value>Aktion</value>
+  </data>
+
+  <data name="License_Desc_Free" xml:space="preserve">
+    <value>Kostenloser Plan - EX-Übersetzung mit Bonus verfügbar</value>
+  </data>
+  <data name="License_Desc_Standard" xml:space="preserve">
+    <value>Standard-Plan - Werbefrei, nur Standardübersetzung</value>
+  </data>
+  <data name="License_Desc_Pro" xml:space="preserve">
+    <value>Pro-Plan - EX-Übersetzung, 10M monatliches Kontingent</value>
+  </data>
+  <data name="License_Desc_Premia" xml:space="preserve">
+    <value>Premia-Plan - EX-Übersetzung, 8M monatliches Kontingent</value>
+  </data>
+  <data name="License_Desc_Premium" xml:space="preserve">
+    <value>Premium-Plan - EX-Übersetzung, 20M monatliches Kontingent</value>
+  </data>
+  <data name="License_Desc_Ultimate" xml:space="preserve">
+    <value>Ultimate-Plan - EX-Übersetzung, 50M monatliches Kontingent</value>
+  </data>
+  <data name="License_NoExpiration" xml:space="preserve">
+    <value>Kein Ablaufdatum</value>
+  </data>
+  <data name="License_LocalOnly" xml:space="preserve">
+    <value>Nur Standard</value>
+  </data>
+  <data name="License_EXTranslation_Available" xml:space="preserve">
+    <value>Verfügbar</value>
+  </data>
+  <data name="License_EXTranslation_Unavailable" xml:space="preserve">
+    <value>Nicht verfügbar</value>
+  </data>
+  <data name="License_RefreshSuccess" xml:space="preserve">
+    <value>Lizenzinformationen aktualisiert</value>
+  </data>
+  <data name="License_RefreshFailed" xml:space="preserve">
+    <value>Lizenzinformationen konnten nicht aktualisiert werden</value>
+  </data>
+  <data name="Settings_License_Upgrade" xml:space="preserve">
+    <value>Plan ändern</value>
+  </data>
+  <data name="License_UpgradeComingSoon" xml:space="preserve">
+    <value>Upgrade-Funktion demnächst verfügbar</value>
+  </data>
+  <data name="License_OpeningPlanPage" xml:space="preserve">
+    <value>Planänderungsseite wird geöffnet...</value>
+  </data>
+  <data name="License_PlanPageOpenFailed" xml:space="preserve">
+    <value>Planänderungsseite konnte nicht geöffnet werden</value>
+  </data>
+
+  <!-- Patreon Integration -->
+  <data name="Settings_License_PatreonIntegration" xml:space="preserve">
+    <value>Patreon-Integration</value>
+  </data>
+  <data name="Settings_License_PatreonStatus" xml:space="preserve">
+    <value>Verbindungsstatus</value>
+  </data>
+  <data name="Settings_License_LastSync" xml:space="preserve">
+    <value>Letzte Synchronisierung</value>
+  </data>
+  <data name="Settings_License_ConnectPatreon" xml:space="preserve">
+    <value>Mit Patreon verbinden</value>
+  </data>
+  <data name="Settings_License_DisconnectPatreon" xml:space="preserve">
+    <value>Trennen</value>
+  </data>
+  <data name="Settings_License_SyncPatreon" xml:space="preserve">
+    <value>Synchronisieren</value>
+  </data>
+
+  <!-- Patreon Integration (Account Settings) -->
+  <data name="Settings_Account_PatreonSection" xml:space="preserve">
+    <value>Patreon-Integration</value>
+  </data>
+  <data name="Settings_Account_PatreonUserFallback" xml:space="preserve">
+    <value>Patreon-Benutzer</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanLabel" xml:space="preserve">
+    <value>Plan:</value>
+  </data>
+  <data name="Settings_Account_PatreonLastSync" xml:space="preserve">
+    <value>Letzte Synchronisierung: {0}</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncNow" xml:space="preserve">
+    <value>Jetzt synchronisieren</value>
+  </data>
+  <data name="Settings_Account_PatreonDisconnect" xml:space="preserve">
+    <value>Trennen</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectTitle" xml:space="preserve">
+    <value>Patreon-Konto verbinden</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
+    <value>Verknüpfen Sie Ihr Patreon-Unterstützerkonto, um Vorteile wie werbefreie Nutzung und EX-Übersetzung freizuschalten</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
+    <value>Mit Patreon verbinden</value>
+  </data>
+  <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
+    <value>Verfügbare Pläne:</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
+    <value>• Pro (3 $/Monat): EX-Übersetzung, 10M monatliches Kontingent</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
+    <value>• Premium (5 $/Monat): EX-Übersetzung, 20M monatliches Kontingent</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
+    <value>• Ultimate (9 $/Monat): EX-Übersetzung, 50M monatliches Kontingent</value>
+  </data>
+  <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
+    <value>Anmelden</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
+    <value>Wird synchronisiert...</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusSynced" xml:space="preserve">
+    <value>Synchronisiert</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusOffline" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusTokenExpired" xml:space="preserve">
+    <value>Erneute Authentifizierung erforderlich</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusError" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusNotConnected" xml:space="preserve">
+    <value>Nicht verbunden</value>
+  </data>
+  <data name="Settings_Account_PatreonLinkedFormat" xml:space="preserve">
+    <value>Verbunden ({0})</value>
+  </data>
+  <data name="Settings_Account_MockModeTestUser" xml:space="preserve">
+    <value>Testbenutzer (Mock-Modus)</value>
+  </data>
+
+  <!-- ========== Advanced Settings ========== -->
+  <data name="Settings_Advanced_Title" xml:space="preserve">
+    <value>Erweiterte Einstellungen</value>
+  </data>
+  <data name="Settings_Advanced_Subtitle" xml:space="preserve">
+    <value>Detaillierte Einstellungen für erweiterte Funktionen und Systemoptimierung</value>
+  </data>
+  <data name="Settings_Advanced_Warning" xml:space="preserve">
+    <value>Warnung: Diese Einstellungen sind für fortgeschrittene Benutzer. Änderungen können unerwartetes Verhalten verursachen.</value>
+  </data>
+  <data name="Settings_Advanced_Basic" xml:space="preserve">
+    <value>Grundlegende Optimierungseinstellungen</value>
+  </data>
+  <data name="Settings_Advanced_CPU" xml:space="preserve">
+    <value>CPU-/Prozesseinstellungen</value>
+  </data>
+  <data name="Settings_Advanced_Memory" xml:space="preserve">
+    <value>Speicher-/Puffereinstellungen</value>
+  </data>
+  <data name="Settings_Advanced_Network" xml:space="preserve">
+    <value>Netzwerkeinstellungen</value>
+  </data>
+  <data name="Settings_Advanced_Seconds" xml:space="preserve">
+    <value>Sekunden</value>
+  </data>
+  <data name="Settings_Advanced_Connections" xml:space="preserve">
+    <value>Verbindungen</value>
+  </data>
+  <data name="Settings_Advanced_Retry" xml:space="preserve">
+    <value>Wiederholungseinstellungen</value>
+  </data>
+  <data name="Settings_Advanced_Times" xml:space="preserve">
+    <value>Mal</value>
+  </data>
+  <data name="Settings_Advanced_Statistics" xml:space="preserve">
+    <value>Statistik-/Überwachungseinstellungen</value>
+  </data>
+  <data name="Settings_Advanced_Days" xml:space="preserve">
+    <value>Tage</value>
+  </data>
+  <data name="Settings_Advanced_Experimental" xml:space="preserve">
+    <value>Experimentelle/Debug-Einstellungen</value>
+  </data>
+  <data name="Settings_Advanced_Danger" xml:space="preserve">
+    <value>Achtung: Diese Einstellungen sind für Entwickler. Nicht in Produktionsumgebungen verwenden.</value>
+  </data>
+
+  <!-- ========== Login View ========== -->
+  <data name="Auth_Login_Title" xml:space="preserve">
+    <value>Bei Baketa anmelden</value>
+  </data>
+  <data name="Auth_Login_Google" xml:space="preserve">
+    <value>Mit Google anmelden</value>
+  </data>
+  <data name="Auth_Login_Discord" xml:space="preserve">
+    <value>Mit Discord anmelden</value>
+  </data>
+  <data name="Auth_Login_Twitch" xml:space="preserve">
+    <value>Mit Twitch anmelden</value>
+  </data>
+  <data name="Auth_Login_Email" xml:space="preserve">
+    <value>E-Mail</value>
+  </data>
+  <data name="Auth_Login_EmailPlaceholder" xml:space="preserve">
+    <value>beispiel@email.com</value>
+  </data>
+  <data name="Auth_Login_Password" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Auth_Login_PasswordPlaceholder" xml:space="preserve">
+    <value>Passwort eingeben</value>
+  </data>
+  <data name="Auth_Login_RememberMe" xml:space="preserve">
+    <value>Angemeldet bleiben</value>
+  </data>
+  <data name="Auth_Login_ForgotPassword" xml:space="preserve">
+    <value>Passwort vergessen?</value>
+  </data>
+  <data name="Auth_Login_Button" xml:space="preserve">
+    <value>Anmelden</value>
+  </data>
+  <data name="Auth_Login_Loading" xml:space="preserve">
+    <value>Authentifizierung...</value>
+  </data>
+  <data name="Auth_Login_SignupPrompt" xml:space="preserve">
+    <value>Neu bei Baketa? </value>
+  </data>
+  <data name="Auth_Login_SignupLink" xml:space="preserve">
+    <value>Konto erstellen</value>
+  </data>
+  <data name="Auth_Login_EmailExpander" xml:space="preserve">
+    <value>Mit E-Mail anmelden</value>
+  </data>
+
+  <!-- ========== Signup View ========== -->
+  <data name="Auth_Signup_Title" xml:space="preserve">
+    <value>Baketa-Konto erstellen</value>
+  </data>
+  <data name="Auth_Signup_Google" xml:space="preserve">
+    <value>Mit Google registrieren</value>
+  </data>
+  <data name="Auth_Signup_Discord" xml:space="preserve">
+    <value>Mit Discord registrieren</value>
+  </data>
+  <data name="Auth_Signup_Twitch" xml:space="preserve">
+    <value>Mit Twitch registrieren</value>
+  </data>
+  <data name="Auth_Signup_OrEmail" xml:space="preserve">
+    <value>oder mit E-Mail registrieren</value>
+  </data>
+  <data name="Auth_Signup_DisplayName" xml:space="preserve">
+    <value>Anzeigename</value>
+  </data>
+  <data name="Auth_Signup_DisplayNamePlaceholder" xml:space="preserve">
+    <value>Ihr Anzeigename</value>
+  </data>
+  <data name="Auth_Signup_Email" xml:space="preserve">
+    <value>E-Mail</value>
+  </data>
+  <data name="Auth_Signup_Password" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Auth_Signup_PasswordPlaceholder" xml:space="preserve">
+    <value>Mindestens 8 Zeichen</value>
+  </data>
+  <data name="Auth_Signup_PasswordRequirement" xml:space="preserve">
+    <value>* Mindestens 8 Zeichen, mit mindestens 3 der folgenden: Großbuchstaben, Kleinbuchstaben, Zahlen, Sonderzeichen</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPassword" xml:space="preserve">
+    <value>Passwort bestätigen</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPasswordPlaceholder" xml:space="preserve">
+    <value>Passwort erneut eingeben</value>
+  </data>
+  <data name="Auth_Signup_Terms" xml:space="preserve">
+    <value>Nutzungsbedingungen</value>
+  </data>
+  <data name="Auth_Signup_TermsAgree" xml:space="preserve">
+    <value>Ich stimme den</value>
+  </data>
+  <data name="Auth_Signup_Privacy" xml:space="preserve">
+    <value>Datenschutzrichtlinie</value>
+  </data>
+  <data name="Auth_Signup_Button" xml:space="preserve">
+    <value>Konto erstellen</value>
+  </data>
+  <data name="Auth_Signup_Loading" xml:space="preserve">
+    <value>Konto wird erstellt...</value>
+  </data>
+  <data name="Auth_Signup_LoginPrompt" xml:space="preserve">
+    <value>Haben Sie bereits ein Konto? </value>
+  </data>
+  <data name="Auth_Signup_LoginLink" xml:space="preserve">
+    <value>Anmelden</value>
+  </data>
+  <data name="Auth_Signup_EmailExpander" xml:space="preserve">
+    <value>Mit E-Mail registrieren</value>
+  </data>
+
+  <!-- ========== Premium Plan ========== -->
+  <data name="Premium_Title" xml:space="preserve">
+    <value>Baketa Premium</value>
+  </data>
+  <data name="Premium_FeatureAdFree" xml:space="preserve">
+    <value>Werbefrei</value>
+  </data>
+  <data name="Premium_FeatureCloudTranslation" xml:space="preserve">
+    <value>EX-Übersetzung (Hochpräzisionsmodul)</value>
+  </data>
+  <data name="Premium_FeaturePrioritySupport" xml:space="preserve">
+    <value>Prioritäts-Support</value>
+  </data>
+  <data name="Premium_FeatureEarlyAccess" xml:space="preserve">
+    <value>Frühzeitiger Zugang zu neuen Funktionen</value>
+  </data>
+  <data name="Premium_Monthly" xml:space="preserve">
+    <value>5 $/Monat</value>
+  </data>
+  <data name="Premium_Yearly" xml:space="preserve">
+    <value>50 $/Jahr (17 % Rabatt)</value>
+  </data>
+
+  <!-- ========== Error Messages ========== -->
+  <data name="Error_NetworkError" xml:space="preserve">
+    <value>Ein Netzwerkfehler ist aufgetreten</value>
+  </data>
+  <data name="Error_AuthenticationFailed" xml:space="preserve">
+    <value>Authentifizierung fehlgeschlagen</value>
+  </data>
+  <data name="Error_TranslationFailed" xml:space="preserve">
+    <value>Übersetzung fehlgeschlagen</value>
+  </data>
+  <data name="Error_OcrFailed" xml:space="preserve">
+    <value>OCR fehlgeschlagen</value>
+  </data>
+  <data name="Error_WindowNotFound" xml:space="preserve">
+    <value>Zielfenster nicht gefunden</value>
+  </data>
+  <data name="Error_InvalidEmail" xml:space="preserve">
+    <value>Ungültige E-Mail-Adresse</value>
+  </data>
+  <data name="Error_PasswordTooShort" xml:space="preserve">
+    <value>Das Passwort muss mindestens 8 Zeichen lang sein</value>
+  </data>
+  <data name="Error_LoginFailed" xml:space="preserve">
+    <value>Anmeldung fehlgeschlagen</value>
+  </data>
+  <data name="Error_PasswordMismatch" xml:space="preserve">
+    <value>Passwörter stimmen nicht überein</value>
+  </data>
+  <data name="Error_SignupFailed" xml:space="preserve">
+    <value>Kontoerstellung fehlgeschlagen</value>
+  </data>
+
+  <!-- ========== Confirmation Dialogs ========== -->
+  <data name="Dialog_LogoutConfirm" xml:space="preserve">
+    <value>Möchten Sie sich wirklich abmelden?</value>
+  </data>
+  <data name="Dialog_DiscardChanges" xml:space="preserve">
+    <value>Sie haben ungespeicherte Änderungen. Änderungen verwerfen?</value>
+  </data>
+  <data name="Dialog_ResetSettings" xml:space="preserve">
+    <value>Einstellungen auf Standard zurücksetzen?</value>
+  </data>
+  <data name="Dialog_ExitApp" xml:space="preserve">
+    <value>Anwendung beenden?</value>
+  </data>
+
+  <!-- MainOverlay Tooltips -->
+  <data name="MainOverlay_StartButton_Tooltip" xml:space="preserve">
+    <value>Übersetzung starten</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Execute" xml:space="preserve">
+    <value>Einzelübersetzung ausführen</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Reset" xml:space="preserve">
+    <value>Zurücksetzen</value>
+    <comment>[Issue #357] Button/tooltip text when shot translation is active</comment>
+  </data>
+  <data name="MainOverlay_Live_Stop" xml:space="preserve">
+    <value>Stoppen</value>
+    <comment>[Issue #357] Button text when live translation is active</comment>
+  </data>
+  <data name="MainOverlay_Status_Initializing" xml:space="preserve">
+    <value>Wird initialisiert...</value>
+  </data>
+  <data name="MainOverlay_Status_Idle" xml:space="preserve">
+    <value>Nicht ausgewählt</value>
+  </data>
+  <data name="MainOverlay_Status_Ready" xml:space="preserve">
+    <value>Bereit</value>
+  </data>
+  <data name="MainOverlay_Status_Translating" xml:space="preserve">
+    <value>Wird übersetzt</value>
+  </data>
+  <data name="MainOverlay_Status_Waiting" xml:space="preserve">
+    <value>Wartend</value>
+  </data>
+  <data name="MainOverlay_Warmup_Failed" xml:space="preserve">
+    <value>Modellinitialisierung fehlgeschlagen. Bitte starten Sie die App neu.</value>
+  </data>
+  <data name="MainOverlay_Warmup_Loading" xml:space="preserve">
+    <value>Modell wird geladen... {0}</value>
+  </data>
+  <data name="MainOverlay_Warmup_Complete" xml:space="preserve">
+    <value>Bereit! Sie können mit dem Übersetzen beginnen</value>
+  </data>
+
+  <!-- Theme Options -->
+  <data name="Theme_Light" xml:space="preserve">
+    <value>Hell</value>
+  </data>
+  <data name="Theme_Dark" xml:space="preserve">
+    <value>Dunkel</value>
+  </data>
+  <data name="Theme_Auto" xml:space="preserve">
+    <value>Automatisch (Systemeinstellung folgen)</value>
+  </data>
+
+  <!-- Size Options -->
+  <data name="Size_Small" xml:space="preserve">
+    <value>Klein (kompakt)</value>
+  </data>
+  <data name="Size_Medium" xml:space="preserve">
+    <value>Mittel (standard)</value>
+  </data>
+  <data name="Size_Large" xml:space="preserve">
+    <value>Groß (gut lesbar)</value>
+  </data>
+
+  <!-- Advanced Settings Toggle -->
+  <data name="Settings_Advanced_Show" xml:space="preserve">
+    <value>Erweiterte Einstellungen anzeigen</value>
+  </data>
+  <data name="Settings_Advanced_Hide" xml:space="preserve">
+    <value>Zurück zu den Grundeinstellungen</value>
+  </data>
+
+  <!-- Settings Window Status Messages -->
+  <data name="Settings_Window_Title" xml:space="preserve">
+    <value>Einstellungen</value>
+  </data>
+  <data name="Settings_Status_HasChanges" xml:space="preserve">
+    <value>Einstellungen wurden geändert</value>
+  </data>
+  <data name="Settings_Status_NoChanges" xml:space="preserve">
+    <value>Keine Änderungen</value>
+  </data>
+  <data name="Settings_Status_Saving" xml:space="preserve">
+    <value>Einstellungen werden gespeichert...</value>
+  </data>
+  <data name="Settings_Status_Saved" xml:space="preserve">
+    <value>Einstellungen gespeichert</value>
+  </data>
+  <data name="Settings_Status_SaveFailed" xml:space="preserve">
+    <value>Speichern fehlgeschlagen: {0}</value>
+  </data>
+  <data name="Settings_Status_AccessDenied" xml:space="preserve">
+    <value>Speichern fehlgeschlagen: Zugriff verweigert</value>
+  </data>
+  <data name="Settings_Status_IOError" xml:space="preserve">
+    <value>Speichern fehlgeschlagen: Datei-E/A-Fehler</value>
+  </data>
+  <data name="Settings_Status_Cancelled" xml:space="preserve">
+    <value>Änderungen abgebrochen</value>
+  </data>
+  <data name="Settings_Status_Reset" xml:space="preserve">
+    <value>Einstellungen zurückgesetzt</value>
+  </data>
+
+  <!-- Settings Window Buttons -->
+  <data name="Settings_Button_Reset" xml:space="preserve">
+    <value>Zurücksetzen</value>
+  </data>
+  <data name="Settings_Button_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Settings_Button_Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+  <data name="Settings_Tooltip_Reset" xml:space="preserve">
+    <value>Alle Einstellungen auf Standard zurücksetzen</value>
+  </data>
+  <data name="Settings_Tooltip_Cancel" xml:space="preserve">
+    <value>Änderungen verwerfen und schließen</value>
+  </data>
+  <data name="Settings_Tooltip_Save" xml:space="preserve">
+    <value>Änderungen speichern</value>
+  </data>
+
+  <!-- ========== Loading Screen ========== -->
+  <!-- [Issue #185] Component download step -->
+  <data name="Loading_DownloadingComponents" xml:space="preserve">
+    <value>Komponenten werden heruntergeladen...</value>
+  </data>
+  <data name="Loading_ResolvingDependencies" xml:space="preserve">
+    <value>Abhängigkeiten werden aufgelöst...</value>
+  </data>
+  <data name="Loading_LoadingOCR" xml:space="preserve">
+    <value>OCR-Modell wird geladen...</value>
+  </data>
+  <data name="Loading_InitializingTranslation" xml:space="preserve">
+    <value>Übersetzungsmodul wird initialisiert...</value>
+  </data>
+  <data name="Loading_PreparingUI" xml:space="preserve">
+    <value>UI-Komponenten werden vorbereitet...</value>
+  </data>
+  <data name="Loading_SetupGpu" xml:space="preserve">
+    <value>GPU-Umgebung wird eingerichtet...</value>
+  </data>
+  <!-- [Issue #259] Loading Tips -->
+  <data name="Loading_Tip_1" xml:space="preserve">
+    <value>Die Ersteinrichtung kann etwa 10 Minuten dauern. Bitte warten Sie.</value>
+  </data>
+  <data name="Loading_Tip_2" xml:space="preserve">
+    <value>Übersetzungs-Overlay, das OCR und maschinelle Übersetzung kombiniert</value>
+  </data>
+  <data name="Loading_Tip_3" xml:space="preserve">
+    <value>Der erste Start kann aufgrund von Modell-Downloads länger dauern</value>
+  </data>
+  <data name="Loading_Tip_4" xml:space="preserve">
+    <value>Übersetzungsergebnisse werden als Overlay auf dem Spielbildschirm angezeigt</value>
+  </data>
+  <data name="Loading_Tip_5" xml:space="preserve">
+    <value>Passen Sie verschiedene Optionen im Einstellungsbildschirm an</value>
+  </data>
+
+  <!-- [Issue #78 Phase 5] Token Usage Alerts -->
+  <data name="TokenUsage_Warning_Title" xml:space="preserve">
+    <value>Nutzungswarnung</value>
+  </data>
+  <data name="TokenUsage_Warning80_Message" xml:space="preserve">
+    <value>Sie haben 80 % Ihres EX-Übersetzungskontingents in diesem Monat verbraucht (verbleibend: {0})</value>
+  </data>
+  <data name="TokenUsage_Warning90_Message" xml:space="preserve">
+    <value>Sie haben 90 % Ihres EX-Übersetzungskontingents in diesem Monat verbraucht (verbleibend: {0})</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
+    <value>Kontingentlimit erreicht</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
+    <value>Sie haben Ihr EX-Übersetzungskontingent erreicht. Es wird auf die Standardübersetzung umgeschaltet.</value>
+  </data>
+
+  <!-- [Issue #245] Window Selection Dialog -->
+  <data name="WindowSelection_Title" xml:space="preserve">
+    <value>Fenster auswählen</value>
+  </data>
+  <data name="WindowSelection_Header" xml:space="preserve">
+    <value>Übersetzungszielfenster auswählen</value>
+  </data>
+  <data name="WindowSelection_Subtitle" xml:space="preserve">
+    <value>Wählen Sie das zu übersetzende Anwendungsfenster aus (einschließlich minimierter Fenster)</value>
+  </data>
+  <data name="WindowSelection_Refresh" xml:space="preserve">
+    <value>Fensterliste aktualisieren</value>
+  </data>
+  <data name="WindowSelection_Searching" xml:space="preserve">
+    <value>Fenster werden gesucht...</value>
+  </data>
+  <data name="WindowSelection_NoWindows" xml:space="preserve">
+    <value>Keine verfügbaren Fenster gefunden</value>
+  </data>
+  <data name="WindowSelection_Minimized" xml:space="preserve">
+    <value>Minimiert</value>
+  </data>
+  <data name="WindowSelection_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="WindowSelection_Select" xml:space="preserve">
+    <value>Auswählen</value>
+  </data>
+  <data name="WindowSelection_Update" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
+
+  <!-- ========== Crash Report Dialog [Issue #252] ========== -->
+  <data name="CrashReport_WindowTitle" xml:space="preserve">
+    <value>Absturzbericht</value>
+  </data>
+  <data name="CrashReport_HeaderText" xml:space="preserve">
+    <value>Unerwartetes Beenden erkannt</value>
+  </data>
+  <data name="CrashReport_DescriptionSingle" xml:space="preserve">
+    <value>Die Anwendung wurde während der letzten Sitzung unerwartet beendet. Möchten Sie einen Absturzbericht senden, um uns bei der Verbesserung zu helfen?</value>
+  </data>
+  <data name="CrashReport_DescriptionMultiple" xml:space="preserve">
+    <value>{0} kürzliche Abstürze wurden erkannt. Möchten Sie Absturzberichte senden, um uns bei der Verbesserung zu helfen?</value>
+  </data>
+  <data name="CrashReport_PrivacyNote" xml:space="preserve">
+    <value>Zum Schutz Ihrer Privatsphäre enthalten Berichte keine personenbezogenen Daten (Benutzername, E-Mail, IP-Adresse usw.).</value>
+  </data>
+  <data name="CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>Systeminformationen einbeziehen (Betriebssystem, Speicherverbrauch usw.)</value>
+  </data>
+  <data name="CrashReport_IncludeLogs" xml:space="preserve">
+    <value>Aktuelle Protokolle einbeziehen</value>
+  </data>
+  <data name="CrashReport_SendButton" xml:space="preserve">
+    <value>Bericht senden</value>
+  </data>
+  <data name="CrashReport_DontSendButton" xml:space="preserve">
+    <value>Nicht senden</value>
+  </data>
+  <data name="CrashReport_CrashDetailsTitle" xml:space="preserve">
+    <value>Absturzdetails</value>
+  </data>
+
+  <!-- ========== Crash Report Settings [Issue #252] ========== -->
+  <data name="Settings_CrashReport_Title" xml:space="preserve">
+    <value>Absturzberichte</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSend" xml:space="preserve">
+    <value>Absturzberichte automatisch senden</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSendDescription" xml:space="preserve">
+    <value>Absturzberichte automatisch senden, ohne einen Bestätigungsdialog anzuzeigen</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>Systeminformationen einbeziehen</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfoDescription" xml:space="preserve">
+    <value>CPU, Speicherverbrauch und andere Systeminformationen in Berichte einbeziehen</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogs" xml:space="preserve">
+    <value>App-Protokolle einbeziehen</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogsDescription" xml:space="preserve">
+    <value>Aktuelle Anwendungsprotokolle in Berichte einbeziehen</value>
+  </data>
+
+  <!-- ========== Update Dialog [Issue #249] ========== -->
+  <data name="Update_WindowTitle" xml:space="preserve">
+    <value>Software-Update</value>
+  </data>
+  <data name="Update_HeaderText" xml:space="preserve">
+    <value>Eine neue Version von {0} ist verfügbar</value>
+  </data>
+  <data name="Update_InfoText" xml:space="preserve">
+    <value>{0} {1} ist verfügbar (Ihre Version: {2}). Möchten Sie es jetzt herunterladen?</value>
+  </data>
+  <data name="Update_SkipButton" xml:space="preserve">
+    <value>Diese Version überspringen</value>
+  </data>
+  <data name="Update_RemindLaterButton" xml:space="preserve">
+    <value>Später erinnern</value>
+  </data>
+  <data name="Update_DownloadButton" xml:space="preserve">
+    <value>Herunterladen</value>
+  </data>
+  <data name="Update_DownloadProgress_Title" xml:space="preserve">
+    <value>Software-Update</value>
+  </data>
+  <data name="Update_DownloadProgress_Downloading" xml:space="preserve">
+    <value>{0} wird heruntergeladen...</value>
+  </data>
+  <data name="Update_DownloadProgress_Complete" xml:space="preserve">
+    <value>Download abgeschlossen</value>
+  </data>
+  <data name="Update_DownloadProgress_InstallAndRelaunch" xml:space="preserve">
+    <value>Installieren und neu starten</value>
+  </data>
+  <data name="Update_DownloadProgress_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+
+  <!-- ========== Consent Dialog (Issue #261) ========== -->
+  <data name="Consent_WindowTitle_Initial" xml:space="preserve">
+    <value>Nutzungsbedingungen</value>
+  </data>
+  <data name="Consent_WindowTitle_Account" xml:space="preserve">
+    <value>Nutzungsbedingungen</value>
+  </data>
+  <data name="Consent_Header_Initial" xml:space="preserve">
+    <value>Willkommen bei Baketa</value>
+  </data>
+  <data name="Consent_Header_Account" xml:space="preserve">
+    <value>Konto erstellen</value>
+  </data>
+  <data name="Consent_Description_Initial" xml:space="preserve">
+    <value>Um Baketa zu verwenden, müssen Sie unseren Nutzungsbedingungen und der Datenschutzrichtlinie zustimmen.</value>
+  </data>
+  <data name="Consent_Description_Account" xml:space="preserve">
+    <value>Um ein Konto zu erstellen, müssen Sie unseren Nutzungsbedingungen und der Datenschutzrichtlinie zustimmen.</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Label" xml:space="preserve">
+    <value>Datenschutzrichtlinie</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Link" xml:space="preserve">
+    <value>Datenschutzrichtlinie lesen</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Checkbox" xml:space="preserve">
+    <value>Ich stimme der Datenschutzrichtlinie zu</value>
+  </data>
+  <data name="Consent_TermsOfService_Label" xml:space="preserve">
+    <value>Nutzungsbedingungen</value>
+  </data>
+  <data name="Consent_TermsOfService_Link" xml:space="preserve">
+    <value>Nutzungsbedingungen lesen</value>
+  </data>
+  <data name="Consent_TermsOfService_Checkbox" xml:space="preserve">
+    <value>Ich stimme den Nutzungsbedingungen zu</value>
+  </data>
+  <data name="Consent_Button_Accept" xml:space="preserve">
+    <value>Zustimmen und fortfahren</value>
+  </data>
+  <data name="Consent_Button_Decline" xml:space="preserve">
+    <value>Ablehnen und beenden</value>
+  </data>
+
+  <!-- ========== Component Update Dialog [Issue #256] ========== -->
+  <data name="ComponentUpdate_WindowTitle" xml:space="preserve">
+    <value>Komponentenaktualisierung</value>
+  </data>
+  <data name="ComponentUpdate_HeaderText" xml:space="preserve">
+    <value>Komponentenaktualisierungen sind verfügbar</value>
+  </data>
+  <data name="ComponentUpdate_Description" xml:space="preserve">
+    <value>Neue Versionen sind für die folgenden Komponenten verfügbar. Möchten Sie aktualisieren?</value>
+  </data>
+  <data name="ComponentUpdate_TotalSize" xml:space="preserve">
+    <value>Gesamte Downloadgröße: {0}</value>
+  </data>
+  <data name="ComponentUpdate_VersionFormat" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="ComponentUpdate_NotInstalled" xml:space="preserve">
+    <value>Nicht installiert → {0}</value>
+  </data>
+  <data name="ComponentUpdate_SizeFormat" xml:space="preserve">
+    <value>Größe: {0}</value>
+  </data>
+  <data name="ComponentUpdate_UpdateNowButton" xml:space="preserve">
+    <value>Jetzt aktualisieren</value>
+  </data>
+  <data name="ComponentUpdate_RemindLaterButton" xml:space="preserve">
+    <value>Später erinnern</value>
+  </data>
+  <data name="ComponentUpdate_SkipButton" xml:space="preserve">
+    <value>Diese Version überspringen</value>
+  </data>
+  <data name="ComponentUpdate_CancelButton" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="ComponentUpdate_CloseButton" xml:space="preserve">
+    <value>Schließen</value>
+  </data>
+  <data name="ComponentUpdate_Status_Pending" xml:space="preserve">
+    <value>Ausstehend</value>
+  </data>
+  <data name="ComponentUpdate_Status_Downloading" xml:space="preserve">
+    <value>Wird heruntergeladen...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Installing" xml:space="preserve">
+    <value>Wird installiert...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Completed" xml:space="preserve">
+    <value>Abgeschlossen</value>
+  </data>
+  <data name="ComponentUpdate_Status_Failed" xml:space="preserve">
+    <value>Fehlgeschlagen</value>
+  </data>
+  <data name="ComponentUpdate_Status_Skipped" xml:space="preserve">
+    <value>Übersprungen</value>
+  </data>
+  <data name="ComponentUpdate_AllCompleted" xml:space="preserve">
+    <value>Alle Komponentenaktualisierungen abgeschlossen</value>
+  </data>
+  <data name="ComponentUpdate_SomeFailed" xml:space="preserve">
+    <value>Einige Komponentenaktualisierungen sind fehlgeschlagen</value>
+  </data>
+  <data name="ComponentUpdate_InsufficientDiskSpace" xml:space="preserve">
+    <value>Nicht genügend Speicherplatz (Benötigt: {0}, Verfügbar: {1})</value>
+  </data>
+  <data name="ComponentUpdate_NoUpdatesAvailable" xml:space="preserve">
+    <value>Alle Komponenten sind auf dem neuesten Stand</value>
+  </data>
+  <data name="ComponentUpdate_CheckingForUpdates" xml:space="preserve">
+    <value>Nach Aktualisierungen wird gesucht...</value>
+  </data>
+
+  <!-- ========== Issue #300: OCR Recovery & Memory Warning ========== -->
+  <data name="OcrRecovery_Title" xml:space="preserve">
+    <value>Texterkennung</value>
+  </data>
+  <data name="OcrRecovery_Started" xml:space="preserve">
+    <value>Texterkennungsmodul wird wiederhergestellt. Bitte warten...</value>
+  </data>
+  <data name="OcrRecovery_Completed" xml:space="preserve">
+    <value>Texterkennungsmodul wiederhergestellt</value>
+  </data>
+  <data name="OcrRecovery_Failed" xml:space="preserve">
+    <value>Wiederherstellung des Texterkennungsmoduls fehlgeschlagen. Bitte starten Sie Baketa neu.</value>
+  </data>
+  <data name="MemoryWarning_Title" xml:space="preserve">
+    <value>Speicherwarnung</value>
+  </data>
+  <data name="MemoryWarning_SystemMemory" xml:space="preserve">
+    <value>Die Speicherauslastung ist hoch ({0} %). Bitte schließen Sie andere Anwendungen.</value>
+  </data>
+  <data name="GpuMemoryWarning_Title" xml:space="preserve">
+    <value>GPU-Speicherwarnung</value>
+  </data>
+
+  <!-- Issue #179: Auth error messages -->
+  <data name="Auth_Error_UserAlreadyExists" xml:space="preserve">
+    <value>Diese E-Mail-Adresse wird bereits verwendet</value>
+  </data>
+  <data name="Auth_Error_WeakPassword" xml:space="preserve">
+    <value>Das Passwort ist zu schwach. Bitte verwenden Sie ein stärkeres Passwort</value>
+  </data>
+  <data name="Auth_Error_InvalidCredentials" xml:space="preserve">
+    <value>Ungültiges E-Mail-Format</value>
+  </data>
+  <data name="Auth_Error_InvalidEmail" xml:space="preserve">
+    <value>Ungültige E-Mail-Adresse oder Passwort</value>
+  </data>
+  <data name="Auth_Error_EmailNotConfirmed" xml:space="preserve">
+    <value>Bestätigungs-E-Mail gesendet. Bitte klicken Sie auf den Link in der E-Mail und melden Sie sich dann über den Anmeldebildschirm an.</value>
+  </data>
+  <data name="Auth_Error_RateLimitExceeded" xml:space="preserve">
+    <value>Zu viele Anfragen. Bitte versuchen Sie es später erneut</value>
+  </data>
+  <data name="Auth_Error_SignupDisabled" xml:space="preserve">
+    <value>Die Registrierung neuer Konten ist derzeit deaktiviert</value>
+  </data>
+  <data name="Auth_Error_SignupFailed" xml:space="preserve">
+    <value>Kontoerstellung fehlgeschlagen: {0}</value>
+  </data>
+  <data name="Auth_Error_LoginFailed" xml:space="preserve">
+    <value>Anmeldung fehlgeschlagen: {0}</value>
+  </data>
+  <data name="Auth_Error_InvalidToken" xml:space="preserve">
+    <value>Authentifizierung fehlgeschlagen. Bitte versuchen Sie, sich mit Google, Discord oder Twitch anzumelden.</value>
+  </data>
+  <data name="Auth_Error_TokenExpired" xml:space="preserve">
+    <value>Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</value>
+  </data>
+  <data name="Auth_Error_NetworkError" xml:space="preserve">
+    <value>Ein Netzwerkfehler ist aufgetreten. Bitte überprüfen Sie Ihre Internetverbindung.</value>
+  </data>
+  <data name="Auth_Error_Timeout" xml:space="preserve">
+    <value>Zeitüberschreitung bei der Verbindung. Bitte überprüfen Sie Ihre Internetverbindung</value>
+  </data>
+  <data name="Auth_Error_Unknown" xml:space="preserve">
+    <value>Ein Authentifizierungsfehler ist aufgetreten</value>
+  </data>
+  <data name="Auth_Success_EmailSent" xml:space="preserve">
+    <value>E-Mail gesendet</value>
+  </data>
+  <data name="Auth_Success_PasswordResetEmailSent" xml:space="preserve">
+    <value>E-Mail zum Zurücksetzen des Passworts gesendet. Bitte überprüfen Sie Ihren Posteingang.</value>
+  </data>
+  <data name="Auth_Error_PasswordResetFailed" xml:space="preserve">
+    <value>Passwort-Zurücksetzung fehlgeschlagen. Bitte überprüfen Sie Ihre E-Mail-Adresse.</value>
+  </data>
+  <data name="Auth_Error_PasswordResetError" xml:space="preserve">
+    <value>Beim Zurücksetzen des Passworts ist ein Fehler aufgetreten.</value>
+  </data>
+  <data name="Auth_Validation_InvalidEmail" xml:space="preserve">
+    <value>Bitte geben Sie eine gültige E-Mail-Adresse ein</value>
+  </data>
+  <data name="Auth_Validation_PasswordRequirement" xml:space="preserve">
+    <value>Das Passwort muss mindestens 8 Zeichen lang sein und 3 oder mehr der folgenden enthalten: Großbuchstaben, Kleinbuchstaben, Zahlen und Sonderzeichen</value>
+  </data>
+  <data name="Auth_Validation_PasswordMismatch" xml:space="preserve">
+    <value>Passwörter stimmen nicht überein</value>
+  </data>
+  <data name="Settings_Account_LogoutSuccess" xml:space="preserve">
+    <value>Erfolgreich abgemeldet</value>
+  </data>
+  <data name="Settings_License_UsedTokens" xml:space="preserve">
+    <value>Verbraucht</value>
+  </data>
+  <data name="Settings_License_PlanRemaining" xml:space="preserve">
+    <value>Plan-Restguthaben</value>
+  </data>
+  <data name="Settings_License_BonusLabel" xml:space="preserve">
+    <value>Bonus</value>
+  </data>
+  <data name="Settings_License_BonusTokens" xml:space="preserve">
+    <value>Bonus</value>
+  </data>
+  <data name="Settings_License_TotalAvailable" xml:space="preserve">
+    <value>Gesamt verfügbar</value>
+  </data>
+  <data name="Auth_Validation_PasswordMinLength" xml:space="preserve">
+    <value>Das Passwort muss mindestens 6 Zeichen lang sein</value>
+  </data>
+  <data name="Auth_Error_PasswordResetException" xml:space="preserve">
+    <value>Passwort-Zurücksetzung fehlgeschlagen: {0}</value>
+  </data>
+  <data name="Auth_Success_ConfirmationEmailSent" xml:space="preserve">
+    <value>Bestätigungs-E-Mail gesendet. Bitte klicken Sie auf den Link in der E-Mail und melden Sie sich dann an. Weiterleitung zur Anmeldung in 3 Sekunden...</value>
+  </data>
+
+  <!-- ========== Issue #424: i18n - Hardcoded string externalization ========== -->
+
+  <!-- ComponentDownloadFailedEventProcessor -->
+  <data name="Download_Failed_Title" xml:space="preserve">
+    <value>Download fehlgeschlagen</value>
+  </data>
+  <data name="Download_Failed_RequiredMessage" xml:space="preserve">
+    <value>Download der erforderlichen Datei fehlgeschlagen.
+Bitte starten Sie die App neu, um es erneut zu versuchen.
+
+Fehlgeschlagene Komponenten: {0}</value>
+  </data>
+  <data name="Download_Failed_OptionalTitle" xml:space="preserve">
+    <value>Einige Downloads fehlgeschlagen</value>
+  </data>
+  <data name="Download_Failed_OptionalMessage" xml:space="preserve">
+    <value>Einige Funktionen sind möglicherweise nicht verfügbar.
+Bitte starten Sie die App neu, um es erneut zu versuchen.</value>
+  </data>
+
+  <!-- DownloadProgressViewModel -->
+  <data name="Update_DownloadProgress_VerificationFailed" xml:space="preserve">
+    <value>Download-Überprüfung fehlgeschlagen</value>
+  </data>
+
+  <!-- App.axaml.cs - Session -->
+  <data name="Session_Expired_Title" xml:space="preserve">
+    <value>Sitzung abgelaufen</value>
+  </data>
+  <data name="Session_Expired_Message" xml:space="preserve">
+    <value>Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.</value>
+  </data>
+
+  <!-- App.axaml.cs - Test Mode -->
+  <data name="TestMode_Warning_Title" xml:space="preserve">
+    <value>Testmodus aktiv</value>
+  </data>
+  <data name="TestMode_Warning_Message" xml:space="preserve">
+    <value>Der Lizenz-Mock-Modus ist aktiv. Für die Produktion setzen Sie License.EnableMockMode auf false in appsettings.json.</value>
+  </data>
+
+  <!-- App.axaml.cs - Hardware Check -->
+  <data name="Hardware_Critical_Title" xml:space="preserve">
+    <value>Hardwareanforderungen - Kritische Warnung</value>
+  </data>
+  <data name="Hardware_Critical_Message" xml:space="preserve">
+    <value>Ihr System erfüllt nicht die Mindestanforderungen. Baketa funktioniert möglicherweise nicht ordnungsgemäß.
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_Warning_Title" xml:space="preserve">
+    <value>Warnung zu Hardwareanforderungen</value>
+  </data>
+  <data name="Hardware_Warning_Message" xml:space="preserve">
+    <value>Ihr System erfüllt nicht die empfohlenen Spezifikationen.
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_CpuCores" xml:space="preserve">
+    <value>CPU: {0} Kerne</value>
+  </data>
+
+  <!-- App.axaml.cs - Patreon Auth -->
+  <data name="Patreon_AuthSuccess_Title" xml:space="preserve">
+    <value>Patreon-Verknüpfung erfolgreich</value>
+  </data>
+  <data name="Patreon_AuthSuccess_Message" xml:space="preserve">
+    <value>Patreon-Konto erfolgreich verknüpft. Plan: {0}</value>
+  </data>
+  <data name="Patreon_AuthFailed_Title" xml:space="preserve">
+    <value>Patreon-Verknüpfung fehlgeschlagen</value>
+  </data>
+  <data name="Patreon_AuthFailed_Message" xml:space="preserve">
+    <value>Bei der Authentifizierung ist ein Fehler aufgetreten</value>
+  </data>
+
+  <!-- MainOverlayViewModel - Translation Error -->
+  <data name="Translation_Error_StopFailed" xml:space="preserve">
+    <value>Übersetzung konnte nicht gestoppt werden.
+Ursache: {0}
+Maßnahme: Bitte starten Sie die App neu.</value>
+  </data>
+  <data name="Translation_Error_StartFailed" xml:space="preserve">
+    <value>Übersetzung konnte nicht gestartet werden.
+Ursache: {0}
+Maßnahme: Bitte starten Sie die App neu.</value>
+  </data>
+
+  <!-- ========== Issue #423: Upsell messages ========== -->
+  <data name="Upsell_ViewPlans" xml:space="preserve">
+    <value>Plan ändern →</value>
+  </data>
+  <data name="Upsell_Free_WithBonus_Message" xml:space="preserve">
+    <value>⚡ Mehr EX-Modus mit einem Pro-Plan erhalten</value>
+  </data>
+  <data name="Upsell_Free_NoBonus_Message" xml:space="preserve">
+    <value>⚡ Pro-Plan abonnieren, um den EX-Modus zu nutzen</value>
+  </data>
+  <data name="Upsell_Upgrade_Message" xml:space="preserve">
+    <value>⬆️ Upgraden Sie Ihren Plan für mehr Token</value>
+  </data>
+
+</root>

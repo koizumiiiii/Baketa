@@ -152,7 +152,7 @@ public sealed class LanguageConfiguration
                 IsSupported = false
             },
 
-            // その他の言語（現在未サポート）
+            // Tier 1 LTR言語
             new()
             {
                 Code = "ko",
@@ -161,7 +161,7 @@ public sealed class LanguageConfiguration
                 OpusPrefix = null,
                 Variant = null,
                 RegionCode = "KR",
-                IsSupported = false
+                IsSupported = true
             },
             new()
             {
@@ -171,7 +171,7 @@ public sealed class LanguageConfiguration
                 OpusPrefix = null,
                 Variant = null,
                 RegionCode = "ES",
-                IsSupported = false
+                IsSupported = true
             },
             new()
             {
@@ -181,7 +181,7 @@ public sealed class LanguageConfiguration
                 OpusPrefix = null,
                 Variant = null,
                 RegionCode = "FR",
-                IsSupported = false
+                IsSupported = true
             },
             new()
             {
@@ -191,8 +191,30 @@ public sealed class LanguageConfiguration
                 OpusPrefix = null,
                 Variant = null,
                 RegionCode = "DE",
-                IsSupported = false
+                IsSupported = true
             },
+            new()
+            {
+                Code = "it",
+                Name = "イタリア語",
+                NativeName = "Italiano",
+                OpusPrefix = null,
+                Variant = null,
+                RegionCode = "IT",
+                IsSupported = true
+            },
+            new()
+            {
+                Code = "pt",
+                Name = "ポルトガル語",
+                NativeName = "Português",
+                OpusPrefix = null,
+                Variant = null,
+                RegionCode = "BR",
+                IsSupported = true
+            },
+
+            // 将来対応予定言語（現在未サポート）
             new()
             {
                 Code = "ru",

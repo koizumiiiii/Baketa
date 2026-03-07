@@ -48,6 +48,12 @@ public static class LanguageCodeNormalizer
         { "spa", "es" },
         { "spanish", "es" },
         { "español", "es" },
+        { "ita", "it" },
+        { "italian", "it" },
+        { "italiano", "it" },
+        { "por", "pt" },
+        { "portuguese", "pt" },
+        { "português", "pt" },
         { "rus", "ru" },
         { "russian", "ru" },
         { "русский", "ru" },
@@ -132,22 +138,27 @@ public static class LanguageCodeNormalizer
     }
 
     /// <summary>
+    /// 既知の地域変種セット（呼び出しごとの再生成を避けるためキャッシュ）
+    /// </summary>
+    private static readonly HashSet<string> KnownRegionalVariants = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "zh-Hans", "zh-Hant", "zh-CN", "zh-TW", "zh-HK", "zh-MO", "zh-SG",
+        "en-US", "en-GB", "en-CA", "en-AU",
+        "es-ES", "es-MX", "es-AR",
+        "fr-FR", "fr-CA",
+        "de-DE", "de-AT", "de-CH",
+        "it-IT",
+        "pt-BR", "pt-PT"
+    };
+
+    /// <summary>
     /// 既知の地域変種かチェック
     /// </summary>
     /// <param name="languageCode">言語コード</param>
     /// <returns>既知地域変種の場合true</returns>
     private static bool IsKnownRegionalVariant(string languageCode)
     {
-        var knownVariants = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "zh-Hans", "zh-Hant", "zh-CN", "zh-TW", "zh-HK", "zh-MO", "zh-SG",
-            "en-US", "en-GB", "en-CA", "en-AU",
-            "es-ES", "es-MX", "es-AR",
-            "fr-FR", "fr-CA",
-            "de-DE", "de-AT", "de-CH"
-        };
-
-        return knownVariants.Contains(languageCode);
+        return KnownRegionalVariants.Contains(languageCode);
     }
 
     /// <summary>

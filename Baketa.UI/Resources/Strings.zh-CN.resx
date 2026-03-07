@@ -1,0 +1,1751 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="0" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ========== App General ========== -->
+  <data name="App_Title" xml:space="preserve">
+    <value>Baketa</value>
+  </data>
+  <data name="App_LoadingMessage" xml:space="preserve">
+    <value>加载中...</value>
+  </data>
+  <data name="App_ErrorTitle" xml:space="preserve">
+    <value>错误</value>
+  </data>
+  <data name="App_Version" xml:space="preserve">
+    <value>当前版本: {0}</value>
+  </data>
+  <data name="App_Copyright" xml:space="preserve">
+    <value>© 2024 Baketa. All rights reserved.</value>
+  </data>
+
+  <!-- ========== Common Buttons ========== -->
+  <data name="Common_Save" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Common_Apply" xml:space="preserve">
+    <value>应用</value>
+  </data>
+  <data name="Common_Reset" xml:space="preserve">
+    <value>重置</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="Common_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>是</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>否</value>
+  </data>
+  <data name="Common_Help" xml:space="preserve">
+    <value>帮助</value>
+  </data>
+  <data name="Common_Loading" xml:space="preserve">
+    <value>加载中...</value>
+  </data>
+  <data name="Common_Or" xml:space="preserve">
+    <value>或</value>
+  </data>
+  <data name="Common_Submit" xml:space="preserve">
+    <value>提交</value>
+  </data>
+
+  <!-- ========== Main Overlay ========== -->
+  <data name="MainOverlay_Minimize" xml:space="preserve">
+    <value>最小化</value>
+  </data>
+  <data name="MainOverlay_SelectWindow" xml:space="preserve">
+    <value>选择目标窗口</value>
+  </data>
+  <data name="MainOverlay_Target" xml:space="preserve">
+    <value>目标</value>
+  </data>
+  <data name="MainOverlay_ShowHideTranslation" xml:space="preserve">
+    <value>显示/隐藏翻译</value>
+  </data>
+  <data name="MainOverlay_LiveTranslation" xml:space="preserve">
+    <value>实时翻译</value>
+  </data>
+  <data name="MainOverlay_ShotTranslation" xml:space="preserve">
+    <value>截图翻译</value>
+  </data>
+  <data name="MainOverlay_Preparing" xml:space="preserve">
+    <value>准备中</value>
+  </data>
+  <data name="MainOverlay_ShowTranslation" xml:space="preserve">
+    <value>显示翻译</value>
+  </data>
+  <data name="MainOverlay_Settings" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="MainOverlay_Exit" xml:space="preserve">
+    <value>退出</value>
+  </data>
+  <data name="MainOverlay_DragToMove" xml:space="preserve">
+    <value>拖动以移动</value>
+  </data>
+  <data name="MainOverlay_Expand" xml:space="preserve">
+    <value>展开</value>
+  </data>
+  <data name="MainOverlay_SelectedWindow" xml:space="preserve">
+    <value>[已选择: {0}]</value>
+  </data>
+  <data name="MainOverlay_TranslationCount" xml:space="preserve">
+    <value>已翻译: {0}</value>
+  </data>
+
+  <!-- ========== Home View ========== -->
+  <data name="Home_QuickStart" xml:space="preserve">
+    <value>快速开始</value>
+  </data>
+  <data name="Home_StartCapture" xml:space="preserve">
+    <value>开始捕获</value>
+  </data>
+  <data name="Home_CaptureSettings" xml:space="preserve">
+    <value>捕获设置</value>
+  </data>
+  <data name="Home_TranslationSettings" xml:space="preserve">
+    <value>翻译设置</value>
+  </data>
+  <data name="Home_RecentTranslations" xml:space="preserve">
+    <value>最近的翻译</value>
+  </data>
+  <data name="Home_ViewAll" xml:space="preserve">
+    <value>查看全部</value>
+  </data>
+  <data name="Home_NoHistory" xml:space="preserve">
+    <value>暂无翻译记录</value>
+  </data>
+  <data name="Home_UsageStatistics" xml:space="preserve">
+    <value>使用统计</value>
+  </data>
+  <data name="Home_CaptureStatus" xml:space="preserve">
+    <value>捕获状态:</value>
+  </data>
+  <data name="Home_TranslationEngine" xml:space="preserve">
+    <value>翻译引擎:</value>
+  </data>
+  <data name="Home_TargetLanguage" xml:space="preserve">
+    <value>目标语言:</value>
+  </data>
+  <data name="Home_MemoryUsage" xml:space="preserve">
+    <value>内存使用:</value>
+  </data>
+  <data name="Home_RunningTime" xml:space="preserve">
+    <value>运行时间:</value>
+  </data>
+  <data name="Home_Tips" xml:space="preserve">
+    <value>提示</value>
+  </data>
+  <data name="Home_Tip_OpenTabs" xml:space="preserve">
+    <value>从左侧标签页打开各项功能</value>
+  </data>
+  <data name="Home_Tip_SelectArea" xml:space="preserve">
+    <value>开始捕获前，请先选择游戏画面中需要翻译的区域</value>
+  </data>
+  <data name="Home_Tip_OverlaySettings" xml:space="preserve">
+    <value>在覆盖层设置中自定义显示位置和字体</value>
+  </data>
+  <data name="Home_Tip_TranslationHistory" xml:space="preserve">
+    <value>在翻译记录中查看过去的翻译内容</value>
+  </data>
+
+  <!-- ========== Settings Window ========== -->
+  <data name="Settings_Title" xml:space="preserve">
+    <value>设置</value>
+  </data>
+
+  <!-- ========== General Settings ========== -->
+  <data name="Settings_General_Title" xml:space="preserve">
+    <value>常规设置</value>
+  </data>
+  <data name="Settings_General_Subtitle" xml:space="preserve">
+    <value>应用程序基本设置</value>
+  </data>
+  <data name="Settings_General_Appearance" xml:space="preserve">
+    <value>外观</value>
+  </data>
+  <data name="Settings_General_Theme" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="Settings_General_ThemeDescription" xml:space="preserve">
+    <value>选择应用程序的配色主题</value>
+  </data>
+  <data name="Settings_General_ThemeLight" xml:space="preserve">
+    <value>浅色</value>
+  </data>
+  <data name="Settings_General_ThemeDark" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="Settings_General_ThemeAuto" xml:space="preserve">
+    <value>自动（跟随系统）</value>
+  </data>
+  <data name="Settings_General_Translation" xml:space="preserve">
+    <value>翻译设置</value>
+  </data>
+  <data name="Settings_General_TranslationEngine" xml:space="preserve">
+    <value>翻译引擎</value>
+  </data>
+  <data name="Settings_General_TranslationEngineDescription" xml:space="preserve">
+    <value>选择要使用的翻译引擎</value>
+  </data>
+  <data name="Settings_General_EXMode" xml:space="preserve">
+    <value>EX模式</value>
+  </data>
+  <data name="Settings_General_EXModeDescription" xml:space="preserve">
+    <value>使用高精度EX翻译引擎</value>
+  </data>
+  <data name="Settings_General_OfflineTranslation" xml:space="preserve">
+    <value>离线翻译</value>
+  </data>
+  <data name="Settings_General_AITranslation" xml:space="preserve">
+    <value>EX翻译</value>
+  </data>
+  <data name="Settings_General_AlphaNote" xml:space="preserve">
+    <value>※ Alpha测试期间仅提供离线翻译</value>
+  </data>
+  <data name="Settings_General_CloudTranslationUpgradeNote" xml:space="preserve">
+    <value>Pro/Premium/Ultimate方案可用</value>
+  </data>
+  <data name="Settings_General_CloudUsageLabel" xml:space="preserve">
+    <value>本月使用量:</value>
+  </data>
+  <data name="Settings_General_CloudUsageTokens" xml:space="preserve">
+    <value></value>
+  </data>
+  <data name="Settings_General_TranslationLanguage" xml:space="preserve">
+    <value>翻译语言</value>
+  </data>
+  <data name="Settings_General_TranslationLanguageDescription" xml:space="preserve">
+    <value>选择源语言和目标语言</value>
+  </data>
+  <data name="Settings_General_FontSize" xml:space="preserve">
+    <value>翻译字体大小</value>
+  </data>
+  <data name="Settings_General_FontSizeDescription" xml:space="preserve">
+    <value>覆盖层上显示的翻译文本大小</value>
+  </data>
+  <data name="Settings_General_FontSizeUnit" xml:space="preserve">
+    <value>px</value>
+  </data>
+  <data name="Settings_General_LanguagePairWarning" xml:space="preserve">
+    <value>※ 请为源语言和目标语言选择不同的语言</value>
+  </data>
+  <data name="Settings_General_Language" xml:space="preserve">
+    <value>语言</value>
+  </data>
+  <data name="Settings_General_LanguageDescription" xml:space="preserve">
+    <value>选择应用程序显示语言</value>
+  </data>
+  <data name="Settings_General_LanguageJapanese" xml:space="preserve">
+    <value>日语</value>
+  </data>
+  <data name="Settings_General_LanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+
+  <!-- ========== Translation Settings ========== -->
+  <data name="Settings_Translation_Title" xml:space="preserve">
+    <value>翻译设置</value>
+  </data>
+  <data name="Settings_Translation_Subtitle" xml:space="preserve">
+    <value>配置翻译引擎、语言对和翻译策略</value>
+  </data>
+  <data name="Settings_Translation_LastSaved" xml:space="preserve">
+    <value>上次保存: {0:MM/dd HH:mm}</value>
+  </data>
+  <data name="Settings_Translation_UnsavedChanges" xml:space="preserve">
+    <value>设置有未保存的更改</value>
+  </data>
+  <data name="Settings_Translation_DiscardChanges" xml:space="preserve">
+    <value>放弃更改</value>
+  </data>
+  <data name="Settings_Translation_Summary" xml:space="preserve">
+    <value>当前设置摘要</value>
+  </data>
+  <data name="Settings_Translation_Engine" xml:space="preserve">
+    <value>翻译引擎</value>
+  </data>
+  <data name="Settings_Translation_LanguagePair" xml:space="preserve">
+    <value>语言对</value>
+  </data>
+  <data name="Settings_Translation_Strategy" xml:space="preserve">
+    <value>翻译策略</value>
+  </data>
+  <data name="Settings_Translation_ChineseVariant" xml:space="preserve">
+    <value>中文变体</value>
+  </data>
+  <data name="Settings_Translation_Fallback" xml:space="preserve">
+    <value>回退</value>
+  </data>
+  <data name="Settings_Translation_ChangeStatus" xml:space="preserve">
+    <value>更改状态</value>
+  </data>
+  <data name="Settings_Translation_Import" xml:space="preserve">
+    <value>导入</value>
+  </data>
+  <data name="Settings_Translation_ImportTip" xml:space="preserve">
+    <value>从设置文件导入</value>
+  </data>
+  <data name="Settings_Translation_Export" xml:space="preserve">
+    <value>导出</value>
+  </data>
+  <data name="Settings_Translation_ExportTip" xml:space="preserve">
+    <value>将设置导出到文件</value>
+  </data>
+  <data name="Settings_Translation_Load" xml:space="preserve">
+    <value>加载</value>
+  </data>
+  <data name="Settings_Translation_LoadTip" xml:space="preserve">
+    <value>加载已保存的设置</value>
+  </data>
+  <data name="Settings_Translation_SaveTip" xml:space="preserve">
+    <value>保存当前设置</value>
+  </data>
+  <data name="Settings_Translation_ApplyTip" xml:space="preserve">
+    <value>保存并应用设置</value>
+  </data>
+  <data name="Settings_Translation_Saving" xml:space="preserve">
+    <value>正在保存设置...</value>
+  </data>
+
+  <!-- ========== Capture Settings ========== -->
+  <data name="Settings_Capture_Title" xml:space="preserve">
+    <value>捕获设置</value>
+  </data>
+  <data name="Settings_Capture_Subtitle" xml:space="preserve">
+    <value>屏幕捕获和截图功能的详细设置</value>
+  </data>
+  <data name="Settings_Capture_Basic" xml:space="preserve">
+    <value>基本设置</value>
+  </data>
+  <data name="Settings_Capture_Enabled" xml:space="preserve">
+    <value>捕获功能</value>
+  </data>
+  <data name="Settings_Capture_EnabledDescription" xml:space="preserve">
+    <value>启用屏幕捕获功能</value>
+  </data>
+  <data name="Settings_Capture_Interval" xml:space="preserve">
+    <value>捕获间隔</value>
+  </data>
+  <data name="Settings_Capture_IntervalDescription" xml:space="preserve">
+    <value>屏幕捕获间隔（越短越精确，越长越快速）</value>
+  </data>
+  <data name="Settings_Capture_Quality" xml:space="preserve">
+    <value>捕获质量</value>
+  </data>
+  <data name="Settings_Capture_QualityDescription" xml:space="preserve">
+    <value>捕获图像的质量（越高越精确，越低越快速）</value>
+  </data>
+  <data name="Settings_Capture_AreaMode" xml:space="preserve">
+    <value>区域检测模式</value>
+  </data>
+  <data name="Settings_Capture_AreaModeDescription" xml:space="preserve">
+    <value>选择自动检测文本区域或使用固定区域</value>
+  </data>
+  <data name="Settings_Capture_AutoDetect" xml:space="preserve">
+    <value>自动检测</value>
+  </data>
+  <data name="Settings_Capture_FixedArea" xml:space="preserve">
+    <value>固定区域</value>
+  </data>
+  <data name="Settings_Capture_FixedAreaSection" xml:space="preserve">
+    <value>固定捕获区域</value>
+  </data>
+  <data name="Settings_Capture_Position" xml:space="preserve">
+    <value>位置和大小</value>
+  </data>
+  <data name="Settings_Capture_PositionDescription" xml:space="preserve">
+    <value>指定固定捕获区域的位置和大小</value>
+  </data>
+  <data name="Settings_Capture_Advanced" xml:space="preserve">
+    <value>高级设置</value>
+  </data>
+  <data name="Settings_Capture_Monitor" xml:space="preserve">
+    <value>目标显示器</value>
+  </data>
+  <data name="Settings_Capture_MonitorDescription" xml:space="preserve">
+    <value>在多显示器环境中选择要捕获的显示器</value>
+  </data>
+  <data name="Settings_Capture_DpiScaling" xml:space="preserve">
+    <value>DPI缩放感知</value>
+  </data>
+  <data name="Settings_Capture_DpiScalingDescription" xml:space="preserve">
+    <value>在高DPI环境中考虑缩放</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccel" xml:space="preserve">
+    <value>硬件加速</value>
+  </data>
+  <data name="Settings_Capture_HardwareAccelDescription" xml:space="preserve">
+    <value>使用GPU进行硬件加速</value>
+  </data>
+  <data name="Settings_Capture_DiffDetection" xml:space="preserve">
+    <value>差异检测设置</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionEnable" xml:space="preserve">
+    <value>差异检测功能</value>
+  </data>
+  <data name="Settings_Capture_DiffDetectionDescription" xml:space="preserve">
+    <value>启用屏幕变化差异检测功能</value>
+  </data>
+
+  <!-- ========== OCR Settings ========== -->
+  <data name="Settings_OCR_Title" xml:space="preserve">
+    <value>OCR设置</value>
+  </data>
+  <data name="Settings_OCR_Subtitle" xml:space="preserve">
+    <value>光学字符识别的详细设置</value>
+  </data>
+  <data name="Settings_OCR_Basic" xml:space="preserve">
+    <value>基本设置</value>
+  </data>
+  <data name="Settings_OCR_Enabled" xml:space="preserve">
+    <value>启用OCR</value>
+  </data>
+  <data name="Settings_OCR_EnabledDescription" xml:space="preserve">
+    <value>自动识别屏幕上的文本</value>
+  </data>
+  <data name="Settings_OCR_Language" xml:space="preserve">
+    <value>识别语言</value>
+  </data>
+  <data name="Settings_OCR_LanguageDescription" xml:space="preserve">
+    <value>OCR识别的主要语言</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguage" xml:space="preserve">
+    <value>目标语言</value>
+  </data>
+  <data name="Settings_OCR_TargetLanguageDescription" xml:space="preserve">
+    <value>翻译结果的输出语言</value>
+  </data>
+  <data name="Settings_OCR_Confidence" xml:space="preserve">
+    <value>置信度阈值</value>
+  </data>
+  <data name="Settings_OCR_ConfidenceDescription" xml:space="preserve">
+    <value>文本识别的最低置信度（0.0-1.0）</value>
+  </data>
+  <data name="Settings_OCR_Filtering" xml:space="preserve">
+    <value>文本过滤</value>
+  </data>
+  <data name="Settings_OCR_FilteringDescription" xml:space="preserve">
+    <value>启用已识别文本的后处理</value>
+  </data>
+  <data name="Settings_OCR_Advanced" xml:space="preserve">
+    <value>高级设置</value>
+  </data>
+  <data name="Settings_OCR_Preprocessing" xml:space="preserve">
+    <value>图像预处理</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingEnable" xml:space="preserve">
+    <value>启用图像预处理</value>
+  </data>
+  <data name="Settings_OCR_PreprocessingDescription" xml:space="preserve">
+    <value>应用图像预处理以提高OCR准确度</value>
+  </data>
+  <data name="Settings_OCR_Grayscale" xml:space="preserve">
+    <value>灰度转换</value>
+  </data>
+
+  <!-- ========== Overlay Settings ========== -->
+  <data name="Settings_Overlay_Title" xml:space="preserve">
+    <value>覆盖层设置</value>
+  </data>
+  <data name="Settings_Overlay_Subtitle" xml:space="preserve">
+    <value>在游戏画面上显示翻译结果的覆盖层设置</value>
+  </data>
+  <data name="Settings_Overlay_ARNote" xml:space="preserve">
+    <value>AR风格显示：翻译结果覆盖在原文相同位置，提供类似Google翻译相机的体验</value>
+  </data>
+  <data name="Settings_Overlay_Basic" xml:space="preserve">
+    <value>基本设置</value>
+  </data>
+  <data name="Settings_Overlay_Enabled" xml:space="preserve">
+    <value>覆盖层显示</value>
+  </data>
+  <data name="Settings_Overlay_EnabledDescription" xml:space="preserve">
+    <value>将翻译结果以覆盖层形式显示在游戏画面上</value>
+  </data>
+  <data name="Settings_Overlay_Opacity" xml:space="preserve">
+    <value>不透明度</value>
+  </data>
+  <data name="Settings_Overlay_OpacityDescription" xml:space="preserve">
+    <value>覆盖层不透明度（越高越不透明）</value>
+  </data>
+  <data name="Settings_Overlay_FontSize" xml:space="preserve">
+    <value>翻译字体大小</value>
+  </data>
+  <data name="Settings_Overlay_FontSizeDescription" xml:space="preserve">
+    <value>覆盖层上显示的翻译文本字体大小</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColor" xml:space="preserve">
+    <value>背景颜色</value>
+  </data>
+  <data name="Settings_Overlay_BackgroundColorDescription" xml:space="preserve">
+    <value>覆盖层的背景颜色</value>
+  </data>
+  <data name="Settings_Overlay_ChooseColor" xml:space="preserve">
+    <value>选择颜色...</value>
+  </data>
+  <data name="Settings_Overlay_TextColor" xml:space="preserve">
+    <value>文本颜色</value>
+  </data>
+  <data name="Settings_Overlay_TextColorDescription" xml:space="preserve">
+    <value>覆盖层的文本颜色</value>
+  </data>
+  <data name="Settings_Overlay_AutoHide" xml:space="preserve">
+    <value>自动隐藏设置</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAuto" xml:space="preserve">
+    <value>实时翻译自动隐藏</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDescription" xml:space="preserve">
+    <value>在指定时间后自动隐藏实时翻译结果</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelay" xml:space="preserve">
+    <value>实时翻译隐藏延迟</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideAutoDelayDescription" xml:space="preserve">
+    <value>实时翻译结果自动消失前的时间</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelay" xml:space="preserve">
+    <value>截图翻译自动隐藏延迟</value>
+  </data>
+  <data name="Settings_Overlay_AutoHideShotDelayDescription" xml:space="preserve">
+    <value>截图翻译结果自动消失前的时间</value>
+  </data>
+  <data name="Settings_Overlay_ManualClose" xml:space="preserve">
+    <value>点击关闭</value>
+  </data>
+  <data name="Settings_Overlay_ManualCloseDescription" xml:space="preserve">
+    <value>点击覆盖层可手动隐藏</value>
+  </data>
+
+  <!-- ========== Account Settings ========== -->
+  <data name="Settings_Account_Title" xml:space="preserve">
+    <value>账户</value>
+  </data>
+  <data name="Settings_Account_Subtitle" xml:space="preserve">
+    <value>用户认证和账户管理</value>
+  </data>
+  <data name="Settings_Account_Processing" xml:space="preserve">
+    <value>处理中...</value>
+  </data>
+  <data name="Settings_Account_LoggedInWith" xml:space="preserve">
+    <value>已通过{0}登录</value>
+  </data>
+  <data name="Settings_Account_LoggedInStatus" xml:space="preserve">
+    <value>已登录</value>
+  </data>
+  <data name="Settings_Account_Actions" xml:space="preserve">
+    <value>账户操作</value>
+  </data>
+  <data name="Settings_Account_LogoutDescription" xml:space="preserve">
+    <value>从此设备注销</value>
+  </data>
+  <data name="Settings_Account_NotLoggedIn" xml:space="preserve">
+    <value>未登录</value>
+  </data>
+  <data name="Settings_Account_LoginBenefits" xml:space="preserve">
+    <value>登录后可同步设置并使用更多功能</value>
+  </data>
+  <data name="Settings_Account_ForgotPassword" xml:space="preserve">
+    <value>忘记密码？</value>
+  </data>
+  <data name="Settings_Account_PasswordReset" xml:space="preserve">
+    <value>重置密码</value>
+  </data>
+  <data name="Settings_Account_PasswordResetDescription" xml:space="preserve">
+    <value>我们将向您注册的邮箱发送密码重置链接</value>
+  </data>
+  <data name="Settings_Account_ResetEmailSent" xml:space="preserve">
+    <value>重置邮件已发送，请检查您的收件箱。</value>
+  </data>
+  <data name="Settings_Account_EmailAddress" xml:space="preserve">
+    <value>电子邮箱</value>
+  </data>
+  <data name="Settings_Account_Profile" xml:space="preserve">
+    <value>个人资料</value>
+  </data>
+  <data name="Settings_Account_Email" xml:space="preserve">
+    <value>邮箱</value>
+  </data>
+  <data name="Settings_Account_ChangePassword" xml:space="preserve">
+    <value>修改密码</value>
+  </data>
+  <data name="Settings_Account_Logout" xml:space="preserve">
+    <value>注销</value>
+  </data>
+  <data name="Settings_Account_Login" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="Settings_Account_Signup" xml:space="preserve">
+    <value>注册</value>
+  </data>
+  <data name="Settings_Account_CurrentPlan" xml:space="preserve">
+    <value>当前方案</value>
+  </data>
+  <data name="Settings_Account_UpgradeToPremium" xml:space="preserve">
+    <value>升级到Premium</value>
+  </data>
+
+  <!-- ========== License Settings ========== -->
+  <data name="Settings_License_Title" xml:space="preserve">
+    <value>许可证</value>
+  </data>
+  <data name="Settings_License_Subtitle" xml:space="preserve">
+    <value>查看方案信息和使用情况</value>
+  </data>
+  <data name="Settings_Upgrade_Title" xml:space="preserve">
+    <value>方案升级</value>
+  </data>
+  <data name="Settings_Upgrade_Subtitle" xml:space="preserve">
+    <value>购买或更改方案</value>
+  </data>
+  <data name="Settings_License_Loading" xml:space="preserve">
+    <value>正在加载许可证信息...</value>
+  </data>
+  <data name="Settings_License_TokenUsage" xml:space="preserve">
+    <value>使用量</value>
+  </data>
+  <data name="Settings_License_MonthlyUsage" xml:space="preserve">
+    <value>月度使用量</value>
+  </data>
+  <data name="Settings_License_QuotaExceeded" xml:space="preserve">
+    <value>月度配额已超限。EX翻译在下月之前不可用。</value>
+  </data>
+  <data name="Settings_License_LocalOnlyMessage" xml:space="preserve">
+    <value>此方案仅支持标准翻译。升级到Pro或更高方案以使用EX翻译。</value>
+  </data>
+  <data name="Settings_License_PlanDetails" xml:space="preserve">
+    <value>方案详情</value>
+  </data>
+  <data name="Settings_License_ExpirationDate" xml:space="preserve">
+    <value>到期日期</value>
+  </data>
+  <data name="Settings_License_CloudAccess" xml:space="preserve">
+    <value>EX翻译</value>
+  </data>
+  <data name="Settings_License_MonthlyLimit" xml:space="preserve">
+    <value>月度配额</value>
+  </data>
+  <data name="Settings_License_Refresh" xml:space="preserve">
+    <value>刷新许可证信息</value>
+  </data>
+  <data name="License_Plan_Free" xml:space="preserve">
+    <value>Free</value>
+  </data>
+  <data name="License_Plan_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="License_Plan_Pro" xml:space="preserve">
+    <value>Pro</value>
+  </data>
+  <data name="License_Plan_Premia" xml:space="preserve">
+    <value>Premia</value>
+  </data>
+  <data name="License_Plan_Premium" xml:space="preserve">
+    <value>Premium</value>
+  </data>
+  <data name="License_Plan_Ultimate" xml:space="preserve">
+    <value>Ultimate</value>
+  </data>
+  <data name="License_Plan_Unknown" xml:space="preserve">
+    <value>未知</value>
+  </data>
+  <data name="License_Plan_PromotionSuffix" xml:space="preserve">
+    <value>（已应用促销代码）</value>
+  </data>
+
+  <!-- Promotion Code Section -->
+  <data name="Settings_License_PromotionCode" xml:space="preserve">
+    <value>促销代码</value>
+  </data>
+  <data name="Settings_License_PromotionExpires" xml:space="preserve">
+    <value>到期日:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeLabel" xml:space="preserve">
+    <value>代码:</value>
+  </data>
+  <data name="Settings_License_PromotionCodeDescription" xml:space="preserve">
+    <value>如果您有促销代码，请在下方输入。</value>
+  </data>
+  <data name="Settings_License_PromotionApply" xml:space="preserve">
+    <value>应用</value>
+  </data>
+  <data name="Settings_License_PromotionVerifying" xml:space="preserve">
+    <value>验证中...</value>
+  </data>
+  <data name="Settings_License_PromotionAppliedFormat" xml:space="preserve">
+    <value>{0}已应用</value>
+  </data>
+  <data name="Settings_License_PromotionPlanPromo" xml:space="preserve">
+    <value>促销</value>
+  </data>
+
+  <data name="License_Desc_Free" xml:space="preserve">
+    <value>免费方案 - 可通过奖励使用EX翻译</value>
+  </data>
+  <data name="License_Desc_Standard" xml:space="preserve">
+    <value>Standard方案 - 无广告，仅标准翻译</value>
+  </data>
+  <data name="License_Desc_Pro" xml:space="preserve">
+    <value>Pro方案 - EX翻译，月度配额1000万</value>
+  </data>
+  <data name="License_Desc_Premia" xml:space="preserve">
+    <value>Premia方案 - EX翻译，月度配额800万</value>
+  </data>
+  <data name="License_Desc_Premium" xml:space="preserve">
+    <value>Premium方案 - EX翻译，月度配额2000万</value>
+  </data>
+  <data name="License_Desc_Ultimate" xml:space="preserve">
+    <value>Ultimate方案 - EX翻译，月度配额5000万</value>
+  </data>
+  <data name="License_NoExpiration" xml:space="preserve">
+    <value>无期限</value>
+  </data>
+  <data name="License_LocalOnly" xml:space="preserve">
+    <value>仅标准翻译</value>
+  </data>
+  <data name="License_EXTranslation_Available" xml:space="preserve">
+    <value>可用</value>
+  </data>
+  <data name="License_EXTranslation_Unavailable" xml:space="preserve">
+    <value>不可用</value>
+  </data>
+  <data name="License_RefreshSuccess" xml:space="preserve">
+    <value>许可证信息已更新</value>
+  </data>
+  <data name="License_RefreshFailed" xml:space="preserve">
+    <value>许可证信息更新失败</value>
+  </data>
+  <data name="Settings_License_Upgrade" xml:space="preserve">
+    <value>更改方案</value>
+  </data>
+  <data name="License_UpgradeComingSoon" xml:space="preserve">
+    <value>升级功能即将推出</value>
+  </data>
+  <data name="License_OpeningPlanPage" xml:space="preserve">
+    <value>正在打开方案更改页面...</value>
+  </data>
+  <data name="License_PlanPageOpenFailed" xml:space="preserve">
+    <value>无法打开方案更改页面</value>
+  </data>
+
+  <!-- Patreon Integration -->
+  <data name="Settings_License_PatreonIntegration" xml:space="preserve">
+    <value>Patreon集成</value>
+  </data>
+  <data name="Settings_License_PatreonStatus" xml:space="preserve">
+    <value>连接状态</value>
+  </data>
+  <data name="Settings_License_LastSync" xml:space="preserve">
+    <value>上次同步</value>
+  </data>
+  <data name="Settings_License_ConnectPatreon" xml:space="preserve">
+    <value>连接到Patreon</value>
+  </data>
+  <data name="Settings_License_DisconnectPatreon" xml:space="preserve">
+    <value>断开连接</value>
+  </data>
+  <data name="Settings_License_SyncPatreon" xml:space="preserve">
+    <value>同步</value>
+  </data>
+
+  <!-- Patreon Integration (Account Settings) -->
+  <data name="Settings_Account_PatreonSection" xml:space="preserve">
+    <value>Patreon集成</value>
+  </data>
+  <data name="Settings_Account_PatreonUserFallback" xml:space="preserve">
+    <value>Patreon用户</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanLabel" xml:space="preserve">
+    <value>方案:</value>
+  </data>
+  <data name="Settings_Account_PatreonLastSync" xml:space="preserve">
+    <value>上次同步: {0}</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncNow" xml:space="preserve">
+    <value>立即同步</value>
+  </data>
+  <data name="Settings_Account_PatreonDisconnect" xml:space="preserve">
+    <value>断开连接</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectTitle" xml:space="preserve">
+    <value>连接Patreon账户</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectDescription" xml:space="preserve">
+    <value>关联您的Patreon支持者账户，解锁无广告和EX翻译等权益</value>
+  </data>
+  <data name="Settings_Account_PatreonConnectButton" xml:space="preserve">
+    <value>连接Patreon</value>
+  </data>
+  <data name="Settings_Account_PatreonAvailablePlans" xml:space="preserve">
+    <value>可用方案:</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPro" xml:space="preserve">
+    <value>• Pro（$3/月）：EX翻译，月度配额1000万</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanPremium" xml:space="preserve">
+    <value>• Premium（$5/月）：EX翻译，月度配额2000万</value>
+  </data>
+  <data name="Settings_Account_PatreonPlanUltimate" xml:space="preserve">
+    <value>• Ultimate（$9/月）：EX翻译，月度配额5000万</value>
+  </data>
+  <data name="Settings_Account_EmailLoginOptional" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="Settings_Account_PatreonSyncing" xml:space="preserve">
+    <value>同步中...</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusSynced" xml:space="preserve">
+    <value>已同步</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusOffline" xml:space="preserve">
+    <value>离线</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusTokenExpired" xml:space="preserve">
+    <value>需要重新认证</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusError" xml:space="preserve">
+    <value>错误</value>
+  </data>
+  <data name="Settings_Account_PatreonStatusNotConnected" xml:space="preserve">
+    <value>未连接</value>
+  </data>
+  <data name="Settings_Account_PatreonLinkedFormat" xml:space="preserve">
+    <value>已连接（{0}）</value>
+  </data>
+  <data name="Settings_Account_MockModeTestUser" xml:space="preserve">
+    <value>测试用户（模拟模式）</value>
+  </data>
+
+  <!-- ========== Advanced Settings ========== -->
+  <data name="Settings_Advanced_Title" xml:space="preserve">
+    <value>高级设置</value>
+  </data>
+  <data name="Settings_Advanced_Subtitle" xml:space="preserve">
+    <value>高级功能和系统优化的详细设置</value>
+  </data>
+  <data name="Settings_Advanced_Warning" xml:space="preserve">
+    <value>警告：这些设置面向高级用户。更改可能导致意外行为。</value>
+  </data>
+  <data name="Settings_Advanced_Basic" xml:space="preserve">
+    <value>基本优化设置</value>
+  </data>
+  <data name="Settings_Advanced_CPU" xml:space="preserve">
+    <value>CPU/进程设置</value>
+  </data>
+  <data name="Settings_Advanced_Memory" xml:space="preserve">
+    <value>内存/缓冲设置</value>
+  </data>
+  <data name="Settings_Advanced_Network" xml:space="preserve">
+    <value>网络设置</value>
+  </data>
+  <data name="Settings_Advanced_Seconds" xml:space="preserve">
+    <value>秒</value>
+  </data>
+  <data name="Settings_Advanced_Connections" xml:space="preserve">
+    <value>连接</value>
+  </data>
+  <data name="Settings_Advanced_Retry" xml:space="preserve">
+    <value>重试设置</value>
+  </data>
+  <data name="Settings_Advanced_Times" xml:space="preserve">
+    <value>次</value>
+  </data>
+  <data name="Settings_Advanced_Statistics" xml:space="preserve">
+    <value>统计/监控设置</value>
+  </data>
+  <data name="Settings_Advanced_Days" xml:space="preserve">
+    <value>天</value>
+  </data>
+  <data name="Settings_Advanced_Experimental" xml:space="preserve">
+    <value>实验性/调试设置</value>
+  </data>
+  <data name="Settings_Advanced_Danger" xml:space="preserve">
+    <value>危险：这些设置面向开发人员。请勿在生产环境中使用。</value>
+  </data>
+
+  <!-- ========== Login View ========== -->
+  <data name="Auth_Login_Title" xml:space="preserve">
+    <value>登录 Baketa</value>
+  </data>
+  <data name="Auth_Login_Google" xml:space="preserve">
+    <value>使用Google登录</value>
+  </data>
+  <data name="Auth_Login_Discord" xml:space="preserve">
+    <value>使用Discord登录</value>
+  </data>
+  <data name="Auth_Login_Twitch" xml:space="preserve">
+    <value>使用Twitch登录</value>
+  </data>
+  <data name="Auth_Login_Email" xml:space="preserve">
+    <value>电子邮箱</value>
+  </data>
+  <data name="Auth_Login_EmailPlaceholder" xml:space="preserve">
+    <value>example@email.com</value>
+  </data>
+  <data name="Auth_Login_Password" xml:space="preserve">
+    <value>密码</value>
+  </data>
+  <data name="Auth_Login_PasswordPlaceholder" xml:space="preserve">
+    <value>输入密码</value>
+  </data>
+  <data name="Auth_Login_RememberMe" xml:space="preserve">
+    <value>记住登录状态</value>
+  </data>
+  <data name="Auth_Login_ForgotPassword" xml:space="preserve">
+    <value>忘记密码？</value>
+  </data>
+  <data name="Auth_Login_Button" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="Auth_Login_Loading" xml:space="preserve">
+    <value>认证中...</value>
+  </data>
+  <data name="Auth_Login_SignupPrompt" xml:space="preserve">
+    <value>还没有账户？</value>
+  </data>
+  <data name="Auth_Login_SignupLink" xml:space="preserve">
+    <value>创建账户</value>
+  </data>
+  <data name="Auth_Login_EmailExpander" xml:space="preserve">
+    <value>使用邮箱登录</value>
+  </data>
+
+  <!-- ========== Signup View ========== -->
+  <data name="Auth_Signup_Title" xml:space="preserve">
+    <value>创建Baketa账户</value>
+  </data>
+  <data name="Auth_Signup_Google" xml:space="preserve">
+    <value>使用Google注册</value>
+  </data>
+  <data name="Auth_Signup_Discord" xml:space="preserve">
+    <value>使用Discord注册</value>
+  </data>
+  <data name="Auth_Signup_Twitch" xml:space="preserve">
+    <value>使用Twitch注册</value>
+  </data>
+  <data name="Auth_Signup_OrEmail" xml:space="preserve">
+    <value>或使用邮箱注册</value>
+  </data>
+  <data name="Auth_Signup_DisplayName" xml:space="preserve">
+    <value>显示名称</value>
+  </data>
+  <data name="Auth_Signup_DisplayNamePlaceholder" xml:space="preserve">
+    <value>您的显示名称</value>
+  </data>
+  <data name="Auth_Signup_Email" xml:space="preserve">
+    <value>电子邮箱</value>
+  </data>
+  <data name="Auth_Signup_Password" xml:space="preserve">
+    <value>密码</value>
+  </data>
+  <data name="Auth_Signup_PasswordPlaceholder" xml:space="preserve">
+    <value>8个字符以上</value>
+  </data>
+  <data name="Auth_Signup_PasswordRequirement" xml:space="preserve">
+    <value>※ 8个字符以上，需包含大写、小写、数字、符号中的至少3种</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPassword" xml:space="preserve">
+    <value>确认密码</value>
+  </data>
+  <data name="Auth_Signup_ConfirmPasswordPlaceholder" xml:space="preserve">
+    <value>再次输入密码</value>
+  </data>
+  <data name="Auth_Signup_Terms" xml:space="preserve">
+    <value>服务条款</value>
+  </data>
+  <data name="Auth_Signup_TermsAgree" xml:space="preserve">
+    <value>我同意</value>
+  </data>
+  <data name="Auth_Signup_Privacy" xml:space="preserve">
+    <value>隐私政策</value>
+  </data>
+  <data name="Auth_Signup_Button" xml:space="preserve">
+    <value>创建账户</value>
+  </data>
+  <data name="Auth_Signup_Loading" xml:space="preserve">
+    <value>正在创建账户...</value>
+  </data>
+  <data name="Auth_Signup_LoginPrompt" xml:space="preserve">
+    <value>已有账户？</value>
+  </data>
+  <data name="Auth_Signup_LoginLink" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="Auth_Signup_EmailExpander" xml:space="preserve">
+    <value>使用邮箱注册</value>
+  </data>
+
+  <!-- ========== Premium Plan ========== -->
+  <data name="Premium_Title" xml:space="preserve">
+    <value>Baketa Premium</value>
+  </data>
+  <data name="Premium_FeatureAdFree" xml:space="preserve">
+    <value>无广告</value>
+  </data>
+  <data name="Premium_FeatureCloudTranslation" xml:space="preserve">
+    <value>EX翻译（高精度翻译引擎）</value>
+  </data>
+  <data name="Premium_FeaturePrioritySupport" xml:space="preserve">
+    <value>优先支持</value>
+  </data>
+  <data name="Premium_FeatureEarlyAccess" xml:space="preserve">
+    <value>抢先体验新功能</value>
+  </data>
+  <data name="Premium_Monthly" xml:space="preserve">
+    <value>$5/月</value>
+  </data>
+  <data name="Premium_Yearly" xml:space="preserve">
+    <value>$50/年（优惠17%）</value>
+  </data>
+
+  <!-- ========== Error Messages ========== -->
+  <data name="Error_NetworkError" xml:space="preserve">
+    <value>发生网络错误</value>
+  </data>
+  <data name="Error_AuthenticationFailed" xml:space="preserve">
+    <value>认证失败</value>
+  </data>
+  <data name="Error_TranslationFailed" xml:space="preserve">
+    <value>翻译失败</value>
+  </data>
+  <data name="Error_OcrFailed" xml:space="preserve">
+    <value>OCR失败</value>
+  </data>
+  <data name="Error_WindowNotFound" xml:space="preserve">
+    <value>未找到目标窗口</value>
+  </data>
+  <data name="Error_InvalidEmail" xml:space="preserve">
+    <value>无效的电子邮箱地址</value>
+  </data>
+  <data name="Error_PasswordTooShort" xml:space="preserve">
+    <value>密码至少需要8个字符</value>
+  </data>
+  <data name="Error_LoginFailed" xml:space="preserve">
+    <value>登录失败</value>
+  </data>
+  <data name="Error_PasswordMismatch" xml:space="preserve">
+    <value>密码不匹配</value>
+  </data>
+  <data name="Error_SignupFailed" xml:space="preserve">
+    <value>账户创建失败</value>
+  </data>
+
+  <!-- ========== Confirmation Dialogs ========== -->
+  <data name="Dialog_LogoutConfirm" xml:space="preserve">
+    <value>确定要注销吗？</value>
+  </data>
+  <data name="Dialog_DiscardChanges" xml:space="preserve">
+    <value>有未保存的更改。要放弃更改吗？</value>
+  </data>
+  <data name="Dialog_ResetSettings" xml:space="preserve">
+    <value>将设置恢复为默认值？</value>
+  </data>
+  <data name="Dialog_ExitApp" xml:space="preserve">
+    <value>退出应用程序？</value>
+  </data>
+
+  <!-- MainOverlay Tooltips -->
+  <data name="MainOverlay_StartButton_Tooltip" xml:space="preserve">
+    <value>开始翻译</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Execute" xml:space="preserve">
+    <value>执行单次翻译</value>
+  </data>
+  <data name="MainOverlay_Singleshot_Reset" xml:space="preserve">
+    <value>重置</value>
+    <comment>[Issue #357] Button/tooltip text when shot translation is active</comment>
+  </data>
+  <data name="MainOverlay_Live_Stop" xml:space="preserve">
+    <value>停止</value>
+    <comment>[Issue #357] Button text when live translation is active</comment>
+  </data>
+  <data name="MainOverlay_Status_Initializing" xml:space="preserve">
+    <value>初始化中...</value>
+  </data>
+  <data name="MainOverlay_Status_Idle" xml:space="preserve">
+    <value>未选择</value>
+  </data>
+  <data name="MainOverlay_Status_Ready" xml:space="preserve">
+    <value>就绪</value>
+  </data>
+  <data name="MainOverlay_Status_Translating" xml:space="preserve">
+    <value>翻译中</value>
+  </data>
+  <data name="MainOverlay_Status_Waiting" xml:space="preserve">
+    <value>等待中</value>
+  </data>
+  <data name="MainOverlay_Warmup_Failed" xml:space="preserve">
+    <value>模型初始化失败。请重启应用程序。</value>
+  </data>
+  <data name="MainOverlay_Warmup_Loading" xml:space="preserve">
+    <value>正在加载模型... {0}</value>
+  </data>
+  <data name="MainOverlay_Warmup_Complete" xml:space="preserve">
+    <value>准备就绪！可以开始翻译了</value>
+  </data>
+
+  <!-- Theme Options -->
+  <data name="Theme_Light" xml:space="preserve">
+    <value>浅色</value>
+  </data>
+  <data name="Theme_Dark" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="Theme_Auto" xml:space="preserve">
+    <value>自动（跟随系统设置）</value>
+  </data>
+
+  <!-- Size Options -->
+  <data name="Size_Small" xml:space="preserve">
+    <value>小（紧凑）</value>
+  </data>
+  <data name="Size_Medium" xml:space="preserve">
+    <value>中（标准）</value>
+  </data>
+  <data name="Size_Large" xml:space="preserve">
+    <value>大（易读）</value>
+  </data>
+
+  <!-- Advanced Settings Toggle -->
+  <data name="Settings_Advanced_Show" xml:space="preserve">
+    <value>显示高级设置</value>
+  </data>
+  <data name="Settings_Advanced_Hide" xml:space="preserve">
+    <value>返回基本设置</value>
+  </data>
+
+  <!-- Settings Window Status Messages -->
+  <data name="Settings_Window_Title" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="Settings_Status_HasChanges" xml:space="preserve">
+    <value>设置已修改</value>
+  </data>
+  <data name="Settings_Status_NoChanges" xml:space="preserve">
+    <value>无更改</value>
+  </data>
+  <data name="Settings_Status_Saving" xml:space="preserve">
+    <value>正在保存设置...</value>
+  </data>
+  <data name="Settings_Status_Saved" xml:space="preserve">
+    <value>设置已保存</value>
+  </data>
+  <data name="Settings_Status_SaveFailed" xml:space="preserve">
+    <value>保存失败: {0}</value>
+  </data>
+  <data name="Settings_Status_AccessDenied" xml:space="preserve">
+    <value>保存失败: 访问被拒绝</value>
+  </data>
+  <data name="Settings_Status_IOError" xml:space="preserve">
+    <value>保存失败: 文件I/O错误</value>
+  </data>
+  <data name="Settings_Status_Cancelled" xml:space="preserve">
+    <value>更改已取消</value>
+  </data>
+  <data name="Settings_Status_Reset" xml:space="preserve">
+    <value>设置已重置</value>
+  </data>
+
+  <!-- Settings Window Buttons -->
+  <data name="Settings_Button_Reset" xml:space="preserve">
+    <value>重置</value>
+  </data>
+  <data name="Settings_Button_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Settings_Button_Save" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="Settings_Tooltip_Reset" xml:space="preserve">
+    <value>将所有设置恢复为默认值</value>
+  </data>
+  <data name="Settings_Tooltip_Cancel" xml:space="preserve">
+    <value>放弃更改并关闭</value>
+  </data>
+  <data name="Settings_Tooltip_Save" xml:space="preserve">
+    <value>保存更改</value>
+  </data>
+
+  <!-- ========== Loading Screen ========== -->
+  <!-- [Issue #185] Component download step -->
+  <data name="Loading_DownloadingComponents" xml:space="preserve">
+    <value>正在下载组件...</value>
+  </data>
+  <data name="Loading_ResolvingDependencies" xml:space="preserve">
+    <value>正在解析依赖项...</value>
+  </data>
+  <data name="Loading_LoadingOCR" xml:space="preserve">
+    <value>正在加载OCR模型...</value>
+  </data>
+  <data name="Loading_InitializingTranslation" xml:space="preserve">
+    <value>正在初始化翻译引擎...</value>
+  </data>
+  <data name="Loading_PreparingUI" xml:space="preserve">
+    <value>正在准备UI组件...</value>
+  </data>
+  <data name="Loading_SetupGpu" xml:space="preserve">
+    <value>正在配置GPU环境...</value>
+  </data>
+  <!-- [Issue #259] Loading Tips -->
+  <data name="Loading_Tip_1" xml:space="preserve">
+    <value>首次设置可能需要约10分钟，请耐心等待。</value>
+  </data>
+  <data name="Loading_Tip_2" xml:space="preserve">
+    <value>结合OCR和机器翻译的翻译覆盖层</value>
+  </data>
+  <data name="Loading_Tip_3" xml:space="preserve">
+    <value>首次启动可能因模型下载而耗时较长</value>
+  </data>
+  <data name="Loading_Tip_4" xml:space="preserve">
+    <value>翻译结果以覆盖层形式显示在游戏画面上</value>
+  </data>
+  <data name="Loading_Tip_5" xml:space="preserve">
+    <value>在设置界面自定义各种选项</value>
+  </data>
+
+  <!-- [Issue #78 Phase 5] Token Usage Alerts -->
+  <data name="TokenUsage_Warning_Title" xml:space="preserve">
+    <value>使用量警告</value>
+  </data>
+  <data name="TokenUsage_Warning80_Message" xml:space="preserve">
+    <value>本月EX翻译配额已使用80%（剩余: {0}）</value>
+  </data>
+  <data name="TokenUsage_Warning90_Message" xml:space="preserve">
+    <value>本月EX翻译配额已使用90%（剩余: {0}）</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Title" xml:space="preserve">
+    <value>已达配额上限</value>
+  </data>
+  <data name="TokenUsage_Exceeded_Message" xml:space="preserve">
+    <value>本月EX翻译配额已用完。自动切换到标准翻译。</value>
+  </data>
+
+  <!-- [Issue #245] Window Selection Dialog -->
+  <data name="WindowSelection_Title" xml:space="preserve">
+    <value>选择窗口</value>
+  </data>
+  <data name="WindowSelection_Header" xml:space="preserve">
+    <value>选择翻译目标窗口</value>
+  </data>
+  <data name="WindowSelection_Subtitle" xml:space="preserve">
+    <value>选择要翻译的应用程序窗口（包括最小化的窗口）</value>
+  </data>
+  <data name="WindowSelection_Refresh" xml:space="preserve">
+    <value>刷新窗口列表</value>
+  </data>
+  <data name="WindowSelection_Searching" xml:space="preserve">
+    <value>正在搜索窗口...</value>
+  </data>
+  <data name="WindowSelection_NoWindows" xml:space="preserve">
+    <value>未找到可用窗口</value>
+  </data>
+  <data name="WindowSelection_Minimized" xml:space="preserve">
+    <value>已最小化</value>
+  </data>
+  <data name="WindowSelection_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="WindowSelection_Select" xml:space="preserve">
+    <value>选择</value>
+  </data>
+  <data name="WindowSelection_Update" xml:space="preserve">
+    <value>刷新</value>
+  </data>
+
+  <!-- ========== Crash Report Dialog [Issue #252] ========== -->
+  <data name="CrashReport_WindowTitle" xml:space="preserve">
+    <value>崩溃报告</value>
+  </data>
+  <data name="CrashReport_HeaderText" xml:space="preserve">
+    <value>检测到意外关闭</value>
+  </data>
+  <data name="CrashReport_DescriptionSingle" xml:space="preserve">
+    <value>应用程序在上次运行期间意外退出。是否发送崩溃报告以帮助我们改进？</value>
+  </data>
+  <data name="CrashReport_DescriptionMultiple" xml:space="preserve">
+    <value>检测到最近{0}次崩溃。是否发送崩溃报告以帮助我们改进？</value>
+  </data>
+  <data name="CrashReport_PrivacyNote" xml:space="preserve">
+    <value>为保护您的隐私，报告不包含个人身份信息（用户名、邮箱地址、IP地址等）。</value>
+  </data>
+  <data name="CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>包含系统信息（操作系统、内存使用等）</value>
+  </data>
+  <data name="CrashReport_IncludeLogs" xml:space="preserve">
+    <value>包含最近的日志</value>
+  </data>
+  <data name="CrashReport_SendButton" xml:space="preserve">
+    <value>发送报告</value>
+  </data>
+  <data name="CrashReport_DontSendButton" xml:space="preserve">
+    <value>不发送</value>
+  </data>
+  <data name="CrashReport_CrashDetailsTitle" xml:space="preserve">
+    <value>崩溃详情</value>
+  </data>
+
+  <!-- ========== Crash Report Settings [Issue #252] ========== -->
+  <data name="Settings_CrashReport_Title" xml:space="preserve">
+    <value>崩溃报告</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSend" xml:space="preserve">
+    <value>自动发送崩溃报告</value>
+  </data>
+  <data name="Settings_CrashReport_AutoSendDescription" xml:space="preserve">
+    <value>崩溃时自动发送报告，不显示确认对话框</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfo" xml:space="preserve">
+    <value>包含系统信息</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeSystemInfoDescription" xml:space="preserve">
+    <value>在报告中包含CPU、内存使用等系统信息</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogs" xml:space="preserve">
+    <value>包含应用日志</value>
+  </data>
+  <data name="Settings_CrashReport_IncludeLogsDescription" xml:space="preserve">
+    <value>在报告中包含最近的应用程序日志</value>
+  </data>
+
+  <!-- ========== Update Dialog [Issue #249] ========== -->
+  <data name="Update_WindowTitle" xml:space="preserve">
+    <value>软件更新</value>
+  </data>
+  <data name="Update_HeaderText" xml:space="preserve">
+    <value>{0}有新版本可用</value>
+  </data>
+  <data name="Update_InfoText" xml:space="preserve">
+    <value>{0} {1}已可用（当前版本: {2}）。是否立即下载？</value>
+  </data>
+  <data name="Update_SkipButton" xml:space="preserve">
+    <value>跳过此版本</value>
+  </data>
+  <data name="Update_RemindLaterButton" xml:space="preserve">
+    <value>稍后提醒</value>
+  </data>
+  <data name="Update_DownloadButton" xml:space="preserve">
+    <value>下载</value>
+  </data>
+  <data name="Update_DownloadProgress_Title" xml:space="preserve">
+    <value>软件更新</value>
+  </data>
+  <data name="Update_DownloadProgress_Downloading" xml:space="preserve">
+    <value>正在下载{0}...</value>
+  </data>
+  <data name="Update_DownloadProgress_Complete" xml:space="preserve">
+    <value>下载完成</value>
+  </data>
+  <data name="Update_DownloadProgress_InstallAndRelaunch" xml:space="preserve">
+    <value>安装并重启</value>
+  </data>
+  <data name="Update_DownloadProgress_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+
+  <!-- ========== Consent Dialog (Issue #261) ========== -->
+  <data name="Consent_WindowTitle_Initial" xml:space="preserve">
+    <value>服务条款同意</value>
+  </data>
+  <data name="Consent_WindowTitle_Account" xml:space="preserve">
+    <value>服务条款同意</value>
+  </data>
+  <data name="Consent_Header_Initial" xml:space="preserve">
+    <value>欢迎使用Baketa</value>
+  </data>
+  <data name="Consent_Header_Account" xml:space="preserve">
+    <value>创建账户</value>
+  </data>
+  <data name="Consent_Description_Initial" xml:space="preserve">
+    <value>使用Baketa前，需要同意我们的服务条款和隐私政策。</value>
+  </data>
+  <data name="Consent_Description_Account" xml:space="preserve">
+    <value>创建账户前，需要同意我们的服务条款和隐私政策。</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Label" xml:space="preserve">
+    <value>隐私政策</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Link" xml:space="preserve">
+    <value>阅读隐私政策</value>
+  </data>
+  <data name="Consent_PrivacyPolicy_Checkbox" xml:space="preserve">
+    <value>我同意隐私政策</value>
+  </data>
+  <data name="Consent_TermsOfService_Label" xml:space="preserve">
+    <value>服务条款</value>
+  </data>
+  <data name="Consent_TermsOfService_Link" xml:space="preserve">
+    <value>阅读服务条款</value>
+  </data>
+  <data name="Consent_TermsOfService_Checkbox" xml:space="preserve">
+    <value>我同意服务条款</value>
+  </data>
+  <data name="Consent_Button_Accept" xml:space="preserve">
+    <value>同意并继续</value>
+  </data>
+  <data name="Consent_Button_Decline" xml:space="preserve">
+    <value>不同意并退出</value>
+  </data>
+
+  <!-- ========== Component Update Dialog [Issue #256] ========== -->
+  <data name="ComponentUpdate_WindowTitle" xml:space="preserve">
+    <value>组件更新</value>
+  </data>
+  <data name="ComponentUpdate_HeaderText" xml:space="preserve">
+    <value>有组件更新可用</value>
+  </data>
+  <data name="ComponentUpdate_Description" xml:space="preserve">
+    <value>以下组件有新版本可用。是否更新？</value>
+  </data>
+  <data name="ComponentUpdate_TotalSize" xml:space="preserve">
+    <value>总下载大小: {0}</value>
+  </data>
+  <data name="ComponentUpdate_VersionFormat" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="ComponentUpdate_NotInstalled" xml:space="preserve">
+    <value>未安装 → {0}</value>
+  </data>
+  <data name="ComponentUpdate_SizeFormat" xml:space="preserve">
+    <value>大小: {0}</value>
+  </data>
+  <data name="ComponentUpdate_UpdateNowButton" xml:space="preserve">
+    <value>立即更新</value>
+  </data>
+  <data name="ComponentUpdate_RemindLaterButton" xml:space="preserve">
+    <value>稍后提醒</value>
+  </data>
+  <data name="ComponentUpdate_SkipButton" xml:space="preserve">
+    <value>跳过此版本</value>
+  </data>
+  <data name="ComponentUpdate_CancelButton" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="ComponentUpdate_CloseButton" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="ComponentUpdate_Status_Pending" xml:space="preserve">
+    <value>等待中</value>
+  </data>
+  <data name="ComponentUpdate_Status_Downloading" xml:space="preserve">
+    <value>下载中...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Installing" xml:space="preserve">
+    <value>安装中...</value>
+  </data>
+  <data name="ComponentUpdate_Status_Completed" xml:space="preserve">
+    <value>已完成</value>
+  </data>
+  <data name="ComponentUpdate_Status_Failed" xml:space="preserve">
+    <value>失败</value>
+  </data>
+  <data name="ComponentUpdate_Status_Skipped" xml:space="preserve">
+    <value>已跳过</value>
+  </data>
+  <data name="ComponentUpdate_AllCompleted" xml:space="preserve">
+    <value>所有组件更新已完成</value>
+  </data>
+  <data name="ComponentUpdate_SomeFailed" xml:space="preserve">
+    <value>部分组件更新失败</value>
+  </data>
+  <data name="ComponentUpdate_InsufficientDiskSpace" xml:space="preserve">
+    <value>磁盘空间不足（需要: {0}，可用: {1}）</value>
+  </data>
+  <data name="ComponentUpdate_NoUpdatesAvailable" xml:space="preserve">
+    <value>所有组件均为最新版本</value>
+  </data>
+  <data name="ComponentUpdate_CheckingForUpdates" xml:space="preserve">
+    <value>正在检查更新...</value>
+  </data>
+
+  <!-- ========== Issue #300: OCR Recovery & Memory Warning ========== -->
+  <data name="OcrRecovery_Title" xml:space="preserve">
+    <value>文字识别</value>
+  </data>
+  <data name="OcrRecovery_Started" xml:space="preserve">
+    <value>正在恢复文字识别引擎，请稍候...</value>
+  </data>
+  <data name="OcrRecovery_Completed" xml:space="preserve">
+    <value>文字识别引擎已恢复</value>
+  </data>
+  <data name="OcrRecovery_Failed" xml:space="preserve">
+    <value>文字识别引擎恢复失败。请重启Baketa。</value>
+  </data>
+  <data name="MemoryWarning_Title" xml:space="preserve">
+    <value>内存警告</value>
+  </data>
+  <data name="MemoryWarning_SystemMemory" xml:space="preserve">
+    <value>内存使用率过高（{0}%）。请关闭其他应用程序。</value>
+  </data>
+  <data name="GpuMemoryWarning_Title" xml:space="preserve">
+    <value>GPU内存警告</value>
+  </data>
+
+  <!-- Issue #179: Auth error messages -->
+  <data name="Auth_Error_UserAlreadyExists" xml:space="preserve">
+    <value>该邮箱地址已被使用</value>
+  </data>
+  <data name="Auth_Error_WeakPassword" xml:space="preserve">
+    <value>密码强度过弱，请设置更强的密码</value>
+  </data>
+  <data name="Auth_Error_InvalidCredentials" xml:space="preserve">
+    <value>邮箱格式无效</value>
+  </data>
+  <data name="Auth_Error_InvalidEmail" xml:space="preserve">
+    <value>邮箱地址或密码不正确</value>
+  </data>
+  <data name="Auth_Error_EmailNotConfirmed" xml:space="preserve">
+    <value>确认邮件已发送。请点击邮件中的链接，然后在登录页面登录。</value>
+  </data>
+  <data name="Auth_Error_RateLimitExceeded" xml:space="preserve">
+    <value>请求过于频繁，请稍后再试</value>
+  </data>
+  <data name="Auth_Error_SignupDisabled" xml:space="preserve">
+    <value>当前暂停新账户注册</value>
+  </data>
+  <data name="Auth_Error_SignupFailed" xml:space="preserve">
+    <value>账户创建失败: {0}</value>
+  </data>
+  <data name="Auth_Error_LoginFailed" xml:space="preserve">
+    <value>登录失败: {0}</value>
+  </data>
+  <data name="Auth_Error_InvalidToken" xml:space="preserve">
+    <value>认证失败。请尝试使用Google、Discord或Twitch登录。</value>
+  </data>
+  <data name="Auth_Error_TokenExpired" xml:space="preserve">
+    <value>会话已过期。请重新登录。</value>
+  </data>
+  <data name="Auth_Error_NetworkError" xml:space="preserve">
+    <value>发生网络错误。请检查您的网络连接。</value>
+  </data>
+  <data name="Auth_Error_Timeout" xml:space="preserve">
+    <value>连接超时。请检查您的网络连接</value>
+  </data>
+  <data name="Auth_Error_Unknown" xml:space="preserve">
+    <value>发生认证错误</value>
+  </data>
+  <data name="Auth_Success_EmailSent" xml:space="preserve">
+    <value>邮件已发送</value>
+  </data>
+  <data name="Auth_Success_PasswordResetEmailSent" xml:space="preserve">
+    <value>密码重置邮件已发送，请检查您的收件箱。</value>
+  </data>
+  <data name="Auth_Error_PasswordResetFailed" xml:space="preserve">
+    <value>密码重置失败。请确认您的邮箱地址。</value>
+  </data>
+  <data name="Auth_Error_PasswordResetError" xml:space="preserve">
+    <value>密码重置过程中发生错误。</value>
+  </data>
+  <data name="Auth_Validation_InvalidEmail" xml:space="preserve">
+    <value>请输入有效的电子邮箱地址</value>
+  </data>
+  <data name="Auth_Validation_PasswordRequirement" xml:space="preserve">
+    <value>密码至少8个字符，且需包含大写、小写、数字、符号中的至少3种</value>
+  </data>
+  <data name="Auth_Validation_PasswordMismatch" xml:space="preserve">
+    <value>密码不匹配</value>
+  </data>
+  <data name="Settings_Account_LogoutSuccess" xml:space="preserve">
+    <value>已成功注销</value>
+  </data>
+  <data name="Settings_License_UsedTokens" xml:space="preserve">
+    <value>已使用</value>
+  </data>
+  <data name="Settings_License_PlanRemaining" xml:space="preserve">
+    <value>方案剩余</value>
+  </data>
+  <data name="Settings_License_BonusLabel" xml:space="preserve">
+    <value>奖励</value>
+  </data>
+  <data name="Settings_License_BonusTokens" xml:space="preserve">
+    <value>奖励</value>
+  </data>
+  <data name="Settings_License_TotalAvailable" xml:space="preserve">
+    <value>总可用量</value>
+  </data>
+  <data name="Auth_Validation_PasswordMinLength" xml:space="preserve">
+    <value>密码至少需要6个字符</value>
+  </data>
+  <data name="Auth_Error_PasswordResetException" xml:space="preserve">
+    <value>密码重置失败: {0}</value>
+  </data>
+  <data name="Auth_Success_ConfirmationEmailSent" xml:space="preserve">
+    <value>确认邮件已发送。请点击邮件中的链接，然后登录。3秒后将跳转到登录页面...</value>
+  </data>
+
+  <!-- ========== Issue #424: i18n - Hardcoded string externalization ========== -->
+
+  <!-- ComponentDownloadFailedEventProcessor -->
+  <data name="Download_Failed_Title" xml:space="preserve">
+    <value>下载失败</value>
+  </data>
+  <data name="Download_Failed_RequiredMessage" xml:space="preserve">
+    <value>必要文件下载失败。
+请重启应用程序重试。
+
+失败的组件: {0}</value>
+  </data>
+  <data name="Download_Failed_OptionalTitle" xml:space="preserve">
+    <value>部分下载失败</value>
+  </data>
+  <data name="Download_Failed_OptionalMessage" xml:space="preserve">
+    <value>部分功能可能不可用。
+请重启应用程序重试。</value>
+  </data>
+
+  <!-- DownloadProgressViewModel -->
+  <data name="Update_DownloadProgress_VerificationFailed" xml:space="preserve">
+    <value>下载验证失败</value>
+  </data>
+
+  <!-- App.axaml.cs - Session -->
+  <data name="Session_Expired_Title" xml:space="preserve">
+    <value>会话已过期</value>
+  </data>
+  <data name="Session_Expired_Message" xml:space="preserve">
+    <value>您的会话已过期。请重新登录。</value>
+  </data>
+
+  <!-- App.axaml.cs - Test Mode -->
+  <data name="TestMode_Warning_Title" xml:space="preserve">
+    <value>测试模式已激活</value>
+  </data>
+  <data name="TestMode_Warning_Message" xml:space="preserve">
+    <value>许可证模拟模式已激活。生产环境请在appsettings.json中将License.EnableMockMode设为false。</value>
+  </data>
+
+  <!-- App.axaml.cs - Hardware Check -->
+  <data name="Hardware_Critical_Title" xml:space="preserve">
+    <value>硬件要求 - 严重警告</value>
+  </data>
+  <data name="Hardware_Critical_Message" xml:space="preserve">
+    <value>您的系统不满足最低要求。Baketa可能无法正常运行。
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_Warning_Title" xml:space="preserve">
+    <value>硬件要求警告</value>
+  </data>
+  <data name="Hardware_Warning_Message" xml:space="preserve">
+    <value>您的系统不满足推荐配置。
+
+{0}
+{1}
+{2}
+
+{3}</value>
+  </data>
+  <data name="Hardware_CpuCores" xml:space="preserve">
+    <value>CPU: {0}核</value>
+  </data>
+
+  <!-- App.axaml.cs - Patreon Auth -->
+  <data name="Patreon_AuthSuccess_Title" xml:space="preserve">
+    <value>Patreon关联成功</value>
+  </data>
+  <data name="Patreon_AuthSuccess_Message" xml:space="preserve">
+    <value>Patreon账户关联成功。方案: {0}</value>
+  </data>
+  <data name="Patreon_AuthFailed_Title" xml:space="preserve">
+    <value>Patreon关联失败</value>
+  </data>
+  <data name="Patreon_AuthFailed_Message" xml:space="preserve">
+    <value>认证过程中发生错误</value>
+  </data>
+
+  <!-- MainOverlayViewModel - Translation Error -->
+  <data name="Translation_Error_StopFailed" xml:space="preserve">
+    <value>停止翻译失败。
+原因: {0}
+处理: 请重启应用程序。</value>
+  </data>
+  <data name="Translation_Error_StartFailed" xml:space="preserve">
+    <value>启动翻译失败。
+原因: {0}
+处理: 请重启应用程序。</value>
+  </data>
+
+  <!-- ========== Issue #423: Upsell messages ========== -->
+  <data name="Upsell_ViewPlans" xml:space="preserve">
+    <value>更改方案 →</value>
+  </data>
+  <data name="Upsell_Free_WithBonus_Message" xml:space="preserve">
+    <value>⚡ 订阅Pro方案获取更多EX模式额度</value>
+  </data>
+  <data name="Upsell_Free_NoBonus_Message" xml:space="preserve">
+    <value>⚡ 订阅Pro方案以使用EX模式</value>
+  </data>
+  <data name="Upsell_Upgrade_Message" xml:space="preserve">
+    <value>⬆️ 升级方案获取更多额度</value>
+  </data>
+
+</root>
