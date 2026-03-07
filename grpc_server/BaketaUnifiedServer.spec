@@ -31,6 +31,11 @@ a = Analysis(
         'grpc',
         'grpc._cython',
         'grpc._cython.cygrpc',
+        'grpc_health',
+        'grpc_health.v1',
+        'grpc_health.v1.health',
+        'grpc_health.v1.health_pb2',
+        'grpc_health.v1.health_pb2_grpc',
         'google.protobuf',
         'google.protobuf.timestamp_pb2',
 
