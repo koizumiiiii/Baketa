@@ -1872,6 +1872,33 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             return (null, null);
         }
 
+        // [Issue #508] Shot翻訳前にDetection-Onlyを実行してOCRヒントを直接渡す
+        // DetectionBoundsCacheを経由しないことで、Detection-Onlyフィルタ（#500）の誤スキップを防止
+        if (_coordinateBasedTranslation != null && _targetWindowHandle.HasValue)
+        {
+            try
+            {
+                var detectionResults = await _ocrEngine.DetectTextRegionsAsync(currentImage!, cancellationToken)
+                    .ConfigureAwait(false);
+                var detectionBounds = detectionResults.TextRegions
+                    .Select(r => r.Bounds)
+                    .Where(b => b.Width > 0 && b.Height > 0)
+                    .ToArray();
+
+                if (detectionBounds.Length > 0)
+                {
+                    _coordinateBasedTranslation.SetPrecomputedHintBounds(detectionBounds, currentImage!.Height);
+                    _logger?.LogInformation(
+                        "[Issue #508] Shot翻訳前Detection-Only完了: {Count}個のテキスト領域を検出（直接パス, ImageHeight={Height}）",
+                        detectionBounds.Length, currentImage!.Height);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "[Issue #508] Shot翻訳前Detection-Only失敗（ヒントなしで続行）");
+            }
+        }
+
         // 翻訳実行
         _logger?.LogDebug("🌍 翻訳処理開始: ID={Id}", translationId);
         var result = await ExecuteTranslationAsync(translationId, currentImage!, TranslationMode.Singleshot, cancellationToken)

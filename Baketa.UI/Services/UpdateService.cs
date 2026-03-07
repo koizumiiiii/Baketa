@@ -182,6 +182,68 @@ public sealed class UpdateService : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
+    /// [Issue #511] ローディング画面中の早期アップデートチェック
+    /// 初期化がハングしても更新を検出できるよう、重い初期化の前に実行する。
+    /// タイムアウト付き（ネットワーク問題で起動を遅延させない）
+    /// </summary>
+    /// <param name="timeoutMs">タイムアウト（ミリ秒）。デフォルト3秒</param>
+    /// <returns>更新が検出されユーザーに通知した場合true</returns>
+    public async Task<bool> CheckForUpdatesEarlyAsync(int timeoutMs = 3000)
+    {
+        try
+        {
+            Initialize(); // SparkleUpdater初期化（未初期化の場合のみ）
+
+            if (_sparkle == null) return false;
+
+            var checkTask = _sparkle.CheckForUpdatesQuietly();
+            var completedTask = await Task.WhenAny(checkTask, Task.Delay(timeoutMs)).ConfigureAwait(false);
+
+            if (completedTask != checkTask)
+            {
+                _logger?.LogInformation("[Issue #511] 早期チェックタイムアウト（{Timeout}ms） - スキップ", timeoutMs);
+                return false;
+            }
+
+            var result = await checkTask.ConfigureAwait(false);
+
+            if (result.Status != UpdateStatus.UpdateAvailable || result.Updates?.Count <= 0)
+                return false;
+
+            // 同一バージョンチェック（既存ロジック流用）
+            var currentVersion = GetCurrentAppVersion();
+            var latestVersionStr = result.Updates[0].Version?.TrimStart('v', 'V') ?? "";
+
+            if (IsVersionEqual(currentVersion, latestVersionStr))
+                return false;
+
+            LatestVersion = result.Updates[0];
+            UpdateAvailable = true;
+            _logger?.LogInformation("[Issue #511] 早期チェックで更新検出: v{Version}", latestVersionStr);
+
+            // UIスレッドで更新ダイアログ表示
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                try
+                {
+                    _sparkle?.ShowUpdateNeededUI(result.Updates);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "[Issue #511] 早期チェックダイアログ表示エラー");
+                }
+            });
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "[Issue #511] 早期チェック失敗（継続）");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 更新を手動チェック（ユーザー操作時）
     /// </summary>
     /// <returns>更新が利用可能かどうか</returns>

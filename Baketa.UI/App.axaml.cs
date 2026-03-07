@@ -419,6 +419,27 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                             _logger?.LogInformation("LoadingViewModel設定完了（フォールバック）");
                         }
 
+                        // --- 1.5 [Issue #511] 早期アップデートチェック（初期化ハング対策） ---
+                        _logger?.LogInformation("[Issue #511] 早期アップデートチェック開始");
+                        try
+                        {
+                            var pythonServerManager = serviceProvider.GetService<IPythonServerManager>();
+                            var updateLogger = serviceProvider.GetService<ILogger<UpdateService>>();
+                            _updateService = new UpdateService(pythonServerManager, updateLogger);
+
+                            var updateFound = await _updateService.CheckForUpdatesEarlyAsync(3000);
+                            if (updateFound)
+                            {
+                                _logger?.LogInformation("[Issue #511] 更新検出 - ユーザーに通知済み");
+                                // 「今すぐ更新」→ NetSparkleがDL＆再起動を処理
+                                // 「スキップ」→ 通常の初期化に進む
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "[Issue #511] 早期アップデートチェック失敗（継続）");
+                        }
+
                         // --- 2. アプリケーション初期化 ---
                         Console.WriteLine("📌 [AUTH_DEBUG] Step 2: アプリケーション初期化開始");
                         var loadingStartTime = System.Diagnostics.Stopwatch.StartNew();
@@ -665,27 +686,8 @@ internal sealed partial class App : Avalonia.Application, IDisposable
                     _logger?.LogWarning(singleshotEx, "SingleshotEventProcessor登録失敗");
                 }
 
-                // 📊 [Issue #269] AnalyticsEventProcessor登録 - 翻訳イベントの使用統計記録
-                // [Issue #297] 名前空間修正: Core.Events.TranslationEvents → Core.Translation.Events
-                // [Issue #307] 両方の名前空間のTranslationCompletedEventに対応
-                try
-                {
-                    var eventAggregator = serviceProvider.GetRequiredService<IEventAggregator>();
-
-                    // Core.Translation.Events.TranslationCompletedEvent 購読（StandardTranslationPipeline用）
-                    var analyticsProcessor1 = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Translation.Events.TranslationCompletedEvent>>();
-                    eventAggregator.Subscribe<Baketa.Core.Translation.Events.TranslationCompletedEvent>(analyticsProcessor1);
-
-                    // Core.Events.EventTypes.TranslationCompletedEvent 購読（TranslationPipelineService用）
-                    var analyticsProcessor2 = serviceProvider.GetRequiredService<IEventProcessor<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>>();
-                    eventAggregator.Subscribe<Baketa.Core.Events.EventTypes.TranslationCompletedEvent>(analyticsProcessor2);
-
-                    Console.WriteLine("✅ AnalyticsEventProcessor登録完了（両イベントタイプ対応）");
-                }
-                catch (Exception analyticsEx)
-                {
-                    _logger?.LogWarning(analyticsEx, "[Issue #307] AnalyticsEventProcessor登録失敗（継続）");
-                }
+                // 📊 [Issue #506] AnalyticsEventProcessorの登録はEventHandlerInitializationServiceで実施
+                // （App.axaml.csとの二重登録を解消）
 
                 // 🔧 [Issue #300] OcrRecoveryEventProcessor登録 - OCRサーバー復旧時のユーザー通知
                 try
@@ -924,9 +926,28 @@ internal sealed partial class App : Avalonia.Application, IDisposable
     {
         try
         {
+            // [Issue #511] 早期チェックで既に初期化済みの場合
+            if (_updateService != null)
+            {
+                _logger?.LogInformation("[Issue #511] UpdateService既に初期化済み - バックグラウンドチェックのみ");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(5000).ConfigureAwait(false);
+                        await _updateService.CheckForUpdatesInBackgroundAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "[Issue #249] サイレント更新チェック失敗（継続）");
+                    }
+                });
+                return;
+            }
+
+            // フォールバック: 早期チェックが実行されなかった場合の既存ロジック
             _logger?.LogInformation("[Issue #249] UpdateService初期化開始...");
 
-            // UpdateServiceをDI経由ではなく直接作成（現時点ではシンプルな実装）
             var pythonServerManager = serviceProvider.GetService<IPythonServerManager>();
             var updateLogger = serviceProvider.GetService<ILogger<UpdateService>>();
 
