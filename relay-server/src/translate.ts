@@ -98,6 +98,7 @@ interface GeminiRequest {
     stopSequences?: string[]; // [Issue #411] 反復ループ早期停止
     responseMimeType?: string; // [Issue #428] JSON出力を構造的に保証
     responseSchema?: object;   // [Issue #428] レスポンスのスキーマ定義
+    thinkingConfig?: { thinkingBudget: number }; // [Issue #508] Thinking制御（現在はデフォルト=有効のまま）
   };
   // [Issue #297] アダルトゲーム等のコンテンツ翻訳対応
   safetySettings?: Array<{
@@ -119,6 +120,7 @@ interface GeminiResponse {
   usageMetadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
+    thoughtsTokenCount?: number; // [Issue #508] Thinking分のトークン数
     totalTokenCount?: number;
   };
   error?: {
@@ -1461,6 +1463,60 @@ function sanitizeRepetition(text: string): { sanitized: string; hasRepetition: b
 }
 
 /**
+ * [Issue #508] テキストからタブ・制御文字・過剰な空白をクリーンアップ
+ * モデルが画像のレイアウトをタブで再現しようとする問題に対処
+ */
+function cleanHallucinatedText(text: string): string {
+  return text
+    .replace(/[\t\r]/g, '')      // タブとCRを削除
+    .replace(/\n/g, ' ')         // 改行をスペースに
+    .replace(/\s{2,}/g, ' ')     // 2つ以上の空白を1つに統合
+    .trim();
+}
+
+/**
+ * [Issue #508] パース済みtexts配列をサニタイズ
+ * - テキスト内のタブ/制御文字をクリーンアップ（除去ではなくテキストを活かす）
+ * - is_legible=false のアイテムを除去
+ * - クリーンアップ後も空のアイテムを除去
+ */
+function sanitizeTextItems<T extends { original: string; translation: string }>(texts: T[]): T[] {
+  const before = texts.length;
+  let cleaned = 0;
+
+  const result = texts
+    .map(item => {
+      const origBefore = item.original || '';
+      const transBefore = item.translation || '';
+
+      // タブ/制御文字をクリーンアップ（テキストを活かす）
+      const origAfter = cleanHallucinatedText(origBefore);
+      const transAfter = cleanHallucinatedText(transBefore);
+
+      if (origAfter !== origBefore || transAfter !== transBefore) {
+        cleaned++;
+        return { ...item, original: origAfter, translation: transAfter };
+      }
+      return item;
+    })
+    .filter(item => {
+      // is_legible=false を除去
+      if ((item as Record<string, unknown>).is_legible === false) return false;
+
+      // クリーンアップ後にoriginal・translationの両方が空なら除去
+      if (item.original.trim() === '' && item.translation.trim() === '') return false;
+
+      return true;
+    });
+
+  if (cleaned > 0 || result.length < before) {
+    console.warn(`[Issue #508] Sanitized: ${cleaned} items cleaned, ${before - result.length} items removed (${before} → ${result.length})`);
+  }
+
+  return result;
+}
+
+/**
  * AIレスポンスからJSONをパース
  * マークダウンコードブロック（```json...```）を除去してパース
  * [Issue #275] 複数テキスト形式にも対応
@@ -1533,7 +1589,7 @@ function parseAiJsonResponse(textContent: string): ParsedAiResponse | null {
 async function translateWithGemini(
   request: TranslateRequest,
   apiKey: string,
-  modelName: string = DEFAULT_GEMINI_MODEL
+  modelName: string = DEFAULT_GEMINI_MODEL,
 ): Promise<{
   success: boolean;
   detectedText?: string;
@@ -1576,39 +1632,46 @@ Prioritize these areas when detecting text.
     ? `\n- Use appropriate sentence-final particles to reflect character tone.\n- Omit pronouns when natural; choose carefully based on character (俺/僕/私, お前/君/あなた).\n- Avoid "translationese" (翻訳調).`
     : '';
 
+  // [Issue #508] Few-Shot + Minify + Description強化でタブ文字ハルシネーション対策
   const prompt = `# Role
-Expert game localizer. Output JSON ONLY.
+Expert game localizer. Output compact minified JSON ONLY. No pretty-printing.
 
 # Task
 Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
 ${contextHint}${historySection}${ocrHintsSection}
-Must include: Dialogs, UI buttons, menus, and all labels.
+Must include: Dialogs, UI buttons, menus, and all labels. Maximum 20 items.
 Do not invent or guess text that is not clearly visible in the image.
 
 # Guidelines
 - Creative localization, not word-for-word.
 - Preserve character tone/personality from visual context.
 - Keep proper nouns as-is.
-- When multiple lines of text are visually adjacent and form a continuous sentence or paragraph (e.g., dialog spanning 2-3 lines), combine them into ONE item with a single bounding_box covering the entire text area. Do NOT split a sentence across multiple items.${jaSpecific}
+- CRITICAL: Within each text element, extract ONLY the readable characters without reproducing visual spacing or layout. If characters of a single word appear spread out, join them (e.g., "大　地" → "大地").
+- Character names and dialog text are SEPARATE items even if visually adjacent. A name label above/beside a dialog box is its own item.
+- When multiple lines form a continuous sentence (e.g., dialog spanning 2-3 lines within the same text box), combine them into ONE item. Do NOT split a sentence across multiple items.${jaSpecific}
 
 # Rules
-- Every item MUST have a non-empty "translation" field.
+- Every item MUST have is_legible, original, and translation fields.
+- If text is clearly readable: set is_legible=true, fill original and translation normally.
+- If text is blurry, unreadable, or uses special fonts: set is_legible=false, original="" and translation="". NEVER pad with tabs, spaces, or guess characters.
 - If text is already in ${request.target_language}, keep it as-is in "translation".
-- Never omit or leave "translation" empty.
-- Never repeat the same character more than 3 times consecutively.
+- The "original" and "translation" fields must contain ONLY printable text characters. No whitespace padding, no tab characters, no control characters.
 - Include a confidence_score (0.0-1.0) for each translation indicating certainty.
 
-# Output Format (JSON only)
-{
-  "texts": [
-    {"original": "Dialog text line1 line2", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950], "confidence_score": 0.95},
-    {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200], "confidence_score": 0.9}
-  ],
-  "detected_language": "ISO 639-1"
-}
+# Examples of correct extraction
+These examples show how to handle visual spacing and separate different text elements:
+
+Example - Game dialog scene with character name + dialog + UI button:
+Image shows a name label "大　地" above a dialog box "「　どうだ？　これなら　仲良く　兄妹で　同じ風呂　に入れるだろう？　」" and a button "セ　ー　ブ"
+Correct output (3 separate items):
+{"texts":[{"is_legible":true,"original":"大地","translation":"Daichi","bounding_box":[40,650,130,720],"confidence_score":0.98},{"is_legible":true,"original":"「どうだ？これなら仲良く兄妹で同じ風呂に入れるだろう？」","translation":"How about this? Now you siblings can share the bath together, right?","bounding_box":[600,50,750,950],"confidence_score":0.95},{"is_legible":true,"original":"セーブ","translation":"Save","bounding_box":[20,900,60,980],"confidence_score":0.97}],"detected_language":"ja"}
+Note: Name, dialog, and button are SEPARATE items. Visual spacing within each text is removed.
+
+# Output Format (minified JSON, no indentation or line breaks)
+{"texts":[{"is_legible":true,"original":"Dialog text","translation":"翻訳テキスト","bounding_box":[100,50,200,950],"confidence_score":0.95}],"detected_language":"ja"}
 
 Bounding boxes: normalized 0-1000 scale, [y_min, x_min, y_max, x_max].
-If no text visible: {"texts": [], "detected_language": ""}`;
+If no text visible: {"texts":[],"detected_language":""}`;
 
   const geminiRequest: GeminiRequest = {
     contents: [{
@@ -1625,10 +1688,13 @@ If no text visible: {"texts": [], "detected_language": ""}`;
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192, // [Issue #387] 途中切れ防止のため増加
+      // [Issue #508] thinkingBudget: 0 は撤去。Thinking無効化はハルシネーション率を上昇させる。
+      // candidatesTokenCountにthinkingは含まれない（別フィールドthoughtsTokenCount）ため、
+      // maxOutputTokensの実質予算を圧迫しない。Thinkingはデフォルト（有効）のまま使用する。
       // [Issue #411] 改行等の同一トークン反復生成を抑制
       // Note: gemini-2.5-flash-lite はfrequencyPenalty未サポートのため条件付き
       ...(modelName !== 'gemini-2.5-flash-lite' ? { frequencyPenalty: 0.3 } : {}),
-      stopSequences: ['\n\n\n\n\n'], // [Issue #411] 5連続改行で生成を強制停止（反復ループ対策）
+      stopSequences: ['\n\n\n\n\n', '\t\t\t\t\t'], // [Issue #411] 5連続改行/タブで生成を強制停止（JSON modeでは無効の可能性あり）
       // [Issue #428] JSON出力を構造的に保証（プロンプト指示だけでなくAPIレベルで強制）
       responseMimeType: 'application/json',
       responseSchema: {
@@ -1636,11 +1702,24 @@ If no text visible: {"texts": [], "detected_language": ""}`;
         properties: {
           texts: {
             type: 'ARRAY',
+            maxItems: 20, // [Issue #508] ハルシネーション防止: 最大20アイテム
             items: {
               type: 'OBJECT',
               properties: {
-                original: { type: 'STRING' },
-                translation: { type: 'STRING' },
+                // [Issue #508] is_legible: 読み取れないテキストの「逃げ道」を提供
+                // モデルが文字を読み取れない場合にfalseを設定させ、タブ文字パディングを防止
+                is_legible: {
+                  type: 'BOOLEAN',
+                  description: 'Set to false if the text is blurry, unreadable, or uses special fonts that cannot be confidently recognized. When false, original and translation must be empty strings.',
+                },
+                original: {
+                  type: 'STRING',
+                  description: 'MUST NOT contain tab characters (\\t), newlines (\\n), or control characters. Extract readable characters only, concatenated without spacing. Never reproduce visual layout.',
+                },
+                translation: {
+                  type: 'STRING',
+                  description: 'MUST NOT contain tab characters (\\t), newlines (\\n), or control characters. Plain translated text only.',
+                },
                 bounding_box: {
                   type: 'ARRAY',
                   items: { type: 'NUMBER' },
@@ -1648,7 +1727,9 @@ If no text visible: {"texts": [], "detected_language": ""}`;
                 // [Issue #429] 翻訳の信頼度スコア
                 confidence_score: { type: 'NUMBER' },
               },
-              required: ['original', 'translation'],
+              // [Issue #508] bounding_boxをrequiredに追加: BBox無しアイテムはCloud主導マッチングで
+              // 無視されるため、Geminiがテキストを分割した場合にBBox無し側が消失する問題を防止
+              required: ['is_legible', 'original', 'translation', 'bounding_box', 'confidence_score'],
             },
           },
           detected_language: { type: 'STRING' },
@@ -1723,7 +1804,9 @@ If no text visible: {"texts": [], "detected_language": ""}`;
 
     // [Issue #387] MAX_TOKENSで応答が途中切れの場合のチェック
     if (finishReason === 'MAX_TOKENS') {
-      console.warn(`[Issue #387] Gemini response truncated (MAX_TOKENS). Consider increasing maxOutputTokens.`);
+      const rawPreview = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+      const previewText = rawPreview ? rawPreview.substring(0, 500) : '(empty)';
+      console.warn(`[Issue #387] Gemini response truncated (MAX_TOKENS). Length=${rawPreview?.length || 0} chars. Preview: ${previewText}`);
     }
 
     const textContent = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -1761,16 +1844,27 @@ If no text visible: {"texts": [], "detected_language": ""}`;
 
     const usage = geminiResponse.usageMetadata;
 
+    // [Issue #508] Thinkingトークンの診断ログ
+    if (usage?.thoughtsTokenCount && usage.thoughtsTokenCount > 0) {
+      console.warn(`[Issue #508] Gemini used ${usage.thoughtsTokenCount} thinking tokens (candidates=${usage.candidatesTokenCount}, response=${(usage.candidatesTokenCount || 0) - usage.thoughtsTokenCount})`);
+    }
+
+    // [Issue #508] ハルシネーション・不正アイテムの後処理フィルタリング
+    const sanitizedTexts = parsed.texts ? sanitizeTextItems(parsed.texts) : parsed.texts;
+
     return {
       success: true,
       detectedText: parsed.detected_text || '',
       translatedText: parsed.translated_text || '',
       detectedLanguage: parsed.detected_language,
-      // [Issue #275] 複数テキスト対応
-      texts: parsed.texts,
+      // [Issue #275] 複数テキスト対応 + [Issue #508] サニタイズ済み
+      texts: sanitizedTexts,
       tokenUsage: {
         input: usage?.promptTokenCount || 0,
-        output: usage?.candidatesTokenCount || 0,
+        // [Issue #508] thinkingトークンを除外した実際の出力トークン数
+        output: usage?.thoughtsTokenCount
+          ? (usage.candidatesTokenCount || 0) - usage.thoughtsTokenCount
+          : (usage?.candidatesTokenCount || 0),
         image: estimateImageTokens(request.image_base64.length),
       },
     };
@@ -1847,27 +1941,29 @@ Prioritize these areas when detecting text.
   const userPrompt = `# Task
 Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
 ${contextHint}${historySection}${ocrHintsSection}
-Must include: Dialogs, UI buttons, menus, and all labels.
+Must include: Dialogs, UI buttons, menus, and all labels. Maximum 20 items.
 Do not invent or guess text that is not clearly visible in the image.
 
 # Guidelines
 - Creative localization, not word-for-word.
 - Preserve character tone/personality from visual context.
 - Keep proper nouns as-is.
+- Extract pure text content only. Do NOT reproduce visual character spacing, layout, or indentation from the image. No tabs or whitespace padding.
 - When multiple lines of text are visually adjacent and form a continuous sentence or paragraph (e.g., dialog spanning 2-3 lines), combine them into ONE item with a single bounding_box covering the entire text area. Do NOT split a sentence across multiple items.${jaSpecific}
 
 # Rules
-- Every item MUST have a non-empty "translation" field.
+- Every item MUST have is_legible, original, and translation fields.
+- If text is clearly readable: set is_legible=true, fill original and translation normally.
+- If text is blurry, unreadable, or uses special fonts: set is_legible=false, original="" and translation="". NEVER pad with tabs, spaces, or guess characters.
 - If text is already in ${request.target_language}, keep it as-is in "translation".
-- Never omit or leave "translation" empty.
 - Never repeat the same character more than 3 times consecutively.
 - Include a confidence_score (0.0-1.0) for each translation indicating certainty.
 
 # Output Format (JSON only)
 {
   "texts": [
-    {"original": "Dialog text line1 line2", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950], "confidence_score": 0.95},
-    {"original": "Button", "translation": "ボタン", "bounding_box": [50, 100, 80, 200], "confidence_score": 0.9}
+    {"is_legible": true, "original": "Dialog text", "translation": "翻訳テキスト", "bounding_box": [100, 50, 200, 950], "confidence_score": 0.95},
+    {"is_legible": false, "original": "", "translation": "", "bounding_box": [50, 100, 80, 200], "confidence_score": 0.0}
   ],
   "detected_language": "ISO 639-1"
 }
@@ -1970,13 +2066,16 @@ If no text visible: {"texts": [], "detected_language": ""}`;
 
     const usage = openaiResponse.usage;
 
+    // [Issue #508] ハルシネーション・不正アイテムの後処理フィルタリング
+    const sanitizedTexts = parsed.texts ? sanitizeTextItems(parsed.texts) : parsed.texts;
+
     return {
       success: true,
       detectedText: parsed.detected_text || '',
       translatedText: parsed.translated_text || '',
       detectedLanguage: parsed.detected_language,
-      // [Issue #275] 複数テキスト対応
-      texts: parsed.texts,
+      // [Issue #275] 複数テキスト対応 + [Issue #508] サニタイズ済み
+      texts: sanitizedTexts,
       tokenUsage: {
         input: usage?.prompt_tokens || 0,
         output: usage?.completion_tokens || 0,
@@ -2084,7 +2183,16 @@ export async function handleTranslate(
     }
 
     const modelName = env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
-    const result = await translateWithGemini(translateRequest, env.GEMINI_API_KEY, modelName);
+    let result = await translateWithGemini(translateRequest, env.GEMINI_API_KEY, modelName);
+
+    // [Issue #508] ハルシネーション検出ログ（リトライは逆効果のため削除済み）
+    if (result.success && result.texts && result.texts.length <= 2) {
+      const outputTokens = result.tokenUsage?.output || 0;
+      if (outputTokens > 4000) {
+        console.warn(`[Issue #508] Hallucination detected: ${result.texts.length} items with ${outputTokens} output tokens. No retry (proven counterproductive).`);
+      }
+    }
+
     const processingTimeMs = Date.now() - startTime;
 
     if (!result.success) {
