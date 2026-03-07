@@ -1060,16 +1060,20 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                 _logger.LogInformation("🔄 [NewStage1_FALLBACK] チェックサムフォールバック発動 - ハッシュ同一だが画像変化検出 (Cached: {Cached:X16}, Current: {Current:X16})",
                     cachedGrid.ImageChecksum, currentChecksum);
 
-                // テキスト領域（下部）を優先的に変化ブロックとして追加
-                var textRow = rows - 1; // [Issue #397] 最下行（動的: 16x9ならRow=8）
-                for (int col = 0; col < cols; col++)
+                // [Issue #512] 全行のブロックを変化ブロックとして追加
+                // テキストは画面内のどの位置にもあり得るため、最下行だけでは不十分
+                // FindDisappearedTextRegion()の30%ピクセル変化率チェックが誤判定を防止
+                for (int row = 0; row < rows; row++)
                 {
-                    var blockIndex = textRow * cols + col;
-                    var block = blockResults.First(b => b.Index == blockIndex);
-                    changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                    for (int col = 0; col < cols; col++)
+                    {
+                        var blockIndex = row * cols + col;
+                        var block = blockResults.First(b => b.Index == blockIndex);
+                        changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                    }
                 }
                 minSimilarity = FallbackSimilarityThreshold; // フォールバック検出時の仮の類似度
-                mostChangedIndex = textRow * cols;
+                mostChangedIndex = 0;
             }
             else if (changedBlocks.Count == 0 && checksumChanged && minSimilarity >= 0.999f)
             {
@@ -1084,15 +1088,18 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                         "🔄 [NewStage1_ROBUST_FALLBACK] ロバストチェックサムで変化検出 - Diff: {Diff}, Threshold: {Threshold}, MinSim: {MinSim:F4}",
                         robustDiff, RobustChecksumDiffThreshold, minSimilarity);
 
-                    var textRow = rows - 1;
-                    for (int col = 0; col < cols; col++)
+                    // [Issue #512] 全行のブロックを変化ブロックとして追加
+                    for (int row = 0; row < rows; row++)
                     {
-                        var blockIndex = textRow * cols + col;
-                        var block = blockResults.First(b => b.Index == blockIndex);
-                        changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                        for (int col = 0; col < cols; col++)
+                        {
+                            var blockIndex = row * cols + col;
+                            var block = blockResults.First(b => b.Index == blockIndex);
+                            changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                        }
                     }
                     minSimilarity = FallbackSimilarityThreshold;
-                    mostChangedIndex = textRow * cols;
+                    mostChangedIndex = 0;
                 }
                 else
                 {
@@ -1106,15 +1113,18 @@ public sealed class EnhancedImageChangeDetectionService : IImageChangeDetectionS
                             "🔄 [NewStage1_SUPPRESS_OVERRIDE] 連続SUPPRESS {Count}回で強制変化検出 - RobustDiff: {Diff}, Threshold: {Threshold}, Context: {ContextId}",
                             suppressCount, robustDiff, RobustChecksumDiffThreshold, contextId);
 
-                        var textRow = rows - 1;
-                        for (int col = 0; col < cols; col++)
+                        // [Issue #512] 全行のブロックを変化ブロックとして追加
+                        for (int row = 0; row < rows; row++)
                         {
-                            var blockIndex = textRow * cols + col;
-                            var block = blockResults.First(b => b.Index == blockIndex);
-                            changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                            for (int col = 0; col < cols; col++)
+                            {
+                                var blockIndex = row * cols + col;
+                                var block = blockResults.First(b => b.Index == blockIndex);
+                                changedBlocks.Add(new BlockChangeInfo(block.Index, block.Row, block.Col, FallbackSimilarityThreshold, block.Region));
+                            }
                         }
                         minSimilarity = FallbackSimilarityThreshold;
-                        mostChangedIndex = textRow * cols;
+                        mostChangedIndex = 0;
                         _consecutiveSuppressCount.TryRemove(contextId, out _);
                         // キャッシュ更新あり（新しい参照フレームへ移行）
                     }
