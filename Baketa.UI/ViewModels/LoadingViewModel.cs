@@ -22,6 +22,7 @@ public class LoadingViewModel : ViewModelBase
 {
     private readonly ILoadingScreenInitializer _initializer;
     private readonly ILogger<LoadingViewModel> _logger;
+    private readonly IDisposable _tipRotationSubscription;
     private bool _disposed;
 
     // [Issue #259] 統合プログレス用プロパティ
@@ -48,7 +49,8 @@ public class LoadingViewModel : ViewModelBase
     };
 
     /// <summary>
-    /// [Issue #259] Tips文字列リスト（ローカライズはリソースファイルの Loading_Tip_X を参照）
+    /// [Issue #259][Issue #475] Tips文字列リスト（多言語ローテーション対応）
+    /// 選択言語の反映が不安定なため、対応全言語のTipsをローテーション表示
     /// </summary>
     private readonly string[] _tips;
 
@@ -131,53 +133,68 @@ public class LoadingViewModel : ViewModelBase
             new("parallel_engines", Strings.Loading_LoadingOCR)
         ];
 
-        // [Issue #259] Tips文字列を初期化（リソースファイルから取得）
-        _tips = LoadTips();
+        // [Issue #259][Issue #475] Tips文字列を初期化（多言語ローテーション）
+        _tips = LoadTips(_logger);
         _currentTip = _tips.Length > 0 ? _tips[0] : string.Empty;
+        _logger.LogInformation("[Issue #475] Tips多言語ローテーション: {Count}個ロード済み", _tips.Length);
+
+        // [Issue #475] Tips自動ローテーション（5秒ごと）
+        // LoadingWindowはReactiveWindowではないためHandleActivationが呼ばれない
+        // コンストラクタで直接タイマーを開始する
+        _tipRotationSubscription = Observable.Interval(TimeSpan.FromSeconds(5))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => RotateTip());
 
         // 進捗イベントを購読
         _initializer.ProgressChanged += OnProgressChanged;
     }
 
     /// <summary>
-    /// [Issue #259] HandleActivationをオーバーライドしてTipsローテーションを開始
+    /// [Issue #475] 対応全言語のカルチャ一覧（resxが存在する言語）
     /// </summary>
-    protected override void HandleActivation()
-    {
-        base.HandleActivation();
-
-        // Tips自動ローテーション（5秒ごと）
-        Observable.Interval(TimeSpan.FromSeconds(5))
-            .ObserveOn(RxApp.MainThreadScheduler)
-            .Subscribe(_ => RotateTip())
-            .DisposeWith(Disposables);
-    }
+    private static readonly System.Globalization.CultureInfo[] TipCultures =
+    [
+        new("en"), new("ja"), new("zh-CN"), new("zh-TW"), new("ko"),
+        new("es"), new("fr"), new("de"), new("it"), new("pt")
+    ];
 
     /// <summary>
-    /// [Issue #259] リソースファイルからTipsを読み込む
+    /// [Issue #259][Issue #475] リソースファイルからTipsを読み込む（多言語ローテーション対応）
+    /// 選択言語の反映が不安定なため、同じTipを全対応言語で順番に表示する
+    /// 例: Tip1(en) → Tip1(ja) → Tip1(zh-CN) → ... → Tip2(en) → Tip2(ja) → ...
     /// </summary>
-    private static string[] LoadTips()
+    private static string[] LoadTips(ILogger logger)
     {
-        // ResourceManagerを使用してリソースを取得
         var resourceManager = Strings.ResourceManager;
         var tips = new List<string>();
+        var seen = new HashSet<string>(); // 同一テキストの重複排除
 
-        for (var i = 1; i <= 10; i++) // 最大10個まで対応
+        for (var i = 1; i <= 10; i++)
         {
-            var tip = resourceManager.GetString($"Loading_Tip_{i}", System.Globalization.CultureInfo.CurrentUICulture);
-            if (!string.IsNullOrEmpty(tip))
+            var englishTip = resourceManager.GetString($"Loading_Tip_{i}", TipCultures[0]);
+            if (string.IsNullOrEmpty(englishTip))
+                break;
+
+            foreach (var culture in TipCultures)
             {
-                tips.Add(tip);
-            }
-            else
-            {
-                break; // 連続しなくなったら終了
+                var tip = resourceManager.GetString($"Loading_Tip_{i}", culture);
+                if (!string.IsNullOrEmpty(tip) && seen.Add(tip))
+                {
+                    tips.Add(tip);
+                }
+                else if (string.IsNullOrEmpty(tip))
+                {
+                    logger.LogDebug("[Issue #475] Tip_{Index} missing for culture {Culture}", i, culture.Name);
+                }
             }
         }
 
+        logger.LogDebug("[Issue #475] LoadTips結果: {Total}個（重複排除後）, カルチャ数: {CultureCount}",
+            tips.Count, TipCultures.Length);
+
         return tips.Count > 0
             ? [.. tips]
-            : ["Baketa - Game Translation Overlay"]; // フォールバック
+            : ["Baketa - Game Translation Overlay"];
     }
 
     /// <summary>
@@ -276,6 +293,7 @@ public class LoadingViewModel : ViewModelBase
 
         if (disposing)
         {
+            _tipRotationSubscription.Dispose();
             _initializer.ProgressChanged -= OnProgressChanged;
         }
 

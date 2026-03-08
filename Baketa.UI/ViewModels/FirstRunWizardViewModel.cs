@@ -26,7 +26,7 @@ public sealed class FirstRunWizardViewModel : ReactiveObject
     /// <summary>
     /// 現在選択可能な言語コード（言語拡張時にここに追加するだけでOK）
     /// </summary>
-    private static readonly HashSet<string> EnabledLanguageCodes = ["en", "ja"];
+    private static readonly HashSet<string> EnabledLanguageCodes = ["en", "ja", "zh-CN", "zh-TW", "ko", "es", "fr", "de", "it", "pt"];
 
     private SupportedLanguage? _selectedLanguage;
 
