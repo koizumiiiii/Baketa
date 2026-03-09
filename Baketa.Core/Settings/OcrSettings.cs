@@ -42,7 +42,7 @@ public sealed class OcrSettings
     /// </summary>
     [SettingMetadata(SettingLevel.Basic, "OCR", "認識言語",
         Description = "OCRで認識する言語",
-        ValidValues = ["ja", "en", "zh", "ko", "multi"])]
+        ValidValues = ["ja", "en", "zh", "ko", "fr", "de", "it", "es", "pt", "multi"])]
     public string RecognitionLanguage { get; set; } = "ja";
 
     /// <summary>

@@ -75,20 +75,25 @@
             'use strict';
 
             // Get language from URL parameter or browser
+            var SUPPORTED_LANGUAGES = ['ja', 'en', 'ko', 'zh-CN', 'zh-TW', 'fr', 'de', 'it', 'es', 'pt'];
             function getLanguage() {
                 const params = new URLSearchParams(window.location.search);
                 const langParam = params.get('lang');
-                if (langParam && (langParam === 'ja' || langParam === 'en')) {
+                if (langParam && SUPPORTED_LANGUAGES.includes(langParam)) {
                     return langParam;
                 }
-                // Also check hash params
                 const hashParams = new URLSearchParams(window.location.hash.substring(1));
                 const hashLang = hashParams.get('lang');
-                if (hashLang && (hashLang === 'ja' || hashLang === 'en')) {
+                if (hashLang && SUPPORTED_LANGUAGES.includes(hashLang)) {
                     return hashLang;
                 }
                 const browserLang = navigator.language || navigator.userLanguage;
-                return browserLang.startsWith('ja') ? 'ja' : 'en';
+                if (SUPPORTED_LANGUAGES.includes(browserLang)) return browserLang;
+                const prefix = browserLang.split('-')[0];
+                if (prefix === 'zh') return (browserLang.includes('TW') || browserLang.includes('Hant')) ? 'zh-TW' : 'zh-CN';
+                var match = SUPPORTED_LANGUAGES.find(function(l) { return l === prefix; });
+                if (match) return match;
+                return 'en';
             }
 
             const lang = getLanguage();
@@ -157,6 +162,7 @@
         </div>
     </div>
 
+    <script src="../shared/i18n.js"></script>
     <script>
         const translations = {
             ja: {
@@ -168,35 +174,59 @@
                 title: 'Authenticating...',
                 subtitle: 'Please wait a moment while we redirect you.',
                 errorText: 'Redirect failed.<br>Please close this page and try the link in your email again.'
+            },
+            ko: {
+                title: '인증 처리 중...',
+                subtitle: '자동으로 리다이렉트됩니다.<br>잠시만 기다려 주세요.',
+                errorText: '리다이렉트에 실패했습니다.<br>이 페이지를 닫고 이메일의 링크를 다시 클릭해 주세요.'
+            },
+            'zh-CN': {
+                title: '正在验证...',
+                subtitle: '正在自动跳转。<br>请稍候。',
+                errorText: '跳转失败。<br>请关闭此页面，重新点击邮件中的链接。'
+            },
+            'zh-TW': {
+                title: '正在驗證...',
+                subtitle: '正在自動跳轉。<br>請稍候。',
+                errorText: '跳轉失敗。<br>請關閉此頁面，重新點擊郵件中的連結。'
+            },
+            fr: {
+                title: 'Authentification en cours...',
+                subtitle: 'Vous allez être redirigé automatiquement.<br>Veuillez patienter.',
+                errorText: 'La redirection a échoué.<br>Veuillez fermer cette page et cliquer à nouveau sur le lien dans votre email.'
+            },
+            de: {
+                title: 'Authentifizierung läuft...',
+                subtitle: 'Sie werden automatisch weitergeleitet.<br>Bitte warten Sie einen Moment.',
+                errorText: 'Weiterleitung fehlgeschlagen.<br>Bitte schließen Sie diese Seite und klicken Sie erneut auf den Link in Ihrer E-Mail.'
+            },
+            it: {
+                title: 'Autenticazione in corso...',
+                subtitle: 'Verrai reindirizzato automaticamente.<br>Attendi un momento.',
+                errorText: 'Reindirizzamento fallito.<br>Chiudi questa pagina e clicca nuovamente sul link nell\'email.'
+            },
+            es: {
+                title: 'Autenticando...',
+                subtitle: 'Serás redirigido automáticamente.<br>Por favor espera un momento.',
+                errorText: 'La redirección ha fallado.<br>Cierra esta página e intenta el enlace del correo de nuevo.'
+            },
+            pt: {
+                title: 'Autenticando...',
+                subtitle: 'Você será redirecionado automaticamente.<br>Por favor, aguarde.',
+                errorText: 'O redirecionamento falhou.<br>Feche esta página e tente o link do email novamente.'
             }
         };
 
-        function getLanguage() {
-            const params = new URLSearchParams(window.location.search);
-            const langParam = params.get('lang');
-            if (langParam && (langParam === 'ja' || langParam === 'en')) {
-                return langParam;
-            }
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            const hashLang = hashParams.get('lang');
-            if (hashLang && (hashLang === 'ja' || hashLang === 'en')) {
-                return hashLang;
-            }
-            const browserLang = navigator.language || navigator.userLanguage;
-            return browserLang.startsWith('ja') ? 'ja' : 'en';
-        }
-
-        function applyTranslations() {
+        // Use getLanguage() and applyTranslations logic from shared/i18n.js
+        (function() {
             const lang = getLanguage();
-            const t = translations[lang];
+            const t = translations[lang] || translations['en'];
 
             document.documentElement.lang = lang;
             document.getElementById('title').textContent = t.title;
             document.getElementById('subtitle').innerHTML = t.subtitle;
             document.getElementById('error-text').innerHTML = t.errorText;
-        }
-
-        applyTranslations();
+        })();
 
         // Show error if not redirected after 3 seconds
         setTimeout(function() {

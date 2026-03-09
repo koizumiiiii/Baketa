@@ -67,8 +67,8 @@ public sealed class OcrSettingsViewModel : Framework.ViewModelBase
         SetupChangeTracking();
 
         // 選択肢の初期化
-        LanguageOptions = ["Japanese", "English", "Chinese", "Korean"];
-        TargetLanguageOptions = ["Japanese", "English", "Chinese", "Korean"];
+        LanguageOptions = ["Japanese", "English", "Chinese", "Korean", "French", "German", "Italian", "Spanish", "Portuguese"];
+        TargetLanguageOptions = ["Japanese", "English", "Chinese", "Korean", "French", "German", "Italian", "Spanish", "Portuguese"];
 
         // コマンドの初期化
         ResetToDefaultsCommand = ReactiveCommand.Create(ResetToDefaults);

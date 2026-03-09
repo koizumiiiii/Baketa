@@ -59,6 +59,7 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
     private int _originalHeight = 50;
     private Color _backgroundColor = Color.FromArgb(200, 240, 240, 240); // 半透明白（ブラー用）
     private float _fontSize = 14f;
+    private string _fontFamily = "Segoe UI"; // フォントファミリー（言語別に設定可能）
 
     // 🔥 [MESSAGE_COALESCING] メッセージ集約用フラグ
     private bool _updatePending;
@@ -484,7 +485,7 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
             // 🔥 白テキスト + 黒の影（可読性向上）
             using var shadowBrush = new SolidBrush(Color.FromArgb(180, 0, 0, 0)); // 影（黒）
             using var textBrush = new SolidBrush(Color.FromArgb(255, 255, 255, 255)); // テキスト（白）
-            using var font = new Font("Segoe UI", _fontSize, FontStyle.Regular);
+            using var font = new Font(_fontFamily, _fontSize, FontStyle.Regular);
 
             var padding = 8f;
             var textWidth = _currentWidth - padding * 2;
@@ -620,6 +621,28 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
         }
     }
 
+    public void SetFontFamily(string fontFamily)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (string.IsNullOrWhiteSpace(fontFamily)) return;
+
+        _fontFamily = fontFamily;
+
+        if (!string.IsNullOrWhiteSpace(_currentText))
+        {
+            _messageQueue.Add(() =>
+            {
+                if (_hwnd == IntPtr.Zero) return;
+
+                AdjustHeightForText();
+                User32Methods.InvalidateRect(_hwnd, IntPtr.Zero, false);
+                User32Methods.UpdateWindow(_hwnd);
+            });
+
+            TriggerMessageQueueProcessing();
+        }
+    }
+
     public void SetPosition(int x, int y)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -707,7 +730,7 @@ public sealed class CompositionOverlayWindow : ILayeredOverlayWindow
         {
             using var tempBitmap = new Bitmap(1, 1);
             using var tempGraphics = Graphics.FromImage(tempBitmap);
-            using var font = new Font("Segoe UI", _fontSize, FontStyle.Regular);
+            using var font = new Font(_fontFamily, _fontSize, FontStyle.Regular);
 
             var padding = 8f;
             var textWidth = _currentWidth - padding * 2;

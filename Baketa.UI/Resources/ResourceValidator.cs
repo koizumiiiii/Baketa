@@ -22,7 +22,15 @@ public partial class ResourceValidator
         _supportedCultures =
         [
             CultureInfo.InvariantCulture, // Default (Japanese)
-            new CultureInfo("en")
+            new CultureInfo("en"),
+            new CultureInfo("zh-CN"),
+            new CultureInfo("zh-TW"),
+            new CultureInfo("ko"),
+            new CultureInfo("fr"),
+            new CultureInfo("de"),
+            new CultureInfo("it"),
+            new CultureInfo("es"),
+            new CultureInfo("pt")
         ];
     }
 

@@ -26,6 +26,12 @@
             <FontFamily x:Key="FontFamily.English">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSans-Regular.ttf#Noto Sans, Segoe UI, sans-serif</FontFamily>
             <!-- 中国語用（簡体字） -->
             <FontFamily x:Key="FontFamily.Chinese">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansSC-Regular.ttf#Noto Sans SC, Microsoft YaHei UI, sans-serif</FontFamily>
+            <!-- 中国語用（繁体字） -->
+            <FontFamily x:Key="FontFamily.ChineseTraditional">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansTC-Regular.ttf#Noto Sans TC, Microsoft JhengHei UI, sans-serif</FontFamily>
+            <!-- 韓国語用 -->
+            <FontFamily x:Key="FontFamily.Korean">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansKR-Regular.ttf#Noto Sans KR, Malgun Gothic, sans-serif</FontFamily>
+            <!-- 欧州言語用 -->
+            <FontFamily x:Key="FontFamily.European">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSans-Regular.ttf#Noto Sans, Segoe UI, sans-serif</FontFamily>
             <!-- デフォルト（日本語優先） -->
             <FontFamily x:Key="DefaultFontFamily">avares://Baketa.UI/Assets/Fonts/NotoSans/NotoSansJP-Regular.otf#Noto Sans CJK JP, Yu Gothic UI, Meiryo UI, Segoe UI, sans-serif</FontFamily>
 

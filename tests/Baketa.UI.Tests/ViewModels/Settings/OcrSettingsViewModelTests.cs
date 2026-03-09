@@ -117,7 +117,7 @@ public class OcrSettingsViewModelTests
     {
         // Arrange
         var viewModel = new OcrSettingsViewModel(_testSettings, _mockEventAggregator.Object, _mockLogger.Object);
-        var expectedLanguages = new[] { "Japanese", "English", "Chinese", "Korean" };
+        var expectedLanguages = new[] { "Japanese", "English", "Chinese", "Korean", "French", "German", "Italian", "Spanish", "Portuguese" };
 
         // Act & Assert
         viewModel.LanguageOptions.Should().BeEquivalentTo(expectedLanguages);

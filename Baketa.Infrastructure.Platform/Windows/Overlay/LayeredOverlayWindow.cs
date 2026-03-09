@@ -53,6 +53,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
     // 🎨 [Issue #348] 可読性向上: 黒95%透過背景
     private Color _backgroundColor = Color.FromArgb(242, 0, 0, 0);
     private float _fontSize = 14f; // フォントサイズ（設定可能）
+    private string _fontFamily = "Segoe UI"; // フォントファミリー（言語別に設定可能）
 
     // 🔥 [MESSAGE_COALESCING] メッセージ集約用フラグ
     // PostMessage()が既に送信済みかを追跡し、重複送信を防ぐ
@@ -383,6 +384,26 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
         }
     }
 
+    public void SetFontFamily(string fontFamily)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (string.IsNullOrWhiteSpace(fontFamily)) return;
+
+        _fontFamily = fontFamily;
+
+        // フォントファミリー変更時もコンテンツを再描画
+        if (!string.IsNullOrWhiteSpace(_currentText))
+        {
+            _messageQueue.Add(() =>
+            {
+                if (_hwnd == IntPtr.Zero) return;
+                UpdateWindowContent();
+            });
+
+            TriggerMessageQueueProcessing();
+        }
+    }
+
     public void SetPosition(int x, int y)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -483,7 +504,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                 // 一時的なBitmapとGraphicsを作成してテキストサイズを測定
                 using var tempBitmap = new Bitmap(1, 1);
                 using var tempGraphics = Graphics.FromImage(tempBitmap);
-                using var font = new Font("Segoe UI", _fontSize, FontStyle.Regular);
+                using var font = new Font(_fontFamily, _fontSize, FontStyle.Regular);
 
                 var padding = 8f;
                 var textWidth = _currentWidth - padding * 2;
@@ -600,7 +621,7 @@ public sealed class LayeredOverlayWindow : ILayeredOverlayWindow
                 // テキスト描画
                 if (!string.IsNullOrWhiteSpace(_currentText))
                 {
-                    using var font = new Font("Segoe UI", _fontSize, FontStyle.Regular);
+                    using var font = new Font(_fontFamily, _fontSize, FontStyle.Regular);
 
                     var padding = 8f;
                     var textWidth = _currentWidth - padding * 2;
