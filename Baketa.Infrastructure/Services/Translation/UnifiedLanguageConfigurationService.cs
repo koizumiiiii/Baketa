@@ -139,7 +139,7 @@ public sealed class UnifiedLanguageConfigurationService : ILanguageConfiguration
     /// <summary>
     /// 設定から言語ペアを作成
     /// </summary>
-    private static LanguagePair CreateLanguagePairFromSettings(dynamic settings)
+    private LanguagePair CreateLanguagePairFromSettings(ITranslationSettings settings)
     {
         try
         {
@@ -153,7 +153,8 @@ public sealed class UnifiedLanguageConfigurationService : ILanguageConfiguration
         }
         catch (ArgumentException ex)
         {
-            // 無効な言語コードの場合はデフォルトにフォールバック
+            _logger.LogWarning(ex, "[Issue #517] 言語コードの解析に失敗しました。デフォルト(ja→en)にフォールバック: Source={Source}, Target={Target}",
+                settings.DefaultSourceLanguage, settings.DefaultTargetLanguage);
             return LanguagePair.Default;
         }
     }
