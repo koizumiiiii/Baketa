@@ -486,6 +486,8 @@ translation_cache/
 screenshots_temp/
 capture_cache/
 
+# Demo screen tool - tracked in git (removed from gitignore)
+
 # Performance profiling files
 *.speedscope
 *.prof
