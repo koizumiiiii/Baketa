@@ -1806,6 +1806,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
             // 言語ペアを取得
             var translationSettings = _configurationFacade.SettingsService.GetTranslationSettings();
             var targetLanguage = translationSettings.DefaultTargetLanguage ?? "ja";
+            _logger?.LogInformation("[Issue #517] Cloud AI翻訳リクエスト - TargetLanguage='{TargetLanguage}' (from settings: '{SettingsValue}')",
+                targetLanguage, translationSettings.DefaultTargetLanguage);
 
             // セッショントークンを取得
             var sessionToken = _licenseManager.CurrentState.SessionId ?? string.Empty;

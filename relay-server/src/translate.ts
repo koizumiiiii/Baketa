@@ -1422,6 +1422,18 @@ function validateTranslateRequest(body: unknown): { valid: true; data: Translate
  *
  * Gemini Vision: 258トークン（~768px）～ 1032トークン（~3072px）
  */
+// [Issue #517] 言語コード→言語名変換（AIプロンプト用）
+// "ko"等のコードをそのまま渡すとAIが認識できず英語にフォールバックする
+function getTargetLanguageName(code: string): string {
+  const map: Record<string, string> = {
+    'en': 'English', 'ja': 'Japanese', 'ko': 'Korean',
+    'zh-cn': 'Simplified Chinese', 'zh-tw': 'Traditional Chinese',
+    'es': 'Spanish', 'fr': 'French', 'de': 'German',
+    'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'ar': 'Arabic',
+  };
+  return map[code.toLowerCase()] ?? code;
+}
+
 function estimateImageTokens(base64Length: number): number {
   // Base64は約1.33倍のサイズなので、元のバイト数を推定
   const estimatedBytes = Math.floor(base64Length * 0.75);
@@ -1626,6 +1638,9 @@ Prioritize these areas when detecting text.
 `;
   }
 
+  // [Issue #517] 言語コード→言語名変換（AIプロンプト用）
+  const targetLanguageName = getTargetLanguageName(request.target_language);
+
   // [Issue #368] プロンプト最適化（~650トークン → ~220トークン）
   // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
   const jaSpecific = request.target_language === 'ja'
@@ -1637,7 +1652,7 @@ Prioritize these areas when detecting text.
 Expert game localizer. Output compact minified JSON ONLY. No pretty-printing.
 
 # Task
-Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
+Detect and translate ALL visible text in this image to ${targetLanguageName}. ${sourceHint}
 ${contextHint}${historySection}${ocrHintsSection}
 Must include: Dialogs, UI buttons, menus, and all labels. Maximum 20 items.
 Do not invent or guess text that is not clearly visible in the image.
@@ -1930,6 +1945,9 @@ Prioritize these areas when detecting text.
 `;
   }
 
+  // [Issue #517] 言語コード→言語名変換（AIプロンプト用）
+  const targetLanguageName = getTargetLanguageName(request.target_language);
+
   // [Issue #368] プロンプト最適化（Geminiと同一プロンプト構造）
   // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
   const jaSpecific = request.target_language === 'ja'
@@ -1939,7 +1957,7 @@ Prioritize these areas when detecting text.
   const systemPrompt = `Expert game localizer. Output JSON ONLY.`;
 
   const userPrompt = `# Task
-Detect and translate ALL visible text in this image to ${request.target_language}. ${sourceHint}
+Detect and translate ALL visible text in this image to ${targetLanguageName}. ${sourceHint}
 ${contextHint}${historySection}${ocrHintsSection}
 Must include: Dialogs, UI buttons, menus, and all labels. Maximum 20 items.
 Do not invent or guess text that is not clearly visible in the image.

@@ -75,6 +75,24 @@ public sealed class FallbackTranslationResult
         Attempts = attempts,
         FinalError = error
     };
+
+    /// <summary>
+    /// [Issue #519] ローカルフォールバック推奨結果を作成
+    /// Cloud AIが全て失敗し、呼び出し元でローカルNLLB翻訳を使うべきことを示す
+    /// </summary>
+    public static FallbackTranslationResult LocalFallbackRequired(
+        IReadOnlyList<FallbackAttempt> attempts) => new()
+    {
+        IsSuccess = false,
+        UsedEngine = FallbackLevel.Local,
+        Attempts = attempts,
+        FinalError = new TranslationErrorDetail
+        {
+            Code = TranslationErrorDetail.Codes.CloudAllFailed,
+            Message = "すべてのCloud AI翻訳エンジンが失敗、ローカルNLLBフォールバック推奨",
+            IsRetryable = true
+        }
+    };
 }
 
 /// <summary>

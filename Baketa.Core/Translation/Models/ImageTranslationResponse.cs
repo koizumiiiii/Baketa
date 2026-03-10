@@ -263,6 +263,14 @@ public sealed class TranslationErrorDetail
         /// [Issue #296] 月間クォータ超過
         /// </summary>
         public const string QuotaExceeded = "QUOTA_EXCEEDED";
+        /// <summary>
+        /// [Issue #518] ハルシネーション検出
+        /// </summary>
+        public const string HallucinationDetected = "HALLUCINATION_DETECTED";
+        /// <summary>
+        /// [Issue #519] すべてのCloud AIエンジンが失敗（ローカルフォールバック推奨）
+        /// </summary>
+        public const string CloudAllFailed = "CLOUD_ALL_FAILED";
     }
 }
 

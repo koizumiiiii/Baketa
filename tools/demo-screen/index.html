@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Demo Game Screen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      cursor: none;
+      user-select: none;
+    }
+
+    .game-screen {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Background */
+    .bg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+
+    /* Characters */
+    .character {
+      position: absolute;
+      bottom: 0;
+      height: 85vh;
+      width: auto;
+      image-rendering: auto;
+      filter: drop-shadow(2px 4px 8px rgba(0,0,0,0.3));
+    }
+
+    .char-left {
+      left: calc(50% - 28vw);
+    }
+
+    .char-right {
+      right: calc(50% - 28vw);
+    }
+
+    /* Dialogue Box */
+    .dialogue-box {
+      position: absolute;
+      bottom: 5%;
+      left: 5%;
+      right: 5%;
+      background: rgba(10, 15, 30, 0.88);
+      border: 2px solid rgba(140, 170, 220, 0.6);
+      border-radius: 8px;
+      padding: 30px 40px;
+      min-height: 300px;
+      box-shadow:
+        0 0 20px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .speaker-name {
+      position: absolute;
+      top: -70px;
+      left: 20px;
+      background: rgba(30, 50, 90, 0.95);
+      border: 1px solid rgba(140, 170, 220, 0.6);
+      border-radius: 4px;
+      padding: 15px 25px;
+      color: #8cb8ff;
+      font-family: "Noto Sans JP", sans-serif;
+      font-size: 34px;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+
+    .dialogue-text {
+      color: #e8eaf0;
+      font-family: "Noto Sans JP", sans-serif;
+      font-size: 40px;
+      line-height: 1.6;
+      letter-spacing: 1px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+
+    /* Text advance indicator */
+    .dialogue-box::after {
+      content: "▼";
+      position: absolute;
+      bottom: 10px;
+      right: 20px;
+      color: rgba(140, 170, 220, 0.7);
+      font-size: 14px;
+      animation: blink 1s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Scene switcher (dev only) */
+    .scene-controls {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 100;
+      display: flex;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .scene-controls:hover {
+      opacity: 1;
+    }
+
+    .scene-controls button {
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      border: 1px solid #555;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .scene-controls button:hover {
+      background: rgba(60,60,120,0.8);
+    }
+
+    .scene-controls button.active {
+      background: rgba(60,80,160,0.9);
+      border-color: #8cb8ff;
+    }
+  </style>
+</head>
+<body>
+
+<div class="game-screen" id="gameScreen">
+  <img class="bg" src="bg-akihabara.png" alt="">
+
+  <img id="charLeft" class="character char-left" src="char-cosplayer.png" alt="">
+  <img id="charRight" class="character char-right" src="char-guy.png" alt="">
+
+  <div class="dialogue-box">
+    <div class="speaker-name" id="speakerName"></div>
+    <div class="dialogue-text" id="dialogueText"></div>
+  </div>
+</div>
+
+<script>
+  const lang = new URLSearchParams(window.location.search).get("lang") || "ja";
+
+  const dialogues = {
+    ja: [
+      {
+        speaker: "リナ",
+        text: "細かいことはいいの！ あ、見てあの棚！ 限定版じゃん！"
+      },
+      {
+        speaker: "タナカ",
+        text: "……あんた、その格好で電車乗ってきたの？ 何かのコスプレ？"
+      },
+      {
+        speaker: "リナ",
+        text: "何かのって失礼な！ これは『蒼穹のアルカディア』の聖騎士セレスティアの第3章の覚醒後バージョンで肩のパーツは本来銀の装甲なんだけど段ボールにスプレーで再現しててマントも劇中だと風になびく長さが重要だからシーツ2枚つなげて……"
+      },
+      {
+        speaker: "タナカ",
+        text: "わかったわかった！オタクの早口って世界共通なんだな。<br>……まあ、今どきここまでの手作りクオリティも逆に作品愛を感じるか。"
+      }
+    ],
+    en: [
+      {
+        speaker: "Lina",
+        text: "Who cares about the details! Oh, look at that shelf! Is that a limited edition?!"
+      },
+      {
+        speaker: "Tanaka",
+        text: "...Did you really ride the train looking like that? Is that supposed to be some kind of cosplay?"
+      },
+      {
+        speaker: "Lina",
+        text: "\"Some kind of\"?! How rude! This is the post-awakening version of Holy Knight Celestia from Chapter 3 of 'Arcadia of the Azure Sky'! The shoulder pieces should be silver armor, but I reproduced them using cardboard and spray paint, and since the cape's length is crucial for that wind-swept look from the show, I sewed two bedsheets together and\u2014"
+      },
+      {
+        speaker: "Tanaka",
+        text: "Okay, okay! I guess geeks talking a mile a minute is a universal thing.<br>...But man, seeing this much handmade effort... I guess I can feel your love for the series."
+      }
+    ]
+  };
+
+  const scenes = dialogues[lang] || dialogues.ja;
+
+  let currentScene = 0;
+
+  function showScene(index) {
+    const scene = scenes[index];
+    document.getElementById("speakerName").textContent = scene.speaker;
+    document.getElementById("dialogueText").innerHTML = scene.text;
+  }
+
+  showScene(0);
+
+  document.getElementById("gameScreen").addEventListener("click", () => {
+    currentScene = (currentScene + 1) % scenes.length;
+    showScene(currentScene);
+  });
+</script>
+
+</body>
+</html>

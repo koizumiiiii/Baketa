@@ -107,34 +107,24 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
                 nextRetry?.ToString("HH:mm:ss") ?? "unknown");
         }
 
-        // Step 3: Local (NLLB-200) へフォールバック
-        // Note: Phase 2ではLocalフォールバックは未実装
-        // 将来的にはローカルOCR + NLLBの統合を検討
+        // [Issue #519] Step 3: Local (NLLB-200) へフォールバック
+        // ローカルNLLBはテキスト入力（OCR結果必要）のため、FallbackOrchestrator内では
+        // 画像翻訳として実行できない。呼び出し元（AggregatedChunksReadyEventHandler）が
+        // OCR結果を使ってローカル翻訳を実行する。
         _logger.LogWarning(
-            "すべてのCloud AI翻訳エンジンが失敗: RequestId={RequestId}",
+            "[Issue #519] すべてのCloud AI翻訳エンジンが失敗、ローカルNLLBフォールバックを推奨: RequestId={RequestId}",
             request.RequestId);
 
-        // Localフォールバックの試行記録を追加
         attempts.Add(new FallbackAttempt
         {
             Level = FallbackLevel.Local,
             ProviderId = "local-nllb",
             Success = false,
-            ErrorCode = TranslationErrorDetail.Codes.NotImplemented,
-            Duration = TimeSpan.Zero
+            ErrorCode = TranslationErrorDetail.Codes.CloudAllFailed,
+            Duration = DateTime.UtcNow - startTime
         });
 
-        // startTimeは将来のメトリクス用に保持（現時点では未使用）
-        _ = DateTime.UtcNow - startTime;
-
-        return FallbackTranslationResult.Failure(
-            new TranslationErrorDetail
-            {
-                Code = TranslationErrorDetail.Codes.ApiError,
-                Message = "すべての翻訳エンジンが失敗しました",
-                IsRetryable = attempts.Any(a => a.ErrorCode == TranslationErrorDetail.Codes.RateLimited)
-            },
-            attempts);
+        return FallbackTranslationResult.LocalFallbackRequired(attempts);
     }
 
     /// <inheritdoc />
@@ -214,6 +204,31 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
 
             if (response.IsSuccess)
             {
+                // [Issue #518] ハルシネーション検出: 成功レスポンスでも品質を検証
+                var hallucinationReason = DetectHallucination(response);
+                if (hallucinationReason != null)
+                {
+                    _logger.LogWarning(
+                        "[Issue #518] {Level}翻訳ハルシネーション検出: RequestId={RequestId}, Reason={Reason} - Secondaryへフォールバック",
+                        level, request.RequestId, hallucinationReason);
+
+                    attempts.Add(new FallbackAttempt
+                    {
+                        Level = level,
+                        ProviderId = translator.ProviderId,
+                        Success = false,
+                        ErrorCode = TranslationErrorDetail.Codes.HallucinationDetected,
+                        Duration = duration
+                    });
+
+                    _engineStatusManager.MarkEngineUnavailable(
+                        engineKey,
+                        FallbackCooldown,
+                        $"Hallucination: {hallucinationReason}");
+
+                    return null; // → 次のエンジンへフォールバック
+                }
+
                 _logger.LogInformation(
                     "{Level}翻訳成功: RequestId={RequestId}, Duration={Duration}ms",
                     level,
@@ -323,5 +338,93 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// [Issue #518] Cloud AI翻訳レスポンスのハルシネーション検出
+    /// 成功レスポンスでも品質に問題がある場合を検出し、Secondaryへのフォールバックを促す
+    /// </summary>
+    /// <returns>ハルシネーション理由（正常なら null）</returns>
+    private static string? DetectHallucination(ImageTranslationResponse response)
+    {
+        // 複数テキスト結果の検証
+        if (response.Texts is { Count: > 0 } texts)
+        {
+            // ルール1: 結果件数が異常に多い（AggregatedChunksReadyEventHandlerの既存ルール前倒し）
+            const int maxReasonableResults = 20;
+            if (texts.Count > maxReasonableResults)
+            {
+                return $"結果件数が異常: {texts.Count}件 (閾値: {maxReasonableResults})";
+            }
+
+            // ルール2: 全結果の翻訳テキストが同一（明らかな異常）
+            if (texts.Count >= 3)
+            {
+                var distinctTranslations = texts
+                    .Select(t => t.Translation?.Trim())
+                    .Where(t => !string.IsNullOrEmpty(t))
+                    .Distinct(StringComparer.Ordinal)
+                    .Count();
+
+                if (distinctTranslations == 1)
+                {
+                    return $"全{texts.Count}件の翻訳結果が同一テキスト";
+                }
+            }
+
+            // ルール3: 翻訳テキストの繰り返しパターン検出
+            foreach (var text in texts)
+            {
+                if (IsRepetitiveText(text.Translation))
+                {
+                    return $"繰り返しパターン検出: '{text.Translation?[..Math.Min(50, text.Translation?.Length ?? 0)]}...'";
+                }
+            }
+        }
+
+        // 単一テキスト結果の検証
+        if (IsRepetitiveText(response.TranslatedText))
+        {
+            return $"繰り返しパターン検出: '{response.TranslatedText?[..Math.Min(50, response.TranslatedText?.Length ?? 0)]}...'";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// [Issue #518] テキストの繰り返しパターンを検出
+    /// 例: "candycandycandy", "THE PARTY OF THE PARTY OF THE PARTY OF"
+    /// </summary>
+    private static bool IsRepetitiveText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Length < 20)
+            return false;
+
+        const int minPhraseLength = 4;
+        const int minRepetitionCount = 3;
+
+        for (int phraseLen = minPhraseLength; phraseLen <= text.Length / minRepetitionCount; phraseLen++)
+        {
+            var phrase = text[..phraseLen];
+            if (string.IsNullOrWhiteSpace(phrase))
+                continue;
+
+            int count = 0;
+            int index = 0;
+            while ((index = text.IndexOf(phrase, index, StringComparison.OrdinalIgnoreCase)) >= 0)
+            {
+                count++;
+                index += phrase.Length;
+            }
+
+            if (count >= minRepetitionCount)
+            {
+                var repetitionRatio = (double)phrase.Length * count / text.Length;
+                if (repetitionRatio >= 0.5)
+                    return true;
+            }
+        }
+
+        return false;
     }
 }
