@@ -107,34 +107,24 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
                 nextRetry?.ToString("HH:mm:ss") ?? "unknown");
         }
 
-        // Step 3: Local (NLLB-200) へフォールバック
-        // Note: Phase 2ではLocalフォールバックは未実装
-        // 将来的にはローカルOCR + NLLBの統合を検討
+        // [Issue #519] Step 3: Local (NLLB-200) へフォールバック
+        // ローカルNLLBはテキスト入力（OCR結果必要）のため、FallbackOrchestrator内では
+        // 画像翻訳として実行できない。呼び出し元（AggregatedChunksReadyEventHandler）が
+        // OCR結果を使ってローカル翻訳を実行する。
         _logger.LogWarning(
-            "すべてのCloud AI翻訳エンジンが失敗: RequestId={RequestId}",
+            "[Issue #519] すべてのCloud AI翻訳エンジンが失敗、ローカルNLLBフォールバックを推奨: RequestId={RequestId}",
             request.RequestId);
 
-        // Localフォールバックの試行記録を追加
         attempts.Add(new FallbackAttempt
         {
             Level = FallbackLevel.Local,
             ProviderId = "local-nllb",
             Success = false,
-            ErrorCode = TranslationErrorDetail.Codes.NotImplemented,
-            Duration = TimeSpan.Zero
+            ErrorCode = TranslationErrorDetail.Codes.CloudAllFailed,
+            Duration = DateTime.UtcNow - startTime
         });
 
-        // startTimeは将来のメトリクス用に保持（現時点では未使用）
-        _ = DateTime.UtcNow - startTime;
-
-        return FallbackTranslationResult.Failure(
-            new TranslationErrorDetail
-            {
-                Code = TranslationErrorDetail.Codes.ApiError,
-                Message = "すべての翻訳エンジンが失敗しました",
-                IsRetryable = attempts.Any(a => a.ErrorCode == TranslationErrorDetail.Codes.RateLimited)
-            },
-            attempts);
+        return FallbackTranslationResult.LocalFallbackRequired(attempts);
     }
 
     /// <inheritdoc />
