@@ -40,6 +40,25 @@ const TRANSLATIONS = {
     lang_de: 'Deutsch',
     lang_it: 'Italiano',
     lang_pt: 'Português',
+    section_faq: 'FAQ',
+    faq1_q: 'Is Baketa really free?',
+    faq1_a: 'Yes! Baketa is free and open source. Basic features including local OCR and translation are completely free. EX Mode, a high-accuracy translation feature, is optionally available for supporters.',
+    faq2_q: 'Does it work with any game?',
+    faq2_a: 'Baketa works with most windowed and borderless-windowed games on Windows. Full-screen exclusive mode may require switching to borderless windowed mode.',
+    faq3_q: 'Does it affect game performance?',
+    faq3_a: 'Baketa is designed to be lightweight and most users report no noticeable slowdown. However, games with heavy memory or GPU usage may experience some impact.',
+    faq4_q: 'What is the difference between Live and Shot translation?',
+    faq4_a: 'Live translation continuously monitors the screen and translates text as it appears. Shot translation captures and translates a single frame on demand — useful for menus or static text.',
+    faq5_q: 'Is an internet connection required?',
+    faq5_a: 'No. OCR and local translation work fully offline. EX Mode requires an internet connection but is optional.',
+    section_requirements: 'System Requirements',
+    req_os: 'OS', req_os_val: 'Windows 10/11 (64-bit)',
+    req_ram: 'RAM', req_ram_val: '8GB+ (16GB recommended)',
+    req_gpu: 'GPU', req_gpu_val: 'VRAM 4GB+ (NVIDIA recommended)',
+    req_storage: 'Storage', req_storage_val: '10GB+',
+    req_note: 'NVIDIA GPU (GTX 1060+) accelerates OCR processing up to 59x faster',
+    req_check_btn: 'Check your PC',
+    check_unknown: 'Could not detect (try Chrome/Edge)',
   },
   ja: {
     meta_title: 'Baketa - 言語の壁を超えて、世界中のゲームを楽しもう',
@@ -74,6 +93,25 @@ const TRANSLATIONS = {
     lang_de: 'Deutsch',
     lang_it: 'Italiano',
     lang_pt: 'Português',
+    section_faq: 'よくある質問',
+    faq1_q: 'Baketaは本当に無料ですか？',
+    faq1_a: 'はい！Baketaは無料でオープンソースです。ローカルOCRと翻訳を含む基本機能は完全無料です。サポーター向けに高精度翻訳機能「EXモード」もオプションで提供されています。',
+    faq2_q: 'どんなゲームでも使えますか？',
+    faq2_a: 'Baketaはほとんどのウィンドウモード・ボーダーレスウィンドウモードのゲームで動作します。フルスクリーン専有モードではボーダーレスウィンドウへの切り替えが必要な場合があります。',
+    faq3_q: 'ゲームのパフォーマンスに影響しますか？',
+    faq3_a: 'Baketaは軽量に設計されており、ほとんどのユーザーは遅延を感じません。ただし、メモリやGPUの消費が激しいゲームでは影響が出る場合があります。',
+    faq4_q: 'Live翻訳とShot翻訳の違いは？',
+    faq4_a: 'Live翻訳は画面を常時監視し、テキストが表示されると自動翻訳します。Shot翻訳はボタンを押した時点の画面をキャプチャして翻訳します。メニューや静的テキストに便利です。',
+    faq5_q: 'インターネット接続は必要ですか？',
+    faq5_a: 'いいえ。OCRとローカル翻訳は完全オフラインで動作します。EXモードはインターネット接続が必要ですが、オプション機能です。',
+    section_requirements: '推奨環境',
+    req_os: 'OS', req_os_val: 'Windows 10/11 (64-bit)',
+    req_ram: 'メモリ', req_ram_val: '8GB以上（16GB推奨）',
+    req_gpu: 'GPU', req_gpu_val: 'VRAM 4GB以上（NVIDIA推奨）',
+    req_storage: 'ストレージ', req_storage_val: '10GB以上',
+    req_note: 'NVIDIA GPU（GTX 1060以上）でOCR処理が最大59倍高速化',
+    req_check_btn: 'PCをチェック',
+    check_unknown: '検出できませんでした（Chrome/Edgeをお試しください）',
   },
   'zh-CN': {
     meta_title: 'Baketa - 打破语言障碍，畅玩全球游戏',
@@ -101,6 +139,25 @@ const TRANSLATIONS = {
     lang_en: 'English', lang_ja: '日本語', lang_zhCN: '简体中文', lang_zhTW: '繁體中文',
     lang_ko: '한국어', lang_es: 'Español', lang_fr: 'Français', lang_de: 'Deutsch',
     lang_it: 'Italiano', lang_pt: 'Português',
+    section_faq: '常见问题',
+    faq1_q: 'Baketa真的免费吗？',
+    faq1_a: '是的！Baketa免费且开源。包括本地OCR和翻译在内的基本功能完全免费。高精度翻译功能"EX模式"作为可选功能面向支持者提供。',
+    faq2_q: '能用于所有游戏吗？',
+    faq2_a: 'Baketa适用于大多数窗口化和无边框窗口化的Windows游戏。全屏独占模式可能需要切换到无边框窗口模式。',
+    faq3_q: '会影响游戏性能吗？',
+    faq3_a: 'Baketa设计为轻量级，大多数用户没有感到明显的延迟。但对于内存或GPU消耗较大的游戏，可能会产生一定影响。',
+    faq4_q: 'Live翻译和Shot翻译有什么区别？',
+    faq4_a: 'Live翻译持续监控屏幕并自动翻译出现的文字。Shot翻译按需捕获并翻译单帧画面——适合菜单或静态文字。',
+    faq5_q: '需要联网吗？',
+    faq5_a: '不需要。OCR和本地翻译完全离线运行。EX模式需要网络连接，但为可选功能。',
+    section_requirements: '系统要求',
+    req_os: '操作系统', req_os_val: 'Windows 10/11 (64位)',
+    req_ram: '内存', req_ram_val: '8GB以上（推荐16GB）',
+    req_gpu: '显卡', req_gpu_val: 'VRAM 4GB以上（推荐NVIDIA）',
+    req_storage: '存储', req_storage_val: '10GB以上',
+    req_note: 'NVIDIA GPU（GTX 1060以上）可将OCR处理加速最高59倍',
+    req_check_btn: '检查您的电脑',
+    check_unknown: '无法检测（请尝试Chrome/Edge）',
   },
   'zh-TW': {
     meta_title: 'Baketa - 打破語言障礙，暢玩全球遊戲',
@@ -128,6 +185,25 @@ const TRANSLATIONS = {
     lang_en: 'English', lang_ja: '日本語', lang_zhCN: '简体中文', lang_zhTW: '繁體中文',
     lang_ko: '한국어', lang_es: 'Español', lang_fr: 'Français', lang_de: 'Deutsch',
     lang_it: 'Italiano', lang_pt: 'Português',
+    section_faq: '常見問題',
+    faq1_q: 'Baketa真的免費嗎？',
+    faq1_a: '是的！Baketa免費且開源。包括本地OCR和翻譯在內的基本功能完全免費。高精度翻譯功能「EX模式」作為可選功能面向支持者提供。',
+    faq2_q: '能用於所有遊戲嗎？',
+    faq2_a: 'Baketa適用於大多數視窗化和無邊框視窗化的Windows遊戲。全螢幕獨佔模式可能需要切換到無邊框視窗模式。',
+    faq3_q: '會影響遊戲效能嗎？',
+    faq3_a: 'Baketa設計為輕量級，大多數使用者沒有感到明顯的延遲。但對於記憶體或GPU消耗較大的遊戲，可能會產生一定影響。',
+    faq4_q: 'Live翻譯和Shot翻譯有什麼區別？',
+    faq4_a: 'Live翻譯持續監控螢幕並自動翻譯出現的文字。Shot翻譯按需擷取並翻譯單幀畫面——適合選單或靜態文字。',
+    faq5_q: '需要網路連線嗎？',
+    faq5_a: '不需要。OCR和本地翻譯完全離線運作。EX模式需要網路連線，但為可選功能。',
+    section_requirements: '系統需求',
+    req_os: '作業系統', req_os_val: 'Windows 10/11 (64位元)',
+    req_ram: '記憶體', req_ram_val: '8GB以上（建議16GB）',
+    req_gpu: '顯示卡', req_gpu_val: 'VRAM 4GB以上（建議NVIDIA）',
+    req_storage: '儲存空間', req_storage_val: '10GB以上',
+    req_note: 'NVIDIA GPU（GTX 1060以上）可將OCR處理加速最高59倍',
+    req_check_btn: '檢查您的電腦',
+    check_unknown: '無法偵測（請嘗試Chrome/Edge）',
   },
   ko: {
     meta_title: 'Baketa - 언어의 벽을 넘어 전 세계 게임을 즐기세요',
@@ -155,6 +231,25 @@ const TRANSLATIONS = {
     lang_en: 'English', lang_ja: '日本語', lang_zhCN: '简体中文', lang_zhTW: '繁體中文',
     lang_ko: '한국어', lang_es: 'Español', lang_fr: 'Français', lang_de: 'Deutsch',
     lang_it: 'Italiano', lang_pt: 'Português',
+    section_faq: '자주 묻는 질문',
+    faq1_q: 'Baketa는 정말 무료인가요?',
+    faq1_a: '네! Baketa는 무료이며 오픈소스입니다. 로컬 OCR과 번역을 포함한 기본 기능은 완전 무료입니다. 고정밀 번역 기능 "EX 모드"는 후원자를 위한 선택적 기능으로 제공됩니다.',
+    faq2_q: '모든 게임에서 작동하나요?',
+    faq2_a: 'Baketa는 대부분의 창 모드 및 테두리 없는 창 모드의 Windows 게임에서 작동합니다. 전체 화면 전용 모드는 테두리 없는 창 모드로 전환해야 할 수 있습니다.',
+    faq3_q: '게임 성능에 영향이 있나요?',
+    faq3_a: 'Baketa는 가볍게 설계되었으며 대부분의 사용자는 눈에 띄는 지연을 느끼지 않습니다. 다만 메모리나 GPU 소비가 큰 게임에서는 영향이 있을 수 있습니다.',
+    faq4_q: 'Live번역과 Shot번역의 차이는 무엇인가요?',
+    faq4_a: 'Live번역은 화면을 지속적으로 모니터링하고 텍스트가 나타나면 자동 번역합니다. Shot번역은 버튼을 누를 때 화면을 캡처하여 번역합니다 — 메뉴나 정적 텍스트에 유용합니다.',
+    faq5_q: '인터넷 연결이 필요한가요?',
+    faq5_a: '아니요. OCR과 로컬 번역은 완전 오프라인으로 작동합니다. EX 모드는 인터넷 연결이 필요하지만 선택적 기능입니다.',
+    section_requirements: '시스템 요구 사항',
+    req_os: 'OS', req_os_val: 'Windows 10/11 (64비트)',
+    req_ram: '메모리', req_ram_val: '8GB 이상 (16GB 권장)',
+    req_gpu: 'GPU', req_gpu_val: 'VRAM 4GB 이상 (NVIDIA 권장)',
+    req_storage: '저장 공간', req_storage_val: '10GB 이상',
+    req_note: 'NVIDIA GPU (GTX 1060 이상)로 OCR 처리 최대 59배 가속',
+    req_check_btn: 'PC 확인하기',
+    check_unknown: '감지할 수 없습니다 (Chrome/Edge를 사용해 보세요)',
   },
   es: {
     meta_title: 'Baketa - Rompe las barreras del idioma y disfruta juegos de todo el mundo',
@@ -182,6 +277,25 @@ const TRANSLATIONS = {
     lang_en: 'English', lang_ja: '日本語', lang_zhCN: '简体中文', lang_zhTW: '繁體中文',
     lang_ko: '한국어', lang_es: 'Español', lang_fr: 'Français', lang_de: 'Deutsch',
     lang_it: 'Italiano', lang_pt: 'Português',
+    section_faq: 'Preguntas frecuentes',
+    faq1_q: '¿Baketa es realmente gratis?',
+    faq1_a: '¡Sí! Baketa es gratuito y de código abierto. Las funciones básicas, incluyendo OCR local y traducción, son completamente gratis. El Modo EX, una función de traducción de alta precisión, está disponible opcionalmente para los patrocinadores.',
+    faq2_q: '¿Funciona con cualquier juego?',
+    faq2_a: 'Baketa funciona con la mayoría de los juegos en modo ventana y ventana sin bordes en Windows. El modo pantalla completa exclusivo puede requerir cambiar a modo ventana sin bordes.',
+    faq3_q: '¿Afecta el rendimiento del juego?',
+    faq3_a: 'Baketa está diseñado para ser ligero y la mayoría de los usuarios no notan ralentización. Sin embargo, los juegos con alto consumo de memoria o GPU pueden verse afectados.',
+    faq4_q: '¿Cuál es la diferencia entre traducción Live y Shot?',
+    faq4_a: 'La traducción Live monitorea la pantalla continuamente y traduce el texto a medida que aparece. La traducción Shot captura y traduce un solo fotograma bajo demanda — útil para menús o texto estático.',
+    faq5_q: '¿Se necesita conexión a internet?',
+    faq5_a: 'No. OCR y traducción local funcionan completamente sin conexión. El Modo EX requiere internet pero es opcional.',
+    section_requirements: 'Requisitos del sistema',
+    req_os: 'SO', req_os_val: 'Windows 10/11 (64 bits)',
+    req_ram: 'RAM', req_ram_val: '8GB+ (16GB recomendado)',
+    req_gpu: 'GPU', req_gpu_val: 'VRAM 4GB+ (NVIDIA recomendado)',
+    req_storage: 'Almacenamiento', req_storage_val: '10GB+',
+    req_note: 'GPU NVIDIA (GTX 1060+) acelera el OCR hasta 59 veces',
+    req_check_btn: 'Comprobar tu PC',
+    check_unknown: 'No se pudo detectar (prueba Chrome/Edge)',
   },
   fr: {
     meta_title: 'Baketa - Brisez les barrières linguistiques, profitez des jeux du monde entier',
@@ -209,6 +323,25 @@ const TRANSLATIONS = {
     lang_en: 'English', lang_ja: '日本語', lang_zhCN: '简体中文', lang_zhTW: '繁體中文',
     lang_ko: '한국어', lang_es: 'Español', lang_fr: 'Français', lang_de: 'Deutsch',
     lang_it: 'Italiano', lang_pt: 'Português',
+    section_faq: 'Questions fréquentes',
+    faq1_q: 'Baketa est-il vraiment gratuit ?',
+    faq1_a: 'Oui ! Baketa est gratuit et open source. Les fonctionnalités de base, y compris l\'OCR local et la traduction, sont entièrement gratuites. Le Mode EX, une fonction de traduction haute précision, est disponible en option pour les supporters.',
+    faq2_q: 'Fonctionne-t-il avec tous les jeux ?',
+    faq2_a: 'Baketa fonctionne avec la plupart des jeux en mode fenêtré et fenêtré sans bordure sur Windows. Le mode plein écran exclusif peut nécessiter un passage en mode fenêtré sans bordure.',
+    faq3_q: 'Affecte-t-il les performances du jeu ?',
+    faq3_a: 'Baketa est conçu pour être léger et la plupart des utilisateurs ne remarquent aucun ralentissement. Cependant, les jeux gourmands en mémoire ou GPU peuvent être impactés.',
+    faq4_q: 'Quelle est la différence entre traduction Live et Shot ?',
+    faq4_a: 'La traduction Live surveille l\'écran en continu et traduit le texte dès qu\'il apparaît. La traduction Shot capture et traduit une seule image à la demande — utile pour les menus ou le texte statique.',
+    faq5_q: 'Une connexion internet est-elle nécessaire ?',
+    faq5_a: 'Non. L\'OCR et la traduction locale fonctionnent entièrement hors ligne. Le Mode EX nécessite une connexion internet mais est optionnel.',
+    section_requirements: 'Configuration requise',
+    req_os: 'OS', req_os_val: 'Windows 10/11 (64 bits)',
+    req_ram: 'RAM', req_ram_val: '8 Go+ (16 Go recommandé)',
+    req_gpu: 'GPU', req_gpu_val: 'VRAM 4 Go+ (NVIDIA recommandé)',
+    req_storage: 'Stockage', req_storage_val: '10 Go+',
+    req_note: 'GPU NVIDIA (GTX 1060+) accélère l\'OCR jusqu\'à 59 fois',
+    req_check_btn: 'Vérifier votre PC',
+    check_unknown: 'Impossible de détecter (essayez Chrome/Edge)',
   },
   de: {
     meta_title: 'Baketa - Überwinde Sprachbarrieren und genieße Spiele weltweit',
@@ -236,6 +369,25 @@ const TRANSLATIONS = {
     lang_en: 'English', lang_ja: '日本語', lang_zhCN: '简体中文', lang_zhTW: '繁體中文',
     lang_ko: '한국어', lang_es: 'Español', lang_fr: 'Français', lang_de: 'Deutsch',
     lang_it: 'Italiano', lang_pt: 'Português',
+    section_faq: 'Häufig gestellte Fragen',
+    faq1_q: 'Ist Baketa wirklich kostenlos?',
+    faq1_a: 'Ja! Baketa ist kostenlos und Open Source. Grundfunktionen einschließlich lokaler OCR und Übersetzung sind völlig kostenlos. Der EX-Modus, eine hochpräzise Übersetzungsfunktion, ist optional für Unterstützer verfügbar.',
+    faq2_q: 'Funktioniert es mit jedem Spiel?',
+    faq2_a: 'Baketa funktioniert mit den meisten Fenster- und randlosen Fenster-Spielen unter Windows. Der exklusive Vollbildmodus erfordert möglicherweise den Wechsel in den randlosen Fenstermodus.',
+    faq3_q: 'Beeinträchtigt es die Spielleistung?',
+    faq3_a: 'Baketa ist auf Leichtigkeit ausgelegt und die meisten Nutzer berichten von keiner spürbaren Verlangsamung. Bei Spielen mit hohem Speicher- oder GPU-Verbrauch kann es jedoch zu Beeinträchtigungen kommen.',
+    faq4_q: 'Was ist der Unterschied zwischen Live- und Shot-Übersetzung?',
+    faq4_a: 'Live-Übersetzung überwacht den Bildschirm kontinuierlich und übersetzt Text bei Erscheinen. Shot-Übersetzung erfasst und übersetzt ein einzelnes Bild auf Abruf — nützlich für Menüs oder statischen Text.',
+    faq5_q: 'Ist eine Internetverbindung erforderlich?',
+    faq5_a: 'Nein. OCR und lokale Übersetzung funktionieren vollständig offline. Der EX-Modus benötigt eine Internetverbindung, ist aber optional.',
+    section_requirements: 'Systemanforderungen',
+    req_os: 'OS', req_os_val: 'Windows 10/11 (64-Bit)',
+    req_ram: 'RAM', req_ram_val: '8 GB+ (16 GB empfohlen)',
+    req_gpu: 'GPU', req_gpu_val: 'VRAM 4 GB+ (NVIDIA empfohlen)',
+    req_storage: 'Speicher', req_storage_val: '10 GB+',
+    req_note: 'NVIDIA GPU (GTX 1060+) beschleunigt die OCR-Verarbeitung bis zu 59-fach',
+    req_check_btn: 'PC prüfen',
+    check_unknown: 'Konnte nicht erkannt werden (versuchen Sie Chrome/Edge)',
   },
   it: {
     meta_title: 'Baketa - Supera le barriere linguistiche, goditi i giochi di tutto il mondo',
@@ -263,6 +415,25 @@ const TRANSLATIONS = {
     lang_en: 'English', lang_ja: '日本語', lang_zhCN: '简体中文', lang_zhTW: '繁體中文',
     lang_ko: '한국어', lang_es: 'Español', lang_fr: 'Français', lang_de: 'Deutsch',
     lang_it: 'Italiano', lang_pt: 'Português',
+    section_faq: 'Domande frequenti',
+    faq1_q: 'Baketa è davvero gratuito?',
+    faq1_a: 'Sì! Baketa è gratuito e open source. Le funzionalità base, inclusi OCR locale e traduzione, sono completamente gratuite. La Modalità EX, una funzione di traduzione ad alta precisione, è disponibile opzionalmente per i sostenitori.',
+    faq2_q: 'Funziona con qualsiasi gioco?',
+    faq2_a: 'Baketa funziona con la maggior parte dei giochi in modalità finestra e finestra senza bordi su Windows. La modalità schermo intero esclusivo potrebbe richiedere il passaggio alla modalità finestra senza bordi.',
+    faq3_q: 'Influisce sulle prestazioni del gioco?',
+    faq3_a: 'Baketa è progettato per essere leggero e la maggior parte degli utenti non nota rallentamenti. Tuttavia, i giochi con elevato consumo di memoria o GPU potrebbero risentirne.',
+    faq4_q: 'Qual è la differenza tra traduzione Live e Shot?',
+    faq4_a: 'La traduzione Live monitora lo schermo continuamente e traduce il testo appena appare. La traduzione Shot cattura e traduce un singolo frame su richiesta — utile per menu o testo statico.',
+    faq5_q: 'È necessaria una connessione internet?',
+    faq5_a: 'No. OCR e traduzione locale funzionano completamente offline. La Modalità EX richiede connessione internet ma è opzionale.',
+    section_requirements: 'Requisiti di sistema',
+    req_os: 'SO', req_os_val: 'Windows 10/11 (64 bit)',
+    req_ram: 'RAM', req_ram_val: '8GB+ (16GB consigliati)',
+    req_gpu: 'GPU', req_gpu_val: 'VRAM 4GB+ (NVIDIA consigliato)',
+    req_storage: 'Archiviazione', req_storage_val: '10GB+',
+    req_note: 'GPU NVIDIA (GTX 1060+) accelera l\'OCR fino a 59 volte',
+    req_check_btn: 'Controlla il tuo PC',
+    check_unknown: 'Impossibile rilevare (prova Chrome/Edge)',
   },
   pt: {
     meta_title: 'Baketa - Quebre as barreiras do idioma e aproveite jogos do mundo todo',
@@ -290,6 +461,25 @@ const TRANSLATIONS = {
     lang_en: 'English', lang_ja: '日本語', lang_zhCN: '简体中文', lang_zhTW: '繁體中文',
     lang_ko: '한국어', lang_es: 'Español', lang_fr: 'Français', lang_de: 'Deutsch',
     lang_it: 'Italiano', lang_pt: 'Português',
+    section_faq: 'Perguntas frequentes',
+    faq1_q: 'Baketa é realmente grátis?',
+    faq1_a: 'Sim! Baketa é grátis e de código aberto. Recursos básicos incluindo OCR local e tradução são completamente gratuitos. O Modo EX, uma função de tradução de alta precisão, está disponível opcionalmente para apoiadores.',
+    faq2_q: 'Funciona com qualquer jogo?',
+    faq2_a: 'Baketa funciona com a maioria dos jogos em modo janela e janela sem bordas no Windows. O modo tela cheia exclusivo pode exigir a mudança para o modo janela sem bordas.',
+    faq3_q: 'Afeta o desempenho do jogo?',
+    faq3_a: 'Baketa é projetado para ser leve e a maioria dos usuários não nota lentidão. No entanto, jogos com alto consumo de memória ou GPU podem ser impactados.',
+    faq4_q: 'Qual é a diferença entre tradução Live e Shot?',
+    faq4_a: 'A tradução Live monitora a tela continuamente e traduz o texto conforme aparece. A tradução Shot captura e traduz um único frame sob demanda — útil para menus ou texto estático.',
+    faq5_q: 'É necessária conexão com a internet?',
+    faq5_a: 'Não. OCR e tradução local funcionam totalmente offline. O Modo EX requer internet mas é opcional.',
+    section_requirements: 'Requisitos do sistema',
+    req_os: 'SO', req_os_val: 'Windows 10/11 (64 bits)',
+    req_ram: 'RAM', req_ram_val: '8GB+ (16GB recomendado)',
+    req_gpu: 'GPU', req_gpu_val: 'VRAM 4GB+ (NVIDIA recomendado)',
+    req_storage: 'Armazenamento', req_storage_val: '10GB+',
+    req_note: 'GPU NVIDIA (GTX 1060+) acelera o OCR até 59 vezes',
+    req_check_btn: 'Verificar seu PC',
+    check_unknown: 'Não foi possível detectar (tente Chrome/Edge)',
   },
 };
 
@@ -297,6 +487,11 @@ const TRANSLATIONS = {
  * Detect user's preferred language from browser settings
  */
 function detectLanguage() {
+  // URL parameter takes highest priority (for shareable links)
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlLang = urlParams.get('lang');
+  if (urlLang && SUPPORTED_LANGS.includes(urlLang)) return urlLang;
+
   const browserLang = navigator.language || navigator.userLanguage || DEFAULT_LANG;
 
   // Exact match first (e.g., zh-CN, zh-TW)
@@ -341,7 +536,13 @@ function applyTranslations(lang) {
   // Highlight current language in language grid
   document.querySelectorAll('.lang-item').forEach(el => {
     el.classList.toggle('lang-item--active', el.dataset.lang === lang);
+    el.setAttribute('aria-pressed', el.dataset.lang === lang);
   });
+
+  // Update URL parameter for shareable links (without page reload)
+  const url = new URL(window.location);
+  url.searchParams.set('lang', lang);
+  history.replaceState(null, '', url);
 
   // Update demo asset
   updateDemoAsset(lang);
@@ -380,15 +581,111 @@ function updateDemoAsset(lang) {
   }
 }
 
+/**
+ * Check user's RAM and GPU specs
+ */
+function checkSpecs(lang) {
+  const t = TRANSLATIONS[lang] || TRANSLATIONS[DEFAULT_LANG];
+  const results = document.getElementById('check-results');
+  results.style.display = '';
+
+  // --- RAM check ---
+  const ramItem = document.getElementById('check-ram');
+  const ramIcon = document.getElementById('check-ram-icon');
+  const ramValue = document.getElementById('check-ram-value');
+
+  if (navigator.deviceMemory) {
+    const gb = navigator.deviceMemory;
+    ramValue.textContent = `${gb}GB`;
+    if (gb >= 16) {
+      ramItem.className = 'lp-check__item lp-check__item--ok';
+      ramIcon.textContent = '\u2714';
+    } else if (gb >= 8) {
+      ramItem.className = 'lp-check__item lp-check__item--ok';
+      ramIcon.textContent = '\u2714';
+    } else {
+      ramItem.className = 'lp-check__item lp-check__item--ng';
+      ramIcon.textContent = '\u2716';
+    }
+  } else {
+    ramItem.className = 'lp-check__item lp-check__item--unknown';
+    ramIcon.textContent = '?';
+    ramValue.textContent = t.check_unknown || 'Could not detect (try Chrome/Edge)';
+  }
+
+  // --- GPU check ---
+  const gpuItem = document.getElementById('check-gpu');
+  const gpuIcon = document.getElementById('check-gpu-icon');
+  const gpuValue = document.getElementById('check-gpu-value');
+
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (gl) {
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      if (ext) {
+        const renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+        gpuValue.textContent = renderer;
+
+        if (/nvidia/i.test(renderer)) {
+          gpuItem.className = 'lp-check__item lp-check__item--ok';
+          gpuIcon.textContent = '\u2714';
+        } else if (/amd|radeon/i.test(renderer)) {
+          gpuItem.className = 'lp-check__item lp-check__item--warn';
+          gpuIcon.textContent = '\u25B2';
+        } else if (/intel/i.test(renderer)) {
+          gpuItem.className = 'lp-check__item lp-check__item--warn';
+          gpuIcon.textContent = '\u25B2';
+        } else {
+          gpuItem.className = 'lp-check__item lp-check__item--unknown';
+          gpuIcon.textContent = '?';
+        }
+      } else {
+        gpuItem.className = 'lp-check__item lp-check__item--unknown';
+        gpuIcon.textContent = '?';
+        gpuValue.textContent = t.check_unknown || 'Could not detect';
+      }
+    }
+  } catch {
+    gpuItem.className = 'lp-check__item lp-check__item--unknown';
+    gpuIcon.textContent = '?';
+    gpuValue.textContent = t.check_unknown || 'Could not detect';
+  }
+
+  // Hide button after check
+  document.getElementById('check-specs-btn').style.display = 'none';
+}
+
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   const lang = detectLanguage();
   applyTranslations(lang);
 
-  // Language grid click handler
+  // Language grid click + keyboard handler
   document.querySelectorAll('.lang-item').forEach(el => {
     el.addEventListener('click', () => {
       applyTranslations(el.dataset.lang);
     });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        applyTranslations(el.dataset.lang);
+      }
+    });
   });
+
+  // PC spec check button (Windows + detectable browsers only)
+  const checkBtn = document.getElementById('check-specs-btn');
+  if (checkBtn) {
+    const isWindows = /Windows/i.test(navigator.userAgent);
+    const hasDeviceMemory = 'deviceMemory' in navigator;
+    if (isWindows && hasDeviceMemory) {
+      checkBtn.addEventListener('click', () => {
+        const currentLang = document.documentElement.lang || DEFAULT_LANG;
+        checkSpecs(currentLang);
+      });
+    } else {
+      checkBtn.style.display = 'none';
+    }
+  }
 });

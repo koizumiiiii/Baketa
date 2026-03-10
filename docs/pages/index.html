@@ -4,19 +4,137 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Baketa - Break language barriers, enjoy games worldwide</title>
-  <meta name="description" content="Baketa is a Windows app that translates game text in real-time using OCR overlay. Play any game in your language.">
+  <meta name="description" content="Baketa is a free, open-source Windows app that translates game text in real-time using OCR overlay. Supports 10 languages including English, Japanese, Chinese, Korean, and European languages.">
+
+  <!-- Favicon -->
+  <link rel="icon" href="assets/icons/baketa.ico" sizes="any">
+  <link rel="icon" href="assets/icons/baketa-icon.svg" type="image/svg+xml">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/baketa-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/baketa-16.png">
+  <link rel="apple-touch-icon" href="assets/icons/baketa-256.png">
+
+  <!-- SEO -->
+  <meta name="keywords" content="game translation, OCR overlay, real-time translation, gaming, Windows app, free, open source, Baketa, ゲーム翻訳, 遊戲翻譯, 게임 번역">
+  <meta name="author" content="Baketa">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://koizumiiiii.github.io/Baketa/">
+
+  <!-- Open Graph (Facebook, Discord, etc.) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Baketa - Game Translation Overlay">
+  <meta property="og:description" content="Free, open-source real-time game translation. OCR detects text on screen and overlays translations. 10 languages supported.">
+  <meta property="og:url" content="https://koizumiiiii.github.io/Baketa/">
+  <meta property="og:image" content="https://koizumiiiii.github.io/Baketa/assets/icons/baketa-256.png">
+  <meta property="og:image:width" content="256">
+  <meta property="og:image:height" content="256">
+  <meta property="og:site_name" content="Baketa">
+  <meta property="og:locale" content="en">
+  <meta property="og:locale:alternate" content="ja">
+  <meta property="og:locale:alternate" content="ko">
+  <meta property="og:locale:alternate" content="zh-CN">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:site" content="@Baketa_app">
+  <meta name="twitter:title" content="Baketa - Game Translation Overlay">
+  <meta name="twitter:description" content="Free, open-source real-time game translation. OCR detects text on screen and overlays translations.">
+  <meta name="twitter:image" content="https://koizumiiiii.github.io/Baketa/assets/icons/baketa-256.png">
+
+  <!-- Structured Data (JSON-LD) for Google / LLM -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Baketa",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Windows 10, Windows 11",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "Baketa is a free, open-source Windows application that translates game text in real-time using OCR technology. It overlays translated text directly on the game screen, supporting 10 languages including English, Japanese, Chinese (Simplified & Traditional), Korean, Spanish, French, German, Italian, and Portuguese.",
+    "url": "https://koizumiiiii.github.io/Baketa/",
+    "downloadUrl": "https://github.com/koizumiiiii/Baketa/releases/latest/download/Baketa.zip",
+    "softwareVersion": "0.2",
+    "author": {
+      "@type": "Organization",
+      "name": "Baketa",
+      "url": "https://github.com/koizumiiiii/Baketa"
+    },
+    "license": "https://github.com/koizumiiiii/Baketa/blob/main/LICENSE",
+    "inLanguage": ["en", "ja", "zh-CN", "zh-TW", "ko", "es", "fr", "de", "it", "pt"],
+    "keywords": "game translation, OCR, overlay, real-time, Windows, free, open source"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Is Baketa really free?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes! Baketa is free and open source. Basic features including local OCR and translation are completely free. EX Mode, a high-accuracy translation feature, is optionally available for supporters."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does it work with any game?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Baketa works with most windowed and borderless-windowed games on Windows. Full-screen exclusive mode may require switching to borderless windowed mode."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does it affect game performance?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Baketa is designed to be lightweight and most users report no noticeable slowdown. However, games with heavy memory or GPU usage may experience some impact."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the difference between Live and Shot translation?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Live translation continuously monitors the screen and translates text as it appears. Shot translation captures and translates a single frame on demand — useful for menus or static text."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is an internet connection required?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. OCR and local translation work fully offline. EX Mode requires an internet connection but is optional."
+        }
+      }
+    ]
+  }
+  </script>
+
   <link rel="stylesheet" href="css/landing.css">
 </head>
 <body>
 
   <!-- ======== 1. Hero ======== -->
   <section class="lp-hero">
+    <!-- Pixel clouds -->
+    <div class="lp-cloud lp-cloud--1"></div>
+    <div class="lp-cloud lp-cloud--2"></div>
+    <div class="lp-cloud lp-cloud--3"></div>
+    <div class="lp-cloud lp-cloud--4"></div>
+    <div class="lp-cloud lp-cloud--5"></div>
+
     <!-- Pixel sparkle decorations -->
-    <div class="lp-hero__sparkle"></div>
-    <div class="lp-hero__sparkle"></div>
-    <div class="lp-hero__sparkle"></div>
-    <div class="lp-hero__sparkle"></div>
-    <div class="lp-hero__sparkle"></div>
+    <div class="lp-hero__sparkle lp-hero__sparkle--1"></div>
+    <div class="lp-hero__sparkle lp-hero__sparkle--2"></div>
+    <div class="lp-hero__sparkle lp-hero__sparkle--3"></div>
+    <div class="lp-hero__sparkle lp-hero__sparkle--4"></div>
+    <div class="lp-hero__sparkle lp-hero__sparkle--5"></div>
 
     <div class="lp-badge" data-i18n="badge">Free & Open Source</div>
     <p class="lp-hero__tagline" data-i18n="hero_tagline">Game Translation Overlay</p>
@@ -43,36 +161,35 @@
     </div>
   </section>
 
-  <!-- ======== 2. Demo ======== -->
+  <!-- ======== 2. Demo (素材準備後に有効化) ========
   <section class="lp-section lp-demo">
     <div class="lp-container">
       <h2 class="lp-section-title" data-i18n="section_demo">See it in action</h2>
       <div class="lp-demo__frame">
-        <!-- Video preferred; falls back to image via JS -->
         <video id="demo-video" autoplay loop muted playsinline>
           <source src="assets/demo/demo-en.mp4" type="video/mp4">
         </video>
-        <!-- Fallback image (hidden by default when video exists) -->
         <img id="demo-image" src="assets/demo/demo-en.png" alt="Baketa demo" style="display:none;">
       </div>
     </div>
   </section>
+  -->
 
   <!-- ======== 3. Languages ======== -->
   <section class="lp-section">
     <div class="lp-container">
       <h2 class="lp-section-title" data-i18n="section_languages">Supported Languages</h2>
       <div class="lp-languages-grid">
-        <div class="lang-item" data-lang="en"    data-i18n="lang_en">English</div>
-        <div class="lang-item" data-lang="ja"    data-i18n="lang_ja">日本語</div>
-        <div class="lang-item" data-lang="zh-CN" data-i18n="lang_zhCN">简体中文</div>
-        <div class="lang-item" data-lang="zh-TW" data-i18n="lang_zhTW">繁體中文</div>
-        <div class="lang-item" data-lang="ko"    data-i18n="lang_ko">한국어</div>
-        <div class="lang-item" data-lang="es"    data-i18n="lang_es">Español</div>
-        <div class="lang-item" data-lang="fr"    data-i18n="lang_fr">Français</div>
-        <div class="lang-item" data-lang="de"    data-i18n="lang_de">Deutsch</div>
-        <div class="lang-item" data-lang="it"    data-i18n="lang_it">Italiano</div>
-        <div class="lang-item" data-lang="pt"    data-i18n="lang_pt">Português</div>
+        <div class="lang-item" data-lang="en"    data-i18n="lang_en" tabindex="0" role="button">English</div>
+        <div class="lang-item" data-lang="ja"    data-i18n="lang_ja" tabindex="0" role="button">日本語</div>
+        <div class="lang-item" data-lang="zh-CN" data-i18n="lang_zhCN" tabindex="0" role="button">简体中文</div>
+        <div class="lang-item" data-lang="zh-TW" data-i18n="lang_zhTW" tabindex="0" role="button">繁體中文</div>
+        <div class="lang-item" data-lang="ko"    data-i18n="lang_ko" tabindex="0" role="button">한국어</div>
+        <div class="lang-item" data-lang="es"    data-i18n="lang_es" tabindex="0" role="button">Español</div>
+        <div class="lang-item" data-lang="fr"    data-i18n="lang_fr" tabindex="0" role="button">Français</div>
+        <div class="lang-item" data-lang="de"    data-i18n="lang_de" tabindex="0" role="button">Deutsch</div>
+        <div class="lang-item" data-lang="it"    data-i18n="lang_it" tabindex="0" role="button">Italiano</div>
+        <div class="lang-item" data-lang="pt"    data-i18n="lang_pt" tabindex="0" role="button">Português</div>
       </div>
     </div>
   </section>
@@ -101,7 +218,81 @@
     </div>
   </section>
 
-  <!-- ======== 5. Footer CTA ======== -->
+  <!-- ======== 5. System Requirements ======== -->
+  <section class="lp-section">
+    <div class="lp-container">
+      <h2 class="lp-section-title" data-i18n="section_requirements">System Requirements</h2>
+      <div class="lp-requirements">
+        <div class="lp-req-item">
+          <div class="lp-req-item__icon">🖥</div>
+          <div class="lp-req-item__label" data-i18n="req_os">OS</div>
+          <div class="lp-req-item__value" data-i18n="req_os_val">Windows 10/11 (64-bit)</div>
+        </div>
+        <div class="lp-req-item">
+          <div class="lp-req-item__icon">💾</div>
+          <div class="lp-req-item__label" data-i18n="req_ram">RAM</div>
+          <div class="lp-req-item__value" data-i18n="req_ram_val">8GB+ (16GB recommended)</div>
+        </div>
+        <div class="lp-req-item">
+          <div class="lp-req-item__icon">🎮</div>
+          <div class="lp-req-item__label" data-i18n="req_gpu">GPU</div>
+          <div class="lp-req-item__value" data-i18n="req_gpu_val">VRAM 4GB+ (NVIDIA recommended)</div>
+        </div>
+        <div class="lp-req-item">
+          <div class="lp-req-item__icon">📁</div>
+          <div class="lp-req-item__label" data-i18n="req_storage">Storage</div>
+          <div class="lp-req-item__value" data-i18n="req_storage_val">10GB+</div>
+        </div>
+      </div>
+      <p class="lp-requirements__note" data-i18n="req_note">NVIDIA GPU (GTX 1060+) accelerates OCR processing up to 59x faster</p>
+      <div class="lp-check">
+        <button class="lp-btn lp-btn--check" id="check-specs-btn" data-i18n="req_check_btn">Check your PC</button>
+        <div class="lp-check__results" id="check-results" style="display:none;">
+          <div class="lp-check__item" id="check-ram">
+            <span class="lp-check__icon" id="check-ram-icon"></span>
+            <span class="lp-check__label" data-i18n="req_ram">RAM</span>
+            <span class="lp-check__value" id="check-ram-value"></span>
+          </div>
+          <div class="lp-check__item" id="check-gpu">
+            <span class="lp-check__icon" id="check-gpu-icon"></span>
+            <span class="lp-check__label" data-i18n="req_gpu">GPU</span>
+            <span class="lp-check__value" id="check-gpu-value"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== 6. FAQ ======== -->
+  <section class="lp-section lp-faq">
+    <div class="lp-container">
+      <h2 class="lp-section-title" data-i18n="section_faq">FAQ</h2>
+      <div class="lp-faq__list">
+        <details class="lp-faq__item">
+          <summary class="lp-faq__question" data-i18n="faq1_q">Is Baketa really free?</summary>
+          <div class="lp-faq__answer" data-i18n="faq1_a">Yes! Baketa is free and open source. Basic features including local OCR and translation are completely free. EX Mode, a high-accuracy translation feature, is optionally available for supporters.</div>
+        </details>
+        <details class="lp-faq__item">
+          <summary class="lp-faq__question" data-i18n="faq2_q">Does it work with any game?</summary>
+          <div class="lp-faq__answer" data-i18n="faq2_a">Baketa works with most windowed and borderless-windowed games on Windows. Full-screen exclusive mode may require switching to borderless windowed mode.</div>
+        </details>
+        <details class="lp-faq__item">
+          <summary class="lp-faq__question" data-i18n="faq3_q">Does it affect game performance?</summary>
+          <div class="lp-faq__answer" data-i18n="faq3_a">Baketa is designed to be lightweight and most users report no noticeable slowdown. However, games with heavy memory or GPU usage may experience some impact.</div>
+        </details>
+        <details class="lp-faq__item">
+          <summary class="lp-faq__question" data-i18n="faq4_q">What is the difference between Live and Shot translation?</summary>
+          <div class="lp-faq__answer" data-i18n="faq4_a">Live translation continuously monitors the screen and translates text as it appears. Shot translation captures and translates a single frame on demand — useful for menus or static text.</div>
+        </details>
+        <details class="lp-faq__item">
+          <summary class="lp-faq__question" data-i18n="faq5_q">Is an internet connection required?</summary>
+          <div class="lp-faq__answer" data-i18n="faq5_a">No. OCR and local translation work fully offline. EX Mode requires an internet connection but is optional.</div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== 6. Footer CTA ======== -->
   <section class="lp-section lp-footer-cta">
     <div class="lp-container">
       <p class="lp-footer-cta__title" data-i18n="footer_cta">Start your new gaming experience</p>
