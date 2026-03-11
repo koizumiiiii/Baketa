@@ -16,7 +16,7 @@ using Xunit;
 using DrawingRectangle = System.Drawing.Rectangle;
 using CoreLanguagePair = Baketa.Core.Models.Translation.LanguagePair;
 using CoreLanguage = Baketa.Core.Models.Translation.Language;
-using TranslationLanguage = Baketa.Core.Translation.Models.Language;
+using TranslationLanguage = Baketa.Core.Models.Translation.Language;
 using TranslationResponse = Baketa.Core.Translation.Models.TranslationResponse;
 
 namespace Baketa.Application.Tests.EventHandlers.Translation;

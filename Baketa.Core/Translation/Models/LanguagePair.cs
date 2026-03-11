@@ -1,4 +1,5 @@
 using System;
+using Baketa.Core.Models.Translation;
 
 namespace Baketa.Core.Translation.Models;
 

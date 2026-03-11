@@ -9,6 +9,7 @@ using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Events.EventTypes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Language = Baketa.Core.Models.Translation.Language;
 using TransModels = Baketa.Core.Translation.Models;
 
 namespace Baketa.Infrastructure.Translation;
@@ -202,8 +203,8 @@ public class DefaultTranslationService : ITranslationService
     /// <returns>翻訳結果</returns>
     public async Task<TransModels.TranslationResponse> TranslateAsync(
         string text,
-        TransModels.Language sourceLang,
-        TransModels.Language targetLang,
+        Language sourceLang,
+        Language targetLang,
         string? context = null,
         CancellationToken cancellationToken = default)
     {
@@ -259,8 +260,8 @@ public class DefaultTranslationService : ITranslationService
     /// <returns>翻訳結果のコレクション</returns>
     public async Task<IReadOnlyList<TransModels.TranslationResponse>> TranslateBatchAsync(
         IReadOnlyList<string> texts,
-        TransModels.Language sourceLang,
-        TransModels.Language targetLang,
+        Language sourceLang,
+        Language targetLang,
         string? context = null,
         CancellationToken cancellationToken = default)
     {

@@ -13,6 +13,7 @@ using Baketa.Core.Translation.Common;
 using Baketa.Core.Translation.Events;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
+using Language = Baketa.Core.Models.Translation.Language;
 
 namespace Baketa.Application.Translation;
 
@@ -186,18 +187,8 @@ public sealed class StandardTranslationPipeline(
             var translationRequest = new TranslationRequest
             {
                 SourceText = request.SourceText,
-                SourceLanguage = new Language
-                {
-                    Code = request.SourceLanguage.Code,
-                    Name = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code,
-                    DisplayName = !string.IsNullOrEmpty(request.SourceLanguage.DisplayName) ? request.SourceLanguage.DisplayName : request.SourceLanguage.Code
-                },
-                TargetLanguage = new Language
-                {
-                    Code = request.TargetLanguage.Code,
-                    Name = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code,
-                    DisplayName = !string.IsNullOrEmpty(request.TargetLanguage.DisplayName) ? request.TargetLanguage.DisplayName : request.TargetLanguage.Code
-                },
+                SourceLanguage = request.SourceLanguage,
+                TargetLanguage = request.TargetLanguage,
                 Context = request.Context != null ? new TranslationContext { DialogueId = request.Context.ToString() } : null
             };
 
@@ -700,18 +691,8 @@ public sealed class StandardTranslationPipeline(
                     var engineRequests = nonCachedRequests.Select(x => new TranslationRequest
                     {
                         SourceText = x.Request.SourceText,
-                        SourceLanguage = new Language
-                        {
-                            Code = x.Request.SourceLanguage.Code,
-                            Name = !string.IsNullOrEmpty(x.Request.SourceLanguage.DisplayName) ? x.Request.SourceLanguage.DisplayName : x.Request.SourceLanguage.Code,
-                            DisplayName = !string.IsNullOrEmpty(x.Request.SourceLanguage.DisplayName) ? x.Request.SourceLanguage.DisplayName : x.Request.SourceLanguage.Code
-                        },
-                        TargetLanguage = new Language
-                        {
-                            Code = x.Request.TargetLanguage.Code,
-                            Name = !string.IsNullOrEmpty(x.Request.TargetLanguage.DisplayName) ? x.Request.TargetLanguage.DisplayName : x.Request.TargetLanguage.Code,
-                            DisplayName = !string.IsNullOrEmpty(x.Request.TargetLanguage.DisplayName) ? x.Request.TargetLanguage.DisplayName : x.Request.TargetLanguage.Code
-                        },
+                        SourceLanguage = x.Request.SourceLanguage,
+                        TargetLanguage = x.Request.TargetLanguage,
                         // RequestIdは読み取り専用プロパティなので形式変更
                         // 代入はできないのでここではスキップ
                         // RequestId = x.Request.RequestId, 

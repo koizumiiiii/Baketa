@@ -1,4 +1,5 @@
 using System;
+using Baketa.Core.Models.Translation;
 
 namespace Baketa.Core.Translation.Models;
 
@@ -88,7 +89,7 @@ public class LanguageDetectionResult
 
         return new LanguageDetectionResult
         {
-            DetectedLanguage = new Language { Code = "unknown", DisplayName = "Unknown" },
+            DetectedLanguage = new Language("unknown", "Unknown"),
             ConfidenceScore = 0,
             IsReliable = false,
             IsSuccessful = false,

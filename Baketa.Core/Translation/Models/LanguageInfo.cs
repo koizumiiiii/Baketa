@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Baketa.Core.Models.Translation;
 
 namespace Baketa.Core.Translation.Models;
 
@@ -118,10 +119,8 @@ public class LanguageInfo
     /// <returns>Language</returns>
     public Language ToLanguage()
     {
-        return new Language
+        return new Language(Code, Name)
         {
-            Code = Code,
-            DisplayName = Name,
             Name = Name, // 互換性のため
             NativeName = NativeName ?? Name,
             RegionCode = RegionCode,

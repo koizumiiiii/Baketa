@@ -7,6 +7,7 @@ using Baketa.Core.Translation;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Language = Baketa.Core.Models.Translation.Language;
 
 namespace Baketa.Core.Tests.Translation.Testing;
 
@@ -19,13 +20,13 @@ public class DummyEngine : TranslationEngineBase
     [
         new LanguagePair
             {
-                SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" },
-                TargetLanguage = new Language { Code = "en", DisplayName = "English" }
+                SourceLanguage = new Language("ja", "Japanese"),
+                TargetLanguage = new Language("en", "English")
             },
             new LanguagePair
             {
-                SourceLanguage = new Language { Code = "en", DisplayName = "English" },
-                TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" }
+                SourceLanguage = new Language("en", "English"),
+                TargetLanguage = new Language("ja", "Japanese")
             },
         ];
 

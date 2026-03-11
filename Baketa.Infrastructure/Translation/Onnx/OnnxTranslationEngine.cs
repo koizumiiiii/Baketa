@@ -3,6 +3,7 @@ using System.IO;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation;
 using Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;

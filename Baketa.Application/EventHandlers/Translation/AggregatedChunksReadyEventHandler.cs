@@ -28,7 +28,7 @@ using Baketa.Application.Services.Translation; // [Issue #291] ITranslationContr
 using Baketa.Core.Settings; // [Issue #379] RoiManagerSettings用
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options; // [Issue #379] IOptions用
-using Language = Baketa.Core.Translation.Models.Language;
+using Language = Baketa.Core.Models.Translation.Language;
 
 namespace Baketa.Application.EventHandlers.Translation;
 

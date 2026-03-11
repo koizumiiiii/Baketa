@@ -1,5 +1,6 @@
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
+using Language = Baketa.Core.Models.Translation.Language;
 using Xunit;
 
 namespace Baketa.Core.Tests.Utilities;

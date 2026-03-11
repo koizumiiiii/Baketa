@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation.Onnx;
+using Language = Baketa.Core.Models.Translation.Language;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
