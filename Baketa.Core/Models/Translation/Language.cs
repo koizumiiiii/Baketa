@@ -56,7 +56,7 @@ public sealed record Language(string Code, string DisplayName)
     /// <summary>
     /// 簡体字中国語
     /// </summary>
-    public static Language ChineseSimplified => new("zh-cn", "Chinese (Simplified)")
+    public static Language ChineseSimplified => new("zh-CN", "Chinese (Simplified)")
     {
         NativeName = "中文（简体）",
         RegionCode = "CN"
@@ -65,7 +65,7 @@ public sealed record Language(string Code, string DisplayName)
     /// <summary>
     /// 繁体字中国語
     /// </summary>
-    public static Language ChineseTraditional => new("zh-tw", "Chinese (Traditional)")
+    public static Language ChineseTraditional => new("zh-TW", "Chinese (Traditional)")
     {
         NativeName = "中文（繁體）",
         RegionCode = "TW"
