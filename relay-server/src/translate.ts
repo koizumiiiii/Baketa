@@ -1434,6 +1434,24 @@ function getTargetLanguageName(code: string): string {
   return map[code.toLowerCase()] ?? code;
 }
 
+/** [Issue #523] ターゲット言語での出力強制指示（現地語） */
+function getNativeLanguageInstruction(code: string): string {
+  const map: Record<string, string> = {
+    'ja': 'すべての翻訳結果を必ず日本語のみで出力してください。',
+    'ko': '반드시 모든 번역 결과를 한국어로만 출력하세요.',
+    'zh-tw': '請務必僅以繁體中文輸出所有翻譯結果。',
+    'zh-cn': '请务必仅以简体中文输出所有翻译结果。',
+    'fr': 'Veuillez traduire exclusivement en français.',
+    'de': 'Bitte übersetzen Sie ausschließlich ins Deutsche.',
+    'es': 'Por favor, traduzca exclusivamente al español.',
+    'it': 'Si prega di tradurre esclusivamente in italiano.',
+    'pt': 'Por favor, traduza exclusivamente para o português.',
+    'ru': 'Пожалуйста, переводите исключительно на русский язык.',
+    'ar': 'يرجى الترجمة حصريًا إلى العربية.',
+  };
+  return map[code.toLowerCase()] ?? '';
+}
+
 function estimateImageTokens(base64Length: number): number {
   // Base64は約1.33倍のサイズなので、元のバイト数を推定
   const estimatedBytes = Math.floor(base64Length * 0.75);
@@ -1640,6 +1658,8 @@ Prioritize these areas when detecting text.
 
   // [Issue #517] 言語コード→言語名変換（AIプロンプト用）
   const targetLanguageName = getTargetLanguageName(request.target_language);
+  // [Issue #523] ターゲット言語での出力強制指示（現地語）
+  const nativeInstruction = getNativeLanguageInstruction(request.target_language);
 
   // [Issue #368] プロンプト最適化（~650トークン → ~220トークン）
   // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
@@ -1663,7 +1683,8 @@ Do not invent or guess text that is not clearly visible in the image.
 - Keep proper nouns as-is.
 - CRITICAL: Within each text element, extract ONLY the readable characters without reproducing visual spacing or layout. If characters of a single word appear spread out, join them (e.g., "大　地" → "大地").
 - Character names and dialog text are SEPARATE items even if visually adjacent. A name label above/beside a dialog box is its own item.
-- When multiple lines form a continuous sentence (e.g., dialog spanning 2-3 lines within the same text box), combine them into ONE item. Do NOT split a sentence across multiple items.${jaSpecific}
+- When multiple lines form a continuous sentence (e.g., dialog spanning 2-3 lines within the same text box), combine them into ONE item. Do NOT split a sentence across multiple items.
+- [Issue #523] CRITICAL: ALL translations MUST be entirely in ${targetLanguageName}. Do NOT mix in English or any other language. Only proper nouns (character names, place names) may remain in their original form.${jaSpecific}
 
 # Rules
 - Every item MUST have is_legible, original, and translation fields.
@@ -1686,7 +1707,7 @@ Note: Name, dialog, and button are SEPARATE items. Visual spacing within each te
 {"texts":[{"is_legible":true,"original":"Dialog text","translation":"翻訳テキスト","bounding_box":[100,50,200,950],"confidence_score":0.95}],"detected_language":"ja"}
 
 Bounding boxes: normalized 0-1000 scale, [y_min, x_min, y_max, x_max].
-If no text visible: {"texts":[],"detected_language":""}`;
+If no text visible: {"texts":[],"detected_language":""}${nativeInstruction ? `\n\n${nativeInstruction}` : ''}`;
 
   const geminiRequest: GeminiRequest = {
     contents: [{
@@ -1733,7 +1754,8 @@ If no text visible: {"texts":[],"detected_language":""}`;
                 },
                 translation: {
                   type: 'STRING',
-                  description: 'MUST NOT contain tab characters (\\t), newlines (\\n), or control characters. Plain translated text only.',
+                  // [Issue #523] ターゲット言語での出力をスキーマレベルで強制
+                  description: `Translated text strictly in ${targetLanguageName}. No English or other languages allowed unless it is a proper noun. MUST NOT contain tab characters (\\t), newlines (\\n), or control characters.`,
                 },
                 bounding_box: {
                   type: 'ARRAY',
@@ -1947,6 +1969,8 @@ Prioritize these areas when detecting text.
 
   // [Issue #517] 言語コード→言語名変換（AIプロンプト用）
   const targetLanguageName = getTargetLanguageName(request.target_language);
+  // [Issue #523] ターゲット言語での出力強制指示（現地語）
+  const nativeInstruction = getNativeLanguageInstruction(request.target_language);
 
   // [Issue #368] プロンプト最適化（Geminiと同一プロンプト構造）
   // [Issue #297] GeminiとOpenAIで同一プロンプトを使用（一貫性確保）
@@ -1967,7 +1991,8 @@ Do not invent or guess text that is not clearly visible in the image.
 - Preserve character tone/personality from visual context.
 - Keep proper nouns as-is.
 - Extract pure text content only. Do NOT reproduce visual character spacing, layout, or indentation from the image. No tabs or whitespace padding.
-- When multiple lines of text are visually adjacent and form a continuous sentence or paragraph (e.g., dialog spanning 2-3 lines), combine them into ONE item with a single bounding_box covering the entire text area. Do NOT split a sentence across multiple items.${jaSpecific}
+- When multiple lines of text are visually adjacent and form a continuous sentence or paragraph (e.g., dialog spanning 2-3 lines), combine them into ONE item with a single bounding_box covering the entire text area. Do NOT split a sentence across multiple items.
+- [Issue #523] CRITICAL: ALL translations MUST be entirely in ${targetLanguageName}. Do NOT mix in English or any other language. Only proper nouns (character names, place names) may remain in their original form.${jaSpecific}
 
 # Rules
 - Every item MUST have is_legible, original, and translation fields.
@@ -1987,7 +2012,7 @@ Do not invent or guess text that is not clearly visible in the image.
 }
 
 Bounding boxes: normalized 0-1000 scale, [y_min, x_min, y_max, x_max].
-If no text visible: {"texts": [], "detected_language": ""}`;
+If no text visible: {"texts": [], "detected_language": ""}${nativeInstruction ? `\n\n${nativeInstruction}` : ''}`;
 
   const openaiRequest: OpenAIRequest = {
     model: modelName,
