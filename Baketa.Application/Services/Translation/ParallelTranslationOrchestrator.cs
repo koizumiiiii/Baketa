@@ -5,6 +5,7 @@ using Baketa.Core.Models.Validation;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
+using Language = Baketa.Core.Models.Translation.Language;
 
 // 名前空間の曖昧性解決
 using ITranslationServiceCore = Baketa.Core.Abstractions.Translation.ITranslationService;

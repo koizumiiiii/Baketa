@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Core.Translation;
@@ -623,11 +624,7 @@ public abstract class TranslationEngineBase : ITranslationEngine, IAsyncDisposab
         // 基本実装（派生クラスでオーバーライド可能）
         var result = new LanguageDetectionResult
         {
-            DetectedLanguage = new Language
-            {
-                Code = "auto",
-                DisplayName = "自動検出"
-            },
+            DetectedLanguage = new Language("auto", "自動検出"),
             Confidence = 0.5f,
             EngineName = Name
         };

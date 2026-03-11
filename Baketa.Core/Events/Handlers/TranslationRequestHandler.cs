@@ -7,6 +7,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Translation.Common;
 using Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 using Baketa.Core.Utilities;
 using Microsoft.Extensions.Logging;
 

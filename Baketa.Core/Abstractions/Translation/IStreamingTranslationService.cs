@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 
 namespace Baketa.Core.Abstractions.Translation;
 

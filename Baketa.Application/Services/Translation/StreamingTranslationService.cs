@@ -12,6 +12,7 @@ using Baketa.Core.Events.Diagnostics;
 using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Utilities;
+using Language = Baketa.Core.Models.Translation.Language;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Application.Services.Translation;

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
+using Language = Baketa.Core.Models.Translation.Language;
 
 namespace Baketa.Application.Translation;
 

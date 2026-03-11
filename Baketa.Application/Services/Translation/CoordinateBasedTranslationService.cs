@@ -26,6 +26,7 @@ using Baketa.Core.Settings;
 using Baketa.Core.Translation.Abstractions; // [Issue #290] IFallbackOrchestrator, ImageTranslationRequest
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Abstractions.License; // [Issue #290] ILicenseManager
+using Language = Baketa.Core.Models.Translation.Language;
 using Baketa.Core.License.Models; // [Issue #290] FeatureType
 using Baketa.Core.Abstractions.Roi; // [Issue #293] IRoiManager
 using Baketa.Core.Abstractions.Text; // [Issue #293] IGateStrategy

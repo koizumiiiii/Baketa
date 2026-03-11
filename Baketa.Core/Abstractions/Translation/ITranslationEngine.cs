@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 
 namespace Baketa.Core.Abstractions.Translation;
 
@@ -89,7 +90,7 @@ public interface ITranslationEngine : IDisposable
         CancellationToken cancellationToken = default)
         => Task.FromResult(new LanguageDetectionResult
         {
-            DetectedLanguage = new Language { Code = "auto", DisplayName = "自動検出" },
+            DetectedLanguage = new Language("auto", "自動検出"),
             Confidence = 0.0f,
             EngineName = Name
         });

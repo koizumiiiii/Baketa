@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation.Strategies;

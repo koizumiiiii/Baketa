@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Baketa.Core.Translation.Events;
 using Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 
 namespace Baketa.Core.Translation.Common;
 
@@ -18,23 +19,15 @@ public static class TranslationExtensions
     /// <param name="sourceLanguage">元言語</param>
     /// <param name="targetLanguage">対象言語</param>
     /// <returns>言語ペア</returns>
-    public static LanguagePair ToLanguagePair(this Models.Language sourceLanguage, Models.Language targetLanguage)
+    public static LanguagePair ToLanguagePair(this Language sourceLanguage, Language targetLanguage)
     {
         ArgumentNullException.ThrowIfNull(sourceLanguage);
         ArgumentNullException.ThrowIfNull(targetLanguage);
 
         return new LanguagePair
         {
-            SourceLanguage = new Models.Language
-            {
-                Code = sourceLanguage.Code,
-                DisplayName = sourceLanguage.DisplayName
-            },
-            TargetLanguage = new Models.Language
-            {
-                Code = targetLanguage.Code,
-                DisplayName = targetLanguage.DisplayName
-            }
+            SourceLanguage = new Language(sourceLanguage.Code, sourceLanguage.DisplayName),
+            TargetLanguage = new Language(targetLanguage.Code, targetLanguage.DisplayName)
         };
     }
 
@@ -44,7 +37,7 @@ public static class TranslationExtensions
     /// <param name="pair1">言語ペア1</param>
     /// <param name="pair2">言語ペア2</param>
     /// <returns>一致する場合はtrue</returns>
-    public static bool Matches(this Models.LanguagePair pair1, Models.LanguagePair pair2)
+    public static bool Matches(this LanguagePair pair1, LanguagePair pair2)
     {
         if (pair1 == null || pair2 == null)
             return false;
@@ -213,7 +206,7 @@ public static class TranslationExtensions
     /// </summary>
     /// <param name="languagePair">言語ペア</param>
     /// <returns>同言語ペアの場合はtrue（翻訳スキップ推奨）</returns>
-    public static bool IsSameLanguagePair(this Models.LanguagePair languagePair)
+    public static bool IsSameLanguagePair(this LanguagePair languagePair)
     {
         ArgumentNullException.ThrowIfNull(languagePair);
         ArgumentNullException.ThrowIfNull(languagePair.SourceLanguage);
@@ -306,7 +299,7 @@ public static class TranslationExtensions
     /// </summary>
     /// <param name="language">言語オブジェクト</param>
     /// <returns>言語名</returns>
-    public static string Name(this Models.Language language)
+    public static string Name(this Language language)
     {
         // Codeから言語名を生成
         return language?.Code ?? "Unknown";

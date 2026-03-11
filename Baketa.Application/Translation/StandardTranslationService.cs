@@ -8,6 +8,7 @@ using Baketa.Core.Translation.Abstractions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
 using TransModels = Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 using ITranslationServiceContract = Baketa.Core.Translation.Abstractions.ITranslationService;
 
 namespace Baketa.Application.Translation;
@@ -168,7 +169,7 @@ public sealed class StandardTranslationService(
         // 一時的な言語検出結果を返す
         return new TransModels.LanguageDetectionResult
         {
-            DetectedLanguage = new TransModels.Language { Code = "auto", DisplayName = "自動検出" },
+            DetectedLanguage = new Language("auto", "自動検出"),
             Confidence = 0.5f,
             EngineName = "DummyDetector"
         };

@@ -14,6 +14,7 @@ using Baketa.Core.Events.EventTypes;
 using Baketa.Core.Models.OCR;
 using Baketa.Core.Translation.Models;
 using Baketa.Core.Translation.Pipeline;
+using Language = Baketa.Core.Models.Translation.Language;
 using Microsoft.Extensions.Logging;
 using ITranslationServiceCore = Baketa.Core.Abstractions.Translation.ITranslationService;
 using PipelineTranslationResult = Baketa.Core.Translation.Pipeline.TranslationResult;

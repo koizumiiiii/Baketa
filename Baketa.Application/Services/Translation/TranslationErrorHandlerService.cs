@@ -8,6 +8,7 @@ using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation.Exceptions;
 using Baketa.Core.Translation.Models;
 using Microsoft.Extensions.Logging;
+using Language = Baketa.Core.Models.Translation.Language;
 using TranslationMode = Baketa.Core.Abstractions.Services.TranslationMode;
 
 namespace Baketa.Application.Services.Translation;
@@ -73,8 +74,8 @@ public class TranslationErrorHandlerService(
                 // 既存のITranslationServiceを使用してシンプルに翻訳実行
                 var translationResult = await _translationService.TranslateAsync(
                     sourceText,
-                    new Language { Code = sourceLanguage, DisplayName = sourceLanguage },
-                    new Language { Code = targetLanguage, DisplayName = targetLanguage },
+                    new Language(sourceLanguage, sourceLanguage),
+                    new Language(targetLanguage, targetLanguage),
                     null, // context
                     cancellationToken).ConfigureAwait(false);
 

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Baketa.Core.Abstractions.Translation;
 using Baketa.Core.Translation;
 using Baketa.Core.Translation.Models;
+using Language = Baketa.Core.Models.Translation.Language;
 using Microsoft.Extensions.Logging;
 
 namespace Baketa.Infrastructure.Translation;
@@ -60,25 +61,25 @@ public class MockTranslationEngine : TranslationEngineBase
         // サポートする言語ペアを定義
         _supportedLanguagePairs = [
             // 英語 → 日本語
-            new LanguagePair { SourceLanguage = new Language { Code = "en", DisplayName = "English" }, TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } },
+            new LanguagePair { SourceLanguage = Language.English, TargetLanguage = Language.Japanese },
                 // 日本語 → 英語
-                new LanguagePair { SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, TargetLanguage = new Language { Code = "en", DisplayName = "English" } },
+                new LanguagePair { SourceLanguage = Language.Japanese, TargetLanguage = Language.English },
                 // 英語 → 中国語（簡体字）
-                new LanguagePair { SourceLanguage = new Language { Code = "en", DisplayName = "English" }, TargetLanguage = new Language { Code = "zh-CN", DisplayName = "Chinese (Simplified)" } },
+                new LanguagePair { SourceLanguage = Language.English, TargetLanguage = Language.ChineseSimplified },
                 // 中国語（簡体字） → 英語
-                new LanguagePair { SourceLanguage = new Language { Code = "zh-CN", DisplayName = "Chinese (Simplified)" }, TargetLanguage = new Language { Code = "en", DisplayName = "English" } },
+                new LanguagePair { SourceLanguage = Language.ChineseSimplified, TargetLanguage = Language.English },
                 // 日本語 → 中国語（簡体字）
-                new LanguagePair { SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, TargetLanguage = new Language { Code = "zh-CN", DisplayName = "Chinese (Simplified)" } },
+                new LanguagePair { SourceLanguage = Language.Japanese, TargetLanguage = Language.ChineseSimplified },
                 // 中国語（簡体字） → 日本語
-                new LanguagePair { SourceLanguage = new Language { Code = "zh-CN", DisplayName = "Chinese (Simplified)" }, TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } },
+                new LanguagePair { SourceLanguage = Language.ChineseSimplified, TargetLanguage = Language.Japanese },
                 // 英語 → 中国語（繁体字）
-                new LanguagePair { SourceLanguage = new Language { Code = "en", DisplayName = "English" }, TargetLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" } },
+                new LanguagePair { SourceLanguage = Language.English, TargetLanguage = Language.ChineseTraditional },
                 // 中国語（繁体字） → 英語
-                new LanguagePair { SourceLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" }, TargetLanguage = new Language { Code = "en", DisplayName = "English" } },
+                new LanguagePair { SourceLanguage = Language.ChineseTraditional, TargetLanguage = Language.English },
                 // 日本語 → 中国語（繁体字）
-                new LanguagePair { SourceLanguage = new Language { Code = "ja", DisplayName = "Japanese" }, TargetLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" } },
+                new LanguagePair { SourceLanguage = Language.Japanese, TargetLanguage = Language.ChineseTraditional },
                 // 中国語（繁体字） → 日本語
-                new LanguagePair { SourceLanguage = new Language { Code = "zh-TW", DisplayName = "Chinese (Traditional)" }, TargetLanguage = new Language { Code = "ja", DisplayName = "Japanese" } }
+                new LanguagePair { SourceLanguage = Language.ChineseTraditional, TargetLanguage = Language.Japanese }
         ];
 
         // テスト用の翻訳セットを初期化

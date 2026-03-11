@@ -402,8 +402,8 @@ public sealed class BackgroundWarmupService(
             // ダミー翻訳リクエスト（英語→日本語）
             var warmupRequest = Core.Translation.Models.TranslationRequest.Create(
                 sourceText: "Hello",
-                sourceLanguage: Core.Translation.Models.Language.English,
-                targetLanguage: Core.Translation.Models.Language.Japanese
+                sourceLanguage: Core.Models.Translation.Language.English,
+                targetLanguage: Core.Models.Translation.Language.Japanese
             );
 
             var response = await engine.TranslateAsync(warmupRequest, cancellationToken).ConfigureAwait(false);

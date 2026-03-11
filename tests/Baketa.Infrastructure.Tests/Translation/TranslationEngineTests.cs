@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Baketa.Core.Translation.Models;
 using Baketa.Infrastructure.Translation;
+using Language = Baketa.Core.Models.Translation.Language;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -99,11 +100,8 @@ public class TranslationEngineTests : IDisposable
     public async Task SupportsLanguagePairAsync_WithUnsupportedPair_ReturnsFalse()
     {
         // Arrange - 未サポートの言語ペア（仮の例としてフランス語を使用）
-        var unsupportedLanguage = new Language
+        var unsupportedLanguage = new Language("fr", "French")
         {
-            Code = "fr",
-            Name = "French",
-            DisplayName = "French",
             NativeName = "Français"
         };
         var pair = LanguagePair.Create(unsupportedLanguage, Language.Japanese);

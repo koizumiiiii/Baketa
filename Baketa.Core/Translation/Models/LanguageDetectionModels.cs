@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Baketa.Core.Models.Translation;
 
 namespace Baketa.Core.Translation.Models;
 

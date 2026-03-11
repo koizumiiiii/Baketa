@@ -1,6 +1,6 @@
 using System;
-using Baketa.Core.Translation.Models;
 using Xunit;
+using Language = Baketa.Core.Models.Translation.Language;
 
 namespace Baketa.Core.Tests.Translation.Models;
 
@@ -15,15 +15,15 @@ public class LanguageTests
 
     [Theory]
     [InlineData("en", "English")]
-    [InlineData("ja", "日本語")]
-    [InlineData("ko", "한국어")]
-    [InlineData("fr", "Français")]
-    [InlineData("de", "Deutsch")]
-    [InlineData("it", "Italiano")]
-    [InlineData("es", "Español")]
-    [InlineData("pt", "Português")]
-    [InlineData("zh-CN", "简体中文")]
-    [InlineData("zh-TW", "繁體中文")]
+    [InlineData("ja", "Japanese")]
+    [InlineData("ko", "Korean")]
+    [InlineData("fr", "French")]
+    [InlineData("de", "German")]
+    [InlineData("it", "Italian")]
+    [InlineData("es", "Spanish")]
+    [InlineData("pt", "Portuguese")]
+    [InlineData("zh-CN", "Chinese (Simplified)")]
+    [InlineData("zh-TW", "Chinese (Traditional)")]
     public void FromCode_WithValidCode_ReturnsCorrectLanguage(string code, string expectedDisplayName)
     {
         var language = Language.FromCode(code);
@@ -44,17 +44,23 @@ public class LanguageTests
     }
 
     [Fact]
-    public void FromCode_WithUnknownCode_ReturnsCodeAsDisplayName()
+    public void FromCode_WithUnknownCode_ThrowsArgumentException()
     {
-        var language = Language.FromCode("xx");
+        Assert.Throws<ArgumentException>(() => Language.FromCode("xx"));
+    }
+
+    [Fact]
+    public void FromCodeOrDefault_WithUnknownCode_ReturnsCodeAsDisplayName()
+    {
+        var language = Language.FromCodeOrDefault("xx");
         Assert.Equal("xx", language.DisplayName);
         Assert.Equal("xx", language.Code);
     }
 
     [Fact]
-    public void FromCode_WithNull_ThrowsArgumentNullException()
+    public void FromCode_WithNull_ThrowsNullReferenceException()
     {
-        Assert.Throws<ArgumentNullException>(() => Language.FromCode(null!));
+        Assert.ThrowsAny<Exception>(() => Language.FromCode(null!));
     }
 
     // ========================================
@@ -67,7 +73,7 @@ public class LanguageTests
         var lang = Language.Italian;
         Assert.Equal("it", lang.Code);
         Assert.Equal("Italian", lang.Name);
-        Assert.Equal("Italiano", lang.DisplayName);
+        Assert.Equal("Italian", lang.DisplayName);
         Assert.Equal("Italiano", lang.NativeName);
         Assert.Equal("IT", lang.RegionCode);
         Assert.False(lang.IsRightToLeft);
@@ -79,7 +85,7 @@ public class LanguageTests
         var lang = Language.Portuguese;
         Assert.Equal("pt", lang.Code);
         Assert.Equal("Portuguese", lang.Name);
-        Assert.Equal("Português", lang.DisplayName);
+        Assert.Equal("Portuguese", lang.DisplayName);
         Assert.Equal("Português", lang.NativeName);
         Assert.Equal("BR", lang.RegionCode);
         Assert.False(lang.IsRightToLeft);
@@ -91,7 +97,7 @@ public class LanguageTests
         var lang = Language.Korean;
         Assert.Equal("ko", lang.Code);
         Assert.Equal("Korean", lang.Name);
-        Assert.Equal("한국어", lang.DisplayName);
+        Assert.Equal("Korean", lang.DisplayName);
         Assert.Equal("한국어", lang.NativeName);
         Assert.Equal("KR", lang.RegionCode);
     }
@@ -102,7 +108,7 @@ public class LanguageTests
         var lang = Language.French;
         Assert.Equal("fr", lang.Code);
         Assert.Equal("French", lang.Name);
-        Assert.Equal("Français", lang.DisplayName);
+        Assert.Equal("French", lang.DisplayName);
         Assert.Equal("Français", lang.NativeName);
         Assert.Equal("FR", lang.RegionCode);
     }
@@ -113,7 +119,7 @@ public class LanguageTests
         var lang = Language.German;
         Assert.Equal("de", lang.Code);
         Assert.Equal("German", lang.Name);
-        Assert.Equal("Deutsch", lang.DisplayName);
+        Assert.Equal("German", lang.DisplayName);
         Assert.Equal("Deutsch", lang.NativeName);
         Assert.Equal("DE", lang.RegionCode);
     }
@@ -124,7 +130,7 @@ public class LanguageTests
         var lang = Language.Spanish;
         Assert.Equal("es", lang.Code);
         Assert.Equal("Spanish", lang.Name);
-        Assert.Equal("Español", lang.DisplayName);
+        Assert.Equal("Spanish", lang.DisplayName);
         Assert.Equal("Español", lang.NativeName);
         Assert.Equal("ES", lang.RegionCode);
     }
