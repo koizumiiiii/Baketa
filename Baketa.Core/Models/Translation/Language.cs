@@ -232,6 +232,25 @@ public sealed record Language(string Code, string DisplayName)
     public bool IsValidForTranslation => !IsAutoDetect && Code != "auto";
 
     /// <summary>
+    /// [Issue #520] 等価比較: Codeベースの大文字小文字無視比較
+    /// 旧Language classとの互換性を維持
+    /// recordのデフォルト（全プロパティ比較）をオーバーライド
+    /// </summary>
+    public bool Equals(Language? other)
+    {
+        if (other is null) return false;
+        return string.Equals(Code, other.Code, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// ハッシュコード: Codeベースの大文字小文字無視
+    /// </summary>
+    public override int GetHashCode()
+    {
+        return StringComparer.OrdinalIgnoreCase.GetHashCode(Code ?? string.Empty);
+    }
+
+    /// <summary>
     /// 文字列表現
     /// </summary>
     public override string ToString()
