@@ -426,8 +426,8 @@ public class TranslationOrchestrationServiceTests : IDisposable
         // Act
         await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
 
-        // エラー発生後も処理が継続されるまで少し待機
-        await Task.Delay(300);
+        // エラー発生後も処理が継続されるまで待機（CI環境では処理が遅いため余裕を持たせる）
+        await Task.Delay(3000);
 
         // Assert
         _service.IsAutomaticTranslationActive.Should().BeTrue();

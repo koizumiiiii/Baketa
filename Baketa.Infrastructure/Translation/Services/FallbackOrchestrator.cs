@@ -27,9 +27,14 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
     private const string SecondaryKey = "secondary";
 
     /// <summary>
-    /// フォールバック無効化期間（エンジン失敗後）
+    /// [Issue #521] ヘルスチェック失敗時のクールダウン（一時的なネットワーク問題）
     /// </summary>
-    private static readonly TimeSpan FallbackCooldown = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan HealthCheckCooldown = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// [Issue #521] APIエラー・ハルシネーション・予期せぬ例外時のクールダウン
+    /// </summary>
+    private static readonly TimeSpan ApiErrorCooldown = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// コンストラクタ
@@ -190,9 +195,10 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
                     Duration = DateTime.UtcNow - startTime
                 });
 
+                // [Issue #521] ヘルスチェック失敗は一時的 → 短いクールダウン
                 _engineStatusManager.MarkEngineUnavailable(
                     engineKey,
-                    FallbackCooldown,
+                    HealthCheckCooldown,
                     "可用性チェック失敗");
 
                 return null;
@@ -223,7 +229,7 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
 
                     _engineStatusManager.MarkEngineUnavailable(
                         engineKey,
-                        FallbackCooldown,
+                        ApiErrorCooldown,
                         $"Hallucination: {hallucinationReason}");
 
                     return null; // → 次のエンジンへフォールバック
@@ -307,7 +313,7 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
             {
                 _engineStatusManager.MarkEngineUnavailable(
                     engineKey,
-                    FallbackCooldown,
+                    ApiErrorCooldown,
                     response.Error.Message);
             }
 
@@ -333,7 +339,7 @@ public sealed class FallbackOrchestrator : IFallbackOrchestrator
 
             _engineStatusManager.MarkEngineUnavailable(
                 engineKey,
-                FallbackCooldown,
+                ApiErrorCooldown,
                 ex.Message);
 
             return null;
