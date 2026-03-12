@@ -287,9 +287,44 @@ public class FallbackOrchestratorTests
         Assert.True(result.IsSuccess);
         Assert.Equal(FallbackLevel.Secondary, result.UsedEngine);
 
-        // Verify engine was marked unavailable
+        // Verify engine was marked unavailable with ApiErrorCooldown (5 min)
         _mockEngineStatusManager.Verify(
-            x => x.MarkEngineUnavailable(PrimaryKey, It.IsAny<TimeSpan>(), It.IsAny<string>()),
+            x => x.MarkEngineUnavailable(PrimaryKey, TimeSpan.FromMinutes(5), It.IsAny<string>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// [Issue #521] ヘルスチェック失敗時は短いクールダウン（30秒）が適用されることを検証
+    /// </summary>
+    [Fact]
+    public async Task TranslateWithFallbackAsync_HealthCheckFails_UsesShortCooldown()
+    {
+        // Arrange
+        var request = CreateTestRequest();
+
+        var mockPrimaryTranslator = new Mock<ICloudImageTranslator>();
+        mockPrimaryTranslator.Setup(x => x.ProviderId).Returns("primary");
+        mockPrimaryTranslator
+            .Setup(x => x.IsAvailableAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false); // ヘルスチェック失敗
+
+        var mockSecondaryTranslator = CreateMockTranslator("secondary", true, request.RequestId);
+
+        SetupEngineAvailable(PrimaryKey, true);
+        SetupEngineAvailable(SecondaryKey, true);
+        SetupKeyedService(PrimaryKey, mockPrimaryTranslator.Object);
+        SetupKeyedService(SecondaryKey, mockSecondaryTranslator.Object);
+
+        // Act
+        var result = await _orchestrator.TranslateWithFallbackAsync(request);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(FallbackLevel.Secondary, result.UsedEngine);
+
+        // [Issue #521] ヘルスチェック失敗は30秒クールダウン
+        _mockEngineStatusManager.Verify(
+            x => x.MarkEngineUnavailable(PrimaryKey, TimeSpan.FromSeconds(30), "可用性チェック失敗"),
             Times.Once);
     }
 
