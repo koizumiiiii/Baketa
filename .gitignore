@@ -600,6 +600,8 @@ dev_cert.*
 # Video/Audio test files (usually large)
 test_media/
 *.mp4
+# Landing page demo videos are allowed (compressed, ~1MB each)
+!docs/pages/assets/demo/*.mp4
 *.avi
 *.mov
 *.wav
