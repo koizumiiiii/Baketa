@@ -337,5 +337,39 @@
   </footer>
 
   <script src="js/i18n-landing.js"></script>
+  <script>
+    // GA4 Custom Events
+    document.addEventListener('DOMContentLoaded', function() {
+      // Download button clicks
+      document.querySelectorAll('a[href*="Baketa.zip"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          gtag('event', 'download_click', {
+            event_category: 'engagement',
+            event_label: btn.closest('.lp-footer-cta') ? 'footer' : 'hero'
+          });
+        });
+      });
+
+      // Language selection
+      document.querySelectorAll('.lang-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+          gtag('event', 'language_select', {
+            event_category: 'engagement',
+            event_label: item.dataset.lang
+          });
+        });
+      });
+
+      // GitHub / X link clicks
+      document.querySelectorAll('.lp-social a').forEach(function(link) {
+        link.addEventListener('click', function() {
+          gtag('event', 'social_click', {
+            event_category: 'engagement',
+            event_label: link.getAttribute('aria-label')
+          });
+        });
+      });
+    });
+  </script>
 </body>
 </html>
