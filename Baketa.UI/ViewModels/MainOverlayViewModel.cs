@@ -1711,37 +1711,26 @@ public class MainOverlayViewModel : ViewModelBase
 
         try
         {
-            // 🔥 [ISSUE#163_TOGGLE] トグル動作: オーバーレイ表示中なら非表示
+            // [Issue #163] トグル動作: オーバーレイ表示中なら非表示（クリア）
             if (IsSingleshotOverlayVisible)
             {
                 Logger?.LogInformation("🗑️ シングルショットオーバーレイを非表示にします");
 
                 try
                 {
-                    // 🔥 [ISSUE#163_CRASH_FIX] HideAllAsync()でクラッシュするため、
-                    // 暫定対策として可視性のみ変更（破棄はしない）
-                    // オーバーレイは次の翻訳実行時に自然にクリアされる
                     await _overlayManager.SetAllVisibilityAsync(false).ConfigureAwait(false);
-
-                    // 状態をリセット
                     IsSingleshotOverlayVisible = false;
-
                     Logger?.LogInformation("✅ シングルショットオーバーレイ非表示完了");
                 }
                 catch (Exception ex)
                 {
                     Logger?.LogError(ex, "オーバーレイ非表示中にエラーが発生: {ErrorMessage}", ex.Message);
-                    // エラーが発生しても状態はリセット
                     IsSingleshotOverlayVisible = false;
-
-                    // 🔥 [ISSUE#171_PHASE2] ユーザーに具体的なエラーメッセージを通知
-                    await _errorNotificationService.ShowErrorAsync(
-                        $"翻訳結果の非表示に失敗しました。\n原因: {ex.Message}\n対処: アプリを再起動してください。").ConfigureAwait(false);
                 }
                 return;
             }
 
-            // 🔥 [ISSUE#163_TOGGLE] オーバーレイ非表示時: 翻訳実行
+            // 翻訳実行
             Logger?.LogInformation("シングルショット翻訳実行開始");
 
             // 🔔 [LOADING] ローディング表示開始
