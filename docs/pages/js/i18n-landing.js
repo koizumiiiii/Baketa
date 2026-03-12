@@ -549,35 +549,174 @@ function applyTranslations(lang) {
 }
 
 /**
- * Update demo image/video based on selected language
- * Video is preferred; if the video file is missing, falls back to image
+ * Current gallery state
+ */
+let currentGalleryIndex = 0;
+let currentDemoLang = DEFAULT_LANG;
+
+// Map language codes to demo asset file suffixes
+const DEMO_LANG_MAP = {
+  'en': 'en', 'ja': 'ja', 'zh-CN': 'cn', 'zh-TW': 'tw',
+  'ko': 'ko', 'es': 'es', 'fr': 'fr', 'de': 'de', 'it': 'it', 'pt': 'pt'
+};
+
+/**
+ * Update demo assets based on selected language
  */
 function updateDemoAsset(lang) {
-  const demoImg = document.getElementById('demo-image');
+  currentDemoLang = lang;
   const demoVideo = document.getElementById('demo-video');
-
   if (demoVideo) {
     const src = demoVideo.querySelector('source');
     if (src) {
-      src.src = `assets/demo/demo-${lang}.mp4`;
+      src.src = `assets/demo/demo-${DEMO_LANG_MAP[lang] || lang}.mp4`;
       demoVideo.load();
-      demoVideo.style.display = '';
-      if (demoImg) demoImg.style.display = 'none';
-
-      // Fallback to image if video fails to load
-      demoVideo.onerror = () => {
-        demoVideo.style.display = 'none';
-        if (demoImg) {
-          demoImg.src = `assets/demo/demo-${lang}.png`;
-          demoImg.alt = `Baketa demo - ${lang}`;
-          demoImg.style.display = '';
-        }
-      };
     }
-  } else if (demoImg) {
-    demoImg.src = `assets/demo/demo-${lang}.png`;
-    demoImg.alt = `Baketa demo - ${lang}`;
-    demoImg.style.display = '';
+  }
+  // Update thumbnail backgrounds
+  updateThumbBackgrounds(lang);
+  // If currently showing an image thumb, refresh it
+  if (currentGalleryIndex > 0) {
+    selectGalleryItem(currentGalleryIndex);
+  }
+}
+
+/**
+ * Update thumbnail background images based on language
+ */
+function updateThumbBackgrounds(lang) {
+  document.querySelectorAll('.lp-gallery__thumb').forEach(thumb => {
+    if (thumb.dataset.srcTemplate) {
+      const url = getThumbImageUrl(thumb, lang);
+      thumb.style.backgroundImage = `url('${url}')`;
+    }
+  });
+}
+
+/**
+ * Get the image URL for a thumb based on language
+ */
+function getThumbImageUrl(thumb, lang) {
+  const fileLang = DEMO_LANG_MAP[lang] || lang;
+  const template = thumb.dataset.srcTemplate;
+  if (template) {
+    return template.replace('{lang}', fileLang) + '.webp';
+  }
+  return '';
+}
+
+
+/**
+ * Select a gallery item (video or image) by index
+ */
+function selectGalleryItem(index) {
+  currentGalleryIndex = index;
+  const thumbs = document.querySelectorAll('.lp-gallery__thumb');
+  const demoVideo = document.getElementById('demo-video');
+  const demoImg = document.getElementById('demo-image');
+
+  // Update active thumb
+  thumbs.forEach((t, i) => {
+    t.classList.toggle('lp-gallery__thumb--active', i === index);
+  });
+
+  const thumb = thumbs[index];
+  if (!thumb) return;
+
+  if (thumb.dataset.type === 'video') {
+    if (demoVideo) { demoVideo.style.display = ''; demoVideo.play(); }
+    if (demoImg) demoImg.style.display = 'none';
+  } else {
+    const url = getThumbImageUrl(thumb, currentDemoLang);
+    if (demoVideo) { demoVideo.style.display = 'none'; demoVideo.pause(); }
+    if (demoImg) {
+      demoImg.src = url;
+      demoImg.alt = `Baketa demo - ${currentDemoLang}`;
+      demoImg.style.display = '';
+    }
+  }
+}
+
+/**
+ * Open modal with current gallery content
+ */
+function openModal() {
+  const modal = document.getElementById('gallery-modal');
+  if (!modal) return;
+
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  updateModalContent();
+
+  // GA4 event
+  const thumbs = document.querySelectorAll('.lp-gallery__thumb');
+  const thumb = thumbs[currentGalleryIndex];
+  if (typeof gtag === 'function') {
+    gtag('event', 'gallery_modal_open', {
+      event_category: 'engagement',
+      event_label: thumb?.dataset.type === 'video' ? 'video' : `image_${currentGalleryIndex}`
+    });
+  }
+}
+
+/**
+ * Close modal
+ */
+function closeModal() {
+  const modal = document.getElementById('gallery-modal');
+  const modalVideo = document.getElementById('modal-video');
+  if (!modal) return;
+
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  if (modalVideo) { modalVideo.pause(); modalVideo.src = ''; }
+}
+
+/**
+ * Navigate modal to next/previous gallery item
+ */
+function modalNavigate(direction) {
+  const thumbs = document.querySelectorAll('.lp-gallery__thumb');
+  const total = thumbs.length;
+  if (total === 0) return;
+
+  let newIndex = currentGalleryIndex + direction;
+  if (newIndex < 0) newIndex = total - 1;
+  if (newIndex >= total) newIndex = 0;
+
+  selectGalleryItem(newIndex);
+  // Re-render modal content
+  updateModalContent();
+}
+
+/**
+ * Update modal content to match current gallery selection
+ */
+function updateModalContent() {
+  const modal = document.getElementById('gallery-modal');
+  if (!modal || modal.getAttribute('aria-hidden') !== 'false') return;
+
+  const modalVideo = document.getElementById('modal-video');
+  const modalImg = document.getElementById('modal-image');
+  const thumbs = document.querySelectorAll('.lp-gallery__thumb');
+  const thumb = thumbs[currentGalleryIndex];
+  if (!thumb) return;
+
+  if (thumb.dataset.type === 'video') {
+    const demoVideo = document.getElementById('demo-video');
+    if (modalVideo && demoVideo) {
+      modalVideo.src = demoVideo.querySelector('source')?.src || '';
+      modalVideo.style.display = '';
+      modalVideo.play();
+    }
+    if (modalImg) modalImg.style.display = 'none';
+  } else {
+    const url = getThumbImageUrl(thumb, currentDemoLang);
+    if (modalImg) {
+      modalImg.src = url;
+      modalImg.style.display = '';
+    }
+    if (modalVideo) { modalVideo.style.display = 'none'; modalVideo.pause(); modalVideo.src = ''; }
   }
 }
 
@@ -660,6 +799,7 @@ function checkSpecs(lang) {
 document.addEventListener('DOMContentLoaded', () => {
   const lang = detectLanguage();
   applyTranslations(lang);
+  updateThumbBackgrounds(lang);
 
   // Language grid click + keyboard handler
   document.querySelectorAll('.lang-item').forEach(el => {
@@ -673,6 +813,38 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  // Gallery: thumb clicks
+  document.querySelectorAll('.lp-gallery__thumb').forEach((thumb, i) => {
+    thumb.addEventListener('click', () => selectGalleryItem(i));
+  });
+
+  // Gallery: main area click → open modal
+  const galleryMain = document.getElementById('gallery-main');
+  if (galleryMain) {
+    galleryMain.addEventListener('click', openModal);
+  }
+
+  // Modal: close handlers
+  const modal = document.getElementById('gallery-modal');
+  if (modal) {
+    modal.querySelector('.lp-modal__backdrop')?.addEventListener('click', closeModal);
+    modal.querySelector('.lp-modal__close')?.addEventListener('click', closeModal);
+    modal.querySelector('.lp-modal__nav--prev')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      modalNavigate(-1);
+    });
+    modal.querySelector('.lp-modal__nav--next')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      modalNavigate(1);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (modal.getAttribute('aria-hidden') !== 'false') return;
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') modalNavigate(-1);
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') modalNavigate(1);
+    });
+  }
 
   // PC spec check button (Windows + detectable browsers only)
   const checkBtn = document.getElementById('check-specs-btn');

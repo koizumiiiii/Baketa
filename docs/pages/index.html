@@ -170,19 +170,50 @@
     </div>
   </section>
 
-  <!-- ======== 2. Demo (素材準備後に有効化) ========
+  <!-- ======== 2. Demo Gallery (Steam-style) ======== -->
   <section class="lp-section lp-demo">
     <div class="lp-container">
       <h2 class="lp-section-title" data-i18n="section_demo">See it in action</h2>
-      <div class="lp-demo__frame">
-        <video id="demo-video" autoplay loop muted playsinline>
-          <source src="assets/demo/demo-en.mp4" type="video/mp4">
-        </video>
-        <img id="demo-image" src="assets/demo/demo-en.png" alt="Baketa demo" style="display:none;">
+      <div class="lp-gallery">
+        <div class="lp-gallery__main" id="gallery-main">
+          <video id="demo-video" autoplay loop muted playsinline>
+            <source src="assets/demo/demo-en.mp4" type="video/mp4">
+          </video>
+          <img id="demo-image" alt="Baketa demo" style="display:none;">
+        </div>
+        <div class="lp-gallery__thumbs" id="gallery-thumbs">
+          <div class="lp-gallery__thumb lp-gallery__thumb--active" data-type="video" data-index="0">
+            <div class="lp-gallery__thumb-play">▶</div>
+            <span>Demo</span>
+          </div>
+          <div class="lp-gallery__thumb" data-type="image" data-index="1" data-src-template="assets/demo/demo-{lang}1">
+            <span>Scene 1</span>
+          </div>
+          <div class="lp-gallery__thumb" data-type="image" data-index="2" data-src-template="assets/demo/demo-{lang}2">
+            <span>Scene 2</span>
+          </div>
+          <div class="lp-gallery__thumb" data-type="image" data-index="3" data-src-template="assets/demo/demo-{lang}3">
+            <span>Scene 3</span>
+          </div>
+          <div class="lp-gallery__thumb" data-type="image" data-index="4" data-src-template="assets/demo/demo-{lang}4">
+            <span>Scene 4</span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
-  -->
+
+  <!-- Modal overlay -->
+  <div class="lp-modal" id="gallery-modal" aria-hidden="true">
+    <div class="lp-modal__backdrop"></div>
+    <div class="lp-modal__content">
+      <button class="lp-modal__close" aria-label="Close">&times;</button>
+      <button class="lp-modal__nav lp-modal__nav--prev" aria-label="Previous">&#8249;</button>
+      <button class="lp-modal__nav lp-modal__nav--next" aria-label="Next">&#8250;</button>
+      <video id="modal-video" autoplay loop muted playsinline style="display:none;"></video>
+      <img id="modal-image" alt="Baketa demo enlarged" style="display:none;">
+    </div>
+  </div>
 
   <!-- ======== 3. Languages ======== -->
   <section class="lp-section">
