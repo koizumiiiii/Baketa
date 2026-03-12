@@ -92,6 +92,8 @@ public class TranslationOrchestrationServiceTests : IDisposable
             null, // textChangeDetectionService（Issue #410: テスト用にnull）
             null, // cloudTranslationCache（Issue #415: テスト用にnull）
             null, // unifiedSettingsService（ONNXモデル オンデマンドロード/アンロード: テスト用にnull）
+            null, // detectionBoundsCache（Issue #525: テスト用にnull）
+            null, // imageChangeDetectionService（Issue #525: テスト用にnull）
             _loggerMock.Object);
     }
 
@@ -632,4 +634,145 @@ public class TranslationOrchestrationServiceTests : IDisposable
     }
 
     #endregion
+}
+
+/// <summary>
+/// [Issue #525] ClearAllDetectionCaches のキャッシュクリア動作テスト
+/// </summary>
+public class TranslationOrchestrationServiceCacheClearTests : IDisposable
+{
+    private readonly Mock<ICaptureService> _captureServiceMock;
+    private readonly Mock<ISettingsService> _settingsServiceMock;
+    private readonly Mock<Baketa.Core.Abstractions.OCR.IOcrEngine> _ocrEngineMock;
+    private readonly Mock<IEventAggregator> _eventAggregatorMock;
+    private readonly Mock<ILogger<TranslationOrchestrationService>> _loggerMock;
+    private readonly Mock<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService> _textChangeDetectionMock;
+    private readonly Mock<Baketa.Core.Abstractions.Processing.IDetectionBoundsCache> _detectionBoundsCacheMock;
+    private readonly Mock<Baketa.Core.Abstractions.Services.IImageChangeDetectionService> _imageChangeDetectionMock;
+    private readonly Mock<IImage> _imageMock;
+    private readonly TranslationOrchestrationService _service;
+    private bool _disposed;
+
+    public TranslationOrchestrationServiceCacheClearTests()
+    {
+        _captureServiceMock = new Mock<ICaptureService>();
+        _settingsServiceMock = new Mock<ISettingsService>();
+        _ocrEngineMock = new Mock<Baketa.Core.Abstractions.OCR.IOcrEngine>();
+        _eventAggregatorMock = new Mock<IEventAggregator>();
+        _loggerMock = new Mock<ILogger<TranslationOrchestrationService>>();
+        _textChangeDetectionMock = new Mock<Baketa.Core.Abstractions.Processing.ITextChangeDetectionService>();
+        _detectionBoundsCacheMock = new Mock<Baketa.Core.Abstractions.Processing.IDetectionBoundsCache>();
+        _imageChangeDetectionMock = new Mock<Baketa.Core.Abstractions.Services.IImageChangeDetectionService>();
+        _imageMock = new Mock<IImage>();
+        _imageMock.Setup(x => x.Clone()).Returns(() => new Mock<IImage>().Object);
+
+        _captureServiceMock
+            .Setup(x => x.CaptureScreenAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_imageMock.Object);
+
+        _settingsServiceMock.Setup(x => x.GetValue(It.IsAny<string>(), It.IsAny<int>())).Returns(2000);
+        _settingsServiceMock.Setup(x => x.GetValue(It.IsAny<string>(), It.IsAny<string>())).Returns(string.Empty);
+        _settingsServiceMock.Setup(x => x.GetValue(It.IsAny<string>(), It.IsAny<double>())).Returns(0.5);
+        _settingsServiceMock.Setup(x => x.GetValue(It.IsAny<string>(), It.IsAny<bool>())).Returns(false);
+
+        var ocrSettingsMock = new Mock<Microsoft.Extensions.Options.IOptionsMonitor<Baketa.Core.Settings.OcrSettings>>();
+        ocrSettingsMock.Setup(x => x.CurrentValue).Returns(new Baketa.Core.Settings.OcrSettings { DetectionThreshold = 0.03 });
+
+        _ocrEngineMock.Setup(x => x.IsInitialized).Returns(true);
+        _ocrEngineMock.Setup(x => x.RecognizeAsync(
+                It.IsAny<IImage>(),
+                It.IsAny<System.Drawing.Rectangle?>(),
+                It.IsAny<IProgress<OcrProgress>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OcrResults(
+                [new OcrTextRegion("test text", new System.Drawing.Rectangle(10, 10, 100, 20), 0.9f)],
+                _imageMock.Object,
+                TimeSpan.FromMilliseconds(100),
+                "en"));
+
+        _service = new TranslationOrchestrationService(
+            _captureServiceMock.Object,
+            _settingsServiceMock.Object,
+            _ocrEngineMock.Object,
+            null, // coordinateBasedTranslation
+            _eventAggregatorMock.Object,
+            ocrSettingsMock.Object,
+            Mock.Of<TranslationAbstractions.ITranslationService>(),
+            null, // translationDictionaryService
+            null, // fallbackOrchestrator
+            null, // licenseManager
+            null, // speculativeOcrService
+            null, // windowManagerAdapter
+            _textChangeDetectionMock.Object,
+            null, // cloudTranslationCache
+            null, // unifiedSettingsService
+            _detectionBoundsCacheMock.Object,
+            _imageChangeDetectionMock.Object,
+            _loggerMock.Object);
+    }
+
+    /// <summary>
+    /// [Issue #525] TriggerSingleTranslationAsync 開始時に全Detectionキャッシュがクリアされることを検証
+    /// </summary>
+    [Fact]
+    public async Task TriggerSingleTranslationAsync_ClearsAllDetectionCaches()
+    {
+        // Act
+        await _service.TriggerSingleTranslationAsync(null, CancellationToken.None);
+
+        // Assert
+        _textChangeDetectionMock.Verify(x => x.ClearAllPreviousTexts(), Times.AtLeastOnce);
+        _textChangeDetectionMock.Verify(x => x.ClearStaticUiMarkers(), Times.AtLeastOnce);
+        _detectionBoundsCacheMock.Verify(x => x.ClearAll(), Times.AtLeastOnce);
+        _imageChangeDetectionMock.Verify(x => x.ClearCache(null), Times.AtLeastOnce);
+    }
+
+    /// <summary>
+    /// [Issue #525] StartAutomaticTranslationAsync 開始時に全Detectionキャッシュがクリアされることを検証
+    /// </summary>
+    [Fact]
+    public async Task StartAutomaticTranslationAsync_ClearsAllDetectionCaches()
+    {
+        // Act
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
+
+        // Assert
+        _textChangeDetectionMock.Verify(x => x.ClearAllPreviousTexts(), Times.AtLeastOnce);
+        _textChangeDetectionMock.Verify(x => x.ClearStaticUiMarkers(), Times.AtLeastOnce);
+        _detectionBoundsCacheMock.Verify(x => x.ClearAll(), Times.AtLeastOnce);
+        _imageChangeDetectionMock.Verify(x => x.ClearCache(null), Times.AtLeastOnce);
+
+        // Cleanup
+        await _service.StopAutomaticTranslationAsync();
+    }
+
+    /// <summary>
+    /// [Issue #525] StopAutomaticTranslationAsync 停止時に全Detectionキャッシュがクリアされることを検証
+    /// </summary>
+    [Fact]
+    public async Task StopAutomaticTranslationAsync_ClearsAllDetectionCaches()
+    {
+        // Arrange
+        await _service.StartAutomaticTranslationAsync(null, CancellationToken.None);
+        _textChangeDetectionMock.Invocations.Clear();
+        _detectionBoundsCacheMock.Invocations.Clear();
+        _imageChangeDetectionMock.Invocations.Clear();
+
+        // Act
+        await _service.StopAutomaticTranslationAsync();
+
+        // Assert
+        _textChangeDetectionMock.Verify(x => x.ClearAllPreviousTexts(), Times.AtLeastOnce);
+        _textChangeDetectionMock.Verify(x => x.ClearStaticUiMarkers(), Times.AtLeastOnce);
+        _detectionBoundsCacheMock.Verify(x => x.ClearAll(), Times.AtLeastOnce);
+        _imageChangeDetectionMock.Verify(x => x.ClearCache(null), Times.AtLeastOnce);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _service?.Dispose();
+        _imageMock?.Object?.Dispose();
+        _disposed = true;
+    }
 }

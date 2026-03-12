@@ -38,6 +38,8 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     private readonly ITextChangeDetectionService? _textChangeDetectionService;
     // [Issue #481] キャプチャ座標→スクリーン座標変換用
     private readonly ICoordinateTransformationService? _coordinateTransformationService;
+    // [Issue #525] Singleshotモード中のTextDisappearanceEvent抑制用
+    private readonly ITranslationModeService? _translationModeService;
 
     // Circuit Breaker設定（IOptions経由で動的取得）
     private float MinConfidenceScore => _settings.CurrentValue.MinConfidenceScore;
@@ -78,7 +80,8 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         ILogger<AutoOverlayCleanupService> logger,
         IOptionsMonitor<AutoOverlayCleanupSettings> settings,
         ITextChangeDetectionService? textChangeDetectionService = null, // [Issue #407] Gate状態リセット用
-        ICoordinateTransformationService? coordinateTransformationService = null) // [Issue #481] 座標変換用
+        ICoordinateTransformationService? coordinateTransformationService = null, // [Issue #481] 座標変換用
+        ITranslationModeService? translationModeService = null) // [Issue #525] Singleshotモード抑制用
     {
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
@@ -86,6 +89,7 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _textChangeDetectionService = textChangeDetectionService;
         _coordinateTransformationService = coordinateTransformationService;
+        _translationModeService = translationModeService;
     }
 
     /// <inheritdoc />
@@ -122,6 +126,15 @@ public sealed class AutoOverlayCleanupService : IAutoOverlayCleanupService, IEve
     {
         if (_disposed || eventData == null)
             return;
+
+        // [Issue #525] Singleshotモード中はTextDisappearanceEventを無視
+        // Singleshotでは画像変化検出をバイパスしており、キャプチャ→翻訳→表示の間に
+        // 前回画像との差分でTextDisappearanceが誤発火し、オーバーレイが削除されてしまう
+        if (_translationModeService?.CurrentMode == TranslationMode.Singleshot)
+        {
+            _logger.LogDebug("[Issue #525] Singleshotモード中のためTextDisappearanceEventを無視");
+            return;
+        }
 
         var stopwatch = Stopwatch.StartNew();
 

@@ -94,6 +94,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     // [Issue #410] テキスト変化検知キャッシュリセット用
     private readonly Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? _textChangeDetectionService;
 
+    // [Issue #525] Detection-Only キャッシュ・画像変化検知キャッシュリセット用
+    private readonly IDetectionBoundsCache? _detectionBoundsCache;
+    private readonly Baketa.Core.Abstractions.Services.IImageChangeDetectionService? _imageChangeDetectionService;
+
     // [Issue #415] Cloud翻訳キャッシュ
     private readonly ICloudTranslationCache? _cloudTranslationCache;
 
@@ -195,6 +199,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         Baketa.Core.Abstractions.Processing.ITextChangeDetectionService? textChangeDetectionService = null,
         ICloudTranslationCache? cloudTranslationCache = null, // [Issue #415] Cloud翻訳キャッシュ
         IUnifiedSettingsService? unifiedSettingsService = null, // ONNXモデル オンデマンドロード/アンロード
+        IDetectionBoundsCache? detectionBoundsCache = null, // [Issue #525] Detection-Onlyキャッシュ
+        Baketa.Core.Abstractions.Services.IImageChangeDetectionService? imageChangeDetectionService = null, // [Issue #525] 画像変化検知キャッシュ
         ILogger<TranslationOrchestrationService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(captureService);
@@ -218,6 +224,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
         _textChangeDetectionService = textChangeDetectionService;
         _cloudTranslationCache = cloudTranslationCache; // [Issue #415] Cloud翻訳キャッシュ
         _unifiedSettingsService = unifiedSettingsService;
+        _detectionBoundsCache = detectionBoundsCache; // [Issue #525] Detection-Onlyキャッシュ
+        _imageChangeDetectionService = imageChangeDetectionService; // [Issue #525] 画像変化検知キャッシュ
         _logger = logger;
 
         // 設定変更時にONNXモデルのロード/アンロードをトリガー
@@ -443,10 +451,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
                 _postTranslationRapidCheckRemaining = 0; // [Issue #392]
             }
 
-            // [Issue #410] 翻訳開始時にキャッシュをリセット（Shot→Live遷移時の誤判定防止）
-            _textChangeDetectionService?.ClearAllPreviousTexts();
-            // [Issue #465] 静的UI要素マーカーもリセット（新規セッション開始）
-            _textChangeDetectionService?.ClearStaticUiMarkers();
+            // [Issue #525] 翻訳開始時に全Detectionキャッシュをリセット（Shot→Live遷移時の誤判定防止）
+            ClearAllDetectionCaches();
             _coordinateBasedTranslation?.ResetTranslationState();
 
             // バックグラウンドタスクで自動翻訳を実行
@@ -666,10 +672,8 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
 
             _logger?.LogDebug("🔧 [PHASE3.3_STOP] Stop完了 - Token競合解決済み");
 
-            // [Issue #410] テキスト変化検知キャッシュをクリア（言語変更後のSameText誤判定防止）
-            _textChangeDetectionService?.ClearAllPreviousTexts();
-            // [Issue #465] 静的UI要素マーカーもリセット（セッション終了）
-            _textChangeDetectionService?.ClearStaticUiMarkers();
+            // [Issue #525] 翻訳停止時に全Detectionキャッシュをクリア（デフォルト状態復帰）
+            ClearAllDetectionCaches();
             _coordinateBasedTranslation?.ResetTranslationState();
 
             // 前回の翻訳結果をリセット（再翻訳時の問題を回避）
@@ -859,6 +863,10 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
             _isSingleTranslationActive = true;
             OnPropertyChanged(nameof(IsAnyTranslationActive));
 
+            // [Issue #525] Singleshot翻訳開始時に全Detectionキャッシュをクリア
+            // 前回のDetection-Onlyキャッシュが残るとDetectionOnlySkipped=trueで翻訳がスキップされる
+            ClearAllDetectionCaches();
+
             _logger?.LogInformation("単発翻訳を実行します: ID={RequestId}", requestId);
 
             // TODO: 翻訳実行イベントの発行はViewModelで実行
@@ -976,6 +984,21 @@ public sealed class TranslationOrchestrationService : ITranslationOrchestrationS
     #endregion
 
     #region プライベートメソッド
+
+    /// <summary>
+    /// [Issue #525] 全Detection/画像変化検知キャッシュをクリア
+    /// デフォルト状態（翻訳モード=None）に戻る際に呼び出す。
+    /// Detection-Onlyフィルタのバウンディングボックスキャッシュ、画像変化検知キャッシュ、
+    /// テキスト変化検知キャッシュをすべてリセットし、次回翻訳時にフレッシュな検出を保証する。
+    /// </summary>
+    private void ClearAllDetectionCaches()
+    {
+        _textChangeDetectionService?.ClearAllPreviousTexts();
+        _textChangeDetectionService?.ClearStaticUiMarkers();
+        _detectionBoundsCache?.ClearAll();
+        _imageChangeDetectionService?.ClearCache();
+        _logger?.LogDebug("[Issue #525] 全Detection/画像変化検知キャッシュをクリア");
+    }
 
     /// <summary>
     /// キャプチャオプションを初期化

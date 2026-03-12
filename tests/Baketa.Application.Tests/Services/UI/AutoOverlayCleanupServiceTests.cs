@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Baketa.Application.Services.UI;
 using Baketa.Core.Abstractions.Events;
 using Baketa.Core.Abstractions.Processing; // [Issue #486] ITextChangeDetectionService用
+using Baketa.Core.Abstractions.Services; // [Issue #525] ITranslationModeService用
 using Baketa.Core.Abstractions.UI.Overlays; // 🔧 [OVERLAY_UNIFICATION] IOverlayManager 用
 using Baketa.Core.Events.Capture;
 using Baketa.Core.Settings;
@@ -532,6 +533,88 @@ public class AutoOverlayCleanupServiceTests : IDisposable
             Times.Once);
 
         serviceWithTextDetection.Dispose();
+    }
+
+    #endregion
+
+    #region [Issue #525] Singleshotモード抑制テスト
+
+    /// <summary>
+    /// Singleshotモード中はTextDisappearanceEventを無視してオーバーレイを削除しない
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_InSingleshotMode_ShouldIgnoreEvent()
+    {
+        // Arrange
+        var translationModeMock = new Mock<ITranslationModeService>();
+        translationModeMock.Setup(s => s.CurrentMode).Returns(TranslationMode.Singleshot);
+
+        var service = new AutoOverlayCleanupService(
+            _overlayManagerMock.Object,
+            _eventAggregatorMock.Object,
+            _loggerMock.Object,
+            _settingsMock.Object,
+            translationModeService: translationModeMock.Object);
+
+        await service.InitializeAsync();
+
+        var eventData = new TextDisappearanceEvent(
+            regions: [new Rectangle(10, 10, 100, 100)],
+            sourceWindow: new IntPtr(12345),
+            regionId: "test-singleshot",
+            confidenceScore: 0.9f
+        );
+
+        // Act
+        await service.HandleAsync(eventData);
+
+        // Assert: Singleshotモードのためオーバーレイ削除は呼ばれない
+        _overlayManagerMock.Verify(
+            om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        // 統計にもカウントされない（モードガードはカウント前に返る）
+        var stats = service.GetStatistics();
+        stats.TotalEventsProcessed.Should().Be(0);
+
+        service.Dispose();
+    }
+
+    /// <summary>
+    /// Liveモード中はTextDisappearanceEventを通常通り処理する（回帰テスト）
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_InLiveMode_ShouldProcessEvent()
+    {
+        // Arrange
+        var translationModeMock = new Mock<ITranslationModeService>();
+        translationModeMock.Setup(s => s.CurrentMode).Returns(TranslationMode.Live);
+
+        var service = new AutoOverlayCleanupService(
+            _overlayManagerMock.Object,
+            _eventAggregatorMock.Object,
+            _loggerMock.Object,
+            _settingsMock.Object,
+            translationModeService: translationModeMock.Object);
+
+        await service.InitializeAsync();
+
+        var eventData = new TextDisappearanceEvent(
+            regions: [new Rectangle(10, 10, 100, 100)],
+            sourceWindow: new IntPtr(12345),
+            regionId: "test-live",
+            confidenceScore: 0.9f
+        );
+
+        // Act
+        await service.HandleAsync(eventData);
+
+        // Assert: Liveモードのため通常通りオーバーレイ削除が実行される
+        _overlayManagerMock.Verify(
+            om => om.HideOverlaysInAreaAsync(It.IsAny<Rectangle>(), -1, It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        service.Dispose();
     }
 
     #endregion
