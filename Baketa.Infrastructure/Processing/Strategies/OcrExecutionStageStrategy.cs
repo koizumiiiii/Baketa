@@ -898,41 +898,26 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
         // 学習済みROI領域を基本として使用
         var combinedRegions = new List<Rectangle>(learnedRegions);
 
-        // [Issue #397] テキスト隣接ブロックを追加（変化検知に依存しない探索領域）
+        // [Issue #526] テキスト隣接ブロックを全て追加（変化検知に依存しない探索領域）
+        // ROIとの重複チェック（IntersectsWith）を削除: 部分的に重なるブロックを除外すると
+        // crop領域が不足し、テキスト全体を包含できない問題が発生していた
+        // 重複追加しても後段のMergeAdjacentRegionsで統合されるため実害なし
+        // [Issue #526] テキスト隣接ブロックを全てcrop領域に追加
+        // グリッドブロック（16x9=80x80px）は最小サイズ閾値（100x50）より小さいため
+        // 最小サイズチェックを適用しない（後段のMergeAdjacentRegionsで統合される）
         if (textAdjacentBlocks is { Count: > 0 })
         {
-            var adjacentToAdd = new List<Rectangle>();
-            foreach (var adjacentBlock in textAdjacentBlocks)
+            if (_regionMerger != null)
             {
-                if (adjacentBlock.Width < _minPartialOcrWidth || adjacentBlock.Height < _minPartialOcrHeight)
-                    continue;
-
-                // 学習済みROI（パディング含む）と重複しない隣接ブロックのみ追加
-                var isWithinLearnedArea = learnedRegions.Any(learned =>
-                {
-                    var expandedLearned = Rectangle.Inflate(learned, RoiPaddingPixels, RoiPaddingPixels);
-                    return expandedLearned.IntersectsWith(adjacentBlock);
-                });
-
-                if (!isWithinLearnedArea)
-                {
-                    adjacentToAdd.Add(adjacentBlock);
-                }
+                var mergedAdjacent = _regionMerger.MergeAdjacentRegions([.. textAdjacentBlocks]);
+                combinedRegions.AddRange(mergedAdjacent);
+                _logger.LogInformation("[Issue #526] テキスト隣接ブロック追加: {Input}ブロック → {Count}領域（マージ後）",
+                    textAdjacentBlocks.Count, mergedAdjacent.Count);
             }
-
-            if (adjacentToAdd.Count > 0)
+            else
             {
-                if (_regionMerger != null)
-                {
-                    var mergedAdjacent = _regionMerger.MergeAdjacentRegions([.. adjacentToAdd]);
-                    combinedRegions.AddRange(mergedAdjacent);
-                    _logger.LogInformation("[Issue #397] テキスト隣接ブロック追加（ROI外）: {Count}領域（マージ後）", mergedAdjacent.Count);
-                }
-                else
-                {
-                    combinedRegions.AddRange(adjacentToAdd);
-                    _logger.LogInformation("[Issue #397] テキスト隣接ブロック追加（ROI外）: {Count}領域", adjacentToAdd.Count);
-                }
+                combinedRegions.AddRange(textAdjacentBlocks);
+                _logger.LogInformation("[Issue #526] テキスト隣接ブロック追加: {Count}領域", textAdjacentBlocks.Count);
             }
         }
 
