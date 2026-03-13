@@ -700,4 +700,22 @@ public static class Strings
     public static string Upsell_Free_WithBonus_Message => GetString("Upsell_Free_WithBonus_Message");
     public static string Upsell_Free_NoBonus_Message => GetString("Upsell_Free_NoBonus_Message");
     public static string Upsell_Upgrade_Message => GetString("Upsell_Upgrade_Message");
+
+    // Issue #527: Language Display Names
+    public static string Lang_Auto => GetString("Lang_Auto");
+    public static string Lang_Japanese => GetString("Lang_Japanese");
+    public static string Lang_English => GetString("Lang_English");
+    public static string Lang_ChineseSimplified => GetString("Lang_ChineseSimplified");
+    public static string Lang_ChineseTraditional => GetString("Lang_ChineseTraditional");
+    public static string Lang_Korean => GetString("Lang_Korean");
+    public static string Lang_French => GetString("Lang_French");
+    public static string Lang_German => GetString("Lang_German");
+    public static string Lang_Italian => GetString("Lang_Italian");
+    public static string Lang_Spanish => GetString("Lang_Spanish");
+    public static string Lang_Portuguese => GetString("Lang_Portuguese");
+    public static string Lang_ChineseVariant_Simplified => GetString("Lang_ChineseVariant_Simplified");
+    public static string Lang_ChineseVariant_Traditional => GetString("Lang_ChineseVariant_Traditional");
+    public static string Lang_ChineseVariant_Auto => GetString("Lang_ChineseVariant_Auto");
+    public static string Lang_ChineseVariant_Cantonese => GetString("Lang_ChineseVariant_Cantonese");
+    public static string Lang_TranslationStrategy_TwoStage => GetString("Lang_TranslationStrategy_TwoStage");
 }

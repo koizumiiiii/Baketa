@@ -783,10 +783,25 @@ public class MainOverlayViewModel : ViewModelBase
     /// </summary>
     private void OnLanguageChanged(object? sender, LanguageChangedEventArgs e)
     {
-        this.RaisePropertyChanged(nameof(SingleshotButtonText));
-        this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
-        this.RaisePropertyChanged(nameof(LiveButtonText));
-        this.RaisePropertyChanged(nameof(InitializationText));
+        // [Issue #528] LanguageChangedイベントはConfigureAwait(false)後の非UIスレッドから
+        // 発火される可能性があるため、UIスレッドにディスパッチする
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            this.RaisePropertyChanged(nameof(SingleshotButtonText));
+            this.RaisePropertyChanged(nameof(SingleshotButtonTooltip));
+            this.RaisePropertyChanged(nameof(LiveButtonText));
+            this.RaisePropertyChanged(nameof(InitializationText));
+
+            // StartButtonTooltipはstored valueのため、言語変更時にStringsから再取得
+            if (_warmupService.Status == Baketa.Core.Abstractions.GPU.WarmupStatus.Failed)
+            {
+                StartButtonTooltip = Strings.MainOverlay_Warmup_Failed;
+            }
+            else if (_warmupService.IsWarmupCompleted)
+            {
+                StartButtonTooltip = Strings.MainOverlay_StartButton_Tooltip;
+            }
+        });
     }
 
     public string InitializationText => CurrentStatus switch

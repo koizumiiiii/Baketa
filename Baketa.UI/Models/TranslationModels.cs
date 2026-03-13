@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Baketa.UI.Resources;
 using ReactiveUI;
 
 namespace Baketa.UI.Models;
@@ -246,6 +247,25 @@ public static class AvailableLanguages
         new() { Code = "es", DisplayName = "スペイン語", NativeName = "Español", Flag = "🇪🇸", RegionCode = "ES" },
         new() { Code = "pt", DisplayName = "ポルトガル語", NativeName = "Português", Flag = "🇧🇷", RegionCode = "BR" }
     ];
+
+    /// <summary>
+    /// 言語コードからローカライズされた表示名を取得
+    /// </summary>
+    public static string GetLocalizedDisplayName(string code) => code switch
+    {
+        "auto" => Strings.Lang_Auto,
+        "ja" => Strings.Lang_Japanese,
+        "en" => Strings.Lang_English,
+        "zh-CN" => Strings.Lang_ChineseSimplified,
+        "zh-TW" => Strings.Lang_ChineseTraditional,
+        "ko" => Strings.Lang_Korean,
+        "fr" => Strings.Lang_French,
+        "de" => Strings.Lang_German,
+        "it" => Strings.Lang_Italian,
+        "es" => Strings.Lang_Spanish,
+        "pt" => Strings.Lang_Portuguese,
+        _ => code
+    };
 
     /// <summary>
     /// 現在サポートされている言語ペア（全言語間の組み合わせを動的生成）

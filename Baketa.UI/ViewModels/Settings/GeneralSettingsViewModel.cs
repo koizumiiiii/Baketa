@@ -58,9 +58,10 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
 
     // 翻訳設定用バッキングフィールド
     private bool _useLocalEngine = true;
-    private string _sourceLanguage = "Japanese";
-    private string _targetLanguage = "English";
+    private string _sourceLanguage = "en";
+    private string _targetLanguage = "ja";
     private int _fontSize = 14;
+    private bool _isUpdatingLanguages;
 
     // [Issue #78 Phase 5] Cloud AI使用量表示用バッキングフィールド
     private long _cloudTokensUsed;
@@ -315,6 +316,7 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         get => _sourceLanguage;
         set
         {
+            if (_isUpdatingLanguages) return;
             this.RaiseAndSetIfChanged(ref _sourceLanguage, value);
             UpdateAvailableTargetLanguages();
         }
@@ -326,7 +328,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     public string TargetLanguage
     {
         get => _targetLanguage;
-        set => this.RaiseAndSetIfChanged(ref _targetLanguage, value);
+        set
+        {
+            if (_isUpdatingLanguages && value is null) return;
+            this.RaiseAndSetIfChanged(ref _targetLanguage, value);
+        }
     }
 
     /// <summary>
@@ -339,13 +345,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     }
 
     /// <summary>
-    /// 利用可能な言語リスト
+    /// 利用可能な言語リスト（言語コード）
     /// </summary>
     public ObservableCollection<string> AvailableLanguages { get; } =
     [
-        "Japanese", "English",
-        "Chinese (Simplified)", "Chinese (Traditional)",
-        "Korean", "French", "German", "Italian", "Spanish", "Portuguese"
+        "ja", "en", "zh-CN", "zh-TW", "ko", "fr", "de", "it", "es", "pt"
     ];
 
     /// <summary>
@@ -511,6 +515,11 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     public IReadOnlyList<UiTheme> AvailableThemes { get; } = [UiTheme.Light, UiTheme.Dark, UiTheme.Auto];
 
     /// <summary>
+    /// [Issue #527] 言語コードからローカライズされた表示名を取得
+    /// </summary>
+    public static string GetLanguageDisplayName(string code) => Models.AvailableLanguages.GetLocalizedDisplayName(code);
+
+    /// <summary>
     /// テーマ表示名を取得
     /// </summary>
     public static string GetThemeDisplayName(UiTheme theme) => theme switch
@@ -645,9 +654,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// </summary>
     private void InitializeFromTranslationSettings(TranslationSettings settings)
     {
-        // 翻訳言語の復元（言語コードから表示名に変換）
-        _sourceLanguage = Baketa.Core.Utilities.LanguageCodeConverter.ToDisplayName(settings.DefaultSourceLanguage, "English");
-        _targetLanguage = Baketa.Core.Utilities.LanguageCodeConverter.ToDisplayName(settings.DefaultTargetLanguage, "English");
+        // [Issue #527] 言語コードを直接使用（表示名変換はUI側のConverterで行う）
+        _sourceLanguage = settings.DefaultSourceLanguage ?? "en";
+        _targetLanguage = settings.DefaultTargetLanguage ?? "ja";
         _fontSize = settings.OverlayFontSize;
 
         // [Issue #78 Phase 5] Cloud AI翻訳設定の復元
@@ -869,21 +878,35 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
     /// </summary>
     private void UpdateAvailableTargetLanguages()
     {
-        AvailableTargetLanguages.Clear();
-
-        // ソース言語以外の全言語をターゲット言語として追加
-        foreach (var lang in AvailableLanguages)
+        if (_isUpdatingLanguages) return;
+        _isUpdatingLanguages = true;
+        try
         {
-            if (!string.Equals(lang, SourceLanguage, StringComparison.Ordinal))
+            var previousTarget = TargetLanguage;
+            AvailableTargetLanguages.Clear();
+
+            // ソース言語以外の全言語をターゲット言語として追加
+            foreach (var lang in AvailableLanguages)
             {
-                AvailableTargetLanguages.Add(lang);
+                if (!string.Equals(lang, SourceLanguage, StringComparison.Ordinal))
+                {
+                    AvailableTargetLanguages.Add(lang);
+                }
+            }
+
+            // 現在の翻訳先言語が選択肢にある場合は維持、なければ最初の選択肢を選択
+            if (AvailableTargetLanguages.Contains(previousTarget))
+            {
+                TargetLanguage = previousTarget;
+            }
+            else if (AvailableTargetLanguages.Count > 0)
+            {
+                TargetLanguage = AvailableTargetLanguages.First();
             }
         }
-
-        // 現在の翻訳先言語が選択肢にない場合は最初の選択肢を選択
-        if (!AvailableTargetLanguages.Contains(TargetLanguage) && AvailableTargetLanguages.Count > 0)
+        finally
         {
-            TargetLanguage = AvailableTargetLanguages.First();
+            _isUpdatingLanguages = false;
         }
     }
 
@@ -983,9 +1006,9 @@ public sealed class GeneralSettingsViewModel : Framework.ViewModelBase
         get
         {
             var settings = _originalTranslationSettings.Clone();
-            // 表示名から言語コードに変換
-            settings.DefaultSourceLanguage = Baketa.Core.Utilities.LanguageCodeConverter.ToLanguageCode(SourceLanguage, "en");
-            settings.DefaultTargetLanguage = Baketa.Core.Utilities.LanguageCodeConverter.ToLanguageCode(TargetLanguage, "en");
+            // [Issue #527] 言語コードを直接使用（変換不要）
+            settings.DefaultSourceLanguage = SourceLanguage ?? "en";
+            settings.DefaultTargetLanguage = TargetLanguage ?? "ja";
             settings.OverlayFontSize = FontSize;
             // [Issue #78 Phase 5] + [Issue #280+#281] Cloud AI翻訳設定を反映
             // UseLocalEngine=true(ローカル翻訳) → EnableCloudAiTranslation=false
