@@ -1748,4 +1748,54 @@
     <value>⬆️ 升級方案取得更多額度</value>
   </data>
 
+  <!-- ========== Issue #527: Language Display Names ========== -->
+  <data name="Lang_Auto" xml:space="preserve">
+    <value>自動偵測</value>
+  </data>
+  <data name="Lang_Japanese" xml:space="preserve">
+    <value>日語</value>
+  </data>
+  <data name="Lang_English" xml:space="preserve">
+    <value>英語</value>
+  </data>
+  <data name="Lang_ChineseSimplified" xml:space="preserve">
+    <value>簡體中文</value>
+  </data>
+  <data name="Lang_ChineseTraditional" xml:space="preserve">
+    <value>繁體中文</value>
+  </data>
+  <data name="Lang_Korean" xml:space="preserve">
+    <value>韓語</value>
+  </data>
+  <data name="Lang_French" xml:space="preserve">
+    <value>法語</value>
+  </data>
+  <data name="Lang_German" xml:space="preserve">
+    <value>德語</value>
+  </data>
+  <data name="Lang_Italian" xml:space="preserve">
+    <value>義大利語</value>
+  </data>
+  <data name="Lang_Spanish" xml:space="preserve">
+    <value>西班牙語</value>
+  </data>
+  <data name="Lang_Portuguese" xml:space="preserve">
+    <value>葡萄牙語</value>
+  </data>
+  <data name="Lang_ChineseVariant_Simplified" xml:space="preserve">
+    <value>簡體</value>
+  </data>
+  <data name="Lang_ChineseVariant_Traditional" xml:space="preserve">
+    <value>繁體</value>
+  </data>
+  <data name="Lang_ChineseVariant_Auto" xml:space="preserve">
+    <value>自動</value>
+  </data>
+  <data name="Lang_ChineseVariant_Cantonese" xml:space="preserve">
+    <value>粵語</value>
+  </data>
+  <data name="Lang_TranslationStrategy_TwoStage" xml:space="preserve">
+    <value>（兩階段翻譯）</value>
+  </data>
+
 </root>

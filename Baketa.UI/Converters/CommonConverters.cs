@@ -377,6 +377,24 @@ internal sealed class BoolToChangesConverter : IValueConverter
 }
 
 /// <summary>
+/// [Issue #527] 言語コードからローカライズされた表示名への変換コンバーター
+/// </summary>
+internal sealed class LanguageCodeToDisplayNameConverter : IValueConverter
+{
+    public static readonly LanguageCodeToDisplayNameConverter Instance = new();
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is string code)
+            return Models.AvailableLanguages.GetLocalizedDisplayName(code);
+        return value;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => BindingOperations.DoNothing;
+}
+
+/// <summary>
 /// [Issue #307] パーセンテージ（double）からGridLength（Star単位）への変換コンバーター
 /// トークンゲージの3セグメント表示に使用
 /// </summary>

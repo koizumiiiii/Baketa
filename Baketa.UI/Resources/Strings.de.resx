@@ -1748,4 +1748,54 @@ Maßnahme: Bitte starten Sie die App neu.</value>
     <value>⬆️ Upgraden Sie Ihren Plan für mehr Token</value>
   </data>
 
+  <!-- ========== Issue #527: Language Display Names ========== -->
+  <data name="Lang_Auto" xml:space="preserve">
+    <value>Automatische Erkennung</value>
+  </data>
+  <data name="Lang_Japanese" xml:space="preserve">
+    <value>Japanisch</value>
+  </data>
+  <data name="Lang_English" xml:space="preserve">
+    <value>Englisch</value>
+  </data>
+  <data name="Lang_ChineseSimplified" xml:space="preserve">
+    <value>Chinesisch (Vereinfacht)</value>
+  </data>
+  <data name="Lang_ChineseTraditional" xml:space="preserve">
+    <value>Chinesisch (Traditionell)</value>
+  </data>
+  <data name="Lang_Korean" xml:space="preserve">
+    <value>Koreanisch</value>
+  </data>
+  <data name="Lang_French" xml:space="preserve">
+    <value>Französisch</value>
+  </data>
+  <data name="Lang_German" xml:space="preserve">
+    <value>Deutsch</value>
+  </data>
+  <data name="Lang_Italian" xml:space="preserve">
+    <value>Italienisch</value>
+  </data>
+  <data name="Lang_Spanish" xml:space="preserve">
+    <value>Spanisch</value>
+  </data>
+  <data name="Lang_Portuguese" xml:space="preserve">
+    <value>Portugiesisch</value>
+  </data>
+  <data name="Lang_ChineseVariant_Simplified" xml:space="preserve">
+    <value>Vereinfacht</value>
+  </data>
+  <data name="Lang_ChineseVariant_Traditional" xml:space="preserve">
+    <value>Traditionell</value>
+  </data>
+  <data name="Lang_ChineseVariant_Auto" xml:space="preserve">
+    <value>Automatisch</value>
+  </data>
+  <data name="Lang_ChineseVariant_Cantonese" xml:space="preserve">
+    <value>Kantonesisch</value>
+  </data>
+  <data name="Lang_TranslationStrategy_TwoStage" xml:space="preserve">
+    <value>(Zweistufige Übersetzung)</value>
+  </data>
+
 </root>

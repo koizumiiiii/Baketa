@@ -101,14 +101,26 @@
                         <StackPanel Orientation="Horizontal" Spacing="12">
                             <ComboBox ItemsSource="{Binding AvailableLanguages}"
                                       SelectedItem="{Binding SourceLanguage}"
-                                      Width="120"/>
+                                      Width="150">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{Binding Converter={x:Static converters:LanguageCodeToDisplayNameConverter.Instance}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <TextBlock Text="→"
                                        VerticalAlignment="Center"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
                             <ComboBox ItemsSource="{Binding AvailableTargetLanguages}"
                                       SelectedItem="{Binding TargetLanguage}"
-                                      Width="120"/>
+                                      Width="150">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{Binding Converter={x:Static converters:LanguageCodeToDisplayNameConverter.Instance}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                         </StackPanel>
                     </controls:SettingsItem.SettingContent>
                 </controls:SettingsItem>

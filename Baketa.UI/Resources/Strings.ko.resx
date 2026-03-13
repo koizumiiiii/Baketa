@@ -1748,4 +1748,54 @@
     <value>⬆️ 플랜을 업그레이드하여 더 많은 토큰을 받으세요</value>
   </data>
 
+  <!-- ========== Issue #527: Language Display Names ========== -->
+  <data name="Lang_Auto" xml:space="preserve">
+    <value>자동 감지</value>
+  </data>
+  <data name="Lang_Japanese" xml:space="preserve">
+    <value>일본어</value>
+  </data>
+  <data name="Lang_English" xml:space="preserve">
+    <value>영어</value>
+  </data>
+  <data name="Lang_ChineseSimplified" xml:space="preserve">
+    <value>중국어 (간체)</value>
+  </data>
+  <data name="Lang_ChineseTraditional" xml:space="preserve">
+    <value>중국어 (번체)</value>
+  </data>
+  <data name="Lang_Korean" xml:space="preserve">
+    <value>한국어</value>
+  </data>
+  <data name="Lang_French" xml:space="preserve">
+    <value>프랑스어</value>
+  </data>
+  <data name="Lang_German" xml:space="preserve">
+    <value>독일어</value>
+  </data>
+  <data name="Lang_Italian" xml:space="preserve">
+    <value>이탈리아어</value>
+  </data>
+  <data name="Lang_Spanish" xml:space="preserve">
+    <value>스페인어</value>
+  </data>
+  <data name="Lang_Portuguese" xml:space="preserve">
+    <value>포르투갈어</value>
+  </data>
+  <data name="Lang_ChineseVariant_Simplified" xml:space="preserve">
+    <value>간체</value>
+  </data>
+  <data name="Lang_ChineseVariant_Traditional" xml:space="preserve">
+    <value>번체</value>
+  </data>
+  <data name="Lang_ChineseVariant_Auto" xml:space="preserve">
+    <value>자동</value>
+  </data>
+  <data name="Lang_ChineseVariant_Cantonese" xml:space="preserve">
+    <value>광동어</value>
+  </data>
+  <data name="Lang_TranslationStrategy_TwoStage" xml:space="preserve">
+    <value>(2단계 번역)</value>
+  </data>
+
 </root>

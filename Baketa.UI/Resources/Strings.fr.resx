@@ -1748,4 +1748,54 @@ Action : Veuillez redémarrer l'application.</value>
     <value>⬆️ Passez à un forfait supérieur pour plus de jetons</value>
   </data>
 
+  <!-- ========== Issue #527: Language Display Names ========== -->
+  <data name="Lang_Auto" xml:space="preserve">
+    <value>Détection automatique</value>
+  </data>
+  <data name="Lang_Japanese" xml:space="preserve">
+    <value>Japonais</value>
+  </data>
+  <data name="Lang_English" xml:space="preserve">
+    <value>Anglais</value>
+  </data>
+  <data name="Lang_ChineseSimplified" xml:space="preserve">
+    <value>Chinois (Simplifié)</value>
+  </data>
+  <data name="Lang_ChineseTraditional" xml:space="preserve">
+    <value>Chinois (Traditionnel)</value>
+  </data>
+  <data name="Lang_Korean" xml:space="preserve">
+    <value>Coréen</value>
+  </data>
+  <data name="Lang_French" xml:space="preserve">
+    <value>Français</value>
+  </data>
+  <data name="Lang_German" xml:space="preserve">
+    <value>Allemand</value>
+  </data>
+  <data name="Lang_Italian" xml:space="preserve">
+    <value>Italien</value>
+  </data>
+  <data name="Lang_Spanish" xml:space="preserve">
+    <value>Espagnol</value>
+  </data>
+  <data name="Lang_Portuguese" xml:space="preserve">
+    <value>Portugais</value>
+  </data>
+  <data name="Lang_ChineseVariant_Simplified" xml:space="preserve">
+    <value>Simplifié</value>
+  </data>
+  <data name="Lang_ChineseVariant_Traditional" xml:space="preserve">
+    <value>Traditionnel</value>
+  </data>
+  <data name="Lang_ChineseVariant_Auto" xml:space="preserve">
+    <value>Automatique</value>
+  </data>
+  <data name="Lang_ChineseVariant_Cantonese" xml:space="preserve">
+    <value>Cantonais</value>
+  </data>
+  <data name="Lang_TranslationStrategy_TwoStage" xml:space="preserve">
+    <value>(Traduction en deux étapes)</value>
+  </data>
+
 </root>
