@@ -450,6 +450,20 @@ public sealed class ApplicationModule : ServiceModuleBase
         });
         services.AddHostedService(provider => provider.GetRequiredService<Services.Learning.RoiMonitoringHostedService>());
 
+        // [Issue #497] ファントムカーソルサービス
+        services.AddSingleton<Services.Cursor.PhantomCursorHostedService>(provider =>
+        {
+            return new Services.Cursor.PhantomCursorHostedService(
+                provider.GetService<Services.UI.IWindowManagementService>(),
+                provider.GetService<Baketa.Core.Abstractions.Services.ICursorStateProvider>(),
+                provider.GetService<Func<Microsoft.Extensions.Logging.ILogger, Baketa.Core.Abstractions.Services.IPhantomCursorWindowAdapter>>(),
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Services.Cursor.PhantomCursorHostedService>>()
+            );
+        });
+        services.AddSingleton<Baketa.Core.Abstractions.Services.IPhantomCursorService>(
+            provider => provider.GetRequiredService<Services.Cursor.PhantomCursorHostedService>());
+        services.AddHostedService(provider => provider.GetRequiredService<Services.Cursor.PhantomCursorHostedService>());
+
         // 統合サービス
         // 例: services.AddSingleton<ITranslationIntegrationService, TranslationIntegrationService>();
 

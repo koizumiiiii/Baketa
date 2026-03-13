@@ -172,6 +172,10 @@ public class PlatformModule : ServiceModuleBase
             Baketa.Infrastructure.Platform.Windows.Credentials.WindowsCredentialStorage>();
         Console.WriteLine("✅ WindowsCredentialStorage登録完了 - 認証トークンの安全な永続化");
 
+        // [Issue #497] カーソル状態プロバイダー（ファントムカーソル用）
+        services.AddSingleton<Baketa.Core.Abstractions.Services.ICursorStateProvider,
+            Baketa.Infrastructure.Platform.Windows.Services.CursorStateProvider>();
+
         // その他のWindows API関連サービス
         // 例: services.AddSingleton<IWindowsProcessService, WindowsProcessService>();
         // 例: services.AddSingleton<IHotkeyService, Win32HotkeyService>();
