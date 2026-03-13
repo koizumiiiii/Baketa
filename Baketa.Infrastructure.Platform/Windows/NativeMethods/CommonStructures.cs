@@ -242,6 +242,25 @@ internal struct WNDCLASS
 }
 
 /// <summary>
+/// [Issue #497] CURSORINFO構造体 - GetCursorInfo用
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct CURSORINFO
+{
+    public uint cbSize;
+    public uint flags;
+    public IntPtr hCursor;
+    public POINT ptScreenPos;
+
+    public const uint CURSOR_SHOWING = 0x00000001;
+
+    public static CURSORINFO Create() => new()
+    {
+        cbSize = (uint)Marshal.SizeOf<CURSORINFO>()
+    };
+}
+
+/// <summary>
 /// 🔥 [DWM_BLUR_IMPLEMENTATION] PAINTSTRUCT構造体
 /// </summary>
 /// <remarks>

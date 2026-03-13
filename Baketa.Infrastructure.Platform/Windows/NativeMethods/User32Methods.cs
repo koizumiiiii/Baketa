@@ -210,6 +210,22 @@ internal static class User32Methods
     // 🔥 [ACRYLIC_BLUR] SetWindowCompositionAttribute for Windows 10/11 Blur/Acrylic
     [DllImport(USER32_DLL, SetLastError = false)]
     internal static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
+
+    // [Issue #497] カーソル情報取得API
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetCursorInfo(ref CURSORINFO pci);
+
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
+
+    [DllImport(USER32_DLL, SetLastError = true, ExactSpelling = true)]
+    internal static extern IntPtr WindowFromPoint(POINT point);
 }
 
 [Flags]

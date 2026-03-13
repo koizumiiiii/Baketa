@@ -1,4 +1,6 @@
+using System;
 using System.Runtime.Versioning;
+using Baketa.Core.Abstractions.Services;
 using Baketa.Core.Abstractions.UI.Overlays;
 using Baketa.Core.UI.Overlay;
 using Baketa.Infrastructure.Platform.Windows.Overlay;
@@ -46,6 +48,10 @@ public static class OverlayModule
         // 🎯 [OVERLAY_UNIFICATION] 統一オーバーレイマネージャー登録
         // Application層が依存するIOverlayManager実装
         services.AddSingleton<IOverlayManager, Win32OverlayManager>();
+
+        // [Issue #497] ファントムカーソルウィンドウファクトリ
+        services.AddSingleton<Func<ILogger, IPhantomCursorWindowAdapter>>(
+            _ => loggerArg => new PhantomCursorWindowAdapter(loggerArg));
 
         logger.LogInformation("✅ [OVERLAY_UNIFICATION] Win32オーバーレイシステム登録完了");
         logger.LogDebug("   - LayeredOverlayWindowFactory → ILayeredOverlayWindowFactory");
