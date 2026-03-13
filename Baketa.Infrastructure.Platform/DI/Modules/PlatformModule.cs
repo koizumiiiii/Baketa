@@ -77,8 +77,12 @@ public class PlatformModule : ServiceModuleBase
             Baketa.Infrastructure.Platform.Windows.Capture.GdiScreenCapturer>();
 
         // ウィンドウマネージャー
-        services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowManager,
-            Baketa.Infrastructure.Platform.Windows.WindowsManager>();
+        services.AddSingleton<Baketa.Infrastructure.Platform.Windows.WindowsManager>();
+        services.AddSingleton<Baketa.Core.Abstractions.Platform.Windows.IWindowManager>(
+            sp => sp.GetRequiredService<Baketa.Infrastructure.Platform.Windows.WindowsManager>());
+        // [Issue #448] CoordinateBasedTranslationServiceが使用するPlatform.IWindowManagerも同一インスタンスで登録
+        services.AddSingleton<Baketa.Core.Abstractions.Platform.IWindowManager>(
+            sp => sp.GetRequiredService<Baketa.Infrastructure.Platform.Windows.WindowsManager>());
 
         // 画像ファクトリー（Phase 3.1: SafeImage統合対応）
         services.AddSingleton<Baketa.Core.Abstractions.Factories.IWindowsImageFactory,

@@ -17,7 +17,7 @@ namespace Baketa.Infrastructure.Platform.Windows;
 /// IWindowManagerインターフェースのWindows特化実装
 /// Win32 APIを使用して実際のウィンドウ情報を取得
 /// </summary>
-public class WindowsManager : IWindowManager
+public class WindowsManager : IWindowManager, Baketa.Core.Abstractions.Platform.IWindowManager
 {
     // P/Invoke宣言は NativeMethods.User32Methods を使用
 
@@ -157,8 +157,18 @@ public class WindowsManager : IWindowManager
     /// <returns>クライアント領域の位置とサイズを表す Rectangle</returns>
     public Rectangle? GetClientBounds(IntPtr handle)
     {
-        // スタブ実装では780x560の位置(10,30)の矩形を返す（ウィンドウ境界と想定）
-        return new Rectangle(10, 30, 780, 560);
+        try
+        {
+            if (NativeMethods.User32Methods.GetClientRect(handle, out NativeMethods.RECT clientRect))
+            {
+                return new Rectangle(0, 0, clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);
+            }
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>

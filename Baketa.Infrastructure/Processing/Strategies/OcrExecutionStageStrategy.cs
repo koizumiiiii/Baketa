@@ -315,6 +315,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
                         partialOcrCount + 1, InitialExpansionCycleLimit, AdjacentHorizontalRange, AdjacentVerticalRange);
                 }
 
+                // [Issue #448] クライアント領域制約の適用（タイトルバー除外）
+                if (context.Input.ClientAreaBounds is { } clientArea1)
+                {
+                    combinedRegions = ApplyClientAreaConstraint(combinedRegions, ocrImage.Width, ocrImage.Height, clientArea1);
+                    if (combinedRegions.Count == 0)
+                    {
+                        _logger.LogDebug("[Issue #448] クライアント領域制約により全領域が除外されました（学習済みROIパス）");
+                        return ProcessingStageResult.CreateSkipped(StageType, "All regions outside client area");
+                    }
+                }
+
                 _logger.LogInformation("🎯 [Issue #293 Phase 7.3] 学習済みROI + 変化領域併用OCR: 学習済み{LearnedCount}領域 + 変化{ChangedCount}領域 = 合計{TotalCount}領域",
                     learnedRegions.Count, combinedRegions.Count - learnedRegions.Count, combinedRegions.Count);
 
@@ -334,8 +345,35 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
                         partialOcrCount + 1, InitialExpansionCycleLimit, AdjacentHorizontalRange, AdjacentVerticalRange);
                 }
 
+                // [Issue #448] クライアント領域制約の適用（タイトルバー除外）
+                if (context.Input.ClientAreaBounds is { } clientArea2)
+                {
+                    mergedRegions = ApplyClientAreaConstraint(mergedRegions, ocrImage.Width, ocrImage.Height, clientArea2);
+                    if (mergedRegions.Count == 0)
+                    {
+                        _logger.LogDebug("[Issue #448] クライアント領域制約により全領域が除外されました（変化領域パス）");
+                        return ProcessingStageResult.CreateSkipped(StageType, "All regions outside client area");
+                    }
+                }
+
                 _logger.LogInformation("🎯 [Issue #293] 変化領域ベース部分OCR実行: {RegionCount}結合領域を処理（探索モード）", mergedRegions.Count);
                 return await ExecutePartialOcrAsync(context, mergedRegions, ocrImage, stopwatch, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            // [Issue #448] 全画面OCRパス: クライアント領域制約がある場合は部分OCRにリダイレクト
+            if (context.Input.ClientAreaBounds is { } clientArea3)
+            {
+                var clientRect = new Rectangle(
+                    (int)(clientArea3.X * ocrImage.Width),
+                    (int)(clientArea3.Y * ocrImage.Height),
+                    (int)(clientArea3.Width * ocrImage.Width),
+                    (int)(clientArea3.Height * ocrImage.Height));
+
+                _logger.LogInformation("[Issue #448] タイトルバー除外: 全画面OCR→クライアント領域部分OCR ({X},{Y},{W}x{H})",
+                    clientRect.X, clientRect.Y, clientRect.Width, clientRect.Height);
+
+                return await ExecutePartialOcrAsync(context, [clientRect], ocrImage, stopwatch, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -1146,6 +1184,26 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
         }
 
         return expandedRegions;
+    }
+
+    /// <summary>
+    /// [Issue #448] クライアント領域制約の適用（タイトルバー除外）
+    /// 各OCR対象領域をクライアント領域と交差させ、タイトルバー・ウィンドウ枠内の領域を除外する。
+    /// 交差結果が小さすぎる（10x10未満）領域もフィルタする。
+    /// </summary>
+    internal static List<Rectangle> ApplyClientAreaConstraint(
+        List<Rectangle> regions, int imageWidth, int imageHeight, NormalizedRect clientArea)
+    {
+        var clientRect = new Rectangle(
+            (int)(clientArea.X * imageWidth),
+            (int)(clientArea.Y * imageHeight),
+            (int)(clientArea.Width * imageWidth),
+            (int)(clientArea.Height * imageHeight));
+
+        return regions
+            .Select(r => Rectangle.Intersect(r, clientRect))
+            .Where(r => !r.IsEmpty && r.Width > 10 && r.Height > 10)
+            .ToList();
     }
 
     /// <summary>

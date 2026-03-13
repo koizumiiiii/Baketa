@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Drawing;
 using Baketa.Core.Abstractions.Imaging;
+using Baketa.Core.Models.Roi;
 
 namespace Baketa.Core.Models.Processing;
 
@@ -97,6 +98,13 @@ public sealed record ProcessingPipelineInput : IDisposable
     /// Size.Empty の場合はスケーリングをスキップする。
     /// </remarks>
     public Size OriginalWindowSize { get; init; } = Size.Empty;
+
+    /// <summary>
+    /// [Issue #448] クライアント領域の正規化座標 (0.0-1.0)
+    /// タイトルバー・ウィンドウ枠を除外したOCR対象領域を示す。
+    /// null の場合、画像全体がOCR対象（全画面/ボーダレス時）。
+    /// </summary>
+    public NormalizedRect? ClientAreaBounds { get; init; }
 
     /// <summary>
     /// 🎯 UltraThink: 所有権管理フラグ
