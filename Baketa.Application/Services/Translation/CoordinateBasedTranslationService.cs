@@ -439,7 +439,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 // 🔥 [Issue #193/#194] キャプチャ時に実行済みのOCR結果を伝達（二重OCR防止）
                 PreExecutedOcrResult = preExecutedOcrResult,
                 // [Issue #397] テキスト変化検知用の前回OCRテキスト
-                PreviousOcrText = previousOcrText
+                PreviousOcrText = previousOcrText,
+                // [Issue #448] タイトルバー除外用クライアント領域の正規化座標
+                ClientAreaBounds = CalculateClientAreaBounds(windowHandle)
             };
 
             // パイプライン実行（ImageChangeDetection → OcrExecution）
@@ -2110,6 +2112,50 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
         }
 
         return Size.Empty;
+    }
+
+    /// <summary>
+    /// [Issue #448] クライアント領域の正規化座標を計算（タイトルバー除外用）
+    /// ウィンドウモード時にタイトルバー・ウィンドウ枠をOCR対象から除外するため、
+    /// クライアント領域を0.0-1.0の正規化座標で返す。
+    /// 全画面/ボーダレスの場合はnullを返す（画像全体がOCR対象）。
+    /// </summary>
+    private NormalizedRect? CalculateClientAreaBounds(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero || _windowManager is null)
+            return null;
+
+        var windowBounds = _windowManager.GetWindowBounds(hwnd);
+        var clientBounds = _windowManager.GetClientBounds(hwnd);
+
+        if (windowBounds is null || clientBounds is null)
+            return null;
+
+        var winW = windowBounds.Value.Width;
+        var winH = windowBounds.Value.Height;
+        var clientW = clientBounds.Value.Width;
+        var clientH = clientBounds.Value.Height;
+
+        if (winW <= 0 || winH <= 0 || clientW <= 0 || clientH <= 0)
+            return null;
+
+        // ウィンドウサイズとクライアントサイズがほぼ同じ → 全画面/ボーダレス
+        if (winH - clientH <= 2 && winW - clientW <= 2)
+            return null;
+
+        // ボーダー幅の推定（左右対称を仮定、数px程度なのでOCR精度に影響なし）
+        var leftBorder = (winW - clientW) / 2;
+        var bottomBorder = leftBorder;
+        var titleBarHeight = winH - clientH - bottomBorder;
+
+        if (titleBarHeight <= 0)
+            return null;
+
+        return new NormalizedRect(
+            (float)leftBorder / winW,
+            (float)(titleBarHeight + leftBorder) / winH,
+            (float)clientW / winW,
+            (float)clientH / winH);
     }
 
     #endregion
