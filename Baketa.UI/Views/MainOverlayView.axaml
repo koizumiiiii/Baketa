@@ -82,8 +82,8 @@
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="CornerRadius" Value="4"/>
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
-      <Setter Property="MinWidth" Value="50"/>
-      <Setter Property="Margin" Value="4,8,4,4"/>
+      <Setter Property="MinWidth" Value="36"/>
+      <Setter Property="Margin" Value="2,4"/>
     </Style>
 
     <Style Selector="Button.minimize-button:pointerover">
@@ -134,6 +134,7 @@
           CornerRadius="8"
           BoxShadow="0 4 12 0 #40000000"
           Padding="4"
+          ClipToBounds="True"
           IsVisible="{Binding !IsCollapsed}">
 
       <StackPanel Orientation="Vertical" Spacing="2">
@@ -396,16 +397,16 @@
     <Border Background="{DynamicResource OverlayBackgroundBrush}"
             BorderBrush="{DynamicResource OverlayBorderBrush}"
             BorderThickness="0,1,1,1"
-            CornerRadius="0,4,4,0"
+            CornerRadius="0,6,6,0"
             IsVisible="{Binding !IsRegionPanelOpen}">
       <Button Command="{Binding ToggleRegionPanelCommand}"
               Background="Transparent"
               BorderThickness="0"
-              Padding="2,8"
+              Padding="5,16"
               Cursor="Hand"
               ToolTip.Tip="OCR対象領域設定">
         <Panel>
-          <PathIcon Width="8" Height="8"
+          <PathIcon Width="10" Height="10"
                     Data="{StaticResource ChevronDownIcon}"
                     Foreground="{DynamicResource OverlayIconBrush}">
             <PathIcon.RenderTransform>
@@ -429,9 +430,9 @@
             CornerRadius="0,8,8,0"
             Padding="6"
             IsVisible="{Binding IsRegionPanelOpen}">
-      <StackPanel Orientation="Horizontal" Spacing="4">
+      <StackPanel Orientation="Horizontal" Spacing="2">
         <!-- 全画面・領域選択（縦並び） -->
-        <StackPanel Spacing="6">
+        <StackPanel Spacing="4">
           <!-- 全画面ボタン -->
           <Button Command="{Binding SetFullScreenModeCommand}"
                   Background="Transparent"
@@ -441,8 +442,7 @@
                   HorizontalAlignment="Center"
                   HorizontalContentAlignment="Center">
             <StackPanel Spacing="2" HorizontalAlignment="Center">
-              <Panel Width="22" Height="22" HorizontalAlignment="Center">
-                <!-- 全体OCR: ウィンドウ形アイコン（ストローク描画） -->
+              <Panel Width="16" Height="16" HorizontalAlignment="Center">
                 <Path Data="M1,1 L21,1 L21,21 L1,21 Z M1,6 L21,6"
                       Stroke="{DynamicResource OverlayIconBrush}"
                       StrokeThickness="1.5" Fill="Transparent" Stretch="Uniform"
@@ -456,7 +456,8 @@
                          FontSize="9"
                          HorizontalAlignment="Center"
                          TextAlignment="Center"
-                         Foreground="{DynamicResource OverlayTextBrush}"/>
+                         Foreground="{DynamicResource OverlayTextBrush}"
+                         IsVisible="{Binding !IsCollapsed}"/>
             </StackPanel>
           </Button>
 
@@ -469,8 +470,7 @@
                   HorizontalAlignment="Center"
                   HorizontalContentAlignment="Center">
             <StackPanel Spacing="2" HorizontalAlignment="Center">
-              <Panel Width="22" Height="22" HorizontalAlignment="Center">
-                <!-- 範囲指定OCR: 破線矩形アイコン（ストローク+ダッシュ描画） -->
+              <Panel Width="16" Height="16" HorizontalAlignment="Center">
                 <Path Data="M3,3 L19,3 L19,19 L3,19 Z"
                       Stroke="{DynamicResource OverlayIconBrush}"
                       StrokeThickness="1.5" StrokeDashArray="3,2"
@@ -486,7 +486,8 @@
                          FontSize="9"
                          HorizontalAlignment="Center"
                          TextAlignment="Center"
-                         Foreground="{DynamicResource OverlayTextBrush}"/>
+                         Foreground="{DynamicResource OverlayTextBrush}"
+                         IsVisible="{Binding !IsCollapsed}"/>
             </StackPanel>
           </Button>
         </StackPanel>
@@ -495,10 +496,10 @@
         <Button Command="{Binding ToggleRegionPanelCommand}"
                 Background="Transparent"
                 BorderThickness="0"
-                Padding="0,8"
+                Padding="3,12"
                 Cursor="Hand"
                 VerticalAlignment="Center">
-          <PathIcon Width="8" Height="8"
+          <PathIcon Width="10" Height="10"
                     Data="{StaticResource ChevronDownIcon}"
                     Foreground="{DynamicResource OverlayIconBrush}">
             <PathIcon.RenderTransform>
@@ -520,6 +521,7 @@
           BorderThickness="1"
           CornerRadius="8"
           BoxShadow="0 2 8 0 #40000000"
+          ClipToBounds="True"
           IsVisible="{Binding IsCollapsed}">
 
     <StackPanel Orientation="Vertical" Spacing="0">
