@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -43,9 +44,43 @@ public partial class MainOverlayView : Window
         // #246: 位置変更イベントを購読して位置を永続化
         PositionChanged += OnPositionChanged;
 
+        // [Issue #449] DWMボーダー除去（Windows 11の白い枠線対策）
+        Opened += (_, _) => RemoveDwmBorder();
+
         // 可視性確認
         _logger?.LogDebug("MainOverlayView - IsVisible: {IsVisible}, WindowState: {WindowState}", IsVisible, WindowState);
     }
+
+    /// <summary>
+    /// [Issue #449] Windows 11 DWMが強制描画するウィンドウ枠線を除去
+    /// </summary>
+    private void RemoveDwmBorder()
+    {
+        try
+        {
+            var platformHandle = TryGetPlatformHandle();
+            if (platformHandle is null) return;
+
+            var hwnd = platformHandle.Handle;
+
+            // DWMWA_WINDOW_CORNER_PREFERENCE = 33: 角丸を無効化
+            int cornerPreference = 1; // DWMWCP_DONOTROUND
+            _ = DwmSetWindowAttribute(hwnd, 33, ref cornerPreference, sizeof(int));
+
+            // DWMWA_BORDER_COLOR = 34: ボーダー色を「なし」に設定
+            int borderColor = unchecked((int)0xFFFFFFFE); // DWMWA_COLOR_NONE
+            _ = DwmSetWindowAttribute(hwnd, 34, ref borderColor, sizeof(int));
+
+            _logger?.LogDebug("[Issue #449] DWMボーダー除去完了");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "[Issue #449] DWMボーダー除去失敗（非Windows 11環境の可能性）");
+        }
+    }
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 
     private void ConfigurePosition()
     {

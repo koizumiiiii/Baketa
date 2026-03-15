@@ -78,6 +78,8 @@ interface TranslateRequest {
   translation_history?: Array<{ original: string; translation: string }>;
   // [Issue #429] OCR配置ヒント
   ocr_hints?: { text_region_count: number; text_areas: string[] };
+  // [Issue #449] フォーカス領域（範囲指定OCR時）
+  focus_region?: { x: number; y: number; width: number; height: number };
 }
 
 /** Gemini API リクエスト */
@@ -1656,6 +1658,20 @@ Prioritize these areas when detecting text.
 `;
   }
 
+  // [Issue #449] フォーカス領域セクションを構築
+  let focusRegionSection = '';
+  if (request.focus_region) {
+    const r = request.focus_region;
+    const left = Math.round(r.x * 100);
+    const top = Math.round(r.y * 100);
+    const right = Math.round((r.x + r.width) * 100);
+    const bottom = Math.round((r.y + r.height) * 100);
+    focusRegionSection = `\n# Focus Region
+ONLY translate text within the region: left ${left}%, top ${top}%, right ${right}%, bottom ${bottom}% of the image.
+Ignore ALL text outside this region.
+`;
+  }
+
   // [Issue #517] 言語コード→言語名変換（AIプロンプト用）
   const targetLanguageName = getTargetLanguageName(request.target_language);
   // [Issue #523] ターゲット言語での出力強制指示（現地語）
@@ -1673,7 +1689,7 @@ Expert game localizer. Output compact minified JSON ONLY. No pretty-printing.
 
 # Task
 Detect and translate ALL visible text in this image to ${targetLanguageName}. ${sourceHint}
-${contextHint}${historySection}${ocrHintsSection}
+${contextHint}${historySection}${ocrHintsSection}${focusRegionSection}
 Must include: Dialogs, UI buttons, menus, and all labels. Maximum 20 items.
 Do not invent or guess text that is not clearly visible in the image.
 
@@ -1967,6 +1983,20 @@ Prioritize these areas when detecting text.
 `;
   }
 
+  // [Issue #449] フォーカス領域セクションを構築（Geminiと同一ロジック）
+  let focusRegionSection = '';
+  if (request.focus_region) {
+    const r = request.focus_region;
+    const left = Math.round(r.x * 100);
+    const top = Math.round(r.y * 100);
+    const right = Math.round((r.x + r.width) * 100);
+    const bottom = Math.round((r.y + r.height) * 100);
+    focusRegionSection = `\n# Focus Region
+ONLY translate text within the region: left ${left}%, top ${top}%, right ${right}%, bottom ${bottom}% of the image.
+Ignore ALL text outside this region.
+`;
+  }
+
   // [Issue #517] 言語コード→言語名変換（AIプロンプト用）
   const targetLanguageName = getTargetLanguageName(request.target_language);
   // [Issue #523] ターゲット言語での出力強制指示（現地語）
@@ -1982,7 +2012,7 @@ Prioritize these areas when detecting text.
 
   const userPrompt = `# Task
 Detect and translate ALL visible text in this image to ${targetLanguageName}. ${sourceHint}
-${contextHint}${historySection}${ocrHintsSection}
+${contextHint}${historySection}${ocrHintsSection}${focusRegionSection}
 Must include: Dialogs, UI buttons, menus, and all labels. Maximum 20 items.
 Do not invent or guess text that is not clearly visible in the image.
 

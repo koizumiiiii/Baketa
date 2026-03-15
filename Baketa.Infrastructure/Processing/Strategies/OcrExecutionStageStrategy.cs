@@ -326,6 +326,17 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
                     }
                 }
 
+                // [Issue #449] マニュアル選択領域制約の適用
+                if (context.Input.ManualSelectionBounds is { } manualArea1)
+                {
+                    combinedRegions = ApplyClientAreaConstraint(combinedRegions, ocrImage.Width, ocrImage.Height, manualArea1);
+                    if (combinedRegions.Count == 0)
+                    {
+                        _logger.LogDebug("[Issue #449] マニュアル選択領域制約により全領域が除外されました（学習済みROIパス）");
+                        return ProcessingStageResult.CreateSkipped(StageType, "All regions outside manual selection");
+                    }
+                }
+
                 _logger.LogInformation("🎯 [Issue #293 Phase 7.3] 学習済みROI + 変化領域併用OCR: 学習済み{LearnedCount}領域 + 変化{ChangedCount}領域 = 合計{TotalCount}領域",
                     learnedRegions.Count, combinedRegions.Count - learnedRegions.Count, combinedRegions.Count);
 
@@ -356,25 +367,65 @@ public class OcrExecutionStageStrategy : IProcessingStageStrategy, IDisposable
                     }
                 }
 
+                // [Issue #449] マニュアル選択領域制約の適用
+                if (context.Input.ManualSelectionBounds is { } manualArea2)
+                {
+                    mergedRegions = ApplyClientAreaConstraint(mergedRegions, ocrImage.Width, ocrImage.Height, manualArea2);
+                    if (mergedRegions.Count == 0)
+                    {
+                        _logger.LogDebug("[Issue #449] マニュアル選択領域制約により全領域が除外されました（変化領域パス）");
+                        return ProcessingStageResult.CreateSkipped(StageType, "All regions outside manual selection");
+                    }
+                }
+
                 _logger.LogInformation("🎯 [Issue #293] 変化領域ベース部分OCR実行: {RegionCount}結合領域を処理（探索モード）", mergedRegions.Count);
                 return await ExecutePartialOcrAsync(context, mergedRegions, ocrImage, stopwatch, cancellationToken)
                     .ConfigureAwait(false);
             }
 
-            // [Issue #448] 全画面OCRパス: クライアント領域制約がある場合は部分OCRにリダイレクト
-            if (context.Input.ClientAreaBounds is { } clientArea3)
+            // [Issue #448/#449] 全画面OCRパス: 領域制約がある場合は部分OCRにリダイレクト
             {
-                var clientRect = new Rectangle(
-                    (int)(clientArea3.X * ocrImage.Width),
-                    (int)(clientArea3.Y * ocrImage.Height),
-                    (int)(clientArea3.Width * ocrImage.Width),
-                    (int)(clientArea3.Height * ocrImage.Height));
+                var constraintRegions = new List<Rectangle>();
 
-                _logger.LogInformation("[Issue #448] タイトルバー除外: 全画面OCR→クライアント領域部分OCR ({X},{Y},{W}x{H})",
-                    clientRect.X, clientRect.Y, clientRect.Width, clientRect.Height);
+                if (context.Input.ClientAreaBounds is { } clientArea3)
+                {
+                    constraintRegions.Add(new Rectangle(
+                        (int)(clientArea3.X * ocrImage.Width),
+                        (int)(clientArea3.Y * ocrImage.Height),
+                        (int)(clientArea3.Width * ocrImage.Width),
+                        (int)(clientArea3.Height * ocrImage.Height)));
+                }
 
-                return await ExecutePartialOcrAsync(context, [clientRect], ocrImage, stopwatch, cancellationToken)
-                    .ConfigureAwait(false);
+                if (context.Input.ManualSelectionBounds is { } manualArea3)
+                {
+                    var manualRect = new Rectangle(
+                        (int)(manualArea3.X * ocrImage.Width),
+                        (int)(manualArea3.Y * ocrImage.Height),
+                        (int)(manualArea3.Width * ocrImage.Width),
+                        (int)(manualArea3.Height * ocrImage.Height));
+
+                    if (constraintRegions.Count > 0)
+                    {
+                        // ClientAreaBoundsとManualSelectionBoundsの交差を計算
+                        constraintRegions = constraintRegions
+                            .Select(r => Rectangle.Intersect(r, manualRect))
+                            .Where(r => !r.IsEmpty && r.Width > 10 && r.Height > 10)
+                            .ToList();
+                    }
+                    else
+                    {
+                        constraintRegions.Add(manualRect);
+                    }
+                }
+
+                if (constraintRegions.Count > 0)
+                {
+                    _logger.LogInformation("[Issue #448/#449] 領域制約: 全画面OCR→部分OCR ({Count}領域)",
+                        constraintRegions.Count);
+
+                    return await ExecutePartialOcrAsync(context, constraintRegions, ocrImage, stopwatch, cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
 
             // 実際のOCRサービス統合（全画面OCR）

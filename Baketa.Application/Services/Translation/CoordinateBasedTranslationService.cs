@@ -94,6 +94,45 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
     private volatile int _precomputedHintImageHeight; // Detection実行時の画像高さ（座標系補正用）
 
 
+    // [Issue #449] ユーザー指定のマニュアル選択領域（正規化座標）
+    // UIからSetManualSelectionBoundsで設定される。nullは全画面モード。
+    private NormalizedRect? _manualSelectionBounds;
+    private readonly object _manualSelectionLock = new();
+
+    /// <summary>
+    /// [Issue #449] マニュアル選択領域を設定
+    /// </summary>
+    public void SetManualSelectionBounds(NormalizedRect? bounds)
+    {
+        // 入力検証: 正規化座標が0.0-1.0の範囲内であること
+        if (bounds is { } b &&
+            (b.X < 0f || b.Y < 0f || b.Width <= 0f || b.Height <= 0f ||
+             b.X + b.Width > 1.01f || b.Y + b.Height > 1.01f))
+        {
+            _logger?.LogWarning("[Issue #449] 無効なマニュアル選択領域: X={X:F3}, Y={Y:F3}, W={W:F3}, H={H:F3} → 無視",
+                b.X, b.Y, b.Width, b.Height);
+            return;
+        }
+
+        lock (_manualSelectionLock)
+        {
+            _manualSelectionBounds = bounds;
+        }
+        _logger?.LogInformation("[Issue #449] マニュアル選択領域更新: {Bounds}",
+            bounds is null ? "null (全画面)" : $"X={bounds.Value.X:F3}, Y={bounds.Value.Y:F3}, W={bounds.Value.Width:F3}, H={bounds.Value.Height:F3}");
+    }
+
+    /// <summary>
+    /// [Issue #449] 現在のマニュアル選択領域を取得
+    /// </summary>
+    public NormalizedRect? GetManualSelectionBounds()
+    {
+        lock (_manualSelectionLock)
+        {
+            return _manualSelectionBounds;
+        }
+    }
+
     // [Issue #381] Cloud AI翻訳用画像の最大長辺（ピクセル）
     // Gemini Vision APIの処理時間はピクセル数に比例するため、テキスト翻訳に十分な解像度に縮小
     private const int CloudImageMaxDimension = 960;
@@ -441,7 +480,9 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 // [Issue #397] テキスト変化検知用の前回OCRテキスト
                 PreviousOcrText = previousOcrText,
                 // [Issue #448] タイトルバー除外用クライアント領域の正規化座標
-                ClientAreaBounds = CalculateClientAreaBounds(windowHandle)
+                ClientAreaBounds = CalculateClientAreaBounds(windowHandle),
+                // [Issue #449] ユーザー指定のマニュアル選択領域
+                ManualSelectionBounds = GetManualSelectionBounds()
             };
 
             // パイプライン実行（ImageChangeDetection → OcrExecution）
@@ -1838,6 +1879,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             // リクエストを作成
             // [Issue #381] Width/Heightは実際に送信するCloud画像サイズ（ログ・トークン推定用）
+            // [Issue #449] ManualSelectionBoundsをFocusRegionとして注入
+            var manualBounds = GetManualSelectionBounds();
             var request = new ImageTranslationRequest
             {
                 ImageBase64 = imageBase64,
@@ -1847,7 +1890,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 SessionToken = sessionToken,
                 MimeType = CloudImageMimeType,
                 TranslationHistory = history,
-                OcrHints = ocrHints
+                OcrHints = ocrHints,
+                FocusRegion = manualBounds is { } mb ? new FocusRegion
+                {
+                    X = mb.X,
+                    Y = mb.Y,
+                    Width = mb.Width,
+                    Height = mb.Height
+                } : null
             };
 
             // Cloud AI翻訳を実行（フォールバック付き）

@@ -1797,5 +1797,17 @@
   <data name="Lang_TranslationStrategy_TwoStage" xml:space="preserve">
     <value>(2단계 번역)</value>
   </data>
+  <data name="MainOverlay_FullOcr" xml:space="preserve">
+    <value>전체 OCR</value>
+  </data>
+  <data name="MainOverlay_RegionOcr" xml:space="preserve">
+    <value>영역 OCR</value>
+  </data>
+  <data name="MainOverlay_FullOcrTooltip" xml:space="preserve">
+    <value>전체 화면을 OCR 대상으로 설정</value>
+  </data>
+  <data name="MainOverlay_RegionOcrTooltip" xml:space="preserve">
+    <value>선택한 영역만 OCR 대상으로 설정 (클릭하여 조정)</value>
+  </data>
 
 </root>

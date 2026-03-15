@@ -1797,5 +1797,17 @@ Action : Veuillez redémarrer l'application.</value>
   <data name="Lang_TranslationStrategy_TwoStage" xml:space="preserve">
     <value>(Traduction en deux étapes)</value>
   </data>
+  <data name="MainOverlay_FullOcr" xml:space="preserve">
+    <value>Full OCR</value>
+  </data>
+  <data name="MainOverlay_RegionOcr" xml:space="preserve">
+    <value>Region OCR</value>
+  </data>
+  <data name="MainOverlay_FullOcrTooltip" xml:space="preserve">
+    <value>OCR entire screen</value>
+  </data>
+  <data name="MainOverlay_RegionOcrTooltip" xml:space="preserve">
+    <value>OCR selected region (click to adjust)</value>
+  </data>
 
 </root>

@@ -107,6 +107,14 @@ public sealed record ProcessingPipelineInput : IDisposable
     public NormalizedRect? ClientAreaBounds { get; init; }
 
     /// <summary>
+    /// [Issue #449] ユーザー指定のマニュアル選択領域（正規化座標 0.0-1.0）
+    /// ドラッグ操作で選択したOCR対象領域を示す。
+    /// null の場合、選択制約なし（全画面対象）。
+    /// ClientAreaBoundsとは独立して適用される（両方設定時は順次フィルタ）。
+    /// </summary>
+    public NormalizedRect? ManualSelectionBounds { get; init; }
+
+    /// <summary>
     /// 🎯 UltraThink: 所有権管理フラグ
     /// </summary>
     public bool OwnsImage { get; init; } = true;
