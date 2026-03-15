@@ -9,20 +9,35 @@
         x:DataType="vm:MainOverlayViewModel"
         Title="Baketa Overlay"
         SizeToContent="WidthAndHeight"
-        MaxWidth="200"
+        MaxWidth="300"
         WindowStartupLocation="Manual"
         ShowInTaskbar="False"
         Topmost="True"
         Background="Transparent"
+        TransparencyLevelHint="Transparent"
         CanResize="False"
         SystemDecorations="None"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="0">
-  
+
   <!-- [Issue #245] Window.Resourcesを削除し、OverlayDesignTokens.axamlのDynamicResourceを使用 -->
 
   <Window.Styles>
+    <!-- Window自体の枠線・背景を透明に -->
+    <Style Selector="Window">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <!-- Avalonia内部テンプレートのボーダー除去 -->
+    <Style Selector="Window /template/ Border#PART_TransparencyFallback">
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Window /template/ Border">
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
     <!-- メニュー項目スタイル -->
     <!-- 🔥 [ISSUE#171] 多言語対応: Width固定値 → MinWidth に変更（テキスト長に応じて自動調整） -->
     <!-- [Issue #245] StaticResource → DynamicResource（テーマ対応） -->
@@ -107,11 +122,12 @@
   </Window.Styles>
 
   <!-- メインコンテナ -->
-  <Grid>
-  
+  <Grid ColumnDefinitions="Auto,Auto">
+
   <!-- メインオーバーレイ: 縦型アイコン+テキスト構成 -->
   <!-- [Issue #245] DynamicResourceでテーマ対応 -->
   <Border Name="MainOverlayBorder"
+          Grid.Column="0"
           Background="{DynamicResource OverlayBackgroundBrush}"
           BorderBrush="{DynamicResource OverlayBorderBrush}"
           BorderThickness="1"
@@ -369,6 +385,130 @@
 
     </StackPanel>
   </Border>
+
+  <!-- [Issue #449] 展開タブ + サブパネル -->
+  <Panel Grid.Column="1"
+         VerticalAlignment="Center"
+         IsVisible="{Binding IsWindowSelected}"
+         Margin="-2,0,0,0">
+
+    <!-- 展開タブ（▶） - 閉じた時のみ表示 -->
+    <Border Background="{DynamicResource OverlayBackgroundBrush}"
+            BorderBrush="{DynamicResource OverlayBorderBrush}"
+            BorderThickness="0,1,1,1"
+            CornerRadius="0,4,4,0"
+            IsVisible="{Binding !IsRegionPanelOpen}">
+      <Button Command="{Binding ToggleRegionPanelCommand}"
+              Background="Transparent"
+              BorderThickness="0"
+              Padding="2,8"
+              Cursor="Hand"
+              ToolTip.Tip="OCR対象領域設定">
+        <Panel>
+          <PathIcon Width="8" Height="8"
+                    Data="{StaticResource ChevronDownIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}">
+            <PathIcon.RenderTransform>
+              <RotateTransform Angle="-90"/>
+            </PathIcon.RenderTransform>
+          </PathIcon>
+          <Ellipse Width="5" Height="5"
+                   Fill="{DynamicResource OverlayStatusActiveBrush}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,0,-4"
+                   IsVisible="{Binding IsRegionSelected}"/>
+        </Panel>
+      </Button>
+    </Border>
+
+    <!-- OCR領域サブパネル（展開時） -->
+    <Border Background="{DynamicResource OverlayBackgroundBrush}"
+            BorderBrush="{DynamicResource OverlayBorderBrush}"
+            BorderThickness="0,1,1,1"
+            CornerRadius="0,8,8,0"
+            Padding="6"
+            IsVisible="{Binding IsRegionPanelOpen}">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <!-- 全画面・領域選択（縦並び） -->
+        <StackPanel Spacing="6">
+          <!-- 全画面ボタン -->
+          <Button Command="{Binding SetFullScreenModeCommand}"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  Padding="4"
+                  Cursor="Hand"
+                  HorizontalAlignment="Center"
+                  HorizontalContentAlignment="Center">
+            <StackPanel Spacing="2" HorizontalAlignment="Center">
+              <Panel Width="22" Height="22" HorizontalAlignment="Center">
+                <!-- 全体OCR: ウィンドウ形アイコン（ストローク描画） -->
+                <Path Data="M1,1 L21,1 L21,21 L1,21 Z M1,6 L21,6"
+                      Stroke="{DynamicResource OverlayIconBrush}"
+                      StrokeThickness="1.5" Fill="Transparent" Stretch="Uniform"
+                      IsVisible="{Binding IsRegionSelected}"/>
+                <Path Data="M1,1 L21,1 L21,21 L1,21 Z M1,6 L21,6"
+                      Stroke="{DynamicResource OverlayStatusActiveBrush}"
+                      StrokeThickness="1.5" Fill="Transparent" Stretch="Uniform"
+                      IsVisible="{Binding !IsRegionSelected}"/>
+              </Panel>
+              <TextBlock Text="{local:Localize MainOverlay_FullOcr}"
+                         FontSize="9"
+                         HorizontalAlignment="Center"
+                         TextAlignment="Center"
+                         Foreground="{DynamicResource OverlayTextBrush}"/>
+            </StackPanel>
+          </Button>
+
+          <!-- 領域選択ボタン -->
+          <Button Command="{Binding SelectRegionCommand}"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  Padding="4"
+                  Cursor="Hand"
+                  HorizontalAlignment="Center"
+                  HorizontalContentAlignment="Center">
+            <StackPanel Spacing="2" HorizontalAlignment="Center">
+              <Panel Width="22" Height="22" HorizontalAlignment="Center">
+                <!-- 範囲指定OCR: 破線矩形アイコン（ストローク+ダッシュ描画） -->
+                <Path Data="M3,3 L19,3 L19,19 L3,19 Z"
+                      Stroke="{DynamicResource OverlayIconBrush}"
+                      StrokeThickness="1.5" StrokeDashArray="3,2"
+                      StrokeLineCap="Round" Fill="Transparent" Stretch="Uniform"
+                      IsVisible="{Binding !IsRegionSelected}"/>
+                <Path Data="M3,3 L19,3 L19,19 L3,19 Z"
+                      Stroke="{DynamicResource OverlayStatusActiveBrush}"
+                      StrokeThickness="1.5" StrokeDashArray="3,2"
+                      StrokeLineCap="Round" Fill="Transparent" Stretch="Uniform"
+                      IsVisible="{Binding IsRegionSelected}"/>
+              </Panel>
+              <TextBlock Text="{local:Localize MainOverlay_RegionOcr}"
+                         FontSize="9"
+                         HorizontalAlignment="Center"
+                         TextAlignment="Center"
+                         Foreground="{DynamicResource OverlayTextBrush}"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <!-- 閉じるボタン（◀）- 右側配置 -->
+        <Button Command="{Binding ToggleRegionPanelCommand}"
+                Background="Transparent"
+                BorderThickness="0"
+                Padding="0,8"
+                Cursor="Hand"
+                VerticalAlignment="Center">
+          <PathIcon Width="8" Height="8"
+                    Data="{StaticResource ChevronDownIcon}"
+                    Foreground="{DynamicResource OverlayIconBrush}">
+            <PathIcon.RenderTransform>
+              <RotateTransform Angle="90"/>
+            </PathIcon.RenderTransform>
+          </PathIcon>
+        </Button>
+      </StackPanel>
+    </Border>
+  </Panel>
 
   <!-- 最小化状態 -->
   <!-- 🔥 [ISSUE#171] UI改善: Live翻訳、Shot翻訳、翻訳表示ボタン追加（アイコンのみ） -->

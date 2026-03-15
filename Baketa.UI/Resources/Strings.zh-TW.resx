@@ -1797,5 +1797,17 @@
   <data name="Lang_TranslationStrategy_TwoStage" xml:space="preserve">
     <value>（兩階段翻譯）</value>
   </data>
+  <data name="MainOverlay_FullOcr" xml:space="preserve">
+    <value>全螢幕OCR</value>
+  </data>
+  <data name="MainOverlay_RegionOcr" xml:space="preserve">
+    <value>區域OCR</value>
+  </data>
+  <data name="MainOverlay_FullOcrTooltip" xml:space="preserve">
+    <value>對整個螢幕進行OCR</value>
+  </data>
+  <data name="MainOverlay_RegionOcrTooltip" xml:space="preserve">
+    <value>僅對選定區域進行OCR（點擊調整）</value>
+  </data>
 
 </root>

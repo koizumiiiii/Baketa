@@ -671,6 +671,30 @@ public class MainOverlayViewModel : ViewModelBase
     /// </summary>
     public bool IsSingleshotActive => IsSingleshotOverlayVisible;
 
+    // [Issue #449] サブパネル開閉状態
+    private bool _isRegionPanelOpen;
+    public bool IsRegionPanelOpen
+    {
+        get => _isRegionPanelOpen;
+        set => this.RaiseAndSetIfChanged(ref _isRegionPanelOpen, value);
+    }
+
+    // [Issue #449] 領域選択状態
+    private bool _isRegionSelected;
+    /// <summary>
+    /// カスタム領域が選択されているか
+    /// </summary>
+    public bool IsRegionSelected
+    {
+        get => _isRegionSelected;
+        set => this.RaiseAndSetIfChanged(ref _isRegionSelected, value);
+    }
+
+    /// <summary>
+    /// 領域選択ボタンのツールチップ（展開タブ用）
+    /// </summary>
+    public string RegionSelectionTooltip => "OCR";  // ツールチップは展開タブのみで使用
+
     /// <summary>
     /// Liveボタンが有効か（UIバインディング用）
     /// IsStartStopEnabledと同じ条件だが、Singleshot実行中は無効
@@ -836,6 +860,12 @@ public class MainOverlayViewModel : ViewModelBase
     public ICommand ExitCommand { get; private set; } = null!;
     // 🔥 [ISSUE#163_PHASE4] シングルショット翻訳実行コマンド
     public ICommand ExecuteSingleshotCommand { get; private set; } = null!;
+    // [Issue #449] 領域選択コマンド
+    public ICommand SelectRegionCommand { get; private set; } = null!;
+    // [Issue #449] サブパネル開閉コマンド
+    public ICommand ToggleRegionPanelCommand { get; private set; } = null!;
+    // [Issue #449] 全画面モードに戻すコマンド
+    public ICommand SetFullScreenModeCommand { get; private set; } = null!;
 
     #endregion
 
@@ -934,7 +964,20 @@ public class MainOverlayViewModel : ViewModelBase
             SelectWindowCommand = ReactiveCommand.CreateFromTask(ExecuteSelectWindowAsync,
                 this.WhenAnyValue(x => x.IsSelectWindowEnabled).ObserveOn(RxApp.MainThreadScheduler),
                 outputScheduler: RxApp.MainThreadScheduler);
-                
+
+            // [Issue #449] 領域選択コマンド（ウィンドウ選択済みなら常に有効）
+            SelectRegionCommand = ReactiveCommand.CreateFromTask(ExecuteSelectRegionAsync,
+                this.WhenAnyValue(x => x.IsWindowSelected).ObserveOn(RxApp.MainThreadScheduler),
+                outputScheduler: RxApp.MainThreadScheduler);
+
+            // [Issue #449] サブパネル開閉・全画面モード
+            ToggleRegionPanelCommand = ReactiveCommand.Create(
+                () => { IsRegionPanelOpen = !IsRegionPanelOpen; },
+                outputScheduler: RxApp.MainThreadScheduler);
+            SetFullScreenModeCommand = ReactiveCommand.Create(
+                () => { ClearRegionSelection(); IsRegionPanelOpen = false; },
+                outputScheduler: RxApp.MainThreadScheduler);
+
             ShowHideCommand = ReactiveCommand.Create(ExecuteShowHide,
                 this.WhenAnyValue(x => x.IsTranslationActive).ObserveOn(RxApp.MainThreadScheduler), // 翻訳中のみ有効
                 outputScheduler: RxApp.MainThreadScheduler);
@@ -1679,6 +1722,96 @@ public class MainOverlayViewModel : ViewModelBase
             Logger?.LogError(ex, "Failed to open settings dialog");
             _currentSettingsDialog = null;
         }
+    }
+
+    /// <summary>
+    /// [Issue #449] 領域選択コマンド実行
+    /// </summary>
+    private async Task ExecuteSelectRegionAsync()
+    {
+        try
+        {
+            // 対象ウィンドウの矩形を取得
+            var selectedWindow = _windowManagementService.SelectedWindow;
+            if (selectedWindow is null || selectedWindow.Handle == IntPtr.Zero)
+                return;
+
+            var serviceProvider = Program.ServiceProvider;
+            if (serviceProvider is null)
+                return;
+
+            var windowManager = serviceProvider.GetService<Baketa.Core.Abstractions.Platform.IWindowManager>();
+            var windowBounds = windowManager?.GetWindowBounds(selectedWindow.Handle);
+            if (windowBounds is null)
+                return;
+
+            var bounds = windowBounds.Value;
+
+            // DPIスケーリング: GetWindowBoundsは物理ピクセル、AvaloniaのWidth/Heightは論理ピクセル
+            var mainWindow = GetMainWindow();
+            var scaling = mainWindow?.Screens.Primary?.Scaling ?? 1.0;
+
+            // 選択ウィンドウを作成・表示
+            var selectionWindow = new Views.RegionSelectionWindow
+            {
+                Position = new Avalonia.PixelPoint(bounds.X, bounds.Y),
+                Width = bounds.Width / scaling,
+                Height = bounds.Height / scaling
+            };
+
+            // 既存の選択領域がある場合、初期表示
+            var translationService = serviceProvider.GetService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
+            if (IsRegionSelected && translationService?.GetManualSelectionBounds() is { } existing)
+            {
+                selectionWindow.SetInitialSelection(existing);
+            }
+
+            // モーダル表示（結果を待つ）
+            await selectionWindow.ShowDialog(GetMainWindow());
+
+            // 結果を処理
+            if (selectionWindow.SelectedRegion is { } selectedRegion)
+            {
+                // カスタム領域選択
+                translationService?.SetManualSelectionBounds(selectedRegion);
+                IsRegionSelected = true;
+
+                this.RaisePropertyChanged(nameof(RegionSelectionTooltip));
+                IsRegionPanelOpen = false;
+                Logger?.LogInformation("[Issue #449] カスタム領域選択: X={X:F3}, Y={Y:F3}, W={W:F3}, H={H:F3}",
+                    selectedRegion.X, selectedRegion.Y, selectedRegion.Width, selectedRegion.Height);
+            }
+            else
+            {
+                // Escでキャンセル → 既存選択を維持（変更なし）
+                Logger?.LogDebug("[Issue #449] 領域選択キャンセル（既存選択を維持）");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "[Issue #449] 領域選択でエラー");
+        }
+    }
+
+    /// <summary>
+    /// [Issue #449] 全画面モードに戻す
+    /// </summary>
+    public void ClearRegionSelection()
+    {
+        var translationService = Program.ServiceProvider?
+            .GetService<Baketa.Application.Services.Translation.CoordinateBasedTranslationService>();
+        translationService?.SetManualSelectionBounds(null);
+        IsRegionSelected = false;
+        this.RaisePropertyChanged(nameof(RegionSelectionTooltip));
+        Logger?.LogInformation("[Issue #449] 全画面モードに戻す");
+    }
+
+    private Window? GetMainWindow()
+    {
+        return Avalonia.Application.Current?.ApplicationLifetime is
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.MainWindow
+            : null;
     }
 
     private async void ExecuteFold()
