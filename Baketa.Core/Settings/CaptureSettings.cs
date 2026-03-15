@@ -89,34 +89,6 @@ public sealed class CaptureSettings
     public int FixedCaptureAreaHeight { get; set; } = 600;
 
     /// <summary>
-    /// [Issue #449] マニュアルOCR領域選択が有効かどうか
-    /// true の場合、ManualSelectionX/Y/Width/Heightで指定された領域のみOCR対象となる
-    /// </summary>
-    [SettingMetadata(SettingLevel.Advanced, "Capture", "マニュアル領域選択",
-        Description = "ドラッグ操作で選択したOCR対象領域を有効にします")]
-    public bool ManualSelectionEnabled { get; set; }
-
-    /// <summary>
-    /// [Issue #449] マニュアル選択領域の正規化X座標 (0.0-1.0)
-    /// </summary>
-    public float ManualSelectionX { get; set; }
-
-    /// <summary>
-    /// [Issue #449] マニュアル選択領域の正規化Y座標 (0.0-1.0)
-    /// </summary>
-    public float ManualSelectionY { get; set; }
-
-    /// <summary>
-    /// [Issue #449] マニュアル選択領域の正規化幅 (0.0-1.0)
-    /// </summary>
-    public float ManualSelectionWidth { get; set; }
-
-    /// <summary>
-    /// [Issue #449] マニュアル選択領域の正規化高さ (0.0-1.0)
-    /// </summary>
-    public float ManualSelectionHeight { get; set; }
-
-    /// <summary>
     /// モニター選択（マルチモニター環境）
     /// </summary>
     [SettingMetadata(SettingLevel.Advanced, "Capture", "対象モニター",
@@ -233,11 +205,6 @@ public sealed class CaptureSettings
             FixedCaptureAreaY = FixedCaptureAreaY,
             FixedCaptureAreaWidth = FixedCaptureAreaWidth,
             FixedCaptureAreaHeight = FixedCaptureAreaHeight,
-            ManualSelectionEnabled = ManualSelectionEnabled,
-            ManualSelectionX = ManualSelectionX,
-            ManualSelectionY = ManualSelectionY,
-            ManualSelectionWidth = ManualSelectionWidth,
-            ManualSelectionHeight = ManualSelectionHeight,
             TargetMonitor = TargetMonitor,
             ConsiderDpiScaling = ConsiderDpiScaling,
             UseHardwareAcceleration = UseHardwareAcceleration,
