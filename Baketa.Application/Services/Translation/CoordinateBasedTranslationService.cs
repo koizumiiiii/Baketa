@@ -1879,6 +1879,8 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
 
             // リクエストを作成
             // [Issue #381] Width/Heightは実際に送信するCloud画像サイズ（ログ・トークン推定用）
+            // [Issue #449] ManualSelectionBoundsをFocusRegionとして注入
+            var manualBounds = GetManualSelectionBounds();
             var request = new ImageTranslationRequest
             {
                 ImageBase64 = imageBase64,
@@ -1888,7 +1890,14 @@ public sealed class CoordinateBasedTranslationService : IDisposable, IEventProce
                 SessionToken = sessionToken,
                 MimeType = CloudImageMimeType,
                 TranslationHistory = history,
-                OcrHints = ocrHints
+                OcrHints = ocrHints,
+                FocusRegion = manualBounds is { } mb ? new FocusRegion
+                {
+                    X = mb.X,
+                    Y = mb.Y,
+                    Width = mb.Width,
+                    Height = mb.Height
+                } : null
             };
 
             // Cloud AI翻訳を実行（フォールバック付き）

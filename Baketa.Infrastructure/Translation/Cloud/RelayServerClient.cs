@@ -231,6 +231,14 @@ public sealed class RelayServerClient : IAsyncDisposable
             {
                 TextRegionCount = request.OcrHints.TextRegionCount,
                 TextAreas = [.. request.OcrHints.TextAreas]
+            } : null,
+            // [Issue #449] フォーカス領域を注入
+            FocusRegion = request.FocusRegion != null ? new RelayFocusRegion
+            {
+                X = request.FocusRegion.X,
+                Y = request.FocusRegion.Y,
+                Width = request.FocusRegion.Width,
+                Height = request.FocusRegion.Height
             } : null
         };
 
@@ -725,6 +733,10 @@ public sealed class RelayServerClient : IAsyncDisposable
         /// <summary>[Issue #429] OCR配置ヒント</summary>
         [JsonPropertyName("ocr_hints")]
         public RelayOcrHints? OcrHints { get; set; }
+
+        /// <summary>[Issue #449] フォーカス領域（範囲指定OCR時）</summary>
+        [JsonPropertyName("focus_region")]
+        public RelayFocusRegion? FocusRegion { get; set; }
     }
 
     private sealed class RelayTranslateResponse
@@ -824,6 +836,22 @@ public sealed class RelayServerClient : IAsyncDisposable
 
         [JsonPropertyName("text_areas")]
         public List<string> TextAreas { get; set; } = [];
+    }
+
+    /// <summary>[Issue #449] フォーカス領域</summary>
+    private sealed class RelayFocusRegion
+    {
+        [JsonPropertyName("x")]
+        public float X { get; set; }
+
+        [JsonPropertyName("y")]
+        public float Y { get; set; }
+
+        [JsonPropertyName("width")]
+        public float Width { get; set; }
+
+        [JsonPropertyName("height")]
+        public float Height { get; set; }
     }
 
     private sealed class RelayTokenUsage

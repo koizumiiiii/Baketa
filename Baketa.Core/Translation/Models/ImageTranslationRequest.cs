@@ -60,6 +60,13 @@ public sealed class ImageTranslationRequest
     public OcrHints? OcrHints { get; init; }
 
     /// <summary>
+    /// [Issue #449] フォーカス領域（正規化座標 0.0-1.0）
+    /// 指定された場合、この領域内のテキストのみを翻訳対象とする。
+    /// 画像全体は送信するが、AIにこの範囲のみ翻訳するよう指示する。
+    /// </summary>
+    public FocusRegion? FocusRegion { get; init; }
+
+    /// <summary>
     /// セッショントークン（認証用）
     /// </summary>
     public required string SessionToken { get; init; }
@@ -99,6 +106,25 @@ public sealed record TranslationHistoryEntry
 
     /// <summary>訳文テキスト</summary>
     public required string Translation { get; init; }
+}
+
+/// <summary>
+/// [Issue #449] フォーカス領域（正規化座標 0.0-1.0）
+/// Cloud AI翻訳時に指定領域内のテキストのみを翻訳対象とする
+/// </summary>
+public sealed record FocusRegion
+{
+    /// <summary>左上X座標 (0.0-1.0)</summary>
+    public float X { get; init; }
+
+    /// <summary>左上Y座標 (0.0-1.0)</summary>
+    public float Y { get; init; }
+
+    /// <summary>幅 (0.0-1.0)</summary>
+    public float Width { get; init; }
+
+    /// <summary>高さ (0.0-1.0)</summary>
+    public float Height { get; init; }
 }
 
 /// <summary>
