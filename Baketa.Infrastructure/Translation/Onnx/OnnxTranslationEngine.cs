@@ -255,10 +255,20 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase, IUnloadableTr
         }
     }
 
+    // [Issue #541] デコーディングパラメータ
+    private const float DefaultRepetitionPenalty = 1.2f;
+    private const int DefaultNoRepeatNgramSize = 3;
+
     /// <summary>
     /// グリーディサーチによる seq2seq 推論
+    /// [Issue #541] 繰り返しペナルティ対応
     /// </summary>
-    private int[] RunGreedySearch(int[] inputIds, int targetLangTokenId, int maxLength = 128)
+    private int[] RunGreedySearch(
+        int[] inputIds,
+        int targetLangTokenId,
+        int maxLength = 128,
+        float repetitionPenalty = DefaultRepetitionPenalty,
+        int noRepeatNgramSize = DefaultNoRepeatNgramSize)
     {
         var batchSize = 1;
         var seqLen = inputIds.Length;
@@ -375,14 +385,56 @@ public sealed class OnnxTranslationEngine : TranslationEngineBase, IUnloadableTr
                 var vocabSize = logits.Dimensions[^1];
                 var lastPos = logits.Dimensions[1] - 1;
 
+                // [Issue #541] logitsをfloat配列にコピー（ペナルティ適用用）
+                var logitScores = new float[vocabSize];
+                for (int v = 0; v < vocabSize; v++)
+                    logitScores[v] = logits[0, lastPos, v];
+
+                // [Issue #541] 繰り返しペナルティ: 既に生成されたトークンのスコアを減衰
+                if (repetitionPenalty > 1.0f)
+                {
+                    foreach (var prevId in generatedIds)
+                    {
+                        if (prevId < 0 || prevId >= vocabSize) continue;
+                        if (logitScores[prevId] > 0)
+                            logitScores[prevId] /= repetitionPenalty;
+                        else
+                            logitScores[prevId] *= repetitionPenalty;
+                    }
+                }
+
+                // [Issue #541] N-gram繰り返しブロック: 直近のN-1トークンと同じN-gramを禁止
+                if (noRepeatNgramSize > 0 && generatedIds.Count >= noRepeatNgramSize)
+                {
+                    var ngramPrefix = generatedIds.Skip(generatedIds.Count - (noRepeatNgramSize - 1)).ToArray();
+                    // 過去の全位置でngramPrefixに続いたトークンを収集
+                    for (int i = 0; i <= generatedIds.Count - noRepeatNgramSize; i++)
+                    {
+                        bool match = true;
+                        for (int j = 0; j < noRepeatNgramSize - 1; j++)
+                        {
+                            if (generatedIds[i + j] != ngramPrefix[j])
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match)
+                        {
+                            var bannedId = generatedIds[i + noRepeatNgramSize - 1];
+                            if (bannedId >= 0 && bannedId < vocabSize)
+                                logitScores[bannedId] = float.NegativeInfinity;
+                        }
+                    }
+                }
+
                 int bestId = 0;
                 float bestScore = float.MinValue;
                 for (int v = 0; v < vocabSize; v++)
                 {
-                    var score = logits[0, lastPos, v];
-                    if (score > bestScore)
+                    if (logitScores[v] > bestScore)
                     {
-                        bestScore = score;
+                        bestScore = logitScores[v];
                         bestId = v;
                     }
                 }
