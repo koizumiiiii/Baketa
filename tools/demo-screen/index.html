@@ -6,7 +6,7 @@
   <title>Demo Game Screen</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+TC:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -74,7 +74,7 @@
       border-radius: 4px;
       padding: 15px 25px;
       color: #8cb8ff;
-      font-family: "Noto Sans JP", sans-serif;
+      font-family: "Noto Sans JP", "Noto Sans SC", "Noto Sans TC", "Noto Sans KR", "Noto Sans", sans-serif;
       font-size: 34px;
       font-weight: bold;
       letter-spacing: 2px;
@@ -82,7 +82,7 @@
 
     .dialogue-text {
       color: #e8eaf0;
-      font-family: "Noto Sans JP", sans-serif;
+      font-family: "Noto Sans JP", "Noto Sans SC", "Noto Sans TC", "Noto Sans KR", "Noto Sans", sans-serif;
       font-size: 40px;
       line-height: 1.6;
       letter-spacing: 1px;
@@ -194,6 +194,54 @@
         speaker: "Tanaka",
         text: "Okay, okay! I guess geeks talking a mile a minute is a universal thing.<br>...But man, seeing this much handmade effort... I guess I can feel your love for the series."
       }
+    ],
+    "zh-Hans": [
+      { speaker: "莉娜", text: "别在意那些细节！ 啊，看那个架子！ 是限定版吧！" },
+      { speaker: "田中", text: "……你就穿成这样坐电车来的？ 这是什么Cosplay？" },
+      { speaker: "莉娜", text: "什么叫'什么'！太失礼了！这是《苍穹的阿卡迪亚》第三章觉醒后版本的圣骑士塞莱斯蒂亚！肩甲本来应该是银色铠甲，我用纸板喷漆还原的，斗篷的长度在剧中迎风飘扬的效果很重要，所以我把两条床单缝在一起——" },
+      { speaker: "田中", text: "知道了知道了！宅宅说话快果然是全世界共通的。<br>……不过，能做到这种手工品质，确实能感受到对作品的热爱。" }
+    ],
+    "zh-Hant": [
+      { speaker: "莉娜", text: "別在意那些細節！ 啊，看那個架子！ 是限定版吧！" },
+      { speaker: "田中", text: "……你就穿成這樣搭電車來的？ 這是什麼Cosplay？" },
+      { speaker: "莉娜", text: "什麼叫'什麼'！太失禮了！這是《蒼穹的阿卡迪亞》第三章覺醒後版本的聖騎士塞萊斯蒂亞！肩甲本來應該是銀色鎧甲，我用紙板噴漆還原的，斗篷的長度在劇中迎風飄揚的效果很重要，所以我把兩條床單縫在一起——" },
+      { speaker: "田中", text: "知道了知道了！宅宅說話快果然是全世界共通的。<br>……不過，能做到這種手工品質，確實能感受到對作品的熱愛。" }
+    ],
+    ko: [
+      { speaker: "리나", text: "세세한 건 신경 쓰지 마! 아, 저 선반 봐! 한정판이잖아!" },
+      { speaker: "타나카", text: "……너 그 차림으로 전철 타고 온 거야? 무슨 코스프레야?" },
+      { speaker: "리나", text: "'무슨'이라니 실례잖아! 이건 '창공의 아르카디아' 3장 각성 후 버전 성기사 셀레스티아야! 어깨 파츠는 원래 은색 갑옷인데 골판지에 스프레이로 재현했고, 망토 길이는 극중에서 바람에 나부끼는 게 중요하니까 시트 두 장을 이어서——" },
+      { speaker: "타나카", text: "알았어 알았어! 덕후의 빠른 말투는 세계 공통이구나.<br>……뭐, 이 정도 수제 퀄리티면 작품에 대한 사랑은 느껴진다." }
+    ],
+    de: [
+      { speaker: "Lina", text: "Ach, Details sind egal! Oh, schau dir das Regal an! Ist das eine limitierte Edition?!" },
+      { speaker: "Tanaka", text: "...Bist du wirklich so mit der Bahn gefahren? Ist das irgendein Cosplay?" },
+      { speaker: "Lina", text: "'Irgendein'?! Wie unhöflich! Das ist die Erwachungsversion der Heiligen Ritterin Celestia aus Kapitel 3 von 'Arkadien des Azurblauen Himmels'! Die Schulterteile sollten eigentlich silberne Rüstung sein, aber ich habe sie mit Pappe und Sprühfarbe nachgebaut, und da die Umhanglänge für den wehenden Look wichtig ist, habe ich zwei Bettlaken zusammengenäht und—" },
+      { speaker: "Tanaka", text: "Schon gut, schon gut! Geeks, die wie ein Wasserfall reden, gibt es wohl überall auf der Welt.<br>...Aber bei so viel handgemachtem Aufwand... da spürt man schon die Liebe zur Serie." }
+    ],
+    fr: [
+      { speaker: "Lina", text: "On s'en fiche des détails ! Oh, regarde cette étagère ! C'est une édition limitée ?!" },
+      { speaker: "Tanaka", text: "...Tu as vraiment pris le train habillée comme ça ? C'est du cosplay ou quoi ?" },
+      { speaker: "Lina", text: "'Ou quoi' ?! C'est impoli ! C'est la version post-éveil de la Sainte Chevalière Celestia du Chapitre 3 d'« Arcadia du Ciel Azuré » ! Les épaulettes devraient être en armure argentée, mais je les ai reproduites avec du carton et de la peinture en spray, et comme la longueur de la cape est cruciale pour l'effet flottant au vent, j'ai cousu deux draps ensemble et—" },
+      { speaker: "Tanaka", text: "C'est bon, c'est bon ! Les geeks qui parlent à toute vitesse, c'est universel, apparemment.<br>...Mais bon, voir autant d'effort artisanal... on sent vraiment l'amour de la série." }
+    ],
+    es: [
+      { speaker: "Lina", text: "¡Los detalles no importan! ¡Ah, mira esa estantería! ¡¿Es una edición limitada?!" },
+      { speaker: "Tanaka", text: "...¿De verdad tomaste el tren vestida así? ¿Es algún tipo de cosplay?" },
+      { speaker: "Lina", text: "¿'Algún tipo'?! ¡Qué grosero! ¡Esto es la versión post-despertar de la Santa Caballera Celestia del Capítulo 3 de 'Arcadia del Cielo Azul'! Las hombreras deberían ser armadura plateada, pero las reproduje con cartón y pintura en spray, y como la longitud de la capa es crucial para el look al viento, cosí dos sábanas juntas y—" },
+      { speaker: "Tanaka", text: "¡Ya, ya! Los otakus hablando a toda velocidad es algo universal.<br>...Pero bueno, viendo tanto esfuerzo artesanal... se nota el amor por la serie." }
+    ],
+    it: [
+      { speaker: "Lina", text: "I dettagli non contano! Oh, guarda quello scaffale! È un'edizione limitata?!" },
+      { speaker: "Tanaka", text: "...Hai davvero preso il treno conciata così? È un qualche cosplay?" },
+      { speaker: "Lina", text: "'Un qualche'?! Che maleducato! Questa è la versione post-risveglio della Santa Cavaliera Celestia dal Capitolo 3 di 'Arcadia del Cielo Azzurro'! Le spalline dovrebbero essere un'armatura argentata, ma le ho riprodotte con cartone e vernice spray, e siccome la lunghezza del mantello è fondamentale per l'effetto svolazzante, ho cucito insieme due lenzuola e—" },
+      { speaker: "Tanaka", text: "Va bene, va bene! I nerd che parlano a raffica sono un fenomeno universale.<br>...Ma devo dire, vedendo tutto questo impegno artigianale... si sente l'amore per la serie." }
+    ],
+    pt: [
+      { speaker: "Lina", text: "Detalhes não importam! Ah, olha aquela prateleira! É uma edição limitada?!" },
+      { speaker: "Tanaka", text: "...Você realmente pegou o trem vestida assim? É algum tipo de cosplay?" },
+      { speaker: "Lina", text: "'Algum tipo'?! Que grosseria! Isso é a versão pós-despertar da Santa Cavaleira Celestia do Capítulo 3 de 'Arcádia do Céu Azul'! As ombreiras deveriam ser armadura prateada, mas eu reproduzi com papelão e tinta spray, e como o comprimento da capa é crucial para o visual ao vento, costurei dois lençóis juntos e—" },
+      { speaker: "Tanaka", text: "Tá bom, tá bom! Otakus falando a mil por hora é algo universal mesmo.<br>...Mas ver tanto esforço artesanal... dá pra sentir o amor pela série." }
     ]
   };
 
@@ -213,6 +261,20 @@
     currentScene = (currentScene + 1) % scenes.length;
     showScene(currentScene);
   });
+
+  // Language switcher
+  const langs = Object.keys(dialogues);
+  const controls = document.createElement("div");
+  controls.className = "scene-controls";
+  controls.style.opacity = "1";
+  langs.forEach(l => {
+    const btn = document.createElement("button");
+    btn.textContent = l;
+    btn.className = l === lang ? "active" : "";
+    btn.onclick = () => { window.location.search = "?lang=" + l; };
+    controls.appendChild(btn);
+  });
+  document.body.appendChild(controls);
 </script>
 
 </body>
